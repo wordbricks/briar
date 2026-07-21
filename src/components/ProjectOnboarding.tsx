@@ -129,32 +129,32 @@ export function ProjectOnboarding({
                   <div className="settings-fields">
                     <label>
                       <span>조직</span>
-                      <jelly-select
-                        label="Velen 조직"
-                        placeholder="조직 선택"
+                      <select
+                        aria-label="Velen 조직"
+                        className="native-select"
                         value={velenOrg}
                         onChange={(event) => {
-                          const org = elementValue(event);
+                          const org = event.currentTarget.value;
                           setVelenOrg(org);
                           setLinearSource("");
                           void onVelenOrgChange(org);
                         }}
                       >
                         {velen.organizations.map((organization) => (
-                          <jelly-option key={organization.slug} value={organization.slug} selected={organization.slug === velenOrg}>
+                          <option key={organization.slug} value={organization.slug}>
                             {organization.name}
-                          </jelly-option>
+                          </option>
                         ))}
-                      </jelly-select>
+                      </select>
                     </label>
                     <label>
                       <span>기본 데이터 소스 <small>선택</small></span>
-                      <jelly-select label="Velen 데이터 소스" placeholder="필요할 때 Agent가 선택" value={dataSource} onChange={(event) => setDataSource(elementValue(event))}>
-                        <jelly-option value="">자동 선택</jelly-option>
+                      <select className="native-select" aria-label="Velen 데이터 소스" value={dataSource} onChange={(event) => setDataSource(event.currentTarget.value)}>
+                        <option value="">자동 선택</option>
                         {velen.sources.filter((source) => source.status === "active").map((source) => (
-                          <jelly-option key={source.sourceRef} value={source.sourceRef}>{source.sourceKey} · {source.provider}</jelly-option>
+                          <option key={source.sourceRef} value={source.sourceRef}>{source.sourceKey} · {source.provider}</option>
                         ))}
-                      </jelly-select>
+                      </select>
                     </label>
                   </div>
                 ) : null}
@@ -177,9 +177,9 @@ export function ProjectOnboarding({
                   <div className="settings-fields">
                     <label>
                       <span>Linear 소스</span>
-                      <jelly-select label="Linear 소스" placeholder="소스 선택" value={linearSource} onChange={(event) => setLinearSource(elementValue(event))}>
-                        {linearSources.map((source) => <jelly-option key={source.sourceRef} value={source.sourceRef}>{source.sourceKey}</jelly-option>)}
-                      </jelly-select>
+                      <select className="native-select" aria-label="Linear 소스" value={linearSource} onChange={(event) => setLinearSource(event.currentTarget.value)}>
+                        {linearSources.map((source) => <option key={source.sourceRef} value={source.sourceRef}>{source.sourceKey}</option>)}
+                      </select>
                     </label>
                     <label>
                       <span>팀 키 <small>선택</small></span>
