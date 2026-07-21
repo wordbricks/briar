@@ -118,6 +118,31 @@ struct VelenInspection {
     sources: Vec<VelenSource>,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AutoHuntHealth {
+    project_id: String,
+    healthy: bool,
+    repository_path: Option<String>,
+    repository_remote: Option<String>,
+    repository_healthy: bool,
+    cli_path: String,
+    cli_installed: bool,
+    cli_version: Option<String>,
+    cli_expected_version: String,
+    cli_current: bool,
+    skill_path: String,
+    skill_installed: bool,
+    skill_version: Option<String>,
+    skill_expected_version: String,
+    skill_current: bool,
+    velen_org: Option<String>,
+    velen_authenticated: bool,
+    velen_email: Option<String>,
+    velen_healthy: bool,
+    issues: Vec<String>,
+}
+
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct CliConfig {
@@ -507,6 +532,11 @@ fn install_auto_hunt_assets(resource_directory: &Path, home: &Path) -> Result<()
     fs::create_dir_all(&binary_directory).map_err(|error| error.to_string())?;
     fs::copy(cli_source, library_directory.join("briar.js"))
         .map_err(|error| format!("Briar CLI를 설치하지 못했습니다: {error}"))?;
+    fs::write(
+        library_directory.join("VERSION"),
+        format!("{}\n", env!("CARGO_PKG_VERSION")),
+    )
+    .map_err(|error| format!("Briar CLI 버전을 설치하지 못했습니다: {error}"))?;
     let launcher_destination = binary_directory.join("briar");
     fs::copy(launcher_source, &launcher_destination)
         .map_err(|error| format!("Briar CLI 런처를 설치하지 못했습니다: {error}"))?;
@@ -522,6 +552,166 @@ fn install_auto_hunt_assets(resource_directory: &Path, home: &Path) -> Result<()
         }
     }
     Ok(())
+}
+
+fn read_trimmed_file(path: &Path) -> Option<String> {
+    fs::read_to_string(path)
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+fn auto_hunt_health_sync(
+    config_path: &Path,
+    resource_directory: &Path,
+    home: &Path,
+    project_id: &str,
+) -> Result<AutoHuntHealth, String> {
+    auto_hunt_health_sync_with(
+        config_path,
+        resource_directory,
+        home,
+        project_id,
+        &inspect_velen_sync,
+    )
+}
+
+fn auto_hunt_health_sync_with(
+    config_path: &Path,
+    resource_directory: &Path,
+    home: &Path,
+    project_id: &str,
+    inspect_velen: &dyn Fn(Option<String>) -> Result<VelenInspection, String>,
+) -> Result<AutoHuntHealth, String> {
+    let contents = fs::read_to_string(config_path)
+        .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
+    let config = serde_json::from_str::<CliConfig>(&contents)
+        .map_err(|error| format!("Briar 로컬 설정이 손상되었습니다: {error}"))?;
+    let project = config
+        .projects
+        .iter()
+        .find(|project| project.id == project_id)
+        .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
+    let mut issues = Vec::new();
+
+    let repository_path = Path::new(&project.repository_path);
+    let repository_healthy = git_repository_root(repository_path)
+        .map(|root| {
+            fs::canonicalize(repository_path)
+                .map(|configured| configured == root)
+                .unwrap_or(false)
+        })
+        .unwrap_or(false);
+    if !repository_healthy {
+        issues.push("연결된 Git 저장소 경로를 사용할 수 없습니다.".to_string());
+    }
+
+    let expected_version = env!("CARGO_PKG_VERSION").to_string();
+    let cli_path = home.join(".local").join("bin").join("briar");
+    let cli_installed = cli_path.is_file();
+    let cli_version = read_trimmed_file(
+        &home.join(".local").join("share").join("briar").join("VERSION"),
+    );
+    let cli_current = cli_version.as_deref() == Some(expected_version.as_str());
+    if !cli_installed {
+        issues.push("Briar CLI가 설치되지 않았습니다.".to_string());
+    } else if !cli_current {
+        issues.push("Briar CLI 버전이 앱 번들과 다릅니다.".to_string());
+    }
+
+    let skill_source = bundled_path(
+        resource_directory,
+        "skills/briar-auto-hunt",
+        "skills/briar-auto-hunt",
+    );
+    let skill_expected_version = read_trimmed_file(&skill_source.join("VERSION"))
+        .unwrap_or_else(|| expected_version.clone());
+    let skill_path = home.join(".codex").join("skills").join("briar-auto-hunt");
+    let skill_installed = skill_path.join("SKILL.md").is_file();
+    let skill_version = read_trimmed_file(&skill_path.join("VERSION"));
+    let skill_current = skill_version.as_deref() == Some(skill_expected_version.as_str());
+    if !skill_installed {
+        issues.push("Briar Auto Hunt 스킬이 설치되지 않았습니다.".to_string());
+    } else if !skill_current {
+        issues.push("Auto Hunt 스킬 버전이 앱 번들과 다릅니다.".to_string());
+    }
+
+    let velen_org = project
+        .auto_hunt
+        .as_ref()
+        .and_then(|auto_hunt| auto_hunt.velen_org.clone());
+    let (velen_authenticated, velen_email, velen_healthy) = if let Some(org) = velen_org.as_deref() {
+        match inspect_velen(Some(org.to_string())) {
+            Ok(inspection) => (inspection.authenticated, inspection.email, true),
+            Err(error) => {
+                issues.push(format!("Velen 연결 확인 실패: {error}"));
+                (false, None, false)
+            }
+        }
+    } else {
+        issues.push("Auto Hunt에 Velen 조직이 설정되지 않았습니다.".to_string());
+        (false, None, false)
+    };
+
+    Ok(AutoHuntHealth {
+        project_id: project.id.clone(),
+        healthy: issues.is_empty(),
+        repository_path: Some(project.repository_path.clone()),
+        repository_remote: project.repository_remote.clone(),
+        repository_healthy,
+        cli_path: cli_path.to_string_lossy().into_owned(),
+        cli_installed,
+        cli_version,
+        cli_expected_version: expected_version,
+        cli_current,
+        skill_path: skill_path.to_string_lossy().into_owned(),
+        skill_installed,
+        skill_version,
+        skill_expected_version,
+        skill_current,
+        velen_org,
+        velen_authenticated,
+        velen_email,
+        velen_healthy,
+        issues,
+    })
+}
+
+#[tauri::command]
+async fn auto_hunt_health(
+    app: tauri::AppHandle,
+    project_id: String,
+) -> Result<AutoHuntHealth, String> {
+    let config_path = cli_config_path(&app)?;
+    let resource_directory = app
+        .path()
+        .resource_dir()
+        .map_err(|error| error.to_string())?;
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        auto_hunt_health_sync(&config_path, &resource_directory, &home, &project_id)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn repair_auto_hunt(
+    app: tauri::AppHandle,
+    project_id: String,
+) -> Result<AutoHuntHealth, String> {
+    let config_path = cli_config_path(&app)?;
+    let resource_directory = app
+        .path()
+        .resource_dir()
+        .map_err(|error| error.to_string())?;
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        install_auto_hunt_assets(&resource_directory, &home)?;
+        auto_hunt_health_sync(&config_path, &resource_directory, &home, &project_id)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -747,9 +937,100 @@ mod tests {
 
         assert!(home.join(".local/bin/briar").is_file());
         assert!(home.join(".local/share/briar/briar.js").is_file());
+        assert_eq!(
+            read_trimmed_file(&home.join(".local/share/briar/VERSION")),
+            Some(env!("CARGO_PKG_VERSION").to_string())
+        );
         assert!(home
             .join(".codex/skills/briar-auto-hunt/SKILL.md")
             .is_file());
+        assert_eq!(
+            read_trimmed_file(&home.join(".codex/skills/briar-auto-hunt/VERSION")),
+            Some(env!("CARGO_PKG_VERSION").to_string())
+        );
+        fs::remove_dir_all(home).expect("test home should be removed");
+    }
+
+    #[test]
+    fn reports_health_drift_and_repairs_bundled_assets() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be after unix epoch")
+            .as_nanos();
+        let home = std::env::temp_dir().join(format!("briar-health-test-{unique}"));
+        let resources = home.join("missing-resources");
+        let config_path = home.join(".config/briar/config.json");
+        let repository = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("workspace root should exist")
+            .to_string_lossy()
+            .into_owned();
+        install_auto_hunt_assets(&resources, &home).expect("assets should install");
+        write_cli_connection(
+            &config_path,
+            "https://briar.example.com".to_string(),
+            "11111111-1111-4111-8111-111111111111".to_string(),
+            "briar_agent_test".to_string(),
+            repository,
+            Some("https://github.com/wordbricks/briar.git".to_string()),
+            AutoHuntConfig {
+                velen_org: "wordbricks".to_string(),
+                data_source: None,
+                linear_enabled: false,
+                linear_source: None,
+                linear_team: None,
+                github_repository: Some("wordbricks/briar".to_string()),
+            },
+        )
+        .expect("connection should be saved");
+        let inspect = |_: Option<String>| {
+            Ok(VelenInspection {
+                authenticated: true,
+                email: Some("jay@example.com".to_string()),
+                current_org: Some("wordbricks".to_string()),
+                organizations: Vec::new(),
+                sources: Vec::new(),
+            })
+        };
+
+        let healthy = auto_hunt_health_sync_with(
+            &config_path,
+            &resources,
+            &home,
+            "11111111-1111-4111-8111-111111111111",
+            &inspect,
+        )
+        .expect("health should be readable");
+        assert!(healthy.healthy);
+        assert!(healthy.repository_healthy);
+        assert!(healthy.cli_current);
+        assert!(healthy.skill_current);
+        assert!(healthy.velen_healthy);
+
+        fs::remove_file(home.join(".local/share/briar/VERSION"))
+            .expect("version marker should be removable");
+        let drifted = auto_hunt_health_sync_with(
+            &config_path,
+            &resources,
+            &home,
+            "11111111-1111-4111-8111-111111111111",
+            &inspect,
+        )
+        .expect("drifted health should be readable");
+        assert!(!drifted.healthy);
+        assert!(!drifted.cli_current);
+
+        install_auto_hunt_assets(&resources, &home).expect("repair should reinstall assets");
+        let repaired = auto_hunt_health_sync_with(
+            &config_path,
+            &resources,
+            &home,
+            "11111111-1111-4111-8111-111111111111",
+            &inspect,
+        )
+        .expect("repaired health should be readable");
+        assert!(repaired.healthy);
+        assert!(repaired.cli_current);
         fs::remove_dir_all(home).expect("test home should be removed");
     }
 }
@@ -766,7 +1047,9 @@ pub fn run() {
             validate_repository_path,
             connected_project_ids,
             connect_local_project,
-            inspect_velen
+            inspect_velen,
+            auto_hunt_health,
+            repair_auto_hunt
         ])
         .run(tauri::generate_context!())
         .expect("error while running Briar");

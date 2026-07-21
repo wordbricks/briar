@@ -4,6 +4,7 @@ import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir, platform } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { z } from "zod";
+import packageJson from "../package.json";
 import {
   autoHuntQaEnvironments,
   autoHuntSources,
@@ -57,6 +58,7 @@ type ProjectConfig = z.infer<typeof projectConfigSchema>;
 const configDirectory = join(homedir(), ".config", "briar");
 const configPath = join(configDirectory, "config.json");
 const defaultApiUrl = process.env.BRIAR_API_URL ?? "http://127.0.0.1:8787";
+const cliVersion = packageJson.version;
 
 const args = process.argv.slice(2);
 const values = (name: string) =>
@@ -656,6 +658,10 @@ Environment:
 `;
 
 async function main() {
+  if (args[0] === "--version" || args[0] === "version") {
+    console.log(`briar ${cliVersion}`);
+    return;
+  }
   if (args[0] === "login") return login();
   if (args[0] === "project" && args[1] === "create") return createProject();
   if (args[0] === "connect") return connectProject();

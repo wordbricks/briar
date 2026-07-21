@@ -1,20 +1,58 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { demoDashboard } from "../lib/demo-data";
-import { CreateIssueDialog, HuntDashboard } from "./HuntDashboard";
+import type { AutoHuntHealth } from "../lib/project-connection";
+import {
+  ConnectionHealth,
+  CreateIssueDialog,
+  HuntDashboard,
+} from "./HuntDashboard";
+
+const dashboardProps = {
+  demoMode: false,
+  error: null,
+  health: null,
+  healthError: null,
+  healthLoading: false,
+  isCreatingIssue: false,
+  isSidebarOpen: true,
+  onCreateIssue: async () => undefined,
+  onHealthRefresh: () => undefined,
+  onReconnect: () => undefined,
+  onRepair: () => undefined,
+  onRefresh: () => undefined,
+  onSidebarOpen: () => undefined,
+};
+
+const healthyHealth: AutoHuntHealth = {
+  projectId: "project-1",
+  healthy: true,
+  repositoryPath: "/Users/jay/git/briar",
+  repositoryRemote: "https://github.com/wordbricks/briar.git",
+  repositoryHealthy: true,
+  cliPath: "/Users/jay/.local/bin/briar",
+  cliInstalled: true,
+  cliVersion: "0.1.0",
+  cliExpectedVersion: "0.1.0",
+  cliCurrent: true,
+  skillPath: "/Users/jay/.codex/skills/briar-auto-hunt",
+  skillInstalled: true,
+  skillVersion: "0.1.0",
+  skillExpectedVersion: "0.1.0",
+  skillCurrent: true,
+  velenOrg: "wordbricks",
+  velenAuthenticated: true,
+  velenEmail: "jay@example.com",
+  velenHealthy: true,
+  issues: [],
+};
 
 describe("HuntDashboard", () => {
   it("offers issue creation from the work queue", () => {
     const markup = renderToStaticMarkup(
       <HuntDashboard
+        {...dashboardProps}
         dashboard={null}
-        demoMode={false}
-        error={null}
-        isCreatingIssue={false}
-        isSidebarOpen
-        onCreateIssue={async () => undefined}
-        onRefresh={() => undefined}
-        onSidebarOpen={() => undefined}
       />,
     );
 
@@ -51,17 +89,35 @@ describe("HuntDashboard", () => {
     };
     const markup = renderToStaticMarkup(
       <HuntDashboard
+        {...dashboardProps}
         dashboard={claimedDashboard}
-        demoMode={false}
-        error={null}
-        isCreatingIssue={false}
-        isSidebarOpen
-        onCreateIssue={async () => undefined}
-        onRefresh={() => undefined}
-        onSidebarOpen={() => undefined}
       />,
     );
 
     expect(markup).toContain("briar-auto-hunt 할당");
+  });
+
+  it("shows local Auto Hunt health and repair actions", () => {
+    const markup = renderToStaticMarkup(
+      <ConnectionHealth
+        error={null}
+        health={{
+          ...healthyHealth,
+          healthy: false,
+          cliCurrent: false,
+          cliVersion: "0.0.9",
+          issues: ["Briar CLI 버전이 앱 번들과 다릅니다."],
+        }}
+        loading={false}
+        onReconnect={() => undefined}
+        onRefresh={() => undefined}
+        onRepair={() => undefined}
+      />,
+    );
+
+    expect(markup).toContain("Auto Hunt 연결 상태");
+    expect(markup).toContain("CLI·스킬 복구");
+    expect(markup).toContain("v0.0.9");
+    expect(markup).toContain("Briar CLI 버전이 앱 번들과 다릅니다.");
   });
 });

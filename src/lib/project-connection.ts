@@ -15,6 +15,29 @@ export type VelenInspection = {
   sources: VelenSource[];
 };
 
+export type AutoHuntHealth = {
+  projectId: string;
+  healthy: boolean;
+  repositoryPath: string | null;
+  repositoryRemote: string | null;
+  repositoryHealthy: boolean;
+  cliPath: string;
+  cliInstalled: boolean;
+  cliVersion: string | null;
+  cliExpectedVersion: string;
+  cliCurrent: boolean;
+  skillPath: string;
+  skillInstalled: boolean;
+  skillVersion: string | null;
+  skillExpectedVersion: string;
+  skillCurrent: boolean;
+  velenOrg: string | null;
+  velenAuthenticated: boolean;
+  velenEmail: string | null;
+  velenHealthy: boolean;
+  issues: string[];
+};
+
 export type LocalAutoHuntConfig = {
   velenOrg: string;
   dataSource?: string | null;
@@ -74,4 +97,18 @@ export async function inspectVelen(org?: string | null) {
   }
   const { invoke } = await import("@tauri-apps/api/core");
   return invoke<VelenInspection>("inspect_velen", { org: org || null });
+}
+
+export async function loadAutoHuntHealth(projectId: string) {
+  if (!isTauri()) return null;
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<AutoHuntHealth>("auto_hunt_health", { projectId });
+}
+
+export async function repairAutoHunt(projectId: string) {
+  if (!isTauri()) {
+    throw new Error("복구 설치는 Briar 데스크톱 앱에서 사용할 수 있습니다.");
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<AutoHuntHealth>("repair_auto_hunt", { projectId });
 }

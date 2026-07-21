@@ -59,9 +59,15 @@ export function App() {
         dashboard={briar.dashboard}
         demoMode={briar.demoMode}
         error={briar.error}
+        health={briar.health}
+        healthError={briar.healthError}
+        healthLoading={briar.healthLoading}
         isCreatingIssue={briar.isCreatingIssue}
         isSidebarOpen={isSidebarOpen}
         onCreateIssue={briar.addIssue}
+        onHealthRefresh={() => void briar.refreshHealth()}
+        onReconnect={briar.reconnectProject}
+        onRepair={() => void briar.repairHealth()}
         onRefresh={() => void briar.refresh()}
         onSidebarOpen={() => setIsSidebarOpen(true)}
       />
