@@ -1,6 +1,6 @@
-import type { HTMLAttributes, Key } from "react";
+import type { HTMLAttributes, Key, RefAttributes } from "react";
 
-type JellyElementProps = HTMLAttributes<HTMLElement> & {
+type JellyElementProps = HTMLAttributes<HTMLElement> & RefAttributes<HTMLElement> & {
   key?: Key;
   block?: boolean;
   checked?: boolean;

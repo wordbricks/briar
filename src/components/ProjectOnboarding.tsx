@@ -16,6 +16,7 @@ import type {
   VelenInspection,
 } from "../lib/project-connection";
 import type { SessionUser } from "../types";
+import { JellySelect } from "./JellySelect";
 import { Logo } from "./Logo";
 
 type Props = {
@@ -136,23 +137,19 @@ export function ProjectOnboarding({
                   <div className="settings-fields single-field">
                     <label>
                       <span>조직</span>
-                      <select
-                        aria-label="Velen 조직"
-                        className="native-select"
+                      <JellySelect
+                        label="Velen 조직"
+                        options={velen.organizations.map((organization) => ({
+                          label: organization.name,
+                          value: organization.slug,
+                        }))}
                         value={velenOrg}
-                        onChange={(event) => {
-                          const org = event.currentTarget.value;
+                        onValueChange={(org) => {
                           setVelenOrg(org);
                           setLinearSource("");
                           void onVelenOrgChange(org);
                         }}
-                      >
-                        {velen.organizations.map((organization) => (
-                          <option key={organization.slug} value={organization.slug}>
-                            {organization.name}
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </label>
                   </div>
                 ) : null}
@@ -175,9 +172,16 @@ export function ProjectOnboarding({
                   <div className="settings-fields">
                     <label>
                       <span>Linear 소스</span>
-                      <select className="native-select" aria-label="Linear 소스" value={linearSource} onChange={(event) => setLinearSource(event.currentTarget.value)}>
-                        {linearSources.map((source) => <option key={source.sourceRef} value={source.sourceRef}>{source.sourceKey}</option>)}
-                      </select>
+                      <JellySelect
+                        label="Linear 소스"
+                        onValueChange={setLinearSource}
+                        options={linearSources.map((source) => ({
+                          label: source.sourceKey,
+                          value: source.sourceRef,
+                        }))}
+                        placeholder="Linear 소스 선택"
+                        value={linearSource}
+                      />
                     </label>
                     <label>
                       <span>팀 키 <small>선택</small></span>
