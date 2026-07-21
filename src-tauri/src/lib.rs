@@ -24,12 +24,12 @@ struct CliProject {
     repository_remote: Option<String>,
     agent_token: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    auto_hunt: Option<AutoHuntConfig>,
+    auto_hunt: Option<StoredAutoHuntConfig>,
     #[serde(flatten)]
     extra: BTreeMap<String, serde_json::Value>,
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct AutoHuntConfig {
     velen_org: String,
@@ -46,6 +46,50 @@ struct AutoHuntConfig {
     linear_team: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     github_repository: Option<String>,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StoredAutoHuntConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    velen_org: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    data_source: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    linear: Option<StoredLinearConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    github_repository: Option<String>,
+    #[serde(flatten)]
+    extra: BTreeMap<String, serde_json::Value>,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StoredLinearConfig {
+    enabled: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    source: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    team_key: Option<String>,
+    #[serde(flatten)]
+    extra: BTreeMap<String, serde_json::Value>,
+}
+
+impl From<AutoHuntConfig> for StoredAutoHuntConfig {
+    fn from(config: AutoHuntConfig) -> Self {
+        Self {
+            velen_org: Some(config.velen_org),
+            data_source: config.data_source,
+            linear: Some(StoredLinearConfig {
+                enabled: config.linear_enabled,
+                source: config.linear_source,
+                team_key: config.linear_team,
+                extra: BTreeMap::new(),
+            }),
+            github_repository: config.github_repository,
+            extra: BTreeMap::new(),
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -357,7 +401,7 @@ fn write_cli_connection(
         repository_path,
         repository_remote,
         agent_token,
-        auto_hunt: Some(auto_hunt),
+        auto_hunt: Some(auto_hunt.into()),
         extra: BTreeMap::new(),
     });
 
@@ -617,6 +661,18 @@ mod tests {
       "id": "existing-project",
       "repositoryPath": "/existing/repository",
       "agentToken": "briar_agent_existing",
+      "autoHunt": {
+        "velenOrg": "existing",
+        "dataSource": "postgres://existing",
+        "linear": {
+          "enabled": true,
+          "source": "linear://existing",
+          "teamKey": "OLD",
+          "customLinearSetting": true
+        },
+        "githubRepository": "example/existing",
+        "customAutoHuntSetting": true
+      },
       "label": "keep me"
     }
   ]
@@ -651,8 +707,19 @@ mod tests {
         assert_eq!(saved["customSetting"], true);
         assert_eq!(saved["projects"].as_array().map(Vec::len), Some(2));
         assert_eq!(saved["projects"][0]["label"], "keep me");
+        assert_eq!(saved["projects"][0]["autoHunt"]["linear"]["enabled"], true);
+        assert_eq!(
+            saved["projects"][0]["autoHunt"]["linear"]["customLinearSetting"],
+            true
+        );
+        assert_eq!(
+            saved["projects"][0]["autoHunt"]["customAutoHuntSetting"],
+            true
+        );
         assert_eq!(saved["projects"][1]["id"], "new-project");
         assert_eq!(saved["projects"][1]["repositoryPath"], "/new/repository");
+        assert_eq!(saved["projects"][1]["autoHunt"]["linear"]["enabled"], false);
+        assert!(saved["projects"][1]["autoHunt"]["linearEnabled"].is_null());
 
         fs::remove_dir_all(directory).expect("test config directory should be removed");
     }
