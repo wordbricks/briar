@@ -1,5 +1,6 @@
 node_modules
 dist
+dist-cli
 dist-worker
 .env
 .env.local

@@ -1,24 +1,35 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   beginDeviceAuthorization,
+  createAgentToken,
   createProject,
   isApiConfigured,
   loadDashboard,
   loadProjects,
   loadSession,
   pollDeviceToken,
+  updateProjectSettings,
 } from "../lib/api";
 import { demoDashboard } from "../lib/demo-data";
+import {
+  connectLocalProject,
+  inspectVelen,
+  loadConnectedProjectIds,
+  pickGitRepository,
+  type LocalAutoHuntConfig,
+  type VelenInspection,
+} from "../lib/project-connection";
 import {
   clearSessionToken,
   readSessionToken,
   writeSessionToken,
 } from "../lib/token-store";
+import { startDashboardPolling } from "../lib/dashboard-polling";
 import type { DashboardPayload, Project, SessionUser } from "../types";
 
 export type ProjectConnection = {
   project: Project;
-  agentToken: string;
+  agentToken: string | null;
 };
 
 const demoMode = import.meta.env.VITE_BRIAR_DEMO !== "false" && !isApiConfigured;
@@ -35,6 +46,17 @@ async function openExternal(url: string) {
     return;
   }
   window.open(url, "_blank", "noopener,noreferrer");
+}
+
+async function findUnconnectedProject(projects: Project[]) {
+  try {
+    const connectedIds = await loadConnectedProjectIds();
+    if (!connectedIds) return null;
+    const connected = new Set(connectedIds);
+    return projects.find((project) => !connected.has(project.id)) ?? null;
+  } catch {
+    return projects[0] ?? null;
+  }
 }
 
 export function useBriar() {
@@ -54,7 +76,23 @@ export function useBriar() {
   const [error, setError] = useState<string | null>(null);
   const [projectConnection, setProjectConnection] =
     useState<ProjectConnection | null>(null);
+  const [velen, setVelen] = useState<VelenInspection | null>(null);
   const pollTimer = useRef<number | null>(null);
+  const loginAttempt = useRef(0);
+
+  const clearLoginTimer = useCallback(() => {
+    if (pollTimer.current === null) return;
+    window.clearTimeout(pollTimer.current);
+    pollTimer.current = null;
+  }, []);
+
+  const cancelLogin = useCallback(() => {
+    loginAttempt.current += 1;
+    clearLoginTimer();
+    setLoginCode(null);
+    setLoading(false);
+    setError(null);
+  }, [clearLoginTimer]);
 
   const refresh = useCallback(async () => {
     if (demoMode || !token || !activeProjectId) return;
@@ -77,11 +115,17 @@ export function useBriar() {
           loadSession(storedToken),
           loadProjects(storedToken),
         ]);
+        const unconnectedProject = await findUnconnectedProject(nextProjects);
         if (cancelled) return;
         setToken(storedToken);
         setUser(nextUser);
         setProjects(nextProjects);
         setActiveProjectId(nextProjects[0]?.id ?? null);
+        setProjectConnection(
+          unconnectedProject
+            ? { project: unconnectedProject, agentToken: null }
+            : null,
+        );
       })
       .catch(() => clearSessionToken())
       .finally(() => !cancelled && setLoading(false));
@@ -90,35 +134,70 @@ export function useBriar() {
     };
   }, []);
 
+  const refreshVelen = useCallback(async (org?: string | null) => {
+    if (demoMode) return null;
+    try {
+      const inspection = await inspectVelen(org);
+      setVelen(inspection);
+      setError(null);
+      return inspection;
+    } catch (caught) {
+      setVelen(null);
+      setError(caught instanceof Error ? caught.message : String(caught));
+      return null;
+    }
+  }, []);
+
   useEffect(() => {
-    void refresh();
-    if (!token || !activeProjectId) return;
-    const interval = window.setInterval(() => void refresh(), 4_000);
-    return () => window.clearInterval(interval);
+    if (!projectConnection || demoMode) return;
+    void refreshVelen();
+  }, [projectConnection, refreshVelen]);
+
+  useEffect(() => {
+    if (demoMode || !token || !activeProjectId) return;
+    return startDashboardPolling(() => void refresh());
   }, [activeProjectId, refresh, token]);
 
   const login = useCallback(async () => {
+    const attempt = ++loginAttempt.current;
+    clearLoginTimer();
     setLoading(true);
     setError(null);
     try {
       const authorization = await beginDeviceAuthorization();
+      if (attempt !== loginAttempt.current) return;
       setLoginCode(authorization.userCode);
       await openExternal(authorization.verificationUrl);
+      if (attempt !== loginAttempt.current) return;
       let delay = authorization.interval * 1_000;
       const poll = async () => {
+        pollTimer.current = null;
+        if (attempt !== loginAttempt.current) return;
         try {
           const result = await pollDeviceToken(authorization.deviceCode);
+          if (attempt !== loginAttempt.current) return;
           if (result.access_token) {
             const nextToken = result.access_token;
-            await writeSessionToken(nextToken);
             const [nextUser, nextProjects] = await Promise.all([
               loadSession(nextToken),
               loadProjects(nextToken),
             ]);
+            const unconnectedProject = await findUnconnectedProject(nextProjects);
+            if (attempt !== loginAttempt.current) return;
+            await writeSessionToken(nextToken);
+            if (attempt !== loginAttempt.current) {
+              await clearSessionToken();
+              return;
+            }
             setToken(nextToken);
             setUser(nextUser);
             setProjects(nextProjects);
             setActiveProjectId(nextProjects[0]?.id ?? null);
+            setProjectConnection(
+              unconnectedProject
+                ? { project: unconnectedProject, agentToken: null }
+                : null,
+            );
             setLoginCode(null);
             setLoading(false);
             return;
@@ -127,8 +206,10 @@ export function useBriar() {
           if (result.error === "access_denied" || result.error === "expired_token") {
             throw new Error(result.error_description ?? "로그인 승인이 종료되었습니다.");
           }
+          if (attempt !== loginAttempt.current) return;
           pollTimer.current = window.setTimeout(() => void poll(), delay);
         } catch (caught) {
+          if (attempt !== loginAttempt.current) return;
           setError(caught instanceof Error ? caught.message : String(caught));
           setLoading(false);
           setLoginCode(null);
@@ -136,13 +217,14 @@ export function useBriar() {
       };
       pollTimer.current = window.setTimeout(() => void poll(), delay);
     } catch (caught) {
+      if (attempt !== loginAttempt.current) return;
       setError(caught instanceof Error ? caught.message : String(caught));
       setLoading(false);
     }
-  }, []);
+  }, [clearLoginTimer]);
 
   const logout = useCallback(async () => {
-    if (pollTimer.current) window.clearTimeout(pollTimer.current);
+    cancelLogin();
     await clearSessionToken();
     setToken(null);
     setUser(null);
@@ -150,10 +232,10 @@ export function useBriar() {
     setDashboard(null);
     setActiveProjectId(null);
     setProjectConnection(null);
-  }, []);
+  }, [cancelLogin]);
 
   const addProject = useCallback(
-    async (input: { name: string; repositoryPath: string }) => {
+    async (input: { name: string }) => {
       if (!token) throw new Error("로그인이 필요합니다.");
       setLoading(true);
       setError(null);
@@ -174,9 +256,52 @@ export function useBriar() {
     [token],
   );
 
+  const connectProject = useCallback(async (autoHunt: LocalAutoHuntConfig) => {
+    if (!projectConnection) throw new Error("연결할 프로젝트가 없습니다.");
+    if (!token && !projectConnection.agentToken) throw new Error("로그인이 필요합니다.");
+    setLoading(true);
+    setError(null);
+    try {
+      const repositoryPath = await pickGitRepository();
+      if (!repositoryPath) return null;
+      const agentToken =
+        projectConnection.agentToken ??
+        (await createAgentToken(token!, projectConnection.project.id)).agentToken;
+      const connectedPath = await connectLocalProject({
+        projectId: projectConnection.project.id,
+        agentToken,
+        repositoryPath,
+        autoHunt,
+      });
+      if (token) {
+        await updateProjectSettings(token, projectConnection.project.id, {
+          velenOrg: autoHunt.velenOrg,
+          dataSource: autoHunt.dataSource ?? null,
+          linear: {
+            enabled: autoHunt.linearEnabled,
+            source: autoHunt.linearSource ?? null,
+            teamKey: autoHunt.linearTeam ?? null,
+          },
+          githubRepository: autoHunt.githubRepository ?? null,
+        });
+      }
+      setProjectConnection(null);
+      await refresh();
+      return connectedPath;
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : String(caught);
+      setError(message);
+      throw caught;
+    } finally {
+      setLoading(false);
+    }
+  }, [projectConnection, refresh, token]);
+
   return {
     activeProjectId,
     addProject,
+    cancelLogin,
+    connectProject,
     dashboard,
     demoMode,
     error,
@@ -187,9 +312,10 @@ export function useBriar() {
     projects,
     projectConnection,
     refresh,
+    refreshVelen,
     setActiveProjectId,
-    finishProjectConnection: () => setProjectConnection(null),
     token,
     user,
+    velen,
   };
 }

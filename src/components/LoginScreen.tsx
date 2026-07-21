@@ -1,21 +1,33 @@
-import { ArrowUpRight, LoaderCircle } from "lucide-react";
+import { ArrowUpRight, LoaderCircle, X } from "lucide-react";
 import { Logo } from "./Logo";
 
 export function LoginScreen({
   error,
   loading,
   loginCode,
+  onCancel,
   onLogin,
 }: {
   error: string | null;
   loading: boolean;
   loginCode: string | null;
+  onCancel: () => void;
   onLogin: () => void;
 }) {
   return (
     <main className="login-shell">
       <div className="login-glow" />
       <section className="login-card">
+        {loginCode && (
+          <button
+            aria-label="로그인 닫기"
+            className="login-close-button"
+            onClick={onCancel}
+            type="button"
+          >
+            <X size={18} />
+          </button>
+        )}
         <Logo />
         <div className="login-copy">
           <p className="eyebrow">AGENT DEVELOPMENT ENVIRONMENT</p>

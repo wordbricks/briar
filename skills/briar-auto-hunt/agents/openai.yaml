@@ -1,0 +1,4 @@
+interface:
+  display_name: "Briar Auto Hunt"
+  short_description: "Run production-bound Auto Hunt work with Briar tracking"
+  default_prompt: "Use $briar-auto-hunt to complete this repository task through production QA while recording each stage in Briar."

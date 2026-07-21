@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+
+if command -v briar >/dev/null 2>&1; then
+  exec briar "$@"
+fi
+
+if [ -x "$HOME/.local/bin/briar" ]; then
+  exec "$HOME/.local/bin/briar" "$@"
+fi
+
+echo "Briar CLI is not installed. Open Briar and reconnect this repository." >&2
+exit 127
