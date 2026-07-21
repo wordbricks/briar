@@ -1,7 +1,6 @@
 import {
   Activity,
   Boxes,
-  ChevronDown,
   CircleHelp,
   GitBranch,
   LogOut,
@@ -11,6 +10,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import type { Project, SessionUser } from "../types";
+import { JellySelect } from "./JellySelect";
 
 export function Sidebar({
   activeProjectId,
@@ -54,19 +54,17 @@ export function Sidebar({
       <div className="project-switcher-row">
         <div className="project-switcher">
           <span className="project-icon"><GitBranch size={15} /></span>
-          <span>
-            <small>PROJECT</small>
-            <select
-              value={activeProjectId ?? ""}
-              onChange={(event) => onProjectChange(event.target.value)}
-              aria-label="프로젝트 선택"
-            >
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>{project.name}</option>
-              ))}
-            </select>
-          </span>
-          <ChevronDown size={14} />
+          <JellySelect
+            className="sidebar-project-select"
+            label="프로젝트 선택"
+            onValueChange={onProjectChange}
+            options={projects.map((project) => ({
+              label: project.name,
+              value: project.id,
+            }))}
+            size="small"
+            value={activeProjectId ?? ""}
+          />
         </div>
         <button
           aria-label="프로젝트 추가"

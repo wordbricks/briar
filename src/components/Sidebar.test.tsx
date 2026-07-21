@@ -20,6 +20,9 @@ describe("Sidebar", () => {
     );
 
     expect(markup).toContain('aria-label="프로젝트 추가"');
+    expect(markup).toContain("<jelly-select");
+    expect(markup).toContain('label="프로젝트 선택"');
+    expect(markup).not.toContain("<select");
     expect(markup).toContain('aria-label="왼쪽 패널 닫기"');
     expect(markup).not.toContain("Briar</span>");
     expect(markup).toContain("Projects");

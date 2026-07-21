@@ -5,5 +5,6 @@ import "jelly-ui-source/components/alert/index";
 import "jelly-ui-source/components/button/index";
 import "jelly-ui-source/components/card/index";
 import "jelly-ui-source/components/input/index";
+import "jelly-ui-source/components/select/index";
 import "jelly-ui-source/components/switch/index";
 import "jelly-ui-source/components/theme/index";
