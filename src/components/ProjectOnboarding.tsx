@@ -45,7 +45,6 @@ export function ProjectOnboarding({
 }: Props) {
   const [name, setName] = useState("");
   const [velenOrg, setVelenOrg] = useState("");
-  const [dataSource, setDataSource] = useState("");
   const [linearEnabled, setLinearEnabled] = useState(false);
   const [linearSource, setLinearSource] = useState("");
   const [linearTeam, setLinearTeam] = useState("");
@@ -78,7 +77,6 @@ export function ProjectOnboarding({
     if (!velenOrg) return;
     await onConnect({
       velenOrg,
-      dataSource: dataSource || null,
       linearEnabled,
       linearSource: linearEnabled ? linearSource || null : null,
       linearTeam: linearEnabled ? linearTeam || null : null,
@@ -126,7 +124,7 @@ export function ProjectOnboarding({
                   </button>
                 </div>
                 {velen ? (
-                  <div className="settings-fields">
+                  <div className="settings-fields single-field">
                     <label>
                       <span>조직</span>
                       <select
@@ -144,15 +142,6 @@ export function ProjectOnboarding({
                           <option key={organization.slug} value={organization.slug}>
                             {organization.name}
                           </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      <span>기본 데이터 소스 <small>선택</small></span>
-                      <select className="native-select" aria-label="Velen 데이터 소스" value={dataSource} onChange={(event) => setDataSource(event.currentTarget.value)}>
-                        <option value="">자동 선택</option>
-                        {velen.sources.filter((source) => source.status === "active").map((source) => (
-                          <option key={source.sourceRef} value={source.sourceRef}>{source.sourceKey} · {source.provider}</option>
                         ))}
                       </select>
                     </label>
