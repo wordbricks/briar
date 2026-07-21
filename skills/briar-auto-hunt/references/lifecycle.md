@@ -2,6 +2,10 @@
 
 Use this ordered lifecycle. Repeating the current stage is allowed with a new semantic event key; moving backward is not.
 
+For Briar-created work, `briar auto-hunt next` returns the highest-priority,
+oldest queued run. Reuse its identity and begin at `analyzing`; its `queued`
+event was written when the user created the issue in the app.
+
 | Stage | Meaning | Minimum evidence |
 | --- | --- | --- |
 | `queued` | Work accepted | stable source identity and title |

@@ -136,6 +136,18 @@ export async function createProject(
   });
 }
 
+export async function createIssue(
+  token: string,
+  projectId: string,
+  input: { title: string; description: string | null; priority: number | null },
+) {
+  return request<{ runId: string; sourceKey: string; stage: "queued" }>(
+    `/projects/${projectId}/issues`,
+    token,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+}
+
 export async function createAgentToken(token: string, projectId: string) {
   return request<{ agentToken: string }>(`/projects/${projectId}/agent-token`, token, {
     method: "POST",

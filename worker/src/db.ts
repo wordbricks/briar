@@ -303,6 +303,28 @@ export async function listDashboardRuns(db: D1Database, projectId: string) {
   return { runs: runs.results, events: events.results };
 }
 
+export async function getNextQueuedHuntRun(
+  db: D1Database,
+  projectId: string,
+) {
+  return await db
+    .prepare(
+      `select run.*,
+              (select count(*) from briar_hunt_events event
+               where event.run_id = run.id) as event_count
+       from briar_hunt_runs run
+       where run.project_id = ? and run.stage = 'queued'
+       order by
+         case when run.priority is null then 1 else 0 end,
+         run.priority asc,
+         coalesce(run.source_created_at, run.started_at) asc,
+         run.run_number asc
+       limit 1`,
+    )
+    .bind(projectId)
+    .first<HuntRunRow>();
+}
+
 export async function findProjectIdByAgentTokenHash(
   db: D1Database,
   agentTokenHash: string,

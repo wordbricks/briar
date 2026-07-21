@@ -9,11 +9,13 @@ import {
   GitFork,
   LoaderCircle,
   PanelLeftOpen,
+  Plus,
   RefreshCw,
   Search,
   X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { JellySelect } from "./JellySelect";
 import { sourceLabel, stageMeta } from "../lib/stages";
 import type { DashboardPayload, HuntRun, HuntSource } from "../types";
 
@@ -24,14 +26,22 @@ export function HuntDashboard({
   dashboard,
   demoMode,
   error,
+  isCreatingIssue,
   isSidebarOpen,
+  onCreateIssue,
   onRefresh,
   onSidebarOpen,
 }: {
   dashboard: DashboardPayload | null;
   demoMode: boolean;
   error: string | null;
+  isCreatingIssue: boolean;
   isSidebarOpen: boolean;
+  onCreateIssue: (input: {
+    title: string;
+    description: string | null;
+    priority: number | null;
+  }) => Promise<unknown>;
   onRefresh: () => void;
   onSidebarOpen: () => void;
 }) {
@@ -39,6 +49,7 @@ export function HuntDashboard({
   const [source, setSource] = useState<SourceFilter>("all");
   const [status, setStatus] = useState<StatusFilter>("active");
   const [selected, setSelected] = useState<HuntRun | null>(null);
+  const [isIssueDialogOpen, setIsIssueDialogOpen] = useState(false);
 
   const runs = dashboard?.runs ?? [];
   const activeCount = runs.filter((run) => !["completed", "cancelled"].includes(run.stage)).length;
@@ -113,6 +124,9 @@ export function HuntDashboard({
               <span>{filtered.length}개 작업</span>
             </div>
             <div className="queue-tools">
+              <button className="create-issue-button" onClick={() => setIsIssueDialogOpen(true)} type="button">
+                <Plus size={14} />이슈 만들기
+              </button>
               <label className="search-box"><Search size={15} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="작업 검색" /></label>
               <div className="source-filter">
                 {(["all", "issue", "feedback", "error"] as const).map((value) => (
@@ -136,8 +150,96 @@ export function HuntDashboard({
           </div>
         </jelly-card>
       </div>
+      {isIssueDialogOpen && (
+        <CreateIssueDialog
+          isSubmitting={isCreatingIssue}
+          onClose={() => setIsIssueDialogOpen(false)}
+          onCreate={async (input) => {
+            await onCreateIssue(input);
+            setIsIssueDialogOpen(false);
+          }}
+        />
+      )}
       {selected && <RunDialog run={selected} onClose={() => setSelected(null)} />}
     </main>
+  );
+}
+
+export function CreateIssueDialog({
+  isSubmitting,
+  onClose,
+  onCreate,
+}: {
+  isSubmitting: boolean;
+  onClose: () => void;
+  onCreate: (input: {
+    title: string;
+    description: string | null;
+    priority: number | null;
+  }) => Promise<void>;
+}) {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [priority, setPriority] = useState("2");
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  return (
+    <div className="dialog-backdrop" onMouseDown={(event) => event.target === event.currentTarget && !isSubmitting && onClose()}>
+      <form
+        className="issue-dialog"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!title.trim() || isSubmitting) return;
+          setSubmitError(null);
+          void onCreate({
+            title: title.trim(),
+            description: description.trim() || null,
+            priority: Number(priority),
+          }).catch((error) =>
+            setSubmitError(error instanceof Error ? error.message : String(error)),
+          );
+        }}
+        role="dialog"
+        aria-modal="true"
+        aria-label="새 Auto Hunt 이슈"
+      >
+        <header>
+          <div><p className="eyebrow">AUTO HUNT ISSUE</p><h2>이슈 만들기</h2></div>
+          <button disabled={isSubmitting} onClick={onClose} type="button" aria-label="닫기"><X size={18} /></button>
+        </header>
+        <div className="issue-form-body">
+          <label>
+            <span>제목 <em>필수</em></span>
+            <input autoFocus maxLength={300} onChange={(event) => setTitle(event.target.value)} placeholder="Codex가 해결할 작업을 적어주세요" required value={title} />
+          </label>
+          <label>
+            <span>설명</span>
+            <textarea maxLength={100000} onChange={(event) => setDescription(event.target.value)} placeholder="문제, 기대 결과, 참고할 맥락을 적어주세요" rows={6} value={description} />
+          </label>
+          <JellySelect
+            className="issue-priority-select"
+            label="우선순위"
+            onValueChange={setPriority}
+            options={[
+              { label: "P1 · 긴급", value: "1" },
+              { label: "P2 · 높음", value: "2" },
+              { label: "P3 · 보통", value: "3" },
+              { label: "P4 · 낮음", value: "4" },
+            ]}
+            value={priority}
+          />
+          {submitError && <div className="issue-form-error"><CircleAlert size={14} />{submitError}</div>}
+          <p>생성 즉시 작업 큐의 <strong>대기</strong> 상태로 등록됩니다.</p>
+        </div>
+        <footer>
+          <button disabled={isSubmitting} onClick={onClose} type="button">취소</button>
+          <button className="issue-submit-button" disabled={isSubmitting || !title.trim()} type="submit">
+            {isSubmitting ? <LoaderCircle className="spin" size={14} /> : <Plus size={14} />}
+            {isSubmitting ? "등록 중" : "이슈 등록"}
+          </button>
+        </footer>
+      </form>
+    </div>
   );
 }
 

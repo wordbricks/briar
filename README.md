@@ -15,7 +15,7 @@ Repository source code stays local. Agents send only task state and Git metadata
 - D1 migrations for Better Auth and Auto Hunt state
 - Persistent desktop sessions stored in a permission-restricted app config file
 - Project-scoped Agent ingest tokens stored as SHA-256 hashes
-- `briar` CLI for login, repository connection, and Auto Hunt event recording
+- `briar` CLI for login, repository connection, queued issue intake, and Auto Hunt event recording
 - A validated `briar-auto-hunt` Codex skill installed automatically with the CLI
 - Mandatory Velen CLI preflight and repository-specific Velen organization/source settings
 - Optional Linear integration through a configured Velen source
@@ -28,11 +28,11 @@ Repository source code stays local. Agents send only task state and Git metadata
 
 ```mermaid
 flowchart LR
-  A["Local Agent / Codex"] -->|"briar auto-hunt record"| C["Briar CLI"]
+  A["Local Agent / Codex"] -->|"briar auto-hunt next / record"| C["Briar CLI"]
   A -->|"context and optional Linear"| V["Velen CLI"]
   C -->|"project Bearer token"| W["Cloudflare Worker"]
   D["Briar Tauri app"] -->|"Better Auth Device Flow"| W
-  D -->|"read-only polling, 4s"| W
+  D -->|"create issues + polling, 4s"| W
   W -->|"D1 binding"| DB[("Cloudflare D1")]
   W -->|"Google OAuth"| G["Google"]
 ```
@@ -148,6 +148,8 @@ briar project create --name wordbricks
 Record the lifecycle using a stable, retry-safe event key for every transition:
 
 ```bash
+briar auto-hunt next
+
 briar auto-hunt record \
   --source issue \
   --source-key WB-142 \
@@ -165,7 +167,7 @@ briar auto-hunt record \
   --status-detail "Agent is implementing the fix"
 ```
 
-The CLI discovers the repository, worktree, branch, commit SHA, and `origin` URL automatically. Run `briar auto-hunt doctor` before work. Reusing an event key with identical data is safe; reusing it with different data is rejected. QA results use `briar auto-hunt qa-result`; completion is rejected until Production QA and a result summary exist, plus a terminal Linear state when a Linear issue is linked.
+The app can create a titled, described, prioritized issue directly in the Auto Hunt queue. After `doctor`, `briar auto-hunt next` returns the highest-priority oldest queued issue so Codex can reuse its existing run identity. The CLI discovers the repository, worktree, branch, commit SHA, and `origin` URL automatically. Reusing an event key with identical data is safe; reusing it with different data is rejected. QA results use `briar auto-hunt qa-result`; completion is rejected until Production QA and a result summary exist, plus a terminal Linear state when a Linear issue is linked.
 
 ## Checks
 

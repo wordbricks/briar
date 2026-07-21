@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   beginDeviceAuthorization,
   createAgentToken,
+  createIssue,
   createProject,
   isApiConfigured,
   loadDashboard,
@@ -25,7 +26,7 @@ import {
   writeSessionToken,
 } from "../lib/token-store";
 import { startDashboardPolling } from "../lib/dashboard-polling";
-import type { DashboardPayload, Project, SessionUser } from "../types";
+import type { DashboardPayload, HuntRun, Project, SessionUser } from "../types";
 
 export type ProjectConnection = {
   project: Project;
@@ -89,6 +90,7 @@ export function useBriar() {
   const [projectConnection, setProjectConnection] =
     useState<ProjectConnection | null>(null);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
+  const [isCreatingIssue, setIsCreatingIssue] = useState(false);
   const [velen, setVelen] = useState<VelenInspection | null>(null);
   const pollTimer = useRef<number | null>(null);
   const loginAttempt = useRef(0);
@@ -352,8 +354,90 @@ export function useBriar() {
     }
   }, [projectConnection, refresh, token]);
 
+  const addIssue = useCallback(
+    async (input: {
+      title: string;
+      description: string | null;
+      priority: number | null;
+    }) => {
+      if (!activeProjectId || !dashboard) {
+        throw new Error("이슈를 추가할 프로젝트가 없습니다.");
+      }
+      setIsCreatingIssue(true);
+      setError(null);
+      try {
+        if (demoMode) {
+          const occurredAt = new Date().toISOString();
+          const issueId = crypto.randomUUID();
+          const sourceKey = `briar-issue:${issueId}`;
+          const run: HuntRun = {
+            id: crypto.randomUUID(),
+            runNumber:
+              Math.max(0, ...dashboard.runs.map((candidate) => candidate.runNumber)) + 1,
+            source: "issue",
+            sourceKey,
+            title: input.title.trim(),
+            stage: "queued",
+            progress: 10,
+            detail: "Briar 앱에서 생성된 이슈가 Auto Hunt 처리를 기다리고 있습니다.",
+            priority: input.priority,
+            repository:
+              dashboard.settings.githubRepository ?? dashboard.project.name,
+            branch: null,
+            commitSha: null,
+            tracker: null,
+            issueDescription: input.description,
+            resultSummary: null,
+            pullRequestUrls: [],
+            targetSha: null,
+            sourceCreatedAt: occurredAt,
+            stagingQaStatus: null,
+            productionQaStatus: null,
+            stagingQaDetail: null,
+            productionQaDetail: null,
+            context: { origin: "briar-app", issueId },
+            startedAt: occurredAt,
+            updatedAt: occurredAt,
+            completedAt: null,
+            events: [
+              {
+                id: crypto.randomUUID(),
+                stage: "queued",
+                detail: "Briar 앱에서 생성된 이슈가 Auto Hunt 처리를 기다리고 있습니다.",
+                actor: "briar-app",
+                qaStatus: null,
+                trackerState: null,
+                pullRequestUrls: [],
+                targetSha: null,
+                occurredAt,
+                recordedAt: occurredAt,
+              },
+            ],
+          };
+          setDashboard((current) =>
+            current ? { ...current, runs: [run, ...current.runs] } : current,
+          );
+          return { runId: run.id, sourceKey, stage: "queued" as const };
+        }
+        if (!token) throw new Error("로그인이 필요합니다.");
+        const result = await createIssue(token, activeProjectId, input);
+        const nextDashboard = await loadDashboard(token, activeProjectId);
+        setDashboard(nextDashboard);
+        return result;
+      } catch (caught) {
+        const message = caught instanceof Error ? caught.message : String(caught);
+        setError(message);
+        throw caught;
+      } finally {
+        setIsCreatingIssue(false);
+      }
+    },
+    [activeProjectId, dashboard, token],
+  );
+
   return {
     activeProjectId,
+    addIssue,
     addProject,
     cancelProjectCreation,
     cancelLogin,
@@ -362,6 +446,7 @@ export function useBriar() {
     demoMode,
     error,
     isCreatingProject,
+    isCreatingIssue,
     loading,
     login,
     loginCode,
