@@ -54,6 +54,10 @@ export type HuntRun = {
   stagingQaDetail: string | null;
   productionQaDetail: string | null;
   context: Record<string, unknown> | null;
+  claimedBy: string | null;
+  claimedAt: string | null;
+  leaseExpiresAt: string | null;
+  claimAttempts: number;
   startedAt: string;
   updatedAt: string;
   completedAt: string | null;

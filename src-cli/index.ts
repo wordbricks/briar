@@ -33,6 +33,14 @@ const projectConfigSchema = z
     agentToken: z.string(),
     repositoryRemote: z.string().optional(),
     autoHunt: autoHuntConfigSchema.optional(),
+    activeClaim: z
+      .object({
+        runId: z.string().uuid(),
+        sourceKey: z.string().min(1),
+        token: z.string().startsWith("briar_claim_"),
+        leaseExpiresAt: z.string().datetime({ offset: true }),
+      })
+      .optional(),
   })
   .passthrough();
 
@@ -420,20 +428,57 @@ const queuedIssueSchema = z.object({
   repository: z.string().min(1),
   sourceCreatedAt: z.string().datetime({ offset: true }).nullable(),
   context: z.record(z.string(), z.unknown()).nullable(),
+  claimToken: z.string().startsWith("briar_claim_"),
+  claimedBy: z.string().min(1),
+  claimedAt: z.string().datetime({ offset: true }),
+  leaseExpiresAt: z.string().datetime({ offset: true }),
+  claimAttempts: z.number().int().positive(),
 });
 
 async function nextHunt() {
   const config = await loadConfig();
   const project = await currentProject(config);
   ensureVelen(project);
+  if (
+    project.activeClaim &&
+    Date.parse(project.activeClaim.leaseExpiresAt) > Date.now()
+  ) {
+    throw new Error(
+      `이미 처리 중인 Auto Hunt claim이 있습니다: ${project.activeClaim.sourceKey}`,
+    );
+  }
   const result = await request<{ issue: unknown }>(
     config.apiUrl,
-    "/ingest/queue/next",
+    "/ingest/queue/claim",
     process.env.BRIAR_AGENT_TOKEN ?? project.agentToken,
+    {
+      method: "POST",
+      body: JSON.stringify({ claimedBy: value("--actor") ?? "briar-auto-hunt" }),
+    },
   );
+  if (result.issue === null) {
+    console.log(JSON.stringify({ issue: null }));
+    return;
+  }
+  const issue = queuedIssueSchema.parse(result.issue);
+  config.projects = config.projects.map((candidate) =>
+    candidate.id === project.id
+      ? {
+          ...candidate,
+          activeClaim: {
+            runId: issue.runId,
+            sourceKey: issue.sourceKey,
+            token: issue.claimToken,
+            leaseExpiresAt: issue.leaseExpiresAt,
+          },
+        }
+      : candidate,
+  );
+  await saveConfig(config);
+  const { claimToken: _claimToken, ...publicIssue } = issue;
   console.log(
     JSON.stringify({
-      issue: result.issue === null ? null : queuedIssueSchema.parse(result.issue),
+      issue: publicIssue,
     }),
   );
 }
@@ -536,8 +581,23 @@ async function recordHunt() {
     config.apiUrl,
     "/ingest/events",
     agentToken,
-    { method: "POST", body: JSON.stringify(input) },
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+      headers:
+        project.activeClaim?.sourceKey === input.sourceKey
+          ? { "X-Briar-Claim-Token": project.activeClaim.token }
+          : undefined,
+    },
   );
+  if (project.activeClaim?.sourceKey === input.sourceKey && input.stage !== "queued") {
+    config.projects = config.projects.map((candidate) =>
+      candidate.id === project.id
+        ? { ...candidate, activeClaim: undefined }
+        : candidate,
+    );
+    await saveConfig(config);
+  }
   console.log(JSON.stringify(result));
 }
 

@@ -38,11 +38,14 @@ Read [lifecycle.md](references/lifecycle.md) before starting. Read [velen-and-li
    briar auto-hunt next
    ```
 
-   If it returns an issue, adopt its `runId`, `source`, `sourceKey`, and `title`
-   as the canonical identity. The queued event already exists, so do not record
+   This command atomically claims one issue with a 15-minute lease and stores
+   its claim token in Briar's mode-0600 local config without printing it. If it
+   returns an issue, adopt its `runId`, `source`, `sourceKey`, and `title` as the
+   canonical identity. The queued event already exists, so do not record
    another intake event. Proceed with Velen investigation and record
-   `analyzing` on that same identity. If it returns `{"issue":null}`, report
-   that the queue is empty and do not invent work.
+   `analyzing` on that same identity before the lease expires; the CLI supplies
+   and then removes the stored claim token automatically. If it returns
+   `{"issue":null}`, report that the queue is empty and do not invent work.
 
 2. Choose the canonical identity:
 

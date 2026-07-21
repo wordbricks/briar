@@ -16,6 +16,10 @@ const runDefaults = {
   stagingQaDetail: null,
   productionQaDetail: null,
   context: null,
+  claimedBy: null,
+  claimedAt: null,
+  leaseExpiresAt: null,
+  claimAttempts: 0,
 } satisfies Pick<
   HuntRun,
   | "priority"
@@ -30,6 +34,10 @@ const runDefaults = {
   | "stagingQaDetail"
   | "productionQaDetail"
   | "context"
+  | "claimedBy"
+  | "claimedAt"
+  | "leaseExpiresAt"
+  | "claimAttempts"
 >;
 
 const event = (
