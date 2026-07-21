@@ -253,9 +253,13 @@ function ActivityRing({ value }: { value: number }) {
 
 function RunRow({ run, onOpen }: { run: HuntRun; onOpen: () => void }) {
   const meta = stageMeta[run.stage];
+  const isClaimed =
+    run.stage === "queued" &&
+    Boolean(run.leaseExpiresAt) &&
+    Date.parse(run.leaseExpiresAt!) > Date.now();
   return (
     <button className="run-row" onClick={onOpen}>
-      <span className="run-title-cell"><i className={`source-dot ${run.source}`} /><span><strong>{run.title}</strong><small>AH-{run.runNumber} · {run.repository}</small></span></span>
+      <span className="run-title-cell"><i className={`source-dot ${run.source}`} /><span><strong>{run.title}</strong><small>AH-{run.runNumber} · {run.repository}{isClaimed && <> · <em>{run.claimedBy ?? "agent"} 할당</em></>}</small></span></span>
       <span><i className={`status-pill ${meta.tone}`}>{run.stage === "implementing" && <LoaderCircle className="spin" size={12} />}{meta.label}</i></span>
       <span className="progress-cell"><span><i style={{ width: `${run.progress}%` }} /></span><small>{run.progress}%</small></span>
       <span className="time-cell">{relativeTime(run.updatedAt)}</span>

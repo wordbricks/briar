@@ -167,7 +167,7 @@ briar auto-hunt record \
   --status-detail "Agent is implementing the fix"
 ```
 
-The app can create a titled, described, prioritized issue directly in the Auto Hunt queue. After `doctor`, `briar auto-hunt next` returns the highest-priority oldest queued issue so Codex can reuse its existing run identity. The CLI discovers the repository, worktree, branch, commit SHA, and `origin` URL automatically. Reusing an event key with identical data is safe; reusing it with different data is rejected. QA results use `briar auto-hunt qa-result`; completion is rejected until Production QA and a result summary exist, plus a terminal Linear state when a Linear issue is linked.
+The app can create a titled, described, prioritized issue directly in the Auto Hunt queue. After `doctor`, `briar auto-hunt next` atomically claims the highest-priority oldest queued issue with a 15-minute lease so concurrent Codex runs do not duplicate work. The claim token is stored only in the mode-`0600` local config, sent on the first processing transition, and then removed. The CLI discovers the repository, worktree, branch, commit SHA, and `origin` URL automatically. Reusing an event key with identical data is safe; reusing it with different data is rejected. QA results use `briar auto-hunt qa-result`; completion is rejected until Production QA and a result summary exist, plus a terminal Linear state when a Linear issue is linked.
 
 ## Checks
 

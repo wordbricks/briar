@@ -9,6 +9,8 @@ import {
 } from "../../src/lib/auto-hunt-contract";
 import { createAuth, type BriarAuth } from "./auth";
 import {
+  assertQueuedHuntClaim,
+  claimNextQueuedHuntRun,
   createProject,
   EventKeyConflictError,
   findProjectIdByAgentTokenHash,
@@ -16,6 +18,7 @@ import {
   getProject,
   getProjectSettings,
   getHuntRunForProject,
+  HuntClaimError,
   HuntTransitionError,
   listDashboardRuns,
   listProjects,
@@ -30,7 +33,8 @@ import {
 } from "./db";
 
 const corsHeaders = {
-  "Access-Control-Allow-Headers": "authorization, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, content-type, x-briar-claim-token",
   "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
   "Access-Control-Allow-Origin": "*",
 };
@@ -144,6 +148,12 @@ const issueInputSchema = z
     title: z.string().trim().min(1).max(300),
     description: z.string().trim().max(100_000).nullable().optional(),
     priority: z.number().int().min(1).max(4).nullable().optional(),
+  })
+  .strict();
+
+const claimInputSchema = z
+  .object({
+    claimedBy: z.string().trim().min(1).max(128),
   })
   .strict();
 
@@ -357,6 +367,10 @@ function dashboardRunJson(run: HuntRunRow, events: HuntEventRow[]) {
     stagingQaDetail: run.staging_qa_detail,
     productionQaDetail: run.production_qa_detail,
     context: parseJsonObject(run.context_json),
+    claimedBy: run.claimed_by,
+    claimedAt: run.claimed_at,
+    leaseExpiresAt: run.lease_expires_at,
+    claimAttempts: run.claim_attempts,
     startedAt: run.started_at,
     updatedAt: run.last_event_at,
     completedAt: run.completed_at,
@@ -535,6 +549,43 @@ async function route(
     });
   }
 
+  if (pathname === "/ingest/queue/claim" && request.method === "POST") {
+    const projectId = await requireAgentProject(db, request);
+    const input = claimInputSchema.parse(await readJson(request));
+    const claimedAt = new Date().toISOString();
+    const leaseExpiresAt = new Date(
+      Date.parse(claimedAt) + 15 * 60_000,
+    ).toISOString();
+    const claimToken = `briar_claim_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
+    const run = await claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: await sha256(claimToken),
+      claimedBy: input.claimedBy,
+      claimedAt,
+      leaseExpiresAt,
+    });
+    return json({
+      issue: run
+        ? {
+            runId: run.id,
+            runNumber: run.run_number,
+            source: run.source,
+            sourceKey: run.source_key,
+            title: run.title,
+            description: run.issue_description,
+            priority: run.priority,
+            repository: run.repository,
+            sourceCreatedAt: run.source_created_at,
+            context: parseJsonObject(run.context_json),
+            claimToken,
+            claimedBy: run.claimed_by,
+            claimedAt: run.claimed_at,
+            leaseExpiresAt: run.lease_expires_at,
+            claimAttempts: run.claim_attempts,
+          }
+        : null,
+    });
+  }
+
   if (pathname === "/ingest/events" && request.method === "POST") {
     const projectId = await requireAgentProject(db, request);
     const parsed = eventSchema.parse(await readJson(request));
@@ -566,6 +617,16 @@ async function route(
       context: parsed.context ?? null,
     };
     try {
+      const claimToken = request.headers.get("x-briar-claim-token");
+      await assertQueuedHuntClaim(
+        db,
+        projectId,
+        input,
+        claimToken?.startsWith("briar_claim_")
+          ? await sha256(claimToken)
+          : null,
+        new Date().toISOString(),
+      );
       const runId = await recordHuntEvent(db, projectId, input);
       return json({ runId, stage: input.stage });
     } catch (error) {
@@ -573,6 +634,9 @@ async function route(
         throw new HttpError(409, error.message);
       }
       if (error instanceof HuntTransitionError) {
+        throw new HttpError(409, error.message);
+      }
+      if (error instanceof HuntClaimError) {
         throw new HttpError(409, error.message);
       }
       throw error;

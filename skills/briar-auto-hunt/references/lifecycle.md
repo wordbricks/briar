@@ -2,9 +2,11 @@
 
 Use this ordered lifecycle. Repeating the current stage is allowed with a new semantic event key; moving backward is not.
 
-For Briar-created work, `briar auto-hunt next` returns the highest-priority,
-oldest queued run. Reuse its identity and begin at `analyzing`; its `queued`
-event was written when the user created the issue in the app.
+For Briar-created work, `briar auto-hunt next` atomically claims and returns the
+highest-priority, oldest queued run. Reuse its identity and begin at `analyzing`
+before the 15-minute lease expires; its `queued` event was written when the
+user created the issue in the app. The CLI stores the claim token locally,
+sends it on the first transition, and removes it after that transition succeeds.
 
 | Stage | Meaning | Minimum evidence |
 | --- | --- | --- |

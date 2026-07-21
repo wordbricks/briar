@@ -4,7 +4,10 @@ import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { HuntEventInput } from "./db";
 import {
+  assertQueuedHuntClaim,
+  claimNextQueuedHuntRun,
   getNextQueuedHuntRun,
+  HuntClaimError,
   HuntTransitionError,
   recordHuntEvent,
   recordQaResult,
@@ -64,6 +67,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       "migrations/0001_briar.sql",
       "migrations/0002_remove_repository_path.sql",
       "migrations/0003_generalize_auto_hunt.sql",
+      "migrations/0004_auto_hunt_claims.sql",
     ]) {
       await executeSql(db, await readFile(resolve(migration), "utf8"));
     }
@@ -231,5 +235,71 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     expect(next?.id).toBe(urgentId);
     expect(next?.title).toBe("Urgent queued issue");
     expect(next?.stage).toBe("queued");
+  });
+
+  it("claims queued runs atomically and safely reassigns expired leases", async () => {
+    const firstHash = "a".repeat(64);
+    const secondHash = "b".repeat(64);
+    const replacementHash = "c".repeat(64);
+    await expect(
+      assertQueuedHuntClaim(
+        db,
+        projectId,
+        {
+          source: "issue",
+          sourceKey: "briar-issue:22222222-2222-4222-8222-222222222222",
+        },
+        null,
+        atMinute(21),
+      ),
+    ).rejects.toBeInstanceOf(HuntClaimError);
+
+    const [first, second] = await Promise.all([
+      claimNextQueuedHuntRun(db, projectId, {
+        claimTokenHash: firstHash,
+        claimedBy: "agent-one",
+        claimedAt: atMinute(22),
+        leaseExpiresAt: atMinute(32),
+      }),
+      claimNextQueuedHuntRun(db, projectId, {
+        claimTokenHash: secondHash,
+        claimedBy: "agent-two",
+        claimedAt: atMinute(22),
+        leaseExpiresAt: atMinute(32),
+      }),
+    ]);
+
+    expect(new Set([first?.title, second?.title])).toEqual(
+      new Set(["Urgent queued issue", "App-created issue"]),
+    );
+    expect(second?.id).not.toBe(first?.id);
+
+    const replacement = await claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: replacementHash,
+      claimedBy: "agent-three",
+      claimedAt: atMinute(40),
+      leaseExpiresAt: atMinute(50),
+    });
+    expect(replacement?.title).toBe("Urgent queued issue");
+    expect(replacement?.claim_attempts).toBe(2);
+
+    await expect(
+      assertQueuedHuntClaim(
+        db,
+        projectId,
+        { source: "issue", sourceKey: replacement!.source_key },
+        firstHash,
+        atMinute(41),
+      ),
+    ).rejects.toBeInstanceOf(HuntClaimError);
+    await expect(
+      assertQueuedHuntClaim(
+        db,
+        projectId,
+        { source: "issue", sourceKey: replacement!.source_key },
+        replacementHash,
+        atMinute(41),
+      ),
+    ).resolves.toBeUndefined();
   });
 });

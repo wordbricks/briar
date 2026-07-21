@@ -51,6 +51,11 @@ export type HuntRunRow = {
   staging_qa_detail: string | null;
   production_qa_detail: string | null;
   context_json: string | null;
+  claim_token_hash: string | null;
+  claimed_by: string | null;
+  claimed_at: string | null;
+  lease_expires_at: string | null;
+  claim_attempts: number;
   started_at: string;
   completed_at: string | null;
   last_event_at: string;
@@ -124,6 +129,7 @@ export class EventKeyConflictError extends Error {
   }
 }
 export class HuntTransitionError extends Error {}
+export class HuntClaimError extends Error {}
 
 const stableJson = (value: unknown) => JSON.stringify(value);
 const normalizedUrls = (urls: string[]) => [...new Set(urls)].sort();
@@ -323,6 +329,88 @@ export async function getNextQueuedHuntRun(
     )
     .bind(projectId)
     .first<HuntRunRow>();
+}
+
+export async function claimNextQueuedHuntRun(
+  db: D1Database,
+  projectId: string,
+  input: {
+    claimTokenHash: string;
+    claimedBy: string;
+    claimedAt: string;
+    leaseExpiresAt: string;
+  },
+) {
+  return await db
+    .prepare(
+      `update briar_hunt_runs
+       set claim_token_hash = ?, claimed_by = ?, claimed_at = ?,
+           lease_expires_at = ?, claim_attempts = claim_attempts + 1,
+           updated_at = ?
+       where id = (
+         select id from briar_hunt_runs
+         where project_id = ? and stage = 'queued'
+           and (lease_expires_at is null or lease_expires_at <= ?)
+         order by
+           case when priority is null then 1 else 0 end,
+           priority asc,
+           coalesce(source_created_at, started_at) asc,
+           run_number asc
+         limit 1
+       )
+       returning *`,
+    )
+    .bind(
+      input.claimTokenHash,
+      input.claimedBy,
+      input.claimedAt,
+      input.leaseExpiresAt,
+      input.claimedAt,
+      projectId,
+      input.claimedAt,
+    )
+    .first<HuntRunRow>();
+}
+
+export async function assertQueuedHuntClaim(
+  db: D1Database,
+  projectId: string,
+  input: Pick<HuntEventInput, "source" | "sourceKey">,
+  claimTokenHash: string | null,
+  observedAt: string,
+) {
+  const run = await db
+    .prepare(
+      `select stage, claim_token_hash, lease_expires_at, context_json
+       from briar_hunt_runs
+       where project_id = ? and source = ? and source_key = ?
+       limit 1`,
+    )
+    .bind(projectId, input.source, input.sourceKey)
+    .first<{
+      stage: AutoHuntStage;
+      claim_token_hash: string | null;
+      lease_expires_at: string | null;
+      context_json: string | null;
+    }>();
+  if (!run || run.stage !== "queued") return;
+  const context: unknown = run.context_json ? JSON.parse(run.context_json) : null;
+  const appCreated =
+    context !== null &&
+    typeof context === "object" &&
+    !Array.isArray(context) &&
+    (context as Record<string, unknown>).origin === "briar-app";
+  if (!run.claim_token_hash && !appCreated) return;
+  if (
+    !claimTokenHash ||
+    claimTokenHash !== run.claim_token_hash ||
+    !run.lease_expires_at ||
+    run.lease_expires_at <= observedAt
+  ) {
+    throw new HuntClaimError(
+      "Queued Auto Hunt run requires its active claim token",
+    );
+  }
 }
 
 export async function findProjectIdByAgentTokenHash(
