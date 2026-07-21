@@ -13,6 +13,7 @@ export function App() {
         error={briar.error}
         loading={briar.loading}
         loginCode={briar.loginCode}
+        onCancel={briar.cancelLogin}
         onLogin={() => void briar.login()}
       />
     );
