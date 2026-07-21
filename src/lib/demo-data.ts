@@ -1,10 +1,51 @@
-import type { DashboardPayload, HuntRun } from "../types";
+import type { DashboardPayload, HuntEvent, HuntRun } from "../types";
 
 const now = Date.now();
 const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
 
+const runDefaults = {
+  priority: null,
+  tracker: null,
+  issueDescription: null,
+  resultSummary: null,
+  pullRequestUrls: [],
+  targetSha: null,
+  sourceCreatedAt: null,
+  stagingQaStatus: null,
+  productionQaStatus: null,
+  stagingQaDetail: null,
+  productionQaDetail: null,
+  context: null,
+} satisfies Pick<
+  HuntRun,
+  | "priority"
+  | "tracker"
+  | "issueDescription"
+  | "resultSummary"
+  | "pullRequestUrls"
+  | "targetSha"
+  | "sourceCreatedAt"
+  | "stagingQaStatus"
+  | "productionQaStatus"
+  | "stagingQaDetail"
+  | "productionQaDetail"
+  | "context"
+>;
+
+const event = (
+  input: Pick<HuntEvent, "id" | "stage" | "detail" | "actor" | "occurredAt">,
+): HuntEvent => ({
+  ...input,
+  qaStatus: null,
+  trackerState: null,
+  pullRequestUrls: [],
+  targetSha: null,
+  recordedAt: input.occurredAt,
+});
+
 const runs: HuntRun[] = [
   {
+    ...runDefaults,
     id: "demo-1",
     runNumber: 12,
     source: "issue",
@@ -20,30 +61,31 @@ const runs: HuntRun[] = [
     updatedAt: ago(2),
     completedAt: null,
     events: [
-      {
+      event({
         id: "event-3",
         stage: "implementing",
         detail: "이벤트 스트림 어댑터 구현 시작",
         actor: "codex",
         occurredAt: ago(23),
-      },
-      {
+      }),
+      event({
         id: "event-2",
         stage: "analyzing",
         detail: "로컬 Git과 Agent 실행 상태 연결 지점 확인",
         actor: "codex",
         occurredAt: ago(36),
-      },
-      {
+      }),
+      event({
         id: "event-1",
         stage: "queued",
         detail: "자동사냥 작업 등록",
         actor: "briar-cli",
         occurredAt: ago(42),
-      },
+      }),
     ],
   },
   {
+    ...runDefaults,
     id: "demo-2",
     runNumber: 11,
     source: "feedback",
@@ -59,23 +101,24 @@ const runs: HuntRun[] = [
     updatedAt: ago(12),
     completedAt: null,
     events: [
-      {
+      event({
         id: "event-6",
         stage: "pr_open",
         detail: "PR #18 생성",
         actor: "codex",
         occurredAt: ago(12),
-      },
-      {
+      }),
+      event({
         id: "event-5",
         stage: "implementing",
         detail: "상세 패널 구현",
         actor: "codex",
         occurredAt: ago(67),
-      },
+      }),
     ],
   },
   {
+    ...runDefaults,
     id: "demo-3",
     runNumber: 10,
     source: "error",
@@ -91,16 +134,17 @@ const runs: HuntRun[] = [
     updatedAt: ago(31),
     completedAt: null,
     events: [
-      {
+      event({
         id: "event-8",
         stage: "blocked",
         detail: "Google OAuth 자격증명 대기",
         actor: "codex",
         occurredAt: ago(31),
-      },
+      }),
     ],
   },
   {
+    ...runDefaults,
     id: "demo-4",
     runNumber: 9,
     source: "issue",
@@ -116,13 +160,13 @@ const runs: HuntRun[] = [
     updatedAt: ago(510),
     completedAt: ago(510),
     events: [
-      {
+      event({
         id: "event-9",
         stage: "completed",
         detail: "Production QA 완료",
         actor: "codex",
         occurredAt: ago(510),
-      },
+      }),
     ],
   },
 ];
@@ -131,8 +175,17 @@ export const demoDashboard: DashboardPayload = {
   project: {
     id: "demo-project",
     name: "Briar",
-    repositoryPath: "/Users/jay/git/briar",
     createdAt: ago(3_000),
+  },
+  settings: {
+    velenOrg: "wordbricks",
+    dataSource: "postgres://getgpt-dbdb",
+    linear: {
+      enabled: true,
+      source: "linear://linear-wordbricks",
+      teamKey: "GG",
+    },
+    githubRepository: "wordbricks/briar",
   },
   runs,
   generatedAt: new Date().toISOString(),

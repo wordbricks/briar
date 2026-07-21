@@ -1,14 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   beginDeviceAuthorization,
+  createAgentToken,
   createProject,
   isApiConfigured,
   loadDashboard,
   loadProjects,
   loadSession,
   pollDeviceToken,
+  updateProjectSettings,
 } from "../lib/api";
 import { demoDashboard } from "../lib/demo-data";
+import {
+  connectLocalProject,
+  inspectVelen,
+  loadConnectedProjectIds,
+  pickGitRepository,
+  type LocalAutoHuntConfig,
+  type VelenInspection,
+} from "../lib/project-connection";
 import {
   clearSessionToken,
   readSessionToken,
@@ -18,7 +28,7 @@ import type { DashboardPayload, Project, SessionUser } from "../types";
 
 export type ProjectConnection = {
   project: Project;
-  agentToken: string;
+  agentToken: string | null;
 };
 
 const demoMode = import.meta.env.VITE_BRIAR_DEMO !== "false" && !isApiConfigured;
@@ -35,6 +45,17 @@ async function openExternal(url: string) {
     return;
   }
   window.open(url, "_blank", "noopener,noreferrer");
+}
+
+async function findUnconnectedProject(projects: Project[]) {
+  try {
+    const connectedIds = await loadConnectedProjectIds();
+    if (!connectedIds) return null;
+    const connected = new Set(connectedIds);
+    return projects.find((project) => !connected.has(project.id)) ?? null;
+  } catch {
+    return projects[0] ?? null;
+  }
 }
 
 export function useBriar() {
@@ -54,6 +75,7 @@ export function useBriar() {
   const [error, setError] = useState<string | null>(null);
   const [projectConnection, setProjectConnection] =
     useState<ProjectConnection | null>(null);
+  const [velen, setVelen] = useState<VelenInspection | null>(null);
   const pollTimer = useRef<number | null>(null);
 
   const refresh = useCallback(async () => {
@@ -77,11 +99,17 @@ export function useBriar() {
           loadSession(storedToken),
           loadProjects(storedToken),
         ]);
+        const unconnectedProject = await findUnconnectedProject(nextProjects);
         if (cancelled) return;
         setToken(storedToken);
         setUser(nextUser);
         setProjects(nextProjects);
         setActiveProjectId(nextProjects[0]?.id ?? null);
+        setProjectConnection(
+          unconnectedProject
+            ? { project: unconnectedProject, agentToken: null }
+            : null,
+        );
       })
       .catch(() => clearSessionToken())
       .finally(() => !cancelled && setLoading(false));
@@ -89,6 +117,25 @@ export function useBriar() {
       cancelled = true;
     };
   }, []);
+
+  const refreshVelen = useCallback(async (org?: string | null) => {
+    if (demoMode) return null;
+    try {
+      const inspection = await inspectVelen(org);
+      setVelen(inspection);
+      setError(null);
+      return inspection;
+    } catch (caught) {
+      setVelen(null);
+      setError(caught instanceof Error ? caught.message : String(caught));
+      return null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!projectConnection || demoMode) return;
+    void refreshVelen();
+  }, [projectConnection, refreshVelen]);
 
   useEffect(() => {
     void refresh();
@@ -115,10 +162,16 @@ export function useBriar() {
               loadSession(nextToken),
               loadProjects(nextToken),
             ]);
+            const unconnectedProject = await findUnconnectedProject(nextProjects);
             setToken(nextToken);
             setUser(nextUser);
             setProjects(nextProjects);
             setActiveProjectId(nextProjects[0]?.id ?? null);
+            setProjectConnection(
+              unconnectedProject
+                ? { project: unconnectedProject, agentToken: null }
+                : null,
+            );
             setLoginCode(null);
             setLoading(false);
             return;
@@ -153,7 +206,7 @@ export function useBriar() {
   }, []);
 
   const addProject = useCallback(
-    async (input: { name: string; repositoryPath: string }) => {
+    async (input: { name: string }) => {
       if (!token) throw new Error("로그인이 필요합니다.");
       setLoading(true);
       setError(null);
@@ -174,9 +227,51 @@ export function useBriar() {
     [token],
   );
 
+  const connectProject = useCallback(async (autoHunt: LocalAutoHuntConfig) => {
+    if (!projectConnection) throw new Error("연결할 프로젝트가 없습니다.");
+    if (!token && !projectConnection.agentToken) throw new Error("로그인이 필요합니다.");
+    setLoading(true);
+    setError(null);
+    try {
+      const repositoryPath = await pickGitRepository();
+      if (!repositoryPath) return null;
+      const agentToken =
+        projectConnection.agentToken ??
+        (await createAgentToken(token!, projectConnection.project.id)).agentToken;
+      const connectedPath = await connectLocalProject({
+        projectId: projectConnection.project.id,
+        agentToken,
+        repositoryPath,
+        autoHunt,
+      });
+      if (token) {
+        await updateProjectSettings(token, projectConnection.project.id, {
+          velenOrg: autoHunt.velenOrg,
+          dataSource: autoHunt.dataSource ?? null,
+          linear: {
+            enabled: autoHunt.linearEnabled,
+            source: autoHunt.linearSource ?? null,
+            teamKey: autoHunt.linearTeam ?? null,
+          },
+          githubRepository: autoHunt.githubRepository ?? null,
+        });
+      }
+      setProjectConnection(null);
+      await refresh();
+      return connectedPath;
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : String(caught);
+      setError(message);
+      throw caught;
+    } finally {
+      setLoading(false);
+    }
+  }, [projectConnection, refresh, token]);
+
   return {
     activeProjectId,
     addProject,
+    connectProject,
     dashboard,
     demoMode,
     error,
@@ -187,9 +282,10 @@ export function useBriar() {
     projects,
     projectConnection,
     refresh,
+    refreshVelen,
     setActiveProjectId,
-    finishProjectConnection: () => setProjectConnection(null),
     token,
     user,
+    velen,
   };
 }

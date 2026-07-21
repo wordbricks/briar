@@ -1,25 +1,33 @@
-export const huntStages = [
-  "queued",
-  "analyzing",
-  "implementing",
-  "pr_open",
-  "staging_qa",
-  "production_qa",
-  "completed",
-  "blocked",
-  "failed",
-  "cancelled",
-] as const;
+import {
+  autoHuntStages,
+  type AutoHuntQaStatus,
+  type AutoHuntSource,
+  type AutoHuntStage,
+} from "./lib/auto-hunt-contract";
 
-export type HuntStage = (typeof huntStages)[number];
-export type HuntSource = "issue" | "error" | "feedback";
+export const huntStages = autoHuntStages;
+export type HuntStage = AutoHuntStage;
+export type HuntSource = AutoHuntSource;
+
+export type TrackerReference = {
+  provider: string;
+  issueId: string | null;
+  identifier: string | null;
+  url: string | null;
+  state: string | null;
+};
 
 export type HuntEvent = {
   id: string;
   stage: HuntStage;
   detail: string | null;
   actor: string;
+  qaStatus: AutoHuntQaStatus | null;
+  trackerState: string | null;
+  pullRequestUrls: string[];
+  targetSha: string | null;
   occurredAt: string;
+  recordedAt: string;
 };
 
 export type HuntRun = {
@@ -31,9 +39,21 @@ export type HuntRun = {
   stage: HuntStage;
   progress: number;
   detail: string | null;
+  priority: number | null;
   repository: string;
   branch: string | null;
   commitSha: string | null;
+  tracker: TrackerReference | null;
+  issueDescription: string | null;
+  resultSummary: string | null;
+  pullRequestUrls: string[];
+  targetSha: string | null;
+  sourceCreatedAt: string | null;
+  stagingQaStatus: AutoHuntQaStatus | null;
+  productionQaStatus: AutoHuntQaStatus | null;
+  stagingQaDetail: string | null;
+  productionQaDetail: string | null;
+  context: Record<string, unknown> | null;
   startedAt: string;
   updatedAt: string;
   completedAt: string | null;
@@ -43,12 +63,23 @@ export type HuntRun = {
 export type Project = {
   id: string;
   name: string;
-  repositoryPath: string;
   createdAt: string;
+};
+
+export type ProjectSettings = {
+  velenOrg: string | null;
+  dataSource: string | null;
+  linear: {
+    enabled: boolean;
+    source: string | null;
+    teamKey: string | null;
+  };
+  githubRepository: string | null;
 };
 
 export type DashboardPayload = {
   project: Project;
+  settings: ProjectSettings;
   runs: HuntRun[];
   generatedAt: string;
 };

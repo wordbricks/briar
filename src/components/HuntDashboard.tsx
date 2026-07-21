@@ -74,9 +74,9 @@ export function HuntDashboard({
             <h1>자동사냥</h1>
             <p>에이전트가 처리하는 작업의 흐름과 병목을 한눈에 확인하세요.</p>
           </div>
-          <button className="refresh-button" onClick={onRefresh}>
+          <jelly-button className="refresh-button" onClick={onRefresh} size="small" variant="white">
             <RefreshCw size={15} />새로고침
-          </button>
+          </jelly-button>
         </section>
 
         {error && <div className="error-banner"><CircleAlert size={16} />{error}</div>}
@@ -88,7 +88,7 @@ export function HuntDashboard({
           <Metric label="완료" value={completedCount} note="Production QA 통과" icon={<Check size={18} />} tone="emerald" />
         </section>
 
-        <section className="queue-panel">
+        <jelly-card className="queue-panel">
           <div className="queue-header">
             <div>
               <h2>작업 큐</h2>
@@ -116,7 +116,7 @@ export function HuntDashboard({
               <div className="empty-state"><Bot size={25} /><strong>조건에 맞는 자동사냥 작업이 없습니다.</strong><span>필터를 변경하거나 새 작업이 기록될 때까지 기다려주세요.</span></div>
             )}
           </div>
-        </section>
+        </jelly-card>
       </div>
       {selected && <RunDialog run={selected} onClose={() => setSelected(null)} />}
     </main>
@@ -124,7 +124,7 @@ export function HuntDashboard({
 }
 
 function Metric({ label, value, note, icon, tone }: { label: string; value: string | number; note: string; icon: React.ReactNode; tone: string }) {
-  return <article className={`metric-card ${tone}`}><div className="metric-icon">{icon}</div><div><span>{label}</span><strong>{value}</strong><small>{note}</small></div></article>;
+  return <jelly-card className={`metric-card ${tone}`}><div className="metric-icon">{icon}</div><div><span>{label}</span><strong>{value}</strong><small>{note}</small></div></jelly-card>;
 }
 
 function ActivityRing({ value }: { value: number }) {

@@ -1,21 +1,34 @@
 import { z } from "zod";
+import {
+  autoHuntQaEnvironments,
+  autoHuntSources,
+  autoHuntStages,
+  progressForAutoHuntStage,
+} from "../../src/lib/auto-hunt-contract";
 import { createAuth, type BriarAuth } from "./auth";
 import {
   createProject,
   EventKeyConflictError,
   findProjectIdByAgentTokenHash,
   getProject,
+  getProjectSettings,
+  getHuntRunForProject,
+  HuntTransitionError,
   listDashboardRuns,
   listProjects,
   recordHuntEvent,
+  recordQaResult,
+  replaceProjectAgentToken,
+  updateProjectSettings,
   type HuntEventRow,
   type HuntRunRow,
   type ProjectRow,
+  type ProjectSettingsRow,
 } from "./db";
 
 const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, content-type",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
   "Access-Control-Allow-Origin": "*",
 };
 
@@ -31,39 +44,136 @@ class HttpError extends Error {
   }
 }
 
-const stageSchema = z.enum([
-  "queued",
-  "analyzing",
-  "implementing",
-  "pr_open",
-  "staging_qa",
-  "production_qa",
-  "completed",
-  "blocked",
-  "failed",
-  "cancelled",
-]);
+const stageSchema = z.enum(autoHuntStages);
+const nullableTrimmed = (max: number) =>
+  z.string().trim().min(1).max(max).nullable().optional();
+const httpsUrl = z
+  .string()
+  .url()
+  .max(1_000)
+  .refine((value) => new URL(value).protocol === "https:", "HTTPS URL required");
+const trackerSchema = z
+  .object({
+    provider: z.string().trim().min(1).max(50),
+    issueId: nullableTrimmed(200),
+    identifier: nullableTrimmed(100),
+    url: httpsUrl.nullable().optional(),
+    state: nullableTrimmed(100),
+  })
+  .strict();
 
-const eventSchema = z.object({
-  source: z.enum(["issue", "error", "feedback"]),
-  sourceKey: z.string().trim().min(1).max(200),
-  title: z.string().trim().min(1).max(300),
-  stage: stageSchema,
-  eventKey: z.string().trim().min(1).max(300),
-  occurredAt: z.string().datetime({ offset: true }),
-  actor: z.string().trim().min(1).max(128),
-  repository: z.string().trim().min(1).max(500),
-  detail: z.string().max(4000).nullable().optional(),
-  branch: z.string().trim().min(1).max(500).nullable().optional(),
-  commitSha: z.string().regex(/^[0-9a-f]{7,64}$/u).nullable().optional(),
-});
+const eventSchema = z
+  .object({
+    source: z.enum(autoHuntSources),
+    sourceKey: z.string().trim().min(1).max(200),
+    title: z.string().trim().min(1).max(300),
+    stage: stageSchema,
+    eventKey: z.string().trim().min(1).max(300),
+    occurredAt: z.string().datetime({ offset: true }),
+    actor: z.string().trim().min(1).max(128),
+    repository: z.string().trim().min(1).max(500),
+    detail: z.string().max(4_000).nullable().optional(),
+    priority: z.number().int().min(1).max(4).nullable().optional(),
+    branch: nullableTrimmed(500),
+    commitSha: z.string().regex(/^[0-9a-f]{7,64}$/u).nullable().optional(),
+    tracker: trackerSchema.nullable().optional(),
+    issueDescription: z.string().max(100_000).nullable().optional(),
+    resultSummary: z.string().max(100_000).nullable().optional(),
+    pullRequestUrls: z
+      .array(httpsUrl)
+      .max(20)
+      .default([])
+      .transform((urls) => [...new Set(urls)].sort()),
+    targetSha: z.string().regex(/^[0-9a-f]{7,64}$/u).nullable().optional(),
+    sourceCreatedAt: z.string().datetime({ offset: true }).nullable().optional(),
+    qaStatus: z.literal("pending").nullable().optional(),
+    stagingQaDetail: z.string().max(100_000).nullable().optional(),
+    productionQaDetail: z.string().max(100_000).nullable().optional(),
+    context: z.record(z.string(), z.unknown()).nullable().optional(),
+  })
+  .strict()
+  .superRefine((input, context) => {
+    if (input.stage === "blocked" && !input.detail?.trim()) {
+      context.addIssue({
+        code: "custom",
+        message: "blocked progress requires an exact blocker reason",
+        path: ["detail"],
+      });
+    }
+    if (
+      input.qaStatus &&
+      input.stage !== "staging_qa" &&
+      input.stage !== "production_qa"
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "QA status requires a QA stage",
+        path: ["qaStatus"],
+      });
+    }
+    if (
+      (input.stage === "staging_qa" || input.stage === "production_qa") &&
+      input.qaStatus !== "pending"
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "QA stages require a pending QA status",
+        path: ["qaStatus"],
+      });
+    }
+    if (input.tracker?.provider === "linear" && input.tracker.url) {
+      if (new URL(input.tracker.url).hostname !== "linear.app") {
+        context.addIssue({
+          code: "custom",
+          message: "Linear tracker URLs must use linear.app",
+          path: ["tracker", "url"],
+        });
+      }
+    }
+  });
 
 const projectInputSchema = z.object({
   name: z.string().trim().min(1).max(100),
-  repositoryPath: z.string().trim().min(1).max(1000),
 });
 
-async function readJson(request: Request, maxBytes = 16_384): Promise<unknown> {
+const projectSettingsSchema = z
+  .object({
+    velenOrg: nullableTrimmed(100),
+    dataSource: nullableTrimmed(300),
+    linear: z
+      .object({
+        enabled: z.boolean(),
+        source: z.string().trim().regex(/^linear:\/\/.+/u).max(300).nullable(),
+        teamKey: z.string().trim().min(1).max(100).nullable(),
+      })
+      .strict(),
+    githubRepository: nullableTrimmed(300),
+  })
+  .strict()
+  .superRefine((input, context) => {
+    if (input.linear.enabled && (!input.velenOrg || !input.linear.source)) {
+      context.addIssue({
+        code: "custom",
+        message: "Linear integration requires a Velen org and Linear source",
+        path: ["linear"],
+      });
+    }
+  });
+
+const qaResultSchema = z
+  .object({
+    runId: z
+      .string()
+      .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u),
+    environment: z.enum(autoHuntQaEnvironments),
+    result: z.enum(["passed", "skipped"]),
+    actor: z.string().trim().min(1).max(128),
+    observedAt: z.string().datetime({ offset: true }),
+    detail: z.string().max(100_000).nullable().optional(),
+  })
+  .strict();
+
+async function readJson(request: Request, maxBytes = 262_144): Promise<unknown> {
   const declaredLength = Number(request.headers.get("content-length") ?? "0");
   if (declaredLength > maxBytes) throw new HttpError(413, "Request body too large");
   if (!request.body) throw new HttpError(400, "Request body is required");
@@ -140,35 +250,32 @@ function projectJson(row: ProjectRow) {
   return {
     id: row.id,
     name: row.name,
-    repositoryPath: row.repository_path,
     createdAt: row.created_at,
   };
 }
 
-const progressForStage = (stage: string) => {
-  switch (stage) {
-    case "queued":
-      return 10;
-    case "analyzing":
-      return 25;
-    case "implementing":
-      return 45;
-    case "pr_open":
-      return 65;
-    case "staging_qa":
-      return 80;
-    case "production_qa":
-      return 92;
-    case "completed":
-      return 100;
-    case "blocked":
-    case "failed":
-      return 50;
-    case "cancelled":
-      return 0;
-    default:
-      return 0;
-  }
+const settingsJson = (row: ProjectSettingsRow | null) => ({
+  velenOrg: row?.velen_org ?? null,
+  dataSource: row?.data_source ?? null,
+  linear: {
+    enabled: row?.linear_enabled === 1,
+    source: row?.linear_source ?? null,
+    teamKey: row?.linear_team_key ?? null,
+  },
+  githubRepository: row?.github_repository ?? null,
+});
+
+const parseJsonArray = (value: string) => {
+  const parsed: unknown = JSON.parse(value);
+  return Array.isArray(parsed) ? parsed : [];
+};
+
+const parseJsonObject = (value: string | null) => {
+  if (!value) return null;
+  const parsed: unknown = JSON.parse(value);
+  return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+    ? parsed
+    : null;
 };
 
 const dashboardEventJson = (event: HuntEventRow) => ({
@@ -176,7 +283,12 @@ const dashboardEventJson = (event: HuntEventRow) => ({
   stage: event.stage,
   detail: event.detail,
   actor: event.actor,
+  qaStatus: event.qa_status,
+  trackerState: event.tracker_issue_state,
+  pullRequestUrls: parseJsonArray(event.pull_request_urls),
+  targetSha: event.target_sha,
   occurredAt: event.occurred_at,
+  recordedAt: event.recorded_at,
 });
 
 function dashboardRunJson(run: HuntRunRow, events: HuntEventRow[]) {
@@ -187,14 +299,35 @@ function dashboardRunJson(run: HuntRunRow, events: HuntEventRow[]) {
     sourceKey: run.source_key,
     title: run.title,
     stage: run.stage,
-    progress: progressForStage(run.stage),
+    progress: progressForAutoHuntStage[run.stage],
     detail: run.detail,
+    priority: run.priority,
     repository: run.repository,
     branch: run.branch,
     commitSha: run.commit_sha,
+    tracker: run.tracker_provider
+      ? {
+          provider: run.tracker_provider,
+          issueId: run.tracker_issue_id,
+          identifier: run.tracker_issue_identifier,
+          url: run.tracker_issue_url,
+          state: run.tracker_issue_state,
+        }
+      : null,
+    issueDescription: run.issue_description,
+    resultSummary: run.result_summary,
+    pullRequestUrls: parseJsonArray(run.pull_request_urls),
+    targetSha: run.target_sha,
+    sourceCreatedAt: run.source_created_at,
+    stagingQaStatus: run.staging_qa_status,
+    productionQaStatus: run.production_qa_status,
+    stagingQaDetail: run.staging_qa_detail,
+    productionQaDetail: run.production_qa_detail,
+    context: parseJsonObject(run.context_json),
     startedAt: run.started_at,
     updatedAt: run.last_event_at,
     completedAt: run.completed_at,
+    eventCount: run.event_count,
     events: events.map(dashboardEventJson),
   };
 }
@@ -231,23 +364,53 @@ async function route(
     const input = projectInputSchema.parse(await readJson(request));
     const agentToken = `briar_agent_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
     const tokenHash = await sha256(agentToken);
-    try {
-      const project = await createProject(db, {
-        ownerUserId: session.user.id,
-        name: input.name,
-        repositoryPath: input.repositoryPath,
-        agentTokenHash: tokenHash,
-      });
-      return json({ project: projectJson(project), agentToken }, 201);
-    } catch (error) {
-      if (
-        error instanceof Error &&
-        error.message.includes("UNIQUE constraint failed")
-      ) {
-        throw new HttpError(409, "Repository is already connected");
-      }
-      throw error;
-    }
+    const project = await createProject(db, {
+      ownerUserId: session.user.id,
+      name: input.name,
+      agentTokenHash: tokenHash,
+    });
+    return json({ project: projectJson(project), agentToken }, 201);
+  }
+
+  const settingsMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/settings$/u,
+  );
+  if (settingsMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, settingsMatch[1], session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    return json({
+      settings: settingsJson(await getProjectSettings(db, project.id)),
+    });
+  }
+  if (settingsMatch && request.method === "PUT") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, settingsMatch[1], session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    const input = projectSettingsSchema.parse(await readJson(request));
+    const settings = await updateProjectSettings(db, project.id, {
+      velenOrg: input.velenOrg ?? null,
+      dataSource: input.dataSource ?? null,
+      linear: input.linear,
+      githubRepository: input.githubRepository ?? null,
+    });
+    return json({ settings: settingsJson(settings) });
+  }
+
+  const agentTokenMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/agent-token$/u,
+  );
+  if (agentTokenMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const agentToken = `briar_agent_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
+    const replaced = await replaceProjectAgentToken(
+      db,
+      agentTokenMatch[1],
+      session.user.id,
+      await sha256(agentToken),
+    );
+    if (!replaced) throw new HttpError(404, "Project not found");
+    return json({ agentToken });
   }
 
   const dashboardMatch = pathname.match(
@@ -257,7 +420,10 @@ async function route(
     const session = await requireSession(auth, request);
     const project = await getProject(db, dashboardMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
-    const { runs, events } = await listDashboardRuns(db, project.id);
+    const [{ runs, events }, settings] = await Promise.all([
+      listDashboardRuns(db, project.id),
+      getProjectSettings(db, project.id),
+    ]);
     const eventsByRun = new Map<string, HuntEventRow[]>();
     for (const event of events) {
       const runEvents = eventsByRun.get(event.run_id) ?? [];
@@ -266,6 +432,7 @@ async function route(
     }
     return json({
       project: projectJson(project),
+      settings: settingsJson(settings),
       runs: runs.map((run) =>
         dashboardRunJson(run, eventsByRun.get(run.id) ?? []),
       ),
@@ -289,8 +456,28 @@ async function route(
       ...parsed,
       occurredAt: new Date(parsed.occurredAt).toISOString(),
       detail: parsed.detail ?? null,
+      priority: parsed.priority ?? null,
       branch: parsed.branch ?? null,
       commitSha: parsed.commitSha ?? null,
+      tracker: parsed.tracker
+        ? {
+            provider: parsed.tracker.provider,
+            issueId: parsed.tracker.issueId ?? null,
+            identifier: parsed.tracker.identifier ?? null,
+            url: parsed.tracker.url ?? null,
+            state: parsed.tracker.state ?? null,
+          }
+        : null,
+      issueDescription: parsed.issueDescription ?? null,
+      resultSummary: parsed.resultSummary ?? null,
+      targetSha: parsed.targetSha ?? null,
+      sourceCreatedAt: parsed.sourceCreatedAt
+        ? new Date(parsed.sourceCreatedAt).toISOString()
+        : null,
+      qaStatus: parsed.qaStatus ?? null,
+      stagingQaDetail: parsed.stagingQaDetail ?? null,
+      productionQaDetail: parsed.productionQaDetail ?? null,
+      context: parsed.context ?? null,
     };
     try {
       const runId = await recordHuntEvent(db, projectId, input);
@@ -299,8 +486,42 @@ async function route(
       if (error instanceof EventKeyConflictError) {
         throw new HttpError(409, error.message);
       }
+      if (error instanceof HuntTransitionError) {
+        throw new HttpError(409, error.message);
+      }
       throw error;
     }
+  }
+
+  if (pathname === "/ingest/qa-results" && request.method === "POST") {
+    const authorization = request.headers.get("authorization") ?? "";
+    const token = authorization.startsWith("Bearer ")
+      ? authorization.slice(7)
+      : "";
+    if (!token.startsWith("briar_agent_")) {
+      throw new HttpError(401, "Invalid agent token");
+    }
+    const projectId = await findProjectIdByAgentTokenHash(db, await sha256(token));
+    if (!projectId) throw new HttpError(401, "Invalid agent token");
+    const input = qaResultSchema.parse(await readJson(request));
+    const outcome = await recordQaResult(db, projectId, {
+      ...input,
+      detail: input.detail ?? null,
+      observedAt: new Date(input.observedAt).toISOString(),
+    });
+    if (outcome === "not_found") throw new HttpError(404, "Run not found");
+    if (outcome === "ineligible") {
+      throw new HttpError(409, "QA result is ineligible");
+    }
+    const run = await getHuntRunForProject(db, projectId, input.runId);
+    return json({
+      runId: input.runId,
+      outcome,
+      issueIdentifier: run?.tracker_issue_identifier ?? null,
+      issueUrl: run?.tracker_issue_url ?? null,
+      pullRequestUrls: run ? parseJsonArray(run.pull_request_urls) : [],
+      targetSha: run?.target_sha ?? null,
+    });
   }
 
   throw new HttpError(404, "Not found");
