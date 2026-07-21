@@ -24,16 +24,18 @@ export function App() {
         connection={briar.projectConnection}
         error={briar.error}
         loading={briar.loading}
-        onComplete={briar.finishProjectConnection}
+        onConnect={briar.connectProject}
         onCreate={briar.addProject}
         onLogout={() => void briar.logout()}
+        onVelenOrgChange={briar.refreshVelen}
         user={briar.user}
+        velen={briar.velen}
       />
     );
   }
 
   return (
-    <div className="app-shell">
+    <jelly-theme mode="light" className="app-shell">
       <Sidebar
         activeProjectId={briar.activeProjectId}
         onProjectChange={briar.setActiveProjectId}
@@ -47,6 +49,6 @@ export function App() {
         error={briar.error}
         onRefresh={() => void briar.refresh()}
       />
-    </div>
+    </jelly-theme>
   );
 }

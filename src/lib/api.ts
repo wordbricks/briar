@@ -1,7 +1,14 @@
 import { z } from "zod";
-import type { DashboardPayload, Project, SessionUser } from "../types";
+import type {
+  DashboardPayload,
+  Project,
+  ProjectSettings,
+  SessionUser,
+} from "../types";
 
 const apiUrl = import.meta.env.VITE_BRIAR_API_URL?.replace(/\/$/u, "") ?? "";
+
+export const briarApiUrl = apiUrl;
 
 const sessionUserSchema = z.object({
   id: z.string(),
@@ -13,7 +20,6 @@ const sessionUserSchema = z.object({
 const projectSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
-  repositoryPath: z.string(),
   createdAt: z.string(),
 });
 
@@ -122,10 +128,28 @@ export async function loadDashboard(
 
 export async function createProject(
   token: string,
-  input: { name: string; repositoryPath: string },
+  input: { name: string },
 ) {
   return request<{ project: Project; agentToken: string }>("/projects", token, {
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+export async function createAgentToken(token: string, projectId: string) {
+  return request<{ agentToken: string }>(`/projects/${projectId}/agent-token`, token, {
+    method: "POST",
+  });
+}
+
+export async function updateProjectSettings(
+  token: string,
+  projectId: string,
+  settings: ProjectSettings,
+) {
+  return request<{ settings: ProjectSettings }>(
+    `/projects/${projectId}/settings`,
+    token,
+    { method: "PUT", body: JSON.stringify(settings) },
+  );
 }

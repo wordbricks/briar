@@ -1,6 +1,6 @@
 # Briar
 
-Briar is a Tauri v2 Agent Development Environment for observing local agents. The first release reproduces the Wordbricks Auto Hunt dashboard as a generic, read-only desktop app.
+Briar is a repository-agnostic Agent Development Environment for running and observing production-bound Auto Hunt work. It extracts the Wordbricks workflow into a reusable D1-backed lifecycle, mandatory Velen context, and optional Linear mirroring.
 
 Repository source code stays local. Agents send only task state and Git metadata to a Cloudflare Worker, while users, projects, and Auto Hunt state are stored in Cloudflare D1.
 
@@ -14,6 +14,10 @@ Repository source code stays local. Agents send only task state and Git metadata
 - OS keychain storage for the desktop session token
 - Project-scoped Agent ingest tokens stored as SHA-256 hashes
 - `briar` CLI for login, repository connection, and Auto Hunt event recording
+- A validated `briar-auto-hunt` Codex skill installed automatically with the CLI
+- Mandatory Velen CLI preflight and repository-specific Velen organization/source settings
+- Optional Linear integration through a configured Velen source
+- Jelly UI components in a light desktop theme
 - Wordbricks stage contract: `queued`, `analyzing`, `implementing`, `pr_open`, `staging_qa`, `production_qa`, `completed`
 - Exceptional states: `blocked`, `failed`, `cancelled`
 - A demo dashboard when no Worker URL is configured
@@ -22,7 +26,8 @@ Repository source code stays local. Agents send only task state and Git metadata
 
 ```mermaid
 flowchart LR
-  A["Local Agent / Codex"] -->|"briar hunt record"| C["Briar CLI"]
+  A["Local Agent / Codex"] -->|"briar auto-hunt record"| C["Briar CLI"]
+  A -->|"context and optional Linear"| V["Velen CLI"]
   C -->|"project Bearer token"| W["Cloudflare Worker"]
   D["Briar Tauri app"] -->|"Better Auth Device Flow"| W
   D -->|"read-only polling, 4s"| W
@@ -34,7 +39,7 @@ The Worker owns Better Auth, dashboard APIs, Agent ingest APIs, authorization ch
 
 ## Install
 
-Requirements: Bun, Rust, Tauri system prerequisites, and Wrangler 4.x.
+Requirements: Bun, Rust, Tauri system prerequisites, Wrangler 4.x, and an authenticated Velen CLI.
 
 ```bash
 bun install
@@ -130,33 +135,35 @@ bun link
 briar login
 ```
 
-After login, create a project from the desktop onboarding screen and copy its one-time `briar connect` command. You can also create it from the CLI:
+After login, create a project from the desktop onboarding screen, choose the Velen organization, optionally select a Linear source, and pick the Git repository. Briar validates every selection, stores the path/token/settings locally, stores non-secret integration settings in D1, and installs the Briar CLI plus Codex skill automatically. The repository path and Agent token are never sent to the Worker as project metadata.
+
+You can also create and connect a project from inside a Git repository with the CLI:
 
 ```bash
-briar project create --name wordbricks --repository /absolute/path/to/wordbricks
+briar project create --name wordbricks
 ```
 
 Record the lifecycle using a stable, retry-safe event key for every transition:
 
 ```bash
-briar hunt record \
+briar auto-hunt record \
   --source issue \
   --source-key WB-142 \
   --title "Fix checkout race" \
   --stage queued \
   --event-key WB-142:queued:1 \
-  --detail "Auto Hunt queued"
+  --status-detail "Auto Hunt queued"
 
-briar hunt record \
+briar auto-hunt record \
   --source issue \
   --source-key WB-142 \
   --title "Fix checkout race" \
   --stage implementing \
   --event-key WB-142:implementing:1 \
-  --detail "Agent is implementing the fix"
+  --status-detail "Agent is implementing the fix"
 ```
 
-The CLI discovers the current branch, commit SHA, and `origin` URL automatically. Reusing an event key with identical data is safe; reusing it with different data is rejected.
+The CLI discovers the repository, worktree, branch, commit SHA, and `origin` URL automatically. Run `briar auto-hunt doctor` before work. Reusing an event key with identical data is safe; reusing it with different data is rejected. QA results use `briar auto-hunt qa-result`; completion is rejected until Production QA and a result summary exist, plus a terminal Linear state when a Linear issue is linked.
 
 ## Checks
 
