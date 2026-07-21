@@ -30,6 +30,7 @@
     "@tauri-apps/plugin-dialog": "2.7.2",
     "@tauri-apps/plugin-opener": "2.5.4",
     "better-auth": "1.6.23",
+    "jelly-ui": "github:jelly-org/ui#8e39a8e61b5a43a562ae85e4b01191d333d5b121",
     "lucide-react": "0.468.0",
     "react": "19.2.7",
     "react-dom": "19.2.7",

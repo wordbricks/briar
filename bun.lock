@@ -9,6 +9,7 @@
         "@tauri-apps/plugin-dialog": "2.7.2",
         "@tauri-apps/plugin-opener": "2.5.4",
         "better-auth": "1.6.23",
+        "jelly-ui": "github:jelly-org/ui#8e39a8e61b5a43a562ae85e4b01191d333d5b121",
         "lucide-react": "0.468.0",
         "react": "19.2.7",
         "react-dom": "19.2.7",
@@ -540,6 +541,8 @@
     "https-proxy-agent": ["https-proxy-agent@7.0.6", "", { "dependencies": { "agent-base": "^7.1.2", "debug": "4" } }, "sha512-vK9P5/iUfdl95AI+JVyUuIcVtd4ofvtrOr3HNtM2yxC9bnMbEdp3x01OhQNnjb8IJYi38VlTE3mBXwcfvywuSw=="],
 
     "is-potential-custom-element-name": ["is-potential-custom-element-name@1.0.1", "", {}, "sha512-bCYeRA2rVibKZd+s2625gGnGF/t7DSqDs4dP7CrLA1m7jKWz6pps0LpYLJN8Q64HtmPKJ1hrN3nzPNKFEKOUiQ=="],
+
+    "jelly-ui": ["jelly-ui@github:jelly-org/ui#8e39a8e", {}, "jelly-org-ui-8e39a8e", "sha512-tfAOidT3jmTgkODmiCmy9zbWxOXmW5OgqD6MRuclb+V6eMxJzQuyXNuy+8i1Vbxa8143fXiqWurlk9GpfA+GDw=="],
 
     "jose": ["jose@6.2.3", "", {}, "sha512-YYVDInQKFJfR/xa3ojUTl8c2KoTwiL1R5Wg9YCydwH0x0B9grbzlg5HC7mMjCtUJjbQ/YnGEZIhI5tCgfTb4Hw=="],
 

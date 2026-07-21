@@ -1,0 +1,77 @@
+import { describe, expect, it, vi } from "vitest";
+import {
+  DASHBOARD_POLL_INTERVAL_MS,
+  startDashboardPolling,
+  type DashboardPollingEnvironment,
+} from "./dashboard-polling";
+
+function pollingHarness(initiallyVisible: boolean) {
+  let visible = initiallyVisible;
+  let intervalCallback: (() => void) | null = null;
+  let visibilityListener: (() => void) | null = null;
+  const clearInterval = vi.fn();
+  const setInterval = vi.fn((callback: () => void) => {
+    intervalCallback = callback;
+    return 41;
+  });
+  const environment: DashboardPollingEnvironment = {
+    isVisible: () => visible,
+    setInterval,
+    clearInterval,
+    addVisibilityListener: (listener) => {
+      visibilityListener = listener;
+      return () => {
+        visibilityListener = null;
+      };
+    },
+  };
+  return {
+    environment,
+    clearInterval,
+    setInterval,
+    tick: () => intervalCallback?.(),
+    setVisible(next: boolean) {
+      visible = next;
+      visibilityListener?.();
+    },
+  };
+}
+
+describe("dashboard polling", () => {
+  it("refreshes immediately and every 15 seconds while visible", () => {
+    const refresh = vi.fn();
+    const harness = pollingHarness(true);
+
+    const stop = startDashboardPolling(refresh, harness.environment);
+
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(harness.setInterval).toHaveBeenCalledWith(
+      refresh,
+      DASHBOARD_POLL_INTERVAL_MS,
+    );
+    harness.tick();
+    expect(refresh).toHaveBeenCalledTimes(2);
+
+    stop();
+    expect(harness.clearInterval).toHaveBeenCalledWith(41);
+  });
+
+  it("pauses while hidden and refreshes as soon as the app is visible", () => {
+    const refresh = vi.fn();
+    const harness = pollingHarness(false);
+
+    const stop = startDashboardPolling(refresh, harness.environment);
+
+    expect(refresh).not.toHaveBeenCalled();
+    expect(harness.setInterval).not.toHaveBeenCalled();
+
+    harness.setVisible(true);
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(harness.setInterval).toHaveBeenCalledTimes(1);
+
+    harness.setVisible(false);
+    expect(harness.clearInterval).toHaveBeenCalledWith(41);
+
+    stop();
+  });
+});

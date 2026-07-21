@@ -24,6 +24,7 @@ import {
   readSessionToken,
   writeSessionToken,
 } from "../lib/token-store";
+import { startDashboardPolling } from "../lib/dashboard-polling";
 import type { DashboardPayload, Project, SessionUser } from "../types";
 
 export type ProjectConnection = {
@@ -138,10 +139,8 @@ export function useBriar() {
   }, [projectConnection, refreshVelen]);
 
   useEffect(() => {
-    void refresh();
-    if (!token || !activeProjectId) return;
-    const interval = window.setInterval(() => void refresh(), 4_000);
-    return () => window.clearInterval(interval);
+    if (demoMode || !token || !activeProjectId) return;
+    return startDashboardPolling(() => void refresh());
   }, [activeProjectId, refresh, token]);
 
   const login = useCallback(async () => {
