@@ -15,10 +15,12 @@
     "cli": "bun run src-cli/index.ts",
     "d1:migrate:local": "wrangler d1 migrations apply briar-db --local",
     "d1:migrate:remote": "wrangler d1 migrations apply briar-db --remote",
-    "worker:dev": "wrangler dev",
+    "secrets:check": "dotenvx run --strict --overload -f .env.production -- bun run scripts/with-worker-secrets.ts check",
+    "worker:dev": "dotenvx run --strict --overload -f .env.production -- bun run scripts/with-worker-secrets.ts dev",
     "worker:types": "wrangler types worker-configuration.d.ts",
     "worker:check": "tsc --project worker/tsconfig.json",
     "worker:build": "wrangler deploy --dry-run --outdir dist-worker",
+    "worker:deploy": "dotenvx run --strict --overload -f .env.production -- bun run scripts/with-worker-secrets.ts deploy",
     "worker:startup": "wrangler check startup"
   },
   "dependencies": {
@@ -32,6 +34,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20260721.1",
+    "@dotenvx/dotenvx": "^2.15.1",
     "@tauri-apps/cli": "2.11.4",
     "@types/bun": "1.3.8",
     "@types/node": "24.10.1",

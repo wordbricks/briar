@@ -43,14 +43,14 @@ bun run worker:types
 
 ## Local development
 
-Create the local Worker secrets file and apply the D1 migration to Wrangler's local database:
+Decrypt the checked-in `.env.production` with the private key stored in the ignored `.env.keys` file, then apply the D1 migration to Wrangler's local database:
 
 ```bash
-cp .dev.vars.example .dev.vars
+bun run secrets:check
 bun run d1:migrate:local
 ```
 
-Google login requires real OAuth credentials in `.dev.vars`. Placeholder values are sufficient for health, Device Authorization code issuance, dashboard API, and ingest API development.
+Google login requires real OAuth credentials in the encrypted environment. `bun run worker:dev` decrypts them only for the child process, writes a mode-`0600` temporary Wrangler environment file, and deletes it when Wrangler exits.
 
 Start the Worker:
 
@@ -87,18 +87,22 @@ bun run d1:migrate:remote
 
 The migration under `migrations/` creates the Better Auth tables, Device Authorization storage, the Auto Hunt schema, constraints, and indexes. Auto Hunt event transitions use D1 atomic batches and stable run IDs to preserve retry-safe idempotency.
 
-## Configure and deploy the Worker
+## Secret management and Worker deployment
 
-Set all required secrets through Wrangler's interactive prompt. Do not add production values to `wrangler.jsonc` or files committed to Git.
+Worker secrets are managed with [dotenvx](https://dotenvx.com/). The encrypted `.env.production` file is safe to commit. The private `.env.keys` file is ignored by Git and must never be committed.
 
 ```bash
-bunx wrangler secret put BETTER_AUTH_SECRET
-bunx wrangler secret put GOOGLE_CLIENT_ID
-bunx wrangler secret put GOOGLE_CLIENT_SECRET
+# Add or rotate a secret. dotenvx updates .env.production and .env.keys.
+bunx dotenvx set BETTER_AUTH_SECRET 'new-value' -f .env.production --no-native --no-armor
+bunx dotenvx set GOOGLE_CLIENT_ID 'new-value' -f .env.production --no-native --no-armor
+bunx dotenvx set GOOGLE_CLIENT_SECRET 'new-value' -f .env.production --no-native --no-armor
 
+bun run secrets:check
 bun run worker:build
-bunx wrangler deploy
+bun run worker:deploy
 ```
+
+`worker:deploy` decrypts the values in memory, writes a mode-`0600` temporary JSON file, deploys it with Wrangler's `--secrets-file`, and removes the temporary file in a `finally` block. Cloudflare continues to store the deployed values as encrypted Worker Secrets. For CI, store the single dotenvx decryption key (`DOTENV_PRIVATE_KEY_PRODUCTION`) in the CI secret store instead of committing `.env.keys`.
 
 In Google Cloud Console, add the deployed Worker callback URI:
 

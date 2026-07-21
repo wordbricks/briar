@@ -15,6 +15,7 @@
       },
       "devDependencies": {
         "@cloudflare/workers-types": "5.20260721.1",
+        "@dotenvx/dotenvx": "^2.15.1",
         "@tauri-apps/cli": "2.11.4",
         "@types/bun": "1.3.8",
         "@types/node": "24.10.1",
@@ -124,6 +125,12 @@
     "@csstools/css-syntax-patches-for-csstree": ["@csstools/css-syntax-patches-for-csstree@1.1.6", "", { "peerDependencies": { "css-tree": "^3.2.1" }, "optionalPeers": ["css-tree"] }, "sha512-TcJCWFbXLPpJYq6z7bfOyjWYJDiDg2/I4gyUC9pqPNqHFRIey0EB0q0L5cSnQDfWJg8Jd6VadakxdIez/3zkqQ=="],
 
     "@csstools/css-tokenizer": ["@csstools/css-tokenizer@4.0.0", "", {}, "sha512-QxULHAm7cNu72w97JUNCBFODFaXpbDg+dP8b/oWFAZ2MTRppA3U00Y2L1HqaS4J6yBqxwa/Y3nMBaxVKbB/NsA=="],
+
+    "@dotenvx/dotenvx": ["@dotenvx/dotenvx@2.15.1", "", { "dependencies": { "@dotenvx/primitives": "^2.1.0", "@dotenvx/tooling": "^1.0.2", "yocto-spinner": "^1.2.1" }, "bin": { "dotenvx": "src/cli/dotenvx.js" } }, "sha512-t5eUkF4HV5qMAY+lg2ZYzPhso5i8EJHPvYKkzot0R4V08ivMs/w4HVe95bR9U2AGTTlSU5AA141mA6dRYRrn6g=="],
+
+    "@dotenvx/primitives": ["@dotenvx/primitives@2.1.0", "", {}, "sha512-GIpMSSgjZk4URRCtAw12vBmobnw3VeSKL+p7/y8ypWvTHFW+StAMZvq4wCjdX+QKuw4alXu0IMGW6QPhKo6ufg=="],
+
+    "@dotenvx/tooling": ["@dotenvx/tooling@1.0.2", "", {}, "sha512-yf4VwIZUzSqlLy2pe0kH2xk6dME73oYW5XqcHE7M1zA1H0RX/dSUThsSRmpCjp622iW9f6VGQl5Aa6szt5Xc0w=="],
 
     "@emnapi/core": ["@emnapi/core@1.11.1", "", { "dependencies": { "@emnapi/wasi-threads": "1.2.2", "tslib": "^2.4.0" } }, "sha512-RSvbQmHzdKzNsLYa/wHrbc3KN4sYLKAdPZxqiM2HATqv/SBk2/ENSHpvXGaLOMcsAyz0poEGqkmmKYG3OWiJEQ=="],
 
@@ -720,6 +727,10 @@
     "xtend": ["xtend@4.0.2", "", {}, "sha512-LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ=="],
 
     "yallist": ["yallist@3.1.1", "", {}, "sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g=="],
+
+    "yocto-spinner": ["yocto-spinner@1.2.2", "", { "dependencies": { "yoctocolors": "^2.1.1" } }, "sha512-DODGl1wJjA/s5pnJFKau9lIYHT81lnhob1i3e1TjxZRxEhWRKl74nTbWE6H5KlkViQQTo/Z29YFdxzTZAMY3ng=="],
+
+    "yoctocolors": ["yoctocolors@2.1.2", "", {}, "sha512-CzhO+pFNo8ajLM2d2IW/R93ipy99LWjtwblvC1RsoSUMZgyLbYFr221TnSNT7GjGdYui6P459mw9JH/g/zW2ug=="],
 
     "youch": ["youch@4.1.0-beta.10", "", { "dependencies": { "@poppinss/colors": "^4.1.5", "@poppinss/dumper": "^0.6.4", "@speed-highlight/core": "^1.2.7", "cookie": "^1.0.2", "youch-core": "^0.3.3" } }, "sha512-rLfVLB4FgQneDr0dv1oddCVZmKjcJ6yX6mS4pU82Mq/Dt9a3cLZQ62pDBL4AUO+uVrCvtWz3ZFUL2HFAFJ/BXQ=="],
 
