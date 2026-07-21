@@ -39,6 +39,18 @@ const demoUser: SessionUser = {
   email: "demo@briar.local",
 };
 
+const emptyDashboard = (project: Project): DashboardPayload => ({
+  project,
+  settings: {
+    velenOrg: null,
+    dataSource: null,
+    linear: { enabled: false, source: null, teamKey: null },
+    githubRepository: null,
+  },
+  runs: [],
+  generatedAt: new Date().toISOString(),
+});
+
 async function openExternal(url: string) {
   if ("__TAURI_INTERNALS__" in window) {
     const { openUrl } = await import("@tauri-apps/plugin-opener");
@@ -76,6 +88,7 @@ export function useBriar() {
   const [error, setError] = useState<string | null>(null);
   const [projectConnection, setProjectConnection] =
     useState<ProjectConnection | null>(null);
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [velen, setVelen] = useState<VelenInspection | null>(null);
   const pollTimer = useRef<number | null>(null);
   const loginAttempt = useRef(0);
@@ -232,10 +245,50 @@ export function useBriar() {
     setDashboard(null);
     setActiveProjectId(null);
     setProjectConnection(null);
+    setIsCreatingProject(false);
   }, [cancelLogin]);
+
+  const startProjectCreation = useCallback(() => {
+    setError(null);
+    setIsCreatingProject(true);
+  }, []);
+
+  const cancelProjectCreation = useCallback(() => {
+    setError(null);
+    setIsCreatingProject(false);
+  }, []);
+
+  const selectProject = useCallback(
+    (projectId: string) => {
+      setActiveProjectId(projectId);
+      if (!demoMode) return;
+      const project = projects.find((candidate) => candidate.id === projectId);
+      if (!project) return;
+      setDashboard(
+        project.id === demoDashboard.project.id
+          ? demoDashboard
+          : emptyDashboard(project),
+      );
+      setError(null);
+    },
+    [projects],
+  );
 
   const addProject = useCallback(
     async (input: { name: string }) => {
+      if (demoMode) {
+        const project: Project = {
+          id: crypto.randomUUID(),
+          name: input.name.trim(),
+          createdAt: new Date().toISOString(),
+        };
+        setProjects((current) => [...current, project]);
+        setActiveProjectId(project.id);
+        setDashboard(emptyDashboard(project));
+        setError(null);
+        setIsCreatingProject(false);
+        return { project, agentToken: null };
+      }
       if (!token) throw new Error("로그인이 필요합니다.");
       setLoading(true);
       setError(null);
@@ -243,6 +296,8 @@ export function useBriar() {
         const result = await createProject(token, input);
         setProjects((current) => [...current, result.project]);
         setActiveProjectId(result.project.id);
+        setIsCreatingProject(false);
+        setVelen(null);
         setProjectConnection(result);
         return result;
       } catch (caught) {
@@ -300,11 +355,13 @@ export function useBriar() {
   return {
     activeProjectId,
     addProject,
+    cancelProjectCreation,
     cancelLogin,
     connectProject,
     dashboard,
     demoMode,
     error,
+    isCreatingProject,
     loading,
     login,
     loginCode,
@@ -313,7 +370,8 @@ export function useBriar() {
     projectConnection,
     refresh,
     refreshVelen,
-    setActiveProjectId,
+    setActiveProjectId: selectProject,
+    startProjectCreation,
     token,
     user,
     velen,
