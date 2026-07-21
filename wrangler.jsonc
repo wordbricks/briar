@@ -4,6 +4,13 @@
   "main": "worker/src/index.ts",
   "compatibility_date": "2026-07-21",
   "compatibility_flags": ["nodejs_compat"],
+  "rules": [
+    {
+      "type": "Text",
+      "globs": ["**/*.svg"],
+      "fallthrough": true
+    }
+  ],
   "placement": {
     "mode": "smart"
   },

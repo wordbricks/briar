@@ -2,6 +2,7 @@ import { ArrowRight, Check, Copy, FolderGit2, LogOut } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { ProjectConnection } from "../hooks/useBriar";
 import type { SessionUser } from "../types";
+import { Logo } from "./Logo";
 
 type Props = {
   connection: ProjectConnection | null;
@@ -47,7 +48,7 @@ export function ProjectOnboarding({
   return (
     <main className="onboarding-shell">
       <header className="onboarding-topbar">
-        <span>⌁ briar</span>
+        <Logo />
         <button onClick={onLogout} type="button">
           <LogOut size={13} /> {user.email}
         </button>

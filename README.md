@@ -1,3 +1,5 @@
+<img src="./src-tauri/app-icon.svg" alt="Briar logo" width="72" />
+
 # Briar
 
 Briar is a Tauri v2 Agent Development Environment for observing local agents. The first release reproduces the Wordbricks Auto Hunt dashboard as a generic, read-only desktop app.

@@ -22,11 +22,7 @@ button { color: inherit; }
 .sidebar-brand { height: 56px; display: flex; align-items: center; padding: 0 18px 0 var(--traffic-light-safe-inset); border-bottom: 1px solid var(--line); }
 .brand { display: inline-flex; align-items: center; gap: 10px; }
 .brand-name { font-size: 18px; font-weight: 700; letter-spacing: -.7px; }
-.brand-mark { width: 24px; height: 24px; position: relative; display: flex; align-items: center; justify-content: center; }
-.brand-mark span { position: absolute; width: 6px; height: 18px; border-radius: 8px 8px 3px 3px; background: linear-gradient(180deg, #d2c9ff, #7660d6); transform-origin: 50% 90%; box-shadow: 0 0 18px rgba(155, 135, 245, .25); }
-.brand-mark span:first-child { transform: rotate(-42deg) translateY(1px); }
-.brand-mark span:nth-child(2) { transform: translateY(-3px); }
-.brand-mark span:last-child { transform: rotate(42deg) translateY(1px); }
+.brand-mark { width: 24px; height: 24px; display: block; filter: drop-shadow(0 0 9px rgba(155, 135, 245, .25)); }
 
 .project-switcher { margin: 16px 12px 8px; min-height: 54px; padding: 9px 10px; display: grid; grid-template-columns: 30px 1fr 14px; align-items: center; gap: 8px; background: #121419; border: 1px solid var(--line); border-radius: 9px; text-align: left; cursor: pointer; }
 .project-icon { width: 29px; height: 29px; border-radius: 7px; display: grid; place-items: center; color: #c7bbff; background: rgba(155, 135, 245, .12); border: 1px solid rgba(155, 135, 245, .17); }
