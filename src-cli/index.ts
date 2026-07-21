@@ -409,6 +409,35 @@ async function autoHuntDoctor() {
   );
 }
 
+const queuedIssueSchema = z.object({
+  runId: z.string().uuid(),
+  runNumber: z.number().int().positive(),
+  source: z.enum(autoHuntSources),
+  sourceKey: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string().nullable(),
+  priority: z.number().int().min(1).max(4).nullable(),
+  repository: z.string().min(1),
+  sourceCreatedAt: z.string().datetime({ offset: true }).nullable(),
+  context: z.record(z.string(), z.unknown()).nullable(),
+});
+
+async function nextHunt() {
+  const config = await loadConfig();
+  const project = await currentProject(config);
+  ensureVelen(project);
+  const result = await request<{ issue: unknown }>(
+    config.apiUrl,
+    "/ingest/queue/next",
+    process.env.BRIAR_AGENT_TOKEN ?? project.agentToken,
+  );
+  console.log(
+    JSON.stringify({
+      issue: result.issue === null ? null : queuedIssueSchema.parse(result.issue),
+    }),
+  );
+}
+
 async function optionalText(valueFlag: string, fileFlag: string) {
   const path = value(fileFlag);
   if (path) return readFile(resolve(path), "utf8");
@@ -549,6 +578,7 @@ const usage = `Briar CLI
   briar project create [--name <name>]
   briar connect --project-id <uuid> --agent-token <token>
   briar auto-hunt doctor
+  briar auto-hunt next
   briar auto-hunt configure --velen-org <slug> [--data-source <provider://source>]
     [--enable-linear --linear-source <linear://source> --linear-team <key>]
     [--disable-linear]
@@ -570,6 +600,7 @@ async function main() {
   if (args[0] === "project" && args[1] === "create") return createProject();
   if (args[0] === "connect") return connectProject();
   if (args[0] === "auto-hunt" && args[1] === "doctor") return autoHuntDoctor();
+  if (args[0] === "auto-hunt" && args[1] === "next") return nextHunt();
   if (args[0] === "auto-hunt" && args[1] === "configure") {
     return configureAutoHunt();
   }

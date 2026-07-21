@@ -4,6 +4,7 @@ import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { HuntEventInput } from "./db";
 import {
+  getNextQueuedHuntRun,
   HuntTransitionError,
   recordHuntEvent,
   recordQaResult,
@@ -160,5 +161,75 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       production_qa_status: "passed",
       result_summary: "Production verified",
     });
+  });
+
+  it("stores an app-created issue as a queued Auto Hunt run", async () => {
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 20, {
+        sourceKey: "briar-issue:22222222-2222-4222-8222-222222222222",
+        eventKey:
+          "briar-issue:22222222-2222-4222-8222-222222222222:queued:intake",
+        title: "App-created issue",
+        actor: "briar-app",
+        priority: 2,
+        branch: null,
+        commitSha: null,
+        issueDescription: "Created directly in Briar",
+        sourceCreatedAt: atMinute(20),
+        context: {
+          origin: "briar-app",
+          issueId: "22222222-2222-4222-8222-222222222222",
+        },
+      }),
+    );
+
+    const run = await db
+      .prepare(
+        `select stage, source, title, priority, issue_description, context_json
+         from briar_hunt_runs where id = ?`,
+      )
+      .bind(runId)
+      .first<{
+        stage: string;
+        source: string;
+        title: string;
+        priority: number;
+        issue_description: string;
+        context_json: string;
+      }>();
+
+    expect(run).toEqual({
+      stage: "queued",
+      source: "issue",
+      title: "App-created issue",
+      priority: 2,
+      issue_description: "Created directly in Briar",
+      context_json:
+        '{"origin":"briar-app","issueId":"22222222-2222-4222-8222-222222222222"}',
+    });
+  });
+
+  it("returns the highest-priority oldest queued run", async () => {
+    const urgentId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 21, {
+        sourceKey: "briar-issue:33333333-3333-4333-8333-333333333333",
+        eventKey:
+          "briar-issue:33333333-3333-4333-8333-333333333333:queued:intake",
+        title: "Urgent queued issue",
+        priority: 1,
+        branch: null,
+        commitSha: null,
+      }),
+    );
+
+    const next = await getNextQueuedHuntRun(db, projectId);
+
+    expect(next?.id).toBe(urgentId);
+    expect(next?.title).toBe("Urgent queued issue");
+    expect(next?.stage).toBe("queued");
   });
 });

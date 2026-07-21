@@ -59,7 +59,9 @@ export function App() {
         dashboard={briar.dashboard}
         demoMode={briar.demoMode}
         error={briar.error}
+        isCreatingIssue={briar.isCreatingIssue}
         isSidebarOpen={isSidebarOpen}
+        onCreateIssue={briar.addIssue}
         onRefresh={() => void briar.refresh()}
         onSidebarOpen={() => setIsSidebarOpen(true)}
       />

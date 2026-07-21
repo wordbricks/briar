@@ -12,6 +12,7 @@ import {
   createProject,
   EventKeyConflictError,
   findProjectIdByAgentTokenHash,
+  getNextQueuedHuntRun,
   getProject,
   getProjectSettings,
   getHuntRunForProject,
@@ -138,6 +139,14 @@ const projectInputSchema = z.object({
   name: z.string().trim().min(1).max(100),
 });
 
+const issueInputSchema = z
+  .object({
+    title: z.string().trim().min(1).max(300),
+    description: z.string().trim().max(100_000).nullable().optional(),
+    priority: z.number().int().min(1).max(4).nullable().optional(),
+  })
+  .strict();
+
 const projectSettingsSchema = z
   .object({
     velenOrg: nullableTrimmed(100),
@@ -255,6 +264,19 @@ async function requireSession(auth: BriarAuth, request: Request) {
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session?.user) throw new HttpError(401, "Unauthorized");
   return session;
+}
+
+async function requireAgentProject(db: D1Database, request: Request) {
+  const authorization = request.headers.get("authorization") ?? "";
+  const token = authorization.startsWith("Bearer ")
+    ? authorization.slice(7)
+    : "";
+  if (!token.startsWith("briar_agent_")) {
+    throw new HttpError(401, "Invalid agent token");
+  }
+  const projectId = await findProjectIdByAgentTokenHash(db, await sha256(token));
+  if (!projectId) throw new HttpError(401, "Invalid agent token");
+  return projectId;
 }
 
 function projectJson(row: ProjectRow) {
@@ -451,17 +473,70 @@ async function route(
     });
   }
 
+  const issuesMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/issues$/u,
+  );
+  if (issuesMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, issuesMatch[1], session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    const [input, settings] = await Promise.all([
+      readJson(request).then((body) => issueInputSchema.parse(body)),
+      getProjectSettings(db, project.id),
+    ]);
+    const issueId = crypto.randomUUID();
+    const sourceKey = `briar-issue:${issueId}`;
+    const occurredAt = new Date().toISOString();
+    const runId = await recordHuntEvent(db, project.id, {
+      source: "issue",
+      sourceKey,
+      title: input.title,
+      stage: "queued",
+      eventKey: `${sourceKey}:queued:intake`,
+      occurredAt,
+      actor: "briar-app",
+      repository: settings?.github_repository ?? project.name,
+      detail: "Briar 앱에서 생성된 이슈가 Auto Hunt 처리를 기다리고 있습니다.",
+      priority: input.priority ?? null,
+      branch: null,
+      commitSha: null,
+      tracker: null,
+      issueDescription: input.description || null,
+      resultSummary: null,
+      pullRequestUrls: [],
+      targetSha: null,
+      sourceCreatedAt: occurredAt,
+      qaStatus: null,
+      stagingQaDetail: null,
+      productionQaDetail: null,
+      context: { origin: "briar-app", issueId },
+    });
+    return json({ runId, sourceKey, stage: "queued" }, 201);
+  }
+
+  if (pathname === "/ingest/queue/next" && request.method === "GET") {
+    const projectId = await requireAgentProject(db, request);
+    const run = await getNextQueuedHuntRun(db, projectId);
+    return json({
+      issue: run
+        ? {
+            runId: run.id,
+            runNumber: run.run_number,
+            source: run.source,
+            sourceKey: run.source_key,
+            title: run.title,
+            description: run.issue_description,
+            priority: run.priority,
+            repository: run.repository,
+            sourceCreatedAt: run.source_created_at,
+            context: parseJsonObject(run.context_json),
+          }
+        : null,
+    });
+  }
+
   if (pathname === "/ingest/events" && request.method === "POST") {
-    const authorization = request.headers.get("authorization") ?? "";
-    const token = authorization.startsWith("Bearer ")
-      ? authorization.slice(7)
-      : "";
-    if (!token.startsWith("briar_agent_")) {
-      throw new HttpError(401, "Invalid agent token");
-    }
-    const tokenHash = await sha256(token);
-    const projectId = await findProjectIdByAgentTokenHash(db, tokenHash);
-    if (!projectId) throw new HttpError(401, "Invalid agent token");
+    const projectId = await requireAgentProject(db, request);
     const parsed = eventSchema.parse(await readJson(request));
     const input = {
       ...parsed,
@@ -505,15 +580,7 @@ async function route(
   }
 
   if (pathname === "/ingest/qa-results" && request.method === "POST") {
-    const authorization = request.headers.get("authorization") ?? "";
-    const token = authorization.startsWith("Bearer ")
-      ? authorization.slice(7)
-      : "";
-    if (!token.startsWith("briar_agent_")) {
-      throw new HttpError(401, "Invalid agent token");
-    }
-    const projectId = await findProjectIdByAgentTokenHash(db, await sha256(token));
-    if (!projectId) throw new HttpError(401, "Invalid agent token");
+    const projectId = await requireAgentProject(db, request);
     const input = qaResultSchema.parse(await readJson(request));
     const outcome = await recordQaResult(db, projectId, {
       ...input,

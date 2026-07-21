@@ -31,6 +31,19 @@ Read [lifecycle.md](references/lifecycle.md) before starting. Read [velen-and-li
    briar auto-hunt doctor
    ```
 
+   When the user asks to process work created in Briar, fetch the next queued
+   issue after preflight:
+
+   ```sh
+   briar auto-hunt next
+   ```
+
+   If it returns an issue, adopt its `runId`, `source`, `sourceKey`, and `title`
+   as the canonical identity. The queued event already exists, so do not record
+   another intake event. Proceed with Velen investigation and record
+   `analyzing` on that same identity. If it returns `{"issue":null}`, report
+   that the queue is empty and do not invent work.
+
 2. Choose the canonical identity:
 
    - `source=issue`: an external or repository issue; prefer its immutable ID as `source-key`.
