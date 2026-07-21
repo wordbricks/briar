@@ -24,8 +24,8 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:8787 https:; img-src 'self' asset: http://asset.localhost https: data:; style-src 'self' 'unsafe-inline'; script-src 'self' https://jelly-ui.com",
-      "devCsp": "default-src 'self' http://localhost:1420; connect-src 'self' ipc: http://ipc.localhost http://localhost:1420 ws://localhost:1420 http://127.0.0.1:8787 https:; img-src 'self' asset: http://asset.localhost http://localhost:1420 https: data:; style-src 'self' 'unsafe-inline' http://localhost:1420; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:1420 https://jelly-ui.com"
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:8787 https:; img-src 'self' asset: http://asset.localhost https: data:; style-src 'self' 'unsafe-inline'; script-src 'self'",
+      "devCsp": "default-src 'self' http://localhost:1420; connect-src 'self' ipc: http://ipc.localhost http://localhost:1420 ws://localhost:1420 http://127.0.0.1:8787 https:; img-src 'self' asset: http://asset.localhost http://localhost:1420 https: data:; style-src 'self' 'unsafe-inline' http://localhost:1420; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:1420"
     }
   },
   "bundle": {
@@ -37,7 +37,8 @@
     "resources": {
       "../dist-cli/briar.js": "cli/briar.js",
       "../scripts/briar-launcher": "cli/briar",
-      "../skills/briar-auto-hunt/": "skills/briar-auto-hunt/"
+      "../skills/briar-auto-hunt/": "skills/briar-auto-hunt/",
+      "../third-party/jelly-ui-LICENSE": "licenses/jelly-ui-LICENSE"
     },
     "macOS": {
       "minimumSystemVersion": "12.0"
