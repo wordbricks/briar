@@ -5,6 +5,7 @@ import {
   ChevronRight,
   CircleAlert,
   Clock3,
+  FolderGit2,
   GitCommitHorizontal,
   GitFork,
   LoaderCircle,
@@ -12,11 +13,15 @@ import {
   Plus,
   RefreshCw,
   Search,
+  ShieldCheck,
+  Terminal,
+  Wrench,
   X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { JellySelect } from "./JellySelect";
 import { sourceLabel, stageMeta } from "../lib/stages";
+import type { AutoHuntHealth } from "../lib/project-connection";
 import type { DashboardPayload, HuntRun, HuntSource } from "../types";
 
 type SourceFilter = "all" | HuntSource;
@@ -26,15 +31,24 @@ export function HuntDashboard({
   dashboard,
   demoMode,
   error,
+  health,
+  healthError,
+  healthLoading,
   isCreatingIssue,
   isSidebarOpen,
   onCreateIssue,
+  onHealthRefresh,
+  onReconnect,
+  onRepair,
   onRefresh,
   onSidebarOpen,
 }: {
   dashboard: DashboardPayload | null;
   demoMode: boolean;
   error: string | null;
+  health: AutoHuntHealth | null;
+  healthError: string | null;
+  healthLoading: boolean;
   isCreatingIssue: boolean;
   isSidebarOpen: boolean;
   onCreateIssue: (input: {
@@ -42,6 +56,9 @@ export function HuntDashboard({
     description: string | null;
     priority: number | null;
   }) => Promise<unknown>;
+  onHealthRefresh: () => void;
+  onReconnect: () => void;
+  onRepair: () => void;
   onRefresh: () => void;
   onSidebarOpen: () => void;
 }) {
@@ -117,6 +134,15 @@ export function HuntDashboard({
           <Metric label="완료" value={completedCount} note="Production QA 통과" icon={<Check size={18} />} tone="emerald" />
         </section>
 
+        <ConnectionHealth
+          error={healthError}
+          health={health}
+          loading={healthLoading}
+          onReconnect={onReconnect}
+          onRefresh={onHealthRefresh}
+          onRepair={onRepair}
+        />
+
         <jelly-card className="queue-panel">
           <div className="queue-header">
             <div>
@@ -163,6 +189,70 @@ export function HuntDashboard({
       {selected && <RunDialog run={selected} onClose={() => setSelected(null)} />}
     </main>
   );
+}
+
+export function ConnectionHealth({
+  error,
+  health,
+  loading,
+  onReconnect,
+  onRefresh,
+  onRepair,
+}: {
+  error: string | null;
+  health: AutoHuntHealth | null;
+  loading: boolean;
+  onReconnect: () => void;
+  onRefresh: () => void;
+  onRepair: () => void;
+}) {
+  const assetsNeedRepair =
+    health && (!health.cliCurrent || !health.skillCurrent);
+  return (
+    <jelly-card className={`health-panel${health?.healthy ? " healthy" : ""}`}>
+      <div className="health-header">
+        <div>
+          <span className="health-icon"><ShieldCheck size={16} /></span>
+          <span><strong>Auto Hunt 연결 상태</strong><small>{health?.healthy ? "실행 준비 완료" : "로컬 실행 환경 검사"}</small></span>
+        </div>
+        <div className="health-actions">
+          {assetsNeedRepair && <button onClick={onRepair} type="button"><Wrench size={13} />CLI·스킬 복구</button>}
+          <button onClick={onReconnect} type="button"><FolderGit2 size={13} />저장소 재연결</button>
+          <button aria-label="연결 상태 다시 검사" disabled={loading} onClick={onRefresh} type="button"><RefreshCw className={loading ? "spin" : ""} size={13} /></button>
+        </div>
+      </div>
+      {error && <div className="health-error"><CircleAlert size={14} />{error}</div>}
+      {health ? (
+        <div className="health-grid">
+          <HealthItem healthy={health.repositoryHealthy} icon={<FolderGit2 size={15} />} label="저장소" value={health.repositoryPath ?? "연결 안 됨"} />
+          <HealthItem healthy={health.cliCurrent} icon={<Terminal size={15} />} label="Briar CLI" value={health.cliVersion ? `v${health.cliVersion}` : "설치 안 됨"} expected={`v${health.cliExpectedVersion}`} />
+          <HealthItem healthy={health.skillCurrent} icon={<Bot size={15} />} label="Auto Hunt 스킬" value={health.skillVersion ? `v${health.skillVersion}` : "설치 안 됨"} expected={`v${health.skillExpectedVersion}`} />
+          <HealthItem healthy={health.velenHealthy} icon={<ShieldCheck size={15} />} label="Velen" value={health.velenOrg ?? "조직 미설정"} expected={health.velenEmail ?? undefined} />
+        </div>
+      ) : (
+        <div className="health-empty">{loading ? "로컬 Auto Hunt 환경을 검사하고 있습니다…" : "데스크톱 앱에서 연결 상태를 확인할 수 있습니다."}</div>
+      )}
+      {health && !health.healthy && health.issues.length > 0 && (
+        <div className="health-issues">{health.issues.map((issue) => <span key={issue}><CircleAlert size={12} />{issue}</span>)}</div>
+      )}
+    </jelly-card>
+  );
+}
+
+function HealthItem({
+  expected,
+  healthy,
+  icon,
+  label,
+  value,
+}: {
+  expected?: string;
+  healthy: boolean;
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
+  return <div className="health-item"><i className={healthy ? "ok" : "warning"}>{icon}</i><span><small>{label}</small><strong title={value}>{value}</strong>{expected && <em>{expected}</em>}</span><b>{healthy ? "정상" : "확인 필요"}</b></div>;
 }
 
 export function CreateIssueDialog({

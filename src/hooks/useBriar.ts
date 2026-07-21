@@ -15,8 +15,11 @@ import { demoDashboard } from "../lib/demo-data";
 import {
   connectLocalProject,
   inspectVelen,
+  loadAutoHuntHealth,
   loadConnectedProjectIds,
   pickGitRepository,
+  repairAutoHunt,
+  type AutoHuntHealth,
   type LocalAutoHuntConfig,
   type VelenInspection,
 } from "../lib/project-connection";
@@ -92,6 +95,9 @@ export function useBriar() {
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [isCreatingIssue, setIsCreatingIssue] = useState(false);
   const [velen, setVelen] = useState<VelenInspection | null>(null);
+  const [health, setHealth] = useState<AutoHuntHealth | null>(null);
+  const [healthError, setHealthError] = useState<string | null>(null);
+  const [healthLoading, setHealthLoading] = useState(false);
   const pollTimer = useRef<number | null>(null);
   const loginAttempt = useRef(0);
 
@@ -172,6 +178,32 @@ export function useBriar() {
     if (demoMode || !token || !activeProjectId) return;
     return startDashboardPolling(() => void refresh());
   }, [activeProjectId, refresh, token]);
+
+  const refreshHealth = useCallback(async () => {
+    if (demoMode || !activeProjectId) {
+      setHealth(null);
+      setHealthError(null);
+      return null;
+    }
+    setHealthLoading(true);
+    try {
+      const result = await loadAutoHuntHealth(activeProjectId);
+      setHealth(result);
+      setHealthError(null);
+      return result;
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : String(caught);
+      setHealth(null);
+      setHealthError(message);
+      return null;
+    } finally {
+      setHealthLoading(false);
+    }
+  }, [activeProjectId]);
+
+  useEffect(() => {
+    void refreshHealth();
+  }, [refreshHealth]);
 
   const login = useCallback(async () => {
     const attempt = ++loginAttempt.current;
@@ -258,6 +290,7 @@ export function useBriar() {
   const cancelProjectCreation = useCallback(() => {
     setError(null);
     setIsCreatingProject(false);
+    setProjectConnection(null);
   }, []);
 
   const selectProject = useCallback(
@@ -343,7 +376,9 @@ export function useBriar() {
         });
       }
       setProjectConnection(null);
+      setIsCreatingProject(false);
       await refresh();
+      await refreshHealth();
       return connectedPath;
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : String(caught);
@@ -352,7 +387,33 @@ export function useBriar() {
     } finally {
       setLoading(false);
     }
-  }, [projectConnection, refresh, token]);
+  }, [projectConnection, refresh, refreshHealth, token]);
+
+  const repairHealth = useCallback(async () => {
+    if (!activeProjectId) throw new Error("복구할 프로젝트가 없습니다.");
+    setHealthLoading(true);
+    setHealthError(null);
+    try {
+      const result = await repairAutoHunt(activeProjectId);
+      setHealth(result);
+      return result;
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : String(caught);
+      setHealthError(message);
+      return null;
+    } finally {
+      setHealthLoading(false);
+    }
+  }, [activeProjectId]);
+
+  const reconnectProject = useCallback(() => {
+    const project = projects.find((candidate) => candidate.id === activeProjectId);
+    if (!project) return;
+    setError(null);
+    setVelen(null);
+    setIsCreatingProject(true);
+    setProjectConnection({ project, agentToken: null });
+  }, [activeProjectId, projects]);
 
   const addIssue = useCallback(
     async (input: {
@@ -449,6 +510,9 @@ export function useBriar() {
     dashboard,
     demoMode,
     error,
+    health,
+    healthError,
+    healthLoading,
     isCreatingProject,
     isCreatingIssue,
     loading,
@@ -457,9 +521,12 @@ export function useBriar() {
     logout,
     projects,
     projectConnection,
+    reconnectProject,
     refresh,
+    refreshHealth,
     refreshVelen,
     setActiveProjectId: selectProject,
+    repairHealth,
     startProjectCreation,
     token,
     user,
