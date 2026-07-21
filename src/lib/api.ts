@@ -1,0 +1,131 @@
+import { z } from "zod";
+import type { DashboardPayload, Project, SessionUser } from "../types";
+
+const apiUrl = import.meta.env.VITE_BRIAR_API_URL?.replace(/\/$/u, "") ?? "";
+
+const sessionUserSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string().email(),
+  image: z.string().nullable().optional(),
+});
+
+const projectSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  repositoryPath: z.string(),
+  createdAt: z.string(),
+});
+
+export const isApiConfigured = Boolean(apiUrl);
+
+async function request<T>(
+  path: string,
+  token: string | null,
+  init?: RequestInit,
+): Promise<T> {
+  if (!apiUrl) throw new Error("Briar API URL이 설정되지 않았습니다.");
+  const response = await fetch(`${apiUrl}${path}`, {
+    ...init,
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...init?.headers,
+    },
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(
+      body?.message ??
+        body?.error_description ??
+        body?.error ??
+        `Briar API 요청 실패 (${response.status})`,
+    );
+  }
+  return response.json() as Promise<T>;
+}
+
+export type DeviceAuthorization = {
+  deviceCode: string;
+  userCode: string;
+  verificationUrl: string;
+  interval: number;
+};
+
+export async function beginDeviceAuthorization(): Promise<DeviceAuthorization> {
+  const response = await request<{
+    device_code: string;
+    user_code: string;
+    verification_uri: string;
+    verification_uri_complete?: string;
+    interval?: number;
+  }>("/api/auth/device/code", null, {
+    method: "POST",
+    body: JSON.stringify({
+      client_id: "briar-desktop",
+      scope: "openid profile email",
+    }),
+  });
+  return {
+    deviceCode: response.device_code,
+    userCode: response.user_code,
+    verificationUrl:
+      response.verification_uri_complete ?? response.verification_uri,
+    interval: response.interval ?? 5,
+  };
+}
+
+type DeviceTokenResponse = {
+  access_token?: string;
+  error?: "authorization_pending" | "slow_down" | "access_denied" | "expired_token";
+  error_description?: string;
+};
+
+export async function pollDeviceToken(
+  deviceCode: string,
+): Promise<DeviceTokenResponse> {
+  try {
+    return await request<DeviceTokenResponse>("/api/auth/device/token", null, {
+      method: "POST",
+      body: JSON.stringify({
+        grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+        device_code: deviceCode,
+        client_id: "briar-desktop",
+      }),
+    });
+  } catch (error) {
+    if (!(error instanceof Error)) throw error;
+    const message = error.message.toLowerCase();
+    if (message.includes("pending")) return { error: "authorization_pending" };
+    if (message.includes("slow")) return { error: "slow_down" };
+    throw error;
+  }
+}
+
+export async function loadSession(token: string): Promise<SessionUser> {
+  const result = await request<{ user: unknown }>("/me", token);
+  return sessionUserSchema.parse(result.user);
+}
+
+export async function loadProjects(token: string): Promise<Project[]> {
+  const result = await request<{ projects: unknown[] }>("/projects", token);
+  return z.array(projectSchema).parse(result.projects);
+}
+
+export async function loadDashboard(
+  token: string,
+  projectId: string,
+): Promise<DashboardPayload> {
+  return request<DashboardPayload>(`/projects/${projectId}/dashboard`, token);
+}
+
+export async function createProject(
+  token: string,
+  input: { name: string; repositoryPath: string },
+) {
+  return request<{ project: Project; agentToken: string }>("/projects", token, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
