@@ -11,7 +11,7 @@ Repository source code stays local. Agents send only task state and Git metadata
 - OAuth 2.0 Device Authorization for the desktop app and CLI
 - Cloudflare D1 storage through a Worker binding
 - D1 migrations for Better Auth and Auto Hunt state
-- OS keychain storage for the desktop session token
+- Persistent desktop sessions stored in a permission-restricted app config file
 - Project-scoped Agent ingest tokens stored as SHA-256 hashes
 - `briar` CLI for login, repository connection, and Auto Hunt event recording
 - A validated `briar-auto-hunt` Codex skill installed automatically with the CLI

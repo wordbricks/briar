@@ -8,8 +8,12 @@ use std::{
 };
 use tauri::Manager;
 
-const KEYRING_SERVICE: &str = "app.briar.desktop";
-const KEYRING_USER: &str = "better-auth-session";
+const SESSION_FILE_NAME: &str = "session.json";
+
+#[derive(Deserialize, Serialize)]
+struct StoredSession {
+    token: String,
+}
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -82,35 +86,92 @@ struct CliConfig {
     extra: BTreeMap<String, serde_json::Value>,
 }
 
-fn session_entry() -> Result<keyring::Entry, String> {
-    keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER).map_err(|error| error.to_string())
+fn session_file_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    Ok(app
+        .path()
+        .app_config_dir()
+        .map_err(|error| error.to_string())?
+        .join(SESSION_FILE_NAME))
 }
 
-#[tauri::command]
-fn read_session_token() -> Result<Option<String>, String> {
-    match session_entry()?.get_password() {
-        Ok(token) => Ok(Some(token)),
-        Err(keyring::Error::NoEntry) => Ok(None),
-        Err(error) => Err(error.to_string()),
+fn read_session_token_from(path: &Path) -> Result<Option<String>, String> {
+    if !path.exists() {
+        return Ok(None);
     }
+    let contents = fs::read_to_string(path)
+        .map_err(|error| format!("Briar 로그인 세션을 읽지 못했습니다: {error}"))?;
+    let session = serde_json::from_str::<StoredSession>(&contents)
+        .map_err(|error| format!("Briar 로그인 세션이 손상되었습니다: {error}"))?;
+    if session.token.trim().is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(session.token))
 }
 
-#[tauri::command]
-fn write_session_token(token: String) -> Result<(), String> {
+fn write_session_token_to(path: &Path, token: String) -> Result<(), String> {
     if token.trim().is_empty() {
         return Err("session token cannot be empty".to_string());
     }
-    session_entry()?
-        .set_password(&token)
-        .map_err(|error| error.to_string())
+    let directory = path
+        .parent()
+        .ok_or_else(|| "Briar 설정 폴더를 찾을 수 없습니다.".to_string())?;
+    fs::create_dir_all(directory)
+        .map_err(|error| format!("Briar 설정 폴더를 만들지 못했습니다: {error}"))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(directory, fs::Permissions::from_mode(0o700))
+            .map_err(|error| format!("Briar 설정 폴더 권한을 지정하지 못했습니다: {error}"))?;
+    }
+
+    let temporary_path = path.with_extension("json.tmp");
+    let serialized = serde_json::to_vec(&StoredSession { token })
+        .map_err(|error| format!("Briar 로그인 세션을 만들지 못했습니다: {error}"))?;
+    let mut options = OpenOptions::new();
+    options.create(true).truncate(true).write(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut file = options
+        .open(&temporary_path)
+        .map_err(|error| format!("Briar 로그인 세션을 열지 못했습니다: {error}"))?;
+    file.write_all(&serialized)
+        .and_then(|_| file.sync_all())
+        .map_err(|error| format!("Briar 로그인 세션을 저장하지 못했습니다: {error}"))?;
+    fs::rename(&temporary_path, path)
+        .map_err(|error| format!("Briar 로그인 세션을 교체하지 못했습니다: {error}"))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, fs::Permissions::from_mode(0o600))
+            .map_err(|error| format!("Briar 로그인 세션 권한을 지정하지 못했습니다: {error}"))?;
+    }
+    Ok(())
+}
+
+fn clear_session_token_at(path: &Path) -> Result<(), String> {
+    match fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(format!("Briar 로그인 세션을 삭제하지 못했습니다: {error}")),
+    }
 }
 
 #[tauri::command]
-fn clear_session_token() -> Result<(), String> {
-    match session_entry()?.delete_credential() {
-        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-        Err(error) => Err(error.to_string()),
-    }
+fn read_session_token(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    read_session_token_from(&session_file_path(&app)?)
+}
+
+#[tauri::command]
+fn write_session_token(app: tauri::AppHandle, token: String) -> Result<(), String> {
+    write_session_token_to(&session_file_path(&app)?, token)
+}
+
+#[tauri::command]
+fn clear_session_token(app: tauri::AppHandle) -> Result<(), String> {
+    clear_session_token_at(&session_file_path(&app)?)
 }
 
 fn git_repository_root(path: &Path) -> Result<PathBuf, String> {
@@ -496,6 +557,45 @@ async fn connect_local_project(
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn persists_and_clears_session_without_a_keychain() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be after unix epoch")
+            .as_nanos();
+        let directory = std::env::temp_dir().join(format!("briar-session-test-{unique}"));
+        let session_path = directory.join(SESSION_FILE_NAME);
+
+        assert_eq!(
+            read_session_token_from(&session_path).expect("missing session should be valid"),
+            None
+        );
+        write_session_token_to(&session_path, "persistent-session-token".to_string())
+            .expect("session should be saved");
+        assert_eq!(
+            read_session_token_from(&session_path).expect("session should be readable"),
+            Some("persistent-session-token".to_string())
+        );
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(
+                fs::metadata(&session_path)
+                    .expect("session metadata should be readable")
+                    .permissions()
+                    .mode()
+                    & 0o777,
+                0o600
+            );
+        }
+        clear_session_token_at(&session_path).expect("session should be cleared");
+        assert_eq!(
+            read_session_token_from(&session_path).expect("cleared session should be valid"),
+            None
+        );
+        fs::remove_dir_all(directory).expect("test session directory should be removed");
+    }
 
     #[test]
     fn writes_cli_connection_without_losing_existing_config() {
