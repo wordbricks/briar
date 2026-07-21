@@ -1,4 +1,5 @@
 import {
+  ArrowLeft,
   ArrowRight,
   Check,
   Database,
@@ -18,9 +19,11 @@ import type { SessionUser } from "../types";
 import { Logo } from "./Logo";
 
 type Props = {
+  canCancel?: boolean;
   connection: ProjectConnection | null;
   error: string | null;
   loading: boolean;
+  onCancel: () => void;
   onConnect: (settings: LocalAutoHuntConfig) => Promise<unknown>;
   onCreate: (input: { name: string }) => Promise<unknown>;
   onLogout: () => void;
@@ -29,14 +32,12 @@ type Props = {
   velen: VelenInspection | null;
 };
 
-function elementValue(event: React.FormEvent<HTMLElement>) {
-  return (event.currentTarget as HTMLElement & { value?: string }).value ?? "";
-}
-
 export function ProjectOnboarding({
+  canCancel = false,
   connection,
   error,
   loading,
+  onCancel,
   onConnect,
   onCreate,
   onLogout,
@@ -88,9 +89,16 @@ export function ProjectOnboarding({
     <jelly-theme mode="light" className="onboarding-shell">
       <header className="onboarding-topbar">
         <Logo />
-        <button onClick={onLogout} type="button">
-          <LogOut size={14} /> {user.email}
-        </button>
+        <div className="onboarding-topbar-actions">
+          {canCancel ? (
+            <button onClick={onCancel} type="button">
+              <ArrowLeft size={14} /> 대시보드로 돌아가기
+            </button>
+          ) : null}
+          <button onClick={onLogout} type="button">
+            <LogOut size={14} /> {user.email}
+          </button>
+        </div>
       </header>
       <jelly-card className="onboarding-card">
         <div className="onboarding-icon">
@@ -173,7 +181,13 @@ export function ProjectOnboarding({
                     </label>
                     <label>
                       <span>팀 키 <small>선택</small></span>
-                      <jelly-input label="Linear 팀 키" placeholder="예: WRD" value={linearTeam} onInput={(event) => setLinearTeam(elementValue(event))} />
+                      <input
+                        aria-label="Linear 팀 키"
+                        className="native-input"
+                        onChange={(event) => setLinearTeam(event.currentTarget.value)}
+                        placeholder="예: WRD"
+                        value={linearTeam}
+                      />
                     </label>
                   </div>
                 ) : null}
@@ -181,15 +195,14 @@ export function ProjectOnboarding({
             </div>
 
             {error ? <jelly-alert variant="rose" className="login-error">{error}</jelly-alert> : null}
-            <jelly-button
-              block
+            <button
+              className="onboarding-primary-action"
               disabled={loading || !velen || !velenOrg || (linearEnabled && !linearSource)}
               onClick={() => void connect()}
-              size="large"
-              variant="mint"
+              type="button"
             >
               {loading ? "연결하는 중…" : "저장소 선택하고 Auto Hunt 연결"} <ArrowRight size={17} />
-            </jelly-button>
+            </button>
             <p className="token-warning">
               경로, Agent 토큰, Velen 설정은 이 컴퓨터의 Briar 설정에 자동 저장됩니다.
               터미널 명령은 필요 없습니다.
@@ -197,25 +210,32 @@ export function ProjectOnboarding({
           </>
         ) : (
           <>
-            <p className="eyebrow">FIRST PROJECT</p>
-            <h1>프로젝트 만들기</h1>
+            <p className="eyebrow">{canCancel ? "NEW PROJECT" : "FIRST PROJECT"}</p>
+            <h1>{canCancel ? "프로젝트 추가" : "프로젝트 만들기"}</h1>
             <p className="onboarding-copy">
-              대시보드 프로젝트를 만든 다음 Git 저장소와 Velen을 연결하세요.
+              {canCancel
+                ? "새 대시보드 프로젝트를 만든 다음 Git 저장소와 Velen을 연결하세요."
+                : "대시보드 프로젝트를 만든 다음 Git 저장소와 Velen을 연결하세요."}
             </p>
             <form className="project-form" onSubmit={(event) => void submit(event)}>
               <label>
                 <span>프로젝트 이름</span>
-                <jelly-input
-                  label="프로젝트 이름"
+                <input
+                  aria-label="프로젝트 이름"
+                  className="native-input"
+                  onChange={(event) => setName(event.currentTarget.value)}
                   placeholder="wordbricks"
                   value={name}
-                  onInput={(event) => setName(elementValue(event))}
                 />
               </label>
               {error ? <jelly-alert variant="rose" className="login-error">{error}</jelly-alert> : null}
-              <jelly-button block disabled={loading || !name.trim()} type="submit" size="large" variant="mint">
+              <button
+                className="onboarding-primary-action"
+                disabled={loading || !name.trim()}
+                type="submit"
+              >
                 {loading ? "만드는 중…" : "프로젝트 만들기"} <ArrowRight size={17} />
-              </jelly-button>
+              </button>
             </form>
           </>
         )}

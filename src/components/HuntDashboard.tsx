@@ -8,6 +8,7 @@ import {
   GitCommitHorizontal,
   GitFork,
   LoaderCircle,
+  PanelLeftOpen,
   RefreshCw,
   Search,
   X,
@@ -23,12 +24,16 @@ export function HuntDashboard({
   dashboard,
   demoMode,
   error,
+  isSidebarOpen,
   onRefresh,
+  onSidebarOpen,
 }: {
   dashboard: DashboardPayload | null;
   demoMode: boolean;
   error: string | null;
+  isSidebarOpen: boolean;
   onRefresh: () => void;
+  onSidebarOpen: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [source, setSource] = useState<SourceFilter>("all");
@@ -60,7 +65,20 @@ export function HuntDashboard({
 
   return (
     <main className="main-content" id="dashboard">
-      <header className="topbar" data-tauri-drag-region>
+      <header className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region>
+        {!isSidebarOpen && (
+          <button
+            aria-controls="app-sidebar"
+            aria-expanded="false"
+            aria-label="왼쪽 패널 열기"
+            className="sidebar-toggle"
+            onClick={onSidebarOpen}
+            title="왼쪽 패널 열기"
+            type="button"
+          >
+            <PanelLeftOpen size={17} />
+          </button>
+        )}
         <div className="window-controls" aria-hidden="true"><i /><i /><i /></div>
         <div className="sync-state"><span />D1 연결됨</div>
       </header>
