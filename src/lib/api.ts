@@ -53,6 +53,7 @@ async function request<T>(
         `Briar API 요청 실패 (${response.status})`,
     );
   }
+  if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }
 
@@ -138,6 +139,10 @@ export async function createProject(
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+export async function deleteProject(token: string, projectId: string) {
+  return request<void>(`/projects/${projectId}`, token, { method: "DELETE" });
 }
 
 export async function createIssue(

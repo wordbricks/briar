@@ -25,6 +25,7 @@ import {
   claimNextQueuedHuntRun,
   createIssueAttachments,
   createProject,
+  deleteProject,
   EventKeyConflictError,
   findProjectIdByAgentTokenHash,
   getIssueAttachment,
@@ -55,7 +56,7 @@ import { serveRelease } from "./releases";
 const corsHeaders = {
   "Access-Control-Allow-Headers":
     "authorization, content-type, x-briar-claim-token",
-  "Access-Control-Allow-Methods": "GET, HEAD, POST, PUT, OPTIONS",
+  "Access-Control-Allow-Methods": "DELETE, GET, HEAD, POST, PUT, OPTIONS",
   "Access-Control-Allow-Origin": "*",
 };
 
@@ -631,6 +632,24 @@ async function route(
       agentTokenHash: tokenHash,
     });
     return json({ project: projectJson(project), agentToken }, 201);
+  }
+
+  const projectMatch = pathname.match(/^\/projects\/([0-9a-f-]+)$/u);
+  if (projectMatch && request.method === "DELETE") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, projectMatch[1], session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    const attachments = await listIssueAttachments(db, project.id);
+    const attachmentKeys = attachments.map((attachment) => attachment.object_key);
+    for (let offset = 0; offset < attachmentKeys.length; offset += 1_000) {
+      await attachmentsBucket.delete(
+        attachmentKeys.slice(offset, offset + 1_000),
+      );
+    }
+    if (!(await deleteProject(db, project.id, session.user.id))) {
+      throw new HttpError(404, "Project not found");
+    }
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   const settingsMatch = pathname.match(

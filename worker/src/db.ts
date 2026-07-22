@@ -245,6 +245,21 @@ export async function getProject(
     .first<ProjectRow>();
 }
 
+export async function deleteProject(
+  db: D1Database,
+  projectId: string,
+  ownerUserId: string,
+) {
+  const result = await db
+    .prepare(
+      `delete from briar_projects
+       where id = ? and owner_user_id = ?`,
+    )
+    .bind(projectId, ownerUserId)
+    .run();
+  return result.meta.changes > 0;
+}
+
 export async function getProjectSettings(db: D1Database, projectId: string) {
   return await db
     .prepare(

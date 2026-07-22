@@ -538,6 +538,48 @@ fn write_cli_connection(
     Ok(())
 }
 
+fn remove_cli_connection(config_path: &Path, project_id: &str) -> Result<(), String> {
+    if !config_path.exists() {
+        return Ok(());
+    }
+    let contents = fs::read_to_string(config_path)
+        .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
+    let mut config = serde_json::from_str::<CliConfig>(&contents)
+        .map_err(|error| format!("Briar 로컬 설정이 손상되었습니다: {error}"))?;
+    let previous_count = config.projects.len();
+    config.projects.retain(|project| project.id != project_id);
+    if config.projects.len() == previous_count {
+        return Ok(());
+    }
+
+    let mut serialized = serde_json::to_vec_pretty(&config)
+        .map_err(|error| format!("Briar 로컬 설정을 만들지 못했습니다: {error}"))?;
+    serialized.push(b'\n');
+    let temporary_path = config_path.with_extension("json.tmp");
+    let mut options = OpenOptions::new();
+    options.create(true).truncate(true).write(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut file = options
+        .open(&temporary_path)
+        .map_err(|error| format!("Briar 로컬 설정을 열지 못했습니다: {error}"))?;
+    file.write_all(&serialized)
+        .and_then(|_| file.sync_all())
+        .map_err(|error| format!("Briar 로컬 설정을 저장하지 못했습니다: {error}"))?;
+    fs::rename(&temporary_path, config_path)
+        .map_err(|error| format!("Briar 로컬 설정을 교체하지 못했습니다: {error}"))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(config_path, fs::Permissions::from_mode(0o600))
+            .map_err(|error| format!("Briar 로컬 설정 권한을 지정하지 못했습니다: {error}"))?;
+    }
+    Ok(())
+}
+
 fn cli_config_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(app
         .path()
@@ -812,6 +854,14 @@ async fn connected_project_ids(app: tauri::AppHandle) -> Result<Vec<String>, Str
 }
 
 #[tauri::command]
+async fn disconnect_local_project(app: tauri::AppHandle, project_id: String) -> Result<(), String> {
+    let config_path = cli_config_path(&app)?;
+    tauri::async_runtime::spawn_blocking(move || remove_cli_connection(&config_path, &project_id))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
 async fn connect_local_project(
     app: tauri::AppHandle,
     api_url: String,
@@ -879,6 +929,7 @@ pub fn run() {
             clear_session_token,
             validate_repository_path,
             connected_project_ids,
+            disconnect_local_project,
             connect_local_project,
             inspect_velen,
             auto_hunt_health,
@@ -1022,6 +1073,38 @@ mod tests {
             Some(3)
         );
         assert!(saved["projects"][1]["autoHunt"]["linearEnabled"].is_null());
+
+        fs::remove_dir_all(directory).expect("test config directory should be removed");
+    }
+
+    #[test]
+    fn removes_only_the_selected_cli_connection() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be after unix epoch")
+            .as_nanos();
+        let directory = std::env::temp_dir().join(format!("briar-disconnect-test-{unique}"));
+        let config_path = directory.join("config.json");
+        fs::create_dir_all(&directory).expect("test config directory should be created");
+        fs::write(
+            &config_path,
+            r#"{
+  "apiUrl": "https://briar.example.com",
+  "projects": [
+    {"id":"keep","repositoryPath":"/keep","agentToken":"briar_agent_keep"},
+    {"id":"delete","repositoryPath":"/delete","agentToken":"briar_agent_delete"}
+  ]
+}"#,
+        )
+        .expect("test config should be written");
+
+        remove_cli_connection(&config_path, "delete").expect("connection should be removed");
+        let saved: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&config_path).expect("saved config should be readable"),
+        )
+        .expect("saved config should be valid json");
+        assert_eq!(saved["projects"].as_array().map(Vec::len), Some(1));
+        assert_eq!(saved["projects"][0]["id"], "keep");
 
         fs::remove_dir_all(directory).expect("test config directory should be removed");
     }

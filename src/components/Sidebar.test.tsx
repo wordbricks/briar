@@ -1,21 +1,32 @@
+/** @vitest-environment jsdom */
+
+import { act } from "react";
+import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Sidebar } from "./Sidebar";
+
+const sidebarProps = {
+  activePage: "dashboard" as const,
+  activeProjectId: "project-1",
+  isOpen: true,
+  onAddProject: () => undefined,
+  onDashboardOpen: () => undefined,
+  onLogout: () => undefined,
+  onProjectChange: () => undefined,
+  onProjectSettings: () => undefined,
+  onToggle: () => undefined,
+  projects: [
+    { id: "project-1", name: "Briar", createdAt: "2026-07-22T00:00:00Z" },
+  ],
+  user: { id: "user-1", name: "Jay", email: "jay@example.com" },
+};
 
 describe("Sidebar", () => {
   it("shows projects as a native-style hierarchy", () => {
     const markup = renderToStaticMarkup(
       <Sidebar
-        activeProjectId="project-1"
-        isOpen
-        onAddProject={() => undefined}
-        onLogout={() => undefined}
-        onProjectChange={() => undefined}
-        onToggle={() => undefined}
-        projects={[
-          { id: "project-1", name: "Briar", createdAt: "2026-07-22T00:00:00Z" },
-        ]}
-        user={{ id: "user-1", name: "Jay", email: "jay@example.com" }}
+        {...sidebarProps}
       />,
     );
 
@@ -26,6 +37,37 @@ describe("Sidebar", () => {
     expect(markup).toContain('aria-current="page"');
     expect(markup).toContain('aria-label="왼쪽 패널 닫기"');
     expect(markup).toContain("자동사냥");
+    expect(markup).toContain('aria-label="Briar 프로젝트 메뉴"');
     expect(markup).not.toContain("<jelly-select");
+  });
+
+  it("opens project settings from the project menu", async () => {
+    const onProjectSettings = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <Sidebar {...sidebarProps} onProjectSettings={onProjectSettings} />,
+      );
+    });
+
+    const trigger = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Briar 프로젝트 메뉴"]',
+    );
+    await act(async () => trigger?.click());
+    expect(trigger?.getAttribute("aria-expanded")).toBe("true");
+    expect(container.querySelector('[role="menu"]')?.textContent).toContain(
+      "프로젝트 설정",
+    );
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('[role="menuitem"]')?.click();
+    });
+    expect(onProjectSettings).toHaveBeenCalledWith("project-1");
+    expect(container.querySelector('[role="menu"]')).toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
   });
 });

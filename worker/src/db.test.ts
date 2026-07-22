@@ -6,7 +6,11 @@ import type { HuntEventInput } from "./db";
 import {
   assertQueuedHuntClaim,
   claimNextQueuedHuntRun,
+  createProject,
   createIssueAttachments,
+  deleteProject,
+  getProject,
+  getProjectSettings,
   getHuntRunForProject,
   getIssueAttachment,
   getNextQueuedHuntRun,
@@ -184,6 +188,20 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       production_qa_status: "passed",
       result_summary: "Production verified",
     });
+  });
+
+  it("deletes only a project owned by the requesting user", async () => {
+    const project = await createProject(db, {
+      ownerUserId: "owner",
+      name: "Disposable",
+      agentTokenHash: "d".repeat(64),
+    });
+
+    await expect(deleteProject(db, project.id, "someone-else")).resolves.toBe(false);
+    await expect(getProject(db, project.id, "owner")).resolves.not.toBeNull();
+    await expect(deleteProject(db, project.id, "owner")).resolves.toBe(true);
+    await expect(getProject(db, project.id, "owner")).resolves.toBeNull();
+    await expect(getProjectSettings(db, project.id)).resolves.toBeNull();
   });
 
   it("stores an app-created issue as a queued Auto Hunt run", async () => {
