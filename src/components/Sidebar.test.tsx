@@ -36,6 +36,8 @@ describe("Sidebar", () => {
     expect(markup).toContain('aria-label="현재 프로젝트"');
     expect(markup).toContain('aria-current="page"');
     expect(markup).toContain('aria-label="왼쪽 패널 닫기"');
+    expect(markup).toContain('aria-haspopup="menu"');
+    expect(markup).toContain('aria-label="계정 메뉴"');
     expect(markup).toContain("자동사냥");
     expect(markup).toContain('aria-label="Briar 프로젝트 메뉴"');
     expect(markup).not.toContain("<jelly-select");
