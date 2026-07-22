@@ -1,20 +1,62 @@
-import type { HuntStage } from "../types";
+import {
+  autoHuntWorkflowStageCatalog,
+  type AutoHuntRunStatus,
+  type AutoHuntWorkflow,
+  type AutoHuntWorkflowStageId,
+} from "./auto-hunt-contract";
 
-export const stageMeta: Record<
-  HuntStage,
-  { label: string; progress: number; tone: string }
+const workflowStageMeta = Object.fromEntries(
+  autoHuntWorkflowStageCatalog.map((stage) => [stage.id, stage]),
+) as unknown as Record<
+  AutoHuntWorkflowStageId,
+  { label: string; tone: string }
+>;
+
+const statusMeta: Record<
+  AutoHuntRunStatus,
+  { label: string; tone: string }
 > = {
-  queued: { label: "대기", progress: 10, tone: "slate" },
-  analyzing: { label: "분석", progress: 25, tone: "blue" },
-  implementing: { label: "구현", progress: 45, tone: "violet" },
-  pr_open: { label: "PR 검증", progress: 65, tone: "indigo" },
-  staging_qa: { label: "Stage QA", progress: 80, tone: "amber" },
-  production_qa: { label: "Production QA", progress: 92, tone: "orange" },
-  completed: { label: "완료", progress: 100, tone: "emerald" },
-  blocked: { label: "차단", progress: 50, tone: "rose" },
-  failed: { label: "실패", progress: 50, tone: "red" },
-  cancelled: { label: "취소", progress: 0, tone: "slate" },
+  queued: { label: "대기", tone: "slate" },
+  running: { label: "진행 중", tone: "violet" },
+  blocked: { label: "차단", tone: "rose" },
+  failed: { label: "실패", tone: "red" },
+  completed: { label: "완료", tone: "emerald" },
+  cancelled: { label: "취소", tone: "slate" },
 };
+
+export function runMeta(
+  status: AutoHuntRunStatus,
+  workflowStage: AutoHuntWorkflowStageId | null,
+  workflow?: AutoHuntWorkflow,
+) {
+  if (status !== "running" && status !== "blocked" && status !== "failed") {
+    return statusMeta[status];
+  }
+  const configured = workflow?.stages.find((stage) => stage.id === workflowStage);
+  const catalog = workflowStage ? workflowStageMeta[workflowStage] : null;
+  if (status === "running" && (configured || catalog)) {
+    return {
+      label: configured?.label ?? catalog?.label ?? statusMeta.running.label,
+      tone: catalog?.tone ?? statusMeta.running.tone,
+    };
+  }
+  return statusMeta[status];
+}
+
+export function eventMeta(
+  status: AutoHuntRunStatus,
+  workflowStage: AutoHuntWorkflowStageId | null,
+  workflow?: AutoHuntWorkflow,
+) {
+  const configured = workflow?.stages.find((stage) => stage.id === workflowStage);
+  const catalog = workflowStage ? workflowStageMeta[workflowStage] : null;
+  return configured || catalog
+    ? {
+        label: configured?.label ?? catalog?.label ?? statusMeta[status].label,
+        tone: catalog?.tone ?? statusMeta[status].tone,
+      }
+    : statusMeta[status];
+}
 
 export const sourceLabel = {
   issue: "이슈",

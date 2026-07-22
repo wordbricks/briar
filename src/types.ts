@@ -1,12 +1,14 @@
 import {
-  autoHuntStages,
+  autoHuntRunStatuses,
   type AutoHuntQaStatus,
+  type AutoHuntRunStatus,
   type AutoHuntSource,
-  type AutoHuntStage,
+  type AutoHuntWorkflow,
+  type AutoHuntWorkflowStageId,
 } from "./lib/auto-hunt-contract";
 
-export const huntStages = autoHuntStages;
-export type HuntStage = AutoHuntStage;
+export const huntStatuses = autoHuntRunStatuses;
+export type HuntStatus = AutoHuntRunStatus;
 export type HuntSource = AutoHuntSource;
 
 export type TrackerReference = {
@@ -35,7 +37,8 @@ export type CreateIssueInput = {
 export type HuntEvent = {
   id: string;
   attempt: number;
-  stage: HuntStage;
+  status: HuntStatus;
+  workflowStage: AutoHuntWorkflowStageId | null;
   detail: string | null;
   actor: string;
   qaStatus: AutoHuntQaStatus | null;
@@ -53,7 +56,9 @@ export type HuntRun = {
   source: HuntSource;
   sourceKey: string;
   title: string;
-  stage: HuntStage;
+  status: HuntStatus;
+  workflowStage: AutoHuntWorkflowStageId | null;
+  workflow: AutoHuntWorkflow;
   progress: number;
   detail: string | null;
   priority: number | null;
@@ -97,6 +102,7 @@ export type ProjectSettings = {
     teamKey: string | null;
   };
   githubRepository: string | null;
+  workflow: AutoHuntWorkflow;
 };
 
 export type DashboardPayload = {

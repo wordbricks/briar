@@ -1,87 +1,47 @@
 # Auto Hunt lifecycle
 
-Use this ordered lifecycle within each attempt. Repeating the current stage is allowed with a new semantic event key; moving backward is not. A blocked or failed run can start a new attempt through the explicit retry command while keeping every event from earlier attempts.
+Auto Hunt separates universal execution status from repository-specific progress.
 
-For Briar-created work, `briar auto-hunt next` atomically claims and returns the
-highest-priority, oldest queued run. Reuse its identity and begin at `analyzing`
-before the 15-minute lease expires; its `queued` event was written when the
-user created the issue in the app. The CLI stores the claim token locally,
-sends it on the first transition, and removes it after that transition succeeds.
+## Universal status
 
-| Stage | Meaning | Minimum evidence |
-| --- | --- | --- |
-| `queued` | Work accepted | stable source identity and title |
-| `analyzing` | Context and root cause investigation | Velen request/evidence plus repository findings |
-| `implementing` | Code or configuration is changing | reproducible signal or explicit hypothesis |
-| `pr_open` | Review boundary exists | PR/review URL when available and checks started |
-| `staging_qa` | Candidate is deployed to staging | target SHA/version and environment URL when available |
-| `production_qa` | Candidate is deployed to production | production target SHA/version |
-| `completed` | Production outcome verified | production QA passed/skipped, result summary, terminal Linear state when linked |
-| `blocked` | External action is required | concrete blocker and owner/action |
-| `failed` | Execution or verification failed | observed command/environment failure |
-| `cancelled` | Work intentionally stopped | cancellation reason |
+| Status | Meaning |
+| --- | --- |
+| `queued` | Work is waiting for an agent |
+| `running` | Work is active at a configured workflow stage |
+| `blocked` | External action is required |
+| `failed` | Execution or verification failed |
+| `completed` | All required snapshot stages and completion rules passed |
+| `cancelled` | Work was intentionally stopped |
 
-## Event key convention
+## Configured workflow stages
 
-Use `<source-key>:<stage>:<semantic-milestone>`, for example:
+`briar auto-hunt doctor` returns the ordered workflow selected when the repository was connected. Available stage IDs cover common cases such as `analyzing`, `planning`, `implementing`, `reviewing`, `pr_open`, `local_qa`, `ci_qa`, `staging_qa`, `production_qa`, and `monitoring`. Only the stages present in the run snapshot apply.
 
-- `WRD-123:queued:intake`
-- `WRD-123:analyzing:root-cause`
-- `WRD-123:implementing:fix-started`
-- `WRD-123:pr_open:pr-482`
-- `WRD-123:staging_qa:sha-abc1234`
-- `WRD-123:production_qa:sha-abc1234`
-- `WRD-123:completed:production-verified`
+New projects default to `local`: `analyzing → implementing → local_qa`. Other built-in presets are `review`, `release`, and `research`; a project may also use a custom ordered selection.
 
-Reuse the exact key and payload when retrying a timed-out write.
+Within an attempt, moving backward is rejected. Retry creates a new attempt with the same workflow snapshot and preserves earlier evidence.
 
-Event keys are scoped to the run's current attempt by Briar. Reuse the same semantic key in a later attempt when it represents the same milestone; the dashboard distinguishes the attempts and preserves both events.
+## Event keys and flags
 
-## Common record flags
+Use `<source-key>:<stage-or-status>:<semantic-milestone>`, for example:
 
-`briar auto-hunt record` accepts:
+- `BRIAR-123:queued:intake`
+- `BRIAR-123:analyzing:root-cause`
+- `BRIAR-123:local_qa:full-checks`
+- `BRIAR-123:completed:criteria-met`
+
+Common flags:
 
 - identity: `--source`, `--source-key`, `--title`, `--event-key`
-- state: `--stage`, `--status-detail`, `--actor`, `--observed-at`, `--priority`
+- execution: `--status`, `--workflow-stage`, `--status-detail`, `--actor`, `--observed-at`
 - Git: `--repository`, `--branch`, `--commit-sha`, repeated `--pull-request-url`, `--target-sha`
 - content: `--issue-description-file`, `--result-summary-file`, `--context-json`
 - tracker: `--tracker-provider`, `--issue-id`, `--issue-identifier`, `--issue-url`, `--issue-state`
 
-The CLI detects repository, branch, and commit when omitted.
+`--stage` remains a compatibility flag for older automations, but new work must use `--status` and `--workflow-stage`.
 
-## QA writes
-
-After recording the matching QA stage, submit:
-
-```sh
-briar auto-hunt qa-result \
-  --run-id '<run-id>' \
-  --environment staging \
-  --result passed \
-  --detail-file '<qa-evidence-file>'
-```
-
-Use `production` for production. `skipped` is allowed only when the environment/check is genuinely unavailable or non-applicable; explain why in the detail file.
+For configured `staging_qa` or `production_qa` stages, record the running stage with pending QA and then submit the matching `qa-result`. Those environment-specific writes are irrelevant when the stages are absent.
 
 ## Failed-run recovery
 
-After recording `blocked` or `failed`, fix the underlying cause and explicitly start a new attempt:
-
-```sh
-briar auto-hunt retry \
-  --run-id '<run-id>' \
-  --reason '<why another attempt is safe>'
-briar auto-hunt next
-```
-
-The retry returns the same run ID with an incremented attempt, resets execution and QA state, and preserves all earlier events. `next` claims the newly queued attempt before work resumes.
-
-To intentionally stop a blocked or failed run:
-
-```sh
-briar auto-hunt cancel \
-  --run-id '<run-id>' \
-  --reason '<why work is being abandoned>'
-```
-
-For either command, pass the same `--request-id '<uuid>'` when retrying a timed-out request so the operation remains idempotent.
+After `blocked` or `failed`, fix the cause and use `briar auto-hunt retry`, followed by `briar auto-hunt next`. To abandon work, use `briar auto-hunt cancel`. Reuse a `--request-id` only when retrying the same timed-out recovery request.

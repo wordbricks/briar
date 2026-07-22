@@ -7,6 +7,7 @@ import {
   assertQueuedHuntClaim,
   claimNextQueuedHuntRun,
   createIssueAttachments,
+  getHuntRunForProject,
   getIssueAttachment,
   getNextQueuedHuntRun,
   HuntClaimError,
@@ -74,6 +75,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       "migrations/0004_auto_hunt_claims.sql",
       "migrations/0005_auto_hunt_recovery.sql",
       "migrations/0006_issue_attachments.sql",
+      "migrations/0007_configurable_workflows.sql",
     ]) {
       await executeSql(db, await readFile(resolve(migration), "utf8"));
     }
@@ -88,8 +90,12 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         '${atMinute(0)}', '${atMinute(0)}'
       );
       insert into briar_project_settings (
-        project_id, velen_org, linear_enabled, created_at, updated_at
-      ) values ('${projectId}', 'example', 0, '${atMinute(0)}', '${atMinute(0)}');
+        project_id, velen_org, linear_enabled, workflow_json, created_at, updated_at
+      ) values (
+        '${projectId}', 'example', 0,
+        '{"version":1,"preset":"release","stages":[{"id":"analyzing","label":"분석","required":true},{"id":"implementing","label":"구현","required":true},{"id":"pr_open","label":"PR 검증","required":true},{"id":"staging_qa","label":"Stage QA","required":true},{"id":"production_qa","label":"Production QA","required":true}]}',
+        '${atMinute(0)}', '${atMinute(0)}'
+      );
     `);
   });
 
@@ -102,15 +108,18 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     expect(runId).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
     );
-    await recordHuntEvent(db, projectId, event("implementing", 2));
+    await recordHuntEvent(db, projectId, event("analyzing", 2));
+    await recordHuntEvent(db, projectId, event("implementing", 3));
     await expect(
-      recordHuntEvent(db, projectId, event("analyzing", 3)),
+      recordHuntEvent(db, projectId, event("analyzing", 4)),
     ).rejects.toBeInstanceOf(HuntTransitionError);
+
+    await recordHuntEvent(db, projectId, event("pr_open", 5));
 
     await recordHuntEvent(
       db,
       projectId,
-      event("staging_qa", 4, { qaStatus: "pending", targetSha: "abcdef1" }),
+      event("staging_qa", 6, { qaStatus: "pending", targetSha: "abcdef1" }),
     );
     expect(
       await recordQaResult(db, projectId, {
@@ -118,20 +127,20 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         environment: "staging",
         result: "passed",
         actor: "vitest",
-        observedAt: atMinute(5),
+        observedAt: atMinute(7),
         detail: "staging verified",
       }),
     ).toBe("passed");
     await recordHuntEvent(
       db,
       projectId,
-      event("production_qa", 6, { qaStatus: "pending", targetSha: "abcdef1" }),
+      event("production_qa", 8, { qaStatus: "pending", targetSha: "abcdef1" }),
     );
     await expect(
       recordHuntEvent(
         db,
         projectId,
-        event("completed", 7, { resultSummary: "too early" }),
+        event("completed", 9, { resultSummary: "too early" }),
       ),
     ).rejects.toThrow("Production QA");
     expect(
@@ -140,18 +149,22 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         environment: "production",
         result: "passed",
         actor: "vitest",
-        observedAt: atMinute(8),
+        observedAt: atMinute(10),
         detail: "production verified",
       }),
     ).toBe("passed");
     await expect(
-      recordHuntEvent(db, projectId, event("completed", 9)),
+      recordHuntEvent(db, projectId, event("completed", 11)),
     ).rejects.toThrow("result summary");
+    const completion = event("completed", 12, {
+      resultSummary: "Production verified",
+    });
     await recordHuntEvent(
       db,
       projectId,
-      event("completed", 10, { resultSummary: "Production verified" }),
+      completion,
     );
+    await expect(recordHuntEvent(db, projectId, completion)).resolves.toBe(runId);
 
     const run = await db
       .prepare(
@@ -174,6 +187,15 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
   });
 
   it("stores an app-created issue as a queued Auto Hunt run", async () => {
+    await db
+      .prepare(
+        `update briar_project_settings set workflow_json = ? where project_id = ?`,
+      )
+      .bind(
+        '{"version":1,"preset":"local","stages":[{"id":"analyzing","label":"분석","required":true},{"id":"implementing","label":"구현","required":true},{"id":"local_qa","label":"로컬 검증","required":true}]}',
+        projectId,
+      )
+      .run();
     const runId = await recordHuntEvent(
       db,
       projectId,
@@ -219,6 +241,42 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       context_json:
         '{"origin":"briar-app","issueId":"22222222-2222-4222-8222-222222222222"}',
     });
+  });
+
+  it("completes a local workflow without staging or production", async () => {
+    const common = { sourceKey: "local-only-run" };
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 30, common),
+    );
+    await recordHuntEvent(db, projectId, event("analyzing", 31, common));
+    await recordHuntEvent(db, projectId, event("implementing", 32, common));
+    await recordHuntEvent(
+      db,
+      projectId,
+      event("implementing", 33, {
+        ...common,
+        status: "running",
+        workflowStage: "local_qa",
+      }),
+    );
+    await recordHuntEvent(
+      db,
+      projectId,
+      event("completed", 34, {
+        ...common,
+        resultSummary: "Local checks passed",
+      }),
+    );
+    const run = await getHuntRunForProject(db, projectId, runId);
+    expect(run).toEqual(
+      expect.objectContaining({
+        status: "completed",
+        workflow_stage: "local_qa",
+        production_qa_status: null,
+      }),
+    );
   });
 
   it("stores issue attachment metadata scoped to its project and run", async () => {

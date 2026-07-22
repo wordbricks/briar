@@ -1,9 +1,14 @@
 import {
+  defaultAutoHuntWorkflow,
   isTerminalTrackerState,
+  normalizeAutoHuntWorkflow,
   type AutoHuntQaEnvironment,
   type AutoHuntQaStatus,
+  type AutoHuntRunStatus,
   type AutoHuntSource,
   type AutoHuntStage,
+  type AutoHuntWorkflow,
+  type AutoHuntWorkflowStageId,
 } from "../../src/lib/auto-hunt-contract";
 
 export type ProjectRow = {
@@ -20,6 +25,7 @@ export type ProjectSettingsRow = {
   linear_source: string | null;
   linear_team_key: string | null;
   github_repository: string | null;
+  workflow_json: string;
   created_at: string;
   updated_at: string;
 };
@@ -31,6 +37,9 @@ export type HuntRunRow = {
   source_key: string;
   title: string;
   stage: AutoHuntStage;
+  status: AutoHuntRunStatus;
+  workflow_stage: AutoHuntWorkflowStageId | null;
+  workflow_snapshot_json: string;
   detail: string | null;
   priority: number | null;
   repository: string;
@@ -69,6 +78,8 @@ export type HuntEventRow = {
   event_key: string;
   attempt: number;
   stage: AutoHuntStage;
+  status: AutoHuntRunStatus;
+  workflow_stage: AutoHuntWorkflowStageId | null;
   detail: string | null;
   actor: string;
   branch: string | null;
@@ -110,6 +121,8 @@ export type HuntEventInput = {
   sourceKey: string;
   title: string;
   stage: AutoHuntStage;
+  status?: AutoHuntRunStatus;
+  workflowStage?: AutoHuntWorkflowStageId | null;
   eventKey: string;
   occurredAt: string;
   actor: string;
@@ -139,6 +152,7 @@ export type ProjectSettingsInput = {
     teamKey: string | null;
   };
   githubRepository: string | null;
+  workflow: AutoHuntWorkflow;
 };
 
 export class EventKeyConflictError extends Error {
@@ -150,6 +164,10 @@ export class HuntTransitionError extends Error {}
 export class HuntClaimError extends Error {}
 
 const stableJson = (value: unknown) => JSON.stringify(value);
+const parseWorkflow = (value: string | null | undefined) => {
+  if (!value) return structuredClone(defaultAutoHuntWorkflow);
+  return normalizeAutoHuntWorkflow(JSON.parse(value) as AutoHuntWorkflow);
+};
 const normalizedUrls = (urls: string[]) => [...new Set(urls)].sort();
 const parseUrls = (value: string | null | undefined) => {
   if (!value) return [];
@@ -231,7 +249,7 @@ export async function getProjectSettings(db: D1Database, projectId: string) {
   return await db
     .prepare(
       `select project_id, velen_org, data_source, linear_enabled,
-              linear_source, linear_team_key, github_repository,
+              linear_source, linear_team_key, github_repository, workflow_json,
               created_at, updated_at
        from briar_project_settings
        where project_id = ?`,
@@ -250,8 +268,8 @@ export async function updateProjectSettings(
     .prepare(
       `insert into briar_project_settings (
          project_id, velen_org, data_source, linear_enabled, linear_source,
-         linear_team_key, github_repository, created_at, updated_at
-       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         linear_team_key, github_repository, workflow_json, created_at, updated_at
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        on conflict(project_id) do update set
          velen_org = excluded.velen_org,
          data_source = excluded.data_source,
@@ -259,6 +277,7 @@ export async function updateProjectSettings(
          linear_source = excluded.linear_source,
          linear_team_key = excluded.linear_team_key,
          github_repository = excluded.github_repository,
+         workflow_json = excluded.workflow_json,
          updated_at = excluded.updated_at`,
     )
     .bind(
@@ -269,6 +288,7 @@ export async function updateProjectSettings(
       input.linear.enabled ? input.linear.source : null,
       input.linear.enabled ? input.linear.teamKey : null,
       input.githubRepository,
+      stableJson(normalizeAutoHuntWorkflow(input.workflow)),
       updatedAt,
       updatedAt,
     )
@@ -280,7 +300,9 @@ export async function listDashboardRuns(db: D1Database, projectId: string) {
   const runs = await db
     .prepare(
       `select run.id, run.run_number, run.source, run.source_key, run.title,
-              run.stage, run.detail, run.priority, run.repository, run.branch,
+              run.stage, run.status, run.workflow_stage,
+              run.workflow_snapshot_json, run.detail, run.priority,
+              run.repository, run.branch,
               run.commit_sha, run.tracker_provider, run.tracker_issue_id,
               run.tracker_issue_identifier, run.tracker_issue_url,
               run.tracker_issue_state, run.issue_description,
@@ -296,7 +318,7 @@ export async function listDashboardRuns(db: D1Database, projectId: string) {
        from briar_hunt_runs run
        where run.project_id = ?
        order by
-         case when run.stage in ('completed', 'cancelled') then 1 else 0 end,
+         case when run.status in ('completed', 'cancelled') then 1 else 0 end,
          run.last_event_at desc
        limit 200`,
     )
@@ -306,7 +328,7 @@ export async function listDashboardRuns(db: D1Database, projectId: string) {
   const events = await db
     .prepare(
       `select ranked.id, ranked.run_id, ranked.event_key, ranked.attempt,
-              ranked.stage,
+              ranked.stage, ranked.status, ranked.workflow_stage,
               ranked.detail, ranked.actor, ranked.branch, ranked.commit_sha,
               ranked.qa_status, ranked.tracker_issue_state,
               ranked.pull_request_urls, ranked.target_sha,
@@ -383,7 +405,7 @@ export async function listIssueAttachments(
            select run.id from briar_hunt_runs run
            where run.project_id = ?
            order by
-             case when run.stage in ('completed', 'cancelled') then 1 else 0 end,
+             case when run.status in ('completed', 'cancelled') then 1 else 0 end,
              run.last_event_at desc
            limit 200
          )
@@ -421,7 +443,7 @@ export async function rollbackNewAppIssue(
     .prepare(
       `delete from briar_hunt_runs
        where id = ? and project_id = ? and source = 'issue'
-         and stage = 'queued' and claim_attempts = 0
+         and status = 'queued' and claim_attempts = 0
          and (select count(*) from briar_hunt_events where run_id = ?) = 1`,
     )
     .bind(runId, projectId, runId)
@@ -439,7 +461,7 @@ export async function getNextQueuedHuntRun(
               (select count(*) from briar_hunt_events event
                where event.run_id = run.id) as event_count
        from briar_hunt_runs run
-       where run.project_id = ? and run.stage = 'queued'
+       where run.project_id = ? and run.status = 'queued'
        order by
          case when run.priority is null then 1 else 0 end,
          run.priority asc,
@@ -469,7 +491,7 @@ export async function claimNextQueuedHuntRun(
            updated_at = ?
        where id = (
          select id from briar_hunt_runs
-         where project_id = ? and stage = 'queued'
+         where project_id = ? and status = 'queued'
            and (lease_expires_at is null or lease_expires_at <= ?)
          order by
            case when priority is null then 1 else 0 end,
@@ -501,7 +523,7 @@ export async function assertQueuedHuntClaim(
 ) {
   const run = await db
     .prepare(
-      `select stage, claim_token_hash, lease_expires_at, context_json,
+      `select stage, status, claim_token_hash, lease_expires_at, context_json,
               case when claim_token_hash = ? then 1 else 0 end as claim_token_valid
        from briar_hunt_runs
        where project_id = ? and source = ? and source_key = ?
@@ -510,12 +532,13 @@ export async function assertQueuedHuntClaim(
     .bind(claimTokenHash ?? "", projectId, input.source, input.sourceKey)
     .first<{
       stage: AutoHuntStage;
+      status: AutoHuntRunStatus;
       claim_token_hash: string | null;
       lease_expires_at: string | null;
       context_json: string | null;
       claim_token_valid: number;
     }>();
-  if (!run || run.stage !== "queued") return;
+  if (!run || run.status !== "queued") return;
   const context: unknown = run.context_json ? JSON.parse(run.context_json) : null;
   const appCreated =
     context !== null &&
@@ -595,12 +618,14 @@ const scopedEventKey = async (eventKey: string, attempt: number) => {
 
 const sameEvent = (row: HuntEventRow, input: HuntEventInput) =>
   row.stage === input.stage &&
+  row.status === input.status &&
+  row.workflow_stage === input.workflowStage &&
   row.detail === input.detail &&
   row.actor === input.actor &&
   row.branch === input.branch &&
   row.commit_sha === input.commitSha &&
   row.qa_status === input.qaStatus &&
-  row.tracker_issue_state === input.tracker?.state &&
+  row.tracker_issue_state === (input.tracker?.state ?? null) &&
   row.pull_request_urls === stableJson(input.pullRequestUrls) &&
   row.target_sha === input.targetSha &&
   row.occurred_at === input.occurredAt;
@@ -637,8 +662,38 @@ const assertCompletionEligible = async (
   run: HuntRunRow | null,
   input: HuntEventInput,
 ) => {
-  if (input.stage !== "completed") return;
-  if (!run || !["passed", "skipped"].includes(run.production_qa_status ?? "")) {
+  if (input.status !== "completed") return;
+  if (!run) throw new HuntTransitionError("Auto Hunt run does not exist");
+  const workflow = parseWorkflow(run.workflow_snapshot_json);
+  const requiredStages = workflow.stages
+    .filter((stage) => stage.required)
+    .map((stage) => stage.id);
+  const completedStages = await db
+    .prepare(
+      `select distinct workflow_stage from briar_hunt_events
+       where run_id = ? and attempt = ? and workflow_stage is not null`,
+    )
+    .bind(run.id, run.current_attempt)
+    .all<{ workflow_stage: AutoHuntWorkflowStageId }>();
+  const completedStageIds = new Set(
+    completedStages.results.map((event) => event.workflow_stage),
+  );
+  const missingStages = requiredStages.filter((stage) => !completedStageIds.has(stage));
+  if (missingStages.length > 0) {
+    throw new HuntTransitionError(
+      `Auto Hunt completion requires workflow stages: ${missingStages.join(", ")}`,
+    );
+  }
+  if (
+    requiredStages.includes("staging_qa") &&
+    !["passed", "skipped"].includes(run.staging_qa_status ?? "")
+  ) {
+    throw new HuntTransitionError("Auto Hunt completion requires Stage QA");
+  }
+  if (
+    requiredStages.includes("production_qa") &&
+    !["passed", "skipped"].includes(run.production_qa_status ?? "")
+  ) {
     throw new HuntTransitionError("Auto Hunt completion requires Production QA");
   }
   const resultSummary = input.resultSummary ?? run.result_summary;
@@ -659,50 +714,80 @@ const assertCompletionEligible = async (
   }
 };
 
-const forwardStageRank: Partial<Record<AutoHuntStage, number>> = {
-  queued: 0,
-  analyzing: 1,
-  implementing: 2,
-  pr_open: 3,
-  staging_qa: 4,
-  production_qa: 5,
-  completed: 6,
-};
-
 const assertStageTransition = async (
-  db: D1Database,
+  _db: D1Database,
   run: HuntRunRow | null,
   input: HuntEventInput,
 ) => {
-  if (!run || input.occurredAt < run.last_event_at || input.stage === run.stage) {
+  if (!run || input.occurredAt < run.last_event_at) {
     return;
   }
-  if (run.stage === "completed" || run.stage === "cancelled") {
-    throw new HuntTransitionError(`Auto Hunt run is already ${run.stage}`);
+  if (
+    input.status === run.status &&
+    (input.status !== "running" || input.workflowStage === run.workflow_stage)
+  ) {
+    return;
   }
-  if (["blocked", "failed", "cancelled"].includes(input.stage)) return;
-  const nextRank = forwardStageRank[input.stage];
-  if (nextRank === undefined) return;
-  let floorRank = forwardStageRank[run.stage];
-  if (floorRank === undefined) {
-    floorRank =
-      (await db
-        .prepare(
-          `select max(case stage
-             when 'queued' then 0 when 'analyzing' then 1
-             when 'implementing' then 2 when 'pr_open' then 3
-             when 'staging_qa' then 4 when 'production_qa' then 5
-             when 'completed' then 6 else null end) as stage_rank
-           from briar_hunt_events where run_id = ? and attempt = ?`,
-        )
-        .bind(run.id, run.current_attempt)
-        .first<number>("stage_rank")) ?? 0;
+  if (run.status === "completed" || run.status === "cancelled") {
+    throw new HuntTransitionError(`Auto Hunt run is already ${run.status}`);
   }
-  if (nextRank < floorRank) {
+  if (["blocked", "failed", "cancelled"].includes(input.status ?? "")) return;
+  if (input.status !== "running" || !input.workflowStage) return;
+  const workflow = parseWorkflow(run.workflow_snapshot_json);
+  const nextRank = workflow.stages.findIndex(
+    (stage) => stage.id === input.workflowStage,
+  );
+  if (nextRank < 0) {
     throw new HuntTransitionError(
-      `Auto Hunt stage cannot regress from rank ${floorRank} to ${nextRank}`,
+      `Workflow stage is not configured for this run: ${input.workflowStage}`,
     );
   }
+  const floorRank = run.workflow_stage
+    ? workflow.stages.findIndex((stage) => stage.id === run.workflow_stage)
+    : -1;
+  if (nextRank < floorRank) {
+    throw new HuntTransitionError(
+      `Auto Hunt workflow cannot regress from rank ${floorRank} to ${nextRank}`,
+    );
+  }
+};
+
+const legacyStatusForStage = (stage: AutoHuntStage): AutoHuntRunStatus => {
+  if (stage === "queued") return "queued";
+  if (["blocked", "failed", "completed", "cancelled"].includes(stage)) {
+    return stage as AutoHuntRunStatus;
+  }
+  return "running";
+};
+
+const legacyWorkflowStage = (
+  stage: AutoHuntStage,
+): AutoHuntWorkflowStageId | null => {
+  if (
+    [
+      "analyzing",
+      "implementing",
+      "pr_open",
+      "staging_qa",
+      "production_qa",
+    ].includes(stage)
+  ) {
+    return stage as AutoHuntWorkflowStageId;
+  }
+  return null;
+};
+
+const legacyStageFor = (
+  status: AutoHuntRunStatus,
+  workflowStage: AutoHuntWorkflowStageId | null,
+): AutoHuntStage => {
+  if (status !== "running") return status;
+  return workflowStage &&
+    ["analyzing", "implementing", "pr_open", "staging_qa", "production_qa"].includes(
+      workflowStage,
+    )
+    ? (workflowStage as AutoHuntStage)
+    : "implementing";
 };
 
 export async function recordHuntEvent(
@@ -712,9 +797,32 @@ export async function recordHuntEvent(
 ) {
   const normalizedInput = {
     ...input,
+    status: input.status ?? legacyStatusForStage(input.stage),
+    workflowStage:
+      input.workflowStage === undefined
+        ? legacyWorkflowStage(input.stage)
+        : input.workflowStage,
     pullRequestUrls: normalizedUrls(input.pullRequestUrls),
   };
+  normalizedInput.stage = legacyStageFor(
+    normalizedInput.status,
+    normalizedInput.workflowStage,
+  );
   const existingRun = await loadRunForIdentity(db, projectId, normalizedInput);
+  const workflowSnapshot = existingRun
+    ? parseWorkflow(existingRun.workflow_snapshot_json)
+    : parseWorkflow((await getProjectSettings(db, projectId))?.workflow_json);
+  if (
+    normalizedInput.status === "running" &&
+    (!normalizedInput.workflowStage ||
+      !workflowSnapshot.stages.some(
+        (stage) => stage.id === normalizedInput.workflowStage,
+      ))
+  ) {
+    throw new HuntTransitionError(
+      `Workflow stage is not configured for this run: ${normalizedInput.workflowStage ?? "none"}`,
+    );
+  }
   const eventAttempt = existingRun?.current_attempt ?? 1;
   const storedEventKey = await scopedEventKey(
     normalizedInput.eventKey,
@@ -726,8 +834,8 @@ export async function recordHuntEvent(
   if (existingRun) {
     const existingEvent = await db
       .prepare(
-        `select id, run_id, event_key, attempt, stage, detail, actor, branch,
-                commit_sha, qa_status, tracker_issue_state,
+        `select id, run_id, event_key, attempt, stage, status, workflow_stage,
+                detail, actor, branch, commit_sha, qa_status, tracker_issue_state,
                 pull_request_urls, target_sha, occurred_at, recorded_at
          from briar_hunt_events
          where run_id = ? and event_key = ?`,
@@ -747,7 +855,7 @@ export async function recordHuntEvent(
     (await digestRunId(projectId, normalizedInput.source, normalizedInput.sourceKey));
   const eventId = crypto.randomUUID();
   const recordedAt = new Date().toISOString();
-  const completedAt = ["completed", "cancelled"].includes(normalizedInput.stage)
+  const completedAt = ["completed", "cancelled"].includes(normalizedInput.status)
     ? normalizedInput.occurredAt
     : null;
   const mergedPullRequestUrls = normalizedUrls([
@@ -763,12 +871,12 @@ export async function recordHuntEvent(
     normalizedInput.stage === "production_qa" && qaStatus === "pending"
       ? "pending"
       : null;
-
   const results = await db.batch([
     db
       .prepare(
         `insert into briar_hunt_runs (
-           id, project_id, source, source_key, title, stage, detail, priority,
+           id, project_id, source, source_key, title, stage, status,
+           workflow_stage, workflow_snapshot_json, detail, priority,
            repository, branch, commit_sha, tracker_provider,
            tracker_issue_id, tracker_issue_identifier, tracker_issue_url,
            tracker_issue_state, issue_description, result_summary,
@@ -776,7 +884,7 @@ export async function recordHuntEvent(
            staging_qa_status, production_qa_status, staging_qa_detail,
            production_qa_detail, context_json, started_at, completed_at,
            last_event_at, created_at, updated_at
-         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          on conflict(project_id, source, source_key) do nothing`,
       )
       .bind(
@@ -786,6 +894,9 @@ export async function recordHuntEvent(
         normalizedInput.sourceKey,
         normalizedInput.title,
         normalizedInput.stage,
+        normalizedInput.status,
+        normalizedInput.workflowStage,
+        stableJson(workflowSnapshot),
         normalizedInput.detail,
         normalizedInput.priority,
         normalizedInput.repository,
@@ -815,10 +926,11 @@ export async function recordHuntEvent(
     db
       .prepare(
         `insert into briar_hunt_events (
-           id, run_id, event_key, attempt, stage, detail, actor, branch, commit_sha,
+           id, run_id, event_key, attempt, stage, status, workflow_stage,
+           detail, actor, branch, commit_sha,
            qa_status, tracker_issue_state, pull_request_urls, target_sha,
            occurred_at, recorded_at
-         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          on conflict(run_id, event_key) do nothing`,
       )
       .bind(
@@ -827,6 +939,8 @@ export async function recordHuntEvent(
         storedEventKey,
         eventAttempt,
         normalizedInput.stage,
+        normalizedInput.status,
+        normalizedInput.workflowStage,
         normalizedInput.detail,
         normalizedInput.actor,
         normalizedInput.branch,
@@ -844,18 +958,17 @@ export async function recordHuntEvent(
          set title = case when ? >= last_event_at then ? else title end,
              stage = case
                when ? < last_event_at then stage
-               when stage = 'completed' and ? <> 'completed' then stage
-               when ? not in ('blocked', 'failed', 'cancelled') and ? < (
-                 select coalesce(max(case event.stage
-                   when 'queued' then 0 when 'analyzing' then 1
-                   when 'implementing' then 2 when 'pr_open' then 3
-                   when 'staging_qa' then 4 when 'production_qa' then 5
-                   when 'completed' then 6 else null end), 0)
-                 from briar_hunt_events event
-                 where event.run_id = briar_hunt_runs.id
-                   and event.attempt = briar_hunt_runs.current_attempt
-               ) then stage
+               when status = 'completed' and ? <> 'completed' then stage
                else ?
+             end,
+             status = case
+               when ? < last_event_at then status
+               when status = 'completed' and ? <> 'completed' then status
+               else ?
+             end,
+             workflow_stage = case
+               when ? >= last_event_at then coalesce(?, workflow_stage)
+               else workflow_stage
              end,
              detail = case when ? >= last_event_at then ? else detail end,
              priority = case when ? >= last_event_at then coalesce(?, priority) else priority end,
@@ -886,7 +999,7 @@ export async function recordHuntEvent(
              completed_at = case
                when ? < last_event_at then completed_at
                when ? in ('completed', 'cancelled') then ?
-               when stage = 'completed' and ? <> 'completed' then completed_at
+               when status = 'completed' and ? <> 'completed' then completed_at
                else null
              end,
              last_event_at = max(last_event_at, ?),
@@ -900,9 +1013,11 @@ export async function recordHuntEvent(
       )
       .bind(
         normalizedInput.occurredAt, normalizedInput.title,
-        normalizedInput.occurredAt, normalizedInput.stage,
-        normalizedInput.stage, forwardStageRank[normalizedInput.stage] ?? 7,
+        normalizedInput.occurredAt, normalizedInput.status,
         normalizedInput.stage,
+        normalizedInput.occurredAt, normalizedInput.status,
+        normalizedInput.status,
+        normalizedInput.occurredAt, normalizedInput.workflowStage,
         normalizedInput.occurredAt, normalizedInput.detail,
         normalizedInput.occurredAt, normalizedInput.priority,
         normalizedInput.occurredAt, normalizedInput.repository,
@@ -924,8 +1039,8 @@ export async function recordHuntEvent(
         normalizedInput.occurredAt, normalizedInput.productionQaDetail,
         normalizedInput.occurredAt,
         normalizedInput.context ? stableJson(normalizedInput.context) : null,
-        normalizedInput.occurredAt, normalizedInput.stage,
-        normalizedInput.occurredAt, normalizedInput.stage,
+        normalizedInput.occurredAt, normalizedInput.status,
+        normalizedInput.occurredAt, normalizedInput.status,
         normalizedInput.occurredAt, recordedAt, runId, eventAttempt, eventId,
       ),
   ]);
@@ -933,8 +1048,8 @@ export async function recordHuntEvent(
   if ((results[1]?.meta.changes ?? 0) === 0) {
     const existingEvent = await db
       .prepare(
-        `select id, run_id, event_key, attempt, stage, detail, actor, branch,
-                commit_sha, qa_status, tracker_issue_state,
+        `select id, run_id, event_key, attempt, stage, status, workflow_stage,
+                detail, actor, branch, commit_sha, qa_status, tracker_issue_state,
                 pull_request_urls, target_sha, occurred_at, recorded_at
          from briar_hunt_events
          where run_id = ? and event_key = ?`,
@@ -994,7 +1109,7 @@ export async function recoverHuntRun(
     };
   }
 
-  if (!(["blocked", "failed"] as AutoHuntStage[]).includes(run.stage)) {
+  if (!( ["blocked", "failed"] as AutoHuntRunStatus[]).includes(run.status)) {
     return {
       outcome: "ineligible",
       attempt: run.current_attempt,
@@ -1019,7 +1134,8 @@ export async function recoverHuntRun(
       ? db
           .prepare(
             `update briar_hunt_runs
-             set stage = 'queued', detail = ?, current_attempt = ?,
+             set stage = 'queued', status = 'queued', workflow_stage = null,
+                 detail = ?, current_attempt = ?,
                  branch = null, commit_sha = null, result_summary = null,
                  pull_request_urls = '[]',
                  target_sha = null, staging_qa_status = null,
@@ -1027,7 +1143,7 @@ export async function recoverHuntRun(
                  production_qa_detail = null, claim_token_hash = null,
                  claimed_by = null, claimed_at = null, lease_expires_at = null,
                  completed_at = null, last_event_at = ?, updated_at = ?
-             where id = ? and project_id = ? and stage in ('blocked', 'failed')
+             where id = ? and project_id = ? and status in ('blocked', 'failed')
                and current_attempt = ? and last_event_at = ?`,
           )
           .bind(
@@ -1043,10 +1159,11 @@ export async function recoverHuntRun(
       : db
           .prepare(
             `update briar_hunt_runs
-             set stage = 'cancelled', detail = ?, claim_token_hash = null,
+             set stage = 'cancelled', status = 'cancelled', detail = ?,
+                 claim_token_hash = null,
                  claimed_by = null, claimed_at = null, lease_expires_at = null,
                  completed_at = ?, last_event_at = ?, updated_at = ?
-             where id = ? and project_id = ? and stage in ('blocked', 'failed')
+             where id = ? and project_id = ? and status in ('blocked', 'failed')
                and current_attempt = ? and last_event_at = ?`,
           )
           .bind(
@@ -1065,21 +1182,23 @@ export async function recoverHuntRun(
     db
       .prepare(
         `insert into briar_hunt_events (
-           id, run_id, event_key, attempt, stage, detail, actor, branch,
+           id, run_id, event_key, attempt, stage, status, workflow_stage,
+           detail, actor, branch,
            commit_sha, qa_status, tracker_issue_state, pull_request_urls,
            target_sha, occurred_at, recorded_at
          )
-         select ?, id, ?, ?, ?, ?, ?, null, null, null,
+         select ?, id, ?, ?, ?, ?, null, ?, ?, null, null, null,
                 tracker_issue_state, '[]', null, ?, ?
          from briar_hunt_runs
          where id = ? and project_id = ? and current_attempt = ?
-           and stage = ? and last_event_at = ?
+           and status = ? and last_event_at = ?
          on conflict(run_id, event_key) do nothing`,
       )
       .bind(
         eventId,
         eventKey,
         nextAttempt,
+        nextStage,
         nextStage,
         detail,
         input.actor,
@@ -1175,10 +1294,11 @@ export async function recordQaResult(
     db
       .prepare(
         `insert into briar_hunt_events (
-           id, run_id, event_key, attempt, stage, detail, actor, branch, commit_sha,
+           id, run_id, event_key, attempt, stage, status, workflow_stage,
+           detail, actor, branch, commit_sha,
            qa_status, tracker_issue_state, pull_request_urls, target_sha,
            occurred_at, recorded_at
-         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ) values (?, ?, ?, ?, ?, 'running', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          on conflict(run_id, event_key) do nothing`,
       )
       .bind(
@@ -1186,6 +1306,7 @@ export async function recordQaResult(
         run.id,
         eventKey,
         run.current_attempt,
+        expectedStage,
         expectedStage,
         detail,
         input.actor,

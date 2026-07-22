@@ -44,6 +44,10 @@ describe("ProjectOnboarding", () => {
     );
 
     expect(markup).toContain('<jelly-select label="Velen 조직"');
+    expect(markup).toContain('<jelly-select label="Auto Hunt 워크플로"');
+    expect(markup).toContain("로컬 개발 · 배포 없음");
+    expect(markup).toContain('aria-pressed="true"');
+    expect(markup).toContain("로컬 검증");
     expect(markup).not.toContain("<select");
   });
 

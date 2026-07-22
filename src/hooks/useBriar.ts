@@ -32,18 +32,21 @@ import {
   writeSessionToken,
 } from "../lib/token-store";
 import { startDashboardPolling } from "../lib/dashboard-polling";
+import { defaultAutoHuntWorkflow } from "../lib/auto-hunt-contract";
 import type {
   CreateIssueInput,
   DashboardPayload,
   HuntRun,
   IssueAttachment,
   Project,
+  ProjectSettings,
   SessionUser,
 } from "../types";
 
 export type ProjectConnection = {
   project: Project;
   agentToken: string | null;
+  workflow?: ProjectSettings["workflow"];
 };
 
 const demoMode = import.meta.env.VITE_BRIAR_DEMO !== "false" && !isApiConfigured;
@@ -60,6 +63,7 @@ const emptyDashboard = (project: Project): DashboardPayload => ({
     dataSource: null,
     linear: { enabled: false, source: null, teamKey: null },
     githubRepository: null,
+    workflow: structuredClone(defaultAutoHuntWorkflow),
   },
   runs: [],
   generatedAt: new Date().toISOString(),
@@ -385,6 +389,7 @@ export function useBriar() {
             teamKey: autoHunt.linearTeam ?? null,
           },
           githubRepository: autoHunt.githubRepository ?? null,
+          workflow: autoHunt.workflow,
         });
       }
       setProjectConnection(null);
@@ -424,8 +429,12 @@ export function useBriar() {
     setError(null);
     setVelen(null);
     setIsCreatingProject(true);
-    setProjectConnection({ project, agentToken: null });
-  }, [activeProjectId, projects]);
+    setProjectConnection({
+      project,
+      agentToken: null,
+      workflow: dashboard?.settings.workflow,
+    });
+  }, [activeProjectId, dashboard?.settings.workflow, projects]);
 
   const addIssue = useCallback(
     async (input: CreateIssueInput) => {
@@ -454,8 +463,10 @@ export function useBriar() {
             source: "issue",
             sourceKey,
             title: input.title.trim(),
-            stage: "queued",
-            progress: 10,
+            status: "queued",
+            workflowStage: null,
+            workflow: dashboard.settings.workflow,
+            progress: 5,
             detail: "Briar 앱에서 생성된 이슈가 Auto Hunt 처리를 기다리고 있습니다.",
             priority: input.priority,
             repository:
@@ -489,7 +500,8 @@ export function useBriar() {
               {
                 id: crypto.randomUUID(),
                 attempt: 1,
-                stage: "queued",
+                status: "queued",
+                workflowStage: null,
                 detail: "Briar 앱에서 생성된 이슈가 Auto Hunt 처리를 기다리고 있습니다.",
                 actor: "briar-app",
                 qaStatus: null,
@@ -552,7 +564,7 @@ export function useBriar() {
                       action === "retry"
                         ? run.currentAttempt + 1
                         : run.currentAttempt;
-                    const stage = action === "retry" ? "queued" : "cancelled";
+                    const status = action === "retry" ? "queued" : "cancelled";
                     const detail =
                       action === "retry"
                         ? `Auto Hunt ${attempt}차 시도를 요청했습니다.`
@@ -560,8 +572,10 @@ export function useBriar() {
                     return {
                       ...run,
                       currentAttempt: attempt,
-                      stage,
-                      progress: action === "retry" ? 10 : run.progress,
+                      status,
+                      workflowStage:
+                        action === "retry" ? null : run.workflowStage,
+                      progress: action === "retry" ? 5 : run.progress,
                       detail,
                       branch: action === "retry" ? null : run.branch,
                       commitSha: action === "retry" ? null : run.commitSha,
@@ -574,7 +588,9 @@ export function useBriar() {
                         {
                           id: crypto.randomUUID(),
                           attempt,
-                          stage,
+                          status,
+                          workflowStage:
+                            action === "retry" ? null : run.workflowStage,
                           detail,
                           actor: "briar-app",
                           qaStatus: null,

@@ -3,9 +3,17 @@ import briarMarkSvg from "../../src/assets/briar-mark.svg";
 import briarIconSvg from "../../src-tauri/app-icon.svg";
 import {
   autoHuntQaEnvironments,
+  autoHuntRunStatuses,
   autoHuntSources,
   autoHuntStages,
-  progressForAutoHuntStage,
+  autoHuntWorkflowPresets,
+  autoHuntWorkflowStageCatalog,
+  defaultAutoHuntWorkflow,
+  normalizeAutoHuntWorkflow,
+  progressForAutoHuntRun,
+  type AutoHuntRunStatus,
+  type AutoHuntStage,
+  type AutoHuntWorkflowStageId,
 } from "../../src/lib/auto-hunt-contract";
 import {
   maxIssueMultipartBytes,
@@ -64,6 +72,62 @@ class HttpError extends Error {
 }
 
 const stageSchema = z.enum(autoHuntStages);
+const runStatusSchema = z.enum(autoHuntRunStatuses);
+const workflowStageIdSchema = z.enum(
+  autoHuntWorkflowStageCatalog.map((stage) => stage.id) as [
+    AutoHuntWorkflowStageId,
+    ...AutoHuntWorkflowStageId[],
+  ],
+);
+const workflowSchema = z
+  .object({
+    version: z.literal(1),
+    preset: z.enum(autoHuntWorkflowPresets),
+    stages: z
+      .array(
+        z
+          .object({
+            id: workflowStageIdSchema,
+            label: z.string().trim().min(1).max(80),
+            required: z.boolean(),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(autoHuntWorkflowStageCatalog.length),
+  })
+  .strict()
+  .transform(normalizeAutoHuntWorkflow);
+
+const statusForLegacyStage = (stage: AutoHuntStage): AutoHuntRunStatus => {
+  if (stage === "queued") return "queued";
+  if (["blocked", "failed", "completed", "cancelled"].includes(stage)) {
+    return stage as AutoHuntRunStatus;
+  }
+  return "running";
+};
+
+const workflowStageForLegacyStage = (
+  stage: AutoHuntStage,
+): AutoHuntWorkflowStageId | null =>
+  ["analyzing", "implementing", "pr_open", "staging_qa", "production_qa"].includes(
+    stage,
+  )
+    ? (stage as AutoHuntWorkflowStageId)
+    : null;
+
+const legacyStageForProgress = (
+  status: AutoHuntRunStatus,
+  workflowStage: AutoHuntWorkflowStageId | null,
+): AutoHuntStage => {
+  if (status !== "running") return status;
+  return workflowStage &&
+    ["analyzing", "implementing", "pr_open", "staging_qa", "production_qa"].includes(
+      workflowStage,
+    )
+    ? (workflowStage as AutoHuntStage)
+    : "implementing";
+};
 const nullableTrimmed = (max: number) =>
   z.string().trim().min(1).max(max).nullable().optional();
 const httpsUrl = z
@@ -86,7 +150,9 @@ const eventSchema = z
     source: z.enum(autoHuntSources),
     sourceKey: z.string().trim().min(1).max(200),
     title: z.string().trim().min(1).max(300),
-    stage: stageSchema,
+    stage: stageSchema.optional(),
+    status: runStatusSchema.optional(),
+    workflowStage: workflowStageIdSchema.nullable().optional(),
     eventKey: z.string().trim().min(1).max(300),
     occurredAt: z.string().datetime({ offset: true }),
     actor: z.string().trim().min(1).max(128),
@@ -112,18 +178,30 @@ const eventSchema = z
   })
   .strict()
   .superRefine((input, context) => {
-    if (input.stage === "blocked" && !input.detail?.trim()) {
+    const status = input.status ?? input.stage;
+    if (!input.stage && !input.status) {
+      context.addIssue({
+        code: "custom",
+        message: "status or legacy stage is required",
+        path: ["status"],
+      });
+    }
+    if (status === "running" && !input.workflowStage) {
+      context.addIssue({
+        code: "custom",
+        message: "running progress requires a workflow stage",
+        path: ["workflowStage"],
+      });
+    }
+    if (status === "blocked" && !input.detail?.trim()) {
       context.addIssue({
         code: "custom",
         message: "blocked progress requires an exact blocker reason",
         path: ["detail"],
       });
     }
-    if (
-      input.qaStatus &&
-      input.stage !== "staging_qa" &&
-      input.stage !== "production_qa"
-    ) {
+    const qaStage = input.workflowStage ?? input.stage;
+    if (input.qaStatus && qaStage !== "staging_qa" && qaStage !== "production_qa") {
       context.addIssue({
         code: "custom",
         message: "QA status requires a QA stage",
@@ -131,7 +209,7 @@ const eventSchema = z
       });
     }
     if (
-      (input.stage === "staging_qa" || input.stage === "production_qa") &&
+      (qaStage === "staging_qa" || qaStage === "production_qa") &&
       input.qaStatus !== "pending"
     ) {
       context.addIssue({
@@ -239,6 +317,7 @@ const projectSettingsSchema = z
       })
       .strict(),
     githubRepository: nullableTrimmed(300),
+    workflow: workflowSchema.default(defaultAutoHuntWorkflow),
   })
   .strict()
   .superRefine((input, context) => {
@@ -415,6 +494,9 @@ const settingsJson = (row: ProjectSettingsRow | null) => ({
     teamKey: row?.linear_team_key ?? null,
   },
   githubRepository: row?.github_repository ?? null,
+  workflow: row?.workflow_json
+    ? normalizeAutoHuntWorkflow(JSON.parse(row.workflow_json))
+    : structuredClone(defaultAutoHuntWorkflow),
 });
 
 const parseJsonArray = (value: string) => {
@@ -433,7 +515,8 @@ const parseJsonObject = (value: string | null) => {
 const dashboardEventJson = (event: HuntEventRow) => ({
   id: event.id,
   attempt: event.attempt,
-  stage: event.stage,
+  status: event.status,
+  workflowStage: event.workflow_stage,
   detail: event.detail,
   actor: event.actor,
   qaStatus: event.qa_status,
@@ -464,8 +547,14 @@ function dashboardRunJson(
     source: run.source,
     sourceKey: run.source_key,
     title: run.title,
-    stage: run.stage,
-    progress: progressForAutoHuntStage[run.stage],
+    status: run.status,
+    workflowStage: run.workflow_stage,
+    workflow: normalizeAutoHuntWorkflow(JSON.parse(run.workflow_snapshot_json)),
+    progress: progressForAutoHuntRun(
+      run.status,
+      run.workflow_stage,
+      normalizeAutoHuntWorkflow(JSON.parse(run.workflow_snapshot_json)),
+    ),
     detail: run.detail,
     priority: run.priority,
     repository: run.repository,
@@ -565,6 +654,7 @@ async function route(
       dataSource: input.dataSource ?? null,
       linear: input.linear,
       githubRepository: input.githubRepository ?? null,
+      workflow: input.workflow,
     });
     return json({ settings: settingsJson(settings) });
   }
@@ -692,6 +782,8 @@ async function route(
         sourceKey,
         title: input.title,
         stage: "queued",
+        status: "queued",
+        workflowStage: null,
         eventKey: `${sourceKey}:queued:intake`,
         occurredAt,
         actor: "briar-app",
@@ -727,6 +819,7 @@ async function route(
           runId,
           sourceKey,
           stage: "queued",
+          status: "queued",
           attachments: attachmentRows.map(attachmentJson),
         },
         201,
@@ -813,6 +906,9 @@ async function route(
             repository: run.repository,
             sourceCreatedAt: run.source_created_at,
             context: parseJsonObject(run.context_json),
+            workflow: normalizeAutoHuntWorkflow(
+              JSON.parse(run.workflow_snapshot_json),
+            ),
             attachments: attachments.map(attachmentJson),
           }
         : null,
@@ -850,6 +946,9 @@ async function route(
             repository: run.repository,
             sourceCreatedAt: run.source_created_at,
             context: parseJsonObject(run.context_json),
+            workflow: normalizeAutoHuntWorkflow(
+              JSON.parse(run.workflow_snapshot_json),
+            ),
             attachments: attachments.map(attachmentJson),
             claimToken,
             claimedBy: run.claimed_by,
@@ -887,8 +986,16 @@ async function route(
   if (pathname === "/ingest/events" && request.method === "POST") {
     const projectId = await requireAgentProject(db, request);
     const parsed = eventSchema.parse(await readJson(request));
+    const status = parsed.status ?? statusForLegacyStage(parsed.stage!);
+    const workflowStage =
+      parsed.workflowStage === undefined
+        ? workflowStageForLegacyStage(parsed.stage!)
+        : parsed.workflowStage;
     const input = {
       ...parsed,
+      stage: legacyStageForProgress(status, workflowStage),
+      status,
+      workflowStage,
       occurredAt: new Date(parsed.occurredAt).toISOString(),
       detail: parsed.detail ?? null,
       priority: parsed.priority ?? null,
@@ -926,7 +1033,12 @@ async function route(
         new Date().toISOString(),
       );
       const runId = await recordHuntEvent(db, projectId, input);
-      return json({ runId, stage: input.stage });
+      return json({
+        runId,
+        status: input.status,
+        workflowStage: input.workflowStage,
+        stage: input.stage,
+      });
     } catch (error) {
       if (error instanceof EventKeyConflictError) {
         throw new HttpError(409, error.message);
