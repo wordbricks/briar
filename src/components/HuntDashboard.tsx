@@ -144,7 +144,7 @@ export function HuntDashboard({
   }, [dashboard?.settings.workflow, filtered, status, t]);
 
   return (
-    <main className="main-content" id="dashboard">
+    <main className="main-content" id="issues">
       <header className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region>
         {!isSidebarOpen && (
           <button

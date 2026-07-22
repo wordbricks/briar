@@ -1,16 +1,19 @@
 import { useState } from "react";
+import { AutoHuntSessions } from "./components/AutoHuntSessions";
 import { HuntDashboard } from "./components/HuntDashboard";
 import { LoginScreen } from "./components/LoginScreen";
 import { ProjectOnboarding } from "./components/ProjectOnboarding";
 import { ProjectSettings } from "./components/ProjectSettings";
 import { Sidebar } from "./components/Sidebar";
 import { useBriar } from "./hooks/useBriar";
+import { useAutoHuntSessions } from "./hooks/useAutoHuntSessions";
 
 export function App() {
   const briar = useBriar();
+  const autoHunt = useAutoHuntSessions();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [activePage, setActivePage] = useState<"dashboard" | "project-settings">(
-    "dashboard",
+  const [activePage, setActivePage] = useState<"issues" | "auto-hunt" | "project-settings">(
+    "issues",
   );
   const activeProject = briar.projects.find(
     (project) => project.id === briar.activeProjectId,
@@ -57,10 +60,11 @@ export function App() {
         activeProjectId={briar.activeProjectId}
         isOpen={isSidebarOpen}
         onAddProject={briar.startProjectCreation}
-        onDashboardOpen={() => setActivePage("dashboard")}
+        onAutoHuntOpen={() => setActivePage("auto-hunt")}
+        onIssuesOpen={() => setActivePage("issues")}
         onProjectChange={(projectId) => {
           briar.setActiveProjectId(projectId);
-          setActivePage("dashboard");
+          setActivePage("issues");
         }}
         onProjectSettings={(projectId) => {
           briar.setActiveProjectId(projectId);
@@ -76,14 +80,28 @@ export function App() {
           dashboard={briar.dashboard}
           isDeleting={briar.deletingProjectId === briar.activeProjectId}
           isSidebarOpen={isSidebarOpen}
-          onBack={() => setActivePage("dashboard")}
+          onBack={() => setActivePage("issues")}
           onDelete={async () => {
             await briar.deleteProject(activeProject.id);
-            setActivePage("dashboard");
+            autoHunt.removeProjectSessions(activeProject.id);
+            setActivePage("issues");
           }}
           onRegenerateWorkflow={() => briar.regenerateWorkflow(activeProject.id)}
           onSidebarOpen={() => setIsSidebarOpen(true)}
           project={activeProject}
+        />
+      ) : activePage === "auto-hunt" && activeProject ? (
+        <AutoHuntSessions
+          dashboard={briar.dashboard}
+          error={briar.error}
+          isSidebarOpen={isSidebarOpen}
+          onSidebarOpen={() => setIsSidebarOpen(true)}
+          onStart={(runs) => autoHunt.startSession(
+            activeProject.id,
+            runs,
+            () => void briar.refresh(),
+          )}
+          sessions={autoHunt.sessions}
         />
       ) : (
         <HuntDashboard

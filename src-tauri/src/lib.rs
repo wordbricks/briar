@@ -1107,6 +1107,48 @@ async fn project_llm_chat(
             &execution_path,
             &project_id,
             &workspace,
+            codex_app_server::ChatExecution {
+                approval_policy: settings.approval_policy,
+                sandbox_mode: codex_app_server::SandboxMode::ReadOnly,
+            },
+            request,
+            &approve,
+        )
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn start_project_auto_hunt(
+    app: tauri::AppHandle,
+    project_id: String,
+    request: codex_app_server::ProjectAutoHuntRequest,
+) -> Result<codex_app_server::ProjectAutoHuntResponse, String> {
+    let config_path = cli_config_path(&app)?;
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    let approval_app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let workspace = connected_project_workspace(&config_path, &project_id)?;
+        let settings = project_llm_settings_from(&config_path, &project_id)?;
+        let binary = codex_app_server::codex_binary(&home)?;
+        let execution_path = cli_execution_path(&home)?;
+        let approve = |method: &str, params: &serde_json::Value| {
+            approval_app
+                .dialog()
+                .message(approval_request_message(method, params))
+                .title("Codex 자동사냥 승인")
+                .buttons(MessageDialogButtons::OkCancelCustom(
+                    "승인".to_string(),
+                    "거절".to_string(),
+                ))
+                .blocking_show()
+        };
+        codex_app_server::start_auto_hunt(
+            &binary,
+            &execution_path,
+            &project_id,
+            &workspace,
             settings.approval_policy,
             request,
             &approve,
@@ -1239,6 +1281,7 @@ pub fn run() {
             validate_repository_path,
             connected_project_ids,
             project_llm_chat,
+            start_project_auto_hunt,
             load_project_llm_settings,
             update_project_llm_settings,
             update_local_project_workflow,

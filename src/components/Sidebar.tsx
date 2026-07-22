@@ -1,5 +1,6 @@
 import {
   Activity,
+  Bot,
   ChevronDown,
   ChevronRight,
   ChevronUp,
@@ -23,7 +24,8 @@ export function Sidebar({
   activeProjectId,
   isOpen,
   onAddProject,
-  onDashboardOpen,
+  onAutoHuntOpen,
+  onIssuesOpen,
   onProjectChange,
   onProjectSettings,
   onLogout,
@@ -31,11 +33,12 @@ export function Sidebar({
   projects,
   user,
 }: {
-  activePage: "dashboard" | "project-settings";
+  activePage: "issues" | "auto-hunt" | "project-settings";
   activeProjectId: string | null;
   isOpen: boolean;
   onAddProject: () => void;
-  onDashboardOpen: () => void;
+  onAutoHuntOpen: () => void;
+  onIssuesOpen: () => void;
   onProjectChange: (projectId: string) => void;
   onProjectSettings: (projectId: string) => void;
   onLogout: () => void;
@@ -216,15 +219,26 @@ export function Sidebar({
                   )}
                 </div>
                 {isActive && (
-                  <a
-                    aria-current={activePage === "dashboard" ? "page" : undefined}
-                    className={`sidebar-project-view${activePage === "dashboard" ? " active" : ""}`}
-                    href="#dashboard"
-                    onClick={onDashboardOpen}
-                  >
-                    <Activity size={14} strokeWidth={1.7} />
-                    <span>{t("sidebar.autoHunt")}</span>
-                  </a>
+                  <div className="sidebar-project-views">
+                    <a
+                      aria-current={activePage === "issues" ? "page" : undefined}
+                      className={`sidebar-project-view${activePage === "issues" ? " active" : ""}`}
+                      href="#issues"
+                      onClick={onIssuesOpen}
+                    >
+                      <Activity size={14} strokeWidth={1.7} />
+                      <span>{t("sidebar.issues")}</span>
+                    </a>
+                    <a
+                      aria-current={activePage === "auto-hunt" ? "page" : undefined}
+                      className={`sidebar-project-view${activePage === "auto-hunt" ? " active" : ""}`}
+                      href="#auto-hunt"
+                      onClick={onAutoHuntOpen}
+                    >
+                      <Bot size={14} strokeWidth={1.7} />
+                      <span>{t("sidebar.autoHunt")}</span>
+                    </a>
+                  </div>
                 )}
               </section>
             );

@@ -8,11 +8,12 @@ import { Sidebar } from "./Sidebar";
 import { I18nProvider } from "../i18n";
 
 const sidebarProps = {
-  activePage: "dashboard" as const,
+  activePage: "issues" as const,
   activeProjectId: "project-1",
   isOpen: true,
   onAddProject: () => undefined,
-  onDashboardOpen: () => undefined,
+  onAutoHuntOpen: () => undefined,
+  onIssuesOpen: () => undefined,
   onLogout: () => undefined,
   onProjectChange: () => undefined,
   onProjectSettings: () => undefined,
@@ -39,6 +40,7 @@ describe("Sidebar", () => {
     expect(markup).toContain('aria-label="왼쪽 패널 닫기"');
     expect(markup).toContain('aria-haspopup="menu"');
     expect(markup).toContain('aria-label="계정 메뉴"');
+    expect(markup).toContain("이슈");
     expect(markup).toContain("자동사냥");
     expect(markup).toContain('aria-label="Briar 프로젝트 메뉴"');
     expect(markup).not.toContain("<jelly-select");
@@ -99,6 +101,7 @@ describe("Sidebar", () => {
         ?.click();
     });
 
+    expect(container.textContent).toContain("Issues");
     expect(container.textContent).toContain("Auto Hunt");
     expect(window.localStorage.getItem("briar.locale.v1")).toBe("en");
     expect(document.documentElement.lang).toBe("en-US");
@@ -122,6 +125,7 @@ describe("Sidebar", () => {
         ?.click();
     });
 
+    expect(container.textContent).toContain("问题");
     expect(container.textContent).toContain("自动狩猎");
     expect(window.localStorage.getItem("briar.locale.v1")).toBe("zh");
     expect(document.documentElement.lang).toBe("zh-CN");
