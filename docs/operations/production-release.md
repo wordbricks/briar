@@ -64,6 +64,13 @@ mutable update manifest is the final write, so a partial build cannot be
 offered to installed clients. Versioned R2 objects are immutable and remain
 available for incident analysis.
 
+Production lifecycle QA is stricter than the main RC check. It rejects the
+candidate unless the installed app exposes a `Developer ID Application`
+authority, carries a valid stapled notarization ticket, and passes Gatekeeper's
+`spctl` assessment. The signed lifecycle evidence records
+`developer-id-notarized-gatekeeper`; an ad-hoc candidate cannot produce that
+result.
+
 Every main artifact build uses an ephemeral updater key to prove that Tauri can
 create an archive and signature without granting Production authority. That
 private key is deleted with its validated temporary directory and is never a
