@@ -28,9 +28,15 @@ workflow uploads the `.dmg`, a zipped `.app`, and `SHA256SUMS` for 30 days. A ta
 must exactly match the version in `src-tauri/tauri.conf.json`; matching tags also
 create a draft GitHub release.
 
-Run the same packaging contract locally after `bun run tauri build`:
+The public API endpoint and disabled demo mode live in `config/release.env`.
+They contain no secrets and are injected explicitly, so a clean runner produces
+the same connected app as a developer machine. The PR gate verifies that the
+compiled frontend contains that endpoint.
+
+Run the same packaging contract locally:
 
 ```sh
+bun run tauri:build:release
 scripts/package-macos-release.sh
 (cd release-artifacts && shasum -a 256 --check SHA256SUMS)
 ```

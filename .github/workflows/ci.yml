@@ -32,6 +32,8 @@ jobs:
         run: bun run test
       - name: Build app assets
         run: bun run build
+      - name: Verify production-configured app assets
+        run: bun run build:release
       - name: Type-check Worker
         run: bun run worker:check
       - name: Build Worker dry run

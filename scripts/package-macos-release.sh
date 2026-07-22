@@ -7,12 +7,14 @@ artifact_root="$workspace_root/release-artifacts"
 app_path="$bundle_root/macos/Briar.app"
 version="$(bun -e "import config from './src-tauri/tauri.conf.json'; console.log(config.version)" --cwd "$workspace_root")"
 
+"$workspace_root/scripts/verify-release-config.sh"
+
 if [[ "${GITHUB_REF_TYPE:-}" == "tag" && "${GITHUB_REF_NAME:-}" != "v$version" ]]; then
   echo "Release tag ${GITHUB_REF_NAME:-<missing>} does not match app version v$version." >&2
   exit 1
 fi
 if [[ ! -d "$app_path" ]]; then
-  echo "Missing release app at $app_path. Run 'bun run tauri build' first." >&2
+  echo "Missing release app at $app_path. Run 'bun run tauri:build:release' first." >&2
   exit 1
 fi
 
