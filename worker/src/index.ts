@@ -7,28 +7,38 @@ import {
   autoHuntStages,
   progressForAutoHuntStage,
 } from "../../src/lib/auto-hunt-contract";
+import {
+  maxIssueMultipartBytes,
+  validateIssueAttachments,
+} from "../../src/lib/issue-attachments";
 import { createAuth, type BriarAuth } from "./auth";
 import {
   assertQueuedHuntClaim,
   claimNextQueuedHuntRun,
+  createIssueAttachments,
   createProject,
   EventKeyConflictError,
   findProjectIdByAgentTokenHash,
+  getIssueAttachment,
   getNextQueuedHuntRun,
   getProject,
   getProjectSettings,
   getHuntRunForProject,
   HuntClaimError,
   HuntTransitionError,
+  listIssueAttachments,
   listDashboardRuns,
   listProjects,
   recoverHuntRun,
   recordHuntEvent,
   recordQaResult,
   replaceProjectAgentToken,
+  rollbackNewAppIssue,
   updateProjectSettings,
   type HuntEventRow,
   type HuntRunRow,
+  type IssueAttachmentInput,
+  type IssueAttachmentRow,
   type ProjectRow,
   type ProjectSettingsRow,
 } from "./db";
@@ -37,7 +47,7 @@ import { serveRelease } from "./releases";
 const corsHeaders = {
   "Access-Control-Allow-Headers":
     "authorization, content-type, x-briar-claim-token",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, HEAD, POST, PUT, OPTIONS",
   "Access-Control-Allow-Origin": "*",
 };
 
@@ -153,6 +163,53 @@ const issueInputSchema = z
   })
   .strict();
 
+export async function readIssueRequest(request: Request) {
+  const contentType = request.headers.get("content-type") ?? "";
+  if (!contentType.toLowerCase().startsWith("multipart/form-data;")) {
+    return {
+      input: issueInputSchema.parse(await readJson(request)),
+      attachments: [] as File[],
+    };
+  }
+
+  const declaredLength = Number(request.headers.get("content-length") ?? "0");
+  if (!Number.isSafeInteger(declaredLength) || declaredLength <= 0) {
+    throw new HttpError(411, "Multipart Content-Length is required");
+  }
+  if (declaredLength > maxIssueMultipartBytes) {
+    throw new HttpError(413, "Issue attachments exceed the 25MB total limit");
+  }
+
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    throw new HttpError(400, "Invalid multipart form data");
+  }
+  const rawAttachments = form.getAll("attachments");
+  if (rawAttachments.some((attachment) => !(attachment instanceof File))) {
+    throw new HttpError(400, "Attachments must be files");
+  }
+  const attachments = rawAttachments as File[];
+  const attachmentError = validateIssueAttachments(attachments);
+  if (attachmentError) throw new HttpError(400, attachmentError);
+
+  const description = form.get("description");
+  const priority = form.get("priority");
+  return {
+    input: issueInputSchema.parse({
+      title: form.get("title"),
+      description:
+        typeof description === "string" && description.trim()
+          ? description
+          : null,
+      priority:
+        typeof priority === "string" && priority ? Number(priority) : null,
+    }),
+    attachments,
+  };
+}
+
 const claimInputSchema = z
   .object({
     claimedBy: z.string().trim().min(1).max(128),
@@ -258,6 +315,27 @@ const svgResponse = (svg: string) =>
     },
   });
 
+const contentDisposition = (filename: string) =>
+  `inline; filename*=UTF-8''${encodeURIComponent(filename).replace(
+    /['()*]/gu,
+    (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
+  )}`;
+
+const attachmentResponse = (
+  attachment: IssueAttachmentRow,
+  object: R2Object,
+  body: BodyInit | null,
+) => {
+  const headers = new Headers(corsHeaders);
+  headers.set("Cache-Control", "private, max-age=300");
+  headers.set("Content-Disposition", contentDisposition(attachment.filename));
+  headers.set("Content-Length", String(object.size));
+  headers.set("Content-Type", attachment.content_type);
+  headers.set("ETag", object.httpEtag);
+  headers.set("X-Content-Type-Options", "nosniff");
+  return new Response(body, { headers });
+};
+
 const devicePage = (apiOrigin: string) =>
   new Response(
     `<!doctype html>
@@ -300,6 +378,24 @@ async function requireAgentProject(db: D1Database, request: Request) {
   const projectId = await findProjectIdByAgentTokenHash(db, await sha256(token));
   if (!projectId) throw new HttpError(401, "Invalid agent token");
   return projectId;
+}
+
+async function requireProjectAccess(
+  auth: BriarAuth,
+  db: D1Database,
+  request: Request,
+  projectId: string,
+) {
+  const authorization = request.headers.get("authorization") ?? "";
+  if (authorization.startsWith("Bearer briar_agent_")) {
+    const agentProjectId = await requireAgentProject(db, request);
+    if (agentProjectId !== projectId) throw new HttpError(404, "Attachment not found");
+    return;
+  }
+  const session = await requireSession(auth, request);
+  if (!(await getProject(db, projectId, session.user.id))) {
+    throw new HttpError(404, "Attachment not found");
+  }
 }
 
 function projectJson(row: ProjectRow) {
@@ -348,7 +444,19 @@ const dashboardEventJson = (event: HuntEventRow) => ({
   recordedAt: event.recorded_at,
 });
 
-function dashboardRunJson(run: HuntRunRow, events: HuntEventRow[]) {
+const attachmentJson = (attachment: IssueAttachmentRow) => ({
+  id: attachment.id,
+  filename: attachment.filename,
+  contentType: attachment.content_type,
+  byteSize: attachment.byte_size,
+  url: `/projects/${attachment.project_id}/runs/${attachment.run_id}/attachments/${attachment.id}`,
+});
+
+function dashboardRunJson(
+  run: HuntRunRow,
+  events: HuntEventRow[],
+  attachments: IssueAttachmentRow[],
+) {
   return {
     id: run.id,
     runNumber: run.run_number,
@@ -373,6 +481,7 @@ function dashboardRunJson(run: HuntRunRow, events: HuntEventRow[]) {
         }
       : null,
     issueDescription: run.issue_description,
+    attachments: attachments.map(attachmentJson),
     resultSummary: run.result_summary,
     pullRequestUrls: parseJsonArray(run.pull_request_urls),
     targetSha: run.target_sha,
@@ -398,6 +507,7 @@ async function route(
   request: Request,
   auth: BriarAuth,
   db: D1Database,
+  attachmentsBucket: R2Bucket,
 ): Promise<Response> {
   const { pathname } = new URL(request.url);
 
@@ -482,9 +592,10 @@ async function route(
     const session = await requireSession(auth, request);
     const project = await getProject(db, dashboardMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
-    const [{ runs, events }, settings] = await Promise.all([
+    const [{ runs, events }, settings, attachments] = await Promise.all([
       listDashboardRuns(db, project.id),
       getProjectSettings(db, project.id),
+      listIssueAttachments(db, project.id),
     ]);
     const eventsByRun = new Map<string, HuntEventRow[]>();
     for (const event of events) {
@@ -492,14 +603,49 @@ async function route(
       runEvents.push(event);
       eventsByRun.set(event.run_id, runEvents);
     }
+    const attachmentsByRun = new Map<string, IssueAttachmentRow[]>();
+    for (const attachment of attachments) {
+      const runAttachments = attachmentsByRun.get(attachment.run_id) ?? [];
+      runAttachments.push(attachment);
+      attachmentsByRun.set(attachment.run_id, runAttachments);
+    }
     return json({
       project: projectJson(project),
       settings: settingsJson(settings),
       runs: runs.map((run) =>
-        dashboardRunJson(run, eventsByRun.get(run.id) ?? []),
+        dashboardRunJson(
+          run,
+          eventsByRun.get(run.id) ?? [],
+          attachmentsByRun.get(run.id) ?? [],
+        ),
       ),
       generatedAt: new Date().toISOString(),
     });
+  }
+
+  const attachmentMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/attachments\/([0-9a-f-]+)$/u,
+  );
+  if (
+    attachmentMatch &&
+    (request.method === "GET" || request.method === "HEAD")
+  ) {
+    await requireProjectAccess(auth, db, request, attachmentMatch[1]);
+    const attachment = await getIssueAttachment(
+      db,
+      attachmentMatch[1],
+      attachmentMatch[2],
+      attachmentMatch[3],
+    );
+    if (!attachment) throw new HttpError(404, "Attachment not found");
+    if (request.method === "HEAD") {
+      const object = await attachmentsBucket.head(attachment.object_key);
+      if (!object) throw new HttpError(404, "Attachment not found");
+      return attachmentResponse(attachment, object, null);
+    }
+    const object = await attachmentsBucket.get(attachment.object_key);
+    if (!object) throw new HttpError(404, "Attachment not found");
+    return attachmentResponse(attachment, object, object.body);
   }
 
   const issuesMatch = pathname.match(
@@ -509,38 +655,117 @@ async function route(
     const session = await requireSession(auth, request);
     const project = await getProject(db, issuesMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
-    const [input, settings] = await Promise.all([
-      readJson(request).then((body) => issueInputSchema.parse(body)),
+    const [{ input, attachments }, settings] = await Promise.all([
+      readIssueRequest(request),
       getProjectSettings(db, project.id),
     ]);
     const issueId = crypto.randomUUID();
     const sourceKey = `briar-issue:${issueId}`;
     const occurredAt = new Date().toISOString();
-    const runId = await recordHuntEvent(db, project.id, {
-      source: "issue",
-      sourceKey,
-      title: input.title,
-      stage: "queued",
-      eventKey: `${sourceKey}:queued:intake`,
-      occurredAt,
-      actor: "briar-app",
-      repository: settings?.github_repository ?? project.name,
-      detail: "Briar 앱에서 생성된 이슈가 Auto Hunt 처리를 기다리고 있습니다.",
-      priority: input.priority ?? null,
-      branch: null,
-      commitSha: null,
-      tracker: null,
-      issueDescription: input.description || null,
-      resultSummary: null,
-      pullRequestUrls: [],
-      targetSha: null,
-      sourceCreatedAt: occurredAt,
-      qaStatus: null,
-      stagingQaDetail: null,
-      productionQaDetail: null,
-      context: { origin: "briar-app", issueId },
-    });
-    return json({ runId, sourceKey, stage: "queued" }, 201);
+    const storedAttachments: Array<IssueAttachmentInput & { file: File }> =
+      attachments.map((file) => {
+        const id = crypto.randomUUID();
+        return {
+          id,
+          object_key: `issue-attachments/${project.id}/${issueId}/${id}`,
+          filename: file.name.normalize("NFC").trim(),
+          content_type: file.type,
+          byte_size: file.size,
+          file,
+        };
+      });
+    const uploadedKeys: string[] = [];
+    let runId: string | null = null;
+    try {
+      for (const attachment of storedAttachments) {
+        await attachmentsBucket.put(attachment.object_key, attachment.file.stream(), {
+          httpMetadata: {
+            contentType: attachment.content_type,
+            contentDisposition: contentDisposition(attachment.filename),
+          },
+          customMetadata: { attachmentId: attachment.id, projectId: project.id },
+        });
+        uploadedKeys.push(attachment.object_key);
+      }
+      runId = await recordHuntEvent(db, project.id, {
+        source: "issue",
+        sourceKey,
+        title: input.title,
+        stage: "queued",
+        eventKey: `${sourceKey}:queued:intake`,
+        occurredAt,
+        actor: "briar-app",
+        repository: settings?.github_repository ?? project.name,
+        detail: "Briar 앱에서 생성된 이슈가 Auto Hunt 처리를 기다리고 있습니다.",
+        priority: input.priority ?? null,
+        branch: null,
+        commitSha: null,
+        tracker: null,
+        issueDescription: input.description || null,
+        resultSummary: null,
+        pullRequestUrls: [],
+        targetSha: null,
+        sourceCreatedAt: occurredAt,
+        qaStatus: null,
+        stagingQaDetail: null,
+        productionQaDetail: null,
+        context: {
+          origin: "briar-app",
+          issueId,
+          attachmentCount: storedAttachments.length,
+        },
+      });
+      await createIssueAttachments(
+        db,
+        project.id,
+        runId,
+        storedAttachments.map(({ file: _file, ...attachment }) => attachment),
+      );
+      const attachmentRows = await listIssueAttachments(db, project.id, runId);
+      return json(
+        {
+          runId,
+          sourceKey,
+          stage: "queued",
+          attachments: attachmentRows.map(attachmentJson),
+        },
+        201,
+      );
+    } catch (error) {
+      if (runId) {
+        try {
+          await rollbackNewAppIssue(db, project.id, runId);
+        } catch (rollbackError) {
+          console.error(
+            JSON.stringify({
+              message: "issue creation rollback failed",
+              error:
+                rollbackError instanceof Error
+                  ? rollbackError.message
+                  : String(rollbackError),
+              runId,
+            }),
+          );
+        }
+      }
+      if (uploadedKeys.length > 0) {
+        try {
+          await attachmentsBucket.delete(uploadedKeys);
+        } catch (cleanupError) {
+          console.error(
+            JSON.stringify({
+              message: "attachment cleanup failed",
+              error:
+                cleanupError instanceof Error
+                  ? cleanupError.message
+                  : String(cleanupError),
+              issueId,
+            }),
+          );
+        }
+      }
+      throw error;
+    }
   }
 
   const recoveryMatch = pathname.match(
@@ -571,6 +796,9 @@ async function route(
   if (pathname === "/ingest/queue/next" && request.method === "GET") {
     const projectId = await requireAgentProject(db, request);
     const run = await getNextQueuedHuntRun(db, projectId);
+    const attachments = run
+      ? await listIssueAttachments(db, projectId, run.id)
+      : [];
     return json({
       issue: run
         ? {
@@ -585,6 +813,7 @@ async function route(
             repository: run.repository,
             sourceCreatedAt: run.source_created_at,
             context: parseJsonObject(run.context_json),
+            attachments: attachments.map(attachmentJson),
           }
         : null,
     });
@@ -604,6 +833,9 @@ async function route(
       claimedAt,
       leaseExpiresAt,
     });
+    const attachments = run
+      ? await listIssueAttachments(db, projectId, run.id)
+      : [];
     return json({
       issue: run
         ? {
@@ -618,6 +850,7 @@ async function route(
             repository: run.repository,
             sourceCreatedAt: run.source_created_at,
             context: parseJsonObject(run.context_json),
+            attachments: attachments.map(attachmentJson),
             claimToken,
             claimedBy: run.claimed_by,
             claimedAt: run.claimed_at,
@@ -762,7 +995,7 @@ export default {
 
     try {
       const auth = createAuth(env, url.origin);
-      return await route(request, auth, env.DB);
+      return await route(request, auth, env.DB, env.ATTACHMENTS);
     } catch (error) {
       if (error instanceof HttpError) {
         return json({ message: error.message }, error.status);

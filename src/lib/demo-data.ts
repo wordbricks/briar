@@ -8,6 +8,7 @@ const runDefaults = {
   priority: null,
   tracker: null,
   issueDescription: null,
+  attachments: [],
   resultSummary: null,
   pullRequestUrls: [],
   targetSha: null,
@@ -27,6 +28,7 @@ const runDefaults = {
   | "currentAttempt"
   | "tracker"
   | "issueDescription"
+  | "attachments"
   | "resultSummary"
   | "pullRequestUrls"
   | "targetSha"

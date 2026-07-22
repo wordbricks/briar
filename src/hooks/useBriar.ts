@@ -7,6 +7,7 @@ import {
   createProject,
   isApiConfigured,
   loadDashboard,
+  loadIssueAttachment,
   loadProjects,
   loadSession,
   pollDeviceToken,
@@ -31,7 +32,14 @@ import {
   writeSessionToken,
 } from "../lib/token-store";
 import { startDashboardPolling } from "../lib/dashboard-polling";
-import type { DashboardPayload, HuntRun, Project, SessionUser } from "../types";
+import type {
+  CreateIssueInput,
+  DashboardPayload,
+  HuntRun,
+  IssueAttachment,
+  Project,
+  SessionUser,
+} from "../types";
 
 export type ProjectConnection = {
   project: Project;
@@ -420,11 +428,7 @@ export function useBriar() {
   }, [activeProjectId, projects]);
 
   const addIssue = useCallback(
-    async (input: {
-      title: string;
-      description: string | null;
-      priority: number | null;
-    }) => {
+    async (input: CreateIssueInput) => {
       if (!activeProjectId || !dashboard) {
         throw new Error("이슈를 추가할 프로젝트가 없습니다.");
       }
@@ -435,6 +439,13 @@ export function useBriar() {
           const occurredAt = new Date().toISOString();
           const issueId = crypto.randomUUID();
           const sourceKey = `briar-issue:${issueId}`;
+          const attachments: IssueAttachment[] = input.attachments.map((file) => ({
+            id: crypto.randomUUID(),
+            filename: file.name,
+            contentType: file.type,
+            byteSize: file.size,
+            url: URL.createObjectURL(file),
+          }));
           const run: HuntRun = {
             id: crypto.randomUUID(),
             runNumber:
@@ -453,6 +464,7 @@ export function useBriar() {
             commitSha: null,
             tracker: null,
             issueDescription: input.description,
+            attachments,
             resultSummary: null,
             pullRequestUrls: [],
             targetSha: null,
@@ -461,7 +473,11 @@ export function useBriar() {
             productionQaStatus: null,
             stagingQaDetail: null,
             productionQaDetail: null,
-            context: { origin: "briar-app", issueId },
+            context: {
+              origin: "briar-app",
+              issueId,
+              attachmentCount: attachments.length,
+            },
             claimedBy: null,
             claimedAt: null,
             leaseExpiresAt: null,
@@ -504,6 +520,16 @@ export function useBriar() {
       }
     },
     [activeProjectId, dashboard, token],
+  );
+
+  const readIssueAttachment = useCallback(
+    async (attachment: IssueAttachment) => {
+      if (!token && !attachment.url.startsWith("blob:")) {
+        throw new Error("첨부 파일을 열려면 로그인이 필요합니다.");
+      }
+      return loadIssueAttachment(token ?? "", attachment);
+    },
+    [token],
   );
 
   const recoverRun = useCallback(
@@ -612,6 +638,7 @@ export function useBriar() {
     refresh,
     refreshHealth,
     refreshVelen,
+    readIssueAttachment,
     setActiveProjectId: selectProject,
     repairHealth,
     retryRun: (runId: string) => recoverRun(runId, "retry"),

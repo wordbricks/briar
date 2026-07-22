@@ -1,6 +1,9 @@
 import { z } from "zod";
+import { validateIssueAttachments } from "./issue-attachments";
 import type {
+  CreateIssueInput,
   DashboardPayload,
+  IssueAttachment,
   Project,
   ProjectSettings,
   SessionUser,
@@ -31,14 +34,15 @@ async function request<T>(
   init?: RequestInit,
 ): Promise<T> {
   if (!apiUrl) throw new Error("Briar API URL이 설정되지 않았습니다.");
+  const headers = new Headers(init?.headers);
+  headers.set("Accept", "application/json");
+  if (!(init?.body instanceof FormData) && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+  if (token) headers.set("Authorization", `Bearer ${token}`);
   const response = await fetch(`${apiUrl}${path}`, {
     ...init,
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...init?.headers,
-    },
+    headers,
   });
   if (!response.ok) {
     const body = await response.json().catch(() => null);
@@ -139,13 +143,60 @@ export async function createProject(
 export async function createIssue(
   token: string,
   projectId: string,
-  input: { title: string; description: string | null; priority: number | null },
+  input: CreateIssueInput,
 ) {
-  return request<{ runId: string; sourceKey: string; stage: "queued" }>(
+  if (input.attachments.length === 0) {
+    const { attachments: _attachments, ...issue } = input;
+    return request<{
+      runId: string;
+      sourceKey: string;
+      stage: "queued";
+      attachments: IssueAttachment[];
+    }>(`/projects/${projectId}/issues`, token, {
+      method: "POST",
+      body: JSON.stringify(issue),
+    });
+  }
+  const attachmentError = validateIssueAttachments(input.attachments);
+  if (attachmentError) throw new Error(attachmentError);
+  const form = new FormData();
+  form.set("title", input.title);
+  form.set("description", input.description ?? "");
+  form.set("priority", input.priority === null ? "" : String(input.priority));
+  for (const attachment of input.attachments) {
+    form.append("attachments", attachment, attachment.name);
+  }
+  return request<{
+    runId: string;
+    sourceKey: string;
+    stage: "queued";
+    attachments: IssueAttachment[];
+  }>(
     `/projects/${projectId}/issues`,
     token,
-    { method: "POST", body: JSON.stringify(input) },
+    { method: "POST", body: form },
   );
+}
+
+export async function loadIssueAttachment(
+  token: string,
+  attachment: IssueAttachment,
+) {
+  if (attachment.url.startsWith("blob:")) {
+    const response = await fetch(attachment.url);
+    if (!response.ok) throw new Error("첨부 파일을 열 수 없습니다.");
+    return response.blob();
+  }
+  if (!apiUrl || !attachment.url.startsWith("/")) {
+    throw new Error("첨부 파일 경로가 유효하지 않습니다.");
+  }
+  const response = await fetch(`${apiUrl}${attachment.url}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    throw new Error(`첨부 파일을 열 수 없습니다. (${response.status})`);
+  }
+  return response.blob();
 }
 
 export type HuntRecoveryResult = {

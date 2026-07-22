@@ -8,7 +8,9 @@ import {
   FolderGit2,
   GitCommitHorizontal,
   GitFork,
+  Image as ImageIcon,
   LoaderCircle,
+  Paperclip,
   PanelLeftOpen,
   Plus,
   RefreshCw,
@@ -16,15 +18,29 @@ import {
   Search,
   ShieldCheck,
   Terminal,
+  Trash2,
+  Video,
   Wrench,
   X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { JellySelect } from "./JellySelect";
 import { UpdateControl } from "./UpdateControl";
 import { sourceLabel, stageMeta } from "../lib/stages";
+import {
+  formatAttachmentBytes,
+  issueAttachmentAccept,
+  maxIssueAttachmentCount,
+  validateIssueAttachments,
+} from "../lib/issue-attachments";
 import type { AutoHuntHealth } from "../lib/project-connection";
-import type { DashboardPayload, HuntRun, HuntSource } from "../types";
+import type {
+  CreateIssueInput,
+  DashboardPayload,
+  HuntRun,
+  HuntSource,
+  IssueAttachment,
+} from "../types";
 
 type SourceFilter = "all" | HuntSource;
 type StatusFilter = "active" | "attention" | "completed";
@@ -42,6 +58,7 @@ export function HuntDashboard({
   isSidebarOpen,
   onCreateIssue,
   onHealthRefresh,
+  onLoadAttachment,
   onReconnect,
   onRetryRun,
   onCancelRun,
@@ -59,12 +76,9 @@ export function HuntDashboard({
   recoveringRunId: string | null;
   recoveryError: string | null;
   isSidebarOpen: boolean;
-  onCreateIssue: (input: {
-    title: string;
-    description: string | null;
-    priority: number | null;
-  }) => Promise<unknown>;
+  onCreateIssue: (input: CreateIssueInput) => Promise<unknown>;
   onHealthRefresh: () => void;
+  onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onReconnect: () => void;
   onRetryRun: (runId: string) => Promise<unknown>;
   onCancelRun: (runId: string) => Promise<unknown>;
@@ -205,6 +219,7 @@ export function HuntDashboard({
           isRecovering={recoveringRunId === selected.id}
           onCancel={() => onCancelRun(selected.id)}
           onClose={() => setSelectedRunId(null)}
+          onLoadAttachment={onLoadAttachment}
           onRetry={() => onRetryRun(selected.id)}
           run={selected}
         />
@@ -284,15 +299,13 @@ export function CreateIssueDialog({
 }: {
   isSubmitting: boolean;
   onClose: () => void;
-  onCreate: (input: {
-    title: string;
-    description: string | null;
-    priority: number | null;
-  }) => Promise<void>;
+  onCreate: (input: CreateIssueInput) => Promise<void>;
 }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("2");
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   return (
@@ -307,6 +320,7 @@ export function CreateIssueDialog({
             title: title.trim(),
             description: description.trim() || null,
             priority: Number(priority),
+            attachments,
           }).catch((error) =>
             setSubmitError(error instanceof Error ? error.message : String(error)),
           );
@@ -328,6 +342,46 @@ export function CreateIssueDialog({
             <span>설명</span>
             <textarea maxLength={100000} onChange={(event) => setDescription(event.target.value)} placeholder="문제, 기대 결과, 참고할 맥락을 적어주세요" rows={6} value={description} />
           </label>
+          <div className="issue-attachment-field">
+            <span>이미지·영상 <em>선택</em></span>
+            <label className="issue-attachment-button">
+              <Paperclip size={15} />
+              <span>파일 추가</span>
+              <small>최대 5개 · 전체 25MB</small>
+              <input
+                accept={issueAttachmentAccept}
+                aria-label="이미지 또는 영상 첨부"
+                disabled={isSubmitting || attachments.length >= maxIssueAttachmentCount}
+                multiple
+                onChange={(event) => {
+                  const selected = Array.from(event.currentTarget.files ?? []);
+                  event.currentTarget.value = "";
+                  if (selected.length === 0) return;
+                  const next = [...attachments, ...selected];
+                  const error = validateIssueAttachments(next);
+                  setAttachmentError(error);
+                  if (!error) setAttachments(next);
+                }}
+                type="file"
+              />
+            </label>
+            {attachments.length > 0 && (
+              <div className="issue-attachment-list">
+                {attachments.map((file, index) => (
+                  <SelectedAttachment
+                    file={file}
+                    key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
+                    onRemove={() => {
+                      setAttachments((current) =>
+                        current.filter((_, candidateIndex) => candidateIndex !== index),
+                      );
+                      setAttachmentError(null);
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
           <JellySelect
             className="issue-priority-select"
             label="우선순위"
@@ -340,7 +394,7 @@ export function CreateIssueDialog({
             ]}
             value={priority}
           />
-          {submitError && <div className="issue-form-error"><CircleAlert size={14} />{submitError}</div>}
+          {(submitError || attachmentError) && <div className="issue-form-error"><CircleAlert size={14} />{submitError ?? attachmentError}</div>}
           <p>생성 즉시 작업 큐의 <strong>대기</strong> 상태로 등록됩니다.</p>
         </div>
         <footer>
@@ -351,6 +405,35 @@ export function CreateIssueDialog({
           </button>
         </footer>
       </form>
+    </div>
+  );
+}
+
+function SelectedAttachment({
+  file,
+  onRemove,
+}: {
+  file: File;
+  onRemove: () => void;
+}) {
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  useEffect(() => {
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+  const isImage = file.type.startsWith("image/");
+  return (
+    <div className="issue-attachment-item">
+      <span className="issue-attachment-preview">
+        {previewUrl && isImage ? (
+          <img alt="" src={previewUrl} />
+        ) : (
+          <Video size={17} />
+        )}
+      </span>
+      <span><strong>{file.name}</strong><small>{formatAttachmentBytes(file.size)}</small></span>
+      <button aria-label={`${file.name} 제거`} onClick={onRemove} type="button"><Trash2 size={14} /></button>
     </div>
   );
 }
@@ -385,6 +468,7 @@ export function RunDialog({
   isRecovering,
   onCancel,
   onClose,
+  onLoadAttachment,
   onRetry,
   run,
 }: {
@@ -392,6 +476,7 @@ export function RunDialog({
   isRecovering: boolean;
   onCancel: () => Promise<unknown>;
   onClose: () => void;
+  onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onRetry: () => Promise<unknown>;
   run: HuntRun;
 }) {
@@ -414,6 +499,13 @@ export function RunDialog({
           <p className="eyebrow">{sourceLabel[run.source].toUpperCase()} · {run.repository}</p>
           <h2>{run.title}</h2>
           <p className="run-detail">{run.detail}</p>
+          {run.issueDescription && <p className="run-issue-description">{run.issueDescription}</p>}
+          {(run.attachments ?? []).length > 0 && (
+            <IssueAttachmentGallery
+              attachments={run.attachments ?? []}
+              onLoadAttachment={onLoadAttachment}
+            />
+          )}
           {needsAttention && (
             <div className="recovery-panel">
               <div><CircleAlert size={16} /><span><strong>{run.stage === "failed" ? "실행이 실패했습니다" : "진행이 차단되었습니다"}</strong><small>이전 시도의 활동 기록은 보존됩니다. 재시도하면 {run.currentAttempt + 1}번 시도로 새 작업이 시작됩니다.</small></span></div>
@@ -439,6 +531,70 @@ export function RunDialog({
         <footer><span>{needsAttention ? "실패 이력과 증거는 재시도 후에도 보존됩니다." : "Auto Hunt 실행 증거를 실시간으로 표시합니다."}</span><button><ArrowUpRight size={14} />로컬 저장소 열기</button></footer>
       </section>
     </div>
+  );
+}
+
+function IssueAttachmentGallery({
+  attachments,
+  onLoadAttachment,
+}: {
+  attachments: IssueAttachment[];
+  onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
+}) {
+  return (
+    <section className="run-attachments">
+      <h3><Paperclip size={14} />첨부 파일 <span>{attachments.length}</span></h3>
+      <div>
+        {attachments.map((attachment) => (
+          <IssueAttachmentPreview
+            attachment={attachment}
+            key={attachment.id}
+            onLoadAttachment={onLoadAttachment}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function IssueAttachmentPreview({
+  attachment,
+  onLoadAttachment,
+}: {
+  attachment: IssueAttachment;
+  onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
+}) {
+  const [source, setSource] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let active = true;
+    let objectUrl: string | null = null;
+    setSource(null);
+    setFailed(false);
+    void onLoadAttachment(attachment)
+      .then((blob) => {
+        if (!active) return;
+        objectUrl = URL.createObjectURL(blob);
+        setSource(objectUrl);
+      })
+      .catch(() => active && setFailed(true));
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [attachment, onLoadAttachment]);
+  const isImage = attachment.contentType.startsWith("image/");
+  return (
+    <article className="run-attachment">
+      <div className="run-attachment-media">
+        {source && isImage && <img alt={attachment.filename} src={source} />}
+        {source && !isImage && <video controls preload="metadata" src={source} />}
+        {!source && !failed && (isImage ? <ImageIcon size={22} /> : <Video size={22} />)}
+        {failed && <CircleAlert size={20} />}
+      </div>
+      <span><strong>{attachment.filename}</strong><small>{failed ? "불러오지 못함" : formatAttachmentBytes(attachment.byteSize)}</small></span>
+      {source && <a download={attachment.filename} href={source}>열기</a>}
+    </article>
   );
 }
 
