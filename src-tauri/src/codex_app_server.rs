@@ -329,18 +329,35 @@ impl CodexConnection {
         thread_id: &str,
         approve: &dyn Fn(&str, &Value) -> bool,
     ) -> Result<String, String> {
-        let mut turn_started = false;
+        let mut active_turn_id = None;
+        let mut messages = AgentMessages::default();
         loop {
             let message = self.read_message()?;
             if self.handle_server_request(&message, approve)? {
                 continue;
             }
             if message.get("id").and_then(Value::as_u64) == Some(TURN_REQUEST_ID) {
-                response_result(message)?;
-                turn_started = true;
+                let result = response_result(message)?;
+                let turn_id = result
+                    .pointer("/turn/id")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        "Codex App Server가 turn ID를 반환하지 않았습니다.".to_string()
+                    })?;
+                active_turn_id = Some(turn_id.to_string());
                 continue;
             }
-            if message.get("method").and_then(Value::as_str) != Some("turn/completed") {
+            let method = message.get("method").and_then(Value::as_str);
+            if method == Some("item/completed") {
+                capture_completed_item(
+                    message.get("params").unwrap_or(&Value::Null),
+                    thread_id,
+                    active_turn_id.as_deref(),
+                    &mut messages,
+                );
+                continue;
+            }
+            if method != Some("turn/completed") {
                 continue;
             }
             let params = message
@@ -349,10 +366,18 @@ impl CodexConnection {
             if params.get("threadId").and_then(Value::as_str) != Some(thread_id) {
                 continue;
             }
-            if !turn_started {
+            let Some(active_turn_id) = active_turn_id.as_deref() else {
                 return Err("Codex가 turn/start 응답 전에 대화를 완료했습니다.".to_string());
+            };
+            if params
+                .get("turn")
+                .and_then(|turn| turn.get("id"))
+                .and_then(Value::as_str)
+                != Some(active_turn_id)
+            {
+                continue;
             }
-            return completed_message(params);
+            return completed_message(params, messages);
         }
     }
 
@@ -436,7 +461,52 @@ fn response_result(message: Value) -> Result<Value, String> {
         .ok_or_else(|| "Codex App Server 응답에 결과가 없습니다.".to_string())
 }
 
-fn completed_message(params: &Value) -> Result<String, String> {
+#[derive(Clone, Debug, Default)]
+struct AgentMessages {
+    fallback: Option<String>,
+    final_answer: Option<String>,
+}
+
+impl AgentMessages {
+    fn capture(&mut self, item: &Value) {
+        if item.get("type").and_then(Value::as_str) != Some("agentMessage") {
+            return;
+        }
+        let Some(text) = item.get("text").and_then(Value::as_str) else {
+            return;
+        };
+        if text.trim().is_empty() {
+            return;
+        }
+        self.fallback = Some(text.to_string());
+        if item.get("phase").and_then(Value::as_str) == Some("final_answer") {
+            self.final_answer = Some(text.to_string());
+        }
+    }
+
+    fn into_message(self) -> Option<String> {
+        self.final_answer.or(self.fallback)
+    }
+}
+
+fn capture_completed_item(
+    params: &Value,
+    thread_id: &str,
+    turn_id: Option<&str>,
+    messages: &mut AgentMessages,
+) {
+    if params.get("threadId").and_then(Value::as_str) != Some(thread_id) {
+        return;
+    }
+    if turn_id.is_some() && params.get("turnId").and_then(Value::as_str) != turn_id {
+        return;
+    }
+    if let Some(item) = params.get("item") {
+        messages.capture(item);
+    }
+}
+
+fn completed_message(params: &Value, mut messages: AgentMessages) -> Result<String, String> {
     let turn = params
         .get("turn")
         .ok_or_else(|| "Codex 완료 응답에 turn이 없습니다.".to_string())?;
@@ -451,30 +521,16 @@ fn completed_message(params: &Value) -> Result<String, String> {
             .unwrap_or(status);
         return Err(format!("Codex 대화가 완료되지 않았습니다: {detail}"));
     }
-    let mut fallback = None;
-    let mut final_answer = None;
     for item in turn
         .get("items")
         .and_then(Value::as_array)
         .into_iter()
         .flatten()
     {
-        if item.get("type").and_then(Value::as_str) != Some("agentMessage") {
-            continue;
-        }
-        let Some(text) = item.get("text").and_then(Value::as_str) else {
-            continue;
-        };
-        if text.trim().is_empty() {
-            continue;
-        }
-        fallback = Some(text.to_string());
-        if item.get("phase").and_then(Value::as_str) == Some("final_answer") {
-            final_answer = Some(text.to_string());
-        }
+        messages.capture(item);
     }
-    final_answer
-        .or(fallback)
+    messages
+        .into_message()
         .ok_or_else(|| "Codex가 최종 메시지를 반환하지 않았습니다.".to_string())
 }
 
@@ -551,7 +607,7 @@ mod tests {
             }
         });
         assert_eq!(
-            completed_message(&params).expect("turn should complete"),
+            completed_message(&params, AgentMessages::default()).expect("turn should complete"),
             "Done"
         );
     }
@@ -593,7 +649,8 @@ printf '%s\n' '{"id":3,"result":{"turn":{"id":"turn-1","items":[],"status":"inPr
 printf '%s\n' '{"id":4,"method":"item/commandExecution/requestApproval","params":{"threadId":"thread-1","turnId":"turn-1","itemId":"item-1","startedAtMs":1,"command":"git status"}}'
 read line
 printf '%s\n' "$line" >> __LOG__
-printf '%s\n' '{"method":"turn/completed","params":{"threadId":"thread-1","turn":{"id":"turn-1","items":[{"id":"message-1","type":"agentMessage","phase":"final_answer","text":"Repository summary"}],"status":"completed"}}}'
+printf '%s\n' '{"method":"item/completed","params":{"threadId":"thread-1","turnId":"turn-1","completedAtMs":1,"item":{"id":"message-1","type":"agentMessage","phase":"final_answer","text":"Repository summary"}}}'
+printf '%s\n' '{"method":"turn/completed","params":{"threadId":"thread-1","turn":{"id":"turn-1","items":[],"itemsView":"notLoaded","status":"completed"}}}'
 "#
         .replace("__LOG__", &format!("'{}'", log.to_string_lossy()))
         .replace("__WORKSPACE__", &workspace_json);
