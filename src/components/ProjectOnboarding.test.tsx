@@ -25,7 +25,7 @@ describe("ProjectOnboarding", () => {
     expect(markup).toContain("대시보드로 돌아가기");
   });
 
-  it("uses Jelly Select for connection dropdowns", () => {
+  it("explains automatic workflow generation during repository connection", () => {
     const markup = renderToStaticMarkup(
       <ProjectOnboarding
         {...baseProps}
@@ -44,10 +44,11 @@ describe("ProjectOnboarding", () => {
     );
 
     expect(markup).toContain('<jelly-select label="Velen 조직"');
-    expect(markup).toContain('<jelly-select label="Auto Hunt 워크플로"');
-    expect(markup).toContain("로컬 개발 · 배포 없음");
-    expect(markup).toContain('aria-pressed="true"');
-    expect(markup).toContain("로컬 검증");
+    expect(markup).toContain("워크플로우 자동 생성");
+    expect(markup).toContain("Codex App Server");
+    expect(markup).toContain("저장소 선택하고 워크플로우 생성");
+    expect(markup).not.toContain('label="Auto Hunt 워크플로"');
+    expect(markup).not.toContain('aria-pressed="true"');
     expect(markup).not.toContain("<select");
   });
 

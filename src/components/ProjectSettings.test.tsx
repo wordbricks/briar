@@ -8,6 +8,7 @@ import { ProjectSettings } from "./ProjectSettings";
 
 describe("ProjectSettings", () => {
   it("configures the project approval policy", async () => {
+    const onRegenerateWorkflow = vi.fn(async () => undefined);
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
@@ -19,6 +20,7 @@ describe("ProjectSettings", () => {
           isSidebarOpen
           onBack={() => undefined}
           onDelete={async () => undefined}
+          onRegenerateWorkflow={onRegenerateWorkflow}
           onSidebarOpen={() => undefined}
           project={{
             id: "project-1",
@@ -55,6 +57,17 @@ describe("ProjectSettings", () => {
       '"enabled": false',
     );
 
+    const regenerateButton = Array.from(
+      container.querySelectorAll<HTMLButtonElement>(
+        ".project-settings-automation-actions button",
+      ),
+    ).find((button) => button.textContent?.includes("워크플로우 재생성"));
+    await act(async () => regenerateButton?.click());
+    expect(onRegenerateWorkflow).toHaveBeenCalledOnce();
+    expect(container.textContent).toContain(
+      "코드 분석 결과로 워크플로우를 갱신했습니다.",
+    );
+
     const saveButton = container.querySelector<HTMLButtonElement>(
       ".project-settings-llm-control button",
     );
@@ -79,6 +92,7 @@ describe("ProjectSettings", () => {
           isSidebarOpen
           onBack={() => undefined}
           onDelete={onDelete}
+          onRegenerateWorkflow={async () => undefined}
           onSidebarOpen={() => undefined}
           project={{
             id: "project-1",

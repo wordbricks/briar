@@ -2,7 +2,7 @@ mod codex_app_server;
 
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     env,
     ffi::OsString,
     fs::{self, OpenOptions},
@@ -759,6 +759,61 @@ fn update_project_llm_settings_at(
     Ok(settings)
 }
 
+fn update_project_workflow_at(
+    config_path: &Path,
+    project_id: &str,
+    workflow: WorkflowConfig,
+) -> Result<WorkflowConfig, String> {
+    validate_generated_workflow(&workflow)?;
+    let contents = fs::read_to_string(config_path)
+        .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
+    let mut config = serde_json::from_str::<CliConfig>(&contents)
+        .map_err(|error| format!("Briar 로컬 설정이 손상되었습니다: {error}"))?;
+    let project = config
+        .projects
+        .iter_mut()
+        .find(|project| project.id == project_id)
+        .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
+    let auto_hunt = project
+        .auto_hunt
+        .as_mut()
+        .ok_or_else(|| "이 프로젝트에 Auto Hunt 설정이 없습니다.".to_string())?;
+    auto_hunt.workflow = Some(workflow.clone());
+    write_cli_config(config_path, &config)?;
+    Ok(workflow)
+}
+
+fn validate_generated_workflow(workflow: &WorkflowConfig) -> Result<(), String> {
+    if workflow.version != 1 || workflow.stages.is_empty() || workflow.stages.len() > 30 {
+        return Err("생성된 워크플로우 버전 또는 단계 수가 올바르지 않습니다.".to_string());
+    }
+    let mut ids = BTreeSet::new();
+    for stage in &workflow.stages {
+        if stage.id.trim().is_empty()
+            || stage.label.trim().is_empty()
+            || !ids.insert(stage.id.as_str())
+        {
+            return Err("생성된 워크플로우 단계가 올바르지 않습니다.".to_string());
+        }
+    }
+    let required = workflow
+        .stages
+        .iter()
+        .filter(|stage| stage.required)
+        .map(|stage| stage.id.as_str())
+        .collect::<Vec<_>>();
+    let completion = workflow
+        .completion
+        .required_stages
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    if completion != required {
+        return Err("생성된 워크플로우의 필수 단계와 완료 조건이 일치하지 않습니다.".to_string());
+    }
+    Ok(())
+}
+
 fn copy_directory(source: &Path, destination: &Path) -> Result<(), String> {
     if destination.exists() && fs::canonicalize(source).ok() == fs::canonicalize(destination).ok() {
         return Ok(());
@@ -1089,6 +1144,20 @@ async fn update_project_llm_settings(
 }
 
 #[tauri::command]
+async fn update_local_project_workflow(
+    app: tauri::AppHandle,
+    project_id: String,
+    workflow: WorkflowConfig,
+) -> Result<WorkflowConfig, String> {
+    let config_path = cli_config_path(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        update_project_workflow_at(&config_path, &project_id, workflow)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
 async fn disconnect_local_project(app: tauri::AppHandle, project_id: String) -> Result<(), String> {
     let config_path = cli_config_path(&app)?;
     tauri::async_runtime::spawn_blocking(move || remove_cli_connection(&config_path, &project_id))
@@ -1172,6 +1241,7 @@ pub fn run() {
             project_llm_chat,
             load_project_llm_settings,
             update_project_llm_settings,
+            update_local_project_workflow,
             disconnect_local_project,
             connect_local_project,
             inspect_velen,
@@ -1422,6 +1492,68 @@ mod tests {
         .expect("saved config should be json");
         assert_eq!(saved["customSetting"], true);
         assert_eq!(saved["projects"][0]["llm"]["approvalPolicy"], "on-request");
+
+        fs::remove_dir_all(directory).expect("test config directory should be removed");
+    }
+
+    #[test]
+    fn updates_the_connected_project_workflow_locally() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be after unix epoch")
+            .as_nanos();
+        let directory = std::env::temp_dir().join(format!("briar-workflow-update-test-{unique}"));
+        let config_path = directory.join("config.json");
+        fs::create_dir_all(&directory).expect("test config directory should be created");
+        fs::write(
+            &config_path,
+            r#"{
+  "apiUrl": "https://briar.example.com",
+  "projects": [{
+    "id": "project-1",
+    "repositoryPath": "/repo",
+    "agentToken": "briar_agent_test",
+    "autoHunt": {
+      "velenOrg": "wordbricks",
+      "workflow": {
+        "version": 1,
+        "preset": "local",
+        "stages": [{"id":"analyzing","label":"Analyze","required":true}],
+        "completion": {"requiredStages":["analyzing"]},
+        "release": {"enabled":false}
+      }
+    }
+  }]
+}"#,
+        )
+        .expect("test config should be written");
+
+        let mut workflow = default_workflow();
+        workflow.preset = "custom".to_string();
+        workflow.stages = vec![WorkflowStageConfig {
+            id: "repository_qa".to_string(),
+            label: "Repository QA".to_string(),
+            required: true,
+            evidence: vec!["diff".to_string()],
+            checks: vec!["cargo test".to_string()],
+        }];
+        workflow.completion.required_stages = vec!["repository_qa".to_string()];
+
+        update_project_workflow_at(&config_path, "project-1", workflow)
+            .expect("workflow should save");
+
+        let saved: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&config_path).expect("saved config should be readable"),
+        )
+        .expect("saved config should be json");
+        assert_eq!(
+            saved["projects"][0]["autoHunt"]["workflow"]["preset"],
+            "custom"
+        );
+        assert_eq!(
+            saved["projects"][0]["autoHunt"]["workflow"]["stages"][0]["checks"][0],
+            "cargo test"
+        );
 
         fs::remove_dir_all(directory).expect("test config directory should be removed");
     }

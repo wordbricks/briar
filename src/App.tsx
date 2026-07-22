@@ -81,6 +81,7 @@ export function App() {
             await briar.deleteProject(activeProject.id);
             setActivePage("dashboard");
           }}
+          onRegenerateWorkflow={() => briar.regenerateWorkflow(activeProject.id)}
           onSidebarOpen={() => setIsSidebarOpen(true)}
           project={activeProject}
         />
