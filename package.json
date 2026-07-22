@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:all": "bash scripts/dev-all.sh",
     "build": "tsc --noEmit && vite build",
     "build:release": "bash scripts/with-release-env.sh bun run build && bash scripts/verify-release-config.sh",
     "check": "tsc --noEmit",
