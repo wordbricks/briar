@@ -46,6 +46,21 @@ jobs:
             shasum -a 256 -- lifecycle-evidence.json >> SHA256SUMS
             shasum -a 256 --check SHA256SUMS
           )
+      - name: Prove ad-hoc candidate cannot satisfy Production trust
+        run: |
+          rejection_log="$RUNNER_TEMP/production-signature-rejection.log"
+          if scripts/qa-macos-lifecycle.sh \
+            --previous-dir release-artifacts \
+            --candidate-dir release-artifacts \
+            --allow-same-version \
+            --require-production-signature \
+            >"$rejection_log" 2>&1; then
+            echo "Ad-hoc RC unexpectedly passed the Production signature gate." >&2
+            exit 1
+          fi
+          grep -F \
+            "Production candidate is not signed by a Developer ID Application identity." \
+            "$rejection_log"
       - name: Upload release artifact
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:

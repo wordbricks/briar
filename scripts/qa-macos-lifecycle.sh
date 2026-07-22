@@ -7,6 +7,7 @@ candidate_dir=""
 evidence_file=""
 allow_same_version=false
 allow_legacy_previous_signature=false
+require_production_signature=false
 
 while (( $# > 0 )); do
   case "$1" in
@@ -28,6 +29,10 @@ while (( $# > 0 )); do
       ;;
     --allow-legacy-previous-signature)
       allow_legacy_previous_signature=true
+      shift
+      ;;
+    --require-production-signature)
+      require_production_signature=true
       shift
       ;;
     *)
@@ -221,6 +226,18 @@ install_dmg "$candidate_dmg" "$installed_app" "$qa_root/mount-candidate"
 assert_app_bundle "$installed_app" true "$candidate_version"
 [[ "$(state_hash "$state_root")" == "$initial_state_hash" ]]
 
+candidate_signature="strict-ad-hoc"
+if [[ "$require_production_signature" == "true" ]]; then
+  if ! codesign -d --verbose=4 "$installed_app" 2>&1 \
+    | grep -q '^Authority=Developer ID Application:'; then
+    echo "Production candidate is not signed by a Developer ID Application identity." >&2
+    exit 1
+  fi
+  xcrun stapler validate "$installed_app"
+  spctl --assess --type execute --verbose=2 "$installed_app"
+  candidate_signature="developer-id-notarized-gatekeeper"
+fi
+
 mv "$installed_app" "$failed_candidate_app"
 mv "$rollback_app" "$installed_app"
 assert_app_bundle "$installed_app" "$previous_signature_required" "$previous_version"
@@ -230,8 +247,9 @@ if [[ -n "$evidence_file" ]]; then
   BRIAR_EVIDENCE_FILE="$evidence_file" \
   BRIAR_PREVIOUS_VERSION="$previous_version" \
   BRIAR_CANDIDATE_VERSION="$candidate_version" \
+  BRIAR_CANDIDATE_SIGNATURE="$candidate_signature" \
   BRIAR_STATE_HASH="$initial_state_hash" \
-    bun -e 'await Bun.write(process.env.BRIAR_EVIDENCE_FILE, JSON.stringify({schemaVersion:1, result:"passed", previousVersion:process.env.BRIAR_PREVIOUS_VERSION, candidateVersion:process.env.BRIAR_CANDIDATE_VERSION, checksumsVerified:true, candidateManifestVerified:true, candidateSignature:"strict-ad-hoc", statePreserved:true, stateHash:process.env.BRIAR_STATE_HASH, install:"dmg", update:"bundle-replacement", rollback:"retained-previous-bundle"}, null, 2) + "\n")'
+    bun -e 'await Bun.write(process.env.BRIAR_EVIDENCE_FILE, JSON.stringify({schemaVersion:1, result:"passed", previousVersion:process.env.BRIAR_PREVIOUS_VERSION, candidateVersion:process.env.BRIAR_CANDIDATE_VERSION, checksumsVerified:true, candidateManifestVerified:true, candidateSignature:process.env.BRIAR_CANDIDATE_SIGNATURE, statePreserved:true, stateHash:process.env.BRIAR_STATE_HASH, install:"dmg", update:"bundle-replacement", rollback:"retained-previous-bundle"}, null, 2) + "\n")'
 fi
 
 echo "Lifecycle QA passed: $previous_version -> $candidate_version -> $previous_version; state preserved."
