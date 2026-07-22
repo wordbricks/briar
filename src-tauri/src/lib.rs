@@ -1,3 +1,5 @@
+mod codex_app_server;
+
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
@@ -9,6 +11,7 @@ use std::{
     process::Command,
 };
 use tauri::Manager;
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
 
 const SESSION_FILE_NAME: &str = "session.json";
 
@@ -25,6 +28,8 @@ struct CliProject {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     repository_remote: Option<String>,
     agent_token: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    llm: Option<codex_app_server::ProjectLlmSettings>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     auto_hunt: Option<StoredAutoHuntConfig>,
     #[serde(flatten)]
@@ -497,10 +502,15 @@ fn write_cli_connection(
         repository_path,
         repository_remote,
         agent_token,
+        llm: Some(codex_app_server::ProjectLlmSettings::default()),
         auto_hunt: Some(auto_hunt.into()),
         extra: BTreeMap::new(),
     });
 
+    write_cli_config(config_path, &config)
+}
+
+fn write_cli_config(config_path: &Path, config: &CliConfig) -> Result<(), String> {
     let config_directory = config_path
         .parent()
         .ok_or_else(|| "Briar 설정 폴더를 찾을 수 없습니다.".to_string())?;
@@ -511,45 +521,6 @@ fn write_cli_connection(
         use std::os::unix::fs::PermissionsExt;
         fs::set_permissions(config_directory, fs::Permissions::from_mode(0o700))
             .map_err(|error| format!("Briar 설정 폴더 권한을 지정하지 못했습니다: {error}"))?;
-    }
-
-    let mut serialized = serde_json::to_vec_pretty(&config)
-        .map_err(|error| format!("Briar 로컬 설정을 만들지 못했습니다: {error}"))?;
-    serialized.push(b'\n');
-    let mut options = OpenOptions::new();
-    options.create(true).truncate(true).write(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
-    }
-    let mut file = options
-        .open(config_path)
-        .map_err(|error| format!("Briar 로컬 설정을 열지 못했습니다: {error}"))?;
-    file.write_all(&serialized)
-        .and_then(|_| file.sync_all())
-        .map_err(|error| format!("Briar 로컬 설정을 저장하지 못했습니다: {error}"))?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(config_path, fs::Permissions::from_mode(0o600))
-            .map_err(|error| format!("Briar 로컬 설정 권한을 지정하지 못했습니다: {error}"))?;
-    }
-    Ok(())
-}
-
-fn remove_cli_connection(config_path: &Path, project_id: &str) -> Result<(), String> {
-    if !config_path.exists() {
-        return Ok(());
-    }
-    let contents = fs::read_to_string(config_path)
-        .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
-    let mut config = serde_json::from_str::<CliConfig>(&contents)
-        .map_err(|error| format!("Briar 로컬 설정이 손상되었습니다: {error}"))?;
-    let previous_count = config.projects.len();
-    config.projects.retain(|project| project.id != project_id);
-    if config.projects.len() == previous_count {
-        return Ok(());
     }
 
     let mut serialized = serde_json::to_vec_pretty(&config)
@@ -580,6 +551,23 @@ fn remove_cli_connection(config_path: &Path, project_id: &str) -> Result<(), Str
     Ok(())
 }
 
+fn remove_cli_connection(config_path: &Path, project_id: &str) -> Result<(), String> {
+    if !config_path.exists() {
+        return Ok(());
+    }
+    let contents = fs::read_to_string(config_path)
+        .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
+    let mut config = serde_json::from_str::<CliConfig>(&contents)
+        .map_err(|error| format!("Briar 로컬 설정이 손상되었습니다: {error}"))?;
+    let previous_count = config.projects.len();
+    config.projects.retain(|project| project.id != project_id);
+    if config.projects.len() == previous_count {
+        return Ok(());
+    }
+
+    write_cli_config(config_path, &config)
+}
+
 fn cli_config_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(app
         .path()
@@ -588,6 +576,97 @@ fn cli_config_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         .join(".config")
         .join("briar")
         .join("config.json"))
+}
+
+fn connected_project_workspace(config_path: &Path, project_id: &str) -> Result<PathBuf, String> {
+    let contents = fs::read_to_string(config_path)
+        .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
+    let config = serde_json::from_str::<CliConfig>(&contents)
+        .map_err(|error| format!("Briar 로컬 설정이 손상되었습니다: {error}"))?;
+    let project = config
+        .projects
+        .iter()
+        .find(|project| project.id == project_id)
+        .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
+    let configured = fs::canonicalize(&project.repository_path)
+        .map_err(|error| format!("연결된 프로젝트 폴더를 열지 못했습니다: {error}"))?;
+    let root = fs::canonicalize(git_repository_root(&configured)?)
+        .map_err(|error| format!("프로젝트 Git 루트를 열지 못했습니다: {error}"))?;
+    if configured != root {
+        return Err("연결된 프로젝트 경로가 Git 저장소 루트가 아닙니다.".to_string());
+    }
+    Ok(root)
+}
+
+fn project_llm_settings_from(
+    config_path: &Path,
+    project_id: &str,
+) -> Result<codex_app_server::ProjectLlmSettings, String> {
+    let contents = fs::read_to_string(config_path)
+        .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
+    let config = serde_json::from_str::<CliConfig>(&contents)
+        .map_err(|error| format!("Briar 로컬 설정이 손상되었습니다: {error}"))?;
+    config
+        .projects
+        .iter()
+        .find(|project| project.id == project_id)
+        .map(|project| project.llm.unwrap_or_default())
+        .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())
+}
+
+fn approval_request_message(method: &str, params: &serde_json::Value) -> String {
+    let action = params
+        .get("command")
+        .and_then(|command| {
+            command.as_str().map(str::to_string).or_else(|| {
+                command.as_array().map(|parts| {
+                    parts
+                        .iter()
+                        .filter_map(|part| part.as_str())
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                })
+            })
+        })
+        .filter(|command| !command.is_empty())
+        .or_else(|| {
+            params
+                .get("reason")
+                .and_then(|reason| reason.as_str())
+                .map(str::to_string)
+        })
+        .unwrap_or_else(|| {
+            if method.contains("fileChange") || method == "applyPatchApproval" {
+                "프로젝트 파일 변경".to_string()
+            } else {
+                "프로젝트 명령 실행".to_string()
+            }
+        });
+    let cwd = params
+        .get("cwd")
+        .and_then(|cwd| cwd.as_str())
+        .map(|cwd| format!("\n\n위치: {cwd}"))
+        .unwrap_or_default();
+    format!("Codex가 다음 작업의 승인을 요청했습니다.\n\n{action}{cwd}")
+}
+
+fn update_project_llm_settings_at(
+    config_path: &Path,
+    project_id: &str,
+    settings: codex_app_server::ProjectLlmSettings,
+) -> Result<codex_app_server::ProjectLlmSettings, String> {
+    let contents = fs::read_to_string(config_path)
+        .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
+    let mut config = serde_json::from_str::<CliConfig>(&contents)
+        .map_err(|error| format!("Briar 로컬 설정이 손상되었습니다: {error}"))?;
+    let project = config
+        .projects
+        .iter_mut()
+        .find(|project| project.id == project_id)
+        .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
+    project.llm = Some(settings);
+    write_cli_config(config_path, &config)?;
+    Ok(settings)
 }
 
 fn copy_directory(source: &Path, destination: &Path) -> Result<(), String> {
@@ -854,6 +933,72 @@ async fn connected_project_ids(app: tauri::AppHandle) -> Result<Vec<String>, Str
 }
 
 #[tauri::command]
+async fn project_llm_chat(
+    app: tauri::AppHandle,
+    project_id: String,
+    request: codex_app_server::ProjectLlmRequest,
+) -> Result<codex_app_server::ProjectLlmResponse, String> {
+    let config_path = cli_config_path(&app)?;
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    let approval_app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let workspace = connected_project_workspace(&config_path, &project_id)?;
+        let settings = project_llm_settings_from(&config_path, &project_id)?;
+        let binary = codex_app_server::codex_binary(&home)?;
+        let execution_path = cli_execution_path(&home)?;
+        let approve = |method: &str, params: &serde_json::Value| {
+            approval_app
+                .dialog()
+                .message(approval_request_message(method, params))
+                .title("Codex 작업 승인")
+                .buttons(MessageDialogButtons::OkCancelCustom(
+                    "승인".to_string(),
+                    "거절".to_string(),
+                ))
+                .blocking_show()
+        };
+        codex_app_server::chat(
+            &binary,
+            &execution_path,
+            &project_id,
+            &workspace,
+            settings.approval_policy,
+            request,
+            &approve,
+        )
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn load_project_llm_settings(
+    app: tauri::AppHandle,
+    project_id: String,
+) -> Result<codex_app_server::ProjectLlmSettings, String> {
+    let config_path = cli_config_path(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        project_llm_settings_from(&config_path, &project_id)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn update_project_llm_settings(
+    app: tauri::AppHandle,
+    project_id: String,
+    settings: codex_app_server::ProjectLlmSettings,
+) -> Result<codex_app_server::ProjectLlmSettings, String> {
+    let config_path = cli_config_path(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        update_project_llm_settings_at(&config_path, &project_id, settings)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
 async fn disconnect_local_project(app: tauri::AppHandle, project_id: String) -> Result<(), String> {
     let config_path = cli_config_path(&app)?;
     tauri::async_runtime::spawn_blocking(move || remove_cli_connection(&config_path, &project_id))
@@ -929,6 +1074,9 @@ pub fn run() {
             clear_session_token,
             validate_repository_path,
             connected_project_ids,
+            project_llm_chat,
+            load_project_llm_settings,
+            update_project_llm_settings,
             disconnect_local_project,
             connect_local_project,
             inspect_velen,
@@ -1061,6 +1209,7 @@ mod tests {
         );
         assert_eq!(saved["projects"][1]["id"], "new-project");
         assert_eq!(saved["projects"][1]["repositoryPath"], "/new/repository");
+        assert_eq!(saved["projects"][1]["llm"]["approvalPolicy"], "never");
         assert_eq!(saved["projects"][1]["autoHunt"]["linear"]["enabled"], false);
         assert_eq!(
             saved["projects"][1]["autoHunt"]["workflow"]["preset"],
@@ -1105,6 +1254,52 @@ mod tests {
         .expect("saved config should be valid json");
         assert_eq!(saved["projects"].as_array().map(Vec::len), Some(1));
         assert_eq!(saved["projects"][0]["id"], "keep");
+
+        fs::remove_dir_all(directory).expect("test config directory should be removed");
+    }
+
+    #[test]
+    fn stores_project_approval_policy_locally() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be after unix epoch")
+            .as_nanos();
+        let directory = std::env::temp_dir().join(format!("briar-llm-settings-test-{unique}"));
+        let config_path = directory.join("config.json");
+        fs::create_dir_all(&directory).expect("test config directory should be created");
+        fs::write(
+            &config_path,
+            r#"{
+  "apiUrl": "https://briar.example.com",
+  "customSetting": true,
+  "projects": [
+    {"id":"project-1","repositoryPath":"/repo","agentToken":"briar_agent_test"}
+  ]
+}"#,
+        )
+        .expect("test config should be written");
+
+        assert_eq!(
+            project_llm_settings_from(&config_path, "project-1")
+                .expect("legacy project settings should load")
+                .approval_policy,
+            codex_app_server::ApprovalPolicy::Never
+        );
+        update_project_llm_settings_at(
+            &config_path,
+            "project-1",
+            codex_app_server::ProjectLlmSettings {
+                approval_policy: codex_app_server::ApprovalPolicy::OnRequest,
+            },
+        )
+        .expect("approval policy should save");
+
+        let saved: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&config_path).expect("saved config should be readable"),
+        )
+        .expect("saved config should be json");
+        assert_eq!(saved["customSetting"], true);
+        assert_eq!(saved["projects"][0]["llm"]["approvalPolicy"], "on-request");
 
         fs::remove_dir_all(directory).expect("test config directory should be removed");
     }

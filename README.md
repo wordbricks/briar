@@ -17,6 +17,7 @@ Repository source code stays local. Agents send only task state and Git metadata
 - Project-scoped Agent ingest tokens stored as SHA-256 hashes
 - `briar` CLI for login, repository connection, queued issue intake, and Auto Hunt event recording
 - A validated `briar-auto-hunt` Codex skill installed automatically with the CLI
+- Project-scoped LLM conversations through Codex App Server
 - Mandatory Velen CLI preflight and repository-specific Velen organization/source settings
 - Optional Linear integration through a configured Velen source
 - Jelly UI components in a light desktop theme
@@ -33,6 +34,8 @@ flowchart LR
   C -->|"project Bearer token"| W["Cloudflare Worker"]
   D["Briar Tauri app"] -->|"Better Auth Device Flow"| W
   D -->|"create issues + polling, 4s"| W
+  D -->|"project-scoped thread + turn"| AS["Codex App Server"]
+  AS -->|"cwd = connected Git root"| R["Local repository"]
   W -->|"D1 binding"| DB[("Cloudflare D1")]
   W -->|"Google OAuth"| G["Google"]
 ```
@@ -41,7 +44,7 @@ The Worker owns Better Auth, dashboard APIs, Agent ingest APIs, authorization ch
 
 ## Install
 
-Requirements: Bun, Rust, Tauri system prerequisites, Wrangler 4.x, and an authenticated Velen CLI.
+Requirements: Bun, Rust, Tauri system prerequisites, Wrangler 4.x, an authenticated Velen CLI, and an installed and authenticated Codex CLI.
 
 ```bash
 bun install
@@ -86,6 +89,31 @@ bun tauri dev
 ```
 
 Without `VITE_BRIAR_API_URL`, Briar opens the built-in demo dashboard.
+
+## Project LLM integration
+
+All model-backed desktop features must use `chatWithProjectLlm` or
+`createProjectChat` from `src/lib/project-llm.ts`. That gateway invokes the
+native `project_llm_chat` command; Briar does not call a model provider API
+directly.
+
+The native command resolves `projectId` from Briar's local connection config,
+verifies that the saved path is the Git root, and supplies that absolute path as
+`cwd` to both `thread/start` (or `thread/resume`) and `turn/start`. Callers cannot
+supply a filesystem path. Conversations are project-scoped, read-only Codex
+threads, and Briar rejects a conversation ID issued for another project.
+The project settings screen stores the App Server approval policy locally as
+`untrusted`, `on-request`, or `never`; existing projects default to `never`.
+Interactive command and file-change requests from `untrusted` and `on-request`
+are shown in a native Briar confirmation dialog and sent back to App Server as
+an approval or denial.
+Optional `instructions` and `outputSchema` support reusable one-shot LLM
+features as well as multi-turn chat.
+
+The transport follows the [Codex App Server protocol](https://learn.chatgpt.com/docs/app-server):
+JSONL over stdio, one `initialize`/`initialized` handshake per connection, then
+thread and turn requests while consuming notifications through
+`turn/completed`.
 
 ## Production D1 database
 

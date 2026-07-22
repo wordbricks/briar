@@ -1,12 +1,25 @@
 import {
   AlertTriangle,
   ArrowLeft,
+  Check,
   LoaderCircle,
   PanelLeftOpen,
+  ShieldCheck,
   Trash2,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import {
+  loadProjectLlmSettings,
+  updateProjectLlmSettings,
+  type ApprovalPolicy,
+} from "../lib/project-llm";
 import type { Project } from "../types";
+
+const approvalPolicyDescriptions: Record<ApprovalPolicy, string> = {
+  untrusted: "신뢰된 읽기 명령 외의 작업을 실행하기 전에 승인을 요청합니다.",
+  "on-request": "Codex가 읽기 전용 경계를 넘어야 할 때 승인을 요청합니다.",
+  never: "승인 요청을 표시하지 않고 허용된 범위 안에서만 동작합니다.",
+};
 
 export function ProjectSettings({
   isDeleting,
@@ -25,7 +38,36 @@ export function ProjectSettings({
 }) {
   const [isConfirming, setIsConfirming] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [approvalPolicy, setApprovalPolicy] = useState<ApprovalPolicy>("never");
+  const [savedApprovalPolicy, setSavedApprovalPolicy] =
+    useState<ApprovalPolicy>("never");
+  const [settingsLoading, setSettingsLoading] = useState(true);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
   const cancelButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setSettingsLoading(true);
+    setSettingsError(null);
+    void loadProjectLlmSettings(project.id)
+      .then((settings) => {
+        if (cancelled) return;
+        setApprovalPolicy(settings.approvalPolicy);
+        setSavedApprovalPolicy(settings.approvalPolicy);
+      })
+      .catch((caught) => {
+        if (!cancelled) {
+          setSettingsError(caught instanceof Error ? caught.message : String(caught));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setSettingsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [project.id]);
 
   useEffect(() => {
     if (!isConfirming) return;
@@ -43,6 +85,20 @@ export function ProjectSettings({
       await onDelete();
     } catch (caught) {
       setDeleteError(caught instanceof Error ? caught.message : String(caught));
+    }
+  };
+
+  const saveLlmSettings = async () => {
+    setSettingsSaving(true);
+    setSettingsError(null);
+    try {
+      const settings = await updateProjectLlmSettings(project.id, { approvalPolicy });
+      setApprovalPolicy(settings.approvalPolicy);
+      setSavedApprovalPolicy(settings.approvalPolicy);
+    } catch (caught) {
+      setSettingsError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setSettingsSaving(false);
     }
   };
 
@@ -82,6 +138,55 @@ export function ProjectSettings({
               <strong>{project.name}</strong>
             </div>
             <small>생성일 {new Date(project.createdAt).toLocaleDateString("ko-KR")}</small>
+          </section>
+
+          <section className="project-settings-llm">
+            <header>
+              <span className="project-settings-llm-icon">
+                <ShieldCheck size={18} strokeWidth={1.8} />
+              </span>
+              <span>
+                <strong>LLM 승인 정책</strong>
+                <small>이 프로젝트에서 시작하는 Codex App Server 대화에 적용됩니다.</small>
+              </span>
+            </header>
+            <div className="project-settings-llm-control">
+              <label htmlFor="project-approval-policy">승인 요청</label>
+              <select
+                disabled={settingsLoading || settingsSaving}
+                id="project-approval-policy"
+                onChange={(event) =>
+                  setApprovalPolicy(event.currentTarget.value as ApprovalPolicy)
+                }
+                value={approvalPolicy}
+              >
+                <option value="untrusted">신뢰하지 않은 명령만 묻기</option>
+                <option value="on-request">필요할 때 묻기</option>
+                <option value="never">묻지 않기</option>
+              </select>
+              <button
+                disabled={
+                  settingsLoading ||
+                  settingsSaving ||
+                  approvalPolicy === savedApprovalPolicy
+                }
+                onClick={() => void saveLlmSettings()}
+                type="button"
+              >
+                {settingsSaving ? (
+                  <LoaderCircle className="spin" size={14} />
+                ) : approvalPolicy === savedApprovalPolicy ? (
+                  <Check size={14} />
+                ) : null}
+                {settingsSaving
+                  ? "저장 중"
+                  : approvalPolicy === savedApprovalPolicy
+                    ? "저장됨"
+                    : "저장"}
+              </button>
+            </div>
+            <p>{approvalPolicyDescriptions[approvalPolicy]}</p>
+            {settingsError && <p className="project-settings-llm-error">{settingsError}</p>}
           </section>
 
           <section className="project-settings-danger">
