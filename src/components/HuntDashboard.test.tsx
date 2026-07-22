@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import { demoDashboard } from "../lib/demo-data";
 import type { AutoHuntHealth } from "../lib/project-connection";
 import {
-  ConnectionHealth,
   CreateIssueDialog,
   HuntDashboard,
   RunDialog,
@@ -107,28 +106,20 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("briar-auto-hunt 할당");
   });
 
-  it("shows local Auto Hunt health and repair actions", () => {
+  it("shows Auto Hunt health as a compact topbar status trigger", () => {
     const markup = renderToStaticMarkup(
-      <ConnectionHealth
-        error={null}
-        health={{
-          ...healthyHealth,
-          healthy: false,
-          cliCurrent: false,
-          cliVersion: "0.0.9",
-          issues: ["Briar CLI 버전이 앱 번들과 다릅니다."],
-        }}
-        loading={false}
-        onReconnect={() => undefined}
-        onRefresh={() => undefined}
-        onRepair={() => undefined}
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={null}
+        health={healthyHealth}
       />,
     );
 
-    expect(markup).toContain("Auto Hunt 연결 상태");
-    expect(markup).toContain("CLI·스킬 복구");
-    expect(markup).toContain("v0.0.9");
-    expect(markup).toContain("Briar CLI 버전이 앱 번들과 다릅니다.");
+    expect(markup).toContain('aria-haspopup="dialog"');
+    expect(markup).toContain("Auto Hunt 연결 상태: 실행 준비 완료");
+    expect(markup).not.toContain("D1 연결됨");
+    expect(markup).not.toContain("health-panel");
+    expect(markup).not.toContain("Briar CLI");
   });
 
   it("shows attempt-aware recovery actions for failed runs", () => {
