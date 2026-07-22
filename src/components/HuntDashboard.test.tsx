@@ -107,6 +107,40 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("briar-auto-hunt 할당");
   });
 
+  it("renders workflow stages as kanban columns", () => {
+    const customWorkflow = {
+      version: 1 as const,
+      preset: "custom" as const,
+      stages: [
+        { id: "analyzing", label: "Analyze", required: true },
+        { id: "security_review", label: "Security review", required: true },
+      ],
+      completion: { requiredStages: ["analyzing", "security_review"] },
+      release: { enabled: false },
+    };
+    const customDashboard = {
+      ...demoDashboard,
+      settings: { ...demoDashboard.settings, workflow: customWorkflow },
+      runs: [{
+        ...demoDashboard.runs[0],
+        status: "running" as const,
+        workflowStage: "security_review",
+        workflow: customWorkflow,
+      }],
+    };
+    const markup = renderToStaticMarkup(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={customDashboard}
+      />,
+    );
+
+    expect(markup).toContain('aria-label="자동사냥 칸반 보드"');
+    expect(markup).toContain("분석");
+    expect(markup).toContain("Security review");
+    expect(markup).toContain('class="kanban-card');
+  });
+
   it("shows Auto Hunt health as a compact topbar status trigger", () => {
     const markup = renderToStaticMarkup(
       <HuntDashboard
