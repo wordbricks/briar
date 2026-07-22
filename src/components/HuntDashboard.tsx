@@ -23,7 +23,7 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { JellySelect } from "./JellySelect";
 import { UpdateControl } from "./UpdateControl";
 import { sourceLabel, stageMeta } from "../lib/stages";
@@ -133,7 +133,14 @@ export function HuntDashboard({
           </button>
         )}
         <div className="window-controls" aria-hidden="true"><i /><i /><i /></div>
-        <div className="sync-state"><span />D1 연결됨</div>
+        <ConnectionHealth
+          error={healthError}
+          health={health}
+          loading={healthLoading}
+          onReconnect={onReconnect}
+          onRefresh={onHealthRefresh}
+          onRepair={onRepair}
+        />
       </header>
       <div className="dashboard-scroll">
         <section className="page-heading">
@@ -158,15 +165,6 @@ export function HuntDashboard({
           <Metric label="확인 필요" value={attentionCount} note="차단 또는 실패" icon={<CircleAlert size={18} />} tone="rose" />
           <Metric label="완료" value={completedCount} note="Production QA 통과" icon={<Check size={18} />} tone="emerald" />
         </section>
-
-        <ConnectionHealth
-          error={healthError}
-          health={health}
-          loading={healthLoading}
-          onReconnect={onReconnect}
-          onRefresh={onHealthRefresh}
-          onRepair={onRepair}
-        />
 
         <UpdateControl />
 
@@ -243,36 +241,81 @@ export function ConnectionHealth({
   onRefresh: () => void;
   onRepair: () => void;
 }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const assetsNeedRepair =
     health && (!health.cliCurrent || !health.skillCurrent);
+  const status = loading ? "loading" : health?.healthy ? "healthy" : "attention";
+  const statusLabel = loading
+    ? "검사 중"
+    : health?.healthy
+      ? "실행 준비 완료"
+      : "확인 필요";
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) setIsOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsOpen(false);
+    };
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isOpen]);
+
   return (
-    <jelly-card className={`health-panel${health?.healthy ? " healthy" : ""}`}>
-      <div className="health-header">
-        <div>
-          <span className="health-icon"><ShieldCheck size={16} /></span>
-          <span><strong>Auto Hunt 연결 상태</strong><small>{health?.healthy ? "실행 준비 완료" : "로컬 실행 환경 검사"}</small></span>
+    <div className="health-menu" ref={menuRef}>
+      <button
+        aria-expanded={isOpen}
+        aria-haspopup="dialog"
+        aria-label={`Auto Hunt 연결 상태: ${statusLabel}`}
+        className={`health-trigger ${status}`}
+        onClick={() => setIsOpen((open) => !open)}
+        title={`Auto Hunt 연결 상태: ${statusLabel}`}
+        type="button"
+      >
+        <span aria-hidden="true" />
+      </button>
+      {isOpen && (
+        <div
+          aria-label="Auto Hunt 연결 상세"
+          className={`health-popover${health?.healthy ? " healthy" : ""}`}
+          role="dialog"
+        >
+          <div className="health-header">
+            <div>
+              <span className="health-icon"><ShieldCheck size={16} /></span>
+              <span><strong>Auto Hunt 연결 상태</strong><small>{statusLabel}</small></span>
+            </div>
+            <div className="health-actions">
+              {assetsNeedRepair && <button onClick={onRepair} type="button"><Wrench size={13} />CLI·스킬 복구</button>}
+              <button onClick={onReconnect} type="button"><FolderGit2 size={13} />저장소 재연결</button>
+              <button aria-label="연결 상태 다시 검사" disabled={loading} onClick={onRefresh} type="button"><RefreshCw className={loading ? "spin" : ""} size={13} /></button>
+            </div>
+          </div>
+          {error && <div className="health-error"><CircleAlert size={14} />{error}</div>}
+          {health ? (
+            <div className="health-grid">
+              <HealthItem healthy={health.repositoryHealthy} icon={<FolderGit2 size={15} />} label="저장소" value={health.repositoryPath ?? "연결 안 됨"} />
+              <HealthItem healthy={health.cliCurrent} icon={<Terminal size={15} />} label="Briar CLI" value={health.cliVersion ? `v${health.cliVersion}` : "설치 안 됨"} expected={`v${health.cliExpectedVersion}`} />
+              <HealthItem healthy={health.skillCurrent} icon={<Bot size={15} />} label="Auto Hunt 스킬" value={health.skillVersion ? `v${health.skillVersion}` : "설치 안 됨"} expected={`v${health.skillExpectedVersion}`} />
+              <HealthItem healthy={health.velenHealthy} icon={<ShieldCheck size={15} />} label="Velen" value={health.velenOrg ?? "조직 미설정"} expected={health.velenEmail ?? undefined} />
+            </div>
+          ) : (
+            <div className="health-empty">{loading ? "로컬 Auto Hunt 환경을 검사하고 있습니다…" : "데스크톱 앱에서 연결 상태를 확인할 수 있습니다."}</div>
+          )}
+          {health && !health.healthy && health.issues.length > 0 && (
+            <div className="health-issues">{health.issues.map((issue) => <span key={issue}><CircleAlert size={12} />{issue}</span>)}</div>
+          )}
         </div>
-        <div className="health-actions">
-          {assetsNeedRepair && <button onClick={onRepair} type="button"><Wrench size={13} />CLI·스킬 복구</button>}
-          <button onClick={onReconnect} type="button"><FolderGit2 size={13} />저장소 재연결</button>
-          <button aria-label="연결 상태 다시 검사" disabled={loading} onClick={onRefresh} type="button"><RefreshCw className={loading ? "spin" : ""} size={13} /></button>
-        </div>
-      </div>
-      {error && <div className="health-error"><CircleAlert size={14} />{error}</div>}
-      {health ? (
-        <div className="health-grid">
-          <HealthItem healthy={health.repositoryHealthy} icon={<FolderGit2 size={15} />} label="저장소" value={health.repositoryPath ?? "연결 안 됨"} />
-          <HealthItem healthy={health.cliCurrent} icon={<Terminal size={15} />} label="Briar CLI" value={health.cliVersion ? `v${health.cliVersion}` : "설치 안 됨"} expected={`v${health.cliExpectedVersion}`} />
-          <HealthItem healthy={health.skillCurrent} icon={<Bot size={15} />} label="Auto Hunt 스킬" value={health.skillVersion ? `v${health.skillVersion}` : "설치 안 됨"} expected={`v${health.skillExpectedVersion}`} />
-          <HealthItem healthy={health.velenHealthy} icon={<ShieldCheck size={15} />} label="Velen" value={health.velenOrg ?? "조직 미설정"} expected={health.velenEmail ?? undefined} />
-        </div>
-      ) : (
-        <div className="health-empty">{loading ? "로컬 Auto Hunt 환경을 검사하고 있습니다…" : "데스크톱 앱에서 연결 상태를 확인할 수 있습니다."}</div>
       )}
-      {health && !health.healthy && health.issues.length > 0 && (
-        <div className="health-issues">{health.issues.map((issue) => <span key={issue}><CircleAlert size={12} />{issue}</span>)}</div>
-      )}
-    </jelly-card>
+    </div>
   );
 }
 
