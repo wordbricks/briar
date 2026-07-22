@@ -610,7 +610,11 @@ fn auto_hunt_health_sync_with(
     let cli_path = home.join(".local").join("bin").join("briar");
     let cli_installed = cli_path.is_file();
     let cli_version = read_trimmed_file(
-        &home.join(".local").join("share").join("briar").join("VERSION"),
+        &home
+            .join(".local")
+            .join("share")
+            .join("briar")
+            .join("VERSION"),
     );
     let cli_current = cli_version.as_deref() == Some(expected_version.as_str());
     if !cli_installed {
@@ -640,7 +644,8 @@ fn auto_hunt_health_sync_with(
         .auto_hunt
         .as_ref()
         .and_then(|auto_hunt| auto_hunt.velen_org.clone());
-    let (velen_authenticated, velen_email, velen_healthy) = if let Some(org) = velen_org.as_deref() {
+    let (velen_authenticated, velen_email, velen_healthy) = if let Some(org) = velen_org.as_deref()
+    {
         match inspect_velen(Some(org.to_string())) {
             Ok(inspection) => (inspection.authenticated, inspection.email, true),
             Err(error) => {
@@ -785,6 +790,26 @@ async fn connect_local_project(
     })
     .await
     .map_err(|error| error.to_string())?
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
+        .invoke_handler(tauri::generate_handler![
+            read_session_token,
+            write_session_token,
+            clear_session_token,
+            validate_repository_path,
+            connected_project_ids,
+            connect_local_project,
+            inspect_velen,
+            auto_hunt_health,
+            repair_auto_hunt
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running Briar");
 }
 
 #[cfg(test)]
@@ -1033,24 +1058,4 @@ mod tests {
         assert!(repaired.cli_current);
         fs::remove_dir_all(home).expect("test home should be removed");
     }
-}
-
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
-    tauri::Builder::default()
-        .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![
-            read_session_token,
-            write_session_token,
-            clear_session_token,
-            validate_repository_path,
-            connected_project_ids,
-            connect_local_project,
-            inspect_velen,
-            auto_hunt_health,
-            repair_auto_hunt
-        ])
-        .run(tauri::generate_context!())
-        .expect("error while running Briar");
 }
