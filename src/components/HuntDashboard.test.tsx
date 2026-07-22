@@ -6,6 +6,7 @@ import {
   ConnectionHealth,
   CreateIssueDialog,
   HuntDashboard,
+  RunDialog,
 } from "./HuntDashboard";
 
 const dashboardProps = {
@@ -15,10 +16,14 @@ const dashboardProps = {
   healthError: null,
   healthLoading: false,
   isCreatingIssue: false,
+  recoveringRunId: null,
+  recoveryError: null,
   isSidebarOpen: true,
   onCreateIssue: async () => undefined,
   onHealthRefresh: () => undefined,
   onReconnect: () => undefined,
+  onRetryRun: async () => undefined,
+  onCancelRun: async () => undefined,
   onRepair: () => undefined,
   onRefresh: () => undefined,
   onSidebarOpen: () => undefined,
@@ -32,13 +37,13 @@ const healthyHealth: AutoHuntHealth = {
   repositoryHealthy: true,
   cliPath: "/Users/jay/.local/bin/briar",
   cliInstalled: true,
-  cliVersion: "0.1.0",
-  cliExpectedVersion: "0.1.0",
+  cliVersion: "0.2.0",
+  cliExpectedVersion: "0.2.0",
   cliCurrent: true,
   skillPath: "/Users/jay/.codex/skills/briar-auto-hunt",
   skillInstalled: true,
-  skillVersion: "0.1.0",
-  skillExpectedVersion: "0.1.0",
+  skillVersion: "0.2.0",
+  skillExpectedVersion: "0.2.0",
   skillCurrent: true,
   velenOrg: "wordbricks",
   velenAuthenticated: true,
@@ -119,5 +124,39 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("CLI·스킬 복구");
     expect(markup).toContain("v0.0.9");
     expect(markup).toContain("Briar CLI 버전이 앱 번들과 다릅니다.");
+  });
+
+  it("shows attempt-aware recovery actions for failed runs", () => {
+    const failedRun = {
+      ...demoDashboard.runs[0],
+      stage: "failed" as const,
+      currentAttempt: 2,
+      detail: "Worker deployment timed out",
+      events: [
+        {
+          ...demoDashboard.runs[0].events[0],
+          stage: "failed" as const,
+          attempt: 2,
+          detail: "Worker deployment timed out",
+        },
+        ...demoDashboard.runs[0].events,
+      ],
+    };
+    const markup = renderToStaticMarkup(
+      <RunDialog
+        error={null}
+        isRecovering={false}
+        onCancel={async () => undefined}
+        onClose={() => undefined}
+        onRetry={async () => undefined}
+        run={failedRun}
+      />,
+    );
+
+    expect(markup).toContain("실행이 실패했습니다");
+    expect(markup).toContain("3번 시도로 새 작업이 시작됩니다");
+    expect(markup).toContain("재시도");
+    expect(markup).toContain("작업 취소");
+    expect(markup).toContain("시도 2");
   });
 });

@@ -63,10 +63,14 @@ export function App() {
         healthError={briar.healthError}
         healthLoading={briar.healthLoading}
         isCreatingIssue={briar.isCreatingIssue}
+        recoveringRunId={briar.recoveringRunId}
+        recoveryError={briar.recoveryError}
         isSidebarOpen={isSidebarOpen}
         onCreateIssue={briar.addIssue}
         onHealthRefresh={() => void briar.refreshHealth()}
         onReconnect={briar.reconnectProject}
+        onRetryRun={briar.retryRun}
+        onCancelRun={briar.cancelRun}
         onRepair={() => void briar.repairHealth()}
         onRefresh={() => void briar.refresh()}
         onSidebarOpen={() => setIsSidebarOpen(true)}

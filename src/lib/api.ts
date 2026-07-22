@@ -148,6 +148,48 @@ export async function createIssue(
   );
 }
 
+export type HuntRecoveryResult = {
+  runId: string;
+  outcome:
+    | "retried"
+    | "cancelled"
+    | "already_retried"
+    | "already_cancelled";
+  attempt: number;
+  stage: "queued" | "cancelled";
+};
+
+async function recoverHuntRun(
+  token: string,
+  projectId: string,
+  runId: string,
+  action: "retry" | "cancel",
+  reason: string | null,
+) {
+  return request<HuntRecoveryResult>(
+    `/projects/${projectId}/runs/${runId}/${action}`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify({ requestId: crypto.randomUUID(), reason }),
+    },
+  );
+}
+
+export const retryHuntRun = (
+  token: string,
+  projectId: string,
+  runId: string,
+  reason: string | null = null,
+) => recoverHuntRun(token, projectId, runId, "retry", reason);
+
+export const cancelHuntRun = (
+  token: string,
+  projectId: string,
+  runId: string,
+  reason: string | null = null,
+) => recoverHuntRun(token, projectId, runId, "cancel", reason);
+
 export async function createAgentToken(token: string, projectId: string) {
   return request<{ agentToken: string }>(`/projects/${projectId}/agent-token`, token, {
     method: "POST",

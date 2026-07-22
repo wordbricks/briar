@@ -1,6 +1,6 @@
 # Auto Hunt lifecycle
 
-Use this ordered lifecycle. Repeating the current stage is allowed with a new semantic event key; moving backward is not.
+Use this ordered lifecycle within each attempt. Repeating the current stage is allowed with a new semantic event key; moving backward is not. A blocked or failed run can start a new attempt through the explicit retry command while keeping every event from earlier attempts.
 
 For Briar-created work, `briar auto-hunt next` atomically claims and returns the
 highest-priority, oldest queued run. Reuse its identity and begin at `analyzing`
@@ -35,6 +35,8 @@ Use `<source-key>:<stage>:<semantic-milestone>`, for example:
 
 Reuse the exact key and payload when retrying a timed-out write.
 
+Event keys are scoped to the run's current attempt by Briar. Reuse the same semantic key in a later attempt when it represents the same milestone; the dashboard distinguishes the attempts and preserves both events.
+
 ## Common record flags
 
 `briar auto-hunt record` accepts:
@@ -60,3 +62,26 @@ briar auto-hunt qa-result \
 ```
 
 Use `production` for production. `skipped` is allowed only when the environment/check is genuinely unavailable or non-applicable; explain why in the detail file.
+
+## Failed-run recovery
+
+After recording `blocked` or `failed`, fix the underlying cause and explicitly start a new attempt:
+
+```sh
+briar auto-hunt retry \
+  --run-id '<run-id>' \
+  --reason '<why another attempt is safe>'
+briar auto-hunt next
+```
+
+The retry returns the same run ID with an incremented attempt, resets execution and QA state, and preserves all earlier events. `next` claims the newly queued attempt before work resumes.
+
+To intentionally stop a blocked or failed run:
+
+```sh
+briar auto-hunt cancel \
+  --run-id '<run-id>' \
+  --reason '<why work is being abandoned>'
+```
+
+For either command, pass the same `--request-id '<uuid>'` when retrying a timed-out request so the operation remains idempotent.

@@ -51,6 +51,7 @@ export type HuntRunRow = {
   staging_qa_detail: string | null;
   production_qa_detail: string | null;
   context_json: string | null;
+  current_attempt: number;
   claim_token_hash: string | null;
   claimed_by: string | null;
   claimed_at: string | null;
@@ -66,6 +67,7 @@ export type HuntEventRow = {
   id: string;
   run_id: string;
   event_key: string;
+  attempt: number;
   stage: AutoHuntStage;
   detail: string | null;
   actor: string;
@@ -269,7 +271,9 @@ export async function listDashboardRuns(db: D1Database, projectId: string) {
               run.result_summary, run.pull_request_urls, run.target_sha,
               run.source_created_at, run.staging_qa_status,
               run.production_qa_status, run.staging_qa_detail,
-              run.production_qa_detail, run.context_json, run.started_at,
+              run.production_qa_detail, run.context_json,
+              run.current_attempt, run.claimed_by, run.claimed_at,
+              run.lease_expires_at, run.claim_attempts, run.started_at,
               run.completed_at, run.last_event_at,
               (select count(*) from briar_hunt_events event
                where event.run_id = run.id) as event_count
@@ -285,7 +289,8 @@ export async function listDashboardRuns(db: D1Database, projectId: string) {
 
   const events = await db
     .prepare(
-      `select ranked.id, ranked.run_id, ranked.event_key, ranked.stage,
+      `select ranked.id, ranked.run_id, ranked.event_key, ranked.attempt,
+              ranked.stage,
               ranked.detail, ranked.actor, ranked.branch, ranked.commit_sha,
               ranked.qa_status, ranked.tracker_issue_state,
               ranked.pull_request_urls, ranked.target_sha,
@@ -381,17 +386,19 @@ export async function assertQueuedHuntClaim(
 ) {
   const run = await db
     .prepare(
-      `select stage, claim_token_hash, lease_expires_at, context_json
+      `select stage, claim_token_hash, lease_expires_at, context_json,
+              case when claim_token_hash = ? then 1 else 0 end as claim_token_valid
        from briar_hunt_runs
        where project_id = ? and source = ? and source_key = ?
        limit 1`,
     )
-    .bind(projectId, input.source, input.sourceKey)
+    .bind(claimTokenHash ?? "", projectId, input.source, input.sourceKey)
     .first<{
       stage: AutoHuntStage;
       claim_token_hash: string | null;
       lease_expires_at: string | null;
       context_json: string | null;
+      claim_token_valid: number;
     }>();
   if (!run || run.stage !== "queued") return;
   const context: unknown = run.context_json ? JSON.parse(run.context_json) : null;
@@ -402,8 +409,7 @@ export async function assertQueuedHuntClaim(
     (context as Record<string, unknown>).origin === "briar-app";
   if (!run.claim_token_hash && !appCreated) return;
   if (
-    !claimTokenHash ||
-    claimTokenHash !== run.claim_token_hash ||
+    run.claim_token_valid !== 1 ||
     !run.lease_expires_at ||
     run.lease_expires_at <= observedAt
   ) {
@@ -458,6 +464,18 @@ const digestRunId = async (
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+};
+
+const scopedEventKey = async (eventKey: string, attempt: number) => {
+  if (attempt === 1) return eventKey;
+  const digest = new Uint8Array(
+    await crypto.subtle.digest("SHA-256", new TextEncoder().encode(eventKey)),
+  );
+  const fingerprint = [...digest.slice(0, 8)]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+  const suffix = `:attempt-${attempt}:${fingerprint}`;
+  return `${eventKey.slice(0, 300 - suffix.length)}${suffix}`;
 };
 
 const sameEvent = (row: HuntEventRow, input: HuntEventInput) =>
@@ -560,9 +578,9 @@ const assertStageTransition = async (
              when 'implementing' then 2 when 'pr_open' then 3
              when 'staging_qa' then 4 when 'production_qa' then 5
              when 'completed' then 6 else null end) as stage_rank
-           from briar_hunt_events where run_id = ?`,
+           from briar_hunt_events where run_id = ? and attempt = ?`,
         )
-        .bind(run.id)
+        .bind(run.id, run.current_attempt)
         .first<number>("stage_rank")) ?? 0;
   }
   if (nextRank < floorRank) {
@@ -582,19 +600,24 @@ export async function recordHuntEvent(
     pullRequestUrls: normalizedUrls(input.pullRequestUrls),
   };
   const existingRun = await loadRunForIdentity(db, projectId, normalizedInput);
+  const eventAttempt = existingRun?.current_attempt ?? 1;
+  const storedEventKey = await scopedEventKey(
+    normalizedInput.eventKey,
+    eventAttempt,
+  );
   await assertStageTransition(db, existingRun, normalizedInput);
   await assertCompletionEligible(db, projectId, existingRun, normalizedInput);
 
   if (existingRun) {
     const existingEvent = await db
       .prepare(
-        `select id, run_id, event_key, stage, detail, actor, branch,
+        `select id, run_id, event_key, attempt, stage, detail, actor, branch,
                 commit_sha, qa_status, tracker_issue_state,
                 pull_request_urls, target_sha, occurred_at, recorded_at
          from briar_hunt_events
          where run_id = ? and event_key = ?`,
       )
-      .bind(existingRun.id, normalizedInput.eventKey)
+      .bind(existingRun.id, storedEventKey)
       .first<HuntEventRow>();
     if (existingEvent) {
       if (!sameEvent(existingEvent, normalizedInput)) {
@@ -677,16 +700,17 @@ export async function recordHuntEvent(
     db
       .prepare(
         `insert into briar_hunt_events (
-           id, run_id, event_key, stage, detail, actor, branch, commit_sha,
+           id, run_id, event_key, attempt, stage, detail, actor, branch, commit_sha,
            qa_status, tracker_issue_state, pull_request_urls, target_sha,
            occurred_at, recorded_at
-         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          on conflict(run_id, event_key) do nothing`,
       )
       .bind(
         eventId,
         runId,
-        normalizedInput.eventKey,
+        storedEventKey,
+        eventAttempt,
         normalizedInput.stage,
         normalizedInput.detail,
         normalizedInput.actor,
@@ -712,7 +736,9 @@ export async function recordHuntEvent(
                    when 'implementing' then 2 when 'pr_open' then 3
                    when 'staging_qa' then 4 when 'production_qa' then 5
                    when 'completed' then 6 else null end), 0)
-                 from briar_hunt_events event where event.run_id = briar_hunt_runs.id
+                 from briar_hunt_events event
+                 where event.run_id = briar_hunt_runs.id
+                   and event.attempt = briar_hunt_runs.current_attempt
                ) then stage
                else ?
              end,
@@ -751,6 +777,7 @@ export async function recordHuntEvent(
              last_event_at = max(last_event_at, ?),
              updated_at = ?
          where id = ?
+           and current_attempt = ?
            and exists (
              select 1 from briar_hunt_events
              where id = ? and run_id = briar_hunt_runs.id
@@ -784,20 +811,20 @@ export async function recordHuntEvent(
         normalizedInput.context ? stableJson(normalizedInput.context) : null,
         normalizedInput.occurredAt, normalizedInput.stage,
         normalizedInput.occurredAt, normalizedInput.stage,
-        normalizedInput.occurredAt, recordedAt, runId, eventId,
+        normalizedInput.occurredAt, recordedAt, runId, eventAttempt, eventId,
       ),
   ]);
 
   if ((results[1]?.meta.changes ?? 0) === 0) {
     const existingEvent = await db
       .prepare(
-        `select id, run_id, event_key, stage, detail, actor, branch,
+        `select id, run_id, event_key, attempt, stage, detail, actor, branch,
                 commit_sha, qa_status, tracker_issue_state,
                 pull_request_urls, target_sha, occurred_at, recorded_at
          from briar_hunt_events
          where run_id = ? and event_key = ?`,
       )
-      .bind(runId, normalizedInput.eventKey)
+      .bind(runId, storedEventKey)
       .first<HuntEventRow>();
     if (!existingEvent || !sameEvent(existingEvent, normalizedInput)) {
       throw new EventKeyConflictError();
@@ -805,6 +832,181 @@ export async function recordHuntEvent(
   }
 
   return runId;
+}
+
+export type HuntRecoveryAction = "retry" | "cancel";
+export type HuntRecoveryOutcome =
+  | "retried"
+  | "cancelled"
+  | "already_retried"
+  | "already_cancelled"
+  | "ineligible"
+  | "not_found";
+
+export async function recoverHuntRun(
+  db: D1Database,
+  projectId: string,
+  input: {
+    runId: string;
+    action: HuntRecoveryAction;
+    requestId: string;
+    actor: string;
+    reason: string | null;
+    occurredAt: string;
+  },
+): Promise<{
+  outcome: HuntRecoveryOutcome;
+  attempt: number | null;
+  stage: AutoHuntStage | null;
+}> {
+  const run = await getHuntRunForProject(db, projectId, input.runId);
+  if (!run) return { outcome: "not_found", attempt: null, stage: null };
+
+  const eventKey = `admin:${input.action}:${input.requestId}`;
+  const existingEvent = await db
+    .prepare(
+      `select attempt, stage from briar_hunt_events
+       where run_id = ? and event_key = ?`,
+    )
+    .bind(run.id, eventKey)
+    .first<Pick<HuntEventRow, "attempt" | "stage">>();
+  if (existingEvent) {
+    return {
+      outcome:
+        input.action === "retry" ? "already_retried" : "already_cancelled",
+      attempt: existingEvent.attempt,
+      stage: existingEvent.stage,
+    };
+  }
+
+  if (!(["blocked", "failed"] as AutoHuntStage[]).includes(run.stage)) {
+    return {
+      outcome: "ineligible",
+      attempt: run.current_attempt,
+      stage: run.stage,
+    };
+  }
+
+  const eventId = crypto.randomUUID();
+  const recordedAt = new Date().toISOString();
+  const nextAttempt =
+    input.action === "retry" ? run.current_attempt + 1 : run.current_attempt;
+  const nextStage: AutoHuntStage =
+    input.action === "retry" ? "queued" : "cancelled";
+  const detail =
+    input.reason ??
+    (input.action === "retry"
+      ? `Auto Hunt ${nextAttempt}차 시도를 요청했습니다.`
+      : "사용자가 Auto Hunt 작업을 취소했습니다.");
+
+  const update =
+    input.action === "retry"
+      ? db
+          .prepare(
+            `update briar_hunt_runs
+             set stage = 'queued', detail = ?, current_attempt = ?,
+                 branch = null, commit_sha = null, result_summary = null,
+                 pull_request_urls = '[]',
+                 target_sha = null, staging_qa_status = null,
+                 production_qa_status = null, staging_qa_detail = null,
+                 production_qa_detail = null, claim_token_hash = null,
+                 claimed_by = null, claimed_at = null, lease_expires_at = null,
+                 completed_at = null, last_event_at = ?, updated_at = ?
+             where id = ? and project_id = ? and stage in ('blocked', 'failed')
+               and current_attempt = ? and last_event_at = ?`,
+          )
+          .bind(
+            detail,
+            nextAttempt,
+            input.occurredAt,
+            recordedAt,
+            run.id,
+            projectId,
+            run.current_attempt,
+            run.last_event_at,
+          )
+      : db
+          .prepare(
+            `update briar_hunt_runs
+             set stage = 'cancelled', detail = ?, claim_token_hash = null,
+                 claimed_by = null, claimed_at = null, lease_expires_at = null,
+                 completed_at = ?, last_event_at = ?, updated_at = ?
+             where id = ? and project_id = ? and stage in ('blocked', 'failed')
+               and current_attempt = ? and last_event_at = ?`,
+          )
+          .bind(
+            detail,
+            input.occurredAt,
+            input.occurredAt,
+            recordedAt,
+            run.id,
+            projectId,
+            run.current_attempt,
+            run.last_event_at,
+          );
+
+  const results = await db.batch([
+    update,
+    db
+      .prepare(
+        `insert into briar_hunt_events (
+           id, run_id, event_key, attempt, stage, detail, actor, branch,
+           commit_sha, qa_status, tracker_issue_state, pull_request_urls,
+           target_sha, occurred_at, recorded_at
+         )
+         select ?, id, ?, ?, ?, ?, ?, null, null, null,
+                tracker_issue_state, '[]', null, ?, ?
+         from briar_hunt_runs
+         where id = ? and project_id = ? and current_attempt = ?
+           and stage = ? and last_event_at = ?
+         on conflict(run_id, event_key) do nothing`,
+      )
+      .bind(
+        eventId,
+        eventKey,
+        nextAttempt,
+        nextStage,
+        detail,
+        input.actor,
+        input.occurredAt,
+        recordedAt,
+        run.id,
+        projectId,
+        nextAttempt,
+        nextStage,
+        input.occurredAt,
+      ),
+  ]);
+
+  if ((results[0]?.meta.changes ?? 0) === 0) {
+    const duplicate = await db
+      .prepare(
+        `select attempt, stage from briar_hunt_events
+         where run_id = ? and event_key = ?`,
+      )
+      .bind(run.id, eventKey)
+      .first<Pick<HuntEventRow, "attempt" | "stage">>();
+    if (duplicate) {
+      return {
+        outcome:
+          input.action === "retry" ? "already_retried" : "already_cancelled",
+        attempt: duplicate.attempt,
+        stage: duplicate.stage,
+      };
+    }
+    const current = await getHuntRunForProject(db, projectId, run.id);
+    return {
+      outcome: "ineligible",
+      attempt: current?.current_attempt ?? null,
+      stage: current?.stage ?? null,
+    };
+  }
+
+  return {
+    outcome: input.action === "retry" ? "retried" : "cancelled",
+    attempt: nextAttempt,
+    stage: nextStage,
+  };
 }
 
 export type QaActionOutcome =
@@ -847,7 +1049,7 @@ export async function recordQaResult(
   if (!eligible) return "ineligible";
 
   const eventId = crypto.randomUUID();
-  const eventKey = `admin:qa-${input.result === "passed" ? "pass" : "skip"}:${input.environment}`;
+  const eventKey = `admin:qa-${input.result === "passed" ? "pass" : "skip"}:${input.environment}:attempt-${run.current_attempt}`;
   const detail =
     input.detail ??
     (input.result === "passed"
@@ -858,16 +1060,17 @@ export async function recordQaResult(
     db
       .prepare(
         `insert into briar_hunt_events (
-           id, run_id, event_key, stage, detail, actor, branch, commit_sha,
+           id, run_id, event_key, attempt, stage, detail, actor, branch, commit_sha,
            qa_status, tracker_issue_state, pull_request_urls, target_sha,
            occurred_at, recorded_at
-         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          on conflict(run_id, event_key) do nothing`,
       )
       .bind(
         eventId,
         run.id,
         eventKey,
+        run.current_attempt,
         expectedStage,
         detail,
         input.actor,
@@ -885,7 +1088,7 @@ export async function recordQaResult(
         `update briar_hunt_runs
          set ${statusColumn} = ?, detail = ?, last_event_at = max(last_event_at, ?),
              updated_at = ?
-         where id = ? and project_id = ?
+         where id = ? and project_id = ? and current_attempt = ?
            and exists (
              select 1 from briar_hunt_events
              where id = ? and run_id = briar_hunt_runs.id
@@ -898,9 +1101,12 @@ export async function recordQaResult(
         recordedAt,
         run.id,
         projectId,
+        run.current_attempt,
         eventId,
       ),
   ]);
+
+  if ((results[1]?.meta.changes ?? 0) === 0) return "ineligible";
 
   if ((results[0]?.meta.changes ?? 0) === 0) {
     const existing = await db

@@ -9,6 +9,7 @@ import {
   getNextQueuedHuntRun,
   HuntClaimError,
   HuntTransitionError,
+  recoverHuntRun,
   recordHuntEvent,
   recordQaResult,
 } from "./db";
@@ -68,6 +69,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       "migrations/0002_remove_repository_path.sql",
       "migrations/0003_generalize_auto_hunt.sql",
       "migrations/0004_auto_hunt_claims.sql",
+      "migrations/0005_auto_hunt_recovery.sql",
     ]) {
       await executeSql(db, await readFile(resolve(migration), "utf8"));
     }
@@ -301,5 +303,132 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         atMinute(41),
       ),
     ).resolves.toBeUndefined();
+  });
+
+  it("retries failed runs as a new attempt while preserving prior evidence", async () => {
+    const sourceKey = "recovery-run";
+    const sharedAnalyzingKey = "recovery:analyzing:stable";
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 51, { sourceKey, eventKey: "recovery:queued:1" }),
+    );
+    await recordHuntEvent(
+      db,
+      projectId,
+      event("analyzing", 52, { sourceKey, eventKey: sharedAnalyzingKey }),
+    );
+    await recordHuntEvent(
+      db,
+      projectId,
+      event("failed", 53, { sourceKey, eventKey: "recovery:failed:1" }),
+    );
+
+    const requestId = "44444444-4444-4444-8444-444444444444";
+    expect(
+      await recoverHuntRun(db, projectId, {
+        runId,
+        action: "retry",
+        requestId,
+        actor: "vitest",
+        reason: "Retry after a transient failure",
+        occurredAt: atMinute(54),
+      }),
+    ).toEqual({ outcome: "retried", attempt: 2, stage: "queued" });
+    expect(
+      await recoverHuntRun(db, projectId, {
+        runId,
+        action: "retry",
+        requestId,
+        actor: "vitest",
+        reason: "Retry after a transient failure",
+        occurredAt: atMinute(54),
+      }),
+    ).toEqual({ outcome: "already_retried", attempt: 2, stage: "queued" });
+
+    await expect(
+      recordHuntEvent(
+        db,
+        projectId,
+        event("analyzing", 55, {
+          sourceKey,
+          eventKey: sharedAnalyzingKey,
+          detail: "Second attempt analysis",
+        }),
+      ),
+    ).resolves.toBe(runId);
+
+    const run = await db
+      .prepare(
+        `select stage, current_attempt, branch, commit_sha, completed_at
+         from briar_hunt_runs where id = ?`,
+      )
+      .bind(runId)
+      .first<{
+        stage: string;
+        current_attempt: number;
+        branch: string | null;
+        commit_sha: string | null;
+        completed_at: string | null;
+      }>();
+    expect(run).toEqual({
+      stage: "analyzing",
+      current_attempt: 2,
+      branch: "codex/integration",
+      commit_sha: "abcdef1",
+      completed_at: null,
+    });
+    const events = await db
+      .prepare(
+        `select attempt, stage from briar_hunt_events
+         where run_id = ? order by occurred_at`,
+      )
+      .bind(runId)
+      .all<{ attempt: number; stage: string }>();
+    expect(events.results).toEqual([
+      { attempt: 1, stage: "queued" },
+      { attempt: 1, stage: "analyzing" },
+      { attempt: 1, stage: "failed" },
+      { attempt: 2, stage: "queued" },
+      { attempt: 2, stage: "analyzing" },
+    ]);
+  });
+
+  it("cancels blocked runs idempotently without deleting evidence", async () => {
+    const sourceKey = "cancel-run";
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 60, { sourceKey, eventKey: "cancel:queued" }),
+    );
+    await recordHuntEvent(
+      db,
+      projectId,
+      event("blocked", 61, { sourceKey, eventKey: "cancel:blocked" }),
+    );
+    const input = {
+      runId,
+      action: "cancel" as const,
+      requestId: "55555555-5555-4555-8555-555555555555",
+      actor: "vitest",
+      reason: null,
+      occurredAt: atMinute(62),
+    };
+    expect(await recoverHuntRun(db, projectId, input)).toEqual({
+      outcome: "cancelled",
+      attempt: 1,
+      stage: "cancelled",
+    });
+    expect(await recoverHuntRun(db, projectId, input)).toEqual({
+      outcome: "already_cancelled",
+      attempt: 1,
+      stage: "cancelled",
+    });
+    expect(
+      await db
+        .prepare("select count(*) as count from briar_hunt_events where run_id = ?")
+        .bind(runId)
+        .first<number>("count"),
+    ).toBe(3);
   });
 });

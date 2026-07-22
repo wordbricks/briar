@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   beginDeviceAuthorization,
+  cancelHuntRun,
   createAgentToken,
   createIssue,
   createProject,
@@ -9,6 +10,7 @@ import {
   loadProjects,
   loadSession,
   pollDeviceToken,
+  retryHuntRun,
   updateProjectSettings,
 } from "../lib/api";
 import { demoDashboard } from "../lib/demo-data";
@@ -94,6 +96,8 @@ export function useBriar() {
     useState<ProjectConnection | null>(null);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [isCreatingIssue, setIsCreatingIssue] = useState(false);
+  const [recoveringRunId, setRecoveringRunId] = useState<string | null>(null);
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const [velen, setVelen] = useState<VelenInspection | null>(null);
   const [health, setHealth] = useState<AutoHuntHealth | null>(null);
   const [healthError, setHealthError] = useState<string | null>(null);
@@ -435,6 +439,7 @@ export function useBriar() {
             id: crypto.randomUUID(),
             runNumber:
               Math.max(0, ...dashboard.runs.map((candidate) => candidate.runNumber)) + 1,
+            currentAttempt: 1,
             source: "issue",
             sourceKey,
             title: input.title.trim(),
@@ -467,6 +472,7 @@ export function useBriar() {
             events: [
               {
                 id: crypto.randomUUID(),
+                attempt: 1,
                 stage: "queued",
                 detail: "Briar 앱에서 생성된 이슈가 Auto Hunt 처리를 기다리고 있습니다.",
                 actor: "briar-app",
@@ -500,6 +506,85 @@ export function useBriar() {
     [activeProjectId, dashboard, token],
   );
 
+  const recoverRun = useCallback(
+    async (runId: string, action: "retry" | "cancel") => {
+      if (!activeProjectId || !dashboard) {
+        throw new Error("복구할 Auto Hunt 작업이 없습니다.");
+      }
+      setRecoveringRunId(runId);
+      setRecoveryError(null);
+      try {
+        if (demoMode) {
+          const occurredAt = new Date().toISOString();
+          setDashboard((current) =>
+            current
+              ? {
+                  ...current,
+                  runs: current.runs.map((run) => {
+                    if (run.id !== runId) return run;
+                    const attempt =
+                      action === "retry"
+                        ? run.currentAttempt + 1
+                        : run.currentAttempt;
+                    const stage = action === "retry" ? "queued" : "cancelled";
+                    const detail =
+                      action === "retry"
+                        ? `Auto Hunt ${attempt}차 시도를 요청했습니다.`
+                        : "사용자가 Auto Hunt 작업을 취소했습니다.";
+                    return {
+                      ...run,
+                      currentAttempt: attempt,
+                      stage,
+                      progress: action === "retry" ? 10 : run.progress,
+                      detail,
+                      branch: action === "retry" ? null : run.branch,
+                      commitSha: action === "retry" ? null : run.commitSha,
+                      claimedBy: null,
+                      claimedAt: null,
+                      leaseExpiresAt: null,
+                      completedAt: action === "cancel" ? occurredAt : null,
+                      updatedAt: occurredAt,
+                      events: [
+                        {
+                          id: crypto.randomUUID(),
+                          attempt,
+                          stage,
+                          detail,
+                          actor: "briar-app",
+                          qaStatus: null,
+                          trackerState: run.tracker?.state ?? null,
+                          pullRequestUrls: [],
+                          targetSha: null,
+                          occurredAt,
+                          recordedAt: occurredAt,
+                        },
+                        ...run.events,
+                      ],
+                    };
+                  }),
+                }
+              : current,
+          );
+          return;
+        }
+        if (!token) throw new Error("로그인이 필요합니다.");
+        if (action === "retry") {
+          await retryHuntRun(token, activeProjectId, runId);
+        } else {
+          await cancelHuntRun(token, activeProjectId, runId);
+        }
+        setDashboard(await loadDashboard(token, activeProjectId));
+      } catch (caught) {
+        const message = caught instanceof Error ? caught.message : String(caught);
+        setRecoveryError(message);
+        throw caught;
+      } finally {
+        setRecoveringRunId(null);
+      }
+    },
+    [activeProjectId, dashboard, token],
+  );
+
   return {
     activeProjectId,
     addIssue,
@@ -522,11 +607,15 @@ export function useBriar() {
     projects,
     projectConnection,
     reconnectProject,
+    recoveringRunId,
+    recoveryError,
     refresh,
     refreshHealth,
     refreshVelen,
     setActiveProjectId: selectProject,
     repairHealth,
+    retryRun: (runId: string) => recoverRun(runId, "retry"),
+    cancelRun: (runId: string) => recoverRun(runId, "cancel"),
     startProjectCreation,
     token,
     user,

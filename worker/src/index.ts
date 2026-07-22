@@ -22,6 +22,7 @@ import {
   HuntTransitionError,
   listDashboardRuns,
   listProjects,
+  recoverHuntRun,
   recordHuntEvent,
   recordQaResult,
   replaceProjectAgentToken,
@@ -156,6 +157,17 @@ const claimInputSchema = z
     claimedBy: z.string().trim().min(1).max(128),
   })
   .strict();
+
+const recoveryUserInputSchema = z
+  .object({
+    requestId: z.string().uuid(),
+    reason: z.string().trim().min(1).max(4_000).nullable().optional(),
+  })
+  .strict();
+
+const recoveryAgentInputSchema = recoveryUserInputSchema.extend({
+  actor: z.string().trim().min(1).max(128),
+});
 
 const projectSettingsSchema = z
   .object({
@@ -323,6 +335,7 @@ const parseJsonObject = (value: string | null) => {
 
 const dashboardEventJson = (event: HuntEventRow) => ({
   id: event.id,
+  attempt: event.attempt,
   stage: event.stage,
   detail: event.detail,
   actor: event.actor,
@@ -338,6 +351,7 @@ function dashboardRunJson(run: HuntRunRow, events: HuntEventRow[]) {
   return {
     id: run.id,
     runNumber: run.run_number,
+    currentAttempt: run.current_attempt,
     source: run.source,
     sourceKey: run.source_key,
     title: run.title,
@@ -528,6 +542,31 @@ async function route(
     return json({ runId, sourceKey, stage: "queued" }, 201);
   }
 
+  const recoveryMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/(retry|cancel)$/u,
+  );
+  if (recoveryMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, recoveryMatch[1], session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    const input = recoveryUserInputSchema.parse(await readJson(request));
+    const result = await recoverHuntRun(db, project.id, {
+      runId: recoveryMatch[2],
+      action: recoveryMatch[3] as "retry" | "cancel",
+      requestId: input.requestId,
+      actor: `briar-app:${session.user.id}`,
+      reason: input.reason ?? null,
+      occurredAt: new Date().toISOString(),
+    });
+    if (result.outcome === "not_found") {
+      throw new HttpError(404, "Run not found");
+    }
+    if (result.outcome === "ineligible") {
+      throw new HttpError(409, "Only blocked or failed runs can be recovered");
+    }
+    return json({ runId: recoveryMatch[2], ...result });
+  }
+
   if (pathname === "/ingest/queue/next" && request.method === "GET") {
     const projectId = await requireAgentProject(db, request);
     const run = await getNextQueuedHuntRun(db, projectId);
@@ -536,6 +575,7 @@ async function route(
         ? {
             runId: run.id,
             runNumber: run.run_number,
+            currentAttempt: run.current_attempt,
             source: run.source,
             sourceKey: run.source_key,
             title: run.title,
@@ -568,6 +608,7 @@ async function route(
         ? {
             runId: run.id,
             runNumber: run.run_number,
+            currentAttempt: run.current_attempt,
             source: run.source,
             sourceKey: run.source_key,
             title: run.title,
@@ -584,6 +625,29 @@ async function route(
           }
         : null,
     });
+  }
+
+  const agentRecoveryMatch = pathname.match(
+    /^\/ingest\/runs\/([0-9a-f-]+)\/(retry|cancel)$/u,
+  );
+  if (agentRecoveryMatch && request.method === "POST") {
+    const projectId = await requireAgentProject(db, request);
+    const input = recoveryAgentInputSchema.parse(await readJson(request));
+    const result = await recoverHuntRun(db, projectId, {
+      runId: agentRecoveryMatch[1],
+      action: agentRecoveryMatch[2] as "retry" | "cancel",
+      requestId: input.requestId,
+      actor: input.actor,
+      reason: input.reason ?? null,
+      occurredAt: new Date().toISOString(),
+    });
+    if (result.outcome === "not_found") {
+      throw new HttpError(404, "Run not found");
+    }
+    if (result.outcome === "ineligible") {
+      throw new HttpError(409, "Only blocked or failed runs can be recovered");
+    }
+    return json({ runId: agentRecoveryMatch[1], ...result });
   }
 
   if (pathname === "/ingest/events" && request.method === "POST") {
