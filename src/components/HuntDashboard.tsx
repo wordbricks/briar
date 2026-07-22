@@ -25,7 +25,6 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { JellySelect } from "./JellySelect";
-import { UpdateControl } from "./UpdateControl";
 import { eventMeta, runMeta, sourceLabel } from "../lib/stages";
 import {
   formatAttachmentBytes,
@@ -165,8 +164,6 @@ export function HuntDashboard({
           <Metric label="확인 필요" value={attentionCount} note="차단 또는 실패" icon={<CircleAlert size={18} />} tone="rose" />
           <Metric label="완료" value={completedCount} note="프로젝트 기준 충족" icon={<Check size={18} />} tone="emerald" />
         </section>
-
-        <UpdateControl />
 
         <jelly-card className="queue-panel">
           <div className="queue-header">

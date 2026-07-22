@@ -42,33 +42,51 @@ export function UpdateControl() {
     }
   };
 
+  const feedback = error
+    ? `업데이트 확인 실패: ${error}`
+    : status === "current"
+      ? "최신 버전입니다."
+      : status === "available"
+        ? `v${available?.version} 업데이트 사용 가능 · 다시 눌러 설치`
+        : status === "installing"
+          ? "업데이트를 설치하고 있습니다…"
+          : status === "checking"
+            ? "업데이트를 확인하고 있습니다…"
+            : null;
+
+  const buttonLabel = status === "available"
+    ? `v${available?.version} 업데이트 설치`
+    : status === "installing"
+      ? "업데이트 설치 중"
+      : "앱 업데이트 확인";
+
+  const runUpdateAction = () => {
+    if (status === "available") return installUpdate();
+    return checkForUpdate();
+  };
+
   return (
-    <jelly-card className="update-panel">
-      <div>
-        <span className="update-icon"><Download size={16} /></span>
-        <span>
-          <strong>앱 업데이트</strong>
-          <small>
-            {status === "current" && "최신 버전입니다."}
-            {status === "available" && `v${available?.version} 업데이트 사용 가능`}
-            {status === "installing" && "서명된 업데이트를 설치하고 있습니다…"}
-            {(status === "idle" || status === "checking") && "서명된 Production 채널을 확인합니다."}
-          </small>
-        </span>
-      </div>
-      <div className="update-actions">
-        {status === "available" ? (
-          <button onClick={() => void installUpdate()} type="button">
-            <Download size={13} />설치 후 재시작
-          </button>
-        ) : (
-          <button disabled={status === "checking" || status === "installing"} onClick={() => void checkForUpdate()} type="button">
-            {status === "checking" ? <LoaderCircle className="spin" size={13} /> : <RefreshCw size={13} />}
-            업데이트 확인
-          </button>
-        )}
-      </div>
-      {error && <div className="update-error"><CircleAlert size={13} />업데이트 확인 실패: {error}</div>}
-    </jelly-card>
+    <div className="sidebar-update-control">
+      {feedback && (
+        <div className={`sidebar-update-feedback${error ? " error" : ""}`} role="status">
+          {error && <CircleAlert size={13} />}
+          <span>{feedback}</span>
+        </div>
+      )}
+      <button
+        aria-label={buttonLabel}
+        className="sidebar-update-trigger"
+        disabled={status === "checking" || status === "installing"}
+        onClick={() => void runUpdateAction()}
+        title={buttonLabel}
+        type="button"
+      >
+        {status === "checking" || status === "installing"
+          ? <LoaderCircle className="spin" size={16} />
+          : status === "current"
+            ? <RefreshCw size={16} />
+            : <Download size={16} />}
+      </button>
+    </div>
   );
 }

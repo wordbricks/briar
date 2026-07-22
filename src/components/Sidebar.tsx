@@ -1,6 +1,7 @@
 import {
   Activity,
   ChevronDown,
+  ChevronUp,
   CircleHelp,
   Ellipsis,
   FolderGit2,
@@ -11,6 +12,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { Project, SessionUser } from "../types";
+import { UpdateControl } from "./UpdateControl";
 
 export function Sidebar({
   activePage,
@@ -41,6 +43,8 @@ export function Sidebar({
   const menuRef = useRef<HTMLDivElement | null>(null);
   const menuItemRef = useRef<HTMLButtonElement | null>(null);
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!openProjectMenuId) return;
@@ -64,6 +68,26 @@ export function Sidebar({
       document.removeEventListener("keydown", closeMenuWithKeyboard);
     };
   }, [openProjectMenuId]);
+
+  useEffect(() => {
+    if (!isAccountMenuOpen) return;
+
+    const closeOnOutsidePress = (event: PointerEvent) => {
+      if (!accountMenuRef.current?.contains(event.target as Node)) {
+        setIsAccountMenuOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsAccountMenuOpen(false);
+    };
+
+    document.addEventListener("pointerdown", closeOnOutsidePress);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePress);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isAccountMenuOpen]);
 
   return (
     <aside
@@ -92,7 +116,6 @@ export function Sidebar({
       </div>
 
       <nav aria-label="주요 메뉴" className="sidebar-primary-nav">
-        <a href="#settings"><Settings size={16} strokeWidth={1.7} />설정</a>
         <a href="#help"><CircleHelp size={16} strokeWidth={1.7} />도움말</a>
       </nav>
 
@@ -134,6 +157,7 @@ export function Sidebar({
                     aria-label={`${project.name} 프로젝트 메뉴`}
                     className="sidebar-project-menu-trigger"
                     onClick={(event) => {
+                      setIsAccountMenuOpen(false);
                       menuTriggerRef.current = event.currentTarget;
                       setOpenProjectMenuId(isMenuOpen ? null : project.id);
                     }}
@@ -182,17 +206,49 @@ export function Sidebar({
       </div>
 
       <div className="sidebar-bottom">
-        <div className="user-card">
-          <div className="avatar">
-            {user.image ? <img src={user.image} alt="" /> : user.name.slice(0, 1).toUpperCase()}
+        <div className="sidebar-footer-row">
+          <div className="account-menu" ref={accountMenuRef}>
+            {isAccountMenuOpen && (
+              <div aria-label="계정 메뉴" className="account-popover" role="menu">
+                <div className="account-popover-identity">
+                  <div className="avatar">
+                    {user.image ? <img src={user.image} alt="" /> : user.name.slice(0, 1).toUpperCase()}
+                  </div>
+                  <span><strong>{user.name}</strong><small>{user.email}</small></span>
+                </div>
+                <div className="account-popover-separator" />
+                <a href="#settings" onClick={() => setIsAccountMenuOpen(false)} role="menuitem">
+                  <Settings size={16} strokeWidth={1.7} />
+                  <span>설정</span>
+                </a>
+                <button onClick={onLogout} role="menuitem" type="button">
+                  <LogOut size={16} strokeWidth={1.7} />
+                  <span>로그아웃</span>
+                </button>
+              </div>
+            )}
+            <button
+              aria-expanded={isAccountMenuOpen}
+              aria-haspopup="menu"
+              aria-label="계정 메뉴"
+              className="user-card"
+              onClick={() => {
+                setOpenProjectMenuId(null);
+                setIsAccountMenuOpen((open) => !open);
+              }}
+              type="button"
+            >
+              <div className="avatar">
+                {user.image ? <img src={user.image} alt="" /> : user.name.slice(0, 1).toUpperCase()}
+              </div>
+              <span>
+                <strong>{user.name}</strong>
+                <small>{user.email}</small>
+              </span>
+              <ChevronUp aria-hidden="true" className={isAccountMenuOpen ? "open" : ""} size={14} strokeWidth={1.8} />
+            </button>
           </div>
-          <span>
-            <strong>{user.name}</strong>
-            <small>{user.email}</small>
-          </span>
-          <button onClick={onLogout} aria-label="로그아웃" title="로그아웃" type="button">
-            <LogOut size={15} strokeWidth={1.7} />
-          </button>
+          <UpdateControl />
         </div>
       </div>
     </aside>
