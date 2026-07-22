@@ -48,11 +48,9 @@ jelly-theme { color: var(--ink); }
 .sidebar-project-select { width:100%; --jelly-select-font-size:12px; --jelly-select-padding-inline:10px; }
 .sidebar-nav { padding: 15px 10px; display: flex; flex-direction: column; gap: 4px; }
 .sidebar-nav p { margin: 0 0 8px 10px; }
-.sidebar a, .sidebar-bottom > a, .sidebar-nav-action { width: 100%; height: 38px; padding: 0 10px; border: 0; border-radius: 10px; display: flex; align-items: center; gap: 10px; color: #777971; background: transparent; text-decoration: none; text-align: left; font-size: 12.5px; font-weight: 550; cursor: pointer; }
-.sidebar a:hover, .sidebar-nav-action:hover { color: #3f403b; background: #f1f1ec; }
+.sidebar a, .sidebar-bottom > a { width: 100%; height: 38px; padding: 0 10px; border: 0; border-radius: 10px; display: flex; align-items: center; gap: 10px; color: #777971; background: transparent; text-decoration: none; text-align: left; font-size: 12.5px; font-weight: 550; cursor: pointer; }
+.sidebar a:hover { color: #3f403b; background: #f1f1ec; }
 .sidebar a.active { color: #563fac; background: #eee9ff; }
-.nav-action-icon { margin-left: auto; color: #999b94; }
-.soon { margin-left: auto; padding: 2px 5px; border-radius: 5px; color: #8d8f88; background: #ecece7; font: 500 8px "DM Mono", monospace; text-transform: uppercase; }
 .sidebar-bottom { margin-top: auto; padding: 10px; border-top: 1px solid var(--line); }
 .user-card { display: grid; grid-template-columns: 32px 1fr 24px; align-items: center; gap: 8px; margin-top: 10px; padding: 9px; border-radius: 12px; background: #fff; border: 1px solid var(--line); }
 .avatar { width: 32px; height: 32px; overflow: hidden; display: grid; place-items: center; border-radius: 50%; color: #fff; background: linear-gradient(135deg, #8f77e5, #5d46b3); font-size: 11px; font-weight: 700; }

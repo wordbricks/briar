@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { Sidebar } from "./Sidebar";
 
 describe("Sidebar", () => {
-  it("offers project creation beside the switcher and in workspace navigation", () => {
+  it("keeps project creation in the switcher and only shows Auto Hunt navigation", () => {
     const markup = renderToStaticMarkup(
       <Sidebar
         activeProjectId="project-1"
@@ -25,6 +25,8 @@ describe("Sidebar", () => {
     expect(markup).not.toContain("<select");
     expect(markup).toContain('aria-label="왼쪽 패널 닫기"');
     expect(markup).not.toContain("Briar</span>");
-    expect(markup).toContain("Projects");
+    expect(markup).toContain("자동사냥");
+    expect(markup).not.toContain("Agents");
+    expect(markup).not.toContain("Projects");
   });
 });

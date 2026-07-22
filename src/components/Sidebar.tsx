@@ -1,13 +1,11 @@
 import {
   Activity,
-  Boxes,
   CircleHelp,
   GitBranch,
   LogOut,
   PanelLeftClose,
   Plus,
   Settings,
-  Sparkles,
 } from "lucide-react";
 import type { Project, SessionUser } from "../types";
 import { JellySelect } from "./JellySelect";
@@ -79,10 +77,6 @@ export function Sidebar({
       <nav className="sidebar-nav">
         <p>WORKSPACE</p>
         <a className="active" href="#dashboard"><Activity size={17} />자동사냥</a>
-        <a href="#agents"><Sparkles size={17} />Agents<span className="soon">Soon</span></a>
-        <button className="sidebar-nav-action" onClick={onAddProject} type="button">
-          <Boxes size={17} />Projects<Plus className="nav-action-icon" size={14} />
-        </button>
       </nav>
       <div className="sidebar-bottom">
         <a href="#settings"><Settings size={17} />설정</a>
