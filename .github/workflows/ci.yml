@@ -100,11 +100,18 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Audit JavaScript dependencies
         run: bun run audit:dependencies
+      - name: Install verified cargo-audit 0.22.2
+        run: |
+          curl --fail --silent --show-error --location \
+            --output /tmp/cargo-audit.tar.gz \
+            https://github.com/RustSec/rustsec/releases/download/cargo-audit/v0.22.2/cargo-audit-x86_64-unknown-linux-gnu-v0.22.2.tgz
+          echo "ab28a1bdb54db4d5d8ad5981cf1f959410370b3d28250dbd35f6a44248620e39  /tmp/cargo-audit.tar.gz" \
+            | sha256sum --check
+          tar -xzf /tmp/cargo-audit.tar.gz -C /tmp
       - name: Audit Rust dependencies
-        uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          working-directory: src-tauri
+        env:
+          CARGO_AUDIT_BIN: /tmp/cargo-audit-x86_64-unknown-linux-gnu-v0.22.2/cargo-audit
+        run: scripts/audit-rust-dependencies.sh
       - name: Install verified Gitleaks 8.30.1
         run: |
           curl --fail --silent --show-error --location \

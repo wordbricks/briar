@@ -10,10 +10,13 @@ permissions and immutable action commit references.
 - `Rust quality`
 - `Dependency and secret audit`
 
-The security job uses `bun audit`, RustSec, and a checksum-verified Gitleaks CLI.
-GitHub Code Security is not assumed because the repository is private and the
-feature may not be licensed. Enable GitHub secret scanning and push protection
-later when the organization has Code Security available.
+The security job uses `bun audit`, checksum-verified `cargo-audit`, and a
+checksum-verified Gitleaks CLI. Rust vulnerabilities and any warning not in the
+dated advisory allowlist fail the gate. The first Rust audit prints all known
+warnings before the strict allowlist check, so accepted debt remains visible in
+the job log. GitHub Code Security is not assumed because the repository is
+private and the feature may not be licensed. Enable GitHub secret scanning and
+push protection later when the organization has Code Security available.
 
 Any audit exception must be narrow, dated, and recorded in
 [`security-exceptions.md`](security-exceptions.md) with a removal condition.
