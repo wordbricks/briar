@@ -24,13 +24,26 @@ const statusMeta: Record<
   cancelled: { label: "취소", tone: "slate" },
 };
 
+type DisplayStatus = AutoHuntRunStatus | AutoHuntWorkflowStageId;
+
+function displayMetaForStatus(status: DisplayStatus) {
+  const runStatus = statusMeta[status as AutoHuntRunStatus];
+  if (runStatus) return runStatus;
+
+  const legacyStage = workflowStageMeta[status as AutoHuntWorkflowStageId];
+  return legacyStage
+    ? { label: legacyStage.label, tone: legacyStage.tone }
+    : { label: status, tone: "slate" };
+}
+
 export function runMeta(
-  status: AutoHuntRunStatus,
-  workflowStage: AutoHuntWorkflowStageId | null,
+  status: DisplayStatus,
+  workflowStage: AutoHuntWorkflowStageId | null | undefined,
   workflow?: AutoHuntWorkflow,
 ) {
+  const statusDisplay = displayMetaForStatus(status);
   if (status !== "running" && status !== "blocked" && status !== "failed") {
-    return statusMeta[status];
+    return statusDisplay;
   }
   const configured = workflow?.stages.find((stage) => stage.id === workflowStage);
   const catalog = workflowStage ? workflowStageMeta[workflowStage] : null;
@@ -40,22 +53,23 @@ export function runMeta(
       tone: catalog?.tone ?? statusMeta.running.tone,
     };
   }
-  return statusMeta[status];
+  return statusDisplay;
 }
 
 export function eventMeta(
-  status: AutoHuntRunStatus,
-  workflowStage: AutoHuntWorkflowStageId | null,
+  status: DisplayStatus,
+  workflowStage: AutoHuntWorkflowStageId | null | undefined,
   workflow?: AutoHuntWorkflow,
 ) {
+  const statusDisplay = displayMetaForStatus(status);
   const configured = workflow?.stages.find((stage) => stage.id === workflowStage);
   const catalog = workflowStage ? workflowStageMeta[workflowStage] : null;
   return configured || catalog
     ? {
-        label: configured?.label ?? catalog?.label ?? statusMeta[status].label,
-        tone: catalog?.tone ?? statusMeta[status].tone,
+        label: configured?.label ?? catalog?.label ?? statusDisplay.label,
+        tone: catalog?.tone ?? statusDisplay.tone,
       }
-    : statusMeta[status];
+    : statusDisplay;
 }
 
 export const sourceLabel = {

@@ -5,6 +5,7 @@ import {
   workflowForPreset,
 } from "./auto-hunt-contract";
 import { demoDashboard } from "./demo-data";
+import { eventMeta, runMeta } from "./stages";
 
 describe("Auto Hunt workflows", () => {
   it("defaults new projects to a deployment-free local workflow", () => {
@@ -36,5 +37,16 @@ describe("Auto Hunt workflows", () => {
     expect(demoDashboard.runs).toHaveLength(4);
     expect(demoDashboard.runs.some((run) => run.status === "completed")).toBe(true);
     expect(demoDashboard.runs.some((run) => run.status === "blocked")).toBe(true);
+  });
+
+  it("renders legacy stage values returned in the status field", () => {
+    expect(runMeta("analyzing", undefined)).toEqual({
+      label: "분석",
+      tone: "blue",
+    });
+    expect(eventMeta("production_qa", undefined)).toEqual({
+      label: "Production QA",
+      tone: "orange",
+    });
   });
 });
