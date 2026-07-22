@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
+    env,
+    ffi::OsString,
     fs::{self, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
@@ -294,8 +296,27 @@ fn velen_binary() -> Result<PathBuf, String> {
     Err("Velen CLI가 필요합니다. Velen CLI를 설치한 뒤 Briar를 다시 여세요.".to_string())
 }
 
-fn run_velen_json(args: &[&str]) -> Result<serde_json::Value, String> {
-    let output = Command::new(velen_binary()?)
+fn cli_execution_path(home: &Path) -> Result<OsString, String> {
+    let mut paths = vec![
+        home.join(".local/bin"),
+        home.join(".bun/bin"),
+        home.join(".cargo/bin"),
+        PathBuf::from("/opt/homebrew/bin"),
+        PathBuf::from("/usr/local/bin"),
+    ];
+    if let Some(existing) = env::var_os("PATH") {
+        paths.extend(env::split_paths(&existing));
+    }
+    env::join_paths(paths).map_err(|error| format!("CLI 실행 경로를 구성하지 못했습니다: {error}"))
+}
+
+fn run_velen_json_with(
+    binary: &Path,
+    home: &Path,
+    args: &[&str],
+) -> Result<serde_json::Value, String> {
+    let output = Command::new(binary)
+        .env("PATH", cli_execution_path(home)?)
         .args(["--output", "json"])
         .args(args)
         .output()
@@ -311,6 +332,11 @@ fn run_velen_json(args: &[&str]) -> Result<serde_json::Value, String> {
         return Err(message.to_string());
     }
     Ok(value)
+}
+
+fn run_velen_json(args: &[&str]) -> Result<serde_json::Value, String> {
+    let home = dirs::home_dir().ok_or_else(|| "홈 폴더를 찾을 수 없습니다.".to_string())?;
+    run_velen_json_with(&velen_binary()?, &home, args)
 }
 
 fn inspect_velen_sync(org: Option<String>) -> Result<VelenInspection, String> {
@@ -978,6 +1004,41 @@ mod tests {
             read_trimmed_file(&home.join(".codex/skills/briar-auto-hunt/VERSION")),
             Some(env!("CARGO_PKG_VERSION").to_string())
         );
+        fs::remove_dir_all(home).expect("test home should be removed");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn runs_node_based_velen_from_a_gui_style_path() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be after unix epoch")
+            .as_nanos();
+        let home = std::env::temp_dir().join(format!("briar-velen-path-test-{unique}"));
+        let local_bin = home.join(".local/bin");
+        fs::create_dir_all(&local_bin).expect("test bin should be created");
+        let node = local_bin.join("node");
+        let velen = home.join("velen");
+        fs::write(
+            &node,
+            "#!/bin/sh\nprintf '%s\\n' '{\"ok\":true,\"runtime\":\"node\"}'\n",
+        )
+        .expect("fake node should be written");
+        fs::write(&velen, "#!/usr/bin/env node\n").expect("fake Velen should be written");
+        fs::set_permissions(&node, fs::Permissions::from_mode(0o755))
+            .expect("fake node should be executable");
+        fs::set_permissions(&velen, fs::Permissions::from_mode(0o755))
+            .expect("fake Velen should be executable");
+
+        let result = run_velen_json_with(&velen, &home, &["auth", "whoami"])
+            .expect("Velen should find node through the augmented GUI path");
+        assert_eq!(
+            result.get("runtime").and_then(|value| value.as_str()),
+            Some("node")
+        );
+
         fs::remove_dir_all(home).expect("test home should be removed");
     }
 
