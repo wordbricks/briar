@@ -1,4 +1,5 @@
 import type { DashboardPayload, HuntEvent, HuntRun } from "../types";
+import { workflowForPreset } from "./auto-hunt-contract";
 
 const now = Date.now();
 const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
@@ -22,6 +23,7 @@ const runDefaults = {
   claimedAt: null,
   leaseExpiresAt: null,
   claimAttempts: 0,
+  workflow: workflowForPreset("local"),
 } satisfies Pick<
   HuntRun,
   | "priority"
@@ -42,10 +44,14 @@ const runDefaults = {
   | "claimedAt"
   | "leaseExpiresAt"
   | "claimAttempts"
+  | "workflow"
 >;
 
 const event = (
-  input: Pick<HuntEvent, "id" | "stage" | "detail" | "actor" | "occurredAt">,
+  input: Pick<
+    HuntEvent,
+    "id" | "status" | "workflowStage" | "detail" | "actor" | "occurredAt"
+  >,
 ): HuntEvent => ({
   ...input,
   attempt: 1,
@@ -64,7 +70,8 @@ const runs: HuntRun[] = [
     source: "issue",
     sourceKey: "BRIAR-12",
     title: "Agent 실행 로그를 작업 상세에 연결",
-    stage: "implementing",
+    status: "running",
+    workflowStage: "implementing",
     progress: 45,
     detail: "Codex가 이벤트 스트림 어댑터와 회귀 테스트를 작성하고 있습니다.",
     repository: "wordbricks/briar",
@@ -76,21 +83,24 @@ const runs: HuntRun[] = [
     events: [
       event({
         id: "event-3",
-        stage: "implementing",
+        status: "running",
+        workflowStage: "implementing",
         detail: "이벤트 스트림 어댑터 구현 시작",
         actor: "codex",
         occurredAt: ago(23),
       }),
       event({
         id: "event-2",
-        stage: "analyzing",
+        status: "running",
+        workflowStage: "analyzing",
         detail: "로컬 Git과 Agent 실행 상태 연결 지점 확인",
         actor: "codex",
         occurredAt: ago(36),
       }),
       event({
         id: "event-1",
-        stage: "queued",
+        status: "queued",
+        workflowStage: null,
         detail: "자동사냥 작업 등록",
         actor: "briar-cli",
         occurredAt: ago(42),
@@ -104,7 +114,8 @@ const runs: HuntRun[] = [
     source: "feedback",
     sourceKey: "feedback-11",
     title: "대시보드 작업 상세 패널 개선",
-    stage: "pr_open",
+    status: "running",
+    workflowStage: "local_qa",
     progress: 65,
     detail: "PR #18의 타입체크와 리뷰 결과를 기다리고 있습니다.",
     repository: "wordbricks/briar",
@@ -116,14 +127,16 @@ const runs: HuntRun[] = [
     events: [
       event({
         id: "event-6",
-        stage: "pr_open",
-        detail: "PR #18 생성",
+        status: "running",
+        workflowStage: "local_qa",
+        detail: "로컬 검증 실행",
         actor: "codex",
         occurredAt: ago(12),
       }),
       event({
         id: "event-5",
-        stage: "implementing",
+        status: "running",
+        workflowStage: "implementing",
         detail: "상세 패널 구현",
         actor: "codex",
         occurredAt: ago(67),
@@ -137,7 +150,8 @@ const runs: HuntRun[] = [
     source: "error",
     sourceKey: "error-10",
     title: "Tauri 시작 시 저장된 세션 복원 실패",
-    stage: "blocked",
+    status: "blocked",
+    workflowStage: "implementing",
     progress: 50,
     detail: "Google OAuth 클라이언트 자격증명 등록이 필요합니다.",
     repository: "wordbricks/briar",
@@ -149,7 +163,8 @@ const runs: HuntRun[] = [
     events: [
       event({
         id: "event-8",
-        stage: "blocked",
+        status: "blocked",
+        workflowStage: "implementing",
         detail: "Google OAuth 자격증명 대기",
         actor: "codex",
         occurredAt: ago(31),
@@ -163,7 +178,8 @@ const runs: HuntRun[] = [
     source: "issue",
     sourceKey: "BRIAR-9",
     title: "D1 작업 이벤트 스키마 추가",
-    stage: "completed",
+    status: "completed",
+    workflowStage: "local_qa",
     progress: 100,
     detail: "마이그레이션과 API 검증이 완료되었습니다.",
     repository: "wordbricks/briar",
@@ -175,8 +191,9 @@ const runs: HuntRun[] = [
     events: [
       event({
         id: "event-9",
-        stage: "completed",
-        detail: "Production QA 완료",
+        status: "completed",
+        workflowStage: "local_qa",
+        detail: "로컬 검증과 작업 완료",
         actor: "codex",
         occurredAt: ago(510),
       }),
@@ -199,6 +216,7 @@ export const demoDashboard: DashboardPayload = {
       teamKey: "GG",
     },
     githubRepository: "wordbricks/briar",
+    workflow: workflowForPreset("local"),
   },
   runs,
   generatedAt: new Date().toISOString(),

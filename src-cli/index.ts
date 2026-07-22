@@ -7,9 +7,30 @@ import { z } from "zod";
 import packageJson from "../package.json";
 import {
   autoHuntQaEnvironments,
+  autoHuntRunStatuses,
   autoHuntSources,
   autoHuntStages,
+  autoHuntWorkflowPresets,
+  autoHuntWorkflowStageCatalog,
+  workflowForPreset,
 } from "../src/lib/auto-hunt-contract";
+
+const workflowStageIds = autoHuntWorkflowStageCatalog.map((stage) => stage.id) as [
+  (typeof autoHuntWorkflowStageCatalog)[number]["id"],
+  ...(typeof autoHuntWorkflowStageCatalog)[number]["id"][],
+];
+
+const workflowConfigSchema = z.object({
+  version: z.literal(1),
+  preset: z.enum(autoHuntWorkflowPresets),
+  stages: z.array(
+    z.object({
+      id: z.enum(workflowStageIds),
+      label: z.string().min(1),
+      required: z.boolean(),
+    }),
+  ).min(1),
+});
 
 const autoHuntConfigSchema = z
   .object({
@@ -24,6 +45,7 @@ const autoHuntConfigSchema = z
       .passthrough()
       .optional(),
     githubRepository: z.string().min(1).optional(),
+    workflow: workflowConfigSchema.optional(),
   })
   .passthrough();
 
@@ -361,6 +383,15 @@ async function configureAutoHunt() {
             teamKey: value("--linear-team") ?? project.autoHunt?.linear?.teamKey,
           }
         : (project.autoHunt?.linear ?? { enabled: false }),
+    workflow: (() => {
+      const preset = value("--workflow-preset");
+      if (!preset) return project.autoHunt?.workflow ?? workflowForPreset("local");
+      const parsed = z.enum(autoHuntWorkflowPresets).parse(preset);
+      if (parsed === "custom") {
+        throw new Error("custom workflow must be configured in the Briar app");
+      }
+      return workflowForPreset(parsed);
+    })(),
   };
   const nextProject = {
     ...project,
@@ -386,6 +417,7 @@ async function configureAutoHunt() {
           teamKey: nextAutoHunt.linear?.teamKey ?? null,
         },
         githubRepository: nextAutoHunt.githubRepository ?? null,
+        workflow: nextAutoHunt.workflow,
       }),
     });
   }
@@ -412,6 +444,7 @@ async function autoHuntDoctor() {
       linearEnabled: project.autoHunt?.linear?.enabled ?? false,
       linearSource: project.autoHunt?.linear?.source ?? null,
       dataSource: project.autoHunt?.dataSource ?? null,
+      workflow: project.autoHunt?.workflow ?? workflowForPreset("local"),
       requestIds: [result.auth.requestId, result.org.requestId, result.linear?.requestId].filter(
         Boolean,
       ),
@@ -439,6 +472,7 @@ const queuedIssueSchema = z.object({
   repository: z.string().min(1),
   sourceCreatedAt: z.string().datetime({ offset: true }).nullable(),
   context: z.record(z.string(), z.unknown()).nullable(),
+  workflow: workflowConfigSchema,
   attachments: z.array(queuedAttachmentSchema).max(5).default([]),
   claimToken: z.string().startsWith("briar_claim_"),
   claimedBy: z.string().min(1),
@@ -590,7 +624,9 @@ async function recordHunt() {
     source: value("--source") ?? "issue",
     sourceKey: required("--source-key"),
     title: required("--title"),
-    stage: required("--stage"),
+    stage: value("--stage"),
+    status: value("--status"),
+    workflowStage: value("--workflow-stage"),
     eventKey: required("--event-key"),
     occurredAt: value("--observed-at") ?? value("--occurred-at") ?? new Date().toISOString(),
     actor: value("--actor") ?? "briar-auto-hunt",
@@ -627,7 +663,9 @@ async function recordHunt() {
     source: z.enum(autoHuntSources),
     sourceKey: z.string().min(1),
     title: z.string().min(1),
-    stage: z.enum(autoHuntStages),
+    stage: z.enum(autoHuntStages).optional(),
+    status: z.enum(autoHuntRunStatuses).optional(),
+    workflowStage: z.enum(workflowStageIds).nullable().optional(),
     eventKey: z.string().min(1),
     occurredAt: z.string().datetime({ offset: true }),
     actor: z.string().min(1),
@@ -654,8 +692,23 @@ async function recordHunt() {
     stagingQaDetail: z.string().nullable(),
     productionQaDetail: z.string().nullable(),
     context: z.record(z.string(), z.unknown()).nullable(),
+  }).superRefine((progress, context) => {
+    if (!progress.stage && !progress.status) {
+      context.addIssue({ code: "custom", message: "--status or --stage is required" });
+    }
+    if (progress.status === "running" && !progress.workflowStage) {
+      context.addIssue({
+        code: "custom",
+        message: "--workflow-stage is required with --status running",
+      });
+    }
   }).parse(input);
-  const result = await request<{ runId: string; stage: string }>(
+  const result = await request<{
+    runId: string;
+    status: string;
+    workflowStage: string | null;
+    stage: string;
+  }>(
     config.apiUrl,
     "/ingest/events",
     agentToken,
@@ -668,7 +721,11 @@ async function recordHunt() {
           : undefined,
     },
   );
-  if (project.activeClaim?.sourceKey === input.sourceKey && input.stage !== "queued") {
+  if (
+    project.activeClaim?.sourceKey === input.sourceKey &&
+    input.status !== "queued" &&
+    input.stage !== "queued"
+  ) {
     config.projects = config.projects.map((candidate) =>
       candidate.id === project.id
         ? { ...candidate, activeClaim: undefined }
@@ -757,8 +814,10 @@ const usage = `Briar CLI
   briar auto-hunt next
   briar auto-hunt configure --velen-org <slug> [--data-source <provider://source>]
     [--enable-linear --linear-source <linear://source> --linear-team <key>]
-    [--disable-linear]
-  briar auto-hunt record --source-key <key> --title <title> --stage <stage>
+    [--disable-linear] [--workflow-preset <local|review|release|research>]
+  briar auto-hunt record --source-key <key> --title <title>
+    --status <queued|running|blocked|failed|completed|cancelled>
+    [--workflow-stage <configured-stage>]
     --event-key <retry-stable-key> [Wordbricks-compatible progress flags]
   briar auto-hunt qa-result --run-id <uuid> --environment <staging|production>
     --result <passed|skipped>

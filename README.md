@@ -20,7 +20,7 @@ Repository source code stays local. Agents send only task state and Git metadata
 - Mandatory Velen CLI preflight and repository-specific Velen organization/source settings
 - Optional Linear integration through a configured Velen source
 - Jelly UI components in a light desktop theme
-- Wordbricks stage contract: `queued`, `analyzing`, `implementing`, `pr_open`, `staging_qa`, `production_qa`, `completed`
+- Universal run status plus repository-specific workflow stages selected at connection time
 - Exceptional states: `blocked`, `failed`, `cancelled`
 - A demo dashboard when no Worker URL is configured
 
@@ -148,7 +148,7 @@ bun link
 briar login
 ```
 
-After login, create a project from the desktop onboarding screen, choose the Velen organization, optionally select a Linear source, and pick the Git repository. Briar validates every selection, stores the path/token/settings locally, stores non-secret integration settings in D1, and installs the Briar CLI plus Codex skill automatically. The repository path and Agent token are never sent to the Worker as project metadata.
+After login, create a project from the desktop onboarding screen, select the workflow that matches the repository, choose the Velen organization, optionally select a Linear source, and pick the Git repository. New projects default to the deployment-free `local` workflow; review, release, research, and custom stage selections are available. Briar validates every selection, stores the path/token/settings locally, stores non-secret integration settings in D1, and installs the Briar CLI plus Codex skill automatically. The repository path and Agent token are never sent to the Worker as project metadata.
 
 You can also create and connect a project from inside a Git repository with the CLI:
 
@@ -156,7 +156,7 @@ You can also create and connect a project from inside a Git repository with the 
 briar project create --name wordbricks
 ```
 
-Record the lifecycle using a stable, retry-safe event key for every transition:
+Record the universal status and configured workflow stage using a stable, retry-safe event key:
 
 ```bash
 briar auto-hunt next
@@ -165,7 +165,7 @@ briar auto-hunt record \
   --source issue \
   --source-key WB-142 \
   --title "Fix checkout race" \
-  --stage queued \
+  --status queued \
   --event-key WB-142:queued:1 \
   --status-detail "Auto Hunt queued"
 
@@ -173,12 +173,13 @@ briar auto-hunt record \
   --source issue \
   --source-key WB-142 \
   --title "Fix checkout race" \
-  --stage implementing \
+  --status running \
+  --workflow-stage implementing \
   --event-key WB-142:implementing:1 \
   --status-detail "Agent is implementing the fix"
 ```
 
-The app can create a titled, described, prioritized issue directly in the Auto Hunt queue. After `doctor`, `briar auto-hunt next` atomically claims the highest-priority oldest queued issue with a 15-minute lease so concurrent Codex runs do not duplicate work. The claim token is stored only in the mode-`0600` local config, sent on the first processing transition, and then removed. The CLI discovers the repository, worktree, branch, commit SHA, and `origin` URL automatically. Reusing an event key with identical data is safe; reusing it with different data is rejected. QA results use `briar auto-hunt qa-result`; completion is rejected until Production QA and a result summary exist, plus a terminal Linear state when a Linear issue is linked.
+The app can create a titled, described, prioritized issue directly in the Auto Hunt queue. Each run snapshots the project's workflow so later setting changes do not rewrite active or historical work. After `doctor`, `briar auto-hunt next` atomically claims the highest-priority oldest queued issue with a 15-minute lease so concurrent Codex runs do not duplicate work. The claim token is stored only in the mode-`0600` local config, sent on the first processing transition, and then removed. The CLI discovers the repository, worktree, branch, commit SHA, and `origin` URL automatically. Reusing an event key with identical data is safe; reusing it with different data is rejected. Completion requires every required snapshot stage and a result summary. Stage/Production QA is required only when that stage is configured; a linked Linear issue must also be terminal.
 
 ## Checks
 

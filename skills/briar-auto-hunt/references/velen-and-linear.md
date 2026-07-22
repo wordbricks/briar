@@ -22,7 +22,7 @@ Use `--dry-run` for unfamiliar or mutating API calls. Preserve the Velen `reques
 
 Read `linearEnabled` and `linearSource` from `briar auto-hunt doctor`.
 
-- When disabled, do not call Linear and do not pass tracker flags to Briar. The complete lifecycle still applies.
+- When disabled, do not call Linear and do not pass tracker flags to Briar. The configured project workflow still applies.
 - When enabled, use only the configured Velen source. Do not use a direct Linear token or a separate Linear CLI.
 
 Describe the configured source to get its current supported operations:
@@ -50,7 +50,7 @@ Record the immutable issue ID, identifier, URL, and current state on Briar event
 For each milestone:
 
 1. Write the Briar event.
-2. Confirm success and retain its run ID/stage.
+2. Confirm success and retain its run ID, status, and workflow stage.
 3. Create or update the Linear comment if useful.
 4. On completion, update the Linear state, fetch the issue again, then record Briar `completed` with the terminal state.
 

@@ -88,7 +88,8 @@ describe("HuntDashboard", () => {
       runs: [
         {
           ...demoDashboard.runs[0],
-          stage: "queued" as const,
+          status: "queued" as const,
+          workflowStage: null,
           claimedBy: "briar-auto-hunt",
           claimedAt: new Date().toISOString(),
           leaseExpiresAt: new Date(Date.now() + 60_000).toISOString(),
@@ -125,13 +126,13 @@ describe("HuntDashboard", () => {
   it("shows attempt-aware recovery actions for failed runs", () => {
     const failedRun = {
       ...demoDashboard.runs[0],
-      stage: "failed" as const,
+      status: "failed" as const,
       currentAttempt: 2,
       detail: "Worker deployment timed out",
       events: [
         {
           ...demoDashboard.runs[0].events[0],
-          stage: "failed" as const,
+          status: "failed" as const,
           attempt: 2,
           detail: "Worker deployment timed out",
         },

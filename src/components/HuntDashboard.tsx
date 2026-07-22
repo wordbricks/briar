@@ -26,7 +26,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { JellySelect } from "./JellySelect";
 import { UpdateControl } from "./UpdateControl";
-import { sourceLabel, stageMeta } from "../lib/stages";
+import { eventMeta, runMeta, sourceLabel } from "../lib/stages";
 import {
   formatAttachmentBytes,
   issueAttachmentAccept,
@@ -94,13 +94,13 @@ export function HuntDashboard({
 
   const runs = dashboard?.runs ?? [];
   const selected = runs.find((run) => run.id === selectedRunId) ?? null;
-  const activeCount = runs.filter((run) => !["completed", "cancelled"].includes(run.stage)).length;
-  const attentionCount = runs.filter((run) => ["blocked", "failed"].includes(run.stage)).length;
-  const completedCount = runs.filter((run) => run.stage === "completed").length;
+  const activeCount = runs.filter((run) => !["completed", "cancelled"].includes(run.status)).length;
+  const attentionCount = runs.filter((run) => ["blocked", "failed"].includes(run.status)).length;
+  const completedCount = runs.filter((run) => run.status === "completed").length;
   const average = activeCount
     ? Math.round(
         runs
-          .filter((run) => !["completed", "cancelled"].includes(run.stage))
+          .filter((run) => !["completed", "cancelled"].includes(run.status))
           .reduce((sum, run) => sum + run.progress, 0) / activeCount,
       )
     : 0;
@@ -109,9 +109,9 @@ export function HuntDashboard({
     const normalized = query.trim().toLowerCase();
     return runs.filter((run) => {
       if (source !== "all" && run.source !== source) return false;
-      if (status === "active" && ["completed", "cancelled"].includes(run.stage)) return false;
-      if (status === "attention" && !["blocked", "failed"].includes(run.stage)) return false;
-      if (status === "completed" && run.stage !== "completed") return false;
+      if (status === "active" && ["completed", "cancelled"].includes(run.status)) return false;
+      if (status === "attention" && !["blocked", "failed"].includes(run.status)) return false;
+      if (status === "completed" && run.status !== "completed") return false;
       return !normalized || `${run.title} ${run.sourceKey} ${run.repository}`.toLowerCase().includes(normalized);
     });
   }, [query, runs, source, status]);
@@ -163,7 +163,7 @@ export function HuntDashboard({
           <Metric label="진행 중" value={activeCount} note="자동사냥 작업" icon={<LoaderCircle size={18} />} tone="violet" />
           <Metric label="평균 진행률" value={`${average}%`} note="진행 중 작업 기준" icon={<ActivityRing value={average} />} tone="blue" />
           <Metric label="확인 필요" value={attentionCount} note="차단 또는 실패" icon={<CircleAlert size={18} />} tone="rose" />
-          <Metric label="완료" value={completedCount} note="Production QA 통과" icon={<Check size={18} />} tone="emerald" />
+          <Metric label="완료" value={completedCount} note="프로젝트 기준 충족" icon={<Check size={18} />} tone="emerald" />
         </section>
 
         <UpdateControl />
@@ -509,15 +509,15 @@ function ActivityRing({ value }: { value: number }) {
 }
 
 function RunRow({ run, onOpen }: { run: HuntRun; onOpen: () => void }) {
-  const meta = stageMeta[run.stage];
+  const meta = runMeta(run.status, run.workflowStage, run.workflow);
   const isClaimed =
-    run.stage === "queued" &&
+    run.status === "queued" &&
     Boolean(run.leaseExpiresAt) &&
     Date.parse(run.leaseExpiresAt!) > Date.now();
   return (
     <button className="run-row" onClick={onOpen}>
       <span className="run-title-cell"><i className={`source-dot ${run.source}`} /><span><strong>{run.title}</strong><small>AH-{run.runNumber} · {run.repository}{isClaimed && <> · <em>{run.claimedBy ?? "agent"} 할당</em></>}</small></span></span>
-      <span><i className={`status-pill ${meta.tone}`}>{run.stage === "implementing" && <LoaderCircle className="spin" size={12} />}{meta.label}</i></span>
+      <span><i className={`status-pill ${meta.tone}`}>{run.status === "running" && <LoaderCircle className="spin" size={12} />}{meta.label}</i></span>
       <span className="progress-cell"><span><i style={{ width: `${run.progress}%` }} /></span><small>{run.progress}%</small></span>
       <span className="time-cell">{relativeTime(run.updatedAt)}</span>
       <span className="row-action"><ChevronRight size={16} /></span>
@@ -542,8 +542,8 @@ export function RunDialog({
   onRetry: () => Promise<unknown>;
   run: HuntRun;
 }) {
-  const meta = stageMeta[run.stage];
-  const needsAttention = ["blocked", "failed"].includes(run.stage);
+  const meta = runMeta(run.status, run.workflowStage, run.workflow);
+  const needsAttention = ["blocked", "failed"].includes(run.status);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const runAction = async (action: () => Promise<unknown>) => {
     try {
@@ -570,7 +570,7 @@ export function RunDialog({
           )}
           {needsAttention && (
             <div className="recovery-panel">
-              <div><CircleAlert size={16} /><span><strong>{run.stage === "failed" ? "실행이 실패했습니다" : "진행이 차단되었습니다"}</strong><small>이전 시도의 활동 기록은 보존됩니다. 재시도하면 {run.currentAttempt + 1}번 시도로 새 작업이 시작됩니다.</small></span></div>
+              <div><CircleAlert size={16} /><span><strong>{run.status === "failed" ? "실행이 실패했습니다" : "진행이 차단되었습니다"}</strong><small>이전 시도의 활동 기록은 보존됩니다. 재시도하면 {run.currentAttempt + 1}번 시도로 새 작업이 시작됩니다.</small></span></div>
               {error && <p><CircleAlert size={13} />{error}</p>}
               <div className="recovery-actions">
                 <button disabled={isRecovering} onClick={() => void runAction(onRetry)} type="button"><RotateCcw className={isRecovering ? "spin" : ""} size={14} />재시도</button>
@@ -588,7 +588,7 @@ export function RunDialog({
             <span><GitCommitHorizontal size={15} /><small>커밋</small><strong>{run.commitSha ?? "—"}</strong></span>
             <span><Clock3 size={15} /><small>시작</small><strong>{formatDate(run.startedAt)}</strong></span>
           </div>
-          <div className="timeline"><h3>활동 기록</h3>{run.events.map((event) => <div className="timeline-event" key={event.id}><i className={stageMeta[event.stage].tone} /><span><strong>{stageMeta[event.stage].label} <em>시도 {event.attempt}</em></strong><p>{event.detail}</p><small>{event.actor} · {relativeTime(event.occurredAt)}</small></span></div>)}</div>
+          <div className="timeline"><h3>활동 기록</h3>{run.events.map((event) => { const eventDisplay = eventMeta(event.status, event.workflowStage, run.workflow); return <div className="timeline-event" key={event.id}><i className={eventDisplay.tone} /><span><strong>{eventDisplay.label} <em>시도 {event.attempt}</em></strong><p>{event.detail}</p><small>{event.actor} · {relativeTime(event.occurredAt)}</small></span></div>; })}</div>
         </div>
         <footer><span>{needsAttention ? "실패 이력과 증거는 재시도 후에도 보존됩니다." : "Auto Hunt 실행 증거를 실시간으로 표시합니다."}</span><button><ArrowUpRight size={14} />로컬 저장소 열기</button></footer>
       </section>

@@ -48,6 +48,48 @@ struct AutoHuntConfig {
     linear_team: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     github_repository: Option<String>,
+    #[serde(default = "default_workflow")]
+    workflow: WorkflowConfig,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WorkflowConfig {
+    version: u8,
+    preset: String,
+    stages: Vec<WorkflowStageConfig>,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WorkflowStageConfig {
+    id: String,
+    label: String,
+    required: bool,
+}
+
+fn default_workflow() -> WorkflowConfig {
+    WorkflowConfig {
+        version: 1,
+        preset: "local".to_string(),
+        stages: vec![
+            WorkflowStageConfig {
+                id: "analyzing".to_string(),
+                label: "분석".to_string(),
+                required: true,
+            },
+            WorkflowStageConfig {
+                id: "implementing".to_string(),
+                label: "구현".to_string(),
+                required: true,
+            },
+            WorkflowStageConfig {
+                id: "local_qa".to_string(),
+                label: "로컬 검증".to_string(),
+                required: true,
+            },
+        ],
+    }
 }
 
 #[derive(Deserialize, Serialize)]
@@ -61,6 +103,8 @@ struct StoredAutoHuntConfig {
     linear: Option<StoredLinearConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     github_repository: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    workflow: Option<WorkflowConfig>,
     #[serde(flatten)]
     extra: BTreeMap<String, serde_json::Value>,
 }
@@ -89,6 +133,7 @@ impl From<AutoHuntConfig> for StoredAutoHuntConfig {
                 extra: BTreeMap::new(),
             }),
             github_repository: config.github_repository,
+            workflow: Some(config.workflow),
             extra: BTreeMap::new(),
         }
     }
@@ -940,6 +985,7 @@ mod tests {
                 linear_source: None,
                 linear_team: None,
                 github_repository: None,
+                workflow: default_workflow(),
             },
         )
         .expect("connection should be saved");
@@ -965,6 +1011,16 @@ mod tests {
         assert_eq!(saved["projects"][1]["id"], "new-project");
         assert_eq!(saved["projects"][1]["repositoryPath"], "/new/repository");
         assert_eq!(saved["projects"][1]["autoHunt"]["linear"]["enabled"], false);
+        assert_eq!(
+            saved["projects"][1]["autoHunt"]["workflow"]["preset"],
+            "local"
+        );
+        assert_eq!(
+            saved["projects"][1]["autoHunt"]["workflow"]["stages"]
+                .as_array()
+                .map(Vec::len),
+            Some(3)
+        );
         assert!(saved["projects"][1]["autoHunt"]["linearEnabled"].is_null());
 
         fs::remove_dir_all(directory).expect("test config directory should be removed");
@@ -1071,6 +1127,7 @@ mod tests {
                 linear_source: None,
                 linear_team: None,
                 github_repository: Some("wordbricks/briar".to_string()),
+                workflow: default_workflow(),
             },
         )
         .expect("connection should be saved");

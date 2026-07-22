@@ -6,6 +6,7 @@ import {
   FolderGit2,
   FolderOpen,
   Link2,
+  ListChecks,
   LogOut,
   RefreshCw,
 } from "lucide-react";
@@ -18,6 +19,13 @@ import type {
 import type { SessionUser } from "../types";
 import { JellySelect } from "./JellySelect";
 import { Logo } from "./Logo";
+import {
+  autoHuntWorkflowStageCatalog,
+  normalizeAutoHuntWorkflow,
+  workflowForPreset,
+  type AutoHuntWorkflowPreset,
+  type AutoHuntWorkflowStageId,
+} from "../lib/auto-hunt-contract";
 
 type Props = {
   canCancel?: boolean;
@@ -51,6 +59,12 @@ export function ProjectOnboarding({
   const [linearEnabled, setLinearEnabled] = useState(false);
   const [linearSource, setLinearSource] = useState("");
   const [linearTeam, setLinearTeam] = useState("");
+  const initialWorkflow = normalizeAutoHuntWorkflow(connection?.workflow);
+  const [workflowPreset, setWorkflowPreset] =
+    useState<AutoHuntWorkflowPreset>(initialWorkflow.preset);
+  const [workflowStageIds, setWorkflowStageIds] = useState<
+    AutoHuntWorkflowStageId[]
+  >(initialWorkflow.stages.map((stage) => stage.id));
 
   useEffect(() => {
     if (!velen || velenOrg) return;
@@ -83,6 +97,17 @@ export function ProjectOnboarding({
       linearEnabled,
       linearSource: linearEnabled ? linearSource || null : null,
       linearTeam: linearEnabled ? linearTeam || null : null,
+      workflow: {
+        version: 1,
+        preset: workflowPreset,
+        stages: autoHuntWorkflowStageCatalog
+          .filter((stage) => workflowStageIds.includes(stage.id))
+          .map((stage) => ({
+            id: stage.id,
+            label: stage.label,
+            required: true,
+          })),
+      },
     }).catch(() => undefined);
   };
 
@@ -115,6 +140,65 @@ export function ProjectOnboarding({
             </p>
 
             <div className="setup-grid">
+              <section className="setup-section">
+                <div className="setup-section-heading">
+                  <ListChecks size={18} />
+                  <div>
+                    <strong>진행 워크플로</strong>
+                    <span>이 저장소에 실제로 존재하는 검증·배포 단계만 선택하세요.</span>
+                  </div>
+                </div>
+                <div className="settings-fields single-field">
+                  <label>
+                    <span>프리셋</span>
+                    <JellySelect
+                      label="Auto Hunt 워크플로"
+                      options={[
+                        { label: "로컬 개발 · 배포 없음", value: "local" },
+                        { label: "PR + CI 검증", value: "review" },
+                        { label: "Stage + Production 배포", value: "release" },
+                        { label: "조사·리서치", value: "research" },
+                        { label: "직접 구성", value: "custom" },
+                      ]}
+                      value={workflowPreset}
+                      onValueChange={(next) => {
+                        const preset = next as AutoHuntWorkflowPreset;
+                        setWorkflowPreset(preset);
+                        if (preset !== "custom") {
+                          setWorkflowStageIds(
+                            workflowForPreset(preset).stages.map((stage) => stage.id),
+                          );
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+                <div className="workflow-stage-picker" aria-label="워크플로 단계">
+                  {autoHuntWorkflowStageCatalog.map((stage) => {
+                    const selected = workflowStageIds.includes(stage.id);
+                    return (
+                      <button
+                        aria-pressed={selected}
+                        className={selected ? "selected" : ""}
+                        key={stage.id}
+                        onClick={() => {
+                          setWorkflowPreset("custom");
+                          setWorkflowStageIds((current) =>
+                            current.includes(stage.id)
+                              ? current.filter((id) => id !== stage.id)
+                              : [...current, stage.id],
+                          );
+                        }}
+                        type="button"
+                      >
+                        {selected ? <Check size={13} /> : null}
+                        {stage.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+
               <section className="setup-section">
                 <div className="setup-section-heading">
                   <FolderOpen size={18} />
@@ -201,14 +285,14 @@ export function ProjectOnboarding({
             {error ? <jelly-alert variant="rose" className="login-error">{error}</jelly-alert> : null}
             <button
               className="onboarding-primary-action"
-              disabled={loading || !velen || !velenOrg || (linearEnabled && !linearSource)}
+              disabled={loading || !velen || !velenOrg || workflowStageIds.length === 0 || (linearEnabled && !linearSource)}
               onClick={() => void connect()}
               type="button"
             >
               {loading ? "연결하는 중…" : "저장소 선택하고 Auto Hunt 연결"} <ArrowRight size={17} />
             </button>
             <p className="token-warning">
-              경로, Agent 토큰, Velen 설정은 이 컴퓨터의 Briar 설정에 자동 저장됩니다.
+              경로, Agent 토큰, Velen 설정과 워크플로는 이 컴퓨터의 Briar 설정에 자동 저장됩니다.
               터미널 명령은 필요 없습니다.
             </p>
           </>

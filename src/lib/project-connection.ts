@@ -1,4 +1,5 @@
 import { briarApiUrl } from "./api";
+import type { AutoHuntWorkflow } from "./auto-hunt-contract";
 
 export type VelenOrganization = { name: string; slug: string };
 export type VelenSource = {
@@ -45,6 +46,7 @@ export type LocalAutoHuntConfig = {
   linearSource?: string | null;
   linearTeam?: string | null;
   githubRepository?: string | null;
+  workflow: AutoHuntWorkflow;
 };
 
 const isTauri = () => "__TAURI_INTERNALS__" in window;

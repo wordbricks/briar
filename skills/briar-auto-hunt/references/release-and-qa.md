@@ -1,42 +1,23 @@
-# Review, release, and QA
+# Optional review, release, and QA stages
+
+Read the run workflow first. This reference applies only to review, CI, deployment, QA, or monitoring stages that are actually configured.
 
 ## Discover the repository adapter
 
-Auto Hunt is repository-agnostic. Derive commands and environments from the target repository instead of assuming Wordbricks:
+Read applicable `AGENTS.md`, manifests, CI workflows, deployment configuration, and existing scripts. Map each configured stage to a real repository action. Prefer existing commands and documented paths. Never create a staging or production environment merely to satisfy Auto Hunt.
 
-1. Read every applicable `AGENTS.md`.
-2. Inspect package/build manifests, CI workflows, deployment configuration, and existing release scripts.
-3. Identify the smallest relevant lint, typecheck, unit/integration test, build, staging deploy, production deploy, smoke check, and rollback commands.
-4. Prefer existing scripts and documented workflows. Do not create a new deployment path merely to finish the hunt.
+## Stage evidence
 
-If the repository has no production environment, define the real terminal environment with the user or record a blocker. Do not relabel a local check as production QA.
+- `reviewing`: review findings and their resolution.
+- `pr_open`: PR/review URL and checks started.
+- `local_qa`: focused checks plus the repository-required local suite.
+- `ci_qa`: actual CI run and result.
+- `staging_qa`: deployed staging target and behavior verification; then submit staging `qa-result`.
+- `production_qa`: deployed production target and behavior verification; then submit production `qa-result`.
+- `monitoring`: observation window, signals checked, and outcome.
 
-## Before review
-
-- Verify the original failure or requirement.
-- Run focused tests, then repository-required broader checks.
-- Inspect the diff for unrelated edits, secrets, generated artifacts, migrations, compatibility, and rollback risk.
-- Record the exact commands and results in the Briar detail/context.
-- Commit intentional files only.
-
-## Staging
-
-Record `staging_qa` only after the candidate exists in staging. Include target SHA/version and PR URL. Exercise the actual user-visible or system behavior, not only deployment health. Save concise evidence and submit the staging QA result.
-
-## Production
-
-Record `production_qa` only after the candidate exists in production. Verify deployment health and the changed behavior against production. Submit the production QA result. If monitoring has a natural stabilization window, observe it before completion.
+If a configured action is unavailable, record a blocker. If a stage is absent, skip it without ceremony.
 
 ## Completion summary
 
-Write a short file containing:
-
-- root cause or requested outcome;
-- implementation and relevant migration/config changes;
-- checks and review result;
-- staging target and QA evidence;
-- production target and QA evidence;
-- PR/release references;
-- rollback posture and remaining risks.
-
-Pass that file with `--result-summary-file` on the `completed` event.
+Summarize the requested outcome, implementation, evidence for every required configured stage, review/release references that apply, rollback posture, and remaining risks. Do not claim a deployment or environment that was not part of the snapshot workflow.
