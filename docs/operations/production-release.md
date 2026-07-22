@@ -76,6 +76,13 @@ create an archive and signature without granting Production authority. That
 private key is deleted with its validated temporary directory and is never a
 trusted release key.
 
+The checked-in base Tauri configuration contains a public-only development
+sentinel whose private key was destroyed and an endpoint that always returns
+404. This lets ordinary local builds initialize the updater without granting
+release authority. The Production workflow replaces both values with the
+offline-backed public key and stable endpoint; its preflight rejects a missing
+or malformed override.
+
 ## Verification
 
 ```sh
