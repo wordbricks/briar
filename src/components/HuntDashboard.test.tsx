@@ -9,7 +9,6 @@ import {
 } from "./HuntDashboard";
 
 const dashboardProps = {
-  demoMode: false,
   error: null,
   health: null,
   healthError: null,
@@ -25,7 +24,6 @@ const dashboardProps = {
   onRetryRun: async () => undefined,
   onCancelRun: async () => undefined,
   onRepair: () => undefined,
-  onRefresh: () => undefined,
   onSidebarOpen: () => undefined,
 };
 
@@ -62,6 +60,20 @@ describe("HuntDashboard", () => {
     );
 
     expect(markup).toContain("이슈 만들기");
+  });
+
+  it("uses the kanban as the full dashboard surface", () => {
+    const markup = renderToStaticMarkup(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={demoDashboard}
+      />,
+    );
+
+    expect(markup).toContain('class="queue-panel"');
+    expect(markup).toContain('class="kanban-board"');
+    expect(markup).not.toContain('class="page-heading"');
+    expect(markup).not.toContain('class="metric-grid"');
   });
 
   it("uses Jelly Select for issue priority and accepts image or video files", () => {
