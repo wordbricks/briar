@@ -10,9 +10,11 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "build:release": "bash scripts/with-release-env.sh bun run build && bash scripts/verify-release-config.sh",
     "check": "tsc --noEmit",
     "test": "vitest run",
     "tauri": "tauri",
+    "tauri:build:release": "bash scripts/with-release-env.sh bun run tauri build && bash scripts/verify-release-config.sh",
     "cli": "bun run src-cli/index.ts",
     "cli:build": "bun build src-cli/index.ts --target=bun --outfile dist-cli/briar.js",
     "cli:install": "bun run cli:build && sh scripts/install-cli.sh",

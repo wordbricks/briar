@@ -32,7 +32,7 @@ jobs:
       - name: Install locked dependencies
         run: bun install --frozen-lockfile
       - name: Build unsigned release candidate
-        run: bun run tauri build
+        run: bun run tauri:build:release
       - name: Package candidate and checksums
         run: scripts/package-macos-release.sh
       - name: Upload release artifact
