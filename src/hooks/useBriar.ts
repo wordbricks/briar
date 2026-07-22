@@ -5,6 +5,7 @@ import {
   createAgentToken,
   createIssue,
   createProject,
+  deleteProject as deleteRemoteProject,
   isApiConfigured,
   loadDashboard,
   loadIssueAttachment,
@@ -17,6 +18,7 @@ import {
 import { demoDashboard } from "../lib/demo-data";
 import {
   connectLocalProject,
+  disconnectLocalProject,
   inspectVelen,
   loadAutoHuntHealth,
   loadConnectedProjectIds,
@@ -108,6 +110,7 @@ export function useBriar() {
     useState<ProjectConnection | null>(null);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [isCreatingIssue, setIsCreatingIssue] = useState(false);
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const [recoveringRunId, setRecoveringRunId] = useState<string | null>(null);
   const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const [velen, setVelen] = useState<VelenInspection | null>(null);
@@ -360,6 +363,65 @@ export function useBriar() {
       }
     },
     [token],
+  );
+
+  const removeProject = useCallback(
+    async (projectId: string) => {
+      const project = projects.find((candidate) => candidate.id === projectId);
+      if (!project) throw new Error("삭제할 프로젝트가 없습니다.");
+      setDeletingProjectId(projectId);
+      setError(null);
+      try {
+        let localCleanupWarning: string | null = null;
+        if (!demoMode) {
+          if (!token) throw new Error("로그인이 필요합니다.");
+          await deleteRemoteProject(token, projectId);
+          try {
+            await disconnectLocalProject(projectId);
+          } catch (caught) {
+            localCleanupWarning =
+              caught instanceof Error ? caught.message : String(caught);
+          }
+        }
+
+        const remaining = projects.filter((candidate) => candidate.id !== projectId);
+        const deletedActiveProject = activeProjectId === projectId;
+        const nextActiveProject = deletedActiveProject
+          ? (remaining[0] ?? null)
+          : (remaining.find((candidate) => candidate.id === activeProjectId) ?? null);
+        setProjects(remaining);
+        setActiveProjectId(nextActiveProject?.id ?? null);
+        setProjectConnection(null);
+        if (deletedActiveProject) {
+          setDashboard(
+            demoMode && nextActiveProject
+              ? nextActiveProject.id === demoDashboard.project.id
+                ? demoDashboard
+                : emptyDashboard(nextActiveProject)
+              : null,
+          );
+          setHealth(null);
+          setHealthError(null);
+          if (!demoMode && token && nextActiveProject) {
+            try {
+              setDashboard(await loadDashboard(token, nextActiveProject.id));
+            } catch (caught) {
+              setError(caught instanceof Error ? caught.message : String(caught));
+            }
+          }
+        }
+        if (localCleanupWarning) {
+          setError(`프로젝트는 삭제했지만 로컬 연결 정리에 실패했습니다: ${localCleanupWarning}`);
+        }
+      } catch (caught) {
+        const message = caught instanceof Error ? caught.message : String(caught);
+        setError(message);
+        throw caught;
+      } finally {
+        setDeletingProjectId(null);
+      }
+    },
+    [activeProjectId, projects, token],
   );
 
   const connectProject = useCallback(async (autoHunt: LocalAutoHuntConfig) => {
@@ -635,6 +697,8 @@ export function useBriar() {
     cancelLogin,
     connectProject,
     dashboard,
+    deleteProject: removeProject,
+    deletingProjectId,
     demoMode,
     error,
     health,

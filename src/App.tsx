@@ -2,12 +2,19 @@ import { useState } from "react";
 import { HuntDashboard } from "./components/HuntDashboard";
 import { LoginScreen } from "./components/LoginScreen";
 import { ProjectOnboarding } from "./components/ProjectOnboarding";
+import { ProjectSettings } from "./components/ProjectSettings";
 import { Sidebar } from "./components/Sidebar";
 import { useBriar } from "./hooks/useBriar";
 
 export function App() {
   const briar = useBriar();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [activePage, setActivePage] = useState<"dashboard" | "project-settings">(
+    "dashboard",
+  );
+  const activeProject = briar.projects.find(
+    (project) => project.id === briar.activeProjectId,
+  );
 
   if (!briar.user) {
     return (
@@ -46,16 +53,38 @@ export function App() {
   return (
     <jelly-theme mode="light" className="app-shell">
       <Sidebar
+        activePage={activePage}
         activeProjectId={briar.activeProjectId}
         isOpen={isSidebarOpen}
         onAddProject={briar.startProjectCreation}
-        onProjectChange={briar.setActiveProjectId}
+        onDashboardOpen={() => setActivePage("dashboard")}
+        onProjectChange={(projectId) => {
+          briar.setActiveProjectId(projectId);
+          setActivePage("dashboard");
+        }}
+        onProjectSettings={(projectId) => {
+          briar.setActiveProjectId(projectId);
+          setActivePage("project-settings");
+        }}
         onLogout={() => void briar.logout()}
         onToggle={() => setIsSidebarOpen(false)}
         projects={briar.projects}
         user={briar.user}
       />
-      <HuntDashboard
+      {activePage === "project-settings" && activeProject ? (
+        <ProjectSettings
+          isDeleting={briar.deletingProjectId === briar.activeProjectId}
+          isSidebarOpen={isSidebarOpen}
+          onBack={() => setActivePage("dashboard")}
+          onDelete={async () => {
+            await briar.deleteProject(activeProject.id);
+            setActivePage("dashboard");
+          }}
+          onSidebarOpen={() => setIsSidebarOpen(true)}
+          project={activeProject}
+        />
+      ) : (
+        <HuntDashboard
         dashboard={briar.dashboard}
         demoMode={briar.demoMode}
         error={briar.error}
@@ -75,7 +104,8 @@ export function App() {
         onRepair={() => void briar.repairHealth()}
         onRefresh={() => void briar.refresh()}
         onSidebarOpen={() => setIsSidebarOpen(true)}
-      />
+        />
+      )}
     </jelly-theme>
   );
 }
