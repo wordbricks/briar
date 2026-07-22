@@ -88,7 +88,6 @@ export function App() {
       ) : (
         <HuntDashboard
         dashboard={briar.dashboard}
-        demoMode={briar.demoMode}
         error={briar.error}
         health={briar.health}
         healthError={briar.healthError}
@@ -104,7 +103,6 @@ export function App() {
         onRetryRun={briar.retryRun}
         onCancelRun={briar.cancelRun}
         onRepair={() => void briar.repairHealth()}
-        onRefresh={() => void briar.refresh()}
         onSidebarOpen={() => setIsSidebarOpen(true)}
         />
       )}

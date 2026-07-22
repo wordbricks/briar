@@ -1,7 +1,6 @@
 import {
   ArrowUpRight,
   Bot,
-  Check,
   ChevronRight,
   CircleAlert,
   Clock3,
@@ -54,7 +53,6 @@ type KanbanColumn = {
 
 export function HuntDashboard({
   dashboard,
-  demoMode,
   error,
   health,
   healthError,
@@ -70,11 +68,9 @@ export function HuntDashboard({
   onRetryRun,
   onCancelRun,
   onRepair,
-  onRefresh,
   onSidebarOpen,
 }: {
   dashboard: DashboardPayload | null;
-  demoMode: boolean;
   error: string | null;
   health: AutoHuntHealth | null;
   healthError: string | null;
@@ -90,7 +86,6 @@ export function HuntDashboard({
   onRetryRun: (runId: string) => Promise<unknown>;
   onCancelRun: (runId: string) => Promise<unknown>;
   onRepair: () => void;
-  onRefresh: () => void;
   onSidebarOpen: () => void;
 }) {
   const { t } = useI18n();
@@ -105,14 +100,6 @@ export function HuntDashboard({
   const activeCount = runs.filter((run) => !["completed", "cancelled"].includes(run.status)).length;
   const attentionCount = runs.filter((run) => ["blocked", "failed"].includes(run.status)).length;
   const completedCount = runs.filter((run) => run.status === "completed").length;
-  const average = activeCount
-    ? Math.round(
-        runs
-          .filter((run) => !["completed", "cancelled"].includes(run.status))
-          .reduce((sum, run) => sum + run.progress, 0) / activeCount,
-      )
-    : 0;
-
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     return runs.filter((run) => {
@@ -183,30 +170,9 @@ export function HuntDashboard({
         />
       </header>
       <div className="dashboard-scroll">
-        <section className="page-heading">
-          <div>
-            <div className="heading-line">
-              <p className="eyebrow">{t("dashboard.eyebrow")}</p>
-              {demoMode && <span className="demo-badge">{t("dashboard.demo")}</span>}
-            </div>
-            <h1>{t("dashboard.title")}</h1>
-            <p>{t("dashboard.description")}</p>
-          </div>
-          <jelly-button className="refresh-button" onClick={onRefresh} size="small" variant="white">
-            <RefreshCw size={15} />{t("dashboard.refresh")}
-          </jelly-button>
-        </section>
-
         {error && <div className="error-banner"><CircleAlert size={16} />{error}</div>}
 
-        <section className="metric-grid">
-          <Metric label={t("dashboard.active")} value={activeCount} note={t("dashboard.autoHuntTasks")} icon={<LoaderCircle size={18} />} tone="violet" />
-          <Metric label={t("dashboard.average")} value={`${average}%`} note={t("dashboard.activeBasis")} icon={<ActivityRing value={average} />} tone="blue" />
-          <Metric label={t("dashboard.attention")} value={attentionCount} note={t("dashboard.blockedOrFailed")} icon={<CircleAlert size={18} />} tone="rose" />
-          <Metric label={t("dashboard.completed")} value={completedCount} note={t("dashboard.criteriaMet")} icon={<Check size={18} />} tone="emerald" />
-        </section>
-
-        <jelly-card className="queue-panel">
+        <section className="queue-panel">
           <div className="queue-header">
             <div>
               <h2>{t("dashboard.queue")}</h2>
@@ -256,7 +222,7 @@ export function HuntDashboard({
               </section>
             ))}
           </div>
-        </jelly-card>
+        </section>
       </div>
       {isIssueDialogOpen && (
         <CreateIssueDialog
@@ -559,14 +525,6 @@ function SelectedAttachment({
       <button aria-label={t("issue.remove", { name: file.name })} onClick={onRemove} type="button"><Trash2 size={14} /></button>
     </div>
   );
-}
-
-function Metric({ label, value, note, icon, tone }: { label: string; value: string | number; note: string; icon: React.ReactNode; tone: string }) {
-  return <jelly-card className={`metric-card ${tone}`}><div className="metric-icon">{icon}</div><div><span>{label}</span><strong>{value}</strong><small>{note}</small></div></jelly-card>;
-}
-
-function ActivityRing({ value }: { value: number }) {
-  return <span className="mini-ring" style={{ "--ring": `${value * 3.6}deg` } as React.CSSProperties} />;
 }
 
 function KanbanCard({ run, onOpen }: { run: HuntRun; onOpen: () => void }) {
