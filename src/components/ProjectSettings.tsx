@@ -16,12 +16,7 @@ import {
   type ApprovalPolicy,
 } from "../lib/project-llm";
 import type { DashboardPayload, Project } from "../types";
-
-const approvalPolicyDescriptions: Record<ApprovalPolicy, string> = {
-  untrusted: "신뢰된 읽기 명령 외의 작업을 실행하기 전에 승인을 요청합니다.",
-  "on-request": "Codex가 읽기 전용 경계를 넘어야 할 때 승인을 요청합니다.",
-  never: "승인 요청을 표시하지 않고 허용된 범위 안에서만 동작합니다.",
-};
+import { useI18n } from "../i18n";
 
 export function ProjectSettings({
   dashboard,
@@ -40,6 +35,7 @@ export function ProjectSettings({
   onSidebarOpen: () => void;
   project: Project;
 }) {
+  const { localeTag, t } = useI18n();
   const [isConfirming, setIsConfirming] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [approvalPolicy, setApprovalPolicy] = useState<ApprovalPolicy>("never");
@@ -126,10 +122,10 @@ export function ProjectSettings({
           <button
             aria-controls="app-sidebar"
             aria-expanded="false"
-            aria-label="왼쪽 패널 열기"
+            aria-label={t("sidebar.open")}
             className="sidebar-toggle"
             onClick={onSidebarOpen}
-            title="왼쪽 패널 열기"
+            title={t("sidebar.open")}
             type="button"
           >
             <PanelLeftOpen size={17} />
@@ -137,7 +133,7 @@ export function ProjectSettings({
         )}
         <button className="project-settings-back" onClick={onBack} type="button">
           <ArrowLeft size={16} strokeWidth={1.8} />
-          <span>자동사냥으로 돌아가기</span>
+          <span>{t("settings.back")}</span>
         </button>
       </header>
 
@@ -145,16 +141,16 @@ export function ProjectSettings({
         <div className="project-settings-content">
           <header className="project-settings-heading">
             <p className="eyebrow">PROJECT SETTINGS</p>
-            <h1>프로젝트 설정</h1>
-            <p>{project.name} 프로젝트의 연결과 데이터를 관리합니다.</p>
+            <h1>{t("settings.title")}</h1>
+            <p>{t("settings.description", { name: project.name })}</p>
           </header>
 
           <section className="project-settings-card">
             <div>
-              <span>프로젝트 이름</span>
+              <span>{t("settings.projectName")}</span>
               <strong>{project.name}</strong>
             </div>
-            <small>생성일 {new Date(project.createdAt).toLocaleDateString("ko-KR")}</small>
+            <small>{t("settings.created", { date: new Date(project.createdAt).toLocaleDateString(localeTag) })}</small>
           </section>
 
           <section className="project-settings-automation">
@@ -163,12 +159,12 @@ export function ProjectSettings({
                 <GitBranch size={18} strokeWidth={1.8} />
               </span>
               <span>
-                <strong>Auto Hunt 실행 워크플로</strong>
-                <small>단계별 증거와 검증 명령, 완료·릴리스 조건을 정의한 실행 계약입니다.</small>
+                <strong>{t("settings.workflowTitle")}</strong>
+                <small>{t("settings.workflowDescription")}</small>
               </span>
               {workflowContract ? (
                 <button
-                  aria-label="워크플로 JSON 복사"
+                  aria-label={t("settings.copyWorkflow")}
                   onClick={() => {
                     void navigator.clipboard.writeText(workflowJson).then(() => {
                       setWorkflowCopied(true);
@@ -178,20 +174,20 @@ export function ProjectSettings({
                   type="button"
                 >
                   {workflowCopied ? <Check size={14} /> : <Copy size={14} />}
-                  {workflowCopied ? "복사됨" : "JSON 복사"}
+                  {workflowCopied ? t("settings.copied") : t("settings.copyJson")}
                 </button>
               ) : null}
             </header>
             {workflowContract ? (
               <div className="project-workflow-contract">
                 <div>
-                  <span>저장소</span>
-                  <strong>{dashboard?.settings.githubRepository ?? "연결된 저장소 없음"}</strong>
+                  <span>{t("settings.repository")}</span>
+                  <strong>{dashboard?.settings.githubRepository ?? t("settings.noRepository")}</strong>
                 </div>
-                <pre aria-label="Auto Hunt 워크플로 JSON"><code>{workflowJson}</code></pre>
+                <pre aria-label={t("settings.workflowJson")}><code>{workflowJson}</code></pre>
               </div>
             ) : (
-              <p className="project-settings-empty">워크플로 정보를 불러오는 중입니다.</p>
+              <p className="project-settings-empty">{t("settings.loadingWorkflow")}</p>
             )}
           </section>
 
@@ -201,12 +197,12 @@ export function ProjectSettings({
                 <ShieldCheck size={18} strokeWidth={1.8} />
               </span>
               <span>
-                <strong>LLM 승인 정책</strong>
-                <small>이 프로젝트에서 시작하는 Codex App Server 대화에 적용됩니다.</small>
+                <strong>{t("settings.llmTitle")}</strong>
+                <small>{t("settings.llmDescription")}</small>
               </span>
             </header>
             <div className="project-settings-llm-control">
-              <label htmlFor="project-approval-policy">승인 요청</label>
+              <label htmlFor="project-approval-policy">{t("settings.approvalRequest")}</label>
               <select
                 disabled={settingsLoading || settingsSaving}
                 id="project-approval-policy"
@@ -215,9 +211,9 @@ export function ProjectSettings({
                 }
                 value={approvalPolicy}
               >
-                <option value="untrusted">신뢰하지 않은 명령만 묻기</option>
-                <option value="on-request">필요할 때 묻기</option>
-                <option value="never">묻지 않기</option>
+                <option value="untrusted">{t("settings.approvalUntrusted")}</option>
+                <option value="on-request">{t("settings.approvalOnRequest")}</option>
+                <option value="never">{t("settings.approvalNever")}</option>
               </select>
               <button
                 disabled={
@@ -234,13 +230,13 @@ export function ProjectSettings({
                   <Check size={14} />
                 ) : null}
                 {settingsSaving
-                  ? "저장 중"
+                  ? t("common.saving")
                   : approvalPolicy === savedApprovalPolicy
-                    ? "저장됨"
-                    : "저장"}
+                    ? t("common.saved")
+                    : t("common.save")}
               </button>
             </div>
-            <p>{approvalPolicyDescriptions[approvalPolicy]}</p>
+            <p>{t(approvalPolicy === "untrusted" ? "settings.approvalUntrustedDescription" : approvalPolicy === "on-request" ? "settings.approvalOnRequestDescription" : "settings.approvalNeverDescription")}</p>
             {settingsError && <p className="project-settings-llm-error">{settingsError}</p>}
           </section>
 
@@ -248,13 +244,13 @@ export function ProjectSettings({
             <div>
               <span className="danger-icon"><AlertTriangle size={18} strokeWidth={1.8} /></span>
               <span>
-                <strong>위험 영역</strong>
-                <small>프로젝트와 모든 Auto Hunt 기록을 영구적으로 삭제합니다.</small>
+                <strong>{t("settings.danger")}</strong>
+                <small>{t("settings.dangerDescription")}</small>
               </span>
             </div>
             <button onClick={() => setIsConfirming(true)} type="button">
               <Trash2 size={15} strokeWidth={1.8} />
-              프로젝트 삭제
+              {t("settings.deleteProject")}
             </button>
           </section>
         </div>
@@ -270,9 +266,9 @@ export function ProjectSettings({
             role="dialog"
           >
             <span className="delete-project-dialog-icon"><Trash2 size={20} strokeWidth={1.8} /></span>
-            <h2 id="delete-project-title">{project.name} 프로젝트를 삭제할까요?</h2>
+            <h2 id="delete-project-title">{t("settings.deleteTitle", { name: project.name })}</h2>
             <p id="delete-project-description">
-              프로젝트 설정과 Auto Hunt 기록이 모두 삭제되며 되돌릴 수 없습니다.
+              {t("settings.deleteDescription")}
             </p>
             {deleteError && <p className="delete-project-error">{deleteError}</p>}
             <footer>
@@ -282,7 +278,7 @@ export function ProjectSettings({
                 ref={cancelButtonRef}
                 type="button"
               >
-                취소
+                {t("common.cancel")}
               </button>
               <button
                 className="delete-project-confirm"
@@ -291,7 +287,7 @@ export function ProjectSettings({
                 type="button"
               >
                 {isDeleting ? <LoaderCircle className="spin" size={15} /> : <Trash2 size={15} />}
-                삭제하기
+                {t("settings.delete")}
               </button>
             </footer>
           </section>

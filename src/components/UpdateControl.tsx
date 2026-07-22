@@ -1,6 +1,7 @@
 import type { Update } from "@tauri-apps/plugin-updater";
 import { CircleAlert, Download, LoaderCircle, RefreshCw } from "lucide-react";
 import { useState } from "react";
+import { useI18n } from "../i18n";
 
 type UpdateStatus = "idle" | "checking" | "current" | "available" | "installing";
 
@@ -8,6 +9,7 @@ const isTauri = () =>
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 export function UpdateControl() {
+  const { t } = useI18n();
   const [status, setStatus] = useState<UpdateStatus>("idle");
   const [available, setAvailable] = useState<Update | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -43,22 +45,22 @@ export function UpdateControl() {
   };
 
   const feedback = error
-    ? `업데이트 확인 실패: ${error}`
+    ? t("update.failed", { error })
     : status === "current"
-      ? "최신 버전입니다."
+      ? t("update.current")
       : status === "available"
-        ? `v${available?.version} 업데이트 사용 가능 · 다시 눌러 설치`
+        ? t("update.available", { version: available?.version ?? "" })
         : status === "installing"
-          ? "업데이트를 설치하고 있습니다…"
+          ? t("update.installing")
           : status === "checking"
-            ? "업데이트를 확인하고 있습니다…"
+            ? t("update.checking")
             : null;
 
   const buttonLabel = status === "available"
-    ? `v${available?.version} 업데이트 설치`
+    ? t("update.install", { version: available?.version ?? "" })
     : status === "installing"
-      ? "업데이트 설치 중"
-      : "앱 업데이트 확인";
+      ? t("update.installingLabel")
+      : t("update.check");
 
   const runUpdateAction = () => {
     if (status === "available") return installUpdate();

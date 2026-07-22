@@ -1,5 +1,6 @@
 import { ArrowUpRight, LoaderCircle, X } from "lucide-react";
 import { Logo } from "./Logo";
+import { useI18n } from "../i18n";
 
 export function LoginScreen({
   error,
@@ -14,13 +15,14 @@ export function LoginScreen({
   onCancel: () => void;
   onLogin: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <main className="login-shell">
       <div className="login-glow" />
       <section className="login-card">
         {loginCode && (
           <button
-            aria-label="로그인 닫기"
+            aria-label={t("login.close")}
             className="login-close-button"
             onClick={onCancel}
             type="button"
@@ -30,28 +32,25 @@ export function LoginScreen({
         )}
         <Logo />
         <div className="login-copy">
-          <p className="eyebrow">AGENT DEVELOPMENT ENVIRONMENT</p>
-          <h1>에이전트의 작업을<br />한눈에 지켜보세요.</h1>
-          <p>
-            로컬 저장소에 Briar를 연결하면 Codex의 자동사냥 진행 상태가
-            실시간 대시보드에 기록됩니다.
-          </p>
+          <p className="eyebrow">{t("login.eyebrow")}</p>
+          <h1>{t("login.title").split("\n").map((line, index) => <span key={line}>{index > 0 ? <br /> : null}{line}</span>)}</h1>
+          <p>{t("login.description")}</p>
         </div>
         {loginCode ? (
           <div className="device-code-card">
-            <span>브라우저에서 로그인 후 이 코드를 승인하세요</span>
+            <span>{t("login.approveCode")}</span>
             <strong>{loginCode}</strong>
-            <small>승인을 기다리고 있습니다…</small>
+            <small>{t("login.waiting")}</small>
           </div>
         ) : (
           <button className="google-button" onClick={onLogin} disabled={loading}>
             {loading ? <LoaderCircle className="spin" size={18} /> : <GoogleIcon />}
-            Google로 계속하기
+            {t("login.continueGoogle")}
             <ArrowUpRight size={16} />
           </button>
         )}
         {error && <p className="login-error">{error}</p>}
-        <p className="login-footnote">로그인은 시스템 브라우저에서 안전하게 진행됩니다.</p>
+        <p className="login-footnote">{t("login.secure")}</p>
       </section>
     </main>
   );
