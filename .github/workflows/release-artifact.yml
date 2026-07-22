@@ -31,10 +31,22 @@ jobs:
           rustup default 1.96.0
       - name: Install locked dependencies
         run: bun install --frozen-lockfile
-      - name: Build unsigned release candidate
+      - name: Build ad-hoc-signed release candidate
         run: bun run tauri:build:release
       - name: Package candidate and checksums
         run: scripts/package-macos-release.sh
+      - name: Smoke-test isolated install and rollback
+        run: |
+          scripts/qa-macos-lifecycle.sh \
+            --previous-dir release-artifacts \
+            --candidate-dir release-artifacts \
+            --allow-same-version \
+            --evidence-file release-artifacts/lifecycle-evidence.json
+          (
+            cd release-artifacts
+            shasum -a 256 -- lifecycle-evidence.json >> SHA256SUMS
+            shasum -a 256 --check SHA256SUMS
+          )
       - name: Upload release artifact
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:

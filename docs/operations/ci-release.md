@@ -23,9 +23,11 @@ Any audit exception must be narrow, dated, and recorded in
 
 ## Release candidates
 
-Every push to `main` and every `v*` tag builds an unsigned macOS candidate. The
-workflow uploads the `.dmg`, a zipped `.app`, and `SHA256SUMS` for 30 days. A tag
-must exactly match the version in `src-tauri/tauri.conf.json`; matching tags also
+Every push to `main` and every `v*` tag builds an ad-hoc-signed macOS candidate.
+The workflow uploads the `.dmg`, a zipped `.app`, `release-manifest.json`, and
+`SHA256SUMS` for 30 days. The manifest binds the channel, previous version,
+target, commit, source commit timestamp, artifact sizes, and SHA-256 hashes. A tag must
+exactly match the version in `src-tauri/tauri.conf.json`; matching tags also
 create a draft GitHub release.
 
 The public API endpoint and disabled demo mode live in `config/release.env`.
@@ -39,11 +41,19 @@ Run the same packaging contract locally:
 bun run tauri:build:release
 scripts/package-macos-release.sh
 (cd release-artifacts && shasum -a 256 --check SHA256SUMS)
+bun run src-cli/release-manifest.ts verify --root release-artifacts
 ```
 
-Signing, notarization, updater signatures, and publication of a non-draft
-release remain Production gates. Do not distribute these unsigned Beta
-artifacts as a trusted public release.
+The release workflow then mounts the DMG into an isolated QA root, installs the
+app, replaces it with the candidate while retaining the previous bundle, and
+rolls back. Bundle identity, version, architecture, embedded Auto Hunt skill,
+signature completeness, and state-file hashes must all survive the cycle. The
+machine-readable lifecycle evidence is added to the artifact and checksum file. See
+[`rc-lifecycle.md`](rc-lifecycle.md) for the cross-version acceptance run.
+
+Developer ID signing, notarization, updater signatures, and publication of a
+non-draft release remain Production gates. Ad-hoc signing proves bundle
+integrity in CI but does not make an artifact trusted by Gatekeeper.
 
 ## Rollback
 
