@@ -6,9 +6,12 @@ import type { HuntEventInput } from "./db";
 import {
   assertQueuedHuntClaim,
   claimNextQueuedHuntRun,
+  createIssueAttachments,
+  getIssueAttachment,
   getNextQueuedHuntRun,
   HuntClaimError,
   HuntTransitionError,
+  listIssueAttachments,
   recoverHuntRun,
   recordHuntEvent,
   recordQaResult,
@@ -70,6 +73,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       "migrations/0003_generalize_auto_hunt.sql",
       "migrations/0004_auto_hunt_claims.sql",
       "migrations/0005_auto_hunt_recovery.sql",
+      "migrations/0006_issue_attachments.sql",
     ]) {
       await executeSql(db, await readFile(resolve(migration), "utf8"));
     }
@@ -215,6 +219,43 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       context_json:
         '{"origin":"briar-app","issueId":"22222222-2222-4222-8222-222222222222"}',
     });
+  });
+
+  it("stores issue attachment metadata scoped to its project and run", async () => {
+    const run = await getNextQueuedHuntRun(db, projectId);
+    expect(run).not.toBeNull();
+    const attachmentId = "66666666-6666-4666-8666-666666666666";
+    await createIssueAttachments(db, projectId, run!.id, [
+      {
+        id: attachmentId,
+        object_key: `issue-attachments/${projectId}/${run!.id}/${attachmentId}`,
+        filename: "screen.png",
+        content_type: "image/png",
+        byte_size: 2048,
+      },
+    ]);
+
+    expect(await listIssueAttachments(db, projectId, run!.id)).toEqual([
+      expect.objectContaining({
+        id: attachmentId,
+        run_id: run!.id,
+        project_id: projectId,
+        filename: "screen.png",
+        content_type: "image/png",
+        byte_size: 2048,
+      }),
+    ]);
+    expect(
+      await getIssueAttachment(db, projectId, run!.id, attachmentId),
+    ).toEqual(expect.objectContaining({ object_key: expect.stringContaining(attachmentId) }));
+    expect(
+      await getIssueAttachment(
+        db,
+        "99999999-9999-4999-8999-999999999999",
+        run!.id,
+        attachmentId,
+      ),
+    ).toBeNull();
   });
 
   it("returns the highest-priority oldest queued run", async () => {

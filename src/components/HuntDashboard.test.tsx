@@ -21,6 +21,7 @@ const dashboardProps = {
   isSidebarOpen: true,
   onCreateIssue: async () => undefined,
   onHealthRefresh: () => undefined,
+  onLoadAttachment: async () => new Blob(),
   onReconnect: () => undefined,
   onRetryRun: async () => undefined,
   onCancelRun: async () => undefined,
@@ -64,7 +65,7 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("이슈 만들기");
   });
 
-  it("uses Jelly Select for issue priority", () => {
+  it("uses Jelly Select for issue priority and accepts image or video files", () => {
     const markup = renderToStaticMarkup(
       <CreateIssueDialog
         isSubmitting={false}
@@ -75,6 +76,9 @@ describe("HuntDashboard", () => {
 
     expect(markup).toContain('<jelly-select class="issue-priority-select" label="우선순위"');
     expect(markup).not.toContain("<select");
+    expect(markup).toContain('type="file"');
+    expect(markup).toContain('aria-label="이미지 또는 영상 첨부"');
+    expect(markup).toContain("video/quicktime");
     expect(markup).toContain("생성 즉시 작업 큐");
   });
 
@@ -148,6 +152,7 @@ describe("HuntDashboard", () => {
         isRecovering={false}
         onCancel={async () => undefined}
         onClose={() => undefined}
+        onLoadAttachment={async () => new Blob()}
         onRetry={async () => undefined}
         run={failedRun}
       />,

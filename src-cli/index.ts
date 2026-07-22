@@ -419,6 +419,14 @@ async function autoHuntDoctor() {
   );
 }
 
+const queuedAttachmentSchema = z.object({
+  id: z.string().uuid(),
+  filename: z.string().min(1).max(255),
+  contentType: z.string().regex(/^(?:image|video)\//u),
+  byteSize: z.number().int().positive().max(20 * 1024 * 1024),
+  url: z.string().startsWith("/"),
+});
+
 const queuedIssueSchema = z.object({
   runId: z.string().uuid(),
   runNumber: z.number().int().positive(),
@@ -431,12 +439,55 @@ const queuedIssueSchema = z.object({
   repository: z.string().min(1),
   sourceCreatedAt: z.string().datetime({ offset: true }).nullable(),
   context: z.record(z.string(), z.unknown()).nullable(),
+  attachments: z.array(queuedAttachmentSchema).max(5).default([]),
   claimToken: z.string().startsWith("briar_claim_"),
   claimedBy: z.string().min(1),
   claimedAt: z.string().datetime({ offset: true }),
   leaseExpiresAt: z.string().datetime({ offset: true }),
   claimAttempts: z.number().int().positive(),
 });
+
+function safeAttachmentFilename(filename: string) {
+  const normalized = filename
+    .normalize("NFC")
+    .replace(/[^\p{L}\p{N}._-]+/gu, "_")
+    .replace(/^\.+/u, "")
+    .slice(-120);
+  return normalized || "attachment";
+}
+
+async function downloadClaimAttachment(
+  apiUrl: string,
+  token: string,
+  projectId: string,
+  runId: string,
+  attachment: z.infer<typeof queuedAttachmentSchema>,
+) {
+  const expectedPrefix = `/projects/${projectId}/runs/${runId}/attachments/`;
+  if (!attachment.url.startsWith(expectedPrefix)) {
+    throw new Error("Attachment URL does not belong to the claimed issue");
+  }
+  const response = await fetch(
+    `${apiUrl.replace(/\/$/u, "")}${attachment.url}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!response.ok) {
+    throw new Error(`Attachment download failed (${response.status})`);
+  }
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (bytes.byteLength !== attachment.byteSize) {
+    throw new Error("Attachment size did not match its metadata");
+  }
+  const directory = join(configDirectory, "attachments", runId);
+  await mkdir(directory, { recursive: true, mode: 0o700 });
+  const path = join(
+    directory,
+    `${attachment.id}-${safeAttachmentFilename(attachment.filename)}`,
+  );
+  await writeFile(path, bytes, { mode: 0o600 });
+  await chmod(path, 0o600);
+  return path;
+}
 
 async function nextHunt() {
   const config = await loadConfig();
@@ -464,6 +515,7 @@ async function nextHunt() {
     return;
   }
   const issue = queuedIssueSchema.parse(result.issue);
+  const agentToken = process.env.BRIAR_AGENT_TOKEN ?? project.agentToken;
   config.projects = config.projects.map((candidate) =>
     candidate.id === project.id
       ? {
@@ -478,10 +530,33 @@ async function nextHunt() {
       : candidate,
   );
   await saveConfig(config);
+  const attachments = await Promise.all(
+    issue.attachments.map(async (attachment) => {
+      try {
+        return {
+          ...attachment,
+          localPath: await downloadClaimAttachment(
+            config.apiUrl,
+            agentToken,
+            project.id,
+            issue.runId,
+            attachment,
+          ),
+          downloadError: null,
+        };
+      } catch (error) {
+        return {
+          ...attachment,
+          localPath: null,
+          downloadError: error instanceof Error ? error.message : String(error),
+        };
+      }
+    }),
+  );
   const { claimToken: _claimToken, ...publicIssue } = issue;
   console.log(
     JSON.stringify({
-      issue: publicIssue,
+      issue: { ...publicIssue, attachments },
     }),
   );
 }

@@ -26,6 +26,10 @@
     {
       "binding": "RELEASES",
       "bucket_name": "briar-releases"
+    },
+    {
+      "binding": "ATTACHMENTS",
+      "bucket_name": "briar-attachments"
     }
   ],
   "secrets": {

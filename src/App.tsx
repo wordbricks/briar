@@ -68,6 +68,7 @@ export function App() {
         isSidebarOpen={isSidebarOpen}
         onCreateIssue={briar.addIssue}
         onHealthRefresh={() => void briar.refreshHealth()}
+        onLoadAttachment={briar.readIssueAttachment}
         onReconnect={briar.reconnectProject}
         onRetryRun={briar.retryRun}
         onCancelRun={briar.cancelRun}

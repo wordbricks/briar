@@ -17,6 +17,21 @@ export type TrackerReference = {
   state: string | null;
 };
 
+export type IssueAttachment = {
+  id: string;
+  filename: string;
+  contentType: string;
+  byteSize: number;
+  url: string;
+};
+
+export type CreateIssueInput = {
+  title: string;
+  description: string | null;
+  priority: number | null;
+  attachments: File[];
+};
+
 export type HuntEvent = {
   id: string;
   attempt: number;
@@ -47,6 +62,7 @@ export type HuntRun = {
   commitSha: string | null;
   tracker: TrackerReference | null;
   issueDescription: string | null;
+  attachments: IssueAttachment[];
   resultSummary: string | null;
   pullRequestUrls: string[];
   targetSha: string | null;
