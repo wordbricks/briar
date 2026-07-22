@@ -308,10 +308,33 @@ export function CreateIssueDialog({
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  const addAttachments = (selected: File[]) => {
+    if (selected.length === 0) return;
+    const next = [...attachments, ...selected];
+    const error = validateIssueAttachments(next);
+    setAttachmentError(error);
+    if (!error) setAttachments(next);
+  };
+
   return (
     <div className="dialog-backdrop" onMouseDown={(event) => event.target === event.currentTarget && !isSubmitting && onClose()}>
       <form
         className="issue-dialog"
+        onPaste={(event) => {
+          const items = Array.from(event.clipboardData.items);
+          const pastedImages = items
+            .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+            .map((item) => item.getAsFile())
+            .filter((file): file is File => file !== null);
+          const images = pastedImages.length > 0
+            ? pastedImages
+            : Array.from(event.clipboardData.files).filter((file) =>
+                file.type.startsWith("image/"),
+              );
+          if (images.length === 0) return;
+          event.preventDefault();
+          addAttachments(images);
+        }}
         onSubmit={(event) => {
           event.preventDefault();
           if (!title.trim() || isSubmitting) return;
@@ -343,11 +366,11 @@ export function CreateIssueDialog({
             <textarea maxLength={100000} onChange={(event) => setDescription(event.target.value)} placeholder="문제, 기대 결과, 참고할 맥락을 적어주세요" rows={6} value={description} />
           </label>
           <div className="issue-attachment-field">
-            <span>이미지·영상 <em>선택</em></span>
+            <span>이미지·영상 <em>선택 또는 붙여넣기</em></span>
             <label className="issue-attachment-button">
               <Paperclip size={15} />
-              <span>파일 추가</span>
-              <small>최대 5개 · 전체 25MB</small>
+              <span>파일 선택</span>
+              <small>이미지는 ⌘V · 최대 5개 · 전체 25MB</small>
               <input
                 accept={issueAttachmentAccept}
                 aria-label="이미지 또는 영상 첨부"
@@ -356,11 +379,7 @@ export function CreateIssueDialog({
                 onChange={(event) => {
                   const selected = Array.from(event.currentTarget.files ?? []);
                   event.currentTarget.value = "";
-                  if (selected.length === 0) return;
-                  const next = [...attachments, ...selected];
-                  const error = validateIssueAttachments(next);
-                  setAttachmentError(error);
-                  if (!error) setAttachments(next);
+                  addAttachments(selected);
                 }}
                 type="file"
               />
