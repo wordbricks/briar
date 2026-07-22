@@ -22,6 +22,12 @@
       "migrations_dir": "migrations"
     }
   ],
+  "r2_buckets": [
+    {
+      "binding": "RELEASES",
+      "bucket_name": "briar-releases"
+    }
+  ],
   "secrets": {
     "required": [
       "BETTER_AUTH_SECRET",

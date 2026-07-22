@@ -31,7 +31,13 @@ jobs:
       - name: Run regression tests
         run: bun run test
       - name: Check release lifecycle script syntax
-        run: bash -n scripts/package-macos-release.sh scripts/qa-macos-lifecycle.sh
+        run: |
+          bash -n \
+            scripts/import-apple-signing-assets.sh \
+            scripts/package-macos-release.sh \
+            scripts/package-production-release.sh \
+            scripts/qa-production-updater-build.sh \
+            scripts/qa-macos-lifecycle.sh
       - name: Build app assets
         run: bun run build
       - name: Verify production-configured app assets

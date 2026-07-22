@@ -4,7 +4,6 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    tags: ["v*"]
 
 permissions:
   contents: read
@@ -31,8 +30,8 @@ jobs:
           rustup default 1.96.0
       - name: Install locked dependencies
         run: bun install --frozen-lockfile
-      - name: Build ad-hoc-signed release candidate
-        run: bun run tauri:build:release
+      - name: Build ad-hoc-signed release candidate with ephemeral updater trust
+        run: scripts/qa-production-updater-build.sh
       - name: Package candidate and checksums
         run: scripts/package-macos-release.sh
       - name: Smoke-test isolated install and rollback
@@ -54,27 +53,3 @@ jobs:
           path: release-artifacts/*
           if-no-files-found: error
           retention-days: 30
-
-  publish-tag:
-    name: Draft tagged release
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: build-macos
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: write
-    steps:
-      - name: Download verified build artifact
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
-        with:
-          name: briar-macos-${{ github.sha }}
-          path: release-artifacts
-      - name: Create draft GitHub release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release create "${GITHUB_REF_NAME}" release-artifacts/* \
-            --repo "${GITHUB_REPOSITORY}" \
-            --draft \
-            --generate-notes \
-            --title "Briar ${GITHUB_REF_NAME}"
