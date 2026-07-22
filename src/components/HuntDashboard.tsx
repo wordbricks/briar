@@ -44,7 +44,13 @@ import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
 
 type SourceFilter = "all" | HuntSource;
-type StatusFilter = "active" | "attention" | "completed";
+type StatusFilter = "all" | "active" | "attention" | "completed";
+type KanbanColumn = {
+  id: string;
+  label: string;
+  tone: string;
+  runs: HuntRun[];
+};
 
 export function HuntDashboard({
   dashboard,
@@ -90,7 +96,7 @@ export function HuntDashboard({
   const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [source, setSource] = useState<SourceFilter>("all");
-  const [status, setStatus] = useState<StatusFilter>("active");
+  const [status, setStatus] = useState<StatusFilter>("all");
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [isIssueDialogOpen, setIsIssueDialogOpen] = useState(false);
 
@@ -117,6 +123,38 @@ export function HuntDashboard({
       return !normalized || `${run.title} ${run.sourceKey} ${run.repository}`.toLowerCase().includes(normalized);
     });
   }, [query, runs, source, status]);
+
+  const kanbanColumns = useMemo<KanbanColumn[]>(() => {
+    const workflow = dashboard?.settings.workflow;
+    const workflowStages = workflow?.stages ?? [];
+    const definitions = [
+      { id: "queued", label: t("status.queued"), tone: "slate" },
+      ...workflowStages.map((stage) => ({
+        id: `stage:${stage.id}`,
+        label: localizeWorkflowStage(t, stage.id, stage.label),
+        tone: runMeta("running", stage.id, workflow).tone,
+      })),
+      { id: "attention", label: t("dashboard.attention"), tone: "rose" },
+      { id: "completed", label: t("dashboard.completed"), tone: "emerald" },
+    ];
+    const visibleDefinitions = definitions.filter((column) => {
+      if (status === "active") return column.id !== "completed";
+      if (status === "attention") return column.id === "attention";
+      if (status === "completed") return column.id === "completed";
+      return true;
+    });
+    const grouped = new Map(
+      visibleDefinitions.map((column) => [column.id, [] as HuntRun[]]),
+    );
+    for (const run of filtered) {
+      const columnId = kanbanColumnForRun(run, workflowStages.map((stage) => stage.id));
+      grouped.get(columnId)?.push(run);
+    }
+    return visibleDefinitions.map((column) => ({
+      ...column,
+      runs: grouped.get(column.id) ?? [],
+    }));
+  }, [dashboard?.settings.workflow, filtered, status, t]);
 
   return (
     <main className="main-content" id="dashboard">
@@ -189,15 +227,34 @@ export function HuntDashboard({
             </div>
           </div>
           <div className="status-tabs">
+            <button className={status === "all" ? "active" : ""} onClick={() => setStatus("all")}>{t("dashboard.all")} <span>{runs.length}</span></button>
             <button className={status === "active" ? "active" : ""} onClick={() => setStatus("active")}>{t("dashboard.active")} <span>{activeCount}</span></button>
             <button className={status === "attention" ? "active" : ""} onClick={() => setStatus("attention")}>{t("dashboard.attention")} <span>{attentionCount}</span></button>
             <button className={status === "completed" ? "active" : ""} onClick={() => setStatus("completed")}>{t("dashboard.completed")} <span>{completedCount}</span></button>
           </div>
-          <div className="queue-table">
-            <div className="queue-table-head"><span>{t("dashboard.task")}</span><span>{t("dashboard.status")}</span><span>{t("dashboard.progress")}</span><span>{t("dashboard.updated")}</span><span /></div>
-            {filtered.length ? filtered.map((run) => <RunRow key={run.id} run={run} onOpen={() => setSelectedRunId(run.id)} />) : (
-              <div className="empty-state"><Bot size={25} /><strong>{t("dashboard.emptyTitle")}</strong><span>{t("dashboard.emptyDescription")}</span></div>
-            )}
+          <div aria-label={t("dashboard.kanbanBoard")} className="kanban-board">
+            {kanbanColumns.map((column) => (
+              <section className={`kanban-column ${column.tone}`} key={column.id}>
+                <header>
+                  <span><i aria-hidden="true" />{column.label}</span>
+                  <strong>{column.runs.length}</strong>
+                </header>
+                <div>
+                  {column.runs.length ? column.runs.map((run) => (
+                    <KanbanCard
+                      key={run.id}
+                      onOpen={() => setSelectedRunId(run.id)}
+                      run={run}
+                    />
+                  )) : (
+                    <div className="kanban-column-empty">
+                      <Bot size={18} />
+                      <span>{t("dashboard.columnEmpty")}</span>
+                    </div>
+                  )}
+                </div>
+              </section>
+            ))}
           </div>
         </jelly-card>
       </div>
@@ -512,7 +569,7 @@ function ActivityRing({ value }: { value: number }) {
   return <span className="mini-ring" style={{ "--ring": `${value * 3.6}deg` } as React.CSSProperties} />;
 }
 
-function RunRow({ run, onOpen }: { run: HuntRun; onOpen: () => void }) {
+function KanbanCard({ run, onOpen }: { run: HuntRun; onOpen: () => void }) {
   const { t } = useI18n();
   const meta = runMeta(run.status, run.workflowStage, run.workflow);
   const label = localizeStatus(t, run.status, run.workflowStage, meta.label);
@@ -521,12 +578,30 @@ function RunRow({ run, onOpen }: { run: HuntRun; onOpen: () => void }) {
     Boolean(run.leaseExpiresAt) &&
     Date.parse(run.leaseExpiresAt!) > Date.now();
   return (
-    <button className="run-row" onClick={onOpen}>
-      <span className="run-title-cell"><i className={`source-dot ${run.source}`} /><span><strong>{run.title}</strong><small>AH-{run.runNumber} · {run.repository}{isClaimed && <> · <em>{t("run.assigned", { agent: run.claimedBy ?? "agent" })}</em></>}</small></span></span>
-      <span><i className={`status-pill ${meta.tone}`}>{run.status === "running" && <LoaderCircle className="spin" size={12} />}{label}</i></span>
-      <span className="progress-cell"><span><i style={{ width: `${run.progress}%` }} /></span><small>{run.progress}%</small></span>
-      <span className="time-cell">{relativeTime(run.updatedAt, t)}</span>
-      <span className="row-action"><ChevronRight size={16} /></span>
+    <button
+      aria-label={t("run.details", { title: run.title })}
+      className={`kanban-card ${meta.tone}`}
+      onClick={onOpen}
+      type="button"
+    >
+      <span className="kanban-card-kicker">
+        <small>AH-{run.runNumber}</small>
+        <i><span className={`source-dot ${run.source}`} />{t(`source.${run.source}` as MessageKey)}</i>
+      </span>
+      <strong>{run.title}</strong>
+      {(run.detail || run.issueDescription) && (
+        <p>{run.detail || run.issueDescription}</p>
+      )}
+      <span className="kanban-card-badges">
+        <i className={`status-pill ${meta.tone}`}>{run.status === "running" && <LoaderCircle className="spin" size={11} />}{label}</i>
+        <i className="kanban-progress">{run.progress}%</i>
+        {run.priority !== null && <i className="kanban-priority">P{run.priority}</i>}
+        {(run.attachments ?? []).length > 0 && <i><Paperclip size={11} />{run.attachments.length}</i>}
+      </span>
+      <span className="kanban-card-footer">
+        <small>{isClaimed ? t("run.assigned", { agent: run.claimedBy ?? "agent" }) : relativeTime(run.updatedAt, t)}</small>
+        <ChevronRight size={14} />
+      </span>
     </button>
   );
 }
@@ -672,6 +747,22 @@ function IssueAttachmentPreview({
 
 type Translate = ReturnType<typeof useI18n>["t"];
 const builtInStageIds = new Set(["analyzing", "planning", "implementing", "reviewing", "pr_open", "local_qa", "ci_qa", "staging_qa", "production_qa", "monitoring"]);
+
+function kanbanColumnForRun(run: HuntRun, workflowStageIds: string[]) {
+  if (["completed", "cancelled"].includes(run.status)) return "completed";
+  if (["blocked", "failed"].includes(run.status)) return "attention";
+  if (run.status === "queued") return "queued";
+  if (run.workflowStage && workflowStageIds.includes(run.workflowStage)) {
+    return `stage:${run.workflowStage}`;
+  }
+  return workflowStageIds[0] ? `stage:${workflowStageIds[0]}` : "queued";
+}
+
+function localizeWorkflowStage(t: Translate, stageId: string, fallback: string) {
+  return builtInStageIds.has(stageId)
+    ? t(`stage.${stageId}` as MessageKey)
+    : fallback;
+}
 
 function localizeStatus(t: Translate, status: HuntRun["status"], workflowStage: string | null, fallback: string) {
   if (status === "running" && workflowStage && builtInStageIds.has(workflowStage)) return t(`stage.${workflowStage}` as MessageKey);
