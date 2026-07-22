@@ -24,10 +24,12 @@ import {
   loadConnectedProjectIds,
   pickGitRepository,
   repairAutoHunt,
+  updateLocalProjectWorkflow,
   type AutoHuntHealth,
   type LocalAutoHuntConfig,
   type VelenInspection,
 } from "../lib/project-connection";
+import { generateProjectWorkflow } from "../lib/project-workflow";
 import {
   clearSessionToken,
   readSessionToken,
@@ -429,18 +431,34 @@ export function useBriar() {
     if (!token && !projectConnection.agentToken) throw new Error("로그인이 필요합니다.");
     setLoading(true);
     setError(null);
+    let connectedLocally = false;
     try {
       const repositoryPath = await pickGitRepository();
       if (!repositoryPath) return null;
       const agentToken =
         projectConnection.agentToken ??
         (await createAgentToken(token!, projectConnection.project.id)).agentToken;
+      if (!projectConnection.agentToken) {
+        setProjectConnection((current) =>
+          current?.project.id === projectConnection.project.id
+            ? { ...current, agentToken }
+            : current,
+        );
+      }
       const connected = await connectLocalProject({
         projectId: projectConnection.project.id,
         agentToken,
         repositoryPath,
         autoHunt,
       });
+      connectedLocally = true;
+      const generatedWorkflow = await generateProjectWorkflow(
+        projectConnection.project.id,
+      );
+      await updateLocalProjectWorkflow(
+        projectConnection.project.id,
+        generatedWorkflow,
+      );
       if (token) {
         await updateProjectSettings(token, projectConnection.project.id, {
           velenOrg: autoHunt.velenOrg,
@@ -451,7 +469,7 @@ export function useBriar() {
             teamKey: autoHunt.linearTeam ?? null,
           },
           githubRepository: autoHunt.githubRepository ?? null,
-          workflow: connected.workflow,
+          workflow: generatedWorkflow,
         });
       }
       setProjectConnection(null);
@@ -460,9 +478,19 @@ export function useBriar() {
       await refreshHealth();
       return connected.repositoryPath;
     } catch (caught) {
-      const message = caught instanceof Error ? caught.message : String(caught);
+      let message = caught instanceof Error ? caught.message : String(caught);
+      if (connectedLocally) {
+        try {
+          await disconnectLocalProject(projectConnection.project.id);
+        } catch (cleanupError) {
+          const cleanup = cleanupError instanceof Error
+            ? cleanupError.message
+            : String(cleanupError);
+          message = `${message} (임시 로컬 연결 정리 실패: ${cleanup})`;
+        }
+      }
       setError(message);
-      throw caught;
+      throw new Error(message);
     } finally {
       setLoading(false);
     }
@@ -497,6 +525,48 @@ export function useBriar() {
       workflow: dashboard?.settings.workflow,
     });
   }, [activeProjectId, dashboard?.settings.workflow, projects]);
+
+  const regenerateWorkflow = useCallback(
+    async (projectId: string) => {
+      if (demoMode) {
+        throw new Error("워크플로우 재생성은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
+      }
+      if (!token) throw new Error("로그인이 필요합니다.");
+      if (!dashboard || dashboard.project.id !== projectId) {
+        throw new Error("워크플로우를 갱신할 프로젝트 설정이 없습니다.");
+      }
+
+      const previousWorkflow = dashboard.settings.workflow;
+      const generatedWorkflow = await generateProjectWorkflow(projectId);
+      await updateLocalProjectWorkflow(projectId, generatedWorkflow);
+      try {
+        const result = await updateProjectSettings(token, projectId, {
+          ...dashboard.settings,
+          workflow: generatedWorkflow,
+        });
+        setDashboard((current) =>
+          current?.project.id === projectId
+            ? { ...current, settings: result.settings }
+            : current,
+        );
+      } catch (caught) {
+        try {
+          await updateLocalProjectWorkflow(projectId, previousWorkflow);
+        } catch (rollbackError) {
+          const cause = caught instanceof Error ? caught.message : String(caught);
+          const rollback = rollbackError instanceof Error
+            ? rollbackError.message
+            : String(rollbackError);
+          throw new Error(
+            `워크플로우 저장에 실패했고 로컬 설정도 복구하지 못했습니다: ${cause} (${rollback})`,
+          );
+        }
+        throw caught;
+      }
+      return generatedWorkflow;
+    },
+    [dashboard, token],
+  );
 
   const addIssue = useCallback(
     async (input: CreateIssueInput) => {
@@ -713,6 +783,7 @@ export function useBriar() {
     projects,
     projectConnection,
     reconnectProject,
+    regenerateWorkflow,
     recoveringRunId,
     recoveryError,
     refresh,

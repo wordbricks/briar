@@ -104,6 +104,20 @@ export async function disconnectLocalProject(projectId: string) {
   await invoke("disconnect_local_project", { projectId });
 }
 
+export async function updateLocalProjectWorkflow(
+  projectId: string,
+  workflow: AutoHuntWorkflow,
+) {
+  if (!isTauri()) {
+    throw new Error("워크플로우 갱신은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<AutoHuntWorkflow>("update_local_project_workflow", {
+    projectId,
+    workflow,
+  });
+}
+
 export async function inspectVelen(org?: string | null) {
   if (!isTauri()) {
     throw new Error("Velen 설정은 Briar 데스크톱 앱에서 사용할 수 있습니다.");

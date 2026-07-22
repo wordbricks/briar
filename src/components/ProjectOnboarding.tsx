@@ -20,11 +20,7 @@ import type { SessionUser } from "../types";
 import { JellySelect } from "./JellySelect";
 import { Logo } from "./Logo";
 import {
-  autoHuntWorkflowStageCatalog,
   normalizeAutoHuntWorkflow,
-  workflowForPreset,
-  type AutoHuntWorkflowPreset,
-  type AutoHuntWorkflowStageId,
 } from "../lib/auto-hunt-contract";
 import { useI18n } from "../i18n";
 
@@ -62,11 +58,6 @@ export function ProjectOnboarding({
   const [linearSource, setLinearSource] = useState("");
   const [linearTeam, setLinearTeam] = useState("");
   const initialWorkflow = normalizeAutoHuntWorkflow(connection?.workflow);
-  const [workflowPreset, setWorkflowPreset] =
-    useState<AutoHuntWorkflowPreset>(initialWorkflow.preset);
-  const [workflowStageIds, setWorkflowStageIds] = useState<
-    AutoHuntWorkflowStageId[]
-  >(initialWorkflow.stages.map((stage) => stage.id));
 
   useEffect(() => {
     if (!velen || velenOrg) return;
@@ -99,25 +90,7 @@ export function ProjectOnboarding({
       linearEnabled,
       linearSource: linearEnabled ? linearSource || null : null,
       linearTeam: linearEnabled ? linearTeam || null : null,
-      workflow: {
-        version: 1,
-        preset: workflowPreset,
-        stages: autoHuntWorkflowStageCatalog
-          .filter((stage) => workflowStageIds.includes(stage.id))
-          .map((stage) => ({
-            id: stage.id,
-            label: stage.label,
-            required: true,
-            ...(stage.evidence ? { evidence: [...stage.evidence] } : {}),
-            ...(stage.checks ? { checks: [...stage.checks] } : {}),
-          })),
-        completion: { requiredStages: workflowStageIds },
-        release: {
-          enabled: workflowStageIds.some((id) =>
-            ["staging_qa", "production_qa"].includes(id),
-          ),
-        },
-      },
+      workflow: initialWorkflow,
     }).catch(() => undefined);
   };
 
@@ -154,55 +127,6 @@ export function ProjectOnboarding({
                     <strong>{t("onboarding.workflow")}</strong>
                     <span>{t("onboarding.workflowDescription")}</span>
                   </div>
-                </div>
-                <div className="settings-fields single-field">
-                  <label>
-                    <span>{t("onboarding.preset")}</span>
-                    <JellySelect
-                      label={t("onboarding.workflowLabel")}
-                      options={[
-                        { label: t("onboarding.presetLocal"), value: "local" },
-                        { label: t("onboarding.presetReview"), value: "review" },
-                        { label: t("onboarding.presetRelease"), value: "release" },
-                        { label: t("onboarding.presetResearch"), value: "research" },
-                        { label: t("onboarding.presetCustom"), value: "custom" },
-                      ]}
-                      value={workflowPreset}
-                      onValueChange={(next) => {
-                        const preset = next as AutoHuntWorkflowPreset;
-                        setWorkflowPreset(preset);
-                        if (preset !== "custom") {
-                          setWorkflowStageIds(
-                            workflowForPreset(preset).stages.map((stage) => stage.id),
-                          );
-                        }
-                      }}
-                    />
-                  </label>
-                </div>
-                <div className="workflow-stage-picker" aria-label={t("onboarding.stages")}>
-                  {autoHuntWorkflowStageCatalog.map((stage) => {
-                    const selected = workflowStageIds.includes(stage.id);
-                    return (
-                      <button
-                        aria-pressed={selected}
-                        className={selected ? "selected" : ""}
-                        key={stage.id}
-                        onClick={() => {
-                          setWorkflowPreset("custom");
-                          setWorkflowStageIds((current) =>
-                            current.includes(stage.id)
-                              ? current.filter((id) => id !== stage.id)
-                              : [...current, stage.id],
-                          );
-                        }}
-                        type="button"
-                      >
-                        {selected ? <Check size={13} /> : null}
-                        {t(`stage.${stage.id}` as Parameters<typeof t>[0])}
-                      </button>
-                    );
-                  })}
                 </div>
               </section>
 
@@ -292,7 +216,7 @@ export function ProjectOnboarding({
             {error ? <jelly-alert variant="rose" className="login-error">{error}</jelly-alert> : null}
             <button
               className="onboarding-primary-action"
-              disabled={loading || !velen || !velenOrg || workflowStageIds.length === 0 || (linearEnabled && !linearSource)}
+              disabled={loading || !velen || !velenOrg || (linearEnabled && !linearSource)}
               onClick={() => void connect()}
               type="button"
             >

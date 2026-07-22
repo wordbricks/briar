@@ -6,6 +6,7 @@ import {
   GitBranch,
   LoaderCircle,
   PanelLeftOpen,
+  RefreshCw,
   ShieldCheck,
   Trash2,
 } from "lucide-react";
@@ -24,6 +25,7 @@ export function ProjectSettings({
   isSidebarOpen,
   onBack,
   onDelete,
+  onRegenerateWorkflow,
   onSidebarOpen,
   project,
 }: {
@@ -32,6 +34,7 @@ export function ProjectSettings({
   isSidebarOpen: boolean;
   onBack: () => void;
   onDelete: () => Promise<unknown>;
+  onRegenerateWorkflow: () => Promise<unknown>;
   onSidebarOpen: () => void;
   project: Project;
 }) {
@@ -45,6 +48,9 @@ export function ProjectSettings({
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [workflowCopied, setWorkflowCopied] = useState(false);
+  const [isRegeneratingWorkflow, setIsRegeneratingWorkflow] = useState(false);
+  const [workflowError, setWorkflowError] = useState<string | null>(null);
+  const [workflowRegenerated, setWorkflowRegenerated] = useState(false);
   const cancelButtonRef = useRef<HTMLButtonElement | null>(null);
   const workflow = dashboard?.settings.workflow ?? null;
   const workflowContract = workflow
@@ -61,6 +67,8 @@ export function ProjectSettings({
 
   useEffect(() => {
     let cancelled = false;
+    setWorkflowError(null);
+    setWorkflowRegenerated(false);
     setSettingsLoading(true);
     setSettingsError(null);
     void loadProjectLlmSettings(project.id)
@@ -115,6 +123,20 @@ export function ProjectSettings({
     }
   };
 
+  const regenerateWorkflow = async () => {
+    setIsRegeneratingWorkflow(true);
+    setWorkflowError(null);
+    setWorkflowRegenerated(false);
+    try {
+      await onRegenerateWorkflow();
+      setWorkflowRegenerated(true);
+    } catch (caught) {
+      setWorkflowError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setIsRegeneratingWorkflow(false);
+    }
+  };
+
   return (
     <main className="main-content project-settings-page">
       <header className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region>
@@ -162,22 +184,51 @@ export function ProjectSettings({
                 <strong>{t("settings.workflowTitle")}</strong>
                 <small>{t("settings.workflowDescription")}</small>
               </span>
-              {workflowContract ? (
+              <div className="project-settings-automation-actions">
                 <button
-                  aria-label={t("settings.copyWorkflow")}
-                  onClick={() => {
-                    void navigator.clipboard.writeText(workflowJson).then(() => {
-                      setWorkflowCopied(true);
-                      window.setTimeout(() => setWorkflowCopied(false), 1_500);
-                    });
-                  }}
+                  disabled={isRegeneratingWorkflow || !workflowContract}
+                  onClick={() => void regenerateWorkflow()}
                   type="button"
                 >
-                  {workflowCopied ? <Check size={14} /> : <Copy size={14} />}
-                  {workflowCopied ? t("settings.copied") : t("settings.copyJson")}
+                  {isRegeneratingWorkflow ? (
+                    <LoaderCircle className="spin" size={14} />
+                  ) : (
+                    <RefreshCw size={14} />
+                  )}
+                  {isRegeneratingWorkflow
+                    ? t("settings.regeneratingWorkflow")
+                    : t("settings.regenerateWorkflow")}
                 </button>
-              ) : null}
+                {workflowContract ? (
+                  <button
+                    aria-label={t("settings.copyWorkflow")}
+                    onClick={() => {
+                      void navigator.clipboard.writeText(workflowJson).then(() => {
+                        setWorkflowCopied(true);
+                        window.setTimeout(() => setWorkflowCopied(false), 1_500);
+                      });
+                    }}
+                    type="button"
+                  >
+                    {workflowCopied ? <Check size={14} /> : <Copy size={14} />}
+                    {workflowCopied ? t("settings.copied") : t("settings.copyJson")}
+                  </button>
+                ) : null}
+              </div>
             </header>
+            <p className="project-settings-workflow-ai-note">
+              {t("settings.regenerateWorkflowDescription")}
+            </p>
+            <div aria-live="polite">
+              {workflowRegenerated ? (
+                <p className="project-settings-workflow-success">
+                  <Check size={13} />{t("settings.workflowRegenerated")}
+                </p>
+              ) : null}
+              {workflowError ? (
+                <p className="project-settings-workflow-error">{workflowError}</p>
+              ) : null}
+            </div>
             {workflowContract ? (
               <div className="project-workflow-contract">
                 <div>
