@@ -1,6 +1,6 @@
 [package]
 name = "briar"
-version = "0.3.0"
+version = "1.0.0"
 description = "Agent Development Environment"
 authors = ["Wordbricks"]
 edition = "2021"
@@ -20,3 +20,7 @@ tauri = { version = "2.11.5", features = [] }
 tauri-plugin-dialog = "2.7.2"
 tauri-plugin-opener = "2.5.4"
 which = "8.0.0"
+
+[target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
+tauri-plugin-process = "=2.3.1"
+tauri-plugin-updater = "=2.10.1"

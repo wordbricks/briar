@@ -55,6 +55,11 @@ Developer ID signing, notarization, updater signatures, and publication of a
 non-draft release remain Production gates. Ad-hoc signing proves bundle
 integrity in CI but does not make an artifact trusted by Gatekeeper.
 
+The complete fail-closed tag workflow, trust ceremony, R2 promotion order, and
+signed provenance contract are documented in
+[`production-release.md`](production-release.md). Incident response and SLOs
+live in [`incident-runbook.md`](incident-runbook.md).
+
 ## Rollback
 
 - Worker: redeploy a known-good main SHA or use `wrangler rollback`.

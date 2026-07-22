@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { JellySelect } from "./JellySelect";
+import { UpdateControl } from "./UpdateControl";
 import { sourceLabel, stageMeta } from "../lib/stages";
 import type { AutoHuntHealth } from "../lib/project-connection";
 import type { DashboardPayload, HuntRun, HuntSource } from "../types";
@@ -152,6 +153,8 @@ export function HuntDashboard({
           onRefresh={onHealthRefresh}
           onRepair={onRepair}
         />
+
+        <UpdateControl />
 
         <jelly-card className="queue-panel">
           <div className="queue-header">

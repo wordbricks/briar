@@ -32,6 +32,7 @@ import {
   type ProjectRow,
   type ProjectSettingsRow,
 } from "./db";
+import { serveRelease } from "./releases";
 
 const corsHeaders = {
   "Access-Control-Allow-Headers":
@@ -740,8 +741,15 @@ export default {
       return new Response(null, { headers: corsHeaders });
     }
     if (url.pathname === "/health") {
-      return json({ ok: true, service: "briar-api", database: "cloudflare-d1" });
+      return json({
+        ok: true,
+        service: "briar-api",
+        database: "cloudflare-d1",
+        updates: "cloudflare-r2",
+      });
     }
+    const releaseResponse = await serveRelease(request, env.RELEASES);
+    if (releaseResponse) return releaseResponse;
     if (url.pathname === "/brand/briar-icon.svg" && request.method === "GET") {
       return svgResponse(briarIconSvg);
     }
