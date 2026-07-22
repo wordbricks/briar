@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { JellySelect } from "./JellySelect";
-import { eventMeta, runMeta, sourceLabel } from "../lib/stages";
+import { eventMeta, runMeta } from "../lib/stages";
 import {
   formatAttachmentBytes,
   issueAttachmentAccept,
@@ -40,6 +40,8 @@ import type {
   HuntSource,
   IssueAttachment,
 } from "../types";
+import { useI18n } from "../i18n";
+import type { MessageKey } from "../i18n/messages";
 
 type SourceFilter = "all" | HuntSource;
 type StatusFilter = "active" | "attention" | "completed";
@@ -85,6 +87,7 @@ export function HuntDashboard({
   onRefresh: () => void;
   onSidebarOpen: () => void;
 }) {
+  const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [source, setSource] = useState<SourceFilter>("all");
   const [status, setStatus] = useState<StatusFilter>("active");
@@ -122,10 +125,10 @@ export function HuntDashboard({
           <button
             aria-controls="app-sidebar"
             aria-expanded="false"
-            aria-label="왼쪽 패널 열기"
+            aria-label={t("sidebar.open")}
             className="sidebar-toggle"
             onClick={onSidebarOpen}
-            title="왼쪽 패널 열기"
+            title={t("sidebar.open")}
             type="button"
           >
             <PanelLeftOpen size={17} />
@@ -145,55 +148,55 @@ export function HuntDashboard({
         <section className="page-heading">
           <div>
             <div className="heading-line">
-              <p className="eyebrow">AUTO HUNT OVERVIEW</p>
-              {demoMode && <span className="demo-badge">DEMO DATA</span>}
+              <p className="eyebrow">{t("dashboard.eyebrow")}</p>
+              {demoMode && <span className="demo-badge">{t("dashboard.demo")}</span>}
             </div>
-            <h1>자동사냥</h1>
-            <p>에이전트가 처리하는 작업의 흐름과 병목을 한눈에 확인하세요.</p>
+            <h1>{t("dashboard.title")}</h1>
+            <p>{t("dashboard.description")}</p>
           </div>
           <jelly-button className="refresh-button" onClick={onRefresh} size="small" variant="white">
-            <RefreshCw size={15} />새로고침
+            <RefreshCw size={15} />{t("dashboard.refresh")}
           </jelly-button>
         </section>
 
         {error && <div className="error-banner"><CircleAlert size={16} />{error}</div>}
 
         <section className="metric-grid">
-          <Metric label="진행 중" value={activeCount} note="자동사냥 작업" icon={<LoaderCircle size={18} />} tone="violet" />
-          <Metric label="평균 진행률" value={`${average}%`} note="진행 중 작업 기준" icon={<ActivityRing value={average} />} tone="blue" />
-          <Metric label="확인 필요" value={attentionCount} note="차단 또는 실패" icon={<CircleAlert size={18} />} tone="rose" />
-          <Metric label="완료" value={completedCount} note="프로젝트 기준 충족" icon={<Check size={18} />} tone="emerald" />
+          <Metric label={t("dashboard.active")} value={activeCount} note={t("dashboard.autoHuntTasks")} icon={<LoaderCircle size={18} />} tone="violet" />
+          <Metric label={t("dashboard.average")} value={`${average}%`} note={t("dashboard.activeBasis")} icon={<ActivityRing value={average} />} tone="blue" />
+          <Metric label={t("dashboard.attention")} value={attentionCount} note={t("dashboard.blockedOrFailed")} icon={<CircleAlert size={18} />} tone="rose" />
+          <Metric label={t("dashboard.completed")} value={completedCount} note={t("dashboard.criteriaMet")} icon={<Check size={18} />} tone="emerald" />
         </section>
 
         <jelly-card className="queue-panel">
           <div className="queue-header">
             <div>
-              <h2>작업 큐</h2>
-              <span>{filtered.length}개 작업</span>
+              <h2>{t("dashboard.queue")}</h2>
+              <span>{t("dashboard.taskCount", { count: filtered.length })}</span>
             </div>
             <div className="queue-tools">
               <button className="create-issue-button" onClick={() => setIsIssueDialogOpen(true)} type="button">
-                <Plus size={14} />이슈 만들기
+                <Plus size={14} />{t("dashboard.createIssue")}
               </button>
-              <label className="search-box"><Search size={15} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="작업 검색" /></label>
+              <label className="search-box"><Search size={15} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("dashboard.search")} /></label>
               <div className="source-filter">
                 {(["all", "issue", "feedback", "error"] as const).map((value) => (
                   <button key={value} className={source === value ? "active" : ""} onClick={() => setSource(value)}>
-                    {value === "all" ? "전체" : sourceLabel[value]}
+                    {value === "all" ? t("dashboard.all") : t(`source.${value}` as MessageKey)}
                   </button>
                 ))}
               </div>
             </div>
           </div>
           <div className="status-tabs">
-            <button className={status === "active" ? "active" : ""} onClick={() => setStatus("active")}>진행 중 <span>{activeCount}</span></button>
-            <button className={status === "attention" ? "active" : ""} onClick={() => setStatus("attention")}>확인 필요 <span>{attentionCount}</span></button>
-            <button className={status === "completed" ? "active" : ""} onClick={() => setStatus("completed")}>완료 <span>{completedCount}</span></button>
+            <button className={status === "active" ? "active" : ""} onClick={() => setStatus("active")}>{t("dashboard.active")} <span>{activeCount}</span></button>
+            <button className={status === "attention" ? "active" : ""} onClick={() => setStatus("attention")}>{t("dashboard.attention")} <span>{attentionCount}</span></button>
+            <button className={status === "completed" ? "active" : ""} onClick={() => setStatus("completed")}>{t("dashboard.completed")} <span>{completedCount}</span></button>
           </div>
           <div className="queue-table">
-            <div className="queue-table-head"><span>작업</span><span>상태</span><span>진행률</span><span>업데이트</span><span /></div>
+            <div className="queue-table-head"><span>{t("dashboard.task")}</span><span>{t("dashboard.status")}</span><span>{t("dashboard.progress")}</span><span>{t("dashboard.updated")}</span><span /></div>
             {filtered.length ? filtered.map((run) => <RunRow key={run.id} run={run} onOpen={() => setSelectedRunId(run.id)} />) : (
-              <div className="empty-state"><Bot size={25} /><strong>조건에 맞는 자동사냥 작업이 없습니다.</strong><span>필터를 변경하거나 새 작업이 기록될 때까지 기다려주세요.</span></div>
+              <div className="empty-state"><Bot size={25} /><strong>{t("dashboard.emptyTitle")}</strong><span>{t("dashboard.emptyDescription")}</span></div>
             )}
           </div>
         </jelly-card>
@@ -238,16 +241,17 @@ export function ConnectionHealth({
   onRefresh: () => void;
   onRepair: () => void;
 }) {
+  const { t } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const assetsNeedRepair =
     health && (!health.cliCurrent || !health.skillCurrent);
   const status = loading ? "loading" : health?.healthy ? "healthy" : "attention";
   const statusLabel = loading
-    ? "검사 중"
+    ? t("health.checking")
     : health?.healthy
-      ? "실행 준비 완료"
-      : "확인 필요";
+      ? t("health.ready")
+      : t("common.checkNeeded");
 
   useEffect(() => {
     if (!isOpen) return;
@@ -271,41 +275,41 @@ export function ConnectionHealth({
       <button
         aria-expanded={isOpen}
         aria-haspopup="dialog"
-        aria-label={`Auto Hunt 연결 상태: ${statusLabel}`}
+        aria-label={t("health.connectionStatus", { status: statusLabel })}
         className={`health-trigger ${status}`}
         onClick={() => setIsOpen((open) => !open)}
-        title={`Auto Hunt 연결 상태: ${statusLabel}`}
+        title={t("health.connectionStatus", { status: statusLabel })}
         type="button"
       >
         <span aria-hidden="true" />
       </button>
       {isOpen && (
         <div
-          aria-label="Auto Hunt 연결 상세"
+          aria-label={t("health.details")}
           className={`health-popover${health?.healthy ? " healthy" : ""}`}
           role="dialog"
         >
           <div className="health-header">
             <div>
               <span className="health-icon"><ShieldCheck size={16} /></span>
-              <span><strong>Auto Hunt 연결 상태</strong><small>{statusLabel}</small></span>
+              <span><strong>{t("health.title")}</strong><small>{statusLabel}</small></span>
             </div>
             <div className="health-actions">
-              {assetsNeedRepair && <button onClick={onRepair} type="button"><Wrench size={13} />CLI·스킬 복구</button>}
-              <button onClick={onReconnect} type="button"><FolderGit2 size={13} />저장소 재연결</button>
-              <button aria-label="연결 상태 다시 검사" disabled={loading} onClick={onRefresh} type="button"><RefreshCw className={loading ? "spin" : ""} size={13} /></button>
+              {assetsNeedRepair && <button onClick={onRepair} type="button"><Wrench size={13} />{t("health.repair")}</button>}
+              <button onClick={onReconnect} type="button"><FolderGit2 size={13} />{t("health.reconnect")}</button>
+              <button aria-label={t("health.recheck")} disabled={loading} onClick={onRefresh} type="button"><RefreshCw className={loading ? "spin" : ""} size={13} /></button>
             </div>
           </div>
           {error && <div className="health-error"><CircleAlert size={14} />{error}</div>}
           {health ? (
             <div className="health-grid">
-              <HealthItem healthy={health.repositoryHealthy} icon={<FolderGit2 size={15} />} label="저장소" value={health.repositoryPath ?? "연결 안 됨"} />
-              <HealthItem healthy={health.cliCurrent} icon={<Terminal size={15} />} label="Briar CLI" value={health.cliVersion ? `v${health.cliVersion}` : "설치 안 됨"} expected={`v${health.cliExpectedVersion}`} />
-              <HealthItem healthy={health.skillCurrent} icon={<Bot size={15} />} label="Auto Hunt 스킬" value={health.skillVersion ? `v${health.skillVersion}` : "설치 안 됨"} expected={`v${health.skillExpectedVersion}`} />
-              <HealthItem healthy={health.velenHealthy} icon={<ShieldCheck size={15} />} label="Velen" value={health.velenOrg ?? "조직 미설정"} expected={health.velenEmail ?? undefined} />
+              <HealthItem healthy={health.repositoryHealthy} icon={<FolderGit2 size={15} />} label={t("health.repository")} value={health.repositoryPath ?? t("common.notConnected")} />
+              <HealthItem healthy={health.cliCurrent} icon={<Terminal size={15} />} label="Briar CLI" value={health.cliVersion ? `v${health.cliVersion}` : t("common.notInstalled")} expected={`v${health.cliExpectedVersion}`} />
+              <HealthItem healthy={health.skillCurrent} icon={<Bot size={15} />} label={t("health.skill")} value={health.skillVersion ? `v${health.skillVersion}` : t("common.notInstalled")} expected={`v${health.skillExpectedVersion}`} />
+              <HealthItem healthy={health.velenHealthy} icon={<ShieldCheck size={15} />} label="Velen" value={health.velenOrg ?? t("health.orgUnset")} expected={health.velenEmail ?? undefined} />
             </div>
           ) : (
-            <div className="health-empty">{loading ? "로컬 Auto Hunt 환경을 검사하고 있습니다…" : "데스크톱 앱에서 연결 상태를 확인할 수 있습니다."}</div>
+            <div className="health-empty">{loading ? t("health.inspecting") : t("health.desktopOnly")}</div>
           )}
           {health && !health.healthy && health.issues.length > 0 && (
             <div className="health-issues">{health.issues.map((issue) => <span key={issue}><CircleAlert size={12} />{issue}</span>)}</div>
@@ -329,7 +333,8 @@ function HealthItem({
   label: string;
   value: string;
 }) {
-  return <div className="health-item"><i className={healthy ? "ok" : "warning"}>{icon}</i><span><small>{label}</small><strong title={value}>{value}</strong>{expected && <em>{expected}</em>}</span><b>{healthy ? "정상" : "확인 필요"}</b></div>;
+  const { t } = useI18n();
+  return <div className="health-item"><i className={healthy ? "ok" : "warning"}>{icon}</i><span><small>{label}</small><strong title={value}>{value}</strong>{expected && <em>{expected}</em>}</span><b>{healthy ? t("common.healthy") : t("common.checkNeeded")}</b></div>;
 }
 
 export function CreateIssueDialog({
@@ -341,6 +346,7 @@ export function CreateIssueDialog({
   onClose: () => void;
   onCreate: (input: CreateIssueInput) => Promise<void>;
 }) {
+  const { t } = useI18n();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("2");
@@ -390,30 +396,30 @@ export function CreateIssueDialog({
         }}
         role="dialog"
         aria-modal="true"
-        aria-label="새 Auto Hunt 이슈"
+        aria-label={t("issue.dialog")}
       >
         <header>
-          <div><p className="eyebrow">AUTO HUNT ISSUE</p><h2>이슈 만들기</h2></div>
-          <button disabled={isSubmitting} onClick={onClose} type="button" aria-label="닫기"><X size={18} /></button>
+          <div><p className="eyebrow">AUTO HUNT ISSUE</p><h2>{t("dashboard.createIssue")}</h2></div>
+          <button disabled={isSubmitting} onClick={onClose} type="button" aria-label={t("common.close")}><X size={18} /></button>
         </header>
         <div className="issue-form-body">
           <label>
-            <span>제목 <em>필수</em></span>
-            <input autoFocus maxLength={300} onChange={(event) => setTitle(event.target.value)} placeholder="Codex가 해결할 작업을 적어주세요" required value={title} />
+            <span>{t("issue.title")} <em>{t("common.required")}</em></span>
+            <input autoFocus maxLength={300} onChange={(event) => setTitle(event.target.value)} placeholder={t("issue.titlePlaceholder")} required value={title} />
           </label>
           <label>
-            <span>설명</span>
-            <textarea maxLength={100000} onChange={(event) => setDescription(event.target.value)} placeholder="문제, 기대 결과, 참고할 맥락을 적어주세요" rows={6} value={description} />
+            <span>{t("issue.description")}</span>
+            <textarea maxLength={100000} onChange={(event) => setDescription(event.target.value)} placeholder={t("issue.descriptionPlaceholder")} rows={6} value={description} />
           </label>
           <div className="issue-attachment-field">
-            <span>이미지·영상 <em>선택 또는 붙여넣기</em></span>
+            <span>{t("issue.attachments")} <em>{t("issue.pasteHint")}</em></span>
             <label className="issue-attachment-button">
               <Paperclip size={15} />
-              <span>파일 선택</span>
-              <small>이미지는 ⌘V · 최대 5개 · 전체 25MB</small>
+              <span>{t("issue.chooseFile")}</span>
+              <small>{t("issue.fileHint")}</small>
               <input
                 accept={issueAttachmentAccept}
-                aria-label="이미지 또는 영상 첨부"
+                aria-label={t("issue.attachmentLabel")}
                 disabled={isSubmitting || attachments.length >= maxIssueAttachmentCount}
                 multiple
                 onChange={(event) => {
@@ -443,24 +449,24 @@ export function CreateIssueDialog({
           </div>
           <JellySelect
             className="issue-priority-select"
-            label="우선순위"
+            label={t("issue.priority")}
             onValueChange={setPriority}
             options={[
-              { label: "P1 · 긴급", value: "1" },
-              { label: "P2 · 높음", value: "2" },
-              { label: "P3 · 보통", value: "3" },
-              { label: "P4 · 낮음", value: "4" },
+              { label: t("issue.priority1"), value: "1" },
+              { label: t("issue.priority2"), value: "2" },
+              { label: t("issue.priority3"), value: "3" },
+              { label: t("issue.priority4"), value: "4" },
             ]}
             value={priority}
           />
           {(submitError || attachmentError) && <div className="issue-form-error"><CircleAlert size={14} />{submitError ?? attachmentError}</div>}
-          <p>생성 즉시 작업 큐의 <strong>대기</strong> 상태로 등록됩니다.</p>
+          <p>{t("issue.queuedHint")}</p>
         </div>
         <footer>
-          <button disabled={isSubmitting} onClick={onClose} type="button">취소</button>
+          <button disabled={isSubmitting} onClick={onClose} type="button">{t("common.cancel")}</button>
           <button className="issue-submit-button" disabled={isSubmitting || !title.trim()} type="submit">
             {isSubmitting ? <LoaderCircle className="spin" size={14} /> : <Plus size={14} />}
-            {isSubmitting ? "등록 중" : "이슈 등록"}
+            {isSubmitting ? t("issue.submitting") : t("issue.submit")}
           </button>
         </footer>
       </form>
@@ -475,6 +481,7 @@ function SelectedAttachment({
   file: File;
   onRemove: () => void;
 }) {
+  const { t } = useI18n();
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   useEffect(() => {
     const url = URL.createObjectURL(file);
@@ -492,7 +499,7 @@ function SelectedAttachment({
         )}
       </span>
       <span><strong>{file.name}</strong><small>{formatAttachmentBytes(file.size)}</small></span>
-      <button aria-label={`${file.name} 제거`} onClick={onRemove} type="button"><Trash2 size={14} /></button>
+      <button aria-label={t("issue.remove", { name: file.name })} onClick={onRemove} type="button"><Trash2 size={14} /></button>
     </div>
   );
 }
@@ -506,17 +513,19 @@ function ActivityRing({ value }: { value: number }) {
 }
 
 function RunRow({ run, onOpen }: { run: HuntRun; onOpen: () => void }) {
+  const { t } = useI18n();
   const meta = runMeta(run.status, run.workflowStage, run.workflow);
+  const label = localizeStatus(t, run.status, run.workflowStage, meta.label);
   const isClaimed =
     run.status === "queued" &&
     Boolean(run.leaseExpiresAt) &&
     Date.parse(run.leaseExpiresAt!) > Date.now();
   return (
     <button className="run-row" onClick={onOpen}>
-      <span className="run-title-cell"><i className={`source-dot ${run.source}`} /><span><strong>{run.title}</strong><small>AH-{run.runNumber} · {run.repository}{isClaimed && <> · <em>{run.claimedBy ?? "agent"} 할당</em></>}</small></span></span>
-      <span><i className={`status-pill ${meta.tone}`}>{run.status === "running" && <LoaderCircle className="spin" size={12} />}{meta.label}</i></span>
+      <span className="run-title-cell"><i className={`source-dot ${run.source}`} /><span><strong>{run.title}</strong><small>AH-{run.runNumber} · {run.repository}{isClaimed && <> · <em>{t("run.assigned", { agent: run.claimedBy ?? "agent" })}</em></>}</small></span></span>
+      <span><i className={`status-pill ${meta.tone}`}>{run.status === "running" && <LoaderCircle className="spin" size={12} />}{label}</i></span>
       <span className="progress-cell"><span><i style={{ width: `${run.progress}%` }} /></span><small>{run.progress}%</small></span>
-      <span className="time-cell">{relativeTime(run.updatedAt)}</span>
+      <span className="time-cell">{relativeTime(run.updatedAt, t)}</span>
       <span className="row-action"><ChevronRight size={16} /></span>
     </button>
   );
@@ -539,7 +548,9 @@ export function RunDialog({
   onRetry: () => Promise<unknown>;
   run: HuntRun;
 }) {
+  const { localeTag, t } = useI18n();
   const meta = runMeta(run.status, run.workflowStage, run.workflow);
+  const label = localizeStatus(t, run.status, run.workflowStage, meta.label);
   const needsAttention = ["blocked", "failed"].includes(run.status);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const runAction = async (action: () => Promise<unknown>) => {
@@ -552,10 +563,10 @@ export function RunDialog({
   };
   return (
     <div className="dialog-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <section className="run-dialog" role="dialog" aria-modal="true" aria-label={`${run.title} 상세`}>
-        <header><div><span className={`status-pill ${meta.tone}`}>{meta.label}</span><small>AH-{run.runNumber} · 시도 {run.currentAttempt}</small></div><button onClick={onClose} aria-label="닫기"><X size={18} /></button></header>
+      <section className="run-dialog" role="dialog" aria-modal="true" aria-label={t("run.details", { title: run.title })}>
+        <header><div><span className={`status-pill ${meta.tone}`}>{label}</span><small>AH-{run.runNumber} · {t("run.attempt", { count: run.currentAttempt })}</small></div><button onClick={onClose} aria-label={t("common.close")}><X size={18} /></button></header>
         <div className="dialog-body">
-          <p className="eyebrow">{sourceLabel[run.source].toUpperCase()} · {run.repository}</p>
+          <p className="eyebrow">{t(`source.${run.source}` as MessageKey).toUpperCase()} · {run.repository}</p>
           <h2>{run.title}</h2>
           <p className="run-detail">{run.detail}</p>
           {run.issueDescription && <p className="run-issue-description">{run.issueDescription}</p>}
@@ -567,27 +578,27 @@ export function RunDialog({
           )}
           {needsAttention && (
             <div className="recovery-panel">
-              <div><CircleAlert size={16} /><span><strong>{run.status === "failed" ? "실행이 실패했습니다" : "진행이 차단되었습니다"}</strong><small>이전 시도의 활동 기록은 보존됩니다. 재시도하면 {run.currentAttempt + 1}번 시도로 새 작업이 시작됩니다.</small></span></div>
+              <div><CircleAlert size={16} /><span><strong>{run.status === "failed" ? t("run.failed") : t("run.blocked")}</strong><small>{t("run.retryDescription", { count: run.currentAttempt + 1 })}</small></span></div>
               {error && <p><CircleAlert size={13} />{error}</p>}
               <div className="recovery-actions">
-                <button disabled={isRecovering} onClick={() => void runAction(onRetry)} type="button"><RotateCcw className={isRecovering ? "spin" : ""} size={14} />재시도</button>
+                <button disabled={isRecovering} onClick={() => void runAction(onRetry)} type="button"><RotateCcw className={isRecovering ? "spin" : ""} size={14} />{t("run.retry")}</button>
                 {confirmCancel ? (
-                  <><button className="danger" disabled={isRecovering} onClick={() => void runAction(onCancel)} type="button">취소 확정</button><button disabled={isRecovering} onClick={() => setConfirmCancel(false)} type="button">돌아가기</button></>
+                  <><button className="danger" disabled={isRecovering} onClick={() => void runAction(onCancel)} type="button">{t("run.confirmCancel")}</button><button disabled={isRecovering} onClick={() => setConfirmCancel(false)} type="button">{t("run.back")}</button></>
                 ) : (
-                  <button className="danger-secondary" disabled={isRecovering} onClick={() => setConfirmCancel(true)} type="button">작업 취소</button>
+                  <button className="danger-secondary" disabled={isRecovering} onClick={() => setConfirmCancel(true)} type="button">{t("run.cancel")}</button>
                 )}
               </div>
             </div>
           )}
-          <div className="large-progress"><div><span>전체 진행률</span><strong>{run.progress}%</strong></div><i><b style={{ width: `${run.progress}%` }} /></i></div>
+          <div className="large-progress"><div><span>{t("run.totalProgress")}</span><strong>{run.progress}%</strong></div><i><b style={{ width: `${run.progress}%` }} /></i></div>
           <div className="run-facts">
-            <span><GitFork size={15} /><small>브랜치</small><strong>{run.branch ?? "—"}</strong></span>
-            <span><GitCommitHorizontal size={15} /><small>커밋</small><strong>{run.commitSha ?? "—"}</strong></span>
-            <span><Clock3 size={15} /><small>시작</small><strong>{formatDate(run.startedAt)}</strong></span>
+            <span><GitFork size={15} /><small>{t("run.branch")}</small><strong>{run.branch ?? "—"}</strong></span>
+            <span><GitCommitHorizontal size={15} /><small>{t("run.commit")}</small><strong>{run.commitSha ?? "—"}</strong></span>
+            <span><Clock3 size={15} /><small>{t("run.started")}</small><strong>{formatDate(run.startedAt, localeTag)}</strong></span>
           </div>
-          <div className="timeline"><h3>활동 기록</h3>{run.events.map((event) => { const eventDisplay = eventMeta(event.status, event.workflowStage, run.workflow); return <div className="timeline-event" key={event.id}><i className={eventDisplay.tone} /><span><strong>{eventDisplay.label} <em>시도 {event.attempt}</em></strong><p>{event.detail}</p><small>{event.actor} · {relativeTime(event.occurredAt)}</small></span></div>; })}</div>
+          <div className="timeline"><h3>{t("run.activity")}</h3>{run.events.map((event) => { const eventDisplay = eventMeta(event.status, event.workflowStage, run.workflow); return <div className="timeline-event" key={event.id}><i className={eventDisplay.tone} /><span><strong>{localizeEvent(t, event.status, event.workflowStage, eventDisplay.label)} <em>{t("run.attempt", { count: event.attempt })}</em></strong><p>{event.detail}</p><small>{event.actor} · {relativeTime(event.occurredAt, t)}</small></span></div>; })}</div>
         </div>
-        <footer><span>{needsAttention ? "실패 이력과 증거는 재시도 후에도 보존됩니다." : "Auto Hunt 실행 증거를 실시간으로 표시합니다."}</span><button><ArrowUpRight size={14} />로컬 저장소 열기</button></footer>
+        <footer><span>{needsAttention ? t("run.preserveEvidence") : t("run.liveEvidence")}</span><button><ArrowUpRight size={14} />{t("run.openRepository")}</button></footer>
       </section>
     </div>
   );
@@ -600,9 +611,10 @@ function IssueAttachmentGallery({
   attachments: IssueAttachment[];
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
 }) {
+  const { t } = useI18n();
   return (
     <section className="run-attachments">
-      <h3><Paperclip size={14} />첨부 파일 <span>{attachments.length}</span></h3>
+      <h3><Paperclip size={14} />{t("run.attachments")} <span>{attachments.length}</span></h3>
       <div>
         {attachments.map((attachment) => (
           <IssueAttachmentPreview
@@ -623,6 +635,7 @@ function IssueAttachmentPreview({
   attachment: IssueAttachment;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
 }) {
+  const { t } = useI18n();
   const [source, setSource] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -651,19 +664,32 @@ function IssueAttachmentPreview({
         {!source && !failed && (isImage ? <ImageIcon size={22} /> : <Video size={22} />)}
         {failed && <CircleAlert size={20} />}
       </div>
-      <span><strong>{attachment.filename}</strong><small>{failed ? "불러오지 못함" : formatAttachmentBytes(attachment.byteSize)}</small></span>
-      {source && <a download={attachment.filename} href={source}>열기</a>}
+      <span><strong>{attachment.filename}</strong><small>{failed ? t("run.loadFailed") : formatAttachmentBytes(attachment.byteSize)}</small></span>
+      {source && <a download={attachment.filename} href={source}>{t("common.open")}</a>}
     </article>
   );
 }
 
-function relativeTime(value: string) {
-  const minutes = Math.max(1, Math.round((Date.now() - new Date(value).getTime()) / 60_000));
-  if (minutes < 60) return `${minutes}분 전`;
-  if (minutes < 1_440) return `${Math.floor(minutes / 60)}시간 전`;
-  return `${Math.floor(minutes / 1_440)}일 전`;
+type Translate = ReturnType<typeof useI18n>["t"];
+const builtInStageIds = new Set(["analyzing", "planning", "implementing", "reviewing", "pr_open", "local_qa", "ci_qa", "staging_qa", "production_qa", "monitoring"]);
+
+function localizeStatus(t: Translate, status: HuntRun["status"], workflowStage: string | null, fallback: string) {
+  if (status === "running" && workflowStage && builtInStageIds.has(workflowStage)) return t(`stage.${workflowStage}` as MessageKey);
+  return t(`status.${status}` as MessageKey) || fallback;
 }
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("ko-KR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+function localizeEvent(t: Translate, status: HuntRun["status"], workflowStage: string | null, fallback: string) {
+  if (workflowStage && builtInStageIds.has(workflowStage)) return t(`stage.${workflowStage}` as MessageKey);
+  return t(`status.${status}` as MessageKey) || fallback;
+}
+
+function relativeTime(value: string, t: Translate) {
+  const minutes = Math.max(1, Math.round((Date.now() - new Date(value).getTime()) / 60_000));
+  if (minutes < 60) return t("time.minutesAgo", { count: minutes });
+  if (minutes < 1_440) return t("time.hoursAgo", { count: Math.floor(minutes / 60) });
+  return t("time.daysAgo", { count: Math.floor(minutes / 1_440) });
+}
+
+function formatDate(value: string, localeTag: string) {
+  return new Intl.DateTimeFormat(localeTag, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
 }

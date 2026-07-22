@@ -1,7 +1,9 @@
 import {
   Activity,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
+  Check,
   CircleHelp,
   Ellipsis,
   FolderGit2,
@@ -9,8 +11,10 @@ import {
   PanelLeftClose,
   Plus,
   Settings,
+  Languages,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useI18n, type Locale } from "../i18n";
 import type { Project, SessionUser } from "../types";
 import { UpdateControl } from "./UpdateControl";
 
@@ -39,12 +43,16 @@ export function Sidebar({
   projects: Project[];
   user: SessionUser;
 }) {
+  const { locale, setLocale, t } = useI18n();
   const [openProjectMenuId, setOpenProjectMenuId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const menuItemRef = useRef<HTMLButtonElement | null>(null);
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+  const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement>(null);
+  const languageMenuRef = useRef<HTMLDivElement>(null);
+  const languageTriggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!openProjectMenuId) return;
@@ -75,10 +83,16 @@ export function Sidebar({
     const closeOnOutsidePress = (event: PointerEvent) => {
       if (!accountMenuRef.current?.contains(event.target as Node)) {
         setIsAccountMenuOpen(false);
+        setIsLanguageMenuOpen(false);
       }
     };
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setIsAccountMenuOpen(false);
+      if (event.key !== "Escape") return;
+      if (isLanguageMenuOpen) {
+        setIsLanguageMenuOpen(false);
+        languageTriggerRef.current?.focus();
+      }
+      else setIsAccountMenuOpen(false);
     };
 
     document.addEventListener("pointerdown", closeOnOutsidePress);
@@ -87,7 +101,20 @@ export function Sidebar({
       document.removeEventListener("pointerdown", closeOnOutsidePress);
       document.removeEventListener("keydown", closeOnEscape);
     };
-  }, [isAccountMenuOpen]);
+  }, [isAccountMenuOpen, isLanguageMenuOpen]);
+
+  useEffect(() => {
+    if (!isLanguageMenuOpen) return;
+    languageMenuRef.current
+      ?.querySelector<HTMLButtonElement>('[aria-checked="true"]')
+      ?.focus();
+  }, [isLanguageMenuOpen]);
+
+  const languages: { locale: Locale; label: string }[] = [
+    { locale: "ko", label: t("language.ko") },
+    { locale: "en", label: t("language.en") },
+    { locale: "zh", label: t("language.zh") },
+  ];
 
   return (
     <aside
@@ -100,10 +127,10 @@ export function Sidebar({
         <button
           aria-controls="app-sidebar"
           aria-expanded="true"
-          aria-label="왼쪽 패널 닫기"
+          aria-label={t("sidebar.close")}
           className="sidebar-toggle"
           onClick={onToggle}
-          title="왼쪽 패널 닫기"
+          title={t("sidebar.close")}
           type="button"
         >
           <PanelLeftClose size={16} strokeWidth={1.7} />
@@ -115,17 +142,17 @@ export function Sidebar({
         <ChevronDown aria-hidden="true" size={14} strokeWidth={1.8} />
       </div>
 
-      <nav aria-label="주요 메뉴" className="sidebar-primary-nav">
-        <a href="#help"><CircleHelp size={16} strokeWidth={1.7} />도움말</a>
+      <nav aria-label={t("sidebar.mainMenu")} className="sidebar-primary-nav">
+        <a href="#help"><CircleHelp size={16} strokeWidth={1.7} />{t("sidebar.help")}</a>
       </nav>
 
       <div className="sidebar-projects">
         <div className="sidebar-section-heading">
-          <span>Projects</span>
+          <span>{t("sidebar.projects")}</span>
           <button
-            aria-label="프로젝트 추가"
+            aria-label={t("sidebar.addProject")}
             onClick={onAddProject}
-            title="프로젝트 추가"
+            title={t("sidebar.addProject")}
             type="button"
           >
             <Plus size={17} strokeWidth={1.6} />
@@ -148,20 +175,20 @@ export function Sidebar({
                   >
                     <FolderGit2 size={16} strokeWidth={1.7} />
                     <span>{project.name}</span>
-                    {isActive && <i aria-label="현재 프로젝트" />}
+                    {isActive && <i aria-label={t("sidebar.currentProject")} />}
                   </button>
                   <button
                     aria-controls={`project-menu-${project.id}`}
                     aria-expanded={isMenuOpen}
                     aria-haspopup="menu"
-                    aria-label={`${project.name} 프로젝트 메뉴`}
+                    aria-label={t("sidebar.projectMenu", { name: project.name })}
                     className="sidebar-project-menu-trigger"
                     onClick={(event) => {
                       setIsAccountMenuOpen(false);
                       menuTriggerRef.current = event.currentTarget;
                       setOpenProjectMenuId(isMenuOpen ? null : project.id);
                     }}
-                    title={`${project.name} 메뉴`}
+                    title={t("sidebar.menu", { name: project.name })}
                     type="button"
                   >
                     <Ellipsis size={18} strokeWidth={2} />
@@ -183,7 +210,7 @@ export function Sidebar({
                         type="button"
                       >
                         <Settings size={16} strokeWidth={1.7} />
-                        <span>프로젝트 설정</span>
+                        <span>{t("sidebar.projectSettings")}</span>
                       </button>
                     </div>
                   )}
@@ -196,7 +223,7 @@ export function Sidebar({
                     onClick={onDashboardOpen}
                   >
                     <Activity size={14} strokeWidth={1.7} />
-                    <span>자동사냥</span>
+                    <span>{t("sidebar.autoHunt")}</span>
                   </a>
                 )}
               </section>
@@ -209,7 +236,7 @@ export function Sidebar({
         <div className="sidebar-footer-row">
           <div className="account-menu" ref={accountMenuRef}>
             {isAccountMenuOpen && (
-              <div aria-label="계정 메뉴" className="account-popover" role="menu">
+              <div aria-label={t("account.menu")} className="account-popover" role="menu">
                 <div className="account-popover-identity">
                   <div className="avatar">
                     {user.image ? <img src={user.image} alt="" /> : user.name.slice(0, 1).toUpperCase()}
@@ -217,23 +244,70 @@ export function Sidebar({
                   <span><strong>{user.name}</strong><small>{user.email}</small></span>
                 </div>
                 <div className="account-popover-separator" />
-                <a href="#settings" onClick={() => setIsAccountMenuOpen(false)} role="menuitem">
+                <a href="#settings" onClick={() => { setIsAccountMenuOpen(false); setIsLanguageMenuOpen(false); }} role="menuitem">
                   <Settings size={16} strokeWidth={1.7} />
-                  <span>설정</span>
+                  <span>{t("account.settings")}</span>
                 </a>
-                <button onClick={onLogout} role="menuitem" type="button">
-                  <LogOut size={16} strokeWidth={1.7} />
-                  <span>로그아웃</span>
+                <button
+                  aria-expanded={isLanguageMenuOpen}
+                  aria-haspopup="menu"
+                  className="account-language-trigger"
+                  onClick={() => setIsLanguageMenuOpen((open) => !open)}
+                  ref={languageTriggerRef}
+                  role="menuitem"
+                  type="button"
+                >
+                  <Languages size={16} strokeWidth={1.7} />
+                  <span>{t("account.language")}</span>
+                  <ChevronRight aria-hidden="true" size={14} />
                 </button>
+                <button onClick={() => { setIsLanguageMenuOpen(false); onLogout(); }} role="menuitem" type="button">
+                  <LogOut size={16} strokeWidth={1.7} />
+                  <span>{t("account.logout")}</span>
+                </button>
+              </div>
+            )}
+            {isAccountMenuOpen && isLanguageMenuOpen && (
+              <div
+                aria-label={t("account.languageMenu")}
+                className="language-popover"
+                onKeyDown={(event) => {
+                  if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+                  event.preventDefault();
+                  const items = Array.from(languageMenuRef.current?.querySelectorAll<HTMLButtonElement>("button") ?? []);
+                  const current = Math.max(0, items.indexOf(document.activeElement as HTMLButtonElement));
+                  const offset = event.key === "ArrowDown" ? 1 : -1;
+                  items[(current + offset + items.length) % items.length]?.focus();
+                }}
+                ref={languageMenuRef}
+                role="menu"
+              >
+                {languages.map((language) => (
+                  <button
+                    aria-checked={locale === language.locale}
+                    key={language.locale}
+                    lang={language.locale}
+                    onClick={() => {
+                      setLocale(language.locale);
+                      setIsLanguageMenuOpen(false);
+                    }}
+                    role="menuitemradio"
+                    type="button"
+                  >
+                    <span>{language.label}</span>
+                    {locale === language.locale ? <Check aria-hidden="true" size={15} /> : null}
+                  </button>
+                ))}
               </div>
             )}
             <button
               aria-expanded={isAccountMenuOpen}
               aria-haspopup="menu"
-              aria-label="계정 메뉴"
+              aria-label={t("account.menu")}
               className="user-card"
               onClick={() => {
                 setOpenProjectMenuId(null);
+                setIsLanguageMenuOpen(false);
                 setIsAccountMenuOpen((open) => !open);
               }}
               type="button"

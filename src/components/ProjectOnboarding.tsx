@@ -26,6 +26,7 @@ import {
   type AutoHuntWorkflowPreset,
   type AutoHuntWorkflowStageId,
 } from "../lib/auto-hunt-contract";
+import { useI18n } from "../i18n";
 
 type Props = {
   canCancel?: boolean;
@@ -54,6 +55,7 @@ export function ProjectOnboarding({
   user,
   velen,
 }: Props) {
+  const { t } = useI18n();
   const [name, setName] = useState("");
   const [velenOrg, setVelenOrg] = useState("");
   const [linearEnabled, setLinearEnabled] = useState(false);
@@ -126,7 +128,7 @@ export function ProjectOnboarding({
         <div className="onboarding-topbar-actions">
           {canCancel ? (
             <button onClick={onCancel} type="button">
-              <ArrowLeft size={14} /> 대시보드로 돌아가기
+              <ArrowLeft size={14} /> {t("onboarding.back")}
             </button>
           ) : null}
           <button onClick={onLogout} type="button">
@@ -141,32 +143,29 @@ export function ProjectOnboarding({
         {connection ? (
           <>
             <p className="eyebrow">AUTO HUNT CONNECTION</p>
-            <h1>{connection.project.name} 연결</h1>
-            <p className="onboarding-copy">
-              Git 저장소와 Velen 조직을 선택하면 Briar가 Agent 설정을 자동으로
-              저장합니다. Linear 연결은 선택 사항입니다.
-            </p>
+            <h1>{t("onboarding.connectTitle", { name: connection.project.name })}</h1>
+            <p className="onboarding-copy">{t("onboarding.connectDescription")}</p>
 
             <div className="setup-grid">
               <section className="setup-section">
                 <div className="setup-section-heading">
                   <ListChecks size={18} />
                   <div>
-                    <strong>진행 워크플로</strong>
-                    <span>이 저장소에 실제로 존재하는 검증·배포 단계만 선택하세요.</span>
+                    <strong>{t("onboarding.workflow")}</strong>
+                    <span>{t("onboarding.workflowDescription")}</span>
                   </div>
                 </div>
                 <div className="settings-fields single-field">
                   <label>
-                    <span>프리셋</span>
+                    <span>{t("onboarding.preset")}</span>
                     <JellySelect
-                      label="Auto Hunt 워크플로"
+                      label={t("onboarding.workflowLabel")}
                       options={[
-                        { label: "로컬 개발 · 배포 없음", value: "local" },
-                        { label: "PR + CI 검증", value: "review" },
-                        { label: "Stage + Production 배포", value: "release" },
-                        { label: "조사·리서치", value: "research" },
-                        { label: "직접 구성", value: "custom" },
+                        { label: t("onboarding.presetLocal"), value: "local" },
+                        { label: t("onboarding.presetReview"), value: "review" },
+                        { label: t("onboarding.presetRelease"), value: "release" },
+                        { label: t("onboarding.presetResearch"), value: "research" },
+                        { label: t("onboarding.presetCustom"), value: "custom" },
                       ]}
                       value={workflowPreset}
                       onValueChange={(next) => {
@@ -181,7 +180,7 @@ export function ProjectOnboarding({
                     />
                   </label>
                 </div>
-                <div className="workflow-stage-picker" aria-label="워크플로 단계">
+                <div className="workflow-stage-picker" aria-label={t("onboarding.stages")}>
                   {autoHuntWorkflowStageCatalog.map((stage) => {
                     const selected = workflowStageIds.includes(stage.id);
                     return (
@@ -200,7 +199,7 @@ export function ProjectOnboarding({
                         type="button"
                       >
                         {selected ? <Check size={13} /> : null}
-                        {stage.label}
+                        {t(`stage.${stage.id}` as Parameters<typeof t>[0])}
                       </button>
                     );
                   })}
@@ -210,7 +209,7 @@ export function ProjectOnboarding({
               <section className="setup-section">
                 <div className="setup-section-heading">
                   <FolderOpen size={18} />
-                  <div><strong>로컬 Git 저장소</strong><span>연결할 때 macOS 폴더 선택기가 열립니다.</span></div>
+                  <div><strong>{t("onboarding.localRepository")}</strong><span>{t("onboarding.folderPicker")}</span></div>
                 </div>
               </section>
 
@@ -218,19 +217,19 @@ export function ProjectOnboarding({
                 <div className="setup-section-heading">
                   <Database size={18} />
                   <div>
-                    <strong>Velen CLI <em>필수</em></strong>
-                    <span>{velen ? `${velen.email ?? "로그인됨"} · 인증 확인` : "설치 및 로그인을 확인하는 중…"}</span>
+                    <strong>Velen CLI <em>{t("common.required")}</em></strong>
+                    <span>{velen ? `${velen.email ?? t("onboarding.loggedIn")} · ${t("onboarding.authenticated")}` : t("onboarding.checkingInstall")}</span>
                   </div>
-                  <button className="icon-action" onClick={() => void onVelenOrgChange(velenOrg)} type="button" aria-label="Velen 새로고침">
+                  <button className="icon-action" onClick={() => void onVelenOrgChange(velenOrg)} type="button" aria-label={t("onboarding.refreshVelen")}>
                     <RefreshCw size={15} />
                   </button>
                 </div>
                 {velen ? (
                   <div className="settings-fields single-field">
                     <label>
-                      <span>조직</span>
+                      <span>{t("onboarding.organization")}</span>
                       <JellySelect
-                        label="Velen 조직"
+                        label={t("onboarding.velenOrg")}
                         options={velen.organizations.map((organization) => ({
                           label: organization.name,
                           value: organization.slug,
@@ -250,9 +249,9 @@ export function ProjectOnboarding({
               <section className="setup-section">
                 <div className="setup-section-heading">
                   <Link2 size={18} />
-                  <div><strong>Linear 연동</strong><span>연결하지 않아도 Auto Hunt는 정상 동작합니다.</span></div>
+                  <div><strong>{t("onboarding.linear")}</strong><span>{t("onboarding.linearDescription")}</span></div>
                   <jelly-switch
-                    aria-label="Linear 연동"
+                    aria-label={t("onboarding.linear")}
                     checked={linearEnabled}
                     disabled={!velen}
                     size="small"
@@ -263,25 +262,25 @@ export function ProjectOnboarding({
                 {linearEnabled ? (
                   <div className="settings-fields">
                     <label>
-                      <span>Linear 소스</span>
+                      <span>{t("onboarding.linearSource")}</span>
                       <JellySelect
-                        label="Linear 소스"
+                        label={t("onboarding.linearSource")}
                         onValueChange={setLinearSource}
                         options={linearSources.map((source) => ({
                           label: source.sourceKey,
                           value: source.sourceRef,
                         }))}
-                        placeholder="Linear 소스 선택"
+                        placeholder={t("onboarding.selectLinearSource")}
                         value={linearSource}
                       />
                     </label>
                     <label>
-                      <span>팀 키 <small>선택</small></span>
+                      <span>{t("onboarding.teamKey")} <small>{t("common.optional")}</small></span>
                       <input
-                        aria-label="Linear 팀 키"
+                        aria-label={t("onboarding.teamKey")}
                         className="native-input"
                         onChange={(event) => setLinearTeam(event.currentTarget.value)}
-                        placeholder="예: WRD"
+                        placeholder={t("onboarding.teamKeyExample")}
                         value={linearTeam}
                       />
                     </label>
@@ -297,27 +296,26 @@ export function ProjectOnboarding({
               onClick={() => void connect()}
               type="button"
             >
-              {loading ? "연결하는 중…" : "저장소 선택하고 Auto Hunt 연결"} <ArrowRight size={17} />
+              {loading ? t("onboarding.connecting") : t("onboarding.connect")} <ArrowRight size={17} />
             </button>
             <p className="token-warning">
-              경로, Agent 토큰, Velen 설정과 워크플로는 이 컴퓨터의 Briar 설정에 자동 저장됩니다.
-              터미널 명령은 필요 없습니다.
+              {t("onboarding.localStorageNotice")}
             </p>
           </>
         ) : (
           <>
             <p className="eyebrow">{canCancel ? "NEW PROJECT" : "FIRST PROJECT"}</p>
-            <h1>{canCancel ? "프로젝트 추가" : "프로젝트 만들기"}</h1>
+            <h1>{canCancel ? t("onboarding.addProject") : t("onboarding.createProject")}</h1>
             <p className="onboarding-copy">
               {canCancel
-                ? "새 대시보드 프로젝트를 만든 다음 Git 저장소와 Velen을 연결하세요."
-                : "대시보드 프로젝트를 만든 다음 Git 저장소와 Velen을 연결하세요."}
+                ? t("onboarding.addDescription")
+                : t("onboarding.createDescription")}
             </p>
             <form className="project-form" onSubmit={(event) => void submit(event)}>
               <label>
-                <span>프로젝트 이름</span>
+                <span>{t("onboarding.projectName")}</span>
                 <input
-                  aria-label="프로젝트 이름"
+                  aria-label={t("onboarding.projectName")}
                   className="native-input"
                   onChange={(event) => setName(event.currentTarget.value)}
                   placeholder="wordbricks"
@@ -330,7 +328,7 @@ export function ProjectOnboarding({
                 disabled={loading || !name.trim()}
                 type="submit"
               >
-                {loading ? "만드는 중…" : "프로젝트 만들기"} <ArrowRight size={17} />
+                {loading ? t("onboarding.creating") : t("onboarding.createProject")} <ArrowRight size={17} />
               </button>
             </form>
           </>
