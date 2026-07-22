@@ -14,16 +14,16 @@ export const autoHuntRunStatuses = [
 ] as const;
 
 export const autoHuntWorkflowStageCatalog = [
-  { id: "analyzing", label: "분석", tone: "blue" },
-  { id: "planning", label: "계획", tone: "cyan" },
-  { id: "implementing", label: "구현", tone: "violet" },
-  { id: "reviewing", label: "리뷰", tone: "indigo" },
-  { id: "pr_open", label: "PR 검증", tone: "indigo" },
-  { id: "local_qa", label: "로컬 검증", tone: "amber" },
-  { id: "ci_qa", label: "CI 검증", tone: "amber" },
-  { id: "staging_qa", label: "Stage QA", tone: "orange" },
-  { id: "production_qa", label: "Production QA", tone: "orange" },
-  { id: "monitoring", label: "모니터링", tone: "emerald" },
+  { id: "analyzing", label: "분석", tone: "blue", evidence: ["velen", "repository"], checks: undefined },
+  { id: "planning", label: "계획", tone: "cyan", evidence: ["repository"], checks: undefined },
+  { id: "implementing", label: "구현", tone: "violet", evidence: ["diff"], checks: undefined },
+  { id: "reviewing", label: "리뷰", tone: "indigo", evidence: ["diff"], checks: undefined },
+  { id: "pr_open", label: "PR 검증", tone: "indigo", evidence: ["pull_request"], checks: undefined },
+  { id: "local_qa", label: "로컬 검증", tone: "amber", evidence: undefined, checks: ["bun run test", "bun run build"] },
+  { id: "ci_qa", label: "CI 검증", tone: "amber", evidence: ["ci"], checks: undefined },
+  { id: "staging_qa", label: "Stage QA", tone: "orange", evidence: ["staging"], checks: undefined },
+  { id: "production_qa", label: "Production QA", tone: "orange", evidence: ["production"], checks: undefined },
+  { id: "monitoring", label: "모니터링", tone: "emerald", evidence: ["monitoring"], checks: undefined },
 ] as const;
 
 export const autoHuntWorkflowPresets = [
@@ -36,8 +36,7 @@ export const autoHuntWorkflowPresets = [
 
 export type AutoHuntSource = (typeof autoHuntSources)[number];
 export type AutoHuntRunStatus = (typeof autoHuntRunStatuses)[number];
-export type AutoHuntWorkflowStageId =
-  (typeof autoHuntWorkflowStageCatalog)[number]["id"];
+export type AutoHuntWorkflowStageId = string;
 export type AutoHuntWorkflowPreset =
   (typeof autoHuntWorkflowPresets)[number];
 
@@ -45,12 +44,26 @@ export type AutoHuntWorkflowStage = {
   id: AutoHuntWorkflowStageId;
   label: string;
   required: boolean;
+  evidence?: string[];
+  checks?: string[];
 };
 
 export type AutoHuntWorkflow = {
   version: 1;
   preset: AutoHuntWorkflowPreset;
   stages: AutoHuntWorkflowStage[];
+  completion: {
+    requiredStages: AutoHuntWorkflowStageId[];
+  };
+  release: {
+    enabled: boolean;
+  };
+};
+
+type AutoHuntWorkflowInput = Omit<AutoHuntWorkflow, "preset" | "completion" | "release"> & {
+  preset?: AutoHuntWorkflowPreset;
+  completion?: AutoHuntWorkflow["completion"];
+  release?: AutoHuntWorkflow["release"];
 };
 
 const stageIdsForPreset: Record<
@@ -69,21 +82,33 @@ const stageIdsForPreset: Record<
   research: ["analyzing", "planning", "reviewing"],
 };
 
-const catalogById = new Map(
+const catalogById: Map<string, (typeof autoHuntWorkflowStageCatalog)[number]> = new Map(
   autoHuntWorkflowStageCatalog.map((stage) => [stage.id, stage]),
 );
 
 export function workflowForPreset(
   preset: Exclude<AutoHuntWorkflowPreset, "custom">,
 ): AutoHuntWorkflow {
+  const stages = stageIdsForPreset[preset].map((id) => {
+    const stage = catalogById.get(id)!;
+    return {
+      id,
+      label: stage.label,
+      required: true,
+      ...(stage.evidence ? { evidence: [...stage.evidence] } : {}),
+      ...(stage.checks ? { checks: [...stage.checks] } : {}),
+    };
+  });
   return {
     version: 1,
     preset,
-    stages: stageIdsForPreset[preset].map((id) => ({
-      id,
-      label: catalogById.get(id)?.label ?? id,
-      required: true,
-    })),
+    stages,
+    completion: { requiredStages: stages.map((stage) => stage.id) },
+    release: {
+      enabled: stages.some((stage) =>
+        ["staging_qa", "production_qa"].includes(stage.id),
+      ),
+    },
   };
 }
 
@@ -91,25 +116,50 @@ export const defaultAutoHuntWorkflow = workflowForPreset("local");
 export const legacyAutoHuntWorkflow = workflowForPreset("release");
 
 export function normalizeAutoHuntWorkflow(
-  workflow: AutoHuntWorkflow | null | undefined,
+  workflow: AutoHuntWorkflowInput | null | undefined,
 ): AutoHuntWorkflow {
   if (!workflow || workflow.version !== 1 || workflow.stages.length === 0) {
     return structuredClone(defaultAutoHuntWorkflow);
   }
   const seen = new Set<AutoHuntWorkflowStageId>();
   const stages = workflow.stages.flatMap((stage) => {
-    const catalog = catalogById.get(stage.id);
-    if (!catalog || seen.has(stage.id)) return [];
-    seen.add(stage.id);
+    const id = stage.id.trim();
+    const catalog = catalogById.get(id);
+    if (!id || seen.has(id)) return [];
+    seen.add(id);
+    const cleanList = (values: string[] | undefined) =>
+      values?.map((value) => value.trim()).filter(Boolean);
+    const evidence = cleanList(stage.evidence) ??
+      (catalog?.evidence ? [...catalog.evidence] : undefined);
+    const checks = cleanList(stage.checks) ??
+      (catalog?.checks ? [...catalog.checks] : undefined);
     return [{
-      id: stage.id,
-      label: stage.label.trim() || catalog.label,
+      id,
+      label: stage.label.trim() || catalog?.label || id,
       required: stage.required,
+      ...(evidence?.length ? { evidence } : {}),
+      ...(checks?.length ? { checks } : {}),
     }];
   });
-  return stages.length > 0
-    ? { version: 1, preset: workflow.preset, stages }
-    : structuredClone(defaultAutoHuntWorkflow);
+  if (stages.length === 0) return structuredClone(defaultAutoHuntWorkflow);
+  const stageIds = new Set(stages.map((stage) => stage.id));
+  const configuredRequiredStages = workflow.completion?.requiredStages.filter(
+    (id) => stageIds.has(id),
+  );
+  const requiredStages = workflow.completion
+    ? (configuredRequiredStages ?? [])
+    : stages.filter((stage) => stage.required).map((stage) => stage.id);
+  return {
+    version: 1,
+    preset: workflow.preset ?? "custom",
+    stages,
+    completion: { requiredStages },
+    release: {
+      enabled: workflow.release?.enabled ?? stages.some((stage) =>
+        ["staging_qa", "production_qa"].includes(stage.id),
+      ),
+    },
+  };
 }
 
 export function progressForAutoHuntRun(

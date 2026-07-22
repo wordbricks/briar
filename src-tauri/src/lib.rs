@@ -61,8 +61,17 @@ struct AutoHuntConfig {
 #[serde(rename_all = "camelCase")]
 struct WorkflowConfig {
     version: u8,
+    #[serde(default = "custom_workflow_preset")]
     preset: String,
     stages: Vec<WorkflowStageConfig>,
+    #[serde(default)]
+    completion: WorkflowCompletionConfig,
+    #[serde(default)]
+    release: WorkflowReleaseConfig,
+}
+
+fn custom_workflow_preset() -> String {
+    "custom".to_string()
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -71,6 +80,73 @@ struct WorkflowStageConfig {
     id: String,
     label: String,
     required: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    evidence: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    checks: Vec<String>,
+}
+
+#[derive(Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WorkflowCompletionConfig {
+    #[serde(default)]
+    required_stages: Vec<String>,
+}
+
+#[derive(Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WorkflowReleaseConfig {
+    #[serde(default)]
+    enabled: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ConnectedLocalProject {
+    repository_path: String,
+    workflow: WorkflowConfig,
+}
+
+fn infer_repository_checks(repository: &Path, workflow: &mut WorkflowConfig) {
+    let Some(stage) = workflow
+        .stages
+        .iter_mut()
+        .find(|stage| stage.id == "local_qa")
+    else {
+        return;
+    };
+    let package_json = repository.join("package.json");
+    if package_json.exists() {
+        let Ok(contents) = fs::read_to_string(package_json) else {
+            return;
+        };
+        let Ok(package) = serde_json::from_str::<serde_json::Value>(&contents) else {
+            return;
+        };
+        let Some(scripts) = package
+            .get("scripts")
+            .and_then(serde_json::Value::as_object)
+        else {
+            return;
+        };
+        let runner =
+            if repository.join("bun.lock").exists() || repository.join("bun.lockb").exists() {
+                "bun run"
+            } else if repository.join("pnpm-lock.yaml").exists() {
+                "pnpm"
+            } else if repository.join("yarn.lock").exists() {
+                "yarn"
+            } else {
+                "npm run"
+            };
+        stage.checks = ["test", "build"]
+            .into_iter()
+            .filter(|name| scripts.contains_key(*name))
+            .map(|name| format!("{runner} {name}"))
+            .collect();
+    } else if repository.join("Cargo.toml").exists() {
+        stage.checks = vec!["cargo test".to_string(), "cargo build".to_string()];
+    }
 }
 
 fn default_workflow() -> WorkflowConfig {
@@ -82,18 +158,32 @@ fn default_workflow() -> WorkflowConfig {
                 id: "analyzing".to_string(),
                 label: "분석".to_string(),
                 required: true,
+                evidence: vec!["velen".to_string(), "repository".to_string()],
+                checks: Vec::new(),
             },
             WorkflowStageConfig {
                 id: "implementing".to_string(),
                 label: "구현".to_string(),
                 required: true,
+                evidence: vec!["diff".to_string()],
+                checks: Vec::new(),
             },
             WorkflowStageConfig {
                 id: "local_qa".to_string(),
                 label: "로컬 검증".to_string(),
                 required: true,
+                evidence: Vec::new(),
+                checks: vec!["bun run test".to_string(), "bun run build".to_string()],
             },
         ],
+        completion: WorkflowCompletionConfig {
+            required_stages: vec![
+                "analyzing".to_string(),
+                "implementing".to_string(),
+                "local_qa".to_string(),
+            ],
+        },
+        release: WorkflowReleaseConfig { enabled: false },
     }
 }
 
@@ -1013,8 +1103,8 @@ async fn connect_local_project(
     project_id: String,
     agent_token: String,
     repository_path: String,
-    auto_hunt: AutoHuntConfig,
-) -> Result<String, String> {
+    mut auto_hunt: AutoHuntConfig,
+) -> Result<ConnectedLocalProject, String> {
     let config_path = cli_config_path(&app)?;
     let resource_directory = app
         .path()
@@ -1024,6 +1114,8 @@ async fn connect_local_project(
     tauri::async_runtime::spawn_blocking(move || {
         let root = git_repository_root(Path::new(&repository_path))?;
         let remote = repository_remote(&root);
+        infer_repository_checks(&root, &mut auto_hunt.workflow);
+        let workflow = auto_hunt.workflow.clone();
         let root_string = root
             .into_os_string()
             .into_string()
@@ -1052,7 +1144,10 @@ async fn connect_local_project(
             remote,
             auto_hunt,
         )?;
-        Ok(root_string)
+        Ok(ConnectedLocalProject {
+            repository_path: root_string,
+            workflow,
+        })
     })
     .await
     .map_err(|error| error.to_string())?
@@ -1224,6 +1319,33 @@ mod tests {
         assert!(saved["projects"][1]["autoHunt"]["linearEnabled"].is_null());
 
         fs::remove_dir_all(directory).expect("test config directory should be removed");
+    }
+
+    #[test]
+    fn infers_local_validation_commands_from_the_repository() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be after unix epoch")
+            .as_nanos();
+        let directory = std::env::temp_dir().join(format!("briar-workflow-test-{unique}"));
+        fs::create_dir_all(&directory).expect("test repository should be created");
+        fs::write(directory.join("bun.lock"), "").expect("bun lock should be written");
+        fs::write(
+            directory.join("package.json"),
+            r#"{"scripts":{"test":"vitest run","build":"vite build","lint":"eslint ."}}"#,
+        )
+        .expect("package manifest should be written");
+        let mut workflow = default_workflow();
+
+        infer_repository_checks(&directory, &mut workflow);
+
+        let validation = workflow
+            .stages
+            .iter()
+            .find(|stage| stage.id == "local_qa")
+            .expect("local validation stage should exist");
+        assert_eq!(validation.checks, vec!["bun run test", "bun run build"]);
+        fs::remove_dir_all(directory).expect("test repository should be removed");
     }
 
     #[test]

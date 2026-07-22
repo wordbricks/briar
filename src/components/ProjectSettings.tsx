@@ -2,6 +2,8 @@ import {
   AlertTriangle,
   ArrowLeft,
   Check,
+  Copy,
+  GitBranch,
   LoaderCircle,
   PanelLeftOpen,
   ShieldCheck,
@@ -13,7 +15,7 @@ import {
   updateProjectLlmSettings,
   type ApprovalPolicy,
 } from "../lib/project-llm";
-import type { Project } from "../types";
+import type { DashboardPayload, Project } from "../types";
 
 const approvalPolicyDescriptions: Record<ApprovalPolicy, string> = {
   untrusted: "신뢰된 읽기 명령 외의 작업을 실행하기 전에 승인을 요청합니다.",
@@ -22,6 +24,7 @@ const approvalPolicyDescriptions: Record<ApprovalPolicy, string> = {
 };
 
 export function ProjectSettings({
+  dashboard,
   isDeleting,
   isSidebarOpen,
   onBack,
@@ -29,6 +32,7 @@ export function ProjectSettings({
   onSidebarOpen,
   project,
 }: {
+  dashboard: DashboardPayload | null;
   isDeleting: boolean;
   isSidebarOpen: boolean;
   onBack: () => void;
@@ -44,7 +48,20 @@ export function ProjectSettings({
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [workflowCopied, setWorkflowCopied] = useState(false);
   const cancelButtonRef = useRef<HTMLButtonElement | null>(null);
+  const workflow = dashboard?.settings.workflow ?? null;
+  const workflowContract = workflow
+    ? {
+        version: workflow.version,
+        stages: workflow.stages,
+        completion: workflow.completion,
+        release: workflow.release,
+      }
+    : null;
+  const workflowJson = workflowContract
+    ? JSON.stringify(workflowContract, null, 2)
+    : "";
 
   useEffect(() => {
     let cancelled = false;
@@ -138,6 +155,44 @@ export function ProjectSettings({
               <strong>{project.name}</strong>
             </div>
             <small>생성일 {new Date(project.createdAt).toLocaleDateString("ko-KR")}</small>
+          </section>
+
+          <section className="project-settings-automation">
+            <header>
+              <span className="project-settings-automation-icon">
+                <GitBranch size={18} strokeWidth={1.8} />
+              </span>
+              <span>
+                <strong>Auto Hunt 실행 워크플로</strong>
+                <small>단계별 증거와 검증 명령, 완료·릴리스 조건을 정의한 실행 계약입니다.</small>
+              </span>
+              {workflowContract ? (
+                <button
+                  aria-label="워크플로 JSON 복사"
+                  onClick={() => {
+                    void navigator.clipboard.writeText(workflowJson).then(() => {
+                      setWorkflowCopied(true);
+                      window.setTimeout(() => setWorkflowCopied(false), 1_500);
+                    });
+                  }}
+                  type="button"
+                >
+                  {workflowCopied ? <Check size={14} /> : <Copy size={14} />}
+                  {workflowCopied ? "복사됨" : "JSON 복사"}
+                </button>
+              ) : null}
+            </header>
+            {workflowContract ? (
+              <div className="project-workflow-contract">
+                <div>
+                  <span>저장소</span>
+                  <strong>{dashboard?.settings.githubRepository ?? "연결된 저장소 없음"}</strong>
+                </div>
+                <pre aria-label="Auto Hunt 워크플로 JSON"><code>{workflowJson}</code></pre>
+              </div>
+            ) : (
+              <p className="project-settings-empty">워크플로 정보를 불러오는 중입니다.</p>
+            )}
           </section>
 
           <section className="project-settings-llm">

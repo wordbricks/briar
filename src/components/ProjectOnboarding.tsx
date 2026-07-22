@@ -106,7 +106,15 @@ export function ProjectOnboarding({
             id: stage.id,
             label: stage.label,
             required: true,
+            ...(stage.evidence ? { evidence: [...stage.evidence] } : {}),
+            ...(stage.checks ? { checks: [...stage.checks] } : {}),
           })),
+        completion: { requiredStages: workflowStageIds },
+        release: {
+          enabled: workflowStageIds.some((id) =>
+            ["staging_qa", "production_qa"].includes(id),
+          ),
+        },
       },
     }).catch(() => undefined);
   };

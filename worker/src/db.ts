@@ -680,9 +680,7 @@ const assertCompletionEligible = async (
   if (input.status !== "completed") return;
   if (!run) throw new HuntTransitionError("Auto Hunt run does not exist");
   const workflow = parseWorkflow(run.workflow_snapshot_json);
-  const requiredStages = workflow.stages
-    .filter((stage) => stage.required)
-    .map((stage) => stage.id);
+  const requiredStages = workflow.completion.requiredStages;
   const completedStages = await db
     .prepare(
       `select distinct workflow_stage from briar_hunt_events

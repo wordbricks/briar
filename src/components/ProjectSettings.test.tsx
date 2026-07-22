@@ -3,6 +3,7 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
+import { demoDashboard } from "../lib/demo-data";
 import { ProjectSettings } from "./ProjectSettings";
 
 describe("ProjectSettings", () => {
@@ -13,6 +14,7 @@ describe("ProjectSettings", () => {
     await act(async () => {
       root.render(
         <ProjectSettings
+          dashboard={demoDashboard}
           isDeleting={false}
           isSidebarOpen
           onBack={() => undefined}
@@ -43,6 +45,15 @@ describe("ProjectSettings", () => {
     expect(container.querySelector(".project-settings-llm")?.textContent).toContain(
       "Codex가 읽기 전용 경계를 넘어야 할 때 승인을 요청합니다.",
     );
+    expect(container.querySelector(".project-settings-automation")?.textContent).toContain(
+      "completion",
+    );
+    expect(container.querySelector(".project-workflow-contract")?.textContent).toContain(
+      "bun run test",
+    );
+    expect(container.querySelector(".project-workflow-contract")?.textContent).toContain(
+      '"enabled": false',
+    );
 
     const saveButton = container.querySelector<HTMLButtonElement>(
       ".project-settings-llm-control button",
@@ -63,6 +74,7 @@ describe("ProjectSettings", () => {
     await act(async () => {
       root.render(
         <ProjectSettings
+          dashboard={demoDashboard}
           isDeleting={false}
           isSidebarOpen
           onBack={() => undefined}

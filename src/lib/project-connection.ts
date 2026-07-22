@@ -49,6 +49,11 @@ export type LocalAutoHuntConfig = {
   workflow: AutoHuntWorkflow;
 };
 
+export type ConnectedLocalProject = {
+  repositoryPath: string;
+  workflow: AutoHuntWorkflow;
+};
+
 const isTauri = () => "__TAURI_INTERNALS__" in window;
 
 export async function loadConnectedProjectIds(): Promise<string[] | null> {
@@ -84,7 +89,7 @@ export async function connectLocalProject(input: {
     throw new Error("프로젝트 연결은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
   }
   const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<string>("connect_local_project", {
+  return invoke<ConnectedLocalProject>("connect_local_project", {
     apiUrl: briarApiUrl,
     projectId: input.projectId,
     agentToken: input.agentToken,
