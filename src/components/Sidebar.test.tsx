@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { Sidebar } from "./Sidebar";
 
 describe("Sidebar", () => {
-  it("keeps project creation in the switcher and only shows Auto Hunt navigation", () => {
+  it("shows projects as a native-style hierarchy", () => {
     const markup = renderToStaticMarkup(
       <Sidebar
         activeProjectId="project-1"
@@ -20,13 +20,12 @@ describe("Sidebar", () => {
     );
 
     expect(markup).toContain('aria-label="프로젝트 추가"');
-    expect(markup).toContain("<jelly-select");
-    expect(markup).toContain('label="프로젝트 선택"');
-    expect(markup).not.toContain("<select");
+    expect(markup).toContain("Projects");
+    expect(markup).toContain("Briar");
+    expect(markup).toContain('aria-label="현재 프로젝트"');
+    expect(markup).toContain('aria-current="page"');
     expect(markup).toContain('aria-label="왼쪽 패널 닫기"');
-    expect(markup).not.toContain("Briar</span>");
     expect(markup).toContain("자동사냥");
-    expect(markup).not.toContain("Agents");
-    expect(markup).not.toContain("Projects");
+    expect(markup).not.toContain("<jelly-select");
   });
 });
