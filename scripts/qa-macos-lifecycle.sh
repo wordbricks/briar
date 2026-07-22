@@ -228,8 +228,12 @@ assert_app_bundle "$installed_app" true "$candidate_version"
 
 candidate_signature="strict-ad-hoc"
 if [[ "$require_production_signature" == "true" ]]; then
-  if ! codesign -d --verbose=4 "$installed_app" 2>&1 \
-    | grep -q '^Authority=Developer ID Application:'; then
+  if ! candidate_codesign_details="$(codesign -d --verbose=4 "$installed_app" 2>&1)"; then
+    echo "Production candidate has an invalid code signature." >&2
+    exit 1
+  fi
+  if ! grep -q '^Authority=Developer ID Application:' \
+    <<< "$candidate_codesign_details"; then
     echo "Production candidate is not signed by a Developer ID Application identity." >&2
     exit 1
   fi
