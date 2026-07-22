@@ -7,7 +7,6 @@ import {
   autoHuntSources,
   autoHuntStages,
   autoHuntWorkflowPresets,
-  autoHuntWorkflowStageCatalog,
   defaultAutoHuntWorkflow,
   normalizeAutoHuntWorkflow,
   progressForAutoHuntRun,
@@ -74,16 +73,14 @@ class HttpError extends Error {
 
 const stageSchema = z.enum(autoHuntStages);
 const runStatusSchema = z.enum(autoHuntRunStatuses);
-const workflowStageIdSchema = z.enum(
-  autoHuntWorkflowStageCatalog.map((stage) => stage.id) as [
-    AutoHuntWorkflowStageId,
-    ...AutoHuntWorkflowStageId[],
-  ],
-);
+const workflowStageIdSchema = z
+  .string()
+  .trim()
+  .regex(/^[a-z][a-z0-9_-]{0,63}$/u);
 const workflowSchema = z
   .object({
     version: z.literal(1),
-    preset: z.enum(autoHuntWorkflowPresets),
+    preset: z.enum(autoHuntWorkflowPresets).optional(),
     stages: z
       .array(
         z
@@ -91,11 +88,20 @@ const workflowSchema = z
             id: workflowStageIdSchema,
             label: z.string().trim().min(1).max(80),
             required: z.boolean(),
+            evidence: z.array(z.string().trim().min(1).max(120)).max(20).optional(),
+            checks: z.array(z.string().trim().min(1).max(500)).max(20).optional(),
           })
           .strict(),
       )
       .min(1)
-      .max(autoHuntWorkflowStageCatalog.length),
+      .max(30),
+    completion: z
+      .object({
+        requiredStages: z.array(workflowStageIdSchema).max(30),
+      })
+      .strict()
+      .optional(),
+    release: z.object({ enabled: z.boolean() }).strict().optional(),
   })
   .strict()
   .transform(normalizeAutoHuntWorkflow);

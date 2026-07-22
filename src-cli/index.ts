@@ -11,25 +11,27 @@ import {
   autoHuntSources,
   autoHuntStages,
   autoHuntWorkflowPresets,
-  autoHuntWorkflowStageCatalog,
   workflowForPreset,
 } from "../src/lib/auto-hunt-contract";
 
-const workflowStageIds = autoHuntWorkflowStageCatalog.map((stage) => stage.id) as [
-  (typeof autoHuntWorkflowStageCatalog)[number]["id"],
-  ...(typeof autoHuntWorkflowStageCatalog)[number]["id"][],
-];
+const workflowStageIdSchema = z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/u);
 
 const workflowConfigSchema = z.object({
   version: z.literal(1),
-  preset: z.enum(autoHuntWorkflowPresets),
+  preset: z.enum(autoHuntWorkflowPresets).optional(),
   stages: z.array(
     z.object({
-      id: z.enum(workflowStageIds),
+      id: workflowStageIdSchema,
       label: z.string().min(1),
       required: z.boolean(),
+      evidence: z.array(z.string().min(1)).optional(),
+      checks: z.array(z.string().min(1)).optional(),
     }),
   ).min(1),
+  completion: z.object({
+    requiredStages: z.array(workflowStageIdSchema),
+  }).optional(),
+  release: z.object({ enabled: z.boolean() }).optional(),
 });
 
 const autoHuntConfigSchema = z
@@ -665,7 +667,7 @@ async function recordHunt() {
     title: z.string().min(1),
     stage: z.enum(autoHuntStages).optional(),
     status: z.enum(autoHuntRunStatuses).optional(),
-    workflowStage: z.enum(workflowStageIds).nullable().optional(),
+    workflowStage: workflowStageIdSchema.nullable().optional(),
     eventKey: z.string().min(1),
     occurredAt: z.string().datetime({ offset: true }),
     actor: z.string().min(1),

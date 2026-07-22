@@ -435,7 +435,7 @@ export function useBriar() {
       const agentToken =
         projectConnection.agentToken ??
         (await createAgentToken(token!, projectConnection.project.id)).agentToken;
-      const connectedPath = await connectLocalProject({
+      const connected = await connectLocalProject({
         projectId: projectConnection.project.id,
         agentToken,
         repositoryPath,
@@ -451,14 +451,14 @@ export function useBriar() {
             teamKey: autoHunt.linearTeam ?? null,
           },
           githubRepository: autoHunt.githubRepository ?? null,
-          workflow: autoHunt.workflow,
+          workflow: connected.workflow,
         });
       }
       setProjectConnection(null);
       setIsCreatingProject(false);
       await refresh();
       await refreshHealth();
-      return connectedPath;
+      return connected.repositoryPath;
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : String(caught);
       setError(message);
