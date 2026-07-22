@@ -12,6 +12,7 @@ Drive one task to a verified production outcome and make every meaningful stage 
 - Run `briar auto-hunt doctor` inside the target Git repository before changing files. Stop if Briar or Velen preflight fails.
 - Use Velen CLI during investigation. Do not silently replace Velen with direct source credentials or another client.
 - Keep one stable `source`, `source-key`, title, and Briar run for the whole task.
+- Keep one Briar run across retries. The current attempt may advance, but prior attempt events and evidence must remain intact.
 - Record Briar first at every stage. Linear comments or state changes happen only after the corresponding Briar event succeeds.
 - Use retry-stable event keys. Never put timestamps or random values in event keys.
 - Do not record `completed` until production QA is passed or explicitly skipped with a defensible reason and a result summary exists.
@@ -99,8 +100,9 @@ Read [lifecycle.md](references/lifecycle.md) before starting. Read [velen-and-li
 
 - Retry the same Briar write with the same event key after timeouts. A changed payload with the same key is a conflict; investigate instead of inventing a new key.
 - If implementation cannot proceed, record `blocked` and state what external action unblocks it.
-- If a check, deployment, or QA action fails, record `failed` with command/environment evidence. Fix forward or follow the repository rollback procedure, then record the next truthful stage.
-- If the task is intentionally abandoned, record `cancelled` with the reason.
+- If a check, deployment, or QA action fails, record `failed` with command/environment evidence. After fixing the underlying cause, start a distinct attempt with `briar auto-hunt retry --run-id '<run-id>' --reason '<reason>'`, then claim the queued run again with `briar auto-hunt next`. Do not delete or rewrite prior attempt evidence.
+- Retry and cancel requests are idempotent when the same `--request-id` UUID is reused after a timeout. Omit it for a fresh request.
+- If a blocked or failed task is intentionally abandoned, use `briar auto-hunt cancel --run-id '<run-id>' --reason '<reason>'` or cancel it in the Briar app. Cancellation is terminal.
 - Never conceal failed deployment or QA evidence by recording a later success event.
 
 ## Handoff

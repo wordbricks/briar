@@ -12,6 +12,7 @@ import {
   PanelLeftOpen,
   Plus,
   RefreshCw,
+  RotateCcw,
   Search,
   ShieldCheck,
   Terminal,
@@ -35,10 +36,14 @@ export function HuntDashboard({
   healthError,
   healthLoading,
   isCreatingIssue,
+  recoveringRunId,
+  recoveryError,
   isSidebarOpen,
   onCreateIssue,
   onHealthRefresh,
   onReconnect,
+  onRetryRun,
+  onCancelRun,
   onRepair,
   onRefresh,
   onSidebarOpen,
@@ -50,6 +55,8 @@ export function HuntDashboard({
   healthError: string | null;
   healthLoading: boolean;
   isCreatingIssue: boolean;
+  recoveringRunId: string | null;
+  recoveryError: string | null;
   isSidebarOpen: boolean;
   onCreateIssue: (input: {
     title: string;
@@ -58,6 +65,8 @@ export function HuntDashboard({
   }) => Promise<unknown>;
   onHealthRefresh: () => void;
   onReconnect: () => void;
+  onRetryRun: (runId: string) => Promise<unknown>;
+  onCancelRun: (runId: string) => Promise<unknown>;
   onRepair: () => void;
   onRefresh: () => void;
   onSidebarOpen: () => void;
@@ -65,10 +74,11 @@ export function HuntDashboard({
   const [query, setQuery] = useState("");
   const [source, setSource] = useState<SourceFilter>("all");
   const [status, setStatus] = useState<StatusFilter>("active");
-  const [selected, setSelected] = useState<HuntRun | null>(null);
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [isIssueDialogOpen, setIsIssueDialogOpen] = useState(false);
 
   const runs = dashboard?.runs ?? [];
+  const selected = runs.find((run) => run.id === selectedRunId) ?? null;
   const activeCount = runs.filter((run) => !["completed", "cancelled"].includes(run.stage)).length;
   const attentionCount = runs.filter((run) => ["blocked", "failed"].includes(run.stage)).length;
   const completedCount = runs.filter((run) => run.stage === "completed").length;
@@ -170,7 +180,7 @@ export function HuntDashboard({
           </div>
           <div className="queue-table">
             <div className="queue-table-head"><span>작업</span><span>상태</span><span>진행률</span><span>업데이트</span><span /></div>
-            {filtered.length ? filtered.map((run) => <RunRow key={run.id} run={run} onOpen={() => setSelected(run)} />) : (
+            {filtered.length ? filtered.map((run) => <RunRow key={run.id} run={run} onOpen={() => setSelectedRunId(run.id)} />) : (
               <div className="empty-state"><Bot size={25} /><strong>조건에 맞는 자동사냥 작업이 없습니다.</strong><span>필터를 변경하거나 새 작업이 기록될 때까지 기다려주세요.</span></div>
             )}
           </div>
@@ -186,7 +196,16 @@ export function HuntDashboard({
           }}
         />
       )}
-      {selected && <RunDialog run={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <RunDialog
+          error={recoveryError}
+          isRecovering={recoveringRunId === selected.id}
+          onCancel={() => onCancelRun(selected.id)}
+          onClose={() => setSelectedRunId(null)}
+          onRetry={() => onRetryRun(selected.id)}
+          run={selected}
+        />
+      )}
     </main>
   );
 }
@@ -358,25 +377,63 @@ function RunRow({ run, onOpen }: { run: HuntRun; onOpen: () => void }) {
   );
 }
 
-function RunDialog({ run, onClose }: { run: HuntRun; onClose: () => void }) {
+export function RunDialog({
+  error,
+  isRecovering,
+  onCancel,
+  onClose,
+  onRetry,
+  run,
+}: {
+  error: string | null;
+  isRecovering: boolean;
+  onCancel: () => Promise<unknown>;
+  onClose: () => void;
+  onRetry: () => Promise<unknown>;
+  run: HuntRun;
+}) {
   const meta = stageMeta[run.stage];
+  const needsAttention = ["blocked", "failed"].includes(run.stage);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const runAction = async (action: () => Promise<unknown>) => {
+    try {
+      await action();
+      setConfirmCancel(false);
+    } catch {
+      // The hook exposes the actionable error in this dialog.
+    }
+  };
   return (
     <div className="dialog-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <section className="run-dialog" role="dialog" aria-modal="true" aria-label={`${run.title} 상세`}>
-        <header><div><span className={`status-pill ${meta.tone}`}>{meta.label}</span><small>AH-{run.runNumber}</small></div><button onClick={onClose} aria-label="닫기"><X size={18} /></button></header>
+        <header><div><span className={`status-pill ${meta.tone}`}>{meta.label}</span><small>AH-{run.runNumber} · 시도 {run.currentAttempt}</small></div><button onClick={onClose} aria-label="닫기"><X size={18} /></button></header>
         <div className="dialog-body">
           <p className="eyebrow">{sourceLabel[run.source].toUpperCase()} · {run.repository}</p>
           <h2>{run.title}</h2>
           <p className="run-detail">{run.detail}</p>
+          {needsAttention && (
+            <div className="recovery-panel">
+              <div><CircleAlert size={16} /><span><strong>{run.stage === "failed" ? "실행이 실패했습니다" : "진행이 차단되었습니다"}</strong><small>이전 시도의 활동 기록은 보존됩니다. 재시도하면 {run.currentAttempt + 1}번 시도로 새 작업이 시작됩니다.</small></span></div>
+              {error && <p><CircleAlert size={13} />{error}</p>}
+              <div className="recovery-actions">
+                <button disabled={isRecovering} onClick={() => void runAction(onRetry)} type="button"><RotateCcw className={isRecovering ? "spin" : ""} size={14} />재시도</button>
+                {confirmCancel ? (
+                  <><button className="danger" disabled={isRecovering} onClick={() => void runAction(onCancel)} type="button">취소 확정</button><button disabled={isRecovering} onClick={() => setConfirmCancel(false)} type="button">돌아가기</button></>
+                ) : (
+                  <button className="danger-secondary" disabled={isRecovering} onClick={() => setConfirmCancel(true)} type="button">작업 취소</button>
+                )}
+              </div>
+            </div>
+          )}
           <div className="large-progress"><div><span>전체 진행률</span><strong>{run.progress}%</strong></div><i><b style={{ width: `${run.progress}%` }} /></i></div>
           <div className="run-facts">
             <span><GitFork size={15} /><small>브랜치</small><strong>{run.branch ?? "—"}</strong></span>
             <span><GitCommitHorizontal size={15} /><small>커밋</small><strong>{run.commitSha ?? "—"}</strong></span>
             <span><Clock3 size={15} /><small>시작</small><strong>{formatDate(run.startedAt)}</strong></span>
           </div>
-          <div className="timeline"><h3>활동 기록</h3>{run.events.map((event) => <div className="timeline-event" key={event.id}><i className={stageMeta[event.stage].tone} /><span><strong>{stageMeta[event.stage].label}</strong><p>{event.detail}</p><small>{event.actor} · {relativeTime(event.occurredAt)}</small></span></div>)}</div>
+          <div className="timeline"><h3>활동 기록</h3>{run.events.map((event) => <div className="timeline-event" key={event.id}><i className={stageMeta[event.stage].tone} /><span><strong>{stageMeta[event.stage].label} <em>시도 {event.attempt}</em></strong><p>{event.detail}</p><small>{event.actor} · {relativeTime(event.occurredAt)}</small></span></div>)}</div>
         </div>
-        <footer><span>이 대시보드는 조회 전용입니다.</span><button><ArrowUpRight size={14} />로컬 저장소 열기</button></footer>
+        <footer><span>{needsAttention ? "실패 이력과 증거는 재시도 후에도 보존됩니다." : "Auto Hunt 실행 증거를 실시간으로 표시합니다."}</span><button><ArrowUpRight size={14} />로컬 저장소 열기</button></footer>
       </section>
     </div>
   );

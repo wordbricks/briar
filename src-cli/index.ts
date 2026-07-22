@@ -422,6 +422,7 @@ async function autoHuntDoctor() {
 const queuedIssueSchema = z.object({
   runId: z.string().uuid(),
   runNumber: z.number().int().positive(),
+  currentAttempt: z.number().int().positive(),
   source: z.enum(autoHuntSources),
   sourceKey: z.string().min(1),
   title: z.string().min(1),
@@ -634,6 +635,44 @@ async function recordQa() {
   console.log(JSON.stringify(result));
 }
 
+async function recoverHunt(action: "retry" | "cancel") {
+  const config = await loadConfig();
+  const project = await currentProject(config);
+  ensureVelen(project);
+  const runId = required("--run-id");
+  const input = {
+    requestId: value("--request-id") ?? crypto.randomUUID(),
+    actor: value("--actor") ?? "briar-auto-hunt",
+    reason: value("--reason") ?? null,
+  };
+  z.object({
+    requestId: z.string().uuid(),
+    actor: z.string().min(1).max(128),
+    reason: z.string().min(1).max(4_000).nullable(),
+  }).parse(input);
+  z.string().uuid().parse(runId);
+  const result = await request<{
+    runId: string;
+    outcome: string;
+    attempt: number;
+    stage: string;
+  }>(
+    config.apiUrl,
+    `/ingest/runs/${runId}/${action}`,
+    process.env.BRIAR_AGENT_TOKEN ?? project.agentToken,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+  if (project.activeClaim?.runId === runId) {
+    config.projects = config.projects.map((candidate) =>
+      candidate.id === project.id
+        ? { ...candidate, activeClaim: undefined }
+        : candidate,
+    );
+    await saveConfig(config);
+  }
+  console.log(JSON.stringify(result));
+}
+
 const usage = `Briar CLI
 
   briar login
@@ -648,6 +687,8 @@ const usage = `Briar CLI
     --event-key <retry-stable-key> [Wordbricks-compatible progress flags]
   briar auto-hunt qa-result --run-id <uuid> --environment <staging|production>
     --result <passed|skipped>
+  briar auto-hunt retry --run-id <uuid> [--request-id <uuid>] [--reason <text>]
+  briar auto-hunt cancel --run-id <uuid> [--request-id <uuid>] [--reason <text>]
 
 Compatibility:
   briar hunt record ...   Alias of briar auto-hunt record
@@ -672,6 +713,8 @@ async function main() {
   }
   if (args[0] === "auto-hunt" && args[1] === "record") return recordHunt();
   if (args[0] === "auto-hunt" && args[1] === "qa-result") return recordQa();
+  if (args[0] === "auto-hunt" && args[1] === "retry") return recoverHunt("retry");
+  if (args[0] === "auto-hunt" && args[1] === "cancel") return recoverHunt("cancel");
   if (args[0] === "hunt" && args[1] === "record") return recordHunt();
   console.log(usage);
 }

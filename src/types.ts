@@ -19,6 +19,7 @@ export type TrackerReference = {
 
 export type HuntEvent = {
   id: string;
+  attempt: number;
   stage: HuntStage;
   detail: string | null;
   actor: string;
@@ -33,6 +34,7 @@ export type HuntEvent = {
 export type HuntRun = {
   id: string;
   runNumber: number;
+  currentAttempt: number;
   source: HuntSource;
   sourceKey: string;
   title: string;

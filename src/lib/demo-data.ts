@@ -4,6 +4,7 @@ const now = Date.now();
 const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
 
 const runDefaults = {
+  currentAttempt: 1,
   priority: null,
   tracker: null,
   issueDescription: null,
@@ -23,6 +24,7 @@ const runDefaults = {
 } satisfies Pick<
   HuntRun,
   | "priority"
+  | "currentAttempt"
   | "tracker"
   | "issueDescription"
   | "resultSummary"
@@ -44,6 +46,7 @@ const event = (
   input: Pick<HuntEvent, "id" | "stage" | "detail" | "actor" | "occurredAt">,
 ): HuntEvent => ({
   ...input,
+  attempt: 1,
   qaStatus: null,
   trackerState: null,
   pullRequestUrls: [],
