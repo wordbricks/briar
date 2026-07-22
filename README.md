@@ -50,6 +50,17 @@ bun run worker:types
 
 ## Local development
 
+Start the local Worker and Tauri desktop app together. This validates the
+encrypted secrets, applies pending local D1 migrations, waits for the Worker,
+and stops both processes when you press `Ctrl+C`. The combined command uses
+`http://127.0.0.1:8788` for its local Worker:
+
+```bash
+bun run dev:all
+```
+
+To run the processes separately, follow the steps below.
+
 Decrypt the checked-in `.env.production` with the private key stored in the ignored `.env.keys` file, then apply the D1 migration to Wrangler's local database:
 
 ```bash

@@ -68,10 +68,26 @@ async function main(): Promise<void> {
       { mode: 0o600 },
     );
 
+    const workerDevPort = process.env.BRIAR_WORKER_DEV_PORT?.trim();
+    const parsedWorkerDevPort = workerDevPort ? Number(workerDevPort) : null;
+    if (
+      workerDevPort &&
+      (!/^\d{1,5}$/u.test(workerDevPort) ||
+        !Number.isInteger(parsedWorkerDevPort) ||
+        parsedWorkerDevPort! < 1 ||
+        parsedWorkerDevPort! > 65_535)
+    ) {
+      throw new Error("BRIAR_WORKER_DEV_PORT must be a valid TCP port.");
+    }
     const exitCode = await runWrangler(
       mode === "deploy"
         ? ["deploy", "--secrets-file", secretsPath]
-        : ["dev", "--env-file", secretsPath],
+        : [
+            "dev",
+            "--env-file",
+            secretsPath,
+            ...(workerDevPort ? ["--port", workerDevPort] : []),
+          ],
     );
 
     if (exitCode !== 0) {
