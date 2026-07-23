@@ -270,6 +270,19 @@ struct VelenInspection {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+struct OnboardingPrerequisiteStatus {
+    installed: bool,
+    version: Option<String>,
+}
+
+#[derive(Serialize)]
+struct OnboardingPrerequisites {
+    codex: OnboardingPrerequisiteStatus,
+    velen: OnboardingPrerequisiteStatus,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct AutoHuntHealth {
     project_id: String,
     healthy: bool,
@@ -442,6 +455,127 @@ fn velen_binary() -> Result<PathBuf, String> {
         }
     }
     Err("Velen CLI가 필요합니다. Velen CLI를 설치한 뒤 Briar를 다시 여세요.".to_string())
+}
+
+fn parse_cli_version(stdout: &[u8]) -> Option<String> {
+    let output = String::from_utf8_lossy(stdout);
+    let trimmed = output.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    if let Ok(value) = serde_json::from_str::<serde_json::Value>(trimmed) {
+        return value
+            .pointer("/data/display")
+            .and_then(serde_json::Value::as_str)
+            .map(str::trim)
+            .filter(|version| !version.is_empty())
+            .map(str::to_string);
+    }
+    trimmed.lines().next().map(str::trim).map(str::to_string)
+}
+
+fn inspect_cli(binary: Result<PathBuf, String>) -> OnboardingPrerequisiteStatus {
+    let Ok(binary) = binary else {
+        return OnboardingPrerequisiteStatus {
+            installed: false,
+            version: None,
+        };
+    };
+    let version = Command::new(&binary)
+        .arg("--version")
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .and_then(|output| parse_cli_version(&output.stdout));
+    OnboardingPrerequisiteStatus {
+        installed: true,
+        version,
+    }
+}
+
+fn inspect_onboarding_prerequisites_sync(home: &Path) -> OnboardingPrerequisites {
+    OnboardingPrerequisites {
+        codex: inspect_cli(codex_app_server::codex_binary(home)),
+        velen: inspect_cli(velen_binary()),
+    }
+}
+
+#[tauri::command]
+async fn inspect_onboarding_prerequisites(
+    app: tauri::AppHandle,
+) -> Result<OnboardingPrerequisites, String> {
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || inspect_onboarding_prerequisites_sync(&home))
+        .await
+        .map_err(|error| error.to_string())
+}
+
+fn install_cli_package(home: &Path, package: &str) -> Result<(), String> {
+    let execution_path = cli_execution_path(home)?;
+    let mut failures = Vec::new();
+    for (manager, args) in [
+        ("bun", vec!["add", "--global", package]),
+        ("npm", vec!["install", "--global", package]),
+    ] {
+        let Ok(binary) = which::which_in(manager, Some(&execution_path), home) else {
+            continue;
+        };
+        match Command::new(binary)
+            .env("PATH", &execution_path)
+            .args(args)
+            .output()
+        {
+            Ok(output) if output.status.success() => return Ok(()),
+            Ok(output) => {
+                let message = String::from_utf8_lossy(&output.stderr);
+                let message = message.trim();
+                failures.push(if message.is_empty() {
+                    format!("{manager} 설치 명령이 실패했습니다.")
+                } else {
+                    format!("{manager}: {message}")
+                });
+            }
+            Err(error) => failures.push(format!("{manager}: {error}")),
+        }
+    }
+    if failures.is_empty() {
+        Err("설치에 필요한 Bun 또는 npm을 찾지 못했습니다.".to_string())
+    } else {
+        Err(format!(
+            "CLI를 설치하지 못했습니다. {}",
+            failures.join(" / ")
+        ))
+    }
+}
+
+#[tauri::command]
+async fn install_onboarding_prerequisite(
+    app: tauri::AppHandle,
+    prerequisite: String,
+) -> Result<OnboardingPrerequisites, String> {
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let package = match prerequisite.as_str() {
+            "codex" => "@openai/codex",
+            "velen" => "@wordbricks/velen",
+            _ => return Err("지원하지 않는 필수 도구입니다.".to_string()),
+        };
+        install_cli_package(&home, package)?;
+        let prerequisites = inspect_onboarding_prerequisites_sync(&home);
+        let installed = match prerequisite.as_str() {
+            "codex" => prerequisites.codex.installed,
+            "velen" => prerequisites.velen.installed,
+            _ => false,
+        };
+        if !installed {
+            return Err(
+                "설치는 완료됐지만 CLI를 찾지 못했습니다. Briar를 다시 열어 주세요.".to_string(),
+            );
+        }
+        Ok(prerequisites)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 fn cli_execution_path(home: &Path) -> Result<OsString, String> {
@@ -1554,6 +1688,8 @@ pub fn run() {
             show_main_window,
             reveal_main_window,
             finish_launch_intro,
+            inspect_onboarding_prerequisites,
+            install_onboarding_prerequisite,
             read_session_token,
             write_session_token,
             clear_session_token,
@@ -1590,6 +1726,21 @@ mod tests {
             launch_intro_bounds(-2560, -120, 2560, 1440, -120),
             (-2560, -120, 2560, 1440)
         );
+    }
+
+    #[test]
+    fn parses_plain_and_json_cli_versions() {
+        assert_eq!(
+            parse_cli_version(b"codex-cli 0.144.1\n"),
+            Some("codex-cli 0.144.1".to_string())
+        );
+        assert_eq!(
+            parse_cli_version(
+                br#"{"command":"version","data":{"display":"velen 0.2.43\n"},"ok":true}"#
+            ),
+            Some("velen 0.2.43".to_string())
+        );
+        assert_eq!(parse_cli_version(b""), None);
     }
 
     #[test]
