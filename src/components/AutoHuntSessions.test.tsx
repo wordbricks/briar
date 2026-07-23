@@ -105,4 +105,48 @@ describe("AutoHuntSessions", () => {
     expect(container.querySelector(".auto-hunt-session-list")).not.toBeNull();
     await act(async () => root.unmount());
   });
+
+  it("does not render a duplicate running status callout in session details", async () => {
+    const session: AutoHuntSession = {
+      id: "session-running",
+      projectId: "project-1",
+      status: "running",
+      issues: [{
+        runId: "run-1",
+        runNumber: 1,
+        sourceKey: "BRIAR-1",
+        title: "진행 중인 이슈",
+        outcome: "pending",
+        summary: null,
+      }],
+      startedAt: "2026-07-22T01:00:00Z",
+      completedAt: null,
+      conversationId: "thread-1",
+      workspaceRoot: "/repo",
+      summary: null,
+      error: null,
+      events: [{ id: "event-1", type: "started", occurredAt: "2026-07-22T01:00:00Z" }],
+    };
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <AutoHuntSessions
+        dashboard={dashboard}
+        error={null}
+        isSidebarOpen
+        onSidebarOpen={() => undefined}
+        onStart={() => "session-2"}
+        sessions={[session]}
+      />,
+    ));
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".auto-hunt-session-row")?.click();
+    });
+
+    expect(container.querySelector(".auto-hunt-running-callout")).toBeNull();
+    expect(container.querySelector(".auto-hunt-status.running")).not.toBeNull();
+    expect(container.querySelector(".auto-hunt-event-count i")).not.toBeNull();
+    await act(async () => root.unmount());
+  });
 });
