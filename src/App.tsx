@@ -12,6 +12,7 @@ import { LaunchIntro } from "./components/LaunchIntro";
 import { LoginScreen } from "./components/LoginScreen";
 import { OrganizationSettings } from "./components/OrganizationSettings";
 import { ProjectOnboarding } from "./components/ProjectOnboarding";
+import { ProjectRepositorySetupDialog } from "./components/ProjectRepositorySetupDialog";
 import { ProjectSettings } from "./components/ProjectSettings";
 import { Sidebar } from "./components/Sidebar";
 import { useBriar } from "./hooks/useBriar";
@@ -76,6 +77,8 @@ export function App() {
     id: string;
     section?: "members";
   } | null>(null);
+  const [repositorySetupProjectId, setRepositorySetupProjectId] =
+    useState<string | null>(null);
   const hasCompactedWindowForOnboarding = useRef(false);
   const activeProject = briar.projects.find(
     (project) => project.id === briar.activeProjectId,
@@ -188,6 +191,7 @@ export function App() {
         onCreate={briar.addProject}
         onLogout={() => void briar.logout()}
         onRepositorySelect={briar.selectProjectRepository}
+        onRepositoryInspect={briar.inspectProjectRepository}
         onVelenOrgChange={briar.refreshVelen}
         user={briar.user}
         velen={briar.velen}
@@ -221,6 +225,7 @@ export function App() {
             setRequestedSessionId(null);
             setActivePage("issues");
           }}
+          onProjectReadinessOpen={setRepositorySetupProjectId}
           onProjectSettings={(projectId) => {
             briar.setActiveProjectId(projectId);
             setActivePage("project-settings");
@@ -229,9 +234,46 @@ export function App() {
           onToggle={() => setIsSidebarOpen(false)}
           organizations={briar.organizations}
           projects={briar.projects}
+          projectReadiness={briar.projectReadiness}
           unreadInboxCount={inbox.unreadCount}
           user={briar.user}
         />
+        {repositorySetupProjectId ? (
+          <ProjectRepositorySetupDialog
+            error={briar.projectReadinessError[repositorySetupProjectId] ?? null}
+            loading={
+              briar.projectReadinessLoadingId === repositorySetupProjectId
+            }
+            onClose={() => {
+              const projectId = repositorySetupProjectId;
+              setRepositorySetupProjectId(null);
+              window.requestAnimationFrame(() => {
+                document
+                  .querySelector<HTMLButtonElement>(
+                    `[data-project-readiness="${projectId}"]`,
+                  )
+                  ?.focus();
+              });
+            }}
+            onInstallGithub={() =>
+              briar.installGithubForProject(repositorySetupProjectId)
+            }
+            onLoginGithub={() =>
+              briar.loginGithubForProject(repositorySetupProjectId)
+            }
+            onRefresh={() =>
+              briar.refreshProjectReadiness(repositorySetupProjectId)
+            }
+            projectName={
+              briar.projects.find(
+                (project) => project.id === repositorySetupProjectId,
+              )?.name ?? ""
+            }
+            readiness={
+              briar.projectReadiness[repositorySetupProjectId] ?? null
+            }
+          />
+        ) : null}
         {activePage === "organization-settings" &&
         settingsOrganization &&
         briar.token ? (

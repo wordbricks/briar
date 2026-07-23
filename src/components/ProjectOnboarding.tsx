@@ -2,19 +2,23 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
+  CircleAlert,
   Database,
   FolderGit2,
   FolderOpen,
+  GitBranch,
   Link2,
   ListChecks,
   LoaderCircle,
   LogOut,
   RefreshCw,
+  UploadCloud,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { ProjectConnection } from "../hooks/useBriar";
 import type {
   LocalAutoHuntConfig,
+  RepositoryReadiness,
   VelenInspection,
 } from "../lib/project-connection";
 import type { SessionUser } from "../types";
@@ -38,6 +42,10 @@ type Props = {
   onCreate: (input: { name: string }) => Promise<unknown>;
   onLogout: () => void;
   onRepositorySelect: () => Promise<string | null>;
+  onRepositoryInspect: (
+    repositoryPath: string,
+    workflow: LocalAutoHuntConfig["workflow"],
+  ) => Promise<RepositoryReadiness>;
   onVelenOrgChange: (org?: string | null) => Promise<VelenInspection | null>;
   user: SessionUser;
   velen: VelenInspection | null;
@@ -53,6 +61,7 @@ export function ProjectOnboarding({
   onCreate,
   onLogout,
   onRepositorySelect,
+  onRepositoryInspect,
   onVelenOrgChange,
   user,
   velen,
@@ -64,6 +73,9 @@ export function ProjectOnboarding({
   const [linearSource, setLinearSource] = useState("");
   const [linearTeam, setLinearTeam] = useState("");
   const [repositoryPath, setRepositoryPath] = useState("");
+  const [repositoryReadiness, setRepositoryReadiness] =
+    useState<RepositoryReadiness | null>(null);
+  const [repositoryError, setRepositoryError] = useState<string | null>(null);
   const [selectingRepository, setSelectingRepository] = useState(false);
   const initialWorkflow = normalizeAutoHuntWorkflow(connection?.workflow);
 
@@ -104,11 +116,20 @@ export function ProjectOnboarding({
 
   const selectRepository = async () => {
     setSelectingRepository(true);
+    setRepositoryError(null);
     try {
       const selected = await onRepositorySelect();
-      if (selected) setRepositoryPath(selected);
-    } catch {
-      // The shared error surface is populated by the repository selector.
+      if (!selected) return;
+      setRepositoryPath(selected);
+      setRepositoryReadiness(null);
+      const readiness = await onRepositoryInspect(selected, initialWorkflow);
+      setRepositoryPath(readiness.repositoryPath);
+      setRepositoryReadiness(readiness);
+    } catch (caught) {
+      setRepositoryReadiness(null);
+      setRepositoryError(
+        caught instanceof Error ? caught.message : String(caught),
+      );
     } finally {
       setSelectingRepository(false);
     }
@@ -177,6 +198,31 @@ export function ProjectOnboarding({
                         : t("onboarding.repositorySelect")}
                   </button>
                 </div>
+                {repositoryPath ? (
+                  <div
+                    aria-label={t("onboarding.gitReadiness")}
+                    className="repository-readiness"
+                  >
+                    <span className={repositoryReadiness?.gitReady ? "ready" : "warning"}>
+                      {repositoryReadiness?.gitReady ? <Check size={13} /> : <CircleAlert size={13} />}
+                      <i><strong>Git</strong><small>{repositoryReadiness?.gitVersion ?? t("common.checkNeeded")}</small></i>
+                    </span>
+                    <span className={repositoryReadiness?.remoteReachable ? "ready" : "warning"}>
+                      {repositoryReadiness?.remoteReachable ? <Check size={13} /> : <GitBranch size={13} />}
+                      <i><strong>origin</strong><small>{repositoryReadiness?.remote ?? t("onboarding.remoteMissing")}</small></i>
+                    </span>
+                    <span className={repositoryReadiness?.pushAccess ? "ready" : "warning"}>
+                      {repositoryReadiness?.pushAccess ? <Check size={13} /> : <UploadCloud size={13} />}
+                      <i><strong>push</strong><small>{repositoryReadiness?.pushAccess ? t("onboarding.pushReady") : t("onboarding.pushCheckNeeded")}</small></i>
+                    </span>
+                  </div>
+                ) : null}
+                {repositoryError ? (
+                  <p className="repository-readiness-error" role="alert">
+                    <CircleAlert size={13} />
+                    {repositoryError}
+                  </p>
+                ) : null}
               </section>
 
               <section className="setup-section">
@@ -258,7 +304,7 @@ export function ProjectOnboarding({
             {error ? <jelly-alert variant="rose" className="login-error">{error}</jelly-alert> : null}
             <button
               className="onboarding-primary-action"
-              disabled={loading || !repositoryPath || !velen || !velenOrg || (linearEnabled && !linearSource)}
+              disabled={loading || selectingRepository || !repositoryReadiness?.gitReady || !velen || !velenOrg || (linearEnabled && !linearSource)}
               onClick={() => void connect()}
               type="button"
             >

@@ -22,13 +22,18 @@ import {
   connectLocalProject,
   disconnectLocalProject,
   inspectVelen,
+  inspectRepositoryReadiness,
+  installProjectGithubCli,
+  loadProjectRepositoryReadiness,
   loadAutoHuntHealth,
   loadConnectedProjectIds,
+  loginProjectGithub,
   pickGitRepository,
   repairAutoHunt,
   updateLocalProjectWorkflow,
   type AutoHuntHealth,
   type LocalAutoHuntConfig,
+  type RepositoryReadiness,
   type VelenInspection,
 } from "../lib/project-connection";
 import { generateProjectWorkflow } from "../lib/project-workflow";
@@ -143,6 +148,14 @@ export function useBriar() {
   const [health, setHealth] = useState<AutoHuntHealth | null>(null);
   const [healthError, setHealthError] = useState<string | null>(null);
   const [healthLoading, setHealthLoading] = useState(false);
+  const [projectReadiness, setProjectReadiness] = useState<
+    Record<string, RepositoryReadiness>
+  >({});
+  const [projectReadinessError, setProjectReadinessError] = useState<
+    Record<string, string>
+  >({});
+  const [projectReadinessLoadingId, setProjectReadinessLoadingId] =
+    useState<string | null>(null);
   const pollTimer = useRef<number | null>(null);
   const pollLoginNow = useRef<(() => void) | null>(null);
   const loginAttempt = useRef(0);
@@ -269,6 +282,64 @@ export function useBriar() {
   useEffect(() => {
     void refreshHealth();
   }, [refreshHealth]);
+
+  const refreshProjectReadiness = useCallback(async (projectId: string) => {
+    if (demoMode || companionMode) return null;
+    setProjectReadinessLoadingId(projectId);
+    try {
+      const readiness = await loadProjectRepositoryReadiness(projectId);
+      if (!readiness) return null;
+      setProjectReadiness((current) => ({
+        ...current,
+        [projectId]: readiness,
+      }));
+      setProjectReadinessError((current) => {
+        const next = { ...current };
+        delete next[projectId];
+        return next;
+      });
+      return readiness;
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : String(caught);
+      setProjectReadinessError((current) => ({
+        ...current,
+        [projectId]: message,
+      }));
+      return null;
+    } finally {
+      setProjectReadinessLoadingId((current) =>
+        current === projectId ? null : current,
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    if (demoMode || companionMode || projects.length === 0) return;
+    let cancelled = false;
+    void Promise.all(
+      projects.map(async (project) => {
+        try {
+          const readiness = await loadProjectRepositoryReadiness(project.id);
+          return readiness ? ([project.id, readiness] as const) : null;
+        } catch {
+          return null;
+        }
+      }),
+    ).then((entries) => {
+      if (cancelled) return;
+      setProjectReadiness(
+        Object.fromEntries(
+          entries.filter(
+            (entry): entry is readonly [string, RepositoryReadiness] =>
+              entry !== null,
+          ),
+        ),
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [projects]);
 
   const login = useCallback(async () => {
     const attempt = ++loginAttempt.current;
@@ -505,6 +576,11 @@ export function useBriar() {
         }
         setActiveProjectId(nextActiveProject?.id ?? null);
         setProjectConnection(null);
+        setProjectReadiness((current) => {
+          const next = { ...current };
+          delete next[projectId];
+          return next;
+        });
         if (deletedActiveProject) {
           setDashboard(
             demoMode && nextActiveProject
@@ -638,6 +714,7 @@ export function useBriar() {
               ? { ...current, settings: generatedSettings }
               : current,
           );
+          await refreshProjectReadiness(connection.project.id);
         } catch (caught) {
           const message = caught instanceof Error ? caught.message : String(caught);
           setError(`프로젝트는 연결했지만 백그라운드 코드 분석에 실패했습니다: ${message}`);
@@ -662,7 +739,47 @@ export function useBriar() {
     } finally {
       setLoading(false);
     }
-  }, [projectConnection, refreshHealth, token]);
+  }, [projectConnection, refreshHealth, refreshProjectReadiness, token]);
+
+  const installGithubForProject = useCallback(async (projectId: string) => {
+    setProjectReadinessLoadingId(projectId);
+    setProjectReadinessError((current) => {
+      const next = { ...current };
+      delete next[projectId];
+      return next;
+    });
+    try {
+      const readiness = await installProjectGithubCli(projectId);
+      setProjectReadiness((current) => ({ ...current, [projectId]: readiness }));
+      return readiness;
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : String(caught);
+      setProjectReadinessError((current) => ({ ...current, [projectId]: message }));
+      throw caught;
+    } finally {
+      setProjectReadinessLoadingId(null);
+    }
+  }, []);
+
+  const loginGithubForProject = useCallback(async (projectId: string) => {
+    setProjectReadinessLoadingId(projectId);
+    setProjectReadinessError((current) => {
+      const next = { ...current };
+      delete next[projectId];
+      return next;
+    });
+    try {
+      const readiness = await loginProjectGithub(projectId);
+      setProjectReadiness((current) => ({ ...current, [projectId]: readiness }));
+      return readiness;
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : String(caught);
+      setProjectReadinessError((current) => ({ ...current, [projectId]: message }));
+      throw caught;
+    } finally {
+      setProjectReadinessLoadingId(null);
+    }
+  }, []);
 
   const repairHealth = useCallback(async () => {
     if (!activeProjectId) throw new Error("복구할 프로젝트가 없습니다.");
@@ -717,6 +834,7 @@ export function useBriar() {
             ? { ...current, settings: result.settings }
             : current,
         );
+        await refreshProjectReadiness(projectId);
       } catch (caught) {
         try {
           await updateLocalProjectWorkflow(projectId, previousWorkflow);
@@ -733,7 +851,7 @@ export function useBriar() {
       }
       return generatedWorkflow;
     },
-    [dashboard, token],
+    [dashboard, refreshProjectReadiness, token],
   );
 
   const addIssue = useCallback(
@@ -953,17 +1071,24 @@ export function useBriar() {
     organizations,
     projects,
     projectConnection,
+    projectReadiness,
+    projectReadinessError,
+    projectReadinessLoadingId,
     reconnectProject,
     regenerateWorkflow,
     recoveringRunId,
     recoveryError,
     refresh,
     refreshHealth,
+    refreshProjectReadiness,
     refreshVelen,
     readIssueAttachment,
     setActiveOrganizationId: selectOrganization,
     setActiveProjectId: selectProject,
     selectProjectRepository,
+    inspectProjectRepository: inspectRepositoryReadiness,
+    installGithubForProject,
+    loginGithubForProject,
     repairHealth,
     retryRun: (runId: string) => recoverRun(runId, "retry"),
     cancelRun: (runId: string) => recoverRun(runId, "cancel"),

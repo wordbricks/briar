@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useI18n, type Locale } from "../i18n";
+import type { RepositoryReadiness } from "../lib/project-connection";
 import type { Organization, Project, SessionUser } from "../types";
 import { UpdateControl } from "./UpdateControl";
 
@@ -33,11 +34,13 @@ export function Sidebar({
   onOrganizationChange,
   onOrganizationSettings,
   onProjectChange,
+  onProjectReadinessOpen,
   onProjectSettings,
   onLogout,
   onToggle,
   organizations,
   projects,
+  projectReadiness,
   unreadInboxCount,
   user,
 }: {
@@ -60,11 +63,13 @@ export function Sidebar({
     section?: "members",
   ) => void;
   onProjectChange: (projectId: string) => void;
+  onProjectReadinessOpen: (projectId: string) => void;
   onProjectSettings: (projectId: string) => void;
   onLogout: () => void;
   onToggle: () => void;
   organizations: Organization[];
   projects: Project[];
+  projectReadiness: Record<string, RepositoryReadiness>;
   unreadInboxCount: number;
   user: SessionUser;
 }) {
@@ -408,10 +413,13 @@ export function Sidebar({
           {visibleProjects.map((project) => {
             const isActive = project.id === activeProjectId;
             const isMenuOpen = project.id === openProjectMenuId;
+            const readiness = projectReadiness[project.id];
+            const needsAttention =
+              readiness?.requiresGithub && !readiness.prReady;
 
             return (
               <section className="sidebar-project-group" key={project.id}>
-                <div className="sidebar-project-row">
+                <div className={`sidebar-project-row${needsAttention ? " has-warning" : ""}`}>
                   <button
                     aria-expanded={isActive}
                     className="sidebar-project-heading"
@@ -422,6 +430,18 @@ export function Sidebar({
                     <span>{project.name}</span>
                     {isActive && <i aria-label={t("sidebar.currentProject")} />}
                   </button>
+                  {needsAttention ? (
+                    <button
+                      aria-label={t("repositorySetup.open", { name: project.name })}
+                      className="sidebar-project-warning"
+                      data-project-readiness={project.id}
+                      onClick={() => onProjectReadinessOpen(project.id)}
+                      title={t("repositorySetup.open", { name: project.name })}
+                      type="button"
+                    >
+                      <span aria-hidden="true">!</span>
+                    </button>
+                  ) : null}
                   <button
                     aria-controls={`project-menu-${project.id}`}
                     aria-expanded={isMenuOpen}

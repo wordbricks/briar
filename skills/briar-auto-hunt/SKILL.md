@@ -18,6 +18,12 @@ Drive one task through the workflow configured for its repository. Treat Briar a
 - When a configured stage is genuinely unavailable, record `blocked` or `failed`; do not relabel another check as that stage.
 - When Linear is enabled, do not record `completed` until the Linear issue is terminal. When Linear is disabled, omit tracker flags.
 - Follow repository-local `AGENTS.md`, test, review, branch, PR, deployment, and rollback rules.
+- When the workflow contains `pr_open` for a GitHub repository, verify `gh`
+  is installed and `gh auth status --hostname github.com` succeeds before
+  implementation can depend on PR delivery. Also verify the configured remote
+  accepts authenticated branch pushes. Record `blocked` with the missing
+  install, login, remote, or permission action instead of attempting the PR
+  stage without it.
 
 ## Load the workflow references
 

@@ -21,7 +21,7 @@ import {
 
 type Step = "welcome" | "prerequisites";
 
-const prerequisiteIds: PrerequisiteId[] = ["codex", "velen"];
+const prerequisiteIds: PrerequisiteId[] = ["git", "codex", "velen"];
 
 export function InitialOnboarding({
   onComplete,
@@ -149,7 +149,7 @@ export function InitialOnboarding({
                   {t("initialOnboarding.prerequisitesEyebrow")}
                 </p>
                 <h1>{t("initialOnboarding.prerequisitesTitle")}</h1>
-                <p>{t("initialOnboarding.prerequisitesDescription")}</p>
+                <p>{t("initialOnboarding.requirementsDescription")}</p>
               </div>
               <button
                 aria-label={t("initialOnboarding.checkAgain")}
@@ -173,7 +173,7 @@ export function InitialOnboarding({
                 return (
                   <article className="initial-prerequisite-row" key={id}>
                     <span className={`initial-prerequisite-icon ${id}`}>
-                      {id === "codex" ? "C" : "V"}
+                      {id === "git" ? "G" : id === "codex" ? "C" : "V"}
                     </span>
                     <div>
                       <strong>

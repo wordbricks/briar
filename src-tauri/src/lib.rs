@@ -280,8 +280,31 @@ struct OnboardingPrerequisiteStatus {
 
 #[derive(Serialize)]
 struct OnboardingPrerequisites {
+    git: OnboardingPrerequisiteStatus,
     codex: OnboardingPrerequisiteStatus,
     velen: OnboardingPrerequisiteStatus,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RepositoryReadiness {
+    repository_path: String,
+    git_installed: bool,
+    git_version: Option<String>,
+    repository_healthy: bool,
+    remote: Option<String>,
+    remote_reachable: bool,
+    push_access: bool,
+    requires_github: bool,
+    github_repository: Option<String>,
+    gh_installed: bool,
+    gh_version: Option<String>,
+    gh_authenticated: bool,
+    gh_account: Option<String>,
+    github_write_access: bool,
+    git_ready: bool,
+    pr_ready: bool,
+    issues: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -446,6 +469,16 @@ fn repository_remote(path: &Path) -> Option<String> {
     (!remote.is_empty()).then(|| remote.to_string())
 }
 
+fn git_binary(home: &Path) -> Result<PathBuf, String> {
+    which::which_in("git", Some(cli_execution_path(home)?), home)
+        .map_err(|_| "Git이 필요합니다. Git을 설치한 뒤 다시 확인하세요.".to_string())
+}
+
+fn gh_binary(home: &Path) -> Result<PathBuf, String> {
+    which::which_in("gh", Some(cli_execution_path(home)?), home)
+        .map_err(|_| "GitHub CLI가 설치되지 않았습니다.".to_string())
+}
+
 fn velen_binary() -> Result<PathBuf, String> {
     if let Ok(path) = which::which("velen") {
         return Ok(path);
@@ -516,6 +549,7 @@ fn inspect_velen_prerequisite_with(
 
 fn inspect_onboarding_prerequisites_sync(home: &Path) -> OnboardingPrerequisites {
     OnboardingPrerequisites {
+        git: inspect_cli(git_binary(home)),
         codex: inspect_cli(codex_app_server::codex_binary(home)),
         velen: inspect_velen_prerequisite_with(velen_binary(), home),
     }
@@ -569,6 +603,28 @@ fn install_cli_package(home: &Path, package: &str) -> Result<(), String> {
     }
 }
 
+fn install_brew_package(home: &Path, package: &str) -> Result<(), String> {
+    let execution_path = cli_execution_path(home)?;
+    let brew = which::which_in("brew", Some(&execution_path), home).map_err(|_| {
+        format!(
+            "{package} 자동 설치에는 Homebrew가 필요합니다. Homebrew를 설치한 뒤 다시 시도하세요."
+        )
+    })?;
+    let output = Command::new(brew)
+        .env("PATH", execution_path)
+        .args(["install", package])
+        .output()
+        .map_err(|error| format!("{package} 설치 명령을 실행하지 못했습니다: {error}"))?;
+    if output.status.success() {
+        return Ok(());
+    }
+    let message = String::from_utf8_lossy(&output.stderr);
+    Err(format!(
+        "{package}를 설치하지 못했습니다: {}",
+        message.trim()
+    ))
+}
+
 #[tauri::command]
 async fn install_onboarding_prerequisite(
     app: tauri::AppHandle,
@@ -576,14 +632,15 @@ async fn install_onboarding_prerequisite(
 ) -> Result<OnboardingPrerequisites, String> {
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
-        let package = match prerequisite.as_str() {
-            "codex" => "@openai/codex",
-            "velen" => "@wordbricks/velen",
+        match prerequisite.as_str() {
+            "git" => install_brew_package(&home, "git")?,
+            "codex" => install_cli_package(&home, "@openai/codex")?,
+            "velen" => install_cli_package(&home, "@wordbricks/velen")?,
             _ => return Err("지원하지 않는 필수 도구입니다.".to_string()),
-        };
-        install_cli_package(&home, package)?;
+        }
         let prerequisites = inspect_onboarding_prerequisites_sync(&home);
         let installed = match prerequisite.as_str() {
+            "git" => prerequisites.git.installed,
             "codex" => prerequisites.codex.installed,
             "velen" => prerequisites.velen.installed,
             _ => false,
@@ -629,6 +686,421 @@ fn cli_execution_path(home: &Path) -> Result<OsString, String> {
         paths.extend(env::split_paths(&existing));
     }
     env::join_paths(paths).map_err(|error| format!("CLI 실행 경로를 구성하지 못했습니다: {error}"))
+}
+
+fn workflow_requires_github(workflow: &WorkflowConfig) -> bool {
+    workflow.stages.iter().any(|stage| {
+        stage.id == "pr_open"
+            || stage
+                .evidence
+                .iter()
+                .any(|evidence| evidence == "pull_request")
+    })
+}
+
+fn github_repository_from_remote(remote: &str) -> Option<String> {
+    let trimmed = remote.trim().trim_end_matches('/').trim_end_matches(".git");
+    let path = if let Some(path) = trimmed.strip_prefix("https://github.com/") {
+        path
+    } else if let Some(path) = trimmed.strip_prefix("http://github.com/") {
+        path
+    } else if let Some(path) = trimmed.strip_prefix("ssh://git@github.com/") {
+        path
+    } else {
+        trimmed.strip_prefix("git@github.com:")?
+    };
+    let mut parts = path.split('/').filter(|part| !part.is_empty());
+    let owner = parts.next()?;
+    let repository = parts.next()?;
+    if parts.next().is_some() {
+        return None;
+    }
+    Some(format!("{owner}/{repository}"))
+}
+
+fn command_failure(output: &std::process::Output) -> String {
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let message = if stderr.trim().is_empty() {
+        stdout.trim()
+    } else {
+        stderr.trim()
+    };
+    if message.is_empty() {
+        "명령이 실패했습니다.".to_string()
+    } else {
+        message.lines().next().unwrap_or(message).to_string()
+    }
+}
+
+fn inspect_repository_readiness_at(
+    repository_path: &Path,
+    workflow: &WorkflowConfig,
+    home: &Path,
+) -> RepositoryReadiness {
+    let mut issues = Vec::new();
+    let requires_github = workflow_requires_github(workflow);
+    let git = git_binary(home);
+    let git_installed = git.is_ok();
+    let git_version = git
+        .as_ref()
+        .ok()
+        .and_then(|binary| Command::new(binary).arg("--version").output().ok())
+        .filter(|output| output.status.success())
+        .and_then(|output| parse_cli_version(&output.stdout));
+    if !git_installed {
+        issues.push("Git이 설치되지 않았습니다.".to_string());
+    }
+
+    let root = git
+        .as_ref()
+        .ok()
+        .and_then(|binary| {
+            Command::new(binary)
+                .arg("-C")
+                .arg(repository_path)
+                .args(["rev-parse", "--show-toplevel"])
+                .output()
+                .ok()
+        })
+        .filter(|output| output.status.success())
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .map(|root| PathBuf::from(root.trim()));
+    let repository_healthy = root.as_ref().is_some_and(|root| root.is_dir());
+    if git_installed && !repository_healthy {
+        issues.push("선택한 폴더가 유효한 Git 저장소가 아닙니다.".to_string());
+    }
+    let resolved_path = root.as_deref().unwrap_or(repository_path);
+    let remote = repository_healthy
+        .then(|| repository_remote(resolved_path))
+        .flatten();
+    if remote.is_none() {
+        issues.push("origin 원격 저장소가 설정되지 않았습니다.".to_string());
+    }
+
+    let safe_remote = remote.as_deref().is_some_and(|remote| {
+        remote.starts_with("https://")
+            || remote.starts_with("http://")
+            || remote.starts_with("ssh://")
+            || remote.starts_with("git@")
+    });
+    let remote_reachable = git
+        .as_ref()
+        .ok()
+        .filter(|_| repository_healthy && safe_remote)
+        .and_then(|binary| {
+            Command::new(binary)
+                .env("GIT_TERMINAL_PROMPT", "0")
+                .env("GCM_INTERACTIVE", "Never")
+                .env(
+                    "GIT_SSH_COMMAND",
+                    "ssh -o BatchMode=yes -o ConnectTimeout=8",
+                )
+                .args(["-c", "http.lowSpeedLimit=1"])
+                .args(["-c", "http.lowSpeedTime=8"])
+                .arg("-C")
+                .arg(resolved_path)
+                .args(["ls-remote", "--exit-code", "origin", "HEAD"])
+                .output()
+                .ok()
+        })
+        .is_some_and(|output| output.status.success());
+    if remote.is_some() && !remote_reachable {
+        issues.push("origin에 인증된 상태로 접근할 수 없습니다.".to_string());
+    }
+
+    // `--dry-run` validates the receive-pack transport without updating a
+    // remote ref. Hooks are disabled because connected repositories are
+    // untrusted input during onboarding.
+    let push_access = git
+        .as_ref()
+        .ok()
+        .filter(|_| repository_healthy && remote_reachable)
+        .and_then(|binary| {
+            let sha = Command::new(binary)
+                .arg("-C")
+                .arg(resolved_path)
+                .args(["rev-parse", "--short=12", "HEAD"])
+                .output()
+                .ok()
+                .filter(|output| output.status.success())
+                .and_then(|output| String::from_utf8(output.stdout).ok())?;
+            let target = format!("HEAD:refs/heads/briar-access-check-{}", sha.trim());
+            Command::new(binary)
+                .env("GIT_TERMINAL_PROMPT", "0")
+                .env("GCM_INTERACTIVE", "Never")
+                .env(
+                    "GIT_SSH_COMMAND",
+                    "ssh -o BatchMode=yes -o ConnectTimeout=8",
+                )
+                .arg("-c")
+                .arg("core.hooksPath=/dev/null")
+                .args(["-c", "http.lowSpeedLimit=1"])
+                .args(["-c", "http.lowSpeedTime=8"])
+                .arg("-C")
+                .arg(resolved_path)
+                .args(["push", "--dry-run", "--porcelain", "origin"])
+                .arg(target)
+                .output()
+                .ok()
+        })
+        .is_some_and(|output| output.status.success());
+    if remote_reachable && !push_access {
+        issues.push("origin에 브랜치를 push할 권한을 확인하지 못했습니다.".to_string());
+    }
+
+    let github_repository = remote.as_deref().and_then(github_repository_from_remote);
+    if requires_github && github_repository.is_none() {
+        issues.push("PR 단계에는 GitHub origin 저장소가 필요합니다.".to_string());
+    }
+    let gh = if requires_github {
+        gh_binary(home)
+    } else {
+        Err("현재 워크플로우에는 GitHub CLI가 필요하지 않습니다.".to_string())
+    };
+    let gh_installed = gh.is_ok();
+    let gh_version = gh
+        .as_ref()
+        .ok()
+        .and_then(|binary| Command::new(binary).arg("--version").output().ok())
+        .filter(|output| output.status.success())
+        .and_then(|output| parse_cli_version(&output.stdout));
+    let gh_authenticated = gh
+        .as_ref()
+        .ok()
+        .and_then(|binary| {
+            Command::new(binary)
+                .env("PATH", cli_execution_path(home).ok()?)
+                .args(["auth", "status", "--hostname", "github.com"])
+                .output()
+                .ok()
+        })
+        .is_some_and(|output| output.status.success());
+    let gh_account = gh
+        .as_ref()
+        .ok()
+        .filter(|_| gh_authenticated)
+        .and_then(|binary| {
+            Command::new(binary)
+                .env("PATH", cli_execution_path(home).ok()?)
+                .args(["api", "user", "--jq", ".login"])
+                .output()
+                .ok()
+        })
+        .filter(|output| output.status.success())
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .map(|account| account.trim().to_string())
+        .filter(|account| !account.is_empty());
+    let github_write_access = gh
+        .as_ref()
+        .ok()
+        .filter(|_| gh_authenticated)
+        .zip(github_repository.as_ref())
+        .and_then(|(binary, repository)| {
+            Command::new(binary)
+                .env("PATH", cli_execution_path(home).ok()?)
+                .args([
+                    "repo",
+                    "view",
+                    repository,
+                    "--json",
+                    "viewerPermission",
+                    "--jq",
+                    ".viewerPermission",
+                ])
+                .output()
+                .ok()
+        })
+        .filter(|output| output.status.success())
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .is_some_and(|permission| matches!(permission.trim(), "WRITE" | "MAINTAIN" | "ADMIN"));
+    if requires_github && !gh_installed {
+        issues.push("PR 단계 실행에 필요한 GitHub CLI가 설치되지 않았습니다.".to_string());
+    } else if requires_github && !gh_authenticated {
+        issues.push("GitHub CLI 로그인이 필요합니다.".to_string());
+    } else if requires_github && !github_write_access {
+        issues.push("GitHub 저장소 쓰기 권한을 확인하지 못했습니다.".to_string());
+    }
+
+    let git_ready = git_installed && repository_healthy;
+    let pr_ready = git_ready
+        && remote_reachable
+        && push_access
+        && github_repository.is_some()
+        && gh_installed
+        && gh_authenticated
+        && github_write_access;
+
+    RepositoryReadiness {
+        repository_path: resolved_path.to_string_lossy().into_owned(),
+        git_installed,
+        git_version,
+        repository_healthy,
+        remote,
+        remote_reachable,
+        push_access,
+        requires_github,
+        github_repository,
+        gh_installed,
+        gh_version,
+        gh_authenticated,
+        gh_account,
+        github_write_access,
+        git_ready,
+        pr_ready,
+        issues,
+    }
+}
+
+fn project_repository_readiness_at(
+    config_path: &Path,
+    project_id: &str,
+    home: &Path,
+) -> Result<RepositoryReadiness, String> {
+    let contents = fs::read_to_string(config_path)
+        .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
+    let config = serde_json::from_str::<CliConfig>(&contents)
+        .map_err(|error| format!("Briar 로컬 설정이 손상되었습니다: {error}"))?;
+    let project = config
+        .projects
+        .iter()
+        .find(|project| project.id == project_id)
+        .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
+    let workflow = project
+        .auto_hunt
+        .as_ref()
+        .and_then(|auto_hunt| auto_hunt.workflow.as_ref())
+        .cloned()
+        .unwrap_or_else(default_workflow);
+    Ok(inspect_repository_readiness_at(
+        Path::new(&project.repository_path),
+        &workflow,
+        home,
+    ))
+}
+
+#[tauri::command]
+async fn inspect_repository_readiness(
+    app: tauri::AppHandle,
+    repository_path: String,
+    workflow: WorkflowConfig,
+) -> Result<RepositoryReadiness, String> {
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        Ok(inspect_repository_readiness_at(
+            Path::new(&repository_path),
+            &workflow,
+            &home,
+        ))
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn project_repository_readiness(
+    app: tauri::AppHandle,
+    project_id: String,
+) -> Result<RepositoryReadiness, String> {
+    let config_path = cli_config_path(&app)?;
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        project_repository_readiness_at(&config_path, &project_id, &home)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn install_project_github_cli(
+    app: tauri::AppHandle,
+    project_id: String,
+) -> Result<RepositoryReadiness, String> {
+    let config_path = cli_config_path(&app)?;
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        if gh_binary(&home).is_err() {
+            install_brew_package(&home, "gh")?;
+        }
+        let readiness = project_repository_readiness_at(&config_path, &project_id, &home)?;
+        if !readiness.gh_installed {
+            return Err(
+                "설치는 완료됐지만 GitHub CLI를 찾지 못했습니다. Briar를 다시 열어 주세요."
+                    .to_string(),
+            );
+        }
+        Ok(readiness)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn login_project_github(
+    app: tauri::AppHandle,
+    project_id: String,
+) -> Result<RepositoryReadiness, String> {
+    let config_path = cli_config_path(&app)?;
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let binary = gh_binary(&home)?;
+        let execution_path = cli_execution_path(&home)?;
+        let authenticated = Command::new(&binary)
+            .env("PATH", &execution_path)
+            .args(["auth", "status", "--hostname", "github.com"])
+            .output()
+            .is_ok_and(|output| output.status.success());
+        if !authenticated {
+            let help = Command::new(&binary)
+                .env("PATH", &execution_path)
+                .args(["auth", "login", "--help"])
+                .output()
+                .ok();
+            let supports_clipboard = help.as_ref().is_some_and(|output| {
+                String::from_utf8_lossy(&output.stdout).contains("--clipboard")
+            });
+            let mut command = Command::new(&binary);
+            command.env("PATH", &execution_path).args([
+                "auth",
+                "login",
+                "--hostname",
+                "github.com",
+                "--git-protocol",
+                "https",
+                "--web",
+            ]);
+            if supports_clipboard {
+                command.arg("--clipboard");
+            }
+            let output = command
+                .output()
+                .map_err(|error| format!("GitHub 로그인을 시작하지 못했습니다: {error}"))?;
+            if !output.status.success() {
+                return Err(format!(
+                    "GitHub 로그인에 실패했습니다: {}",
+                    command_failure(&output)
+                ));
+            }
+        }
+        let setup = Command::new(&binary)
+            .env("PATH", &execution_path)
+            .args(["auth", "setup-git", "--hostname", "github.com"])
+            .output()
+            .map_err(|error| format!("Git push 인증을 설정하지 못했습니다: {error}"))?;
+        if !setup.status.success() {
+            return Err(format!(
+                "Git push 인증을 설정하지 못했습니다: {}",
+                command_failure(&setup)
+            ));
+        }
+        let readiness = project_repository_readiness_at(&config_path, &project_id, &home)?;
+        if !readiness.gh_authenticated {
+            return Err("GitHub 로그인은 완료됐지만 인증 상태를 확인하지 못했습니다.".to_string());
+        }
+        Ok(readiness)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 fn run_velen_json_with(
@@ -1268,6 +1740,13 @@ async fn project_llm_chat(
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
     let approval_app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
+        let readiness = project_repository_readiness_at(&config_path, &project_id, &home)?;
+        if readiness.requires_github && !readiness.pr_ready {
+            return Err(format!(
+                "PR 단계 실행 준비가 필요합니다: {}",
+                readiness.issues.join(" ")
+            ));
+        }
         let workspace = connected_project_workspace(&config_path, &project_id)?;
         let settings = project_llm_settings_from(&config_path, &project_id)?;
         let binary = codex_app_server::codex_binary(&home)?;
@@ -1763,6 +2242,7 @@ pub fn run() {
             write_session_token,
             clear_session_token,
             validate_repository_path,
+            inspect_repository_readiness,
             connected_project_ids,
             project_llm_chat,
             start_project_auto_hunt,
@@ -1770,6 +2250,9 @@ pub fn run() {
             load_project_llm_settings,
             update_project_llm_settings,
             update_local_project_workflow,
+            project_repository_readiness,
+            install_project_github_cli,
+            login_project_github,
             disconnect_local_project,
             connect_local_project,
             inspect_velen,
@@ -2182,6 +2665,32 @@ mod tests {
         assert_eq!(
             root,
             Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap()
+        );
+    }
+
+    #[test]
+    fn recognizes_pr_workflows_and_github_remotes() {
+        let mut workflow = default_workflow();
+        assert!(!workflow_requires_github(&workflow));
+        workflow.stages.push(WorkflowStageConfig {
+            id: "pr_open".to_string(),
+            label: "PR validation".to_string(),
+            required: true,
+            evidence: vec!["pull_request".to_string()],
+            checks: Vec::new(),
+        });
+        assert!(workflow_requires_github(&workflow));
+        assert_eq!(
+            github_repository_from_remote("git@github.com:wordbricks/briar.git"),
+            Some("wordbricks/briar".to_string())
+        );
+        assert_eq!(
+            github_repository_from_remote("https://github.com/wordbricks/briar.git"),
+            Some("wordbricks/briar".to_string())
+        );
+        assert_eq!(
+            github_repository_from_remote("git@gitlab.com:wordbricks/briar.git"),
+            None
         );
     }
 
