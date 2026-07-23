@@ -11,6 +11,15 @@ export type AutoHuntAppServerEvent = {
   message: Record<string, unknown>;
 };
 
+export type AutoHuntAgentMessage = {
+  id: string;
+  phase: string | null;
+  text: string;
+  startedAtMs: number;
+  updatedAtMs: number;
+  isComplete: boolean;
+};
+
 export type AutoHuntAgentIssue = Pick<
   HuntRun,
   "id" | "runNumber" | "sourceKey" | "title"
@@ -102,4 +111,64 @@ export function mergeAutoHuntAppServerEvents(
     left.sessionId.localeCompare(right.sessionId) ||
     left.sequence - right.sequence
   );
+}
+
+export function agentMessagesFromAppServerEvents(
+  events: AutoHuntAppServerEvent[],
+): AutoHuntAgentMessage[] {
+  const messages = new Map<string, AutoHuntAgentMessage>();
+  const order: string[] = [];
+
+  for (const event of events) {
+    if (event.direction !== "server") continue;
+    const method = event.message.method;
+    const params = record(event.message.params);
+    if (!params) continue;
+
+    if (method === "item/started" || method === "item/completed") {
+      const item = record(params.item);
+      if (!item || item.type !== "agentMessage") continue;
+      const id = string(item.id) ?? `agent-message-${event.sequence}`;
+      const existing = messages.get(id);
+      if (!existing) order.push(id);
+      messages.set(id, {
+        id,
+        phase: string(item.phase) ?? existing?.phase ?? null,
+        text: string(item.text) ?? existing?.text ?? "",
+        startedAtMs: existing?.startedAtMs ?? event.occurredAtMs,
+        updatedAtMs: event.occurredAtMs,
+        isComplete: method === "item/completed",
+      });
+      continue;
+    }
+
+    if (method !== "item/agentMessage/delta") continue;
+    const id = string(params.itemId);
+    const delta = string(params.delta);
+    if (!id || delta === null) continue;
+    const existing = messages.get(id);
+    if (!existing) order.push(id);
+    messages.set(id, {
+      id,
+      phase: existing?.phase ?? null,
+      text: `${existing?.text ?? ""}${delta}`,
+      startedAtMs: existing?.startedAtMs ?? event.occurredAtMs,
+      updatedAtMs: event.occurredAtMs,
+      isComplete: false,
+    });
+  }
+
+  return order
+    .map((id) => messages.get(id))
+    .filter((message): message is AutoHuntAgentMessage => Boolean(message));
+}
+
+function record(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function string(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
 }

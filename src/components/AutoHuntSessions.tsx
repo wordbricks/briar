@@ -1,6 +1,4 @@
 import {
-  ArrowDownLeft,
-  ArrowUpRight,
   Bot,
   ChevronRight,
   CircleAlert,
@@ -16,8 +14,8 @@ import { useAutoHuntAppServerEvents } from "../hooks/useAutoHuntAppServerEvents"
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
 import {
+  agentMessagesFromAppServerEvents,
   maxAutoHuntSessionIssues,
-  type AutoHuntAppServerEvent,
 } from "../lib/auto-hunt-agent";
 import type {
   AutoHuntSession,
@@ -57,7 +55,12 @@ export function AutoHuntSessions({
     (session) => session.id === selectedSessionId,
   ) ?? null;
   const appServerEvents = useAutoHuntAppServerEvents(selectedSession?.id ?? null);
+  const agentMessages = useMemo(
+    () => agentMessagesFromAppServerEvents(appServerEvents.events),
+    [appServerEvents.events],
+  );
   const eventListRef = useRef<HTMLDivElement>(null);
+  const latestAgentMessage = agentMessages[agentMessages.length - 1];
 
   useEffect(() => {
     if (!selectedSession) return;
@@ -70,9 +73,9 @@ export function AutoHuntSessions({
 
   useEffect(() => {
     const eventList = eventListRef.current;
-    if (!eventList || appServerEvents.events.length === 0) return;
+    if (!eventList || agentMessages.length === 0) return;
     eventList.scrollTop = eventList.scrollHeight;
-  }, [appServerEvents.events.length]);
+  }, [agentMessages.length, latestAgentMessage?.text.length]);
 
   const start = () => {
     setStartError(null);
@@ -244,7 +247,7 @@ export function AutoHuntSessions({
                     {selectedSession.status === "running" && (
                       <i><span />{t("autoHunt.live")}</i>
                     )}
-                    {t("autoHunt.eventCount", { count: appServerEvents.events.length })}
+                    {t("autoHunt.eventCount", { count: agentMessages.length })}
                   </span>
                 </header>
                 {appServerEvents.error ? (
@@ -255,26 +258,27 @@ export function AutoHuntSessions({
                   <div className="auto-hunt-event-state">
                     <LoaderCircle className="spin" size={14} />{t("autoHunt.eventsLoading")}
                   </div>
-                ) : appServerEvents.events.length === 0 ? (
+                ) : agentMessages.length === 0 ? (
                   <div className="auto-hunt-event-state">{t("autoHunt.eventsEmpty")}</div>
                 ) : (
-                  <div className="auto-hunt-app-server-events" ref={eventListRef}>
-                    {appServerEvents.events.map((event) => (
-                      <details className={`auto-hunt-app-server-event ${event.direction}`} key={event.sequence}>
-                        <summary>
-                          <span className="auto-hunt-event-direction" title={t(`autoHunt.direction.${event.direction}` as MessageKey)}>
-                            {event.direction === "client"
-                              ? <ArrowUpRight size={13} />
-                              : <ArrowDownLeft size={13} />}
-                          </span>
-                          <strong>{appServerEventLabel(t, event)}</strong>
-                          <small>#{event.sequence}</small>
-                          <time dateTime={new Date(event.occurredAtMs).toISOString()}>
-                            {formatEventTime(event.occurredAtMs, localeTag)}
+                  <div className="auto-hunt-agent-messages" ref={eventListRef}>
+                    {agentMessages.map((message) => (
+                      <article className="auto-hunt-agent-message" key={message.id}>
+                        <header>
+                          <span><Bot size={13} /></span>
+                          <strong>{agentMessagePhase(t, message.phase)}</strong>
+                          {!message.isComplete && (
+                            <small className="auto-hunt-message-streaming">
+                              <LoaderCircle className="spin" size={11} />
+                              {t("autoHunt.agentMessage.streaming")}
+                            </small>
+                          )}
+                          <time dateTime={new Date(message.updatedAtMs).toISOString()}>
+                            {formatEventTime(message.updatedAtMs, localeTag)}
                           </time>
-                        </summary>
-                        <pre>{JSON.stringify(event.message, null, 2)}</pre>
-                      </details>
+                        </header>
+                        <p>{message.text || t("autoHunt.agentMessage.writing")}</p>
+                      </article>
                     ))}
                   </div>
                 )}
@@ -335,13 +339,11 @@ function formatEventTime(value: number, localeTag: string) {
   }).format(new Date(value));
 }
 
-function appServerEventLabel(
+function agentMessagePhase(
   t: (key: MessageKey) => string,
-  event: AutoHuntAppServerEvent,
+  phase: string | null,
 ) {
-  if (typeof event.message.method === "string") return event.message.method;
-  const id = typeof event.message.id === "string" || typeof event.message.id === "number"
-    ? ` #${event.message.id}`
-    : "";
-  return `${t(event.direction === "client" ? "autoHunt.request" : "autoHunt.response")}${id}`;
+  return phase === "final_answer"
+    ? t("autoHunt.agentMessage.final")
+    : t("autoHunt.agentMessage.commentary");
 }
