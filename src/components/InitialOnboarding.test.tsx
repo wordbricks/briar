@@ -42,6 +42,8 @@ describe("InitialOnboarding", () => {
       <InitialOnboarding onComplete={() => undefined} />,
     ));
     expect(container.textContent).toContain("Briar에 오신 것을 환영해요.");
+    expect(container.querySelector(".brand")).toBeNull();
+    expect(container.querySelector(".initial-onboarding-header")).toBeNull();
 
     await act(async () => {
       container.querySelector<HTMLButtonElement>(

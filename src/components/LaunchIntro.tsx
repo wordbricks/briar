@@ -2,10 +2,9 @@ import { useEffect, type CSSProperties } from "react";
 import briarMarkUrl from "../assets/briar-mark.svg";
 import { useI18n } from "../i18n";
 
-const INTRO_DURATION_MS = 5_200;
-const INTRO_REVEAL_MS = 4_575;
-const REDUCED_MOTION_DURATION_MS = 900;
-const REDUCED_MOTION_REVEAL_MS = 650;
+const INTRO_HOLD_MS = 5_000;
+const INTRO_FADE_MS = 600;
+const REDUCED_MOTION_FADE_MS = 200;
 
 export function LaunchIntro({
   native = false,
@@ -29,13 +28,11 @@ export function LaunchIntro({
       ? null
       : window.setTimeout(
           onComplete,
-          reducedMotion ? REDUCED_MOTION_DURATION_MS : INTRO_DURATION_MS,
+          INTRO_HOLD_MS +
+            (reducedMotion ? REDUCED_MOTION_FADE_MS : INTRO_FADE_MS),
         );
     const revealTimer = !preview && onReveal
-      ? window.setTimeout(
-          onReveal,
-          reducedMotion ? REDUCED_MOTION_REVEAL_MS : INTRO_REVEAL_MS,
-        )
+      ? window.setTimeout(onReveal, INTRO_HOLD_MS)
       : null;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -59,6 +56,12 @@ export function LaunchIntro({
       aria-label={t("intro.label")}
       className={`launch-intro${native ? " launch-intro-native" : ""}${preview ? " launch-intro-preview" : ""}`}
       data-testid="launch-intro"
+      style={
+        {
+          "--launch-intro-fade-duration": `${INTRO_FADE_MS}ms`,
+          "--launch-intro-hold-duration": `${INTRO_HOLD_MS}ms`,
+        } as CSSProperties
+      }
     >
       <button
         className="launch-intro-skip"

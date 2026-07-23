@@ -16,7 +16,6 @@ import {
   type OnboardingPrerequisites,
   type PrerequisiteId,
 } from "../lib/initial-onboarding";
-import { Logo } from "./Logo";
 
 type Step = "welcome" | "prerequisites";
 
@@ -81,29 +80,6 @@ export function InitialOnboarding({
         aria-label={t("initialOnboarding.label")}
         className="initial-onboarding"
       >
-        <div className="initial-onboarding-ambient" aria-hidden="true">
-          <span />
-          <span />
-        </div>
-
-        <header className="initial-onboarding-header">
-          <Logo />
-          <ol aria-label={t("initialOnboarding.progress")}>
-            <li className={step === "welcome" ? "active" : "complete"}>
-              <span>{step === "welcome" ? "1" : <Check size={12} />}</span>
-              {t("initialOnboarding.welcomeStep")}
-            </li>
-            <li className={step === "prerequisites" ? "active" : ""}>
-              <span>2</span>
-              {t("initialOnboarding.prerequisitesStep")}
-            </li>
-            <li>
-              <span>3</span>
-              {t("initialOnboarding.loginStep")}
-            </li>
-          </ol>
-        </header>
-
         {step === "welcome" ? (
           <section className="initial-welcome-card">
             <div className="initial-welcome-visual" aria-hidden="true">
