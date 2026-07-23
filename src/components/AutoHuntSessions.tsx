@@ -1,4 +1,5 @@
 import {
+  ArrowLeft,
   Bot,
   ChevronRight,
   CircleAlert,
@@ -7,7 +8,6 @@ import {
   PanelLeftOpen,
   Play,
   Sparkles,
-  X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAutoHuntAppServerEvents } from "../hooks/useAutoHuntAppServerEvents";
@@ -63,15 +63,6 @@ export function AutoHuntSessions({
   const latestAgentMessage = agentMessages[agentMessages.length - 1];
 
   useEffect(() => {
-    if (!selectedSession) return;
-    const close = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setSelectedSessionId(null);
-    };
-    document.addEventListener("keydown", close);
-    return () => document.removeEventListener("keydown", close);
-  }, [selectedSession]);
-
-  useEffect(() => {
     const eventList = eventListRef.current;
     if (!eventList || agentMessages.length === 0) return;
     eventList.scrollTop = eventList.scrollHeight;
@@ -87,127 +78,57 @@ export function AutoHuntSessions({
     }
   };
 
-  return (
-    <main className="main-content" id="auto-hunt">
-      <header className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region>
-        {!isSidebarOpen && (
-          <button
-            aria-controls="app-sidebar"
-            aria-expanded="false"
-            aria-label={t("sidebar.open")}
-            className="sidebar-toggle"
-            onClick={onSidebarOpen}
-            title={t("sidebar.open")}
-            type="button"
-          >
-            <PanelLeftOpen size={17} />
-          </button>
-        )}
-        <div className="window-controls" aria-hidden="true"><i /><i /><i /></div>
-      </header>
-
-      <div className="auto-hunt-scroll">
-        <section className="auto-hunt-hero">
-          <div className="auto-hunt-hero-copy">
-            <p className="eyebrow"><Sparkles size={13} />{t("autoHunt.eyebrow")}</p>
-            <h1>{t("autoHunt.title")}</h1>
-            <p>{t("autoHunt.description")}</p>
-            <div className="auto-hunt-capacity">
-              <span>{t("autoHunt.available", { count: queued.length })}</span>
-              <span>{t("autoHunt.limit")}</span>
-            </div>
-          </div>
-          <button
-            className="auto-hunt-start-button"
-            disabled={!dashboard || queued.length === 0 || Boolean(runningSession)}
-            onClick={start}
-            type="button"
-          >
-            {runningSession
-              ? <LoaderCircle className="spin" size={18} />
-              : <Play fill="currentColor" size={17} />}
-            {runningSession ? t("autoHunt.running") : t("autoHunt.start")}
-          </button>
-        </section>
-
-        {(error || startError) && (
-          <div className="error-banner"><CircleAlert size={16} />{startError ?? error}</div>
-        )}
-
-        <section className="auto-hunt-session-panel">
-          <header>
-            <div>
-              <h2>{t("autoHunt.sessions")}</h2>
-              <p>{t("autoHunt.sessionsDescription")}</p>
-            </div>
-            <span>{projectSessions.length}</span>
-          </header>
-
-          {projectSessions.length === 0 ? (
-            <div className="auto-hunt-empty">
-              <span><Bot size={22} /></span>
-              <strong>{t("autoHunt.emptyTitle")}</strong>
-              <p>{queued.length === 0 ? t("autoHunt.noQueued") : t("autoHunt.emptyDescription")}</p>
-            </div>
-          ) : (
-            <div className="auto-hunt-session-list">
-              {projectSessions.map((session) => (
-                <button
-                  className="auto-hunt-session-row"
-                  key={session.id}
-                  onClick={() => setSelectedSessionId(session.id)}
-                  type="button"
-                >
-                  <SessionStatusIcon status={session.status} />
-                  <span className="auto-hunt-session-copy">
-                    <strong>{t("autoHunt.session")} · {formatDate(session.startedAt, localeTag)}</strong>
-                    <small>{session.issues.map((issue) => issue.title).join(" · ")}</small>
-                  </span>
-                  <span className={`auto-hunt-status ${session.status}`}>
-                    {statusLabel(t, session.status)}
-                  </span>
-                  <span className="auto-hunt-session-count">
-                    {t("autoHunt.issueCount", { count: session.issues.length })}
-                  </span>
-                  <ChevronRight size={16} />
-                </button>
-              ))}
-            </div>
+  if (selectedSession) {
+    return (
+      <main className="main-content" id="auto-hunt-session">
+        <header className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region>
+          {!isSidebarOpen && (
+            <button
+              aria-controls="app-sidebar"
+              aria-expanded="false"
+              aria-label={t("sidebar.open")}
+              className="sidebar-toggle"
+              onClick={onSidebarOpen}
+              title={t("sidebar.open")}
+              type="button"
+            >
+              <PanelLeftOpen size={17} />
+            </button>
           )}
-        </section>
-      </div>
+          <div className="window-controls" aria-hidden="true"><i /><i /><i /></div>
+        </header>
 
-      {selectedSession && (
-        <div
-          className="dialog-backdrop"
-          onMouseDown={(event) => {
-            if (event.currentTarget === event.target) setSelectedSessionId(null);
-          }}
-        >
+        <div className="auto-hunt-scroll auto-hunt-session-detail-scroll">
           <section
-            aria-label={`${t("autoHunt.session")} ${formatDate(selectedSession.startedAt, localeTag)}`}
-            aria-modal="true"
-            className="auto-hunt-session-dialog"
-            role="dialog"
+            aria-labelledby="auto-hunt-session-title"
+            className="auto-hunt-session-page"
           >
             <header>
-              <div>
-                <SessionStatusIcon status={selectedSession.status} />
-                <span>
-                  <small>{t("autoHunt.session")}</small>
-                  <strong>{formatDate(selectedSession.startedAt, localeTag)}</strong>
-                </span>
-              </div>
-              <div>
-                <span className={`auto-hunt-status ${selectedSession.status}`}>
-                  {statusLabel(t, selectedSession.status)}
-                </span>
-                <button aria-label={t("common.close")} onClick={() => setSelectedSessionId(null)} type="button">
-                  <X size={16} />
+              <div className="auto-hunt-session-page-heading">
+                <button
+                  className="auto-hunt-session-back"
+                  onClick={() => setSelectedSessionId(null)}
+                  type="button"
+                >
+                  <ArrowLeft size={16} />
+                  {t("run.back")}
                 </button>
+                <div>
+                  <SessionStatusIcon status={selectedSession.status} />
+                  <span>
+                    <small>{t("autoHunt.session")}</small>
+                    <h1 id="auto-hunt-session-title">
+                      {formatDate(selectedSession.startedAt, localeTag)}
+                    </h1>
+                  </span>
+                </div>
               </div>
+              <span className={`auto-hunt-status ${selectedSession.status}`}>
+                {statusLabel(t, selectedSession.status)}
+              </span>
             </header>
-            <div className="auto-hunt-dialog-body">
+
+            <div className="auto-hunt-session-detail-body">
               {selectedSession.status === "running" && (
                 <div className="auto-hunt-running-callout">
                   <LoaderCircle className="spin" size={18} />
@@ -301,7 +222,100 @@ export function AutoHuntSessions({
             </div>
           </section>
         </div>
-      )}
+      </main>
+    );
+  }
+
+  return (
+    <main className="main-content" id="auto-hunt">
+      <header className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region>
+        {!isSidebarOpen && (
+          <button
+            aria-controls="app-sidebar"
+            aria-expanded="false"
+            aria-label={t("sidebar.open")}
+            className="sidebar-toggle"
+            onClick={onSidebarOpen}
+            title={t("sidebar.open")}
+            type="button"
+          >
+            <PanelLeftOpen size={17} />
+          </button>
+        )}
+        <div className="window-controls" aria-hidden="true"><i /><i /><i /></div>
+      </header>
+
+      <div className="auto-hunt-scroll">
+        <section className="auto-hunt-hero">
+          <div className="auto-hunt-hero-copy">
+            <p className="eyebrow"><Sparkles size={13} />{t("autoHunt.eyebrow")}</p>
+            <h1>{t("autoHunt.title")}</h1>
+            <p>{t("autoHunt.description")}</p>
+            <div className="auto-hunt-capacity">
+              <span>{t("autoHunt.available", { count: queued.length })}</span>
+              <span>{t("autoHunt.limit")}</span>
+            </div>
+          </div>
+          <button
+            className="auto-hunt-start-button"
+            disabled={!dashboard || queued.length === 0 || Boolean(runningSession)}
+            onClick={start}
+            type="button"
+          >
+            {runningSession
+              ? <LoaderCircle className="spin" size={18} />
+              : <Play fill="currentColor" size={17} />}
+            {runningSession ? t("autoHunt.running") : t("autoHunt.start")}
+          </button>
+        </section>
+
+        {(error || startError) && (
+          <div className="error-banner"><CircleAlert size={16} />{startError ?? error}</div>
+        )}
+
+        <section className="auto-hunt-session-panel">
+          <header>
+            <div>
+              <h2>{t("autoHunt.sessions")}</h2>
+              <p>{t("autoHunt.sessionsDescription")}</p>
+            </div>
+            <span>{projectSessions.length}</span>
+          </header>
+
+          {projectSessions.length === 0 ? (
+            <div className="auto-hunt-empty">
+              <span><Bot size={22} /></span>
+              <strong>{t("autoHunt.emptyTitle")}</strong>
+              <p>{queued.length === 0 ? t("autoHunt.noQueued") : t("autoHunt.emptyDescription")}</p>
+            </div>
+          ) : (
+            <div className="auto-hunt-session-list">
+              {projectSessions.map((session) => (
+                <button
+                  className="auto-hunt-session-row"
+                  key={session.id}
+                  onClick={() => setSelectedSessionId(session.id)}
+                  type="button"
+                >
+                  <SessionStatusIcon status={session.status} />
+                  <span className="auto-hunt-session-copy">
+                    <strong>{t("autoHunt.session")} · {formatDate(session.startedAt, localeTag)}</strong>
+                    <small>{session.issues.map((issue) => issue.title).join(" · ")}</small>
+                  </span>
+                  <span className={`auto-hunt-status ${session.status}`}>
+                    {statusLabel(t, session.status)}
+                  </span>
+                  <span className="auto-hunt-session-count">
+                    {t("autoHunt.issueCount", { count: session.issues.length })}
+                  </span>
+                  <ChevronRight size={16} />
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+
     </main>
   );
 }
