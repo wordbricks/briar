@@ -26,6 +26,15 @@ describe("LoginScreen", () => {
     expect(markup).not.toContain('aria-label="로그인 닫기"');
   });
 
+  it("does not show the desktop sign-in security footnote", () => {
+    const markup = renderToStaticMarkup(
+      <LoginScreen {...baseProps} loginCode={null} />,
+    );
+
+    expect(markup).not.toContain("login-footnote");
+    expect(markup).not.toContain("시스템 브라우저에서 안전하게");
+  });
+
   it("describes Android sign-in as an in-app flow", () => {
     const markup = renderToStaticMarkup(
       <LoginScreen
