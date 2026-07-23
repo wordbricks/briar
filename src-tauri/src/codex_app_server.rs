@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
+    env,
+    ffi::{OsStr, OsString},
     fs,
     io::{BufRead, BufReader, Read, Write},
     path::{Path, PathBuf},
@@ -156,6 +158,221 @@ pub(crate) struct ProjectAutoHuntRequest {
 pub(crate) struct AutoHuntExecution {
     pub(crate) approval_policy: ApprovalPolicy,
     pub(crate) event_sink: AppServerEventSink,
+}
+
+pub(crate) struct AutoHuntCliEnvironment {
+    _directory: tempfile::TempDir,
+    execution_path: OsString,
+}
+
+impl AutoHuntCliEnvironment {
+    pub(crate) fn prepare(
+        home: &Path,
+        execution_path: &OsStr,
+        workspace: &Path,
+    ) -> Result<Self, String> {
+        let bun_binary = which::which_in("bun", Some(execution_path), workspace)
+            .map_err(|_| "Briar CLI 실행에 필요한 Bun을 찾지 못했습니다.".to_string())?;
+        let briar_entry = home.join(".local/share/briar/briar.js");
+        if !briar_entry.is_file() {
+            return Err(
+                "Briar CLI 번들을 찾지 못했습니다. 연결 상태에서 CLI 및 스킬 복구를 실행하세요."
+                    .to_string(),
+            );
+        }
+        let velen_binary = which::which_in("velen", Some(execution_path), workspace)
+            .map_err(|_| "Velen CLI를 찾지 못했습니다.".to_string())?;
+        let directory = tempfile::Builder::new()
+            .prefix("briar-auto-hunt-")
+            .tempdir()
+            .map_err(|error| format!("자동사냥 CLI 환경을 만들지 못했습니다: {error}"))?;
+        let sandbox_home = directory.path().join("home");
+        let sandbox_config = sandbox_home.join(".config");
+        let wrapper_directory = directory.path().join("bin");
+        create_secure_directory(&sandbox_config)?;
+        create_secure_directory(&wrapper_directory)?;
+        for cli in ["briar", "velen"] {
+            copy_secure_tree(&home.join(".config").join(cli), &sandbox_config.join(cli))?;
+        }
+        write_cli_wrapper(
+            &wrapper_directory,
+            "briar",
+            &bun_binary,
+            &[briar_entry.as_os_str()],
+            &sandbox_home,
+            &sandbox_config,
+        )?;
+        write_cli_wrapper(
+            &wrapper_directory,
+            "velen",
+            &velen_binary,
+            &[],
+            &sandbox_home,
+            &sandbox_config,
+        )?;
+        let mut paths = vec![wrapper_directory];
+        paths.extend(env::split_paths(execution_path));
+        let execution_path = env::join_paths(paths)
+            .map_err(|error| format!("자동사냥 CLI 실행 경로를 만들지 못했습니다: {error}"))?;
+        Ok(Self {
+            _directory: directory,
+            execution_path,
+        })
+    }
+
+    pub(crate) fn execution_path(&self) -> &OsStr {
+        &self.execution_path
+    }
+}
+
+fn copy_secure_tree(source: &Path, destination: &Path) -> Result<(), String> {
+    let metadata = match fs::symlink_metadata(source) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => {
+            return Err(format!(
+                "자동사냥 CLI 설정을 확인하지 못했습니다 ({}): {error}",
+                source.display()
+            ));
+        }
+    };
+    if metadata.file_type().is_symlink() {
+        return Err(format!(
+            "자동사냥 CLI 설정의 심볼릭 링크는 복사하지 않습니다: {}",
+            source.display()
+        ));
+    }
+    if metadata.is_dir() {
+        create_secure_directory(destination)?;
+        let entries = fs::read_dir(source).map_err(|error| {
+            format!(
+                "자동사냥 CLI 설정을 읽지 못했습니다 ({}): {error}",
+                source.display()
+            )
+        })?;
+        for entry in entries {
+            let entry = entry.map_err(|error| {
+                format!(
+                    "자동사냥 CLI 설정 항목을 읽지 못했습니다 ({}): {error}",
+                    source.display()
+                )
+            })?;
+            copy_secure_tree(&entry.path(), &destination.join(entry.file_name()))?;
+        }
+        return Ok(());
+    }
+    if !metadata.is_file() {
+        return Err(format!(
+            "지원하지 않는 자동사냥 CLI 설정 항목입니다: {}",
+            source.display()
+        ));
+    }
+    if let Some(parent) = destination.parent() {
+        create_secure_directory(parent)?;
+    }
+    fs::copy(source, destination).map_err(|error| {
+        format!(
+            "자동사냥 CLI 설정을 복사하지 못했습니다 ({}): {error}",
+            source.display()
+        )
+    })?;
+    set_secure_file_permissions(destination)
+}
+
+fn create_secure_directory(path: &Path) -> Result<(), String> {
+    fs::create_dir_all(path)
+        .map_err(|error| format!("보호된 임시 폴더를 만들지 못했습니다: {error}"))?;
+    set_secure_directory_permissions(path)
+}
+
+#[cfg(unix)]
+fn set_secure_directory_permissions(path: &Path) -> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+    fs::set_permissions(path, fs::Permissions::from_mode(0o700))
+        .map_err(|error| format!("보호된 임시 폴더 권한을 설정하지 못했습니다: {error}"))
+}
+
+#[cfg(not(unix))]
+fn set_secure_directory_permissions(_path: &Path) -> Result<(), String> {
+    Ok(())
+}
+
+#[cfg(unix)]
+fn set_secure_file_permissions(path: &Path) -> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+    fs::set_permissions(path, fs::Permissions::from_mode(0o600))
+        .map_err(|error| format!("보호된 임시 파일 권한을 설정하지 못했습니다: {error}"))
+}
+
+#[cfg(not(unix))]
+fn set_secure_file_permissions(_path: &Path) -> Result<(), String> {
+    Ok(())
+}
+
+#[cfg(unix)]
+fn shell_quote(value: &OsStr) -> String {
+    let value = value.to_string_lossy();
+    format!("'{}'", value.replace('\'', "'\"'\"'"))
+}
+
+#[cfg(unix)]
+fn write_cli_wrapper(
+    directory: &Path,
+    name: &str,
+    binary: &Path,
+    arguments: &[&OsStr],
+    home: &Path,
+    config: &Path,
+) -> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+    let wrapper = directory.join(name);
+    let arguments = arguments
+        .iter()
+        .map(|argument| shell_quote(argument))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let arguments = if arguments.is_empty() {
+        String::new()
+    } else {
+        format!(" {arguments}")
+    };
+    let contents = format!(
+        "#!/bin/sh\nexport HOME={}\nexport XDG_CONFIG_HOME={}\nexec {}{} \"$@\"\n",
+        shell_quote(home.as_os_str()),
+        shell_quote(config.as_os_str()),
+        shell_quote(binary.as_os_str()),
+        arguments,
+    );
+    fs::write(&wrapper, contents)
+        .map_err(|error| format!("{name} CLI 래퍼를 만들지 못했습니다: {error}"))?;
+    fs::set_permissions(&wrapper, fs::Permissions::from_mode(0o700))
+        .map_err(|error| format!("{name} CLI 래퍼 권한을 설정하지 못했습니다: {error}"))
+}
+
+#[cfg(windows)]
+fn write_cli_wrapper(
+    directory: &Path,
+    name: &str,
+    binary: &Path,
+    arguments: &[&OsStr],
+    home: &Path,
+    config: &Path,
+) -> Result<(), String> {
+    let wrapper = directory.join(format!("{name}.cmd"));
+    let arguments = arguments
+        .iter()
+        .map(|argument| format!(" \"{}\"", Path::new(argument).display()))
+        .collect::<String>();
+    let contents = format!(
+        "@echo off\r\nset \"HOME={}\"\r\nset \"USERPROFILE={}\"\r\nset \"XDG_CONFIG_HOME={}\"\r\n\"{}\"{} %*\r\n",
+        home.display(),
+        home.display(),
+        config.display(),
+        binary.display(),
+        arguments,
+    );
+    fs::write(&wrapper, contents)
+        .map_err(|error| format!("{name} CLI 래퍼를 만들지 못했습니다: {error}"))
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -789,6 +1006,88 @@ fn approval_decision(method: &str, approved: bool) -> Option<Value> {
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[cfg(unix)]
+    #[test]
+    fn isolates_auto_hunt_cli_credentials_in_a_temporary_home() {
+        use std::os::unix::fs::{MetadataExt, PermissionsExt};
+
+        let fixture = tempfile::tempdir().expect("fixture directory should exist");
+        let home = fixture.path().join("source-home");
+        let binary_directory = fixture.path().join("source-bin");
+        let briar_config = home.join(".config/briar/config.json");
+        let velen_auth = home.join(".config/velen/auth.json");
+        let briar_entry = home.join(".local/share/briar/briar.js");
+        create_secure_directory(
+            briar_config
+                .parent()
+                .expect("Briar config should have a parent"),
+        )
+        .expect("Briar config directory should exist");
+        create_secure_directory(
+            velen_auth
+                .parent()
+                .expect("Velen auth should have a parent"),
+        )
+        .expect("Velen config directory should exist");
+        create_secure_directory(&binary_directory).expect("binary directory should exist");
+        create_secure_directory(
+            briar_entry
+                .parent()
+                .expect("Briar entry should have a parent"),
+        )
+        .expect("Briar library directory should exist");
+        fs::write(&briar_config, "original-briar").expect("Briar fixture config should be written");
+        fs::write(&velen_auth, "original-velen").expect("Velen fixture auth should be written");
+        fs::write(&briar_entry, "fixture").expect("Briar fixture entry should be written");
+        for name in ["bun", "velen"] {
+            let binary = binary_directory.join(name);
+            let body = if name == "bun" {
+                "#!/bin/sh\nshift\nprintf changed > \"$HOME/.config/briar/config.json\"\n"
+            } else {
+                "#!/bin/sh\nexit 0\n"
+            };
+            fs::write(&binary, body).expect("fixture binary should be written");
+            fs::set_permissions(&binary, fs::Permissions::from_mode(0o700))
+                .expect("fixture binary should be executable");
+        }
+        let source_path =
+            env::join_paths([binary_directory]).expect("fixture execution path should be valid");
+        let cli_environment = AutoHuntCliEnvironment::prepare(&home, &source_path, fixture.path())
+            .expect("isolated CLI environment should be prepared");
+        let wrapper = which::which_in(
+            "briar",
+            Some(cli_environment.execution_path()),
+            fixture.path(),
+        )
+        .expect("Briar wrapper should be first on PATH");
+        let output = Command::new(wrapper)
+            .output()
+            .expect("Briar wrapper should execute");
+        assert!(output.status.success());
+        assert_eq!(
+            fs::read_to_string(&briar_config).expect("source config should remain readable"),
+            "original-briar"
+        );
+        let snapshot_home = cli_environment._directory.path().join("home");
+        assert_eq!(
+            fs::read_to_string(snapshot_home.join(".config/briar/config.json"))
+                .expect("snapshot should receive Briar changes"),
+            "changed"
+        );
+        assert_eq!(
+            fs::read_to_string(snapshot_home.join(".config/velen/auth.json"))
+                .expect("Velen auth should be copied"),
+            "original-velen"
+        );
+        assert_eq!(
+            fs::metadata(snapshot_home.join(".config/velen/auth.json"))
+                .expect("snapshot auth metadata should exist")
+                .mode()
+                & 0o777,
+            0o600
+        );
+    }
 
     #[test]
     fn scopes_conversation_ids_to_the_project() {

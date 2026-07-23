@@ -1142,6 +1142,8 @@ async fn start_project_auto_hunt(
         let settings = project_llm_settings_from(&config_path, &project_id)?;
         let binary = codex_app_server::codex_binary(&home)?;
         let execution_path = cli_execution_path(&home)?;
+        let cli_environment =
+            codex_app_server::AutoHuntCliEnvironment::prepare(&home, &execution_path, &workspace)?;
         let approve = |method: &str, params: &serde_json::Value| {
             approval_app
                 .dialog()
@@ -1155,7 +1157,7 @@ async fn start_project_auto_hunt(
         };
         codex_app_server::start_auto_hunt(
             &binary,
-            &execution_path,
+            cli_environment.execution_path(),
             &project_id,
             &workspace,
             codex_app_server::AutoHuntExecution {
