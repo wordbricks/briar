@@ -12,6 +12,11 @@ describe("LaunchIntro", () => {
     expect(markup).toContain("Briar 시작 화면");
     expect(markup).toContain("Skip intro");
     expect(markup).toContain("--launch-character-index");
+    expect(markup).toContain("launch-intro-content");
+    expect(markup).not.toContain("launch-intro-window");
+    expect(markup).not.toContain("launch-intro-gradient");
+    expect(markup).not.toContain("launch-intro-grain");
+    expect(markup).not.toContain("launch-intro-status");
   });
 
   it("marks the full-screen native presentation", () => {
