@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { isAndroidCompanion, isDesktopTauri } from "./platform";
+import {
+  isAndroidCompanion,
+  isDesktopTauri,
+  isMacDesktopTauri,
+} from "./platform";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -22,5 +26,16 @@ describe("platform detection", () => {
 
     expect(isAndroidCompanion()).toBe(false);
     expect(isDesktopTauri()).toBe(true);
+    expect(isMacDesktopTauri()).toBe(true);
+  });
+
+  it("does not enable the native intro for another desktop platform", () => {
+    vi.stubGlobal("navigator", {
+      userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+    });
+    vi.stubGlobal("window", { __TAURI_INTERNALS__: {} });
+
+    expect(isDesktopTauri()).toBe(true);
+    expect(isMacDesktopTauri()).toBe(false);
   });
 });

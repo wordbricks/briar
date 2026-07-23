@@ -13,4 +13,12 @@ describe("LaunchIntro", () => {
     expect(markup).toContain("건너뛰기");
     expect(markup).toContain("--launch-character-index");
   });
+
+  it("marks the full-screen native presentation", () => {
+    const markup = renderToStaticMarkup(
+      <LaunchIntro native onComplete={() => undefined} />,
+    );
+
+    expect(markup).toContain("launch-intro-native");
+  });
 });

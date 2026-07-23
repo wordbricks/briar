@@ -1,0 +1,10 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "launch-intro",
+  "description": "Minimal capabilities for the native Briar launch intro",
+  "platforms": ["macOS"],
+  "windows": ["launch-intro"],
+  "permissions": [
+    "core:default"
+  ]
+}

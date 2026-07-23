@@ -3,9 +3,19 @@ import briarMarkUrl from "../assets/briar-mark.svg";
 import { useI18n } from "../i18n";
 
 const INTRO_DURATION_MS = 5_200;
+const INTRO_REVEAL_MS = 4_575;
 const REDUCED_MOTION_DURATION_MS = 900;
+const REDUCED_MOTION_REVEAL_MS = 650;
 
-export function LaunchIntro({ onComplete }: { onComplete: () => void }) {
+export function LaunchIntro({
+  native = false,
+  onComplete,
+  onReveal,
+}: {
+  native?: boolean;
+  onComplete: () => void;
+  onReveal?: () => void;
+}) {
   const { t } = useI18n();
   const lines = t("login.title").split("\n");
 
@@ -17,28 +27,41 @@ export function LaunchIntro({ onComplete }: { onComplete: () => void }) {
       onComplete,
       reducedMotion ? REDUCED_MOTION_DURATION_MS : INTRO_DURATION_MS,
     );
+    const revealTimer = onReveal
+      ? window.setTimeout(
+          onReveal,
+          reducedMotion ? REDUCED_MOTION_REVEAL_MS : INTRO_REVEAL_MS,
+        )
+      : null;
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onComplete();
+      if (event.key === "Escape") {
+        onReveal?.();
+        onComplete();
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => {
       window.clearTimeout(timer);
+      if (revealTimer !== null) window.clearTimeout(revealTimer);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [onComplete]);
+  }, [onComplete, onReveal]);
 
   let characterIndex = 0;
 
   return (
     <section
       aria-label={t("intro.label")}
-      className="launch-intro"
+      className={`launch-intro${native ? " launch-intro-native" : ""}`}
       data-testid="launch-intro"
     >
       <button
         className="launch-intro-skip"
-        onClick={onComplete}
+        onClick={() => {
+          onReveal?.();
+          onComplete();
+        }}
         type="button"
       >
         {t("intro.skip")}
