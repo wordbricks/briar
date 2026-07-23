@@ -9,11 +9,17 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
     process::Command,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc, Mutex,
+    },
 };
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
 
 const SESSION_FILE_NAME: &str = "session.json";
+const AUTO_HUNT_EVENT_DIRECTORY: &str = "auto-hunt-sessions";
+const AUTO_HUNT_APP_SERVER_EVENT: &str = "auto-hunt-app-server-event";
 
 #[derive(Deserialize, Serialize)]
 struct StoredSession {
@@ -1110,6 +1116,7 @@ async fn project_llm_chat(
             codex_app_server::ChatExecution {
                 approval_policy: settings.approval_policy,
                 sandbox_mode: codex_app_server::SandboxMode::ReadOnly,
+                event_sink: None,
             },
             request,
             &approve,
@@ -1127,6 +1134,7 @@ async fn start_project_auto_hunt(
 ) -> Result<codex_app_server::ProjectAutoHuntResponse, String> {
     let config_path = cli_config_path(&app)?;
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    let event_sink = create_auto_hunt_event_sink(&app, &request.session_id)?;
     let approval_app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let workspace = connected_project_workspace(&config_path, &project_id)?;
@@ -1149,10 +1157,122 @@ async fn start_project_auto_hunt(
             &execution_path,
             &project_id,
             &workspace,
-            settings.approval_policy,
+            codex_app_server::AutoHuntExecution {
+                approval_policy: settings.approval_policy,
+                event_sink,
+            },
             request,
             &approve,
         )
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+fn validate_auto_hunt_session_id(session_id: &str) -> Result<(), String> {
+    if session_id.is_empty()
+        || session_id.len() > 128
+        || !session_id
+            .bytes()
+            .all(|character| character.is_ascii_alphanumeric() || matches!(character, b'-' | b'_'))
+    {
+        return Err("자동사냥 세션 ID가 올바르지 않습니다.".to_string());
+    }
+    Ok(())
+}
+
+fn auto_hunt_event_path(app: &tauri::AppHandle, session_id: &str) -> Result<PathBuf, String> {
+    validate_auto_hunt_session_id(session_id)?;
+    Ok(app
+        .path()
+        .app_data_dir()
+        .map_err(|error| error.to_string())?
+        .join(AUTO_HUNT_EVENT_DIRECTORY)
+        .join(format!("{session_id}.jsonl")))
+}
+
+fn create_auto_hunt_event_sink(
+    app: &tauri::AppHandle,
+    session_id: &str,
+) -> Result<codex_app_server::AppServerEventSink, String> {
+    let path = auto_hunt_event_path(app, session_id)?;
+    let directory = path
+        .parent()
+        .ok_or_else(|| "자동사냥 이벤트 저장 경로가 올바르지 않습니다.".to_string())?;
+    fs::create_dir_all(directory)
+        .map_err(|error| format!("자동사냥 이벤트 저장 폴더를 만들지 못했습니다: {error}"))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(directory, fs::Permissions::from_mode(0o700)).map_err(|error| {
+            format!("자동사냥 이벤트 저장 폴더 권한을 지정하지 못했습니다: {error}")
+        })?;
+    }
+    let mut options = OpenOptions::new();
+    options.create_new(true).write(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let file = options
+        .open(path)
+        .map_err(|error| format!("자동사냥 이벤트 로그를 열지 못했습니다: {error}"))?;
+    let file = Arc::new(Mutex::new(file));
+    let sequence = Arc::new(AtomicU64::new(0));
+    let session_id = session_id.to_string();
+    let event_app = app.clone();
+
+    Ok(Arc::new(move |direction, message| {
+        let record = codex_app_server::AppServerEventRecord::new(
+            session_id.clone(),
+            sequence.fetch_add(1, Ordering::Relaxed) + 1,
+            direction,
+            message.clone(),
+        );
+        let serialized = serde_json::to_vec(&record)
+            .map_err(|error| format!("자동사냥 이벤트를 직렬화하지 못했습니다: {error}"))?;
+        {
+            let mut file = file
+                .lock()
+                .map_err(|_| "자동사냥 이벤트 로그 잠금이 손상되었습니다.".to_string())?;
+            file.write_all(&serialized)
+                .and_then(|_| file.write_all(b"\n"))
+                .and_then(|_| file.flush())
+                .map_err(|error| format!("자동사냥 이벤트를 저장하지 못했습니다: {error}"))?;
+        }
+        let _ = event_app.emit(AUTO_HUNT_APP_SERVER_EVENT, &record);
+        Ok(())
+    }))
+}
+
+#[tauri::command]
+async fn load_auto_hunt_app_server_events(
+    app: tauri::AppHandle,
+    session_id: String,
+) -> Result<Vec<codex_app_server::AppServerEventRecord>, String> {
+    let path = auto_hunt_event_path(&app, &session_id)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let contents = match fs::read_to_string(&path) {
+            Ok(contents) => contents,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(error) => {
+                return Err(format!("자동사냥 이벤트 로그를 읽지 못했습니다: {error}"));
+            }
+        };
+        contents
+            .lines()
+            .enumerate()
+            .filter(|(_, line)| !line.trim().is_empty())
+            .map(|(index, line)| {
+                serde_json::from_str(line).map_err(|error| {
+                    format!(
+                        "자동사냥 이벤트 로그의 {}번째 줄이 손상되었습니다: {error}",
+                        index + 1
+                    )
+                })
+            })
+            .collect()
     })
     .await
     .map_err(|error| error.to_string())?
@@ -1282,6 +1402,7 @@ pub fn run() {
             connected_project_ids,
             project_llm_chat,
             start_project_auto_hunt,
+            load_auto_hunt_app_server_events,
             load_project_llm_settings,
             update_project_llm_settings,
             update_local_project_workflow,
@@ -1299,6 +1420,14 @@ pub fn run() {
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn validates_auto_hunt_session_ids_before_building_log_paths() {
+        assert!(validate_auto_hunt_session_id("019f8a9c-2c95-7591-a096-fcbf930cf122").is_ok());
+        assert!(validate_auto_hunt_session_id("../session").is_err());
+        assert!(validate_auto_hunt_session_id("session.jsonl").is_err());
+        assert!(validate_auto_hunt_session_id("").is_err());
+    }
 
     #[test]
     fn persists_and_clears_session_without_a_keychain() {

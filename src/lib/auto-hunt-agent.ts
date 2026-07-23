@@ -1,6 +1,15 @@
 import type { HuntRun } from "../types";
 
 export const maxAutoHuntSessionIssues = 3;
+export const autoHuntAppServerEventName = "auto-hunt-app-server-event";
+
+export type AutoHuntAppServerEvent = {
+  sessionId: string;
+  sequence: number;
+  occurredAtMs: number;
+  direction: "client" | "server";
+  message: Record<string, unknown>;
+};
 
 export type AutoHuntAgentIssue = Pick<
   HuntRun,
@@ -29,6 +38,7 @@ const isTauri = () =>
 export async function startProjectAutoHunt(
   projectId: string,
   issues: AutoHuntAgentIssue[],
+  sessionId: string,
 ): Promise<AutoHuntAgentResponse> {
   if (!isTauri()) {
     throw new Error("자동사냥은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
@@ -45,6 +55,7 @@ export async function startProjectAutoHunt(
   return invoke<AutoHuntAgentResponse>("start_project_auto_hunt", {
     projectId,
     request: {
+      sessionId,
       issues: issues.map((issue) => ({
         runId: issue.id,
         runNumber: issue.runNumber,
@@ -53,4 +64,42 @@ export async function startProjectAutoHunt(
       })),
     },
   });
+}
+
+export async function loadAutoHuntAppServerEvents(
+  sessionId: string,
+): Promise<AutoHuntAppServerEvent[]> {
+  if (!isTauri()) return [];
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<AutoHuntAppServerEvent[]>(
+    "load_auto_hunt_app_server_events",
+    { sessionId },
+  );
+}
+
+export async function listenToAutoHuntAppServerEvents(
+  onEvent: (event: AutoHuntAppServerEvent) => void,
+): Promise<() => void> {
+  if (!isTauri()) return () => undefined;
+  const { listen } = await import("@tauri-apps/api/event");
+  return listen<AutoHuntAppServerEvent>(
+    autoHuntAppServerEventName,
+    (event) => onEvent(event.payload),
+  );
+}
+
+export function mergeAutoHuntAppServerEvents(
+  current: AutoHuntAppServerEvent[],
+  incoming: AutoHuntAppServerEvent | AutoHuntAppServerEvent[],
+): AutoHuntAppServerEvent[] {
+  const merged = new Map(
+    current.map((event) => [`${event.sessionId}:${event.sequence}`, event]),
+  );
+  for (const event of Array.isArray(incoming) ? incoming : [incoming]) {
+    merged.set(`${event.sessionId}:${event.sequence}`, event);
+  }
+  return [...merged.values()].sort((left, right) =>
+    left.sessionId.localeCompare(right.sessionId) ||
+    left.sequence - right.sequence
+  );
 }

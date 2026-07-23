@@ -171,7 +171,7 @@ export function useAutoHuntSessions(
     sessionsRef.current = [session, ...sessionsRef.current];
     setSessions(sessionsRef.current);
 
-    void runner(projectId, candidates)
+    void runner(projectId, candidates, session.id)
       .then((response) => {
         const completedAt = new Date().toISOString();
         setSessions((current) => current.map((candidate) =>
