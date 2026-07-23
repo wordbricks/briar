@@ -64,7 +64,11 @@ export type DeviceAuthorization = {
   interval: number;
 };
 
-export async function beginDeviceAuthorization(): Promise<DeviceAuthorization> {
+export type DeviceClientId = "briar-android" | "briar-desktop";
+
+export async function beginDeviceAuthorization(
+  clientId: DeviceClientId = "briar-desktop",
+): Promise<DeviceAuthorization> {
   const response = await request<{
     device_code: string;
     user_code: string;
@@ -74,15 +78,20 @@ export async function beginDeviceAuthorization(): Promise<DeviceAuthorization> {
   }>("/api/auth/device/code", null, {
     method: "POST",
     body: JSON.stringify({
-      client_id: "briar-desktop",
+      client_id: clientId,
       scope: "openid profile email",
     }),
   });
+  const verificationUrl =
+    response.verification_uri_complete ?? response.verification_uri;
+  const clientVerificationUrl = new URL(verificationUrl);
+  if (clientId === "briar-android") {
+    clientVerificationUrl.searchParams.set("client", "android");
+  }
   return {
     deviceCode: response.device_code,
     userCode: response.user_code,
-    verificationUrl:
-      response.verification_uri_complete ?? response.verification_uri,
+    verificationUrl: clientVerificationUrl.toString(),
     interval: response.interval ?? 5,
   };
 }
@@ -95,6 +104,7 @@ type DeviceTokenResponse = {
 
 export async function pollDeviceToken(
   deviceCode: string,
+  clientId: DeviceClientId = "briar-desktop",
 ): Promise<DeviceTokenResponse> {
   try {
     return await request<DeviceTokenResponse>("/api/auth/device/token", null, {
@@ -102,7 +112,7 @@ export async function pollDeviceToken(
       body: JSON.stringify({
         grant_type: "urn:ietf:params:oauth:grant-type:device_code",
         device_code: deviceCode,
-        client_id: "briar-desktop",
+        client_id: clientId,
       }),
     });
   } catch (error) {

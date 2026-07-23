@@ -14,6 +14,7 @@ import {
   pollDeviceToken,
   retryHuntRun,
   updateProjectSettings,
+  type DeviceClientId,
 } from "../lib/api";
 import { demoDashboard } from "../lib/demo-data";
 import {
@@ -37,6 +38,7 @@ import {
 } from "../lib/token-store";
 import { startDashboardPolling } from "../lib/dashboard-polling";
 import { defaultAutoHuntWorkflow } from "../lib/auto-hunt-contract";
+import { isAndroidCompanion } from "../lib/platform";
 import type {
   CreateIssueInput,
   DashboardPayload,
@@ -54,6 +56,10 @@ export type ProjectConnection = {
 };
 
 const demoMode = import.meta.env.VITE_BRIAR_DEMO !== "false" && !isApiConfigured;
+const companionMode = isAndroidCompanion();
+const deviceClientId: DeviceClientId = companionMode
+  ? "briar-android"
+  : "briar-desktop";
 const demoUser: SessionUser = {
   id: "demo-user",
   name: "Jay",
@@ -73,7 +79,11 @@ const emptyDashboard = (project: Project): DashboardPayload => ({
   generatedAt: new Date().toISOString(),
 });
 
-async function openExternal(url: string) {
+async function openAuthorization(url: string) {
+  if (companionMode && window.BriarAndroidAuth) {
+    window.BriarAndroidAuth.open(url);
+    return;
+  }
   if ("__TAURI_INTERNALS__" in window) {
     const { openUrl } = await import("@tauri-apps/plugin-opener");
     await openUrl(url);
@@ -120,6 +130,7 @@ export function useBriar() {
   const [healthError, setHealthError] = useState<string | null>(null);
   const [healthLoading, setHealthLoading] = useState(false);
   const pollTimer = useRef<number | null>(null);
+  const pollLoginNow = useRef<(() => void) | null>(null);
   const loginAttempt = useRef(0);
 
   const clearLoginTimer = useCallback(() => {
@@ -131,9 +142,21 @@ export function useBriar() {
   const cancelLogin = useCallback(() => {
     loginAttempt.current += 1;
     clearLoginTimer();
+    pollLoginNow.current = null;
     setLoginCode(null);
     setLoading(false);
     setError(null);
+  }, [clearLoginTimer]);
+
+  useEffect(() => {
+    if (!companionMode) return;
+    const handleAuthReturn = () => {
+      clearLoginTimer();
+      pollLoginNow.current?.();
+    };
+    window.addEventListener("briar-auth-return", handleAuthReturn);
+    return () =>
+      window.removeEventListener("briar-auth-return", handleAuthReturn);
   }, [clearLoginTimer]);
 
   const refresh = useCallback(async () => {
@@ -157,7 +180,9 @@ export function useBriar() {
           loadSession(storedToken),
           loadProjects(storedToken),
         ]);
-        const unconnectedProject = await findUnconnectedProject(nextProjects);
+        const unconnectedProject = companionMode
+          ? null
+          : await findUnconnectedProject(nextProjects);
         if (cancelled) return;
         setToken(storedToken);
         setUser(nextUser);
@@ -201,7 +226,7 @@ export function useBriar() {
   }, [activeProjectId, refresh, token]);
 
   const refreshHealth = useCallback(async () => {
-    if (demoMode || !activeProjectId) {
+    if (demoMode || companionMode || !activeProjectId) {
       setHealth(null);
       setHealthError(null);
       return null;
@@ -232,17 +257,20 @@ export function useBriar() {
     setLoading(true);
     setError(null);
     try {
-      const authorization = await beginDeviceAuthorization();
+      const authorization = await beginDeviceAuthorization(deviceClientId);
       if (attempt !== loginAttempt.current) return;
       setLoginCode(authorization.userCode);
-      await openExternal(authorization.verificationUrl);
+      await openAuthorization(authorization.verificationUrl);
       if (attempt !== loginAttempt.current) return;
       let delay = authorization.interval * 1_000;
       const poll = async () => {
         pollTimer.current = null;
         if (attempt !== loginAttempt.current) return;
         try {
-          const result = await pollDeviceToken(authorization.deviceCode);
+          const result = await pollDeviceToken(
+            authorization.deviceCode,
+            deviceClientId,
+          );
           if (attempt !== loginAttempt.current) return;
           if (result.access_token) {
             const nextToken = result.access_token;
@@ -250,7 +278,9 @@ export function useBriar() {
               loadSession(nextToken),
               loadProjects(nextToken),
             ]);
-            const unconnectedProject = await findUnconnectedProject(nextProjects);
+            const unconnectedProject = companionMode
+              ? null
+              : await findUnconnectedProject(nextProjects);
             if (attempt !== loginAttempt.current) return;
             await writeSessionToken(nextToken);
             if (attempt !== loginAttempt.current) {
@@ -268,6 +298,7 @@ export function useBriar() {
             );
             setLoginCode(null);
             setLoading(false);
+            pollLoginNow.current = null;
             return;
           }
           if (result.error === "slow_down") delay += 5_000;
@@ -281,13 +312,16 @@ export function useBriar() {
           setError(caught instanceof Error ? caught.message : String(caught));
           setLoading(false);
           setLoginCode(null);
+          pollLoginNow.current = null;
         }
       };
+      pollLoginNow.current = () => void poll();
       pollTimer.current = window.setTimeout(() => void poll(), delay);
     } catch (caught) {
       if (attempt !== loginAttempt.current) return;
       setError(caught instanceof Error ? caught.message : String(caught));
       setLoading(false);
+      pollLoginNow.current = null;
     }
   }, [clearLoginTimer]);
 
@@ -770,6 +804,7 @@ export function useBriar() {
     deleteProject: removeProject,
     deletingProjectId,
     demoMode,
+    companionMode,
     error,
     health,
     healthError,

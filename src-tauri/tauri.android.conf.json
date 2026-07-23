@@ -1,0 +1,21 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Briar Companion",
+  "identifier": "app.briar.companion",
+  "build": {
+    "beforeDevCommand": "bun run dev",
+    "beforeBuildCommand": "bash scripts/with-release-env.sh bun run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost https://briar-api.wbai.workers.dev; img-src 'self' asset: http://asset.localhost https: data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "resources": [],
+    "shortDescription": "Monitor Briar Auto Hunt from Android",
+    "longDescription": "Briar Companion monitors Auto Hunt work and queues new issues for a connected Briar desktop agent."
+  }
+}

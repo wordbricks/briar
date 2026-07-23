@@ -52,6 +52,7 @@ type KanbanColumn = {
 };
 
 export function HuntDashboard({
+  companionMode = false,
   dashboard,
   error,
   health,
@@ -70,6 +71,7 @@ export function HuntDashboard({
   onRepair,
   onSidebarOpen,
 }: {
+  companionMode?: boolean;
   dashboard: DashboardPayload | null;
   error: string | null;
   health: AutoHuntHealth | null;
@@ -137,15 +139,18 @@ export function HuntDashboard({
       const columnId = kanbanColumnForRun(run, workflowStages.map((stage) => stage.id));
       grouped.get(columnId)?.push(run);
     }
-    return visibleDefinitions.map((column) => ({
+    const columns = visibleDefinitions.map((column) => ({
       ...column,
       runs: grouped.get(column.id) ?? [],
     }));
-  }, [dashboard?.settings.workflow, filtered, status, t]);
+    return companionMode
+      ? columns.filter((column) => column.runs.length > 0)
+      : columns;
+  }, [companionMode, dashboard?.settings.workflow, filtered, status, t]);
 
   return (
     <main className="main-content" id="issues">
-      <header className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region>
+      {!companionMode && <header className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region>
         {!isSidebarOpen && (
           <button
             aria-controls="app-sidebar"
@@ -168,7 +173,7 @@ export function HuntDashboard({
           onRefresh={onHealthRefresh}
           onRepair={onRepair}
         />
-      </header>
+      </header>}
       <div className="dashboard-scroll">
         {error && <div className="error-banner"><CircleAlert size={16} />{error}</div>}
 
@@ -199,7 +204,13 @@ export function HuntDashboard({
             <button className={status === "completed" ? "active" : ""} onClick={() => setStatus("completed")}>{t("dashboard.completed")} <span>{completedCount}</span></button>
           </div>
           <div aria-label={t("dashboard.kanbanBoard")} className="kanban-board">
-            {kanbanColumns.map((column) => (
+            {kanbanColumns.length === 0 ? (
+              <div className="companion-no-runs">
+                <Bot size={22} />
+                <strong>{t("dashboard.emptyTitle")}</strong>
+                <span>{t("dashboard.emptyDescription")}</span>
+              </div>
+            ) : kanbanColumns.map((column) => (
               <section className={`kanban-column ${column.tone}`} key={column.id}>
                 <header>
                   <span><i aria-hidden="true" />{column.label}</span>
@@ -243,6 +254,7 @@ export function HuntDashboard({
           onLoadAttachment={onLoadAttachment}
           onRetry={() => onRetryRun(selected.id)}
           run={selected}
+          showRepositoryAction={!companionMode}
         />
       )}
     </main>
@@ -572,6 +584,7 @@ export function RunDialog({
   onLoadAttachment,
   onRetry,
   run,
+  showRepositoryAction = true,
 }: {
   error: string | null;
   isRecovering: boolean;
@@ -580,6 +593,7 @@ export function RunDialog({
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onRetry: () => Promise<unknown>;
   run: HuntRun;
+  showRepositoryAction?: boolean;
 }) {
   const { localeTag, t } = useI18n();
   const meta = runMeta(run.status, run.workflowStage, run.workflow);
@@ -631,7 +645,10 @@ export function RunDialog({
           </div>
           <div className="timeline"><h3>{t("run.activity")}</h3>{run.events.map((event) => { const eventDisplay = eventMeta(event.status, event.workflowStage, run.workflow); return <div className="timeline-event" key={event.id}><i className={eventDisplay.tone} /><span><strong>{localizeEvent(t, event.status, event.workflowStage, eventDisplay.label)} <em>{t("run.attempt", { count: event.attempt })}</em></strong><p>{event.detail}</p><small>{event.actor} · {relativeTime(event.occurredAt, t)}</small></span></div>; })}</div>
         </div>
-        <footer><span>{needsAttention ? t("run.preserveEvidence") : t("run.liveEvidence")}</span><button><ArrowUpRight size={14} />{t("run.openRepository")}</button></footer>
+        <footer>
+          <span>{needsAttention ? t("run.preserveEvidence") : t("run.liveEvidence")}</span>
+          {showRepositoryAction && <button><ArrowUpRight size={14} />{t("run.openRepository")}</button>}
+        </footer>
       </section>
     </div>
   );

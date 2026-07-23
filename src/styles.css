@@ -279,3 +279,55 @@ jelly-theme { color: var(--ink); }
 @media (prefers-reduced-transparency: reduce) { .sidebar,.sidebar-project-menu,.account-popover,.language-popover { backdrop-filter:none; -webkit-backdrop-filter:none; }.sidebar { background:#f4f4f2; }.sidebar-project-menu,.account-popover,.language-popover { background:#fff; }.launch-intro-skip { background:#2b2734; backdrop-filter:none; -webkit-backdrop-filter:none; } }
 @media (prefers-contrast: more) { .sidebar { border-right-color:#8b8c86; background:#f8f8f6; } }
 @media (max-width:760px) { .sidebar { width:220px; flex-basis:220px; }.sidebar.sidebar-collapsed { width:0; flex-basis:0; }.sidebar-toolbar { padding-left:20px; }.topbar.sidebar-closed { padding-left:20px; }.dashboard-scroll { padding:10px; }.health-grid { grid-template-columns:1fr; }.health-header { align-items:flex-start; gap:10px; flex-direction:column; }.queue-header { align-items:flex-start; gap:12px; flex-direction:column; }.queue-tools { width:100%; flex-wrap:wrap; }.search-box { flex:1; }.kanban-board { grid-auto-columns:minmax(250px,82vw); }.settings-fields { grid-template-columns:1fr; }.onboarding-card { padding:26px; }.project-settings-scroll { padding:34px 22px 50px; }.project-settings-automation > header { flex-wrap:wrap; }.project-settings-automation-actions { width:100%; margin-left:43px; }.project-settings-workflow-ai-note,.project-settings-workflow-success,.project-settings-workflow-error { margin-left:43px; }.project-settings-llm-control { grid-template-columns:1fr; }.project-settings-llm-control button { width:100%; }.project-settings-danger { align-items:flex-start; flex-direction:column; }.project-settings-danger > button { width:100%; justify-content:center; }.auto-hunt-scroll { padding:20px 14px 32px; }.auto-hunt-hero { padding:24px; align-items:flex-start; flex-direction:column; }.auto-hunt-start-button { width:100%; }.auto-hunt-capacity { align-items:flex-start; flex-direction:column; }.auto-hunt-session-row { grid-template-columns:38px minmax(0,1fr) 20px; }.auto-hunt-session-row > .auto-hunt-status,.auto-hunt-session-count { display:none; }.auto-hunt-session-page > header { padding:16px 18px; align-items:flex-start; }.auto-hunt-session-detail-body { padding:20px 18px; }.auto-hunt-target { grid-template-columns:48px minmax(0,1fr); }.auto-hunt-target > .auto-hunt-outcome { grid-column:2; justify-self:start; }.launch-intro-window { width:calc(100vw - 34px); height:min(440px,calc(100vh - 110px)); min-height:330px; }.launch-intro-brand { top:20px; left:21px; }.launch-intro-copy { width:calc(100% - 36px); }.launch-intro-copy h1 { font-size:clamp(26px,8vw,40px); }.launch-intro-skip { top:14px; right:14px; } }
+.companion-shell {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  padding-top: env(safe-area-inset-top);
+  background: #f7f7f3;
+}
+.companion-header {
+  min-width: 0;
+  padding: 14px max(16px, env(safe-area-inset-right)) 12px max(16px, env(safe-area-inset-left));
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255,255,255,.92);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+.companion-brand { min-width: 0; display: flex; align-items: center; gap: 9px; }
+.companion-brand > span { padding: 4px 7px; border-radius: 999px; color: #654db5; background: #eee9ff; font-size: 8px; font-weight: 700; text-transform: uppercase; }
+.companion-header-actions { display: flex; gap: 6px; }
+.companion-header-actions button { width: 42px; height: 42px; padding: 0; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 12px; color: #64665f; background: #fafaf7; }
+.companion-project-picker { min-width: 0; grid-column: 1 / -1; display: grid; gap: 6px; color: #858780; font-size: 9px; }
+.companion-project-picker select { width: 100%; height: 46px; padding: 0 42px 0 13px; border: 1px solid #dedfd8; border-radius: 12px; color: #33342f; background: #fff; font-size: 14px; font-weight: 650; }
+.companion-shell .main-content { min-height: 0; height: auto; overflow-y: auto; }
+.companion-shell .dashboard-scroll { padding: 14px max(14px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); display: block; overflow: visible; }
+.companion-shell .queue-panel { overflow: visible; border-radius: 16px; }
+.companion-shell .queue-header { padding: 18px; }
+.companion-shell .queue-tools { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+.companion-shell .create-issue-button { min-height: 44px; grid-column: 2; grid-row: 1; }
+.companion-shell .search-box { min-height: 44px; grid-column: 1; grid-row: 1; }
+.companion-shell .source-filter { grid-column: 1 / -1; overflow-x: auto; }
+.companion-shell .source-filter button,
+.companion-shell .status-tabs button { min-height: 42px; white-space: nowrap; }
+.companion-shell .status-tabs { overflow-x: auto; scrollbar-width: none; }
+.companion-shell .kanban-board { padding: 12px; display: grid; grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: minmax(0,1fr); gap: 12px; overflow: visible; }
+.companion-shell .kanban-column { min-width: 0; height: auto; }
+.companion-shell .kanban-column > div { overflow: visible; }
+.companion-shell .kanban-card { min-height: 128px; }
+.companion-no-runs { min-height: 220px; padding: 32px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 9px; color: #858780; text-align: center; }
+.companion-no-runs strong { color: #484944; font-size: 13px; }
+.companion-no-runs span { max-width: 280px; font-size: 10px; line-height: 1.6; }
+.companion-shell .dialog-backdrop { padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); align-items: flex-end; }
+.companion-shell .issue-dialog,
+.companion-shell .run-dialog { width: 100%; max-height: 92dvh; border-radius: 22px 22px 14px 14px; }
+.companion-shell .run-facts { grid-template-columns: 1fr; }
+.companion-shell .run-dialog footer { padding-bottom: max(14px, env(safe-area-inset-bottom)); }
+.companion-empty { min-height: 100dvh; padding: 48px 28px; display: flex; align-items: center; justify-content: center; flex-direction: column; background: #f7f7f3; text-align: center; }
+.companion-empty > span { margin-top: 16px; color: #654db5; font-size: 10px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+.companion-empty h1 { margin: 24px 0 0; font-size: 24px; letter-spacing: -.6px; }
+.companion-empty p { max-width: 360px; margin: 12px 0 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.companion-empty button { min-width: 140px; height: 46px; margin-top: 26px; border: 0; border-radius: 12px; color: #fff; background: var(--accent); font-weight: 700; }

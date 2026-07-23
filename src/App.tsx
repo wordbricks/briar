@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { AutoHuntSessions } from "./components/AutoHuntSessions";
+import { CompanionEmptyState, CompanionHeader } from "./components/CompanionHeader";
 import { HuntDashboard } from "./components/HuntDashboard";
 import { LaunchIntro } from "./components/LaunchIntro";
 import { LoginScreen } from "./components/LoginScreen";
@@ -49,6 +50,7 @@ export function App() {
   if (!briar.user) {
     content = (
       <LoginScreen
+        companionMode={briar.companionMode}
         error={briar.error}
         loading={briar.loading}
         loginCode={briar.loginCode}
@@ -57,9 +59,10 @@ export function App() {
       />
     );
   } else if (
-    briar.projects.length === 0 ||
-    briar.isCreatingProject ||
-    briar.projectConnection
+    !briar.companionMode &&
+    (briar.projects.length === 0 ||
+      briar.isCreatingProject ||
+      briar.projectConnection)
   ) {
     content = (
       <ProjectOnboarding
@@ -148,6 +151,46 @@ export function App() {
             onSidebarOpen={() => setIsSidebarOpen(true)}
           />
         )}
+      </jelly-theme>
+    );
+  }
+
+  if (briar.companionMode) {
+    if (!briar.user) return content;
+    if (briar.projects.length === 0) {
+      return <CompanionEmptyState onLogout={() => void briar.logout()} />;
+    }
+    return (
+      <jelly-theme mode="light" className="app-shell companion-shell">
+        <CompanionHeader
+          activeProjectId={briar.activeProjectId}
+          loading={briar.loading}
+          onLogout={() => void briar.logout()}
+          onProjectChange={briar.setActiveProjectId}
+          onRefresh={() => void briar.refresh()}
+          projects={briar.projects}
+          user={briar.user}
+        />
+        <HuntDashboard
+          companionMode
+          dashboard={briar.dashboard}
+          error={briar.error}
+          health={null}
+          healthError={null}
+          healthLoading={false}
+          isCreatingIssue={briar.isCreatingIssue}
+          recoveringRunId={briar.recoveringRunId}
+          recoveryError={briar.recoveryError}
+          isSidebarOpen
+          onCreateIssue={briar.addIssue}
+          onHealthRefresh={() => {}}
+          onLoadAttachment={briar.readIssueAttachment}
+          onReconnect={() => {}}
+          onRetryRun={briar.retryRun}
+          onCancelRun={briar.cancelRun}
+          onRepair={() => {}}
+          onSidebarOpen={() => {}}
+        />
       </jelly-theme>
     );
   }

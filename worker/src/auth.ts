@@ -29,7 +29,9 @@ export function createAuth(env: Env, apiOrigin: string) {
       deviceAuthorization({
         verificationUri: `${apiOrigin}/device`,
         validateClient: async (clientId) =>
-          clientId === "briar-desktop" || clientId === "briar-cli",
+          clientId === "briar-android" ||
+          clientId === "briar-desktop" ||
+          clientId === "briar-cli",
       }),
     ],
   });
