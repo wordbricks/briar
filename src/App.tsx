@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AutoHuntSessions } from "./components/AutoHuntSessions";
 import { CompanionEmptyState, CompanionHeader } from "./components/CompanionHeader";
 import { HuntDashboard } from "./components/HuntDashboard";
+import { Inbox } from "./components/Inbox";
 import { InitialOnboarding } from "./components/InitialOnboarding";
 import { LaunchIntro } from "./components/LaunchIntro";
 import { LoginScreen } from "./components/LoginScreen";
@@ -11,6 +12,7 @@ import { ProjectSettings } from "./components/ProjectSettings";
 import { Sidebar } from "./components/Sidebar";
 import { useBriar } from "./hooks/useBriar";
 import { useAutoHuntSessions } from "./hooks/useAutoHuntSessions";
+import { useInbox } from "./hooks/useInbox";
 import {
   clearLaunchIntroPreview,
   isLaunchIntroPreview,
@@ -30,6 +32,12 @@ import {
 export function App() {
   const briar = useBriar();
   const autoHunt = useAutoHuntSessions();
+  const inbox = useInbox(
+    briar.user?.id ?? null,
+    briar.dashboard,
+    autoHunt.sessions,
+    briar.projects,
+  );
   const mobilePlatform = getMobilePlatform() ?? "android";
   const previewsLaunchIntro = isLaunchIntroPreview();
   const runsOnDesktopTauri = isDesktopTauri();
@@ -44,8 +52,16 @@ export function App() {
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(
     hasCompletedInitialOnboarding,
   );
-  const [activePage, setActivePage] = useState<"issues" | "auto-hunt" | "project-settings" | "organization-settings">(
-    "issues",
+  const [activePage, setActivePage] = useState<
+    | "issues"
+    | "auto-hunt"
+    | "inbox"
+    | "project-settings"
+    | "organization-settings"
+  >("issues");
+  const [requestedRunId, setRequestedRunId] = useState<string | null>(null);
+  const [requestedSessionId, setRequestedSessionId] = useState<string | null>(
+    null,
   );
   const [activeOrganizationId, setActiveOrganizationId] = useState<string | null>(null);
   const hasCompactedWindowForOnboarding = useRef(false);
@@ -162,6 +178,7 @@ export function App() {
           isOpen={isSidebarOpen}
           onAddProject={briar.startProjectCreation}
           onAutoHuntOpen={() => setActivePage("auto-hunt")}
+          onInboxOpen={() => setActivePage("inbox")}
           onIssuesOpen={() => setActivePage("issues")}
           onOrganizationSettings={(organizationId) => {
             setActiveOrganizationId(organizationId);
@@ -169,6 +186,8 @@ export function App() {
           }}
           onProjectChange={(projectId) => {
             briar.setActiveProjectId(projectId);
+            setRequestedRunId(null);
+            setRequestedSessionId(null);
             setActivePage("issues");
           }}
           onProjectSettings={(projectId) => {
@@ -178,6 +197,7 @@ export function App() {
           onLogout={() => void briar.logout()}
           onToggle={() => setIsSidebarOpen(false)}
           projects={briar.projects}
+          unreadInboxCount={inbox.unreadCount}
           user={briar.user}
         />
         {activePage === "organization-settings" &&
@@ -191,6 +211,29 @@ export function App() {
               ) ?? activeProject!
             }
             token={briar.token}
+          />
+        ) : activePage === "inbox" ? (
+          <Inbox
+            isSidebarOpen={isSidebarOpen}
+            messages={inbox.messages}
+            onMarkAllRead={inbox.markAllRead}
+            onOpen={(message) => {
+              inbox.markRead(message.id);
+              if (message.projectId !== briar.activeProjectId) {
+                briar.setActiveProjectId(message.projectId);
+              }
+              if (message.kind === "issue") {
+                setRequestedSessionId(null);
+                setRequestedRunId(message.targetId);
+                setActivePage("issues");
+              } else {
+                setRequestedRunId(null);
+                setRequestedSessionId(message.targetId);
+                setActivePage("auto-hunt");
+              }
+            }}
+            onSidebarOpen={() => setIsSidebarOpen(true)}
+            unreadCount={inbox.unreadCount}
           />
         ) : activePage === "project-settings" && activeProject ? (
           <ProjectSettings
@@ -213,6 +256,8 @@ export function App() {
             error={briar.error}
             isSidebarOpen={isSidebarOpen}
             onSidebarOpen={() => setIsSidebarOpen(true)}
+            requestedSessionId={requestedSessionId}
+            onRequestedSessionOpen={() => setRequestedSessionId(null)}
             onStart={(runs) =>
               autoHunt.startSession(activeProject.id, runs, () =>
                 void briar.refresh()
@@ -230,6 +275,7 @@ export function App() {
             isCreatingIssue={briar.isCreatingIssue}
             recoveringRunId={briar.recoveringRunId}
             recoveryError={briar.recoveryError}
+            requestedRunId={requestedRunId}
             isSidebarOpen={isSidebarOpen}
             onCreateIssue={briar.addIssue}
             onHealthRefresh={() => void briar.refreshHealth()}
@@ -238,6 +284,7 @@ export function App() {
             onRetryRun={briar.retryRun}
             onCancelRun={briar.cancelRun}
             onRepair={() => void briar.repairHealth()}
+            onRequestedRunOpen={() => setRequestedRunId(null)}
             onSidebarOpen={() => setIsSidebarOpen(true)}
           />
         )}

@@ -30,14 +30,18 @@ export function AutoHuntSessions({
   error,
   isSidebarOpen,
   onSidebarOpen,
+  onRequestedSessionOpen,
   onStart,
+  requestedSessionId = null,
   sessions,
 }: {
   dashboard: DashboardPayload | null;
   error: string | null;
   isSidebarOpen: boolean;
   onSidebarOpen: () => void;
+  onRequestedSessionOpen?: () => void;
   onStart: (runs: HuntRun[]) => string;
+  requestedSessionId?: string | null;
   sessions: AutoHuntSession[];
 }) {
   const { localeTag, t } = useI18n();
@@ -68,6 +72,15 @@ export function AutoHuntSessions({
     if (!eventList || agentMessages.length === 0) return;
     eventList.scrollTop = eventList.scrollHeight;
   }, [agentMessages.length, latestAgentMessage?.text.length]);
+
+  useEffect(() => {
+    if (!requestedSessionId) return;
+    if (!projectSessions.some((session) => session.id === requestedSessionId)) {
+      return;
+    }
+    setSelectedSessionId(requestedSessionId);
+    onRequestedSessionOpen?.();
+  }, [onRequestedSessionOpen, projectSessions, requestedSessionId]);
 
   const start = () => {
     setStartError(null);
