@@ -73,7 +73,9 @@ export function HuntDashboard({
   onRetryRun,
   onCancelRun,
   onRepair,
+  onRequestedRunOpen,
   onSidebarOpen,
+  requestedRunId = null,
 }: {
   companionMode?: boolean;
   dashboard: DashboardPayload | null;
@@ -92,7 +94,9 @@ export function HuntDashboard({
   onRetryRun: (runId: string) => Promise<unknown>;
   onCancelRun: (runId: string) => Promise<unknown>;
   onRepair: () => void;
+  onRequestedRunOpen?: () => void;
   onSidebarOpen: () => void;
+  requestedRunId?: string | null;
 }) {
   const { t } = useI18n();
   const [query, setQuery] = useState("");
@@ -117,6 +121,13 @@ export function HuntDashboard({
       return !normalized || `${run.title} ${run.sourceKey} ${run.repository}`.toLowerCase().includes(normalized);
     });
   }, [query, runs, source, status]);
+
+  useEffect(() => {
+    if (!requestedRunId) return;
+    if (!runs.some((run) => run.id === requestedRunId)) return;
+    setSelectedRunId(requestedRunId);
+    onRequestedRunOpen?.();
+  }, [onRequestedRunOpen, requestedRunId, runs]);
 
   const kanbanColumns = useMemo<KanbanColumn[]>(() => {
     const workflow = dashboard?.settings.workflow;

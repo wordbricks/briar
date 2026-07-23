@@ -9,6 +9,7 @@ import {
   CircleHelp,
   Ellipsis,
   FolderGit2,
+  Inbox,
   LogOut,
   PanelLeftClose,
   Plus,
@@ -26,6 +27,7 @@ export function Sidebar({
   isOpen,
   onAddProject,
   onAutoHuntOpen,
+  onInboxOpen,
   onIssuesOpen,
   onOrganizationSettings,
   onProjectChange,
@@ -33,13 +35,20 @@ export function Sidebar({
   onLogout,
   onToggle,
   projects,
+  unreadInboxCount,
   user,
 }: {
-  activePage: "issues" | "auto-hunt" | "project-settings" | "organization-settings";
+  activePage:
+    | "issues"
+    | "auto-hunt"
+    | "inbox"
+    | "project-settings"
+    | "organization-settings";
   activeProjectId: string | null;
   isOpen: boolean;
   onAddProject: () => void;
   onAutoHuntOpen: () => void;
+  onInboxOpen: () => void;
   onIssuesOpen: () => void;
   onOrganizationSettings: (organizationId: string) => void;
   onProjectChange: (projectId: string) => void;
@@ -47,6 +56,7 @@ export function Sidebar({
   onLogout: () => void;
   onToggle: () => void;
   projects: Project[];
+  unreadInboxCount: number;
   user: SessionUser;
 }) {
   const { locale, setLocale, t } = useI18n();
@@ -149,6 +159,21 @@ export function Sidebar({
       </div>
 
       <nav aria-label={t("sidebar.mainMenu")} className="sidebar-primary-nav">
+        <a
+          aria-current={activePage === "inbox" ? "page" : undefined}
+          className={activePage === "inbox" ? "active" : ""}
+          href="#inbox"
+          onClick={onInboxOpen}
+        >
+          <Inbox size={16} strokeWidth={1.7} />
+          <span>{t("sidebar.inbox")}</span>
+          {unreadInboxCount > 0 && (
+            <i
+              aria-label={t("inbox.unreadCount", { count: unreadInboxCount })}
+              className="sidebar-unread-dot"
+            />
+          )}
+        </a>
         <a href="#help"><CircleHelp size={16} strokeWidth={1.7} />{t("sidebar.help")}</a>
       </nav>
 

@@ -13,6 +13,7 @@ const sidebarProps = {
   isOpen: true,
   onAddProject: () => undefined,
   onAutoHuntOpen: () => undefined,
+  onInboxOpen: () => undefined,
   onIssuesOpen: () => undefined,
   onLogout: () => undefined,
   onOrganizationSettings: () => undefined,
@@ -22,6 +23,7 @@ const sidebarProps = {
   projects: [
     { id: "project-1", name: "Briar", createdAt: "2026-07-22T00:00:00Z" },
   ],
+  unreadInboxCount: 0,
   user: { id: "user-1", name: "Jay", email: "jay@example.com" },
 };
 
@@ -42,9 +44,19 @@ describe("Sidebar", () => {
     expect(markup).toContain('aria-haspopup="menu"');
     expect(markup).toContain('aria-label="계정 메뉴"');
     expect(markup).toContain("이슈");
+    expect(markup).toContain("받은 편지함");
     expect(markup).toContain("자동사냥");
     expect(markup).toContain('aria-label="Briar 프로젝트 메뉴"');
     expect(markup).not.toContain("<jelly-select");
+  });
+
+  it("shows an unread dot for Inbox messages", () => {
+    const markup = renderToStaticMarkup(
+      <Sidebar {...sidebarProps} unreadInboxCount={2} />,
+    );
+
+    expect(markup).toContain("sidebar-unread-dot");
+    expect(markup).toContain('aria-label="읽지 않은 메시지 2개"');
   });
 
   it("opens project settings from the project menu", async () => {
