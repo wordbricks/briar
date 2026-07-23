@@ -14,6 +14,8 @@
     "build:release": "bash scripts/with-release-env.sh bun run build && bash scripts/verify-release-config.sh",
     "check": "tsc --noEmit",
     "test": "vitest run",
+    "ci:local": "bash scripts/ci-local.sh",
+    "ci:signoff": "bash scripts/ci-local.sh --signoff",
     "tauri": "tauri",
     "tauri:build:release": "bash scripts/with-release-env.sh bun run tauri build && bash scripts/verify-release-config.sh",
     "android:init": "tauri android init",

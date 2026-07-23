@@ -236,16 +236,39 @@ briar auto-hunt record \
 
 The app can create a titled, described, prioritized issue directly in the Auto Hunt queue. Each run snapshots the project's workflow so later setting changes do not rewrite active or historical work. After `doctor`, `briar auto-hunt next` atomically claims the highest-priority oldest queued issue with a 15-minute lease so concurrent Codex runs do not duplicate work. The claim token is stored only in the mode-`0600` local config, sent on the first processing transition, and then removed. The CLI discovers the repository, worktree, branch, commit SHA, and `origin` URL automatically. Reusing an event key with identical data is safe; reusing it with different data is rejected. Completion requires every required snapshot stage and a result summary. Stage/Production QA is required only when that stage is configured; a linked Linear issue must also be terminal.
 
-## Checks
+## Local CI and signoff
+
+Pull request CI runs on the developer machine and records the result on the
+tested commit with [gh-signoff](https://github.com/basecamp/gh-signoff).
+GitHub requires four partial signoffs:
+
+- `signoff/app-worker`
+- `signoff/d1-migrations`
+- `signoff/rust`
+- `signoff/security`
+
+Install the local tools once:
 
 ```bash
-bun run check
-bun run test
-bun run build
-bun run d1:migrate:local
-bun run worker:types
-bun run worker:check
-bun run worker:build
-bun run worker:startup
-cargo check --manifest-path src-tauri/Cargo.toml
+gh extension install basecamp/gh-signoff
+cargo install cargo-audit --version 0.22.2 --locked
+brew install gitleaks
 ```
+
+Run checks while developing:
+
+```bash
+bun run ci:local
+```
+
+After committing and pushing the exact revision that passed, run the checks
+again and publish all four required statuses:
+
+```bash
+bun run ci:signoff
+```
+
+Pass one or more context names to run or sign off only those phases, for
+example `scripts/ci-local.sh security --signoff`. The production release and
+release artifact workflows remain on GitHub Actions because they build and
+publish release deliverables rather than validate pull requests.
