@@ -1,71 +1,64 @@
 import type { Update } from "@tauri-apps/plugin-updater";
-import { CircleAlert, Download, LoaderCircle, RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { CircleAlert, Download, LoaderCircle } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useI18n } from "../i18n";
-
-type UpdateStatus = "idle" | "checking" | "current" | "available" | "installing";
 
 const isTauri = () =>
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 export function UpdateControl() {
   const { t } = useI18n();
-  const [status, setStatus] = useState<UpdateStatus>("idle");
   const [available, setAvailable] = useState<Update | null>(null);
+  const [isInstalling, setIsInstalling] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hasChecked = useRef(false);
+  const isMounted = useRef(false);
 
-  if (!isTauri()) return null;
+  useEffect(() => {
+    isMounted.current = true;
 
-  const checkForUpdate = async () => {
-    setStatus("checking");
-    setError(null);
-    try {
-      const { check } = await import("@tauri-apps/plugin-updater");
-      const update = await check();
-      setAvailable(update);
-      setStatus(update ? "available" : "current");
-    } catch (caught) {
-      setStatus("idle");
-      setError(caught instanceof Error ? caught.message : String(caught));
+    if (isTauri() && !hasChecked.current) {
+      hasChecked.current = true;
+      void import("@tauri-apps/plugin-updater")
+        .then(({ check }) => check())
+        .then((update) => {
+          if (isMounted.current) setAvailable(update);
+        })
+        .catch(() => {
+          // A background check should not surface UI unless an update exists.
+        });
     }
-  };
+
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   const installUpdate = async () => {
     if (!available) return;
-    setStatus("installing");
+    setIsInstalling(true);
     setError(null);
     try {
       await available.downloadAndInstall();
       const { relaunch } = await import("@tauri-apps/plugin-process");
       await relaunch();
     } catch (caught) {
-      setStatus("available");
+      setIsInstalling(false);
       setError(caught instanceof Error ? caught.message : String(caught));
     }
   };
 
+  if (!isTauri() || !available) return null;
+
   const feedback = error
     ? t("update.failed", { error })
-    : status === "current"
-      ? t("update.current")
-      : status === "available"
-        ? t("update.available", { version: available?.version ?? "" })
-        : status === "installing"
-          ? t("update.installing")
-          : status === "checking"
-            ? t("update.checking")
-            : null;
+    : isInstalling
+      ? t("update.installing")
+      : t("update.available", { version: available.version });
 
-  const buttonLabel = status === "available"
-    ? t("update.install", { version: available?.version ?? "" })
-    : status === "installing"
-      ? t("update.installingLabel")
-      : t("update.check");
-
-  const runUpdateAction = () => {
-    if (status === "available") return installUpdate();
-    return checkForUpdate();
-  };
+  const buttonLabel = isInstalling
+    ? t("update.installingLabel")
+    : t("update.install", { version: available.version });
 
   return (
     <div className="sidebar-update-control">
@@ -78,16 +71,14 @@ export function UpdateControl() {
       <button
         aria-label={buttonLabel}
         className="sidebar-update-trigger"
-        disabled={status === "checking" || status === "installing"}
-        onClick={() => void runUpdateAction()}
+        disabled={isInstalling}
+        onClick={() => void installUpdate()}
         title={buttonLabel}
         type="button"
       >
-        {status === "checking" || status === "installing"
-          ? <LoaderCircle className="spin" size={16} />
-          : status === "current"
-            ? <RefreshCw size={16} />
-            : <Download size={16} />}
+        {isInstalling
+          ? <LoaderCircle aria-hidden="true" className="spin" size={14} />
+          : <Download aria-hidden="true" size={14} />}
       </button>
     </div>
   );
