@@ -13,3 +13,8 @@ export function isDesktopTauri() {
     !isAndroidCompanion()
   );
 }
+
+export function isMacDesktopTauri() {
+  if (!isDesktopTauri() || typeof navigator === "undefined") return false;
+  return /\bMacintosh\b|\bMac OS X\b/iu.test(navigator.userAgent);
+}

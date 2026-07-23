@@ -14,6 +14,8 @@ use std::{
         Arc, Mutex,
     },
 };
+#[cfg(target_os = "macos")]
+use tauri::{webview::Color, AppHandle, WebviewUrl, WebviewWindowBuilder};
 use tauri::{Emitter, Manager};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
 
@@ -1387,6 +1389,149 @@ async fn connect_local_project(
     .map_err(|error| error.to_string())?
 }
 
+fn launch_intro_bounds(
+    monitor_x: i32,
+    monitor_y: i32,
+    monitor_width: u32,
+    monitor_height: u32,
+    work_area_y: i32,
+) -> (i32, i32, u32, u32) {
+    let top_inset = work_area_y.saturating_sub(monitor_y).max(0) as u32;
+    (
+        monitor_x,
+        monitor_y.saturating_add(top_inset as i32),
+        monitor_width,
+        monitor_height.saturating_sub(top_inset).max(1),
+    )
+}
+
+#[cfg(target_os = "macos")]
+fn main_window(app: &AppHandle) -> Result<tauri::WebviewWindow, String> {
+    app.get_webview_window("main")
+        .ok_or_else(|| "Briar main window is unavailable".to_string())
+}
+
+#[cfg(target_os = "macos")]
+fn display_main_window(app: &AppHandle, focus: bool) -> Result<(), String> {
+    let main = main_window(app)?;
+    main.center().map_err(|error| error.to_string())?;
+    main.show().map_err(|error| error.to_string())?;
+    if focus {
+        main.set_focus().map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn show_main_window(app: tauri::AppHandle) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        display_main_window(&app, true)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = app;
+        Ok(())
+    }
+}
+
+#[tauri::command]
+fn reveal_main_window(app: tauri::AppHandle) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        display_main_window(&app, false)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = app;
+        Ok(())
+    }
+}
+
+#[tauri::command]
+fn finish_launch_intro(app: tauri::AppHandle) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        if let Some(intro) = app.get_webview_window("launch-intro") {
+            intro.destroy().map_err(|error| error.to_string())?;
+        }
+        display_main_window(&app, true)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = app;
+        Ok(())
+    }
+}
+
+#[tauri::command]
+fn prepare_launch_intro(app: tauri::AppHandle) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        if app.get_webview_window("launch-intro").is_some() {
+            return Ok(());
+        }
+
+        let main = main_window(&app)?;
+        main.center().map_err(|error| error.to_string())?;
+        main.hide().map_err(|error| error.to_string())?;
+
+        let monitor = match main.current_monitor().map_err(|error| error.to_string())? {
+            Some(monitor) => monitor,
+            None => main
+                .primary_monitor()
+                .map_err(|error| error.to_string())?
+                .ok_or_else(|| "No macOS display is available".to_string())?,
+        };
+        let position = monitor.position();
+        let size = monitor.size();
+        let work_area = monitor.work_area();
+        let (x, y, width, height) = launch_intro_bounds(
+            position.x,
+            position.y,
+            size.width,
+            size.height,
+            work_area.position.y,
+        );
+        let scale_factor = monitor.scale_factor();
+
+        let build_result = WebviewWindowBuilder::new(
+            &app,
+            "launch-intro",
+            WebviewUrl::App("index.html?launchIntro=native".into()),
+        )
+        .title("")
+        .position(x as f64 / scale_factor, y as f64 / scale_factor)
+        .inner_size(width as f64 / scale_factor, height as f64 / scale_factor)
+        .decorations(false)
+        .resizable(false)
+        .minimizable(false)
+        .maximizable(false)
+        .closable(false)
+        .always_on_top(true)
+        .visible_on_all_workspaces(true)
+        .shadow(false)
+        .transparent(true)
+        .background_color(Color(0, 0, 0, 0))
+        .initialization_script("document.documentElement.classList.add('launch-intro-document');")
+        .focused(true)
+        .visible(true)
+        .build();
+
+        if let Err(error) = build_result {
+            let _ = display_main_window(&app, true);
+            return Err(error.to_string());
+        }
+
+        Ok(())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = app;
+        Err("The native launch intro is only available on macOS".to_string())
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default()
@@ -1397,7 +1542,18 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build());
     builder
+        .setup(|app| {
+            #[cfg(target_os = "macos")]
+            if let Some(main) = app.get_webview_window("main") {
+                main.hide()?;
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
+            prepare_launch_intro,
+            show_main_window,
+            reveal_main_window,
+            finish_launch_intro,
             read_session_token,
             write_session_token,
             clear_session_token,
@@ -1423,6 +1579,18 @@ pub fn run() {
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn launch_intro_covers_the_desktop_below_the_menu_bar() {
+        assert_eq!(
+            launch_intro_bounds(0, 0, 3024, 1964, 48),
+            (0, 48, 3024, 1916)
+        );
+        assert_eq!(
+            launch_intro_bounds(-2560, -120, 2560, 1440, -120),
+            (-2560, -120, 2560, 1440)
+        );
+    }
 
     #[test]
     fn validates_auto_hunt_session_ids_before_building_log_paths() {

@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AutoHuntSessions } from "./components/AutoHuntSessions";
 import { CompanionEmptyState, CompanionHeader } from "./components/CompanionHeader";
 import { HuntDashboard } from "./components/HuntDashboard";
@@ -9,24 +9,18 @@ import { ProjectSettings } from "./components/ProjectSettings";
 import { Sidebar } from "./components/Sidebar";
 import { useBriar } from "./hooks/useBriar";
 import { useAutoHuntSessions } from "./hooks/useAutoHuntSessions";
-
-const launchIntroStorageKey = "briar.launch-intro.seen.v1";
-
-function shouldShowLaunchIntro() {
-  if (typeof window === "undefined") return false;
-  if (new URLSearchParams(window.location.search).has("intro")) return true;
-  try {
-    return window.localStorage.getItem(launchIntroStorageKey) !== "true";
-  } catch {
-    return true;
-  }
-}
+import {
+  markLaunchIntroSeen,
+  shouldShowLaunchIntro,
+} from "./lib/launch-intro";
+import { isMacDesktopTauri } from "./lib/platform";
 
 export function App() {
   const briar = useBriar();
   const autoHunt = useAutoHuntSessions();
+  const usesNativeLaunchIntro = isMacDesktopTauri();
   const [isLaunchIntroVisible, setIsLaunchIntroVisible] = useState(
-    shouldShowLaunchIntro,
+    () => !usesNativeLaunchIntro && shouldShowLaunchIntro(),
   );
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activePage, setActivePage] = useState<"issues" | "auto-hunt" | "project-settings">(
@@ -36,12 +30,32 @@ export function App() {
     (project) => project.id === briar.activeProjectId,
   );
 
+  useEffect(() => {
+    if (!usesNativeLaunchIntro) return;
+    let cancelled = false;
+
+    void import("@tauri-apps/api/core").then(async ({ invoke }) => {
+      if (cancelled) return;
+      const shouldPrepareLaunchIntro = shouldShowLaunchIntro();
+      const command = shouldPrepareLaunchIntro
+        ? "prepare_launch_intro"
+        : "show_main_window";
+      try {
+        await invoke(command);
+        if (shouldPrepareLaunchIntro) markLaunchIntroSeen();
+      } catch (error) {
+        console.error("Failed to prepare the native launch experience", error);
+        await invoke("show_main_window").catch(() => undefined);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [usesNativeLaunchIntro]);
+
   const completeLaunchIntro = useCallback(() => {
-    try {
-      window.localStorage.setItem(launchIntroStorageKey, "true");
-    } catch {
-      // The intro still completes when persistence is unavailable.
-    }
+    markLaunchIntroSeen();
     setIsLaunchIntroVisible(false);
   }, []);
 
