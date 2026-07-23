@@ -10,17 +10,22 @@ import { Sidebar } from "./components/Sidebar";
 import { useBriar } from "./hooks/useBriar";
 import { useAutoHuntSessions } from "./hooks/useAutoHuntSessions";
 import {
+  clearLaunchIntroPreview,
+  isLaunchIntroPreview,
   markLaunchIntroSeen,
   shouldShowLaunchIntro,
 } from "./lib/launch-intro";
-import { isMacDesktopTauri } from "./lib/platform";
+import { isDesktopTauri, isMacDesktopTauri } from "./lib/platform";
 
 export function App() {
   const briar = useBriar();
   const autoHunt = useAutoHuntSessions();
-  const usesNativeLaunchIntro = isMacDesktopTauri();
+  const previewsLaunchIntro = isLaunchIntroPreview();
+  const runsOnDesktopTauri = isDesktopTauri();
+  const usesNativeLaunchIntro =
+    isMacDesktopTauri() && !previewsLaunchIntro;
   const [isLaunchIntroVisible, setIsLaunchIntroVisible] = useState(
-    () => !usesNativeLaunchIntro && shouldShowLaunchIntro(),
+    () => previewsLaunchIntro || (!usesNativeLaunchIntro && shouldShowLaunchIntro()),
   );
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activePage, setActivePage] = useState<"issues" | "auto-hunt" | "project-settings">(
@@ -31,12 +36,13 @@ export function App() {
   );
 
   useEffect(() => {
-    if (!usesNativeLaunchIntro) return;
+    if (!runsOnDesktopTauri) return;
     let cancelled = false;
 
     void import("@tauri-apps/api/core").then(async ({ invoke }) => {
       if (cancelled) return;
-      const shouldPrepareLaunchIntro = shouldShowLaunchIntro();
+      const shouldPrepareLaunchIntro =
+        usesNativeLaunchIntro && shouldShowLaunchIntro();
       const command = shouldPrepareLaunchIntro
         ? "prepare_launch_intro"
         : "show_main_window";
@@ -52,9 +58,10 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [usesNativeLaunchIntro]);
+  }, [runsOnDesktopTauri, usesNativeLaunchIntro]);
 
   const completeLaunchIntro = useCallback(() => {
+    clearLaunchIntroPreview();
     markLaunchIntroSeen();
     setIsLaunchIntroVisible(false);
   }, []);
@@ -213,7 +220,10 @@ export function App() {
     <>
       {content}
       {isLaunchIntroVisible ? (
-        <LaunchIntro onComplete={completeLaunchIntro} />
+        <LaunchIntro
+          onComplete={completeLaunchIntro}
+          preview={previewsLaunchIntro}
+        />
       ) : null}
     </>
   );
