@@ -34,7 +34,7 @@ export const ko = {
   "language.zh": "中文",
   "login.close": "로그인 닫기",
   "intro.label": "Briar 시작 화면",
-  "intro.skip": "건너뛰기",
+  "intro.skip": "Skip intro",
   "login.eyebrow": "에이전트 개발 환경",
   "login.title": "에이전트의 작업을\n한눈에 지켜보세요.",
   "login.description": "로컬 저장소에 Briar를 연결하면 Codex의 자동사냥 진행 상태가 실시간 대시보드에 기록됩니다.",

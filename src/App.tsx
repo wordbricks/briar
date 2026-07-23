@@ -10,6 +10,8 @@ import { Sidebar } from "./components/Sidebar";
 import { useBriar } from "./hooks/useBriar";
 import { useAutoHuntSessions } from "./hooks/useAutoHuntSessions";
 import {
+  clearLaunchIntroPreview,
+  isLaunchIntroPreview,
   markLaunchIntroSeen,
   shouldShowLaunchIntro,
 } from "./lib/launch-intro";
@@ -18,9 +20,10 @@ import { isMacDesktopTauri } from "./lib/platform";
 export function App() {
   const briar = useBriar();
   const autoHunt = useAutoHuntSessions();
-  const usesNativeLaunchIntro = isMacDesktopTauri();
+  const previewsLaunchIntro = isLaunchIntroPreview();
+  const usesNativeLaunchIntro = isMacDesktopTauri() && !previewsLaunchIntro;
   const [isLaunchIntroVisible, setIsLaunchIntroVisible] = useState(
-    () => !usesNativeLaunchIntro && shouldShowLaunchIntro(),
+    () => previewsLaunchIntro || (!usesNativeLaunchIntro && shouldShowLaunchIntro()),
   );
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activePage, setActivePage] = useState<"issues" | "auto-hunt" | "project-settings">(
@@ -55,6 +58,7 @@ export function App() {
   }, [usesNativeLaunchIntro]);
 
   const completeLaunchIntro = useCallback(() => {
+    clearLaunchIntroPreview();
     markLaunchIntroSeen();
     setIsLaunchIntroVisible(false);
   }, []);
@@ -213,7 +217,10 @@ export function App() {
     <>
       {content}
       {isLaunchIntroVisible ? (
-        <LaunchIntro onComplete={completeLaunchIntro} />
+        <LaunchIntro
+          onComplete={completeLaunchIntro}
+          preview={previewsLaunchIntro}
+        />
       ) : null}
     </>
   );

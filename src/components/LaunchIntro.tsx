@@ -11,10 +11,12 @@ export function LaunchIntro({
   native = false,
   onComplete,
   onReveal,
+  preview = false,
 }: {
   native?: boolean;
   onComplete: () => void;
   onReveal?: () => void;
+  preview?: boolean;
 }) {
   const { t } = useI18n();
   const lines = t("login.title").split("\n");
@@ -23,11 +25,13 @@ export function LaunchIntro({
     const reducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
     ).matches;
-    const timer = window.setTimeout(
-      onComplete,
-      reducedMotion ? REDUCED_MOTION_DURATION_MS : INTRO_DURATION_MS,
-    );
-    const revealTimer = onReveal
+    const timer = preview
+      ? null
+      : window.setTimeout(
+          onComplete,
+          reducedMotion ? REDUCED_MOTION_DURATION_MS : INTRO_DURATION_MS,
+        );
+    const revealTimer = !preview && onReveal
       ? window.setTimeout(
           onReveal,
           reducedMotion ? REDUCED_MOTION_REVEAL_MS : INTRO_REVEAL_MS,
@@ -42,18 +46,18 @@ export function LaunchIntro({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => {
-      window.clearTimeout(timer);
+      if (timer !== null) window.clearTimeout(timer);
       if (revealTimer !== null) window.clearTimeout(revealTimer);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [onComplete, onReveal]);
+  }, [onComplete, onReveal, preview]);
 
   let characterIndex = 0;
 
   return (
     <section
       aria-label={t("intro.label")}
-      className={`launch-intro${native ? " launch-intro-native" : ""}`}
+      className={`launch-intro${native ? " launch-intro-native" : ""}${preview ? " launch-intro-preview" : ""}`}
       data-testid="launch-intro"
     >
       <button

@@ -10,7 +10,7 @@ describe("LaunchIntro", () => {
 
     expect(markup).toContain('data-testid="launch-intro"');
     expect(markup).toContain("Briar 시작 화면");
-    expect(markup).toContain("건너뛰기");
+    expect(markup).toContain("Skip intro");
     expect(markup).toContain("--launch-character-index");
   });
 
@@ -20,5 +20,13 @@ describe("LaunchIntro", () => {
     );
 
     expect(markup).toContain("launch-intro-native");
+  });
+
+  it("marks a persistent development preview", () => {
+    const markup = renderToStaticMarkup(
+      <LaunchIntro preview onComplete={() => undefined} />,
+    );
+
+    expect(markup).toContain("launch-intro-preview");
   });
 });
