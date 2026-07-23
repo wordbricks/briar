@@ -151,6 +151,7 @@ pub(crate) struct ProjectAutoHuntIssue {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProjectAutoHuntRequest {
     pub(crate) session_id: String,
+    pub(crate) api_url: String,
     pub(crate) issues: Vec<ProjectAutoHuntIssue>,
 }
 
@@ -170,6 +171,8 @@ impl AutoHuntCliEnvironment {
         home: &Path,
         execution_path: &OsStr,
         workspace: &Path,
+        project_id: &str,
+        api_url: &str,
     ) -> Result<Self, String> {
         let bun_binary = which::which_in("bun", Some(execution_path), workspace)
             .map_err(|_| "Briar CLI 실행에 필요한 Bun을 찾지 못했습니다.".to_string())?;
@@ -201,6 +204,10 @@ impl AutoHuntCliEnvironment {
             &[briar_entry.as_os_str()],
             &sandbox_home,
             &sandbox_config,
+            &[
+                ("BRIAR_PROJECT_ID", OsStr::new(project_id)),
+                ("BRIAR_API_URL", OsStr::new(api_url)),
+            ],
         )?;
         write_cli_wrapper(
             &wrapper_directory,
@@ -209,6 +216,7 @@ impl AutoHuntCliEnvironment {
             &[],
             &sandbox_home,
             &sandbox_config,
+            &[],
         )?;
         let mut paths = vec![wrapper_directory];
         paths.extend(env::split_paths(execution_path));
@@ -323,6 +331,7 @@ fn write_cli_wrapper(
     arguments: &[&OsStr],
     home: &Path,
     config: &Path,
+    environment: &[(&str, &OsStr)],
 ) -> Result<(), String> {
     use std::os::unix::fs::PermissionsExt;
     let wrapper = directory.join(name);
@@ -336,8 +345,12 @@ fn write_cli_wrapper(
     } else {
         format!(" {arguments}")
     };
+    let environment = environment
+        .iter()
+        .map(|(name, value)| format!("export {name}={}\n", shell_quote(value)))
+        .collect::<String>();
     let contents = format!(
-        "#!/bin/sh\nexport HOME={}\nexport XDG_CONFIG_HOME={}\nexec {}{} \"$@\"\n",
+        "#!/bin/sh\nexport HOME={}\nexport XDG_CONFIG_HOME={}\n{environment}exec {}{} \"$@\"\n",
         shell_quote(home.as_os_str()),
         shell_quote(config.as_os_str()),
         shell_quote(binary.as_os_str()),
@@ -357,14 +370,19 @@ fn write_cli_wrapper(
     arguments: &[&OsStr],
     home: &Path,
     config: &Path,
+    environment: &[(&str, &OsStr)],
 ) -> Result<(), String> {
     let wrapper = directory.join(format!("{name}.cmd"));
     let arguments = arguments
         .iter()
         .map(|argument| format!(" \"{}\"", Path::new(argument).display()))
         .collect::<String>();
+    let environment = environment
+        .iter()
+        .map(|(name, value)| format!("set \"{name}={}\"\r\n", value.to_string_lossy()))
+        .collect::<String>();
     let contents = format!(
-        "@echo off\r\nset \"HOME={}\"\r\nset \"USERPROFILE={}\"\r\nset \"XDG_CONFIG_HOME={}\"\r\n\"{}\"{} %*\r\n",
+        "@echo off\r\nset \"HOME={}\"\r\nset \"USERPROFILE={}\"\r\nset \"XDG_CONFIG_HOME={}\"\r\n{environment}\"{}\"{} %*\r\n",
         home.display(),
         home.display(),
         config.display(),
@@ -1043,7 +1061,7 @@ mod tests {
         for name in ["bun", "velen"] {
             let binary = binary_directory.join(name);
             let body = if name == "bun" {
-                "#!/bin/sh\nshift\nprintf changed > \"$HOME/.config/briar/config.json\"\n"
+                "#!/bin/sh\nshift\nprintf changed > \"$HOME/.config/briar/config.json\"\nprintf '%s' \"$BRIAR_PROJECT_ID\" > \"$HOME/project-id\"\nprintf '%s' \"$BRIAR_API_URL\" > \"$HOME/api-url\"\n"
             } else {
                 "#!/bin/sh\nexit 0\n"
             };
@@ -1053,8 +1071,14 @@ mod tests {
         }
         let source_path =
             env::join_paths([binary_directory]).expect("fixture execution path should be valid");
-        let cli_environment = AutoHuntCliEnvironment::prepare(&home, &source_path, fixture.path())
-            .expect("isolated CLI environment should be prepared");
+        let cli_environment = AutoHuntCliEnvironment::prepare(
+            &home,
+            &source_path,
+            fixture.path(),
+            "project-local",
+            "http://127.0.0.1:8788",
+        )
+        .expect("isolated CLI environment should be prepared");
         let wrapper = which::which_in(
             "briar",
             Some(cli_environment.execution_path()),
@@ -1079,6 +1103,16 @@ mod tests {
             fs::read_to_string(snapshot_home.join(".config/velen/auth.json"))
                 .expect("Velen auth should be copied"),
             "original-velen"
+        );
+        assert_eq!(
+            fs::read_to_string(snapshot_home.join("project-id"))
+                .expect("selected project should reach the Briar CLI"),
+            "project-local"
+        );
+        assert_eq!(
+            fs::read_to_string(snapshot_home.join("api-url"))
+                .expect("selected API should reach the Briar CLI"),
+            "http://127.0.0.1:8788"
         );
         assert_eq!(
             fs::metadata(snapshot_home.join(".config/velen/auth.json"))
