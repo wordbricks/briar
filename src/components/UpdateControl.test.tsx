@@ -29,28 +29,31 @@ describe("UpdateControl", () => {
     Reflect.deleteProperty(window, "__TAURI_INTERNALS__");
   });
 
-  it("reports when the signed channel is current", async () => {
+  it("stays hidden when the signed channel is current", async () => {
     check.mockResolvedValue(null);
     const root = createRoot(container);
     await act(async () => root.render(<UpdateControl />));
-    await act(async () => {
-      container.querySelector("button")?.click();
-    });
-    expect(container.textContent).toContain("최신 버전입니다");
+    expect(check).toHaveBeenCalledOnce();
+    expect(container.querySelector("button")).toBeNull();
     await act(async () => root.unmount());
   });
 
-  it("installs a verified update and relaunches", async () => {
+  it("shows a compact install button only for a verified update", async () => {
     const downloadAndInstall = vi.fn().mockResolvedValue(undefined);
     check.mockResolvedValue({ version: "1.0.1", downloadAndInstall });
     const root = createRoot(container);
     await act(async () => root.render(<UpdateControl />));
     await act(async () => {
-      container.querySelector("button")?.click();
+      await Promise.resolve();
     });
+
+    const button = container.querySelector("button");
     expect(container.textContent).toContain("v1.0.1 업데이트 사용 가능");
+    expect(button?.className).toBe("sidebar-update-trigger");
+    expect(button?.getAttribute("aria-label")).toContain("v1.0.1");
+
     await act(async () => {
-      container.querySelector("button")?.click();
+      button?.click();
     });
     expect(downloadAndInstall).toHaveBeenCalledOnce();
     expect(relaunch).toHaveBeenCalledOnce();
