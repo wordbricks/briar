@@ -5,6 +5,7 @@ import { HuntDashboard } from "./components/HuntDashboard";
 import { InitialOnboarding } from "./components/InitialOnboarding";
 import { LaunchIntro } from "./components/LaunchIntro";
 import { LoginScreen } from "./components/LoginScreen";
+import { OrganizationSettings } from "./components/OrganizationSettings";
 import { ProjectOnboarding } from "./components/ProjectOnboarding";
 import { ProjectSettings } from "./components/ProjectSettings";
 import { Sidebar } from "./components/Sidebar";
@@ -43,9 +44,10 @@ export function App() {
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(
     hasCompletedInitialOnboarding,
   );
-  const [activePage, setActivePage] = useState<"issues" | "auto-hunt" | "project-settings">(
+  const [activePage, setActivePage] = useState<"issues" | "auto-hunt" | "project-settings" | "organization-settings">(
     "issues",
   );
+  const [activeOrganizationId, setActiveOrganizationId] = useState<string | null>(null);
   const hasCompactedWindowForOnboarding = useRef(false);
   const activeProject = briar.projects.find(
     (project) => project.id === briar.activeProjectId,
@@ -161,6 +163,10 @@ export function App() {
           onAddProject={briar.startProjectCreation}
           onAutoHuntOpen={() => setActivePage("auto-hunt")}
           onIssuesOpen={() => setActivePage("issues")}
+          onOrganizationSettings={(organizationId) => {
+            setActiveOrganizationId(organizationId);
+            setActivePage("organization-settings");
+          }}
           onProjectChange={(projectId) => {
             briar.setActiveProjectId(projectId);
             setActivePage("issues");
@@ -174,7 +180,19 @@ export function App() {
           projects={briar.projects}
           user={briar.user}
         />
-        {activePage === "project-settings" && activeProject ? (
+        {activePage === "organization-settings" &&
+        activeOrganizationId &&
+        briar.token ? (
+          <OrganizationSettings
+            onBack={() => setActivePage("issues")}
+            organization={
+              briar.projects.find(
+                (project) => project.organizationId === activeOrganizationId,
+              ) ?? activeProject!
+            }
+            token={briar.token}
+          />
+        ) : activePage === "project-settings" && activeProject ? (
           <ProjectSettings
             dashboard={briar.dashboard}
             isDeleting={briar.deletingProjectId === briar.activeProjectId}

@@ -20,14 +20,17 @@ import {
 } from "../../src/lib/issue-attachments";
 import { createAuth, type BriarAuth } from "./auth";
 import {
+  addOrganizationMember,
   assertQueuedHuntClaim,
   claimNextQueuedHuntRun,
   createIssueAttachments,
+  createOrganization,
   createProject,
   deleteProject,
   EventKeyConflictError,
   findProjectIdByAgentTokenHash,
   getIssueAttachment,
+  getOrganizationRole,
   getNextQueuedHuntRun,
   getProject,
   getProjectSettings,
@@ -36,11 +39,14 @@ import {
   HuntTransitionError,
   listIssueAttachments,
   listDashboardRuns,
+  listOrganizationMembers,
+  listOrganizations,
   listProjects,
   recoverHuntRun,
   recordHuntEvent,
   recordQaResult,
   replaceProjectAgentToken,
+  removeOrganizationMember,
   rollbackNewAppIssue,
   updateProjectSettings,
   type HuntEventRow,
@@ -49,6 +55,9 @@ import {
   type IssueAttachmentRow,
   type ProjectRow,
   type ProjectSettingsRow,
+  type OrganizationMemberRow,
+  type OrganizationRole,
+  type OrganizationRow,
 } from "./db";
 import { serveRelease } from "./releases";
 
@@ -238,6 +247,14 @@ const eventSchema = z
 
 const projectInputSchema = z.object({
   name: z.string().trim().min(1).max(100),
+  organizationId: z.string().uuid().optional(),
+});
+const organizationInputSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+});
+const organizationMemberInputSchema = z.object({
+  email: z.string().trim().email().max(320),
+  role: z.enum(["admin", "member"]).default("member"),
 });
 
 const issueInputSchema = z
@@ -505,9 +522,30 @@ function projectJson(row: ProjectRow) {
   return {
     id: row.id,
     name: row.name,
+    organizationId: row.organization_id,
+    organizationName: row.organization_name,
+    role: row.member_role,
     createdAt: row.created_at,
   };
 }
+
+const organizationJson = (row: OrganizationRow) => ({
+  id: row.id,
+  name: row.name,
+  role: row.role,
+  createdAt: row.created_at,
+});
+const organizationMemberJson = (row: OrganizationMemberRow) => ({
+  userId: row.user_id,
+  name: row.name,
+  email: row.email,
+  image: row.image,
+  role: row.role,
+  createdAt: row.created_at,
+});
+
+const canManageOrganization = (role: OrganizationRole | null) =>
+  role === "owner" || role === "admin";
 
 const settingsJson = (row: ProjectSettingsRow | null) => ({
   velenOrg: row?.velen_org ?? null,
@@ -638,6 +676,82 @@ async function route(
     return json({ user: session.user });
   }
 
+  if (pathname === "/organizations" && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const organizations = await listOrganizations(db, session.user.id);
+    return json({ organizations: organizations.map(organizationJson) });
+  }
+
+  if (pathname === "/organizations" && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const input = organizationInputSchema.parse(await readJson(request));
+    const organization = await createOrganization(db, {
+      name: input.name,
+      ownerUserId: session.user.id,
+    });
+    return json({ organization: organizationJson(organization) }, 201);
+  }
+
+  const organizationMembersMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/members$/u,
+  );
+  if (organizationMembersMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const role = await getOrganizationRole(
+      db,
+      organizationMembersMatch[1],
+      session.user.id,
+    );
+    if (!role) throw new HttpError(404, "Organization not found");
+    const members = await listOrganizationMembers(db, organizationMembersMatch[1]);
+    return json({ members: members.map(organizationMemberJson) });
+  }
+  if (organizationMembersMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const role = await getOrganizationRole(
+      db,
+      organizationMembersMatch[1],
+      session.user.id,
+    );
+    if (!canManageOrganization(role)) {
+      throw new HttpError(403, "Organization admin access required");
+    }
+    const input = organizationMemberInputSchema.parse(await readJson(request));
+    const userId = await addOrganizationMember(
+      db,
+      organizationMembersMatch[1],
+      input.email,
+      input.role,
+    );
+    if (!userId) {
+      throw new HttpError(404, "A Briar user with that email was not found");
+    }
+    const members = await listOrganizationMembers(db, organizationMembersMatch[1]);
+    return json({ members: members.map(organizationMemberJson) });
+  }
+
+  const organizationMemberMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/members\/([^/]+)$/u,
+  );
+  if (organizationMemberMatch && request.method === "DELETE") {
+    const session = await requireSession(auth, request);
+    const role = await getOrganizationRole(
+      db,
+      organizationMemberMatch[1],
+      session.user.id,
+    );
+    if (role !== "owner") {
+      throw new HttpError(403, "Organization owner access required");
+    }
+    const removed = await removeOrganizationMember(
+      db,
+      organizationMemberMatch[1],
+      decodeURIComponent(organizationMemberMatch[2]),
+    );
+    if (!removed) throw new HttpError(404, "Member not found");
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
   if (pathname === "/projects" && request.method === "GET") {
     const session = await requireSession(auth, request);
     const projects = await listProjects(db, session.user.id);
@@ -647,13 +761,30 @@ async function route(
   if (pathname === "/projects" && request.method === "POST") {
     const session = await requireSession(auth, request);
     const input = projectInputSchema.parse(await readJson(request));
+    let organizations = await listOrganizations(db, session.user.id);
+    if (organizations.length === 0) {
+      const organization = await createOrganization(db, {
+        name: `${session.user.name || session.user.email}의 조직`,
+        ownerUserId: session.user.id,
+      });
+      organizations = [organization];
+    }
+    const organization =
+      organizations.find((candidate) => candidate.id === input.organizationId) ??
+      (input.organizationId ? null : organizations[0]);
+    if (!organization || !canManageOrganization(organization.role)) {
+      throw new HttpError(403, "Organization admin access required");
+    }
     const agentToken = `briar_agent_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
     const tokenHash = await sha256(agentToken);
     const project = await createProject(db, {
       ownerUserId: session.user.id,
+      organizationId: organization.id,
       name: input.name,
       agentTokenHash: tokenHash,
     });
+    project.organization_name = organization.name;
+    project.member_role = organization.role;
     return json({ project: projectJson(project), agentToken }, 201);
   }
 
@@ -662,6 +793,9 @@ async function route(
     const session = await requireSession(auth, request);
     const project = await getProject(db, projectMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
+    if (project.member_role !== "owner") {
+      throw new HttpError(403, "Organization owner access required");
+    }
     const attachments = await listIssueAttachments(db, project.id);
     const attachmentKeys = attachments.map((attachment) => attachment.object_key);
     for (let offset = 0; offset < attachmentKeys.length; offset += 1_000) {
@@ -690,6 +824,9 @@ async function route(
     const session = await requireSession(auth, request);
     const project = await getProject(db, settingsMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
+    if (!canManageOrganization(project.member_role)) {
+      throw new HttpError(403, "Organization admin access required");
+    }
     const input = projectSettingsSchema.parse(await readJson(request));
     const settings = await updateProjectSettings(db, project.id, {
       velenOrg: input.velenOrg ?? null,

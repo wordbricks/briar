@@ -15,6 +15,7 @@ const sidebarProps = {
   onAutoHuntOpen: () => undefined,
   onIssuesOpen: () => undefined,
   onLogout: () => undefined,
+  onOrganizationSettings: () => undefined,
   onProjectChange: () => undefined,
   onProjectSettings: () => undefined,
   onToggle: () => undefined,
