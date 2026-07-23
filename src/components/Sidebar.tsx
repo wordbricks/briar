@@ -30,7 +30,6 @@ export function Sidebar({
   onInboxOpen,
   onIssuesOpen,
   onOrganizationChange,
-  onOrganizationSettings,
   onProjectChange,
   onProjectSettings,
   onLogout,
@@ -44,8 +43,7 @@ export function Sidebar({
     | "issues"
     | "auto-hunt"
     | "inbox"
-    | "project-settings"
-    | "organization-settings";
+    | "project-settings";
   activeOrganizationId: string | null;
   activeProjectId: string | null;
   isOpen: boolean;
@@ -54,7 +52,6 @@ export function Sidebar({
   onInboxOpen: () => void;
   onIssuesOpen: () => void;
   onOrganizationChange: (organizationId: string) => void;
-  onOrganizationSettings: (organizationId: string) => void;
   onProjectChange: (projectId: string) => void;
   onProjectSettings: (projectId: string) => void;
   onLogout: () => void;
@@ -304,16 +301,6 @@ export function Sidebar({
         </div>
 
         <div className="sidebar-project-list">
-          {activeOrganization && (
-            <button
-              className="sidebar-organization-heading"
-              onClick={() => onOrganizationSettings(activeOrganization.id)}
-              type="button"
-            >
-              <Building2 size={14} strokeWidth={1.7} />
-              <span>{activeOrganization.name}</span>
-            </button>
-          )}
           {visibleProjects.map((project) => {
             const isActive = project.id === activeProjectId;
             const isMenuOpen = project.id === openProjectMenuId;
