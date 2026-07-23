@@ -206,70 +206,68 @@ export function HuntDashboard({
       <div className="dashboard-scroll">
         {error && <div className="error-banner"><CircleAlert size={16} />{error}</div>}
 
-        <section className={`queue-panel${companionMode ? " compact-list" : ""}`}>
-          <div className="queue-header">
-            <div>
-              <h2>{t("dashboard.queue")}</h2>
-              <span>{t("dashboard.taskCount", { count: filtered.length })}</span>
-            </div>
-            <div className="queue-tools">
-              {!companionMode && (
-                <button
-                  aria-label={t("dashboard.createIssue")}
-                  className="create-issue-button"
-                  onClick={() => setIsIssueDialogOpen(true)}
-                  type="button"
-                >
-                  <Plus size={14} />{t("dashboard.createIssue")}
+        <div className="queue-header">
+          <div>
+            <h2>{t("dashboard.queue")}</h2>
+            <span>{t("dashboard.taskCount", { count: filtered.length })}</span>
+          </div>
+          <div className="queue-tools">
+            {!companionMode && (
+              <button
+                aria-label={t("dashboard.createIssue")}
+                className="create-issue-button"
+                onClick={() => setIsIssueDialogOpen(true)}
+                type="button"
+              >
+                <Plus size={14} />{t("dashboard.createIssue")}
+              </button>
+            )}
+            <label className="search-box"><Search size={15} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("dashboard.search")} /></label>
+            <div className="source-filter">
+              {(["all", "issue", "feedback", "error"] as const).map((value) => (
+                <button key={value} className={source === value ? "active" : ""} onClick={() => setSource(value)}>
+                  {value === "all" ? t("dashboard.all") : t(`source.${value}` as MessageKey)}
                 </button>
-              )}
-              <label className="search-box"><Search size={15} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("dashboard.search")} /></label>
-              <div className="source-filter">
-                {(["all", "issue", "feedback", "error"] as const).map((value) => (
-                  <button key={value} className={source === value ? "active" : ""} onClick={() => setSource(value)}>
-                    {value === "all" ? t("dashboard.all") : t(`source.${value}` as MessageKey)}
-                  </button>
-                ))}
-              </div>
+              ))}
             </div>
           </div>
-          {!companionMode && <div className="status-tabs">
-            <button className={status === "all" ? "active" : ""} onClick={() => setStatus("all")}>{t("dashboard.all")} <span>{runs.length}</span></button>
-            <button className={status === "active" ? "active" : ""} onClick={() => setStatus("active")}>{t("dashboard.active")} <span>{activeCount}</span></button>
-            <button className={status === "attention" ? "active" : ""} onClick={() => setStatus("attention")}>{t("dashboard.attention")} <span>{attentionCount}</span></button>
-            <button className={status === "completed" ? "active" : ""} onClick={() => setStatus("completed")}>{t("dashboard.completed")} <span>{completedCount}</span></button>
-          </div>}
-          <div aria-label={t("dashboard.kanbanBoard")} className="kanban-board">
-            {kanbanColumns.length === 0 ? (
-              <div className="companion-no-runs">
-                <Bot size={22} />
-                <strong>{t("dashboard.emptyTitle")}</strong>
-                <span>{t("dashboard.emptyDescription")}</span>
+        </div>
+        {!companionMode && <div className="status-tabs">
+          <button className={status === "all" ? "active" : ""} onClick={() => setStatus("all")}>{t("dashboard.all")} <span>{runs.length}</span></button>
+          <button className={status === "active" ? "active" : ""} onClick={() => setStatus("active")}>{t("dashboard.active")} <span>{activeCount}</span></button>
+          <button className={status === "attention" ? "active" : ""} onClick={() => setStatus("attention")}>{t("dashboard.attention")} <span>{attentionCount}</span></button>
+          <button className={status === "completed" ? "active" : ""} onClick={() => setStatus("completed")}>{t("dashboard.completed")} <span>{completedCount}</span></button>
+        </div>}
+        <div aria-label={t("dashboard.kanbanBoard")} className="kanban-board">
+          {kanbanColumns.length === 0 ? (
+            <div className="companion-no-runs">
+              <Bot size={22} />
+              <strong>{t("dashboard.emptyTitle")}</strong>
+              <span>{t("dashboard.emptyDescription")}</span>
+            </div>
+          ) : kanbanColumns.map((column) => (
+            <section className={`kanban-column ${column.tone}`} key={column.id}>
+              <header>
+                <span><i aria-hidden="true" />{column.label}</span>
+                <strong>{column.runs.length}</strong>
+              </header>
+              <div>
+                {column.runs.length ? column.runs.map((run) => (
+                  <KanbanCard
+                    key={run.id}
+                    onOpen={() => setSelectedRunId(run.id)}
+                    run={run}
+                  />
+                )) : (
+                  <div className="kanban-column-empty">
+                    <Bot size={18} />
+                    <span>{t("dashboard.columnEmpty")}</span>
+                  </div>
+                )}
               </div>
-            ) : kanbanColumns.map((column) => (
-              <section className={`kanban-column ${column.tone}`} key={column.id}>
-                <header>
-                  <span><i aria-hidden="true" />{column.label}</span>
-                  <strong>{column.runs.length}</strong>
-                </header>
-                <div>
-                  {column.runs.length ? column.runs.map((run) => (
-                    <KanbanCard
-                      key={run.id}
-                      onOpen={() => setSelectedRunId(run.id)}
-                      run={run}
-                    />
-                  )) : (
-                    <div className="kanban-column-empty">
-                      <Bot size={18} />
-                      <span>{t("dashboard.columnEmpty")}</span>
-                    </div>
-                  )}
-                </div>
-              </section>
-            ))}
-          </div>
-        </section>
+            </section>
+          ))}
+        </div>
       </div>
       {companionMode && (
         <CompanionBottomNavigation
