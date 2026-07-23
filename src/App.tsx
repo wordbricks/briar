@@ -22,10 +22,12 @@ export function App() {
   const autoHunt = useAutoHuntSessions();
   const previewsLaunchIntro = isLaunchIntroPreview();
   const runsOnDesktopTauri = isDesktopTauri();
-  const usesNativeLaunchIntro =
-    isMacDesktopTauri() && !previewsLaunchIntro;
+  // Preview changes the timing, not the macOS presentation surface.
+  const usesNativeLaunchIntro = isMacDesktopTauri();
   const [isLaunchIntroVisible, setIsLaunchIntroVisible] = useState(
-    () => previewsLaunchIntro || (!usesNativeLaunchIntro && shouldShowLaunchIntro()),
+    () =>
+      !usesNativeLaunchIntro &&
+      (previewsLaunchIntro || shouldShowLaunchIntro()),
   );
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activePage, setActivePage] = useState<"issues" | "auto-hunt" | "project-settings">(
