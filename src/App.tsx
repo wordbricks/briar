@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AutoHuntSessions } from "./components/AutoHuntSessions";
 import { CompanionEmptyState, CompanionHeader } from "./components/CompanionHeader";
 import { HuntDashboard } from "./components/HuntDashboard";
@@ -46,9 +46,15 @@ export function App() {
   const [activePage, setActivePage] = useState<"issues" | "auto-hunt" | "project-settings">(
     "issues",
   );
+  const hasCompactedWindowForOnboarding = useRef(false);
   const activeProject = briar.projects.find(
     (project) => project.id === briar.activeProjectId,
   );
+  const shouldShowInitialOnboarding =
+    !briar.companionMode &&
+    !briar.loading &&
+    !briar.user &&
+    !hasCompletedOnboarding;
 
   useEffect(() => {
     if (!briar.user || hasCompletedOnboarding) return;
@@ -81,6 +87,26 @@ export function App() {
     };
   }, [runsOnDesktopTauri, usesNativeLaunchIntro]);
 
+  useEffect(() => {
+    if (!runsOnDesktopTauri || briar.companionMode || briar.loading) return;
+    const compact = shouldShowInitialOnboarding;
+    if (!compact && !hasCompactedWindowForOnboarding.current) return;
+    hasCompactedWindowForOnboarding.current = compact;
+
+    void import("@tauri-apps/api/core")
+      .then(({ invoke }) =>
+        invoke("set_main_window_onboarding_mode", { compact }),
+      )
+      .catch((error) => {
+        console.error("Failed to resize the Briar onboarding window", error);
+      });
+  }, [
+    briar.companionMode,
+    briar.loading,
+    runsOnDesktopTauri,
+    shouldShowInitialOnboarding,
+  ]);
+
   const completeLaunchIntro = useCallback(() => {
     clearLaunchIntroPreview();
     markLaunchIntroSeen();
@@ -88,11 +114,6 @@ export function App() {
   }, []);
 
   let content: React.ReactNode;
-  const shouldShowInitialOnboarding =
-    !briar.companionMode &&
-    !briar.loading &&
-    !briar.user &&
-    !hasCompletedOnboarding;
 
   if (shouldShowInitialOnboarding) {
     content = (

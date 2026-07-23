@@ -15,13 +15,15 @@ use std::{
     },
 };
 #[cfg(target_os = "macos")]
-use tauri::{webview::Color, AppHandle, WebviewUrl, WebviewWindowBuilder};
-use tauri::{Emitter, Manager};
+use tauri::{webview::Color, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
 
 const SESSION_FILE_NAME: &str = "session.json";
 const AUTO_HUNT_EVENT_DIRECTORY: &str = "auto-hunt-sessions";
 const AUTO_HUNT_APP_SERVER_EVENT: &str = "auto-hunt-app-server-event";
+const DEFAULT_MAIN_WINDOW_SIZE: (f64, f64) = (1280.0, 820.0);
+const ONBOARDING_MAIN_WINDOW_SIZE: (f64, f64) = (980.0, 680.0);
 
 #[derive(Deserialize, Serialize)]
 struct StoredSession {
@@ -1539,10 +1541,26 @@ fn launch_intro_bounds(
     )
 }
 
-#[cfg(target_os = "macos")]
 fn main_window(app: &AppHandle) -> Result<tauri::WebviewWindow, String> {
     app.get_webview_window("main")
         .ok_or_else(|| "Briar main window is unavailable".to_string())
+}
+
+fn main_window_size(compact: bool) -> (f64, f64) {
+    if compact {
+        ONBOARDING_MAIN_WINDOW_SIZE
+    } else {
+        DEFAULT_MAIN_WINDOW_SIZE
+    }
+}
+
+#[tauri::command]
+fn set_main_window_onboarding_mode(app: tauri::AppHandle, compact: bool) -> Result<(), String> {
+    let main = main_window(&app)?;
+    let (width, height) = main_window_size(compact);
+    main.set_size(tauri::LogicalSize::new(width, height))
+        .map_err(|error| error.to_string())?;
+    main.center().map_err(|error| error.to_string())
 }
 
 #[cfg(target_os = "macos")]
@@ -1688,6 +1706,7 @@ pub fn run() {
             show_main_window,
             reveal_main_window,
             finish_launch_intro,
+            set_main_window_onboarding_mode,
             inspect_onboarding_prerequisites,
             install_onboarding_prerequisite,
             read_session_token,
@@ -1726,6 +1745,12 @@ mod tests {
             launch_intro_bounds(-2560, -120, 2560, 1440, -120),
             (-2560, -120, 2560, 1440)
         );
+    }
+
+    #[test]
+    fn uses_compact_window_dimensions_only_during_onboarding() {
+        assert_eq!(main_window_size(true), ONBOARDING_MAIN_WINDOW_SIZE);
+        assert_eq!(main_window_size(false), DEFAULT_MAIN_WINDOW_SIZE);
     }
 
     #[test]

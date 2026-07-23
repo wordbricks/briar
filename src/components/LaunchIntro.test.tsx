@@ -77,11 +77,19 @@ describe("LaunchIntro", () => {
     expect(markup).toContain("launch-intro-native");
   });
 
-  it("marks a persistent development preview", () => {
-    const markup = renderToStaticMarkup(
-      <LaunchIntro preview onComplete={() => undefined} />,
-    );
+  it("automatically completes a forced development preview", async () => {
+    vi.useFakeTimers();
+    const onComplete = vi.fn();
 
-    expect(markup).toContain("launch-intro-preview");
+    await act(async () => root.render(
+      <LaunchIntro preview onComplete={onComplete} />,
+    ));
+    expect(container.querySelector(".launch-intro-preview")).not.toBeNull();
+
+    await act(async () => vi.advanceTimersByTime(5_599));
+    expect(onComplete).not.toHaveBeenCalled();
+
+    await act(async () => vi.advanceTimersByTime(1));
+    expect(onComplete).toHaveBeenCalledOnce();
   });
 });

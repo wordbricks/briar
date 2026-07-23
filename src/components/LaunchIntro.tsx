@@ -24,14 +24,12 @@ export function LaunchIntro({
     const reducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
     ).matches;
-    const timer = preview
-      ? null
-      : window.setTimeout(
-          onComplete,
-          INTRO_HOLD_MS +
-            (reducedMotion ? REDUCED_MOTION_FADE_MS : INTRO_FADE_MS),
-        );
-    const revealTimer = !preview && onReveal
+    const timer = window.setTimeout(
+      onComplete,
+      INTRO_HOLD_MS +
+        (reducedMotion ? REDUCED_MOTION_FADE_MS : INTRO_FADE_MS),
+    );
+    const revealTimer = onReveal
       ? window.setTimeout(onReveal, INTRO_HOLD_MS)
       : null;
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -43,7 +41,7 @@ export function LaunchIntro({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => {
-      if (timer !== null) window.clearTimeout(timer);
+      window.clearTimeout(timer);
       if (revealTimer !== null) window.clearTimeout(revealTimer);
       window.removeEventListener("keydown", handleKeyDown);
     };
