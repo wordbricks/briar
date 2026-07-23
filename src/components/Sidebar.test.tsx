@@ -46,6 +46,8 @@ describe("Sidebar", () => {
     expect(markup).toContain("이슈");
     expect(markup).toContain("받은 편지함");
     expect(markup).toContain("자동사냥");
+    expect(markup).not.toContain("도움말");
+    expect(markup).not.toContain('href="#help"');
     expect(markup).toContain('aria-label="Briar 프로젝트 메뉴"');
     expect(markup).not.toContain("<jelly-select");
   });

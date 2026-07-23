@@ -70,13 +70,14 @@ describe("HuntDashboard", () => {
       />,
     );
 
-    expect(markup).toContain('class="queue-panel"');
+    expect(markup).not.toContain("queue-panel");
+    expect(markup).toContain('class="dashboard-scroll"><div class="queue-header"');
     expect(markup).toContain('class="kanban-board"');
     expect(markup).not.toContain('class="page-heading"');
     expect(markup).not.toContain('class="metric-grid"');
   });
 
-  it("marks the companion queue as a compact list", () => {
+  it("renders the companion queue directly in its parent", () => {
     const markup = renderToStaticMarkup(
       <HuntDashboard
         {...dashboardProps}
@@ -85,7 +86,7 @@ describe("HuntDashboard", () => {
       />,
     );
 
-    expect(markup).toContain('class="queue-panel compact-list"');
+    expect(markup).not.toContain("queue-panel");
     expect(markup).toContain('aria-label="이슈 만들기"');
     expect(markup).toContain('class="companion-bottom-nav"');
     expect(markup).toContain('class="companion-fab"');

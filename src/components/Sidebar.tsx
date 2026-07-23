@@ -6,7 +6,6 @@ import {
   ChevronRight,
   ChevronUp,
   Check,
-  CircleHelp,
   Ellipsis,
   FolderGit2,
   Inbox,
@@ -174,7 +173,6 @@ export function Sidebar({
             />
           )}
         </a>
-        <a href="#help"><CircleHelp size={16} strokeWidth={1.7} />{t("sidebar.help")}</a>
       </nav>
 
       <div className="sidebar-projects">
