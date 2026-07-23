@@ -71,10 +71,7 @@ export function LaunchIntro({
         {t("intro.skip")}
       </button>
 
-      <div className="launch-intro-window" aria-hidden="true">
-        <div className="launch-intro-gradient launch-intro-gradient-primary" />
-        <div className="launch-intro-gradient launch-intro-gradient-secondary" />
-        <div className="launch-intro-grain" />
+      <div className="launch-intro-content" aria-hidden="true">
         <div className="launch-intro-brand">
           <img src={briarMarkUrl} alt="" />
           <span>briar</span>
@@ -103,11 +100,6 @@ export function LaunchIntro({
               </span>
             ))}
           </h1>
-        </div>
-        <div className="launch-intro-status">
-          <span />
-          <span />
-          <span />
         </div>
       </div>
     </section>
