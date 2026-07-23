@@ -1555,10 +1555,7 @@ fn main_window_size(compact: bool) -> (f64, f64) {
 }
 
 #[tauri::command]
-fn set_main_window_onboarding_mode(
-    app: tauri::AppHandle,
-    compact: bool,
-) -> Result<(), String> {
+fn set_main_window_onboarding_mode(app: tauri::AppHandle, compact: bool) -> Result<(), String> {
     let main = main_window(&app)?;
     let (width, height) = main_window_size(compact);
     main.set_size(tauri::LogicalSize::new(width, height))
