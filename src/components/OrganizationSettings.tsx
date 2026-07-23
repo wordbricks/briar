@@ -1,5 +1,5 @@
 import { ArrowLeft, Building2, Trash2, UserPlus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   addOrganizationMember,
   loadOrganizationMembers,
@@ -11,16 +11,19 @@ export function OrganizationSettings({
   organization,
   token,
   onBack,
+  initialSection,
 }: {
   organization: Organization;
   token: string;
   onBack: () => void;
+  initialSection?: "members";
 }) {
   const [members, setMembers] = useState<OrganizationMember[]>([]);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"admin" | "member">("member");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const memberEmailRef = useRef<HTMLInputElement | null>(null);
   const organizationId = organization.id;
   const canManage =
     organization.role === "owner" || organization.role === "admin";
@@ -32,6 +35,10 @@ export function OrganizationSettings({
         setError(caught instanceof Error ? caught.message : String(caught)),
       );
   }, [organizationId, token]);
+
+  useEffect(() => {
+    if (initialSection === "members") memberEmailRef.current?.focus();
+  }, [initialSection]);
 
   return (
     <main className="organization-settings">
@@ -68,6 +75,7 @@ export function OrganizationSettings({
             aria-label="멤버 이메일"
             onChange={(event) => setEmail(event.target.value)}
             placeholder="동료의 Briar 이메일"
+            ref={memberEmailRef}
             required
             type="email"
             value={email}
