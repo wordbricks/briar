@@ -275,6 +275,7 @@ struct VelenInspection {
 struct OnboardingPrerequisiteStatus {
     installed: bool,
     version: Option<String>,
+    authenticated: bool,
 }
 
 #[derive(Serialize)]
@@ -481,6 +482,7 @@ fn inspect_cli(binary: Result<PathBuf, String>) -> OnboardingPrerequisiteStatus 
         return OnboardingPrerequisiteStatus {
             installed: false,
             version: None,
+            authenticated: false,
         };
     };
     let version = Command::new(&binary)
@@ -492,13 +494,30 @@ fn inspect_cli(binary: Result<PathBuf, String>) -> OnboardingPrerequisiteStatus 
     OnboardingPrerequisiteStatus {
         installed: true,
         version,
+        authenticated: true,
     }
+}
+
+fn inspect_velen_prerequisite_with(
+    binary: Result<PathBuf, String>,
+    home: &Path,
+) -> OnboardingPrerequisiteStatus {
+    let Ok(binary) = binary else {
+        return OnboardingPrerequisiteStatus {
+            installed: false,
+            version: None,
+            authenticated: false,
+        };
+    };
+    let mut status = inspect_cli(Ok(binary.clone()));
+    status.authenticated = run_velen_json_with(&binary, home, &["auth", "whoami"]).is_ok();
+    status
 }
 
 fn inspect_onboarding_prerequisites_sync(home: &Path) -> OnboardingPrerequisites {
     OnboardingPrerequisites {
         codex: inspect_cli(codex_app_server::codex_binary(home)),
-        velen: inspect_cli(velen_binary()),
+        velen: inspect_velen_prerequisite_with(velen_binary(), home),
     }
 }
 
@@ -572,6 +591,24 @@ async fn install_onboarding_prerequisite(
         if !installed {
             return Err(
                 "설치는 완료됐지만 CLI를 찾지 못했습니다. Briar를 다시 열어 주세요.".to_string(),
+            );
+        }
+        Ok(prerequisites)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn login_onboarding_velen(app: tauri::AppHandle) -> Result<OnboardingPrerequisites, String> {
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let binary = velen_binary()?;
+        run_velen_json_with(&binary, &home, &["auth", "login"])?;
+        let prerequisites = inspect_onboarding_prerequisites_sync(&home);
+        if !prerequisites.velen.authenticated {
+            return Err(
+                "Velen OAuth 로그인은 완료됐지만 인증 상태를 확인하지 못했습니다.".to_string(),
             );
         }
         Ok(prerequisites)
@@ -1709,6 +1746,7 @@ pub fn run() {
             set_main_window_onboarding_mode,
             inspect_onboarding_prerequisites,
             install_onboarding_prerequisite,
+            login_onboarding_velen,
             read_session_token,
             write_session_token,
             clear_session_token,
@@ -1751,6 +1789,54 @@ mod tests {
     fn uses_compact_window_dimensions_only_during_onboarding() {
         assert_eq!(main_window_size(true), ONBOARDING_MAIN_WINDOW_SIZE);
         assert_eq!(main_window_size(false), DEFAULT_MAIN_WINDOW_SIZE);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn onboarding_requires_an_authenticated_velen_session() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be after unix epoch")
+            .as_nanos();
+        let home = std::env::temp_dir().join(format!("briar-velen-onboarding-test-{unique}"));
+        fs::create_dir_all(&home).expect("test home should be created");
+        let velen = home.join("velen");
+        fs::write(
+            &velen,
+            "#!/bin/sh\n\
+             if [ \"$1\" = \"--version\" ]; then\n\
+               printf '%s\\n' 'velen 1.0.0'\n\
+               exit 0\n\
+             fi\n\
+             printf '%s\\n' '{\"ok\":true,\"data\":{\"user\":{\"email\":\"jay@example.com\"}}}'\n",
+        )
+        .expect("authenticated fake Velen should be written");
+        fs::set_permissions(&velen, fs::Permissions::from_mode(0o755))
+            .expect("fake Velen should be executable");
+
+        let authenticated = inspect_velen_prerequisite_with(Ok(velen.clone()), &home);
+        assert!(authenticated.installed);
+        assert!(authenticated.authenticated);
+        assert_eq!(authenticated.version.as_deref(), Some("velen 1.0.0"));
+
+        fs::write(
+            &velen,
+            "#!/bin/sh\n\
+             if [ \"$1\" = \"--version\" ]; then\n\
+               printf '%s\\n' 'velen 1.0.0'\n\
+               exit 0\n\
+             fi\n\
+             printf '%s\\n' '{\"ok\":false,\"error\":{\"message\":\"Not logged in\"}}'\n\
+             exit 1\n",
+        )
+        .expect("unauthenticated fake Velen should be written");
+        let unauthenticated = inspect_velen_prerequisite_with(Ok(velen), &home);
+        assert!(unauthenticated.installed);
+        assert!(!unauthenticated.authenticated);
+
+        fs::remove_dir_all(home).expect("test home should be removed");
     }
 
     #[test]

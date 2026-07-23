@@ -3,6 +3,7 @@ import {
   Check,
   Download,
   LoaderCircle,
+  LogIn,
   RefreshCw,
   Sparkles,
   SquareTerminal,
@@ -12,6 +13,7 @@ import { useI18n } from "../i18n";
 import {
   inspectOnboardingPrerequisites,
   installOnboardingPrerequisite,
+  loginOnboardingVelen,
   markInitialOnboardingComplete,
   type OnboardingPrerequisites,
   type PrerequisiteId,
@@ -32,19 +34,37 @@ export function InitialOnboarding({
     useState<OnboardingPrerequisites | null>(null);
   const [checking, setChecking] = useState(false);
   const [installing, setInstalling] = useState<PrerequisiteId | null>(null);
+  const [authenticatingVelen, setAuthenticatingVelen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const authenticateVelen = useCallback(async () => {
+    setAuthenticatingVelen(true);
+    setError(null);
+    try {
+      setPrerequisites(await loginOnboardingVelen());
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setAuthenticatingVelen(false);
+    }
+  }, []);
 
   const checkPrerequisites = useCallback(async () => {
     setChecking(true);
     setError(null);
     try {
-      setPrerequisites(await inspectOnboardingPrerequisites());
+      const inspected = await inspectOnboardingPrerequisites();
+      setPrerequisites(inspected);
+      if (inspected.velen.installed && !inspected.velen.authenticated) {
+        setChecking(false);
+        await authenticateVelen();
+      }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
       setChecking(false);
     }
-  }, []);
+  }, [authenticateVelen]);
 
   useEffect(() => {
     if (step !== "prerequisites") return;
@@ -55,9 +75,16 @@ export function InitialOnboarding({
     setInstalling(prerequisite);
     setError(null);
     try {
-      setPrerequisites(
-        await installOnboardingPrerequisite(prerequisite),
-      );
+      const installed = await installOnboardingPrerequisite(prerequisite);
+      setPrerequisites(installed);
+      if (
+        prerequisite === "velen" &&
+        installed.velen.installed &&
+        !installed.velen.authenticated
+      ) {
+        setInstalling(null);
+        await authenticateVelen();
+      }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
@@ -67,7 +94,11 @@ export function InitialOnboarding({
 
   const ready =
     prerequisites !== null &&
-    prerequisiteIds.every((id) => prerequisites[id].installed);
+    prerequisiteIds.every(
+      (id) =>
+        prerequisites[id].installed && prerequisites[id].authenticated,
+    );
+  const busy = checking || installing !== null || authenticatingVelen;
 
   const continueToLogin = () => {
     markInitialOnboardingComplete();
@@ -123,7 +154,7 @@ export function InitialOnboarding({
               <button
                 aria-label={t("initialOnboarding.checkAgain")}
                 className="initial-prerequisites-refresh"
-                disabled={checking || installing !== null}
+                disabled={busy}
                 onClick={() => void checkPrerequisites()}
                 type="button"
               >
@@ -135,6 +166,10 @@ export function InitialOnboarding({
               {prerequisiteIds.map((id) => {
                 const status = prerequisites?.[id];
                 const isInstalling = installing === id;
+                const needsVelenLogin =
+                  id === "velen" &&
+                  status?.installed &&
+                  !status.authenticated;
                 return (
                   <article className="initial-prerequisite-row" key={id}>
                     <span className={`initial-prerequisite-icon ${id}`}>
@@ -152,25 +187,42 @@ export function InitialOnboarding({
                         <LoaderCircle className="spin" size={15} />
                         {t("initialOnboarding.checking")}
                       </span>
-                    ) : status?.installed ? (
+                    ) : status?.installed && status.authenticated ? (
                       <span className="initial-prerequisite-status installed">
                         <Check size={15} />
-                        {status.version ?? t("initialOnboarding.installed")}
+                        {id === "velen"
+                          ? [
+                              status.version,
+                              t("initialOnboarding.velenAuthenticated"),
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")
+                          : status.version ?? t("initialOnboarding.installed")}
                       </span>
                     ) : (
                       <button
                         className="initial-prerequisite-install"
-                        disabled={checking || installing !== null}
-                        onClick={() => void install(id)}
+                        disabled={busy}
+                        onClick={() =>
+                          void (needsVelenLogin
+                            ? authenticateVelen()
+                            : install(id))
+                        }
                         type="button"
                       >
-                        {isInstalling ? (
+                        {isInstalling || (needsVelenLogin && authenticatingVelen) ? (
                           <LoaderCircle className="spin" size={15} />
+                        ) : needsVelenLogin ? (
+                          <LogIn size={15} />
                         ) : (
                           <Download size={15} />
                         )}
                         {t(
-                          isInstalling
+                          needsVelenLogin && authenticatingVelen
+                            ? "initialOnboarding.velenLoggingIn"
+                            : needsVelenLogin
+                              ? "initialOnboarding.velenLogin"
+                              : isInstalling
                             ? "initialOnboarding.installing"
                             : "initialOnboarding.install",
                         )}
@@ -206,7 +258,7 @@ export function InitialOnboarding({
                 </small>
                 <button
                   className="initial-onboarding-primary"
-                  disabled={!ready || checking || installing !== null}
+                  disabled={!ready || busy}
                   onClick={continueToLogin}
                   type="button"
                 >
