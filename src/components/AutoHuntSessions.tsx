@@ -26,18 +26,22 @@ import type {
 import type { DashboardPayload, HuntRun } from "../types";
 
 export function AutoHuntSessions({
+  companionMode = false,
   dashboard,
   error,
   isSidebarOpen,
+  onBack,
   onSidebarOpen,
   onRequestedSessionOpen,
   onStart,
   requestedSessionId = null,
   sessions,
 }: {
+  companionMode?: boolean;
   dashboard: DashboardPayload | null;
   error: string | null;
   isSidebarOpen: boolean;
+  onBack?: () => void;
   onSidebarOpen: () => void;
   onRequestedSessionOpen?: () => void;
   onStart: (runs: HuntRun[]) => string;
@@ -95,7 +99,7 @@ export function AutoHuntSessions({
   if (selectedSession) {
     return (
       <main className="main-content" id="auto-hunt-session">
-        <header className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region>
+        {!companionMode && <header className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region>
           {!isSidebarOpen && (
             <button
               aria-controls="app-sidebar"
@@ -110,7 +114,7 @@ export function AutoHuntSessions({
             </button>
           )}
           <div className="window-controls" aria-hidden="true"><i /><i /><i /></div>
-        </header>
+        </header>}
 
         <div className="auto-hunt-scroll auto-hunt-session-detail-scroll">
           <section
@@ -121,7 +125,10 @@ export function AutoHuntSessions({
               <div className="auto-hunt-session-page-heading">
                 <button
                   className="auto-hunt-session-back"
-                  onClick={() => setSelectedSessionId(null)}
+                  onClick={() => {
+                    if (onBack) onBack();
+                    else setSelectedSessionId(null);
+                  }}
                   type="button"
                 >
                   <ArrowLeft size={16} />
@@ -246,7 +253,7 @@ export function AutoHuntSessions({
 
   return (
     <main className="main-content" id="auto-hunt">
-      <header className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region>
+      {!companionMode && <header className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region>
         {!isSidebarOpen && (
           <button
             aria-controls="app-sidebar"
@@ -261,7 +268,7 @@ export function AutoHuntSessions({
           </button>
         )}
         <div className="window-controls" aria-hidden="true"><i /><i /><i /></div>
-      </header>
+      </header>}
 
       <div className="auto-hunt-scroll">
         <section className="auto-hunt-hero">

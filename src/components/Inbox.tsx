@@ -16,6 +16,7 @@ import type {
 } from "../hooks/useInbox";
 
 export function Inbox({
+  companionMode = false,
   isSidebarOpen,
   messages,
   onMarkAllRead,
@@ -23,6 +24,7 @@ export function Inbox({
   onSidebarOpen,
   unreadCount,
 }: {
+  companionMode?: boolean;
   isSidebarOpen: boolean;
   messages: InboxMessageWithReadState[];
   onMarkAllRead: () => void;
@@ -31,6 +33,92 @@ export function Inbox({
   unreadCount: number;
 }) {
   const { localeTag, t } = useI18n();
+
+  const inboxContent = (
+    <div className="inbox-scroll">
+      <section className="inbox-content" aria-labelledby="inbox-title">
+        <header className="inbox-heading">
+          <div>
+            <p className="eyebrow"><InboxIcon size={13} />{t("inbox.eyebrow")}</p>
+            <h1 id="inbox-title">{t("inbox.title")}</h1>
+            <p>{t("inbox.description")}</p>
+          </div>
+          {unreadCount > 0 && (
+            <button onClick={onMarkAllRead} type="button">
+              <Check size={14} />
+              {t("inbox.markAllRead")}
+            </button>
+          )}
+        </header>
+
+        <section className="inbox-panel" aria-label={t("inbox.messages")}>
+          <header>
+            <strong>{t("inbox.messages")}</strong>
+            <span>{t("inbox.unreadCount", { count: unreadCount })}</span>
+          </header>
+
+          {messages.length === 0 ? (
+            <div className="inbox-empty">
+              <span><InboxIcon size={23} /></span>
+              <strong>{t("inbox.emptyTitle")}</strong>
+              <p>{t("inbox.emptyDescription")}</p>
+            </div>
+          ) : (
+            <div className="inbox-list">
+              {messages.map((message) => (
+                <button
+                  className={`inbox-message${message.isUnread ? " unread" : ""}`}
+                  key={message.id}
+                  onClick={() => onOpen(message)}
+                  type="button"
+                >
+                  <span
+                    className={`inbox-message-icon ${message.kind} ${message.status}`}
+                  >
+                    {message.kind === "session"
+                      ? <Bot size={17} />
+                      : message.status === "failed" || message.status === "blocked"
+                        ? <CircleAlert size={17} />
+                        : message.status === "completed"
+                          ? <CheckCircle2 size={17} />
+                          : <Clock3 size={17} />}
+                  </span>
+                  <span className="inbox-message-copy">
+                    <span>
+                      <strong>{messageTitle(t, message)}</strong>
+                      {message.isUnread && (
+                        <i
+                          aria-label={t("inbox.unread")}
+                          className="inbox-unread-dot"
+                        />
+                      )}
+                    </span>
+                    <small>{messageDescription(t, message)}</small>
+                    <em>
+                      <span>{message.projectName}</span>
+                      <Clock3 size={11} />
+                      <time dateTime={message.occurredAt}>
+                        {formatDate(message.occurredAt, localeTag)}
+                      </time>
+                    </em>
+                  </span>
+                  <ChevronRight size={16} />
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+      </section>
+    </div>
+  );
+
+  if (companionMode) {
+    return (
+      <main className="main-content companion-inbox" id="inbox">
+        {inboxContent}
+      </main>
+    );
+  }
 
   return (
     <main className="main-content" id="inbox">
@@ -53,82 +141,7 @@ export function Inbox({
         )}
         <div className="window-controls" aria-hidden="true"><i /><i /><i /></div>
       </header>
-
-      <div className="inbox-scroll">
-        <section className="inbox-content" aria-labelledby="inbox-title">
-          <header className="inbox-heading">
-            <div>
-              <p className="eyebrow"><InboxIcon size={13} />{t("inbox.eyebrow")}</p>
-              <h1 id="inbox-title">{t("inbox.title")}</h1>
-              <p>{t("inbox.description")}</p>
-            </div>
-            {unreadCount > 0 && (
-              <button onClick={onMarkAllRead} type="button">
-                <Check size={14} />
-                {t("inbox.markAllRead")}
-              </button>
-            )}
-          </header>
-
-          <section className="inbox-panel" aria-label={t("inbox.messages")}>
-            <header>
-              <strong>{t("inbox.messages")}</strong>
-              <span>{t("inbox.unreadCount", { count: unreadCount })}</span>
-            </header>
-
-            {messages.length === 0 ? (
-              <div className="inbox-empty">
-                <span><InboxIcon size={23} /></span>
-                <strong>{t("inbox.emptyTitle")}</strong>
-                <p>{t("inbox.emptyDescription")}</p>
-              </div>
-            ) : (
-              <div className="inbox-list">
-                {messages.map((message) => (
-                  <button
-                    className={`inbox-message${message.isUnread ? " unread" : ""}`}
-                    key={message.id}
-                    onClick={() => onOpen(message)}
-                    type="button"
-                  >
-                    <span
-                      className={`inbox-message-icon ${message.kind} ${message.status}`}
-                    >
-                      {message.kind === "session"
-                        ? <Bot size={17} />
-                        : message.status === "failed" || message.status === "blocked"
-                          ? <CircleAlert size={17} />
-                          : message.status === "completed"
-                            ? <CheckCircle2 size={17} />
-                            : <Clock3 size={17} />}
-                    </span>
-                    <span className="inbox-message-copy">
-                      <span>
-                        <strong>{messageTitle(t, message)}</strong>
-                        {message.isUnread && (
-                          <i
-                            aria-label={t("inbox.unread")}
-                            className="inbox-unread-dot"
-                          />
-                        )}
-                      </span>
-                      <small>{messageDescription(t, message)}</small>
-                      <em>
-                        <span>{message.projectName}</span>
-                        <Clock3 size={11} />
-                        <time dateTime={message.occurredAt}>
-                          {formatDate(message.occurredAt, localeTag)}
-                        </time>
-                      </em>
-                    </span>
-                    <ChevronRight size={16} />
-                  </button>
-                ))}
-              </div>
-            )}
-          </section>
-        </section>
-      </div>
+      {inboxContent}
     </main>
   );
 }

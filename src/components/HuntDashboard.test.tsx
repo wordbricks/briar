@@ -89,7 +89,8 @@ describe("HuntDashboard", () => {
     expect(markup).toContain('aria-label="이슈 만들기"');
     expect(markup).toContain('class="companion-bottom-nav"');
     expect(markup).toContain('class="companion-fab"');
-    expect(markup).toContain('class="companion-search-trigger"');
+    expect(markup).toContain("<strong>Inbox</strong>");
+    expect(markup).not.toContain('class="companion-search-trigger"');
     expect(markup).not.toContain('class="status-tabs"');
   });
 

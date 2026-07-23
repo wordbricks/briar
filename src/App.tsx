@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AutoHuntSessions } from "./components/AutoHuntSessions";
+import {
+  CompanionBottomNavigation,
+  type CompanionStatusFilter,
+} from "./components/CompanionBottomNavigation";
 import { CompanionEmptyState, CompanionHeader } from "./components/CompanionHeader";
 import { HuntDashboard } from "./components/HuntDashboard";
 import { Inbox } from "./components/Inbox";
@@ -63,11 +67,25 @@ export function App() {
   const [requestedSessionId, setRequestedSessionId] = useState<string | null>(
     null,
   );
+  const [companionPage, setCompanionPage] = useState<
+    "issues" | "inbox" | "session"
+  >("issues");
+  const [companionStatus, setCompanionStatus] =
+    useState<CompanionStatusFilter>("all");
   const [activeOrganizationId, setActiveOrganizationId] = useState<string | null>(null);
   const hasCompactedWindowForOnboarding = useRef(false);
   const activeProject = briar.projects.find(
     (project) => project.id === briar.activeProjectId,
   );
+  const companionRuns = briar.dashboard?.runs ?? [];
+  const companionCounts = {
+    active: companionRuns.filter(
+      (run) => !["completed", "cancelled"].includes(run.status),
+    ).length,
+    attention: companionRuns.filter((run) =>
+      ["blocked", "failed"].includes(run.status)
+    ).length,
+  };
   const shouldShowInitialOnboarding =
     !briar.companionMode &&
     !briar.loading &&
@@ -306,31 +324,109 @@ export function App() {
           activeProjectId={briar.activeProjectId}
           loading={briar.loading}
           onLogout={() => void briar.logout()}
-          onProjectChange={briar.setActiveProjectId}
+          onProjectChange={(projectId) => {
+            briar.setActiveProjectId(projectId);
+            setCompanionPage("issues");
+            setCompanionStatus("all");
+            setRequestedRunId(null);
+            setRequestedSessionId(null);
+          }}
           onRefresh={() => void briar.refresh()}
           projects={briar.projects}
           user={briar.user}
         />
-        <HuntDashboard
-          companionMode
-          dashboard={briar.dashboard}
-          error={briar.error}
-          health={null}
-          healthError={null}
-          healthLoading={false}
-          isCreatingIssue={briar.isCreatingIssue}
-          recoveringRunId={briar.recoveringRunId}
-          recoveryError={briar.recoveryError}
-          isSidebarOpen
-          onCreateIssue={briar.addIssue}
-          onHealthRefresh={() => {}}
-          onLoadAttachment={briar.readIssueAttachment}
-          onReconnect={() => {}}
-          onRetryRun={briar.retryRun}
-          onCancelRun={briar.cancelRun}
-          onRepair={() => {}}
-          onSidebarOpen={() => {}}
-        />
+        {companionPage === "inbox" ? (
+          <>
+            <Inbox
+              companionMode
+              isSidebarOpen
+              messages={inbox.messages}
+              onMarkAllRead={inbox.markAllRead}
+              onOpen={(message) => {
+                inbox.markRead(message.id);
+                if (message.projectId !== briar.activeProjectId) {
+                  briar.setActiveProjectId(message.projectId);
+                }
+                if (message.kind === "issue") {
+                  setRequestedRunId(message.targetId);
+                  setCompanionStatus("all");
+                  setCompanionPage("issues");
+                } else {
+                  setRequestedSessionId(message.targetId);
+                  setCompanionPage("session");
+                }
+              }}
+              onSidebarOpen={() => {}}
+              unreadCount={inbox.unreadCount}
+            />
+            <CompanionBottomNavigation
+              activeDestination="inbox"
+              counts={companionCounts}
+              onInboxOpen={() => {}}
+              onStatusChange={(status) => {
+                setCompanionStatus(status);
+                setCompanionPage("issues");
+              }}
+              unreadInboxCount={inbox.unreadCount}
+            />
+          </>
+        ) : companionPage === "session" ? (
+          <>
+            <AutoHuntSessions
+              companionMode
+              dashboard={briar.dashboard}
+              error={briar.error}
+              isSidebarOpen
+              onBack={() => setCompanionPage("inbox")}
+              onRequestedSessionOpen={() => setRequestedSessionId(null)}
+              onSidebarOpen={() => {}}
+              onStart={(runs) =>
+                autoHunt.startSession(briar.activeProjectId!, runs, () =>
+                  void briar.refresh()
+                )
+              }
+              requestedSessionId={requestedSessionId}
+              sessions={autoHunt.sessions}
+            />
+            <CompanionBottomNavigation
+              activeDestination="inbox"
+              counts={companionCounts}
+              onInboxOpen={() => setCompanionPage("inbox")}
+              onStatusChange={(status) => {
+                setCompanionStatus(status);
+                setCompanionPage("issues");
+              }}
+              unreadInboxCount={inbox.unreadCount}
+            />
+          </>
+        ) : (
+          <HuntDashboard
+            companionMode
+            companionStatus={companionStatus}
+            companionUnreadInboxCount={inbox.unreadCount}
+            dashboard={briar.dashboard}
+            error={briar.error}
+            health={null}
+            healthError={null}
+            healthLoading={false}
+            isCreatingIssue={briar.isCreatingIssue}
+            recoveringRunId={briar.recoveringRunId}
+            recoveryError={briar.recoveryError}
+            requestedRunId={requestedRunId}
+            isSidebarOpen
+            onCompanionInboxOpen={() => setCompanionPage("inbox")}
+            onCompanionStatusChange={setCompanionStatus}
+            onCreateIssue={briar.addIssue}
+            onHealthRefresh={() => {}}
+            onLoadAttachment={briar.readIssueAttachment}
+            onReconnect={() => {}}
+            onRequestedRunOpen={() => setRequestedRunId(null)}
+            onRetryRun={briar.retryRun}
+            onCancelRun={briar.cancelRun}
+            onRepair={() => {}}
+            onSidebarOpen={() => {}}
+          />
+        )}
       </jelly-theme>
     );
   }
