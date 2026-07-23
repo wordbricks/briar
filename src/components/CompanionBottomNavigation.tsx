@@ -1,11 +1,4 @@
-import {
-  Activity,
-  Bell,
-  CheckCircle2,
-  Inbox,
-  ListTodo,
-  Plus,
-} from "lucide-react";
+import { Inbox, ListTodo, Plus } from "lucide-react";
 import { useI18n } from "../i18n";
 
 export type CompanionStatusFilter =
@@ -18,14 +11,12 @@ type CompanionDestination = CompanionStatusFilter | "inbox";
 
 export function CompanionBottomNavigation({
   activeDestination,
-  counts,
   onCreate,
   onInboxOpen,
   onStatusChange,
   unreadInboxCount,
 }: {
   activeDestination: CompanionDestination;
-  counts: { active: number; attention: number };
   onCreate?: () => void;
   onInboxOpen: () => void;
   onStatusChange: (status: CompanionStatusFilter) => void;
@@ -40,23 +31,6 @@ export function CompanionBottomNavigation({
   }> = [
     { icon: ListTodo, label: t("companion.navTasks"), value: "all" },
     {
-      count: counts.active,
-      icon: Activity,
-      label: t("companion.navActive"),
-      value: "active",
-    },
-    {
-      count: counts.attention,
-      icon: Bell,
-      label: t("companion.navAttention"),
-      value: "attention",
-    },
-    {
-      icon: CheckCircle2,
-      label: t("companion.navCompleted"),
-      value: "completed",
-    },
-    {
       count: unreadInboxCount,
       icon: Inbox,
       label: t("companion.navInbox"),
@@ -66,16 +40,6 @@ export function CompanionBottomNavigation({
 
   return (
     <div className="companion-bottom-chrome">
-      {onCreate && (
-        <button
-          aria-label={t("dashboard.createIssue")}
-          className="companion-fab"
-          onClick={onCreate}
-          type="button"
-        >
-          <Plus size={25} />
-        </button>
-      )}
       <nav aria-label={t("sidebar.mainMenu")} className="companion-bottom-nav">
         {destinations.map((destination) => {
           const Icon = destination.icon;
@@ -100,6 +64,16 @@ export function CompanionBottomNavigation({
           );
         })}
       </nav>
+      {onCreate && (
+        <button
+          aria-label={t("dashboard.createIssue")}
+          className="companion-fab"
+          onClick={onCreate}
+          type="button"
+        >
+          <Plus size={25} />
+        </button>
+      )}
     </div>
   );
 }

@@ -4,12 +4,12 @@ import { I18nProvider } from "../i18n";
 import { CompanionBottomNavigation } from "./CompanionBottomNavigation";
 
 describe("CompanionBottomNavigation", () => {
-  it("replaces the rightmost search action with an Inbox tab", () => {
+  it("keeps only Tasks and Inbox with the create action after the navigation", () => {
     const markup = renderToStaticMarkup(
       <I18nProvider>
         <CompanionBottomNavigation
           activeDestination="inbox"
-          counts={{ active: 2, attention: 1 }}
+          onCreate={() => undefined}
           onInboxOpen={() => undefined}
           onStatusChange={() => undefined}
           unreadInboxCount={3}
@@ -20,7 +20,12 @@ describe("CompanionBottomNavigation", () => {
     expect(markup).toContain("Inbox");
     expect(markup).toContain('aria-current="page"');
     expect(markup).toContain(">3<");
-    expect(markup).not.toContain('aria-label="작업 검색"');
-    expect(markup.match(/<button/g)).toHaveLength(5);
+    expect(markup).not.toContain(">Active<");
+    expect(markup).not.toContain(">Alerts<");
+    expect(markup).not.toContain(">Completed<");
+    expect(markup.match(/<button/g)).toHaveLength(3);
+    expect(markup.indexOf("companion-bottom-nav")).toBeLessThan(
+      markup.indexOf("companion-fab"),
+    );
   });
 });
