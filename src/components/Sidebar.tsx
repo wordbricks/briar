@@ -17,22 +17,25 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useI18n, type Locale } from "../i18n";
-import type { Project, SessionUser } from "../types";
+import type { Organization, Project, SessionUser } from "../types";
 import { UpdateControl } from "./UpdateControl";
 
 export function Sidebar({
   activePage,
+  activeOrganizationId,
   activeProjectId,
   isOpen,
   onAddProject,
   onAutoHuntOpen,
   onInboxOpen,
   onIssuesOpen,
+  onOrganizationChange,
   onOrganizationSettings,
   onProjectChange,
   onProjectSettings,
   onLogout,
   onToggle,
+  organizations,
   projects,
   unreadInboxCount,
   user,
@@ -43,22 +46,27 @@ export function Sidebar({
     | "inbox"
     | "project-settings"
     | "organization-settings";
+  activeOrganizationId: string | null;
   activeProjectId: string | null;
   isOpen: boolean;
   onAddProject: () => void;
   onAutoHuntOpen: () => void;
   onInboxOpen: () => void;
   onIssuesOpen: () => void;
+  onOrganizationChange: (organizationId: string) => void;
   onOrganizationSettings: (organizationId: string) => void;
   onProjectChange: (projectId: string) => void;
   onProjectSettings: (projectId: string) => void;
   onLogout: () => void;
   onToggle: () => void;
+  organizations: Organization[];
   projects: Project[];
   unreadInboxCount: number;
   user: SessionUser;
 }) {
   const { locale, setLocale, t } = useI18n();
+  const [isOrganizationMenuOpen, setIsOrganizationMenuOpen] = useState(false);
+  const organizationMenuRef = useRef<HTMLDivElement | null>(null);
   const [openProjectMenuId, setOpenProjectMenuId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const menuItemRef = useRef<HTMLButtonElement | null>(null);
@@ -68,6 +76,33 @@ export function Sidebar({
   const accountMenuRef = useRef<HTMLDivElement>(null);
   const languageMenuRef = useRef<HTMLDivElement>(null);
   const languageTriggerRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!isOrganizationMenuOpen) return;
+    organizationMenuRef.current
+      ?.querySelector<HTMLButtonElement>('[aria-checked="true"]')
+      ?.focus();
+
+    const closeOnOutsidePress = (event: PointerEvent) => {
+      if (!organizationMenuRef.current?.contains(event.target as Node)) {
+        setIsOrganizationMenuOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setIsOrganizationMenuOpen(false);
+      organizationMenuRef.current
+        ?.querySelector<HTMLButtonElement>(".sidebar-brand")
+        ?.focus();
+    };
+
+    document.addEventListener("pointerdown", closeOnOutsidePress);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePress);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isOrganizationMenuOpen]);
 
   useEffect(() => {
     if (!openProjectMenuId) return;
@@ -130,6 +165,23 @@ export function Sidebar({
     { locale: "en", label: t("language.en") },
     { locale: "zh", label: t("language.zh") },
   ];
+  const activeOrganization =
+    organizations.find(
+      (organization) => organization.id === activeOrganizationId,
+    ) ??
+    organizations.find(
+      (organization) =>
+        organization.id ===
+        projects.find((project) => project.id === activeProjectId)
+          ?.organizationId,
+    ) ??
+    organizations[0] ??
+    null;
+  const visibleProjects = activeOrganization
+    ? projects.filter(
+        (project) => project.organizationId === activeOrganization.id,
+      )
+    : projects;
 
   return (
     <aside
@@ -152,9 +204,72 @@ export function Sidebar({
         </button>
       </div>
 
-      <div className="sidebar-brand" data-tauri-drag-region>
-        <span>Briar</span>
-        <ChevronDown aria-hidden="true" size={14} strokeWidth={1.8} />
+      <div
+        className="sidebar-organization-switcher"
+        ref={organizationMenuRef}
+      >
+        <button
+          aria-expanded={isOrganizationMenuOpen}
+          aria-haspopup="menu"
+          aria-label={t("sidebar.organizationSwitcher")}
+          className="sidebar-brand"
+          onClick={() => {
+            setOpenProjectMenuId(null);
+            setIsAccountMenuOpen(false);
+            setIsLanguageMenuOpen(false);
+            setIsOrganizationMenuOpen((open) => !open);
+          }}
+          type="button"
+        >
+          <span>{activeOrganization?.name ?? "Briar"}</span>
+          <ChevronDown
+            aria-hidden="true"
+            className={isOrganizationMenuOpen ? "open" : ""}
+            size={14}
+            strokeWidth={1.8}
+          />
+        </button>
+        {isOrganizationMenuOpen && (
+          <div
+            aria-label={t("sidebar.organizationMenu")}
+            className="sidebar-organization-menu"
+            onKeyDown={(event) => {
+              if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+              event.preventDefault();
+              const items = Array.from(
+                organizationMenuRef.current?.querySelectorAll<HTMLButtonElement>(
+                  ".sidebar-organization-menu button",
+                ) ?? [],
+              );
+              const current = Math.max(
+                0,
+                items.indexOf(document.activeElement as HTMLButtonElement),
+              );
+              const offset = event.key === "ArrowDown" ? 1 : -1;
+              items[(current + offset + items.length) % items.length]?.focus();
+            }}
+            role="menu"
+          >
+            {organizations.map((organization) => (
+              <button
+                aria-checked={organization.id === activeOrganization?.id}
+                key={organization.id}
+                onClick={() => {
+                  onOrganizationChange(organization.id);
+                  setIsOrganizationMenuOpen(false);
+                }}
+                role="menuitemradio"
+                type="button"
+              >
+                <Building2 aria-hidden="true" size={15} strokeWidth={1.7} />
+                <span>{organization.name}</span>
+                {organization.id === activeOrganization?.id ? (
+                  <Check aria-hidden="true" size={15} strokeWidth={1.8} />
+                ) : null}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <nav aria-label={t("sidebar.mainMenu")} className="sidebar-primary-nav">
@@ -189,31 +304,22 @@ export function Sidebar({
         </div>
 
         <div className="sidebar-project-list">
-          {projects.map((project, index) => {
+          {activeOrganization && (
+            <button
+              className="sidebar-organization-heading"
+              onClick={() => onOrganizationSettings(activeOrganization.id)}
+              type="button"
+            >
+              <Building2 size={14} strokeWidth={1.7} />
+              <span>{activeOrganization.name}</span>
+            </button>
+          )}
+          {visibleProjects.map((project) => {
             const isActive = project.id === activeProjectId;
             const isMenuOpen = project.id === openProjectMenuId;
-            const organizationName = project.organizationName ?? "내 조직";
-            const startsOrganization =
-              index === 0 ||
-              (projects[index - 1]?.organizationId ?? "personal") !==
-                (project.organizationId ?? "personal");
 
             return (
               <section className="sidebar-project-group" key={project.id}>
-                {startsOrganization && (
-                  <button
-                    className="sidebar-organization-heading"
-                    onClick={() =>
-                      onOrganizationSettings(
-                        project.organizationId ?? project.id,
-                      )
-                    }
-                    type="button"
-                  >
-                    <Building2 size={14} strokeWidth={1.7} />
-                    <span>{organizationName}</span>
-                  </button>
-                )}
                 <div className="sidebar-project-row">
                   <button
                     aria-expanded={isActive}

@@ -7,6 +7,7 @@ import {
   FolderOpen,
   Link2,
   ListChecks,
+  LoaderCircle,
   LogOut,
   RefreshCw,
 } from "lucide-react";
@@ -30,9 +31,13 @@ type Props = {
   error: string | null;
   loading: boolean;
   onCancel: () => void;
-  onConnect: (settings: LocalAutoHuntConfig) => Promise<unknown>;
+  onConnect: (
+    settings: LocalAutoHuntConfig,
+    repositoryPath: string,
+  ) => Promise<unknown>;
   onCreate: (input: { name: string }) => Promise<unknown>;
   onLogout: () => void;
+  onRepositorySelect: () => Promise<string | null>;
   onVelenOrgChange: (org?: string | null) => Promise<VelenInspection | null>;
   user: SessionUser;
   velen: VelenInspection | null;
@@ -47,6 +52,7 @@ export function ProjectOnboarding({
   onConnect,
   onCreate,
   onLogout,
+  onRepositorySelect,
   onVelenOrgChange,
   user,
   velen,
@@ -57,6 +63,8 @@ export function ProjectOnboarding({
   const [linearEnabled, setLinearEnabled] = useState(false);
   const [linearSource, setLinearSource] = useState("");
   const [linearTeam, setLinearTeam] = useState("");
+  const [repositoryPath, setRepositoryPath] = useState("");
+  const [selectingRepository, setSelectingRepository] = useState(false);
   const initialWorkflow = normalizeAutoHuntWorkflow(connection?.workflow);
 
   useEffect(() => {
@@ -84,14 +92,26 @@ export function ProjectOnboarding({
   };
 
   const connect = async () => {
-    if (!velenOrg) return;
+    if (!repositoryPath || !velenOrg) return;
     await onConnect({
       velenOrg,
       linearEnabled,
       linearSource: linearEnabled ? linearSource || null : null,
       linearTeam: linearEnabled ? linearTeam || null : null,
       workflow: initialWorkflow,
-    }).catch(() => undefined);
+    }, repositoryPath).catch(() => undefined);
+  };
+
+  const selectRepository = async () => {
+    setSelectingRepository(true);
+    try {
+      const selected = await onRepositorySelect();
+      if (selected) setRepositoryPath(selected);
+    } catch {
+      // The shared error surface is populated by the repository selector.
+    } finally {
+      setSelectingRepository(false);
+    }
   };
 
   return (
@@ -130,10 +150,32 @@ export function ProjectOnboarding({
                 </div>
               </section>
 
-              <section className="setup-section">
+              <section className={`setup-section repository-setup${repositoryPath ? " connected" : ""}`}>
                 <div className="setup-section-heading">
-                  <FolderOpen size={18} />
-                  <div><strong>{t("onboarding.localRepository")}</strong><span>{t("onboarding.folderPicker")}</span></div>
+                  {repositoryPath ? <Check size={18} /> : <FolderOpen size={18} />}
+                  <div>
+                    <strong>{t("onboarding.localRepository")}</strong>
+                    <span className={repositoryPath ? "repository-path" : undefined} title={repositoryPath || undefined}>
+                      {repositoryPath || t("onboarding.folderPicker")}
+                    </span>
+                  </div>
+                  <button
+                    className="setup-repository-action"
+                    disabled={loading || selectingRepository}
+                    onClick={() => void selectRepository()}
+                    type="button"
+                  >
+                    {selectingRepository ? (
+                      <LoaderCircle aria-hidden="true" className="spin" size={14} />
+                    ) : (
+                      <FolderOpen aria-hidden="true" size={14} />
+                    )}
+                    {selectingRepository
+                      ? t("onboarding.repositorySelecting")
+                      : repositoryPath
+                        ? t("onboarding.repositoryChange")
+                        : t("onboarding.repositorySelect")}
+                  </button>
                 </div>
               </section>
 
@@ -216,7 +258,7 @@ export function ProjectOnboarding({
             {error ? <jelly-alert variant="rose" className="login-error">{error}</jelly-alert> : null}
             <button
               className="onboarding-primary-action"
-              disabled={loading || !velen || !velenOrg || (linearEnabled && !linearSource)}
+              disabled={loading || !repositoryPath || !velen || !velenOrg || (linearEnabled && !linearSource)}
               onClick={() => void connect()}
               type="button"
             >

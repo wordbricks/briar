@@ -9,6 +9,7 @@ import { I18nProvider } from "../i18n";
 
 const sidebarProps = {
   activePage: "issues" as const,
+  activeOrganizationId: "organization-1",
   activeProjectId: "project-1",
   isOpen: true,
   onAddProject: () => undefined,
@@ -16,12 +17,28 @@ const sidebarProps = {
   onInboxOpen: () => undefined,
   onIssuesOpen: () => undefined,
   onLogout: () => undefined,
+  onOrganizationChange: () => undefined,
   onOrganizationSettings: () => undefined,
   onProjectChange: () => undefined,
   onProjectSettings: () => undefined,
   onToggle: () => undefined,
+  organizations: [
+    {
+      id: "organization-1",
+      name: "Briar",
+      role: "owner" as const,
+      createdAt: "2026-07-22T00:00:00Z",
+    },
+  ],
   projects: [
-    { id: "project-1", name: "Briar", createdAt: "2026-07-22T00:00:00Z" },
+    {
+      id: "project-1",
+      name: "Briar",
+      organizationId: "organization-1",
+      organizationName: "Briar",
+      role: "owner" as const,
+      createdAt: "2026-07-22T00:00:00Z",
+    },
   ],
   unreadInboxCount: 0,
   user: { id: "user-1", name: "Jay", email: "jay@example.com" },
@@ -41,6 +58,7 @@ describe("Sidebar", () => {
     expect(markup).toContain('aria-label="현재 프로젝트"');
     expect(markup).toContain('aria-current="page"');
     expect(markup).toContain('aria-label="왼쪽 패널 닫기"');
+    expect(markup).toContain('aria-label="조직 전환"');
     expect(markup).toContain('aria-haspopup="menu"');
     expect(markup).toContain('aria-label="계정 메뉴"');
     expect(markup).toContain("이슈");
@@ -50,6 +68,66 @@ describe("Sidebar", () => {
     expect(markup).not.toContain('href="#help"');
     expect(markup).toContain('aria-label="Briar 프로젝트 메뉴"');
     expect(markup).not.toContain("<jelly-select");
+  });
+
+  it("switches organizations from the brand control", async () => {
+    const onOrganizationChange = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <Sidebar
+          {...sidebarProps}
+          onOrganizationChange={onOrganizationChange}
+          organizations={[
+            ...sidebarProps.organizations,
+            {
+              id: "organization-2",
+              name: "Wordbricks",
+              role: "member",
+              createdAt: "2026-07-23T00:00:00Z",
+            },
+          ]}
+          projects={[
+            ...sidebarProps.projects,
+            {
+              id: "project-2",
+              name: "Console",
+              organizationId: "organization-2",
+              organizationName: "Wordbricks",
+              role: "member",
+              createdAt: "2026-07-23T00:00:00Z",
+            },
+          ]}
+        />,
+      );
+    });
+
+    const trigger = container.querySelector<HTMLButtonElement>(
+      '[aria-label="조직 전환"]',
+    );
+    await act(async () => trigger?.click());
+    expect(trigger?.getAttribute("aria-expanded")).toBe("true");
+    expect(container.querySelector('[aria-label="조직 선택"]')?.textContent).toContain(
+      "Wordbricks",
+    );
+    expect(container.textContent).not.toContain("Console");
+
+    await act(async () => {
+      Array.from(
+        container.querySelectorAll<HTMLButtonElement>(
+          '[aria-label="조직 선택"] button',
+        ),
+      )
+        .find((button) => button.textContent?.includes("Wordbricks"))
+        ?.click();
+    });
+    expect(onOrganizationChange).toHaveBeenCalledWith("organization-2");
+    expect(trigger?.getAttribute("aria-expanded")).toBe("false");
+
+    await act(async () => root.unmount());
+    container.remove();
   });
 
   it("shows an unread dot for Inbox messages", () => {

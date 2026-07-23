@@ -9,6 +9,7 @@ import {
   isApiConfigured,
   loadDashboard,
   loadIssueAttachment,
+  loadOrganizations,
   loadProjects,
   loadSession,
   pollDeviceToken,
@@ -44,6 +45,7 @@ import type {
   DashboardPayload,
   HuntRun,
   IssueAttachment,
+  Organization,
   Project,
   ProjectSettings,
   SessionUser,
@@ -64,6 +66,12 @@ const demoUser: SessionUser = {
   id: "demo-user",
   name: "Jay",
   email: "demo@briar.local",
+};
+const demoOrganization: Organization = {
+  id: demoDashboard.project.organizationId!,
+  name: demoDashboard.project.organizationName!,
+  role: demoDashboard.project.role!,
+  createdAt: demoDashboard.project.createdAt,
 };
 
 const emptyDashboard = (project: Project): DashboardPayload => ({
@@ -108,6 +116,12 @@ export function useBriar() {
   const [token, setToken] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>(
     demoMode ? [demoDashboard.project] : [],
+  );
+  const [organizations, setOrganizations] = useState<Organization[]>(
+    demoMode ? [demoOrganization] : [],
+  );
+  const [activeOrganizationId, setActiveOrganizationId] = useState<string | null>(
+    demoMode ? demoOrganization.id : null,
   );
   const [activeProjectId, setActiveProjectId] = useState<string | null>(
     demoMode ? demoDashboard.project.id : null,
@@ -176,9 +190,10 @@ export function useBriar() {
     void readSessionToken()
       .then(async (storedToken) => {
         if (!storedToken || cancelled) return;
-        const [nextUser, nextProjects] = await Promise.all([
+        const [nextUser, nextProjects, nextOrganizations] = await Promise.all([
           loadSession(storedToken),
           loadProjects(storedToken),
+          loadOrganizations(storedToken),
         ]);
         const unconnectedProject = companionMode
           ? null
@@ -187,6 +202,10 @@ export function useBriar() {
         setToken(storedToken);
         setUser(nextUser);
         setProjects(nextProjects);
+        setOrganizations(nextOrganizations);
+        setActiveOrganizationId(
+          nextProjects[0]?.organizationId ?? nextOrganizations[0]?.id ?? null,
+        );
         setActiveProjectId(nextProjects[0]?.id ?? null);
         setProjectConnection(
           unconnectedProject
@@ -274,9 +293,10 @@ export function useBriar() {
           if (attempt !== loginAttempt.current) return;
           if (result.access_token) {
             const nextToken = result.access_token;
-            const [nextUser, nextProjects] = await Promise.all([
+            const [nextUser, nextProjects, nextOrganizations] = await Promise.all([
               loadSession(nextToken),
               loadProjects(nextToken),
+              loadOrganizations(nextToken),
             ]);
             const unconnectedProject = companionMode
               ? null
@@ -290,6 +310,10 @@ export function useBriar() {
             setToken(nextToken);
             setUser(nextUser);
             setProjects(nextProjects);
+            setOrganizations(nextOrganizations);
+            setActiveOrganizationId(
+              nextProjects[0]?.organizationId ?? nextOrganizations[0]?.id ?? null,
+            );
             setActiveProjectId(nextProjects[0]?.id ?? null);
             setProjectConnection(
               unconnectedProject
@@ -331,6 +355,8 @@ export function useBriar() {
     setToken(null);
     setUser(null);
     setProjects([]);
+    setOrganizations([]);
+    setActiveOrganizationId(null);
     setDashboard(null);
     setActiveProjectId(null);
     setProjectConnection(null);
@@ -350,10 +376,15 @@ export function useBriar() {
 
   const selectProject = useCallback(
     (projectId: string) => {
-      setActiveProjectId(projectId);
-      if (!demoMode) return;
       const project = projects.find((candidate) => candidate.id === projectId);
       if (!project) return;
+      setActiveProjectId(projectId);
+      setActiveOrganizationId((current) => project.organizationId ?? current);
+      if (!demoMode) {
+        setDashboard(null);
+        setError(null);
+        return;
+      }
       setDashboard(
         project.id === demoDashboard.project.id
           ? demoDashboard
@@ -364,15 +395,47 @@ export function useBriar() {
     [projects],
   );
 
+  const selectOrganization = useCallback(
+    (organizationId: string) => {
+      if (!organizations.some((organization) => organization.id === organizationId)) {
+        return;
+      }
+      const project =
+        projects.find((candidate) => candidate.organizationId === organizationId) ??
+        null;
+      setActiveOrganizationId(organizationId);
+      setActiveProjectId(project?.id ?? null);
+      setDashboard(
+        demoMode && project
+          ? project.id === demoDashboard.project.id
+            ? demoDashboard
+            : emptyDashboard(project)
+          : null,
+      );
+      setHealth(null);
+      setHealthError(null);
+      setError(null);
+    },
+    [organizations, projects],
+  );
+
   const addProject = useCallback(
     async (input: { name: string }) => {
       if (demoMode) {
+        const organization =
+          organizations.find(
+            (candidate) => candidate.id === activeOrganizationId,
+          ) ?? demoOrganization;
         const project: Project = {
           id: crypto.randomUUID(),
           name: input.name.trim(),
+          organizationId: organization.id,
+          organizationName: organization.name,
+          role: organization.role,
           createdAt: new Date().toISOString(),
         };
         setProjects((current) => [...current, project]);
+        setActiveOrganizationId(organization.id);
         setActiveProjectId(project.id);
         setDashboard(emptyDashboard(project));
         setError(null);
@@ -383,8 +446,14 @@ export function useBriar() {
       setLoading(true);
       setError(null);
       try {
-        const result = await createProject(token, input);
+        const result = await createProject(token, {
+          ...input,
+          organizationId: activeOrganizationId ?? undefined,
+        });
         setProjects((current) => [...current, result.project]);
+        setActiveOrganizationId(
+          result.project.organizationId ?? activeOrganizationId,
+        );
         setActiveProjectId(result.project.id);
         setIsCreatingProject(false);
         setVelen(null);
@@ -398,7 +467,7 @@ export function useBriar() {
         setLoading(false);
       }
     },
-    [token],
+    [activeOrganizationId, organizations, token],
   );
 
   const removeProject = useCallback(
@@ -423,9 +492,17 @@ export function useBriar() {
         const remaining = projects.filter((candidate) => candidate.id !== projectId);
         const deletedActiveProject = activeProjectId === projectId;
         const nextActiveProject = deletedActiveProject
-          ? (remaining[0] ?? null)
+          ? (remaining.find(
+              (candidate) =>
+                candidate.organizationId === activeOrganizationId,
+            ) ??
+            remaining[0] ??
+            null)
           : (remaining.find((candidate) => candidate.id === activeProjectId) ?? null);
         setProjects(remaining);
+        if (nextActiveProject?.organizationId) {
+          setActiveOrganizationId(nextActiveProject.organizationId);
+        }
         setActiveProjectId(nextActiveProject?.id ?? null);
         setProjectConnection(null);
         if (deletedActiveProject) {
@@ -457,65 +534,122 @@ export function useBriar() {
         setDeletingProjectId(null);
       }
     },
-    [activeProjectId, projects, token],
+    [activeOrganizationId, activeProjectId, projects, token],
   );
 
-  const connectProject = useCallback(async (autoHunt: LocalAutoHuntConfig) => {
+  const selectProjectRepository = useCallback(async () => {
+    setError(null);
+    try {
+      return await pickGitRepository();
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : String(caught);
+      setError(message);
+      throw caught;
+    }
+  }, []);
+
+  const connectProject = useCallback(async (
+    autoHunt: LocalAutoHuntConfig,
+    repositoryPath: string,
+  ) => {
     if (!projectConnection) throw new Error("연결할 프로젝트가 없습니다.");
+    if (!repositoryPath) throw new Error("연결할 Git 저장소를 선택하세요.");
     if (!token && !projectConnection.agentToken) throw new Error("로그인이 필요합니다.");
+    const connection = projectConnection;
     setLoading(true);
     setError(null);
     let connectedLocally = false;
     try {
-      const repositoryPath = await pickGitRepository();
-      if (!repositoryPath) return null;
       const agentToken =
-        projectConnection.agentToken ??
-        (await createAgentToken(token!, projectConnection.project.id)).agentToken;
-      if (!projectConnection.agentToken) {
+        connection.agentToken ??
+        (await createAgentToken(token!, connection.project.id)).agentToken;
+      if (!connection.agentToken) {
         setProjectConnection((current) =>
-          current?.project.id === projectConnection.project.id
+          current?.project.id === connection.project.id
             ? { ...current, agentToken }
             : current,
         );
       }
       const connected = await connectLocalProject({
-        projectId: projectConnection.project.id,
+        projectId: connection.project.id,
         agentToken,
         repositoryPath,
         autoHunt,
       });
       connectedLocally = true;
-      const generatedWorkflow = await generateProjectWorkflow(
-        projectConnection.project.id,
-      );
-      await updateLocalProjectWorkflow(
-        projectConnection.project.id,
-        generatedWorkflow,
-      );
+
+      const initialSettings: ProjectSettings = {
+        velenOrg: autoHunt.velenOrg,
+        dataSource: autoHunt.dataSource ?? null,
+        linear: {
+          enabled: autoHunt.linearEnabled,
+          source: autoHunt.linearSource ?? null,
+          teamKey: autoHunt.linearTeam ?? null,
+        },
+        githubRepository: autoHunt.githubRepository ?? null,
+        workflow: autoHunt.workflow,
+      };
+      let savedSettings = initialSettings;
       if (token) {
-        await updateProjectSettings(token, projectConnection.project.id, {
-          velenOrg: autoHunt.velenOrg,
-          dataSource: autoHunt.dataSource ?? null,
-          linear: {
-            enabled: autoHunt.linearEnabled,
-            source: autoHunt.linearSource ?? null,
-            teamKey: autoHunt.linearTeam ?? null,
-          },
-          githubRepository: autoHunt.githubRepository ?? null,
-          workflow: generatedWorkflow,
-        });
+        const saved = await updateProjectSettings(
+          token,
+          connection.project.id,
+          initialSettings,
+        );
+        savedSettings = saved.settings;
       }
+
+      setDashboard((current) =>
+        current?.project.id === connection.project.id
+          ? { ...current, settings: savedSettings }
+          : {
+              ...emptyDashboard(connection.project),
+              settings: savedSettings,
+            },
+      );
       setProjectConnection(null);
       setIsCreatingProject(false);
-      await refresh();
-      await refreshHealth();
+      setError(null);
+      void refreshHealth();
+
+      void (async () => {
+        try {
+          const generatedWorkflow = await generateProjectWorkflow(
+            connection.project.id,
+          );
+          await updateLocalProjectWorkflow(
+            connection.project.id,
+            generatedWorkflow,
+          );
+          let generatedSettings = {
+            ...initialSettings,
+            workflow: generatedWorkflow,
+          };
+          if (token) {
+            const saved = await updateProjectSettings(
+              token,
+              connection.project.id,
+              generatedSettings,
+            );
+            generatedSettings = saved.settings;
+          }
+          setDashboard((current) =>
+            current?.project.id === connection.project.id
+              ? { ...current, settings: generatedSettings }
+              : current,
+          );
+        } catch (caught) {
+          const message = caught instanceof Error ? caught.message : String(caught);
+          setError(`프로젝트는 연결했지만 백그라운드 코드 분석에 실패했습니다: ${message}`);
+        }
+      })();
+
       return connected.repositoryPath;
     } catch (caught) {
       let message = caught instanceof Error ? caught.message : String(caught);
       if (connectedLocally) {
         try {
-          await disconnectLocalProject(projectConnection.project.id);
+          await disconnectLocalProject(connection.project.id);
         } catch (cleanupError) {
           const cleanup = cleanupError instanceof Error
             ? cleanupError.message
@@ -528,7 +662,7 @@ export function useBriar() {
     } finally {
       setLoading(false);
     }
-  }, [projectConnection, refresh, refreshHealth, token]);
+  }, [projectConnection, refreshHealth, token]);
 
   const repairHealth = useCallback(async () => {
     if (!activeProjectId) throw new Error("복구할 프로젝트가 없습니다.");
@@ -794,6 +928,7 @@ export function useBriar() {
   );
 
   return {
+    activeOrganizationId,
     activeProjectId,
     addIssue,
     addProject,
@@ -815,6 +950,7 @@ export function useBriar() {
     login,
     loginCode,
     logout,
+    organizations,
     projects,
     projectConnection,
     reconnectProject,
@@ -825,7 +961,9 @@ export function useBriar() {
     refreshHealth,
     refreshVelen,
     readIssueAttachment,
+    setActiveOrganizationId: selectOrganization,
     setActiveProjectId: selectProject,
+    selectProjectRepository,
     repairHealth,
     retryRun: (runId: string) => recoverRun(runId, "retry"),
     cancelRun: (runId: string) => recoverRun(runId, "cancel"),

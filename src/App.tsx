@@ -72,10 +72,13 @@ export function App() {
   >("issues");
   const [companionStatus, setCompanionStatus] =
     useState<CompanionStatusFilter>("all");
-  const [activeOrganizationId, setActiveOrganizationId] = useState<string | null>(null);
+  const [settingsOrganizationId, setSettingsOrganizationId] = useState<string | null>(null);
   const hasCompactedWindowForOnboarding = useRef(false);
   const activeProject = briar.projects.find(
     (project) => project.id === briar.activeProjectId,
+  );
+  const settingsOrganization = briar.organizations.find(
+    (organization) => organization.id === settingsOrganizationId,
   );
   const shouldShowInitialOnboarding =
     !briar.companionMode &&
@@ -170,9 +173,18 @@ export function App() {
         error={briar.error}
         loading={briar.loading}
         onCancel={briar.cancelProjectCreation}
-        onConnect={briar.connectProject}
+        onConnect={async (settings, repositoryPath) => {
+          const connected = await briar.connectProject(settings, repositoryPath);
+          if (connected) {
+            setRequestedRunId(null);
+            setRequestedSessionId(null);
+            setActivePage("issues");
+          }
+          return connected;
+        }}
         onCreate={briar.addProject}
         onLogout={() => void briar.logout()}
+        onRepositorySelect={briar.selectProjectRepository}
         onVelenOrgChange={briar.refreshVelen}
         user={briar.user}
         velen={briar.velen}
@@ -183,14 +195,21 @@ export function App() {
       <jelly-theme mode="light" className="app-shell">
         <Sidebar
           activePage={activePage}
+          activeOrganizationId={briar.activeOrganizationId}
           activeProjectId={briar.activeProjectId}
           isOpen={isSidebarOpen}
           onAddProject={briar.startProjectCreation}
           onAutoHuntOpen={() => setActivePage("auto-hunt")}
           onInboxOpen={() => setActivePage("inbox")}
           onIssuesOpen={() => setActivePage("issues")}
+          onOrganizationChange={(organizationId) => {
+            briar.setActiveOrganizationId(organizationId);
+            setRequestedRunId(null);
+            setRequestedSessionId(null);
+            setActivePage("issues");
+          }}
           onOrganizationSettings={(organizationId) => {
-            setActiveOrganizationId(organizationId);
+            setSettingsOrganizationId(organizationId);
             setActivePage("organization-settings");
           }}
           onProjectChange={(projectId) => {
@@ -205,20 +224,17 @@ export function App() {
           }}
           onLogout={() => void briar.logout()}
           onToggle={() => setIsSidebarOpen(false)}
+          organizations={briar.organizations}
           projects={briar.projects}
           unreadInboxCount={inbox.unreadCount}
           user={briar.user}
         />
         {activePage === "organization-settings" &&
-        activeOrganizationId &&
+        settingsOrganization &&
         briar.token ? (
           <OrganizationSettings
             onBack={() => setActivePage("issues")}
-            organization={
-              briar.projects.find(
-                (project) => project.organizationId === activeOrganizationId,
-              ) ?? activeProject!
-            }
+            organization={settingsOrganization}
             token={briar.token}
           />
         ) : activePage === "inbox" ? (

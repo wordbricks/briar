@@ -5,14 +5,14 @@ import {
   loadOrganizationMembers,
   removeOrganizationMember,
 } from "../lib/api";
-import type { OrganizationMember, Project } from "../types";
+import type { Organization, OrganizationMember } from "../types";
 
 export function OrganizationSettings({
   organization,
   token,
   onBack,
 }: {
-  organization: Project;
+  organization: Organization;
   token: string;
   onBack: () => void;
 }) {
@@ -21,7 +21,7 @@ export function OrganizationSettings({
   const [role, setRole] = useState<"admin" | "member">("member");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const organizationId = organization.organizationId!;
+  const organizationId = organization.id;
   const canManage =
     organization.role === "owner" || organization.role === "admin";
 
@@ -41,7 +41,7 @@ export function OrganizationSettings({
         </button>
         <Building2 size={20} />
         <div>
-          <h1>{organization.organizationName}</h1>
+          <h1>{organization.name}</h1>
           <p>조직 멤버는 이 조직의 모든 프로젝트를 열람할 수 있습니다.</p>
         </div>
       </header>
