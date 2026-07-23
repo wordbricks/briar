@@ -1542,9 +1542,9 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build());
     builder
-        .setup(|app| {
-            #[cfg(target_os = "macos")]
-            if let Some(main) = app.get_webview_window("main") {
+        .setup(|_app| {
+            #[cfg(all(target_os = "macos", not(dev)))]
+            if let Some(main) = _app.get_webview_window("main") {
                 main.hide()?;
             }
             Ok(())

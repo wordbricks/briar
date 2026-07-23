@@ -15,13 +15,15 @@ import {
   markLaunchIntroSeen,
   shouldShowLaunchIntro,
 } from "./lib/launch-intro";
-import { isMacDesktopTauri } from "./lib/platform";
+import { isDesktopTauri, isMacDesktopTauri } from "./lib/platform";
 
 export function App() {
   const briar = useBriar();
   const autoHunt = useAutoHuntSessions();
   const previewsLaunchIntro = isLaunchIntroPreview();
-  const usesNativeLaunchIntro = isMacDesktopTauri() && !previewsLaunchIntro;
+  const runsOnDesktopTauri = isDesktopTauri();
+  const usesNativeLaunchIntro =
+    isMacDesktopTauri() && !previewsLaunchIntro;
   const [isLaunchIntroVisible, setIsLaunchIntroVisible] = useState(
     () => previewsLaunchIntro || (!usesNativeLaunchIntro && shouldShowLaunchIntro()),
   );
@@ -34,12 +36,13 @@ export function App() {
   );
 
   useEffect(() => {
-    if (!usesNativeLaunchIntro) return;
+    if (!runsOnDesktopTauri) return;
     let cancelled = false;
 
     void import("@tauri-apps/api/core").then(async ({ invoke }) => {
       if (cancelled) return;
-      const shouldPrepareLaunchIntro = shouldShowLaunchIntro();
+      const shouldPrepareLaunchIntro =
+        usesNativeLaunchIntro && shouldShowLaunchIntro();
       const command = shouldPrepareLaunchIntro
         ? "prepare_launch_intro"
         : "show_main_window";
@@ -55,7 +58,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [usesNativeLaunchIntro]);
+  }, [runsOnDesktopTauri, usesNativeLaunchIntro]);
 
   const completeLaunchIntro = useCallback(() => {
     clearLaunchIntroPreview();
