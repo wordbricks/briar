@@ -1,4 +1,5 @@
 export const ko = {
+  "app.developmentBadge": "개발 앱",
   "common.cancel": "취소",
   "common.close": "닫기",
   "common.save": "저장",
@@ -270,6 +271,7 @@ export type Messages = Record<MessageKey, string>;
 
 export const en: Messages = {
   ...ko,
+  "app.developmentBadge": "Development app",
   "common.cancel": "Cancel", "common.close": "Close", "common.save": "Save", "common.saved": "Saved", "common.saving": "Saving", "common.required": "Required", "common.optional": "Optional", "common.open": "Open", "common.checkNeeded": "Needs attention", "common.healthy": "Healthy", "common.notInstalled": "Not installed", "common.notConnected": "Not connected",
   "sidebar.close": "Close sidebar", "sidebar.open": "Open sidebar", "sidebar.mainMenu": "Main menu", "sidebar.help": "Help", "sidebar.projects": "Projects", "sidebar.addProject": "Add project", "sidebar.currentProject": "Current project", "sidebar.projectMenu": "{name} project menu", "sidebar.menu": "{name} menu", "sidebar.projectSettings": "Project settings", "sidebar.issues": "Issues", "sidebar.autoHunt": "Auto Hunt",
   "account.menu": "Account menu", "account.settings": "Settings", "account.language": "Language", "account.languageMenu": "Choose language", "account.logout": "Log out",
@@ -291,6 +293,7 @@ export const en: Messages = {
 
 export const zh: Messages = {
   ...en,
+  "app.developmentBadge": "开发应用",
   "common.cancel": "取消", "common.close": "关闭", "common.save": "保存", "common.saved": "已保存", "common.saving": "保存中", "common.required": "必填", "common.optional": "可选", "common.open": "打开", "common.checkNeeded": "需要检查", "common.healthy": "正常", "common.notInstalled": "未安装", "common.notConnected": "未连接",
   "sidebar.close": "关闭侧边栏", "sidebar.open": "打开侧边栏", "sidebar.mainMenu": "主菜单", "sidebar.help": "帮助", "sidebar.projects": "项目", "sidebar.addProject": "添加项目", "sidebar.currentProject": "当前项目", "sidebar.projectMenu": "{name} 项目菜单", "sidebar.menu": "{name} 菜单", "sidebar.projectSettings": "项目设置", "sidebar.issues": "问题", "sidebar.autoHunt": "自动狩猎",
   "account.menu": "账户菜单", "account.settings": "设置", "account.language": "语言", "account.languageMenu": "选择语言", "account.logout": "退出登录",
