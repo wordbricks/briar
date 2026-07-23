@@ -1,6 +1,7 @@
 import {
   Activity,
   Bot,
+  Building2,
   ChevronDown,
   ChevronRight,
   ChevronUp,
@@ -26,6 +27,7 @@ export function Sidebar({
   onAddProject,
   onAutoHuntOpen,
   onIssuesOpen,
+  onOrganizationSettings,
   onProjectChange,
   onProjectSettings,
   onLogout,
@@ -33,12 +35,13 @@ export function Sidebar({
   projects,
   user,
 }: {
-  activePage: "issues" | "auto-hunt" | "project-settings";
+  activePage: "issues" | "auto-hunt" | "project-settings" | "organization-settings";
   activeProjectId: string | null;
   isOpen: boolean;
   onAddProject: () => void;
   onAutoHuntOpen: () => void;
   onIssuesOpen: () => void;
+  onOrganizationSettings: (organizationId: string) => void;
   onProjectChange: (projectId: string) => void;
   onProjectSettings: (projectId: string) => void;
   onLogout: () => void;
@@ -163,12 +166,31 @@ export function Sidebar({
         </div>
 
         <div className="sidebar-project-list">
-          {projects.map((project) => {
+          {projects.map((project, index) => {
             const isActive = project.id === activeProjectId;
             const isMenuOpen = project.id === openProjectMenuId;
+            const organizationName = project.organizationName ?? "내 조직";
+            const startsOrganization =
+              index === 0 ||
+              (projects[index - 1]?.organizationId ?? "personal") !==
+                (project.organizationId ?? "personal");
 
             return (
               <section className="sidebar-project-group" key={project.id}>
+                {startsOrganization && (
+                  <button
+                    className="sidebar-organization-heading"
+                    onClick={() =>
+                      onOrganizationSettings(
+                        project.organizationId ?? project.id,
+                      )
+                    }
+                    type="button"
+                  >
+                    <Building2 size={14} strokeWidth={1.7} />
+                    <span>{organizationName}</span>
+                  </button>
+                )}
                 <div className="sidebar-project-row">
                   <button
                     aria-expanded={isActive}

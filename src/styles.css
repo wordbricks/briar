@@ -54,6 +54,21 @@ jelly-theme { color: var(--ink); }
 .sidebar-section-heading button:active { transform: scale(.95); }
 .sidebar-section-heading button:focus-visible, .sidebar-project-heading:focus-visible, .sidebar-project-menu-trigger:focus-visible, .sidebar-project-view:focus-visible { outline: 2px solid #8b70dd; outline-offset: -1px; }
 .sidebar-project-list { min-height: 0; padding: 0 10px 16px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(82,83,77,.2) transparent; }
+.sidebar-organization-heading { align-items: center; background: none; border: 0; color: var(--text-tertiary); cursor: pointer; display: flex; font-size: 11px; font-weight: 650; gap: 7px; letter-spacing: .02em; margin: 14px 10px 5px; min-width: 0; padding: 0; text-transform: uppercase; }
+.sidebar-organization-heading span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.organization-settings { box-sizing: border-box; margin: 0 auto; max-width: 760px; overflow-y: auto; padding: 64px 40px; width: 100%; }
+.organization-settings > header { align-items: flex-start; display: flex; gap: 12px; margin-bottom: 32px; }
+.organization-settings > header button, .organization-member button { background: none; border: 0; cursor: pointer; padding: 3px; }
+.organization-settings h1 { font-size: 24px; margin: 0 0 5px; }
+.organization-settings p { color: var(--text-secondary); margin: 0; }
+.organization-settings form { align-items: center; background: rgba(0,0,0,.025); border: 1px solid var(--border-subtle); border-radius: 10px; display: grid; gap: 10px; grid-template-columns: auto 1fr auto auto; margin-bottom: 28px; padding: 14px; }
+.organization-settings input, .organization-settings select { border: 1px solid var(--border-subtle); border-radius: 7px; font: inherit; padding: 9px 10px; }
+.organization-settings form > button { border: 0; border-radius: 7px; cursor: pointer; padding: 10px 16px; }
+.organization-settings-error { color: #a33 !important; margin-bottom: 18px !important; }
+.organization-settings section h2 { font-size: 14px; margin-bottom: 10px; }
+.organization-member { align-items: center; border-top: 1px solid var(--border-subtle); display: grid; gap: 12px; grid-template-columns: 1fr auto auto; min-height: 60px; }
+.organization-member div { display: flex; flex-direction: column; }
+.organization-member span, .organization-member small { color: var(--text-secondary); font-size: 12px; }
 .sidebar-project-group { margin-bottom: 7px; }
 .sidebar-project-row { position:relative; display:grid; grid-template-columns:minmax(0,1fr) 28px; align-items:center; gap:1px; }
 .sidebar-project-heading { width: 100%; height: 34px; padding: 0 9px; display: grid; grid-template-columns: 18px minmax(0,1fr) 8px; align-items: center; gap: 8px; border: 0; border-radius: 8px; color: #50514c; background: transparent; text-align: left; cursor: pointer; }

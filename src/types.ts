@@ -90,6 +90,25 @@ export type HuntRun = {
 export type Project = {
   id: string;
   name: string;
+  organizationId?: string;
+  organizationName?: string;
+  role?: "owner" | "admin" | "member";
+  createdAt: string;
+};
+
+export type Organization = {
+  id: string;
+  name: string;
+  role: "owner" | "admin" | "member";
+  createdAt: string;
+};
+
+export type OrganizationMember = {
+  userId: string;
+  name: string;
+  email: string;
+  image: string | null;
+  role: "owner" | "admin" | "member";
   createdAt: string;
 };
 
