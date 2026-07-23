@@ -18,7 +18,6 @@ const sidebarProps = {
   onIssuesOpen: () => undefined,
   onLogout: () => undefined,
   onOrganizationChange: () => undefined,
-  onOrganizationSettings: () => undefined,
   onProjectChange: () => undefined,
   onProjectSettings: () => undefined,
   onToggle: () => undefined,
@@ -59,6 +58,7 @@ describe("Sidebar", () => {
     expect(markup).toContain('aria-current="page"');
     expect(markup).toContain('aria-label="왼쪽 패널 닫기"');
     expect(markup).toContain('aria-label="조직 전환"');
+    expect(markup).not.toContain("sidebar-organization-heading");
     expect(markup).toContain('aria-haspopup="menu"');
     expect(markup).toContain('aria-label="계정 메뉴"');
     expect(markup).toContain("이슈");

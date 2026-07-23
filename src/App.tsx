@@ -10,7 +10,6 @@ import { Inbox } from "./components/Inbox";
 import { InitialOnboarding } from "./components/InitialOnboarding";
 import { LaunchIntro } from "./components/LaunchIntro";
 import { LoginScreen } from "./components/LoginScreen";
-import { OrganizationSettings } from "./components/OrganizationSettings";
 import { ProjectOnboarding } from "./components/ProjectOnboarding";
 import { ProjectSettings } from "./components/ProjectSettings";
 import { Sidebar } from "./components/Sidebar";
@@ -61,7 +60,6 @@ export function App() {
     | "auto-hunt"
     | "inbox"
     | "project-settings"
-    | "organization-settings"
   >("issues");
   const [requestedRunId, setRequestedRunId] = useState<string | null>(null);
   const [requestedSessionId, setRequestedSessionId] = useState<string | null>(
@@ -72,13 +70,9 @@ export function App() {
   >("issues");
   const [companionStatus, setCompanionStatus] =
     useState<CompanionStatusFilter>("all");
-  const [settingsOrganizationId, setSettingsOrganizationId] = useState<string | null>(null);
   const hasCompactedWindowForOnboarding = useRef(false);
   const activeProject = briar.projects.find(
     (project) => project.id === briar.activeProjectId,
-  );
-  const settingsOrganization = briar.organizations.find(
-    (organization) => organization.id === settingsOrganizationId,
   );
   const shouldShowInitialOnboarding =
     !briar.companionMode &&
@@ -208,10 +202,6 @@ export function App() {
             setRequestedSessionId(null);
             setActivePage("issues");
           }}
-          onOrganizationSettings={(organizationId) => {
-            setSettingsOrganizationId(organizationId);
-            setActivePage("organization-settings");
-          }}
           onProjectChange={(projectId) => {
             briar.setActiveProjectId(projectId);
             setRequestedRunId(null);
@@ -229,15 +219,7 @@ export function App() {
           unreadInboxCount={inbox.unreadCount}
           user={briar.user}
         />
-        {activePage === "organization-settings" &&
-        settingsOrganization &&
-        briar.token ? (
-          <OrganizationSettings
-            onBack={() => setActivePage("issues")}
-            organization={settingsOrganization}
-            token={briar.token}
-          />
-        ) : activePage === "inbox" ? (
+        {activePage === "inbox" ? (
           <Inbox
             isSidebarOpen={isSidebarOpen}
             messages={inbox.messages}
