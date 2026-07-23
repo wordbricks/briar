@@ -150,13 +150,6 @@ export function AutoHuntSessions({
             </header>
 
             <div className="auto-hunt-session-detail-body">
-              {selectedSession.status === "running" && (
-                <div className="auto-hunt-running-callout">
-                  <LoaderCircle className="spin" size={18} />
-                  <span><strong>{t("autoHunt.running")}</strong><small>{t("autoHunt.inProgressDescription")}</small></span>
-                </div>
-              )}
-
               <section className="auto-hunt-dialog-section">
                 <h3>{t("autoHunt.targets")}</h3>
                 <div className="auto-hunt-target-list">
