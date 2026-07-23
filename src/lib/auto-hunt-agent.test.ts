@@ -1,10 +1,21 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   agentMessagesFromAppServerEvents,
   mergeAutoHuntAppServerEvents,
   naturalLanguageFromAgentMessage,
+  startProjectAutoHunt,
   type AutoHuntAppServerEvent,
 } from "./auto-hunt-agent";
+
+const { invoke } = vi.hoisted(() => ({ invoke: vi.fn() }));
+
+vi.mock("./api", () => ({ briarApiUrl: "http://127.0.0.1:8788" }));
+vi.mock("@tauri-apps/api/core", () => ({ invoke }));
+
+afterEach(() => {
+  invoke.mockReset();
+  vi.unstubAllGlobals();
+});
 
 const event = (
   sequence: number,
@@ -134,5 +145,41 @@ describe("naturalLanguageFromAgentMessage", () => {
       .toBe("파일을 분석하고 있습니다.");
     expect(naturalLanguageFromAgentMessage('{"issues":[],"summary":"작성 중'))
       .toBe('{"issues":[],"summary":"작성 중');
+  });
+});
+
+describe("startProjectAutoHunt", () => {
+  it("pins the native session to the active API and project", async () => {
+    vi.stubGlobal("window", { __TAURI_INTERNALS__: {} });
+    invoke.mockResolvedValue({
+      conversationId: "briar:project-local:thread-1",
+      workspaceRoot: "/repo",
+      result: { summary: "완료", issues: [] },
+    });
+
+    await startProjectAutoHunt(
+      "535a1867-ba4c-430f-9c11-ddd46513ec7f",
+      [{
+        id: "run-1",
+        runNumber: 13,
+        sourceKey: "issue-13",
+        title: "settings 페이지 구현",
+      }],
+      "session-1",
+    );
+
+    expect(invoke).toHaveBeenCalledWith("start_project_auto_hunt", {
+      projectId: "535a1867-ba4c-430f-9c11-ddd46513ec7f",
+      request: {
+        sessionId: "session-1",
+        apiUrl: "http://127.0.0.1:8788",
+        issues: [{
+          runId: "run-1",
+          runNumber: 13,
+          sourceKey: "issue-13",
+          title: "settings 페이지 구현",
+        }],
+      },
+    });
   });
 });

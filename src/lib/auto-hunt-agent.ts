@@ -1,4 +1,5 @@
 import type { HuntRun } from "../types";
+import { briarApiUrl } from "./api";
 
 export const maxAutoHuntSessionIssues = 3;
 export const autoHuntAppServerEventName = "auto-hunt-app-server-event";
@@ -52,6 +53,9 @@ export async function startProjectAutoHunt(
   if (!isTauri()) {
     throw new Error("자동사냥은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
   }
+  if (!briarApiUrl) {
+    throw new Error("자동사냥을 실행하려면 Briar API URL이 필요합니다.");
+  }
   if (issues.length === 0) {
     throw new Error("대기 상태인 이슈가 없습니다.");
   }
@@ -65,6 +69,7 @@ export async function startProjectAutoHunt(
     projectId,
     request: {
       sessionId,
+      apiUrl: briarApiUrl,
       issues: issues.map((issue) => ({
         runId: issue.id,
         runNumber: issue.runNumber,

@@ -99,7 +99,11 @@ const required = (name: string) => {
 
 async function loadConfig(): Promise<Config> {
   try {
-    return configSchema.parse(JSON.parse(await readFile(configPath, "utf8")));
+    const config = configSchema.parse(JSON.parse(await readFile(configPath, "utf8")));
+    return {
+      ...config,
+      apiUrl: process.env.BRIAR_API_URL ?? config.apiUrl,
+    };
   } catch {
     return { apiUrl: defaultApiUrl, projects: [] };
   }
@@ -242,7 +246,7 @@ async function currentProject(config: Config): Promise<ProjectConfig> {
   const repositoryPath = await currentRepositoryPath();
   const remote = gitValue(["remote", "get-url", "origin"]);
   const commonDirectory = gitCommonDirectory(repositoryPath);
-  const project = config.projects.find((candidate) => {
+  const matchesRepository = (candidate: ProjectConfig) => {
     if (resolve(candidate.repositoryPath) === repositoryPath) return true;
     if (remote && candidate.repositoryRemote === remote) return true;
     const candidateCommonDirectory = gitCommonDirectory(candidate.repositoryPath);
@@ -251,8 +255,20 @@ async function currentProject(config: Config): Promise<ProjectConfig> {
         candidateCommonDirectory &&
         commonDirectory === candidateCommonDirectory,
     );
-  });
+  };
+  const requestedProjectId = process.env.BRIAR_PROJECT_ID?.trim();
+  const project = requestedProjectId
+    ? config.projects.find(
+        (candidate) =>
+          candidate.id === requestedProjectId && matchesRepository(candidate),
+      )
+    : config.projects.find(matchesRepository);
   if (!project) {
+    if (requestedProjectId) {
+      throw new Error(
+        "자동사냥이 요청한 Briar 프로젝트가 이 저장소에 연결되어 있지 않습니다.",
+      );
+    }
     throw new Error(
       "연결된 Briar 프로젝트가 없습니다. Briar 앱에서 이 저장소를 연결하세요.",
     );

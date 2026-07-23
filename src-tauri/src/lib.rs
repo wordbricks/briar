@@ -1308,6 +1308,13 @@ async fn start_project_auto_hunt(
     project_id: String,
     request: codex_app_server::ProjectAutoHuntRequest,
 ) -> Result<codex_app_server::ProjectAutoHuntResponse, String> {
+    let api_url = request.api_url.trim();
+    if api_url.is_empty()
+        || api_url.chars().any(char::is_whitespace)
+        || !(api_url.starts_with("http://") || api_url.starts_with("https://"))
+    {
+        return Err("자동사냥 API URL이 올바르지 않습니다.".to_string());
+    }
     let config_path = cli_config_path(&app)?;
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
     let event_sink = create_auto_hunt_event_sink(&app, &request.session_id)?;
@@ -1317,8 +1324,13 @@ async fn start_project_auto_hunt(
         let settings = project_llm_settings_from(&config_path, &project_id)?;
         let binary = codex_app_server::codex_binary(&home)?;
         let execution_path = cli_execution_path(&home)?;
-        let cli_environment =
-            codex_app_server::AutoHuntCliEnvironment::prepare(&home, &execution_path, &workspace)?;
+        let cli_environment = codex_app_server::AutoHuntCliEnvironment::prepare(
+            &home,
+            &execution_path,
+            &workspace,
+            &project_id,
+            &request.api_url,
+        )?;
         let approve = |method: &str, params: &serde_json::Value| {
             approval_app
                 .dialog()
