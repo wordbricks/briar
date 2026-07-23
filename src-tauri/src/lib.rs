@@ -1116,6 +1116,7 @@ async fn project_llm_chat(
             codex_app_server::ChatExecution {
                 approval_policy: settings.approval_policy,
                 sandbox_mode: codex_app_server::SandboxMode::ReadOnly,
+                network_access: false,
                 event_sink: None,
             },
             request,

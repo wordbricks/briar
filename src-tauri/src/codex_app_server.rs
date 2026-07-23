@@ -25,6 +25,7 @@ pub(crate) enum SandboxMode {
 pub(crate) struct ChatExecution {
     pub(crate) approval_policy: ApprovalPolicy,
     pub(crate) sandbox_mode: SandboxMode,
+    pub(crate) network_access: bool,
     pub(crate) event_sink: Option<AppServerEventSink>,
 }
 
@@ -227,6 +228,7 @@ pub(crate) fn chat(
         binary,
         execution_path,
         &workspace_root,
+        execution.network_access,
         execution.event_sink,
     )?;
     connection.send(&initialize_request())?;
@@ -298,6 +300,7 @@ pub(crate) fn start_auto_hunt(
         ChatExecution {
             approval_policy: execution.approval_policy,
             sandbox_mode: SandboxMode::WorkspaceWrite,
+            network_access: true,
             event_sink: Some(execution.event_sink),
         },
         ProjectLlmRequest {
@@ -453,10 +456,12 @@ impl CodexConnection {
         binary: &Path,
         execution_path: &std::ffi::OsStr,
         workspace: &Path,
+        network_access: bool,
         event_sink: Option<AppServerEventSink>,
     ) -> Result<Self, String> {
-        let mut child = Command::new(binary)
-            .args(["app-server", "--listen", "stdio://"])
+        let mut command = Command::new(binary);
+        command.args(app_server_args(network_access));
+        let mut child = command
             .current_dir(workspace)
             .env("PATH", execution_path)
             .stdin(Stdio::piped())
@@ -662,6 +667,14 @@ impl CodexConnection {
     }
 }
 
+fn app_server_args(network_access: bool) -> Vec<&'static str> {
+    let mut arguments = vec!["app-server", "--listen", "stdio://"];
+    if network_access {
+        arguments.extend(["--config", "sandbox_workspace_write.network_access=true"]);
+    }
+    arguments
+}
+
 impl Drop for CodexConnection {
     fn drop(&mut self) {
         self.stdin.take();
@@ -834,6 +847,20 @@ mod tests {
         assert!(instructions.contains("briar-auto-hunt"));
         assert!(instructions.contains("briar auto-hunt next"));
         assert!(instructions.contains("at most 3 issues"));
+        assert_eq!(
+            app_server_args(true),
+            vec![
+                "app-server",
+                "--listen",
+                "stdio://",
+                "--config",
+                "sandbox_workspace_write.network_access=true"
+            ]
+        );
+        assert_eq!(
+            app_server_args(false),
+            vec!["app-server", "--listen", "stdio://"]
+        );
     }
 
     #[test]
@@ -928,6 +955,7 @@ printf '%s\n' '{"method":"turn/completed","params":{"threadId":"thread-1","turn"
             ChatExecution {
                 approval_policy: ApprovalPolicy::OnRequest,
                 sandbox_mode: SandboxMode::ReadOnly,
+                network_access: false,
                 event_sink: Some(Arc::new(move |direction, message| {
                     sink_events
                         .lock()
