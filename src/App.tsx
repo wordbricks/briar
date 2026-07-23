@@ -20,11 +20,16 @@ import {
   hasCompletedInitialOnboarding,
   markInitialOnboardingComplete,
 } from "./lib/initial-onboarding";
-import { isDesktopTauri, isMacDesktopTauri } from "./lib/platform";
+import {
+  getMobilePlatform,
+  isDesktopTauri,
+  isMacDesktopTauri,
+} from "./lib/platform";
 
 export function App() {
   const briar = useBriar();
   const autoHunt = useAutoHuntSessions();
+  const mobilePlatform = getMobilePlatform() ?? "android";
   const previewsLaunchIntro = isLaunchIntroPreview();
   const runsOnDesktopTauri = isDesktopTauri();
   // Preview changes the timing, not the macOS presentation surface.
@@ -207,7 +212,10 @@ export function App() {
       return <CompanionEmptyState onLogout={() => void briar.logout()} />;
     }
     return (
-      <jelly-theme mode="light" className="app-shell companion-shell">
+      <jelly-theme
+        mode="light"
+        className={`app-shell companion-shell platform-${mobilePlatform}`}
+      >
         <CompanionHeader
           activeProjectId={briar.activeProjectId}
           loading={briar.loading}

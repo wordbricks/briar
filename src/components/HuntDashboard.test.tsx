@@ -76,6 +76,23 @@ describe("HuntDashboard", () => {
     expect(markup).not.toContain('class="metric-grid"');
   });
 
+  it("marks the companion queue as a compact list", () => {
+    const markup = renderToStaticMarkup(
+      <HuntDashboard
+        {...dashboardProps}
+        companionMode
+        dashboard={demoDashboard}
+      />,
+    );
+
+    expect(markup).toContain('class="queue-panel compact-list"');
+    expect(markup).toContain('aria-label="이슈 만들기"');
+    expect(markup).toContain('class="companion-bottom-nav"');
+    expect(markup).toContain('class="companion-fab"');
+    expect(markup).toContain('class="companion-search-trigger"');
+    expect(markup).not.toContain('class="status-tabs"');
+  });
+
   it("uses Jelly Select for issue priority and accepts image or video files", () => {
     const markup = renderToStaticMarkup(
       <CreateIssueDialog
