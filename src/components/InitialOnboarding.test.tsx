@@ -3,6 +3,10 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  inspectOnboardingPrerequisites,
+  loginOnboardingVelen,
+} from "../lib/initial-onboarding";
 import { InitialOnboarding } from "./InitialOnboarding";
 
 vi.mock("../lib/initial-onboarding", async (importOriginal) => {
@@ -11,10 +15,30 @@ vi.mock("../lib/initial-onboarding", async (importOriginal) => {
   return {
     ...original,
     inspectOnboardingPrerequisites: vi.fn().mockResolvedValue({
-      codex: { installed: true, version: "codex-cli 1.0.0" },
-      velen: { installed: true, version: "velen 1.0.0" },
+      codex: {
+        installed: true,
+        version: "codex-cli 1.0.0",
+        authenticated: true,
+      },
+      velen: {
+        installed: true,
+        version: "velen 1.0.0",
+        authenticated: true,
+      },
     }),
     installOnboardingPrerequisite: vi.fn(),
+    loginOnboardingVelen: vi.fn().mockResolvedValue({
+      codex: {
+        installed: true,
+        version: "codex-cli 1.0.0",
+        authenticated: true,
+      },
+      velen: {
+        installed: true,
+        version: "velen 1.0.0",
+        authenticated: true,
+      },
+    }),
     markInitialOnboardingComplete: vi.fn(),
   };
 });
@@ -74,5 +98,32 @@ describe("InitialOnboarding", () => {
 
     await act(async () => continueButton?.click());
     expect(onComplete).toHaveBeenCalledOnce();
+  });
+
+  it("starts Velen OAuth when the CLI is installed but unauthenticated", async () => {
+    vi.mocked(inspectOnboardingPrerequisites).mockResolvedValueOnce({
+      codex: {
+        installed: true,
+        version: "codex-cli 1.0.0",
+        authenticated: true,
+      },
+      velen: {
+        installed: true,
+        version: "velen 1.0.0",
+        authenticated: false,
+      },
+    });
+
+    await act(async () => root.render(
+      <InitialOnboarding onComplete={() => undefined} />,
+    ));
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".initial-welcome-copy button",
+      )?.click();
+    });
+
+    expect(loginOnboardingVelen).toHaveBeenCalledOnce();
+    expect(container.textContent).toContain("OAuth 로그인됨");
   });
 });
