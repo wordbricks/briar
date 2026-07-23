@@ -163,6 +163,22 @@ export function agentMessagesFromAppServerEvents(
     .filter((message): message is AutoHuntAgentMessage => Boolean(message));
 }
 
+export function naturalLanguageFromAgentMessage(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed) return text;
+
+  const jsonText = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i)?.[1]
+    ?? trimmed;
+
+  try {
+    const payload = JSON.parse(jsonText) as unknown;
+    const summary = record(payload) && string(record(payload)?.summary);
+    return summary?.trim() || text;
+  } catch {
+    return text;
+  }
+}
+
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>

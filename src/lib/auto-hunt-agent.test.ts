@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   agentMessagesFromAppServerEvents,
   mergeAutoHuntAppServerEvents,
+  naturalLanguageFromAgentMessage,
   type AutoHuntAppServerEvent,
 } from "./auto-hunt-agent";
 
@@ -114,5 +115,24 @@ describe("agentMessagesFromAppServerEvents", () => {
       updatedAtMs: 5,
       isComplete: true,
     }]);
+  });
+});
+
+describe("naturalLanguageFromAgentMessage", () => {
+  it("extracts the natural-language summary from a structured response", () => {
+    expect(naturalLanguageFromAgentMessage(JSON.stringify({
+      issues: [],
+      summary: "원인을 확인하고 레이아웃을 수정했습니다.",
+    }))).toBe("원인을 확인하고 레이아웃을 수정했습니다.");
+  });
+
+  it("supports fenced JSON and keeps ordinary or incomplete messages unchanged", () => {
+    expect(naturalLanguageFromAgentMessage(
+      '```json\n{"issues":[],"summary":"검증을 완료했습니다."}\n```',
+    )).toBe("검증을 완료했습니다.");
+    expect(naturalLanguageFromAgentMessage("파일을 분석하고 있습니다."))
+      .toBe("파일을 분석하고 있습니다.");
+    expect(naturalLanguageFromAgentMessage('{"issues":[],"summary":"작성 중'))
+      .toBe('{"issues":[],"summary":"작성 중');
   });
 });
