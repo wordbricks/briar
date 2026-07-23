@@ -39,6 +39,26 @@ export type AutoHuntHealth = {
   issues: string[];
 };
 
+export type RepositoryReadiness = {
+  repositoryPath: string;
+  gitInstalled: boolean;
+  gitVersion: string | null;
+  repositoryHealthy: boolean;
+  remote: string | null;
+  remoteReachable: boolean;
+  pushAccess: boolean;
+  requiresGithub: boolean;
+  githubRepository: string | null;
+  ghInstalled: boolean;
+  ghVersion: string | null;
+  ghAuthenticated: boolean;
+  ghAccount: string | null;
+  githubWriteAccess: boolean;
+  gitReady: boolean;
+  prReady: boolean;
+  issues: string[];
+};
+
 export type LocalAutoHuntConfig = {
   velenOrg: string;
   dataSource?: string | null;
@@ -77,6 +97,48 @@ export async function pickGitRepository(): Promise<string | null> {
   });
   if (!selected) return null;
   return invoke<string>("validate_repository_path", { path: selected });
+}
+
+export async function inspectRepositoryReadiness(
+  repositoryPath: string,
+  workflow: AutoHuntWorkflow,
+) {
+  if (!isTauri()) {
+    throw new Error("Git 저장소 검사는 Briar 데스크톱 앱에서 사용할 수 있습니다.");
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<RepositoryReadiness>("inspect_repository_readiness", {
+    repositoryPath,
+    workflow,
+  });
+}
+
+export async function loadProjectRepositoryReadiness(projectId: string) {
+  if (!isTauri()) return null;
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<RepositoryReadiness>("project_repository_readiness", {
+    projectId,
+  });
+}
+
+export async function installProjectGithubCli(projectId: string) {
+  if (!isTauri()) {
+    throw new Error("GitHub CLI 설치는 Briar 데스크톱 앱에서 사용할 수 있습니다.");
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<RepositoryReadiness>("install_project_github_cli", {
+    projectId,
+  });
+}
+
+export async function loginProjectGithub(projectId: string) {
+  if (!isTauri()) {
+    throw new Error("GitHub 로그인은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<RepositoryReadiness>("login_project_github", {
+    projectId,
+  });
 }
 
 export async function connectLocalProject(input: {

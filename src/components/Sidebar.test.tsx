@@ -20,6 +20,7 @@ const sidebarProps = {
   onOrganizationChange: () => undefined,
   onOrganizationSettings: () => undefined,
   onProjectChange: () => undefined,
+  onProjectReadinessOpen: () => undefined,
   onProjectSettings: () => undefined,
   onToggle: () => undefined,
   organizations: [
@@ -40,6 +41,7 @@ const sidebarProps = {
       createdAt: "2026-07-22T00:00:00Z",
     },
   ],
+  projectReadiness: {},
   unreadInboxCount: 0,
   user: { id: "user-1", name: "Jay", email: "jay@example.com" },
 };
@@ -237,6 +239,52 @@ describe("Sidebar", () => {
     });
     expect(onProjectSettings).toHaveBeenCalledWith("project-1");
     expect(container.querySelector('[role="menu"]')).toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("opens PR readiness from the warning beside a project", async () => {
+    const onProjectReadinessOpen = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <Sidebar
+          {...sidebarProps}
+          onProjectReadinessOpen={onProjectReadinessOpen}
+          projectReadiness={{
+            "project-1": {
+              repositoryPath: "/Users/jay/git/briar",
+              gitInstalled: true,
+              gitVersion: "git version 2.50.1",
+              repositoryHealthy: true,
+              remote: "git@github.com:wordbricks/briar.git",
+              remoteReachable: true,
+              pushAccess: true,
+              requiresGithub: true,
+              githubRepository: "wordbricks/briar",
+              ghInstalled: false,
+              ghVersion: null,
+              ghAuthenticated: false,
+              ghAccount: null,
+              githubWriteAccess: false,
+              gitReady: true,
+              prReady: false,
+              issues: ["GitHub CLI가 설치되지 않았습니다."],
+            },
+          }}
+        />,
+      );
+    });
+
+    const warning = container.querySelector<HTMLButtonElement>(
+      '[data-project-readiness="project-1"]',
+    );
+    expect(warning?.textContent).toBe("!");
+    await act(async () => warning?.click());
+    expect(onProjectReadinessOpen).toHaveBeenCalledWith("project-1");
 
     await act(async () => root.unmount());
     container.remove();

@@ -6,6 +6,11 @@ Read the run workflow first. This reference applies only to review, CI, deployme
 
 Read applicable `AGENTS.md`, manifests, CI workflows, deployment configuration, and existing scripts. Map each configured stage to a real repository action. Prefer existing commands and documented paths. Never create a staging or production environment merely to satisfy Auto Hunt.
 
+For a GitHub repository with `pr_open`, check `gh --version`,
+`gh auth status --hostname github.com`, the `origin` remote, and authenticated
+branch-push access before starting PR delivery. If any prerequisite is missing,
+record the exact install, login, remote, or permission action as a blocker.
+
 ## Stage evidence
 
 - `reviewing`: review findings and their resolution.

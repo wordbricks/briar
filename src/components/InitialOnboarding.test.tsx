@@ -15,6 +15,11 @@ vi.mock("../lib/initial-onboarding", async (importOriginal) => {
   return {
     ...original,
     inspectOnboardingPrerequisites: vi.fn().mockResolvedValue({
+      git: {
+        installed: true,
+        version: "git version 2.50.1",
+        authenticated: true,
+      },
       codex: {
         installed: true,
         version: "codex-cli 1.0.0",
@@ -28,6 +33,11 @@ vi.mock("../lib/initial-onboarding", async (importOriginal) => {
     }),
     installOnboardingPrerequisite: vi.fn(),
     loginOnboardingVelen: vi.fn().mockResolvedValue({
+      git: {
+        installed: true,
+        version: "git version 2.50.1",
+        authenticated: true,
+      },
       codex: {
         installed: true,
         version: "codex-cli 1.0.0",
@@ -76,11 +86,12 @@ describe("InitialOnboarding", () => {
     });
 
     expect(container.textContent).toContain("먼저, 작업 환경을 준비할게요.");
+    expect(container.textContent).toContain("git version 2.50.1");
     expect(container.textContent).toContain("codex-cli 1.0.0");
     expect(container.textContent).toContain("velen 1.0.0");
   });
 
-  it("continues only after both prerequisites are installed", async () => {
+  it("continues only after all prerequisites are installed", async () => {
     const onComplete = vi.fn();
     await act(async () => root.render(
       <InitialOnboarding onComplete={onComplete} />,
@@ -102,6 +113,11 @@ describe("InitialOnboarding", () => {
 
   it("starts Velen OAuth when the CLI is installed but unauthenticated", async () => {
     vi.mocked(inspectOnboardingPrerequisites).mockResolvedValueOnce({
+      git: {
+        installed: true,
+        version: "git version 2.50.1",
+        authenticated: true,
+      },
       codex: {
         installed: true,
         version: "codex-cli 1.0.0",
