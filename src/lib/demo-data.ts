@@ -205,6 +205,9 @@ export const demoDashboard: DashboardPayload = {
   project: {
     id: "demo-project",
     name: "Briar",
+    organizationId: "demo-organization",
+    organizationName: "Briar",
+    role: "owner",
     createdAt: ago(3_000),
   },
   settings: {
