@@ -401,6 +401,10 @@ jelly-theme { color: var(--ink); }
   padding-top: env(safe-area-inset-top);
   background: #fff;
 }
+.platform-ios.companion-shell {
+  padding-top: max(0px, calc(env(safe-area-inset-top, 0px) - 12px));
+  background: #f8f8fa;
+}
 .companion-header {
   min-width: 0;
   min-height: 68px;
@@ -413,8 +417,8 @@ jelly-theme { color: var(--ink); }
   background: #faf9fc;
 }
 .platform-ios .companion-header {
-  min-height: 76px;
-  background: rgba(246,245,248,.88);
+  min-height: 68px;
+  background: #f8f8fa;
   backdrop-filter: blur(22px) saturate(160%);
   -webkit-backdrop-filter: blur(22px) saturate(160%);
 }
@@ -526,6 +530,7 @@ jelly-theme { color: var(--ink); }
 }
 .companion-shell .main-content { min-height: 0; height: auto; overflow-y: auto; background: #fff; }
 .companion-shell .dashboard-scroll { padding: 0 0 calc(116px + env(safe-area-inset-bottom)); display: block; overflow: visible; }
+.platform-ios.companion-shell .dashboard-scroll { padding-bottom: 116px; }
 .companion-shell .queue-panel.compact-list { overflow: visible; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .companion-shell .queue-header { min-height: 0; padding: 18px max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left)); align-items: stretch; gap: 12px; flex-direction: column; }
 .companion-shell .queue-header > div:first-child { min-height: 28px; align-items: center; justify-content: space-between; }
@@ -540,6 +545,7 @@ jelly-theme { color: var(--ink); }
 .companion-shell .status-tabs { min-height: 44px; padding: 2px max(12px, env(safe-area-inset-right)) 2px max(12px, env(safe-area-inset-left)); gap: 0; overflow-x: auto; scrollbar-width: none; }
 .companion-shell .status-tabs button { height: 40px; padding: 0 9px; border-radius: 8px; }
 .companion-shell .kanban-board { padding: 0 max(16px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); display: grid; grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: minmax(0,1fr); gap: 14px; overflow: visible; background: transparent; }
+.platform-ios.companion-shell .kanban-board { padding-bottom: 10px; }
 .companion-shell .kanban-column { min-width: 0; height: auto; overflow: visible; border: 0; border-radius: 0; background: transparent; }
 .companion-shell .kanban-column > header { min-height: 36px; padding: 0; border-bottom: 1px solid #dedfd9; }
 .companion-shell .kanban-column > header > span { color: #73756e; font-size: 10px; }
@@ -570,6 +576,7 @@ jelly-theme { color: var(--ink); }
   gap: 10px;
   pointer-events: none;
 }
+.platform-ios .companion-bottom-chrome { bottom: 8px; }
 .companion-bottom-nav,
 .companion-fab { pointer-events: auto; }
 .companion-bottom-nav {
