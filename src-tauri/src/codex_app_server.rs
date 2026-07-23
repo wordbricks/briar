@@ -7,6 +7,7 @@ use std::{
     process::{Child, ChildStdin, Command, Stdio},
     sync::{Arc, Mutex},
     thread,
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 const INITIALIZE_REQUEST_ID: u64 = 1;
@@ -20,10 +21,56 @@ pub(crate) enum SandboxMode {
     WorkspaceWrite,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone)]
 pub(crate) struct ChatExecution {
     pub(crate) approval_policy: ApprovalPolicy,
     pub(crate) sandbox_mode: SandboxMode,
+    pub(crate) network_access: bool,
+    pub(crate) event_sink: Option<AppServerEventSink>,
+}
+
+pub(crate) type AppServerEventSink =
+    Arc<dyn Fn(AppServerEventDirection, &Value) -> Result<(), String> + Send + Sync>;
+
+#[derive(Clone, Copy, Debug, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum AppServerEventDirection {
+    Client,
+    Server,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AppServerEventRecord {
+    pub(crate) session_id: String,
+    pub(crate) sequence: u64,
+    pub(crate) occurred_at_ms: u64,
+    pub(crate) direction: String,
+    pub(crate) message: Value,
+}
+
+impl AppServerEventRecord {
+    pub(crate) fn new(
+        session_id: String,
+        sequence: u64,
+        direction: AppServerEventDirection,
+        message: Value,
+    ) -> Self {
+        Self {
+            session_id,
+            sequence,
+            occurred_at_ms: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as u64,
+            direction: match direction {
+                AppServerEventDirection::Client => "client",
+                AppServerEventDirection::Server => "server",
+            }
+            .to_string(),
+            message,
+        }
+    }
 }
 
 impl SandboxMode {
@@ -101,7 +148,14 @@ pub(crate) struct ProjectAutoHuntIssue {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProjectAutoHuntRequest {
+    pub(crate) session_id: String,
     pub(crate) issues: Vec<ProjectAutoHuntIssue>,
+}
+
+#[derive(Clone)]
+pub(crate) struct AutoHuntExecution {
+    pub(crate) approval_policy: ApprovalPolicy,
+    pub(crate) event_sink: AppServerEventSink,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -170,7 +224,13 @@ pub(crate) fn chat(
         .map(|conversation_id| decode_conversation_id(project_id, conversation_id))
         .transpose()?;
 
-    let mut connection = CodexConnection::start(binary, execution_path, &workspace_root)?;
+    let mut connection = CodexConnection::start(
+        binary,
+        execution_path,
+        &workspace_root,
+        execution.network_access,
+        execution.event_sink,
+    )?;
     connection.send(&initialize_request())?;
     connection.read_response(INITIALIZE_REQUEST_ID)?;
     connection.send(&json!({ "method": "initialized", "params": {} }))?;
@@ -214,7 +274,7 @@ pub(crate) fn start_auto_hunt(
     execution_path: &std::ffi::OsStr,
     project_id: &str,
     workspace_root: &Path,
-    approval_policy: ApprovalPolicy,
+    execution: AutoHuntExecution,
     request: ProjectAutoHuntRequest,
     approve: &dyn Fn(&str, &Value) -> bool,
 ) -> Result<ProjectAutoHuntResponse, String> {
@@ -238,8 +298,10 @@ pub(crate) fn start_auto_hunt(
         project_id,
         workspace_root,
         ChatExecution {
-            approval_policy,
+            approval_policy: execution.approval_policy,
             sandbox_mode: SandboxMode::WorkspaceWrite,
+            network_access: true,
+            event_sink: Some(execution.event_sink),
         },
         ProjectLlmRequest {
             message,
@@ -386,6 +448,7 @@ struct CodexConnection {
     stdout: std::io::Lines<BufReader<std::process::ChildStdout>>,
     stderr: Arc<Mutex<String>>,
     stderr_thread: Option<thread::JoinHandle<()>>,
+    event_sink: Option<AppServerEventSink>,
 }
 
 impl CodexConnection {
@@ -393,9 +456,12 @@ impl CodexConnection {
         binary: &Path,
         execution_path: &std::ffi::OsStr,
         workspace: &Path,
+        network_access: bool,
+        event_sink: Option<AppServerEventSink>,
     ) -> Result<Self, String> {
-        let mut child = Command::new(binary)
-            .args(["app-server", "--listen", "stdio://"])
+        let mut command = Command::new(binary);
+        command.args(app_server_args(network_access));
+        let mut child = command
             .current_dir(workspace)
             .env("PATH", execution_path)
             .stdin(Stdio::piped())
@@ -431,6 +497,7 @@ impl CodexConnection {
             stdout: BufReader::new(stdout).lines(),
             stderr,
             stderr_thread: Some(stderr_thread),
+            event_sink,
         })
     }
 
@@ -444,7 +511,8 @@ impl CodexConnection {
         stdin
             .write_all(b"\n")
             .and_then(|_| stdin.flush())
-            .map_err(|error| format!("Codex App Server에 요청을 보내지 못했습니다: {error}"))
+            .map_err(|error| format!("Codex App Server에 요청을 보내지 못했습니다: {error}"))?;
+        self.record_event(AppServerEventDirection::Client, message)
     }
 
     fn read_message(&mut self) -> Result<Value, String> {
@@ -457,8 +525,21 @@ impl CodexConnection {
                 return Err(self.exit_error("Codex App Server가 응답 전에 종료되었습니다."));
             }
         };
-        serde_json::from_str(&line)
-            .map_err(|error| format!("Codex App Server가 잘못된 응답을 보냈습니다: {error}"))
+        let message = serde_json::from_str(&line)
+            .map_err(|error| format!("Codex App Server가 잘못된 응답을 보냈습니다: {error}"))?;
+        self.record_event(AppServerEventDirection::Server, &message)?;
+        Ok(message)
+    }
+
+    fn record_event(
+        &self,
+        direction: AppServerEventDirection,
+        message: &Value,
+    ) -> Result<(), String> {
+        if let Some(event_sink) = &self.event_sink {
+            event_sink(direction, message)?;
+        }
+        Ok(())
     }
 
     fn read_response(&mut self, request_id: u64) -> Result<Value, String> {
@@ -584,6 +665,14 @@ impl CodexConnection {
             format!("{fallback} {stderr}")
         }
     }
+}
+
+fn app_server_args(network_access: bool) -> Vec<&'static str> {
+    let mut arguments = vec!["app-server", "--listen", "stdio://"];
+    if network_access {
+        arguments.extend(["--config", "sandbox_workspace_write.network_access=true"]);
+    }
+    arguments
 }
 
 impl Drop for CodexConnection {
@@ -758,6 +847,20 @@ mod tests {
         assert!(instructions.contains("briar-auto-hunt"));
         assert!(instructions.contains("briar auto-hunt next"));
         assert!(instructions.contains("at most 3 issues"));
+        assert_eq!(
+            app_server_args(true),
+            vec![
+                "app-server",
+                "--listen",
+                "stdio://",
+                "--config",
+                "sandbox_workspace_write.network_access=true"
+            ]
+        );
+        assert_eq!(
+            app_server_args(false),
+            vec!["app-server", "--listen", "stdio://"]
+        );
     }
 
     #[test]
@@ -839,6 +942,8 @@ printf '%s\n' '{"method":"turn/completed","params":{"threadId":"thread-1","turn"
         fs::write(&binary, script).expect("fake Codex should be written");
         fs::set_permissions(&binary, fs::Permissions::from_mode(0o755))
             .expect("fake Codex should be executable");
+        let recorded_events = Arc::new(Mutex::new(Vec::new()));
+        let sink_events = recorded_events.clone();
 
         let response = chat(
             &binary,
@@ -850,6 +955,14 @@ printf '%s\n' '{"method":"turn/completed","params":{"threadId":"thread-1","turn"
             ChatExecution {
                 approval_policy: ApprovalPolicy::OnRequest,
                 sandbox_mode: SandboxMode::ReadOnly,
+                network_access: false,
+                event_sink: Some(Arc::new(move |direction, message| {
+                    sink_events
+                        .lock()
+                        .expect("event sink should lock")
+                        .push((direction, message.clone()));
+                    Ok(())
+                })),
             },
             ProjectLlmRequest {
                 message: "Summarize the repository".to_string(),
@@ -883,6 +996,18 @@ printf '%s\n' '{"method":"turn/completed","params":{"threadId":"thread-1","turn"
         );
         assert_eq!(requests[4]["id"], 4);
         assert_eq!(requests[4]["result"]["decision"], "accept");
+        let events = recorded_events.lock().expect("recorded events should lock");
+        assert_eq!(events.len(), 11);
+        assert!(matches!(events[0].0, AppServerEventDirection::Client));
+        assert_eq!(events[0].1["method"], "initialize");
+        assert!(matches!(
+            events.last().expect("last event should exist").0,
+            AppServerEventDirection::Server
+        ));
+        assert_eq!(
+            events.last().expect("last event should exist").1["method"],
+            "turn/completed"
+        );
 
         fs::remove_dir_all(directory).expect("test directory should be removed");
     }

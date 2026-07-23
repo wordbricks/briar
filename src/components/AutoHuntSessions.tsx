@@ -1,4 +1,6 @@
 import {
+  ArrowDownLeft,
+  ArrowUpRight,
   Bot,
   ChevronRight,
   CircleAlert,
@@ -9,10 +11,14 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useAutoHuntAppServerEvents } from "../hooks/useAutoHuntAppServerEvents";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
-import { maxAutoHuntSessionIssues } from "../lib/auto-hunt-agent";
+import {
+  maxAutoHuntSessionIssues,
+  type AutoHuntAppServerEvent,
+} from "../lib/auto-hunt-agent";
 import type {
   AutoHuntSession,
   AutoHuntSessionIssueOutcome,
@@ -50,6 +56,8 @@ export function AutoHuntSessions({
   const selectedSession = projectSessions.find(
     (session) => session.id === selectedSessionId,
   ) ?? null;
+  const appServerEvents = useAutoHuntAppServerEvents(selectedSession?.id ?? null);
+  const eventListRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!selectedSession) return;
@@ -59,6 +67,12 @@ export function AutoHuntSessions({
     document.addEventListener("keydown", close);
     return () => document.removeEventListener("keydown", close);
   }, [selectedSession]);
+
+  useEffect(() => {
+    const eventList = eventListRef.current;
+    if (!eventList || appServerEvents.events.length === 0) return;
+    eventList.scrollTop = eventList.scrollHeight;
+  }, [appServerEvents.events.length]);
 
   const start = () => {
     setStartError(null);
@@ -220,6 +234,52 @@ export function AutoHuntSessions({
                 </section>
               )}
 
+              <section className="auto-hunt-dialog-section auto-hunt-app-server-section">
+                <header>
+                  <div>
+                    <h3>{t("autoHunt.appServerEvents")}</h3>
+                    <p>{t("autoHunt.appServerEventsDescription")}</p>
+                  </div>
+                  <span className="auto-hunt-event-count">
+                    {selectedSession.status === "running" && (
+                      <i><span />{t("autoHunt.live")}</i>
+                    )}
+                    {t("autoHunt.eventCount", { count: appServerEvents.events.length })}
+                  </span>
+                </header>
+                {appServerEvents.error ? (
+                  <div className="auto-hunt-event-state error">
+                    <CircleAlert size={14} />{appServerEvents.error}
+                  </div>
+                ) : appServerEvents.isLoading ? (
+                  <div className="auto-hunt-event-state">
+                    <LoaderCircle className="spin" size={14} />{t("autoHunt.eventsLoading")}
+                  </div>
+                ) : appServerEvents.events.length === 0 ? (
+                  <div className="auto-hunt-event-state">{t("autoHunt.eventsEmpty")}</div>
+                ) : (
+                  <div className="auto-hunt-app-server-events" ref={eventListRef}>
+                    {appServerEvents.events.map((event) => (
+                      <details className={`auto-hunt-app-server-event ${event.direction}`} key={event.sequence}>
+                        <summary>
+                          <span className="auto-hunt-event-direction" title={t(`autoHunt.direction.${event.direction}` as MessageKey)}>
+                            {event.direction === "client"
+                              ? <ArrowUpRight size={13} />
+                              : <ArrowDownLeft size={13} />}
+                          </span>
+                          <strong>{appServerEventLabel(t, event)}</strong>
+                          <small>#{event.sequence}</small>
+                          <time dateTime={new Date(event.occurredAtMs).toISOString()}>
+                            {formatEventTime(event.occurredAtMs, localeTag)}
+                          </time>
+                        </summary>
+                        <pre>{JSON.stringify(event.message, null, 2)}</pre>
+                      </details>
+                    ))}
+                  </div>
+                )}
+              </section>
+
               <section className="auto-hunt-dialog-section">
                 <h3>{t("autoHunt.timeline")}</h3>
                 <div className="auto-hunt-timeline">
@@ -265,4 +325,23 @@ function formatDate(value: string, localeTag: string) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
+}
+
+function formatEventTime(value: number, localeTag: string) {
+  return new Intl.DateTimeFormat(localeTag, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(new Date(value));
+}
+
+function appServerEventLabel(
+  t: (key: MessageKey) => string,
+  event: AutoHuntAppServerEvent,
+) {
+  if (typeof event.message.method === "string") return event.message.method;
+  const id = typeof event.message.id === "string" || typeof event.message.id === "number"
+    ? ` #${event.message.id}`
+    : "";
+  return `${t(event.direction === "client" ? "autoHunt.request" : "autoHunt.response")}${id}`;
 }

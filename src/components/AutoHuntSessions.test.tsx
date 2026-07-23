@@ -93,6 +93,8 @@ describe("AutoHuntSessions", () => {
     expect(dialog?.textContent).toContain("삭제 오류 수정");
     expect(dialog?.textContent).toContain("수정하고 검증했습니다.");
     expect(dialog?.textContent).toContain("세션을 시작했습니다.");
+    expect(dialog?.textContent).toContain("Codex App Server 이벤트");
+    expect(dialog?.textContent).toContain("아직 기록된 App Server 이벤트가 없습니다.");
     await act(async () => root.unmount());
   });
 });
