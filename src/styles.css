@@ -580,7 +580,7 @@ jelly-theme { color: var(--ink); }
   bottom: 0;
   grid-template-columns: minmax(0, 1fr) 52px;
   align-items: center;
-  padding: 8px max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left));
+  padding: 8px max(12px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
   background: rgba(248,248,250,.96);
   box-shadow: 0 -8px 24px rgba(36,34,43,.06);
   backdrop-filter: blur(24px) saturate(165%);
