@@ -2088,7 +2088,9 @@ fn set_main_window_onboarding_mode(app: tauri::AppHandle, compact: bool) -> Resu
     let (width, height) = main_window_size(compact);
     main.set_size(tauri::LogicalSize::new(width, height))
         .map_err(|error| error.to_string())?;
-    main.center().map_err(|error| error.to_string())
+    #[cfg(desktop)]
+    main.center().map_err(|error| error.to_string())?;
+    Ok(())
 }
 
 #[cfg(target_os = "macos")]
