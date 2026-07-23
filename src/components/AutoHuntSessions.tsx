@@ -16,6 +16,7 @@ import type { MessageKey } from "../i18n/messages";
 import {
   agentMessagesFromAppServerEvents,
   maxAutoHuntSessionIssues,
+  naturalLanguageFromAgentMessage,
 } from "../lib/auto-hunt-agent";
 import type {
   AutoHuntSession,
@@ -198,7 +199,11 @@ export function AutoHuntSessions({
                             {formatEventTime(message.updatedAtMs, localeTag)}
                           </time>
                         </header>
-                        <p>{message.text || t("autoHunt.agentMessage.writing")}</p>
+                        <p>
+                          {message.text
+                            ? naturalLanguageFromAgentMessage(message.text)
+                            : t("autoHunt.agentMessage.writing")}
+                        </p>
                       </article>
                     ))}
                   </div>
