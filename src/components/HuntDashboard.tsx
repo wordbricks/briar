@@ -272,10 +272,6 @@ export function HuntDashboard({
       {companionMode && (
         <CompanionBottomNavigation
           activeDestination={status}
-          counts={{
-            active: activeCount,
-            attention: attentionCount,
-          }}
           onCreate={() => setIsIssueDialogOpen(true)}
           onInboxOpen={() => onCompanionInboxOpen?.()}
           onStatusChange={setStatus}

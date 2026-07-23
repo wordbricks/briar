@@ -77,15 +77,6 @@ export function App() {
   const activeProject = briar.projects.find(
     (project) => project.id === briar.activeProjectId,
   );
-  const companionRuns = briar.dashboard?.runs ?? [];
-  const companionCounts = {
-    active: companionRuns.filter(
-      (run) => !["completed", "cancelled"].includes(run.status),
-    ).length,
-    attention: companionRuns.filter((run) =>
-      ["blocked", "failed"].includes(run.status)
-    ).length,
-  };
   const shouldShowInitialOnboarding =
     !briar.companionMode &&
     !briar.loading &&
@@ -361,7 +352,6 @@ export function App() {
             />
             <CompanionBottomNavigation
               activeDestination="inbox"
-              counts={companionCounts}
               onInboxOpen={() => {}}
               onStatusChange={(status) => {
                 setCompanionStatus(status);
@@ -390,7 +380,6 @@ export function App() {
             />
             <CompanionBottomNavigation
               activeDestination="inbox"
-              counts={companionCounts}
               onInboxOpen={() => setCompanionPage("inbox")}
               onStatusChange={(status) => {
                 setCompanionStatus(status);
