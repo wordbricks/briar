@@ -1,9 +1,6 @@
 import {
-  Activity,
   ArrowUpRight,
-  Bell,
   Bot,
-  CheckCircle2,
   ChevronRight,
   CircleAlert,
   Clock3,
@@ -11,7 +8,6 @@ import {
   GitCommitHorizontal,
   GitFork,
   Image as ImageIcon,
-  ListTodo,
   LoaderCircle,
   Paperclip,
   PanelLeftOpen,
@@ -28,6 +24,10 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { JellySelect } from "./JellySelect";
+import {
+  CompanionBottomNavigation,
+  type CompanionStatusFilter,
+} from "./CompanionBottomNavigation";
 import { eventMeta, runMeta } from "../lib/stages";
 import {
   formatAttachmentBytes,
@@ -47,7 +47,7 @@ import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
 
 type SourceFilter = "all" | HuntSource;
-type StatusFilter = "all" | "active" | "attention" | "completed";
+type StatusFilter = CompanionStatusFilter;
 type KanbanColumn = {
   id: string;
   label: string;
@@ -57,6 +57,8 @@ type KanbanColumn = {
 
 export function HuntDashboard({
   companionMode = false,
+  companionStatus,
+  companionUnreadInboxCount = 0,
   dashboard,
   error,
   health,
@@ -72,12 +74,16 @@ export function HuntDashboard({
   onReconnect,
   onRetryRun,
   onCancelRun,
+  onCompanionInboxOpen,
+  onCompanionStatusChange,
   onRepair,
   onRequestedRunOpen,
   onSidebarOpen,
   requestedRunId = null,
 }: {
   companionMode?: boolean;
+  companionStatus?: CompanionStatusFilter;
+  companionUnreadInboxCount?: number;
   dashboard: DashboardPayload | null;
   error: string | null;
   health: AutoHuntHealth | null;
@@ -93,6 +99,8 @@ export function HuntDashboard({
   onReconnect: () => void;
   onRetryRun: (runId: string) => Promise<unknown>;
   onCancelRun: (runId: string) => Promise<unknown>;
+  onCompanionInboxOpen?: () => void;
+  onCompanionStatusChange?: (status: CompanionStatusFilter) => void;
   onRepair: () => void;
   onRequestedRunOpen?: () => void;
   onSidebarOpen: () => void;
@@ -101,10 +109,15 @@ export function HuntDashboard({
   const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [source, setSource] = useState<SourceFilter>("all");
-  const [status, setStatus] = useState<StatusFilter>("all");
+  const [internalStatus, setInternalStatus] = useState<StatusFilter>("all");
+  const status = companionMode && companionStatus
+    ? companionStatus
+    : internalStatus;
+  const setStatus = companionMode && onCompanionStatusChange
+    ? onCompanionStatusChange
+    : setInternalStatus;
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [isIssueDialogOpen, setIsIssueDialogOpen] = useState(false);
-  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const runs = dashboard?.runs ?? [];
   const selected = runs.find((run) => run.id === selectedRunId) ?? null;
@@ -210,7 +223,7 @@ export function HuntDashboard({
                   <Plus size={14} />{t("dashboard.createIssue")}
                 </button>
               )}
-              <label className="search-box"><Search size={15} /><input ref={searchInputRef} value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("dashboard.search")} /></label>
+              <label className="search-box"><Search size={15} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("dashboard.search")} /></label>
               <div className="source-filter">
                 {(["all", "issue", "feedback", "error"] as const).map((value) => (
                   <button key={value} className={source === value ? "active" : ""} onClick={() => setSource(value)}>
@@ -260,17 +273,15 @@ export function HuntDashboard({
       </div>
       {companionMode && (
         <CompanionBottomNavigation
+          activeDestination={status}
           counts={{
             active: activeCount,
             attention: attentionCount,
           }}
           onCreate={() => setIsIssueDialogOpen(true)}
-          onSearch={() => {
-            searchInputRef.current?.focus();
-            searchInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-          }}
+          onInboxOpen={() => onCompanionInboxOpen?.()}
           onStatusChange={setStatus}
-          status={status}
+          unreadInboxCount={companionUnreadInboxCount}
         />
       )}
       {isIssueDialogOpen && (
@@ -296,89 +307,6 @@ export function HuntDashboard({
         />
       )}
     </main>
-  );
-}
-
-function CompanionBottomNavigation({
-  counts,
-  onCreate,
-  onSearch,
-  onStatusChange,
-  status,
-}: {
-  counts: { active: number; attention: number };
-  onCreate: () => void;
-  onSearch: () => void;
-  onStatusChange: (status: StatusFilter) => void;
-  status: StatusFilter;
-}) {
-  const { t } = useI18n();
-  const destinations: Array<{
-    count?: number;
-    icon: typeof ListTodo;
-    label: string;
-    value: StatusFilter;
-  }> = [
-    { icon: ListTodo, label: t("companion.navTasks"), value: "all" },
-    {
-      count: counts.active,
-      icon: Activity,
-      label: t("companion.navActive"),
-      value: "active",
-    },
-    {
-      count: counts.attention,
-      icon: Bell,
-      label: t("companion.navAttention"),
-      value: "attention",
-    },
-    {
-      icon: CheckCircle2,
-      label: t("companion.navCompleted"),
-      value: "completed",
-    },
-  ];
-
-  return (
-    <div className="companion-bottom-chrome">
-      <button
-        aria-label={t("dashboard.createIssue")}
-        className="companion-fab"
-        onClick={onCreate}
-        type="button"
-      >
-        <Plus size={25} />
-      </button>
-      <nav aria-label={t("sidebar.mainMenu")} className="companion-bottom-nav">
-        {destinations.map((destination) => {
-          const Icon = destination.icon;
-          const isActive = status === destination.value;
-          return (
-            <button
-              aria-current={isActive ? "page" : undefined}
-              className={isActive ? "active" : ""}
-              key={destination.value}
-              onClick={() => onStatusChange(destination.value)}
-              type="button"
-            >
-              <span>
-                <Icon size={22} />
-                {destination.count ? <i>{destination.count}</i> : null}
-              </span>
-              <strong>{destination.label}</strong>
-            </button>
-          );
-        })}
-      </nav>
-      <button
-        aria-label={t("dashboard.search")}
-        className="companion-search-trigger"
-        onClick={onSearch}
-        type="button"
-      >
-        <Search size={25} />
-      </button>
-    </div>
   );
 }
 
