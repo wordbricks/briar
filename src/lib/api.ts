@@ -5,6 +5,8 @@ import type {
   DashboardPayload,
   IssueAttachment,
   Project,
+  Organization,
+  OrganizationMember,
   ProjectSettings,
   SessionUser,
 } from "../types";
@@ -23,6 +25,9 @@ const sessionUserSchema = z.object({
 const projectSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
+  organizationId: z.string().uuid(),
+  organizationName: z.string(),
+  role: z.enum(["owner", "admin", "member"]),
   createdAt: z.string(),
 });
 
@@ -134,6 +139,56 @@ export async function loadProjects(token: string): Promise<Project[]> {
   return z.array(projectSchema).parse(result.projects);
 }
 
+export async function loadOrganizations(token: string): Promise<Organization[]> {
+  const result = await request<{ organizations: Organization[] }>(
+    "/organizations",
+    token,
+  );
+  return result.organizations;
+}
+
+export async function createOrganization(token: string, name: string) {
+  return request<{ organization: Organization }>("/organizations", token, {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function loadOrganizationMembers(
+  token: string,
+  organizationId: string,
+) {
+  const result = await request<{ members: OrganizationMember[] }>(
+    `/organizations/${organizationId}/members`,
+    token,
+  );
+  return result.members;
+}
+
+export async function addOrganizationMember(
+  token: string,
+  organizationId: string,
+  input: { email: string; role: "admin" | "member" },
+) {
+  return request<{ members: OrganizationMember[] }>(
+    `/organizations/${organizationId}/members`,
+    token,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+}
+
+export async function removeOrganizationMember(
+  token: string,
+  organizationId: string,
+  userId: string,
+) {
+  return request<void>(
+    `/organizations/${organizationId}/members/${encodeURIComponent(userId)}`,
+    token,
+    { method: "DELETE" },
+  );
+}
+
 export async function loadDashboard(
   token: string,
   projectId: string,
@@ -143,7 +198,7 @@ export async function loadDashboard(
 
 export async function createProject(
   token: string,
-  input: { name: string },
+  input: { name: string; organizationId?: string },
 ) {
   return request<{ project: Project; agentToken: string }>("/projects", token, {
     method: "POST",

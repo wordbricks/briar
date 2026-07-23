@@ -6,6 +6,7 @@ import type { HuntEventInput } from "./db";
 import {
   assertQueuedHuntClaim,
   claimNextQueuedHuntRun,
+  addOrganizationMember,
   createProject,
   createIssueAttachments,
   deleteProject,
@@ -17,6 +18,8 @@ import {
   HuntClaimError,
   HuntTransitionError,
   listIssueAttachments,
+  listOrganizationMembers,
+  listProjects,
   recoverHuntRun,
   recordHuntEvent,
   recordQaResult,
@@ -80,16 +83,24 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       "migrations/0005_auto_hunt_recovery.sql",
       "migrations/0006_issue_attachments.sql",
       "migrations/0007_configurable_workflows.sql",
+      "migrations/0008_organizations.sql",
     ]) {
       await executeSql(db, await readFile(resolve(migration), "utf8"));
     }
     await executeSql(db, `
       insert into user (id, name, email, emailVerified, createdAt, updatedAt)
       values ('owner', 'Owner', 'owner@example.com', 1, '${atMinute(0)}', '${atMinute(0)}');
-      insert into briar_projects (
-        id, owner_user_id, name, agent_token_hash, created_at, updated_at
+      insert into briar_organizations (id, name, created_at, updated_at)
+      values ('${projectId}', 'Example Org', '${atMinute(0)}', '${atMinute(0)}');
+      insert into briar_organization_members (
+        organization_id, user_id, role, created_at, updated_at
       ) values (
-        '${projectId}', 'owner', 'Example',
+        '${projectId}', 'owner', 'owner', '${atMinute(0)}', '${atMinute(0)}'
+      );
+      insert into briar_projects (
+        id, owner_user_id, organization_id, name, agent_token_hash, created_at, updated_at
+      ) values (
+        '${projectId}', 'owner', '${projectId}', 'Example',
         'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
         '${atMinute(0)}', '${atMinute(0)}'
       );
@@ -193,6 +204,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
   it("deletes only a project owned by the requesting user", async () => {
     const project = await createProject(db, {
       ownerUserId: "owner",
+      organizationId: projectId,
       name: "Disposable",
       agentTokenHash: "d".repeat(64),
     });
@@ -202,6 +214,28 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await expect(deleteProject(db, project.id, "owner")).resolves.toBe(true);
     await expect(getProject(db, project.id, "owner")).resolves.toBeNull();
     await expect(getProjectSettings(db, project.id)).resolves.toBeNull();
+  });
+
+  it("shares organization projects with members without granting owner deletion", async () => {
+    await executeSql(db, `
+      insert into user (id, name, email, emailVerified, createdAt, updatedAt)
+      values ('member', 'Member', 'member@example.com', 1, '${atMinute(0)}', '${atMinute(0)}');
+    `);
+    await expect(
+      addOrganizationMember(db, projectId, "member@example.com", "member"),
+    ).resolves.toBe("member");
+
+    const projects = await listProjects(db, "member");
+    expect(projects.map((project) => project.id)).toContain(projectId);
+    expect(projects[0]?.member_role).toBe("member");
+    expect(await getProject(db, projectId, "member")).not.toBeNull();
+    await expect(deleteProject(db, projectId, "member")).resolves.toBe(false);
+
+    const members = await listOrganizationMembers(db, projectId);
+    expect(members.map((member) => member.email)).toEqual([
+      "owner@example.com",
+      "member@example.com",
+    ]);
   });
 
   it("stores an app-created issue as a queued Auto Hunt run", async () => {
