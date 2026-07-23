@@ -51,7 +51,7 @@ describe("AutoHuntSessions", () => {
     await act(async () => root.unmount());
   });
 
-  it("opens a session overview modal from the session list", async () => {
+  it("opens session details as a page and returns to the session list", async () => {
     const session: AutoHuntSession = {
       id: "session-1",
       projectId: "project-1",
@@ -89,12 +89,20 @@ describe("AutoHuntSessions", () => {
       container.querySelector<HTMLButtonElement>(".auto-hunt-session-row")?.click();
     });
 
-    const dialog = container.querySelector('[role="dialog"]');
-    expect(dialog?.textContent).toContain("삭제 오류 수정");
-    expect(dialog?.textContent).toContain("수정하고 검증했습니다.");
-    expect(dialog?.textContent).toContain("세션을 시작했습니다.");
-    expect(dialog?.textContent).toContain("Codex Agent 메시지");
-    expect(dialog?.textContent).toContain("아직 Agent 메시지가 없습니다.");
+    const detailPage = container.querySelector(".auto-hunt-session-page");
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(detailPage?.textContent).toContain("삭제 오류 수정");
+    expect(detailPage?.textContent).toContain("수정하고 검증했습니다.");
+    expect(detailPage?.textContent).toContain("세션을 시작했습니다.");
+    expect(detailPage?.textContent).toContain("Codex Agent 메시지");
+    expect(detailPage?.textContent).toContain("아직 Agent 메시지가 없습니다.");
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".auto-hunt-session-back")?.click();
+    });
+
+    expect(container.querySelector(".auto-hunt-session-page")).toBeNull();
+    expect(container.querySelector(".auto-hunt-session-list")).not.toBeNull();
     await act(async () => root.unmount());
   });
 });
