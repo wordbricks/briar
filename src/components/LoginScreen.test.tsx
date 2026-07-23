@@ -25,4 +25,19 @@ describe("LoginScreen", () => {
 
     expect(markup).not.toContain('aria-label="로그인 닫기"');
   });
+
+  it("describes Android sign-in as an in-app flow", () => {
+    const markup = renderToStaticMarkup(
+      <LoginScreen
+        {...baseProps}
+        companionMode
+        loginCode="F65P9NQN"
+      />,
+    );
+
+    expect(markup).toContain("인앱 로그인에서 Google 계정으로 계속하세요");
+    expect(markup).toContain("자동으로 앱으로 돌아옵니다");
+    expect(markup).toContain("안전한 인앱 브라우저");
+    expect(markup).not.toContain("브라우저에서 로그인 후");
+  });
 });

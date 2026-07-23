@@ -3,12 +3,14 @@ import { Logo } from "./Logo";
 import { useI18n } from "../i18n";
 
 export function LoginScreen({
+  companionMode = false,
   error,
   loading,
   loginCode,
   onCancel,
   onLogin,
 }: {
+  companionMode?: boolean;
   error: string | null;
   loading: boolean;
   loginCode: string | null;
@@ -32,15 +34,21 @@ export function LoginScreen({
         )}
         <Logo />
         <div className="login-copy">
-          <p className="eyebrow">{t("login.eyebrow")}</p>
-          <h1>{t("login.title").split("\n").map((line, index) => <span key={line}>{index > 0 ? <br /> : null}{line}</span>)}</h1>
-          <p>{t("login.description")}</p>
+          <p className="eyebrow">
+            {companionMode ? t("companion.badge") : t("login.eyebrow")}
+          </p>
+          <h1>{t(companionMode ? "companion.loginTitle" : "login.title").split("\n").map((line, index) => <span key={line}>{index > 0 ? <br /> : null}{line}</span>)}</h1>
+          <p>{t(companionMode ? "companion.loginDescription" : "login.description")}</p>
         </div>
         {loginCode ? (
           <div className="device-code-card">
-            <span>{t("login.approveCode")}</span>
+            <span>
+              {t(companionMode ? "companion.loginApprove" : "login.approveCode")}
+            </span>
             <strong>{loginCode}</strong>
-            <small>{t("login.waiting")}</small>
+            <small>
+              {t(companionMode ? "companion.loginWaiting" : "login.waiting")}
+            </small>
           </div>
         ) : (
           <button className="google-button" onClick={onLogin} disabled={loading}>
@@ -50,7 +58,9 @@ export function LoginScreen({
           </button>
         )}
         {error && <p className="login-error">{error}</p>}
-        <p className="login-footnote">{t("login.secure")}</p>
+        <p className="login-footnote">
+          {t(companionMode ? "companion.loginSecure" : "login.secure")}
+        </p>
       </section>
     </main>
   );

@@ -90,6 +90,33 @@ bun tauri dev
 
 Without `VITE_BRIAR_API_URL`, Briar opens the built-in demo dashboard.
 
+## Android companion
+
+The Android build is a companion to Briar Desktop. It signs in to the same
+Worker API and supports project switching, dashboard monitoring, issue creation
+with attachments, and retry/cancel actions. Repository setup, Velen, the Briar
+CLI, Codex App Server, and Auto Hunt execution remain on the desktop agent.
+
+Install Android Studio or the Android command-line tools, JDK 21, Android SDK
+36, Build Tools 35+, and NDK 27.2. Set `JAVA_HOME`, `ANDROID_HOME`, and
+`NDK_HOME`, then initialize or run the generated Android project:
+
+```bash
+bun run android:init
+bun run android:dev
+```
+
+Build an installable ARM64 debug APK or unsigned release APK/AAB:
+
+```bash
+bun run android:build:debug
+bun run android:build
+```
+
+Artifacts are written below
+`src-tauri/gen/android/app/build/outputs/`. Release packages must be signed with
+the production Android keystore before distribution through Google Play.
+
 ## Project LLM integration
 
 All model-backed desktop features must use `chatWithProjectLlm` or
