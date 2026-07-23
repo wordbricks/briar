@@ -1,6 +1,9 @@
 import {
+  Activity,
   ArrowUpRight,
+  Bell,
   Bot,
+  CheckCircle2,
   ChevronRight,
   CircleAlert,
   Clock3,
@@ -8,6 +11,7 @@ import {
   GitCommitHorizontal,
   GitFork,
   Image as ImageIcon,
+  ListTodo,
   LoaderCircle,
   Paperclip,
   PanelLeftOpen,
@@ -96,6 +100,7 @@ export function HuntDashboard({
   const [status, setStatus] = useState<StatusFilter>("all");
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [isIssueDialogOpen, setIsIssueDialogOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const runs = dashboard?.runs ?? [];
   const selected = runs.find((run) => run.id === selectedRunId) ?? null;
@@ -177,17 +182,24 @@ export function HuntDashboard({
       <div className="dashboard-scroll">
         {error && <div className="error-banner"><CircleAlert size={16} />{error}</div>}
 
-        <section className="queue-panel">
+        <section className={`queue-panel${companionMode ? " compact-list" : ""}`}>
           <div className="queue-header">
             <div>
               <h2>{t("dashboard.queue")}</h2>
               <span>{t("dashboard.taskCount", { count: filtered.length })}</span>
             </div>
             <div className="queue-tools">
-              <button className="create-issue-button" onClick={() => setIsIssueDialogOpen(true)} type="button">
-                <Plus size={14} />{t("dashboard.createIssue")}
-              </button>
-              <label className="search-box"><Search size={15} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("dashboard.search")} /></label>
+              {!companionMode && (
+                <button
+                  aria-label={t("dashboard.createIssue")}
+                  className="create-issue-button"
+                  onClick={() => setIsIssueDialogOpen(true)}
+                  type="button"
+                >
+                  <Plus size={14} />{t("dashboard.createIssue")}
+                </button>
+              )}
+              <label className="search-box"><Search size={15} /><input ref={searchInputRef} value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("dashboard.search")} /></label>
               <div className="source-filter">
                 {(["all", "issue", "feedback", "error"] as const).map((value) => (
                   <button key={value} className={source === value ? "active" : ""} onClick={() => setSource(value)}>
@@ -197,12 +209,12 @@ export function HuntDashboard({
               </div>
             </div>
           </div>
-          <div className="status-tabs">
+          {!companionMode && <div className="status-tabs">
             <button className={status === "all" ? "active" : ""} onClick={() => setStatus("all")}>{t("dashboard.all")} <span>{runs.length}</span></button>
             <button className={status === "active" ? "active" : ""} onClick={() => setStatus("active")}>{t("dashboard.active")} <span>{activeCount}</span></button>
             <button className={status === "attention" ? "active" : ""} onClick={() => setStatus("attention")}>{t("dashboard.attention")} <span>{attentionCount}</span></button>
             <button className={status === "completed" ? "active" : ""} onClick={() => setStatus("completed")}>{t("dashboard.completed")} <span>{completedCount}</span></button>
-          </div>
+          </div>}
           <div aria-label={t("dashboard.kanbanBoard")} className="kanban-board">
             {kanbanColumns.length === 0 ? (
               <div className="companion-no-runs">
@@ -235,6 +247,21 @@ export function HuntDashboard({
           </div>
         </section>
       </div>
+      {companionMode && (
+        <CompanionBottomNavigation
+          counts={{
+            active: activeCount,
+            attention: attentionCount,
+          }}
+          onCreate={() => setIsIssueDialogOpen(true)}
+          onSearch={() => {
+            searchInputRef.current?.focus();
+            searchInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+          }}
+          onStatusChange={setStatus}
+          status={status}
+        />
+      )}
       {isIssueDialogOpen && (
         <CreateIssueDialog
           isSubmitting={isCreatingIssue}
@@ -258,6 +285,89 @@ export function HuntDashboard({
         />
       )}
     </main>
+  );
+}
+
+function CompanionBottomNavigation({
+  counts,
+  onCreate,
+  onSearch,
+  onStatusChange,
+  status,
+}: {
+  counts: { active: number; attention: number };
+  onCreate: () => void;
+  onSearch: () => void;
+  onStatusChange: (status: StatusFilter) => void;
+  status: StatusFilter;
+}) {
+  const { t } = useI18n();
+  const destinations: Array<{
+    count?: number;
+    icon: typeof ListTodo;
+    label: string;
+    value: StatusFilter;
+  }> = [
+    { icon: ListTodo, label: t("companion.navTasks"), value: "all" },
+    {
+      count: counts.active,
+      icon: Activity,
+      label: t("companion.navActive"),
+      value: "active",
+    },
+    {
+      count: counts.attention,
+      icon: Bell,
+      label: t("companion.navAttention"),
+      value: "attention",
+    },
+    {
+      icon: CheckCircle2,
+      label: t("companion.navCompleted"),
+      value: "completed",
+    },
+  ];
+
+  return (
+    <div className="companion-bottom-chrome">
+      <button
+        aria-label={t("dashboard.createIssue")}
+        className="companion-fab"
+        onClick={onCreate}
+        type="button"
+      >
+        <Plus size={25} />
+      </button>
+      <nav aria-label={t("sidebar.mainMenu")} className="companion-bottom-nav">
+        {destinations.map((destination) => {
+          const Icon = destination.icon;
+          const isActive = status === destination.value;
+          return (
+            <button
+              aria-current={isActive ? "page" : undefined}
+              className={isActive ? "active" : ""}
+              key={destination.value}
+              onClick={() => onStatusChange(destination.value)}
+              type="button"
+            >
+              <span>
+                <Icon size={22} />
+                {destination.count ? <i>{destination.count}</i> : null}
+              </span>
+              <strong>{destination.label}</strong>
+            </button>
+          );
+        })}
+      </nav>
+      <button
+        aria-label={t("dashboard.search")}
+        className="companion-search-trigger"
+        onClick={onSearch}
+        type="button"
+      >
+        <Search size={25} />
+      </button>
+    </div>
   );
 }
 

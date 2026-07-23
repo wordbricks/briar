@@ -1,16 +1,23 @@
-const androidUserAgent = /\bAndroid\b/iu;
+export type MobilePlatform = "android" | "ios";
 
-export function isAndroidCompanion() {
+export function getMobilePlatform(): MobilePlatform | null {
+  if (typeof navigator !== "undefined") {
+    if (/\bAndroid\b/iu.test(navigator.userAgent)) return "android";
+    if (/\biPhone\b|\biPad\b|\biPod\b/iu.test(navigator.userAgent)) return "ios";
+  }
+  return import.meta.env.VITE_BRIAR_COMPANION === "true" ? "android" : null;
+}
+
+export function isMobileCompanion() {
   if (import.meta.env.VITE_BRIAR_COMPANION === "true") return true;
-  if (typeof navigator === "undefined") return false;
-  return androidUserAgent.test(navigator.userAgent);
+  return getMobilePlatform() !== null;
 }
 
 export function isDesktopTauri() {
   return (
     typeof window !== "undefined" &&
     "__TAURI_INTERNALS__" in window &&
-    !isAndroidCompanion()
+    !isMobileCompanion()
   );
 }
 

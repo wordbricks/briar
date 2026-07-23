@@ -38,7 +38,7 @@ import {
 } from "../lib/token-store";
 import { startDashboardPolling } from "../lib/dashboard-polling";
 import { defaultAutoHuntWorkflow } from "../lib/auto-hunt-contract";
-import { isAndroidCompanion } from "../lib/platform";
+import { isMobileCompanion } from "../lib/platform";
 import type {
   CreateIssueInput,
   DashboardPayload,
@@ -56,7 +56,7 @@ export type ProjectConnection = {
 };
 
 const demoMode = import.meta.env.VITE_BRIAR_DEMO !== "false" && !isApiConfigured;
-const companionMode = isAndroidCompanion();
+const companionMode = isMobileCompanion();
 const deviceClientId: DeviceClientId = companionMode
   ? "briar-android"
   : "briar-desktop";

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  isAndroidCompanion,
+  getMobilePlatform,
+  isMobileCompanion,
   isDesktopTauri,
   isMacDesktopTauri,
 } from "./platform";
@@ -16,7 +17,20 @@ describe("platform detection", () => {
     });
     vi.stubGlobal("window", { __TAURI_INTERNALS__: {} });
 
-    expect(isAndroidCompanion()).toBe(true);
+    expect(isMobileCompanion()).toBe(true);
+    expect(getMobilePlatform()).toBe("android");
+    expect(isDesktopTauri()).toBe(false);
+  });
+
+  it("detects an iOS WebView as the companion app", () => {
+    vi.stubGlobal("navigator", {
+      userAgent:
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15",
+    });
+    vi.stubGlobal("window", { __TAURI_INTERNALS__: {} });
+
+    expect(isMobileCompanion()).toBe(true);
+    expect(getMobilePlatform()).toBe("ios");
     expect(isDesktopTauri()).toBe(false);
   });
 
@@ -24,7 +38,8 @@ describe("platform detection", () => {
     vi.stubGlobal("navigator", { userAgent: "Mozilla/5.0 (Macintosh)" });
     vi.stubGlobal("window", { __TAURI_INTERNALS__: {} });
 
-    expect(isAndroidCompanion()).toBe(false);
+    expect(isMobileCompanion()).toBe(false);
+    expect(getMobilePlatform()).toBeNull();
     expect(isDesktopTauri()).toBe(true);
     expect(isMacDesktopTauri()).toBe(true);
   });
