@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AutoHuntSessions } from "./components/AutoHuntSessions";
 import { CompanionEmptyState, CompanionHeader } from "./components/CompanionHeader";
 import { HuntDashboard } from "./components/HuntDashboard";
+import { InitialOnboarding } from "./components/InitialOnboarding";
 import { LaunchIntro } from "./components/LaunchIntro";
 import { LoginScreen } from "./components/LoginScreen";
 import { ProjectOnboarding } from "./components/ProjectOnboarding";
@@ -15,6 +16,10 @@ import {
   markLaunchIntroSeen,
   shouldShowLaunchIntro,
 } from "./lib/launch-intro";
+import {
+  hasCompletedInitialOnboarding,
+  markInitialOnboardingComplete,
+} from "./lib/initial-onboarding";
 import { isDesktopTauri, isMacDesktopTauri } from "./lib/platform";
 
 export function App() {
@@ -30,12 +35,21 @@ export function App() {
       (previewsLaunchIntro || shouldShowLaunchIntro()),
   );
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(
+    hasCompletedInitialOnboarding,
+  );
   const [activePage, setActivePage] = useState<"issues" | "auto-hunt" | "project-settings">(
     "issues",
   );
   const activeProject = briar.projects.find(
     (project) => project.id === briar.activeProjectId,
   );
+
+  useEffect(() => {
+    if (!briar.user || hasCompletedOnboarding) return;
+    markInitialOnboardingComplete();
+    setHasCompletedOnboarding(true);
+  }, [briar.user, hasCompletedOnboarding]);
 
   useEffect(() => {
     if (!runsOnDesktopTauri) return;
@@ -69,8 +83,17 @@ export function App() {
   }, []);
 
   let content: React.ReactNode;
+  const shouldShowInitialOnboarding =
+    !briar.companionMode &&
+    !briar.loading &&
+    !briar.user &&
+    !hasCompletedOnboarding;
 
-  if (!briar.user) {
+  if (shouldShowInitialOnboarding) {
+    content = (
+      <InitialOnboarding onComplete={() => setHasCompletedOnboarding(true)} />
+    );
+  } else if (!briar.user) {
     content = (
       <LoginScreen
         companionMode={briar.companionMode}
