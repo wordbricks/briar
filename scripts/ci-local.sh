@@ -162,7 +162,6 @@ includes_context security && run_context security run_security
 
 if $should_signoff; then
   gh signoff "${selected_contexts[@]}"
-  gh signoff status
 else
   echo
   echo "[local-ci] All selected checks passed."
