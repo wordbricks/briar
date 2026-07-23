@@ -58,9 +58,9 @@ export function LoginScreen({
           </button>
         )}
         {error && <p className="login-error">{error}</p>}
-        <p className="login-footnote">
-          {t(companionMode ? "companion.loginSecure" : "login.secure")}
-        </p>
+        {companionMode && (
+          <p className="login-footnote">{t("companion.loginSecure")}</p>
+        )}
       </section>
     </main>
   );
