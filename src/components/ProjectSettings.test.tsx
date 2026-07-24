@@ -38,18 +38,28 @@ describe("ProjectSettings", () => {
     const select = container.querySelector<HTMLSelectElement>(
       "#project-approval-policy",
     );
+    const provider = container.querySelector<HTMLSelectElement>(
+      "#project-agent-provider",
+    );
+    expect(Array.from(provider?.options ?? []).map((option) => option.value)).toEqual([
+      "codex",
+      "claude",
+    ]);
     expect(Array.from(select?.options ?? []).map((option) => option.value)).toEqual([
       "untrusted",
       "on-request",
       "never",
     ]);
     await act(async () => {
+      if (!provider) return;
+      provider.value = "claude";
+      provider.dispatchEvent(new Event("change", { bubbles: true }));
       if (!select) return;
       select.value = "on-request";
       select.dispatchEvent(new Event("change", { bubbles: true }));
     });
     expect(container.querySelector(".project-settings-llm")?.textContent).toContain(
-      "Codex가 읽기 전용 경계를 넘어야 할 때 승인을 요청합니다.",
+      "Claude가 읽기 전용 경계를 넘어야 할 때 승인을 요청합니다.",
     );
     expect(container.querySelector(".project-settings-automation")?.textContent).toContain(
       "completion",

@@ -3,11 +3,16 @@ export type JsonSchema = Record<string, unknown> | boolean;
 export const approvalPolicies = ["untrusted", "on-request", "never"] as const;
 export type ApprovalPolicy = (typeof approvalPolicies)[number];
 
+export const agentProviders = ["codex", "claude"] as const;
+export type AgentProvider = (typeof agentProviders)[number];
+
 export type ProjectLlmSettings = {
+  provider: AgentProvider;
   approvalPolicy: ApprovalPolicy;
 };
 
 export const defaultProjectLlmSettings: ProjectLlmSettings = {
+  provider: "codex",
   approvalPolicy: "never",
 };
 
@@ -43,7 +48,8 @@ const isTauri = () =>
 /**
  * The only Briar frontend gateway for model-backed project features.
  * The native layer resolves projectId to the connected Git root and talks to
- * Codex App Server; callers cannot supply or override a filesystem workspace.
+ * the selected local agent backend; callers cannot supply or override a
+ * filesystem workspace.
  */
 export async function chatWithProjectLlm(
   input: ProjectLlmChatInput,
@@ -84,7 +90,7 @@ export async function updateProjectLlmSettings(
 }
 
 /**
- * Creates a stateful project chat while keeping the Codex thread id opaque.
+ * Creates a stateful project chat while keeping the provider conversation id opaque.
  * Sends are serialized so two turns cannot race on the same conversation.
  */
 export function createProjectChat(

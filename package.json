@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "vite",
     "dev:all": "bash scripts/dev-all.sh",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && bun run agent:build",
     "build:release": "bash scripts/with-release-env.sh bun run build && bash scripts/verify-release-config.sh",
     "check": "tsc --noEmit",
     "test": "vitest run",
@@ -28,6 +28,7 @@
     "cli": "bun run src-cli/index.ts",
     "cli:build": "bun build src-cli/index.ts --target=bun --outfile dist-cli/briar.js",
     "cli:install": "bun run cli:build && sh scripts/install-cli.sh",
+    "agent:build": "bun build src-agent/claude-runner.ts --target=bun --outfile dist-agent/claude-runner.js",
     "d1:migrate:local": "wrangler d1 migrations apply briar-db --local",
     "d1:migrate:remote": "wrangler d1 migrations apply briar-db --remote",
     "audit:dependencies": "bash scripts/audit-dependencies.sh",
@@ -41,6 +42,7 @@
     "worker:startup": "wrangler check startup"
   },
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "0.3.218",
     "@tauri-apps/api": "2.11.1",
     "@tauri-apps/plugin-dialog": "2.7.2",
     "@tauri-apps/plugin-opener": "2.5.4",

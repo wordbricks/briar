@@ -90,6 +90,7 @@ run_rust() {
     --profile minimal \
     --component rustfmt,clippy
   bun run cli:build
+  bun run agent:build
   cargo +"$rust_toolchain" fmt --manifest-path src-tauri/Cargo.toml --all --check
   cargo +"$rust_toolchain" clippy \
     --manifest-path src-tauri/Cargo.toml \

@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   loadProjectLlmSettings,
   updateProjectLlmSettings,
+  type AgentProvider,
   type ApprovalPolicy,
 } from "../lib/project-llm";
 import type { DashboardPayload, Project } from "../types";
@@ -49,8 +50,10 @@ export function ProjectSettings({
   const [isConfirming, setIsConfirming] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [approvalPolicy, setApprovalPolicy] = useState<ApprovalPolicy>("never");
+  const [provider, setProvider] = useState<AgentProvider>("codex");
   const [savedApprovalPolicy, setSavedApprovalPolicy] =
     useState<ApprovalPolicy>("never");
+  const [savedProvider, setSavedProvider] = useState<AgentProvider>("codex");
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
@@ -79,6 +82,9 @@ export function ProjectSettings({
   const workflowJson = workflowContract
     ? JSON.stringify(workflowContract, null, 2)
     : "";
+  const providerName = provider === "codex" ? "Codex" : "Claude";
+  const providerRuntimeName =
+    provider === "codex" ? "Codex App Server" : "Claude Agent SDK";
 
   useEffect(() => {
     let cancelled = false;
@@ -89,6 +95,8 @@ export function ProjectSettings({
     void loadProjectLlmSettings(project.id)
       .then((settings) => {
         if (cancelled) return;
+        setProvider(settings.provider);
+        setSavedProvider(settings.provider);
         setApprovalPolicy(settings.approvalPolicy);
         setSavedApprovalPolicy(settings.approvalPolicy);
       })
@@ -137,7 +145,12 @@ export function ProjectSettings({
     setSettingsSaving(true);
     setSettingsError(null);
     try {
-      const settings = await updateProjectLlmSettings(project.id, { approvalPolicy });
+      const settings = await updateProjectLlmSettings(project.id, {
+        provider,
+        approvalPolicy,
+      });
+      setProvider(settings.provider);
+      setSavedProvider(settings.provider);
       setApprovalPolicy(settings.approvalPolicy);
       setSavedApprovalPolicy(settings.approvalPolicy);
     } catch (caught) {
@@ -419,7 +432,10 @@ export function ProjectSettings({
               </div>
             </header>
             <p className="project-settings-workflow-ai-note">
-              {t("settings.regenerateWorkflowDescription")}
+              {t("settings.regenerateWorkflowDescription").replace(
+                "Codex App Server",
+                providerRuntimeName,
+              )}
             </p>
             <div aria-live="polite">
               {workflowRegenerated ? (
@@ -451,10 +467,27 @@ export function ProjectSettings({
               </span>
               <span>
                 <strong>{t("settings.llmTitle")}</strong>
-                <small>{t("settings.llmDescription")}</small>
+                <small>
+                  {t("settings.llmDescription").replace(
+                    "Codex App Server",
+                    providerRuntimeName,
+                  )}
+                </small>
               </span>
             </header>
             <div className="project-settings-llm-control">
+              <label htmlFor="project-agent-provider">Agent</label>
+              <select
+                disabled={settingsLoading || settingsSaving}
+                id="project-agent-provider"
+                onChange={(event) =>
+                  setProvider(event.currentTarget.value as AgentProvider)
+                }
+                value={provider}
+              >
+                <option value="codex">Codex</option>
+                <option value="claude">Claude</option>
+              </select>
               <label htmlFor="project-approval-policy">{t("settings.approvalRequest")}</label>
               <select
                 disabled={settingsLoading || settingsSaving}
@@ -472,24 +505,35 @@ export function ProjectSettings({
                 disabled={
                   settingsLoading ||
                   settingsSaving ||
-                  approvalPolicy === savedApprovalPolicy
+                  (provider === savedProvider &&
+                    approvalPolicy === savedApprovalPolicy)
                 }
                 onClick={() => void saveLlmSettings()}
                 type="button"
               >
                 {settingsSaving ? (
                   <LoaderCircle className="spin" size={14} />
-                ) : approvalPolicy === savedApprovalPolicy ? (
+                ) : provider === savedProvider &&
+                  approvalPolicy === savedApprovalPolicy ? (
                   <Check size={14} />
                 ) : null}
                 {settingsSaving
                   ? t("common.saving")
-                  : approvalPolicy === savedApprovalPolicy
+                  : provider === savedProvider &&
+                      approvalPolicy === savedApprovalPolicy
                     ? t("common.saved")
                     : t("common.save")}
               </button>
             </div>
-            <p>{t(approvalPolicy === "untrusted" ? "settings.approvalUntrustedDescription" : approvalPolicy === "on-request" ? "settings.approvalOnRequestDescription" : "settings.approvalNeverDescription")}</p>
+            <p>
+              {t(
+                approvalPolicy === "untrusted"
+                  ? "settings.approvalUntrustedDescription"
+                  : approvalPolicy === "on-request"
+                    ? "settings.approvalOnRequestDescription"
+                    : "settings.approvalNeverDescription",
+              ).replace("Codex", providerName)}
+            </p>
             {settingsError && <p className="project-settings-llm-error">{settingsError}</p>}
           </section>
 

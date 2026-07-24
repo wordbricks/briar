@@ -92,7 +92,7 @@ describe("AutoHuntSessions", () => {
     expect(detailPage?.textContent).toContain("삭제 오류 수정");
     expect(detailPage?.textContent).toContain("수정하고 검증했습니다.");
     expect(detailPage?.textContent).toContain("세션을 시작했습니다.");
-    expect(detailPage?.textContent).toContain("Codex Agent 메시지");
+    expect(detailPage?.textContent).toContain("Agent 메시지");
     expect(detailPage?.textContent).toContain("아직 Agent 메시지가 없습니다.");
 
     await act(async () => {

@@ -16,8 +16,8 @@ Repository source code stays local. Agents send only task state and Git metadata
 - Persistent desktop sessions stored in a permission-restricted app config file
 - Project-scoped Agent ingest tokens stored as SHA-256 hashes
 - `briar` CLI for login, repository connection, queued issue intake, and Auto Hunt event recording
-- A validated `briar-auto-hunt` Codex skill installed automatically with the CLI
-- Project-scoped LLM conversations through Codex App Server
+- A validated `briar-auto-hunt` skill installed for Codex and Claude
+- Project-scoped LLM conversations through Codex App Server or Claude Agent SDK
 - Mandatory Velen CLI preflight and repository-specific Velen organization/source settings
 - Optional Linear integration through a configured Velen source
 - Jelly UI components in a light desktop theme
@@ -29,12 +29,12 @@ Repository source code stays local. Agents send only task state and Git metadata
 
 ```mermaid
 flowchart LR
-  A["Local Agent / Codex"] -->|"briar auto-hunt next / record"| C["Briar CLI"]
+  A["Local Agent / Codex or Claude"] -->|"briar auto-hunt next / record"| C["Briar CLI"]
   A -->|"context and optional Linear"| V["Velen CLI"]
   C -->|"project Bearer token"| W["Cloudflare Worker"]
   D["Briar Tauri app"] -->|"Better Auth Device Flow"| W
   D -->|"create issues + polling, 4s"| W
-  D -->|"project-scoped thread + turn"| AS["Codex App Server"]
+  D -->|"provider-neutral AgentBackend"| AS["Codex App Server / Claude Agent SDK"]
   AS -->|"cwd = connected Git root"| R["Local repository"]
   W -->|"D1 binding"| DB[("Cloudflare D1")]
   W -->|"Google OAuth"| G["Google"]
@@ -44,7 +44,9 @@ The Worker owns Better Auth, dashboard APIs, Agent ingest APIs, authorization ch
 
 ## Install
 
-Requirements: Bun, Rust, Tauri system prerequisites, Wrangler 4.x, an authenticated Velen CLI, and an installed and authenticated Codex CLI.
+Requirements: Bun, Rust, Tauri system prerequisites, Wrangler 4.x, an
+authenticated Velen CLI, and at least one installed and authenticated coding
+agent: Codex CLI or Claude Code.
 
 ```bash
 bun install
@@ -128,11 +130,12 @@ model provider API directly.
 
 The native command resolves `projectId` from Briar's local connection config,
 verifies that the saved path is the Git root, and supplies that absolute path as
-`cwd` to both `thread/start` (or `thread/resume`) and `turn/start`. Callers cannot
-supply a filesystem path. Conversations are project-scoped, read-only Codex
-threads, and Briar rejects a conversation ID issued for another project.
-The project settings screen stores the App Server approval policy locally as
-`untrusted`, `on-request`, or `never`; existing projects default to `never`.
+the backend working directory. Callers cannot supply a filesystem path.
+Conversations are scoped to both the project and provider, and Briar rejects a
+conversation ID issued for another project or backend.
+The project settings screen stores the backend (`codex` or `claude`) and
+approval policy (`untrusted`, `on-request`, or `never`) locally; existing
+projects default to Codex with `never`.
 Interactive command and file-change requests from `untrusted` and `on-request`
 are shown in a native Briar confirmation dialog and sent back to App Server as
 an approval or denial.
@@ -146,6 +149,13 @@ thread and turn requests while consuming notifications through
 `turn/completed`. It translates agent messages and turn completion into
 provider-neutral events while retaining the raw App Server payload for local
 diagnostics and compatibility with existing Auto Hunt logs.
+
+`ClaudeBackend` runs a bundled Bun adapter around the official
+`@anthropic-ai/claude-agent-sdk` and uses the user's authenticated Claude Code
+executable. The adapter maps SDK streaming, result, and permission callbacks to
+the same Briar events and approval function. Bash always runs in Claude's
+OS-level sandbox with fail-closed startup and the unsandboxed escape disabled;
+read-only project analysis exposes only `Read`, `Glob`, and `Grep`.
 
 ## Production D1 database
 

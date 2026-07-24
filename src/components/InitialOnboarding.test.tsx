@@ -25,6 +25,11 @@ vi.mock("../lib/initial-onboarding", async (importOriginal) => {
         version: "codex-cli 1.0.0",
         authenticated: true,
       },
+      claude: {
+        installed: false,
+        version: null,
+        authenticated: false,
+      },
       velen: {
         installed: true,
         version: "velen 1.0.0",
@@ -42,6 +47,11 @@ vi.mock("../lib/initial-onboarding", async (importOriginal) => {
         installed: true,
         version: "codex-cli 1.0.0",
         authenticated: true,
+      },
+      claude: {
+        installed: false,
+        version: null,
+        authenticated: false,
       },
       velen: {
         installed: true,
@@ -111,6 +121,46 @@ describe("InitialOnboarding", () => {
     expect(onComplete).toHaveBeenCalledOnce();
   });
 
+  it("accepts Claude as the installed coding agent", async () => {
+    vi.mocked(inspectOnboardingPrerequisites).mockResolvedValueOnce({
+      git: {
+        installed: true,
+        version: "git version 2.50.1",
+        authenticated: true,
+      },
+      codex: {
+        installed: false,
+        version: null,
+        authenticated: false,
+      },
+      claude: {
+        installed: true,
+        version: "2.1.218",
+        authenticated: true,
+      },
+      velen: {
+        installed: true,
+        version: "velen 1.0.0",
+        authenticated: true,
+      },
+    });
+    const onComplete = vi.fn();
+    await act(async () =>
+      root.render(<InitialOnboarding onComplete={onComplete} />),
+    );
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".initial-welcome-copy button",
+      )?.click();
+    });
+
+    const continueButton = Array.from(
+      container.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent?.includes("Google 로그인으로 계속"));
+    expect(container.textContent).toContain("Claude Code");
+    expect(continueButton?.disabled).toBe(false);
+  });
+
   it("starts Velen OAuth when the CLI is installed but unauthenticated", async () => {
     vi.mocked(inspectOnboardingPrerequisites).mockResolvedValueOnce({
       git: {
@@ -122,6 +172,11 @@ describe("InitialOnboarding", () => {
         installed: true,
         version: "codex-cli 1.0.0",
         authenticated: true,
+      },
+      claude: {
+        installed: false,
+        version: null,
+        authenticated: false,
       },
       velen: {
         installed: true,

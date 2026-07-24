@@ -76,22 +76,26 @@ describe("project LLM gateway", () => {
 
   it("loads and updates the project approval policy", async () => {
     invoke
-      .mockResolvedValueOnce({ approvalPolicy: "never" })
-      .mockResolvedValueOnce({ approvalPolicy: "on-request" });
+      .mockResolvedValueOnce({ provider: "codex", approvalPolicy: "never" })
+      .mockResolvedValueOnce({ provider: "claude", approvalPolicy: "on-request" });
 
     await expect(loadProjectLlmSettings("project-1")).resolves.toEqual({
+      provider: "codex",
       approvalPolicy: "never",
     });
     await expect(
-      updateProjectLlmSettings("project-1", { approvalPolicy: "on-request" }),
-    ).resolves.toEqual({ approvalPolicy: "on-request" });
+      updateProjectLlmSettings("project-1", {
+        provider: "claude",
+        approvalPolicy: "on-request",
+      }),
+    ).resolves.toEqual({ provider: "claude", approvalPolicy: "on-request" });
 
     expect(invoke).toHaveBeenNthCalledWith(1, "load_project_llm_settings", {
       projectId: "project-1",
     });
     expect(invoke).toHaveBeenNthCalledWith(2, "update_project_llm_settings", {
       projectId: "project-1",
-      settings: { approvalPolicy: "on-request" },
+      settings: { provider: "claude", approvalPolicy: "on-request" },
     });
   });
 });
