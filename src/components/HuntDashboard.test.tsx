@@ -215,8 +215,15 @@ describe("HuntDashboard", () => {
     expect(properties?.textContent).not.toContain("전체 진행률");
     expect(properties?.querySelector(".run-property.progress")).toBeNull();
     expect(container.textContent).not.toContain("로컬 저장소 열기");
+    expect(container.textContent).not.toContain(
+      "Auto Hunt 실행 증거를 실시간으로 표시합니다.",
+    );
     expect(container.querySelectorAll(".issue-activity .timeline-event")).toHaveLength(1);
-    expect(container.querySelector(".issue-message-composer")).not.toBeNull();
+    const composerDock = container.querySelector(".run-page-composer-dock");
+    expect(composerDock).not.toBeNull();
+    expect(
+      composerDock?.querySelector(".issue-message-composer"),
+    ).not.toBeNull();
 
     await act(async () => {
       container.querySelector<HTMLButtonElement>(".run-page-back")?.click();
