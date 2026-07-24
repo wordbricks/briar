@@ -1,5 +1,6 @@
 import type { DashboardPayload, HuntEvent, HuntRun } from "../types";
 import { workflowForPreset } from "./auto-hunt-contract";
+import { defaultAutoHuntAutomation } from "./auto-hunt-automation";
 
 const now = Date.now();
 const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
@@ -220,6 +221,7 @@ export const demoDashboard: DashboardPayload = {
     },
     githubRepository: "wordbricks/briar",
     workflow: workflowForPreset("local"),
+    automation: structuredClone(defaultAutoHuntAutomation),
   },
   runs,
   generatedAt: new Date().toISOString(),

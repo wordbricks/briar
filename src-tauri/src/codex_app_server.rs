@@ -15,7 +15,7 @@ use std::{
 const INITIALIZE_REQUEST_ID: u64 = 1;
 const THREAD_REQUEST_ID: u64 = 2;
 const TURN_REQUEST_ID: u64 = 3;
-pub(crate) const MAX_AUTO_HUNT_ISSUES: usize = 3;
+pub(crate) const MAX_AUTO_HUNT_ISSUES: usize = 10;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum SandboxMode {
@@ -1163,7 +1163,7 @@ mod tests {
     }
 
     #[test]
-    fn configures_auto_hunt_for_workspace_writes_and_three_issue_limit() {
+    fn configures_auto_hunt_for_workspace_writes_and_configurable_issue_limit() {
         let request = thread_request(
             "/repo",
             None,
@@ -1174,7 +1174,7 @@ mod tests {
         assert_eq!(request["params"]["sandbox"], "workspace-write");
         assert_eq!(
             auto_hunt_output_schema()["properties"]["issues"]["maxItems"],
-            3
+            MAX_AUTO_HUNT_ISSUES
         );
         let instructions = auto_hunt_instructions(3);
         assert!(instructions.contains("briar-auto-hunt"));

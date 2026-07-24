@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  maxAutoHuntSessionIssues,
   startProjectAutoHunt,
   type AutoHuntAgentResponse,
 } from "../lib/auto-hunt-agent";
+import {
+  defaultAutoHuntMaxIssues,
+  selectAutoHuntCandidates,
+  type AutoHuntAutomaticTrigger,
+} from "../lib/auto-hunt-automation";
 import type { HuntRun } from "../types";
 
 const storageKey = "briar.auto-hunt-sessions.v1";
@@ -52,6 +56,10 @@ export type AutoHuntSession = {
   summary: string | null;
   error: string | null;
   events: AutoHuntSessionEvent[];
+  trigger?: {
+    type: "manual" | "automatic";
+    reasons: AutoHuntAutomaticTrigger[];
+  };
 };
 
 type AutoHuntRunner = typeof startProjectAutoHunt;
@@ -69,15 +77,21 @@ function readSessions(): AutoHuntSession[] {
       session && typeof session === "object" && typeof session.id === "string"
     ) as AutoHuntSession[];
     const interruptedAt = new Date().toISOString();
-    return restored.map((session) => session.status === "running"
-      ? {
-          ...session,
-          status: "interrupted",
-          completedAt: interruptedAt,
-          error: null,
-          events: [...session.events, event("interrupted", interruptedAt)],
-        }
-      : session);
+    return restored.map((storedSession) => {
+      const session = {
+        ...storedSession,
+        trigger: storedSession.trigger ?? { type: "manual" as const, reasons: [] },
+      };
+      return session.status === "running"
+        ? {
+            ...session,
+            status: "interrupted",
+            completedAt: interruptedAt,
+            error: null,
+            events: [...session.events, event("interrupted", interruptedAt)],
+          }
+        : session;
+    });
   } catch {
     return [];
   }
@@ -135,15 +149,20 @@ export function useAutoHuntSessions(
     projectId: string,
     runs: HuntRun[],
     onSettled?: () => void,
+    options?: {
+      maxIssues?: number;
+      trigger?: AutoHuntSession["trigger"];
+    },
   ) => {
     if (sessionsRef.current.some(
       (session) => session.projectId === projectId && session.status === "running",
     )) {
       throw new Error("이 프로젝트에서 이미 자동사냥 세션이 진행 중입니다.");
     }
-    const candidates = runs
-      .filter((run) => run.status === "queued")
-      .slice(0, maxAutoHuntSessionIssues);
+    const candidates = selectAutoHuntCandidates(
+      runs,
+      options?.maxIssues ?? defaultAutoHuntMaxIssues,
+    );
     if (candidates.length === 0) {
       throw new Error("대기 상태인 이슈가 없습니다.");
     }
@@ -167,6 +186,7 @@ export function useAutoHuntSessions(
       summary: null,
       error: null,
       events: [event("started", startedAt)],
+      trigger: options?.trigger ?? { type: "manual", reasons: [] },
     };
     sessionsRef.current = [session, ...sessionsRef.current];
     setSessions(sessionsRef.current);
