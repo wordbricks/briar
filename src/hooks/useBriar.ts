@@ -18,7 +18,10 @@ import {
   updateProjectSettings,
   type DeviceClientId,
 } from "../lib/api";
-import { demoDashboard } from "../lib/demo-data";
+import {
+  demoDashboard,
+  demoRepositoryReadiness,
+} from "../lib/demo-data";
 import {
   connectLocalProject,
   disconnectLocalProject,
@@ -152,7 +155,11 @@ export function useBriar() {
   const [healthLoading, setHealthLoading] = useState(false);
   const [projectReadiness, setProjectReadiness] = useState<
     Record<string, RepositoryReadiness>
-  >({});
+  >(
+    demoMode
+      ? { [demoDashboard.project.id]: demoRepositoryReadiness }
+      : {},
+  );
   const [projectReadinessError, setProjectReadinessError] = useState<
     Record<string, string>
   >({});

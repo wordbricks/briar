@@ -22,6 +22,7 @@ const sidebarProps = {
   onProjectChange: () => undefined,
   onProjectReadinessOpen: () => undefined,
   onProjectSettings: () => undefined,
+  onSettings: () => undefined,
   organizations: [
     {
       id: "organization-1",
@@ -237,6 +238,37 @@ describe("Sidebar", () => {
     });
     expect(onProjectSettings).toHaveBeenCalledWith("project-1");
     expect(container.querySelector('[role="menu"]')).toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("opens application settings from the account menu", async () => {
+    const onSettings = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(<Sidebar {...sidebarProps} onSettings={onSettings} />);
+    });
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="계정 메뉴"]')
+        ?.click();
+    });
+    await act(async () => {
+      Array.from(
+        container.querySelectorAll<HTMLAnchorElement>(
+          ".account-popover a",
+        ),
+      )
+        .find((anchor) => anchor.textContent?.includes("설정"))
+        ?.click();
+    });
+
+    expect(onSettings).toHaveBeenCalledOnce();
+    expect(container.querySelector(".account-popover")).toBeNull();
 
     await act(async () => root.unmount());
     container.remove();

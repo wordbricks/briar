@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AutoHuntSessions } from "./components/AutoHuntSessions";
+import { AppSettings } from "./components/AppSettings";
 import {
   CompanionBottomNavigation,
   type CompanionStatusFilter,
@@ -42,7 +43,8 @@ type ActivePage =
   | "auto-hunt"
   | "inbox"
   | "project-settings"
-  | "organization-settings";
+  | "organization-settings"
+  | "settings";
 
 export function App() {
   const briar = useBriar();
@@ -290,43 +292,46 @@ export function App() {
           onForward={goForward}
           onSidebarToggle={() => setIsSidebarOpen((open) => !open)}
         />
-        <Sidebar
-          activePage={activePage}
-          activeOrganizationId={briar.activeOrganizationId}
-          activeProjectId={briar.activeProjectId}
-          isOpen={isSidebarOpen}
-          onAddProject={briar.startProjectCreation}
-          onAutoHuntOpen={() => navigateToPage("auto-hunt")}
-          onInboxOpen={() => navigateToPage("inbox")}
-          onIssuesOpen={() => navigateToPage("issues")}
-          onOrganizationChange={(organizationId) => {
-            briar.setActiveOrganizationId(organizationId);
-            setRequestedRunId(null);
-            setRequestedSessionId(null);
-            resetNavigation("issues");
-          }}
-          onOrganizationSettings={(organizationId, section) => {
-            setOrganizationSettingsTarget({ id: organizationId, section });
-            navigateToPage("organization-settings");
-          }}
-          onProjectChange={(projectId) => {
-            briar.setActiveProjectId(projectId);
-            setRequestedRunId(null);
-            setRequestedSessionId(null);
-            resetNavigation("issues");
-          }}
-          onProjectReadinessOpen={setRepositorySetupProjectId}
-          onProjectSettings={(projectId) => {
-            briar.setActiveProjectId(projectId);
-            navigateToPage("project-settings");
-          }}
-          onLogout={() => void briar.logout()}
-          organizations={briar.organizations}
-          projects={briar.projects}
-          projectReadiness={briar.projectReadiness}
-          unreadInboxCount={inbox.unreadCount}
-          user={briar.user}
-        />
+        {activePage !== "settings" ? (
+          <Sidebar
+            activePage={activePage}
+            activeOrganizationId={briar.activeOrganizationId}
+            activeProjectId={briar.activeProjectId}
+            isOpen={isSidebarOpen}
+            onAddProject={briar.startProjectCreation}
+            onAutoHuntOpen={() => navigateToPage("auto-hunt")}
+            onInboxOpen={() => navigateToPage("inbox")}
+            onIssuesOpen={() => navigateToPage("issues")}
+            onOrganizationChange={(organizationId) => {
+              briar.setActiveOrganizationId(organizationId);
+              setRequestedRunId(null);
+              setRequestedSessionId(null);
+              resetNavigation("issues");
+            }}
+            onOrganizationSettings={(organizationId, section) => {
+              setOrganizationSettingsTarget({ id: organizationId, section });
+              navigateToPage("organization-settings");
+            }}
+            onProjectChange={(projectId) => {
+              briar.setActiveProjectId(projectId);
+              setRequestedRunId(null);
+              setRequestedSessionId(null);
+              resetNavigation("issues");
+            }}
+            onProjectReadinessOpen={setRepositorySetupProjectId}
+            onProjectSettings={(projectId) => {
+              briar.setActiveProjectId(projectId);
+              navigateToPage("project-settings");
+            }}
+            onSettings={() => navigateToPage("settings")}
+            onLogout={() => void briar.logout()}
+            organizations={briar.organizations}
+            projects={briar.projects}
+            projectReadiness={briar.projectReadiness}
+            unreadInboxCount={inbox.unreadCount}
+            user={briar.user}
+          />
+        ) : null}
         {repositorySetupProjectId ? (
           <ProjectRepositorySetupDialog
             error={briar.projectReadinessError[repositorySetupProjectId] ?? null}
@@ -363,7 +368,18 @@ export function App() {
             }
           />
         ) : null}
-        {activePage === "organization-settings" &&
+        {activePage === "settings" && activeProject ? (
+          <AppSettings
+            error={briar.projectReadinessError[activeProject.id] ?? null}
+            isSidebarOpen={isSidebarOpen}
+            loading={briar.projectReadinessLoadingId === activeProject.id}
+            onBack={() => (canGoBack ? goBack() : navigateToPage("issues"))}
+            onRefresh={() => briar.refreshProjectReadiness(activeProject.id)}
+            projectId={activeProject.id}
+            projectName={activeProject.name}
+            readiness={briar.projectReadiness[activeProject.id] ?? null}
+          />
+        ) : activePage === "organization-settings" &&
         settingsOrganization &&
         briar.token ? (
           <OrganizationSettings
