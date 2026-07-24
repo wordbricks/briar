@@ -807,7 +807,29 @@ export function RunPage({
           className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`}
           data-tauri-drag-region
         >
-          <div className="window-controls" aria-hidden="true"><i /><i /><i /></div>
+          <button
+            aria-label={t("run.back")}
+            className="run-page-titlebar-back"
+            onClick={onBack}
+            title={t("run.back")}
+            type="button"
+          >
+            <ArrowLeft aria-hidden="true" size={16} />
+          </button>
+          <small
+            className="run-page-window-number"
+            data-tauri-drag-region
+          >
+            AH-{run.runNumber}
+          </small>
+          <strong
+            className="run-page-window-title"
+            data-tauri-drag-region
+            id="run-page-title"
+            title={run.title}
+          >
+            {run.title}
+          </strong>
         </header>
       )}
       <div className="run-page-scroll">
@@ -816,31 +838,45 @@ export function RunPage({
           className="run-page"
         >
           <header>
-            <div className="run-page-heading">
-              <button
-                className="run-page-back"
-                onClick={onBack}
-                type="button"
-              >
-                <ArrowLeft size={16} />
-                {t("run.back")}
-              </button>
-              <div className="run-page-overview">
-                <div className="run-page-title-row">
-                  <small>AH-{run.runNumber}</small>
-                  <h1 id="run-page-title">{run.title}</h1>
+            {companionMode ? (
+              <div className="run-page-heading">
+                <button
+                  className="run-page-back"
+                  onClick={onBack}
+                  type="button"
+                >
+                  <ArrowLeft size={16} />
+                  {t("run.back")}
+                </button>
+                <div className="run-page-overview">
+                  <div className="run-page-title-row">
+                    <small>AH-{run.runNumber}</small>
+                    <h1 id="run-page-title">{run.title}</h1>
+                  </div>
+                  {issueContent && (
+                    <p className="run-page-description">{issueContent}</p>
+                  )}
                 </div>
+                <div className="run-page-meta">
+                  <span className={`status-pill ${meta.tone}`}>{label}</span>
+                  <small>
+                    {t("run.attempt", { count: run.currentAttempt })}
+                  </small>
+                </div>
+              </div>
+            ) : (
+              <div className="run-page-summary">
                 {issueContent && (
                   <p className="run-page-description">{issueContent}</p>
                 )}
+                <div className="run-page-meta">
+                  <span className={`status-pill ${meta.tone}`}>{label}</span>
+                  <small>
+                    {t("run.attempt", { count: run.currentAttempt })}
+                  </small>
+                </div>
               </div>
-              <div className="run-page-meta">
-                <span className={`status-pill ${meta.tone}`}>{label}</span>
-                <small>
-                  {t("run.attempt", { count: run.currentAttempt })}
-                </small>
-              </div>
-            </div>
+            )}
           </header>
           <div className="run-page-body">
             <div className="run-page-layout">
