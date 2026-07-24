@@ -9,8 +9,8 @@ import {
   type OnboardingPrerequisites,
 } from "../lib/initial-onboarding";
 import {
-  loadProjectLlmSettings,
-  updateProjectLlmSettings,
+  loadAppProviderSettings,
+  updateAppProviderSettings,
 } from "../lib/project-llm";
 import type { RepositoryReadiness } from "../lib/project-connection";
 import { AppSettings } from "./AppSettings";
@@ -23,8 +23,8 @@ vi.mock("../lib/project-llm", async (importOriginal) => {
   const original = await importOriginal<typeof import("../lib/project-llm")>();
   return {
     ...original,
-    loadProjectLlmSettings: vi.fn(),
-    updateProjectLlmSettings: vi.fn(),
+    loadAppProviderSettings: vi.fn(),
+    updateAppProviderSettings: vi.fn(),
   };
 });
 
@@ -74,8 +74,8 @@ const providerStatuses: OnboardingPrerequisites = {
 describe("AppSettings", () => {
   beforeEach(() => {
     vi.mocked(inspectOnboardingPrerequisites).mockReset();
-    vi.mocked(loadProjectLlmSettings).mockReset();
-    vi.mocked(updateProjectLlmSettings).mockReset();
+    vi.mocked(loadAppProviderSettings).mockReset();
+    vi.mocked(updateAppProviderSettings).mockReset();
     window.localStorage.clear();
     window.localStorage.setItem("briar.locale.v1", "en");
     (
@@ -140,16 +140,16 @@ describe("AppSettings", () => {
     container.remove();
   });
 
-  it("shows provider readiness and switches the project's active provider", async () => {
+  it("shows provider readiness and enables both providers independently", async () => {
     vi.mocked(inspectOnboardingPrerequisites).mockResolvedValue(
       providerStatuses,
     );
-    vi.mocked(loadProjectLlmSettings).mockResolvedValue({
-      provider: "codex",
-      approvalPolicy: "on-request",
+    vi.mocked(loadAppProviderSettings).mockResolvedValue({
+      codex: true,
+      claude: true,
     });
-    vi.mocked(updateProjectLlmSettings).mockImplementation(
-      async (_projectId, settings) => settings,
+    vi.mocked(updateAppProviderSettings).mockImplementation(
+      async (settings) => settings,
     );
     const container = document.createElement("div");
     document.body.append(container);
@@ -180,9 +180,15 @@ describe("AppSettings", () => {
     expect(container.textContent).toContain("codex-cli 0.145.0");
     expect(container.textContent).toContain("Claude");
     expect(container.textContent).toContain("2.1.206");
-    expect(container.textContent).toContain("Active for the Briar project");
+    expect(container.textContent).toContain(
+      "Enabled · Available in project settings.",
+    );
     expect(
       container.querySelector<HTMLInputElement>('[aria-label="Codex enabled"]')
+        ?.checked,
+    ).toBe(true);
+    expect(
+      container.querySelector<HTMLInputElement>('[aria-label="Claude enabled"]')
         ?.checked,
     ).toBe(true);
 
@@ -191,14 +197,14 @@ describe("AppSettings", () => {
         .querySelector<HTMLInputElement>('[aria-label="Claude enabled"]')
         ?.click();
     });
-    expect(updateProjectLlmSettings).toHaveBeenCalledWith("project-1", {
-      provider: "claude",
-      approvalPolicy: "on-request",
+    expect(updateAppProviderSettings).toHaveBeenCalledWith({
+      codex: true,
+      claude: false,
     });
     expect(
       container.querySelector<HTMLInputElement>('[aria-label="Claude enabled"]')
         ?.checked,
-    ).toBe(true);
+    ).toBe(false);
 
     await act(async () => {
       container

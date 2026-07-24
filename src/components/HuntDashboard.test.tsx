@@ -207,12 +207,20 @@ describe("HuntDashboard", () => {
     expect(container.querySelector(".dialog-backdrop")).toBeNull();
     expect(container.querySelector(".run-page")).not.toBeNull();
     expect(container.querySelector(".kanban-board")).toBeNull();
-    const heading = container.querySelector(".run-page-heading");
-    expect(heading?.querySelector(".run-page-title-row h1")?.textContent).toBe(
-      demoDashboard.runs[0].title,
+    expect(container.querySelector(".window-controls")).toBeNull();
+    const titlebarBack = container.querySelector(".run-page-titlebar-back");
+    expect(titlebarBack?.getAttribute("aria-label")).toBe("돌아가기");
+    expect(container.querySelector(".run-page-window-number")?.textContent).toBe(
+      `AH-${demoDashboard.runs[0].runNumber}`,
     );
-    expect(heading?.querySelector(".run-page-description")).not.toBeNull();
-    expect(heading?.textContent).toContain(`AH-${demoDashboard.runs[0].runNumber}`);
+    const windowTitle = container.querySelector(".run-page-window-title");
+    expect(windowTitle?.textContent).toBe(demoDashboard.runs[0].title);
+    expect(windowTitle?.getAttribute("title")).toBe(demoDashboard.runs[0].title);
+    expect(windowTitle?.hasAttribute("data-tauri-drag-region")).toBe(true);
+    expect(container.querySelector(".run-page-heading")).toBeNull();
+    expect(container.querySelector(".run-page-back")).toBeNull();
+    expect(container.querySelector(".run-page-title-row")).toBeNull();
+    expect(container.querySelector(".run-page-summary .run-page-description")).not.toBeNull();
     expect(container.querySelector(".run-page-content > h1")).toBeNull();
     expect(container.querySelector(".run-page-content > .eyebrow")).toBeNull();
     expect(container.querySelector(".run-page-content > .run-detail")).toBeNull();
@@ -238,12 +246,38 @@ describe("HuntDashboard", () => {
     expect(container.querySelector(".run-page-composer-dock")).toBeNull();
 
     await act(async () => {
-      container.querySelector<HTMLButtonElement>(".run-page-back")?.click();
+      container.querySelector<HTMLButtonElement>(".run-page-titlebar-back")?.click();
     });
 
     expect(container.querySelector(".run-page")).toBeNull();
     expect(container.querySelector(".kanban-board")).not.toBeNull();
     await act(async () => root.unmount());
+  });
+
+  it("keeps in-page issue navigation in companion mode", () => {
+    const markup = renderToStaticMarkup(
+      <RunPage
+        companionMode
+        isSidebarOpen
+        error={null}
+        isRecovering={false}
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }}
+        run={demoDashboard.runs[0]}
+      />,
+    );
+
+    expect(markup).not.toContain("run-page-titlebar-back");
+    expect(markup).toContain("run-page-back");
+    expect(markup).toContain(`AH-${demoDashboard.runs[0].runNumber}`);
+    expect(markup).toContain(`<h1 id="run-page-title">${demoDashboard.runs[0].title}</h1>`);
   });
 
   it("opens a message thread in the right drawer and closes it with Escape", async () => {
