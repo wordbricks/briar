@@ -5,7 +5,6 @@ import {
   CircleAlert,
   Clock3,
   LoaderCircle,
-  PanelLeftOpen,
   Play,
   Sparkles,
 } from "lucide-react";
@@ -31,7 +30,6 @@ export function AutoHuntSessions({
   error,
   isSidebarOpen,
   onBack,
-  onSidebarOpen,
   onRequestedSessionOpen,
   onStart,
   requestedSessionId = null,
@@ -42,7 +40,6 @@ export function AutoHuntSessions({
   error: string | null;
   isSidebarOpen: boolean;
   onBack?: () => void;
-  onSidebarOpen: () => void;
   onRequestedSessionOpen?: () => void;
   onStart: (runs: HuntRun[]) => string;
   requestedSessionId?: string | null;
@@ -100,19 +97,6 @@ export function AutoHuntSessions({
     return (
       <main className="main-content" id="auto-hunt-session">
         {!companionMode && <header className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region>
-          {!isSidebarOpen && (
-            <button
-              aria-controls="app-sidebar"
-              aria-expanded="false"
-              aria-label={t("sidebar.open")}
-              className="sidebar-toggle"
-              onClick={onSidebarOpen}
-              title={t("sidebar.open")}
-              type="button"
-            >
-              <PanelLeftOpen size={17} />
-            </button>
-          )}
           <div className="window-controls" aria-hidden="true"><i /><i /><i /></div>
         </header>}
 
@@ -247,19 +231,6 @@ export function AutoHuntSessions({
   return (
     <main className="main-content" id="auto-hunt">
       {!companionMode && <header className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region>
-        {!isSidebarOpen && (
-          <button
-            aria-controls="app-sidebar"
-            aria-expanded="false"
-            aria-label={t("sidebar.open")}
-            className="sidebar-toggle"
-            onClick={onSidebarOpen}
-            title={t("sidebar.open")}
-            type="button"
-          >
-            <PanelLeftOpen size={17} />
-          </button>
-        )}
         <div className="window-controls" aria-hidden="true"><i /><i /><i /></div>
       </header>}
 

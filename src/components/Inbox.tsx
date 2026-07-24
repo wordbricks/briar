@@ -6,7 +6,6 @@ import {
   CircleAlert,
   Clock3,
   Inbox as InboxIcon,
-  PanelLeftOpen,
 } from "lucide-react";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
@@ -21,7 +20,6 @@ export function Inbox({
   messages,
   onMarkAllRead,
   onOpen,
-  onSidebarOpen,
   unreadCount,
 }: {
   companionMode?: boolean;
@@ -29,7 +27,6 @@ export function Inbox({
   messages: InboxMessageWithReadState[];
   onMarkAllRead: () => void;
   onOpen: (message: InboxMessageWithReadState) => void;
-  onSidebarOpen: () => void;
   unreadCount: number;
 }) {
   const { localeTag, t } = useI18n();
@@ -126,19 +123,6 @@ export function Inbox({
         className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`}
         data-tauri-drag-region
       >
-        {!isSidebarOpen && (
-          <button
-            aria-controls="app-sidebar"
-            aria-expanded="false"
-            aria-label={t("sidebar.open")}
-            className="sidebar-toggle"
-            onClick={onSidebarOpen}
-            title={t("sidebar.open")}
-            type="button"
-          >
-            <PanelLeftOpen size={17} />
-          </button>
-        )}
         <div className="window-controls" aria-hidden="true"><i /><i /><i /></div>
       </header>
       {inboxContent}

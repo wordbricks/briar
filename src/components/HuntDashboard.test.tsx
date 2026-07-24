@@ -29,7 +29,6 @@ const dashboardProps = {
   onRetryRun: async () => undefined,
   onCancelRun: async () => undefined,
   onRepair: () => undefined,
-  onSidebarOpen: () => undefined,
 };
 
 const healthyHealth: AutoHuntHealth = {
@@ -258,7 +257,6 @@ describe("HuntDashboard", () => {
         onLoadAttachment={async () => new Blob()}
         onMove={async () => undefined}
         onRetry={async () => undefined}
-        onSidebarOpen={() => undefined}
         run={failedRun}
       />,
     );

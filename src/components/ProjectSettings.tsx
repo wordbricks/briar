@@ -5,7 +5,6 @@ import {
   Copy,
   GitBranch,
   LoaderCircle,
-  PanelLeftOpen,
   RefreshCw,
   ShieldCheck,
   Trash2,
@@ -26,7 +25,6 @@ export function ProjectSettings({
   onBack,
   onDelete,
   onRegenerateWorkflow,
-  onSidebarOpen,
   project,
 }: {
   dashboard: DashboardPayload | null;
@@ -35,7 +33,6 @@ export function ProjectSettings({
   onBack: () => void;
   onDelete: () => Promise<unknown>;
   onRegenerateWorkflow: () => Promise<unknown>;
-  onSidebarOpen: () => void;
   project: Project;
 }) {
   const { localeTag, t } = useI18n();
@@ -140,19 +137,6 @@ export function ProjectSettings({
   return (
     <main className="main-content project-settings-page">
       <header className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region>
-        {!isSidebarOpen && (
-          <button
-            aria-controls="app-sidebar"
-            aria-expanded="false"
-            aria-label={t("sidebar.open")}
-            className="sidebar-toggle"
-            onClick={onSidebarOpen}
-            title={t("sidebar.open")}
-            type="button"
-          >
-            <PanelLeftOpen size={17} />
-          </button>
-        )}
         <button className="project-settings-back" onClick={onBack} type="button">
           <ArrowLeft size={16} strokeWidth={1.8} />
           <span>{t("settings.back")}</span>

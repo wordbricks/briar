@@ -11,7 +11,6 @@ import {
   FolderGit2,
   Inbox,
   LogOut,
-  PanelLeftClose,
   Plus,
   Settings,
   Languages,
@@ -37,7 +36,6 @@ export function Sidebar({
   onProjectReadinessOpen,
   onProjectSettings,
   onLogout,
-  onToggle,
   organizations,
   projects,
   projectReadiness,
@@ -66,7 +64,6 @@ export function Sidebar({
   onProjectReadinessOpen: (projectId: string) => void;
   onProjectSettings: (projectId: string) => void;
   onLogout: () => void;
-  onToggle: () => void;
   organizations: Organization[];
   projects: Project[];
   projectReadiness: Record<string, RepositoryReadiness>;
@@ -213,19 +210,7 @@ export function Sidebar({
       inert={!isOpen ? true : undefined}
       id="app-sidebar"
     >
-      <div className="sidebar-toolbar" data-tauri-drag-region>
-        <button
-          aria-controls="app-sidebar"
-          aria-expanded="true"
-          aria-label={t("sidebar.close")}
-          className="sidebar-toggle"
-          onClick={onToggle}
-          title={t("sidebar.close")}
-          type="button"
-        >
-          <PanelLeftClose size={16} strokeWidth={1.7} />
-        </button>
-      </div>
+      <div className="sidebar-toolbar" data-tauri-drag-region />
 
       <div
         className="sidebar-organization-switcher"
@@ -383,7 +368,10 @@ export function Sidebar({
           aria-current={activePage === "inbox" ? "page" : undefined}
           className={activePage === "inbox" ? "active" : ""}
           href="#inbox"
-          onClick={onInboxOpen}
+          onClick={(event) => {
+            event.preventDefault();
+            onInboxOpen();
+          }}
         >
           <Inbox size={16} strokeWidth={1.7} />
           <span>{t("sidebar.inbox")}</span>
@@ -486,7 +474,10 @@ export function Sidebar({
                       aria-current={activePage === "issues" ? "page" : undefined}
                       className={`sidebar-project-view${activePage === "issues" ? " active" : ""}`}
                       href="#issues"
-                      onClick={onIssuesOpen}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        onIssuesOpen();
+                      }}
                     >
                       <Activity size={14} strokeWidth={1.7} />
                       <span>{t("sidebar.issues")}</span>
@@ -495,7 +486,10 @@ export function Sidebar({
                       aria-current={activePage === "auto-hunt" ? "page" : undefined}
                       className={`sidebar-project-view${activePage === "auto-hunt" ? " active" : ""}`}
                       href="#auto-hunt"
-                      onClick={onAutoHuntOpen}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        onAutoHuntOpen();
+                      }}
                     >
                       <Bot size={14} strokeWidth={1.7} />
                       <span>{t("sidebar.autoHunt")}</span>
