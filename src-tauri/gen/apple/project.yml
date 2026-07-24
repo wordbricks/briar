@@ -33,6 +33,7 @@ targets:
       - path: Sources
       - path: Assets.xcassets
       - path: Externals
+        buildPhase: none
       - path: briar_iOS
       - path: assets
         buildPhase: resources
