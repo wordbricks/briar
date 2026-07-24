@@ -1,7 +1,7 @@
 import type { HuntRun } from "../types";
 import { briarApiUrl } from "./api";
+import { maxAutoHuntIssuesLimit } from "./auto-hunt-automation";
 
-export const maxAutoHuntSessionIssues = 3;
 export const autoHuntAppServerEventName = "auto-hunt-app-server-event";
 
 export type AutoHuntAppServerEvent = {
@@ -78,9 +78,9 @@ export async function startProjectAutoHunt(
   if (issues.length === 0) {
     throw new Error("대기 상태인 이슈가 없습니다.");
   }
-  if (issues.length > maxAutoHuntSessionIssues) {
+  if (issues.length > maxAutoHuntIssuesLimit) {
     throw new Error(
-      `한 번의 자동사냥 세션에서는 최대 ${maxAutoHuntSessionIssues}개의 이슈만 처리할 수 있습니다.`,
+      `한 번의 자동사냥 세션에서는 최대 ${maxAutoHuntIssuesLimit}개의 이슈만 처리할 수 있습니다.`,
     );
   }
   const { invoke } = await import("@tauri-apps/api/core");

@@ -70,7 +70,10 @@ export type DeviceAuthorization = {
   interval: number;
 };
 
-export type DeviceClientId = "briar-android" | "briar-desktop";
+export type DeviceClientId =
+  | "briar-mobile"
+  | "briar-android"
+  | "briar-desktop";
 
 export async function beginDeviceAuthorization(
   clientId: DeviceClientId = "briar-desktop",
@@ -91,8 +94,8 @@ export async function beginDeviceAuthorization(
   const verificationUrl =
     response.verification_uri_complete ?? response.verification_uri;
   const clientVerificationUrl = new URL(verificationUrl);
-  if (clientId === "briar-android") {
-    clientVerificationUrl.searchParams.set("client", "android");
+  if (clientId === "briar-mobile" || clientId === "briar-android") {
+    clientVerificationUrl.searchParams.set("client", "mobile");
   }
   return {
     deviceCode: response.device_code,

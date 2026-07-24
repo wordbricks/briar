@@ -10,6 +10,11 @@ import {
   type AutoHuntWorkflow,
   type AutoHuntWorkflowStageId,
 } from "../../src/lib/auto-hunt-contract";
+import {
+  defaultAutoHuntAutomation,
+  normalizeAutoHuntAutomation,
+  type AutoHuntAutomation,
+} from "../../src/lib/auto-hunt-automation";
 
 export type ProjectRow = {
   id: string;
@@ -45,6 +50,7 @@ export type ProjectSettingsRow = {
   linear_team_key: string | null;
   github_repository: string | null;
   workflow_json: string;
+  auto_hunt_automation_json: string;
   created_at: string;
   updated_at: string;
 };
@@ -172,6 +178,7 @@ export type ProjectSettingsInput = {
   };
   githubRepository: string | null;
   workflow: AutoHuntWorkflow;
+  automation?: AutoHuntAutomation;
 };
 
 export class EventKeyConflictError extends Error {
@@ -407,7 +414,7 @@ export async function getProjectSettings(db: D1Database, projectId: string) {
     .prepare(
       `select project_id, velen_org, data_source, linear_enabled,
               linear_source, linear_team_key, github_repository, workflow_json,
-              created_at, updated_at
+              auto_hunt_automation_json, created_at, updated_at
        from briar_project_settings
        where project_id = ?`,
     )
@@ -421,12 +428,16 @@ export async function updateProjectSettings(
   input: ProjectSettingsInput,
 ) {
   const updatedAt = new Date().toISOString();
+  const automation = stableJson(
+    normalizeAutoHuntAutomation(input.automation ?? defaultAutoHuntAutomation),
+  );
   await db
     .prepare(
       `insert into briar_project_settings (
          project_id, velen_org, data_source, linear_enabled, linear_source,
-         linear_team_key, github_repository, workflow_json, created_at, updated_at
-       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         linear_team_key, github_repository, workflow_json,
+         auto_hunt_automation_json, created_at, updated_at
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        on conflict(project_id) do update set
          velen_org = excluded.velen_org,
          data_source = excluded.data_source,
@@ -435,6 +446,10 @@ export async function updateProjectSettings(
          linear_team_key = excluded.linear_team_key,
          github_repository = excluded.github_repository,
          workflow_json = excluded.workflow_json,
+         auto_hunt_automation_json = case
+           when ? = 1 then excluded.auto_hunt_automation_json
+           else briar_project_settings.auto_hunt_automation_json
+         end,
          updated_at = excluded.updated_at`,
     )
     .bind(
@@ -446,8 +461,10 @@ export async function updateProjectSettings(
       input.linear.enabled ? input.linear.teamKey : null,
       input.githubRepository,
       stableJson(normalizeAutoHuntWorkflow(input.workflow)),
+      automation,
       updatedAt,
       updatedAt,
+      input.automation ? 1 : 0,
     )
     .run();
   return await getProjectSettings(db, projectId);

@@ -6,6 +6,7 @@ import {
   type AutoHuntWorkflow,
   type AutoHuntWorkflowStageId,
 } from "./lib/auto-hunt-contract";
+import type { AutoHuntAutomation } from "./lib/auto-hunt-automation";
 
 export const huntStatuses = autoHuntRunStatuses;
 export type HuntStatus = AutoHuntRunStatus;
@@ -127,6 +128,7 @@ export type ProjectSettings = {
   };
   githubRepository: string | null;
   workflow: AutoHuntWorkflow;
+  automation: AutoHuntAutomation;
 };
 
 export type DashboardPayload = {
