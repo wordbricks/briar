@@ -43,6 +43,13 @@
     "category": "DeveloperTool",
     "shortDescription": "Agent Development Environment",
     "longDescription": "Connect local agents and observe Auto Hunt progress from a desktop dashboard.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
     "resources": {
       "../dist-cli/briar.js": "cli/briar.js",
       "../scripts/briar-launcher": "cli/briar",
@@ -51,7 +58,22 @@
     },
     "macOS": {
       "minimumSystemVersion": "12.0",
-      "signingIdentity": "-"
+      "signingIdentity": "-",
+      "dmg": {
+        "background": "icons/dmg-background.png",
+        "windowSize": {
+          "width": 720,
+          "height": 440
+        },
+        "appPosition": {
+          "x": 180,
+          "y": 226
+        },
+        "applicationFolderPosition": {
+          "x": 540,
+          "y": 226
+        }
+      }
     }
   }
 }
