@@ -204,6 +204,8 @@ describe("HuntDashboard", () => {
     expect(properties?.textContent).toContain("우선순위");
     expect(properties?.textContent).toContain("저장소");
     expect(properties?.querySelector(".run-status-control")).not.toBeNull();
+    expect(properties?.textContent).not.toContain("전체 진행률");
+    expect(properties?.querySelector(".run-property.progress")).toBeNull();
     expect(container.textContent).not.toContain("로컬 저장소 열기");
 
     await act(async () => {

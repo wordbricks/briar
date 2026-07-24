@@ -874,14 +874,6 @@ export function RunPage({
                     <span className="run-property-icon agent"><Bot size={15} /></span>
                     <span className="run-property-copy"><small>{t("run.agent")}</small><strong>Codex App Server</strong></span>
                   </div>
-                  <div className="run-property progress">
-                    <span className="run-property-icon progress"><Activity size={15} /></span>
-                    <span className="run-property-copy">
-                      <small>{t("run.totalProgress")}</small>
-                      <strong>{run.progress}%</strong>
-                      <i><b style={{ width: `${run.progress}%` }} /></i>
-                    </span>
-                  </div>
                   <div className="run-property">
                     <span className="run-property-icon attempt"><RotateCcw size={15} /></span>
                     <span className="run-property-copy"><small>{t("run.currentAttempt")}</small><strong>{t("run.attempt", { count: run.currentAttempt })}</strong></span>
