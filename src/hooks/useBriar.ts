@@ -17,6 +17,7 @@ import {
   moveHuntRun,
   pollDeviceToken,
   retryHuntRun,
+  updateOrganization as updateRemoteOrganization,
   updateProjectSettings,
   type DeviceClientId,
 } from "../lib/api";
@@ -570,6 +571,49 @@ export function useBriar() {
       setError(null);
     },
     [organizations, projects],
+  );
+
+  const renameOrganization = useCallback(
+    async (organizationId: string, name: string) => {
+      const currentOrganization = organizations.find(
+        (organization) => organization.id === organizationId,
+      );
+      if (!currentOrganization) {
+        throw new Error("변경할 조직을 찾을 수 없습니다.");
+      }
+      if (!demoMode && !token) throw new Error("로그인이 필요합니다.");
+      const organization =
+        demoMode || !token
+          ? { ...currentOrganization, name }
+          : (
+              await updateRemoteOrganization(token, organizationId, name)
+            ).organization;
+      setOrganizations((current) =>
+        current.map((candidate) =>
+          candidate.id === organizationId ? organization : candidate,
+        ),
+      );
+      setProjects((current) =>
+        current.map((project) =>
+          project.organizationId === organizationId
+            ? { ...project, organizationName: organization.name }
+            : project,
+        ),
+      );
+      setDashboard((current) =>
+        current?.project.organizationId === organizationId
+          ? {
+              ...current,
+              project: {
+                ...current.project,
+                organizationName: organization.name,
+              },
+            }
+          : current,
+      );
+      return organization;
+    },
+    [organizations, token],
   );
 
   const addProject = useCallback(
@@ -1466,6 +1510,7 @@ export function useBriar() {
     projectReadinessError,
     projectReadinessLoadingId,
     reconnectProject,
+    renameOrganization,
     regenerateWorkflow,
     saveAutoHuntAutomation,
     saveLinearIntegration,

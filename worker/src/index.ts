@@ -56,6 +56,7 @@ import {
   removeOrganizationMember,
   rollbackNewAppIssue,
   updateProjectSettings,
+  updateOrganization,
   type HuntEventRow,
   type HuntRunRow,
   type IssueAttachmentInput,
@@ -774,6 +775,30 @@ async function route(
       ownerUserId: session.user.id,
     });
     return json({ organization: organizationJson(organization) }, 201);
+  }
+
+  const organizationMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)$/u,
+  );
+  if (organizationMatch && request.method === "PUT") {
+    const session = await requireSession(auth, request);
+    const role = await getOrganizationRole(
+      db,
+      organizationMatch[1],
+      session.user.id,
+    );
+    if (!canManageOrganization(role)) {
+      throw new HttpError(403, "Organization admin access required");
+    }
+    const input = organizationInputSchema.parse(await readJson(request));
+    const organization = await updateOrganization(
+      db,
+      organizationMatch[1],
+      input.name,
+      role,
+    );
+    if (!organization) throw new HttpError(404, "Organization not found");
+    return json({ organization: organizationJson(organization) });
   }
 
   const organizationMembersMatch = pathname.match(

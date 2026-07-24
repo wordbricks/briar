@@ -1,9 +1,11 @@
 import {
   ArrowLeft,
+  Building2,
   Download,
   Search,
   Trash2,
   UserPlus,
+  Users,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -23,14 +25,25 @@ export function OrganizationSettings({
   organization,
   token,
   onBack,
+  onRename,
+  isSidebarOpen = true,
   initialSection,
 }: {
   organization: Organization;
   token: string;
   onBack: () => void;
-  initialSection?: "members";
+  onRename: (organizationId: string, name: string) => Promise<Organization>;
+  isSidebarOpen?: boolean;
+  initialSection?: "general" | "members";
 }) {
   const { locale, t } = useI18n();
+  const [activeSection, setActiveSection] = useState<"general" | "members">(
+    initialSection ?? "general",
+  );
+  const [organizationName, setOrganizationName] = useState(organization.name);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameError, setRenameError] = useState<string | null>(null);
+  const [renameSaved, setRenameSaved] = useState(false);
   const [members, setMembers] = useState<OrganizationMember[]>([]);
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
@@ -48,8 +61,21 @@ export function OrganizationSettings({
     organization.role === "owner" || organization.role === "admin";
   const dateLocale =
     locale === "ko" ? "ko-KR" : locale === "zh" ? "zh-CN" : "en-US";
+  const normalizedOrganizationName = organizationName.trim();
+  const canSaveOrganizationName =
+    canManage &&
+    normalizedOrganizationName.length > 0 &&
+    normalizedOrganizationName.length <= 100 &&
+    normalizedOrganizationName !== organization.name &&
+    !isRenaming;
 
   useEffect(() => {
+    if (!token) {
+      setMembers([]);
+      setLoading(false);
+      setError(null);
+      return;
+    }
     setLoading(true);
     void loadOrganizationMembers(token, organizationId)
       .then((result) => {
@@ -63,8 +89,14 @@ export function OrganizationSettings({
   }, [organizationId, token]);
 
   useEffect(() => {
-    if (initialSection === "members") searchRef.current?.focus();
-  }, [initialSection]);
+    if (activeSection === "members") searchRef.current?.focus();
+  }, [activeSection]);
+
+  useEffect(() => {
+    setOrganizationName(organization.name);
+    setRenameSaved(false);
+    setRenameError(null);
+  }, [organization.name]);
 
   useEffect(() => {
     if (isInviteOpen) inviteEmailRef.current?.focus();
@@ -117,23 +149,150 @@ export function OrganizationSettings({
   };
 
   return (
-    <main className="organization-settings">
-      <header className="organization-members-header">
+    <div className="organization-settings-layout">
+      <aside
+        aria-hidden={!isSidebarOpen}
+        className={`organization-settings-sidebar${
+          isSidebarOpen ? "" : " organization-settings-sidebar-collapsed"
+        }`}
+        id="app-sidebar"
+        inert={!isSidebarOpen ? true : undefined}
+      >
+        <div className="organization-settings-sidebar-toolbar" data-tauri-drag-region />
         <button
-          aria-label={t("organization.back")}
-          className="organization-members-back"
+          className="organization-settings-back"
           onClick={onBack}
           type="button"
         >
           <ArrowLeft size={18} strokeWidth={1.8} />
+          <span>{t("organization.backToApp")}</span>
         </button>
-        <div>
-          <h1>{t("organization.membersTitle")}</h1>
-          <p>{t("organization.membersDescription", { name: organization.name })}</p>
-        </div>
-      </header>
 
-      <div className="organization-members-toolbar">
+        <div className="organization-settings-identity">
+          <span>
+            <Building2 aria-hidden="true" size={17} strokeWidth={1.8} />
+          </span>
+          <div>
+            <strong>{organization.name}</strong>
+            <small>{t("organization.settingsLabel")}</small>
+          </div>
+        </div>
+
+        <nav aria-label={t("organization.navigation")}>
+          <p>{t("organization.organizationSection")}</p>
+          <button
+            aria-current={activeSection === "general" ? "page" : undefined}
+            className={activeSection === "general" ? "active" : ""}
+            onClick={() => setActiveSection("general")}
+            type="button"
+          >
+            <Building2 aria-hidden="true" size={16} strokeWidth={1.8} />
+            <span>{t("organization.general")}</span>
+          </button>
+          <button
+            aria-current={activeSection === "members" ? "page" : undefined}
+            className={activeSection === "members" ? "active" : ""}
+            onClick={() => setActiveSection("members")}
+            type="button"
+          >
+            <Users aria-hidden="true" size={16} strokeWidth={1.8} />
+            <span>{t("organization.membersAndInvites")}</span>
+          </button>
+        </nav>
+      </aside>
+
+      <main className="organization-settings">
+        <div className="organization-settings-content">
+          {activeSection === "general" ? (
+            <>
+              <header className="organization-settings-header">
+                <h1>{t("organization.settingsTitle")}</h1>
+                <p>
+                  {t("organization.settingsDescription", {
+                    name: organization.name,
+                  })}
+                </p>
+              </header>
+
+              <section className="organization-general-section">
+                <h2>{t("organization.general")}</h2>
+                <form
+                  className="organization-general-card"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    if (!canSaveOrganizationName) return;
+                    setIsRenaming(true);
+                    setRenameError(null);
+                    setRenameSaved(false);
+                    void onRename(organizationId, normalizedOrganizationName)
+                      .then((updatedOrganization) => {
+                        setOrganizationName(updatedOrganization.name);
+                        setRenameSaved(true);
+                      })
+                      .catch((caught) =>
+                        setRenameError(
+                          caught instanceof Error
+                            ? caught.message
+                            : String(caught),
+                        ),
+                      )
+                      .finally(() => setIsRenaming(false));
+                  }}
+                >
+                  <div>
+                    <label htmlFor="organization-name">
+                      {t("organization.organizationName")}
+                    </label>
+                    <p>{t("organization.organizationNameDescription")}</p>
+                  </div>
+                  <div className="organization-general-control">
+                    <input
+                      autoComplete="organization"
+                      disabled={!canManage || isRenaming}
+                      id="organization-name"
+                      maxLength={100}
+                      onChange={(event) => {
+                        setOrganizationName(event.target.value);
+                        setRenameSaved(false);
+                        setRenameError(null);
+                      }}
+                      required
+                      value={organizationName}
+                    />
+                    <button disabled={!canSaveOrganizationName} type="submit">
+                      {isRenaming ? t("common.saving") : t("common.save")}
+                    </button>
+                  </div>
+                  {!canManage ? (
+                    <p className="organization-general-note">
+                      {t("organization.namePermission")}
+                    </p>
+                  ) : renameError ? (
+                    <p className="organization-general-error" role="alert">
+                      {renameError}
+                    </p>
+                  ) : renameSaved ? (
+                    <p className="organization-general-saved" role="status">
+                      {t("organization.nameSaved")}
+                    </p>
+                  ) : null}
+                </form>
+              </section>
+            </>
+          ) : (
+            <>
+              <header className="organization-members-header">
+                <div>
+                  <h1>{t("organization.membersTitle")}</h1>
+                  <p>
+                    {t("organization.membersDescription", {
+                      name: organization.name,
+                    })}
+                  </p>
+                </div>
+              </header>
+
+              <div className="organization-members-toolbar">
         <label className="organization-members-search">
           <Search aria-hidden="true" size={17} strokeWidth={1.8} />
           <input
@@ -180,15 +339,15 @@ export function OrganizationSettings({
             </button>
           )}
         </div>
-      </div>
+              </div>
 
-      {error && !isInviteOpen && (
+              {error && !isInviteOpen && (
         <p className="organization-settings-error" role="alert">
           {error}
         </p>
-      )}
+              )}
 
-      <section
+              <section
         aria-label={t("organization.memberList")}
         className="organization-member-table"
       >
@@ -281,9 +440,12 @@ export function OrganizationSettings({
             </div>
           ))
         )}
-      </section>
+              </section>
+            </>
+          )}
+        </div>
 
-      {isInviteOpen && (
+        {isInviteOpen && (
         <div
           className="organization-invite-overlay"
           onMouseDown={(event) => {
@@ -380,7 +542,8 @@ export function OrganizationSettings({
             </footer>
           </form>
         </div>
-      )}
-    </main>
+        )}
+      </main>
+    </div>
   );
 }

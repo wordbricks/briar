@@ -66,6 +66,7 @@ describe("OrganizationSettings", () => {
     await act(async () => {
       root.render(
         <OrganizationSettings
+          initialSection="members"
           organization={{
             id: "organization-1",
             name: "Wordbricks",
@@ -73,6 +74,7 @@ describe("OrganizationSettings", () => {
             createdAt: "2023-12-01T00:00:00Z",
           }}
           onBack={() => undefined}
+          onRename={vi.fn()}
           token="token"
         />,
       );
@@ -119,6 +121,59 @@ describe("OrganizationSettings", () => {
       "organization-1",
       { email: "new@wordbricks.ai", role: "member" },
     );
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("shows the settings navigation and renames the organization", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    const onRename = vi.fn().mockResolvedValue({
+      id: "organization-1",
+      name: "Briar Labs",
+      role: "owner",
+      createdAt: "2023-12-01T00:00:00Z",
+    });
+
+    await act(async () => {
+      root.render(
+        <OrganizationSettings
+          organization={{
+            id: "organization-1",
+            name: "Wordbricks",
+            role: "owner",
+            createdAt: "2023-12-01T00:00:00Z",
+          }}
+          onBack={() => undefined}
+          onRename={onRename}
+          token="token"
+        />,
+      );
+    });
+
+    expect(
+      container.querySelector('[aria-label="조직 설정 메뉴"]')?.textContent,
+    ).toContain("General");
+    expect(
+      container.querySelector('[aria-label="조직 설정 메뉴"]')?.textContent,
+    ).toContain("멤버 및 초대");
+
+    const nameInput = container.querySelector<HTMLInputElement>(
+      "#organization-name",
+    )!;
+    await act(async () => {
+      setInputValue(nameInput, "Briar Labs");
+    });
+    await act(async () => {
+      nameInput.form?.dispatchEvent(
+        new Event("submit", { bubbles: true, cancelable: true }),
+      );
+    });
+
+    expect(onRename).toHaveBeenCalledWith("organization-1", "Briar Labs");
+    expect(container.textContent).toContain("조직 이름을 저장했습니다.");
 
     await act(async () => root.unmount());
     container.remove();

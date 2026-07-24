@@ -310,7 +310,8 @@ export function App() {
           onForward={goForward}
           onSidebarToggle={() => setIsSidebarOpen((open) => !open)}
         />
-        {activePage !== "settings" ? (
+        {activePage !== "settings" &&
+        activePage !== "organization-settings" ? (
           <Sidebar
             activePage={activePage}
             activeOrganizationId={briar.activeOrganizationId}
@@ -328,6 +329,7 @@ export function App() {
             }}
             onOrganizationSettings={(organizationId, section) => {
               setOrganizationSettingsTarget({ id: organizationId, section });
+              setIsSidebarOpen(true);
               navigateToPage("organization-settings");
             }}
             onProjectChange={(projectId) => {
@@ -398,16 +400,17 @@ export function App() {
             readiness={briar.projectReadiness[activeProject.id] ?? null}
           />
         ) : activePage === "organization-settings" &&
-        settingsOrganization &&
-        briar.token ? (
+        settingsOrganization ? (
           <OrganizationSettings
             initialSection={organizationSettingsTarget?.section}
+            isSidebarOpen={isSidebarOpen}
             key={`${settingsOrganization.id}-${organizationSettingsTarget?.section ?? "settings"}`}
             onBack={() =>
               canGoBack ? goBack() : navigateToPage("issues")
             }
             organization={settingsOrganization}
-            token={briar.token}
+            onRename={briar.renameOrganization}
+            token={briar.token ?? ""}
           />
         ) : activePage === "inbox" ? (
           <Inbox

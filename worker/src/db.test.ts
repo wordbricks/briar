@@ -28,6 +28,7 @@ import {
   recordHuntEvent,
   recordQaResult,
   updateProjectSettings,
+  updateOrganization,
 } from "./db";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
@@ -274,6 +275,19 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       "owner@example.com",
       "member@example.com",
     ]);
+  });
+
+  it("updates an organization name while preserving its membership role", async () => {
+    await expect(
+      updateOrganization(db, projectId, "Renamed Org", "owner"),
+    ).resolves.toMatchObject({
+      id: projectId,
+      name: "Renamed Org",
+      role: "owner",
+    });
+    expect((await listProjects(db, "owner"))[0]?.organization_name).toBe(
+      "Renamed Org",
+    );
   });
 
   it("stores an app-created issue as a queued Auto Hunt run", async () => {
