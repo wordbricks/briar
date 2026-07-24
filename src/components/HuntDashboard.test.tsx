@@ -191,6 +191,7 @@ describe("HuntDashboard", () => {
 
   it("opens issue details as a page and returns to the kanban", async () => {
     const container = document.createElement("div");
+    document.body.append(container);
     const root = createRoot(container);
     await act(async () => root.render(
       <HuntDashboard
@@ -239,7 +240,32 @@ describe("HuntDashboard", () => {
     expect(container.textContent).not.toContain(
       "Auto Hunt 실행 증거를 실시간으로 표시합니다.",
     );
-    expect(container.querySelectorAll(".issue-activity .timeline-event")).toHaveLength(1);
+    const activityTrigger = container.querySelector<HTMLButtonElement>(
+      ".issue-activity-trigger",
+    );
+    expect(activityTrigger?.getAttribute("aria-label")).toBe("상태 히스토리 열기");
+    expect(activityTrigger?.textContent).toContain("구현");
+    expect(activityTrigger?.textContent).toContain("시도 1");
+    expect(activityTrigger?.textContent).not.toContain("기록 3개");
+    expect(container.querySelectorAll(".issue-activity .timeline-event")).toHaveLength(0);
+
+    await act(async () => activityTrigger?.click());
+    const activityDialog = container.querySelector(".issue-activity-dialog");
+    expect(activityDialog?.getAttribute("role")).toBe("dialog");
+    expect(activityDialog?.textContent).toContain("상태 히스토리");
+    expect(activityDialog?.textContent).toContain("기록 3개");
+    expect(
+      activityDialog?.querySelectorAll(".timeline-event"),
+    ).toHaveLength(demoDashboard.runs[0].events.length);
+    expect(document.activeElement).toBe(
+      activityDialog?.querySelector('button[aria-label="닫기"]'),
+    );
+
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    });
+    expect(container.querySelector(".issue-activity-dialog")).toBeNull();
+    expect(document.activeElement).toBe(activityTrigger);
     const descriptionPanel = container.querySelector(".issue-description-panel");
     expect(descriptionPanel).not.toBeNull();
     expect(descriptionPanel?.querySelector(".issue-description-markdown p")?.textContent)
@@ -259,6 +285,7 @@ describe("HuntDashboard", () => {
     expect(container.querySelector(".run-page")).toBeNull();
     expect(container.querySelector(".kanban-board")).not.toBeNull();
     await act(async () => root.unmount());
+    container.remove();
   });
 
   it("keeps in-page issue navigation in companion mode", () => {

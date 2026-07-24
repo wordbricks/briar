@@ -4,7 +4,6 @@ import {
   AtSign,
   Bold,
   Bot,
-  ChevronDown,
   ChevronRight,
   CircleAlert,
   Clock3,
@@ -1012,40 +1011,137 @@ export function RunPage({
 
 function IssueActivity({ run }: { run: HuntRun }) {
   const { t } = useI18n();
-  const event = run.events[0] ?? null;
-  const eventDisplay = event
-    ? eventMeta(event.status, event.workflowStage, run.workflow)
-    : null;
+  const [isOpen, setIsOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const latestEvent = run.events[0] ?? null;
+  const latestDisplay = latestEvent
+    ? eventMeta(latestEvent.status, latestEvent.workflowStage, run.workflow)
+    : runMeta(run.status, run.workflowStage, run.workflow);
+  const latestLabel = latestEvent
+    ? localizeEvent(
+        t,
+        latestEvent.status,
+        latestEvent.workflowStage,
+        latestDisplay.label,
+      )
+    : localizeStatus(t, run.status, run.workflowStage, latestDisplay.label);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    closeRef.current?.focus();
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsOpen(false);
+      if (event.key === "Tab") {
+        event.preventDefault();
+        closeRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("keydown", closeOnEscape);
+      triggerRef.current?.focus();
+    };
+  }, [isOpen]);
+
   return (
-    <details className="timeline issue-activity">
-      <summary>
-        <span>
-          <h3>{t("run.activity")}</h3>
-          <small>{t("run.activityCount", { count: run.events.length })}</small>
+    <div className="issue-activity">
+      <button
+        aria-expanded={isOpen}
+        aria-haspopup="dialog"
+        aria-label={t("run.openStatusHistory")}
+        className="issue-activity-trigger"
+        onClick={() => setIsOpen(true)}
+        ref={triggerRef}
+        type="button"
+      >
+        <span className={`issue-activity-dot ${latestDisplay.tone}`} />
+        <span className="issue-activity-latest">
+          <strong>{latestLabel}</strong>
+          <small>
+            {latestEvent
+              ? `${t("run.attempt", { count: latestEvent.attempt })} · ${relativeTime(latestEvent.occurredAt, t)}`
+              : t("run.notSet")}
+          </small>
         </span>
-        <ChevronDown aria-hidden="true" size={15} />
-      </summary>
-      {event && eventDisplay ? (
-        <div className="timeline-event" key={event.id}>
-          <i className={eventDisplay.tone} />
-          <span>
-            <strong>
-              {localizeEvent(
-                t,
-                event.status,
-                event.workflowStage,
-                eventDisplay.label,
-              )}{" "}
-              <em>{t("run.attempt", { count: event.attempt })}</em>
-            </strong>
-            {event.detail && <p>{event.detail}</p>}
-            <small>
-              {event.actor} · {relativeTime(event.occurredAt, t)}
-            </small>
-          </span>
+        <ChevronRight aria-hidden="true" size={15} />
+      </button>
+      {isOpen && (
+        <div
+          className="dialog-backdrop issue-activity-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setIsOpen(false);
+          }}
+          role="presentation"
+        >
+          <section
+            aria-labelledby="issue-activity-dialog-title"
+            aria-modal="true"
+            className="issue-activity-dialog"
+            role="dialog"
+          >
+            <header>
+              <div>
+                <span className="issue-activity-dialog-icon">
+                  <Activity aria-hidden="true" size={16} />
+                </span>
+                <span>
+                  <h2 id="issue-activity-dialog-title">
+                    {t("run.statusHistory")}
+                  </h2>
+                  <small>
+                    {t("run.activityCount", { count: run.events.length })}
+                  </small>
+                </span>
+              </div>
+              <button
+                aria-label={t("common.close")}
+                onClick={() => setIsOpen(false)}
+                ref={closeRef}
+                type="button"
+              >
+                <X aria-hidden="true" size={17} />
+              </button>
+            </header>
+            <div className="issue-activity-history">
+              {run.events.length > 0 ? (
+                run.events.map((event) => {
+                  const display = eventMeta(
+                    event.status,
+                    event.workflowStage,
+                    run.workflow,
+                  );
+                  return (
+                    <div className="timeline-event" key={event.id}>
+                      <i className={display.tone} />
+                      <span>
+                        <strong>
+                          {localizeEvent(
+                            t,
+                            event.status,
+                            event.workflowStage,
+                            display.label,
+                          )}{" "}
+                          <em>
+                            {t("run.attempt", { count: event.attempt })}
+                          </em>
+                        </strong>
+                        {event.detail && <p>{event.detail}</p>}
+                        <small>
+                          {event.actor} · {relativeTime(event.occurredAt, t)}
+                        </small>
+                      </span>
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="issue-activity-empty">{t("run.activityEmpty")}</p>
+              )}
+            </div>
+          </section>
         </div>
-      ) : null}
-    </details>
+      )}
+    </div>
   );
 }
 
