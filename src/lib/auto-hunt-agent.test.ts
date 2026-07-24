@@ -45,6 +45,49 @@ describe("mergeAutoHuntAppServerEvents", () => {
 });
 
 describe("agentMessagesFromAppServerEvents", () => {
+  it("renders provider-neutral agent events without parsing the raw protocol", () => {
+    const events: AutoHuntAppServerEvent[] = [
+      {
+        ...event(1, "claude/stream"),
+        direction: "server",
+        event: {
+          type: "messageStarted",
+          id: "message-1",
+          phase: "commentary",
+          text: "",
+        },
+      },
+      {
+        ...event(2, "claude/stream"),
+        direction: "server",
+        event: {
+          type: "messageDelta",
+          id: "message-1",
+          delta: "공통 이벤트입니다.",
+        },
+      },
+      {
+        ...event(3, "claude/result"),
+        direction: "server",
+        event: {
+          type: "messageCompleted",
+          id: "message-1",
+          phase: "commentary",
+          text: "공통 이벤트입니다.",
+        },
+      },
+    ];
+
+    expect(agentMessagesFromAppServerEvents(events)).toEqual([{
+      id: "message-1",
+      phase: "commentary",
+      text: "공통 이벤트입니다.",
+      startedAtMs: 1,
+      updatedAtMs: 3,
+      isComplete: true,
+    }]);
+  });
+
   it("combines agent message deltas and hides non-message protocol events", () => {
     const events: AutoHuntAppServerEvent[] = [
       event(1, "initialize"),

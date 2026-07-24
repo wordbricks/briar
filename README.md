@@ -121,8 +121,10 @@ the production Android keystore before distribution through Google Play.
 
 All model-backed desktop features must use `chatWithProjectLlm` or
 `createProjectChat` from `src/lib/project-llm.ts`. That gateway invokes the
-native `project_llm_chat` command; Briar does not call a model provider API
-directly.
+native `project_llm_chat` command, which routes the request through the
+provider-neutral `AgentBackend` boundary in `src-tauri/src/agent`. Provider
+implementations keep their native transport private; Briar does not call a
+model provider API directly.
 
 The native command resolves `projectId` from Briar's local connection config,
 verifies that the saved path is the Git root, and supplies that absolute path as
@@ -137,10 +139,13 @@ an approval or denial.
 Optional `instructions` and `outputSchema` support reusable one-shot LLM
 features as well as multi-turn chat.
 
-The transport follows the [Codex App Server protocol](https://learn.chatgpt.com/docs/app-server):
+The current `CodexBackend` transport follows the
+[Codex App Server protocol](https://learn.chatgpt.com/docs/app-server):
 JSONL over stdio, one `initialize`/`initialized` handshake per connection, then
 thread and turn requests while consuming notifications through
-`turn/completed`.
+`turn/completed`. It translates agent messages and turn completion into
+provider-neutral events while retaining the raw App Server payload for local
+diagnostics and compatibility with existing Auto Hunt logs.
 
 ## Production D1 database
 

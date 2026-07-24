@@ -10,7 +10,26 @@ export type AutoHuntAppServerEvent = {
   occurredAtMs: number;
   direction: "client" | "server";
   message: Record<string, unknown>;
+  provider?: "codex";
+  event?: AutoHuntAgentEvent;
 };
+
+export type AutoHuntAgentEvent =
+  | {
+      type: "messageStarted" | "messageCompleted";
+      id: string;
+      phase: string | null;
+      text: string;
+    }
+  | {
+      type: "messageDelta";
+      id: string;
+      delta: string;
+    }
+  | {
+      type: "turnCompleted";
+      status: string;
+    };
 
 export type AutoHuntAgentMessage = {
   id: string;
@@ -125,6 +144,36 @@ export function agentMessagesFromAppServerEvents(
   const order: string[] = [];
 
   for (const event of events) {
+    const normalized = event.event;
+    if (normalized?.type === "messageStarted" || normalized?.type === "messageCompleted") {
+      const existing = messages.get(normalized.id);
+      if (!existing) order.push(normalized.id);
+      messages.set(normalized.id, {
+        id: normalized.id,
+        phase: normalized.phase ?? existing?.phase ?? null,
+        text: normalized.text || existing?.text || "",
+        startedAtMs: existing?.startedAtMs ?? event.occurredAtMs,
+        updatedAtMs: event.occurredAtMs,
+        isComplete: normalized.type === "messageCompleted",
+      });
+      continue;
+    }
+    if (normalized?.type === "messageDelta") {
+      const existing = messages.get(normalized.id);
+      if (!existing) order.push(normalized.id);
+      messages.set(normalized.id, {
+        id: normalized.id,
+        phase: existing?.phase ?? null,
+        text: `${existing?.text ?? ""}${normalized.delta}`,
+        startedAtMs: existing?.startedAtMs ?? event.occurredAtMs,
+        updatedAtMs: event.occurredAtMs,
+        isComplete: false,
+      });
+      continue;
+    }
+
+    // Legacy Codex logs did not include a normalized event. Keep decoding
+    // their raw App Server message so existing session history still renders.
     if (event.direction !== "server") continue;
     const method = event.message.method;
     const params = record(event.message.params);
