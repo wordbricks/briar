@@ -50,6 +50,23 @@ export type HuntEvent = {
   recordedAt: string;
 };
 
+export type IssueMessageAuthor = {
+  id: string | null;
+  name: string;
+  image: string | null;
+};
+
+export type IssueMessage = {
+  id: string;
+  runId: string;
+  parentMessageId: string | null;
+  body: string;
+  author: IssueMessageAuthor;
+  replyCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type HuntRun = {
   id: string;
   runNumber: number;

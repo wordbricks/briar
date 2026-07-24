@@ -467,12 +467,14 @@ export function App() {
             onCreateIssue={briar.addIssue}
             onHealthRefresh={() => void briar.refreshHealth()}
             onLoadAttachment={briar.readIssueAttachment}
+            onLoadIssueMessages={briar.readIssueMessages}
             onMoveRun={briar.moveRun}
             onReconnect={briar.reconnectProject}
             onRetryRun={briar.retryRun}
             onCancelRun={briar.cancelRun}
             onRepair={() => void briar.repairHealth()}
             onRequestedRunOpen={() => setRequestedRunId(null)}
+            onSendIssueMessage={briar.addIssueMessage}
           />
         )}
       </jelly-theme>
@@ -590,12 +592,14 @@ export function App() {
             onCreateIssue={briar.addIssue}
             onHealthRefresh={() => {}}
             onLoadAttachment={briar.readIssueAttachment}
+            onLoadIssueMessages={briar.readIssueMessages}
             onMoveRun={briar.moveRun}
             onReconnect={() => {}}
             onRequestedRunOpen={() => setRequestedRunId(null)}
             onRetryRun={briar.retryRun}
             onCancelRun={briar.cancelRun}
             onRepair={() => {}}
+            onSendIssueMessage={briar.addIssueMessage}
           />
         )}
       </jelly-theme>

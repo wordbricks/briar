@@ -6,6 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { demoDashboard } from "../lib/demo-data";
 import type { AutoHuntHealth } from "../lib/project-connection";
+import type { IssueMessage } from "../types";
 import {
   CreateIssueDialog,
   HuntDashboard,
@@ -24,12 +25,19 @@ const dashboardProps = {
   onCreateIssue: async () => undefined,
   onHealthRefresh: () => undefined,
   onLoadAttachment: async () => new Blob(),
+  onLoadIssueMessages: async () => [],
   onMoveRun: async () => undefined,
   onReconnect: () => undefined,
   onRetryRun: async () => undefined,
   onCancelRun: async () => undefined,
   onRepair: () => undefined,
+  onSendIssueMessage: async () => {
+    throw new Error("not implemented in this test");
+  },
 };
+
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
+  .IS_REACT_ACT_ENVIRONMENT = true;
 
 const healthyHealth: AutoHuntHealth = {
   projectId: "project-1",
@@ -207,6 +215,8 @@ describe("HuntDashboard", () => {
     expect(properties?.textContent).not.toContain("전체 진행률");
     expect(properties?.querySelector(".run-property.progress")).toBeNull();
     expect(container.textContent).not.toContain("로컬 저장소 열기");
+    expect(container.querySelectorAll(".issue-activity .timeline-event")).toHaveLength(1);
+    expect(container.querySelector(".issue-message-composer")).not.toBeNull();
 
     await act(async () => {
       container.querySelector<HTMLButtonElement>(".run-page-back")?.click();
@@ -215,6 +225,64 @@ describe("HuntDashboard", () => {
     expect(container.querySelector(".run-page")).toBeNull();
     expect(container.querySelector(".kanban-board")).not.toBeNull();
     await act(async () => root.unmount());
+  });
+
+  it("opens a message thread in the right drawer and closes it with Escape", async () => {
+    const rootMessage: IssueMessage = {
+      id: "message-root",
+      runId: demoDashboard.runs[0].id,
+      parentMessageId: null,
+      body: "원문 메시지",
+      author: { id: "jay", name: "Jay", image: null },
+      replyCount: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    const reply: IssueMessage = {
+      ...rootMessage,
+      id: "message-reply",
+      parentMessageId: rootMessage.id,
+      body: "스레드 답장",
+      replyCount: 0,
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => [rootMessage, reply]}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => reply}
+          run={demoDashboard.runs[0]}
+        />,
+      );
+    });
+
+    const trigger = container.querySelector<HTMLButtonElement>(
+      ".issue-thread-trigger",
+    );
+    expect(trigger?.textContent).toContain("답장 1개");
+    await act(async () => trigger?.click());
+    expect(container.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(container.querySelector(".issue-thread-content")?.textContent).toContain(
+      "스레드 답장",
+    );
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    });
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+    await act(async () => root.unmount());
+    container.remove();
   });
 
   it("shows Auto Hunt health as a compact topbar status trigger", () => {
@@ -257,8 +325,12 @@ describe("HuntDashboard", () => {
         onBack={() => undefined}
         onCancel={async () => undefined}
         onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => []}
         onMove={async () => undefined}
         onRetry={async () => undefined}
+        onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }}
         run={failedRun}
       />,
     );

@@ -4,11 +4,13 @@ import {
   cancelHuntRun,
   createAgentToken,
   createIssue,
+  createIssueMessage,
   createProject,
   deleteProject as deleteRemoteProject,
   isApiConfigured,
   loadDashboard,
   loadIssueAttachment,
+  loadIssueMessages,
   loadOrganizations,
   loadProjects,
   loadSession,
@@ -67,6 +69,7 @@ import type {
   HuntRun,
   HuntRunPlacement,
   IssueAttachment,
+  IssueMessage,
   Organization,
   Project,
   ProjectSettings,
@@ -94,6 +97,32 @@ const demoOrganization: Organization = {
   name: demoDashboard.project.organizationName!,
   role: demoDashboard.project.role!,
   createdAt: demoDashboard.project.createdAt,
+};
+const demoMessageTime = new Date(Date.now() - 18 * 60_000).toISOString();
+const demoReplyTime = new Date(Date.now() - 8 * 60_000).toISOString();
+const initialDemoIssueMessages: Record<string, IssueMessage[]> = {
+  "demo-1": [
+    {
+      id: "demo-message-1",
+      runId: "demo-1",
+      parentMessageId: null,
+      body: "이벤트 스트림에서 빠지는 상태가 없는지 같이 확인해 주세요.",
+      author: { id: demoUser.id, name: demoUser.name, image: null },
+      replyCount: 1,
+      createdAt: demoMessageTime,
+      updatedAt: demoMessageTime,
+    },
+    {
+      id: "demo-message-reply-1",
+      runId: "demo-1",
+      parentMessageId: "demo-message-1",
+      body: "완료·실패·중단 상태까지 회귀 테스트에 포함했습니다.",
+      author: { id: "demo-codex", name: "Codex", image: null },
+      replyCount: 0,
+      createdAt: demoReplyTime,
+      updatedAt: demoReplyTime,
+    },
+  ],
 };
 
 const emptyDashboard = (project: Project): DashboardPayload => ({
@@ -148,6 +177,9 @@ export function useBriar() {
   const [isCreatingIssue, setIsCreatingIssue] = useState(false);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const [recoveringRunId, setRecoveringRunId] = useState<string | null>(null);
+  const issueMessagesByRun = useRef<Record<string, IssueMessage[]>>(
+    demoMode ? initialDemoIssueMessages : {},
+  );
   const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const [velen, setVelen] = useState<VelenInspection | null>(null);
   const [health, setHealth] = useState<AutoHuntHealth | null>(null);
@@ -1016,6 +1048,70 @@ export function useBriar() {
     [token],
   );
 
+  const readIssueMessages = useCallback(
+    async (runId: string) => {
+      if (!activeProjectId) throw new Error("메시지를 불러올 프로젝트가 없습니다.");
+      if (demoMode) return issueMessagesByRun.current[runId] ?? [];
+      if (!token) throw new Error("메시지를 불러오려면 로그인이 필요합니다.");
+      const messages = await loadIssueMessages(token, activeProjectId, runId);
+      issueMessagesByRun.current = {
+        ...issueMessagesByRun.current,
+        [runId]: messages,
+      };
+      return messages;
+    },
+    [activeProjectId, token],
+  );
+
+  const addIssueMessage = useCallback(
+    async (
+      runId: string,
+      input: { body: string; parentMessageId: string | null },
+    ) => {
+      const body = input.body.trim();
+      if (!body) throw new Error("메시지를 입력해 주세요.");
+      if (!activeProjectId) throw new Error("메시지를 보낼 프로젝트가 없습니다.");
+      let message: IssueMessage;
+      if (demoMode) {
+        const createdAt = new Date().toISOString();
+        message = {
+          id: crypto.randomUUID(),
+          runId,
+          parentMessageId: input.parentMessageId,
+          body,
+          author: {
+            id: demoUser.id,
+            name: demoUser.name,
+            image: demoUser.image ?? null,
+          },
+          replyCount: 0,
+          createdAt,
+          updatedAt: createdAt,
+        };
+      } else {
+        if (!token) throw new Error("메시지를 보내려면 로그인이 필요합니다.");
+        message = await createIssueMessage(token, activeProjectId, runId, {
+          body,
+          parentMessageId: input.parentMessageId,
+        });
+      }
+      const currentMessages = issueMessagesByRun.current[runId] ?? [];
+      issueMessagesByRun.current = {
+        ...issueMessagesByRun.current,
+        [runId]: [
+          ...currentMessages.map((candidate) =>
+            candidate.id === message.parentMessageId
+              ? { ...candidate, replyCount: candidate.replyCount + 1 }
+              : candidate,
+          ),
+          message,
+        ],
+      };
+      return message;
+    },
+    [activeProjectId, token],
+  );
+
   const recoverRun = useCallback(
     async (runId: string, action: "retry" | "cancel") => {
       if (!activeProjectId || !dashboard) {
@@ -1235,6 +1331,8 @@ export function useBriar() {
     refreshProjectReadiness,
     refreshVelen,
     readIssueAttachment,
+    readIssueMessages,
+    addIssueMessage,
     setActiveOrganizationId: selectOrganization,
     setActiveProjectId: selectProject,
     selectProjectRepository,
