@@ -87,6 +87,11 @@ export type HuntRun = {
   events: HuntEvent[];
 };
 
+export type HuntRunPlacement = {
+  status: HuntStatus;
+  workflowStage: AutoHuntWorkflowStageId | null;
+};
+
 export type Project = {
   id: string;
   name: string;

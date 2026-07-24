@@ -1,4 +1,5 @@
 import {
+  ArrowLeft,
   ArrowUpRight,
   Bot,
   ChevronRight,
@@ -22,7 +23,13 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+} from "react";
 import { JellySelect } from "./JellySelect";
 import {
   CompanionBottomNavigation,
@@ -40,6 +47,7 @@ import type {
   CreateIssueInput,
   DashboardPayload,
   HuntRun,
+  HuntRunPlacement,
   HuntSource,
   IssueAttachment,
 } from "../types";
@@ -52,6 +60,7 @@ type KanbanColumn = {
   id: string;
   label: string;
   tone: string;
+  placement: HuntRunPlacement;
   runs: HuntRun[];
 };
 
@@ -71,6 +80,7 @@ export function HuntDashboard({
   onCreateIssue,
   onHealthRefresh,
   onLoadAttachment,
+  onMoveRun,
   onReconnect,
   onRetryRun,
   onCancelRun,
@@ -96,6 +106,7 @@ export function HuntDashboard({
   onCreateIssue: (input: CreateIssueInput) => Promise<unknown>;
   onHealthRefresh: () => void;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
+  onMoveRun: (runId: string, placement: HuntRunPlacement) => Promise<unknown>;
   onReconnect: () => void;
   onRetryRun: (runId: string) => Promise<unknown>;
   onCancelRun: (runId: string) => Promise<unknown>;
@@ -118,19 +129,26 @@ export function HuntDashboard({
     : setInternalStatus;
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [isIssueDialogOpen, setIsIssueDialogOpen] = useState(false);
+  const [draggedRunId, setDraggedRunId] = useState<string | null>(null);
+  const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null);
 
   const runs = dashboard?.runs ?? [];
   const selected = runs.find((run) => run.id === selectedRunId) ?? null;
   const activeCount = runs.filter((run) => !["completed", "cancelled"].includes(run.status)).length;
   const attentionCount = runs.filter((run) => ["blocked", "failed"].includes(run.status)).length;
-  const completedCount = runs.filter((run) => run.status === "completed").length;
+  const completedCount = runs.filter((run) =>
+    ["completed", "cancelled"].includes(run.status)
+  ).length;
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     return runs.filter((run) => {
       if (source !== "all" && run.source !== source) return false;
       if (status === "active" && ["completed", "cancelled"].includes(run.status)) return false;
       if (status === "attention" && !["blocked", "failed"].includes(run.status)) return false;
-      if (status === "completed" && run.status !== "completed") return false;
+      if (
+        status === "completed" &&
+        !["completed", "cancelled"].includes(run.status)
+      ) return false;
       return !normalized || `${run.title} ${run.sourceKey} ${run.repository}`.toLowerCase().includes(normalized);
     });
   }, [query, runs, source, status]);
@@ -146,19 +164,53 @@ export function HuntDashboard({
     const workflow = dashboard?.settings.workflow;
     const workflowStages = workflow?.stages ?? [];
     const definitions = [
-      { id: "queued", label: t("status.queued"), tone: "slate" },
+      {
+        id: "status:queued",
+        label: t("status.queued"),
+        tone: "slate",
+        placement: { status: "queued" as const, workflowStage: null },
+      },
       ...workflowStages.map((stage) => ({
         id: `stage:${stage.id}`,
         label: localizeWorkflowStage(t, stage.id, stage.label),
         tone: runMeta("running", stage.id, workflow).tone,
+        placement: { status: "running" as const, workflowStage: stage.id },
       })),
-      { id: "attention", label: t("dashboard.attention"), tone: "rose" },
-      { id: "completed", label: t("dashboard.completed"), tone: "emerald" },
+      {
+        id: "status:blocked",
+        label: t("status.blocked"),
+        tone: "rose",
+        placement: { status: "blocked" as const, workflowStage: null },
+      },
+      {
+        id: "status:failed",
+        label: t("status.failed"),
+        tone: "red",
+        placement: { status: "failed" as const, workflowStage: null },
+      },
+      {
+        id: "status:completed",
+        label: t("status.completed"),
+        tone: "emerald",
+        placement: { status: "completed" as const, workflowStage: null },
+      },
+      {
+        id: "status:cancelled",
+        label: t("status.cancelled"),
+        tone: "slate",
+        placement: { status: "cancelled" as const, workflowStage: null },
+      },
     ];
     const visibleDefinitions = definitions.filter((column) => {
-      if (status === "active") return column.id !== "completed";
-      if (status === "attention") return column.id === "attention";
-      if (status === "completed") return column.id === "completed";
+      if (status === "active") {
+        return !["status:completed", "status:cancelled"].includes(column.id);
+      }
+      if (status === "attention") {
+        return ["status:blocked", "status:failed"].includes(column.id);
+      }
+      if (status === "completed") {
+        return ["status:completed", "status:cancelled"].includes(column.id);
+      }
       return true;
     });
     const grouped = new Map(
@@ -176,6 +228,25 @@ export function HuntDashboard({
       ? columns.filter((column) => column.runs.length > 0)
       : columns;
   }, [companionMode, dashboard?.settings.workflow, filtered, status, t]);
+
+  if (selected) {
+    return (
+      <RunPage
+        companionMode={companionMode}
+        error={recoveryError}
+        isRecovering={recoveringRunId === selected.id}
+        isSidebarOpen={isSidebarOpen}
+        onBack={() => setSelectedRunId(null)}
+        onCancel={() => onCancelRun(selected.id)}
+        onLoadAttachment={onLoadAttachment}
+        onMove={(placement) => onMoveRun(selected.id, placement)}
+        onRetry={() => onRetryRun(selected.id)}
+        onSidebarOpen={onSidebarOpen}
+        run={selected}
+        showRepositoryAction={!companionMode}
+      />
+    );
+  }
 
   return (
     <main className="main-content" id="issues">
@@ -246,7 +317,39 @@ export function HuntDashboard({
               <span>{t("dashboard.emptyDescription")}</span>
             </div>
           ) : kanbanColumns.map((column) => (
-            <section className={`kanban-column ${column.tone}`} key={column.id}>
+            <section
+              aria-label={column.label}
+              className={`kanban-column ${column.tone}${dragOverColumnId === column.id ? " drag-over" : ""}`}
+              key={column.id}
+              onDragEnter={(event) => {
+                if (!draggedRunId) return;
+                event.preventDefault();
+                setDragOverColumnId(column.id);
+              }}
+              onDragOver={(event) => {
+                if (!draggedRunId) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "move";
+              }}
+              onDragLeave={(event) => {
+                if (
+                  event.currentTarget.contains(event.relatedTarget as Node | null)
+                ) return;
+                setDragOverColumnId((current) =>
+                  current === column.id ? null : current
+                );
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                const runId =
+                  draggedRunId || event.dataTransfer.getData("text/plain");
+                setDraggedRunId(null);
+                setDragOverColumnId(null);
+                const run = runs.find((candidate) => candidate.id === runId);
+                if (!run || placementMatchesRun(run, column.placement)) return;
+                void onMoveRun(run.id, column.placement).catch(() => undefined);
+              }}
+            >
               <header>
                 <span><i aria-hidden="true" />{column.label}</span>
                 <strong>{column.runs.length}</strong>
@@ -254,7 +357,17 @@ export function HuntDashboard({
               <div>
                 {column.runs.length ? column.runs.map((run) => (
                   <KanbanCard
+                    isMoving={recoveringRunId === run.id}
                     key={run.id}
+                    onDragEnd={() => {
+                      setDraggedRunId(null);
+                      setDragOverColumnId(null);
+                    }}
+                    onDragStart={(event) => {
+                      event.dataTransfer.effectAllowed = "move";
+                      event.dataTransfer.setData("text/plain", run.id);
+                      setDraggedRunId(run.id);
+                    }}
                     onOpen={() => setSelectedRunId(run.id)}
                     run={run}
                   />
@@ -286,18 +399,6 @@ export function HuntDashboard({
             await onCreateIssue(input);
             setIsIssueDialogOpen(false);
           }}
-        />
-      )}
-      {selected && (
-        <RunDialog
-          error={recoveryError}
-          isRecovering={recoveringRunId === selected.id}
-          onCancel={() => onCancelRun(selected.id)}
-          onClose={() => setSelectedRunId(null)}
-          onLoadAttachment={onLoadAttachment}
-          onRetry={() => onRetryRun(selected.id)}
-          run={selected}
-          showRepositoryAction={!companionMode}
         />
       )}
     </main>
@@ -582,7 +683,19 @@ function SelectedAttachment({
   );
 }
 
-function KanbanCard({ run, onOpen }: { run: HuntRun; onOpen: () => void }) {
+function KanbanCard({
+  isMoving,
+  onDragEnd,
+  onDragStart,
+  run,
+  onOpen,
+}: {
+  isMoving: boolean;
+  onDragEnd: () => void;
+  onDragStart: (event: DragEvent<HTMLButtonElement>) => void;
+  run: HuntRun;
+  onOpen: () => void;
+}) {
   const { t } = useI18n();
   const meta = runMeta(run.status, run.workflowStage, run.workflow);
   const label = localizeStatus(t, run.status, run.workflowStage, meta.label);
@@ -593,7 +706,11 @@ function KanbanCard({ run, onOpen }: { run: HuntRun; onOpen: () => void }) {
   return (
     <button
       aria-label={t("run.details", { title: run.title })}
-      className={`kanban-card ${meta.tone}`}
+      aria-disabled={isMoving}
+      className={`kanban-card ${meta.tone}${isMoving ? " moving" : ""}`}
+      draggable={!isMoving}
+      onDragEnd={onDragEnd}
+      onDragStart={onDragStart}
       onClick={onOpen}
       type="button"
     >
@@ -619,22 +736,30 @@ function KanbanCard({ run, onOpen }: { run: HuntRun; onOpen: () => void }) {
   );
 }
 
-export function RunDialog({
+export function RunPage({
+  companionMode = false,
   error,
   isRecovering,
+  isSidebarOpen,
+  onBack,
   onCancel,
-  onClose,
   onLoadAttachment,
+  onMove,
   onRetry,
+  onSidebarOpen,
   run,
   showRepositoryAction = true,
 }: {
+  companionMode?: boolean;
   error: string | null;
   isRecovering: boolean;
+  isSidebarOpen: boolean;
+  onBack: () => void;
   onCancel: () => Promise<unknown>;
-  onClose: () => void;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
+  onMove: (placement: HuntRunPlacement) => Promise<unknown>;
   onRetry: () => Promise<unknown>;
+  onSidebarOpen: () => void;
   run: HuntRun;
   showRepositoryAction?: boolean;
 }) {
@@ -643,22 +768,96 @@ export function RunDialog({
   const label = localizeStatus(t, run.status, run.workflowStage, meta.label);
   const needsAttention = ["blocked", "failed"].includes(run.status);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const placementOptions = [
+    { label: t("status.queued"), value: "status:queued" },
+    ...run.workflow.stages.map((stage) => ({
+      label: localizeWorkflowStage(t, stage.id, stage.label),
+      value: `stage:${stage.id}`,
+    })),
+    { label: t("status.blocked"), value: "status:blocked" },
+    { label: t("status.failed"), value: "status:failed" },
+    { label: t("status.completed"), value: "status:completed" },
+    { label: t("status.cancelled"), value: "status:cancelled" },
+  ];
+  const placementValue = placementIdForRun(run);
   const runAction = async (action: () => Promise<unknown>) => {
     try {
       await action();
       setConfirmCancel(false);
     } catch {
-      // The hook exposes the actionable error in this dialog.
+      // The hook exposes the actionable error on this page.
     }
   };
   return (
-    <div className="dialog-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <section className="run-dialog" role="dialog" aria-modal="true" aria-label={t("run.details", { title: run.title })}>
-        <header><div><span className={`status-pill ${meta.tone}`}>{label}</span><small>AH-{run.runNumber} · {t("run.attempt", { count: run.currentAttempt })}</small></div><button onClick={onClose} aria-label={t("common.close")}><X size={18} /></button></header>
-        <div className="dialog-body">
+    <main className="main-content run-page-shell" id="issue-detail">
+      {!companionMode && (
+        <header
+          className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`}
+          data-tauri-drag-region
+        >
+          {!isSidebarOpen && (
+            <button
+              aria-controls="app-sidebar"
+              aria-expanded="false"
+              aria-label={t("sidebar.open")}
+              className="sidebar-toggle"
+              onClick={onSidebarOpen}
+              title={t("sidebar.open")}
+              type="button"
+            >
+              <PanelLeftOpen size={17} />
+            </button>
+          )}
+          <div className="window-controls" aria-hidden="true"><i /><i /><i /></div>
+        </header>
+      )}
+      <div className="run-page-scroll">
+        <article
+          aria-labelledby="run-page-title"
+          className="run-page"
+        >
+          <header>
+            <div className="run-page-heading">
+              <button
+                className="run-page-back"
+                onClick={onBack}
+                type="button"
+              >
+                <ArrowLeft size={16} />
+                {t("run.back")}
+              </button>
+              <div>
+                <span className={`status-pill ${meta.tone}`}>{label}</span>
+                <small>
+                  AH-{run.runNumber} · {t("run.attempt", { count: run.currentAttempt })}
+                </small>
+              </div>
+            </div>
+          </header>
+          <div className="run-page-body">
           <p className="eyebrow">{t(`source.${run.source}` as MessageKey).toUpperCase()} · {run.repository}</p>
-          <h2>{run.title}</h2>
+          <h1 id="run-page-title">{run.title}</h1>
           <p className="run-detail">{run.detail}</p>
+          <label className="run-status-control">
+            <span>{t("dashboard.status")}</span>
+            <select
+              disabled={isRecovering}
+              onChange={(event) => {
+                const placement = placementForId(event.currentTarget.value);
+                if (!placement || placementMatchesRun(run, placement)) return;
+                void runAction(() => onMove(placement));
+              }}
+              value={placementValue}
+            >
+              {placementOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            {isRecovering && <LoaderCircle className="spin" size={14} />}
+          </label>
+          {error && <p className="run-status-error"><CircleAlert size={13} />{error}</p>}
           {run.issueDescription && <p className="run-issue-description">{run.issueDescription}</p>}
           {(run.attachments ?? []).length > 0 && (
             <IssueAttachmentGallery
@@ -669,7 +868,6 @@ export function RunDialog({
           {needsAttention && (
             <div className="recovery-panel">
               <div><CircleAlert size={16} /><span><strong>{run.status === "failed" ? t("run.failed") : t("run.blocked")}</strong><small>{t("run.retryDescription", { count: run.currentAttempt + 1 })}</small></span></div>
-              {error && <p><CircleAlert size={13} />{error}</p>}
               <div className="recovery-actions">
                 <button disabled={isRecovering} onClick={() => void runAction(onRetry)} type="button"><RotateCcw className={isRecovering ? "spin" : ""} size={14} />{t("run.retry")}</button>
                 {confirmCancel ? (
@@ -687,13 +885,14 @@ export function RunDialog({
             <span><Clock3 size={15} /><small>{t("run.started")}</small><strong>{formatDate(run.startedAt, localeTag)}</strong></span>
           </div>
           <div className="timeline"><h3>{t("run.activity")}</h3>{run.events.map((event) => { const eventDisplay = eventMeta(event.status, event.workflowStage, run.workflow); return <div className="timeline-event" key={event.id}><i className={eventDisplay.tone} /><span><strong>{localizeEvent(t, event.status, event.workflowStage, eventDisplay.label)} <em>{t("run.attempt", { count: event.attempt })}</em></strong><p>{event.detail}</p><small>{event.actor} · {relativeTime(event.occurredAt, t)}</small></span></div>; })}</div>
-        </div>
-        <footer>
-          <span>{needsAttention ? t("run.preserveEvidence") : t("run.liveEvidence")}</span>
-          {showRepositoryAction && <button><ArrowUpRight size={14} />{t("run.openRepository")}</button>}
-        </footer>
-      </section>
-    </div>
+            <footer className="run-page-footer">
+              <span>{needsAttention ? t("run.preserveEvidence") : t("run.liveEvidence")}</span>
+              {showRepositoryAction && <button><ArrowUpRight size={14} />{t("run.openRepository")}</button>}
+            </footer>
+          </div>
+        </article>
+      </div>
+    </main>
   );
 }
 
@@ -767,13 +966,45 @@ type Translate = ReturnType<typeof useI18n>["t"];
 const builtInStageIds = new Set(["analyzing", "planning", "implementing", "reviewing", "pr_open", "local_qa", "ci_qa", "staging_qa", "production_qa", "monitoring"]);
 
 function kanbanColumnForRun(run: HuntRun, workflowStageIds: string[]) {
-  if (["completed", "cancelled"].includes(run.status)) return "completed";
-  if (["blocked", "failed"].includes(run.status)) return "attention";
-  if (run.status === "queued") return "queued";
+  if (run.status !== "running") return `status:${run.status}`;
   if (run.workflowStage && workflowStageIds.includes(run.workflowStage)) {
     return `stage:${run.workflowStage}`;
   }
-  return workflowStageIds[0] ? `stage:${workflowStageIds[0]}` : "queued";
+  return workflowStageIds[0]
+    ? `stage:${workflowStageIds[0]}`
+    : "status:queued";
+}
+
+function placementIdForRun(run: HuntRun) {
+  return run.status === "running" && run.workflowStage
+    ? `stage:${run.workflowStage}`
+    : `status:${run.status}`;
+}
+
+function placementForId(value: string): HuntRunPlacement | null {
+  if (value.startsWith("stage:")) {
+    const workflowStage = value.slice("stage:".length);
+    return workflowStage
+      ? { status: "running", workflowStage }
+      : null;
+  }
+  if (!value.startsWith("status:")) return null;
+  const status = value.slice("status:".length);
+  if (
+    !["queued", "blocked", "failed", "completed", "cancelled"].includes(status)
+  ) return null;
+  return {
+    status: status as Exclude<HuntRun["status"], "running">,
+    workflowStage: null,
+  };
+}
+
+function placementMatchesRun(run: HuntRun, placement: HuntRunPlacement) {
+  return (
+    run.status === placement.status &&
+    (placement.status !== "running" ||
+      run.workflowStage === placement.workflowStage)
+  );
 }
 
 function localizeWorkflowStage(t: Translate, stageId: string, fallback: string) {

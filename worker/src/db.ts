@@ -694,15 +694,26 @@ export async function assertQueuedHuntClaim(
       lease_expires_at: string | null;
       context_json: string | null;
       claim_token_valid: number;
-    }>();
-  if (!run || run.status !== "queued") return;
+  }>();
+  if (!run) return;
+  if (run.status !== "queued") {
+    if (claimTokenHash && run.claim_token_valid !== 1) {
+      throw new HuntClaimError("Auto Hunt claim token is no longer active");
+    }
+    return;
+  }
   const context: unknown = run.context_json ? JSON.parse(run.context_json) : null;
   const appCreated =
     context !== null &&
     typeof context === "object" &&
     !Array.isArray(context) &&
     (context as Record<string, unknown>).origin === "briar-app";
-  if (!run.claim_token_hash && !appCreated) return;
+  if (!run.claim_token_hash) {
+    if (claimTokenHash) {
+      throw new HuntClaimError("Auto Hunt claim token is no longer active");
+    }
+    if (!appCreated) return;
+  }
   if (
     run.claim_token_valid !== 1 ||
     !run.lease_expires_at ||
@@ -1398,6 +1409,192 @@ export async function recoverHuntRun(
     outcome: input.action === "retry" ? "retried" : "cancelled",
     attempt: nextAttempt,
     stage: nextStage,
+  };
+}
+
+export type HuntMoveOutcome =
+  | "moved"
+  | "unchanged"
+  | "already_moved"
+  | "not_found";
+
+export async function moveHuntRun(
+  db: D1Database,
+  projectId: string,
+  input: {
+    runId: string;
+    status: AutoHuntRunStatus;
+    workflowStage: AutoHuntWorkflowStageId | null;
+    requestId: string;
+    actor: string;
+    occurredAt: string;
+  },
+): Promise<{
+  outcome: HuntMoveOutcome;
+  status: AutoHuntRunStatus | null;
+  workflowStage: AutoHuntWorkflowStageId | null;
+}> {
+  const run = await getHuntRunForProject(db, projectId, input.runId);
+  if (!run) {
+    return { outcome: "not_found", status: null, workflowStage: null };
+  }
+
+  const workflow = parseWorkflow(run.workflow_snapshot_json);
+  if (input.status === "running") {
+    if (
+      !input.workflowStage ||
+      !workflow.stages.some((stage) => stage.id === input.workflowStage)
+    ) {
+      throw new HuntTransitionError(
+        `Workflow stage is not configured for this run: ${input.workflowStage ?? "none"}`,
+      );
+    }
+  } else if (input.workflowStage !== null) {
+    throw new HuntTransitionError(
+      "Only running status can select a workflow stage",
+    );
+  }
+
+  const targetWorkflowStage =
+    input.status === "queued"
+      ? null
+      : input.status === "running"
+        ? input.workflowStage
+        : run.workflow_stage;
+  const eventKey = `admin:move:${input.requestId}`;
+  const existingEvent = await db
+    .prepare(
+      `select status, workflow_stage from briar_hunt_events
+       where run_id = ? and event_key = ?`,
+    )
+    .bind(run.id, eventKey)
+    .first<Pick<HuntEventRow, "status" | "workflow_stage">>();
+  if (existingEvent) {
+    return {
+      outcome: "already_moved",
+      status: existingEvent.status,
+      workflowStage: existingEvent.workflow_stage,
+    };
+  }
+  if (
+    run.status === input.status &&
+    (input.status !== "running" ||
+      run.workflow_stage === targetWorkflowStage)
+  ) {
+    return {
+      outcome: "unchanged",
+      status: run.status,
+      workflowStage: run.workflow_stage,
+    };
+  }
+
+  const targetStage = legacyStageFor(input.status, targetWorkflowStage);
+  const targetLabel =
+    input.status === "running"
+      ? workflow.stages.find((stage) => stage.id === targetWorkflowStage)?.label
+      : {
+          queued: "대기",
+          blocked: "차단",
+          failed: "실패",
+          completed: "완료",
+          cancelled: "취소",
+        }[input.status];
+  const detail = `사용자가 작업을 ${targetLabel ?? input.status} 상태로 이동했습니다.`;
+  const eventId = crypto.randomUUID();
+  const recordedAt = new Date().toISOString();
+  const targetAttempt =
+    input.status === "queued" ? run.current_attempt + 1 : run.current_attempt;
+  const completedAt = ["completed", "cancelled"].includes(input.status)
+    ? input.occurredAt
+    : null;
+
+  const results = await db.batch([
+    db
+      .prepare(
+        `insert into briar_hunt_events (
+           id, run_id, event_key, attempt, stage, status, workflow_stage,
+           detail, actor, branch, commit_sha, qa_status, tracker_issue_state,
+           pull_request_urls, target_sha, occurred_at, recorded_at
+         )
+         select ?, id, ?, ?, ?, ?, ?, ?, ?, branch, commit_sha,
+                null, tracker_issue_state, pull_request_urls, target_sha, ?, ?
+         from briar_hunt_runs
+         where id = ? and project_id = ? and current_attempt = ?
+           and last_event_at = ?
+         on conflict(run_id, event_key) do nothing`,
+      )
+      .bind(
+        eventId,
+        eventKey,
+        targetAttempt,
+        targetStage,
+        input.status,
+        targetWorkflowStage,
+        detail,
+        input.actor,
+        input.occurredAt,
+        recordedAt,
+        run.id,
+        projectId,
+        run.current_attempt,
+        run.last_event_at,
+      ),
+    db
+      .prepare(
+        `update briar_hunt_runs
+         set stage = ?, status = ?, workflow_stage = ?, detail = ?,
+             current_attempt = ?,
+             claim_token_hash = null, claimed_by = null, claimed_at = null,
+             lease_expires_at = null, completed_at = ?, last_event_at = ?,
+             updated_at = ?
+         where id = ? and project_id = ? and current_attempt = ?
+           and last_event_at = ?
+           and exists (
+             select 1 from briar_hunt_events
+             where id = ? and run_id = briar_hunt_runs.id
+           )`,
+      )
+      .bind(
+        targetStage,
+        input.status,
+        targetWorkflowStage,
+        detail,
+        targetAttempt,
+        completedAt,
+        input.occurredAt,
+        recordedAt,
+        run.id,
+        projectId,
+        run.current_attempt,
+        run.last_event_at,
+        eventId,
+      ),
+  ]);
+
+  if ((results[1]?.meta.changes ?? 0) === 0) {
+    const duplicate = await db
+      .prepare(
+        `select status, workflow_stage from briar_hunt_events
+         where run_id = ? and event_key = ?`,
+      )
+      .bind(run.id, eventKey)
+      .first<Pick<HuntEventRow, "status" | "workflow_stage">>();
+    if (duplicate) {
+      return {
+        outcome: "already_moved",
+        status: duplicate.status,
+        workflowStage: duplicate.workflow_stage,
+      };
+    }
+    throw new HuntTransitionError(
+      "Auto Hunt run changed while its status was being moved",
+    );
+  }
+
+  return {
+    outcome: "moved",
+    status: input.status,
+    workflowStage: targetWorkflowStage,
   };
 }
 

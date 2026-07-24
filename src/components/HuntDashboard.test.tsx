@@ -1,3 +1,7 @@
+/** @vitest-environment jsdom */
+
+import { act } from "react";
+import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { demoDashboard } from "../lib/demo-data";
@@ -5,7 +9,7 @@ import type { AutoHuntHealth } from "../lib/project-connection";
 import {
   CreateIssueDialog,
   HuntDashboard,
-  RunDialog,
+  RunPage,
 } from "./HuntDashboard";
 
 const dashboardProps = {
@@ -20,6 +24,7 @@ const dashboardProps = {
   onCreateIssue: async () => undefined,
   onHealthRefresh: () => undefined,
   onLoadAttachment: async () => new Blob(),
+  onMoveRun: async () => undefined,
   onReconnect: () => undefined,
   onRetryRun: async () => undefined,
   onCancelRun: async () => undefined,
@@ -170,6 +175,38 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("분석");
     expect(markup).toContain("Security review");
     expect(markup).toContain('class="kanban-card');
+    expect(markup).toContain('draggable="true"');
+    expect(markup).toContain('aria-label="차단"');
+    expect(markup).toContain('aria-label="실패"');
+    expect(markup).toContain('aria-label="취소"');
+  });
+
+  it("opens issue details as a page and returns to the kanban", async () => {
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={demoDashboard}
+      />,
+    ));
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".kanban-card")?.click();
+    });
+
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(container.querySelector(".dialog-backdrop")).toBeNull();
+    expect(container.querySelector(".run-page")).not.toBeNull();
+    expect(container.querySelector(".kanban-board")).toBeNull();
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".run-page-back")?.click();
+    });
+
+    expect(container.querySelector(".run-page")).toBeNull();
+    expect(container.querySelector(".kanban-board")).not.toBeNull();
+    await act(async () => root.unmount());
   });
 
   it("shows Auto Hunt health as a compact topbar status trigger", () => {
@@ -205,13 +242,16 @@ describe("HuntDashboard", () => {
       ],
     };
     const markup = renderToStaticMarkup(
-      <RunDialog
+      <RunPage
+        isSidebarOpen
         error={null}
         isRecovering={false}
+        onBack={() => undefined}
         onCancel={async () => undefined}
-        onClose={() => undefined}
         onLoadAttachment={async () => new Blob()}
+        onMove={async () => undefined}
         onRetry={async () => undefined}
+        onSidebarOpen={() => undefined}
         run={failedRun}
       />,
     );
@@ -221,5 +261,8 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("재시도");
     expect(markup).toContain("작업 취소");
     expect(markup).toContain("시도 2");
+    expect(markup).toContain('<label class="run-status-control">');
+    expect(markup).toContain('<option value="status:queued">대기</option>');
+    expect(markup).toContain('<option value="status:completed">완료</option>');
   });
 });

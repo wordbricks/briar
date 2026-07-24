@@ -42,6 +42,7 @@ import {
   listOrganizationMembers,
   listOrganizations,
   listProjects,
+  moveHuntRun,
   recoverHuntRun,
   recordHuntEvent,
   recordQaResult,
@@ -328,6 +329,30 @@ const recoveryUserInputSchema = z
 const recoveryAgentInputSchema = recoveryUserInputSchema.extend({
   actor: z.string().trim().min(1).max(128),
 });
+
+const moveRunInputSchema = z
+  .object({
+    requestId: z.string().uuid(),
+    status: runStatusSchema,
+    workflowStage: workflowStageIdSchema.nullable(),
+  })
+  .strict()
+  .superRefine((input, context) => {
+    if (input.status === "running" && !input.workflowStage) {
+      context.addIssue({
+        code: "custom",
+        message: "running status requires a workflow stage",
+        path: ["workflowStage"],
+      });
+    }
+    if (input.status !== "running" && input.workflowStage !== null) {
+      context.addIssue({
+        code: "custom",
+        message: "only running status can select a workflow stage",
+        path: ["workflowStage"],
+      });
+    }
+  });
 
 const projectSettingsSchema = z
   .object({
@@ -1063,6 +1088,35 @@ async function route(
       throw new HttpError(409, "Only blocked or failed runs can be recovered");
     }
     return json({ runId: recoveryMatch[2], ...result });
+  }
+
+  const moveRunMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/status$/u,
+  );
+  if (moveRunMatch && request.method === "PUT") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, moveRunMatch[1], session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    const input = moveRunInputSchema.parse(await readJson(request));
+    try {
+      const result = await moveHuntRun(db, project.id, {
+        runId: moveRunMatch[2],
+        status: input.status,
+        workflowStage: input.workflowStage,
+        requestId: input.requestId,
+        actor: `briar-app:${session.user.id}`,
+        occurredAt: new Date().toISOString(),
+      });
+      if (result.outcome === "not_found") {
+        throw new HttpError(404, "Run not found");
+      }
+      return json({ runId: moveRunMatch[2], ...result });
+    } catch (error) {
+      if (error instanceof HuntTransitionError) {
+        throw new HttpError(409, error.message);
+      }
+      throw error;
+    }
   }
 
   if (pathname === "/ingest/queue/next" && request.method === "GET") {
