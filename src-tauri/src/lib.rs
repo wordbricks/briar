@@ -340,9 +340,42 @@ struct CliConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     user_token: Option<String>,
     #[serde(default)]
+    agent_providers: AppProviderSettings,
+    #[serde(default)]
     projects: Vec<CliProject>,
     #[serde(flatten)]
     extra: BTreeMap<String, serde_json::Value>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AppProviderSettings {
+    #[serde(default = "enabled_by_default")]
+    codex: bool,
+    #[serde(default = "enabled_by_default")]
+    claude: bool,
+}
+
+impl Default for AppProviderSettings {
+    fn default() -> Self {
+        Self {
+            codex: true,
+            claude: true,
+        }
+    }
+}
+
+impl AppProviderSettings {
+    fn is_enabled(self, provider: agent::AgentProviderKind) -> bool {
+        match provider {
+            agent::AgentProviderKind::Codex => self.codex,
+            agent::AgentProviderKind::Claude => self.claude,
+        }
+    }
+}
+
+fn enabled_by_default() -> bool {
+    true
 }
 
 fn session_file_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -1244,6 +1277,7 @@ fn write_cli_connection(
         CliConfig {
             api_url: api_url.clone(),
             user_token: None,
+            agent_providers: AppProviderSettings::default(),
             projects: Vec::new(),
             extra: BTreeMap::new(),
         }
@@ -1363,8 +1397,32 @@ fn project_llm_settings_from(
         .projects
         .iter()
         .find(|project| project.id == project_id)
-        .map(|project| project.llm.unwrap_or_default())
+        .map(|project| project.llm.clone().unwrap_or_default())
         .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())
+}
+
+fn app_provider_settings_from(config_path: &Path) -> Result<AppProviderSettings, String> {
+    let contents = fs::read_to_string(config_path)
+        .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
+    let config = serde_json::from_str::<CliConfig>(&contents)
+        .map_err(|error| format!("Briar 로컬 설정이 손상되었습니다: {error}"))?;
+    Ok(config.agent_providers)
+}
+
+fn update_app_provider_settings_at(
+    config_path: &Path,
+    settings: AppProviderSettings,
+) -> Result<AppProviderSettings, String> {
+    if !settings.codex && !settings.claude {
+        return Err("하나 이상의 에이전트 프로바이더를 활성화해야 합니다.".to_string());
+    }
+    let contents = fs::read_to_string(config_path)
+        .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
+    let mut config = serde_json::from_str::<CliConfig>(&contents)
+        .map_err(|error| format!("Briar 로컬 설정이 손상되었습니다: {error}"))?;
+    config.agent_providers = settings;
+    write_cli_config(config_path, &config)?;
+    Ok(settings)
 }
 
 fn approval_request_message(
@@ -1414,18 +1472,32 @@ fn approval_request_message(
 fn update_project_llm_settings_at(
     config_path: &Path,
     project_id: &str,
-    settings: agent::ProjectLlmSettings,
+    mut settings: agent::ProjectLlmSettings,
 ) -> Result<agent::ProjectLlmSettings, String> {
+    settings.model = settings
+        .model
+        .map(|model| model.trim().to_string())
+        .filter(|model| !model.is_empty());
+    if settings
+        .model
+        .as_deref()
+        .is_some_and(|model| model.len() > 128 || model.chars().any(char::is_whitespace))
+    {
+        return Err("모델 ID는 공백 없이 128자 이하여야 합니다.".to_string());
+    }
     let contents = fs::read_to_string(config_path)
         .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
     let mut config = serde_json::from_str::<CliConfig>(&contents)
         .map_err(|error| format!("Briar 로컬 설정이 손상되었습니다: {error}"))?;
+    if !config.agent_providers.is_enabled(settings.provider) {
+        return Err("앱 설정에서 먼저 이 에이전트 프로바이더를 활성화하세요.".to_string());
+    }
     let project = config
         .projects
         .iter_mut()
         .find(|project| project.id == project_id)
         .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
-    project.llm = Some(settings);
+    project.llm = Some(settings.clone());
     write_cli_config(config_path, &config)?;
     Ok(settings)
 }
@@ -1702,7 +1774,7 @@ fn auto_hunt_health_sync_with(
     );
     let skill_expected_version = read_trimmed_file(&skill_source.join("VERSION"))
         .unwrap_or_else(|| expected_version.clone());
-    let skill_directory = match project.llm.unwrap_or_default().provider {
+    let skill_directory = match project.llm.clone().unwrap_or_default().provider {
         agent::AgentProviderKind::Codex => ".codex",
         agent::AgentProviderKind::Claude => ".claude",
     };
@@ -1847,6 +1919,11 @@ async fn project_llm_chat(
         }
         let workspace = connected_project_workspace(&config_path, &project_id)?;
         let settings = project_llm_settings_from(&config_path, &project_id)?;
+        if !app_provider_settings_from(&config_path)?.is_enabled(settings.provider) {
+            return Err(
+                "선택한 에이전트 프로바이더가 앱 설정에서 비활성화되어 있습니다.".to_string(),
+            );
+        }
         let execution_path = cli_execution_path(&home)?;
         let backend =
             agent::discover_backend(settings.provider, &home, &execution_path, &claude_runner)?;
@@ -1874,6 +1951,7 @@ async fn project_llm_chat(
                 approval_policy: settings.approval_policy,
                 sandbox_mode: agent::SandboxMode::ReadOnly,
                 network_access: false,
+                model: settings.model,
                 event_sink: None,
             },
             request,
@@ -1913,6 +1991,11 @@ async fn start_project_auto_hunt(
     tauri::async_runtime::spawn_blocking(move || {
         let workspace = connected_project_workspace(&config_path, &project_id)?;
         let settings = project_llm_settings_from(&config_path, &project_id)?;
+        if !app_provider_settings_from(&config_path)?.is_enabled(settings.provider) {
+            return Err(
+                "선택한 에이전트 프로바이더가 앱 설정에서 비활성화되어 있습니다.".to_string(),
+            );
+        }
         let execution_path = cli_execution_path(&home)?;
         let cli_environment = agent::AutoHuntCliEnvironment::prepare(
             &home,
@@ -1949,6 +2032,7 @@ async fn start_project_auto_hunt(
             &workspace,
             agent::AutoHuntExecution {
                 approval_policy: settings.approval_policy,
+                model: settings.model,
                 event_sink,
             },
             request,
@@ -2062,6 +2146,27 @@ async fn load_auto_hunt_app_server_events(
                 })
             })
             .collect()
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn load_app_provider_settings(app: tauri::AppHandle) -> Result<AppProviderSettings, String> {
+    let config_path = cli_config_path(&app)?;
+    tauri::async_runtime::spawn_blocking(move || app_provider_settings_from(&config_path))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn update_app_provider_settings(
+    app: tauri::AppHandle,
+    settings: AppProviderSettings,
+) -> Result<AppProviderSettings, String> {
+    let config_path = cli_config_path(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        update_app_provider_settings_at(&config_path, settings)
     })
     .await
     .map_err(|error| error.to_string())?
@@ -2399,6 +2504,8 @@ pub fn run() {
             project_llm_chat,
             start_project_auto_hunt,
             load_auto_hunt_app_server_events,
+            load_app_provider_settings,
+            update_app_provider_settings,
             load_project_llm_settings,
             update_project_llm_settings,
             update_local_project_workflow,
@@ -2733,11 +2840,25 @@ mod tests {
                 .approval_policy,
             agent::ApprovalPolicy::Never
         );
+        assert!(
+            app_provider_settings_from(&config_path)
+                .expect("legacy provider settings should load")
+                .codex
+        );
+        update_app_provider_settings_at(
+            &config_path,
+            AppProviderSettings {
+                codex: false,
+                claude: true,
+            },
+        )
+        .expect("provider settings should save");
         update_project_llm_settings_at(
             &config_path,
             "project-1",
             agent::ProjectLlmSettings {
                 provider: agent::AgentProviderKind::Claude,
+                model: Some("sonnet".to_string()),
                 approval_policy: agent::ApprovalPolicy::OnRequest,
             },
         )
@@ -2748,7 +2869,10 @@ mod tests {
         )
         .expect("saved config should be json");
         assert_eq!(saved["customSetting"], true);
+        assert_eq!(saved["agentProviders"]["codex"], false);
+        assert_eq!(saved["agentProviders"]["claude"], true);
         assert_eq!(saved["projects"][0]["llm"]["provider"], "claude");
+        assert_eq!(saved["projects"][0]["llm"]["model"], "sonnet");
         assert_eq!(saved["projects"][0]["llm"]["approvalPolicy"], "on-request");
 
         fs::remove_dir_all(directory).expect("test config directory should be removed");

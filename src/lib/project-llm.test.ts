@@ -7,7 +7,9 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 import {
   chatWithProjectLlm,
   createProjectChat,
+  loadAppProviderSettings,
   loadProjectLlmSettings,
+  updateAppProviderSettings,
   updateProjectLlmSettings,
 } from "./project-llm";
 
@@ -76,26 +78,59 @@ describe("project LLM gateway", () => {
 
   it("loads and updates the project approval policy", async () => {
     invoke
-      .mockResolvedValueOnce({ provider: "codex", approvalPolicy: "never" })
-      .mockResolvedValueOnce({ provider: "claude", approvalPolicy: "on-request" });
+      .mockResolvedValueOnce({ provider: "codex", model: null, approvalPolicy: "never" })
+      .mockResolvedValueOnce({
+        provider: "claude",
+        model: "sonnet",
+        approvalPolicy: "on-request",
+      });
 
     await expect(loadProjectLlmSettings("project-1")).resolves.toEqual({
       provider: "codex",
+      model: null,
       approvalPolicy: "never",
     });
     await expect(
       updateProjectLlmSettings("project-1", {
         provider: "claude",
+        model: "sonnet",
         approvalPolicy: "on-request",
       }),
-    ).resolves.toEqual({ provider: "claude", approvalPolicy: "on-request" });
+    ).resolves.toEqual({
+      provider: "claude",
+      model: "sonnet",
+      approvalPolicy: "on-request",
+    });
 
     expect(invoke).toHaveBeenNthCalledWith(1, "load_project_llm_settings", {
       projectId: "project-1",
     });
     expect(invoke).toHaveBeenNthCalledWith(2, "update_project_llm_settings", {
       projectId: "project-1",
-      settings: { provider: "claude", approvalPolicy: "on-request" },
+      settings: {
+        provider: "claude",
+        model: "sonnet",
+        approvalPolicy: "on-request",
+      },
+    });
+  });
+
+  it("loads and updates app-wide provider enablement", async () => {
+    invoke
+      .mockResolvedValueOnce({ codex: true, claude: true })
+      .mockResolvedValueOnce({ codex: false, claude: true });
+
+    await expect(loadAppProviderSettings()).resolves.toEqual({
+      codex: true,
+      claude: true,
+    });
+    await expect(
+      updateAppProviderSettings({ codex: false, claude: true }),
+    ).resolves.toEqual({ codex: false, claude: true });
+
+    expect(invoke).toHaveBeenNthCalledWith(1, "load_app_provider_settings");
+    expect(invoke).toHaveBeenNthCalledWith(2, "update_app_provider_settings", {
+      settings: { codex: false, claude: true },
     });
   });
 });

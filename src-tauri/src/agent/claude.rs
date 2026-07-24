@@ -84,6 +84,7 @@ struct ClaudeRunnerRequest<'a> {
     conversation_id: Option<&'a str>,
     instructions: Option<&'a str>,
     output_schema: Option<Value>,
+    model: Option<&'a str>,
     approval_policy: ApprovalPolicy,
     sandbox_mode: SandboxMode,
     network_access: bool,
@@ -247,6 +248,7 @@ pub(crate) fn chat(
         conversation_id,
         instructions: request.instructions.as_deref(),
         output_schema: request.output_schema,
+        model: execution.model.as_deref(),
         approval_policy: execution.approval_policy,
         sandbox_mode: execution.sandbox_mode,
         network_access: execution.network_access,
@@ -373,6 +375,7 @@ echo '{"type":"result","sessionId":"session-1","message":"done"}'
                 approval_policy: ApprovalPolicy::OnRequest,
                 sandbox_mode: SandboxMode::WorkspaceWrite,
                 network_access: true,
+                model: Some("sonnet".to_string()),
                 event_sink: Some(Arc::new(move |event| {
                     captured_events
                         .lock()

@@ -9,7 +9,7 @@ import type { ProjectSettings as ProjectSettingsData } from "../types";
 import { ProjectSettings } from "./ProjectSettings";
 
 describe("ProjectSettings", () => {
-  it("configures the project approval policy", async () => {
+  it("configures the project provider, model, and approval policy", async () => {
     const onRegenerateWorkflow = vi.fn(async () => undefined);
     const onUpdateAutomation = vi.fn(async (automation: AutoHuntAutomation) =>
       automation
@@ -60,6 +60,9 @@ describe("ProjectSettings", () => {
     const provider = container.querySelector<HTMLSelectElement>(
       "#project-agent-provider",
     );
+    const model = container.querySelector<HTMLSelectElement>(
+      "#project-agent-model",
+    );
     expect(Array.from(provider?.options ?? []).map((option) => option.value)).toEqual([
       "codex",
       "claude",
@@ -69,10 +72,28 @@ describe("ProjectSettings", () => {
       "on-request",
       "never",
     ]);
+    expect(Array.from(model?.options ?? []).map((option) => option.value)).toEqual([
+      "",
+      "gpt-5.6-sol",
+      "gpt-5.6-terra",
+      "gpt-5.6-luna",
+    ]);
     await act(async () => {
       if (!provider) return;
       provider.value = "claude";
       provider.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    const claudeModel = container.querySelector<HTMLSelectElement>(
+      "#project-agent-model",
+    );
+    expect(
+      Array.from(claudeModel?.options ?? []).map((option) => option.value),
+    ).toEqual(["", "sonnet", "opus", "haiku", "fable"]);
+    await act(async () => {
+      if (claudeModel) {
+        claudeModel.value = "sonnet";
+        claudeModel.dispatchEvent(new Event("change", { bubbles: true }));
+      }
       if (!select) return;
       select.value = "on-request";
       select.dispatchEvent(new Event("change", { bubbles: true }));

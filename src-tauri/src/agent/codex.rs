@@ -372,6 +372,7 @@ pub(crate) fn chat(
         message,
         request.output_schema,
         execution.approval_policy,
+        execution.model.as_deref(),
     ))?;
     let response_message = connection.read_turn(active_thread_id, approve)?;
 
@@ -411,6 +412,7 @@ pub(crate) fn start_auto_hunt_with(
             approval_policy: execution.approval_policy,
             sandbox_mode: SandboxMode::WorkspaceWrite,
             network_access: true,
+            model: execution.model,
             event_sink: Some(execution.event_sink),
         },
         ProjectLlmRequest {
@@ -512,6 +514,7 @@ fn turn_request(
     message: &str,
     output_schema: Option<Value>,
     approval_policy: ApprovalPolicy,
+    model: Option<&str>,
 ) -> Value {
     let mut params = json!({
         "threadId": thread_id,
@@ -521,6 +524,9 @@ fn turn_request(
     });
     if let Some(output_schema) = output_schema {
         params["outputSchema"] = output_schema;
+    }
+    if let Some(model) = model.filter(|value| !value.trim().is_empty()) {
+        params["model"] = Value::String(model.to_string());
     }
     json!({ "method": "turn/start", "id": TURN_REQUEST_ID, "params": params })
 }
@@ -1122,11 +1128,13 @@ mod tests {
             "Summarize this project",
             Some(json!({ "type": "object" })),
             ApprovalPolicy::Never,
+            Some("gpt-5.6-sol"),
         );
         assert_eq!(request["method"], "turn/start");
         assert_eq!(request["params"]["threadId"], "thread-1");
         assert_eq!(request["params"]["cwd"], "/repo");
         assert_eq!(request["params"]["approvalPolicy"], "never");
+        assert_eq!(request["params"]["model"], "gpt-5.6-sol");
         assert_eq!(request["params"]["input"][0]["type"], "text");
         assert_eq!(request["params"]["outputSchema"]["type"], "object");
     }
@@ -1207,6 +1215,7 @@ printf '%s\n' '{"method":"turn/completed","params":{"threadId":"thread-1","turn"
                 approval_policy: ApprovalPolicy::OnRequest,
                 sandbox_mode: SandboxMode::ReadOnly,
                 network_access: false,
+                model: Some("gpt-5.6-sol".to_string()),
                 event_sink: Some(Arc::new(move |event| {
                     sink_events
                         .lock()
@@ -1241,6 +1250,7 @@ printf '%s\n' '{"method":"turn/completed","params":{"threadId":"thread-1","turn"
         );
         assert_eq!(requests[3]["method"], "turn/start");
         assert_eq!(requests[3]["params"]["approvalPolicy"], "on-request");
+        assert_eq!(requests[3]["params"]["model"], "gpt-5.6-sol");
         assert_eq!(
             requests[3]["params"]["cwd"],
             workspace_json.trim_matches('"')
