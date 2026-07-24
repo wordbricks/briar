@@ -102,14 +102,17 @@ pub(crate) struct ChatExecution {
     pub(crate) approval_policy: ApprovalPolicy,
     pub(crate) sandbox_mode: SandboxMode,
     pub(crate) network_access: bool,
+    pub(crate) model: Option<String>,
     pub(crate) event_sink: Option<AgentEventSink>,
 }
 
-#[derive(Clone, Copy, Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProjectLlmSettings {
     #[serde(default)]
     pub(crate) provider: AgentProviderKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) model: Option<String>,
     #[serde(default)]
     pub(crate) approval_policy: ApprovalPolicy,
 }
@@ -118,6 +121,7 @@ impl Default for ProjectLlmSettings {
     fn default() -> Self {
         Self {
             provider: AgentProviderKind::Codex,
+            model: None,
             approval_policy: ApprovalPolicy::Never,
         }
     }
@@ -146,6 +150,7 @@ pub(crate) struct ProjectLlmResponse {
 #[derive(Clone)]
 pub(crate) struct AutoHuntExecution {
     pub(crate) approval_policy: ApprovalPolicy,
+    pub(crate) model: Option<String>,
     pub(crate) event_sink: AgentEventSink,
 }
 

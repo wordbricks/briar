@@ -12,6 +12,7 @@ export type ClaudeRunnerRequest = {
   conversationId?: string | null;
   instructions?: string | null;
   outputSchema?: Record<string, unknown> | boolean | null;
+  model?: string | null;
   approvalPolicy: "untrusted" | "on-request" | "never";
   sandboxMode: "readOnly" | "workspaceWrite";
   networkAccess: boolean;
@@ -89,6 +90,7 @@ export function claudeOptions(
   return {
     cwd: request.workspaceRoot,
     ...(request.conversationId ? { resume: request.conversationId } : {}),
+    ...(request.model?.trim() ? { model: request.model.trim() } : {}),
     pathToClaudeCodeExecutable: request.claudeBinary,
     systemPrompt: {
       type: "preset",
