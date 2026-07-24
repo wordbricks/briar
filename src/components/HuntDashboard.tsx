@@ -1,4 +1,5 @@
 import {
+  Activity,
   ArrowLeft,
   ArrowUpRight,
   Bot,
@@ -17,8 +18,10 @@ import {
   RotateCcw,
   Search,
   ShieldCheck,
+  Signal,
   Terminal,
   Trash2,
+  UserRound,
   Video,
   Wrench,
   X,
@@ -767,6 +770,9 @@ export function RunPage({
   const meta = runMeta(run.status, run.workflowStage, run.workflow);
   const label = localizeStatus(t, run.status, run.workflowStage, meta.label);
   const needsAttention = ["blocked", "failed"].includes(run.status);
+  const priorityLabel = run.priority === null
+    ? t("run.notSet")
+    : t(`issue.priority${run.priority}` as MessageKey);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const placementOptions = [
     { label: t("status.queued"), value: "status:queued" },
@@ -835,60 +841,114 @@ export function RunPage({
             </div>
           </header>
           <div className="run-page-body">
-          <p className="eyebrow">{t(`source.${run.source}` as MessageKey).toUpperCase()} · {run.repository}</p>
-          <h1 id="run-page-title">{run.title}</h1>
-          <p className="run-detail">{run.detail}</p>
-          <label className="run-status-control">
-            <span>{t("dashboard.status")}</span>
-            <select
-              disabled={isRecovering}
-              onChange={(event) => {
-                const placement = placementForId(event.currentTarget.value);
-                if (!placement || placementMatchesRun(run, placement)) return;
-                void runAction(() => onMove(placement));
-              }}
-              value={placementValue}
-            >
-              {placementOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            {isRecovering && <LoaderCircle className="spin" size={14} />}
-          </label>
-          {error && <p className="run-status-error"><CircleAlert size={13} />{error}</p>}
-          {run.issueDescription && <p className="run-issue-description">{run.issueDescription}</p>}
-          {(run.attachments ?? []).length > 0 && (
-            <IssueAttachmentGallery
-              attachments={run.attachments ?? []}
-              onLoadAttachment={onLoadAttachment}
-            />
-          )}
-          {needsAttention && (
-            <div className="recovery-panel">
-              <div><CircleAlert size={16} /><span><strong>{run.status === "failed" ? t("run.failed") : t("run.blocked")}</strong><small>{t("run.retryDescription", { count: run.currentAttempt + 1 })}</small></span></div>
-              <div className="recovery-actions">
-                <button disabled={isRecovering} onClick={() => void runAction(onRetry)} type="button"><RotateCcw className={isRecovering ? "spin" : ""} size={14} />{t("run.retry")}</button>
-                {confirmCancel ? (
-                  <><button className="danger" disabled={isRecovering} onClick={() => void runAction(onCancel)} type="button">{t("run.confirmCancel")}</button><button disabled={isRecovering} onClick={() => setConfirmCancel(false)} type="button">{t("run.back")}</button></>
-                ) : (
-                  <button className="danger-secondary" disabled={isRecovering} onClick={() => setConfirmCancel(true)} type="button">{t("run.cancel")}</button>
+            <div className="run-page-layout">
+              <div className="run-page-content">
+                <p className="eyebrow">{t(`source.${run.source}` as MessageKey).toUpperCase()} · {run.repository}</p>
+                <h1 id="run-page-title">{run.title}</h1>
+                {run.detail && <p className="run-detail">{run.detail}</p>}
+                {run.issueDescription && <p className="run-issue-description">{run.issueDescription}</p>}
+                {(run.attachments ?? []).length > 0 && (
+                  <IssueAttachmentGallery
+                    attachments={run.attachments ?? []}
+                    onLoadAttachment={onLoadAttachment}
+                  />
                 )}
+                {needsAttention && (
+                  <div className="recovery-panel">
+                    <div><CircleAlert size={16} /><span><strong>{run.status === "failed" ? t("run.failed") : t("run.blocked")}</strong><small>{t("run.retryDescription", { count: run.currentAttempt + 1 })}</small></span></div>
+                    <div className="recovery-actions">
+                      <button disabled={isRecovering} onClick={() => void runAction(onRetry)} type="button"><RotateCcw className={isRecovering ? "spin" : ""} size={14} />{t("run.retry")}</button>
+                      {confirmCancel ? (
+                        <><button className="danger" disabled={isRecovering} onClick={() => void runAction(onCancel)} type="button">{t("run.confirmCancel")}</button><button disabled={isRecovering} onClick={() => setConfirmCancel(false)} type="button">{t("run.back")}</button></>
+                      ) : (
+                        <button className="danger-secondary" disabled={isRecovering} onClick={() => setConfirmCancel(true)} type="button">{t("run.cancel")}</button>
+                      )}
+                    </div>
+                  </div>
+                )}
+                <div className="timeline"><h3>{t("run.activity")}</h3>{run.events.map((event) => { const eventDisplay = eventMeta(event.status, event.workflowStage, run.workflow); return <div className="timeline-event" key={event.id}><i className={eventDisplay.tone} /><span><strong>{localizeEvent(t, event.status, event.workflowStage, eventDisplay.label)} <em>{t("run.attempt", { count: event.attempt })}</em></strong><p>{event.detail}</p><small>{event.actor} · {relativeTime(event.occurredAt, t)}</small></span></div>; })}</div>
+                <footer className="run-page-footer">
+                  <span>{needsAttention ? t("run.preserveEvidence") : t("run.liveEvidence")}</span>
+                  {showRepositoryAction && <button><ArrowUpRight size={14} />{t("run.openRepository")}</button>}
+                </footer>
               </div>
+              <aside aria-label={t("run.properties")} className="run-properties">
+                <section>
+                  <h2>{t("run.properties")}</h2>
+                  <label className="run-property run-status-control">
+                    <span className={`run-property-icon ${meta.tone}`}><Activity size={15} /></span>
+                    <span className="run-property-copy">
+                      <small>{t("dashboard.status")}</small>
+                      <select
+                        aria-label={t("dashboard.status")}
+                        disabled={isRecovering}
+                        onChange={(event) => {
+                          const placement = placementForId(event.currentTarget.value);
+                          if (!placement || placementMatchesRun(run, placement)) return;
+                          void runAction(() => onMove(placement));
+                        }}
+                        value={placementValue}
+                      >
+                        {placementOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </span>
+                    {isRecovering && <LoaderCircle className="spin" size={14} />}
+                  </label>
+                  {error && <p className="run-status-error"><CircleAlert size={13} />{error}</p>}
+                  <div className="run-property">
+                    <span className="run-property-icon priority"><Signal size={15} /></span>
+                    <span className="run-property-copy"><small>{t("issue.priority")}</small><strong>{priorityLabel}</strong></span>
+                  </div>
+                  <div className="run-property">
+                    <span className="run-property-icon assignee"><UserRound size={15} /></span>
+                    <span className="run-property-copy"><small>{t("run.assignee")}</small><strong>{run.claimedBy ?? t("run.unassigned")}</strong></span>
+                  </div>
+                  <div className="run-property">
+                    <span className="run-property-icon agent"><Bot size={15} /></span>
+                    <span className="run-property-copy"><small>{t("run.agent")}</small><strong>Codex App Server</strong></span>
+                  </div>
+                  <div className="run-property progress">
+                    <span className="run-property-icon progress"><Activity size={15} /></span>
+                    <span className="run-property-copy">
+                      <small>{t("run.totalProgress")}</small>
+                      <strong>{run.progress}%</strong>
+                      <i><b style={{ width: `${run.progress}%` }} /></i>
+                    </span>
+                  </div>
+                  <div className="run-property">
+                    <span className="run-property-icon attempt"><RotateCcw size={15} /></span>
+                    <span className="run-property-copy"><small>{t("run.currentAttempt")}</small><strong>{t("run.attempt", { count: run.currentAttempt })}</strong></span>
+                  </div>
+                </section>
+                <section>
+                  <h2>{t("run.repository")}</h2>
+                  <div className="run-property">
+                    <span className="run-property-icon repository"><FolderGit2 size={15} /></span>
+                    <span className="run-property-copy"><small>{t("run.repository")}</small><strong title={run.repository}>{run.repository}</strong></span>
+                  </div>
+                  <div className="run-property">
+                    <span className="run-property-icon source"><span className={`source-dot ${run.source}`} /></span>
+                    <span className="run-property-copy"><small>{t("run.source")}</small><strong>{t(`source.${run.source}` as MessageKey)}</strong></span>
+                  </div>
+                  <div className="run-property">
+                    <span className="run-property-icon"><GitFork size={15} /></span>
+                    <span className="run-property-copy"><small>{t("run.branch")}</small><strong title={run.branch ?? undefined}>{run.branch ?? "—"}</strong></span>
+                  </div>
+                  <div className="run-property">
+                    <span className="run-property-icon"><GitCommitHorizontal size={15} /></span>
+                    <span className="run-property-copy"><small>{t("run.commit")}</small><strong title={run.commitSha ?? undefined}>{run.commitSha ?? "—"}</strong></span>
+                  </div>
+                  <div className="run-property">
+                    <span className="run-property-icon"><Clock3 size={15} /></span>
+                    <span className="run-property-copy"><small>{t("run.started")}</small><strong>{formatDate(run.startedAt, localeTag)}</strong></span>
+                  </div>
+                </section>
+              </aside>
             </div>
-          )}
-          <div className="large-progress"><div><span>{t("run.totalProgress")}</span><strong>{run.progress}%</strong></div><i><b style={{ width: `${run.progress}%` }} /></i></div>
-          <div className="run-facts">
-            <span><GitFork size={15} /><small>{t("run.branch")}</small><strong>{run.branch ?? "—"}</strong></span>
-            <span><GitCommitHorizontal size={15} /><small>{t("run.commit")}</small><strong>{run.commitSha ?? "—"}</strong></span>
-            <span><Clock3 size={15} /><small>{t("run.started")}</small><strong>{formatDate(run.startedAt, localeTag)}</strong></span>
-          </div>
-          <div className="timeline"><h3>{t("run.activity")}</h3>{run.events.map((event) => { const eventDisplay = eventMeta(event.status, event.workflowStage, run.workflow); return <div className="timeline-event" key={event.id}><i className={eventDisplay.tone} /><span><strong>{localizeEvent(t, event.status, event.workflowStage, eventDisplay.label)} <em>{t("run.attempt", { count: event.attempt })}</em></strong><p>{event.detail}</p><small>{event.actor} · {relativeTime(event.occurredAt, t)}</small></span></div>; })}</div>
-            <footer className="run-page-footer">
-              <span>{needsAttention ? t("run.preserveEvidence") : t("run.liveEvidence")}</span>
-              {showRepositoryAction && <button><ArrowUpRight size={14} />{t("run.openRepository")}</button>}
-            </footer>
           </div>
         </article>
       </div>

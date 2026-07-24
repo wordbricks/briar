@@ -199,6 +199,12 @@ describe("HuntDashboard", () => {
     expect(container.querySelector(".dialog-backdrop")).toBeNull();
     expect(container.querySelector(".run-page")).not.toBeNull();
     expect(container.querySelector(".kanban-board")).toBeNull();
+    const properties = container.querySelector(".run-properties");
+    expect(properties).not.toBeNull();
+    expect(properties?.textContent).toContain("속성");
+    expect(properties?.textContent).toContain("우선순위");
+    expect(properties?.textContent).toContain("저장소");
+    expect(properties?.querySelector(".run-status-control")).not.toBeNull();
 
     await act(async () => {
       container.querySelector<HTMLButtonElement>(".run-page-back")?.click();
@@ -261,7 +267,7 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("재시도");
     expect(markup).toContain("작업 취소");
     expect(markup).toContain("시도 2");
-    expect(markup).toContain('<label class="run-status-control">');
+    expect(markup).toContain('<label class="run-property run-status-control">');
     expect(markup).toContain('<option value="status:queued">대기</option>');
     expect(markup).toContain('<option value="status:completed">완료</option>');
   });
