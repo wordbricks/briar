@@ -206,6 +206,10 @@ describe("HuntDashboard", () => {
     expect(container.querySelector(".dialog-backdrop")).toBeNull();
     expect(container.querySelector(".run-page")).not.toBeNull();
     expect(container.querySelector(".kanban-board")).toBeNull();
+    const windowTitle = container.querySelector(".run-page-window-title");
+    expect(windowTitle?.textContent).toBe(demoDashboard.runs[0].title);
+    expect(windowTitle?.getAttribute("title")).toBe(demoDashboard.runs[0].title);
+    expect(windowTitle?.hasAttribute("data-tauri-drag-region")).toBe(true);
     const heading = container.querySelector(".run-page-heading");
     expect(heading?.querySelector(".run-page-title-row h1")?.textContent).toBe(
       demoDashboard.runs[0].title,

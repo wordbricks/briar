@@ -808,6 +808,13 @@ export function RunPage({
           data-tauri-drag-region
         >
           <div className="window-controls" aria-hidden="true"><i /><i /><i /></div>
+          <strong
+            className="run-page-window-title"
+            data-tauri-drag-region
+            title={run.title}
+          >
+            {run.title}
+          </strong>
         </header>
       )}
       <div className="run-page-scroll">
