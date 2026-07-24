@@ -12,6 +12,7 @@ import {
   loadOrganizations,
   loadProjects,
   loadSession,
+  moveHuntRun,
   pollDeviceToken,
   retryHuntRun,
   updateProjectSettings,
@@ -43,12 +44,16 @@ import {
   writeSessionToken,
 } from "../lib/token-store";
 import { startDashboardPolling } from "../lib/dashboard-polling";
-import { defaultAutoHuntWorkflow } from "../lib/auto-hunt-contract";
+import {
+  defaultAutoHuntWorkflow,
+  progressForAutoHuntRun,
+} from "../lib/auto-hunt-contract";
 import { isMobileCompanion } from "../lib/platform";
 import type {
   CreateIssueInput,
   DashboardPayload,
   HuntRun,
+  HuntRunPlacement,
   IssueAttachment,
   Organization,
   Project,
@@ -1045,6 +1050,103 @@ export function useBriar() {
     [activeProjectId, dashboard, token],
   );
 
+  const moveRun = useCallback(
+    async (runId: string, placement: HuntRunPlacement) => {
+      if (!activeProjectId || !dashboard) {
+        throw new Error("이동할 Auto Hunt 작업이 없습니다.");
+      }
+      setRecoveringRunId(runId);
+      setRecoveryError(null);
+      try {
+        if (demoMode) {
+          const occurredAt = new Date().toISOString();
+          setDashboard((current) =>
+            current
+              ? {
+                  ...current,
+                  runs: current.runs.map((run) => {
+                    if (run.id !== runId) return run;
+                    const workflowStage =
+                      placement.status === "queued"
+                        ? null
+                        : placement.status === "running"
+                          ? placement.workflowStage
+                          : run.workflowStage;
+                    const currentAttempt =
+                      placement.status === "queued"
+                        ? run.currentAttempt + 1
+                        : run.currentAttempt;
+                    const targetLabel =
+                      placement.status === "running"
+                        ? run.workflow.stages.find(
+                            (stage) => stage.id === workflowStage,
+                          )?.label
+                        : {
+                            queued: "대기",
+                            blocked: "차단",
+                            failed: "실패",
+                            completed: "완료",
+                            cancelled: "취소",
+                          }[placement.status];
+                    const detail = `사용자가 작업을 ${targetLabel ?? placement.status} 상태로 이동했습니다.`;
+                    return {
+                      ...run,
+                      currentAttempt,
+                      status: placement.status,
+                      workflowStage,
+                      progress: progressForAutoHuntRun(
+                        placement.status,
+                        workflowStage,
+                        run.workflow,
+                      ),
+                      detail,
+                      claimedBy: null,
+                      claimedAt: null,
+                      leaseExpiresAt: null,
+                      completedAt: ["completed", "cancelled"].includes(
+                        placement.status,
+                      )
+                        ? occurredAt
+                        : null,
+                      updatedAt: occurredAt,
+                      events: [
+                        {
+                          id: crypto.randomUUID(),
+                          attempt: currentAttempt,
+                          status: placement.status,
+                          workflowStage,
+                          detail,
+                          actor: "briar-app",
+                          qaStatus: null,
+                          trackerState: run.tracker?.state ?? null,
+                          pullRequestUrls: run.pullRequestUrls,
+                          targetSha: run.targetSha,
+                          occurredAt,
+                          recordedAt: occurredAt,
+                        },
+                        ...run.events,
+                      ],
+                    };
+                  }),
+                }
+              : current,
+          );
+          return;
+        }
+        if (!token) throw new Error("로그인이 필요합니다.");
+        await moveHuntRun(token, activeProjectId, runId, placement);
+        setDashboard(await loadDashboard(token, activeProjectId));
+      } catch (caught) {
+        const message = caught instanceof Error ? caught.message : String(caught);
+        setRecoveryError(message);
+        throw caught;
+      } finally {
+        setRecoveringRunId(null);
+      }
+    },
+    [activeProjectId, dashboard, token],
+  );
+
   return {
     activeOrganizationId,
     activeProjectId,
@@ -1092,6 +1194,7 @@ export function useBriar() {
     repairHealth,
     retryRun: (runId: string) => recoverRun(runId, "retry"),
     cancelRun: (runId: string) => recoverRun(runId, "cancel"),
+    moveRun,
     startProjectCreation,
     token,
     user,

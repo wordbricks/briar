@@ -20,6 +20,7 @@ import {
   listIssueAttachments,
   listOrganizationMembers,
   listProjects,
+  moveHuntRun,
   recoverHuntRun,
   recordHuntEvent,
   recordQaResult,
@@ -581,5 +582,187 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         .bind(runId)
         .first<number>("count"),
     ).toBe(3);
+  });
+
+  it("moves a run freely across workflow and terminal states with an audit trail", async () => {
+    const sourceKey = "manual-move-run";
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 70, { sourceKey, eventKey: "move:queued" }),
+    );
+    await recordHuntEvent(
+      db,
+      projectId,
+      event("analyzing", 71, { sourceKey, eventKey: "move:analyzing" }),
+    );
+    await recordHuntEvent(
+      db,
+      projectId,
+      event("implementing", 72, { sourceKey, eventKey: "move:implementing" }),
+    );
+    await db
+      .prepare(
+        `update briar_hunt_runs
+         set claim_token_hash = ?, claimed_by = 'vitest-agent',
+             claimed_at = ?, lease_expires_at = ?
+         where id = ?`,
+      )
+      .bind("a".repeat(64), atMinute(72), atMinute(90), runId)
+      .run();
+
+    const regressInput = {
+      runId,
+      status: "running" as const,
+      workflowStage: "analyzing",
+      requestId: "66666666-6666-4666-8666-666666666666",
+      actor: "briar-app:test-user",
+      occurredAt: atMinute(73),
+    };
+    expect(await moveHuntRun(db, projectId, regressInput)).toEqual({
+      outcome: "moved",
+      status: "running",
+      workflowStage: "analyzing",
+    });
+    expect(await moveHuntRun(db, projectId, regressInput)).toEqual({
+      outcome: "already_moved",
+      status: "running",
+      workflowStage: "analyzing",
+    });
+
+    const regressed = await db
+      .prepare(
+        `select status, workflow_stage, current_attempt, branch, commit_sha,
+                claim_token_hash, claimed_by, lease_expires_at
+         from briar_hunt_runs where id = ?`,
+      )
+      .bind(runId)
+      .first<{
+        status: string;
+        workflow_stage: string | null;
+        current_attempt: number;
+        branch: string | null;
+        commit_sha: string | null;
+        claim_token_hash: string | null;
+        claimed_by: string | null;
+        lease_expires_at: string | null;
+      }>();
+    expect(regressed).toEqual({
+      status: "running",
+      workflow_stage: "analyzing",
+      current_attempt: 1,
+      branch: "codex/integration",
+      commit_sha: "abcdef1",
+      claim_token_hash: null,
+      claimed_by: null,
+      lease_expires_at: null,
+    });
+    await expect(
+      assertQueuedHuntClaim(
+        db,
+        projectId,
+        { source: "issue", sourceKey },
+        "a".repeat(64),
+        atMinute(74),
+      ),
+    ).rejects.toBeInstanceOf(HuntClaimError);
+
+    expect(
+      await moveHuntRun(db, projectId, {
+        ...regressInput,
+        status: "completed",
+        workflowStage: null,
+        requestId: "77777777-7777-4777-8777-777777777777",
+        occurredAt: atMinute(74),
+      }),
+    ).toEqual({
+      outcome: "moved",
+      status: "completed",
+      workflowStage: "analyzing",
+    });
+    expect(
+      await moveHuntRun(db, projectId, {
+        ...regressInput,
+        status: "queued",
+        workflowStage: null,
+        requestId: "88888888-8888-4888-8888-888888888888",
+        occurredAt: atMinute(75),
+      }),
+    ).toEqual({
+      outcome: "moved",
+      status: "queued",
+      workflowStage: null,
+    });
+
+    const requeued = await db
+      .prepare(
+        `select current_attempt, workflow_stage, branch, commit_sha
+         from briar_hunt_runs where id = ?`,
+      )
+      .bind(runId)
+      .first<{
+        current_attempt: number;
+        workflow_stage: string | null;
+        branch: string | null;
+        commit_sha: string | null;
+      }>();
+    expect(requeued).toEqual({
+      current_attempt: 2,
+      workflow_stage: null,
+      branch: "codex/integration",
+      commit_sha: "abcdef1",
+    });
+
+    const events = await db
+      .prepare(
+        `select status, workflow_stage, actor
+         from briar_hunt_events
+         where run_id = ? and event_key like 'admin:move:%'
+         order by occurred_at`,
+      )
+      .bind(runId)
+      .all<{
+        status: string;
+        workflow_stage: string | null;
+        actor: string;
+      }>();
+    expect(events.results).toEqual([
+      {
+        status: "running",
+        workflow_stage: "analyzing",
+        actor: "briar-app:test-user",
+      },
+      {
+        status: "completed",
+        workflow_stage: "analyzing",
+        actor: "briar-app:test-user",
+      },
+      {
+        status: "queued",
+        workflow_stage: null,
+        actor: "briar-app:test-user",
+      },
+    ]);
+  });
+
+  it("rejects a manual running state outside the run workflow", async () => {
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 80, {
+        sourceKey: "manual-invalid-stage",
+        eventKey: "move-invalid:queued",
+      }),
+    );
+    await expect(
+      moveHuntRun(db, projectId, {
+        runId,
+        status: "running",
+        workflowStage: "not_configured",
+        requestId: "99999999-9999-4999-8999-999999999999",
+        actor: "briar-app:test-user",
+        occurredAt: atMinute(81),
+      }),
+    ).rejects.toBeInstanceOf(HuntTransitionError);
   });
 });

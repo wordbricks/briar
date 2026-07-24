@@ -352,6 +352,7 @@ export function App() {
             onCreateIssue={briar.addIssue}
             onHealthRefresh={() => void briar.refreshHealth()}
             onLoadAttachment={briar.readIssueAttachment}
+            onMoveRun={briar.moveRun}
             onReconnect={briar.reconnectProject}
             onRetryRun={briar.retryRun}
             onCancelRun={briar.cancelRun}
@@ -471,6 +472,7 @@ export function App() {
             onCreateIssue={briar.addIssue}
             onHealthRefresh={() => {}}
             onLoadAttachment={briar.readIssueAttachment}
+            onMoveRun={briar.moveRun}
             onReconnect={() => {}}
             onRequestedRunOpen={() => setRequestedRunId(null)}
             onRetryRun={briar.retryRun}

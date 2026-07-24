@@ -3,6 +3,7 @@ import { validateIssueAttachments } from "./issue-attachments";
 import type {
   CreateIssueInput,
   DashboardPayload,
+  HuntRunPlacement,
   IssueAttachment,
   Project,
   Organization,
@@ -310,6 +311,32 @@ export const cancelHuntRun = (
   runId: string,
   reason: string | null = null,
 ) => recoverHuntRun(token, projectId, runId, "cancel", reason);
+
+export type HuntMoveResult = {
+  runId: string;
+  outcome: "moved" | "unchanged" | "already_moved";
+  status: HuntRunPlacement["status"];
+  workflowStage: string | null;
+};
+
+export async function moveHuntRun(
+  token: string,
+  projectId: string,
+  runId: string,
+  placement: HuntRunPlacement,
+) {
+  return request<HuntMoveResult>(
+    `/projects/${projectId}/runs/${runId}/status`,
+    token,
+    {
+      method: "PUT",
+      body: JSON.stringify({
+        requestId: crypto.randomUUID(),
+        ...placement,
+      }),
+    },
+  );
+}
 
 export async function createAgentToken(token: string, projectId: string) {
   return request<{ agentToken: string }>(`/projects/${projectId}/agent-token`, token, {
