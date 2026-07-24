@@ -46,6 +46,10 @@ import {
   readSessionToken,
   writeSessionToken,
 } from "../lib/token-store";
+import {
+  isAuthorizationCancelled,
+  openAuthorization,
+} from "../lib/auth-session";
 import { startDashboardPolling } from "../lib/dashboard-polling";
 import {
   defaultAutoHuntWorkflow,
@@ -78,7 +82,7 @@ export type ProjectConnection = {
 const demoMode = import.meta.env.VITE_BRIAR_DEMO !== "false" && !isApiConfigured;
 const companionMode = isMobileCompanion();
 const deviceClientId: DeviceClientId = companionMode
-  ? "briar-android"
+  ? "briar-mobile"
   : "briar-desktop";
 const demoUser: SessionUser = {
   id: "demo-user",
@@ -105,19 +109,6 @@ const emptyDashboard = (project: Project): DashboardPayload => ({
   runs: [],
   generatedAt: new Date().toISOString(),
 });
-
-async function openAuthorization(url: string) {
-  if (companionMode && window.BriarAndroidAuth) {
-    window.BriarAndroidAuth.open(url);
-    return;
-  }
-  if ("__TAURI_INTERNALS__" in window) {
-    const { openUrl } = await import("@tauri-apps/plugin-opener");
-    await openUrl(url);
-    return;
-  }
-  window.open(url, "_blank", "noopener,noreferrer");
-}
 
 async function findUnconnectedProject(projects: Project[]) {
   try {
@@ -368,7 +359,9 @@ export function useBriar() {
       const authorization = await beginDeviceAuthorization(deviceClientId);
       if (attempt !== loginAttempt.current) return;
       setLoginCode(authorization.userCode);
-      await openAuthorization(authorization.verificationUrl);
+      const authorizationPresentation = await openAuthorization(
+        authorization.verificationUrl,
+      );
       if (attempt !== loginAttempt.current) return;
       let delay = authorization.interval * 1_000;
       const poll = async () => {
@@ -429,9 +422,19 @@ export function useBriar() {
         }
       };
       pollLoginNow.current = () => void poll();
-      pollTimer.current = window.setTimeout(() => void poll(), delay);
+      if (authorizationPresentation === "completed") {
+        void poll();
+      } else {
+        pollTimer.current = window.setTimeout(() => void poll(), delay);
+      }
     } catch (caught) {
       if (attempt !== loginAttempt.current) return;
+      if (isAuthorizationCancelled(caught)) {
+        setLoginCode(null);
+        setLoading(false);
+        pollLoginNow.current = null;
+        return;
+      }
       setError(caught instanceof Error ? caught.message : String(caught));
       setLoading(false);
       pollLoginNow.current = null;

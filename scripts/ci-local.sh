@@ -113,7 +113,12 @@ run_security() {
 
   bun run audit:dependencies
   bun run audit:rust
-  gitleaks git --redact --no-banner --log-opts="--all" .
+  gitleaks git \
+    --config .gitleaks.toml \
+    --redact \
+    --no-banner \
+    --log-opts="--all" \
+    .
 }
 
 while [[ $# -gt 0 ]]; do

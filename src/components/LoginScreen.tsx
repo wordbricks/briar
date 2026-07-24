@@ -19,7 +19,9 @@ export function LoginScreen({
 }) {
   const { t } = useI18n();
   return (
-    <main className="login-shell">
+    <main
+      className={`login-shell${companionMode ? " companion-login-shell" : ""}`}
+    >
       <div className="login-glow" />
       <section className="login-card">
         {loginCode && (
