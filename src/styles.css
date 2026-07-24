@@ -950,31 +950,17 @@ jelly-theme { color: var(--ink); }
   min-width:0;
   display:flex;
   overflow:hidden;
-  color:#2d2e2a;
-  background:#fbfbfa;
+  color:var(--ink);
+  background:#f7f7f3;
 }
 .app-settings-sidebar {
-  width:270px;
-  flex:0 0 270px;
   min-width:0;
-  display:flex;
-  flex-direction:column;
   overflow:hidden;
-  border-right:1px solid rgba(56,57,52,.10);
-  background:rgba(247,247,245,.86);
-  backdrop-filter:blur(22px) saturate(145%);
-  -webkit-backdrop-filter:blur(22px) saturate(145%);
-  transition:width .3s cubic-bezier(.2,.8,.2,1),flex-basis .3s cubic-bezier(.2,.8,.2,1),border-color .2s ease;
-}
-.settings-sidebar-closed .app-settings-sidebar {
-  width:0;
-  flex-basis:0;
-  border-right-color:transparent;
 }
 .app-settings-brand {
-  height:66px;
-  flex:0 0 66px;
-  padding:0 12px 0 184px;
+  height:88px;
+  flex:0 0 88px;
+  padding:46px 17px 0;
   display:flex;
   align-items:center;
   white-space:nowrap;
@@ -983,32 +969,32 @@ jelly-theme { color: var(--ink); }
 .app-settings-brand .brand-mark { width:21px; height:21px; flex-basis:21px; }
 .app-settings-brand .brand-name { font-size:14px; letter-spacing:-.45px; }
 .app-settings-sidebar nav {
-  padding:26px 13px 16px;
+  padding:3px 10px 16px;
   display:grid;
-  gap:3px;
+  gap:2px;
 }
 .app-settings-sidebar nav button,
 .app-settings-back {
   width:100%;
-  height:42px;
-  padding:0 11px;
+  height:34px;
+  padding:0 10px;
   display:flex;
   align-items:center;
-  gap:11px;
+  gap:10px;
   border:0;
-  border-radius:10px;
-  color:#969792;
+  border-radius:8px;
+  color:#5f605b;
   background:transparent;
   text-align:left;
   cursor:pointer;
-  font-size:13px;
+  font-size:12.5px;
   font-weight:520;
   transition:color .14s ease,background-color .14s ease,transform .1s ease-out;
 }
 .app-settings-sidebar nav button:hover,
 .app-settings-back:hover {
-  color:#555651;
-  background:rgba(55,56,51,.055);
+  color:#30312d;
+  background:rgba(44,45,41,.06);
 }
 .app-settings-sidebar nav button:active,
 .app-settings-back:active { transform:scale(.985); }
@@ -1018,36 +1004,18 @@ jelly-theme { color: var(--ink); }
   outline-offset:-1px;
 }
 .app-settings-sidebar nav button.active {
-  color:#292a27;
-  background:rgba(50,51,47,.085);
-  font-weight:650;
+  color:#30312d;
+  background:rgba(48,49,45,.085);
+  font-weight:560;
 }
 .app-settings-sidebar nav svg { flex:0 0 auto; }
 .app-settings-back {
-  width:calc(100% - 26px);
-  margin:auto 13px 13px;
-  color:#62635e;
+  width:calc(100% - 20px);
+  margin:auto 10px 10px;
+  color:#5f605b;
 }
 .app-settings-main {
-  min-width:0;
-  flex:1;
-  display:flex;
-  flex-direction:column;
-  background:radial-gradient(circle at 92% 2%,rgba(123,101,201,.035),transparent 28%),#fdfdfc;
-}
-.app-settings-topbar {
-  height:66px;
-  flex:0 0 66px;
-  padding:0 26px;
-  display:flex;
-  align-items:center;
-  border-bottom:1px solid rgba(56,57,52,.09);
-  background:rgba(255,255,254,.70);
-  backdrop-filter:blur(18px) saturate(140%);
-  -webkit-backdrop-filter:blur(18px) saturate(140%);
-}
-.settings-sidebar-closed .app-settings-topbar {
-  padding-left:var(--window-navigation-content-inset);
+  background:radial-gradient(circle at 15% 0%,rgba(110,82,199,.06),transparent 32%),#f7f7f3;
 }
 .app-settings-topbar h1 {
   margin:0;
@@ -1351,14 +1319,9 @@ jelly-theme { color: var(--ink); }
 }
 
 @media (max-width:900px) {
-  .app-settings-sidebar { width:226px; flex-basis:226px; }
-  .app-settings-brand { padding-left:178px; }
-  .app-settings-brand .brand-name { display:none; }
   .source-control-settings { width:calc(100% - 42px); padding-top:38px; }
 }
 @media (max-width:700px) {
-  .app-settings-sidebar { width:0; flex-basis:0; border-right:0; }
-  .app-settings-topbar { padding-left:var(--window-navigation-content-inset); }
   .source-control-settings { width:calc(100% - 28px); }
   .provider-heading-actions > span { display:none; }
   .source-control-provider { padding:16px 15px; grid-template-columns:32px minmax(0,1fr) 46px; column-gap:9px; }
@@ -1379,8 +1342,7 @@ jelly-theme { color: var(--ink); }
   .source-control-switch span::after { transition:none; }
 }
 @media (prefers-reduced-transparency: reduce) {
-  .app-settings-sidebar,
-  .app-settings-topbar {
+  .app-settings-sidebar {
     background:#f8f8f6;
     backdrop-filter:none;
     -webkit-backdrop-filter:none;
