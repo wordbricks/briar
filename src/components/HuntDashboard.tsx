@@ -8,7 +8,6 @@ import {
   CircleAlert,
   Clock3,
   Code2,
-  FileText,
   FolderGit2,
   GitCommitHorizontal,
   GitFork,
@@ -41,6 +40,8 @@ import {
   useState,
   type DragEvent,
   type FormEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
 } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -783,6 +784,11 @@ export function RunPage({
     ? t("run.notSet")
     : t(`issue.priority${run.priority}` as MessageKey);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [contentSplit, setContentSplit] = useState(50);
+  const [isResizingContent, setIsResizingContent] = useState(false);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const activeResizePointerRef = useRef<number | null>(null);
+  const resizeGrabOffsetRef = useRef(0);
   const placementOptions = [
     { label: t("status.queued"), value: "status:queued" },
     ...run.workflow.stages.map((stage) => ({
@@ -803,6 +809,57 @@ export function RunPage({
     } catch {
       // The hook exposes the actionable error on this page.
     }
+  };
+  const clampContentSplit = (value: number) =>
+    Math.min(80, Math.max(20, value));
+  const updateContentSplitFromPointer = (clientY: number) => {
+    const content = contentRef.current;
+    if (!content) return;
+    const bounds = content.getBoundingClientRect();
+    const availableHeight = Math.max(1, bounds.height - 12);
+    const dividerTop =
+      clientY - bounds.top - resizeGrabOffsetRef.current;
+    setContentSplit(
+      clampContentSplit(Math.round((dividerTop / availableHeight) * 100)),
+    );
+  };
+  const startContentResize = (
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    const dividerBounds = event.currentTarget.getBoundingClientRect();
+    activeResizePointerRef.current = event.pointerId;
+    resizeGrabOffsetRef.current = event.clientY - dividerBounds.top;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setIsResizingContent(true);
+    event.preventDefault();
+  };
+  const moveContentResize = (
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    if (activeResizePointerRef.current !== event.pointerId) return;
+    updateContentSplitFromPointer(event.clientY);
+  };
+  const finishContentResize = (
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    if (activeResizePointerRef.current !== event.pointerId) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    activeResizePointerRef.current = null;
+    setIsResizingContent(false);
+  };
+  const resizeContentWithKeyboard = (
+    event: ReactKeyboardEvent<HTMLDivElement>,
+  ) => {
+    let nextSplit: number | null = null;
+    if (event.key === "ArrowUp") nextSplit = contentSplit - 5;
+    if (event.key === "ArrowDown") nextSplit = contentSplit + 5;
+    if (event.key === "Home") nextSplit = 20;
+    if (event.key === "End") nextSplit = 80;
+    if (nextSplit === null) return;
+    event.preventDefault();
+    setContentSplit(clampContentSplit(nextSplit));
   };
   return (
     <main className="main-content run-page-shell" id="issue-detail">
@@ -884,15 +941,17 @@ export function RunPage({
           </header>
           <div className="run-page-body">
             <div className="run-page-layout">
-              <div className="run-page-content">
+              <div
+                className={`run-page-content${isResizingContent ? " is-resizing" : ""}`}
+                ref={contentRef}
+                style={{
+                  gridTemplateRows: `minmax(96px,${contentSplit}fr) 12px minmax(220px,${100 - contentSplit}fr)`,
+                }}
+              >
                 <section
-                  aria-labelledby="issue-description-title"
-                  className="issue-description-panel"
+                  aria-label={t("issue.description")}
+                  className="issue-description-pane"
                 >
-                  <header>
-                    <FileText aria-hidden="true" size={15} />
-                    <h2 id="issue-description-title">{t("issue.description")}</h2>
-                  </header>
                   <div className="issue-description-scroll">
                     {issueContent ? (
                       <div className="issue-description-markdown">
@@ -927,6 +986,21 @@ export function RunPage({
                     )}
                   </div>
                 </section>
+                <div
+                  aria-label={t("run.resizeContentPanels")}
+                  aria-orientation="horizontal"
+                  aria-valuemax={80}
+                  aria-valuemin={20}
+                  aria-valuenow={contentSplit}
+                  className="issue-content-divider"
+                  onKeyDown={resizeContentWithKeyboard}
+                  onPointerCancel={finishContentResize}
+                  onPointerDown={startContentResize}
+                  onPointerMove={moveContentResize}
+                  onPointerUp={finishContentResize}
+                  role="separator"
+                  tabIndex={0}
+                />
                 <IssueConversation
                   onLoad={onLoadIssueMessages}
                   onSend={onSendIssueMessage}

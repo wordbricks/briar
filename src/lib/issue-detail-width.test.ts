@@ -32,13 +32,27 @@ describe("issue detail width", () => {
     expect(bodyRule).not.toContain("1180px");
     expect(bodyRule).toContain("margin:0");
     expect(layoutRule).toContain(
-      "grid-template-columns:minmax(0,1fr) minmax(220px,260px)",
-    );
-    expect(styles).toContain(
       "grid-template-columns:minmax(0,1fr) minmax(180px,220px)",
     );
+    expect(layoutRule).toContain("gap:28px");
     expect(styles).toContain(
-      "grid-template-columns:minmax(0,1fr) minmax(150px,180px)",
+      "grid-template-columns:minmax(0,1fr) minmax(165px,195px)",
     );
+    expect(styles).toContain(
+      "grid-template-columns:minmax(0,1fr) minmax(145px,170px)",
+    );
+  });
+
+  it("uses the full content width without a description card", () => {
+    const contentRule = firstRule(".run-page-content");
+    const descriptionRule = firstRule(".issue-description-pane");
+    const dividerRule = firstRule(".issue-content-divider");
+
+    expect(contentRule).toContain("width:100%");
+    expect(descriptionRule).toContain("width:100%");
+    expect(descriptionRule).not.toContain("border:");
+    expect(descriptionRule).not.toContain("background:");
+    expect(dividerRule).toContain("cursor:row-resize");
+    expect(dividerRule).toContain("touch-action:none");
   });
 });

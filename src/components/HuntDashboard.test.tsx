@@ -266,13 +266,31 @@ describe("HuntDashboard", () => {
     });
     expect(container.querySelector(".issue-activity-dialog")).toBeNull();
     expect(document.activeElement).toBe(activityTrigger);
-    const descriptionPanel = container.querySelector(".issue-description-panel");
-    expect(descriptionPanel).not.toBeNull();
-    expect(descriptionPanel?.querySelector(".issue-description-markdown p")?.textContent)
+    const descriptionPane = container.querySelector(".issue-description-pane");
+    expect(descriptionPane).not.toBeNull();
+    expect(descriptionPane?.querySelector(":scope > header")).toBeNull();
+    expect(descriptionPane?.querySelector(".issue-description-markdown p")?.textContent)
       .toBe(demoDashboard.runs[0].detail);
+    const content = container.querySelector<HTMLElement>(".run-page-content");
+    const contentDivider = container.querySelector<HTMLElement>(
+      ".issue-content-divider",
+    );
+    expect(content?.style.gridTemplateRows).toContain("50fr");
+    expect(contentDivider?.getAttribute("role")).toBe("separator");
+    expect(contentDivider?.getAttribute("aria-orientation")).toBe("horizontal");
+    expect(contentDivider?.getAttribute("aria-valuenow")).toBe("50");
+    await act(async () => {
+      contentDivider?.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, key: "ArrowDown" }),
+      );
+    });
+    expect(contentDivider?.getAttribute("aria-valuenow")).toBe("55");
+    expect(content?.style.gridTemplateRows).toContain("55fr");
+    expect(content?.style.gridTemplateRows).toContain("45fr");
     const conversation = container.querySelector(".issue-conversation");
     expect(conversation).not.toBeNull();
-    expect(descriptionPanel?.nextElementSibling).toBe(conversation);
+    expect(descriptionPane?.nextElementSibling).toBe(contentDivider);
+    expect(contentDivider?.nextElementSibling).toBe(conversation);
     expect(
       conversation?.querySelector(".issue-message-list + .issue-message-composer"),
     ).not.toBeNull();
@@ -347,7 +365,7 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("<h1>목표</h1>");
     expect(markup).toContain("<li>상세 내용을 표시합니다.</li>");
     expect(markup).toContain("<del>일반 텍스트</del>");
-    expect(markup.indexOf("issue-description-panel")).toBeLessThan(
+    expect(markup.indexOf("issue-description-pane")).toBeLessThan(
       markup.indexOf("issue-conversation"),
     );
   });
