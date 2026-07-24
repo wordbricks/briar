@@ -4,7 +4,7 @@
   "version": "1.1.1",
   "identifier": "app.briar.desktop",
   "build": {
-    "beforeDevCommand": "bun run cli:build && bun run dev",
+    "beforeDevCommand": "bun run cli:build && bun run agent:build && bun run dev",
     "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "bun run build && bun run cli:build",
     "frontendDist": "../dist"
@@ -52,8 +52,10 @@
     ],
     "resources": {
       "../dist-cli/briar.js": "cli/briar.js",
+      "../dist-agent/claude-runner.js": "agent/claude-runner.js",
       "../scripts/briar-launcher": "cli/briar",
       "../skills/briar-auto-hunt/": "skills/briar-auto-hunt/",
+      "../third-party/claude-agent-sdk-LICENSE.md": "licenses/claude-agent-sdk-LICENSE.md",
       "../third-party/jelly-ui-LICENSE": "licenses/jelly-ui-LICENSE"
     },
     "macOS": {

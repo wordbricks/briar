@@ -282,6 +282,7 @@ struct OnboardingPrerequisiteStatus {
 struct OnboardingPrerequisites {
     git: OnboardingPrerequisiteStatus,
     codex: OnboardingPrerequisiteStatus,
+    claude: OnboardingPrerequisiteStatus,
     velen: OnboardingPrerequisiteStatus,
 }
 
@@ -548,9 +549,11 @@ fn inspect_velen_prerequisite_with(
 }
 
 fn inspect_onboarding_prerequisites_sync(home: &Path) -> OnboardingPrerequisites {
+    let execution_path = cli_execution_path(home).unwrap_or_default();
     OnboardingPrerequisites {
         git: inspect_cli(git_binary(home)),
         codex: inspect_cli(agent::codex_binary(home)),
+        claude: inspect_cli(agent::claude_binary(home, &execution_path)),
         velen: inspect_velen_prerequisite_with(velen_binary(), home),
     }
 }
@@ -635,6 +638,7 @@ async fn install_onboarding_prerequisite(
         match prerequisite.as_str() {
             "git" => install_brew_package(&home, "git")?,
             "codex" => install_cli_package(&home, "@openai/codex")?,
+            "claude" => install_cli_package(&home, "@anthropic-ai/claude-code")?,
             "velen" => install_cli_package(&home, "@wordbricks/velen")?,
             _ => return Err("지원하지 않는 필수 도구입니다.".to_string()),
         }
@@ -642,6 +646,7 @@ async fn install_onboarding_prerequisite(
         let installed = match prerequisite.as_str() {
             "git" => prerequisites.git.installed,
             "codex" => prerequisites.codex.installed,
+            "claude" => prerequisites.claude.installed,
             "velen" => prerequisites.velen.installed,
             _ => false,
         };
@@ -1210,6 +1215,11 @@ async fn validate_repository_path(path: String) -> Result<String, String> {
     .map_err(|error| error.to_string())?
 }
 
+struct LocalProjectAgentConfig {
+    llm: agent::ProjectLlmSettings,
+    auto_hunt: AutoHuntConfig,
+}
+
 fn write_cli_connection(
     config_path: &Path,
     api_url: String,
@@ -1217,7 +1227,7 @@ fn write_cli_connection(
     agent_token: String,
     repository_path: String,
     repository_remote: Option<String>,
-    auto_hunt: AutoHuntConfig,
+    agent_config: LocalProjectAgentConfig,
 ) -> Result<(), String> {
     if api_url.trim().is_empty() || project_id.trim().is_empty() {
         return Err("Briar 프로젝트 연결 정보가 올바르지 않습니다.".to_string());
@@ -1245,8 +1255,8 @@ fn write_cli_connection(
         repository_path,
         repository_remote,
         agent_token,
-        llm: Some(agent::ProjectLlmSettings::default()),
-        auto_hunt: Some(auto_hunt.into()),
+        llm: Some(agent_config.llm),
+        auto_hunt: Some(agent_config.auto_hunt.into()),
         extra: BTreeMap::new(),
     });
 
@@ -1357,7 +1367,11 @@ fn project_llm_settings_from(
         .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())
 }
 
-fn approval_request_message(method: &str, params: &serde_json::Value) -> String {
+fn approval_request_message(
+    provider: agent::AgentProviderKind,
+    method: &str,
+    params: &serde_json::Value,
+) -> String {
     let action = params
         .get("command")
         .and_then(|command| {
@@ -1390,7 +1404,11 @@ fn approval_request_message(method: &str, params: &serde_json::Value) -> String 
         .and_then(|cwd| cwd.as_str())
         .map(|cwd| format!("\n\n위치: {cwd}"))
         .unwrap_or_default();
-    format!("Codex가 다음 작업의 승인을 요청했습니다.\n\n{action}{cwd}")
+    let provider_name = match provider {
+        agent::AgentProviderKind::Codex => "Codex",
+        agent::AgentProviderKind::Claude => "Claude",
+    };
+    format!("{provider_name}가 다음 작업의 승인을 요청했습니다.\n\n{action}{cwd}")
 }
 
 fn update_project_llm_settings_at(
@@ -1508,8 +1526,11 @@ fn install_auto_hunt_assets(resource_directory: &Path, home: &Path) -> Result<()
     if !skill_source.is_dir() {
         return Err("Briar Auto Hunt 스킬 번들을 찾지 못했습니다.".to_string());
     }
-    let skill_destination = home.join(".codex").join("skills").join("briar-auto-hunt");
-    copy_directory(&skill_source, &skill_destination)?;
+    let skill_destinations = [".codex", ".claude"]
+        .map(|directory| home.join(directory).join("skills").join("briar-auto-hunt"));
+    for skill_destination in &skill_destinations {
+        copy_directory(&skill_source, skill_destination)?;
+    }
 
     let cli_source = bundled_path(resource_directory, "cli/briar.js", "dist-cli/briar.js");
     let launcher_source = bundled_path(resource_directory, "cli/briar", "scripts/briar-launcher");
@@ -1535,10 +1556,12 @@ fn install_auto_hunt_assets(resource_directory: &Path, home: &Path) -> Result<()
         use std::os::unix::fs::PermissionsExt;
         fs::set_permissions(&launcher_destination, fs::Permissions::from_mode(0o755))
             .map_err(|error| error.to_string())?;
-        let skill_launcher = skill_destination.join("scripts").join("briar");
-        if skill_launcher.exists() {
-            fs::set_permissions(skill_launcher, fs::Permissions::from_mode(0o755))
-                .map_err(|error| error.to_string())?;
+        for skill_destination in &skill_destinations {
+            let skill_launcher = skill_destination.join("scripts").join("briar");
+            if skill_launcher.exists() {
+                fs::set_permissions(skill_launcher, fs::Permissions::from_mode(0o755))
+                    .map_err(|error| error.to_string())?;
+            }
         }
     }
     Ok(())
@@ -1620,7 +1643,14 @@ fn auto_hunt_health_sync_with(
     );
     let skill_expected_version = read_trimmed_file(&skill_source.join("VERSION"))
         .unwrap_or_else(|| expected_version.clone());
-    let skill_path = home.join(".codex").join("skills").join("briar-auto-hunt");
+    let skill_directory = match project.llm.unwrap_or_default().provider {
+        agent::AgentProviderKind::Codex => ".codex",
+        agent::AgentProviderKind::Claude => ".claude",
+    };
+    let skill_path = home
+        .join(skill_directory)
+        .join("skills")
+        .join("briar-auto-hunt");
     let skill_installed = skill_path.join("SKILL.md").is_file();
     let skill_version = read_trimmed_file(&skill_path.join("VERSION"));
     let skill_current = skill_version.as_deref() == Some(skill_expected_version.as_str());
@@ -1738,6 +1768,15 @@ async fn project_llm_chat(
 ) -> Result<agent::ProjectLlmResponse, String> {
     let config_path = cli_config_path(&app)?;
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    let resource_directory = app
+        .path()
+        .resource_dir()
+        .map_err(|error| error.to_string())?;
+    let claude_runner = bundled_path(
+        &resource_directory,
+        "agent/claude-runner.js",
+        "dist-agent/claude-runner.js",
+    );
     let approval_app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let readiness = project_repository_readiness_at(&config_path, &project_id, &home)?;
@@ -1750,12 +1789,18 @@ async fn project_llm_chat(
         let workspace = connected_project_workspace(&config_path, &project_id)?;
         let settings = project_llm_settings_from(&config_path, &project_id)?;
         let execution_path = cli_execution_path(&home)?;
-        let backend = agent::CodexBackend::discover(&home, &execution_path)?;
+        let backend =
+            agent::discover_backend(settings.provider, &home, &execution_path, &claude_runner)?;
+        let provider = settings.provider;
         let approve = |method: &str, params: &serde_json::Value| {
+            let provider_name = match provider {
+                agent::AgentProviderKind::Codex => "Codex",
+                agent::AgentProviderKind::Claude => "Claude",
+            };
             approval_app
                 .dialog()
-                .message(approval_request_message(method, params))
-                .title("Codex 작업 승인")
+                .message(approval_request_message(provider, method, params))
+                .title(format!("{provider_name} 작업 승인"))
                 .buttons(MessageDialogButtons::OkCancelCustom(
                     "승인".to_string(),
                     "거절".to_string(),
@@ -1795,6 +1840,15 @@ async fn start_project_auto_hunt(
     }
     let config_path = cli_config_path(&app)?;
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    let resource_directory = app
+        .path()
+        .resource_dir()
+        .map_err(|error| error.to_string())?;
+    let claude_runner = bundled_path(
+        &resource_directory,
+        "agent/claude-runner.js",
+        "dist-agent/claude-runner.js",
+    );
     let event_sink = create_auto_hunt_event_sink(&app, &request.session_id)?;
     let approval_app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
@@ -1808,12 +1862,22 @@ async fn start_project_auto_hunt(
             &project_id,
             &request.api_url,
         )?;
-        let backend = agent::CodexBackend::discover(&home, cli_environment.execution_path())?;
+        let backend = agent::discover_backend(
+            settings.provider,
+            &home,
+            cli_environment.execution_path(),
+            &claude_runner,
+        )?;
+        let provider = settings.provider;
         let approve = |method: &str, params: &serde_json::Value| {
+            let provider_name = match provider {
+                agent::AgentProviderKind::Codex => "Codex",
+                agent::AgentProviderKind::Claude => "Claude",
+            };
             approval_app
                 .dialog()
-                .message(approval_request_message(method, params))
-                .title("Codex 자동사냥 승인")
+                .message(approval_request_message(provider, method, params))
+                .title(format!("{provider_name} 자동사냥 승인"))
                 .buttons(MessageDialogButtons::OkCancelCustom(
                     "승인".to_string(),
                     "거절".to_string(),
@@ -2032,6 +2096,14 @@ async fn connect_local_project(
             }
         }
         install_auto_hunt_assets(&resource_directory, &home)?;
+        let execution_path = cli_execution_path(&home)?;
+        let provider = if agent::codex_binary(&home).is_ok() {
+            agent::AgentProviderKind::Codex
+        } else if agent::claude_binary(&home, &execution_path).is_ok() {
+            agent::AgentProviderKind::Claude
+        } else {
+            agent::AgentProviderKind::Codex
+        };
         write_cli_connection(
             &config_path,
             api_url,
@@ -2039,7 +2111,13 @@ async fn connect_local_project(
             agent_token,
             root_string.clone(),
             remote,
-            auto_hunt,
+            LocalProjectAgentConfig {
+                llm: agent::ProjectLlmSettings {
+                    provider,
+                    ..agent::ProjectLlmSettings::default()
+                },
+                auto_hunt,
+            },
         )?;
         Ok(ConnectedLocalProject {
             repository_path: root_string,
@@ -2443,14 +2521,17 @@ mod tests {
             "briar_agent_new".to_string(),
             "/new/repository".to_string(),
             Some("git@github.com:example/repository.git".to_string()),
-            AutoHuntConfig {
-                velen_org: "example".to_string(),
-                data_source: None,
-                linear_enabled: false,
-                linear_source: None,
-                linear_team: None,
-                github_repository: None,
-                workflow: default_workflow(),
+            LocalProjectAgentConfig {
+                llm: agent::ProjectLlmSettings::default(),
+                auto_hunt: AutoHuntConfig {
+                    velen_org: "example".to_string(),
+                    data_source: None,
+                    linear_enabled: false,
+                    linear_source: None,
+                    linear_team: None,
+                    github_repository: None,
+                    workflow: default_workflow(),
+                },
             },
         )
         .expect("connection should be saved");
@@ -2582,6 +2663,7 @@ mod tests {
             &config_path,
             "project-1",
             agent::ProjectLlmSettings {
+                provider: agent::AgentProviderKind::Claude,
                 approval_policy: agent::ApprovalPolicy::OnRequest,
             },
         )
@@ -2592,6 +2674,7 @@ mod tests {
         )
         .expect("saved config should be json");
         assert_eq!(saved["customSetting"], true);
+        assert_eq!(saved["projects"][0]["llm"]["provider"], "claude");
         assert_eq!(saved["projects"][0]["llm"]["approvalPolicy"], "on-request");
 
         fs::remove_dir_all(directory).expect("test config directory should be removed");
@@ -2715,6 +2798,9 @@ mod tests {
         assert!(home
             .join(".codex/skills/briar-auto-hunt/SKILL.md")
             .is_file());
+        assert!(home
+            .join(".claude/skills/briar-auto-hunt/SKILL.md")
+            .is_file());
         assert_eq!(
             read_trimmed_file(&home.join(".codex/skills/briar-auto-hunt/VERSION")),
             Some(env!("CARGO_PKG_VERSION").to_string())
@@ -2779,14 +2865,17 @@ mod tests {
             "briar_agent_test".to_string(),
             repository,
             Some("https://github.com/wordbricks/briar.git".to_string()),
-            AutoHuntConfig {
-                velen_org: "wordbricks".to_string(),
-                data_source: None,
-                linear_enabled: false,
-                linear_source: None,
-                linear_team: None,
-                github_repository: Some("wordbricks/briar".to_string()),
-                workflow: default_workflow(),
+            LocalProjectAgentConfig {
+                llm: agent::ProjectLlmSettings::default(),
+                auto_hunt: AutoHuntConfig {
+                    velen_org: "wordbricks".to_string(),
+                    data_source: None,
+                    linear_enabled: false,
+                    linear_source: None,
+                    linear_team: None,
+                    github_repository: Some("wordbricks/briar".to_string()),
+                    workflow: default_workflow(),
+                },
             },
         )
         .expect("connection should be saved");

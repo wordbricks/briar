@@ -20,5 +20,5 @@
     },
     "types": ["vite/client", "bun"]
   },
-  "include": ["src", "src-cli", "vite.config.ts"]
+  "include": ["src", "src-agent", "src-cli", "vite.config.ts"]
 }

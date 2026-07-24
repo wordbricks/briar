@@ -78,7 +78,7 @@ describe("ProjectOnboarding", () => {
 
     expect(markup).toContain('<jelly-select label="Velen 조직"');
     expect(markup).toContain("워크플로우 자동 생성");
-    expect(markup).toContain("Codex App Server");
+    expect(markup).toContain("Agent backend");
     expect(markup).toContain("저장소 선택");
     expect(markup).toContain("백그라운드");
     expect(markup).toContain(">확인 ");

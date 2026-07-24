@@ -27,6 +27,13 @@ import type {
 } from "../hooks/useAutoHuntSessions";
 import type { DashboardPayload, HuntRun } from "../types";
 
+function agentCopy(value: string) {
+  return value
+    .replaceAll("Codex App Server", "Agent backend")
+    .replaceAll("Codex Agent", "Agent")
+    .replaceAll("Codex", "Agent");
+}
+
 export function AutoHuntSessions({
   companionMode = false,
   dashboard,
@@ -155,7 +162,7 @@ export function AutoHuntSessions({
 
               {(selectedSession.summary || selectedSession.error) && (
                 <section className={`auto-hunt-summary${selectedSession.error ? " error" : ""}`}>
-                  <h3>{t("autoHunt.summary")}</h3>
+                  <h3>{agentCopy(t("autoHunt.summary"))}</h3>
                   <p>{selectedSession.error ?? selectedSession.summary}</p>
                 </section>
               )}
@@ -163,8 +170,8 @@ export function AutoHuntSessions({
               <section className="auto-hunt-dialog-section auto-hunt-app-server-section">
                 <header>
                   <div>
-                    <h3>{t("autoHunt.appServerEvents")}</h3>
-                    <p>{t("autoHunt.appServerEventsDescription")}</p>
+                    <h3>{agentCopy(t("autoHunt.appServerEvents"))}</h3>
+                    <p>{agentCopy(t("autoHunt.appServerEventsDescription"))}</p>
                   </div>
                   <span className="auto-hunt-event-count">
                     {selectedSession.status === "running" && (
@@ -241,9 +248,9 @@ export function AutoHuntSessions({
       <div className="auto-hunt-scroll">
         <section className="auto-hunt-hero">
           <div className="auto-hunt-hero-copy">
-            <p className="eyebrow"><Sparkles size={13} />{t("autoHunt.eyebrow")}</p>
+            <p className="eyebrow"><Sparkles size={13} />{agentCopy(t("autoHunt.eyebrow"))}</p>
             <h1>{t("autoHunt.title")}</h1>
-            <p>{t("autoHunt.description")}</p>
+            <p>{agentCopy(t("autoHunt.description"))}</p>
             <div className="auto-hunt-capacity">
               <span>{t("autoHunt.available", { count: queued.length })}</span>
               <span>{t("autoHunt.limit", { count: maxIssues })}</span>

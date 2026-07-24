@@ -21,7 +21,8 @@ import {
 
 type Step = "welcome" | "prerequisites";
 
-const prerequisiteIds: PrerequisiteId[] = ["git", "codex", "velen"];
+const prerequisiteIds: PrerequisiteId[] = ["git", "codex", "claude", "velen"];
+const agentPrerequisiteIds: PrerequisiteId[] = ["codex", "claude"];
 
 export function InitialOnboarding({
   onComplete,
@@ -94,9 +95,12 @@ export function InitialOnboarding({
 
   const ready =
     prerequisites !== null &&
-    prerequisiteIds.every(
-      (id) =>
-        prerequisites[id].installed && prerequisites[id].authenticated,
+    prerequisites.git.installed &&
+    prerequisites.git.authenticated &&
+    prerequisites.velen.installed &&
+    prerequisites.velen.authenticated &&
+    agentPrerequisiteIds.some(
+      (id) => prerequisites[id].installed && prerequisites[id].authenticated,
     );
   const busy = checking || installing !== null || authenticatingVelen;
 
@@ -173,14 +177,34 @@ export function InitialOnboarding({
                 return (
                   <article className="initial-prerequisite-row" key={id}>
                     <span className={`initial-prerequisite-icon ${id}`}>
-                      {id === "git" ? "G" : id === "codex" ? "C" : "V"}
+                      {id === "git"
+                        ? "G"
+                        : id === "codex"
+                          ? "C"
+                          : id === "claude"
+                            ? "A"
+                            : "V"}
                     </span>
                     <div>
                       <strong>
-                        {t(`initialOnboarding.${id}Name`)}
-                        <em>{t("common.required")}</em>
+                        {id === "claude"
+                          ? "Claude Code"
+                          : t(`initialOnboarding.${id}Name`)}
+                        <em>
+                          {t(
+                            agentPrerequisiteIds.includes(id)
+                              ? "common.optional"
+                              : "common.required",
+                          )}
+                        </em>
                       </strong>
-                      <p>{t(`initialOnboarding.${id}Description`)}</p>
+                      <p>
+                        {t(
+                          `initialOnboarding.${
+                            id === "claude" ? "codex" : id
+                          }Description`,
+                        )}
+                      </p>
                     </div>
                     {checking && !prerequisites ? (
                       <span className="initial-prerequisite-status checking">

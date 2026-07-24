@@ -166,7 +166,12 @@ export function ProjectOnboarding({
                   <ListChecks size={18} />
                   <div>
                     <strong>{t("onboarding.workflow")}</strong>
-                    <span>{t("onboarding.workflowDescription")}</span>
+                    <span>
+                      {t("onboarding.workflowDescription").replace(
+                        "Codex App Server",
+                        "Agent backend",
+                      )}
+                    </span>
                   </div>
                 </div>
               </section>

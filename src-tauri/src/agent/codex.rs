@@ -9,134 +9,18 @@ use std::{
     process::{Child, ChildStdin, Command, Stdio},
     sync::{Arc, Mutex},
     thread,
-    time::{SystemTime, UNIX_EPOCH},
 };
 
 use super::{
     AgentBackend, AgentEvent, AgentEventDirection, AgentEventSink, AgentProviderEvent,
-    AgentProviderKind,
+    AgentProviderKind, ApprovalPolicy, AutoHuntExecution, ChatExecution, ProjectLlmRequest,
+    ProjectLlmResponse, SandboxMode,
 };
 
 const INITIALIZE_REQUEST_ID: u64 = 1;
 const THREAD_REQUEST_ID: u64 = 2;
 const TURN_REQUEST_ID: u64 = 3;
 pub(crate) const MAX_AUTO_HUNT_ISSUES: usize = 10;
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) enum SandboxMode {
-    ReadOnly,
-    WorkspaceWrite,
-}
-
-#[derive(Clone)]
-pub(crate) struct ChatExecution {
-    pub(crate) approval_policy: ApprovalPolicy,
-    pub(crate) sandbox_mode: SandboxMode,
-    pub(crate) network_access: bool,
-    pub(crate) event_sink: Option<AgentEventSink>,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct AppServerEventRecord {
-    pub(crate) session_id: String,
-    pub(crate) sequence: u64,
-    pub(crate) occurred_at_ms: u64,
-    pub(crate) direction: String,
-    pub(crate) message: Value,
-    #[serde(default)]
-    pub(crate) provider: AgentProviderKind,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) event: Option<AgentEvent>,
-}
-
-impl AppServerEventRecord {
-    pub(crate) fn new(
-        session_id: String,
-        sequence: u64,
-        provider_event: AgentProviderEvent,
-    ) -> Self {
-        Self {
-            session_id,
-            sequence,
-            occurred_at_ms: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_millis() as u64,
-            direction: match provider_event.direction {
-                AgentEventDirection::Client => "client",
-                AgentEventDirection::Server => "server",
-            }
-            .to_string(),
-            message: provider_event.raw,
-            provider: provider_event.provider,
-            event: provider_event.event,
-        }
-    }
-}
-
-impl SandboxMode {
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::ReadOnly => "read-only",
-            Self::WorkspaceWrite => "workspace-write",
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "kebab-case")]
-pub(crate) enum ApprovalPolicy {
-    Untrusted,
-    OnRequest,
-    #[default]
-    Never,
-}
-
-impl ApprovalPolicy {
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Untrusted => "untrusted",
-            Self::OnRequest => "on-request",
-            Self::Never => "never",
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct ProjectLlmSettings {
-    #[serde(default)]
-    pub(crate) approval_policy: ApprovalPolicy,
-}
-
-impl Default for ProjectLlmSettings {
-    fn default() -> Self {
-        Self {
-            approval_policy: ApprovalPolicy::Never,
-        }
-    }
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct ProjectLlmRequest {
-    pub(crate) message: String,
-    #[serde(default)]
-    pub(crate) conversation_id: Option<String>,
-    #[serde(default)]
-    pub(crate) instructions: Option<String>,
-    #[serde(default)]
-    pub(crate) output_schema: Option<Value>,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct ProjectLlmResponse {
-    pub(crate) conversation_id: String,
-    pub(crate) message: String,
-    pub(crate) workspace_root: String,
-}
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -153,12 +37,6 @@ pub(crate) struct ProjectAutoHuntRequest {
     pub(crate) session_id: String,
     pub(crate) api_url: String,
     pub(crate) issues: Vec<ProjectAutoHuntIssue>,
-}
-
-#[derive(Clone)]
-pub(crate) struct AutoHuntExecution {
-    pub(crate) approval_policy: ApprovalPolicy,
-    pub(crate) event_sink: AgentEventSink,
 }
 
 pub(crate) struct AutoHuntCliEnvironment {
@@ -544,9 +422,9 @@ pub(crate) fn start_auto_hunt_with(
         approve,
     )?;
     let result = serde_json::from_str::<ProjectAutoHuntResult>(&response.message)
-        .map_err(|error| format!("Codex 자동사냥 결과를 읽지 못했습니다: {error}"))?;
+        .map_err(|error| format!("에이전트 자동사냥 결과를 읽지 못했습니다: {error}"))?;
     if result.issues.len() > issue_count {
-        return Err("Codex가 세션 한도를 초과한 자동사냥 결과를 반환했습니다.".to_string());
+        return Err("에이전트가 세션 한도를 초과한 자동사냥 결과를 반환했습니다.".to_string());
     }
     Ok(ProjectAutoHuntResponse {
         conversation_id: response.conversation_id,

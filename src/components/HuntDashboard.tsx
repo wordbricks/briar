@@ -872,7 +872,7 @@ export function RunPage({
                   </div>
                   <div className="run-property">
                     <span className="run-property-icon agent"><Bot size={15} /></span>
-                    <span className="run-property-copy"><small>{t("run.agent")}</small><strong>Codex App Server</strong></span>
+                    <span className="run-property-copy"><small>{t("run.agent")}</small><strong>Agent backend</strong></span>
                   </div>
                   <div className="run-property">
                     <span className="run-property-icon attempt"><RotateCcw size={15} /></span>
