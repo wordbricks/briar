@@ -219,11 +219,12 @@ describe("HuntDashboard", () => {
       "Auto Hunt 실행 증거를 실시간으로 표시합니다.",
     );
     expect(container.querySelectorAll(".issue-activity .timeline-event")).toHaveLength(1);
-    const composerDock = container.querySelector(".run-page-composer-dock");
-    expect(composerDock).not.toBeNull();
+    const conversation = container.querySelector(".issue-conversation");
+    expect(conversation).not.toBeNull();
     expect(
-      composerDock?.querySelector(".issue-message-composer"),
+      conversation?.querySelector(".issue-message-list + .issue-message-composer"),
     ).not.toBeNull();
+    expect(container.querySelector(".run-page-composer-dock")).toBeNull();
 
     await act(async () => {
       container.querySelector<HTMLButtonElement>(".run-page-back")?.click();

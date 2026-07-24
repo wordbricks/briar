@@ -42,7 +42,6 @@ import {
   type DragEvent,
   type FormEvent,
 } from "react";
-import { createPortal } from "react-dom";
 import { JellySelect } from "./JellySelect";
 import {
   CompanionBottomNavigation,
@@ -780,9 +779,6 @@ export function RunPage({
     ? t("run.notSet")
     : t(`issue.priority${run.priority}` as MessageKey);
   const [confirmCancel, setConfirmCancel] = useState(false);
-  const [composerTarget, setComposerTarget] = useState<HTMLDivElement | null>(
-    null,
-  );
   const placementOptions = [
     { label: t("status.queued"), value: "status:queued" },
     ...run.workflow.stages.map((stage) => ({
@@ -864,7 +860,6 @@ export function RunPage({
                 )}
                 <IssueActivity run={run} />
                 <IssueConversation
-                  composerTarget={composerTarget}
                   onLoad={onLoadIssueMessages}
                   onSend={onSendIssueMessage}
                   run={run}
@@ -942,11 +937,6 @@ export function RunPage({
           </div>
         </article>
       </div>
-      <div className="run-page-composer-dock">
-        <div className="run-page-composer-frame">
-          <div className="run-page-composer-slot" ref={setComposerTarget} />
-        </div>
-      </div>
     </main>
   );
 }
@@ -991,12 +981,10 @@ function IssueActivity({ run }: { run: HuntRun }) {
 }
 
 function IssueConversation({
-  composerTarget,
   onLoad,
   onSend,
   run,
 }: {
-  composerTarget: HTMLDivElement | null;
   onLoad: () => Promise<IssueMessage[]>;
   onSend: (input: {
     body: string;
@@ -1108,14 +1096,10 @@ function IssueConversation({
           ))
         )}
       </div>
-      {composerTarget &&
-        createPortal(
-          <MessageComposer
-            onSubmit={(body) => sendMessage(body, null)}
-            placeholder={t("run.messagePlaceholder", { title: run.title })}
-          />,
-          composerTarget,
-        )}
+      <MessageComposer
+        onSubmit={(body) => sendMessage(body, null)}
+        placeholder={t("run.messagePlaceholder", { title: run.title })}
+      />
       <div
         aria-hidden={activeThread === null}
         className={`issue-thread-layer${activeThread ? " open" : ""}`}
