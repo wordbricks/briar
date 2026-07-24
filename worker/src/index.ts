@@ -36,6 +36,7 @@ import {
   findProjectIdByAgentTokenHash,
   getIssueAttachment,
   getOrganizationRole,
+  isOrganizationHandleAvailable,
   getNextQueuedHuntRun,
   getProject,
   getProjectSettings,
@@ -260,7 +261,14 @@ const projectInputSchema = z.object({
 });
 const organizationInputSchema = z.object({
   name: z.string().trim().min(1).max(100),
+  handle: z
+    .string()
+    .trim()
+    .min(1)
+    .max(63)
+    .regex(/^[a-z0-9-]+$/u),
 });
+const organizationHandleSchema = organizationInputSchema.shape.handle;
 const organizationMemberInputSchema = z.object({
   email: z.string().trim().email().max(320),
   role: z.enum(["admin", "member"]).default("member"),
@@ -594,6 +602,7 @@ function projectJson(row: ProjectRow) {
 const organizationJson = (row: OrganizationRow) => ({
   id: row.id,
   name: row.name,
+  handle: row.handle,
   role: row.role,
   createdAt: row.created_at,
 });
@@ -767,13 +776,39 @@ async function route(
     return json({ organizations: organizations.map(organizationJson) });
   }
 
+  if (
+    pathname === "/organizations/handle-availability" &&
+    request.method === "GET"
+  ) {
+    await requireSession(auth, request);
+    const handle = organizationHandleSchema.parse(
+      new URL(request.url).searchParams.get("handle"),
+    );
+    return json({
+      available: await isOrganizationHandleAvailable(db, handle),
+    });
+  }
+
   if (pathname === "/organizations" && request.method === "POST") {
     const session = await requireSession(auth, request);
     const input = organizationInputSchema.parse(await readJson(request));
-    const organization = await createOrganization(db, {
-      name: input.name,
-      ownerUserId: session.user.id,
-    });
+    if (!(await isOrganizationHandleAvailable(db, input.handle))) {
+      throw new HttpError(409, "Organization handle already exists");
+    }
+    let organization: OrganizationRow;
+    try {
+      organization = await createOrganization(db, {
+        name: input.name,
+        handle: input.handle,
+        ownerUserId: session.user.id,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message.toLowerCase() : "";
+      if (message.includes("unique") && message.includes("handle")) {
+        throw new HttpError(409, "Organization handle already exists");
+      }
+      throw error;
+    }
     return json({ organization: organizationJson(organization) }, 201);
   }
 
@@ -874,6 +909,7 @@ async function route(
     if (organizations.length === 0) {
       const organization = await createOrganization(db, {
         name: `${session.user.name || session.user.email}의 조직`,
+        handle: `organization-${crypto.randomUUID().replaceAll("-", "")}`,
         ownerUserId: session.user.id,
       });
       organizations = [organization];

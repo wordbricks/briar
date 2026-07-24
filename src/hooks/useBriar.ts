@@ -3,6 +3,7 @@ import {
   beginDeviceAuthorization,
   cancelHuntRun,
   createAgentToken,
+  createOrganization as createRemoteOrganization,
   createIssue,
   createIssueMessage,
   createProject,
@@ -14,6 +15,7 @@ import {
   loadOrganizations,
   loadProjects,
   loadSession,
+  isOrganizationHandleAvailable as checkRemoteOrganizationHandle,
   moveHuntRun,
   pollDeviceToken,
   retryHuntRun,
@@ -100,6 +102,7 @@ const demoUser: SessionUser = {
 const demoOrganization: Organization = {
   id: demoDashboard.project.organizationId!,
   name: demoDashboard.project.organizationName!,
+  handle: "briar",
   role: demoDashboard.project.role!,
   createdAt: demoDashboard.project.createdAt,
 };
@@ -611,6 +614,54 @@ export function useBriar() {
             }
           : current,
       );
+      return organization;
+    },
+    [organizations, token],
+  );
+
+  const checkOrganizationHandle = useCallback(
+    async (handle: string) => {
+      if (demoMode) {
+        return !organizations.some(
+          (organization) => organization.handle === handle,
+        );
+      }
+      if (!token) throw new Error("로그인이 필요합니다.");
+      return checkRemoteOrganizationHandle(token, handle);
+    },
+    [organizations, token],
+  );
+
+  const addOrganization = useCallback(
+    async (input: { name: string; handle: string }) => {
+      let organization: Organization;
+      if (demoMode) {
+        if (
+          organizations.some(
+            (candidate) => candidate.handle === input.handle,
+          )
+        ) {
+          throw new Error("Organization handle already exists");
+        }
+        organization = {
+          id: crypto.randomUUID(),
+          name: input.name.trim(),
+          handle: input.handle,
+          role: "owner",
+          createdAt: new Date().toISOString(),
+        };
+      } else {
+        if (!token) throw new Error("로그인이 필요합니다.");
+        const result = await createRemoteOrganization(token, input);
+        organization = result.organization;
+      }
+      setOrganizations((current) => [...current, organization]);
+      setActiveOrganizationId(organization.id);
+      setActiveProjectId(null);
+      setDashboard(null);
+      setHealth(null);
+      setHealthError(null);
+      setError(null);
       return organization;
     },
     [organizations, token],
@@ -1483,10 +1534,12 @@ export function useBriar() {
   return {
     activeOrganizationId,
     activeProjectId,
+    addOrganization,
     addIssue,
     addProject,
     cancelProjectCreation,
     cancelLogin,
+    checkOrganizationHandle,
     connectProject,
     dashboard,
     deleteProject: removeProject,

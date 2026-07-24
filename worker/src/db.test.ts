@@ -8,6 +8,7 @@ import {
   assertQueuedHuntClaim,
   claimNextQueuedHuntRun,
   addOrganizationMember,
+  createOrganization,
   createIssueMessage,
   createProject,
   createIssueAttachments,
@@ -22,6 +23,7 @@ import {
   listIssueAttachments,
   listIssueMessages,
   listOrganizationMembers,
+  isOrganizationHandleAvailable,
   listProjects,
   moveHuntRun,
   recoverHuntRun,
@@ -93,14 +95,18 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       "migrations/0009_auto_hunt_automation.sql",
       "migrations/0010_issue_messages.sql",
       "migrations/0011_issue_message_agents.sql",
+      "migrations/0012_organization_handles.sql",
     ]) {
       await executeSql(db, await readFile(resolve(migration), "utf8"));
     }
     await executeSql(db, `
       insert into user (id, name, email, emailVerified, createdAt, updatedAt)
       values ('owner', 'Owner', 'owner@example.com', 1, '${atMinute(0)}', '${atMinute(0)}');
-      insert into briar_organizations (id, name, created_at, updated_at)
-      values ('${projectId}', 'Example Org', '${atMinute(0)}', '${atMinute(0)}');
+      insert into briar_organizations (id, name, handle, created_at, updated_at)
+      values (
+        '${projectId}', 'Example Org', 'example-org',
+        '${atMinute(0)}', '${atMinute(0)}'
+      );
       insert into briar_organization_members (
         organization_id, user_id, role, created_at, updated_at
       ) values (
@@ -155,6 +161,30 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       queueThreshold: { enabled: true, minimumIssues: 5 },
       urgentIssue: { enabled: true },
     });
+  });
+
+  it("allows duplicate organization names but enforces unique handles", async () => {
+    await expect(
+      isOrganizationHandleAvailable(db, "another-example"),
+    ).resolves.toBe(true);
+    const organization = await createOrganization(db, {
+      name: "Example Org",
+      handle: "another-example",
+      ownerUserId: "owner",
+    });
+
+    expect(organization.name).toBe("Example Org");
+    expect(organization.handle).toBe("another-example");
+    await expect(
+      isOrganizationHandleAvailable(db, "another-example"),
+    ).resolves.toBe(false);
+    await expect(
+      createOrganization(db, {
+        name: "A different name",
+        handle: "another-example",
+        ownerUserId: "owner",
+      }),
+    ).rejects.toThrow();
   });
 
   it("enforces forward stages, QA gates, and a completion summary", async () => {

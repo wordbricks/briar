@@ -12,6 +12,7 @@ import { InitialOnboarding } from "./components/InitialOnboarding";
 import { LaunchIntro } from "./components/LaunchIntro";
 import { LoginScreen } from "./components/LoginScreen";
 import { OrganizationSettings } from "./components/OrganizationSettings";
+import { OrganizationCreate } from "./components/OrganizationCreate";
 import { ProjectOnboarding } from "./components/ProjectOnboarding";
 import { ProjectRepositorySetupDialog } from "./components/ProjectRepositorySetupDialog";
 import { ProjectSettings } from "./components/ProjectSettings";
@@ -47,6 +48,7 @@ type ActivePage =
   | "auto-hunt"
   | "inbox"
   | "project-settings"
+  | "organization-create"
   | "organization-settings"
   | "settings";
 
@@ -321,6 +323,7 @@ export function App() {
             onAutoHuntOpen={() => navigateToPage("auto-hunt")}
             onInboxOpen={() => navigateToPage("inbox")}
             onIssuesOpen={() => navigateToPage("issues")}
+            onAddOrganization={() => navigateToPage("organization-create")}
             onOrganizationChange={(organizationId) => {
               briar.setActiveOrganizationId(organizationId);
               setRequestedRunId(null);
@@ -388,7 +391,18 @@ export function App() {
             }
           />
         ) : null}
-        {activePage === "settings" && activeProject ? (
+        {activePage === "organization-create" ? (
+          <OrganizationCreate
+            onBack={() =>
+              canGoBack ? goBack() : navigateToPage("issues")
+            }
+            onCheckHandle={briar.checkOrganizationHandle}
+            onCreate={async (input) => {
+              await briar.addOrganization(input);
+              resetNavigation("issues");
+            }}
+          />
+        ) : activePage === "settings" && activeProject ? (
           <AppSettings
             error={briar.projectReadinessError[activeProject.id] ?? null}
             isSidebarOpen={isSidebarOpen}
