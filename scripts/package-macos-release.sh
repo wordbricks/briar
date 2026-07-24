@@ -15,10 +15,6 @@ set +a
 
 "$workspace_root/scripts/verify-release-config.sh"
 
-if [[ "${GITHUB_REF_TYPE:-}" == "tag" && "${GITHUB_REF_NAME:-}" != "v$version" ]]; then
-  echo "Release tag ${GITHUB_REF_NAME:-<missing>} does not match app version v$version." >&2
-  exit 1
-fi
 if [[ ! -d "$app_path" ]]; then
   echo "Missing release app at $app_path. Run 'bun run tauri:build:release' first." >&2
   exit 1

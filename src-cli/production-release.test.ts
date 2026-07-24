@@ -31,25 +31,26 @@ function completeEnvironment(): NodeJS.ProcessEnv {
     CLOUDFLARE_ACCOUNT_ID: "present",
     BRIAR_UPDATER_PUBLIC_KEY: publicKey,
     BRIAR_UPDATE_ENDPOINT: "https://briar-api.example/releases/latest.json",
-    GITHUB_REF_NAME: "v1.0.0",
-    GITHUB_REF_TYPE: "tag",
-    GITHUB_REF_PROTECTED: "true",
   };
 }
 
 describe("Production release contract", () => {
-  it("fails closed when a secret or protected exact tag is missing", () => {
+  it("fails closed when a build secret is missing", () => {
     const environment = completeEnvironment();
     delete environment.APPLE_CERTIFICATE;
     expect(() => validateProductionEnvironment(environment, "1.0.0")).toThrow(
       "Missing Production secrets: APPLE_CERTIFICATE",
     );
-    expect(() =>
-      validateProductionEnvironment(
-        { ...completeEnvironment(), GITHUB_REF_PROTECTED: "false" },
-        "1.0.0",
-      ),
-    ).toThrow("must be protected");
+  });
+
+  it("requires publishing credentials only for publication", () => {
+    const environment = completeEnvironment();
+    delete environment.CLOUDFLARE_API_TOKEN;
+    delete environment.CLOUDFLARE_ACCOUNT_ID;
+    expect(() => validateProductionEnvironment(environment, "1.0.0")).not.toThrow();
+    expect(() => validateProductionEnvironment(environment, "1.0.0", true)).toThrow(
+      "CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID",
+    );
   });
 
   it("builds a secret-free updater config", () => {
@@ -93,8 +94,9 @@ describe("Production release contract", () => {
       repository: "wordbricks/briar",
       commitSha: "a".repeat(40),
       releasedAt: "2026-07-22T00:00:00Z",
-      workflowRef: "wordbricks/briar/.github/workflows/production-release.yml@refs/tags/v1.0.0",
-      invocationId: "123",
+      builderId:
+        "https://github.com/wordbricks/briar/blob/main/scripts/release-macos-production.sh",
+      invocationId: "local:v1.0.0:aaaaaaaa",
     });
     expect(result.latest.platforms["darwin-aarch64"]).toEqual({
       signature: "trusted signature",
@@ -102,6 +104,12 @@ describe("Production release contract", () => {
     });
     expect(result.provenance.subject.map((subject) => subject.name)).toContain(
       "briar.spdx.json",
+    );
+    expect(result.provenance.predicate.buildDefinition.buildType).toContain(
+      "docs/operations/production-release.md#local-production-release-v1",
+    );
+    expect(result.provenance.predicate.runDetails.builder.id).toContain(
+      "scripts/release-macos-production.sh",
     );
   });
 });

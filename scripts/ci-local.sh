@@ -16,7 +16,7 @@ usage() {
   cat <<'EOF'
 Usage: scripts/ci-local.sh [--signoff] [all|app-worker|d1-migrations|rust|security ...]
 
-Runs the former GitHub Actions CI checks locally. The default is all contexts.
+Runs all repository CI checks locally. The default is all contexts.
 Pass --signoff only after committing and pushing the exact revision under test.
 EOF
 }
@@ -52,12 +52,18 @@ run_context() {
 }
 
 run_app_worker() {
+  if [[ -d .github/workflows ]] &&
+    find .github/workflows -type f -print -quit | grep -q .; then
+    fail "GitHub Actions workflows are not allowed; use the local CI and release scripts."
+  fi
   bun run check
   bun run test
   bash -n \
     scripts/import-apple-signing-assets.sh \
     scripts/package-macos-release.sh \
     scripts/package-production-release.sh \
+    scripts/release-macos-candidate.sh \
+    scripts/release-macos-production.sh \
     scripts/qa-production-updater-build.sh \
     scripts/qa-macos-lifecycle.sh
   bun run build

@@ -14,6 +14,8 @@ const requiredProductionSecrets = [
   "APPLE_API_KEY_CONTENT",
   "TAURI_SIGNING_PRIVATE_KEY",
   "TAURI_SIGNING_PRIVATE_KEY_PASSWORD",
+] as const;
+const requiredPublishingSecrets = [
   "CLOUDFLARE_API_TOKEN",
   "CLOUDFLARE_ACCOUNT_ID",
 ] as const;
@@ -38,17 +40,15 @@ function requireHttpsUrl(value: string, name: string) {
 export function validateProductionEnvironment(
   env: NodeJS.ProcessEnv,
   version: string,
+  publish = false,
 ) {
   requireSemver(version);
-  const missing = requiredProductionSecrets.filter((name) => !env[name]?.trim());
+  const required = publish
+    ? [...requiredProductionSecrets, ...requiredPublishingSecrets]
+    : requiredProductionSecrets;
+  const missing = required.filter((name) => !env[name]?.trim());
   if (missing.length > 0) {
     throw new Error(`Missing Production secrets: ${missing.join(", ")}`);
-  }
-  if (env.GITHUB_REF_NAME !== `v${version}` || env.GITHUB_REF_TYPE !== "tag") {
-    throw new Error(`Production releases require the exact tag v${version}.`);
-  }
-  if (env.GITHUB_REF_PROTECTED !== "true") {
-    throw new Error("Production release tags must be protected.");
   }
   productionUpdaterConfig(env);
 }
@@ -108,7 +108,7 @@ export async function generateProductionMetadata(input: {
   repository: string;
   commitSha: string;
   releasedAt: string;
-  workflowRef: string;
+  builderId: string;
   invocationId: string;
 }) {
   requireSemver(input.version);
@@ -149,7 +149,7 @@ export async function generateProductionMetadata(input: {
     predicateType: "https://slsa.dev/provenance/v1",
     predicate: {
       buildDefinition: {
-        buildType: "https://github.com/wordbricks/briar/.github/workflows/production-release.yml@v1",
+        buildType: "https://github.com/wordbricks/briar/blob/main/docs/operations/production-release.md#local-production-release-v1",
         externalParameters: {
           repository: input.repository,
           commitSha: input.commitSha,
@@ -161,7 +161,7 @@ export async function generateProductionMetadata(input: {
         ],
       },
       runDetails: {
-        builder: { id: input.workflowRef },
+        builder: { id: input.builderId },
         metadata: { invocationId: input.invocationId },
         byproducts: [],
       },
@@ -189,24 +189,34 @@ if (import.meta.main) {
   const command = process.argv[2];
   const version = requiredArgument("--version");
   if (command === "preflight") {
-    validateProductionEnvironment(process.env, version);
+    validateProductionEnvironment(process.env, version, process.argv.includes("--publish"));
     console.log(`Production preflight passed for Briar v${version}.`);
   } else if (command === "config") {
     const output = requiredArgument("--output");
     await writeFile(output, `${JSON.stringify(productionUpdaterConfig(process.env), null, 2)}\n`);
     console.log(`Wrote secret-free Production Tauri config to ${basename(output)}.`);
   } else if (command === "metadata") {
-    const commitSha = process.env.GITHUB_SHA ?? execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
-    const releasedAt = execFileSync("git", ["show", "-s", "--format=%cI", commitSha], { encoding: "utf8" }).trim();
+    const commitSha =
+      process.env.BRIAR_RELEASE_COMMIT ??
+      execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+    const releasedAt = execFileSync(
+      "git",
+      ["show", "-s", "--format=%cI", commitSha],
+      { encoding: "utf8" },
+    ).trim();
     await generateProductionMetadata({
       root: requiredArgument("--root"),
       version,
       baseUrl: requiredArgument("--base-url"),
-      repository: process.env.GITHUB_REPOSITORY ?? "wordbricks/briar",
+      repository: process.env.BRIAR_RELEASE_REPOSITORY ?? "wordbricks/briar",
       commitSha,
       releasedAt,
-      workflowRef: process.env.GITHUB_WORKFLOW_REF ?? "local-production-dry-run",
-      invocationId: process.env.GITHUB_RUN_ID ?? "local",
+      builderId:
+        process.env.BRIAR_RELEASE_BUILDER_ID ??
+        "https://github.com/wordbricks/briar/blob/main/scripts/release-macos-production.sh",
+      invocationId:
+        process.env.BRIAR_RELEASE_INVOCATION_ID ??
+        `local:v${version}:${commitSha}`,
     });
     console.log(`Generated updater and provenance metadata for Briar v${version}.`);
   } else {

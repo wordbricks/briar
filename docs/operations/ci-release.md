@@ -1,62 +1,64 @@
-# CI and release gates
+# Local CI and release gates
 
-Briar's Beta gate is enforced by GitHub Actions with read-only default token
-permissions and immutable action commit references.
+Briar runs validation and macOS release builds on developer-controlled machines.
+The repository does not contain hosted automation workflows. Local CI also
+fails if a file is added under `.github/workflows/`.
 
-## Required pull request checks
+## Required pull request signoffs
 
-- `App and Worker quality`
-- `D1 migration contract`
-- `Rust quality`
-- `Dependency and secret audit`
+Branch protection requires these commit statuses:
 
-The security job uses `bun audit`, checksum-verified `cargo-audit`, and a
-checksum-verified Gitleaks CLI. Rust vulnerabilities and any warning not in the
-dated advisory allowlist fail the gate. The first Rust audit prints all known
-warnings before the strict allowlist check, so accepted debt remains visible in
-the job log. GitHub Code Security is not assumed because the repository is
-private and the feature may not be licensed. Enable GitHub secret scanning and
-push protection later when the organization has Code Security available.
+- `signoff/app-worker`
+- `signoff/d1-migrations`
+- `signoff/rust`
+- `signoff/security`
+
+Run all checks locally:
+
+```sh
+bun run ci:local
+```
+
+After committing and pushing the exact revision that passed, publish all four
+statuses with `gh-signoff`:
+
+```sh
+bun run ci:signoff
+```
+
+The security phase uses `bun audit`, `cargo-audit`, and Gitleaks. Rust
+vulnerabilities and any warning not in the dated advisory allowlist fail the
+gate. The first Rust audit prints all known warnings before the strict allowlist
+check, so accepted debt remains visible in the local log.
 
 Any audit exception must be narrow, dated, and recorded in
 [`security-exceptions.md`](security-exceptions.md) with a removal condition.
 
-## Release candidates
+## Local release candidates
 
-Every push to `main` and every `v*` tag builds an ad-hoc-signed macOS candidate.
-The workflow uploads the `.dmg`, a zipped `.app`, `release-manifest.json`, and
-`SHA256SUMS` for 30 days. The manifest binds the channel, previous version,
-target, commit, source commit timestamp, artifact sizes, and SHA-256 hashes. A tag must
-exactly match the version in `src-tauri/tauri.conf.json`; matching tags also
-create a draft GitHub release.
-
-The public API endpoint and disabled demo mode live in `config/release.env`.
-They contain no secrets and are injected explicitly, so a clean runner produces
-the same connected app as a developer machine. The PR gate verifies that the
-compiled frontend contains that endpoint.
-
-Run the same packaging contract locally:
+Build the ad-hoc-signed macOS candidate, package it, exercise isolated install
+and rollback, prove that it cannot satisfy the Production signature gate, and
+write checksummed lifecycle evidence:
 
 ```sh
-bun run tauri:build:release
-scripts/package-macos-release.sh
-(cd release-artifacts && shasum -a 256 --check SHA256SUMS)
-bun run src-cli/release-manifest.ts verify --root release-artifacts
+bun run release:macos:candidate
 ```
 
-The release workflow then mounts the DMG into an isolated QA root, installs the
-app, replaces it with the candidate while retaining the previous bundle, and
-rolls back. Bundle identity, version, architecture, embedded Auto Hunt skill,
-signature completeness, and state-file hashes must all survive the cycle. The
-machine-readable lifecycle evidence is added to the artifact and checksum file. See
-[`rc-lifecycle.md`](rc-lifecycle.md) for the cross-version acceptance run.
+The command writes the `.dmg`, zipped `.app`, `release-manifest.json`,
+`lifecycle-evidence.json`, and `SHA256SUMS` to `release-artifacts/`. The manifest
+binds the channel, previous version, target, commit, source commit timestamp,
+artifact sizes, and SHA-256 hashes.
 
-Developer ID signing, notarization, updater signatures, and publication of a
-non-draft release remain Production gates. Ad-hoc signing proves bundle
-integrity in CI but does not make an artifact trusted by Gatekeeper.
+The public API endpoint and disabled demo mode live in `config/release.env`.
+They contain no secrets and are injected explicitly, so a clean release host
+produces the same connected app as a developer machine.
 
-The complete fail-closed tag workflow, trust ceremony, R2 promotion order, and
-signed provenance contract are documented in
+Developer ID signing, notarization, updater signatures, and public publication
+remain Production gates. Ad-hoc signing proves bundle integrity but does not
+make an artifact trusted by Gatekeeper.
+
+The complete fail-closed local tag transaction, trust ceremony, R2 promotion
+order, and signed provenance contract are documented in
 [`production-release.md`](production-release.md). Incident response and SLOs
 live in [`incident-runbook.md`](incident-runbook.md).
 
@@ -66,4 +68,4 @@ live in [`incident-runbook.md`](incident-runbook.md).
 - D1: capture a Time Travel bookmark before each remote migration and restore it
   only after confirming the forward fix is unsafe.
 - Desktop: retain the previous signed release until the new candidate passes
-  production QA.
+  Production QA.
