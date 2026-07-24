@@ -290,7 +290,11 @@ export async function createIssueMessage(
   token: string,
   projectId: string,
   runId: string,
-  input: { body: string; parentMessageId: string | null },
+  input: {
+    body: string;
+    parentMessageId: string | null;
+    agentConversationId?: string | null;
+  },
 ) {
   const result = await request<{ message: IssueMessage }>(
     `/projects/${projectId}/runs/${runId}/messages`,

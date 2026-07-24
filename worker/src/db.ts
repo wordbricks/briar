@@ -122,6 +122,7 @@ export type IssueMessageRow = {
   run_id: string;
   parent_message_id: string | null;
   author_user_id: string | null;
+  author_agent_provider: "codex" | "claude" | null;
   author_name: string | null;
   author_image: string | null;
   body: string;
@@ -547,7 +548,8 @@ export async function listIssueMessages(
   const result = await db
     .prepare(
       `select message.id, message.run_id, message.parent_message_id,
-              message.author_user_id, author.name as author_name,
+              message.author_user_id, message.author_agent_provider,
+              author.name as author_name,
               author.image as author_image, message.body,
               (select count(*) from briar_issue_messages reply
                where reply.parent_message_id = message.id) as reply_count,
@@ -570,7 +572,8 @@ export async function createIssueMessage(
     projectId: string;
     runId: string;
     parentMessageId: string | null;
-    authorUserId: string;
+    authorUserId: string | null;
+    authorAgentProvider: "codex" | "claude" | null;
     body: string;
     createdAt: string;
   },
@@ -579,9 +582,9 @@ export async function createIssueMessage(
     .prepare(
       `insert into briar_issue_messages (
          id, project_id, run_id, parent_message_id, author_user_id,
-         body, created_at, updated_at
+         author_agent_provider, body, created_at, updated_at
        )
-       select ?, run.project_id, run.id, parent.id, ?, ?, ?, ?
+       select ?, run.project_id, run.id, parent.id, ?, ?, ?, ?, ?
        from briar_hunt_runs run
        left join briar_issue_messages parent
          on parent.id = ?
@@ -594,6 +597,7 @@ export async function createIssueMessage(
     .bind(
       input.id,
       input.authorUserId,
+      input.authorAgentProvider,
       input.body,
       input.createdAt,
       input.createdAt,

@@ -277,6 +277,7 @@ const issueMessageInputSchema = z
   .object({
     body: z.string().trim().min(1).max(10_000),
     parentMessageId: z.string().uuid().nullable().optional(),
+    agentConversationId: z.string().trim().min(1).max(1_000).nullable().optional(),
   })
   .strict();
 
@@ -666,9 +667,14 @@ const issueMessageJson = (message: IssueMessageRow) => ({
   parentMessageId: message.parent_message_id,
   body: message.body,
   author: {
-    id: message.author_user_id,
-    name: message.author_name ?? "알 수 없는 사용자",
-    image: message.author_image,
+    id: message.author_agent_provider ? null : message.author_user_id,
+    name: message.author_agent_provider
+      ? `Briar · ${
+          message.author_agent_provider === "codex" ? "Codex" : "Claude"
+        }`
+      : message.author_name ?? "알 수 없는 사용자",
+    image: message.author_agent_provider ? null : message.author_image,
+    provider: message.author_agent_provider,
   },
   replyCount: message.reply_count,
   createdAt: message.created_at,
@@ -1017,12 +1023,23 @@ async function route(
     const project = await getProject(db, issueMessagesMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
     const input = issueMessageInputSchema.parse(await readJson(request, 16_384));
+    const agentProvider = input.agentConversationId
+      ? input.agentConversationId.startsWith(`briar:claude:${project.id}:`)
+        ? "claude"
+        : input.agentConversationId.startsWith(`briar:${project.id}:`)
+          ? "codex"
+          : null
+      : null;
+    if (input.agentConversationId && !agentProvider) {
+      throw new HttpError(400, "Agent conversation does not belong to this project");
+    }
     const message = await createIssueMessage(db, {
       id: crypto.randomUUID(),
       projectId: project.id,
       runId: issueMessagesMatch[2],
       parentMessageId: input.parentMessageId ?? null,
-      authorUserId: session.user.id,
+      authorUserId: agentProvider ? null : session.user.id,
+      authorAgentProvider: agentProvider,
       body: input.body,
       createdAt: new Date().toISOString(),
     });

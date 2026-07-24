@@ -22,6 +22,23 @@ pub(crate) enum AgentProviderKind {
     Claude,
 }
 
+impl AgentProviderKind {
+    pub(crate) fn for_conversation_id(project_id: &str, conversation_id: &str) -> Option<Self> {
+        let claude_prefix = format!("briar:claude:{project_id}:");
+        if conversation_id
+            .strip_prefix(&claude_prefix)
+            .is_some_and(|id| !id.is_empty())
+        {
+            return Some(Self::Claude);
+        }
+        let codex_prefix = format!("briar:{project_id}:");
+        conversation_id
+            .strip_prefix(&codex_prefix)
+            .filter(|id| !id.is_empty())
+            .map(|_| Self::Codex)
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum AgentEventDirection {
@@ -369,4 +386,25 @@ pub(crate) fn start_auto_hunt(
         request,
         approve,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::AgentProviderKind;
+
+    #[test]
+    fn resolves_the_original_provider_from_a_project_conversation() {
+        assert_eq!(
+            AgentProviderKind::for_conversation_id("project-1", "briar:project-1:thread-1"),
+            Some(AgentProviderKind::Codex)
+        );
+        assert_eq!(
+            AgentProviderKind::for_conversation_id("project-1", "briar:claude:project-1:session-1"),
+            Some(AgentProviderKind::Claude)
+        );
+        assert_eq!(
+            AgentProviderKind::for_conversation_id("project-2", "briar:project-1:thread-1"),
+            None
+        );
+    }
 }

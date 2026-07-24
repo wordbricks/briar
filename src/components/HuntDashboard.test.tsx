@@ -376,7 +376,7 @@ describe("HuntDashboard", () => {
       runId: demoDashboard.runs[0].id,
       parentMessageId: null,
       body: "원문 메시지",
-      author: { id: "jay", name: "Jay", image: null },
+      author: { id: "jay", name: "Jay", image: null, provider: null },
       replyCount: 1,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -403,7 +403,10 @@ describe("HuntDashboard", () => {
           onLoadIssueMessages={async () => [rootMessage, reply]}
           onMove={async () => undefined}
           onRetry={async () => undefined}
-          onSendIssueMessage={async () => reply}
+          onSendIssueMessage={async () => ({
+            message: reply,
+            agentReply: null,
+          })}
           run={demoDashboard.runs[0]}
         />,
       );
@@ -424,6 +427,89 @@ describe("HuntDashboard", () => {
     });
     expect(container.querySelector('[role="dialog"]')).toBeNull();
     expect(document.activeElement).toBe(trigger);
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("inserts @briar and renders the provider reply in the conversation", async () => {
+    const createdAt = new Date().toISOString();
+    const userMessage: IssueMessage = {
+      id: "message-user",
+      runId: demoDashboard.runs[0].id,
+      parentMessageId: null,
+      body: "@briar 변경 내용을 설명해 줘",
+      author: { id: "jay", name: "Jay", image: null, provider: null },
+      replyCount: 0,
+      createdAt,
+      updatedAt: createdAt,
+    };
+    const agentMessage: IssueMessage = {
+      ...userMessage,
+      id: "message-agent",
+      body: "Codex가 처리한 변경 내용을 설명합니다.",
+      author: {
+        id: null,
+        name: "Briar · Codex",
+        image: null,
+        provider: "codex",
+      },
+    };
+    let sentBody = "";
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async (input) => {
+            sentBody = input.body;
+            return {
+              message: userMessage,
+              agentReply: Promise.resolve(agentMessage),
+            };
+          }}
+          run={demoDashboard.runs[0]}
+        />,
+      );
+    });
+
+    const mentionButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="멘션"]',
+    );
+    const textarea = container.querySelector<HTMLTextAreaElement>(
+      ".issue-message-composer textarea",
+    );
+    await act(async () => mentionButton?.click());
+    expect(textarea?.value).toBe("@briar ");
+
+    await act(async () => {
+      if (!textarea) return;
+      Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )?.set?.call(textarea, "@briar 변경 내용을 설명해 줘");
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".issue-message-send")?.click();
+      await Promise.resolve();
+    });
+
+    expect(sentBody).toBe("@briar 변경 내용을 설명해 줘");
+    expect(container.textContent).toContain(userMessage.body);
+    expect(container.textContent).toContain(agentMessage.body);
+    expect(
+      container.querySelector('.issue-message-avatar.agent[aria-label="Briar · Codex"]'),
+    ).not.toBeNull();
     await act(async () => root.unmount());
     container.remove();
   });

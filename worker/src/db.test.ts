@@ -91,6 +91,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       "migrations/0008_organizations.sql",
       "migrations/0009_auto_hunt_automation.sql",
       "migrations/0010_issue_messages.sql",
+      "migrations/0011_issue_message_agents.sql",
     ]) {
       await executeSql(db, await readFile(resolve(migration), "utf8"));
     }
@@ -343,6 +344,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     );
     const rootId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
     const replyId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const agentReplyId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
     expect(
       await createIssueMessage(db, {
         id: rootId,
@@ -350,6 +352,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         runId,
         parentMessageId: null,
         authorUserId: "owner",
+        authorAgentProvider: null,
         body: "Please verify the edge case.",
         createdAt: atMinute(26),
       }),
@@ -367,6 +370,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         runId,
         parentMessageId: rootId,
         authorUserId: "owner",
+        authorAgentProvider: null,
         body: "The edge case is covered.",
         createdAt: atMinute(27),
       }),
@@ -376,13 +380,37 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         parent_message_id: rootId,
       }),
     );
+    expect(
+      await createIssueMessage(db, {
+        id: agentReplyId,
+        projectId,
+        runId,
+        parentMessageId: rootId,
+        authorUserId: null,
+        authorAgentProvider: "claude",
+        body: "The original provider checked the follow-up.",
+        createdAt: atMinute(28),
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        id: agentReplyId,
+        author_user_id: null,
+        author_agent_provider: "claude",
+      }),
+    );
 
     const messages = await listIssueMessages(db, projectId, runId);
     expect(messages).toEqual([
-      expect.objectContaining({ id: rootId, reply_count: 1 }),
+      expect.objectContaining({ id: rootId, reply_count: 2 }),
       expect.objectContaining({
         id: replyId,
         parent_message_id: rootId,
+        reply_count: 0,
+      }),
+      expect.objectContaining({
+        id: agentReplyId,
+        parent_message_id: rootId,
+        author_agent_provider: "claude",
         reply_count: 0,
       }),
     ]);
@@ -393,8 +421,9 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         runId,
         parentMessageId: replyId,
         authorUserId: "owner",
+        authorAgentProvider: null,
         body: "Nested replies are not supported.",
-        createdAt: atMinute(28),
+        createdAt: atMinute(29),
       }),
     ).resolves.toBeNull();
   });
