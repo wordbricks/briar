@@ -13,9 +13,14 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
+  agentModels,
+  agentProviders,
+  defaultAppProviderSettings,
+  loadAppProviderSettings,
   loadProjectLlmSettings,
   updateProjectLlmSettings,
   type AgentProvider,
+  type AppProviderSettings,
   type ApprovalPolicy,
 } from "../lib/project-llm";
 import type { DashboardPayload, Project, ProjectSettings as ProjectSettingsData } from "../types";
@@ -61,9 +66,13 @@ export function ProjectSettings({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [approvalPolicy, setApprovalPolicy] = useState<ApprovalPolicy>("never");
   const [provider, setProvider] = useState<AgentProvider>("codex");
+  const [model, setModel] = useState<string | null>(null);
+  const [providerAvailability, setProviderAvailability] =
+    useState<AppProviderSettings>(defaultAppProviderSettings);
   const [savedApprovalPolicy, setSavedApprovalPolicy] =
     useState<ApprovalPolicy>("never");
   const [savedProvider, setSavedProvider] = useState<AgentProvider>("codex");
+  const [savedModel, setSavedModel] = useState<string | null>(null);
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
@@ -119,11 +128,17 @@ export function ProjectSettings({
     setWorkflowRegenerated(false);
     setSettingsLoading(true);
     setSettingsError(null);
-    void loadProjectLlmSettings(project.id)
-      .then((settings) => {
+    void Promise.all([
+      loadProjectLlmSettings(project.id),
+      loadAppProviderSettings(),
+    ])
+      .then(([settings, availability]) => {
         if (cancelled) return;
         setProvider(settings.provider);
         setSavedProvider(settings.provider);
+        setModel(settings.model);
+        setSavedModel(settings.model);
+        setProviderAvailability(availability);
         setApprovalPolicy(settings.approvalPolicy);
         setSavedApprovalPolicy(settings.approvalPolicy);
       })
@@ -210,10 +225,13 @@ export function ProjectSettings({
     try {
       const settings = await updateProjectLlmSettings(project.id, {
         provider,
+        model,
         approvalPolicy,
       });
       setProvider(settings.provider);
       setSavedProvider(settings.provider);
+      setModel(settings.model);
+      setSavedModel(settings.model);
       setApprovalPolicy(settings.approvalPolicy);
       setSavedApprovalPolicy(settings.approvalPolicy);
     } catch (caught) {
@@ -259,6 +277,14 @@ export function ProjectSettings({
     (source) => source.sourceRef === linear.source,
   );
   const linearChanged = JSON.stringify(linear) !== JSON.stringify(savedLinear);
+  const providerModels = agentModels[provider];
+  const selectedModelKnown = providerModels.some(
+    (option) => option.value === (model ?? ""),
+  );
+  const llmSettingsChanged =
+    provider !== savedProvider ||
+    model !== savedModel ||
+    approvalPolicy !== savedApprovalPolicy;
 
   const saveLinear = async () => {
     setLinearSaving(true);
@@ -686,27 +712,51 @@ export function ProjectSettings({
                 <ShieldCheck size={18} strokeWidth={1.8} />
               </span>
               <span>
-                <strong>{t("settings.llmTitle")}</strong>
-                <small>
-                  {t("settings.llmDescription").replace(
-                    "Codex App Server",
-                    providerRuntimeName,
-                  )}
-                </small>
+                <strong>{t("settings.agentTitle")}</strong>
+                <small>{t("settings.agentDescription")}</small>
               </span>
             </header>
             <div className="project-settings-llm-control">
-              <label htmlFor="project-agent-provider">Agent</label>
+              <label htmlFor="project-agent-provider">{t("settings.provider")}</label>
               <select
                 disabled={settingsLoading || settingsSaving}
                 id="project-agent-provider"
-                onChange={(event) =>
-                  setProvider(event.currentTarget.value as AgentProvider)
-                }
+                onChange={(event) => {
+                  setProvider(event.currentTarget.value as AgentProvider);
+                  setModel(null);
+                }}
                 value={provider}
               >
-                <option value="codex">Codex</option>
-                <option value="claude">Claude</option>
+                {agentProviders.map((candidate) => (
+                  <option
+                    disabled={!providerAvailability[candidate]}
+                    key={candidate}
+                    value={candidate}
+                  >
+                    {candidate === "codex" ? "Codex" : "Claude"}
+                    {!providerAvailability[candidate]
+                      ? ` · ${t("settings.providerDisabled")}`
+                      : ""}
+                  </option>
+                ))}
+              </select>
+              <label htmlFor="project-agent-model">{t("settings.model")}</label>
+              <select
+                disabled={settingsLoading || settingsSaving}
+                id="project-agent-model"
+                onChange={(event) => setModel(event.currentTarget.value || null)}
+                value={model ?? ""}
+              >
+                {!selectedModelKnown && model ? (
+                  <option value={model}>{model}</option>
+                ) : null}
+                {providerModels.map((option) => (
+                  <option key={option.value || "default"} value={option.value}>
+                    {option.value
+                      ? option.label
+                      : t("settings.providerDefaultModel")}
+                  </option>
+                ))}
               </select>
               <label htmlFor="project-approval-policy">{t("settings.approvalRequest")}</label>
               <select
@@ -725,22 +775,20 @@ export function ProjectSettings({
                 disabled={
                   settingsLoading ||
                   settingsSaving ||
-                  (provider === savedProvider &&
-                    approvalPolicy === savedApprovalPolicy)
+                  !providerAvailability[provider] ||
+                  !llmSettingsChanged
                 }
                 onClick={() => void saveLlmSettings()}
                 type="button"
               >
                 {settingsSaving ? (
                   <LoaderCircle className="spin" size={14} />
-                ) : provider === savedProvider &&
-                  approvalPolicy === savedApprovalPolicy ? (
+                ) : !llmSettingsChanged ? (
                   <Check size={14} />
                 ) : null}
                 {settingsSaving
                   ? t("common.saving")
-                  : provider === savedProvider &&
-                      approvalPolicy === savedApprovalPolicy
+                  : !llmSettingsChanged
                     ? t("common.saved")
                     : t("common.save")}
               </button>

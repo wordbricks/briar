@@ -6,13 +6,43 @@ export type ApprovalPolicy = (typeof approvalPolicies)[number];
 export const agentProviders = ["codex", "claude"] as const;
 export type AgentProvider = (typeof agentProviders)[number];
 
+export type AppProviderSettings = Record<AgentProvider, boolean>;
+
+export const defaultAppProviderSettings: AppProviderSettings = {
+  codex: true,
+  claude: true,
+};
+
+export type AgentModelOption = {
+  value: string;
+  label: string;
+};
+
+export const agentModels: Record<AgentProvider, AgentModelOption[]> = {
+  codex: [
+    { value: "", label: "Provider default" },
+    { value: "gpt-5.6-sol", label: "GPT-5.6 Sol" },
+    { value: "gpt-5.6-terra", label: "GPT-5.6 Terra" },
+    { value: "gpt-5.6-luna", label: "GPT-5.6 Luna" },
+  ],
+  claude: [
+    { value: "", label: "Provider default" },
+    { value: "sonnet", label: "Claude Sonnet" },
+    { value: "opus", label: "Claude Opus" },
+    { value: "haiku", label: "Claude Haiku" },
+    { value: "fable", label: "Claude Fable" },
+  ],
+};
+
 export type ProjectLlmSettings = {
   provider: AgentProvider;
+  model: string | null;
   approvalPolicy: ApprovalPolicy;
 };
 
 export const defaultProjectLlmSettings: ProjectLlmSettings = {
   provider: "codex",
+  model: null,
   approvalPolicy: "never",
 };
 
@@ -74,7 +104,26 @@ export async function loadProjectLlmSettings(
 ): Promise<ProjectLlmSettings> {
   if (!isTauri()) return defaultProjectLlmSettings;
   const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<ProjectLlmSettings>("load_project_llm_settings", { projectId });
+  const settings = await invoke<ProjectLlmSettings>("load_project_llm_settings", {
+    projectId,
+  });
+  return { ...settings, model: settings.model ?? null };
+}
+
+export async function loadAppProviderSettings(): Promise<AppProviderSettings> {
+  if (!isTauri()) return defaultAppProviderSettings;
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<AppProviderSettings>("load_app_provider_settings");
+}
+
+export async function updateAppProviderSettings(
+  settings: AppProviderSettings,
+): Promise<AppProviderSettings> {
+  if (!isTauri()) return settings;
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<AppProviderSettings>("update_app_provider_settings", {
+    settings,
+  });
 }
 
 export async function updateProjectLlmSettings(
@@ -83,10 +132,11 @@ export async function updateProjectLlmSettings(
 ): Promise<ProjectLlmSettings> {
   if (!isTauri()) return settings;
   const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<ProjectLlmSettings>("update_project_llm_settings", {
+  const saved = await invoke<ProjectLlmSettings>("update_project_llm_settings", {
     projectId,
     settings,
   });
+  return { ...saved, model: saved.model ?? null };
 }
 
 /**

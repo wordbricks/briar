@@ -23,10 +23,10 @@ import {
   type OnboardingPrerequisites,
 } from "../lib/initial-onboarding";
 import {
-  loadProjectLlmSettings,
-  updateProjectLlmSettings,
+  loadAppProviderSettings,
+  updateAppProviderSettings,
   type AgentProvider,
-  type ProjectLlmSettings,
+  type AppProviderSettings,
 } from "../lib/project-llm";
 import type { RepositoryReadiness } from "../lib/project-connection";
 import { Logo } from "./Logo";
@@ -98,7 +98,7 @@ export function AppSettings({
   const [providerStatuses, setProviderStatuses] =
     useState<OnboardingPrerequisites | null>(null);
   const [providerSettings, setProviderSettings] =
-    useState<ProjectLlmSettings | null>(null);
+    useState<AppProviderSettings | null>(null);
   const [providersLoading, setProvidersLoading] = useState(false);
   const [providerSaving, setProviderSaving] =
     useState<AgentProvider | null>(null);
@@ -116,7 +116,7 @@ export function AppSettings({
     try {
       const [statuses, settings] = await Promise.all([
         inspectOnboardingPrerequisites(),
-        loadProjectLlmSettings(projectId),
+        loadAppProviderSettings(),
       ]);
       setProviderStatuses(statuses);
       setProviderSettings(settings);
@@ -126,28 +126,27 @@ export function AppSettings({
     } finally {
       setProvidersLoading(false);
     }
-  }, [projectId]);
+  }, []);
 
   useEffect(() => {
     if (activeSection !== "providers") return;
     void refreshProviders();
   }, [activeSection, refreshProviders]);
 
-  const selectProvider = async (provider: AgentProvider) => {
-    if (
-      !providerSettings ||
-      providerSettings.provider === provider ||
-      providerSaving
-    ) {
+  const toggleProvider = async (
+    provider: AgentProvider,
+    enabled: boolean,
+  ) => {
+    if (!providerSettings || providerSettings[provider] === enabled || providerSaving) {
       return;
     }
     setProviderSaving(provider);
     setProviderError(null);
     try {
       setProviderSettings(
-        await updateProjectLlmSettings(projectId, {
+        await updateAppProviderSettings({
           ...providerSettings,
-          provider,
+          [provider]: enabled,
         }),
       );
     } catch (caught) {
@@ -280,23 +279,22 @@ export function AppSettings({
                       providerStatuses.codex.authenticated,
                   )}
                   description={providerDescription({
-                    active: providerSettings?.provider === "codex",
                     authenticated: providerStatuses?.codex.authenticated,
+                    enabled: providerSettings?.codex ?? false,
                     installed: providerStatuses?.codex.installed,
                     loading: providersLoading && !providerStatuses,
-                    projectName,
                     providerName: "Codex CLI",
                     t,
                   })}
                   disabled={providerSaving !== null}
-                  enabled={providerSettings?.provider === "codex"}
+                  enabled={providerSettings?.codex ?? false}
                   icon={
                     <span className="source-control-provider-icon codex">
                       <Bot size={20} strokeWidth={1.9} />
                     </span>
                   }
                   name="Codex"
-                  onToggle={() => void selectProvider("codex")}
+                  onToggle={(enabled) => void toggleProvider("codex", enabled)}
                   title={
                     <>
                       Codex
@@ -321,23 +319,22 @@ export function AppSettings({
                       providerStatuses.claude.authenticated,
                   )}
                   description={providerDescription({
-                    active: providerSettings?.provider === "claude",
                     authenticated: providerStatuses?.claude.authenticated,
+                    enabled: providerSettings?.claude ?? false,
                     installed: providerStatuses?.claude.installed,
                     loading: providersLoading && !providerStatuses,
-                    projectName,
                     providerName: "Claude Code",
                     t,
                   })}
                   disabled={providerSaving !== null}
-                  enabled={providerSettings?.provider === "claude"}
+                  enabled={providerSettings?.claude ?? false}
                   icon={
                     <span className="source-control-provider-icon claude">
                       <Sparkles size={19} strokeWidth={1.8} />
                     </span>
                   }
                   name="Claude"
-                  onToggle={() => void selectProvider("claude")}
+                  onToggle={(enabled) => void toggleProvider("claude", enabled)}
                   title={
                     <>
                       Claude
@@ -631,19 +628,17 @@ function ProviderRow({
 }
 
 function providerDescription({
-  active,
   authenticated,
+  enabled,
   installed,
   loading,
-  projectName,
   providerName,
   t,
 }: {
-  active: boolean;
   authenticated: boolean | undefined;
+  enabled: boolean;
   installed: boolean | undefined;
   loading: boolean;
-  projectName: string;
   providerName: string;
   t: ReturnType<typeof useI18n>["t"];
 }) {
@@ -656,7 +651,7 @@ function providerDescription({
       provider: providerName,
     });
   }
-  return active
-    ? t("appSettings.activeProvider", { project: projectName })
-    : t("appSettings.providerReady");
+  return t(
+    enabled ? "appSettings.providerEnabled" : "appSettings.providerReady",
+  );
 }

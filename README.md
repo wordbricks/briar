@@ -133,9 +133,11 @@ verifies that the saved path is the Git root, and supplies that absolute path as
 the backend working directory. Callers cannot supply a filesystem path.
 Conversations are scoped to both the project and provider, and Briar rejects a
 conversation ID issued for another project or backend.
-The project settings screen stores the backend (`codex` or `claude`) and
-approval policy (`untrusted`, `on-request`, or `never`) locally; existing
-projects default to Codex with `never`.
+App settings independently enable the installed Codex and Claude providers.
+Each project then stores its selected backend (`codex` or `claude`), optional
+provider model override, and approval policy (`untrusted`, `on-request`, or
+`never`) locally; existing projects default to Codex, the provider's default
+model, and `never`.
 Interactive command and file-change requests from `untrusted` and `on-request`
 are shown in a native Briar confirmation dialog and sent back to App Server as
 an approval or denial.
