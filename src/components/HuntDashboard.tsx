@@ -723,10 +723,12 @@ function KanbanCard({
         <small>AH-{run.runNumber}</small>
         <i><span className={`source-dot ${run.source}`} />{t(`source.${run.source}` as MessageKey)}</i>
       </span>
-      <strong>{run.title}</strong>
-      {(run.detail || run.issueDescription) && (
-        <p>{run.detail || run.issueDescription}</p>
-      )}
+      <span className="kanban-card-copy">
+        <strong>{run.title}</strong>
+        {(run.detail || run.issueDescription) && (
+          <span>{run.detail || run.issueDescription}</span>
+        )}
+      </span>
       <span className="kanban-card-badges">
         <i className={`status-pill ${meta.tone}`}>{run.status === "running" && <LoaderCircle className="spin" size={11} />}{label}</i>
         <i className="kanban-progress">{run.progress}%</i>
