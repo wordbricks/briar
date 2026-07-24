@@ -13,10 +13,21 @@ import {
   LoaderCircle,
   RefreshCw,
   Settings2,
+  Sparkles,
   SlidersHorizontal,
 } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useI18n } from "../i18n";
+import {
+  inspectOnboardingPrerequisites,
+  type OnboardingPrerequisites,
+} from "../lib/initial-onboarding";
+import {
+  loadProjectLlmSettings,
+  updateProjectLlmSettings,
+  type AgentProvider,
+  type ProjectLlmSettings,
+} from "../lib/project-llm";
 import type { RepositoryReadiness } from "../lib/project-connection";
 import { Logo } from "./Logo";
 
@@ -84,11 +95,67 @@ export function AppSettings({
     readProviderPreference(projectId, "github"),
   );
   const [gitExpanded, setGitExpanded] = useState(false);
+  const [providerStatuses, setProviderStatuses] =
+    useState<OnboardingPrerequisites | null>(null);
+  const [providerSettings, setProviderSettings] =
+    useState<ProjectLlmSettings | null>(null);
+  const [providersLoading, setProvidersLoading] = useState(false);
+  const [providerSaving, setProviderSaving] =
+    useState<AgentProvider | null>(null);
+  const [providerError, setProviderError] = useState<string | null>(null);
+  const [providersChecked, setProvidersChecked] = useState(false);
 
   useEffect(() => {
     setGitEnabled(readProviderPreference(projectId, "git"));
     setGithubEnabled(readProviderPreference(projectId, "github"));
   }, [projectId]);
+
+  const refreshProviders = useCallback(async () => {
+    setProvidersLoading(true);
+    setProviderError(null);
+    try {
+      const [statuses, settings] = await Promise.all([
+        inspectOnboardingPrerequisites(),
+        loadProjectLlmSettings(projectId),
+      ]);
+      setProviderStatuses(statuses);
+      setProviderSettings(settings);
+      setProvidersChecked(true);
+    } catch (caught) {
+      setProviderError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setProvidersLoading(false);
+    }
+  }, [projectId]);
+
+  useEffect(() => {
+    if (activeSection !== "providers") return;
+    void refreshProviders();
+  }, [activeSection, refreshProviders]);
+
+  const selectProvider = async (provider: AgentProvider) => {
+    if (
+      !providerSettings ||
+      providerSettings.provider === provider ||
+      providerSaving
+    ) {
+      return;
+    }
+    setProviderSaving(provider);
+    setProviderError(null);
+    try {
+      setProviderSettings(
+        await updateProjectLlmSettings(projectId, {
+          ...providerSettings,
+          provider,
+        }),
+      );
+    } catch (caught) {
+      setProviderError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setProviderSaving(null);
+    }
+  };
 
   const navigation: Array<{
     id: SettingsSection;
@@ -168,7 +235,133 @@ export function AppSettings({
           <h1>{t("appSettings.title")}</h1>
         </header>
 
-        {activeSection === "source-control" ? (
+        {activeSection === "providers" ? (
+          <div className="app-settings-scroll">
+            <div className="source-control-settings provider-settings">
+              <SettingsGroupHeading
+                action={
+                  <div className="provider-heading-actions">
+                    {providersChecked ? (
+                      <span>{t("appSettings.checkedJustNow")}</span>
+                    ) : null}
+                    <button
+                      aria-label={t("appSettings.refreshProviders")}
+                      className="source-control-refresh"
+                      disabled={providersLoading || providerSaving !== null}
+                      onClick={() => void refreshProviders()}
+                      title={t("appSettings.refreshProviders")}
+                      type="button"
+                    >
+                      {providersLoading ? (
+                        <LoaderCircle className="spin" size={16} />
+                      ) : (
+                        <RefreshCw size={16} />
+                      )}
+                    </button>
+                  </div>
+                }
+                title={t("appSettings.providers")}
+              />
+
+              <div
+                aria-busy={providersLoading || providerSaving !== null}
+                className="source-control-card provider-card"
+              >
+                <ProviderRow
+                  available={Boolean(
+                    providerStatuses?.codex.installed &&
+                      providerStatuses.codex.authenticated,
+                  )}
+                  description={providerDescription({
+                    active: providerSettings?.provider === "codex",
+                    authenticated: providerStatuses?.codex.authenticated,
+                    installed: providerStatuses?.codex.installed,
+                    loading: providersLoading && !providerStatuses,
+                    projectName,
+                    providerName: "Codex CLI",
+                    t,
+                  })}
+                  disabled={providerSaving !== null}
+                  enabled={providerSettings?.provider === "codex"}
+                  icon={
+                    <span className="source-control-provider-icon codex">
+                      <Bot size={20} strokeWidth={1.9} />
+                    </span>
+                  }
+                  name="Codex"
+                  onToggle={() => void selectProvider("codex")}
+                  title={
+                    <>
+                      Codex
+                      {providerStatuses?.codex.version ? (
+                        <code>{providerStatuses.codex.version}</code>
+                      ) : null}
+                    </>
+                  }
+                  trailing={
+                    providerSaving === "codex" ? (
+                      <LoaderCircle
+                        aria-label={t("common.saving")}
+                        className="provider-saving spin"
+                        size={16}
+                      />
+                    ) : null
+                  }
+                />
+                <ProviderRow
+                  available={Boolean(
+                    providerStatuses?.claude.installed &&
+                      providerStatuses.claude.authenticated,
+                  )}
+                  description={providerDescription({
+                    active: providerSettings?.provider === "claude",
+                    authenticated: providerStatuses?.claude.authenticated,
+                    installed: providerStatuses?.claude.installed,
+                    loading: providersLoading && !providerStatuses,
+                    projectName,
+                    providerName: "Claude Code",
+                    t,
+                  })}
+                  disabled={providerSaving !== null}
+                  enabled={providerSettings?.provider === "claude"}
+                  icon={
+                    <span className="source-control-provider-icon claude">
+                      <Sparkles size={19} strokeWidth={1.8} />
+                    </span>
+                  }
+                  name="Claude"
+                  onToggle={() => void selectProvider("claude")}
+                  title={
+                    <>
+                      Claude
+                      {providerStatuses?.claude.version ? (
+                        <code>{providerStatuses.claude.version}</code>
+                      ) : null}
+                    </>
+                  }
+                  trailing={
+                    providerSaving === "claude" ? (
+                      <LoaderCircle
+                        aria-label={t("common.saving")}
+                        className="provider-saving spin"
+                        size={16}
+                      />
+                    ) : null
+                  }
+                />
+              </div>
+
+              {providerError ? (
+                <p className="source-control-error" role="alert">
+                  {providerError}
+                </p>
+              ) : null}
+              <p className="source-control-project-note provider-project-note">
+                {t("appSettings.providerScope", { project: projectName })}
+              </p>
+            </div>
+          </div>
+        ) : activeSection === "source-control" ? (
           <div className="app-settings-scroll">
             <div className="source-control-settings">
               <SettingsGroupHeading
@@ -382,6 +575,7 @@ function ProviderRow({
   available,
   badge,
   description,
+  disabled = false,
   enabled,
   icon,
   name,
@@ -392,6 +586,7 @@ function ProviderRow({
   available: boolean;
   badge?: string;
   description: string;
+  disabled?: boolean;
   enabled: boolean;
   icon: ReactNode;
   name: string;
@@ -418,7 +613,7 @@ function ProviderRow({
         <input
           aria-label={`${name} enabled`}
           checked={enabled}
-          disabled={!available || !onToggle}
+          disabled={disabled || !available || !onToggle}
           onChange={(event) => onToggle?.(event.currentTarget.checked)}
           type="checkbox"
         />
@@ -426,4 +621,35 @@ function ProviderRow({
       </label>
     </div>
   );
+}
+
+function providerDescription({
+  active,
+  authenticated,
+  installed,
+  loading,
+  projectName,
+  providerName,
+  t,
+}: {
+  active: boolean;
+  authenticated: boolean | undefined;
+  installed: boolean | undefined;
+  loading: boolean;
+  projectName: string;
+  providerName: string;
+  t: ReturnType<typeof useI18n>["t"];
+}) {
+  if (loading) return t("appSettings.checkingProviders");
+  if (!installed) {
+    return t("appSettings.providerNotInstalled", { provider: providerName });
+  }
+  if (!authenticated) {
+    return t("appSettings.providerAuthenticationRequired", {
+      provider: providerName,
+    });
+  }
+  return active
+    ? t("appSettings.activeProvider", { project: projectName })
+    : t("appSettings.providerReady");
 }
