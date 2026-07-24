@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="440" viewBox="0 0 720 440">
+  <defs>
+    <linearGradient id="base" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fbfaf8"/>
+      <stop offset="0.55" stop-color="#f9f9f8"/>
+      <stop offset="1" stop-color="#eef3fb"/>
+    </linearGradient>
+    <radialGradient id="warm" cx="0" cy="0" r="1" gradientTransform="translate(116 32) rotate(29) scale(250 180)">
+      <stop offset="0" stop-color="#f6d9f4" stop-opacity="0.78"/>
+      <stop offset="0.62" stop-color="#f6e8db" stop-opacity="0.3"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="sun" cx="0" cy="0" r="1" gradientTransform="translate(582 28) rotate(148) scale(236 166)">
+      <stop offset="0" stop-color="#f9dcf5" stop-opacity="0.75"/>
+      <stop offset="0.58" stop-color="#f7edd4" stop-opacity="0.34"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="cool" cx="0" cy="0" r="1" gradientTransform="translate(360 458) rotate(-90) scale(186 460)">
+      <stop offset="0" stop-color="#dbe7fb" stop-opacity="0.9"/>
+      <stop offset="0.65" stop-color="#ebf1fa" stop-opacity="0.26"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="softShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="5"/>
+    </filter>
+  </defs>
+
+  <rect width="720" height="440" fill="url(#base)"/>
+  <rect width="720" height="440" fill="url(#warm)"/>
+  <rect width="720" height="440" fill="url(#sun)"/>
+  <rect width="720" height="440" fill="url(#cool)"/>
+
+  <text
+    x="360"
+    y="72"
+    text-anchor="middle"
+    fill="#626267"
+    font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif"
+    font-size="22"
+    font-weight="500"
+    letter-spacing="-0.4"
+  >To install, drag <tspan fill="#202124" font-weight="700">Briar</tspan> to <tspan fill="#202124" font-weight="700">Applications</tspan></text>
+
+  <g transform="translate(360 226)">
+    <path d="M-31 -15 L-18 0 L-31 15" fill="none" stroke="#222327" stroke-opacity="0.18" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" filter="url(#softShadow)"/>
+    <path d="M-6 -15 L7 0 L-6 15" fill="none" stroke="#222327" stroke-opacity="0.18" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" filter="url(#softShadow)"/>
+    <path d="M19 -15 L32 0 L19 15" fill="none" stroke="#222327" stroke-opacity="0.18" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" filter="url(#softShadow)"/>
+
+    <path d="M-31 -15 L-18 0 L-31 15" fill="none" stroke="#202124" stroke-opacity="0.28" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M-6 -15 L7 0 L-6 15" fill="none" stroke="#202124" stroke-opacity="0.58" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M19 -15 L32 0 L19 15" fill="none" stroke="#111214" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
