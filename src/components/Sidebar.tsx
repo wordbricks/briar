@@ -35,6 +35,7 @@ export function Sidebar({
   onProjectChange,
   onProjectReadinessOpen,
   onProjectSettings,
+  onSettings,
   onLogout,
   organizations,
   projects,
@@ -47,7 +48,8 @@ export function Sidebar({
     | "auto-hunt"
     | "inbox"
     | "project-settings"
-    | "organization-settings";
+    | "organization-settings"
+    | "settings";
   activeOrganizationId: string | null;
   activeProjectId: string | null;
   isOpen: boolean;
@@ -63,6 +65,7 @@ export function Sidebar({
   onProjectChange: (projectId: string) => void;
   onProjectReadinessOpen: (projectId: string) => void;
   onProjectSettings: (projectId: string) => void;
+  onSettings: () => void;
   onLogout: () => void;
   organizations: Organization[];
   projects: Project[];
@@ -514,7 +517,16 @@ export function Sidebar({
                   <span><strong>{user.name}</strong><small>{user.email}</small></span>
                 </div>
                 <div className="account-popover-separator" />
-                <a href="#settings" onClick={() => { setIsAccountMenuOpen(false); setIsLanguageMenuOpen(false); }} role="menuitem">
+                <a
+                  href="#settings"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    setIsAccountMenuOpen(false);
+                    setIsLanguageMenuOpen(false);
+                    onSettings();
+                  }}
+                  role="menuitem"
+                >
                   <Settings size={16} strokeWidth={1.7} />
                   <span>{t("account.settings")}</span>
                 </a>

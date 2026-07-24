@@ -1,6 +1,7 @@
 import type { DashboardPayload, HuntEvent, HuntRun } from "../types";
 import { workflowForPreset } from "./auto-hunt-contract";
 import { defaultAutoHuntAutomation } from "./auto-hunt-automation";
+import type { RepositoryReadiness } from "./project-connection";
 
 const now = Date.now();
 const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
@@ -225,4 +226,24 @@ export const demoDashboard: DashboardPayload = {
   },
   runs,
   generatedAt: new Date().toISOString(),
+};
+
+export const demoRepositoryReadiness: RepositoryReadiness = {
+  repositoryPath: "/Users/jay/git/briar",
+  gitInstalled: true,
+  gitVersion: "git version 2.50.1",
+  repositoryHealthy: true,
+  remote: "git@github.com:wordbricks/briar.git",
+  remoteReachable: true,
+  pushAccess: true,
+  requiresGithub: true,
+  githubRepository: "wordbricks/briar",
+  ghInstalled: true,
+  ghVersion: "gh version 2.94.0",
+  ghAuthenticated: true,
+  ghAccount: "jay",
+  githubWriteAccess: true,
+  gitReady: true,
+  prReady: true,
+  issues: [],
 };
