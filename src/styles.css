@@ -319,12 +319,46 @@ jelly-theme { color: var(--ink); }
 .run-page-back { width:max-content; padding:5px 7px 5px 5px; display:flex; align-items:center; gap:5px; border:0; border-radius:8px; color:#777971; background:transparent; cursor:pointer; font-size:9px; font-weight:650; }
 .run-page-back:hover { color:#52418f; background:#f0ecfb; }
 .run-page-back:focus-visible { outline:2px solid #8b70dd; outline-offset:2px; }
-.run-page-body { width:min(920px,100%); margin:0 auto; padding:34px 36px 48px; }
+.run-page-body { width:min(1180px,100%); margin:0 auto; padding:40px 48px 56px; }
+.run-page-layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(260px,300px); align-items:start; gap:64px; }
+.run-page-content { min-width:0; }
 .run-page-body h1 { margin:0; max-width:760px; color:#30312d; font-size:28px; line-height:1.25; letter-spacing:-.8px; }
+.run-properties { min-width:0; position:sticky; top:32px; display:grid; gap:34px; padding:4px 0 18px 28px; border-left:1px solid #ecece7; }
+.run-properties section { min-width:0; display:grid; gap:4px; }
+.run-properties h2 { margin:0 0 13px; color:#858780; font-size:10px; font-weight:650; letter-spacing:.01em; }
+.run-property { min-width:0; min-height:43px; display:grid; grid-template-columns:26px minmax(0,1fr); align-items:center; gap:9px; border-radius:9px; color:#777971; }
+.run-property-icon { width:26px; height:26px; display:grid; place-items:center; border-radius:8px; color:#858780; background:#f5f5f1; }
+.run-property-icon.violet { color:#6750b7; background:#f0ecfd; }
+.run-property-icon.indigo,.run-property-icon.blue { color:#397aad; background:#edf7ff; }
+.run-property-icon.amber,.run-property-icon.orange,.run-property-icon.priority { color:#a66c1e; background:#fff6e5; }
+.run-property-icon.emerald { color:#2c8467; background:#ebf8f3; }
+.run-property-icon.rose,.run-property-icon.red { color:#b94759; background:#fff0f2; }
+.run-property-icon.slate { color:#757770; background:#f1f1ed; }
+.run-property-icon.assignee { color:#5f6d79; background:#eff2f4; }
+.run-property-icon.agent { color:#654bb8; background:#f0ecfd; }
+.run-property-icon.repository { color:#654bb8; background:#f0ecfd; }
+.run-property-icon.source .source-dot { width:9px; height:9px; flex-basis:9px; }
+.run-property-copy { min-width:0; display:grid; gap:3px; }
+.run-property-copy small { color:#a0a29b; font-size:7.5px; font-weight:550; }
+.run-property-copy strong { overflow:hidden; color:#555750; font-size:9.5px; font-weight:600; text-overflow:ellipsis; white-space:nowrap; }
+.run-properties .run-status-control { margin:0; padding:0; grid-template-columns:26px minmax(0,1fr) 16px; gap:9px; border:0; background:transparent; }
+.run-properties .run-status-control select { width:100%; height:20px; margin:-2px 0 0 -3px; padding:0 20px 0 3px; border:0; border-radius:6px; outline:0; color:#555750; background:transparent; font-size:9.5px; font-weight:600; cursor:pointer; }
+.run-properties .run-status-control select:hover { background:#f5f3fa; }
+.run-properties .run-status-control select:focus-visible { box-shadow:0 0 0 2px rgba(128,104,206,.18); }
+.run-properties .run-status-control > svg { color:#7158c1; }
+.run-properties .run-status-error { margin:0 0 4px 35px; }
+.run-property.progress { align-items:start; padding-top:8px; padding-bottom:7px; }
+.run-property.progress .run-property-copy > i { width:100%; height:4px; margin-top:4px; overflow:hidden; display:block; border-radius:999px; background:#e9e8e3; }
+.run-property.progress .run-property-copy > i b { height:100%; display:block; border-radius:inherit; background:linear-gradient(90deg,#7259c6,#a58eea); }
 .run-page-footer { min-height:58px; margin-top:28px; padding-top:18px; display:flex; align-items:center; justify-content:space-between; gap:18px; border-top:1px solid var(--line); }
 .run-page-footer > span { color:#989a93; font:500 9px "DM Mono",monospace; }
 .run-page-footer > button { min-height:34px; padding:0 11px; display:flex; align-items:center; gap:6px; border:1px solid var(--line); border-radius:9px; color:#6e7070; background:#fafaf7; cursor:pointer; font-size:9px; }
 .recovery-panel { margin-top:18px; padding:14px; border:1px solid #efc5cc; border-radius:12px; background:#fff7f8; }.recovery-panel > div:first-child { display:flex; align-items:flex-start; gap:9px; color:#c44d62; }.recovery-panel > div:first-child span { display:grid; gap:3px; }.recovery-panel strong { color:#873445; font-size:10px; }.recovery-panel small { color:#8d626b; font-size:9px; line-height:1.5; }.recovery-panel > p { margin:10px 0 0; display:flex; align-items:center; gap:6px; color:#b13f54; font-size:9px; }.recovery-actions { margin-top:12px; display:flex; justify-content:flex-end; gap:7px; }.recovery-actions button { min-height:30px; padding:0 11px; display:inline-flex; align-items:center; gap:6px; font-size:9px; }.recovery-actions button:first-child { border-color:#7259c6; background:#7259c6; color:#fff; }.recovery-actions .danger { border-color:#bd4056; background:#bd4056; color:#fff; }.recovery-actions .danger-secondary { border-color:#e6aab5; background:#fff; color:#a43d50; }.timeline-event strong em { margin-left:5px; padding:2px 5px; border-radius:999px; background:#f0f0ec; color:#92948d; font:500 7px "DM Mono",monospace; }
+@media (max-width:1100px) {
+  .run-page-body { padding-right:34px; padding-left:34px; }
+  .run-page-layout { grid-template-columns:1fr; gap:36px; }
+  .run-properties { position:static; grid-template-columns:repeat(2,minmax(0,1fr)); gap:30px; padding:28px 0 0; border-top:1px solid #ecece7; border-left:0; }
+}
 .issue-dialog { width:min(560px,calc(100vw - 48px)); overflow:hidden; border:1px solid var(--line); border-radius:20px; background:#fff; box-shadow:0 30px 100px rgba(40,42,34,.18); }.issue-dialog > header,.issue-dialog > footer { min-height:64px; padding:0 20px; display:flex; align-items:center; justify-content:space-between; }.issue-dialog > header { border-bottom:1px solid var(--line); }.issue-dialog > header h2 { margin:0; font-size:18px; }.issue-dialog > header .eyebrow { margin-bottom:4px; }.issue-dialog > header button { width:34px; height:34px; display:grid; place-items:center; border:1px solid var(--line); border-radius:9px; color:#777971; background:#fafaf7; cursor:pointer; }.issue-form-body { padding:22px 24px; display:grid; gap:17px; }.issue-form-body label { display:grid; gap:7px; color:#686a63; font-size:9px; font-weight:650; }.issue-form-body label span em { color:#795fc8; font-style:normal; }.issue-form-body input,.issue-form-body textarea { width:100%; padding:12px 13px; border:1px solid #e1e2dc; border-radius:11px; outline:none; color:#3f403b; background:#fafaf7; font-size:11px; resize:vertical; }.issue-form-body input:focus,.issue-form-body textarea:focus { border-color:#8068ce; background:#fff; box-shadow:0 0 0 3px rgba(128,104,206,.12); }.issue-priority-select { width:100%; --jelly-select-font-size:11px; }.issue-form-error { padding:9px 10px; display:flex; align-items:center; gap:7px; border:1px solid #f3cbd2; border-radius:9px; color:#a63b4d; background:#fff1f3; font-size:9px; }.issue-form-body > p { margin:0; color:#92948d; font-size:9px; }.issue-form-body > p strong { color:#654bb8; }.issue-dialog > footer { justify-content:flex-end; gap:8px; border-top:1px solid var(--line); background:#fafaf7; }.issue-dialog > footer button { min-width:72px; height:36px; padding:0 13px; display:flex; align-items:center; justify-content:center; gap:6px; border:1px solid var(--line); border-radius:10px; color:#6f716a; background:#fff; font-size:10px; cursor:pointer; }.issue-dialog > footer .issue-submit-button { min-width:104px; border-color:#654bb8; color:#fff; background:#654bb8; }.issue-dialog > footer button:disabled { opacity:.55; cursor:not-allowed; }
 .issue-dialog { max-height:calc(100vh - 48px); display:flex; flex-direction:column; }.issue-dialog .issue-form-body { overflow-y:auto; }.issue-attachment-field { display:grid; gap:8px; }.issue-attachment-field > span { color:#686a63; font-size:9px; font-weight:650; }.issue-attachment-field > span em { color:#989a93; font-style:normal; }.issue-form-body .issue-attachment-button { min-height:54px; padding:10px 12px; display:grid; grid-template-columns:18px auto 1fr; align-items:center; gap:7px; border:1px dashed #d7d2e8; border-radius:11px; color:#6651ae; background:#faf8ff; cursor:pointer; }.issue-attachment-button:hover { border-color:#9783d6; background:#f5f1ff; }.issue-attachment-button > small { justify-self:end; color:#999b94; font-weight:500; }.issue-form-body .issue-attachment-button input { width:1px; height:1px; position:absolute; overflow:hidden; padding:0; border:0; opacity:0; }.issue-attachment-list { display:grid; gap:6px; }.issue-attachment-item { min-width:0; min-height:48px; padding:6px; display:grid; grid-template-columns:38px minmax(0,1fr) 30px; align-items:center; gap:8px; border:1px solid #e7e5ed; border-radius:10px; background:#fff; }.issue-attachment-preview { width:38px; height:34px; overflow:hidden; display:grid; place-items:center; border-radius:7px; color:#7560bb; background:#f0ebff; }.issue-attachment-preview img { width:100%; height:100%; object-fit:cover; }.issue-attachment-item > span:nth-child(2) { min-width:0; display:grid; gap:2px; }.issue-attachment-item strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#565850; font-size:9px; }.issue-attachment-item small { color:#999b94; font:500 8px "DM Mono",monospace; }.issue-attachment-item button { width:30px; height:30px; display:grid; place-items:center; border:0; border-radius:8px; color:#a46a73; background:transparent; cursor:pointer; }.issue-attachment-item button:hover { background:#fff0f2; }
 .run-issue-description { margin:14px 0 0; padding:12px 14px; white-space:pre-wrap; border:1px solid #e8e7e1; border-radius:11px; color:#62645d; background:#fafaf7; font-size:10px; line-height:1.6; }.run-attachments { margin-top:16px; }.run-attachments > h3 { margin:0 0 8px; display:flex; align-items:center; gap:6px; color:#64665f; font-size:10px; }.run-attachments > h3 span { padding:2px 5px; border-radius:5px; color:#6a55b0; background:#eee9ff; font:500 8px "DM Mono",monospace; }.run-attachments > div { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }.run-attachment { min-width:0; overflow:hidden; display:grid; grid-template-columns:72px minmax(0,1fr) auto; align-items:center; gap:9px; border:1px solid #e5e5df; border-radius:11px; background:#fafaf7; }.run-attachment-media { width:72px; height:62px; overflow:hidden; display:grid; place-items:center; color:#8068ce; background:#f0ecfa; }.run-attachment-media img,.run-attachment-media video { width:100%; height:100%; object-fit:cover; }.run-attachment > span { min-width:0; display:grid; gap:3px; }.run-attachment strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#555750; font-size:8.5px; }.run-attachment small { color:#999b94; font:500 7.5px "DM Mono",monospace; }.run-attachment > a { margin-right:8px; padding:5px 7px; border-radius:7px; color:#624ca9; background:#eee9ff; font-size:8px; text-decoration:none; }
@@ -863,6 +897,7 @@ jelly-theme { color: var(--ink); }
 @media (max-width:760px) {
   .run-page > header { min-height:88px; padding:16px 18px; }
   .run-page-body { padding:24px 18px 36px; }
+  .run-properties { grid-template-columns:1fr; }
   .run-page-body h1 { font-size:23px; }
   .run-page-footer { align-items:flex-start; flex-direction:column; }
   .run-page-footer > button { width:100%; justify-content:center; }
@@ -871,5 +906,7 @@ jelly-theme { color: var(--ink); }
 .companion-shell .run-page-scroll { overflow:visible; background:#fff; }
 .companion-shell .run-page > header { min-height:82px; padding:14px max(16px,env(safe-area-inset-right)) 14px max(16px,env(safe-area-inset-left)); }
 .companion-shell .run-page-body { padding:24px max(16px,env(safe-area-inset-right)) calc(36px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left)); }
+.companion-shell .run-page-layout { grid-template-columns:1fr; gap:32px; }
+.companion-shell .run-properties { position:static; grid-template-columns:1fr; gap:28px; padding:26px 0 0; border-top:1px solid #ecece7; border-left:0; }
 .companion-shell .run-page-body h1 { font-size:22px; }
 .companion-shell .run-page-footer { padding-bottom:max(10px,env(safe-area-inset-bottom)); }
