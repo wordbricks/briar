@@ -42,6 +42,20 @@ const organizationSchema = z.object({
 
 export const isApiConfigured = Boolean(apiUrl);
 
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+export function isApiErrorStatus(error: unknown, status: number) {
+  return error instanceof ApiError && error.status === status;
+}
+
 async function request<T>(
   path: string,
   token: string | null,
@@ -60,7 +74,8 @@ async function request<T>(
   });
   if (!response.ok) {
     const body = await response.json().catch(() => null);
-    throw new Error(
+    throw new ApiError(
+      response.status,
       body?.message ??
         body?.error_description ??
         body?.error ??
