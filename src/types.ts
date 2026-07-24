@@ -129,6 +129,7 @@ export type Project = {
 export type Organization = {
   id: string;
   name: string;
+  handle: string;
   role: "owner" | "admin" | "member";
   createdAt: string;
 };

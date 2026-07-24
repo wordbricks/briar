@@ -29,6 +29,7 @@ export type OrganizationRole = "owner" | "admin" | "member";
 export type OrganizationRow = {
   id: string;
   name: string;
+  handle: string;
   role: OrganizationRole;
   created_at: string;
 };
@@ -220,7 +221,8 @@ const parseUrls = (value: string | null | undefined) => {
 export async function listOrganizations(db: D1Database, userId: string) {
   const result = await db
     .prepare(
-      `select organization.id, organization.name, membership.role,
+      `select organization.id, organization.name, organization.handle,
+              membership.role,
               organization.created_at
        from briar_organizations organization
        join briar_organization_members membership
@@ -235,20 +237,28 @@ export async function listOrganizations(db: D1Database, userId: string) {
 
 export async function createOrganization(
   db: D1Database,
-  input: { name: string; ownerUserId: string },
+  input: { name: string; handle: string; ownerUserId: string },
 ) {
   const createdAt = new Date().toISOString();
   const organization: OrganizationRow = {
     id: crypto.randomUUID(),
     name: input.name,
+    handle: input.handle,
     role: "owner",
     created_at: createdAt,
   };
   await db.batch([
     db.prepare(
-      `insert into briar_organizations (id, name, created_at, updated_at)
-       values (?, ?, ?, ?)`,
-    ).bind(organization.id, organization.name, createdAt, createdAt),
+      `insert into briar_organizations
+         (id, name, handle, created_at, updated_at)
+       values (?, ?, ?, ?, ?)`,
+    ).bind(
+      organization.id,
+      organization.name,
+      organization.handle,
+      createdAt,
+      createdAt,
+    ),
     db.prepare(
       `insert into briar_organization_members
          (organization_id, user_id, role, created_at, updated_at)
@@ -276,7 +286,7 @@ export async function updateOrganization(
   if (result.meta.changes === 0) return null;
   return db
     .prepare(
-      `select id, name, created_at
+      `select id, name, handle, created_at
        from briar_organizations
        where id = ?`,
     )
@@ -285,6 +295,17 @@ export async function updateOrganization(
     .then((organization) =>
       organization ? { ...organization, role } : null,
     );
+}
+
+export async function isOrganizationHandleAvailable(
+  db: D1Database,
+  handle: string,
+) {
+  const organization = await db
+    .prepare(`select 1 as found from briar_organizations where handle = ?`)
+    .bind(handle)
+    .first<{ found: number }>();
+  return organization === null;
 }
 
 export async function getOrganizationRole(

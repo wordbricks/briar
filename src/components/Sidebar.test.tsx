@@ -16,6 +16,7 @@ const sidebarProps = {
   onAutoHuntOpen: () => undefined,
   onInboxOpen: () => undefined,
   onIssuesOpen: () => undefined,
+  onAddOrganization: () => undefined,
   onLogout: () => undefined,
   onOrganizationChange: () => undefined,
   onOrganizationSettings: () => undefined,
@@ -27,6 +28,7 @@ const sidebarProps = {
     {
       id: "organization-1",
       name: "Briar",
+      handle: "briar",
       role: "owner" as const,
       createdAt: "2026-07-22T00:00:00Z",
     },
@@ -87,6 +89,7 @@ describe("Sidebar", () => {
             {
               id: "organization-2",
               name: "Wordbricks",
+              handle: "wordbricks",
               role: "member",
               createdAt: "2026-07-23T00:00:00Z",
             },
@@ -143,6 +146,49 @@ describe("Sidebar", () => {
     });
     expect(onOrganizationChange).toHaveBeenCalledWith("organization-2");
     expect(trigger?.getAttribute("aria-expanded")).toBe("false");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("opens the organization creation page from the bottom of the switcher", async () => {
+    const onAddOrganization = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <Sidebar
+          {...sidebarProps}
+          onAddOrganization={onAddOrganization}
+        />,
+      );
+    });
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="조직 메뉴 열기"]')
+        ?.click();
+    });
+    await act(async () => {
+      Array.from(
+        container.querySelectorAll<HTMLButtonElement>(
+          '[aria-label="조직 메뉴"] button',
+        ),
+      )
+        .find((button) => button.textContent?.includes("조직 전환"))
+        ?.click();
+    });
+    const items = Array.from(
+      container.querySelectorAll<HTMLButtonElement>(
+        '[aria-label="조직 메뉴"] button',
+      ),
+    );
+    expect(items.at(-1)?.textContent).toContain("조직 추가");
+
+    await act(async () => items.at(-1)?.click());
+    expect(onAddOrganization).toHaveBeenCalledOnce();
+    expect(container.querySelector('[aria-label="조직 메뉴"]')).toBeNull();
 
     await act(async () => root.unmount());
     container.remove();

@@ -32,6 +32,13 @@ const projectSchema = z.object({
   role: z.enum(["owner", "admin", "member"]),
   createdAt: z.string(),
 });
+const organizationSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  handle: z.string(),
+  role: z.enum(["owner", "admin", "member"]),
+  createdAt: z.string(),
+});
 
 export const isApiConfigured = Boolean(apiUrl);
 
@@ -145,18 +152,33 @@ export async function loadProjects(token: string): Promise<Project[]> {
 }
 
 export async function loadOrganizations(token: string): Promise<Organization[]> {
-  const result = await request<{ organizations: Organization[] }>(
+  const result = await request<{ organizations: unknown[] }>(
     "/organizations",
     token,
   );
-  return result.organizations;
+  return z.array(organizationSchema).parse(result.organizations);
 }
 
-export async function createOrganization(token: string, name: string) {
-  return request<{ organization: Organization }>("/organizations", token, {
+export async function createOrganization(
+  token: string,
+  input: { name: string; handle: string },
+) {
+  const result = await request<{ organization: unknown }>("/organizations", token, {
     method: "POST",
-    body: JSON.stringify({ name }),
+    body: JSON.stringify(input),
   });
+  return { organization: organizationSchema.parse(result.organization) };
+}
+
+export async function isOrganizationHandleAvailable(
+  token: string,
+  handle: string,
+) {
+  const result = await request<{ available: boolean }>(
+    `/organizations/handle-availability?handle=${encodeURIComponent(handle)}`,
+    token,
+  );
+  return result.available;
 }
 
 export async function updateOrganization(

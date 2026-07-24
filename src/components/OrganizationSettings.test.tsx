@@ -70,6 +70,7 @@ describe("OrganizationSettings", () => {
           organization={{
             id: "organization-1",
             name: "Wordbricks",
+            handle: "wordbricks",
             role: "owner",
             createdAt: "2023-12-01T00:00:00Z",
           }}
@@ -133,6 +134,7 @@ describe("OrganizationSettings", () => {
     const onRename = vi.fn().mockResolvedValue({
       id: "organization-1",
       name: "Briar Labs",
+      handle: "wordbricks",
       role: "owner",
       createdAt: "2023-12-01T00:00:00Z",
     });
@@ -143,6 +145,7 @@ describe("OrganizationSettings", () => {
           organization={{
             id: "organization-1",
             name: "Wordbricks",
+            handle: "wordbricks",
             role: "owner",
             createdAt: "2023-12-01T00:00:00Z",
           }}

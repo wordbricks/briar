@@ -30,6 +30,7 @@ export function Sidebar({
   onAutoHuntOpen,
   onInboxOpen,
   onIssuesOpen,
+  onAddOrganization,
   onOrganizationChange,
   onOrganizationSettings,
   onProjectChange,
@@ -48,6 +49,7 @@ export function Sidebar({
     | "auto-hunt"
     | "inbox"
     | "project-settings"
+    | "organization-create"
     | "organization-settings"
     | "settings";
   activeOrganizationId: string | null;
@@ -57,6 +59,7 @@ export function Sidebar({
   onAutoHuntOpen: () => void;
   onInboxOpen: () => void;
   onIssuesOpen: () => void;
+  onAddOrganization: () => void;
   onOrganizationChange: (organizationId: string) => void;
   onOrganizationSettings: (
     organizationId: string,
@@ -360,6 +363,23 @@ export function Sidebar({
                     </button>
                   ))}
                 </div>
+                <div
+                  className="sidebar-organization-menu-separator"
+                  role="separator"
+                />
+                <button
+                  className="sidebar-organization-add"
+                  onClick={() => {
+                    setIsOrganizationMenuOpen(false);
+                    setOrganizationMenuView("actions");
+                    onAddOrganization();
+                  }}
+                  role="menuitem"
+                  type="button"
+                >
+                  <Plus aria-hidden="true" size={15} strokeWidth={1.7} />
+                  <span>{t("sidebar.addOrganization")}</span>
+                </button>
               </>
             )}
           </div>
