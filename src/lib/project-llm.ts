@@ -18,6 +18,21 @@ export type AgentModelOption = {
   label: string;
 };
 
+export const modelEfforts = [
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+  "ultra",
+] as const;
+export type ModelEffort = (typeof modelEfforts)[number];
+
+export const agentEfforts: Record<AgentProvider, readonly ModelEffort[]> = {
+  codex: modelEfforts,
+  claude: modelEfforts.filter((effort) => effort !== "ultra"),
+};
+
 export const agentModels: Record<AgentProvider, AgentModelOption[]> = {
   codex: [
     { value: "", label: "Provider default" },
@@ -37,12 +52,14 @@ export const agentModels: Record<AgentProvider, AgentModelOption[]> = {
 export type ProjectLlmSettings = {
   provider: AgentProvider;
   model: string | null;
+  effort: ModelEffort | null;
   approvalPolicy: ApprovalPolicy;
 };
 
 export const defaultProjectLlmSettings: ProjectLlmSettings = {
   provider: "codex",
   model: null,
+  effort: null,
   approvalPolicy: "never",
 };
 
@@ -107,7 +124,11 @@ export async function loadProjectLlmSettings(
   const settings = await invoke<ProjectLlmSettings>("load_project_llm_settings", {
     projectId,
   });
-  return { ...settings, model: settings.model ?? null };
+  return {
+    ...settings,
+    model: settings.model ?? null,
+    effort: settings.effort ?? null,
+  };
 }
 
 export async function loadAppProviderSettings(): Promise<AppProviderSettings> {
@@ -136,7 +157,11 @@ export async function updateProjectLlmSettings(
     projectId,
     settings,
   });
-  return { ...saved, model: saved.model ?? null };
+  return {
+    ...saved,
+    model: saved.model ?? null,
+    effort: saved.effort ?? null,
+  };
 }
 
 /**

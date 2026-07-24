@@ -1485,6 +1485,11 @@ fn update_project_llm_settings_at(
     {
         return Err("모델 ID는 공백 없이 128자 이하여야 합니다.".to_string());
     }
+    if settings.provider == agent::AgentProviderKind::Claude
+        && settings.effort == Some(agent::ModelEffort::Ultra)
+    {
+        return Err("Claude는 ultra effort를 지원하지 않습니다.".to_string());
+    }
     let contents = fs::read_to_string(config_path)
         .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
     let mut config = serde_json::from_str::<CliConfig>(&contents)
@@ -1933,10 +1938,10 @@ async fn project_llm_chat(
         }
         let execution_path = cli_execution_path(&home)?;
         let backend = agent::discover_backend(provider, &home, &execution_path, &claude_runner)?;
-        let model = if provider == settings.provider {
-            settings.model
+        let (model, effort) = if provider == settings.provider {
+            (settings.model, settings.effort)
         } else {
-            None
+            (None, None)
         };
         let approve = |method: &str, params: &serde_json::Value| {
             let provider_name = match provider {
@@ -1962,6 +1967,7 @@ async fn project_llm_chat(
                 sandbox_mode: agent::SandboxMode::ReadOnly,
                 network_access: false,
                 model,
+                effort,
                 event_sink: None,
             },
             request,
@@ -2043,6 +2049,7 @@ async fn start_project_auto_hunt(
             agent::AutoHuntExecution {
                 approval_policy: settings.approval_policy,
                 model: settings.model,
+                effort: settings.effort,
                 event_sink,
             },
             request,
@@ -2850,6 +2857,12 @@ mod tests {
                 .approval_policy,
             agent::ApprovalPolicy::Never
         );
+        assert_eq!(
+            project_llm_settings_from(&config_path, "project-1")
+                .expect("legacy project settings should load")
+                .effort,
+            None
+        );
         assert!(
             app_provider_settings_from(&config_path)
                 .expect("legacy provider settings should load")
@@ -2869,6 +2882,7 @@ mod tests {
             agent::ProjectLlmSettings {
                 provider: agent::AgentProviderKind::Claude,
                 model: Some("sonnet".to_string()),
+                effort: Some(agent::ModelEffort::High),
                 approval_policy: agent::ApprovalPolicy::OnRequest,
             },
         )
@@ -2883,6 +2897,7 @@ mod tests {
         assert_eq!(saved["agentProviders"]["claude"], true);
         assert_eq!(saved["projects"][0]["llm"]["provider"], "claude");
         assert_eq!(saved["projects"][0]["llm"]["model"], "sonnet");
+        assert_eq!(saved["projects"][0]["llm"]["effort"], "high");
         assert_eq!(saved["projects"][0]["llm"]["approvalPolicy"], "on-request");
 
         fs::remove_dir_all(directory).expect("test config directory should be removed");

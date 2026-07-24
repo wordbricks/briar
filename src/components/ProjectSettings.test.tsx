@@ -9,7 +9,7 @@ import type { ProjectSettings as ProjectSettingsData } from "../types";
 import { ProjectSettings } from "./ProjectSettings";
 
 describe("ProjectSettings", () => {
-  it("configures the project provider, model, and approval policy", async () => {
+  it("configures the project provider, model, effort, and approval policy", async () => {
     const onRegenerateWorkflow = vi.fn(async () => undefined);
     const onUpdateAutomation = vi.fn(async (automation: AutoHuntAutomation) =>
       automation
@@ -63,6 +63,9 @@ describe("ProjectSettings", () => {
     const model = container.querySelector<HTMLSelectElement>(
       "#project-agent-model",
     );
+    const effort = container.querySelector<HTMLSelectElement>(
+      "#project-agent-effort",
+    );
     expect(Array.from(provider?.options ?? []).map((option) => option.value)).toEqual([
       "codex",
       "claude",
@@ -78,6 +81,15 @@ describe("ProjectSettings", () => {
       "gpt-5.6-terra",
       "gpt-5.6-luna",
     ]);
+    expect(Array.from(effort?.options ?? []).map((option) => option.value)).toEqual([
+      "",
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max",
+      "ultra",
+    ]);
     await act(async () => {
       if (!provider) return;
       provider.value = "claude";
@@ -89,10 +101,20 @@ describe("ProjectSettings", () => {
     expect(
       Array.from(claudeModel?.options ?? []).map((option) => option.value),
     ).toEqual(["", "sonnet", "opus", "haiku", "fable"]);
+    const claudeEffort = container.querySelector<HTMLSelectElement>(
+      "#project-agent-effort",
+    );
+    expect(
+      Array.from(claudeEffort?.options ?? []).map((option) => option.value),
+    ).toEqual(["", "low", "medium", "high", "xhigh", "max"]);
     await act(async () => {
       if (claudeModel) {
         claudeModel.value = "sonnet";
         claudeModel.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      if (claudeEffort) {
+        claudeEffort.value = "high";
+        claudeEffort.dispatchEvent(new Event("change", { bubbles: true }));
       }
       if (!select) return;
       select.value = "on-request";

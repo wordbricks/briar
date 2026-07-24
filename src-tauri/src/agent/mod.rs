@@ -114,12 +114,37 @@ impl ApprovalPolicy {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum ModelEffort {
+    Low,
+    Medium,
+    High,
+    Xhigh,
+    Max,
+    Ultra,
+}
+
+impl ModelEffort {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Low => "low",
+            Self::Medium => "medium",
+            Self::High => "high",
+            Self::Xhigh => "xhigh",
+            Self::Max => "max",
+            Self::Ultra => "ultra",
+        }
+    }
+}
+
 #[derive(Clone)]
 pub(crate) struct ChatExecution {
     pub(crate) approval_policy: ApprovalPolicy,
     pub(crate) sandbox_mode: SandboxMode,
     pub(crate) network_access: bool,
     pub(crate) model: Option<String>,
+    pub(crate) effort: Option<ModelEffort>,
     pub(crate) event_sink: Option<AgentEventSink>,
 }
 
@@ -130,6 +155,8 @@ pub(crate) struct ProjectLlmSettings {
     pub(crate) provider: AgentProviderKind,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) effort: Option<ModelEffort>,
     #[serde(default)]
     pub(crate) approval_policy: ApprovalPolicy,
 }
@@ -139,6 +166,7 @@ impl Default for ProjectLlmSettings {
         Self {
             provider: AgentProviderKind::Codex,
             model: None,
+            effort: None,
             approval_policy: ApprovalPolicy::Never,
         }
     }
@@ -168,6 +196,7 @@ pub(crate) struct ProjectLlmResponse {
 pub(crate) struct AutoHuntExecution {
     pub(crate) approval_policy: ApprovalPolicy,
     pub(crate) model: Option<String>,
+    pub(crate) effort: Option<ModelEffort>,
     pub(crate) event_sink: AgentEventSink,
 }
 
