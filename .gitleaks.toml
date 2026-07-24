@@ -1,0 +1,7 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Cargo registry checksums are public package integrity hashes"
+targetRules = ["generic-api-key"]
+paths = ['''(^|/)src-tauri/Cargo\.lock$''']
