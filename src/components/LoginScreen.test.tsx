@@ -49,4 +49,14 @@ describe("LoginScreen", () => {
     expect(markup).toContain("안전한 인앱 브라우저");
     expect(markup).not.toContain("브라우저에서 로그인 후");
   });
+
+  it("uses the full-screen companion layout on mobile", () => {
+    const markup = renderToStaticMarkup(
+      <LoginScreen {...baseProps} companionMode loginCode={null} />,
+    );
+
+    expect(markup).toContain(
+      'class="login-shell companion-login-shell"',
+    );
+  });
 });
