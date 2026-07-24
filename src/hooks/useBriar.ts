@@ -52,6 +52,7 @@ import {
   readSessionToken,
   writeSessionToken,
 } from "../lib/token-store";
+import { restoreStoredSession } from "../lib/session-restore";
 import {
   isAuthorizationCancelled,
   openAuthorization,
@@ -259,36 +260,71 @@ export function useBriar() {
   useEffect(() => {
     if (demoMode) return;
     let cancelled = false;
-    void readSessionToken()
-      .then(async (storedToken) => {
-        if (!storedToken || cancelled) return;
-        const [nextUser, nextProjects, nextOrganizations] = await Promise.all([
-          loadSession(storedToken),
-          loadProjects(storedToken),
-          loadOrganizations(storedToken),
-        ]);
-        const unconnectedProject = companionMode
+    let retryTimer: number | null = null;
+    let retryAttempt = 0;
+
+    const scheduleRetry = (caught: unknown) => {
+      const message =
+        caught instanceof Error ? caught.message : String(caught);
+      setError(`${message} 다시 연결하는 중입니다…`);
+      setLoading(true);
+      const retryDelay = Math.min(1_000 * 2 ** retryAttempt, 15_000);
+      retryAttempt += 1;
+      retryTimer = window.setTimeout(() => void restore(), retryDelay);
+    };
+
+    const restore = async () => {
+      const result = await restoreStoredSession({
+        clearToken: clearSessionToken,
+        loadOrganizations,
+        loadProjects,
+        loadSession,
+        readToken: readSessionToken,
+      });
+      if (cancelled) return;
+      if (result.status === "missing" || result.status === "unauthorized") {
+        setError(null);
+        setLoading(false);
+        return;
+      }
+      if (result.status === "retry") {
+        scheduleRetry(result.error);
+        return;
+      }
+
+      let unconnectedProject: Project | null;
+      try {
+        unconnectedProject = companionMode
           ? null
-          : await findUnconnectedProject(nextProjects);
-        if (cancelled) return;
-        setToken(storedToken);
-        setUser(nextUser);
-        setProjects(nextProjects);
-        setOrganizations(nextOrganizations);
-        setActiveOrganizationId(
-          nextProjects[0]?.organizationId ?? nextOrganizations[0]?.id ?? null,
-        );
-        setActiveProjectId(nextProjects[0]?.id ?? null);
-        setProjectConnection(
-          unconnectedProject
-            ? { project: unconnectedProject, agentToken: null }
-            : null,
-        );
-      })
-      .catch(() => clearSessionToken())
-      .finally(() => !cancelled && setLoading(false));
+          : await findUnconnectedProject(result.projects);
+      } catch (caught) {
+        if (!cancelled) scheduleRetry(caught);
+        return;
+      }
+      if (cancelled) return;
+      setToken(result.token);
+      setUser(result.user);
+      setProjects(result.projects);
+      setOrganizations(result.organizations);
+      setActiveOrganizationId(
+        result.projects[0]?.organizationId ??
+          result.organizations[0]?.id ??
+          null,
+      );
+      setActiveProjectId(result.projects[0]?.id ?? null);
+      setProjectConnection(
+        unconnectedProject
+          ? { project: unconnectedProject, agentToken: null }
+          : null,
+      );
+      setError(null);
+      setLoading(false);
+    };
+
+    void restore();
     return () => {
       cancelled = true;
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
     };
   }, []);
 
