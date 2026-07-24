@@ -21,7 +21,6 @@ describe("ProjectSettings", () => {
           onBack={() => undefined}
           onDelete={async () => undefined}
           onRegenerateWorkflow={onRegenerateWorkflow}
-          onSidebarOpen={() => undefined}
           project={{
             id: "project-1",
             name: "Briar",
@@ -93,7 +92,6 @@ describe("ProjectSettings", () => {
           onBack={() => undefined}
           onDelete={onDelete}
           onRegenerateWorkflow={async () => undefined}
-          onSidebarOpen={() => undefined}
           project={{
             id: "project-1",
             name: "Briar",

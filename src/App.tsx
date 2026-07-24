@@ -15,9 +15,11 @@ import { ProjectOnboarding } from "./components/ProjectOnboarding";
 import { ProjectRepositorySetupDialog } from "./components/ProjectRepositorySetupDialog";
 import { ProjectSettings } from "./components/ProjectSettings";
 import { Sidebar } from "./components/Sidebar";
+import { WindowNavigationControls } from "./components/WindowNavigationControls";
 import { useBriar } from "./hooks/useBriar";
 import { useAutoHuntSessions } from "./hooks/useAutoHuntSessions";
 import { useInbox } from "./hooks/useInbox";
+import { useNavigationHistory } from "./hooks/useNavigationHistory";
 import {
   clearLaunchIntroPreview,
   isLaunchIntroPreview,
@@ -33,6 +35,13 @@ import {
   isDesktopTauri,
   isMacDesktopTauri,
 } from "./lib/platform";
+
+type ActivePage =
+  | "issues"
+  | "auto-hunt"
+  | "inbox"
+  | "project-settings"
+  | "organization-settings";
 
 export function App() {
   const briar = useBriar();
@@ -57,13 +66,15 @@ export function App() {
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(
     hasCompletedInitialOnboarding,
   );
-  const [activePage, setActivePage] = useState<
-    | "issues"
-    | "auto-hunt"
-    | "inbox"
-    | "project-settings"
-    | "organization-settings"
-  >("issues");
+  const {
+    current: activePage,
+    canGoBack,
+    canGoForward,
+    goBack,
+    goForward,
+    navigate: navigateToPage,
+    reset: resetNavigation,
+  } = useNavigationHistory<ActivePage>("issues");
   const [requestedRunId, setRequestedRunId] = useState<string | null>(null);
   const [requestedSessionId, setRequestedSessionId] = useState<string | null>(
     null,
@@ -184,7 +195,7 @@ export function App() {
           if (connected) {
             setRequestedRunId(null);
             setRequestedSessionId(null);
-            setActivePage("issues");
+            resetNavigation("issues");
           }
           return connected;
         }}
@@ -200,38 +211,45 @@ export function App() {
   } else {
     content = (
       <jelly-theme mode="light" className="app-shell">
+        <WindowNavigationControls
+          canGoBack={canGoBack}
+          canGoForward={canGoForward}
+          isSidebarOpen={isSidebarOpen}
+          onBack={goBack}
+          onForward={goForward}
+          onSidebarToggle={() => setIsSidebarOpen((open) => !open)}
+        />
         <Sidebar
           activePage={activePage}
           activeOrganizationId={briar.activeOrganizationId}
           activeProjectId={briar.activeProjectId}
           isOpen={isSidebarOpen}
           onAddProject={briar.startProjectCreation}
-          onAutoHuntOpen={() => setActivePage("auto-hunt")}
-          onInboxOpen={() => setActivePage("inbox")}
-          onIssuesOpen={() => setActivePage("issues")}
+          onAutoHuntOpen={() => navigateToPage("auto-hunt")}
+          onInboxOpen={() => navigateToPage("inbox")}
+          onIssuesOpen={() => navigateToPage("issues")}
           onOrganizationChange={(organizationId) => {
             briar.setActiveOrganizationId(organizationId);
             setRequestedRunId(null);
             setRequestedSessionId(null);
-            setActivePage("issues");
+            resetNavigation("issues");
           }}
           onOrganizationSettings={(organizationId, section) => {
             setOrganizationSettingsTarget({ id: organizationId, section });
-            setActivePage("organization-settings");
+            navigateToPage("organization-settings");
           }}
           onProjectChange={(projectId) => {
             briar.setActiveProjectId(projectId);
             setRequestedRunId(null);
             setRequestedSessionId(null);
-            setActivePage("issues");
+            resetNavigation("issues");
           }}
           onProjectReadinessOpen={setRepositorySetupProjectId}
           onProjectSettings={(projectId) => {
             briar.setActiveProjectId(projectId);
-            setActivePage("project-settings");
+            navigateToPage("project-settings");
           }}
           onLogout={() => void briar.logout()}
-          onToggle={() => setIsSidebarOpen(false)}
           organizations={briar.organizations}
           projects={briar.projects}
           projectReadiness={briar.projectReadiness}
@@ -280,7 +298,9 @@ export function App() {
           <OrganizationSettings
             initialSection={organizationSettingsTarget?.section}
             key={`${settingsOrganization.id}-${organizationSettingsTarget?.section ?? "settings"}`}
-            onBack={() => setActivePage("issues")}
+            onBack={() =>
+              canGoBack ? goBack() : navigateToPage("issues")
+            }
             organization={settingsOrganization}
             token={briar.token}
           />
@@ -297,14 +317,13 @@ export function App() {
               if (message.kind === "issue") {
                 setRequestedSessionId(null);
                 setRequestedRunId(message.targetId);
-                setActivePage("issues");
+                navigateToPage("issues");
               } else {
                 setRequestedRunId(null);
                 setRequestedSessionId(message.targetId);
-                setActivePage("auto-hunt");
+                navigateToPage("auto-hunt");
               }
             }}
-            onSidebarOpen={() => setIsSidebarOpen(true)}
             unreadCount={inbox.unreadCount}
           />
         ) : activePage === "project-settings" && activeProject ? (
@@ -312,14 +331,15 @@ export function App() {
             dashboard={briar.dashboard}
             isDeleting={briar.deletingProjectId === briar.activeProjectId}
             isSidebarOpen={isSidebarOpen}
-            onBack={() => setActivePage("issues")}
+            onBack={() =>
+              canGoBack ? goBack() : navigateToPage("issues")
+            }
             onDelete={async () => {
               await briar.deleteProject(activeProject.id);
               autoHunt.removeProjectSessions(activeProject.id);
-              setActivePage("issues");
+              resetNavigation("issues");
             }}
             onRegenerateWorkflow={() => briar.regenerateWorkflow(activeProject.id)}
-            onSidebarOpen={() => setIsSidebarOpen(true)}
             project={activeProject}
           />
         ) : activePage === "auto-hunt" && activeProject ? (
@@ -327,7 +347,6 @@ export function App() {
             dashboard={briar.dashboard}
             error={briar.error}
             isSidebarOpen={isSidebarOpen}
-            onSidebarOpen={() => setIsSidebarOpen(true)}
             requestedSessionId={requestedSessionId}
             onRequestedSessionOpen={() => setRequestedSessionId(null)}
             onStart={(runs) =>
@@ -358,7 +377,6 @@ export function App() {
             onCancelRun={briar.cancelRun}
             onRepair={() => void briar.repairHealth()}
             onRequestedRunOpen={() => setRequestedRunId(null)}
-            onSidebarOpen={() => setIsSidebarOpen(true)}
           />
         )}
       </jelly-theme>
@@ -411,7 +429,6 @@ export function App() {
                   setCompanionPage("session");
                 }
               }}
-              onSidebarOpen={() => {}}
               unreadCount={inbox.unreadCount}
             />
             <CompanionBottomNavigation
@@ -433,7 +450,6 @@ export function App() {
               isSidebarOpen
               onBack={() => setCompanionPage("inbox")}
               onRequestedSessionOpen={() => setRequestedSessionId(null)}
-              onSidebarOpen={() => {}}
               onStart={(runs) =>
                 autoHunt.startSession(briar.activeProjectId!, runs, () =>
                   void briar.refresh()
@@ -478,7 +494,6 @@ export function App() {
             onRetryRun={briar.retryRun}
             onCancelRun={briar.cancelRun}
             onRepair={() => {}}
-            onSidebarOpen={() => {}}
           />
         )}
       </jelly-theme>

@@ -11,7 +11,6 @@ import {
   Image as ImageIcon,
   LoaderCircle,
   Paperclip,
-  PanelLeftOpen,
   Plus,
   RefreshCw,
   RotateCcw,
@@ -90,7 +89,6 @@ export function HuntDashboard({
   onCompanionStatusChange,
   onRepair,
   onRequestedRunOpen,
-  onSidebarOpen,
   requestedRunId = null,
 }: {
   companionMode?: boolean;
@@ -116,7 +114,6 @@ export function HuntDashboard({
   onCompanionStatusChange?: (status: CompanionStatusFilter) => void;
   onRepair: () => void;
   onRequestedRunOpen?: () => void;
-  onSidebarOpen: () => void;
   requestedRunId?: string | null;
 }) {
   const { t } = useI18n();
@@ -243,7 +240,6 @@ export function HuntDashboard({
         onLoadAttachment={onLoadAttachment}
         onMove={(placement) => onMoveRun(selected.id, placement)}
         onRetry={() => onRetryRun(selected.id)}
-        onSidebarOpen={onSidebarOpen}
         run={selected}
       />
     );
@@ -252,19 +248,6 @@ export function HuntDashboard({
   return (
     <main className="main-content" id="issues">
       {!companionMode && <header className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region>
-        {!isSidebarOpen && (
-          <button
-            aria-controls="app-sidebar"
-            aria-expanded="false"
-            aria-label={t("sidebar.open")}
-            className="sidebar-toggle"
-            onClick={onSidebarOpen}
-            title={t("sidebar.open")}
-            type="button"
-          >
-            <PanelLeftOpen size={17} />
-          </button>
-        )}
         <div className="window-controls" aria-hidden="true"><i /><i /><i /></div>
         <ConnectionHealth
           error={healthError}
@@ -747,7 +730,6 @@ export function RunPage({
   onLoadAttachment,
   onMove,
   onRetry,
-  onSidebarOpen,
   run,
 }: {
   companionMode?: boolean;
@@ -759,7 +741,6 @@ export function RunPage({
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onMove: (placement: HuntRunPlacement) => Promise<unknown>;
   onRetry: () => Promise<unknown>;
-  onSidebarOpen: () => void;
   run: HuntRun;
 }) {
   const { localeTag, t } = useI18n();
@@ -797,19 +778,6 @@ export function RunPage({
           className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`}
           data-tauri-drag-region
         >
-          {!isSidebarOpen && (
-            <button
-              aria-controls="app-sidebar"
-              aria-expanded="false"
-              aria-label={t("sidebar.open")}
-              className="sidebar-toggle"
-              onClick={onSidebarOpen}
-              title={t("sidebar.open")}
-              type="button"
-            >
-              <PanelLeftOpen size={17} />
-            </button>
-          )}
           <div className="window-controls" aria-hidden="true"><i /><i /><i /></div>
         </header>
       )}

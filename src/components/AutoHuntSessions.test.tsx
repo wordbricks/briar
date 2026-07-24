@@ -30,7 +30,6 @@ describe("AutoHuntSessions", () => {
         dashboard={dashboard}
         error={null}
         isSidebarOpen
-        onSidebarOpen={() => undefined}
         onStart={onStart}
         sessions={[]}
       />,
@@ -79,7 +78,6 @@ describe("AutoHuntSessions", () => {
         dashboard={dashboard}
         error={null}
         isSidebarOpen
-        onSidebarOpen={() => undefined}
         onStart={() => "session-2"}
         sessions={[session]}
       />,
@@ -134,7 +132,6 @@ describe("AutoHuntSessions", () => {
         dashboard={dashboard}
         error={null}
         isSidebarOpen
-        onSidebarOpen={() => undefined}
         onStart={() => "session-2"}
         sessions={[session]}
       />,

@@ -22,7 +22,6 @@ const sidebarProps = {
   onProjectChange: () => undefined,
   onProjectReadinessOpen: () => undefined,
   onProjectSettings: () => undefined,
-  onToggle: () => undefined,
   organizations: [
     {
       id: "organization-1",
@@ -59,7 +58,6 @@ describe("Sidebar", () => {
     expect(markup).toContain("Briar");
     expect(markup).toContain('aria-label="현재 프로젝트"');
     expect(markup).toContain('aria-current="page"');
-    expect(markup).toContain('aria-label="왼쪽 패널 닫기"');
     expect(markup).toContain('aria-label="조직 메뉴 열기"');
     expect(markup).not.toContain("sidebar-organization-heading");
     expect(markup).toContain('aria-haspopup="menu"');
