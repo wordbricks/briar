@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { workflowForPreset } from "../../src/lib/auto-hunt-contract";
 import type { HuntEventInput } from "./db";
 import {
   assertQueuedHuntClaim,
@@ -24,6 +25,7 @@ import {
   recoverHuntRun,
   recordHuntEvent,
   recordQaResult,
+  updateProjectSettings,
 } from "./db";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
@@ -85,6 +87,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       "migrations/0006_issue_attachments.sql",
       "migrations/0007_configurable_workflows.sql",
       "migrations/0008_organizations.sql",
+      "migrations/0009_auto_hunt_automation.sql",
     ]) {
       await executeSql(db, await readFile(resolve(migration), "utf8"));
     }
@@ -117,6 +120,36 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
 
   afterAll(async () => {
     await miniflare.dispose();
+  });
+
+  it("stores automation settings and preserves them for older settings clients", async () => {
+    const baseSettings = {
+      velenOrg: "example",
+      dataSource: null,
+      linear: { enabled: false, source: null, teamKey: null },
+      githubRepository: "example/repository",
+      workflow: workflowForPreset("release"),
+    };
+    await updateProjectSettings(db, projectId, {
+      ...baseSettings,
+      automation: {
+        enabled: true,
+        maxIssuesPerSession: 7,
+        schedule: { enabled: true, intervalHours: 3 },
+        queueThreshold: { enabled: true, minimumIssues: 5 },
+        urgentIssue: { enabled: true },
+      },
+    });
+    await updateProjectSettings(db, projectId, baseSettings);
+
+    const settings = await getProjectSettings(db, projectId);
+    expect(JSON.parse(settings?.auto_hunt_automation_json ?? "{}")).toEqual({
+      enabled: true,
+      maxIssuesPerSession: 7,
+      schedule: { enabled: true, intervalHours: 3 },
+      queueThreshold: { enabled: true, minimumIssues: 5 },
+      urgentIssue: { enabled: true },
+    });
   });
 
   it("enforces forward stages, QA gates, and a completion summary", async () => {

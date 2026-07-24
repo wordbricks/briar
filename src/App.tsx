@@ -35,6 +35,7 @@ import {
   isDesktopTauri,
   isMacDesktopTauri,
 } from "./lib/platform";
+import { automaticTriggersFor } from "./lib/auto-hunt-automation";
 
 type ActivePage =
   | "issues"
@@ -102,6 +103,76 @@ export function App() {
     !briar.loading &&
     !briar.user &&
     !hasCompletedOnboarding;
+
+  useEffect(() => {
+    const dashboard = briar.dashboard;
+    if (
+      !runsOnDesktopTauri ||
+      briar.companionMode ||
+      !dashboard?.settings.automation.enabled
+    ) {
+      return;
+    }
+    const intervalId = window.setInterval(() => {
+      void briar.refresh();
+    }, 15_000);
+    return () => window.clearInterval(intervalId);
+  }, [
+    briar.companionMode,
+    briar.dashboard?.project.id,
+    briar.dashboard?.settings.automation.enabled,
+    briar.refresh,
+    runsOnDesktopTauri,
+  ]);
+
+  useEffect(() => {
+    const dashboard = briar.dashboard;
+    if (
+      !runsOnDesktopTauri ||
+      briar.companionMode ||
+      !dashboard?.settings.automation.enabled ||
+      autoHunt.sessions.some(
+        (session) =>
+          session.projectId === dashboard.project.id &&
+          session.status === "running",
+      )
+    ) {
+      return;
+    }
+    const lastAutomaticStartAt =
+      autoHunt.sessions.find(
+        (session) =>
+          session.projectId === dashboard.project.id &&
+          session.trigger?.type === "automatic",
+      )?.startedAt ?? null;
+    const reasons = automaticTriggersFor(
+      dashboard.settings.automation,
+      dashboard.runs,
+      Date.now(),
+      lastAutomaticStartAt,
+    );
+    if (reasons.length === 0) return;
+    try {
+      autoHunt.startSession(
+        dashboard.project.id,
+        dashboard.runs,
+        () => void briar.refresh(),
+        {
+          maxIssues: dashboard.settings.automation.maxIssuesPerSession,
+          trigger: { type: "automatic", reasons },
+        },
+      );
+    } catch (error) {
+      console.error("Failed to start automatic Auto Hunt session", error);
+    }
+  }, [
+    autoHunt.sessions,
+    autoHunt.startSession,
+    briar.companionMode,
+    briar.dashboard,
+    briar.refresh,
+    runsOnDesktopTauri,
+  ]);
 
   useEffect(() => {
     if (!briar.user || hasCompletedOnboarding) return;
@@ -340,6 +411,9 @@ export function App() {
               resetNavigation("issues");
             }}
             onRegenerateWorkflow={() => briar.regenerateWorkflow(activeProject.id)}
+            onUpdateAutomation={(automation) =>
+              briar.saveAutoHuntAutomation(activeProject.id, automation)
+            }
             project={activeProject}
           />
         ) : activePage === "auto-hunt" && activeProject ? (
@@ -350,8 +424,14 @@ export function App() {
             requestedSessionId={requestedSessionId}
             onRequestedSessionOpen={() => setRequestedSessionId(null)}
             onStart={(runs) =>
-              autoHunt.startSession(activeProject.id, runs, () =>
-                void briar.refresh()
+              autoHunt.startSession(
+                activeProject.id,
+                runs,
+                () => void briar.refresh(),
+                {
+                  maxIssues:
+                    briar.dashboard?.settings.automation.maxIssuesPerSession,
+                },
               )
             }
             sessions={autoHunt.sessions}
@@ -451,8 +531,14 @@ export function App() {
               onBack={() => setCompanionPage("inbox")}
               onRequestedSessionOpen={() => setRequestedSessionId(null)}
               onStart={(runs) =>
-                autoHunt.startSession(briar.activeProjectId!, runs, () =>
-                  void briar.refresh()
+                autoHunt.startSession(
+                  briar.activeProjectId!,
+                  runs,
+                  () => void briar.refresh(),
+                  {
+                    maxIssues:
+                      briar.dashboard?.settings.automation.maxIssuesPerSession,
+                  },
                 )
               }
               requestedSessionId={requestedSessionId}
