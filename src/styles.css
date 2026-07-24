@@ -1089,6 +1089,20 @@ jelly-theme { color: var(--ink); }
   letter-spacing:.11em;
   text-transform:uppercase;
 }
+.provider-heading-actions {
+  grid-column:3;
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:8px;
+}
+.provider-heading-actions > span {
+  color:#a0a19c;
+  font-size:10.5px;
+  font-weight:520;
+  white-space:nowrap;
+}
+.provider-heading-actions .source-control-refresh { flex:0 0 32px; }
 .source-control-refresh,
 .source-control-disclosure {
   width:32px;
@@ -1164,6 +1178,8 @@ jelly-theme { color: var(--ink); }
 .source-control-provider-icon.gitlab { color:#e45b32; background:#fff1e9; }
 .source-control-provider-icon.azure { color:#2789ce; background:#ecf6fd; }
 .source-control-provider-icon.bitbucket { color:#2477df; background:#edf5ff; }
+.source-control-provider-icon.codex { color:#30312d; background:#f1f2ee; }
+.source-control-provider-icon.claude { color:#d66f45; background:#fff1e9; }
 .source-control-provider-copy {
   min-width:0;
   display:grid;
@@ -1208,6 +1224,10 @@ jelly-theme { color: var(--ink); }
   font-weight:700;
 }
 .source-control-disclosure {
+  grid-column:3;
+  color:#8f908a;
+}
+.provider-saving {
   grid-column:3;
   color:#8f908a;
 }
@@ -1299,6 +1319,7 @@ jelly-theme { color: var(--ink); }
   font-size:10px;
   text-align:right;
 }
+.provider-project-note { max-width:620px; margin-left:auto; }
 .app-settings-placeholder {
   min-height:0;
   flex:1;
@@ -1339,6 +1360,7 @@ jelly-theme { color: var(--ink); }
   .app-settings-sidebar { width:0; flex-basis:0; border-right:0; }
   .app-settings-topbar { padding-left:var(--window-navigation-content-inset); }
   .source-control-settings { width:calc(100% - 28px); }
+  .provider-heading-actions > span { display:none; }
   .source-control-provider { padding:16px 15px; grid-template-columns:32px minmax(0,1fr) 46px; column-gap:9px; }
   .source-control-status { top:17px; left:14px; }
   .source-control-switch { grid-column:3; }
