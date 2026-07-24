@@ -1,7 +1,6 @@
 import {
   Activity,
   ArrowLeft,
-  ArrowUpRight,
   Bot,
   ChevronRight,
   CircleAlert,
@@ -246,7 +245,6 @@ export function HuntDashboard({
         onRetry={() => onRetryRun(selected.id)}
         onSidebarOpen={onSidebarOpen}
         run={selected}
-        showRepositoryAction={!companionMode}
       />
     );
   }
@@ -751,7 +749,6 @@ export function RunPage({
   onRetry,
   onSidebarOpen,
   run,
-  showRepositoryAction = true,
 }: {
   companionMode?: boolean;
   error: string | null;
@@ -764,7 +761,6 @@ export function RunPage({
   onRetry: () => Promise<unknown>;
   onSidebarOpen: () => void;
   run: HuntRun;
-  showRepositoryAction?: boolean;
 }) {
   const { localeTag, t } = useI18n();
   const meta = runMeta(run.status, run.workflowStage, run.workflow);
@@ -869,7 +865,6 @@ export function RunPage({
                 <div className="timeline"><h3>{t("run.activity")}</h3>{run.events.map((event) => { const eventDisplay = eventMeta(event.status, event.workflowStage, run.workflow); return <div className="timeline-event" key={event.id}><i className={eventDisplay.tone} /><span><strong>{localizeEvent(t, event.status, event.workflowStage, eventDisplay.label)} <em>{t("run.attempt", { count: event.attempt })}</em></strong><p>{event.detail}</p><small>{event.actor} · {relativeTime(event.occurredAt, t)}</small></span></div>; })}</div>
                 <footer className="run-page-footer">
                   <span>{needsAttention ? t("run.preserveEvidence") : t("run.liveEvidence")}</span>
-                  {showRepositoryAction && <button><ArrowUpRight size={14} />{t("run.openRepository")}</button>}
                 </footer>
               </div>
               <aside aria-label={t("run.properties")} className="run-properties">
