@@ -4,11 +4,15 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
 import { demoDashboard } from "../lib/demo-data";
+import type { AutoHuntAutomation } from "../lib/auto-hunt-automation";
 import { ProjectSettings } from "./ProjectSettings";
 
 describe("ProjectSettings", () => {
   it("configures the project approval policy", async () => {
     const onRegenerateWorkflow = vi.fn(async () => undefined);
+    const onUpdateAutomation = vi.fn(async (automation: AutoHuntAutomation) =>
+      automation
+    );
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
@@ -21,6 +25,7 @@ describe("ProjectSettings", () => {
           onBack={() => undefined}
           onDelete={async () => undefined}
           onRegenerateWorkflow={onRegenerateWorkflow}
+          onUpdateAutomation={onUpdateAutomation}
           project={{
             id: "project-1",
             name: "Briar",
@@ -49,6 +54,9 @@ describe("ProjectSettings", () => {
     expect(container.querySelector(".project-settings-automation")?.textContent).toContain(
       "completion",
     );
+    expect(container.querySelector(".project-settings-auto-run")?.textContent).toContain(
+      "자동 실행 조건",
+    );
     expect(container.querySelector(".project-workflow-contract")?.textContent).toContain(
       "bun run test",
     );
@@ -74,6 +82,18 @@ describe("ProjectSettings", () => {
     await act(async () => saveButton?.click());
     expect(saveButton?.textContent).toContain("저장됨");
 
+    const autoRunToggle = container.querySelector<HTMLInputElement>(
+      ".project-settings-toggle input",
+    );
+    await act(async () => autoRunToggle?.click());
+    const autoRunSave = container.querySelector<HTMLButtonElement>(
+      ".project-settings-auto-run > footer button",
+    );
+    await act(async () => autoRunSave?.click());
+    expect(onUpdateAutomation).toHaveBeenCalledWith(
+      expect.objectContaining({ enabled: true, maxIssuesPerSession: 3 }),
+    );
+
     await act(async () => root.unmount());
     container.remove();
   });
@@ -92,6 +112,7 @@ describe("ProjectSettings", () => {
           onBack={() => undefined}
           onDelete={onDelete}
           onRegenerateWorkflow={async () => undefined}
+          onUpdateAutomation={async (automation) => automation}
           project={{
             id: "project-1",
             name: "Briar",

@@ -8,6 +8,7 @@ import {
   RefreshCw,
   ShieldCheck,
   Trash2,
+  Zap,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -17,6 +18,11 @@ import {
 } from "../lib/project-llm";
 import type { DashboardPayload, Project } from "../types";
 import { useI18n } from "../i18n";
+import {
+  defaultAutoHuntAutomation,
+  normalizeAutoHuntAutomation,
+  type AutoHuntAutomation,
+} from "../lib/auto-hunt-automation";
 
 export function ProjectSettings({
   dashboard,
@@ -25,6 +31,7 @@ export function ProjectSettings({
   onBack,
   onDelete,
   onRegenerateWorkflow,
+  onUpdateAutomation,
   project,
 }: {
   dashboard: DashboardPayload | null;
@@ -33,6 +40,9 @@ export function ProjectSettings({
   onBack: () => void;
   onDelete: () => Promise<unknown>;
   onRegenerateWorkflow: () => Promise<unknown>;
+  onUpdateAutomation: (
+    automation: AutoHuntAutomation,
+  ) => Promise<AutoHuntAutomation>;
   project: Project;
 }) {
   const { localeTag, t } = useI18n();
@@ -48,6 +58,14 @@ export function ProjectSettings({
   const [isRegeneratingWorkflow, setIsRegeneratingWorkflow] = useState(false);
   const [workflowError, setWorkflowError] = useState<string | null>(null);
   const [workflowRegenerated, setWorkflowRegenerated] = useState(false);
+  const [automation, setAutomation] = useState<AutoHuntAutomation>(
+    () => normalizeAutoHuntAutomation(dashboard?.settings.automation),
+  );
+  const [savedAutomation, setSavedAutomation] = useState<AutoHuntAutomation>(
+    () => normalizeAutoHuntAutomation(dashboard?.settings.automation),
+  );
+  const [automationSaving, setAutomationSaving] = useState(false);
+  const [automationError, setAutomationError] = useState<string | null>(null);
   const cancelButtonRef = useRef<HTMLButtonElement | null>(null);
   const workflow = dashboard?.settings.workflow ?? null;
   const workflowContract = workflow
@@ -86,6 +104,15 @@ export function ProjectSettings({
       cancelled = true;
     };
   }, [project.id]);
+
+  useEffect(() => {
+    const next = normalizeAutoHuntAutomation(
+      dashboard?.settings.automation ?? defaultAutoHuntAutomation,
+    );
+    setAutomation(next);
+    setSavedAutomation(next);
+    setAutomationError(null);
+  }, [dashboard?.settings.automation, project.id]);
 
   useEffect(() => {
     if (!isConfirming) return;
@@ -134,6 +161,22 @@ export function ProjectSettings({
     }
   };
 
+  const saveAutomation = async () => {
+    setAutomationSaving(true);
+    setAutomationError(null);
+    try {
+      const saved = await onUpdateAutomation(automation);
+      setAutomation(saved);
+      setSavedAutomation(saved);
+    } catch (caught) {
+      setAutomationError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setAutomationSaving(false);
+    }
+  };
+  const automationChanged =
+    JSON.stringify(automation) !== JSON.stringify(savedAutomation);
+
   return (
     <main className="main-content project-settings-page">
       <header className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region>
@@ -157,6 +200,181 @@ export function ProjectSettings({
               <strong>{project.name}</strong>
             </div>
             <small>{t("settings.created", { date: new Date(project.createdAt).toLocaleDateString(localeTag) })}</small>
+          </section>
+
+          <section className="project-settings-auto-run">
+            <header>
+              <span className="project-settings-auto-run-icon">
+                <Zap size={18} strokeWidth={1.8} />
+              </span>
+              <span>
+                <strong>{t("settings.autoRunTitle")}</strong>
+                <small>{t("settings.autoRunDescription")}</small>
+              </span>
+              <label className="project-settings-toggle">
+                <input
+                  checked={automation.enabled}
+                  onChange={(event) => {
+                    const enabled = event.currentTarget.checked;
+                    setAutomation((current) => ({
+                      ...current,
+                      enabled,
+                    }));
+                  }}
+                  type="checkbox"
+                />
+                <span>{t(automation.enabled ? "settings.autoRunOn" : "settings.autoRunOff")}</span>
+              </label>
+            </header>
+
+            <div className="project-settings-auto-run-rules">
+              <label>
+                <span>{t("settings.autoRunMaxIssues")}</span>
+                <input
+                  max={10}
+                  min={1}
+                  onChange={(event) => {
+                    const maxIssuesPerSession = Number(event.currentTarget.value);
+                    setAutomation((current) => ({
+                      ...current,
+                      maxIssuesPerSession,
+                    }));
+                  }}
+                  type="number"
+                  value={automation.maxIssuesPerSession}
+                />
+                <small>{t("settings.autoRunMaxIssuesDescription")}</small>
+              </label>
+
+              <div className="project-settings-auto-run-condition">
+                <label className="project-settings-auto-run-condition-check">
+                  <input
+                    checked={automation.schedule.enabled}
+                    disabled={!automation.enabled}
+                    onChange={(event) => {
+                      const enabled = event.currentTarget.checked;
+                      setAutomation((current) => ({
+                        ...current,
+                        schedule: {
+                          ...current.schedule,
+                          enabled,
+                        },
+                      }));
+                    }}
+                    type="checkbox"
+                  />
+                  <span>
+                    <strong>{t("settings.autoRunSchedule")}</strong>
+                    <small>{t("settings.autoRunScheduleDescription")}</small>
+                  </span>
+                </label>
+                <input
+                  aria-label={t("settings.autoRunIntervalHours")}
+                  disabled={!automation.enabled || !automation.schedule.enabled}
+                  max={168}
+                  min={1}
+                  onChange={(event) => {
+                    const intervalHours = Number(event.currentTarget.value);
+                    setAutomation((current) => ({
+                      ...current,
+                      schedule: {
+                        ...current.schedule,
+                        intervalHours,
+                      },
+                    }));
+                  }}
+                  type="number"
+                  value={automation.schedule.intervalHours}
+                />
+                <em>{t("settings.hours")}</em>
+              </div>
+
+              <div className="project-settings-auto-run-condition">
+                <label className="project-settings-auto-run-condition-check">
+                  <input
+                    checked={automation.queueThreshold.enabled}
+                    disabled={!automation.enabled}
+                    onChange={(event) => {
+                      const enabled = event.currentTarget.checked;
+                      setAutomation((current) => ({
+                        ...current,
+                        queueThreshold: {
+                          ...current.queueThreshold,
+                          enabled,
+                        },
+                      }));
+                    }}
+                    type="checkbox"
+                  />
+                  <span>
+                    <strong>{t("settings.autoRunQueue")}</strong>
+                    <small>{t("settings.autoRunQueueDescription")}</small>
+                  </span>
+                </label>
+                <input
+                  aria-label={t("settings.autoRunQueueMinimum")}
+                  disabled={!automation.enabled || !automation.queueThreshold.enabled}
+                  max={100}
+                  min={1}
+                  onChange={(event) => {
+                    const minimumIssues = Number(event.currentTarget.value);
+                    setAutomation((current) => ({
+                      ...current,
+                      queueThreshold: {
+                        ...current.queueThreshold,
+                        minimumIssues,
+                      },
+                    }));
+                  }}
+                  type="number"
+                  value={automation.queueThreshold.minimumIssues}
+                />
+                <em>{t("settings.issuesUnit")}</em>
+              </div>
+
+              <div className="project-settings-auto-run-condition">
+                <label className="project-settings-auto-run-condition-check">
+                  <input
+                    checked={automation.urgentIssue.enabled}
+                    disabled={!automation.enabled}
+                    onChange={(event) => {
+                      const enabled = event.currentTarget.checked;
+                      setAutomation((current) => ({
+                        ...current,
+                        urgentIssue: { enabled },
+                      }));
+                    }}
+                    type="checkbox"
+                  />
+                  <span>
+                    <strong>{t("settings.autoRunUrgent")}</strong>
+                    <small>{t("settings.autoRunUrgentDescription")}</small>
+                  </span>
+                </label>
+              </div>
+            </div>
+            <footer>
+              <p>{t("settings.autoRunOrNotice")}</p>
+              <button
+                disabled={automationSaving || !automationChanged}
+                onClick={() => void saveAutomation()}
+                type="button"
+              >
+                {automationSaving ? (
+                  <LoaderCircle className="spin" size={14} />
+                ) : !automationChanged ? (
+                  <Check size={14} />
+                ) : null}
+                {automationSaving
+                  ? t("common.saving")
+                  : !automationChanged
+                    ? t("common.saved")
+                    : t("common.save")}
+              </button>
+            </footer>
+            {automationError ? (
+              <p className="project-settings-auto-run-error">{automationError}</p>
+            ) : null}
           </section>
 
           <section className="project-settings-automation">

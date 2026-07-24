@@ -14,9 +14,12 @@ import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
 import {
   agentMessagesFromAppServerEvents,
-  maxAutoHuntSessionIssues,
   naturalLanguageFromAgentMessage,
 } from "../lib/auto-hunt-agent";
+import {
+  defaultAutoHuntMaxIssues,
+  selectAutoHuntCandidates,
+} from "../lib/auto-hunt-automation";
 import type {
   AutoHuntSession,
   AutoHuntSessionIssueOutcome,
@@ -53,9 +56,10 @@ export function AutoHuntSessions({
     () => sessions.filter((session) => session.projectId === projectId),
     [projectId, sessions],
   );
-  const queued = (dashboard?.runs ?? [])
-    .filter((run) => run.status === "queued")
-    .slice(0, maxAutoHuntSessionIssues);
+  const maxIssues =
+    dashboard?.settings?.automation?.maxIssuesPerSession ??
+    defaultAutoHuntMaxIssues;
+  const queued = selectAutoHuntCandidates(dashboard?.runs ?? [], maxIssues);
   const runningSession = projectSessions.find((session) => session.status === "running");
   const selectedSession = projectSessions.find(
     (session) => session.id === selectedSessionId,
@@ -242,7 +246,7 @@ export function AutoHuntSessions({
             <p>{t("autoHunt.description")}</p>
             <div className="auto-hunt-capacity">
               <span>{t("autoHunt.available", { count: queued.length })}</span>
-              <span>{t("autoHunt.limit")}</span>
+              <span>{t("autoHunt.limit", { count: maxIssues })}</span>
             </div>
           </div>
           <button

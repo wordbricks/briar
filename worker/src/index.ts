@@ -15,6 +15,10 @@ import {
   type AutoHuntWorkflowStageId,
 } from "../../src/lib/auto-hunt-contract";
 import {
+  defaultAutoHuntAutomation,
+  normalizeAutoHuntAutomation,
+} from "../../src/lib/auto-hunt-automation";
+import {
   maxIssueMultipartBytes,
   validateIssueAttachments,
 } from "../../src/lib/issue-attachments";
@@ -367,6 +371,27 @@ const projectSettingsSchema = z
       .strict(),
     githubRepository: nullableTrimmed(300),
     workflow: workflowSchema.default(defaultAutoHuntWorkflow),
+    automation: z
+      .object({
+        enabled: z.boolean(),
+        maxIssuesPerSession: z.number().int().min(1).max(10),
+        schedule: z
+          .object({
+            enabled: z.boolean(),
+            intervalHours: z.number().int().min(1).max(168),
+          })
+          .strict(),
+        queueThreshold: z
+          .object({
+            enabled: z.boolean(),
+            minimumIssues: z.number().int().min(1).max(100),
+          })
+          .strict(),
+        urgentIssue: z.object({ enabled: z.boolean() }).strict(),
+      })
+      .strict()
+      .transform(normalizeAutoHuntAutomation)
+      .optional(),
   })
   .strict()
   .superRefine((input, context) => {
@@ -584,6 +609,9 @@ const settingsJson = (row: ProjectSettingsRow | null) => ({
   workflow: row?.workflow_json
     ? normalizeAutoHuntWorkflow(JSON.parse(row.workflow_json))
     : structuredClone(defaultAutoHuntWorkflow),
+  automation: row?.auto_hunt_automation_json
+    ? normalizeAutoHuntAutomation(JSON.parse(row.auto_hunt_automation_json))
+    : structuredClone(defaultAutoHuntAutomation),
 });
 
 const parseJsonArray = (value: string) => {
@@ -859,6 +887,7 @@ async function route(
       linear: input.linear,
       githubRepository: input.githubRepository ?? null,
       workflow: input.workflow,
+      automation: input.automation,
     });
     return json({ settings: settingsJson(settings) });
   }
