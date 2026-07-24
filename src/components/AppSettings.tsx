@@ -195,13 +195,15 @@ export function AppSettings({
   ];
 
   return (
-    <main
-      className={`app-settings${isSidebarOpen ? "" : " settings-sidebar-closed"}`}
-    >
+    <main className="app-settings">
       <aside
+        aria-hidden={!isSidebarOpen}
         aria-label={t("appSettings.navigation")}
-        className="app-settings-sidebar"
+        className={`sidebar app-settings-sidebar${
+          isSidebarOpen ? "" : " sidebar-collapsed"
+        }`}
         id="app-sidebar"
+        inert={!isSidebarOpen ? true : undefined}
       >
         <div className="app-settings-brand">
           <Logo />
@@ -230,8 +232,13 @@ export function AppSettings({
         </button>
       </aside>
 
-      <section className="app-settings-main">
-        <header className="app-settings-topbar" data-tauri-drag-region>
+      <section className="main-content app-settings-main">
+        <header
+          className={`topbar app-settings-topbar${
+            isSidebarOpen ? "" : " sidebar-closed"
+          }`}
+          data-tauri-drag-region
+        >
           <h1>{t("appSettings.title")}</h1>
         </header>
 
