@@ -27,6 +27,7 @@ import {
   addOrganizationMember,
   assertQueuedHuntClaim,
   claimNextQueuedHuntRun,
+  createIssueMessage,
   createIssueAttachments,
   createOrganization,
   createProject,
@@ -42,6 +43,7 @@ import {
   HuntClaimError,
   HuntTransitionError,
   listIssueAttachments,
+  listIssueMessages,
   listDashboardRuns,
   listOrganizationMembers,
   listOrganizations,
@@ -58,6 +60,7 @@ import {
   type HuntRunRow,
   type IssueAttachmentInput,
   type IssueAttachmentRow,
+  type IssueMessageRow,
   type ProjectRow,
   type ProjectSettingsRow,
   type OrganizationMemberRow,
@@ -267,6 +270,13 @@ const issueInputSchema = z
     title: z.string().trim().min(1).max(300),
     description: z.string().trim().max(100_000).nullable().optional(),
     priority: z.number().int().min(1).max(4).nullable().optional(),
+  })
+  .strict();
+
+const issueMessageInputSchema = z
+  .object({
+    body: z.string().trim().min(1).max(10_000),
+    parentMessageId: z.string().uuid().nullable().optional(),
   })
   .strict();
 
@@ -650,6 +660,21 @@ const attachmentJson = (attachment: IssueAttachmentRow) => ({
   url: `/projects/${attachment.project_id}/runs/${attachment.run_id}/attachments/${attachment.id}`,
 });
 
+const issueMessageJson = (message: IssueMessageRow) => ({
+  id: message.id,
+  runId: message.run_id,
+  parentMessageId: message.parent_message_id,
+  body: message.body,
+  author: {
+    id: message.author_user_id,
+    name: message.author_name ?? "알 수 없는 사용자",
+    image: message.author_image,
+  },
+  replyCount: message.reply_count,
+  createdAt: message.created_at,
+  updatedAt: message.updated_at,
+});
+
 function dashboardRunJson(
   run: HuntRunRow,
   events: HuntEventRow[],
@@ -969,6 +994,45 @@ async function route(
     const object = await attachmentsBucket.get(attachment.object_key);
     if (!object) throw new HttpError(404, "Attachment not found");
     return attachmentResponse(attachment, object, object.body);
+  }
+
+  const issueMessagesMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/messages$/u,
+  );
+  if (issueMessagesMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, issueMessagesMatch[1], session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    const run = await getHuntRunForProject(
+      db,
+      project.id,
+      issueMessagesMatch[2],
+    );
+    if (!run) throw new HttpError(404, "Run not found");
+    const messages = await listIssueMessages(db, project.id, run.id);
+    return json({ messages: messages.map(issueMessageJson) });
+  }
+  if (issueMessagesMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, issueMessagesMatch[1], session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    const input = issueMessageInputSchema.parse(await readJson(request, 16_384));
+    const message = await createIssueMessage(db, {
+      id: crypto.randomUUID(),
+      projectId: project.id,
+      runId: issueMessagesMatch[2],
+      parentMessageId: input.parentMessageId ?? null,
+      authorUserId: session.user.id,
+      body: input.body,
+      createdAt: new Date().toISOString(),
+    });
+    if (!message) {
+      throw new HttpError(
+        404,
+        input.parentMessageId ? "Thread message not found" : "Run not found",
+      );
+    }
+    return json({ message: issueMessageJson(message) }, 201);
   }
 
   const issuesMatch = pathname.match(

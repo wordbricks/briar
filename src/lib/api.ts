@@ -5,6 +5,7 @@ import type {
   DashboardPayload,
   HuntRunPlacement,
   IssueAttachment,
+  IssueMessage,
   Project,
   Organization,
   OrganizationMember,
@@ -271,6 +272,32 @@ export async function loadIssueAttachment(
     throw new Error(`첨부 파일을 열 수 없습니다. (${response.status})`);
   }
   return response.blob();
+}
+
+export async function loadIssueMessages(
+  token: string,
+  projectId: string,
+  runId: string,
+) {
+  const result = await request<{ messages: IssueMessage[] }>(
+    `/projects/${projectId}/runs/${runId}/messages`,
+    token,
+  );
+  return result.messages;
+}
+
+export async function createIssueMessage(
+  token: string,
+  projectId: string,
+  runId: string,
+  input: { body: string; parentMessageId: string | null },
+) {
+  const result = await request<{ message: IssueMessage }>(
+    `/projects/${projectId}/runs/${runId}/messages`,
+    token,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+  return result.message;
 }
 
 export type HuntRecoveryResult = {

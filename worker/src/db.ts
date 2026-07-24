@@ -117,6 +117,19 @@ export type HuntEventRow = {
   recorded_at: string;
 };
 
+export type IssueMessageRow = {
+  id: string;
+  run_id: string;
+  parent_message_id: string | null;
+  author_user_id: string | null;
+  author_name: string | null;
+  author_image: string | null;
+  body: string;
+  reply_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
 export type IssueAttachmentRow = {
   id: string;
   run_id: string;
@@ -524,6 +537,75 @@ export async function listDashboardRuns(db: D1Database, projectId: string) {
     .all<HuntEventRow>();
 
   return { runs: runs.results, events: events.results };
+}
+
+export async function listIssueMessages(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+) {
+  const result = await db
+    .prepare(
+      `select message.id, message.run_id, message.parent_message_id,
+              message.author_user_id, author.name as author_name,
+              author.image as author_image, message.body,
+              (select count(*) from briar_issue_messages reply
+               where reply.parent_message_id = message.id) as reply_count,
+              message.created_at, message.updated_at
+       from briar_issue_messages message
+       left join "user" author on author.id = message.author_user_id
+       where message.project_id = ? and message.run_id = ?
+       order by message.created_at, message.id
+       limit 1000`,
+    )
+    .bind(projectId, runId)
+    .all<IssueMessageRow>();
+  return result.results;
+}
+
+export async function createIssueMessage(
+  db: D1Database,
+  input: {
+    id: string;
+    projectId: string;
+    runId: string;
+    parentMessageId: string | null;
+    authorUserId: string;
+    body: string;
+    createdAt: string;
+  },
+) {
+  const result = await db
+    .prepare(
+      `insert into briar_issue_messages (
+         id, project_id, run_id, parent_message_id, author_user_id,
+         body, created_at, updated_at
+       )
+       select ?, run.project_id, run.id, parent.id, ?, ?, ?, ?
+       from briar_hunt_runs run
+       left join briar_issue_messages parent
+         on parent.id = ?
+        and parent.project_id = run.project_id
+        and parent.run_id = run.id
+        and parent.parent_message_id is null
+       where run.id = ? and run.project_id = ?
+         and (? is null or parent.id is not null)`,
+    )
+    .bind(
+      input.id,
+      input.authorUserId,
+      input.body,
+      input.createdAt,
+      input.createdAt,
+      input.parentMessageId,
+      input.runId,
+      input.projectId,
+      input.parentMessageId,
+    )
+    .run();
+  if (result.meta.changes !== 1) return null;
+  const messages = await listIssueMessages(db, input.projectId, input.runId);
+  return messages.find((message) => message.id === input.id) ?? null;
 }
 
 export async function createIssueAttachments(

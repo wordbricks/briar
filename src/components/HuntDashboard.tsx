@@ -1,22 +1,31 @@
 import {
   Activity,
   ArrowLeft,
+  AtSign,
+  Bold,
   Bot,
+  ChevronDown,
   ChevronRight,
   CircleAlert,
   Clock3,
+  Code2,
   FolderGit2,
   GitCommitHorizontal,
   GitFork,
   Image as ImageIcon,
+  Italic,
+  Link2,
   LoaderCircle,
+  MessageCircle,
   Paperclip,
   Plus,
   RefreshCw,
   RotateCcw,
   Search,
+  Send,
   ShieldCheck,
   Signal,
+  Smile,
   Terminal,
   Trash2,
   UserRound,
@@ -25,11 +34,13 @@ import {
   X,
 } from "lucide-react";
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
   type DragEvent,
+  type FormEvent,
 } from "react";
 import { JellySelect } from "./JellySelect";
 import {
@@ -51,6 +62,7 @@ import type {
   HuntRunPlacement,
   HuntSource,
   IssueAttachment,
+  IssueMessage,
 } from "../types";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
@@ -81,6 +93,7 @@ export function HuntDashboard({
   onCreateIssue,
   onHealthRefresh,
   onLoadAttachment,
+  onLoadIssueMessages,
   onMoveRun,
   onReconnect,
   onRetryRun,
@@ -89,6 +102,7 @@ export function HuntDashboard({
   onCompanionStatusChange,
   onRepair,
   onRequestedRunOpen,
+  onSendIssueMessage,
   requestedRunId = null,
 }: {
   companionMode?: boolean;
@@ -106,6 +120,7 @@ export function HuntDashboard({
   onCreateIssue: (input: CreateIssueInput) => Promise<unknown>;
   onHealthRefresh: () => void;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
+  onLoadIssueMessages: (runId: string) => Promise<IssueMessage[]>;
   onMoveRun: (runId: string, placement: HuntRunPlacement) => Promise<unknown>;
   onReconnect: () => void;
   onRetryRun: (runId: string) => Promise<unknown>;
@@ -114,6 +129,10 @@ export function HuntDashboard({
   onCompanionStatusChange?: (status: CompanionStatusFilter) => void;
   onRepair: () => void;
   onRequestedRunOpen?: () => void;
+  onSendIssueMessage: (
+    runId: string,
+    input: { body: string; parentMessageId: string | null },
+  ) => Promise<IssueMessage>;
   requestedRunId?: string | null;
 }) {
   const { t } = useI18n();
@@ -238,8 +257,10 @@ export function HuntDashboard({
         onBack={() => setSelectedRunId(null)}
         onCancel={() => onCancelRun(selected.id)}
         onLoadAttachment={onLoadAttachment}
+        onLoadIssueMessages={() => onLoadIssueMessages(selected.id)}
         onMove={(placement) => onMoveRun(selected.id, placement)}
         onRetry={() => onRetryRun(selected.id)}
+        onSendIssueMessage={(input) => onSendIssueMessage(selected.id, input)}
         run={selected}
       />
     );
@@ -728,8 +749,10 @@ export function RunPage({
   onBack,
   onCancel,
   onLoadAttachment,
+  onLoadIssueMessages,
   onMove,
   onRetry,
+  onSendIssueMessage,
   run,
 }: {
   companionMode?: boolean;
@@ -739,8 +762,13 @@ export function RunPage({
   onBack: () => void;
   onCancel: () => Promise<unknown>;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
+  onLoadIssueMessages: () => Promise<IssueMessage[]>;
   onMove: (placement: HuntRunPlacement) => Promise<unknown>;
   onRetry: () => Promise<unknown>;
+  onSendIssueMessage: (input: {
+    body: string;
+    parentMessageId: string | null;
+  }) => Promise<IssueMessage>;
   run: HuntRun;
 }) {
   const { localeTag, t } = useI18n();
@@ -830,7 +858,12 @@ export function RunPage({
                     </div>
                   </div>
                 )}
-                <div className="timeline"><h3>{t("run.activity")}</h3>{run.events.map((event) => { const eventDisplay = eventMeta(event.status, event.workflowStage, run.workflow); return <div className="timeline-event" key={event.id}><i className={eventDisplay.tone} /><span><strong>{localizeEvent(t, event.status, event.workflowStage, eventDisplay.label)} <em>{t("run.attempt", { count: event.attempt })}</em></strong><p>{event.detail}</p><small>{event.actor} · {relativeTime(event.occurredAt, t)}</small></span></div>; })}</div>
+                <IssueActivity run={run} />
+                <IssueConversation
+                  onLoad={onLoadIssueMessages}
+                  onSend={onSendIssueMessage}
+                  run={run}
+                />
                 <footer className="run-page-footer">
                   <span>{needsAttention ? t("run.preserveEvidence") : t("run.liveEvidence")}</span>
                 </footer>
@@ -908,6 +941,420 @@ export function RunPage({
         </article>
       </div>
     </main>
+  );
+}
+
+function IssueActivity({ run }: { run: HuntRun }) {
+  const { t } = useI18n();
+  const event = run.events[0] ?? null;
+  const eventDisplay = event
+    ? eventMeta(event.status, event.workflowStage, run.workflow)
+    : null;
+  return (
+    <details className="timeline issue-activity" open>
+      <summary>
+        <span>
+          <h3>{t("run.activity")}</h3>
+          <small>{t("run.activityCount", { count: run.events.length })}</small>
+        </span>
+        <ChevronDown aria-hidden="true" size={15} />
+      </summary>
+      {event && eventDisplay ? (
+        <div className="timeline-event" key={event.id}>
+          <i className={eventDisplay.tone} />
+          <span>
+            <strong>
+              {localizeEvent(
+                t,
+                event.status,
+                event.workflowStage,
+                eventDisplay.label,
+              )}{" "}
+              <em>{t("run.attempt", { count: event.attempt })}</em>
+            </strong>
+            {event.detail && <p>{event.detail}</p>}
+            <small>
+              {event.actor} · {relativeTime(event.occurredAt, t)}
+            </small>
+          </span>
+        </div>
+      ) : null}
+    </details>
+  );
+}
+
+function IssueConversation({
+  onLoad,
+  onSend,
+  run,
+}: {
+  onLoad: () => Promise<IssueMessage[]>;
+  onSend: (input: {
+    body: string;
+    parentMessageId: string | null;
+  }) => Promise<IssueMessage>;
+  run: HuntRun;
+}) {
+  const { localeTag, t } = useI18n();
+  const [messages, setMessages] = useState<IssueMessage[]>([]);
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const threadTriggerRef = useRef<HTMLButtonElement | null>(null);
+
+  const loadMessages = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      setMessages(await onLoad());
+    } catch {
+      setLoadError(t("run.messagesLoadFailed"));
+    } finally {
+      setLoading(false);
+    }
+  }, [onLoad, t]);
+
+  useEffect(() => {
+    void loadMessages();
+  }, [loadMessages]);
+
+  useEffect(() => {
+    if (!activeThreadId) return;
+    closeButtonRef.current?.focus();
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setActiveThreadId(null);
+      threadTriggerRef.current?.focus();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [activeThreadId]);
+
+  const roots = messages.filter((message) => message.parentMessageId === null);
+  const activeThread =
+    roots.find((message) => message.id === activeThreadId) ?? null;
+  const replies = activeThread
+    ? messages.filter(
+        (message) => message.parentMessageId === activeThread.id,
+      )
+    : [];
+  const openThread = (messageId: string, trigger: HTMLButtonElement) => {
+    threadTriggerRef.current = trigger;
+    setActiveThreadId(messageId);
+  };
+  const closeThread = () => {
+    setActiveThreadId(null);
+    threadTriggerRef.current?.focus();
+  };
+  const sendMessage = async (
+    body: string,
+    parentMessageId: string | null,
+  ) => {
+    const message = await onSend({ body, parentMessageId });
+    setMessages((current) => [
+      ...current.map((candidate) =>
+        candidate.id === parentMessageId
+          ? { ...candidate, replyCount: candidate.replyCount + 1 }
+          : candidate,
+      ),
+      message,
+    ]);
+  };
+
+  return (
+    <section className="issue-conversation" aria-labelledby="issue-messages-title">
+      <header>
+        <span>
+          <MessageCircle aria-hidden="true" size={16} />
+          <h2 id="issue-messages-title">{t("run.messages")}</h2>
+        </span>
+        {roots.length > 0 && <small>{roots.length}</small>}
+      </header>
+      <div className="issue-message-list">
+        {loading ? (
+          <div className="issue-message-state">
+            <LoaderCircle className="spin" size={16} />
+            {t("run.messagesLoading")}
+          </div>
+        ) : loadError ? (
+          <button
+            className="issue-message-state error"
+            onClick={() => void loadMessages()}
+            type="button"
+          >
+            <CircleAlert size={15} />
+            {loadError}
+          </button>
+        ) : roots.length === 0 ? (
+          <p className="issue-message-empty">{t("run.messagesEmpty")}</p>
+        ) : (
+          roots.map((message) => (
+            <IssueMessageItem
+              key={message.id}
+              localeTag={localeTag}
+              message={message}
+              onOpenThread={openThread}
+            />
+          ))
+        )}
+      </div>
+      <MessageComposer
+        onSubmit={(body) => sendMessage(body, null)}
+        placeholder={t("run.messagePlaceholder", { title: run.title })}
+      />
+      <div
+        aria-hidden={activeThread === null}
+        className={`issue-thread-layer${activeThread ? " open" : ""}`}
+      >
+        <aside
+          aria-label={t("run.thread")}
+          className="issue-thread-drawer"
+          role={activeThread ? "dialog" : undefined}
+        >
+          <header>
+            <div>
+              <strong>{t("run.thread")}</strong>
+              {activeThread && (
+                <small>{t("run.replies", { count: replies.length })}</small>
+              )}
+            </div>
+            <button
+              aria-label={t("common.close")}
+              onClick={closeThread}
+              ref={closeButtonRef}
+              type="button"
+            >
+              <X size={18} />
+            </button>
+          </header>
+          <div className="issue-thread-content">
+            {activeThread && (
+              <>
+                <IssueMessageItem
+                  localeTag={localeTag}
+                  message={activeThread}
+                />
+                <div className="issue-thread-divider">
+                  <span>{t("run.replies", { count: replies.length })}</span>
+                </div>
+                {replies.map((message) => (
+                  <IssueMessageItem
+                    key={message.id}
+                    localeTag={localeTag}
+                    message={message}
+                  />
+                ))}
+              </>
+            )}
+          </div>
+          {activeThread && (
+            <MessageComposer
+              compact
+              onSubmit={(body) => sendMessage(body, activeThread.id)}
+              placeholder={t("run.threadPlaceholder")}
+            />
+          )}
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+function IssueMessageItem({
+  localeTag,
+  message,
+  onOpenThread,
+}: {
+  localeTag: string;
+  message: IssueMessage;
+  onOpenThread?: (messageId: string, trigger: HTMLButtonElement) => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <article className="issue-message">
+      <MessageAvatar message={message} />
+      <div>
+        <header>
+          <strong>{message.author.name}</strong>
+          <time dateTime={message.createdAt}>
+            {formatDate(message.createdAt, localeTag)}
+          </time>
+        </header>
+        <p>{message.body}</p>
+        {onOpenThread && (
+          <button
+            className={`issue-thread-trigger${
+              message.replyCount > 0 ? " has-replies" : ""
+            }`}
+            onClick={(event) =>
+              onOpenThread(message.id, event.currentTarget)
+            }
+            title={t("run.replyInThread")}
+            type="button"
+          >
+            <MessageCircle size={14} />
+            {message.replyCount > 0
+              ? t("run.replies", { count: message.replyCount })
+              : t("run.replyInThread")}
+          </button>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function MessageAvatar({ message }: { message: IssueMessage }) {
+  if (message.author.image) {
+    return (
+      <img
+        alt=""
+        className="issue-message-avatar"
+        src={message.author.image}
+      />
+    );
+  }
+  return (
+    <span aria-hidden="true" className="issue-message-avatar">
+      {message.author.name.trim().charAt(0).toUpperCase() || "?"}
+    </span>
+  );
+}
+
+function MessageComposer({
+  compact = false,
+  onSubmit,
+  placeholder,
+}: {
+  compact?: boolean;
+  onSubmit: (body: string) => Promise<void>;
+  placeholder: string;
+}) {
+  const { t } = useI18n();
+  const [body, setBody] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const submit = async (event?: FormEvent) => {
+    event?.preventDefault();
+    const nextBody = body.trim();
+    if (!nextBody || sending) return;
+    setSending(true);
+    setError(null);
+    try {
+      await onSubmit(nextBody);
+      setBody("");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setSending(false);
+    }
+  };
+  const wrapSelection = (before: string, after = before) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const selectionStart = textarea.selectionStart;
+    const selectionEnd = textarea.selectionEnd;
+    setBody(
+      `${body.slice(0, selectionStart)}${before}${body.slice(
+        selectionStart,
+        selectionEnd,
+      )}${after}${body.slice(selectionEnd)}`,
+    );
+    requestAnimationFrame(() => {
+      textarea.focus();
+      const cursor = selectionEnd + before.length + after.length;
+      textarea.setSelectionRange(cursor, cursor);
+    });
+  };
+  return (
+    <form
+      className={`issue-message-composer${compact ? " compact" : ""}`}
+      onSubmit={(event) => void submit(event)}
+    >
+      <div className="issue-composer-formatting">
+        <button
+          aria-label={t("run.formatBold")}
+          onClick={() => wrapSelection("**")}
+          type="button"
+        >
+          <Bold size={15} />
+        </button>
+        <button
+          aria-label={t("run.formatItalic")}
+          onClick={() => wrapSelection("_")}
+          type="button"
+        >
+          <Italic size={15} />
+        </button>
+        <button
+          aria-label={t("run.formatLink")}
+          onClick={() => wrapSelection("[", "](https://)")}
+          type="button"
+        >
+          <Link2 size={15} />
+        </button>
+        <button
+          aria-label={t("run.formatCode")}
+          onClick={() => wrapSelection("`")}
+          type="button"
+        >
+          <Code2 size={15} />
+        </button>
+      </div>
+      <textarea
+        aria-label={placeholder}
+        disabled={sending}
+        maxLength={10_000}
+        onChange={(event) => setBody(event.currentTarget.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+            event.preventDefault();
+            void submit();
+          }
+        }}
+        placeholder={placeholder}
+        ref={textareaRef}
+        rows={compact ? 2 : 3}
+        value={body}
+      />
+      <footer>
+        <div>
+          <button
+            aria-label={t("run.emoji")}
+            onClick={() => wrapSelection("🙂", "")}
+            type="button"
+          >
+            <Smile size={16} />
+          </button>
+          <button
+            aria-label={t("run.mention")}
+            onClick={() => wrapSelection("@", "")}
+            type="button"
+          >
+            <AtSign size={16} />
+          </button>
+        </div>
+        <button
+          aria-label={sending ? t("run.sendingMessage") : t("run.sendMessage")}
+          className="issue-message-send"
+          disabled={!body.trim() || sending}
+          type="submit"
+        >
+          {sending ? (
+            <LoaderCircle className="spin" size={16} />
+          ) : (
+            <Send size={16} />
+          )}
+        </button>
+      </footer>
+      {error && (
+        <p className="issue-composer-error">
+          <CircleAlert size={13} />
+          {error}
+        </p>
+      )}
+    </form>
   );
 }
 

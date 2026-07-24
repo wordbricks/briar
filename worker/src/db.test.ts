@@ -8,6 +8,7 @@ import {
   assertQueuedHuntClaim,
   claimNextQueuedHuntRun,
   addOrganizationMember,
+  createIssueMessage,
   createProject,
   createIssueAttachments,
   deleteProject,
@@ -19,6 +20,7 @@ import {
   HuntClaimError,
   HuntTransitionError,
   listIssueAttachments,
+  listIssueMessages,
   listOrganizationMembers,
   listProjects,
   moveHuntRun,
@@ -88,6 +90,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       "migrations/0007_configurable_workflows.sql",
       "migrations/0008_organizations.sql",
       "migrations/0009_auto_hunt_automation.sql",
+      "migrations/0010_issue_messages.sql",
     ]) {
       await executeSql(db, await readFile(resolve(migration), "utf8"));
     }
@@ -327,6 +330,73 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       context_json:
         '{"origin":"briar-app","issueId":"22222222-2222-4222-8222-222222222222"}',
     });
+  });
+
+  it("stores issue conversations with one-level threaded replies", async () => {
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 25, {
+        sourceKey: "issue-message-run",
+        eventKey: "issue-message-run:queued",
+      }),
+    );
+    const rootId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const replyId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    expect(
+      await createIssueMessage(db, {
+        id: rootId,
+        projectId,
+        runId,
+        parentMessageId: null,
+        authorUserId: "owner",
+        body: "Please verify the edge case.",
+        createdAt: atMinute(26),
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        id: rootId,
+        author_name: "Owner",
+        reply_count: 0,
+      }),
+    );
+    expect(
+      await createIssueMessage(db, {
+        id: replyId,
+        projectId,
+        runId,
+        parentMessageId: rootId,
+        authorUserId: "owner",
+        body: "The edge case is covered.",
+        createdAt: atMinute(27),
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        id: replyId,
+        parent_message_id: rootId,
+      }),
+    );
+
+    const messages = await listIssueMessages(db, projectId, runId);
+    expect(messages).toEqual([
+      expect.objectContaining({ id: rootId, reply_count: 1 }),
+      expect.objectContaining({
+        id: replyId,
+        parent_message_id: rootId,
+        reply_count: 0,
+      }),
+    ]);
+    await expect(
+      createIssueMessage(db, {
+        id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        projectId,
+        runId,
+        parentMessageId: replyId,
+        authorUserId: "owner",
+        body: "Nested replies are not supported.",
+        createdAt: atMinute(28),
+      }),
+    ).resolves.toBeNull();
   });
 
   it("completes a local workflow without staging or production", async () => {
