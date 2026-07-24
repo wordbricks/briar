@@ -89,6 +89,47 @@ describe("HuntDashboard", () => {
     expect(markup).not.toContain('class="metric-grid"');
   });
 
+  it("switches between kanban and list views while preserving issue navigation", async () => {
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={demoDashboard}
+      />,
+    ));
+
+    const listButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="리스트 보기"]',
+    );
+    expect(listButton?.getAttribute("aria-pressed")).toBe("false");
+
+    await act(async () => listButton?.click());
+
+    expect(container.querySelector(".kanban-board")).toBeNull();
+    expect(container.querySelector(".issue-list")).not.toBeNull();
+    expect(container.querySelectorAll(".issue-list-row")).toHaveLength(
+      demoDashboard.runs.length,
+    );
+    expect(listButton?.getAttribute("aria-pressed")).toBe("true");
+    expect(container.querySelector(".issue-list")?.textContent).toContain(
+      demoDashboard.runs[0].title,
+    );
+
+    await act(async () => {
+      container.querySelector<HTMLElement>(".issue-list-row")?.click();
+    });
+    expect(container.querySelector(".run-page")).not.toBeNull();
+    expect(container.querySelector(".issue-list")).toBeNull();
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".run-page-titlebar-back")?.click();
+    });
+    expect(container.querySelector(".issue-list")).not.toBeNull();
+    expect(container.querySelector(".kanban-board")).toBeNull();
+    await act(async () => root.unmount());
+  });
+
   it("renders the companion queue directly in its parent", () => {
     const markup = renderToStaticMarkup(
       <HuntDashboard

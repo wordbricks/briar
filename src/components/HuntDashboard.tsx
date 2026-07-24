@@ -8,12 +8,14 @@ import {
   CircleAlert,
   Clock3,
   Code2,
+  Columns3,
   FolderGit2,
   GitCommitHorizontal,
   GitFork,
   Image as ImageIcon,
   Italic,
   Link2,
+  List,
   LoaderCircle,
   MessageCircle,
   Paperclip,
@@ -73,6 +75,7 @@ import type { MessageKey } from "../i18n/messages";
 
 type SourceFilter = "all" | HuntSource;
 type StatusFilter = CompanionStatusFilter;
+type DashboardView = "kanban" | "list";
 type KanbanColumn = {
   id: string;
   label: string;
@@ -142,6 +145,7 @@ export function HuntDashboard({
   const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [source, setSource] = useState<SourceFilter>("all");
+  const [view, setView] = useState<DashboardView>("kanban");
   const [internalStatus, setInternalStatus] = useState<StatusFilter>("all");
   const status = companionMode && companionStatus
     ? companionStatus
@@ -310,6 +314,36 @@ export function HuntDashboard({
                 </button>
               ))}
             </div>
+            {!companionMode && (
+              <div
+                aria-label={t("dashboard.viewMode")}
+                className="view-switch"
+                role="group"
+              >
+                <button
+                  aria-label={t("dashboard.kanbanView")}
+                  aria-pressed={view === "kanban"}
+                  className={view === "kanban" ? "active" : ""}
+                  onClick={() => setView("kanban")}
+                  title={t("dashboard.kanbanView")}
+                  type="button"
+                >
+                  <Columns3 size={14} />
+                  <span>{t("dashboard.kanban")}</span>
+                </button>
+                <button
+                  aria-label={t("dashboard.listView")}
+                  aria-pressed={view === "list"}
+                  className={view === "list" ? "active" : ""}
+                  onClick={() => setView("list")}
+                  title={t("dashboard.listView")}
+                  type="button"
+                >
+                  <List size={14} />
+                  <span>{t("dashboard.list")}</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
         {!companionMode && <div className="status-tabs">
@@ -318,7 +352,12 @@ export function HuntDashboard({
           <button className={status === "attention" ? "active" : ""} onClick={() => setStatus("attention")}>{t("dashboard.attention")} <span>{attentionCount}</span></button>
           <button className={status === "completed" ? "active" : ""} onClick={() => setStatus("completed")}>{t("dashboard.completed")} <span>{completedCount}</span></button>
         </div>}
-        <div aria-label={t("dashboard.kanbanBoard")} className="kanban-board">
+        {view === "list" && !companionMode ? (
+          <IssueList
+            onOpen={(runId) => setSelectedRunId(runId)}
+            runs={filtered}
+          />
+        ) : <div aria-label={t("dashboard.kanbanBoard")} className="kanban-board">
           {kanbanColumns.length === 0 ? (
             <div className="companion-no-runs">
               <Bot size={22} />
@@ -389,7 +428,7 @@ export function HuntDashboard({
               </div>
             </section>
           ))}
-        </div>
+        </div>}
       </div>
       {companionMode && (
         <CompanionBottomNavigation
@@ -744,6 +783,109 @@ function KanbanCard({
         <ChevronRight size={14} />
       </span>
     </button>
+  );
+}
+
+function IssueList({
+  onOpen,
+  runs,
+}: {
+  onOpen: (runId: string) => void;
+  runs: HuntRun[];
+}) {
+  const { t } = useI18n();
+
+  return (
+    <div
+      aria-label={t("dashboard.issueList")}
+      className="issue-list"
+      role="table"
+    >
+      <div className="issue-list-grid issue-list-header" role="row">
+        <span role="columnheader">{t("dashboard.task")}</span>
+        <span role="columnheader">{t("dashboard.status")}</span>
+        <span role="columnheader">{t("issue.priority")}</span>
+        <span role="columnheader">{t("dashboard.progress")}</span>
+        <span role="columnheader">{t("dashboard.updated")}</span>
+        <span aria-hidden="true" />
+      </div>
+      <div className="issue-list-body" role="rowgroup">
+        {runs.length === 0 ? (
+          <div className="issue-list-empty">
+            <Bot size={22} />
+            <strong>{t("dashboard.emptyTitle")}</strong>
+            <span>{t("dashboard.emptyDescription")}</span>
+          </div>
+        ) : runs.map((run) => {
+          const meta = runMeta(
+            run.status,
+            run.workflowStage,
+            run.workflow,
+          );
+          const label = localizeStatus(
+            t,
+            run.status,
+            run.workflowStage,
+            meta.label,
+          );
+          const isClaimed =
+            run.status === "queued" &&
+            Boolean(run.leaseExpiresAt) &&
+            Date.parse(run.leaseExpiresAt!) > Date.now();
+
+          return (
+            <div
+              aria-label={t("run.details", { title: run.title })}
+              className="issue-list-grid issue-list-row"
+              key={run.id}
+              onClick={() => onOpen(run.id)}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter" && event.key !== " ") return;
+                event.preventDefault();
+                onOpen(run.id);
+              }}
+              role="row"
+              tabIndex={0}
+            >
+              <span className="issue-list-task" role="cell">
+                <small>AH-{run.runNumber} · {run.sourceKey}</small>
+                <strong>{run.title}</strong>
+                {(run.detail || run.issueDescription) && (
+                  <span>{run.detail || run.issueDescription}</span>
+                )}
+              </span>
+              <span className="issue-list-status" role="cell">
+                <i className={`status-pill ${meta.tone}`}>
+                  {run.status === "running" && (
+                    <LoaderCircle className="spin" size={11} />
+                  )}
+                  {label}
+                </i>
+                <small>
+                  <i className={`source-dot ${run.source}`} />
+                  {t(`source.${run.source}` as MessageKey)}
+                </small>
+              </span>
+              <span className="issue-list-priority" role="cell">
+                {run.priority === null ? "—" : `P${run.priority}`}
+              </span>
+              <span className="issue-list-progress" role="cell">
+                <span aria-hidden="true">
+                  <i style={{ width: `${run.progress}%` }} />
+                </span>
+                <strong>{run.progress}%</strong>
+              </span>
+              <span className="issue-list-updated" role="cell">
+                {isClaimed
+                  ? t("run.assigned", { agent: run.claimedBy ?? "agent" })
+                  : relativeTime(run.updatedAt, t)}
+              </span>
+              <ChevronRight aria-hidden="true" size={15} />
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
