@@ -13,6 +13,7 @@ const request: ClaudeRunnerRequest = {
   message: "Inspect the repository",
   workspaceRoot: "/repo",
   model: "sonnet",
+  effort: "high",
   approvalPolicy: "never",
   sandboxMode: "readOnly",
   networkAccess: false,
@@ -25,6 +26,7 @@ describe("Claude runner", () => {
 
     expect(options.cwd).toBe("/repo");
     expect(options.model).toBe("sonnet");
+    expect(options.effort).toBe("high");
     expect(options.permissionMode).toBe("dontAsk");
     expect(options.tools).toEqual(["Read", "Glob", "Grep"]);
     expect(options.disallowedTools).toEqual(["WebFetch", "WebSearch"]);

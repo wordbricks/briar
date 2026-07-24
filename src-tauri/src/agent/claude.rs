@@ -11,7 +11,7 @@ use std::{
 
 use super::{
     AgentEvent, AgentEventDirection, AgentProviderEvent, AgentProviderKind, ApprovalPolicy,
-    ChatExecution, ProjectLlmRequest, ProjectLlmResponse, SandboxMode,
+    ChatExecution, ModelEffort, ProjectLlmRequest, ProjectLlmResponse, SandboxMode,
 };
 
 #[derive(Clone)]
@@ -85,6 +85,7 @@ struct ClaudeRunnerRequest<'a> {
     instructions: Option<&'a str>,
     output_schema: Option<Value>,
     model: Option<&'a str>,
+    effort: Option<ModelEffort>,
     approval_policy: ApprovalPolicy,
     sandbox_mode: SandboxMode,
     network_access: bool,
@@ -249,6 +250,7 @@ pub(crate) fn chat(
         instructions: request.instructions.as_deref(),
         output_schema: request.output_schema,
         model: execution.model.as_deref(),
+        effort: execution.effort,
         approval_policy: execution.approval_policy,
         sandbox_mode: execution.sandbox_mode,
         network_access: execution.network_access,
@@ -376,6 +378,7 @@ echo '{"type":"result","sessionId":"session-1","message":"done"}'
                 sandbox_mode: SandboxMode::WorkspaceWrite,
                 network_access: true,
                 model: Some("sonnet".to_string()),
+                effort: Some(ModelEffort::High),
                 event_sink: Some(Arc::new(move |event| {
                     captured_events
                         .lock()
@@ -399,6 +402,7 @@ echo '{"type":"result","sessionId":"session-1","message":"done"}'
         let events = events.lock().expect("events should lock");
         assert_eq!(events.len(), 2);
         assert_eq!(events[0].provider, AgentProviderKind::Claude);
+        assert_eq!(events[0].raw["effort"], "high");
         assert!(matches!(
             events[1].event,
             Some(AgentEvent::MessageCompleted { .. })

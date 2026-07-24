@@ -78,27 +78,36 @@ describe("project LLM gateway", () => {
 
   it("loads and updates the project approval policy", async () => {
     invoke
-      .mockResolvedValueOnce({ provider: "codex", model: null, approvalPolicy: "never" })
+      .mockResolvedValueOnce({
+        provider: "codex",
+        model: null,
+        effort: null,
+        approvalPolicy: "never",
+      })
       .mockResolvedValueOnce({
         provider: "claude",
         model: "sonnet",
+        effort: "high",
         approvalPolicy: "on-request",
       });
 
     await expect(loadProjectLlmSettings("project-1")).resolves.toEqual({
       provider: "codex",
       model: null,
+      effort: null,
       approvalPolicy: "never",
     });
     await expect(
       updateProjectLlmSettings("project-1", {
         provider: "claude",
         model: "sonnet",
+        effort: "high",
         approvalPolicy: "on-request",
       }),
     ).resolves.toEqual({
       provider: "claude",
       model: "sonnet",
+      effort: "high",
       approvalPolicy: "on-request",
     });
 
@@ -110,6 +119,7 @@ describe("project LLM gateway", () => {
       settings: {
         provider: "claude",
         model: "sonnet",
+        effort: "high",
         approvalPolicy: "on-request",
       },
     });
