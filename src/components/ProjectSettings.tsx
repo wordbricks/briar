@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
+  agentEfforts,
   agentModels,
   agentProviders,
   defaultAppProviderSettings,
@@ -22,6 +23,7 @@ import {
   type AgentProvider,
   type AppProviderSettings,
   type ApprovalPolicy,
+  type ModelEffort,
 } from "../lib/project-llm";
 import type { DashboardPayload, Project, ProjectSettings as ProjectSettingsData } from "../types";
 import { useI18n } from "../i18n";
@@ -67,12 +69,14 @@ export function ProjectSettings({
   const [approvalPolicy, setApprovalPolicy] = useState<ApprovalPolicy>("never");
   const [provider, setProvider] = useState<AgentProvider>("codex");
   const [model, setModel] = useState<string | null>(null);
+  const [effort, setEffort] = useState<ModelEffort | null>(null);
   const [providerAvailability, setProviderAvailability] =
     useState<AppProviderSettings>(defaultAppProviderSettings);
   const [savedApprovalPolicy, setSavedApprovalPolicy] =
     useState<ApprovalPolicy>("never");
   const [savedProvider, setSavedProvider] = useState<AgentProvider>("codex");
   const [savedModel, setSavedModel] = useState<string | null>(null);
+  const [savedEffort, setSavedEffort] = useState<ModelEffort | null>(null);
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
@@ -138,6 +142,8 @@ export function ProjectSettings({
         setSavedProvider(settings.provider);
         setModel(settings.model);
         setSavedModel(settings.model);
+        setEffort(settings.effort);
+        setSavedEffort(settings.effort);
         setProviderAvailability(availability);
         setApprovalPolicy(settings.approvalPolicy);
         setSavedApprovalPolicy(settings.approvalPolicy);
@@ -226,12 +232,15 @@ export function ProjectSettings({
       const settings = await updateProjectLlmSettings(project.id, {
         provider,
         model,
+        effort,
         approvalPolicy,
       });
       setProvider(settings.provider);
       setSavedProvider(settings.provider);
       setModel(settings.model);
       setSavedModel(settings.model);
+      setEffort(settings.effort);
+      setSavedEffort(settings.effort);
       setApprovalPolicy(settings.approvalPolicy);
       setSavedApprovalPolicy(settings.approvalPolicy);
     } catch (caught) {
@@ -278,12 +287,14 @@ export function ProjectSettings({
   );
   const linearChanged = JSON.stringify(linear) !== JSON.stringify(savedLinear);
   const providerModels = agentModels[provider];
+  const providerEfforts = agentEfforts[provider];
   const selectedModelKnown = providerModels.some(
     (option) => option.value === (model ?? ""),
   );
   const llmSettingsChanged =
     provider !== savedProvider ||
     model !== savedModel ||
+    effort !== savedEffort ||
     approvalPolicy !== savedApprovalPolicy;
 
   const saveLinear = async () => {
@@ -724,6 +735,7 @@ export function ProjectSettings({
                 onChange={(event) => {
                   setProvider(event.currentTarget.value as AgentProvider);
                   setModel(null);
+                  setEffort(null);
                 }}
                 value={provider}
               >
@@ -755,6 +767,24 @@ export function ProjectSettings({
                     {option.value
                       ? option.label
                       : t("settings.providerDefaultModel")}
+                  </option>
+                ))}
+              </select>
+              <label htmlFor="project-agent-effort">{t("settings.effort")}</label>
+              <select
+                disabled={settingsLoading || settingsSaving}
+                id="project-agent-effort"
+                onChange={(event) =>
+                  setEffort(
+                    (event.currentTarget.value as ModelEffort) || null,
+                  )
+                }
+                value={effort ?? ""}
+              >
+                <option value="">{t("settings.providerDefaultEffort")}</option>
+                {providerEfforts.map((candidate) => (
+                  <option key={candidate} value={candidate}>
+                    {candidate}
                   </option>
                 ))}
               </select>
