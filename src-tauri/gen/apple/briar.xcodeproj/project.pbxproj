@@ -11,7 +11,6 @@
 		098A2977733E973A6451350A /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 673AFED0D774FA9A84115914 /* WebKit.framework */; };
 		0EF95E32C70DAF0083CE30D6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 08D7B53CA355AE9E46DCE166 /* Assets.xcassets */; };
 		20505EDC7A9559E739B90CF2 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 846FECBD7E9A9537FD1EE0E9 /* Metal.framework */; };
-		44195CA72C39A6BD4FC65F42 /* libapp.a in Resources */ = {isa = PBXBuildFile; fileRef = FE7BD6394F03382E1E08C3A4 /* libapp.a */; };
 		69F5565FA7D936F8767251CE /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BC6DA2A77F5468C3C8744DFC /* MetalKit.framework */; };
 		893C1A93007E60E051ADD908 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9EA9710AF94B7DDEF9A5CAD2 /* CoreGraphics.framework */; };
 		9DD12D94781135338BE074B3 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FA12C26B2D981EC95CFD855E /* UIKit.framework */; };
@@ -171,7 +170,7 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
-		"TEMP_CAC11F9C-C4E5-43AE-8695-E9F0EEFD64FA" /* x86_64 */ = {
+		"TEMP_AEC05007-45DC-4B00-B5B9-79AF3EA44B78" /* x86_64 */ = {
 			isa = PBXGroup;
 			children = (
 			);
@@ -243,7 +242,6 @@
 				0EF95E32C70DAF0083CE30D6 /* Assets.xcassets in Resources */,
 				DCDFC574D011F669490E6DFF /* LaunchScreen.storyboard in Resources */,
 				B5A26F903EE25636486D65BE /* assets in Resources */,
-				44195CA72C39A6BD4FC65F42 /* libapp.a in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -296,7 +294,7 @@
 				CODE_SIGN_ENTITLEMENTS = briar_iOS/briar_iOS.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = QFJZ2V3829;
+				DEVELOPMENT_TEAM = "QFJZ2V3829";
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -448,7 +446,7 @@
 				CODE_SIGN_ENTITLEMENTS = briar_iOS/briar_iOS.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = QFJZ2V3829;
+				DEVELOPMENT_TEAM = "QFJZ2V3829";
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
 				FRAMEWORK_SEARCH_PATHS = (
