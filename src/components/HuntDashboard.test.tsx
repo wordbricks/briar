@@ -206,6 +206,16 @@ describe("HuntDashboard", () => {
     expect(container.querySelector(".dialog-backdrop")).toBeNull();
     expect(container.querySelector(".run-page")).not.toBeNull();
     expect(container.querySelector(".kanban-board")).toBeNull();
+    const heading = container.querySelector(".run-page-heading");
+    expect(heading?.querySelector(".run-page-title-row h1")?.textContent).toBe(
+      demoDashboard.runs[0].title,
+    );
+    expect(heading?.querySelector(".run-page-description")).not.toBeNull();
+    expect(heading?.textContent).toContain(`AH-${demoDashboard.runs[0].runNumber}`);
+    expect(container.querySelector(".run-page-content > h1")).toBeNull();
+    expect(container.querySelector(".run-page-content > .eyebrow")).toBeNull();
+    expect(container.querySelector(".run-page-content > .run-detail")).toBeNull();
+    expect(container.querySelector(".run-page-content > .run-issue-description")).toBeNull();
     const properties = container.querySelector(".run-properties");
     expect(properties).not.toBeNull();
     expect(properties?.textContent).toContain("속성");
