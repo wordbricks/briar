@@ -1,4 +1,4 @@
-mod codex_app_server;
+mod agent;
 
 use serde::{Deserialize, Serialize};
 use std::{
@@ -39,7 +39,7 @@ struct CliProject {
     repository_remote: Option<String>,
     agent_token: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    llm: Option<codex_app_server::ProjectLlmSettings>,
+    llm: Option<agent::ProjectLlmSettings>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     auto_hunt: Option<StoredAutoHuntConfig>,
     #[serde(flatten)]
@@ -550,7 +550,7 @@ fn inspect_velen_prerequisite_with(
 fn inspect_onboarding_prerequisites_sync(home: &Path) -> OnboardingPrerequisites {
     OnboardingPrerequisites {
         git: inspect_cli(git_binary(home)),
-        codex: inspect_cli(codex_app_server::codex_binary(home)),
+        codex: inspect_cli(agent::codex_binary(home)),
         velen: inspect_velen_prerequisite_with(velen_binary(), home),
     }
 }
@@ -1245,7 +1245,7 @@ fn write_cli_connection(
         repository_path,
         repository_remote,
         agent_token,
-        llm: Some(codex_app_server::ProjectLlmSettings::default()),
+        llm: Some(agent::ProjectLlmSettings::default()),
         auto_hunt: Some(auto_hunt.into()),
         extra: BTreeMap::new(),
     });
@@ -1344,7 +1344,7 @@ fn connected_project_workspace(config_path: &Path, project_id: &str) -> Result<P
 fn project_llm_settings_from(
     config_path: &Path,
     project_id: &str,
-) -> Result<codex_app_server::ProjectLlmSettings, String> {
+) -> Result<agent::ProjectLlmSettings, String> {
     let contents = fs::read_to_string(config_path)
         .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
     let config = serde_json::from_str::<CliConfig>(&contents)
@@ -1396,8 +1396,8 @@ fn approval_request_message(method: &str, params: &serde_json::Value) -> String 
 fn update_project_llm_settings_at(
     config_path: &Path,
     project_id: &str,
-    settings: codex_app_server::ProjectLlmSettings,
-) -> Result<codex_app_server::ProjectLlmSettings, String> {
+    settings: agent::ProjectLlmSettings,
+) -> Result<agent::ProjectLlmSettings, String> {
     let contents = fs::read_to_string(config_path)
         .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
     let mut config = serde_json::from_str::<CliConfig>(&contents)
@@ -1734,8 +1734,8 @@ async fn connected_project_ids(app: tauri::AppHandle) -> Result<Vec<String>, Str
 async fn project_llm_chat(
     app: tauri::AppHandle,
     project_id: String,
-    request: codex_app_server::ProjectLlmRequest,
-) -> Result<codex_app_server::ProjectLlmResponse, String> {
+    request: agent::ProjectLlmRequest,
+) -> Result<agent::ProjectLlmResponse, String> {
     let config_path = cli_config_path(&app)?;
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
     let approval_app = app.clone();
@@ -1749,8 +1749,8 @@ async fn project_llm_chat(
         }
         let workspace = connected_project_workspace(&config_path, &project_id)?;
         let settings = project_llm_settings_from(&config_path, &project_id)?;
-        let binary = codex_app_server::codex_binary(&home)?;
         let execution_path = cli_execution_path(&home)?;
+        let backend = agent::CodexBackend::discover(&home, &execution_path)?;
         let approve = |method: &str, params: &serde_json::Value| {
             approval_app
                 .dialog()
@@ -1762,14 +1762,13 @@ async fn project_llm_chat(
                 ))
                 .blocking_show()
         };
-        codex_app_server::chat(
-            &binary,
-            &execution_path,
+        agent::AgentBackend::run(
+            &backend,
             &project_id,
             &workspace,
-            codex_app_server::ChatExecution {
+            agent::ChatExecution {
                 approval_policy: settings.approval_policy,
-                sandbox_mode: codex_app_server::SandboxMode::ReadOnly,
+                sandbox_mode: agent::SandboxMode::ReadOnly,
                 network_access: false,
                 event_sink: None,
             },
@@ -1785,8 +1784,8 @@ async fn project_llm_chat(
 async fn start_project_auto_hunt(
     app: tauri::AppHandle,
     project_id: String,
-    request: codex_app_server::ProjectAutoHuntRequest,
-) -> Result<codex_app_server::ProjectAutoHuntResponse, String> {
+    request: agent::ProjectAutoHuntRequest,
+) -> Result<agent::ProjectAutoHuntResponse, String> {
     let api_url = request.api_url.trim();
     if api_url.is_empty()
         || api_url.chars().any(char::is_whitespace)
@@ -1801,15 +1800,15 @@ async fn start_project_auto_hunt(
     tauri::async_runtime::spawn_blocking(move || {
         let workspace = connected_project_workspace(&config_path, &project_id)?;
         let settings = project_llm_settings_from(&config_path, &project_id)?;
-        let binary = codex_app_server::codex_binary(&home)?;
         let execution_path = cli_execution_path(&home)?;
-        let cli_environment = codex_app_server::AutoHuntCliEnvironment::prepare(
+        let cli_environment = agent::AutoHuntCliEnvironment::prepare(
             &home,
             &execution_path,
             &workspace,
             &project_id,
             &request.api_url,
         )?;
+        let backend = agent::CodexBackend::discover(&home, cli_environment.execution_path())?;
         let approve = |method: &str, params: &serde_json::Value| {
             approval_app
                 .dialog()
@@ -1821,12 +1820,11 @@ async fn start_project_auto_hunt(
                 ))
                 .blocking_show()
         };
-        codex_app_server::start_auto_hunt(
-            &binary,
-            cli_environment.execution_path(),
+        agent::start_auto_hunt(
+            &backend,
             &project_id,
             &workspace,
-            codex_app_server::AutoHuntExecution {
+            agent::AutoHuntExecution {
                 approval_policy: settings.approval_policy,
                 event_sink,
             },
@@ -1863,7 +1861,7 @@ fn auto_hunt_event_path(app: &tauri::AppHandle, session_id: &str) -> Result<Path
 fn create_auto_hunt_event_sink(
     app: &tauri::AppHandle,
     session_id: &str,
-) -> Result<codex_app_server::AppServerEventSink, String> {
+) -> Result<agent::AgentEventSink, String> {
     let path = auto_hunt_event_path(app, session_id)?;
     let directory = path
         .parent()
@@ -1892,12 +1890,11 @@ fn create_auto_hunt_event_sink(
     let session_id = session_id.to_string();
     let event_app = app.clone();
 
-    Ok(Arc::new(move |direction, message| {
-        let record = codex_app_server::AppServerEventRecord::new(
+    Ok(Arc::new(move |provider_event| {
+        let record = agent::AppServerEventRecord::new(
             session_id.clone(),
             sequence.fetch_add(1, Ordering::Relaxed) + 1,
-            direction,
-            message.clone(),
+            provider_event,
         );
         let serialized = serde_json::to_vec(&record)
             .map_err(|error| format!("자동사냥 이벤트를 직렬화하지 못했습니다: {error}"))?;
@@ -1919,7 +1916,7 @@ fn create_auto_hunt_event_sink(
 async fn load_auto_hunt_app_server_events(
     app: tauri::AppHandle,
     session_id: String,
-) -> Result<Vec<codex_app_server::AppServerEventRecord>, String> {
+) -> Result<Vec<agent::AppServerEventRecord>, String> {
     let path = auto_hunt_event_path(&app, &session_id)?;
     tauri::async_runtime::spawn_blocking(move || {
         let contents = match fs::read_to_string(&path) {
@@ -1951,7 +1948,7 @@ async fn load_auto_hunt_app_server_events(
 async fn load_project_llm_settings(
     app: tauri::AppHandle,
     project_id: String,
-) -> Result<codex_app_server::ProjectLlmSettings, String> {
+) -> Result<agent::ProjectLlmSettings, String> {
     let config_path = cli_config_path(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
         project_llm_settings_from(&config_path, &project_id)
@@ -1964,8 +1961,8 @@ async fn load_project_llm_settings(
 async fn update_project_llm_settings(
     app: tauri::AppHandle,
     project_id: String,
-    settings: codex_app_server::ProjectLlmSettings,
-) -> Result<codex_app_server::ProjectLlmSettings, String> {
+    settings: agent::ProjectLlmSettings,
+) -> Result<agent::ProjectLlmSettings, String> {
     let config_path = cli_config_path(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
         update_project_llm_settings_at(&config_path, &project_id, settings)
@@ -2577,13 +2574,13 @@ mod tests {
             project_llm_settings_from(&config_path, "project-1")
                 .expect("legacy project settings should load")
                 .approval_policy,
-            codex_app_server::ApprovalPolicy::Never
+            agent::ApprovalPolicy::Never
         );
         update_project_llm_settings_at(
             &config_path,
             "project-1",
-            codex_app_server::ProjectLlmSettings {
-                approval_policy: codex_app_server::ApprovalPolicy::OnRequest,
+            agent::ProjectLlmSettings {
+                approval_policy: agent::ApprovalPolicy::OnRequest,
             },
         )
         .expect("approval policy should save");
