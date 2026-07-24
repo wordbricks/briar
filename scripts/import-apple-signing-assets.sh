@@ -1,17 +1,17 @@
 #!/bin/bash
 set -euo pipefail
 
-: "${RUNNER_TEMP:?RUNNER_TEMP is required}"
-: "${GITHUB_ENV:?GITHUB_ENV is required}"
+: "${BRIAR_RELEASE_TEMP:?BRIAR_RELEASE_TEMP is required}"
+: "${BRIAR_RELEASE_ENV_FILE:?BRIAR_RELEASE_ENV_FILE is required}"
 : "${APPLE_CERTIFICATE:?APPLE_CERTIFICATE is required}"
 : "${APPLE_CERTIFICATE_PASSWORD:?APPLE_CERTIFICATE_PASSWORD is required}"
 : "${KEYCHAIN_PASSWORD:?KEYCHAIN_PASSWORD is required}"
 : "${APPLE_API_KEY:?APPLE_API_KEY is required}"
 : "${APPLE_API_KEY_CONTENT:?APPLE_API_KEY_CONTENT is required}"
 
-keychain_path="$RUNNER_TEMP/briar-production.keychain-db"
-certificate_path="$RUNNER_TEMP/briar-production.p12"
-api_key_path="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY}.p8"
+keychain_path="$BRIAR_RELEASE_TEMP/briar-production.keychain-db"
+certificate_path="$BRIAR_RELEASE_TEMP/briar-production.p12"
+api_key_path="$BRIAR_RELEASE_TEMP/AuthKey_${APPLE_API_KEY}.p8"
 
 umask 077
 printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$certificate_path"
@@ -39,9 +39,9 @@ if [[ -z "$identity" ]]; then
 fi
 
 {
-  printf 'APPLE_SIGNING_IDENTITY=%s\n' "$identity"
-  printf 'APPLE_API_KEY_PATH=%s\n' "$api_key_path"
-  printf 'BRIAR_PRODUCTION_KEYCHAIN=%s\n' "$keychain_path"
-} >> "$GITHUB_ENV"
+  printf 'APPLE_SIGNING_IDENTITY=%q\n' "$identity"
+  printf 'APPLE_API_KEY_PATH=%q\n' "$api_key_path"
+  printf 'BRIAR_PRODUCTION_KEYCHAIN=%q\n' "$keychain_path"
+} >> "$BRIAR_RELEASE_ENV_FILE"
 
 echo "Imported one Developer ID Application identity and App Store Connect API key."

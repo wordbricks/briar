@@ -269,6 +269,15 @@ bun run ci:signoff
 ```
 
 Pass one or more context names to run or sign off only those phases, for
-example `scripts/ci-local.sh security --signoff`. The production release and
-release artifact workflows remain on GitHub Actions because they build and
-publish release deliverables rather than validate pull requests.
+example `scripts/ci-local.sh security --signoff`. Release candidates and
+Production releases also run locally:
+
+```bash
+bun run release:macos:candidate
+bun run release:macos:production
+bun run release:macos:production -- --publish
+```
+
+The Production command only mutates GitHub and R2 when `--publish` is explicit.
+See [the local Production release runbook](docs/operations/production-release.md)
+for host, credential, signed-tag, and rollback requirements.

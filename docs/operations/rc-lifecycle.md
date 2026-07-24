@@ -8,11 +8,15 @@ developer's installed app or real credentials.
 
 ## Acceptance run
 
-Build and package the candidate, then use an accepted previous artifact:
+Build, package, and self-test a same-version candidate locally:
 
 ```sh
-bun run tauri:build:release
-scripts/package-macos-release.sh
+bun run release:macos:candidate
+```
+
+For a real cross-version acceptance run, use an accepted previous artifact:
+
+```sh
 scripts/qa-macos-lifecycle.sh \
   --previous-dir /path/to/previous-artifacts \
   --candidate-dir release-artifacts \
@@ -29,7 +33,9 @@ The command rejects missing or mismatched checksums, a missing candidate
 manifest, non-forward versions, the wrong bundle identifier or architecture, a
 skill/app version mismatch, incomplete candidate signing, or any state hash
 change. On success it writes machine-readable evidence and removes only its
-validated `/tmp/briar-lifecycle.*` work area.
+validated `/tmp/briar-lifecycle.*` work area. The local candidate command also
+exercises the mechanics against the candidate twice with
+`--allow-same-version`.
 
 ## Failure and rollback
 
