@@ -159,6 +159,21 @@ export async function createOrganization(token: string, name: string) {
   });
 }
 
+export async function updateOrganization(
+  token: string,
+  organizationId: string,
+  name: string,
+) {
+  return request<{ organization: Organization }>(
+    `/organizations/${organizationId}`,
+    token,
+    {
+      method: "PUT",
+      body: JSON.stringify({ name }),
+    },
+  );
+}
+
 export async function loadOrganizationMembers(
   token: string,
   organizationId: string,

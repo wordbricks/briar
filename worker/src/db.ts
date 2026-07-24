@@ -258,6 +258,35 @@ export async function createOrganization(
   return organization;
 }
 
+export async function updateOrganization(
+  db: D1Database,
+  organizationId: string,
+  name: string,
+  role: OrganizationRole,
+) {
+  const updatedAt = new Date().toISOString();
+  const result = await db
+    .prepare(
+      `update briar_organizations
+       set name = ?, updated_at = ?
+       where id = ?`,
+    )
+    .bind(name, updatedAt, organizationId)
+    .run();
+  if (result.meta.changes === 0) return null;
+  return db
+    .prepare(
+      `select id, name, created_at
+       from briar_organizations
+       where id = ?`,
+    )
+    .bind(organizationId)
+    .first<Omit<OrganizationRow, "role">>()
+    .then((organization) =>
+      organization ? { ...organization, role } : null,
+    );
+}
+
 export async function getOrganizationRole(
   db: D1Database,
   organizationId: string,
