@@ -336,8 +336,9 @@ jelly-theme { color: var(--ink); }
 .main-content { min-width: 0; flex: 1; height: 100%; display: flex; flex-direction: column; background: radial-gradient(circle at 15% 0%, rgba(110,82,199,.06), transparent 32%), #f7f7f3; }
 .topbar { height: 58px; flex: 0 0 58px; display: flex; align-items: center; gap: 12px; padding: 0 22px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.7); }
 .topbar.sidebar-closed { padding-left: var(--window-navigation-content-inset); }
+.run-page-shell > .topbar { height:40px; flex-basis:40px; gap:10px; }
 .window-controls { display: flex; gap: 7px; }.window-controls i { width: 10px; height: 10px; border-radius: 50%; background: #dedfd9; }
-.run-page-titlebar-back { width:30px; height:30px; flex:0 0 30px; padding:0; display:grid; place-items:center; border:0; border-radius:8px; color:#777971; background:transparent; cursor:pointer; transition:color .15s ease,background-color .15s ease,transform .1s ease-out; }
+.run-page-titlebar-back { width:28px; height:28px; flex:0 0 28px; padding:0; display:grid; place-items:center; border:0; border-radius:8px; color:#777971; background:transparent; cursor:pointer; transition:color .15s ease,background-color .15s ease,transform .1s ease-out; }
 .run-page-titlebar-back:hover { color:#3f403b; background:rgba(44,45,41,.07); }
 .run-page-titlebar-back:active { transform:scale(.95); }
 .run-page-titlebar-back:focus-visible { outline:2px solid #8b70dd; outline-offset:2px; }
