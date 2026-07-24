@@ -9,6 +9,7 @@ import {
   CircleAlert,
   Clock3,
   Code2,
+  FileText,
   FolderGit2,
   GitCommitHorizontal,
   GitFork,
@@ -42,6 +43,8 @@ import {
   type DragEvent,
   type FormEvent,
 } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { JellySelect } from "./JellySelect";
 import {
   CompanionBottomNavigation,
@@ -841,36 +844,36 @@ export function RunPage({
         >
           <header>
             {companionMode ? (
-              <div className="run-page-heading">
-                <button
-                  className="run-page-back"
-                  onClick={onBack}
-                  type="button"
-                >
-                  <ArrowLeft size={16} />
-                  {t("run.back")}
-                </button>
-                <div className="run-page-overview">
-                  <div className="run-page-title-row">
-                    <small>AH-{run.runNumber}</small>
-                    <h1 id="run-page-title">{run.title}</h1>
+              <>
+                <div className="run-page-heading">
+                  <button
+                    className="run-page-back"
+                    onClick={onBack}
+                    type="button"
+                  >
+                    <ArrowLeft size={16} />
+                    {t("run.back")}
+                  </button>
+                  <div className="run-page-overview">
+                    <div className="run-page-title-row">
+                      <small>AH-{run.runNumber}</small>
+                      <h1 id="run-page-title">{run.title}</h1>
+                    </div>
                   </div>
-                  {issueContent && (
-                    <p className="run-page-description">{issueContent}</p>
-                  )}
+                  <div className="run-page-meta">
+                    <span className={`status-pill ${meta.tone}`}>{label}</span>
+                    <small>
+                      {t("run.attempt", { count: run.currentAttempt })}
+                    </small>
+                  </div>
                 </div>
-                <div className="run-page-meta">
-                  <span className={`status-pill ${meta.tone}`}>{label}</span>
-                  <small>
-                    {t("run.attempt", { count: run.currentAttempt })}
-                  </small>
+                <div className="run-page-summary">
+                  <IssueActivity run={run} />
                 </div>
-              </div>
+              </>
             ) : (
               <div className="run-page-summary">
-                {issueContent && (
-                  <p className="run-page-description">{issueContent}</p>
-                )}
+                <IssueActivity run={run} />
                 <div className="run-page-meta">
                   <span className={`status-pill ${meta.tone}`}>{label}</span>
                   <small>
@@ -883,26 +886,48 @@ export function RunPage({
           <div className="run-page-body">
             <div className="run-page-layout">
               <div className="run-page-content">
-                {(run.attachments ?? []).length > 0 && (
-                  <IssueAttachmentGallery
-                    attachments={run.attachments ?? []}
-                    onLoadAttachment={onLoadAttachment}
-                  />
-                )}
-                {needsAttention && (
-                  <div className="recovery-panel">
-                    <div><CircleAlert size={16} /><span><strong>{run.status === "failed" ? t("run.failed") : t("run.blocked")}</strong><small>{t("run.retryDescription", { count: run.currentAttempt + 1 })}</small></span></div>
-                    <div className="recovery-actions">
-                      <button disabled={isRecovering} onClick={() => void runAction(onRetry)} type="button"><RotateCcw className={isRecovering ? "spin" : ""} size={14} />{t("run.retry")}</button>
-                      {confirmCancel ? (
-                        <><button className="danger" disabled={isRecovering} onClick={() => void runAction(onCancel)} type="button">{t("run.confirmCancel")}</button><button disabled={isRecovering} onClick={() => setConfirmCancel(false)} type="button">{t("run.back")}</button></>
-                      ) : (
-                        <button className="danger-secondary" disabled={isRecovering} onClick={() => setConfirmCancel(true)} type="button">{t("run.cancel")}</button>
-                      )}
-                    </div>
+                <section
+                  aria-labelledby="issue-description-title"
+                  className="issue-description-panel"
+                >
+                  <header>
+                    <FileText aria-hidden="true" size={15} />
+                    <h2 id="issue-description-title">{t("issue.description")}</h2>
+                  </header>
+                  <div className="issue-description-scroll">
+                    {issueContent ? (
+                      <div className="issue-description-markdown">
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          skipHtml
+                        >
+                          {issueContent}
+                        </ReactMarkdown>
+                      </div>
+                    ) : (
+                      <p className="issue-description-empty">{t("run.notSet")}</p>
+                    )}
+                    {(run.attachments ?? []).length > 0 && (
+                      <IssueAttachmentGallery
+                        attachments={run.attachments ?? []}
+                        onLoadAttachment={onLoadAttachment}
+                      />
+                    )}
+                    {needsAttention && (
+                      <div className="recovery-panel">
+                        <div><CircleAlert size={16} /><span><strong>{run.status === "failed" ? t("run.failed") : t("run.blocked")}</strong><small>{t("run.retryDescription", { count: run.currentAttempt + 1 })}</small></span></div>
+                        <div className="recovery-actions">
+                          <button disabled={isRecovering} onClick={() => void runAction(onRetry)} type="button"><RotateCcw className={isRecovering ? "spin" : ""} size={14} />{t("run.retry")}</button>
+                          {confirmCancel ? (
+                            <><button className="danger" disabled={isRecovering} onClick={() => void runAction(onCancel)} type="button">{t("run.confirmCancel")}</button><button disabled={isRecovering} onClick={() => setConfirmCancel(false)} type="button">{t("run.back")}</button></>
+                          ) : (
+                            <button className="danger-secondary" disabled={isRecovering} onClick={() => setConfirmCancel(true)} type="button">{t("run.cancel")}</button>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-                <IssueActivity run={run} />
+                </section>
                 <IssueConversation
                   onLoad={onLoadIssueMessages}
                   onSend={onSendIssueMessage}
@@ -992,7 +1017,7 @@ function IssueActivity({ run }: { run: HuntRun }) {
     ? eventMeta(event.status, event.workflowStage, run.workflow)
     : null;
   return (
-    <details className="timeline issue-activity" open>
+    <details className="timeline issue-activity">
       <summary>
         <span>
           <h3>{t("run.activity")}</h3>
