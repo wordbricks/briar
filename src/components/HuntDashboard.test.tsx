@@ -220,11 +220,13 @@ describe("HuntDashboard", () => {
     expect(container.querySelector(".run-page-heading")).toBeNull();
     expect(container.querySelector(".run-page-back")).toBeNull();
     expect(container.querySelector(".run-page-title-row")).toBeNull();
-    expect(container.querySelector(".run-page-summary .run-page-description")).not.toBeNull();
+    expect(container.querySelector(".run-page-summary .run-page-description")).toBeNull();
+    expect(container.querySelector(".run-page-summary > .issue-activity")).not.toBeNull();
     expect(container.querySelector(".run-page-content > h1")).toBeNull();
     expect(container.querySelector(".run-page-content > .eyebrow")).toBeNull();
     expect(container.querySelector(".run-page-content > .run-detail")).toBeNull();
     expect(container.querySelector(".run-page-content > .run-issue-description")).toBeNull();
+    expect(container.querySelector(".run-page-content > .issue-activity")).toBeNull();
     const properties = container.querySelector(".run-properties");
     expect(properties).not.toBeNull();
     expect(properties?.textContent).toContain("속성");
@@ -238,8 +240,13 @@ describe("HuntDashboard", () => {
       "Auto Hunt 실행 증거를 실시간으로 표시합니다.",
     );
     expect(container.querySelectorAll(".issue-activity .timeline-event")).toHaveLength(1);
+    const descriptionPanel = container.querySelector(".issue-description-panel");
+    expect(descriptionPanel).not.toBeNull();
+    expect(descriptionPanel?.querySelector(".issue-description-markdown p")?.textContent)
+      .toBe(demoDashboard.runs[0].detail);
     const conversation = container.querySelector(".issue-conversation");
     expect(conversation).not.toBeNull();
+    expect(descriptionPanel?.nextElementSibling).toBe(conversation);
     expect(
       conversation?.querySelector(".issue-message-list + .issue-message-composer"),
     ).not.toBeNull();
@@ -278,6 +285,44 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("run-page-back");
     expect(markup).toContain(`AH-${demoDashboard.runs[0].runNumber}`);
     expect(markup).toContain(`<h1 id="run-page-title">${demoDashboard.runs[0].title}</h1>`);
+  });
+
+  it("renders the issue description as Markdown above the conversation", () => {
+    const markup = renderToStaticMarkup(
+      <RunPage
+        isSidebarOpen
+        error={null}
+        isRecovering={false}
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }}
+        run={{
+          ...demoDashboard.runs[0],
+          issueDescription: [
+            "# 목표",
+            "",
+            "- 상세 내용을 표시합니다.",
+            "- 대화 위에 배치합니다.",
+            "",
+            "~~일반 텍스트~~ **마크다운**",
+          ].join("\n"),
+        }}
+      />,
+    );
+
+    expect(markup).toContain('<div class="issue-description-markdown">');
+    expect(markup).toContain("<h1>목표</h1>");
+    expect(markup).toContain("<li>상세 내용을 표시합니다.</li>");
+    expect(markup).toContain("<del>일반 텍스트</del>");
+    expect(markup.indexOf("issue-description-panel")).toBeLessThan(
+      markup.indexOf("issue-conversation"),
+    );
   });
 
   it("opens a message thread in the right drawer and closes it with Escape", async () => {
