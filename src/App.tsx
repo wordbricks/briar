@@ -37,6 +37,10 @@ import {
   isMacDesktopTauri,
 } from "./lib/platform";
 import { automaticTriggersFor } from "./lib/auto-hunt-automation";
+import {
+  issueAgentConversation,
+  mentionsBriar,
+} from "./lib/issue-agent-reply";
 
 type ActivePage =
   | "issues"
@@ -105,6 +109,20 @@ export function App() {
     !briar.loading &&
     !briar.user &&
     !hasCompletedOnboarding;
+  const sendIssueMessage = (
+    runId: string,
+    input: { body: string; parentMessageId: string | null },
+  ) => {
+    const agentConversation =
+      briar.activeProjectId && mentionsBriar(input.body)
+        ? issueAgentConversation(
+            autoHunt.sessions,
+            briar.activeProjectId,
+            runId,
+          )
+        : null;
+    return briar.addIssueMessage(runId, input, agentConversation);
+  };
 
   useEffect(() => {
     const dashboard = briar.dashboard;
@@ -479,7 +497,7 @@ export function App() {
             onCancelRun={briar.cancelRun}
             onRepair={() => void briar.repairHealth()}
             onRequestedRunOpen={() => setRequestedRunId(null)}
-            onSendIssueMessage={briar.addIssueMessage}
+            onSendIssueMessage={sendIssueMessage}
           />
         )}
       </jelly-theme>
@@ -604,7 +622,7 @@ export function App() {
             onRetryRun={briar.retryRun}
             onCancelRun={briar.cancelRun}
             onRepair={() => {}}
-            onSendIssueMessage={briar.addIssueMessage}
+            onSendIssueMessage={sendIssueMessage}
           />
         )}
       </jelly-theme>

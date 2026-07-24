@@ -66,6 +66,7 @@ import type {
   HuntSource,
   IssueAttachment,
   IssueMessage,
+  IssueMessageSendResult,
 } from "../types";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
@@ -135,7 +136,7 @@ export function HuntDashboard({
   onSendIssueMessage: (
     runId: string,
     input: { body: string; parentMessageId: string | null },
-  ) => Promise<IssueMessage>;
+  ) => Promise<IssueMessageSendResult>;
   requestedRunId?: string | null;
 }) {
   const { t } = useI18n();
@@ -773,7 +774,7 @@ export function RunPage({
   onSendIssueMessage: (input: {
     body: string;
     parentMessageId: string | null;
-  }) => Promise<IssueMessage>;
+  }) => Promise<IssueMessageSendResult>;
   run: HuntRun;
 }) {
   const { localeTag, t } = useI18n();
@@ -1058,7 +1059,7 @@ function IssueConversation({
   onSend: (input: {
     body: string;
     parentMessageId: string | null;
-  }) => Promise<IssueMessage>;
+  }) => Promise<IssueMessageSendResult>;
   run: HuntRun;
 }) {
   const { localeTag, t } = useI18n();
@@ -1066,6 +1067,8 @@ function IssueConversation({
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [agentReplyError, setAgentReplyError] = useState<string | null>(null);
+  const [agentReplying, setAgentReplying] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const threadTriggerRef = useRef<HTMLButtonElement | null>(null);
 
@@ -1117,15 +1120,29 @@ function IssueConversation({
     body: string,
     parentMessageId: string | null,
   ) => {
-    const message = await onSend({ body, parentMessageId });
-    setMessages((current) => [
-      ...current.map((candidate) =>
-        candidate.id === parentMessageId
-          ? { ...candidate, replyCount: candidate.replyCount + 1 }
-          : candidate,
-      ),
-      message,
-    ]);
+    const appendMessage = (message: IssueMessage) =>
+      setMessages((current) => [
+        ...current.map((candidate) =>
+          candidate.id === message.parentMessageId
+            ? { ...candidate, replyCount: candidate.replyCount + 1 }
+            : candidate,
+        ),
+        message,
+      ]);
+    setAgentReplyError(null);
+    const result = await onSend({ body, parentMessageId });
+    appendMessage(result.message);
+    if (!result.agentReply) return;
+    setAgentReplying(true);
+    try {
+      appendMessage(await result.agentReply);
+    } catch (caught) {
+      setAgentReplyError(
+        caught instanceof Error ? caught.message : String(caught),
+      );
+    } finally {
+      setAgentReplying(false);
+    }
   };
 
   return (
@@ -1163,6 +1180,18 @@ function IssueConversation({
               onOpenThread={openThread}
             />
           ))
+        )}
+        {agentReplying && (
+          <div className="issue-agent-reply-state">
+            <LoaderCircle className="spin" size={14} />
+            {t("run.briarReplying")}
+          </div>
+        )}
+        {agentReplyError && (
+          <div className="issue-agent-reply-state error">
+            <CircleAlert size={14} />
+            {t("run.briarReplyFailed", { error: agentReplyError })}
+          </div>
         )}
       </div>
       <MessageComposer
@@ -1271,6 +1300,16 @@ function IssueMessageItem({
 }
 
 function MessageAvatar({ message }: { message: IssueMessage }) {
+  if (message.author.provider) {
+    return (
+      <span
+        aria-label={message.author.name}
+        className="issue-message-avatar agent"
+      >
+        <Bot size={17} />
+      </span>
+    );
+  }
   if (message.author.image) {
     return (
       <img
@@ -1395,7 +1434,7 @@ function MessageComposer({
           </button>
           <button
             aria-label={t("run.mention")}
-            onClick={() => wrapSelection("@", "")}
+            onClick={() => wrapSelection("@briar ", "")}
             type="button"
           >
             <AtSign size={16} />

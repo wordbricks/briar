@@ -1919,15 +1919,25 @@ async fn project_llm_chat(
         }
         let workspace = connected_project_workspace(&config_path, &project_id)?;
         let settings = project_llm_settings_from(&config_path, &project_id)?;
-        if !app_provider_settings_from(&config_path)?.is_enabled(settings.provider) {
+        let provider = request
+            .conversation_id
+            .as_deref()
+            .and_then(|conversation_id| {
+                agent::AgentProviderKind::for_conversation_id(&project_id, conversation_id)
+            })
+            .unwrap_or(settings.provider);
+        if !app_provider_settings_from(&config_path)?.is_enabled(provider) {
             return Err(
-                "선택한 에이전트 프로바이더가 앱 설정에서 비활성화되어 있습니다.".to_string(),
+                "이 대화의 에이전트 프로바이더가 앱 설정에서 비활성화되어 있습니다.".to_string(),
             );
         }
         let execution_path = cli_execution_path(&home)?;
-        let backend =
-            agent::discover_backend(settings.provider, &home, &execution_path, &claude_runner)?;
-        let provider = settings.provider;
+        let backend = agent::discover_backend(provider, &home, &execution_path, &claude_runner)?;
+        let model = if provider == settings.provider {
+            settings.model
+        } else {
+            None
+        };
         let approve = |method: &str, params: &serde_json::Value| {
             let provider_name = match provider {
                 agent::AgentProviderKind::Codex => "Codex",
@@ -1951,7 +1961,7 @@ async fn project_llm_chat(
                 approval_policy: settings.approval_policy,
                 sandbox_mode: agent::SandboxMode::ReadOnly,
                 network_access: false,
-                model: settings.model,
+                model,
                 event_sink: None,
             },
             request,

@@ -7,6 +7,7 @@ import {
   type AutoHuntWorkflowStageId,
 } from "./lib/auto-hunt-contract";
 import type { AutoHuntAutomation } from "./lib/auto-hunt-automation";
+import type { AgentProvider } from "./lib/project-llm";
 
 export const huntStatuses = autoHuntRunStatuses;
 export type HuntStatus = AutoHuntRunStatus;
@@ -54,6 +55,7 @@ export type IssueMessageAuthor = {
   id: string | null;
   name: string;
   image: string | null;
+  provider: AgentProvider | null;
 };
 
 export type IssueMessage = {
@@ -65,6 +67,11 @@ export type IssueMessage = {
   replyCount: number;
   createdAt: string;
   updatedAt: string;
+};
+
+export type IssueMessageSendResult = {
+  message: IssueMessage;
+  agentReply: Promise<IssueMessage> | null;
 };
 
 export type HuntRun = {

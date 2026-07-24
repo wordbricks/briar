@@ -467,6 +467,7 @@ jelly-theme { color: var(--ink); }
 .issue-message { min-width:0; padding:11px 10px; display:grid; grid-template-columns:34px minmax(0,1fr); align-items:start; gap:10px; border-radius:10px; transition:background-color .12s ease-out; }
 .issue-message:hover { background:#fafaf7; }
 .issue-message-avatar { width:34px; height:34px; overflow:hidden; display:grid; place-items:center; border:1px solid rgba(83,72,118,.1); border-radius:9px; color:#fff; background:linear-gradient(145deg,#8068ce,#5943a4); object-fit:cover; font-size:12px; font-weight:760; }
+.issue-message-avatar.agent { color:#5f4aab; border-color:#dcd4f3; background:#f1edfc; }
 .issue-message > div { min-width:0; }
 .issue-message > div > header { min-height:19px; display:flex; align-items:baseline; gap:7px; }
 .issue-message > div > header strong { overflow:hidden; color:#33342f; font-size:10.5px; text-overflow:ellipsis; white-space:nowrap; }
@@ -480,6 +481,8 @@ jelly-theme { color: var(--ink); }
 .issue-message-state,.issue-message-empty { min-height:86px; margin:0; display:flex; align-items:center; justify-content:center; gap:7px; border:1px dashed #dedfd9; border-radius:11px; color:#92948d; background:#fafaf7; font-size:9px; text-align:center; }
 button.issue-message-state { width:100%; cursor:pointer; }
 .issue-message-state.error { color:#a54253; border-color:#efc7ce; background:#fff6f7; }
+.issue-agent-reply-state { margin:4px 10px; padding:9px 11px; display:flex; align-items:center; gap:7px; border-radius:9px; color:#6a57ad; background:#f5f2fc; font-size:9px; }
+.issue-agent-reply-state.error { color:#a54253; background:#fff1f3; }
 .issue-message-composer { position:relative; flex:0 0 auto; overflow:hidden; display:grid; border:1px solid #d7d8d2; border-radius:13px; background:#fff; box-shadow:0 4px 16px rgba(43,42,37,.04); transition:border-color .14s ease-out,box-shadow .14s ease-out; }
 .issue-message-composer:focus-within { border-color:#9b88d7; box-shadow:0 0 0 3px rgba(128,104,206,.10),0 6px 20px rgba(43,42,37,.05); }
 .issue-composer-formatting { min-height:34px; padding:4px 8px; display:flex; align-items:center; gap:2px; border-bottom:1px solid #eeeeea; background:#fafaf8; }
