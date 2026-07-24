@@ -430,7 +430,12 @@ export function App() {
             onUpdateAutomation={(automation) =>
               briar.saveAutoHuntAutomation(activeProject.id, automation)
             }
+            onUpdateLinear={(linear) =>
+              briar.saveLinearIntegration(activeProject.id, linear)
+            }
+            onRefreshVelen={briar.refreshVelen}
             project={activeProject}
+            velen={briar.velen}
           />
         ) : activePage === "auto-hunt" && activeProject ? (
           <AutoHuntSessions
