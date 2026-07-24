@@ -791,6 +791,7 @@ export function RunPage({
     { label: t("status.cancelled"), value: "status:cancelled" },
   ];
   const placementValue = placementIdForRun(run);
+  const issueContent = run.issueDescription || run.detail;
   const runAction = async (action: () => Promise<unknown>) => {
     try {
       await action();
@@ -824,10 +825,19 @@ export function RunPage({
                 <ArrowLeft size={16} />
                 {t("run.back")}
               </button>
-              <div>
+              <div className="run-page-overview">
+                <div className="run-page-title-row">
+                  <small>AH-{run.runNumber}</small>
+                  <h1 id="run-page-title">{run.title}</h1>
+                </div>
+                {issueContent && (
+                  <p className="run-page-description">{issueContent}</p>
+                )}
+              </div>
+              <div className="run-page-meta">
                 <span className={`status-pill ${meta.tone}`}>{label}</span>
                 <small>
-                  AH-{run.runNumber} · {t("run.attempt", { count: run.currentAttempt })}
+                  {t("run.attempt", { count: run.currentAttempt })}
                 </small>
               </div>
             </div>
@@ -835,10 +845,6 @@ export function RunPage({
           <div className="run-page-body">
             <div className="run-page-layout">
               <div className="run-page-content">
-                <p className="eyebrow">{t(`source.${run.source}` as MessageKey).toUpperCase()} · {run.repository}</p>
-                <h1 id="run-page-title">{run.title}</h1>
-                {run.detail && <p className="run-detail">{run.detail}</p>}
-                {run.issueDescription && <p className="run-issue-description">{run.issueDescription}</p>}
                 {(run.attachments ?? []).length > 0 && (
                   <IssueAttachmentGallery
                     attachments={run.attachments ?? []}
@@ -864,9 +870,6 @@ export function RunPage({
                   onSend={onSendIssueMessage}
                   run={run}
                 />
-                <footer className="run-page-footer">
-                  <span>{needsAttention ? t("run.preserveEvidence") : t("run.liveEvidence")}</span>
-                </footer>
               </div>
               <aside aria-label={t("run.properties")} className="run-properties">
                 <section>

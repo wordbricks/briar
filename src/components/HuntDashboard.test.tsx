@@ -206,6 +206,16 @@ describe("HuntDashboard", () => {
     expect(container.querySelector(".dialog-backdrop")).toBeNull();
     expect(container.querySelector(".run-page")).not.toBeNull();
     expect(container.querySelector(".kanban-board")).toBeNull();
+    const heading = container.querySelector(".run-page-heading");
+    expect(heading?.querySelector(".run-page-title-row h1")?.textContent).toBe(
+      demoDashboard.runs[0].title,
+    );
+    expect(heading?.querySelector(".run-page-description")).not.toBeNull();
+    expect(heading?.textContent).toContain(`AH-${demoDashboard.runs[0].runNumber}`);
+    expect(container.querySelector(".run-page-content > h1")).toBeNull();
+    expect(container.querySelector(".run-page-content > .eyebrow")).toBeNull();
+    expect(container.querySelector(".run-page-content > .run-detail")).toBeNull();
+    expect(container.querySelector(".run-page-content > .run-issue-description")).toBeNull();
     const properties = container.querySelector(".run-properties");
     expect(properties).not.toBeNull();
     expect(properties?.textContent).toContain("속성");
@@ -215,8 +225,16 @@ describe("HuntDashboard", () => {
     expect(properties?.textContent).not.toContain("전체 진행률");
     expect(properties?.querySelector(".run-property.progress")).toBeNull();
     expect(container.textContent).not.toContain("로컬 저장소 열기");
+    expect(container.textContent).not.toContain(
+      "Auto Hunt 실행 증거를 실시간으로 표시합니다.",
+    );
     expect(container.querySelectorAll(".issue-activity .timeline-event")).toHaveLength(1);
-    expect(container.querySelector(".issue-message-composer")).not.toBeNull();
+    const conversation = container.querySelector(".issue-conversation");
+    expect(conversation).not.toBeNull();
+    expect(
+      conversation?.querySelector(".issue-message-list + .issue-message-composer"),
+    ).not.toBeNull();
+    expect(container.querySelector(".run-page-composer-dock")).toBeNull();
 
     await act(async () => {
       container.querySelector<HTMLButtonElement>(".run-page-back")?.click();
