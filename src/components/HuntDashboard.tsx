@@ -89,6 +89,7 @@ type KanbanColumn = {
 
 export function HuntDashboard({
   companionMode = false,
+  companionSearchMode = false,
   companionStatus,
   companionUnreadInboxCount = 0,
   dashboard,
@@ -111,6 +112,7 @@ export function HuntDashboard({
   onRetryRun,
   onCancelRun,
   onCompanionInboxOpen,
+  onCompanionSearchOpen,
   onCompanionStatusChange,
   onRepair,
   onRequestedRunOpen,
@@ -118,6 +120,7 @@ export function HuntDashboard({
   requestedRunId = null,
 }: {
   companionMode?: boolean;
+  companionSearchMode?: boolean;
   companionStatus?: CompanionStatusFilter;
   companionUnreadInboxCount?: number;
   dashboard: DashboardPayload | null;
@@ -140,6 +143,7 @@ export function HuntDashboard({
   onRetryRun: (runId: string) => Promise<unknown>;
   onCancelRun: (runId: string) => Promise<unknown>;
   onCompanionInboxOpen?: () => void;
+  onCompanionSearchOpen?: () => void;
   onCompanionStatusChange?: (status: CompanionStatusFilter) => void;
   onRepair: () => void;
   onRequestedRunOpen?: () => void;
@@ -173,7 +177,10 @@ export function HuntDashboard({
     ["completed", "cancelled"].includes(run.status)
   ).length;
   const filtered = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
+    const normalized =
+      !companionMode || companionSearchMode
+        ? query.trim().toLowerCase()
+        : "";
     return runs.filter((run) => {
       if (source !== "all" && run.source !== source) return false;
       if (status === "active" && ["completed", "cancelled"].includes(run.status)) return false;
@@ -184,7 +191,7 @@ export function HuntDashboard({
       ) return false;
       return !normalized || `${run.title} ${run.sourceKey} ${run.repository}`.toLowerCase().includes(normalized);
     });
-  }, [query, runs, source, status]);
+  }, [companionMode, companionSearchMode, query, runs, source, status]);
 
   useEffect(() => {
     if (!requestedRunId) return;
@@ -311,7 +318,11 @@ export function HuntDashboard({
 
         <div className="queue-header">
           <div>
-            <h2>{t("dashboard.queue")}</h2>
+            <h2>
+              {companionMode && companionSearchMode
+                ? t("companion.navSearch")
+                : t("dashboard.queue")}
+            </h2>
             <span>{t("dashboard.taskCount", { count: filtered.length })}</span>
           </div>
           <div className="queue-tools">
@@ -325,7 +336,17 @@ export function HuntDashboard({
                 <Plus size={14} />{t("dashboard.createIssue")}
               </button>
             )}
-            <label className="search-box"><Search size={15} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("dashboard.search")} /></label>
+            {(!companionMode || companionSearchMode) && (
+              <label className="search-box">
+                <Search size={15} />
+                <input
+                  autoFocus={companionSearchMode}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={t("dashboard.search")}
+                />
+              </label>
+            )}
             <div className="source-filter">
               {(["all", "issue", "feedback", "error"] as const).map((value) => (
                 <button key={value} className={source === value ? "active" : ""} onClick={() => setSource(value)}>
@@ -451,9 +472,10 @@ export function HuntDashboard({
       </div>
       {companionMode && (
         <CompanionBottomNavigation
-          activeDestination={status}
+          activeDestination={companionSearchMode ? "search" : status}
           onCreate={() => setIsIssueDialogOpen(true)}
           onInboxOpen={() => onCompanionInboxOpen?.()}
+          onSearchOpen={() => onCompanionSearchOpen?.()}
           onStatusChange={setStatus}
           unreadInboxCount={companionUnreadInboxCount}
         />
