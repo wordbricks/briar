@@ -53,7 +53,9 @@ describe("UpdateControl", () => {
     });
 
     const button = container.querySelector("button");
-    expect(container.textContent).toContain("v1.0.1 업데이트 사용 가능");
+    // Idle "update available" state: install button only, no prompt text.
+    expect(container.textContent).not.toContain("업데이트 사용 가능");
+    expect(container.querySelector(".sidebar-update-feedback")).toBeNull();
     expect(button?.className).toBe("sidebar-update-trigger");
     expect(button?.getAttribute("aria-label")).toContain("v1.0.1");
 
@@ -97,8 +99,10 @@ describe("UpdateControl", () => {
     });
 
     expect(check).toHaveBeenCalledTimes(3);
-    expect(container.textContent).toContain("v1.2.0 업데이트 사용 가능");
+    expect(container.textContent).not.toContain("업데이트 사용 가능");
+    expect(container.querySelector(".sidebar-update-feedback")).toBeNull();
     expect(container.querySelector("button")).not.toBeNull();
+    expect(container.querySelector("button")?.getAttribute("aria-label")).toContain("v1.2.0");
     await act(async () => root.unmount());
   });
 
