@@ -129,10 +129,72 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         '${atMinute(0)}', '${atMinute(0)}'
       );
     `);
+    const migrationRunId = await recordHuntEvent(
+      db,
+      projectId,
+      event("cancelled", 1, {
+        sourceKey: "pre-backlog-migration",
+        eventKey: "pre-backlog-migration:cancelled",
+        title: "Pre-backlog migration sentinel",
+      }),
+    );
+    await createIssueAttachments(db, projectId, migrationRunId, [{
+      id: "11111111-2222-4333-8444-555555555555",
+      object_key: "issue-attachments/pre-backlog-migration/sentinel",
+      filename: "sentinel.png",
+      content_type: "image/png",
+      byte_size: 8,
+    }]);
+    await createIssueMessage(db, {
+      id: "66666666-7777-4888-8999-000000000000",
+      projectId,
+      runId: migrationRunId,
+      parentMessageId: null,
+      authorUserId: "owner",
+      authorAgentProvider: null,
+      body: "Preserve this message through the backlog migration.",
+      createdAt: atMinute(1),
+    });
+    await executeSql(
+      db,
+      await readFile(resolve("migrations/0015_backlog_status.sql"), "utf8"),
+    );
   });
 
   afterAll(async () => {
     await miniflare.dispose();
+  });
+
+  it("preserves existing run data and child foreign keys in the backlog migration", async () => {
+    const run = await db
+      .prepare(
+        `select id, stage, status from briar_hunt_runs
+         where source_key = 'pre-backlog-migration'`,
+      )
+      .first<{ id: string; stage: string; status: string }>();
+
+    expect(run).toMatchObject({ stage: "cancelled", status: "cancelled" });
+    expect(
+      await db
+        .prepare("select count(*) as count from briar_hunt_events where run_id = ?")
+        .bind(run!.id)
+        .first<number>("count"),
+    ).toBe(1);
+    expect(
+      await db
+        .prepare("select count(*) as count from briar_issue_attachments where run_id = ?")
+        .bind(run!.id)
+        .first<number>("count"),
+    ).toBe(1);
+    expect(
+      await db
+        .prepare("select count(*) as count from briar_issue_messages where run_id = ?")
+        .bind(run!.id)
+        .first<number>("count"),
+    ).toBe(1);
+    expect(
+      await db.prepare("pragma foreign_key_check").all(),
+    ).toMatchObject({ results: [] });
   });
 
   it("stores automation settings and preserves them for older settings clients", async () => {
@@ -548,6 +610,19 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
   });
 
   it("returns the highest-priority oldest queued run", async () => {
+    await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 20, {
+        sourceKey: "backlog-issue",
+        eventKey: "backlog-issue:backlog:intake",
+        title: "Backlog issue",
+        status: "backlog",
+        priority: 1,
+        branch: null,
+        commitSha: null,
+      }),
+    );
     const urgentId = await recordHuntEvent(
       db,
       projectId,
@@ -567,6 +642,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     expect(next?.id).toBe(urgentId);
     expect(next?.title).toBe("Urgent queued issue");
     expect(next?.stage).toBe("queued");
+    expect(next?.source_key).not.toBe("backlog-issue");
   });
 
   it("claims queued runs atomically and safely reassigns expired leases", async () => {

@@ -1103,6 +1103,7 @@ const legacyStageFor = (
   status: AutoHuntRunStatus,
   workflowStage: AutoHuntWorkflowStageId | null,
 ): AutoHuntStage => {
+  if (status === "backlog") return "queued";
   if (status !== "running") return status;
   return workflowStage &&
     ["analyzing", "implementing", "pr_open", "staging_qa", "production_qa"].includes(
@@ -1609,7 +1610,7 @@ export async function moveHuntRun(
   }
 
   const targetWorkflowStage =
-    input.status === "queued"
+    input.status === "backlog" || input.status === "queued"
       ? null
       : input.status === "running"
         ? input.workflowStage
@@ -1646,6 +1647,7 @@ export async function moveHuntRun(
     input.status === "running"
       ? workflow.stages.find((stage) => stage.id === targetWorkflowStage)?.label
       : {
+          backlog: "백로그",
           queued: "대기",
           blocked: "차단",
           failed: "실패",

@@ -16,6 +16,7 @@ const statusMeta: Record<
   AutoHuntRunStatus,
   { label: string; tone: string }
 > = {
+  backlog: { label: "백로그", tone: "slate" },
   queued: { label: "대기", tone: "slate" },
   running: { label: "진행 중", tone: "violet" },
   blocked: { label: "차단", tone: "rose" },

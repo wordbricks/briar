@@ -204,7 +204,7 @@ export async function assertWorkerHasNoRunInFlight(
     .prepare(
       `select id from briar_hunt_runs
        where project_id = ? and worker_id = ?
-         and status not in ('completed', 'cancelled', 'blocked', 'failed')
+         and status not in ('backlog', 'completed', 'cancelled', 'blocked', 'failed')
        limit 1`,
     )
     .bind(projectId, workerId)
@@ -284,7 +284,9 @@ export async function reapStalledHuntRuns(
     .prepare(
       `select id, worker_id, claim_attempts from briar_hunt_runs
        where project_id = ?
-         and status not in ('queued', 'completed', 'cancelled', 'blocked', 'failed')
+         and status not in (
+           'backlog', 'queued', 'completed', 'cancelled', 'blocked', 'failed'
+         )
          and claim_token_hash is not null
          and lease_expires_at is not null
          and lease_expires_at <= ?
@@ -345,7 +347,9 @@ export async function countLeasedRuns(
          and claim_token_hash is not null
          and lease_expires_at is not null
          and lease_expires_at > ?
-         and status not in ('completed', 'cancelled', 'blocked', 'failed')`,
+         and status not in (
+           'backlog', 'completed', 'cancelled', 'blocked', 'failed'
+         )`,
     )
     .bind(projectId, observedAt)
     .first<{ leased: number }>();

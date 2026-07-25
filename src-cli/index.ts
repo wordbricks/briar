@@ -1245,7 +1245,7 @@ const usage = `Briar CLI
     [--enable-worktrees|--disable-worktrees] [--worktree-root <dir>]
     [--branch-prefix <prefix>]
   briar auto-hunt record --source-key <key> --title <title>
-    --status <queued|running|blocked|failed|completed|cancelled>
+    --status <backlog|queued|running|blocked|failed|completed|cancelled>
     [--workflow-stage <configured-stage>]
     --event-key <retry-stable-key> [Wordbricks-compatible progress flags]
   briar auto-hunt qa-result --run-id <uuid> --environment <staging|production>

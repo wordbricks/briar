@@ -70,4 +70,29 @@ describe("Auto Hunt automation", () => {
       2,
     ).map((run) => run.id)).toEqual(["run-2", "run-3"]);
   });
+
+  it("never treats backlog work as an Auto Hunt candidate or trigger", () => {
+    const automation = normalizeAutoHuntAutomation({
+      ...defaultAutoHuntAutomation,
+      enabled: true,
+      schedule: { enabled: true, intervalHours: 1 },
+      queueThreshold: { enabled: true, minimumIssues: 1 },
+      urgentIssue: { enabled: true },
+    });
+    const backlog = {
+      ...queued(0, 1),
+      id: "run-backlog",
+      status: "backlog",
+    };
+
+    expect(selectAutoHuntCandidates([backlog], 3)).toEqual([]);
+    expect(
+      automaticTriggersFor(
+        automation,
+        [backlog],
+        Date.parse("2026-07-24T12:00:00.000Z"),
+        null,
+      ),
+    ).toEqual([]);
+  });
 });

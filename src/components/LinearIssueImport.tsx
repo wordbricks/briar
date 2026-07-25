@@ -85,6 +85,7 @@ export function LinearIssueImport({
   const placementOptions = useMemo(() => {
     const stages = workflow?.stages ?? [];
     return [
+      { label: t("status.backlog"), value: "status:backlog" },
       { label: t("status.queued"), value: "status:queued" },
       ...stages.map((stage) => ({
         label: localizeStageLabel(t, stage.id, stage.label),

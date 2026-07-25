@@ -213,6 +213,12 @@ export function HuntDashboard({
     const workflowStages = workflow?.stages ?? [];
     const definitions = [
       {
+        id: "status:backlog",
+        label: t("status.backlog"),
+        tone: "slate",
+        placement: { status: "backlog" as const, workflowStage: null },
+      },
+      {
         id: "status:queued",
         label: t("status.queued"),
         tone: "slate",
@@ -916,6 +922,7 @@ export function RunPage({
   const activeResizePointerRef = useRef<number | null>(null);
   const resizeGrabOffsetRef = useRef(0);
   const placementOptions = [
+    { label: t("status.backlog"), value: "status:backlog" },
     { label: t("status.queued"), value: "status:queued" },
     ...run.workflow.stages.map((stage) => ({
       label: localizeWorkflowStage(t, stage.id, stage.label),
@@ -2012,7 +2019,14 @@ function placementForId(value: string): HuntRunPlacement | null {
   if (!value.startsWith("status:")) return null;
   const status = value.slice("status:".length);
   if (
-    !["queued", "blocked", "failed", "completed", "cancelled"].includes(status)
+    ![
+      "backlog",
+      "queued",
+      "blocked",
+      "failed",
+      "completed",
+      "cancelled",
+    ].includes(status)
   ) return null;
   return {
     status: status as Exclude<HuntRun["status"], "running">,
