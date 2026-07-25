@@ -549,16 +549,16 @@ describe("HuntDashboard", () => {
       );
     });
 
-    const trigger = container.querySelector<HTMLButtonElement>(
-      ".issue-thread-trigger",
+    const threadSummary = container.querySelector<HTMLButtonElement>(
+      ".issue-thread-summary",
     );
-    expect(trigger?.getAttribute("title")).toBe("스레드에서 답장하기");
-    expect(trigger?.getAttribute("aria-label")).toBe("스레드에서 답장하기");
+    expect(threadSummary?.getAttribute("title")).toBe("스레드에서 답장하기");
+    expect(threadSummary?.textContent).toContain("답장 1개");
+    expect(threadSummary?.textContent).toContain("스레드 보기");
     expect(
-      container.querySelector(".issue-message-actions")?.getAttribute("role"),
-    ).toBe("toolbar");
-    expect(container.querySelector(".issue-thread-summary")?.textContent)
-      .toContain("답장 1개");
+      threadSummary?.querySelector('.issue-thread-participant[title="Jay"]'),
+    ).not.toBeNull();
+    expect(container.querySelector(".issue-message-actions")).toBeNull();
     const threadContent = container.querySelector<HTMLElement>(
       ".issue-thread-content",
     );
@@ -569,7 +569,7 @@ describe("HuntDashboard", () => {
       value: 480,
     });
     threadContent.scrollTop = 0;
-    await act(async () => trigger?.click());
+    await act(async () => threadSummary?.click());
     expect(container.querySelector('[role="dialog"]')).not.toBeNull();
     expect(container.querySelector(".issue-thread-content")?.textContent).toContain(
       "스레드 답장",
@@ -604,7 +604,7 @@ describe("HuntDashboard", () => {
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     });
     expect(container.querySelector('[role="dialog"]')).toBeNull();
-    expect(document.activeElement).toBe(trigger);
+    expect(document.activeElement).toBe(threadSummary);
     await act(async () => root.unmount());
     container.remove();
   });
@@ -721,6 +721,12 @@ describe("HuntDashboard", () => {
       ".issue-thread-summary",
     );
     expect(threadSummary?.textContent).toContain("답장 1개");
+    expect(threadSummary?.textContent).toContain("스레드 보기");
+    expect(
+      threadSummary?.querySelector(
+        '.issue-thread-participant.agent[title="Briar · Codex"]',
+      ),
+    ).not.toBeNull();
     await act(async () => threadSummary?.click());
     expect(container.querySelector(".issue-thread-content")?.textContent)
       .toContain(agentMessage.body);

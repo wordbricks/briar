@@ -577,10 +577,18 @@ jelly-theme { color: var(--ink); }
 .issue-thread-trigger:hover { color:#5f4aab; background:#f0ecfb; }
 .issue-thread-trigger:active { transform:scale(.94); }
 .issue-thread-trigger:focus-visible { outline:2px solid #8b70dd; outline-offset:1px; }
-.issue-thread-summary { min-height:23px; margin:2px 0 -2px; padding:0 6px; display:inline-flex; align-items:center; gap:5px; border:0; border-radius:6px; color:#7865bb; background:transparent; cursor:pointer; font-size:8.5px; font-weight:650; transition:background-color .12s ease-out,transform .1s ease-out; }
-.issue-thread-summary:hover { background:#f0ecfb; }
+.issue-thread-summary { width:100%; min-height:38px; margin:7px 0 1px; padding:5px 9px; display:flex; align-items:center; gap:8px; border:1px solid #e1e2dc; border-radius:9px; color:#777971; background:#fff; cursor:pointer; font-size:8.5px; text-align:left; box-shadow:0 1px 3px rgba(43,42,37,.03); transition:border-color .12s ease-out,background-color .12s ease-out,box-shadow .12s ease-out,transform .1s ease-out; }
+.issue-thread-summary:hover { border-color:#cfc7e8; background:#faf8ff; box-shadow:0 3px 10px rgba(69,55,112,.07); }
 .issue-thread-summary:active { transform:scale(.97); }
 .issue-thread-summary:focus-visible { outline:2px solid #8b70dd; outline-offset:1px; }
+.issue-thread-summary > strong { color:#6650b2; font-size:9px; }
+.issue-thread-summary > span:not(.issue-thread-participants) { color:#7f817a; font-weight:500; }
+.issue-thread-summary > svg:last-child { margin-left:auto; color:#90928b; }
+.issue-thread-participants { min-width:25px; display:flex; align-items:center; padding-left:1px; }
+.issue-thread-participant { width:25px; height:25px; margin-left:-5px; overflow:hidden; display:grid; place-items:center; border:2px solid #fff; border-radius:8px; color:#fff; background:linear-gradient(145deg,#8068ce,#5943a4); font-size:8px; font-weight:760; box-shadow:0 1px 4px rgba(43,42,37,.12); }
+.issue-thread-participant:first-child { margin-left:0; }
+.issue-thread-participant.agent { color:#5f4aab; background:#eee9fb; }
+.issue-thread-participant img { width:100%; height:100%; object-fit:cover; }
 .issue-message-state,.issue-message-empty { min-height:86px; margin:0; display:flex; align-items:center; justify-content:center; gap:7px; border:1px dashed #dedfd9; border-radius:11px; color:#92948d; background:#fafaf7; font-size:9px; text-align:center; }
 button.issue-message-state { width:100%; cursor:pointer; }
 .issue-message-state.error { color:#a54253; border-color:#efc7ce; background:#fff6f7; }

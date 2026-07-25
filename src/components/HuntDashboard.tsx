@@ -1418,12 +1418,20 @@ function IssueConversation({
   }, [activeThreadId]);
 
   const roots = messages.filter((message) => message.parentMessageId === null);
+  const repliesByRootId = useMemo(() => {
+    const grouped = new Map<string, IssueMessage[]>();
+    for (const message of messages) {
+      if (!message.parentMessageId) continue;
+      const threadReplies = grouped.get(message.parentMessageId) ?? [];
+      threadReplies.push(message);
+      grouped.set(message.parentMessageId, threadReplies);
+    }
+    return grouped;
+  }, [messages]);
   const activeThread =
     roots.find((message) => message.id === activeThreadId) ?? null;
   const replies = activeThread
-    ? messages.filter(
-        (message) => message.parentMessageId === activeThread.id,
-      )
+    ? repliesByRootId.get(activeThread.id) ?? []
     : [];
 
   useLayoutEffect(() => {
@@ -1507,6 +1515,7 @@ function IssueConversation({
               localeTag={localeTag}
               message={message}
               onOpenThread={openThread}
+              threadReplies={repliesByRootId.get(message.id) ?? []}
             />
           ))
         )}
@@ -1589,12 +1598,15 @@ function IssueMessageItem({
   localeTag,
   message,
   onOpenThread,
+  threadReplies = [],
 }: {
   localeTag: string;
   message: IssueMessage;
   onOpenThread?: (messageId: string, trigger: HTMLButtonElement) => void;
+  threadReplies?: IssueMessage[];
 }) {
   const { t } = useI18n();
+  const threadParticipants = uniqueThreadParticipants(threadReplies);
   return (
     <article className="issue-message">
       <MessageAvatar message={message} />
@@ -1615,12 +1627,21 @@ function IssueMessageItem({
             title={t("run.replyInThread")}
             type="button"
           >
-            <MessageCircle size={14} />
-            {t("run.replies", { count: message.replyCount })}
+            <span aria-hidden="true" className="issue-thread-participants">
+              {threadParticipants.map((participant) => (
+                <ThreadParticipantAvatar
+                  author={participant}
+                  key={`${participant.provider ?? "user"}:${participant.id ?? participant.name}`}
+                />
+              ))}
+            </span>
+            <strong>{t("run.replies", { count: message.replyCount })}</strong>
+            <span>{t("run.viewThread")}</span>
+            <ChevronRight aria-hidden="true" size={16} />
           </button>
         )}
       </div>
-      {onOpenThread && (
+      {onOpenThread && message.replyCount === 0 && (
         <div
           aria-label={t("run.replyInThread")}
           className="issue-message-actions"
@@ -1640,6 +1661,41 @@ function IssueMessageItem({
         </div>
       )}
     </article>
+  );
+}
+
+function uniqueThreadParticipants(replies: IssueMessage[]) {
+  const participants: IssueMessage["author"][] = [];
+  const seen = new Set<string>();
+  for (let index = replies.length - 1; index >= 0; index -= 1) {
+    const author = replies[index].author;
+    const key = `${author.provider ?? "user"}:${author.id ?? author.name}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    participants.push(author);
+    if (participants.length === 3) break;
+  }
+  return participants;
+}
+
+function ThreadParticipantAvatar({
+  author,
+}: {
+  author: IssueMessage["author"];
+}) {
+  return (
+    <span
+      className={`issue-thread-participant${author.provider ? " agent" : ""}`}
+      title={author.name}
+    >
+      {author.image ? (
+        <img alt="" src={author.image} />
+      ) : author.provider ? (
+        <Bot aria-hidden="true" size={13} />
+      ) : (
+        author.name.trim().charAt(0).toUpperCase() || "?"
+      )}
+    </span>
   );
 }
 
