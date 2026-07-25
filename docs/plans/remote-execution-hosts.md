@@ -1,6 +1,42 @@
 # Remote execution hosts
 
-Status: proposed. Created 2026-07-25.
+Status: in progress. Created 2026-07-25.
+
+## Progress
+
+Landed on `worktree-remote-execution-hosts`, all four local CI gates green
+(`bun run ci:local`):
+
+| Section | State | Where |
+| --- | --- | --- |
+| §1.1 host records, project binding | done | `src-tauri/src/lib.rs`, commit `9ed6ab8` |
+| §1.2 command runner abstraction | done | `src-tauri/src/host/`, commit `f3027cc` |
+| §1.3 `ssh -G` target resolution | done | `resolve_ssh_alias` in `src-tauri/src/lib.rs` |
+| §1.4 askpass authentication | done | `src-tauri/src/host/ssh.rs` |
+| §1.5 remote PATH bootstrap | done | `src-tauri/src/host/shell.rs` |
+| §2.1 migration | done as `0013` (0012 was taken) | `migrations/0013_execution_workers.sql` |
+| §2.2 worker API and reaper | done | `worker/src/workers.ts`, commit `ed42e7e` |
+| §2.3 worker loop and service installer | done except the agent launcher | `src-cli/worker.ts`, commit `dd291b4` |
+| §1.6 host-aware diagnostics | **not started** | `auto_hunt_health` and friends still local-only |
+| §1.7 agent launch over SSH | **not started** | Auto Hunt refuses remote hosts with a Korean error |
+| §2.4 shared runners, Codex port | **not started** | `runClaimedIssue` in `src-cli/index.ts` is a stub that fails loudly |
+| §2.5 desktop observation | **not started** | worker/transcript endpoints have no UI |
+| §1.8 renderer host picker | **not started** | `connect_local_project` accepts `executionHostId`, nothing sends it |
+
+Three defects surfaced while implementing, all fixed with regression tests:
+
+- The lease was set once at claim time and never renewed, so any run longer than
+  15 minutes lost its claim (`renewHuntRunLease`, plus the loop's renewal task).
+- `assertQueuedHuntClaim` stops gating writes once a run leaves `queued`, so a
+  worker that died mid-run left the issue in progress forever. Recovered by
+  `reapStalledHuntRuns`, called on claim, heartbeat, and dashboard read.
+- The worker loop's renewal wait blocked the loop for a full renewal interval
+  after each issue, and its first heartbeat never fired because a
+  never-reported worker read as up to date.
+
+The two remaining blockers are related: both §1.7 and §2.4 need the agent
+launcher to stop being Rust-only. §1.7 additionally needs
+`AutoHuntCliEnvironment::prepare` to build its sandbox home on the remote host.
 
 Briar runs Auto Hunt on the machine that shows the dashboard. This plan adds
 **remote execution hosts**: machines other than the desktop that hold the
