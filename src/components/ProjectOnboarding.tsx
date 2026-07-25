@@ -6,6 +6,7 @@ import {
   Database,
   FolderGit2,
   FolderOpen,
+  FolderPlus,
   GitBranch,
   Link2,
   ListChecks,
@@ -19,6 +20,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import type { ProjectConnection } from "../hooks/useBriar";
 import type {
+  CreatedProjectWorkspace,
   LocalAutoHuntConfig,
   RepositoryReadiness,
   VelenInspection,
@@ -26,8 +28,14 @@ import type {
 import {
   addSshHost,
   listExecutionHosts,
+  projectWorkspaceRoot,
   type ExecutionHost,
 } from "../lib/project-connection";
+import {
+  projectWorkspacePath,
+  repositoryProjectName,
+  type ProjectStartMode,
+} from "../lib/project-workspace";
 import type { SessionUser } from "../types";
 import { NativeSelect } from "./NativeSelect";
 import { Logo } from "./Logo";
@@ -55,6 +63,7 @@ type Props = {
     workflow: LocalAutoHuntConfig["workflow"],
     executionHostId: string,
   ) => Promise<RepositoryReadiness>;
+  onWorkspaceCreate: (name: string) => Promise<CreatedProjectWorkspace>;
   onVelenOrgChange: (
     org?: string | null,
     executionHostId?: string,
@@ -74,6 +83,7 @@ export function ProjectOnboarding({
   onLogout,
   onRepositorySelect,
   onRepositoryInspect,
+  onWorkspaceCreate,
   onVelenOrgChange,
   user,
   velen,
@@ -96,6 +106,9 @@ export function ProjectOnboarding({
   const [sshAlias, setSshAlias] = useState("");
   const [sshLabel, setSshLabel] = useState("");
   const [addingHost, setAddingHost] = useState(false);
+  const [startMode, setStartMode] = useState<ProjectStartMode>("existing");
+  const [workspaceRoot, setWorkspaceRoot] = useState<string | null>(null);
+  const [creatingWorkspace, setCreatingWorkspace] = useState(false);
   const initialWorkflow = normalizeAutoHuntWorkflow(connection?.workflow);
   const executionHost = executionHosts.find(
     (host) => host.id === executionHostId,
@@ -113,6 +126,19 @@ export function ProjectOnboarding({
       cancelled = true;
     };
   }, [connection]);
+
+  useEffect(() => {
+    if (connection || workspaceRoot) return;
+    let cancelled = false;
+    void projectWorkspaceRoot()
+      .then((root) => {
+        if (!cancelled && root) setWorkspaceRoot(root);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [connection, workspaceRoot]);
 
   useEffect(() => {
     if (!velen || velenOrg) return;
@@ -133,9 +159,47 @@ export function ProjectOnboarding({
     }
   }, [linearSource, linearSources]);
 
+  const newProjectPreviewPath = projectWorkspacePath(workspaceRoot, name);
+
+  const chooseStartMode = (mode: ProjectStartMode) => {
+    if (mode === startMode) return;
+    setStartMode(mode);
+    setName("");
+    setRepositoryPath("");
+    setRepositoryReadiness(null);
+    setRepositoryError(null);
+  };
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    await onCreate({ name }).catch(() => undefined);
+    const projectName = name.trim();
+    if (!projectName) return;
+    if (startMode === "existing") {
+      if (!repositoryPath) return;
+      await onCreate({ name: projectName }).catch(() => undefined);
+      return;
+    }
+    // Briar owns the folder for a from-scratch project, so create it before the project.
+    setCreatingWorkspace(true);
+    setRepositoryError(null);
+    try {
+      const workspace = await onWorkspaceCreate(projectName);
+      setRepositoryPath(workspace.repositoryPath);
+      const readiness = await onRepositoryInspect(
+        workspace.repositoryPath,
+        initialWorkflow,
+        "local",
+      );
+      setRepositoryPath(readiness.repositoryPath);
+      setRepositoryReadiness(readiness);
+      await onCreate({ name: projectName }).catch(() => undefined);
+    } catch (caught) {
+      setRepositoryError(
+        caught instanceof Error ? caught.message : String(caught),
+      );
+    } finally {
+      setCreatingWorkspace(false);
+    }
   };
 
   const connect = async () => {
@@ -170,6 +234,8 @@ export function ProjectOnboarding({
       );
       setRepositoryPath(readiness.repositoryPath);
       setRepositoryReadiness(readiness);
+      // A project created from an existing repository is named after that repository.
+      if (!connection) setName(repositoryProjectName(readiness.repositoryPath));
     } catch (caught) {
       setRepositoryReadiness(null);
       setRepositoryError(
@@ -487,8 +553,97 @@ export function ProjectOnboarding({
                 : t("onboarding.createDescription")}
             </p>
             <form className="project-form" onSubmit={(event) => void submit(event)}>
+              <div
+                aria-label={t("onboarding.startMode")}
+                className="project-start-modes"
+                role="radiogroup"
+              >
+                <button
+                  aria-checked={startMode === "existing"}
+                  className={`project-start-mode${startMode === "existing" ? " selected" : ""}`}
+                  onClick={() => chooseStartMode("existing")}
+                  role="radio"
+                  type="button"
+                >
+                  <FolderGit2 aria-hidden="true" size={17} />
+                  <strong>{t("onboarding.modeExisting")}</strong>
+                  <span>{t("onboarding.modeExistingDescription")}</span>
+                </button>
+                <button
+                  aria-checked={startMode === "new"}
+                  className={`project-start-mode${startMode === "new" ? " selected" : ""}`}
+                  onClick={() => chooseStartMode("new")}
+                  role="radio"
+                  type="button"
+                >
+                  <FolderPlus aria-hidden="true" size={17} />
+                  <strong>{t("onboarding.modeNew")}</strong>
+                  <span>{t("onboarding.modeNewDescription")}</span>
+                </button>
+              </div>
+
+              {startMode === "existing" ? (
+                <section className={`setup-section repository-setup${repositoryPath ? " connected" : ""}`}>
+                  <div className="setup-section-heading">
+                    {repositoryPath ? <Check size={18} /> : <FolderOpen size={18} />}
+                    <div>
+                      <strong>{t("onboarding.localRepository")}</strong>
+                      <span
+                        className={repositoryPath ? "repository-path" : undefined}
+                        title={repositoryPath || undefined}
+                      >
+                        {repositoryPath || t("onboarding.folderPicker")}
+                      </span>
+                    </div>
+                    <button
+                      className="setup-repository-action"
+                      disabled={loading || selectingRepository}
+                      onClick={() => void selectRepository()}
+                      type="button"
+                    >
+                      {selectingRepository ? (
+                        <LoaderCircle aria-hidden="true" className="spin" size={14} />
+                      ) : (
+                        <FolderOpen aria-hidden="true" size={14} />
+                      )}
+                      {selectingRepository
+                        ? t("onboarding.repositorySelecting")
+                        : repositoryPath
+                        ? t("onboarding.repositoryChange")
+                        : t("onboarding.repositorySelect")}
+                    </button>
+                  </div>
+                  {repositoryPath ? (
+                    <div
+                      aria-label={t("onboarding.gitReadiness")}
+                      className="repository-readiness compact"
+                    >
+                      <span className={repositoryReadiness?.gitReady ? "ready" : "warning"}>
+                        {repositoryReadiness?.gitReady ? <Check size={13} /> : <CircleAlert size={13} />}
+                        <i><strong>Git</strong><small>{repositoryReadiness?.gitVersion ?? t("common.checkNeeded")}</small></i>
+                      </span>
+                      <span className={repositoryReadiness?.remoteReachable ? "ready" : "warning"}>
+                        {repositoryReadiness?.remoteReachable ? <Check size={13} /> : <GitBranch size={13} />}
+                        <i><strong>origin</strong><small>{repositoryReadiness?.remote ?? t("onboarding.remoteMissing")}</small></i>
+                      </span>
+                    </div>
+                  ) : null}
+                  {repositoryError ? (
+                    <p className="repository-readiness-error" role="alert">
+                      <CircleAlert size={13} />
+                      {repositoryError}
+                    </p>
+                  ) : null}
+                </section>
+              ) : null}
+
               <label>
-                <span>{t("onboarding.projectName")}</span>
+                <span>
+                  {t("onboarding.projectName")}
+                  {startMode === "existing" && name ? (
+                    <small>{t("onboarding.nameFromRepository")}</small>
+                  ) : null}
+                </span>
                 <input
                   aria-label={t("onboarding.projectName")}
                   className="native-input"
@@ -497,13 +652,38 @@ export function ProjectOnboarding({
                   value={name}
                 />
               </label>
+
+              {startMode === "new" ? (
+                <p className="project-workspace-hint">
+                  {newProjectPreviewPath
+                    ? t("onboarding.workspacePreview", { path: newProjectPreviewPath })
+                    : t("onboarding.workspaceDescription")}
+                </p>
+              ) : null}
+              {startMode === "new" && repositoryError ? (
+                <p className="repository-readiness-error" role="alert">
+                  <CircleAlert size={13} />
+                  {repositoryError}
+                </p>
+              ) : null}
+
               {error ? <div className="login-error" role="alert">{error}</div> : null}
               <button
                 className="onboarding-primary-action"
-                disabled={loading || !name.trim()}
+                disabled={
+                  loading ||
+                  creatingWorkspace ||
+                  selectingRepository ||
+                  !name.trim() ||
+                  (startMode === "existing" && !repositoryPath)
+                }
                 type="submit"
               >
-                {loading ? t("onboarding.creating") : t("onboarding.createProject")} <ArrowRight size={17} />
+                {creatingWorkspace
+                  ? t("onboarding.workspaceCreating")
+                  : loading
+                  ? t("onboarding.creating")
+                  : t("onboarding.createProject")} <ArrowRight size={17} />
               </button>
             </form>
           </>

@@ -29,6 +29,7 @@ import {
 } from "../lib/demo-data";
 import {
   connectLocalProject,
+  createProjectWorkspace,
   disconnectLocalProject,
   inspectVelen,
   inspectRepositoryReadiness,
@@ -851,6 +852,11 @@ export function useBriar() {
     }
   }, []);
 
+  const createProjectRepository = useCallback(async (name: string) => {
+    setError(null);
+    return await createProjectWorkspace(name);
+  }, []);
+
   const connectProject = useCallback(async (
     autoHunt: LocalAutoHuntConfig,
     repositoryPath: string,
@@ -1664,6 +1670,7 @@ export function useBriar() {
     setActiveOrganizationId: selectOrganization,
     setActiveProjectId: selectProject,
     selectProjectRepository,
+    createProjectRepository,
     inspectProjectRepository: inspectRepositoryReadiness,
     installGithubForProject,
     loginGithubForProject,

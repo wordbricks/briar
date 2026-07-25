@@ -1379,6 +1379,160 @@ async fn validate_repository_path(path: String) -> Result<String, String> {
     .map_err(|error| error.to_string())?
 }
 
+/// Folder that holds the repositories Briar creates for brand-new projects.
+fn briar_workspace_root(home: &Path) -> PathBuf {
+    home.join("Briar")
+}
+
+/// Turns a project name into a folder name that is safe on every platform.
+fn project_folder_name(name: &str) -> Result<String, String> {
+    let sanitized: String = name
+        .trim()
+        .chars()
+        .map(|character| {
+            if character.is_control()
+                || character.is_whitespace()
+                || "/\\:*?\"<>|".contains(character)
+            {
+                '-'
+            } else {
+                character
+            }
+        })
+        .collect();
+    let folder = sanitized
+        .trim_matches(|character| matches!(character, '-' | '.'))
+        .to_string();
+    if folder.is_empty() {
+        return Err("이 이름으로는 폴더를 만들 수 없습니다. 다른 이름을 입력하세요.".to_string());
+    }
+    Ok(folder)
+}
+
+/// Resolves a folder the same way repository checks do, so the stored path matches.
+fn canonical_directory(path: &Path) -> Result<PathBuf, String> {
+    fs::canonicalize(path).map_err(|error| format!("프로젝트 폴더를 열지 못했습니다: {error}"))
+}
+
+fn path_display_string(path: PathBuf) -> Result<String, String> {
+    path.into_os_string()
+        .into_string()
+        .map_err(|_| "경로를 표시할 수 없습니다.".to_string())
+}
+
+fn init_git_repository(git: &Path, path: &Path, name: &str) -> Result<(), String> {
+    let init = Command::new(git)
+        .arg("-C")
+        .arg(path)
+        .args(["init", "-b", "main"])
+        .output()
+        .map_err(|error| format!("Git을 실행할 수 없습니다: {error}"))?;
+    if !init.status.success() {
+        // Git older than 2.28 has no -b, so fall back to its default branch name.
+        let fallback = Command::new(git)
+            .arg("-C")
+            .arg(path)
+            .arg("init")
+            .output()
+            .map_err(|error| format!("Git을 실행할 수 없습니다: {error}"))?;
+        if !fallback.status.success() {
+            return Err(format!(
+                "Git 저장소를 초기화하지 못했습니다: {}",
+                String::from_utf8_lossy(&fallback.stderr).trim()
+            ));
+        }
+    }
+    let readme = path.join("README.md");
+    if !readme.exists() {
+        fs::write(&readme, format!("# {name}\n"))
+            .map_err(|error| format!("README.md를 만들지 못했습니다: {error}"))?;
+    }
+    // The first commit needs a Git identity, so leave the file staged when it is missing.
+    let _ = Command::new(git)
+        .arg("-C")
+        .arg(path)
+        .args(["add", "README.md"])
+        .output();
+    let _ = Command::new(git)
+        .arg("-C")
+        .arg(path)
+        .args(["commit", "-m", "chore: initialize project"])
+        .output();
+    Ok(())
+}
+
+fn create_project_workspace_in(
+    git: &Path,
+    root: &Path,
+    name: &str,
+) -> Result<CreatedProjectWorkspace, String> {
+    let folder = project_folder_name(name)?;
+    let target = root.join(&folder);
+    if target.exists() {
+        if !target.is_dir() {
+            return Err(format!(
+                "{} 경로에 이미 파일이 있습니다. 다른 이름을 입력하세요.",
+                target.display()
+            ));
+        }
+        if target.join(".git").exists() {
+            // Retrying after a failed project creation should reuse what we already made.
+            return Ok(CreatedProjectWorkspace {
+                repository_path: path_display_string(canonical_directory(&target)?)?,
+                created: false,
+            });
+        }
+        let is_empty = fs::read_dir(&target)
+            .map_err(|error| format!("폴더를 읽지 못했습니다: {error}"))?
+            .next()
+            .is_none();
+        if !is_empty {
+            return Err(format!(
+                "{} 폴더가 이미 있습니다. 기존 저장소 연결을 사용하거나 다른 이름을 입력하세요.",
+                target.display()
+            ));
+        }
+    }
+    fs::create_dir_all(&target)
+        .map_err(|error| format!("프로젝트 폴더를 만들지 못했습니다: {error}"))?;
+    if let Err(error) = init_git_repository(git, &target, name) {
+        let _ = fs::remove_dir_all(&target);
+        return Err(error);
+    }
+    Ok(CreatedProjectWorkspace {
+        repository_path: path_display_string(canonical_directory(&target)?)?,
+        created: true,
+    })
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CreatedProjectWorkspace {
+    repository_path: String,
+    /// False when an earlier attempt already created the repository.
+    created: bool,
+}
+
+#[tauri::command]
+async fn project_workspace_root(app: tauri::AppHandle) -> Result<String, String> {
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    path_display_string(briar_workspace_root(&home))
+}
+
+#[tauri::command]
+async fn create_project_workspace(
+    app: tauri::AppHandle,
+    name: String,
+) -> Result<CreatedProjectWorkspace, String> {
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let git = git_binary(&home)?;
+        create_project_workspace_in(&git, &briar_workspace_root(&home), &name)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
 struct LocalProjectAgentConfig {
     llm: agent::ProjectLlmSettings,
     auto_hunt: AutoHuntConfig,
@@ -3104,6 +3258,8 @@ pub fn run() {
             write_session_token,
             clear_session_token,
             validate_repository_path,
+            project_workspace_root,
+            create_project_workspace,
             inspect_repository_readiness,
             connected_project_ids,
             project_llm_chat,
@@ -3160,6 +3316,52 @@ mod tests {
         assert_eq!(execution.approval_policy, agent::ApprovalPolicy::OnRequest);
         assert_eq!(execution.sandbox_mode, agent::SandboxMode::ReadOnly);
         assert!(!execution.network_access);
+    }
+
+    #[test]
+    fn project_folder_names_stay_filesystem_safe() {
+        assert_eq!(project_folder_name("  briar  ").as_deref(), Ok("briar"));
+        assert_eq!(
+            project_folder_name("my new project").as_deref(),
+            Ok("my-new-project")
+        );
+        assert_eq!(
+            project_folder_name("../etc/passwd").as_deref(),
+            Ok("etc-passwd")
+        );
+        assert!(project_folder_name("   ").is_err());
+        assert!(project_folder_name("///").is_err());
+    }
+
+    #[test]
+    fn new_projects_get_an_initialized_git_repository() {
+        let Ok(git) = which::which("git") else {
+            return;
+        };
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = env::temp_dir().join(format!("briar-workspace-{unique}"));
+
+        let created = create_project_workspace_in(&git, &root, "Sample Project").expect("created");
+        assert!(created.created);
+        assert!(created.repository_path.ends_with("Sample-Project"));
+        assert!(Path::new(&created.repository_path).join(".git").is_dir());
+        assert!(Path::new(&created.repository_path)
+            .join("README.md")
+            .is_file());
+
+        let reused = create_project_workspace_in(&git, &root, "Sample Project").expect("reused");
+        assert!(!reused.created);
+        assert_eq!(reused.repository_path, created.repository_path);
+
+        let occupied = root.join("Taken");
+        fs::create_dir_all(&occupied).expect("directory");
+        fs::write(occupied.join("notes.md"), "hello").expect("file");
+        assert!(create_project_workspace_in(&git, &root, "Taken").is_err());
+
+        let _ = fs::remove_dir_all(&root);
     }
 
     #[test]

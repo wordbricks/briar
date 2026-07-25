@@ -70,6 +70,11 @@ export type LocalAutoHuntConfig = {
   workflow: AutoHuntWorkflow;
 };
 
+export type CreatedProjectWorkspace = {
+  repositoryPath: string;
+  created: boolean;
+};
+
 export type ConnectedLocalProject = {
   repositoryPath: string;
   workflow: AutoHuntWorkflow;
@@ -115,6 +120,22 @@ export async function pickGitRepository(): Promise<string | null> {
   });
   if (!selected) return null;
   return invoke<string>("validate_repository_path", { path: selected });
+}
+
+export async function projectWorkspaceRoot(): Promise<string | null> {
+  if (!isTauri()) return null;
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<string>("project_workspace_root");
+}
+
+export async function createProjectWorkspace(
+  name: string,
+): Promise<CreatedProjectWorkspace> {
+  if (!isTauri()) {
+    throw new Error("새 프로젝트 폴더 만들기는 Briar 데스크톱 앱에서 사용할 수 있습니다.");
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<CreatedProjectWorkspace>("create_project_workspace", { name });
 }
 
 export async function inspectRepositoryReadiness(
