@@ -6,6 +6,7 @@ import {
   type CompanionStatusFilter,
 } from "./components/CompanionBottomNavigation";
 import { CompanionEmptyState, CompanionHeader } from "./components/CompanionHeader";
+import { CompanionSettings } from "./components/CompanionSettings";
 import { HuntDashboard } from "./components/HuntDashboard";
 import { Inbox } from "./components/Inbox";
 import { InitialOnboarding } from "./components/InitialOnboarding";
@@ -86,7 +87,7 @@ export function App() {
     null,
   );
   const [companionPage, setCompanionPage] = useState<
-    "issues" | "search" | "inbox" | "session"
+    "issues" | "search" | "inbox" | "session" | "settings"
   >("issues");
   const [companionStatus, setCompanionStatus] =
     useState<CompanionStatusFilter>("all");
@@ -535,9 +536,17 @@ export function App() {
         className={`app-shell companion-shell platform-${mobilePlatform}`}
       >
         <CompanionHeader
+          activeOrganizationId={briar.activeOrganizationId}
           activeProjectId={briar.activeProjectId}
           loading={briar.loading}
           onLogout={() => void briar.logout()}
+          onOrganizationChange={(organizationId) => {
+            briar.setActiveOrganizationId(organizationId);
+            setCompanionPage("issues");
+            setCompanionStatus("all");
+            setRequestedRunId(null);
+            setRequestedSessionId(null);
+          }}
           onProjectChange={(projectId) => {
             briar.setActiveProjectId(projectId);
             setCompanionPage("issues");
@@ -546,10 +555,17 @@ export function App() {
             setRequestedSessionId(null);
           }}
           onRefresh={() => void briar.refresh()}
+          onSettings={() => setCompanionPage("settings")}
+          organizations={briar.organizations}
           projects={briar.projects}
           user={briar.user}
         />
-        {companionPage === "inbox" ? (
+        {companionPage === "settings" ? (
+          <CompanionSettings
+            onBack={() => setCompanionPage("issues")}
+            user={briar.user}
+          />
+        ) : companionPage === "inbox" ? (
           <>
             <Inbox
               companionMode
