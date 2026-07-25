@@ -242,7 +242,7 @@ export function AppSettings({
           className={`topbar app-settings-topbar${
             isSidebarOpen ? "" : " sidebar-closed"
           }`}
-          data-tauri-drag-region
+          data-tauri-drag-region="deep"
         >
           <h1>{t("appSettings.title")}</h1>
         </header>
