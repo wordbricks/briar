@@ -67,7 +67,8 @@ describe("ProjectOnboarding", () => {
       />,
     );
 
-    expect(markup).toContain('<select aria-label="Velen 조직" class="native-select"');
+    expect(markup).toContain('aria-haspopup="listbox" aria-label="Velen 조직"');
+    expect(markup).toContain("select-menu-large native-select");
     expect(markup).toContain("워크플로우 자동 생성");
     expect(markup).toContain("Agent backend");
     expect(markup).toContain("저장소 선택");

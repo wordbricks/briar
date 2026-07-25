@@ -33,6 +33,7 @@ import {
   type AutoHuntAutomation,
 } from "../lib/auto-hunt-automation";
 import type { VelenInspection } from "../lib/project-connection";
+import { SelectMenu } from "./SelectMenu";
 
 export function ProjectSettings({
   dashboard,
@@ -393,27 +394,33 @@ export function ProjectSettings({
               <div className="project-settings-linear-fields">
                 <label>
                   <span>{t("settings.linearSource")}</span>
-                  <select
-                    aria-label={t("settings.linearSource")}
+                  <SelectMenu
                     disabled={linearLoading || linearSaving}
-                    onChange={(event) => {
-                      const source = event.currentTarget.value || null;
+                    label={t("settings.linearSource")}
+                    onValueChange={(value) => {
+                      const source = value || null;
                       setLinear((current) => ({ ...current, source }));
                     }}
+                    options={[
+                      {
+                        label: t("settings.linearSelectSource"),
+                        value: "",
+                      },
+                      ...(linear.source && !selectedLinearSourceAvailable
+                        ? [{
+                            disabled: true,
+                            label: `${linear.source} · ${t("settings.linearUnavailable")}`,
+                            value: linear.source,
+                          }]
+                        : []),
+                      ...linearSources.map((source) => ({
+                        label: source.sourceKey,
+                        value: source.sourceRef,
+                      })),
+                    ]}
+                    size="small"
                     value={linear.source ?? ""}
-                  >
-                    <option value="">{t("settings.linearSelectSource")}</option>
-                    {linear.source && !selectedLinearSourceAvailable ? (
-                      <option disabled value={linear.source}>
-                        {linear.source} · {t("settings.linearUnavailable")}
-                      </option>
-                    ) : null}
-                    {linearSources.map((source) => (
-                      <option key={source.sourceRef} value={source.sourceRef}>
-                        {source.sourceKey}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </label>
                 <label>
                   <span>
@@ -729,78 +736,93 @@ export function ProjectSettings({
             </header>
             <div className="project-settings-llm-control">
               <label htmlFor="project-agent-provider">{t("settings.provider")}</label>
-              <select
+              <SelectMenu
                 disabled={settingsLoading || settingsSaving}
                 id="project-agent-provider"
-                onChange={(event) => {
-                  setProvider(event.currentTarget.value as AgentProvider);
+                label={t("settings.provider")}
+                onValueChange={(value) => {
+                  setProvider(value as AgentProvider);
                   setModel(null);
                   setEffort(null);
                 }}
+                options={agentProviders.map((candidate) => ({
+                  description: !providerAvailability[candidate]
+                    ? t("settings.providerDisabled")
+                    : undefined,
+                  disabled: !providerAvailability[candidate],
+                  label: candidate === "codex" ? "Codex" : "Claude",
+                  value: candidate,
+                }))}
+                size="small"
                 value={provider}
-              >
-                {agentProviders.map((candidate) => (
-                  <option
-                    disabled={!providerAvailability[candidate]}
-                    key={candidate}
-                    value={candidate}
-                  >
-                    {candidate === "codex" ? "Codex" : "Claude"}
-                    {!providerAvailability[candidate]
-                      ? ` · ${t("settings.providerDisabled")}`
-                      : ""}
-                  </option>
-                ))}
-              </select>
+              />
               <label htmlFor="project-agent-model">{t("settings.model")}</label>
-              <select
+              <SelectMenu
                 disabled={settingsLoading || settingsSaving}
                 id="project-agent-model"
-                onChange={(event) => setModel(event.currentTarget.value || null)}
-                value={model ?? ""}
-              >
-                {!selectedModelKnown && model ? (
-                  <option value={model}>{model}</option>
-                ) : null}
-                {providerModels.map((option) => (
-                  <option key={option.value || "default"} value={option.value}>
-                    {option.value
+                label={t("settings.model")}
+                onValueChange={(value) => setModel(value || null)}
+                options={[
+                  ...(!selectedModelKnown && model
+                    ? [{ label: model, value: model }]
+                    : []),
+                  ...providerModels.map((option) => ({
+                    label: option.value
                       ? option.label
-                      : t("settings.providerDefaultModel")}
-                  </option>
-                ))}
-              </select>
+                      : t("settings.providerDefaultModel"),
+                    value: option.value,
+                  })),
+                ]}
+                size="small"
+                value={model ?? ""}
+              />
               <label htmlFor="project-agent-effort">{t("settings.effort")}</label>
-              <select
+              <SelectMenu
                 disabled={settingsLoading || settingsSaving}
                 id="project-agent-effort"
-                onChange={(event) =>
-                  setEffort(
-                    (event.currentTarget.value as ModelEffort) || null,
-                  )
-                }
+                label={t("settings.effort")}
+                onValueChange={(value) =>
+                  setEffort((value as ModelEffort) || null)}
+                options={[
+                  {
+                    label: t("settings.providerDefaultEffort"),
+                    value: "",
+                  },
+                  ...providerEfforts.map((candidate) => ({
+                    label: candidate,
+                    value: candidate,
+                  })),
+                ]}
+                size="small"
                 value={effort ?? ""}
-              >
-                <option value="">{t("settings.providerDefaultEffort")}</option>
-                {providerEfforts.map((candidate) => (
-                  <option key={candidate} value={candidate}>
-                    {candidate}
-                  </option>
-                ))}
-              </select>
+              />
               <label htmlFor="project-approval-policy">{t("settings.approvalRequest")}</label>
-              <select
+              <SelectMenu
                 disabled={settingsLoading || settingsSaving}
                 id="project-approval-policy"
-                onChange={(event) =>
-                  setApprovalPolicy(event.currentTarget.value as ApprovalPolicy)
-                }
+                label={t("settings.approvalRequest")}
+                onValueChange={(value) =>
+                  setApprovalPolicy(value as ApprovalPolicy)}
+                options={[
+                  {
+                    description: t("settings.approvalUntrustedDescription"),
+                    label: t("settings.approvalUntrusted"),
+                    value: "untrusted",
+                  },
+                  {
+                    description: t("settings.approvalOnRequestDescription"),
+                    label: t("settings.approvalOnRequest"),
+                    value: "on-request",
+                  },
+                  {
+                    description: t("settings.approvalNeverDescription"),
+                    label: t("settings.approvalNever"),
+                    value: "never",
+                  },
+                ]}
+                size="small"
                 value={approvalPolicy}
-              >
-                <option value="untrusted">{t("settings.approvalUntrusted")}</option>
-                <option value="on-request">{t("settings.approvalOnRequest")}</option>
-                <option value="never">{t("settings.approvalNever")}</option>
-              </select>
+              />
               <button
                 disabled={
                   settingsLoading ||

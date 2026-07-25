@@ -1,7 +1,6 @@
 import {
   Building2,
   Check,
-  ChevronDown,
   LogOut,
   RefreshCw,
   Settings,
@@ -10,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { Logo } from "./Logo";
 import { useI18n } from "../i18n";
 import type { Organization, Project, SessionUser } from "../types";
+import { SelectMenu } from "./SelectMenu";
 
 export function CompanionHeader({
   activeOrganizationId,
@@ -77,21 +77,19 @@ export function CompanionHeader({
         <div className="companion-workspace-mark">
           <Logo compact />
         </div>
-        <label className="companion-project-picker">
-          <span className="visually-hidden">{t("companion.project")}</span>
-          <select
-            aria-label={t("companion.project")}
-            onChange={(event) => onProjectChange(event.target.value)}
+        <div className="companion-project-picker">
+          <SelectMenu
+            className="companion-project-select"
+            label={t("companion.project")}
+            onValueChange={onProjectChange}
+            options={projects.map((project) => ({
+              label: project.name,
+              value: project.id,
+            }))}
+            size="small"
             value={activeProjectId ?? ""}
-          >
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </select>
-          <ChevronDown aria-hidden="true" size={19} />
-        </label>
+          />
+        </div>
       </div>
       <div className="companion-header-actions">
         <button
