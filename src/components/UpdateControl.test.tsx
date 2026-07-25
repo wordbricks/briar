@@ -3,7 +3,7 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { UpdateControl } from "./UpdateControl";
+import { UPDATE_CHECK_INTERVAL_MS, UpdateControl } from "./UpdateControl";
 
 const { check, relaunch } = vi.hoisted(() => ({
   check: vi.fn(),
@@ -17,6 +17,7 @@ describe("UpdateControl", () => {
   let container: HTMLDivElement;
 
   beforeEach(() => {
+    vi.useFakeTimers();
     Object.assign(window, { __TAURI_INTERNALS__: {} });
     container = document.createElement("div");
     document.body.append(container);
@@ -27,12 +28,16 @@ describe("UpdateControl", () => {
   afterEach(() => {
     container.remove();
     Reflect.deleteProperty(window, "__TAURI_INTERNALS__");
+    vi.useRealTimers();
   });
 
   it("stays hidden when the signed channel is current", async () => {
     check.mockResolvedValue(null);
     const root = createRoot(container);
     await act(async () => root.render(<UpdateControl />));
+    await act(async () => {
+      await Promise.resolve();
+    });
     expect(check).toHaveBeenCalledOnce();
     expect(container.querySelector("button")).toBeNull();
     await act(async () => root.unmount());
@@ -58,5 +63,58 @@ describe("UpdateControl", () => {
     expect(downloadAndInstall).toHaveBeenCalledOnce();
     expect(relaunch).toHaveBeenCalledOnce();
     await act(async () => root.unmount());
+  });
+
+  it("rechecks the signed channel on a fixed interval", async () => {
+    check.mockResolvedValue(null);
+    const root = createRoot(container);
+    await act(async () => root.render(<UpdateControl />));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(check).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(UPDATE_CHECK_INTERVAL_MS - 1);
+    });
+    expect(check).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(check).toHaveBeenCalledTimes(2);
+
+    const downloadAndInstall = vi.fn().mockResolvedValue(undefined);
+    check.mockResolvedValue({ version: "1.2.0", downloadAndInstall });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(UPDATE_CHECK_INTERVAL_MS);
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(check).toHaveBeenCalledTimes(3);
+    expect(container.textContent).toContain("v1.2.0 업데이트 사용 가능");
+    expect(container.querySelector("button")).not.toBeNull();
+    await act(async () => root.unmount());
+  });
+
+  it("stops rechecking after unmount", async () => {
+    check.mockResolvedValue(null);
+    const root = createRoot(container);
+    await act(async () => root.render(<UpdateControl />));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(check).toHaveBeenCalledOnce();
+
+    await act(async () => root.unmount());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(UPDATE_CHECK_INTERVAL_MS * 2);
+    });
+    expect(check).toHaveBeenCalledOnce();
   });
 });
