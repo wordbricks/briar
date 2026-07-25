@@ -1,5 +1,6 @@
 export const ko = {
   "app.developmentBadge": "개발 앱",
+  "app.version": "앱 버전 {version}",
   "common.cancel": "취소",
   "common.close": "닫기",
   "common.save": "저장",
@@ -763,6 +764,7 @@ export const en: Messages = {
   "repositorySetup.configureGit": "Configure Git push authentication",
   "repositorySetup.ready": "Ready for PR automation",
   "app.developmentBadge": "Development app",
+  "app.version": "App version {version}",
   "common.cancel": "Cancel", "common.close": "Close", "common.save": "Save", "common.saved": "Saved", "common.saving": "Saving", "common.required": "Required", "common.optional": "Optional", "common.open": "Open", "common.checkNeeded": "Needs attention", "common.healthy": "Healthy", "common.notInstalled": "Not installed", "common.notConnected": "Not connected",
   "sidebar.close": "Close sidebar", "sidebar.open": "Open sidebar", "sidebar.mainMenu": "Main menu", "sidebar.organizationSwitcher": "Open organization menu", "sidebar.organizationMenu": "Organization menu", "sidebar.organizationSettings": "Organization settings", "sidebar.manageMembers": "Invite and manage members", "sidebar.switchOrganization": "Switch organization", "sidebar.organizationList": "Choose organization", "sidebar.projects": "Projects", "sidebar.addProject": "Add project", "sidebar.currentProject": "Current project", "sidebar.projectNotConnected": "{name}: no repository connected on this computer", "sidebar.projectMenu": "{name} project menu", "sidebar.menu": "{name} menu", "sidebar.projectSettings": "Project settings", "sidebar.inbox": "Inbox", "sidebar.issues": "Issues", "sidebar.autoHunt": "Auto Hunt",
   "navigation.history": "Navigation history", "navigation.back": "Back", "navigation.forward": "Forward",
@@ -947,6 +949,7 @@ export const zh: Messages = {
   "repositorySetup.configureGit": "配置 Git 推送认证",
   "repositorySetup.ready": "PR 自动化已准备",
   "app.developmentBadge": "开发应用",
+  "app.version": "应用版本 {version}",
   "common.cancel": "取消", "common.close": "关闭", "common.save": "保存", "common.saved": "已保存", "common.saving": "保存中", "common.required": "必填", "common.optional": "可选", "common.open": "打开", "common.checkNeeded": "需要检查", "common.healthy": "正常", "common.notInstalled": "未安装", "common.notConnected": "未连接",
   "sidebar.close": "关闭侧边栏", "sidebar.open": "打开侧边栏", "sidebar.mainMenu": "主菜单", "sidebar.organizationSwitcher": "打开组织菜单", "sidebar.organizationMenu": "组织菜单", "sidebar.organizationSettings": "组织设置", "sidebar.manageMembers": "邀请和管理成员", "sidebar.switchOrganization": "切换组织", "sidebar.organizationList": "选择组织", "sidebar.projects": "项目", "sidebar.addProject": "添加项目", "sidebar.currentProject": "当前项目", "sidebar.projectNotConnected": "{name}：这台电脑尚未连接仓库", "sidebar.projectMenu": "{name} 项目菜单", "sidebar.menu": "{name} 菜单", "sidebar.projectSettings": "项目设置", "sidebar.inbox": "收件箱", "sidebar.issues": "问题", "sidebar.autoHunt": "自动狩猎",
   "navigation.history": "导航历史", "navigation.back": "后退", "navigation.forward": "前进",
