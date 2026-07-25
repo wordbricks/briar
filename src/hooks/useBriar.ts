@@ -69,7 +69,10 @@ import {
 } from "../lib/auto-hunt-automation";
 import { isMobileCompanion } from "../lib/platform";
 import { chatWithProjectLlm } from "../lib/project-llm";
-import type { IssueAgentConversation } from "../lib/issue-agent-reply";
+import {
+  providerForConversation,
+  type IssueAgentConversation,
+} from "../lib/issue-agent-reply";
 import type {
   CreateIssueInput,
   DashboardPayload,
@@ -1380,7 +1383,17 @@ export function useBriar() {
         if (!replyBody) {
           throw new Error("AI 프로바이더가 빈 답변을 반환했습니다.");
         }
-        return persistMessage(replyBody, agentConversation);
+        const provider = providerForConversation(
+          activeProjectId,
+          response.conversationId,
+        );
+        if (!provider) {
+          throw new Error("AI 프로바이더 대화 식별자가 유효하지 않습니다.");
+        }
+        return persistMessage(replyBody, {
+          conversationId: response.conversationId,
+          provider,
+        });
       });
       return { message, agentReply };
     },

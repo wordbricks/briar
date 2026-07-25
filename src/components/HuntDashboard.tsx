@@ -37,6 +37,7 @@ import {
 import {
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -59,6 +60,7 @@ import {
   maxIssueAttachmentCount,
   validateIssueAttachments,
 } from "../lib/issue-attachments";
+import { briarMentionAtCaret } from "../lib/issue-agent-reply";
 import type { AutoHuntHealth } from "../lib/project-connection";
 import type {
   CreateIssueInput,
@@ -1666,7 +1668,14 @@ function MessageComposer({
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [caret, setCaret] = useState(0);
+  const [composerFocused, setComposerFocused] = useState(false);
+  const [mentionDismissed, setMentionDismissed] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const mentionListId = useId();
+  const activeMention = briarMentionAtCaret(body, caret);
+  const showsMentionSuggestion =
+    composerFocused && !mentionDismissed && activeMention !== null;
   const submit = async (event?: FormEvent) => {
     event?.preventDefault();
     const nextBody = body.trim();
@@ -1697,11 +1706,33 @@ function MessageComposer({
       textarea.focus();
       const cursor = selectionEnd + before.length + after.length;
       textarea.setSelectionRange(cursor, cursor);
+      setCaret(cursor);
+    });
+  };
+  const completeBriarMention = () => {
+    const textarea = textareaRef.current;
+    if (!textarea || !activeMention) return;
+    const nextBody = `${body.slice(0, activeMention.start)}@briar ${body.slice(
+      activeMention.end,
+    )}`;
+    const nextCaret = activeMention.start + "@briar ".length;
+    setBody(nextBody);
+    setCaret(nextCaret);
+    setMentionDismissed(false);
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(nextCaret, nextCaret);
     });
   };
   return (
     <form
       className={`issue-message-composer${compact ? " compact" : ""}`}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setComposerFocused(false);
+        }
+      }}
+      onFocus={() => setComposerFocused(true)}
       onSubmit={(event) => void submit(event)}
     >
       <div className="issue-composer-formatting">
@@ -1734,17 +1765,60 @@ function MessageComposer({
           <Code2 size={15} />
         </button>
       </div>
+      {showsMentionSuggestion && (
+        <div
+          aria-label={t("run.mention")}
+          className="issue-composer-mention-menu"
+          id={mentionListId}
+          role="listbox"
+        >
+          <button
+            aria-selected="true"
+            onClick={completeBriarMention}
+            onMouseDown={(event) => event.preventDefault()}
+            role="option"
+            type="button"
+          >
+            <span aria-hidden="true">
+              <Bot size={14} />
+            </span>
+            <strong>@briar</strong>
+          </button>
+        </div>
+      )}
       <textarea
+        aria-autocomplete="list"
+        aria-controls={showsMentionSuggestion ? mentionListId : undefined}
+        aria-expanded={showsMentionSuggestion}
         aria-label={placeholder}
         disabled={sending}
         maxLength={10_000}
-        onChange={(event) => setBody(event.currentTarget.value)}
+        onChange={(event) => {
+          setBody(event.currentTarget.value);
+          setCaret(event.currentTarget.selectionStart);
+          setMentionDismissed(false);
+        }}
         onKeyDown={(event) => {
+          if (
+            showsMentionSuggestion &&
+            (event.key === "Tab" ||
+              (event.key === "Enter" && !event.metaKey && !event.ctrlKey))
+          ) {
+            event.preventDefault();
+            completeBriarMention();
+            return;
+          }
+          if (showsMentionSuggestion && event.key === "Escape") {
+            event.preventDefault();
+            setMentionDismissed(true);
+            return;
+          }
           if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
             event.preventDefault();
             void submit();
           }
         }}
+        onSelect={(event) => setCaret(event.currentTarget.selectionStart)}
         placeholder={placeholder}
         ref={textareaRef}
         rows={compact ? 2 : 3}
