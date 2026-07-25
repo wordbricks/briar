@@ -1,4 +1,5 @@
 mod agent;
+mod host;
 
 use serde::{Deserialize, Serialize};
 use std::{
