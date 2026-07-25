@@ -114,6 +114,7 @@ run_security() {
 
   bun run audit:dependencies
   bun run audit:rust
+  bun run secrets:verify-encrypted
   gitleaks git \
     --config .gitleaks.toml \
     --redact \

@@ -81,7 +81,7 @@ done
 
 if [[ "${BRIAR_RELEASE_SECRETS_LOADED:-}" != "true" ]]; then
   [[ -f "$release_secrets" ]] ||
-    fail "Missing $release_secrets. Copy .env.release.example and populate it with dotenvx."
+    fail "Missing checked-in encrypted release environment at $release_secrets."
   dotenvx_bin="$workspace_root/node_modules/.bin/dotenvx"
   [[ -x "$dotenvx_bin" ]] ||
     fail "Missing dotenvx. Run 'bun install --frozen-lockfile' first."

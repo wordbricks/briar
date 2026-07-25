@@ -33,6 +33,7 @@
     "d1:migrate:remote": "wrangler d1 migrations apply briar-db --remote",
     "audit:dependencies": "bash scripts/audit-dependencies.sh",
     "audit:rust": "bash scripts/audit-rust-dependencies.sh",
+    "secrets:verify-encrypted": "bun run scripts/verify-encrypted-env.ts",
     "secrets:check": "dotenvx run --strict --overload -f .env.production -- bun run scripts/with-worker-secrets.ts check",
     "worker:dev": "dotenvx run --strict --overload -f .env.production -- bun run scripts/with-worker-secrets.ts dev",
     "worker:types": "wrangler types worker-configuration.d.ts",
