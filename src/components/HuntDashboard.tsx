@@ -52,6 +52,7 @@ import {
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { NativeSelect } from "./NativeSelect";
+import { SelectMenu } from "./SelectMenu";
 import {
   CompanionBottomNavigation,
   type CompanionStatusFilter,
@@ -1271,22 +1272,20 @@ export function RunPage({
                     <span className={`run-property-icon ${meta.tone}`}><Activity size={15} /></span>
                     <span className="run-property-copy">
                       <small>{t("dashboard.status")}</small>
-                      <select
-                        aria-label={t("dashboard.status")}
+                      <SelectMenu
+                        align="end"
+                        className="run-status-select"
                         disabled={isRecovering}
-                        onChange={(event) => {
-                          const placement = placementForId(event.currentTarget.value);
+                        label={t("dashboard.status")}
+                        onValueChange={(value) => {
+                          const placement = placementForId(value);
                           if (!placement || placementMatchesRun(run, placement)) return;
                           void runAction(() => onMove(placement));
                         }}
+                        options={placementOptions}
+                        size="small"
                         value={placementValue}
-                      >
-                        {placementOptions.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </span>
                     {isRecovering && <LoaderCircle className="spin" size={14} />}
                   </label>

@@ -1,7 +1,6 @@
-export type NativeSelectOption = {
-  label: string;
-  value: string;
-};
+import { SelectMenu, type SelectMenuOption } from "./SelectMenu";
+
+export type NativeSelectOption = SelectMenuOption;
 
 export function NativeSelect({
   className,
@@ -19,22 +18,14 @@ export function NativeSelect({
   value: string;
 }) {
   return (
-    <select
-      aria-label={label}
+    <SelectMenu
       className={["native-select", className].filter(Boolean).join(" ")}
-      onChange={(event) => onValueChange(event.currentTarget.value)}
+      label={label}
+      onValueChange={onValueChange}
+      options={options}
+      placeholder={placeholder}
+      size="large"
       value={value}
-    >
-      {placeholder || !value ? (
-        <option disabled hidden value="">
-          {placeholder ?? label}
-        </option>
-      ) : null}
-      {options.map((option) => (
-        <option key={option.value} value={option.value}>
-          {option.label}
-        </option>
-      ))}
-    </select>
+    />
   );
 }

@@ -204,7 +204,7 @@ describe("HuntDashboard", () => {
     );
   });
 
-  it("uses a native select for issue priority and accepts image or video files", () => {
+  it("uses the custom dropdown for issue priority and accepts image or video files", () => {
     const markup = renderToStaticMarkup(
       <CreateIssueDialog
         isSubmitting={false}
@@ -213,7 +213,8 @@ describe("HuntDashboard", () => {
       />,
     );
 
-    expect(markup).toContain('<select aria-label="우선순위" class="native-select issue-priority-select"');
+    expect(markup).toContain('aria-haspopup="listbox" aria-label="우선순위"');
+    expect(markup).toContain("native-select issue-priority-select");
     expect(markup).toContain('type="file"');
     expect(markup).toContain('aria-label="이미지 또는 영상 첨부"');
     expect(markup).toContain("video/quicktime");
@@ -903,7 +904,7 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("작업 취소");
     expect(markup).toContain("시도 2");
     expect(markup).toContain('<label class="run-property run-status-control">');
-    expect(markup).toContain('<option value="status:queued">대기</option>');
-    expect(markup).toContain('<option value="status:completed">완료</option>');
+    expect(markup).toContain('aria-haspopup="listbox" aria-label="상태"');
+    expect(markup).toContain('<span class="select-menu-value">실패</span>');
   });
 });

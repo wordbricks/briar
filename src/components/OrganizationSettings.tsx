@@ -16,6 +16,7 @@ import {
   removeOrganizationMember,
 } from "../lib/api";
 import type { Organization, OrganizationMember } from "../types";
+import { SelectMenu } from "./SelectMenu";
 
 type RoleFilter = "all" | OrganizationMember["role"];
 
@@ -304,17 +305,19 @@ export function OrganizationSettings({
             value={query}
           />
         </label>
-        <select
-          aria-label={t("organization.roleFilter")}
+        <SelectMenu
           className="organization-role-filter"
-          onChange={(event) => setRoleFilter(event.target.value as RoleFilter)}
+          label={t("organization.roleFilter")}
+          onValueChange={(value) => setRoleFilter(value as RoleFilter)}
+          options={[
+            { label: t("organization.filterAll"), value: "all" },
+            { label: t("organization.role.owner"), value: "owner" },
+            { label: t("organization.role.admin"), value: "admin" },
+            { label: t("organization.role.member"), value: "member" },
+          ]}
+          size="small"
           value={roleFilter}
-        >
-          <option value="all">{t("organization.filterAll")}</option>
-          <option value="owner">{t("organization.role.owner")}</option>
-          <option value="admin">{t("organization.role.admin")}</option>
-          <option value="member">{t("organization.role.member")}</option>
-        </select>
+        />
         <div className="organization-members-actions">
           <button
             className="organization-export-button"
@@ -511,15 +514,22 @@ export function OrganizationSettings({
             </label>
             <label>
               <span>{t("organization.inviteRole")}</span>
-              <select
-                onChange={(event) =>
-                  setRole(event.target.value as "admin" | "member")
-                }
+              <SelectMenu
+                label={t("organization.inviteRole")}
+                onValueChange={(value) =>
+                  setRole(value as "admin" | "member")}
+                options={[
+                  {
+                    label: t("organization.role.member"),
+                    value: "member",
+                  },
+                  {
+                    label: t("organization.role.admin"),
+                    value: "admin",
+                  },
+                ]}
                 value={role}
-              >
-                <option value="member">{t("organization.role.member")}</option>
-                <option value="admin">{t("organization.role.admin")}</option>
-              </select>
+              />
             </label>
             {error && (
               <p className="organization-invite-error" role="alert">

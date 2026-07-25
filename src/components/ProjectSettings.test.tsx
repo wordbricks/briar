@@ -54,34 +54,44 @@ describe("ProjectSettings", () => {
       );
     });
 
-    const select = container.querySelector<HTMLSelectElement>(
-      "#project-approval-policy",
-    );
-    const provider = container.querySelector<HTMLSelectElement>(
-      "#project-agent-provider",
-    );
-    const model = container.querySelector<HTMLSelectElement>(
-      "#project-agent-model",
-    );
-    const effort = container.querySelector<HTMLSelectElement>(
-      "#project-agent-effort",
-    );
-    expect(Array.from(provider?.options ?? []).map((option) => option.value)).toEqual([
+    const optionValues = async (controlId: string) => {
+      const trigger = container.querySelector<HTMLButtonElement>(`#${controlId}`);
+      await act(async () => trigger?.click());
+      const values = Array.from(
+        document.querySelectorAll<HTMLButtonElement>(
+          `#${controlId}-listbox .select-menu-option`,
+        ),
+      ).map((option) => option.dataset.value);
+      await act(async () => trigger?.click());
+      return values;
+    };
+    const choose = async (controlId: string, value: string) => {
+      const trigger = container.querySelector<HTMLButtonElement>(`#${controlId}`);
+      await act(async () => trigger?.click());
+      const option = Array.from(
+        document.querySelectorAll<HTMLButtonElement>(
+          `#${controlId}-listbox .select-menu-option`,
+        ),
+      ).find((candidate) => candidate.dataset.value === value);
+      await act(async () => option?.click());
+    };
+
+    expect(await optionValues("project-agent-provider")).toEqual([
       "codex",
       "claude",
     ]);
-    expect(Array.from(select?.options ?? []).map((option) => option.value)).toEqual([
+    expect(await optionValues("project-approval-policy")).toEqual([
       "untrusted",
       "on-request",
       "never",
     ]);
-    expect(Array.from(model?.options ?? []).map((option) => option.value)).toEqual([
+    expect(await optionValues("project-agent-model")).toEqual([
       "",
       "gpt-5.6-sol",
       "gpt-5.6-terra",
       "gpt-5.6-luna",
     ]);
-    expect(Array.from(effort?.options ?? []).map((option) => option.value)).toEqual([
+    expect(await optionValues("project-agent-effort")).toEqual([
       "",
       "low",
       "medium",
@@ -90,36 +100,25 @@ describe("ProjectSettings", () => {
       "max",
       "ultra",
     ]);
-    await act(async () => {
-      if (!provider) return;
-      provider.value = "claude";
-      provider.dispatchEvent(new Event("change", { bubbles: true }));
-    });
-    const claudeModel = container.querySelector<HTMLSelectElement>(
-      "#project-agent-model",
-    );
-    expect(
-      Array.from(claudeModel?.options ?? []).map((option) => option.value),
-    ).toEqual(["", "sonnet", "opus", "haiku", "fable"]);
-    const claudeEffort = container.querySelector<HTMLSelectElement>(
-      "#project-agent-effort",
-    );
-    expect(
-      Array.from(claudeEffort?.options ?? []).map((option) => option.value),
-    ).toEqual(["", "low", "medium", "high", "xhigh", "max"]);
-    await act(async () => {
-      if (claudeModel) {
-        claudeModel.value = "sonnet";
-        claudeModel.dispatchEvent(new Event("change", { bubbles: true }));
-      }
-      if (claudeEffort) {
-        claudeEffort.value = "high";
-        claudeEffort.dispatchEvent(new Event("change", { bubbles: true }));
-      }
-      if (!select) return;
-      select.value = "on-request";
-      select.dispatchEvent(new Event("change", { bubbles: true }));
-    });
+    await choose("project-agent-provider", "claude");
+    expect(await optionValues("project-agent-model")).toEqual([
+      "",
+      "sonnet",
+      "opus",
+      "haiku",
+      "fable",
+    ]);
+    expect(await optionValues("project-agent-effort")).toEqual([
+      "",
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max",
+    ]);
+    await choose("project-agent-model", "sonnet");
+    await choose("project-agent-effort", "high");
+    await choose("project-approval-policy", "on-request");
     expect(container.querySelector(".project-settings-llm")?.textContent).toContain(
       "Claude가 읽기 전용 경계를 넘어야 할 때 승인을 요청합니다.",
     );
@@ -151,7 +150,7 @@ describe("ProjectSettings", () => {
     );
 
     const saveButton = container.querySelector<HTMLButtonElement>(
-      ".project-settings-llm-control button",
+      ".project-settings-llm-control > button",
     );
     expect(saveButton?.textContent).toContain("저장");
     await act(async () => saveButton?.click());
