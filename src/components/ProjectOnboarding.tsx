@@ -244,7 +244,7 @@ export function ProjectOnboarding({
                 <div className="settings-fields">
                   <label>
                     <span>호스트</span>
-                    <JellySelect
+                    <NativeSelect
                       label="실행 호스트"
                       options={executionHosts.map((host) => ({
                         label: host.kind === "ssh"
