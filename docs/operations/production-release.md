@@ -18,13 +18,10 @@ Store two independently controlled encrypted backups of the private key and
 password. Losing the key prevents future updates to every installed app that
 trusts its public half. Never commit either value.
 
-Production credentials are stored in the ignored `.env.release` file and
-decrypted by dotenvx when `release:macos:production` starts. Create the file
-from the checked-in schema:
-
-```sh
-cp .env.release.example .env.release
-```
+Production credentials are stored as ciphertext in the checked-in
+`.env.release` file and decrypted by dotenvx when
+`release:macos:production` starts. The corresponding private key is never
+committed.
 
 Populate each value with `dotenvx set`. When importing values that are already
 exported by a password manager, this form keeps the secret itself out of shell
@@ -42,7 +39,10 @@ Repeat that command for the following variables:
 - `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
 
 Publishing additionally requires `CLOUDFLARE_API_TOKEN` in `.env.release` and
-an authenticated GitHub CLI session from `gh auth login`.
+an authenticated GitHub CLI session from `gh auth login`. The current Wrangler
+upload path uses Cloudflare's REST API, so the token needs Account /
+`Workers R2 Storage` / Edit permission. Bucket-scoped R2 Object Read & Write
+credentials are S3-only and are not compatible with this command path.
 
 Set these non-secret values in the checked-in `config/release.env`:
 
@@ -51,12 +51,12 @@ Set these non-secret values in the checked-in `config/release.env`:
   signer
 - `CLOUDFLARE_ACCOUNT_ID`
 
-Limit the Cloudflare token to R2 object read/write on the `briar-releases`
-bucket. Worker deployment uses a separate credential. Keep all credentials
-outside the repository. Dotenvx writes the matching private decryption key to
-the ignored `.env.keys` file by default. On another trusted release host,
-inject `DOTENV_PRIVATE_KEY_RELEASE` from the password manager instead of
-copying or committing `.env.keys`.
+Worker deployment uses a separate credential. Dotenvx commits only ciphertext
+and writes the matching private decryption key to the ignored `.env.keys` file
+by default. Run `bun run secrets:verify-encrypted` before committing changes to
+either encrypted environment file. On another trusted release host, inject
+`DOTENV_PRIVATE_KEY_RELEASE` from the password manager instead of copying or
+committing `.env.keys`.
 
 The release host requires macOS, Bun 1.3.14, Rust 1.96.0, Xcode command-line
 tools, Syft, `gh`, `jq`, and a clean checkout with access to `origin`.
@@ -68,8 +68,8 @@ tools, Syft, `gh`, `jq`, and a clean checkout with access to `origin`.
 3. Create and push an annotated, signed `vX.Y.Z` tag on a commit contained in
    `origin/main`.
 4. Check out that exact tag on the trusted macOS release host.
-5. Provision `.env.release` and inject its dotenvx decryption key on the trusted
-   release host.
+5. Inject the checked-in `.env.release` file's dotenvx decryption key on the
+   trusted release host.
 6. Build and verify the notarized artifacts without publishing:
 
    ```sh

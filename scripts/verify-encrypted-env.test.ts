@@ -1,0 +1,48 @@
+import { describe, expect, it } from "vitest";
+import { verifyEncryptedEnv } from "./verify-encrypted-env";
+
+const policy = {
+  publicKey: "DOTENV_PUBLIC_KEY_TEST",
+  secrets: ["FIRST_SECRET", "SECOND_SECRET"],
+} as const;
+const publicKey = `02${"a".repeat(64)}`;
+
+function fixture(overrides: Partial<Record<string, string>> = {}) {
+  const values = {
+    DOTENV_PUBLIC_KEY_TEST: publicKey,
+    FIRST_SECRET: "encrypted:abc123+/=",
+    SECOND_SECRET: "encrypted:def456+/=",
+    ...overrides,
+  };
+  return Object.entries(values)
+    .map(([key, value]) => `${key}="${value}"`)
+    .join("\n");
+}
+
+describe("encrypted environment verification", () => {
+  it("accepts a public key and encrypted secret values", () => {
+    expect(() => verifyEncryptedEnv(".env.test", fixture(), policy)).not.toThrow();
+  });
+
+  it("rejects plaintext and empty secret values", () => {
+    expect(() =>
+      verifyEncryptedEnv(".env.test", fixture({ FIRST_SECRET: "plaintext" }), policy),
+    ).toThrow("requires encrypted ciphertext for FIRST_SECRET");
+    expect(() =>
+      verifyEncryptedEnv(".env.test", fixture({ SECOND_SECRET: "" }), policy),
+    ).toThrow("requires encrypted ciphertext for SECOND_SECRET");
+  });
+
+  it("rejects unexpected variables and duplicate assignments", () => {
+    expect(() =>
+      verifyEncryptedEnv(
+        ".env.test",
+        `${fixture()}\nDOTENV_PRIVATE_KEY_TEST="must-not-be-committed"`,
+        policy,
+      ),
+    ).toThrow("contains unexpected DOTENV_PRIVATE_KEY_TEST");
+    expect(() =>
+      verifyEncryptedEnv(".env.test", `${fixture()}\nFIRST_SECRET="encrypted:again"`, policy),
+    ).toThrow("contains duplicate FIRST_SECRET");
+  });
+});
