@@ -89,12 +89,20 @@ if [[ "${BRIAR_RELEASE_SECRETS_LOADED:-}" != "true" ]]; then
   dotenvx_bin="$workspace_root/node_modules/.bin/dotenvx"
   [[ -x "$dotenvx_bin" ]] ||
     fail "Missing dotenvx. Run 'bun install --frozen-lockfile' first."
+  if [[ ${#original_args[@]} -gt 0 ]]; then
+    exec "$dotenvx_bin" run \
+      --strict \
+      --redact \
+      --overload \
+      -f "$release_secrets" \
+      -- env BRIAR_RELEASE_SECRETS_LOADED=true "$0" "${original_args[@]}"
+  fi
   exec "$dotenvx_bin" run \
     --strict \
     --redact \
     --overload \
     -f "$release_secrets" \
-    -- env BRIAR_RELEASE_SECRETS_LOADED=true "$0" "${original_args[@]}"
+    -- env BRIAR_RELEASE_SECRETS_LOADED=true "$0"
 fi
 
 [[ "$(uname -s)" == "Darwin" ]] || fail "Production macOS releases require macOS."
@@ -182,6 +190,19 @@ scripts/with-release-env.sh \
     --version "$version" \
     --output "$production_config"
 scripts/with-release-env.sh bun run tauri build --config "$production_config"
+
+dmg_directory="$workspace_root/src-tauri/target/release/bundle/dmg"
+dmg_path="$(
+  find "$dmg_directory" -maxdepth 1 -type f -name 'Briar_*_aarch64.dmg' -print -quit
+)"
+[[ -n "$dmg_path" ]] || fail "Expected a signed Production DMG."
+xcrun notarytool submit "$dmg_path" \
+  --key "$APPLE_API_KEY_PATH" \
+  --key-id "$APPLE_API_KEY" \
+  --issuer "$APPLE_API_ISSUER" \
+  --wait
+xcrun stapler staple "$dmg_path"
+
 scripts/package-production-release.sh
 
 scripts/qa-macos-lifecycle.sh \
