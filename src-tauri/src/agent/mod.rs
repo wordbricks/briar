@@ -169,6 +169,9 @@ pub(crate) struct ChatExecution {
     pub(crate) effort: Option<ModelEffort>,
     pub(crate) event_sink: Option<AgentEventSink>,
     pub(crate) environment: Vec<(String, String)>,
+    /// Directories outside the workspace the agent may still write to, such as
+    /// the Auto Hunt per-issue worktree root. Empty keeps the sandbox at cwd.
+    pub(crate) workspace_write_roots: Vec<String>,
 }
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
@@ -222,6 +225,7 @@ pub(crate) struct AutoHuntExecution {
     pub(crate) effort: Option<ModelEffort>,
     pub(crate) event_sink: AgentEventSink,
     pub(crate) environment: Vec<(String, String)>,
+    pub(crate) workspace_write_roots: Vec<String>,
 }
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]

@@ -95,6 +95,8 @@ struct ClaudeRunnerRequest<'a> {
     approval_policy: ApprovalPolicy,
     sandbox_mode: SandboxMode,
     network_access: bool,
+    /// Extra directories the sandbox must allow writes in (Auto Hunt worktrees).
+    additional_directories: &'a [String],
     claude_binary: &'a str,
 }
 
@@ -263,6 +265,7 @@ pub(crate) fn chat(
         approval_policy: execution.approval_policy,
         sandbox_mode: execution.sandbox_mode,
         network_access: execution.network_access,
+        additional_directories: &execution.workspace_write_roots,
         claude_binary: &runtime.claude_binary,
     };
     let raw_request = serde_json::to_value(&runner_request)
@@ -396,6 +399,7 @@ echo '{"type":"result","sessionId":"session-1","message":"done"}'
                     Ok(())
                 })),
                 environment: Vec::new(),
+                workspace_write_roots: Vec::new(),
             },
             ProjectLlmRequest {
                 message: "Fix it".to_string(),

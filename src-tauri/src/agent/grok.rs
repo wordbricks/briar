@@ -396,6 +396,7 @@ echo '{"type":"result","sessionId":"session-1","message":"done"}'
                     Ok(())
                 })),
                 environment: Vec::new(),
+                workspace_write_roots: Vec::new(),
             },
             ProjectLlmRequest {
                 message: "hello".to_string(),
