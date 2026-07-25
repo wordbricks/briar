@@ -31,8 +31,9 @@ const agents = [
   { name: "Human", state: "2 approvals", tone: "blue" },
 ] as const;
 
+// Stable redirect that always resolves to the current Production DMG.
 const MAC_DOWNLOAD_URL =
-  "https://briar-api.wbai.workers.dev/releases/v1.1.1/Briar_1.1.1_aarch64.dmg";
+  "https://briar-api.wbai.workers.dev/releases/latest/mac-aarch64.dmg";
 const GITHUB_URL = "https://github.com/wordbricks/briar";
 
 function Brand() {
@@ -364,7 +365,7 @@ export default function Home() {
           <a
             className="header-cta header-download"
             href={MAC_DOWNLOAD_URL}
-            aria-label="Mac용 Briar 1.1.1 다운로드"
+            aria-label="Mac용 Briar 최신 버전 다운로드"
           >
             Mac용 다운로드 <span aria-hidden="true">↓</span>
           </a>
@@ -389,7 +390,7 @@ export default function Home() {
           <a
             className="button button-primary"
             href={MAC_DOWNLOAD_URL}
-            aria-label="Mac용 Briar 1.1.1 다운로드"
+            aria-label="Mac용 Briar 최신 버전 다운로드"
           >
             Mac용 Briar 다운로드 <span aria-hidden="true">↓</span>
           </a>
@@ -635,7 +636,7 @@ export default function Home() {
           <a
             className="button button-primary"
             href={MAC_DOWNLOAD_URL}
-            aria-label="Mac용 Briar 1.1.1 다운로드"
+            aria-label="Mac용 Briar 최신 버전 다운로드"
           >
             Mac용 Briar 다운로드 <span aria-hidden="true">↓</span>
           </a>
@@ -649,7 +650,7 @@ export default function Home() {
           </a>
         </div>
         <small className="download-note">
-          v1.1.1 · macOS Apple Silicon · 서명 및 공증 완료
+          최신 릴리즈 · macOS Apple Silicon · 서명 및 공증 완료
         </small>
       </section>
 
