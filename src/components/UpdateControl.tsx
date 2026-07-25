@@ -76,11 +76,13 @@ export function UpdateControl() {
 
   if (!isTauri() || !available) return null;
 
+  // Show status text only while installing or on error — not for the idle
+  // "update available" state (the download button alone is enough).
   const feedback = error
     ? t("update.failed", { error })
     : isInstalling
       ? t("update.installing")
-      : t("update.available", { version: available.version });
+      : null;
 
   const buttonLabel = isInstalling
     ? t("update.installingLabel")
