@@ -561,6 +561,61 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
+  it("suggests and completes @briar when typing a mention", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("message should not be sent");
+          }}
+          run={demoDashboard.runs[0]}
+        />,
+      );
+    });
+
+    const textarea = container.querySelector<HTMLTextAreaElement>(
+      ".issue-message-composer textarea",
+    );
+    await act(async () => {
+      textarea?.focus();
+      if (!textarea) return;
+      Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )?.set?.call(textarea, "@");
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    const suggestion = container.querySelector<HTMLButtonElement>(
+      '[role="option"]',
+    );
+    expect(suggestion?.textContent).toContain("@briar");
+    expect(textarea?.getAttribute("aria-expanded")).toBe("true");
+
+    await act(async () => {
+      textarea?.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }),
+      );
+    });
+    expect(textarea?.value).toBe("@briar ");
+    expect(container.querySelector('[role="option"]')).toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("shows Auto Hunt health as a compact topbar status trigger", () => {
     const markup = renderToStaticMarkup(
       <HuntDashboard

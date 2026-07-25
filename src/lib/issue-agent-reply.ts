@@ -11,12 +11,24 @@ type IssueSession = {
 };
 
 export type IssueAgentConversation = {
-  conversationId: string;
-  provider: AgentProvider;
+  conversationId: string | null;
+  provider: AgentProvider | null;
 };
 
 export function mentionsBriar(body: string) {
   return /(^|[^\p{L}\p{N}_])@briar(?=$|[^\p{L}\p{N}_])/iu.test(body);
+}
+
+export function briarMentionAtCaret(body: string, caret: number) {
+  if (!Number.isInteger(caret) || caret < 0 || caret > body.length) return null;
+  const match = body
+    .slice(0, caret)
+    .match(/(^|[^\p{L}\p{N}_])@([\p{L}\p{N}_-]*)$/u);
+  if (!match || !"briar".startsWith(match[2].toLowerCase())) return null;
+  return {
+    start: caret - match[2].length - 1,
+    end: caret,
+  };
 }
 
 export function providerForConversation(
@@ -32,7 +44,7 @@ export function issueAgentConversation(
   sessions: readonly IssueSession[],
   projectId: string,
   runId: string,
-): IssueAgentConversation | null {
+): IssueAgentConversation {
   for (const session of sessions) {
     if (
       session.projectId !== projectId ||
@@ -55,5 +67,5 @@ export function issueAgentConversation(
       return { conversationId: session.conversationId, provider };
     }
   }
-  return null;
+  return { conversationId: null, provider: null };
 }

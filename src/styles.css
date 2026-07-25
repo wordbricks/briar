@@ -593,6 +593,12 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .issue-composer-formatting button:hover,.issue-message-composer footer button:hover { color:#554491; background:#efebfa; }
 .issue-composer-formatting button:active,.issue-message-composer footer button:active { transform:scale(.94); }
 .issue-composer-formatting button:focus-visible,.issue-message-composer footer button:focus-visible { outline:2px solid #8b70dd; outline-offset:1px; }
+.issue-composer-mention-menu { margin:7px 9px 0; padding:3px; border:1px solid #dedfd9; border-radius:9px; background:#fff; box-shadow:0 7px 20px rgba(43,42,37,.10); }
+.issue-composer-mention-menu button { width:100%; min-height:32px; padding:4px 8px; display:flex; align-items:center; gap:8px; border:0; border-radius:6px; color:#4f5050; background:#f5f2fc; cursor:pointer; text-align:left; }
+.issue-composer-mention-menu button > span { width:22px; height:22px; display:grid; place-items:center; border-radius:6px; color:#604bad; background:#e9e2fa; }
+.issue-composer-mention-menu button strong { font-size:10px; }
+.issue-composer-mention-menu button:hover { color:#554491; background:#efebfa; }
+.issue-composer-mention-menu button:focus-visible { outline:2px solid #8b70dd; outline-offset:1px; }
 .issue-message-composer textarea { width:100%; min-height:72px; padding:11px 13px 4px; resize:vertical; border:0; outline:0; color:#41423e; background:transparent; font:400 10px/1.6 inherit; }
 .issue-message-composer textarea::placeholder { color:#a2a49d; }
 .issue-message-composer footer { min-height:38px; padding:4px 7px 6px 8px; display:flex; align-items:center; justify-content:space-between; gap:8px; }

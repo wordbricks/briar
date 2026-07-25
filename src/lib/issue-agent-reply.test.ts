@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  briarMentionAtCaret,
   issueAgentConversation,
   mentionsBriar,
   providerForConversation,
@@ -11,6 +12,14 @@ describe("issue agent replies", () => {
     expect(mentionsBriar("Could you check this, @BRIAR?")).toBe(true);
     expect(mentionsBriar("owner@briar.example")).toBe(false);
     expect(mentionsBriar("@briard")).toBe(false);
+  });
+
+  it("suggests @briar for a mention prefix at the caret", () => {
+    expect(briarMentionAtCaret("@", 1)).toEqual({ start: 0, end: 1 });
+    expect(briarMentionAtCaret("ask @br", 7)).toEqual({ start: 4, end: 7 });
+    expect(briarMentionAtCaret("owner@", 6)).toBeNull();
+    expect(briarMentionAtCaret("@other", 6)).toBeNull();
+    expect(briarMentionAtCaret("@briar ", 7)).toBeNull();
   });
 
   it("resolves the provider encoded in a project-scoped conversation id", () => {
@@ -49,6 +58,13 @@ describe("issue agent replies", () => {
     ).toEqual({
       conversationId: "briar:claude:project-1:session-1",
       provider: "claude",
+    });
+  });
+
+  it("starts a new project conversation when the issue has no prior session", () => {
+    expect(issueAgentConversation([], "project-1", "run-1")).toEqual({
+      conversationId: null,
+      provider: null,
     });
   });
 });
