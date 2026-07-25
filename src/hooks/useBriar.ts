@@ -72,6 +72,7 @@ import { chatWithProjectLlm } from "../lib/project-llm";
 import {
   agentReplyParentMessageId,
   providerForConversation,
+  shouldBriarReply,
   type IssueAgentConversation,
 } from "../lib/issue-agent-reply";
 import type {
@@ -1299,6 +1300,12 @@ export function useBriar() {
       const body = input.body.trim();
       if (!body) throw new Error("메시지를 입력해 주세요.");
       if (!activeProjectId) throw new Error("메시지를 보낼 프로젝트가 없습니다.");
+      const shouldRequestAgentReply =
+        agentConversation !== null &&
+        shouldBriarReply(issueMessagesByRun.current[runId] ?? [], {
+          body,
+          parentMessageId: input.parentMessageId,
+        });
       const cacheMessage = (message: IssueMessage) => {
         const currentMessages = issueMessagesByRun.current[runId] ?? [];
         issueMessagesByRun.current = {
@@ -1358,14 +1365,16 @@ export function useBriar() {
       };
 
       const message = await persistMessage(body, null, input.parentMessageId);
-      if (!agentConversation) return { message, agentReply: null };
+      if (!shouldRequestAgentReply || !agentConversation) {
+        return { message, agentReply: null };
+      }
 
       const run = dashboard?.runs.find((candidate) => candidate.id === runId);
       const agentReply = chatWithProjectLlm({
         projectId: activeProjectId,
         conversationId: agentConversation.conversationId,
         message: [
-          "A user mentioned @briar in this issue conversation.",
+          "A user sent a message in an issue conversation where Briar should respond.",
           "Reply to the user based on the prior Auto Hunt conversation and the issue snapshot below.",
           JSON.stringify({
             runId,

@@ -503,6 +503,10 @@ describe("HuntDashboard", () => {
       },
     };
     let sentBody = "";
+    let resolveAgentReply: (message: IssueMessage) => void = () => undefined;
+    const pendingAgentReply = new Promise<IssueMessage>((resolve) => {
+      resolveAgentReply = resolve;
+    });
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
@@ -522,7 +526,7 @@ describe("HuntDashboard", () => {
             sentBody = input.body;
             return {
               message: userMessage,
-              agentReply: Promise.resolve(agentMessage),
+              agentReply: pendingAgentReply,
             };
           }}
           run={demoDashboard.runs[0]}
@@ -548,12 +552,37 @@ describe("HuntDashboard", () => {
       textarea.dispatchEvent(new Event("input", { bubbles: true }));
     });
     await act(async () => {
-      container.querySelector<HTMLButtonElement>(".issue-message-send")?.click();
+      textarea?.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          bubbles: true,
+          cancelable: true,
+          key: "Enter",
+          shiftKey: true,
+        }),
+      );
+    });
+    expect(sentBody).toBe("");
+    expect(textarea?.value).toBe("@briar 변경 내용을 설명해 줘");
+
+    await act(async () => {
+      textarea?.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          bubbles: true,
+          cancelable: true,
+          key: "Enter",
+        }),
+      );
       await Promise.resolve();
     });
 
     expect(sentBody).toBe("@briar 변경 내용을 설명해 줘");
+    expect(textarea?.value).toBe("");
     expect(container.textContent).toContain(userMessage.body);
+    expect(container.textContent).toContain("Briar가 답변을 작성하고 있습니다");
+    await act(async () => {
+      resolveAgentReply(agentMessage);
+      await pendingAgentReply;
+    });
     expect(
       container.querySelector(".issue-message-list")?.textContent,
     ).not.toContain(agentMessage.body);

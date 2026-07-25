@@ -1448,15 +1448,14 @@ function IssueConversation({
     appendMessage(result.message);
     if (!result.agentReply) return;
     setAgentReplying(true);
-    try {
-      appendMessage(await result.agentReply);
-    } catch (caught) {
-      setAgentReplyError(
-        caught instanceof Error ? caught.message : String(caught),
-      );
-    } finally {
-      setAgentReplying(false);
-    }
+    void result.agentReply
+      .then(appendMessage)
+      .catch((caught: unknown) => {
+        setAgentReplyError(
+          caught instanceof Error ? caught.message : String(caught),
+        );
+      })
+      .finally(() => setAgentReplying(false));
   };
 
   return (
@@ -1682,10 +1681,14 @@ function MessageComposer({
     if (!nextBody || sending) return;
     setSending(true);
     setError(null);
+    setBody("");
+    setCaret(0);
+    setMentionDismissed(false);
     try {
       await onSubmit(nextBody);
-      setBody("");
     } catch (caught) {
+      setBody(nextBody);
+      setCaret(nextBody.length);
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
       setSending(false);
@@ -1813,7 +1816,11 @@ function MessageComposer({
             setMentionDismissed(true);
             return;
           }
-          if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+          if (
+            event.key === "Enter" &&
+            !event.shiftKey &&
+            !event.nativeEvent.isComposing
+          ) {
             event.preventDefault();
             void submit();
           }
