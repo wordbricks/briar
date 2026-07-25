@@ -34,6 +34,12 @@ test("server-renders the finished Briar landing page", async () => {
   assert.match(html, /에이전트 작업을 운영하세요/);
   assert.match(html, /코드는 로컬에/);
   assert.match(html, /Agent event stream 연결/);
+  assert.match(html, /Mac용 Briar 다운로드/);
+  assert.match(html, /macOS Apple Silicon/);
+  assert.match(
+    html,
+    /https:\/\/briar-api\.wbai\.workers\.dev\/releases\/v1\.1\.1\/Briar_1\.1\.1_aarch64\.dmg/,
+  );
   assert.match(html, /https:\/\/github\.com\/wordbricks\/briar/);
   assert.match(html, /http:\/\/localhost\/og\.png/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
