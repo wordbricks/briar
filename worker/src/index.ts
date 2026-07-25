@@ -69,6 +69,23 @@ import {
   type OrganizationRole,
   type OrganizationRow,
 } from "./db";
+import {
+  appendAgentTranscript,
+  assertWorkerHasNoRunInFlight,
+  attributeRunToWorker,
+  countLeasedRuns,
+  leaseExpiryFrom,
+  listExecutionWorkers,
+  MAX_TRANSCRIPT_EVENTS_PER_REQUEST,
+  reapStalledHuntRuns,
+  readAgentTranscript,
+  recordWorkerHeartbeat,
+  registerExecutionWorker,
+  renewHuntRunLease,
+  TranscriptLimitError,
+  WorkerConflictError,
+  workerStateAt,
+} from "./workers";
 import { serveRelease } from "./releases";
 
 const corsHeaders = {
@@ -340,6 +357,54 @@ export async function readIssueRequest(request: Request) {
 const claimInputSchema = z
   .object({
     claimedBy: z.string().trim().min(1).max(128),
+    workerId: z.string().trim().min(1).max(128).optional(),
+  })
+  .strict();
+
+const workerRegisterSchema = z
+  .object({
+    label: z.string().trim().min(1).max(100),
+    hostFingerprint: z.string().regex(/^[0-9a-f]{64}$/u),
+    agentProvider: z.enum(["codex", "claude"]),
+    versions: z.record(z.string().max(64), z.string().max(64)).default({}),
+  })
+  .strict();
+
+const workerHeartbeatSchema = z
+  .object({
+    versions: z.record(z.string().max(64), z.string().max(64)).optional(),
+  })
+  .strict();
+
+const leaseRenewSchema = z
+  .object({
+    claimToken: z.string().trim().min(1).max(200),
+  })
+  .strict();
+
+const transcriptSchema = z
+  .object({
+    sessionId: z
+      .string()
+      .trim()
+      .min(1)
+      .max(128)
+      .regex(/^[A-Za-z0-9_-]+$/u),
+    runId: z.string().uuid().nullable().optional(),
+    workerId: z.string().trim().min(1).max(128).nullable().optional(),
+    agentProvider: z.enum(["codex", "claude"]),
+    events: z
+      .array(
+        z
+          .object({
+            sequence: z.number().int().positive(),
+            direction: z.enum(["client", "server"]),
+            payload: z.unknown(),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(MAX_TRANSCRIPT_EVENTS_PER_REQUEST),
   })
   .strict();
 
@@ -550,6 +615,27 @@ deny.onclick=async()=>{try{await api('/device/deny',{method:'POST',body:JSON.str
     },
   );
 };
+
+const workerJson = (
+  worker: {
+    id: string;
+    label: string;
+    agent_provider: string;
+    versions_json: string;
+    state: string;
+    last_heartbeat_at: string;
+    created_at: string;
+  },
+  observedAt: string,
+) => ({
+  id: worker.id,
+  label: worker.label,
+  agentProvider: worker.agent_provider,
+  versions: parseJsonObject(worker.versions_json) ?? {},
+  state: workerStateAt(worker.last_heartbeat_at, observedAt, worker.state as never),
+  lastHeartbeatAt: worker.last_heartbeat_at,
+  createdAt: worker.created_at,
+});
 
 async function requireSession(auth: BriarAuth, request: Request) {
   const session = await auth.api.getSession({ headers: request.headers });
@@ -1290,6 +1376,119 @@ async function route(
     }
   }
 
+  if (pathname === "/ingest/workers/register" && request.method === "POST") {
+    const projectId = await requireAgentProject(db, request);
+    const input = workerRegisterSchema.parse(await readJson(request));
+    const observedAt = new Date().toISOString();
+    const worker = await registerExecutionWorker(db, projectId, {
+      id: crypto.randomUUID(),
+      label: input.label,
+      hostFingerprint: input.hostFingerprint,
+      agentProvider: input.agentProvider,
+      versions: input.versions,
+      observedAt,
+    });
+    if (!worker) throw new HttpError(500, "Worker registration failed");
+    return json({ worker: workerJson(worker, observedAt) }, 201);
+  }
+
+  const workerHeartbeatMatch = pathname.match(
+    /^\/ingest\/workers\/([0-9a-zA-Z-]+)\/heartbeat$/u,
+  );
+  if (workerHeartbeatMatch && request.method === "POST") {
+    const projectId = await requireAgentProject(db, request);
+    const input = workerHeartbeatSchema.parse(await readJson(request));
+    const observedAt = new Date().toISOString();
+    const worker = await recordWorkerHeartbeat(db, projectId, {
+      workerId: workerHeartbeatMatch[1],
+      versions: input.versions,
+      observedAt,
+    });
+    // A heartbeat is the cheapest regular touchpoint, so let it also recover
+    // runs whose holder stopped reporting.
+    const reaped = await reapStalledHuntRuns(db, projectId, observedAt);
+    return json({ worker: workerJson(worker, observedAt), reaped });
+  }
+
+  const leaseMatch = pathname.match(/^\/ingest\/runs\/([0-9a-f-]+)\/lease$/u);
+  if (leaseMatch && request.method === "POST") {
+    const projectId = await requireAgentProject(db, request);
+    const input = leaseRenewSchema.parse(await readJson(request));
+    const observedAt = new Date().toISOString();
+    const renewed = await renewHuntRunLease(db, projectId, {
+      runId: leaseMatch[1],
+      claimTokenHash: await sha256(input.claimToken),
+      observedAt,
+    });
+    return json({
+      runId: renewed.id,
+      leaseExpiresAt: renewed.lease_expires_at,
+    });
+  }
+
+  if (pathname === "/ingest/transcripts" && request.method === "POST") {
+    const projectId = await requireAgentProject(db, request);
+    const input = transcriptSchema.parse(await readJson(request));
+    const result = await appendAgentTranscript(db, projectId, {
+      sessionId: input.sessionId,
+      runId: input.runId ?? null,
+      workerId: input.workerId ?? null,
+      agentProvider: input.agentProvider,
+      events: input.events,
+      observedAt: new Date().toISOString(),
+    });
+    return json(result, 202);
+  }
+
+  const projectWorkersMatch = pathname.match(/^\/projects\/([0-9a-f-]+)\/workers$/u);
+  if (projectWorkersMatch && request.method === "GET") {
+    const projectId = projectWorkersMatch[1];
+    await requireProjectAccess(auth, db, request, projectId);
+    const observedAt = new Date().toISOString();
+    // Reading the dashboard is the other regular touchpoint, so recover
+    // abandoned runs here too rather than waiting for the next claim.
+    const reaped = await reapStalledHuntRuns(db, projectId, observedAt);
+    const workers = await listExecutionWorkers(db, projectId, observedAt);
+    return json({
+      workers: workers.map((worker) => workerJson(worker, observedAt)),
+      leasedRuns: await countLeasedRuns(db, projectId, observedAt),
+      reaped,
+    });
+  }
+
+  const transcriptMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/sessions\/([A-Za-z0-9_-]+)\/transcript$/u,
+  );
+  if (transcriptMatch && request.method === "GET") {
+    const projectId = transcriptMatch[1];
+    await requireProjectAccess(auth, db, request, projectId);
+    const afterSequence = Number.parseInt(
+      new URL(request.url).searchParams.get("afterSequence") ?? "0",
+      10,
+    );
+    const transcript = await readAgentTranscript(db, projectId, transcriptMatch[2], {
+      afterSequence: Number.isFinite(afterSequence) && afterSequence > 0 ? afterSequence : 0,
+    });
+    if (!transcript) throw new HttpError(404, "Transcript not found");
+    return json({
+      session: {
+        sessionId: transcript.session.session_id,
+        runId: transcript.session.run_id,
+        workerId: transcript.session.worker_id,
+        agentProvider: transcript.session.agent_provider,
+        startedAt: transcript.session.started_at,
+        lastEventAt: transcript.session.last_event_at,
+        eventCount: transcript.session.event_count,
+      },
+      events: transcript.events.map((event) => ({
+        sequence: event.sequence,
+        direction: event.direction,
+        message: JSON.parse(event.payload_json),
+        recordedAt: event.recorded_at,
+      })),
+    });
+  }
+
   if (pathname === "/ingest/queue/next" && request.method === "GET") {
     const projectId = await requireAgentProject(db, request);
     const run = await getNextQueuedHuntRun(db, projectId);
@@ -1323,9 +1522,13 @@ async function route(
     const projectId = await requireAgentProject(db, request);
     const input = claimInputSchema.parse(await readJson(request));
     const claimedAt = new Date().toISOString();
-    const leaseExpiresAt = new Date(
-      Date.parse(claimedAt) + 15 * 60_000,
-    ).toISOString();
+    // Recover runs abandoned by a dead worker before looking at the queue, so
+    // they are claimable again in this same request.
+    await reapStalledHuntRuns(db, projectId, claimedAt);
+    if (input.workerId) {
+      await assertWorkerHasNoRunInFlight(db, projectId, input.workerId);
+    }
+    const leaseExpiresAt = leaseExpiryFrom(claimedAt);
     const claimToken = `briar_claim_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
     const run = await claimNextQueuedHuntRun(db, projectId, {
       claimTokenHash: await sha256(claimToken),
@@ -1333,6 +1536,13 @@ async function route(
       claimedAt,
       leaseExpiresAt,
     });
+    if (run && input.workerId) {
+      await attributeRunToWorker(db, projectId, {
+        runId: run.id,
+        workerId: input.workerId,
+        observedAt: claimedAt,
+      });
+    }
     const attachments = run
       ? await listIssueAttachments(db, projectId, run.id)
       : [];
@@ -1519,6 +1729,12 @@ export default {
     } catch (error) {
       if (error instanceof HttpError) {
         return json({ message: error.message }, error.status);
+      }
+      if (error instanceof WorkerConflictError) {
+        return json({ message: error.message }, 409);
+      }
+      if (error instanceof TranscriptLimitError) {
+        return json({ message: error.message }, 413);
       }
       if (error instanceof z.ZodError) {
         return json({ message: "Invalid request", issues: error.issues }, 400);
