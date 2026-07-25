@@ -1900,6 +1900,7 @@ async fn connected_project_ids(app: tauri::AppHandle) -> Result<Vec<String>, Str
 async fn project_llm_chat(
     app: tauri::AppHandle,
     project_id: String,
+    full_access: Option<bool>,
     request: agent::ProjectLlmRequest,
 ) -> Result<agent::ProjectLlmResponse, String> {
     let config_path = cli_config_path(&app)?;
@@ -1962,20 +1963,42 @@ async fn project_llm_chat(
             &backend,
             &project_id,
             &workspace,
-            agent::ChatExecution {
-                approval_policy: settings.approval_policy,
-                sandbox_mode: agent::SandboxMode::ReadOnly,
-                network_access: false,
+            project_chat_execution(
+                full_access.unwrap_or(false),
+                settings.approval_policy,
                 model,
                 effort,
-                event_sink: None,
-            },
+            ),
             request,
             &approve,
         )
     })
     .await
     .map_err(|error| error.to_string())?
+}
+
+fn project_chat_execution(
+    full_access: bool,
+    approval_policy: agent::ApprovalPolicy,
+    model: Option<String>,
+    effort: Option<agent::ModelEffort>,
+) -> agent::ChatExecution {
+    agent::ChatExecution {
+        approval_policy: if full_access {
+            agent::ApprovalPolicy::Never
+        } else {
+            approval_policy
+        },
+        sandbox_mode: if full_access {
+            agent::SandboxMode::DangerFullAccess
+        } else {
+            agent::SandboxMode::ReadOnly
+        },
+        network_access: full_access,
+        model,
+        effort,
+        event_sink: None,
+    }
 }
 
 #[tauri::command]
@@ -2544,6 +2567,31 @@ pub fn run() {
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn unrestricted_project_chat_bypasses_approvals_and_sandboxing() {
+        let execution = project_chat_execution(
+            true,
+            agent::ApprovalPolicy::OnRequest,
+            Some("model".to_string()),
+            Some(agent::ModelEffort::High),
+        );
+
+        assert_eq!(execution.approval_policy, agent::ApprovalPolicy::Never);
+        assert_eq!(execution.sandbox_mode, agent::SandboxMode::DangerFullAccess);
+        assert!(execution.network_access);
+        assert_eq!(execution.model.as_deref(), Some("model"));
+        assert_eq!(execution.effort, Some(agent::ModelEffort::High));
+    }
+
+    #[test]
+    fn ordinary_project_chat_stays_read_only() {
+        let execution = project_chat_execution(false, agent::ApprovalPolicy::OnRequest, None, None);
+
+        assert_eq!(execution.approval_policy, agent::ApprovalPolicy::OnRequest);
+        assert_eq!(execution.sandbox_mode, agent::SandboxMode::ReadOnly);
+        assert!(!execution.network_access);
+    }
 
     #[test]
     fn launch_intro_covers_the_desktop_below_the_menu_bar() {

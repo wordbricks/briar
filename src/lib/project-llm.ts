@@ -69,6 +69,7 @@ export type ProjectLlmChatInput = {
   conversationId?: string | null;
   instructions?: string | null;
   outputSchema?: JsonSchema | null;
+  fullAccess?: boolean;
 };
 
 export type ProjectLlmChatResponse = {
@@ -107,6 +108,7 @@ export async function chatWithProjectLlm(
   const { invoke } = await import("@tauri-apps/api/core");
   return invoke<ProjectLlmChatResponse>("project_llm_chat", {
     projectId: input.projectId,
+    fullAccess: input.fullAccess ?? false,
     request: {
       message: input.message,
       conversationId: input.conversationId ?? null,

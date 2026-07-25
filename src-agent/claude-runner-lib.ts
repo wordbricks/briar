@@ -15,7 +15,7 @@ export type ClaudeRunnerRequest = {
   model?: string | null;
   effort?: "low" | "medium" | "high" | "xhigh" | "max" | null;
   approvalPolicy: "untrusted" | "on-request" | "never";
-  sandboxMode: "readOnly" | "workspaceWrite";
+  sandboxMode: "readOnly" | "workspaceWrite" | "dangerFullAccess";
   networkAccess: boolean;
   claudeBinary: string;
 };
@@ -84,9 +84,12 @@ export function claudeOptions(
   canUseTool: CanUseTool,
 ): Options {
   const readOnly = request.sandboxMode === "readOnly";
+  const dangerFullAccess = request.sandboxMode === "dangerFullAccess";
   const promptAppend = request.instructions?.trim();
   const autoApproveWithinSandbox =
-    !readOnly && request.approvalPolicy === "never";
+    !readOnly &&
+    !dangerFullAccess &&
+    request.approvalPolicy === "never";
 
   return {
     cwd: request.workspaceRoot,
@@ -116,7 +119,12 @@ export function claudeOptions(
           },
         }
       : {}),
-    ...(readOnly
+    ...(dangerFullAccess
+      ? {
+          permissionMode: "bypassPermissions",
+          allowDangerouslySkipPermissions: true,
+        }
+      : readOnly
       ? {
           tools: [...readOnlyTools],
           allowedTools: [...readOnlyTools],
@@ -128,15 +136,19 @@ export function claudeOptions(
             : "default",
           canUseTool,
         }),
-    sandbox: {
-      enabled: true,
-      failIfUnavailable: true,
-      autoAllowBashIfSandboxed: autoApproveWithinSandbox,
-      allowUnsandboxedCommands: false,
-      network: request.networkAccess
-        ? { allowedDomains: ["*"] }
-        : { deniedDomains: ["*"] },
-    },
+    ...(dangerFullAccess
+      ? {}
+      : {
+          sandbox: {
+            enabled: true,
+            failIfUnavailable: true,
+            autoAllowBashIfSandboxed: autoApproveWithinSandbox,
+            allowUnsandboxedCommands: false,
+            network: request.networkAccess
+              ? { allowedDomains: ["*"] }
+              : { deniedDomains: ["*"] },
+          },
+        }),
     ...(request.networkAccess
       ? {}
       : { disallowedTools: ["WebFetch", "WebSearch"] }),

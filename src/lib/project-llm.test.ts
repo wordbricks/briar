@@ -37,6 +37,7 @@ describe("project LLM gateway", () => {
 
     expect(invoke).toHaveBeenCalledWith("project_llm_chat", {
       projectId: "project-1",
+      fullAccess: false,
       request: {
         message: "Summarize this project",
         conversationId: null,
@@ -46,6 +47,25 @@ describe("project LLM gateway", () => {
     });
     expect(invoke.mock.calls[0]?.[1]).not.toHaveProperty("cwd");
     expect(invoke.mock.calls[0]?.[1]).not.toHaveProperty("workspaceRoot");
+  });
+
+  it("forwards explicit unrestricted access to the native gateway", async () => {
+    invoke.mockResolvedValue({
+      conversationId: "briar:project-1:thread-1",
+      message: "done",
+      workspaceRoot: "/repo",
+    });
+
+    await chatWithProjectLlm({
+      projectId: "project-1",
+      message: "Fix the issue",
+      fullAccess: true,
+    });
+
+    expect(invoke).toHaveBeenCalledWith(
+      "project_llm_chat",
+      expect.objectContaining({ fullAccess: true }),
+    );
   });
 
   it("continues and serializes a project conversation", async () => {

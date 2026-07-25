@@ -84,6 +84,7 @@ pub(crate) type AgentEventSink =
 pub(crate) enum SandboxMode {
     ReadOnly,
     WorkspaceWrite,
+    DangerFullAccess,
 }
 
 impl SandboxMode {
@@ -91,6 +92,7 @@ impl SandboxMode {
         match self {
             Self::ReadOnly => "read-only",
             Self::WorkspaceWrite => "workspace-write",
+            Self::DangerFullAccess => "danger-full-access",
         }
     }
 }
