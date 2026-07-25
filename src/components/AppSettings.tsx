@@ -12,10 +12,11 @@ import {
   Link2,
   LoaderCircle,
   RefreshCw,
+  Search,
   Settings2,
   SlidersHorizontal,
 } from "lucide-react";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useI18n } from "../i18n";
 import {
   inspectOnboardingPrerequisites,
@@ -29,7 +30,6 @@ import {
 } from "../lib/project-llm";
 import { ClaudeIcon, CodexIcon, GrokIcon } from "./AgentIcons";
 import type { RepositoryReadiness } from "../lib/project-connection";
-import { Logo } from "./Logo";
 
 export type SettingsSection =
   | "general"
@@ -41,11 +41,25 @@ export type SettingsSection =
 
 type ProviderToggle = "git" | "github";
 
+type NavItem = {
+  id: SettingsSection;
+  icon: ReactNode;
+  label: string;
+};
+
+type NavGroup = {
+  id: string;
+  label: string;
+  items: NavItem[];
+};
+
 function readProviderPreference(projectId: string, provider: ProviderToggle) {
   try {
-    return window.localStorage.getItem(
-      `briar.settings.source-control.${projectId}.${provider}`,
-    ) !== "false";
+    return (
+      window.localStorage.getItem(
+        `briar.settings.source-control.${projectId}.${provider}`,
+      ) !== "false"
+    );
   } catch {
     return true;
   }
@@ -90,6 +104,7 @@ export function AppSettings({
   const { t } = useI18n();
   const [activeSection, setActiveSection] =
     useState<SettingsSection>(initialSection);
+  const [searchQuery, setSearchQuery] = useState("");
   const [gitEnabled, setGitEnabled] = useState(() =>
     readProviderPreference(projectId, "git"),
   );
@@ -128,7 +143,9 @@ export function AppSettings({
       setProviderSettings(settings);
       setProvidersChecked(true);
     } catch (caught) {
-      setProviderError(caught instanceof Error ? caught.message : String(caught));
+      setProviderError(
+        caught instanceof Error ? caught.message : String(caught),
+      );
     } finally {
       setProvidersLoading(false);
     }
@@ -143,7 +160,11 @@ export function AppSettings({
     provider: AgentProvider,
     enabled: boolean,
   ) => {
-    if (!providerSettings || providerSettings[provider] === enabled || providerSaving) {
+    if (
+      !providerSettings ||
+      providerSettings[provider] === enabled ||
+      providerSaving
+    ) {
       return;
     }
     setProviderSaving(provider);
@@ -156,48 +177,102 @@ export function AppSettings({
         }),
       );
     } catch (caught) {
-      setProviderError(caught instanceof Error ? caught.message : String(caught));
+      setProviderError(
+        caught instanceof Error ? caught.message : String(caught),
+      );
     } finally {
       setProviderSaving(null);
     }
   };
 
-  const navigation: Array<{
-    id: SettingsSection;
-    icon: ReactNode;
-    label: string;
-  }> = [
-    {
-      id: "general",
-      icon: <SlidersHorizontal size={17} strokeWidth={1.75} />,
-      label: t("appSettings.general"),
-    },
-    {
-      id: "keybindings",
-      icon: <Keyboard size={17} strokeWidth={1.75} />,
-      label: t("appSettings.keybindings"),
-    },
-    {
-      id: "providers",
-      icon: <Bot size={17} strokeWidth={1.75} />,
-      label: t("appSettings.providers"),
-    },
-    {
-      id: "source-control",
-      icon: <GitBranch size={17} strokeWidth={1.75} />,
-      label: t("appSettings.sourceControl"),
-    },
-    {
-      id: "connections",
-      icon: <Link2 size={17} strokeWidth={1.75} />,
-      label: t("appSettings.connections"),
-    },
-    {
-      id: "archive",
-      icon: <Archive size={17} strokeWidth={1.75} />,
-      label: t("appSettings.archive"),
-    },
-  ];
+  const navigationGroups: NavGroup[] = useMemo(
+    () => [
+      {
+        id: "setup",
+        label: t("appSettings.groupSetup"),
+        items: [
+          {
+            id: "general",
+            icon: <SlidersHorizontal size={16} strokeWidth={1.75} />,
+            label: t("appSettings.general"),
+          },
+          {
+            id: "keybindings",
+            icon: <Keyboard size={16} strokeWidth={1.75} />,
+            label: t("appSettings.keybindings"),
+          },
+        ],
+      },
+      {
+        id: "ai",
+        label: t("appSettings.groupAi"),
+        items: [
+          {
+            id: "providers",
+            icon: <Bot size={16} strokeWidth={1.75} />,
+            label: t("appSettings.providers"),
+          },
+        ],
+      },
+      {
+        id: "workflows",
+        label: t("appSettings.groupWorkflows"),
+        items: [
+          {
+            id: "source-control",
+            icon: <GitBranch size={16} strokeWidth={1.75} />,
+            label: t("appSettings.sourceControl"),
+          },
+          {
+            id: "connections",
+            icon: <Link2 size={16} strokeWidth={1.75} />,
+            label: t("appSettings.connections"),
+          },
+        ],
+      },
+      {
+        id: "data",
+        label: t("appSettings.groupData"),
+        items: [
+          {
+            id: "archive",
+            icon: <Archive size={16} strokeWidth={1.75} />,
+            label: t("appSettings.archive"),
+          },
+        ],
+      },
+    ],
+    [t],
+  );
+
+  const flatNavigation = useMemo(
+    () => navigationGroups.flatMap((group) => group.items),
+    [navigationGroups],
+  );
+
+  const filteredGroups = useMemo(() => {
+    const query = searchQuery.trim().toLocaleLowerCase();
+    if (!query) return navigationGroups;
+    return navigationGroups
+      .map((group) => ({
+        ...group,
+        items: group.items.filter((item) =>
+          item.label.toLocaleLowerCase().includes(query),
+        ),
+      }))
+      .filter((group) => group.items.length > 0);
+  }, [navigationGroups, searchQuery]);
+
+  const activeItem = flatNavigation.find((item) => item.id === activeSection);
+  const sectionDescriptions: Record<SettingsSection, string> = {
+    general: t("appSettings.generalDescription"),
+    keybindings: t("appSettings.keybindingsDescription"),
+    providers: t("appSettings.providersDescription"),
+    "source-control": t("appSettings.sourceControlDescription"),
+    connections: t("appSettings.connectionsDescription"),
+    archive: t("appSettings.archiveDescription"),
+  };
+  const sectionDescription = sectionDescriptions[activeSection];
 
   return (
     <main className="app-settings">
@@ -210,45 +285,63 @@ export function AppSettings({
         id="app-sidebar"
         inert={!isSidebarOpen ? true : undefined}
       >
-        <div className="app-settings-brand">
-          <Logo />
-        </div>
-        <nav>
-          {navigation.map((item) => (
-            <button
-              aria-current={activeSection === item.id ? "page" : undefined}
-              className={activeSection === item.id ? "active" : ""}
-              key={item.id}
-              onClick={() => setActiveSection(item.id)}
-              type="button"
-            >
-              {item.icon}
-              <span>{item.label}</span>
-            </button>
-          ))}
-        </nav>
-        <button
-          className="app-settings-back"
-          onClick={onBack}
-          type="button"
-        >
-          <ArrowLeft size={17} strokeWidth={1.8} />
+        <div
+          className="app-settings-sidebar-toolbar"
+          data-tauri-drag-region
+        />
+
+        <button className="app-settings-back" onClick={onBack} type="button">
+          <ArrowLeft size={16} strokeWidth={1.9} />
           <span>{t("appSettings.back")}</span>
         </button>
+
+        <label className="app-settings-search">
+          <Search aria-hidden="true" size={14} strokeWidth={1.9} />
+          <input
+            aria-label={t("appSettings.search")}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder={t("appSettings.search")}
+            type="search"
+            value={searchQuery}
+          />
+        </label>
+
+        <nav className="app-settings-nav">
+          {filteredGroups.map((group) => (
+            <div className="app-settings-nav-group" key={group.id}>
+              <p>{group.label}</p>
+              {group.items.map((item) => (
+                <button
+                  aria-current={activeSection === item.id ? "page" : undefined}
+                  className={activeSection === item.id ? "active" : ""}
+                  key={item.id}
+                  onClick={() => setActiveSection(item.id)}
+                  type="button"
+                >
+                  {item.icon}
+                  <span>{item.label}</span>
+                </button>
+              ))}
+            </div>
+          ))}
+        </nav>
       </aside>
 
       <section className="main-content app-settings-main">
-        <header
-          className={`topbar app-settings-topbar${
+        <div
+          className={`app-settings-main-toolbar${
             isSidebarOpen ? "" : " sidebar-closed"
           }`}
           data-tauri-drag-region="deep"
-        >
-          <h1>{t("appSettings.title")}</h1>
-        </header>
+        />
 
-        {activeSection === "providers" ? (
-          <div className="app-settings-scroll">
+        <div className="app-settings-scroll">
+          <header className="app-settings-page-header">
+            <h1>{activeItem?.label ?? t("appSettings.title")}</h1>
+            <p>{sectionDescription}</p>
+          </header>
+
+          {activeSection === "providers" ? (
             <div className="source-control-settings provider-settings">
               <SettingsGroupHeading
                 action={
@@ -410,9 +503,7 @@ export function AppSettings({
                 {t("appSettings.providerScope", { project: projectName })}
               </p>
             </div>
-          </div>
-        ) : activeSection === "source-control" ? (
-          <div className="app-settings-scroll">
+          ) : activeSection === "source-control" ? (
             <div className="source-control-settings">
               <SettingsGroupHeading
                 action={
@@ -514,7 +605,8 @@ export function AppSettings({
                     readiness?.ghAuthenticated
                       ? t("appSettings.authenticatedAs", {
                           account:
-                            readiness.ghAccount ?? t("appSettings.unknownAccount"),
+                            readiness.ghAccount ??
+                            t("appSettings.unknownAccount"),
                         })
                       : readiness?.ghInstalled
                         ? t("appSettings.authenticationRequired")
@@ -588,18 +680,16 @@ export function AppSettings({
                 {t("appSettings.projectScope", { project: projectName })}
               </p>
             </div>
-          </div>
-        ) : (
-          <div className="app-settings-placeholder">
-            <span>
-              <Settings2 size={22} strokeWidth={1.7} />
-            </span>
-            <h2>
-              {navigation.find((item) => item.id === activeSection)?.label}
-            </h2>
-            <p>{t("appSettings.sectionPlaceholder")}</p>
-          </div>
-        )}
+          ) : (
+            <div className="app-settings-placeholder">
+              <span>
+                <Settings2 size={22} strokeWidth={1.7} />
+              </span>
+              <h2>{activeItem?.label}</h2>
+              <p>{t("appSettings.sectionPlaceholder")}</p>
+            </div>
+          )}
+        </div>
       </section>
     </main>
   );
@@ -614,7 +704,6 @@ function SettingsGroupHeading({
 }) {
   return (
     <div className="source-control-section-heading">
-      <span aria-hidden="true" />
       <h2>{title}</h2>
       {action}
     </div>
@@ -645,7 +734,9 @@ function ProviderRow({
   trailing?: ReactNode;
 }) {
   return (
-    <div className={`source-control-provider${available ? "" : " unavailable"}`}>
+    <div
+      className={`source-control-provider${available ? "" : " unavailable"}`}
+    >
       <span
         aria-label={available ? "Available" : "Unavailable"}
         className={`source-control-status ${available ? "available" : "unavailable"}`}
@@ -654,7 +745,9 @@ function ProviderRow({
       <div className="source-control-provider-copy">
         <div>
           <strong>{title}</strong>
-          {badge ? <span className="source-control-badge">{badge}</span> : null}
+          {badge ? (
+            <span className="source-control-badge">{badge}</span>
+          ) : null}
         </div>
         <p>{description}</p>
       </div>
