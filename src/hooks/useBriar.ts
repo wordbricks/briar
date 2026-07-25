@@ -46,6 +46,11 @@ import {
   type RepositoryReadiness,
   type VelenInspection,
 } from "../lib/project-connection";
+import {
+  isProjectConnectedLocally,
+  withConnectedProject,
+  withoutConnectedProject,
+} from "../lib/local-project-connection";
 import { generateProjectWorkflow } from "../lib/project-workflow";
 import {
   clearSessionToken,
@@ -163,14 +168,12 @@ const emptyDashboard = (project: Project): DashboardPayload => ({
   generatedAt: new Date().toISOString(),
 });
 
-async function findUnconnectedProject(projects: Project[]) {
+// null이면 로컬 연결 상태를 알 수 없다는 뜻입니다(웹·모바일 또는 조회 실패).
+async function readConnectedProjectIds() {
   try {
-    const connectedIds = await loadConnectedProjectIds();
-    if (!connectedIds) return null;
-    const connected = new Set(connectedIds);
-    return projects.find((project) => !connected.has(project.id)) ?? null;
+    return await loadConnectedProjectIds();
   } catch {
-    return projects[0] ?? null;
+    return null;
   }
 }
 
@@ -189,6 +192,9 @@ export function useBriar() {
   const [activeProjectId, setActiveProjectId] = useState<string | null>(
     demoMode ? demoDashboard.project.id : null,
   );
+  const [connectedProjectIds, setConnectedProjectIds] = useState<
+    string[] | null
+  >(null);
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(
     demoMode ? demoDashboard : null,
   );
@@ -297,31 +303,21 @@ export function useBriar() {
         return;
       }
 
-      let unconnectedProject: Project | null;
-      try {
-        unconnectedProject = companionMode
-          ? null
-          : await findUnconnectedProject(result.projects);
-      } catch (caught) {
-        if (!cancelled) scheduleRetry(caught);
-        return;
-      }
+      const nextConnectedProjectIds = companionMode
+        ? null
+        : await readConnectedProjectIds();
       if (cancelled) return;
       setToken(result.token);
       setUser(result.user);
       setProjects(result.projects);
       setOrganizations(result.organizations);
+      setConnectedProjectIds(nextConnectedProjectIds);
       setActiveOrganizationId(
         result.projects[0]?.organizationId ??
           result.organizations[0]?.id ??
           null,
       );
       setActiveProjectId(result.projects[0]?.id ?? null);
-      setProjectConnection(
-        unconnectedProject
-          ? { project: unconnectedProject, agentToken: null }
-          : null,
-      );
       setError(null);
       setLoading(false);
     };
@@ -373,7 +369,13 @@ export function useBriar() {
   }, [activeProjectId, refresh, token]);
 
   const refreshHealth = useCallback(async () => {
-    if (demoMode || companionMode || !activeProjectId) {
+    if (
+      demoMode ||
+      companionMode ||
+      !activeProjectId ||
+      // 이 기기에 저장소를 연결하기 전에는 로컬 상태를 검사할 대상이 없습니다.
+      !isProjectConnectedLocally(connectedProjectIds, activeProjectId)
+    ) {
       setHealth(null);
       setHealthError(null);
       return null;
@@ -392,7 +394,7 @@ export function useBriar() {
     } finally {
       setHealthLoading(false);
     }
-  }, [activeProjectId]);
+  }, [activeProjectId, connectedProjectIds]);
 
   useEffect(() => {
     void refreshHealth();
@@ -433,6 +435,9 @@ export function useBriar() {
     let cancelled = false;
     void Promise.all(
       projects.map(async (project) => {
+        if (!isProjectConnectedLocally(connectedProjectIds, project.id)) {
+          return null;
+        }
         try {
           const readiness = await loadProjectRepositoryReadiness(project.id);
           return readiness ? ([project.id, readiness] as const) : null;
@@ -454,7 +459,7 @@ export function useBriar() {
     return () => {
       cancelled = true;
     };
-  }, [projects]);
+  }, [connectedProjectIds, projects]);
 
   const login = useCallback(async () => {
     const attempt = ++loginAttempt.current;
@@ -486,9 +491,9 @@ export function useBriar() {
               loadProjects(nextToken),
               loadOrganizations(nextToken),
             ]);
-            const unconnectedProject = companionMode
+            const nextConnectedProjectIds = companionMode
               ? null
-              : await findUnconnectedProject(nextProjects);
+              : await readConnectedProjectIds();
             if (attempt !== loginAttempt.current) return;
             await writeSessionToken(nextToken);
             if (attempt !== loginAttempt.current) {
@@ -499,15 +504,12 @@ export function useBriar() {
             setUser(nextUser);
             setProjects(nextProjects);
             setOrganizations(nextOrganizations);
+            setConnectedProjectIds(nextConnectedProjectIds);
             setActiveOrganizationId(
               nextProjects[0]?.organizationId ?? nextOrganizations[0]?.id ?? null,
             );
             setActiveProjectId(nextProjects[0]?.id ?? null);
-            setProjectConnection(
-              unconnectedProject
-                ? { project: unconnectedProject, agentToken: null }
-                : null,
-            );
+            setProjectConnection(null);
             setLoginCode(null);
             setLoading(false);
             pollLoginNow.current = null;
@@ -554,6 +556,7 @@ export function useBriar() {
     setUser(null);
     setProjects([]);
     setOrganizations([]);
+    setConnectedProjectIds(null);
     setActiveOrganizationId(null);
     setDashboard(null);
     setActiveProjectId(null);
@@ -794,6 +797,9 @@ export function useBriar() {
         }
         setActiveProjectId(nextActiveProject?.id ?? null);
         setProjectConnection(null);
+        setConnectedProjectIds((current) =>
+          withoutConnectedProject(current, projectId),
+        );
         setProjectReadiness((current) => {
           const next = { ...current };
           delete next[projectId];
@@ -871,6 +877,9 @@ export function useBriar() {
         autoHunt,
       });
       connectedLocally = true;
+      setConnectedProjectIds((current) =>
+        withConnectedProject(current, connection.project.id),
+      );
 
       const initialSettings: ProjectSettings = {
         velenOrg: autoHunt.velenOrg,
@@ -1607,6 +1616,11 @@ export function useBriar() {
     cancelLogin,
     checkOrganizationHandle,
     connectProject,
+    connectedProjectIds,
+    isActiveProjectConnectedLocally: isProjectConnectedLocally(
+      connectedProjectIds,
+      activeProjectId,
+    ),
     dashboard,
     deleteProject: removeProject,
     deletingProjectId,

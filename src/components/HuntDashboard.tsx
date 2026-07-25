@@ -97,9 +97,11 @@ export function HuntDashboard({
   healthError,
   healthLoading,
   isCreatingIssue,
+  needsLocalConnection = false,
   recoveringRunId,
   recoveryError,
   isSidebarOpen,
+  onConnectRepository,
   onCreateIssue,
   onHealthRefresh,
   onLoadAttachment,
@@ -124,9 +126,11 @@ export function HuntDashboard({
   healthError: string | null;
   healthLoading: boolean;
   isCreatingIssue: boolean;
+  needsLocalConnection?: boolean;
   recoveringRunId: string | null;
   recoveryError: string | null;
   isSidebarOpen: boolean;
+  onConnectRepository?: () => void;
   onCreateIssue: (input: CreateIssueInput) => Promise<unknown>;
   onHealthRefresh: () => void;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
@@ -292,6 +296,18 @@ export function HuntDashboard({
       </header>}
       <div className="dashboard-scroll">
         {error && <div className="error-banner"><CircleAlert size={16} />{error}</div>}
+        {needsLocalConnection && (
+          <div className="connect-banner">
+            <span aria-hidden="true"><FolderGit2 size={16} /></span>
+            <div>
+              <strong>{t("dashboard.connectRepositoryTitle")}</strong>
+              <small>{t("dashboard.connectRepositoryDescription")}</small>
+            </div>
+            <button onClick={onConnectRepository} type="button">
+              <FolderGit2 size={13} />{t("dashboard.connectRepository")}
+            </button>
+          </div>
+        )}
 
         <div className="queue-header">
           <div>
