@@ -746,10 +746,7 @@ fn install_grok_cli(home: &Path) -> Result<(), String> {
     let output = Command::new(shell)
         .env("PATH", &execution_path)
         .env("HOME", home)
-        .args([
-            "-c",
-            "curl -fsSL https://x.ai/cli/install.sh | bash",
-        ])
+        .args(["-c", "curl -fsSL https://x.ai/cli/install.sh | bash"])
         .output()
         .map_err(|error| format!("Grok CLI 설치 명령을 실행하지 못했습니다: {error}"))?;
     if output.status.success() {
@@ -4002,9 +3999,7 @@ mod tests {
         assert!(home
             .join(".claude/skills/briar-auto-hunt/SKILL.md")
             .is_file());
-        assert!(home
-            .join(".grok/skills/briar-auto-hunt/SKILL.md")
-            .is_file());
+        assert!(home.join(".grok/skills/briar-auto-hunt/SKILL.md").is_file());
         assert_eq!(
             read_trimmed_file(&home.join(".codex/skills/briar-auto-hunt/VERSION")),
             Some(env!("CARGO_PKG_VERSION").to_string())

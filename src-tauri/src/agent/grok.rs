@@ -342,8 +342,7 @@ fn decode_conversation_id<'a>(
         .strip_prefix(&prefix)
         .filter(|session_id| !session_id.is_empty())
         .ok_or_else(|| {
-            "이 Grok 대화는 다른 프로젝트 또는 에이전트에 속해 있어 이어갈 수 없습니다."
-                .to_string()
+            "이 Grok 대화는 다른 프로젝트 또는 에이전트에 속해 있어 이어갈 수 없습니다.".to_string()
         })
 }
 
