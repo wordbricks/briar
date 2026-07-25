@@ -13,6 +13,15 @@ import {
   autoHuntWorkflowPresets,
   workflowForPreset,
 } from "../src/lib/auto-hunt-contract";
+import {
+  defaultWorkerLabel,
+  hostFingerprint,
+  interruptibleSleep,
+  runWorkerLoop,
+  serviceDefinition,
+  writeServiceDefinition,
+  type ClaimedIssue,
+} from "./worker";
 
 const workflowStageIdSchema = z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/u);
 
@@ -57,6 +66,10 @@ const projectConfigSchema = z
     repositoryPath: z.string(),
     agentToken: z.string(),
     repositoryRemote: z.string().optional(),
+    llm: z
+      .object({ provider: z.enum(["codex", "claude"]) })
+      .passthrough()
+      .optional(),
     autoHunt: autoHuntConfigSchema.optional(),
     activeClaim: z
       .object({
@@ -823,6 +836,190 @@ async function recoverHunt(action: "retry" | "cancel") {
   console.log(JSON.stringify(result));
 }
 
+const workerRegistrationSchema = z.object({
+  worker: z.object({
+    id: z.string().min(1),
+    label: z.string().min(1),
+    state: z.enum(["online", "stale", "disabled"]),
+    lastHeartbeatAt: z.string(),
+  }),
+});
+
+const claimedRunSchema = z.object({
+  runId: z.string().uuid(),
+  sourceKey: z.string().min(1),
+  title: z.string().min(1),
+  claimToken: z.string().startsWith("briar_claim_"),
+  leaseExpiresAt: z.string(),
+});
+
+/**
+ * Agent launcher for a claimed issue.
+ *
+ * Only the Claude path exists as a standalone runner today
+ * (dist-agent/claude-runner.js). The Codex app-server client still lives in the
+ * desktop's Rust layer, so `briar worker` cannot drive it until that client is
+ * ported to src-agent — see docs/plans/remote-execution-hosts.md §2.4.
+ */
+async function runClaimedIssue(project: ProjectConfig, issue: ClaimedIssue) {
+  const provider = project.llm?.provider ?? "codex";
+  if (provider !== "claude") {
+    throw new Error(
+      `이 프로젝트는 ${provider} 에이전트를 사용하도록 설정되어 있어 워커에서 실행할 수 없습니다. Codex 러너 이식이 끝나면 사용할 수 있습니다.`,
+    );
+  }
+  throw new Error(
+    `Claude 러너 연결이 아직 준비되지 않았습니다: ${issue.sourceKey}는 데스크톱 앱에서 실행하세요.`,
+  );
+}
+
+async function workerCommand() {
+  const config = await loadConfig();
+  const projectId = value("--project");
+  const project = projectId
+    ? config.projects.find((candidate) => candidate.id === projectId)
+    : await currentProject(config);
+  if (!project) {
+    throw new Error("이 컴퓨터에 연결된 프로젝트를 찾지 못했습니다.");
+  }
+  ensureVelen(project);
+  const agentToken = process.env.BRIAR_AGENT_TOKEN ?? project.agentToken;
+  const label = value("--label") ?? defaultWorkerLabel();
+  const provider = project.llm?.provider ?? "codex";
+
+  const registration = workerRegistrationSchema.parse(
+    await request(config.apiUrl, "/ingest/workers/register", agentToken, {
+      method: "POST",
+      body: JSON.stringify({
+        label,
+        hostFingerprint: hostFingerprint(),
+        agentProvider: provider,
+        versions: { briar: cliVersion },
+      }),
+    }),
+  );
+  const workerId = registration.worker.id;
+  console.log(`worker ${label} registered as ${workerId}`);
+
+  const maxIssues = Number.parseInt(value("--max-issues") ?? "", 10);
+  const result = await runWorkerLoop(
+    {
+      claim: async () => {
+        const claimed = await request<{ issue: unknown }>(
+          config.apiUrl,
+          "/ingest/queue/claim",
+          agentToken,
+          {
+            method: "POST",
+            body: JSON.stringify({ claimedBy: label, workerId }),
+          },
+        );
+        return claimed.issue === null
+          ? null
+          : claimedRunSchema.parse(claimed.issue);
+      },
+      renewLease: async (issue) => {
+        await request(
+          config.apiUrl,
+          `/ingest/runs/${issue.runId}/lease`,
+          agentToken,
+          {
+            method: "POST",
+            body: JSON.stringify({ claimToken: issue.claimToken }),
+          },
+        );
+      },
+      heartbeat: async () => {
+        await request(
+          config.apiUrl,
+          `/ingest/workers/${workerId}/heartbeat`,
+          agentToken,
+          {
+            method: "POST",
+            body: JSON.stringify({ versions: { briar: cliVersion } }),
+          },
+        );
+      },
+      runIssue: (issue) => runClaimedIssue(project, issue),
+      sleep: interruptibleSleep,
+      now: () => Date.now(),
+      log: (line) => console.log(line),
+    },
+    {
+      once: has("--once"),
+      ...(Number.isInteger(maxIssues) && maxIssues > 0 ? { maxIssues } : {}),
+    },
+  );
+  console.log(JSON.stringify(result));
+}
+
+async function workerStatus() {
+  const config = await loadConfig();
+  const project = value("--project")
+    ? config.projects.find((candidate) => candidate.id === value("--project"))
+    : await currentProject(config);
+  if (!project) {
+    throw new Error("이 컴퓨터에 연결된 프로젝트를 찾지 못했습니다.");
+  }
+  const definition = serviceDefinition({
+    projectId: project.id,
+    briarBinary: process.execPath,
+    workingDirectory: project.repositoryPath,
+  });
+  console.log(
+    JSON.stringify(
+      {
+        projectId: project.id,
+        service: definition.label,
+        unitPath: definition.path,
+        logPath: definition.logPath,
+        hostFingerprint: hostFingerprint(),
+      },
+      null,
+      2,
+    ),
+  );
+}
+
+async function workerService(action: "install" | "uninstall") {
+  const config = await loadConfig();
+  const project = value("--project")
+    ? config.projects.find((candidate) => candidate.id === value("--project"))
+    : await currentProject(config);
+  if (!project) {
+    throw new Error("이 컴퓨터에 연결된 프로젝트를 찾지 못했습니다.");
+  }
+  const briarBinary = value("--briar-binary") ?? process.execPath;
+  const definition = serviceDefinition({
+    projectId: project.id,
+    briarBinary,
+    workingDirectory: project.repositoryPath,
+  });
+  const command =
+    action === "install" ? definition.enableCommand : definition.disableCommand;
+  if (action === "install") {
+    await writeServiceDefinition(definition);
+  }
+  const argv =
+    command[0] === "launchctl"
+      ? [...command, definition.path]
+      : command;
+  const spawned = Bun.spawnSync({ cmd: argv, stdout: "pipe", stderr: "pipe" });
+  if (!spawned.success) {
+    throw new Error(
+      `서비스 ${action === "install" ? "설치" : "제거"}에 실패했습니다: ${new TextDecoder().decode(spawned.stderr).trim()}`,
+    );
+  }
+  console.log(
+    JSON.stringify({
+      action,
+      service: definition.label,
+      unitPath: definition.path,
+      logPath: definition.logPath,
+    }),
+  );
+}
+
 const usage = `Briar CLI
 
   briar login
@@ -841,6 +1038,10 @@ const usage = `Briar CLI
     --result <passed|skipped>
   briar auto-hunt retry --run-id <uuid> [--request-id <uuid>] [--reason <text>]
   briar auto-hunt cancel --run-id <uuid> [--request-id <uuid>] [--reason <text>]
+  briar worker [--project <uuid>] [--label <text>] [--max-issues <n>] [--once]
+  briar worker status [--project <uuid>]
+  briar worker install-service [--project <uuid>] [--briar-binary <path>]
+  briar worker uninstall-service [--project <uuid>]
 
 Compatibility:
   briar hunt record ...   Alias of briar auto-hunt record
@@ -868,6 +1069,14 @@ async function main() {
   if (args[0] === "auto-hunt" && args[1] === "retry") return recoverHunt("retry");
   if (args[0] === "auto-hunt" && args[1] === "cancel") return recoverHunt("cancel");
   if (args[0] === "hunt" && args[1] === "record") return recordHunt();
+  if (args[0] === "worker" && args[1] === "status") return workerStatus();
+  if (args[0] === "worker" && args[1] === "install-service") {
+    return workerService("install");
+  }
+  if (args[0] === "worker" && args[1] === "uninstall-service") {
+    return workerService("uninstall");
+  }
+  if (args[0] === "worker") return workerCommand();
   console.log(usage);
 }
 
