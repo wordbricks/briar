@@ -411,6 +411,97 @@ describe("HuntDashboard", () => {
     );
   });
 
+  it("scrolls the conversation to the bottom after loading and sending", async () => {
+    const createdAt = new Date().toISOString();
+    const loadedMessage: IssueMessage = {
+      id: "message-loaded",
+      runId: demoDashboard.runs[0].id,
+      parentMessageId: null,
+      body: "기존 메시지",
+      author: { id: "jay", name: "Jay", image: null, provider: null },
+      replyCount: 0,
+      createdAt,
+      updatedAt: createdAt,
+    };
+    const sentMessage: IssueMessage = {
+      ...loadedMessage,
+      id: "message-sent",
+      body: "새 메시지",
+    };
+    let resolveLoadedMessages: (messages: IssueMessage[]) => void =
+      () => undefined;
+    const loadedMessages = new Promise<IssueMessage[]>((resolve) => {
+      resolveLoadedMessages = resolve;
+    });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={() => loadedMessages}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => ({
+            message: sentMessage,
+            agentReply: null,
+          })}
+          run={demoDashboard.runs[0]}
+        />,
+      );
+    });
+
+    const messageList = container.querySelector<HTMLElement>(
+      ".issue-message-list",
+    );
+    expect(messageList).not.toBeNull();
+    if (!messageList) throw new Error("message list was not rendered");
+    Object.defineProperty(messageList, "scrollHeight", {
+      configurable: true,
+      value: 640,
+    });
+    messageList.scrollTop = 0;
+    await act(async () => {
+      resolveLoadedMessages([loadedMessage]);
+      await loadedMessages;
+      await Promise.resolve();
+    });
+    expect(messageList?.scrollTop).toBe(640);
+
+    const textarea = container.querySelector<HTMLTextAreaElement>(
+      ".issue-message-composer textarea",
+    );
+    await act(async () => {
+      if (!textarea) return;
+      Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )?.set?.call(textarea, sentMessage.body);
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    messageList.scrollTop = 0;
+    await act(async () => {
+      textarea?.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          bubbles: true,
+          cancelable: true,
+          key: "Enter",
+        }),
+      );
+      await Promise.resolve();
+    });
+    expect(messageList?.scrollTop).toBe(640);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("opens a message thread in the right drawer and closes it with Escape", async () => {
     const rootMessage: IssueMessage = {
       id: "message-root",
@@ -429,6 +520,11 @@ describe("HuntDashboard", () => {
       body: "스레드 답장",
       replyCount: 0,
     };
+    const sentReply: IssueMessage = {
+      ...reply,
+      id: "message-new-reply",
+      body: "새 스레드 답장",
+    };
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
@@ -445,7 +541,7 @@ describe("HuntDashboard", () => {
           onMove={async () => undefined}
           onRetry={async () => undefined}
           onSendIssueMessage={async () => ({
-            message: reply,
+            message: sentReply,
             agentReply: null,
           })}
           run={demoDashboard.runs[0]}
@@ -463,11 +559,46 @@ describe("HuntDashboard", () => {
     ).toBe("toolbar");
     expect(container.querySelector(".issue-thread-summary")?.textContent)
       .toContain("답장 1개");
+    const threadContent = container.querySelector<HTMLElement>(
+      ".issue-thread-content",
+    );
+    expect(threadContent).not.toBeNull();
+    if (!threadContent) throw new Error("thread content was not rendered");
+    Object.defineProperty(threadContent, "scrollHeight", {
+      configurable: true,
+      value: 480,
+    });
+    threadContent.scrollTop = 0;
     await act(async () => trigger?.click());
     expect(container.querySelector('[role="dialog"]')).not.toBeNull();
     expect(container.querySelector(".issue-thread-content")?.textContent).toContain(
       "스레드 답장",
     );
+    expect(threadContent?.scrollTop).toBe(480);
+
+    const threadTextarea = container.querySelector<HTMLTextAreaElement>(
+      ".issue-thread-drawer .issue-message-composer textarea",
+    );
+    await act(async () => {
+      if (!threadTextarea) return;
+      Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )?.set?.call(threadTextarea, sentReply.body);
+      threadTextarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    threadContent.scrollTop = 0;
+    await act(async () => {
+      threadTextarea?.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          bubbles: true,
+          cancelable: true,
+          key: "Enter",
+        }),
+      );
+      await Promise.resolve();
+    });
+    expect(threadContent?.scrollTop).toBe(480);
 
     await act(async () => {
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));

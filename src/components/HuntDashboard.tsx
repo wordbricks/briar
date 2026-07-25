@@ -38,6 +38,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -1384,6 +1385,8 @@ function IssueConversation({
   const [agentReplyError, setAgentReplyError] = useState<string | null>(null);
   const [agentReplying, setAgentReplying] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const messageListRef = useRef<HTMLDivElement | null>(null);
+  const threadContentRef = useRef<HTMLDivElement | null>(null);
   const threadTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   const loadMessages = useCallback(async () => {
@@ -1422,6 +1425,19 @@ function IssueConversation({
         (message) => message.parentMessageId === activeThread.id,
       )
     : [];
+
+  useLayoutEffect(() => {
+    const messageList = messageListRef.current;
+    if (messageList) messageList.scrollTop = messageList.scrollHeight;
+  }, [agentReplying, loading, messages.length]);
+
+  useLayoutEffect(() => {
+    const threadContent = threadContentRef.current;
+    if (activeThread && threadContent) {
+      threadContent.scrollTop = threadContent.scrollHeight;
+    }
+  }, [activeThreadId, replies.length]);
+
   const openThread = (messageId: string, trigger: HTMLButtonElement) => {
     threadTriggerRef.current = trigger;
     setActiveThreadId(messageId);
@@ -1467,7 +1483,7 @@ function IssueConversation({
         </span>
         {roots.length > 0 && <small>{roots.length}</small>}
       </header>
-      <div className="issue-message-list">
+      <div className="issue-message-list" ref={messageListRef}>
         {loading ? (
           <div className="issue-message-state">
             <LoaderCircle className="spin" size={16} />
@@ -1536,7 +1552,7 @@ function IssueConversation({
               <X size={18} />
             </button>
           </header>
-          <div className="issue-thread-content">
+          <div className="issue-thread-content" ref={threadContentRef}>
             {activeThread && (
               <>
                 <IssueMessageItem
