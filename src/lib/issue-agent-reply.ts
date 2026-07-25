@@ -20,6 +20,20 @@ export function mentionsBriar(body: string) {
   return /(^|[^\p{L}\p{N}_])@briar(?=$|[^\p{L}\p{N}_])/iu.test(body);
 }
 
+export function shouldBriarReply(
+  messages: readonly IssueMessage[],
+  input: { body: string; parentMessageId: string | null },
+) {
+  if (mentionsBriar(input.body)) return true;
+  if (!input.parentMessageId) return false;
+  return messages.some(
+    (message) =>
+      (message.id === input.parentMessageId ||
+        message.parentMessageId === input.parentMessageId) &&
+      (message.author.provider !== null || mentionsBriar(message.body)),
+  );
+}
+
 export function agentReplyParentMessageId(
   message: Pick<IssueMessage, "id" | "parentMessageId">,
 ) {

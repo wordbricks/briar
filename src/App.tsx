@@ -38,10 +38,7 @@ import {
   isMacDesktopTauri,
 } from "./lib/platform";
 import { automaticTriggersFor } from "./lib/auto-hunt-automation";
-import {
-  issueAgentConversation,
-  mentionsBriar,
-} from "./lib/issue-agent-reply";
+import { issueAgentConversation } from "./lib/issue-agent-reply";
 
 type ActivePage =
   | "issues"
@@ -116,7 +113,7 @@ export function App() {
     input: { body: string; parentMessageId: string | null },
   ) => {
     const agentConversation =
-      briar.activeProjectId && mentionsBriar(input.body)
+      briar.activeProjectId
         ? issueAgentConversation(
             autoHunt.sessions,
             briar.activeProjectId,

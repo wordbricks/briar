@@ -5,6 +5,7 @@ import {
   issueAgentConversation,
   mentionsBriar,
   providerForConversation,
+  shouldBriarReply,
 } from "./issue-agent-reply";
 
 describe("issue agent replies", () => {
@@ -21,6 +22,57 @@ describe("issue agent replies", () => {
         parentMessageId: "thread-root",
       }),
     ).toBe("thread-root");
+  });
+
+  it("continues replying in a thread where Briar was mentioned", () => {
+    const rootMessage = {
+      id: "thread-root",
+      runId: "run-1",
+      parentMessageId: null,
+      body: "@briar 진행 상황을 알려줘",
+      author: { id: "user-1", name: "User", image: null, provider: null },
+      replyCount: 1,
+      createdAt: "2026-07-25T00:00:00.000Z",
+      updatedAt: "2026-07-25T00:00:00.000Z",
+    } as const;
+
+    expect(
+      shouldBriarReply([rootMessage], {
+        body: "그 다음에는 어떻게 됐어?",
+        parentMessageId: rootMessage.id,
+      }),
+    ).toBe(true);
+    expect(
+      shouldBriarReply([rootMessage], {
+        body: "별도의 새 메시지",
+        parentMessageId: null,
+      }),
+    ).toBe(false);
+  });
+
+  it("continues replying when Briar has already participated in the thread", () => {
+    const agentReply = {
+      id: "agent-reply",
+      runId: "run-1",
+      parentMessageId: "thread-root",
+      body: "현재 진행 중입니다.",
+      author: {
+        id: null,
+        name: "Briar · Codex",
+        image: null,
+        provider: "codex",
+      },
+      replyCount: 0,
+      createdAt: "2026-07-25T00:00:00.000Z",
+      updatedAt: "2026-07-25T00:00:00.000Z",
+    } as const;
+
+    expect(
+      shouldBriarReply([agentReply], {
+        body: "완료되면 알려줘",
+        parentMessageId: "thread-root",
+      }),
+    ).toBe(true);
   });
 
   it("recognizes a standalone @briar mention without matching email-like text", () => {
