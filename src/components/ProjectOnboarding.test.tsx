@@ -287,6 +287,7 @@ describe("ProjectOnboarding", () => {
       expect.objectContaining({
         velenOrg: "briar",
         linearEnabled: false,
+        githubRepository: "wordbricks/briar",
       }),
       "/Users/jay/git/briar",
       "local",
