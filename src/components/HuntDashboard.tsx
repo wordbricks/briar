@@ -314,7 +314,7 @@ export function HuntDashboard({
 
   return (
     <main className="main-content" id="issues">
-      {!companionMode && <header className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region>
+      {!companionMode && <header className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region="deep">
         <ConnectionHealth
           error={healthError}
           health={health}
@@ -1123,7 +1123,7 @@ export function RunPage({
       {!companionMode && (
         <header
           className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`}
-          data-tauri-drag-region
+          data-tauri-drag-region="deep"
         >
           <button
             aria-label={t("run.back")}
@@ -1134,15 +1134,11 @@ export function RunPage({
           >
             <ArrowLeft aria-hidden="true" size={16} />
           </button>
-          <small
-            className="run-page-window-number"
-            data-tauri-drag-region
-          >
+          <small className="run-page-window-number">
             AH-{run.runNumber}
           </small>
           <strong
             className="run-page-window-title"
-            data-tauri-drag-region
             id="run-page-title"
             title={run.title}
           >

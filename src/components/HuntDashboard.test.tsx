@@ -314,7 +314,11 @@ describe("HuntDashboard", () => {
     const windowTitle = container.querySelector(".run-page-window-title");
     expect(windowTitle?.textContent).toBe(demoDashboard.runs[0].title);
     expect(windowTitle?.getAttribute("title")).toBe(demoDashboard.runs[0].title);
-    expect(windowTitle?.hasAttribute("data-tauri-drag-region")).toBe(true);
+    expect(
+      container
+        .querySelector(".run-page-shell > .topbar")
+        ?.getAttribute("data-tauri-drag-region"),
+    ).toBe("deep");
     expect(container.querySelector(".run-page-heading")).toBeNull();
     expect(container.querySelector(".run-page-back")).toBeNull();
     expect(container.querySelector(".run-page-title-row")).toBeNull();

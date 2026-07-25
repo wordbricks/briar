@@ -340,7 +340,7 @@ export function ProjectSettings({
 
   return (
     <main className="main-content project-settings-page">
-      <header className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region>
+      <header className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region="deep">
         <button className="project-settings-back" onClick={onBack} type="button">
           <ArrowLeft size={16} strokeWidth={1.8} />
           <span>{t("settings.back")}</span>

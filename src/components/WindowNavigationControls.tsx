@@ -54,7 +54,7 @@ export function WindowNavigationControls({
     <nav
       aria-label={t("navigation.history")}
       className="window-navigation-controls"
-      data-tauri-drag-region
+      data-tauri-drag-region="deep"
     >
       <button
         aria-controls="app-sidebar"
