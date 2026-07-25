@@ -31,7 +31,7 @@ import {
 import type { RepositoryReadiness } from "../lib/project-connection";
 import { Logo } from "./Logo";
 
-type SettingsSection =
+export type SettingsSection =
   | "general"
   | "keybindings"
   | "providers"
@@ -68,6 +68,7 @@ function writeProviderPreference(
 
 export function AppSettings({
   error,
+  initialSection = "source-control",
   isSidebarOpen,
   loading,
   onBack,
@@ -77,6 +78,7 @@ export function AppSettings({
   readiness,
 }: {
   error: string | null;
+  initialSection?: SettingsSection;
   isSidebarOpen: boolean;
   loading: boolean;
   onBack: () => void;
@@ -87,7 +89,7 @@ export function AppSettings({
 }) {
   const { t } = useI18n();
   const [activeSection, setActiveSection] =
-    useState<SettingsSection>("source-control");
+    useState<SettingsSection>(initialSection);
   const [gitEnabled, setGitEnabled] = useState(() =>
     readProviderPreference(projectId, "git"),
   );
@@ -104,6 +106,10 @@ export function AppSettings({
     useState<AgentProvider | null>(null);
   const [providerError, setProviderError] = useState<string | null>(null);
   const [providersChecked, setProvidersChecked] = useState(false);
+
+  useEffect(() => {
+    setActiveSection(initialSection);
+  }, [initialSection]);
 
   useEffect(() => {
     setGitEnabled(readProviderPreference(projectId, "git"));

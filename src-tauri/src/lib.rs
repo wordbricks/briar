@@ -1,4 +1,5 @@
 mod agent;
+mod agent_usage;
 mod host;
 
 use serde::{Deserialize, Serialize};
@@ -2967,6 +2968,14 @@ async fn load_app_provider_settings(app: tauri::AppHandle) -> Result<AppProvider
 }
 
 #[tauri::command]
+async fn load_agent_usage(
+    app: tauri::AppHandle,
+) -> Result<agent_usage::AgentUsageSnapshot, String> {
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    Ok(agent_usage::load(home).await)
+}
+
+#[tauri::command]
 async fn update_app_provider_settings(
     app: tauri::AppHandle,
     settings: AppProviderSettings,
@@ -3334,6 +3343,7 @@ pub fn run() {
             start_project_auto_hunt,
             load_auto_hunt_app_server_events,
             load_app_provider_settings,
+            load_agent_usage,
             update_app_provider_settings,
             load_project_llm_settings,
             update_project_llm_settings,
