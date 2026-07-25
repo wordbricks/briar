@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
@@ -19,6 +20,13 @@ export default defineConfig({
       : undefined,
     watch: {
       ignored: ["**/src-tauri/**"],
+    },
+  },
+  test: {
+    setupFiles: ["./src/test/setup.ts"],
+    env: {
+      // api.ts reads this at module load; tests expect a configured Worker URL.
+      VITE_BRIAR_API_URL: "http://127.0.0.1:8787",
     },
   },
 });
