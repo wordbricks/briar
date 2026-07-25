@@ -107,9 +107,7 @@ export function AutoHuntSessions({
   if (selectedSession) {
     return (
       <main className="main-content" id="auto-hunt-session">
-        {!companionMode && <header className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region>
-          <div className="window-controls" aria-hidden="true"><i /><i /><i /></div>
-        </header>}
+        {!companionMode && <header className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region />}
 
         <div className="auto-hunt-scroll auto-hunt-session-detail-scroll">
           <section
@@ -241,9 +239,7 @@ export function AutoHuntSessions({
 
   return (
     <main className="main-content" id="auto-hunt">
-      {!companionMode && <header className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region>
-        <div className="window-controls" aria-hidden="true"><i /><i /><i /></div>
-      </header>}
+      {!companionMode && <header className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region />}
 
       <div className="auto-hunt-scroll">
         <section className="auto-hunt-hero">

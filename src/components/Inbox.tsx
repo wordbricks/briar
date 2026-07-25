@@ -122,9 +122,7 @@ export function Inbox({
       <header
         className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`}
         data-tauri-drag-region
-      >
-        <div className="window-controls" aria-hidden="true"><i /><i /><i /></div>
-      </header>
+      />
       {inboxContent}
     </main>
   );

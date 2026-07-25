@@ -315,7 +315,6 @@ export function HuntDashboard({
   return (
     <main className="main-content" id="issues">
       {!companionMode && <header className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region>
-        <div className="window-controls" aria-hidden="true"><i /><i /><i /></div>
         <ConnectionHealth
           error={healthError}
           health={health}
