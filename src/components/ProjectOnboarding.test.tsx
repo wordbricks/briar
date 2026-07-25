@@ -121,7 +121,7 @@ describe("ProjectOnboarding", () => {
     expect(confirm?.disabled).toBe(true);
 
     const select = container.querySelector<HTMLButtonElement>(
-      ".setup-repository-action",
+      ".repository-setup .setup-repository-action",
     );
     await act(async () => select?.click());
 
@@ -129,6 +129,7 @@ describe("ProjectOnboarding", () => {
     expect(onRepositoryInspect).toHaveBeenCalledWith(
       "/Users/jay/git/briar",
       expect.objectContaining({ preset: "local" }),
+      "local",
     );
     expect(container.textContent).toContain("/Users/jay/git/briar");
     expect(container.textContent).toContain("push 권한 확인됨");
@@ -141,6 +142,7 @@ describe("ProjectOnboarding", () => {
         linearEnabled: false,
       }),
       "/Users/jay/git/briar",
+      "local",
     );
 
     await act(async () => root.unmount());
