@@ -44,6 +44,7 @@ import {
 } from "./lib/platform";
 import { automaticTriggersFor } from "./lib/auto-hunt-automation";
 import { issueAgentConversation } from "./lib/issue-agent-reply";
+import { isRepositoryConnectedForImport } from "./lib/linear-import";
 
 type ActivePage =
   | "issues"
@@ -483,8 +484,23 @@ export function App() {
             onUpdateLinear={(linear) =>
               briar.saveLinearIntegration(activeProject.id, linear)
             }
+            onConnectLinearImport={(apiKey) =>
+              briar.connectLinearForImport(activeProject.id, apiKey)
+            }
+            onLoadLinearImportStates={(input) =>
+              briar.loadLinearStatesForImport(activeProject.id, input)
+            }
+            onImportLinearIssues={(input) =>
+              briar.runLinearIssueImport(activeProject.id, input)
+            }
             onRefreshVelen={briar.refreshVelen}
             project={activeProject}
+            repositoryConnected={isRepositoryConnectedForImport({
+              projectId: activeProject.id,
+              connectedProjectIds: briar.connectedProjectIds,
+              githubRepository: briar.dashboard?.settings.githubRepository,
+              repositoryPath: briar.health?.repositoryPath,
+            })}
             velen={briar.velen}
           />
         ) : activePage === "auto-hunt" && activeProject ? (

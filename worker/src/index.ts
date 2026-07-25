@@ -43,6 +43,7 @@ import {
   getHuntRunForProject,
   HuntClaimError,
   HuntTransitionError,
+  importLinearHuntRuns,
   listIssueAttachments,
   listIssueMessages,
   listDashboardRuns,
@@ -69,6 +70,19 @@ import {
   type OrganizationRole,
   type OrganizationRow,
 } from "./db";
+import {
+  fetchLinearIssuesForTeams,
+  fetchLinearViewerAndTeams,
+  fetchLinearWorkflowStates,
+  LinearApiError,
+  LINEAR_IMPORT_ISSUE_LIMIT,
+} from "./linear";
+import {
+  defaultPlacementForLinearType,
+  linearSourceKey,
+  mapLinearPriority,
+  parsePlacementKey,
+} from "../../src/lib/linear-import";
 import {
   appendAgentTranscript,
   assertWorkerHasNoRunInFlight,
@@ -296,6 +310,31 @@ const issueInputSchema = z
     title: z.string().trim().min(1).max(300),
     description: z.string().trim().max(100_000).nullable().optional(),
     priority: z.number().int().min(1).max(4).nullable().optional(),
+  })
+  .strict();
+
+const linearApiKeySchema = z
+  .object({
+    apiKey: z.string().trim().min(10).max(500),
+  })
+  .strict();
+
+const linearStatesInputSchema = z
+  .object({
+    apiKey: z.string().trim().min(10).max(500),
+    teamIds: z.array(z.string().trim().min(1).max(100)).min(1).max(50),
+  })
+  .strict();
+
+const linearImportInputSchema = z
+  .object({
+    apiKey: z.string().trim().min(10).max(500),
+    teamIds: z.array(z.string().trim().min(1).max(100)).min(1).max(50),
+    statusMapping: z
+      .record(z.string().trim().min(1).max(100), z.string().trim().min(1).max(100))
+      .refine((value) => Object.keys(value).length > 0, {
+        message: "statusMapping is required",
+      }),
   })
   .strict();
 
@@ -1072,6 +1111,126 @@ async function route(
       automation: input.automation,
     });
     return json({ settings: settingsJson(settings) });
+  }
+
+  const linearConnectMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/linear\/connect$/u,
+  );
+  if (linearConnectMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, linearConnectMatch[1], session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    const input = linearApiKeySchema.parse(await readJson(request));
+    try {
+      const { viewer, teams } = await fetchLinearViewerAndTeams(input.apiKey);
+      return json({ viewer, teams });
+    } catch (error) {
+      if (error instanceof LinearApiError) {
+        throw new HttpError(error.status === 401 || error.status === 403 ? 401 : 502, error.message);
+      }
+      throw error;
+    }
+  }
+
+  const linearStatesMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/linear\/states$/u,
+  );
+  if (linearStatesMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, linearStatesMatch[1], session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    const input = linearStatesInputSchema.parse(await readJson(request));
+    try {
+      const states = await fetchLinearWorkflowStates(input.apiKey, input.teamIds);
+      return json({ states });
+    } catch (error) {
+      if (error instanceof LinearApiError) {
+        throw new HttpError(error.status === 401 || error.status === 403 ? 401 : 502, error.message);
+      }
+      throw error;
+    }
+  }
+
+  const linearImportMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/linear\/import$/u,
+  );
+  if (linearImportMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, linearImportMatch[1], session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    const input = linearImportInputSchema.parse(await readJson(request));
+    const settings = await getProjectSettings(db, project.id);
+    const workflow = settings?.workflow_json
+      ? normalizeAutoHuntWorkflow(JSON.parse(settings.workflow_json))
+      : structuredClone(defaultAutoHuntWorkflow);
+    const firstStageId = workflow.stages[0]?.id ?? null;
+    const workflowStageIds = new Set(workflow.stages.map((stage) => stage.id));
+
+    const statusMap = new Map<
+      string,
+      { status: AutoHuntRunStatus; workflowStage: string | null }
+    >();
+    for (const [stateId, placementKey] of Object.entries(input.statusMapping)) {
+      const placement = parsePlacementKey(placementKey);
+      if (!placement) {
+        throw new HttpError(400, `Invalid status mapping for state ${stateId}`);
+      }
+      if (
+        placement.status === "running" &&
+        (!placement.workflowStage || !workflowStageIds.has(placement.workflowStage))
+      ) {
+        throw new HttpError(
+          400,
+          `Status mapping for ${stateId} targets an unknown workflow stage`,
+        );
+      }
+      statusMap.set(stateId, placement);
+    }
+
+    try {
+      const { issues, truncated } = await fetchLinearIssuesForTeams(
+        input.apiKey,
+        input.teamIds,
+        LINEAR_IMPORT_ISSUE_LIMIT,
+      );
+      const runs = issues.map((issue) => {
+        const mapped =
+          (issue.state ? statusMap.get(issue.state.id) : null) ??
+          defaultPlacementForLinearType(issue.state?.type ?? "unstarted", firstStageId);
+        return {
+          sourceKey: linearSourceKey(issue.id),
+          title: issue.title,
+          description: issue.description,
+          priority: mapLinearPriority(issue.priority),
+          status: mapped.status,
+          workflowStage: mapped.workflowStage,
+          tracker: {
+            provider: "linear",
+            issueId: issue.id,
+            identifier: issue.identifier,
+            url: issue.url,
+            state: issue.state?.name ?? null,
+          },
+          sourceCreatedAt: issue.createdAt,
+        };
+      });
+      const result = await importLinearHuntRuns(
+        db,
+        project.id,
+        settings?.github_repository ?? project.name,
+        runs,
+      );
+      return json({
+        ...result,
+        total: issues.length,
+        truncated,
+      });
+    } catch (error) {
+      if (error instanceof LinearApiError) {
+        throw new HttpError(error.status === 401 || error.status === 403 ? 401 : 502, error.message);
+      }
+      throw error;
+    }
   }
 
   const agentTokenMatch = pathname.match(
