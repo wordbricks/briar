@@ -23,9 +23,7 @@ Production credentials are stored as ciphertext in the checked-in
 `release:macos:production` starts. The corresponding private key is never
 committed.
 
-Populate each value with `dotenvx set`. When importing values that are already
-exported by a password manager, this form keeps the secret itself out of shell
-history:
+Populate each value with `dotenvx set`:
 
 ```sh
 bunx dotenvx set APPLE_CERTIFICATE "$APPLE_CERTIFICATE" -f .env.release
@@ -54,9 +52,9 @@ Set these non-secret values in the checked-in `config/release.env`:
 Worker deployment uses a separate credential. Dotenvx commits only ciphertext
 and writes the matching private decryption key to the ignored `.env.keys` file
 by default. Run `bun run secrets:verify-encrypted` before committing changes to
-either encrypted environment file. On another trusted release host, inject
-`DOTENV_PRIVATE_KEY_RELEASE` from the password manager instead of copying or
-committing `.env.keys`.
+either encrypted environment file. The Production release command requires
+`.env.keys` on the trusted release host; if it is missing the command exits
+without decrypting secrets. Never commit `.env.keys`.
 
 The release host requires macOS, Bun 1.3.14, Rust 1.96.0, Xcode command-line
 tools, Syft, `gh`, `jq`, and a clean checkout with access to `origin`.
@@ -68,8 +66,8 @@ tools, Syft, `gh`, `jq`, and a clean checkout with access to `origin`.
 3. Create and push an annotated, signed `vX.Y.Z` tag on a commit contained in
    `origin/main`.
 4. Check out that exact tag on the trusted macOS release host.
-5. Inject the checked-in `.env.release` file's dotenvx decryption key on the
-   trusted release host.
+5. Ensure the ignored `.env.keys` file is present on the trusted release host.
+   Without it the release command exits immediately.
 6. Build and verify the notarized artifacts without publishing:
 
    ```sh
