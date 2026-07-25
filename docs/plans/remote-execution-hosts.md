@@ -17,11 +17,11 @@ Landed on `worktree-remote-execution-hosts`, all four local CI gates green
 | §2.1 migration | done as `0013` (0012 was taken) | `migrations/0013_execution_workers.sql` |
 | §2.2 worker API and reaper | done | `worker/src/workers.ts`, commit `ed42e7e` |
 | §2.3 worker loop and service installer | done except the agent launcher | `src-cli/worker.ts`, commit `dd291b4` |
-| §1.6 host-aware diagnostics | **not started** | `auto_hunt_health` and friends still local-only |
-| §1.7 agent launch over SSH | **not started** | Auto Hunt refuses remote hosts with a Korean error |
+| §1.6 host-aware diagnostics | done for attached hosts | repository, GitHub, Velen, Bun, agent auth, CLI and skill checks use the selected runner |
+| §1.7 agent launch over SSH | done | Codex app-server and the uploaded Claude runner use SSH stdio; Auto Hunt builds and cleans its sandbox on the remote host |
 | §2.4 shared runners, Codex port | **not started** | `runClaimedIssue` in `src-cli/index.ts` is a stub that fails loudly |
 | §2.5 desktop observation | **not started** | worker/transcript endpoints have no UI |
-| §1.8 renderer host picker | **not started** | `connect_local_project` accepts `executionHostId`, nothing sends it |
+| §1.8 renderer host picker | partial | project connection can add/select an SSH host and validate a remote path; settings badges and removal UI remain |
 
 Three defects surfaced while implementing, all fixed with regression tests:
 
@@ -34,9 +34,12 @@ Three defects surfaced while implementing, all fixed with regression tests:
   after each issue, and its first heartbeat never fired because a
   never-reported worker read as up to date.
 
-The two remaining blockers are related: both §1.7 and §2.4 need the agent
-launcher to stop being Rust-only. §1.7 additionally needs
-`AutoHuntCliEnvironment::prepare` to build its sandbox home on the remote host.
+The attached-host launcher is no longer local-process-only: both providers
+spawn through `CommandRunner`, Claude's bundled runner is uploaded for the
+session, and `AutoHuntCliEnvironment::prepare_on_host` creates the isolated
+CLI home on the remote host. The remaining launcher blocker is detached
+workers (§2.4), which still need the provider protocol client in `src-agent/`
+rather than the desktop Rust process.
 
 Briar runs Auto Hunt on the machine that shows the dashboard. This plan adds
 **remote execution hosts**: machines other than the desktop that hold the

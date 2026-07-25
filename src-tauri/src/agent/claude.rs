@@ -1,56 +1,62 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
-    ffi::{OsStr, OsString},
+    ffi::OsStr,
     io::{BufRead, BufReader, Read, Write},
     path::{Path, PathBuf},
-    process::{Child, ChildStdin, ChildStdout, Command, Stdio},
+    process::{Child, ChildStdin, ChildStdout},
     sync::{Arc, Mutex},
     thread,
 };
 
+#[cfg(test)]
+use crate::host::LocalRunner;
+use crate::host::{CommandRunner, CommandSpec};
+
 use super::{
     AgentEvent, AgentEventDirection, AgentProviderEvent, AgentProviderKind, ApprovalPolicy,
-    ChatExecution, ModelEffort, ProjectLlmRequest, ProjectLlmResponse, SandboxMode,
+    ChatExecution, HostRunnerFile, ModelEffort, ProjectLlmRequest, ProjectLlmResponse, SandboxMode,
 };
 
-#[derive(Clone)]
 pub(crate) struct ClaudeRuntime {
-    bun_binary: PathBuf,
-    claude_binary: PathBuf,
-    runner: PathBuf,
-    execution_path: OsString,
+    command_runner: Arc<dyn CommandRunner>,
+    bun_binary: String,
+    claude_binary: String,
+    runner: HostRunnerFile,
 }
 
 impl ClaudeRuntime {
     pub(crate) fn discover(
-        home: &Path,
-        execution_path: &OsStr,
-        runner: &Path,
+        command_runner: Arc<dyn CommandRunner>,
+        runner_bundle: &Path,
     ) -> Result<Self, String> {
-        if !runner.is_file() {
-            return Err(
-                "Briar의 Claude Agent runner를 찾지 못했습니다. 앱을 다시 설치하세요.".to_string(),
-            );
-        }
-        let bun_binary = which::which_in("bun", Some(execution_path), home)
-            .map_err(|_| "Claude Agent SDK 실행에 필요한 Bun을 찾지 못했습니다.".to_string())?;
-        let claude_binary = claude_binary(home, execution_path)?;
+        let bun_binary = command_runner.resolve_binary("bun").map_err(|_| {
+            "Claude Agent SDK 실행에 필요한 Bun을 실행 호스트에서 찾지 못했습니다.".to_string()
+        })?;
+        let claude_binary = command_runner.resolve_binary("claude")?;
+        let runner =
+            HostRunnerFile::prepare(command_runner.clone(), runner_bundle, "claude-runner.js")?;
         Ok(Self {
+            command_runner,
             bun_binary,
             claude_binary,
-            runner: runner.to_path_buf(),
-            execution_path: execution_path.to_os_string(),
+            runner,
         })
     }
 
     #[cfg(test)]
     fn for_test(bun_binary: PathBuf, claude_binary: PathBuf, runner: PathBuf) -> Self {
+        let command_runner: Arc<dyn CommandRunner> = Arc::new(LocalRunner::new(
+            std::env::var_os("PATH").unwrap_or_default(),
+            std::env::temp_dir(),
+        ));
+        let runner =
+            HostRunnerFile::prepare(command_runner.clone(), &runner, "claude-runner.js").unwrap();
         Self {
-            bun_binary,
-            claude_binary,
+            command_runner,
+            bun_binary: bun_binary.to_string_lossy().into_owned(),
+            claude_binary: claude_binary.to_string_lossy().into_owned(),
             runner,
-            execution_path: std::env::var_os("PATH").unwrap_or_default(),
         }
     }
 }
@@ -125,15 +131,20 @@ struct ClaudeConnection {
 }
 
 impl ClaudeConnection {
-    fn start(runtime: &ClaudeRuntime, workspace: &Path) -> Result<Self, String> {
-        let mut child = Command::new(&runtime.bun_binary)
-            .arg(&runtime.runner)
-            .current_dir(workspace)
-            .env("PATH", &runtime.execution_path)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
+    fn start(
+        runtime: &ClaudeRuntime,
+        workspace: &Path,
+        environment: &[(String, String)],
+    ) -> Result<Self, String> {
+        let mut spec = CommandSpec::new(&runtime.bun_binary)
+            .args([runtime.runner.path()])
+            .working_directory(workspace);
+        for (key, value) in environment {
+            spec = spec.env(key, value);
+        }
+        let mut child = runtime
+            .command_runner
+            .spawn_piped(&spec)
             .map_err(|error| format!("Claude Agent runner를 시작하지 못했습니다: {error}"))?;
         let stdin = child
             .stdin
@@ -228,7 +239,9 @@ pub(crate) fn chat(
     if message.is_empty() {
         return Err("LLM에 보낼 메시지를 입력하세요.".to_string());
     }
-    let workspace_root = std::fs::canonicalize(workspace_root)
+    let workspace_root = runtime
+        .command_runner
+        .canonicalize(workspace_root)
         .map_err(|error| format!("프로젝트 워크스페이스를 열지 못했습니다: {error}"))?;
     let workspace = workspace_root
         .to_str()
@@ -238,10 +251,6 @@ pub(crate) fn chat(
         .as_deref()
         .map(|id| decode_conversation_id(project_id, id))
         .transpose()?;
-    let claude_binary = runtime
-        .claude_binary
-        .to_str()
-        .ok_or_else(|| "Claude Code 실행 경로를 표시할 수 없습니다.".to_string())?;
     let runner_request = ClaudeRunnerRequest {
         r#type: "run",
         message,
@@ -254,7 +263,7 @@ pub(crate) fn chat(
         approval_policy: execution.approval_policy,
         sandbox_mode: execution.sandbox_mode,
         network_access: execution.network_access,
-        claude_binary,
+        claude_binary: &runtime.claude_binary,
     };
     let raw_request = serde_json::to_value(&runner_request)
         .map_err(|error| format!("Claude Agent 요청을 만들지 못했습니다: {error}"))?;
@@ -267,7 +276,7 @@ pub(crate) fn chat(
         })?;
     }
 
-    let mut connection = ClaudeConnection::start(runtime, &workspace_root)?;
+    let mut connection = ClaudeConnection::start(runtime, &workspace_root, &execution.environment)?;
     connection.send(&raw_request)?;
     loop {
         match connection.read()? {
@@ -386,6 +395,7 @@ echo '{"type":"result","sessionId":"session-1","message":"done"}'
                         .push(event);
                     Ok(())
                 })),
+                environment: Vec::new(),
             },
             ProjectLlmRequest {
                 message: "Fix it".to_string(),

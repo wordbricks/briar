@@ -838,21 +838,25 @@ fn command_failure(output: &std::process::Output) -> String {
     }
 }
 
-fn inspect_repository_readiness_at(
+fn inspect_repository_readiness_on(
+    runner: &dyn host::CommandRunner,
     repository_path: &Path,
     workflow: &WorkflowConfig,
-    home: &Path,
 ) -> RepositoryReadiness {
     let mut issues = Vec::new();
     let requires_github = workflow_requires_github(workflow);
-    let git = git_binary(home);
+    let git = runner.resolve_binary("git");
     let git_installed = git.is_ok();
     let git_version = git
         .as_ref()
         .ok()
-        .and_then(|binary| Command::new(binary).arg("--version").output().ok())
-        .filter(|output| output.status.success())
-        .and_then(|output| parse_cli_version(&output.stdout));
+        .and_then(|binary| {
+            runner
+                .run(&host::CommandSpec::new(binary).args(["--version"]))
+                .ok()
+        })
+        .filter(host::CommandOutput::success)
+        .and_then(|output| parse_cli_version(output.stdout.as_bytes()));
     if !git_installed {
         issues.push("Git이 설치되지 않았습니다.".to_string());
     }
@@ -861,23 +865,24 @@ fn inspect_repository_readiness_at(
         .as_ref()
         .ok()
         .and_then(|binary| {
-            Command::new(binary)
-                .arg("-C")
-                .arg(repository_path)
-                .args(["rev-parse", "--show-toplevel"])
-                .output()
+            runner
+                .run(
+                    &host::CommandSpec::new(binary)
+                        .args(["rev-parse", "--show-toplevel"])
+                        .working_directory(repository_path),
+                )
                 .ok()
         })
-        .filter(|output| output.status.success())
-        .and_then(|output| String::from_utf8(output.stdout).ok())
-        .map(|root| PathBuf::from(root.trim()));
-    let repository_healthy = root.as_ref().is_some_and(|root| root.is_dir());
+        .filter(host::CommandOutput::success)
+        .map(|output| PathBuf::from(output.stdout_trimmed()))
+        .and_then(|path| runner.canonicalize(&path).ok());
+    let repository_healthy = root.is_some();
     if git_installed && !repository_healthy {
         issues.push("선택한 폴더가 유효한 Git 저장소가 아닙니다.".to_string());
     }
     let resolved_path = root.as_deref().unwrap_or(repository_path);
     let remote = repository_healthy
-        .then(|| repository_remote(resolved_path))
+        .then(|| repository_remote_on(runner, resolved_path))
         .flatten();
     if remote.is_none() {
         issues.push("origin 원격 저장소가 설정되지 않았습니다.".to_string());
@@ -894,22 +899,23 @@ fn inspect_repository_readiness_at(
         .ok()
         .filter(|_| repository_healthy && safe_remote)
         .and_then(|binary| {
-            Command::new(binary)
-                .env("GIT_TERMINAL_PROMPT", "0")
-                .env("GCM_INTERACTIVE", "Never")
-                .env(
-                    "GIT_SSH_COMMAND",
-                    "ssh -o BatchMode=yes -o ConnectTimeout=8",
+            runner
+                .run(
+                    &host::CommandSpec::new(binary)
+                        .env("GIT_TERMINAL_PROMPT", "0")
+                        .env("GCM_INTERACTIVE", "Never")
+                        .env(
+                            "GIT_SSH_COMMAND",
+                            "ssh -o BatchMode=yes -o ConnectTimeout=8",
+                        )
+                        .args(["-c", "http.lowSpeedLimit=1"])
+                        .args(["-c", "http.lowSpeedTime=8"])
+                        .args(["ls-remote", "--exit-code", "origin", "HEAD"])
+                        .working_directory(resolved_path),
                 )
-                .args(["-c", "http.lowSpeedLimit=1"])
-                .args(["-c", "http.lowSpeedTime=8"])
-                .arg("-C")
-                .arg(resolved_path)
-                .args(["ls-remote", "--exit-code", "origin", "HEAD"])
-                .output()
                 .ok()
         })
-        .is_some_and(|output| output.status.success());
+        .is_some_and(|output| output.success());
     if remote.is_some() && !remote_reachable {
         issues.push("origin에 인증된 상태로 접근할 수 없습니다.".to_string());
     }
@@ -922,34 +928,35 @@ fn inspect_repository_readiness_at(
         .ok()
         .filter(|_| repository_healthy && remote_reachable)
         .and_then(|binary| {
-            let sha = Command::new(binary)
-                .arg("-C")
-                .arg(resolved_path)
-                .args(["rev-parse", "--short=12", "HEAD"])
-                .output()
-                .ok()
-                .filter(|output| output.status.success())
-                .and_then(|output| String::from_utf8(output.stdout).ok())?;
-            let target = format!("HEAD:refs/heads/briar-access-check-{}", sha.trim());
-            Command::new(binary)
-                .env("GIT_TERMINAL_PROMPT", "0")
-                .env("GCM_INTERACTIVE", "Never")
-                .env(
-                    "GIT_SSH_COMMAND",
-                    "ssh -o BatchMode=yes -o ConnectTimeout=8",
+            let sha = runner
+                .run(
+                    &host::CommandSpec::new(binary)
+                        .args(["rev-parse", "--short=12", "HEAD"])
+                        .working_directory(resolved_path),
                 )
-                .arg("-c")
-                .arg("core.hooksPath=/dev/null")
-                .args(["-c", "http.lowSpeedLimit=1"])
-                .args(["-c", "http.lowSpeedTime=8"])
-                .arg("-C")
-                .arg(resolved_path)
-                .args(["push", "--dry-run", "--porcelain", "origin"])
-                .arg(target)
-                .output()
+                .ok()
+                .filter(host::CommandOutput::success)?
+                .stdout_trimmed();
+            let target = format!("HEAD:refs/heads/briar-access-check-{sha}");
+            runner
+                .run(
+                    &host::CommandSpec::new(binary)
+                        .env("GIT_TERMINAL_PROMPT", "0")
+                        .env("GCM_INTERACTIVE", "Never")
+                        .env(
+                            "GIT_SSH_COMMAND",
+                            "ssh -o BatchMode=yes -o ConnectTimeout=8",
+                        )
+                        .args(["-c", "core.hooksPath=/dev/null"])
+                        .args(["-c", "http.lowSpeedLimit=1"])
+                        .args(["-c", "http.lowSpeedTime=8"])
+                        .args(["push", "--dry-run", "--porcelain", "origin"])
+                        .args([target])
+                        .working_directory(resolved_path),
+                )
                 .ok()
         })
-        .is_some_and(|output| output.status.success());
+        .is_some_and(|output| output.success());
     if remote_reachable && !push_access {
         issues.push("origin에 브랜치를 push할 권한을 확인하지 못했습니다.".to_string());
     }
@@ -959,7 +966,7 @@ fn inspect_repository_readiness_at(
         issues.push("PR 단계에는 GitHub origin 저장소가 필요합니다.".to_string());
     }
     let gh = if requires_github {
-        gh_binary(home)
+        runner.resolve_binary("gh")
     } else {
         Err("현재 워크플로우에는 GitHub CLI가 필요하지 않습니다.".to_string())
     };
@@ -967,34 +974,38 @@ fn inspect_repository_readiness_at(
     let gh_version = gh
         .as_ref()
         .ok()
-        .and_then(|binary| Command::new(binary).arg("--version").output().ok())
-        .filter(|output| output.status.success())
-        .and_then(|output| parse_cli_version(&output.stdout));
+        .and_then(|binary| {
+            runner
+                .run(&host::CommandSpec::new(binary).args(["--version"]))
+                .ok()
+        })
+        .filter(host::CommandOutput::success)
+        .and_then(|output| parse_cli_version(output.stdout.as_bytes()));
     let gh_authenticated = gh
         .as_ref()
         .ok()
         .and_then(|binary| {
-            Command::new(binary)
-                .env("PATH", cli_execution_path(home).ok()?)
-                .args(["auth", "status", "--hostname", "github.com"])
-                .output()
+            runner
+                .run(&host::CommandSpec::new(binary).args([
+                    "auth",
+                    "status",
+                    "--hostname",
+                    "github.com",
+                ]))
                 .ok()
         })
-        .is_some_and(|output| output.status.success());
+        .is_some_and(|output| output.success());
     let gh_account = gh
         .as_ref()
         .ok()
         .filter(|_| gh_authenticated)
         .and_then(|binary| {
-            Command::new(binary)
-                .env("PATH", cli_execution_path(home).ok()?)
-                .args(["api", "user", "--jq", ".login"])
-                .output()
+            runner
+                .run(&host::CommandSpec::new(binary).args(["api", "user", "--jq", ".login"]))
                 .ok()
         })
-        .filter(|output| output.status.success())
-        .and_then(|output| String::from_utf8(output.stdout).ok())
-        .map(|account| account.trim().to_string())
+        .filter(host::CommandOutput::success)
+        .map(|output| output.stdout_trimmed())
         .filter(|account| !account.is_empty());
     let github_write_access = gh
         .as_ref()
@@ -1002,9 +1013,8 @@ fn inspect_repository_readiness_at(
         .filter(|_| gh_authenticated)
         .zip(github_repository.as_ref())
         .and_then(|(binary, repository)| {
-            Command::new(binary)
-                .env("PATH", cli_execution_path(home).ok()?)
-                .args([
+            runner
+                .run(&host::CommandSpec::new(binary).args([
                     "repo",
                     "view",
                     repository,
@@ -1012,13 +1022,11 @@ fn inspect_repository_readiness_at(
                     "viewerPermission",
                     "--jq",
                     ".viewerPermission",
-                ])
-                .output()
+                ]))
                 .ok()
         })
-        .filter(|output| output.status.success())
-        .and_then(|output| String::from_utf8(output.stdout).ok())
-        .is_some_and(|permission| matches!(permission.trim(), "WRITE" | "MAINTAIN" | "ADMIN"));
+        .filter(host::CommandOutput::success)
+        .is_some_and(|output| matches!(output.stdout.trim(), "WRITE" | "MAINTAIN" | "ADMIN"));
     if requires_github && !gh_installed {
         issues.push("PR 단계 실행에 필요한 GitHub CLI가 설치되지 않았습니다.".to_string());
     } else if requires_github && !gh_authenticated {
@@ -1077,10 +1085,11 @@ fn project_repository_readiness_at(
         .and_then(|auto_hunt| auto_hunt.workflow.as_ref())
         .cloned()
         .unwrap_or_else(default_workflow);
-    Ok(inspect_repository_readiness_at(
+    let runner = project_runner(&config, project_id, home)?;
+    Ok(inspect_repository_readiness_on(
+        runner.as_ref(),
         Path::new(&project.repository_path),
         &workflow,
-        home,
     ))
 }
 
@@ -1089,13 +1098,24 @@ async fn inspect_repository_readiness(
     app: tauri::AppHandle,
     repository_path: String,
     workflow: WorkflowConfig,
+    execution_host_id: Option<String>,
 ) -> Result<RepositoryReadiness, String> {
+    let config_path = cli_config_path(&app)?;
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
-        Ok(inspect_repository_readiness_at(
+        let config = read_cli_config(&config_path)?;
+        let execution_host = host::ExecutionHostId::parse(execution_host_id.as_deref());
+        let runner = host::runner_for(
+            &execution_host,
+            &config.ssh_hosts,
+            cli_execution_path(&home)?,
+            &home,
+            host::SshAuth::default(),
+        )?;
+        Ok(inspect_repository_readiness_on(
+            runner.as_ref(),
             Path::new(&repository_path),
             &workflow,
-            &home,
         ))
     })
     .await
@@ -1232,13 +1252,40 @@ fn run_velen_json_with(
     Ok(value)
 }
 
-fn run_velen_json(args: &[&str]) -> Result<serde_json::Value, String> {
-    let home = dirs::home_dir().ok_or_else(|| "홈 폴더를 찾을 수 없습니다.".to_string())?;
-    run_velen_json_with(&velen_binary()?, &home, args)
+fn run_velen_json_on(
+    runner: &dyn host::CommandRunner,
+    args: &[&str],
+) -> Result<serde_json::Value, String> {
+    let binary = runner.resolve_binary("velen")?;
+    let output = runner.run(
+        &host::CommandSpec::new(binary)
+            .args(["--output", "json"])
+            .args(args.iter().copied()),
+    )?;
+    let value: serde_json::Value =
+        serde_json::from_str(&output.stdout).map_err(|_| output.failure_message())?;
+    if !output.success() || value.get("ok").and_then(|ok| ok.as_bool()) == Some(false) {
+        let message = value
+            .pointer("/error/message")
+            .or_else(|| value.get("message"))
+            .and_then(|message| message.as_str())
+            .unwrap_or("Velen CLI 요청에 실패했습니다.");
+        return Err(message.to_string());
+    }
+    Ok(value)
 }
 
 fn inspect_velen_sync(org: Option<String>) -> Result<VelenInspection, String> {
-    let whoami = run_velen_json(&["auth", "whoami"])?;
+    let home = dirs::home_dir().ok_or_else(|| "홈 폴더를 찾을 수 없습니다.".to_string())?;
+    let runner = host::LocalRunner::new(cli_execution_path(&home)?, home);
+    inspect_velen_on(&runner, org)
+}
+
+fn inspect_velen_on(
+    runner: &dyn host::CommandRunner,
+    org: Option<String>,
+) -> Result<VelenInspection, String> {
+    let whoami = run_velen_json_on(runner, &["auth", "whoami"])?;
     let authenticated = whoami
         .pointer("/data/authenticated")
         .and_then(|value| value.as_bool())
@@ -1254,7 +1301,7 @@ fn inspect_velen_sync(org: Option<String>) -> Result<VelenInspection, String> {
         .pointer("/data/effectiveOrg")
         .and_then(|value| value.as_str())
         .map(str::to_string);
-    let organizations = run_velen_json(&["org", "list"])?
+    let organizations = run_velen_json_on(runner, &["org", "list"])?
         .pointer("/data/organizations")
         .and_then(|value| value.as_array())
         .into_iter()
@@ -1268,7 +1315,7 @@ fn inspect_velen_sync(org: Option<String>) -> Result<VelenInspection, String> {
         .collect();
     let selected_org = org.or_else(|| current_org.clone());
     let sources = if let Some(selected_org) = selected_org.as_deref() {
-        run_velen_json(&["--org", selected_org, "source", "list"])?
+        run_velen_json_on(runner, &["--org", selected_org, "source", "list"])?
             .pointer("/data/sources")
             .and_then(|value| value.as_array())
             .into_iter()
@@ -1297,10 +1344,27 @@ fn inspect_velen_sync(org: Option<String>) -> Result<VelenInspection, String> {
 }
 
 #[tauri::command]
-async fn inspect_velen(org: Option<String>) -> Result<VelenInspection, String> {
-    tauri::async_runtime::spawn_blocking(move || inspect_velen_sync(org))
-        .await
-        .map_err(|error| error.to_string())?
+async fn inspect_velen(
+    app: tauri::AppHandle,
+    org: Option<String>,
+    execution_host_id: Option<String>,
+) -> Result<VelenInspection, String> {
+    let config_path = cli_config_path(&app)?;
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let config = read_cli_config(&config_path)?;
+        let execution_host = host::ExecutionHostId::parse(execution_host_id.as_deref());
+        let runner = host::runner_for(
+            &execution_host,
+            &config.ssh_hosts,
+            cli_execution_path(&home)?,
+            &home,
+            host::SshAuth::default(),
+        )?;
+        inspect_velen_on(runner.as_ref(), org)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -2082,6 +2146,41 @@ fn read_trimmed_file(path: &Path) -> Option<String> {
         .filter(|value| !value.is_empty())
 }
 
+fn read_trimmed_file_on(runner: &dyn host::CommandRunner, path: &Path) -> Option<String> {
+    let shell = runner.resolve_binary("sh").ok()?;
+    let output = runner
+        .run(&host::CommandSpec::new(shell).args([
+            "-c".to_string(),
+            "test -f \"$1\" && cat -- \"$1\"".to_string(),
+            "briar-read-file".to_string(),
+            path.to_string_lossy().into_owned(),
+        ]))
+        .ok()?;
+    output
+        .success()
+        .then(|| output.stdout_trimmed())
+        .filter(|value| !value.is_empty())
+}
+
+fn host_home_directory(
+    runner: &dyn host::CommandRunner,
+    local_home: &Path,
+) -> Result<PathBuf, String> {
+    if !runner.is_remote() {
+        return Ok(local_home.to_path_buf());
+    }
+    let shell = runner.resolve_binary("sh")?;
+    let output =
+        runner.run(&host::CommandSpec::new(shell).args(["-c", "printf '%s' \"$HOME\""]))?;
+    if !output.success() || output.stdout.is_empty() {
+        return Err(format!(
+            "원격 홈 폴더를 확인하지 못했습니다: {}",
+            output.failure_message()
+        ));
+    }
+    Ok(PathBuf::from(output.stdout_trimmed()))
+}
+
 fn auto_hunt_health_sync(
     config_path: &Path,
     resource_directory: &Path,
@@ -2113,30 +2212,37 @@ fn auto_hunt_health_sync_with(
         .iter()
         .find(|project| project.id == project_id)
         .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
+    let runner = project_runner(&config, project_id, home)?;
+    let execution_home = host_home_directory(runner.as_ref(), home)?;
     let mut issues = Vec::new();
 
     let repository_path = Path::new(&project.repository_path);
-    let repository_healthy = git_repository_root(repository_path)
-        .map(|root| {
-            fs::canonicalize(repository_path)
-                .map(|configured| configured == root)
-                .unwrap_or(false)
-        })
-        .unwrap_or(false);
+    let repository_healthy = resolve_workspace_with(runner.as_ref(), repository_path).is_ok();
     if !repository_healthy {
         issues.push("연결된 Git 저장소 경로를 사용할 수 없습니다.".to_string());
     }
 
     let expected_version = env!("CARGO_PKG_VERSION").to_string();
-    let cli_path = home.join(".local").join("bin").join("briar");
-    let cli_installed = cli_path.is_file();
+    let cli_path = execution_home.join(".local").join("bin").join("briar");
+    let cli_installed = runner.resolve_binary("briar").is_ok();
     let cli_version = read_trimmed_file(
-        &home
+        &execution_home
             .join(".local")
             .join("share")
             .join("briar")
             .join("VERSION"),
-    );
+    )
+    .filter(|_| !runner.is_remote())
+    .or_else(|| {
+        read_trimmed_file_on(
+            runner.as_ref(),
+            &execution_home
+                .join(".local")
+                .join("share")
+                .join("briar")
+                .join("VERSION"),
+        )
+    });
     let cli_current = cli_version.as_deref() == Some(expected_version.as_str());
     if !cli_installed {
         issues.push("Briar CLI가 설치되지 않았습니다.".to_string());
@@ -2155,12 +2261,13 @@ fn auto_hunt_health_sync_with(
         agent::AgentProviderKind::Codex => ".codex",
         agent::AgentProviderKind::Claude => ".claude",
     };
-    let skill_path = home
+    let skill_path = execution_home
         .join(skill_directory)
         .join("skills")
         .join("briar-auto-hunt");
-    let skill_installed = skill_path.join("SKILL.md").is_file();
-    let skill_version = read_trimmed_file(&skill_path.join("VERSION"));
+    let skill_installed =
+        read_trimmed_file_on(runner.as_ref(), &skill_path.join("SKILL.md")).is_some();
+    let skill_version = read_trimmed_file_on(runner.as_ref(), &skill_path.join("VERSION"));
     let skill_current = skill_version.as_deref() == Some(skill_expected_version.as_str());
     if !skill_installed {
         issues.push("Briar Auto Hunt 스킬이 설치되지 않았습니다.".to_string());
@@ -2174,7 +2281,12 @@ fn auto_hunt_health_sync_with(
         .and_then(|auto_hunt| auto_hunt.velen_org.clone());
     let (velen_authenticated, velen_email, velen_healthy) = if let Some(org) = velen_org.as_deref()
     {
-        match inspect_velen(Some(org.to_string())) {
+        let inspection = if runner.is_remote() {
+            inspect_velen_on(runner.as_ref(), Some(org.to_string()))
+        } else {
+            inspect_velen(Some(org.to_string()))
+        };
+        match inspection {
             Ok(inspection) => (inspection.authenticated, inspection.email, true),
             Err(error) => {
                 issues.push(format!("Velen 연결 확인 실패: {error}"));
@@ -2185,6 +2297,62 @@ fn auto_hunt_health_sync_with(
         issues.push("Auto Hunt에 Velen 조직이 설정되지 않았습니다.".to_string());
         (false, None, false)
     };
+
+    if runner.is_remote() {
+        if runner.resolve_binary("bun").is_err() {
+            issues.push("원격 호스트에 Bun이 설치되지 않았습니다.".to_string());
+        }
+        if cli_installed && repository_healthy {
+            let cli_connected = runner
+                .resolve_binary("briar")
+                .and_then(|binary| {
+                    runner.run(
+                        &host::CommandSpec::new(binary)
+                            .args(["auto-hunt", "doctor"])
+                            .env("BRIAR_PROJECT_ID", project_id)
+                            .env("BRIAR_API_URL", &config.api_url)
+                            .working_directory(repository_path),
+                    )
+                })
+                .is_ok_and(|output| output.success());
+            if !cli_connected {
+                issues.push(
+                    "원격 Briar CLI가 이 프로젝트에 연결되지 않았습니다. 원격 저장소에서 `briar connect`와 `briar auto-hunt configure`를 실행해 주세요."
+                        .to_string(),
+                );
+            }
+        }
+        let (agent_name, auth_args): (&str, &[&str]) =
+            match project.llm.clone().unwrap_or_default().provider {
+                agent::AgentProviderKind::Codex => ("codex", &["login", "status"]),
+                agent::AgentProviderKind::Claude => ("claude", &["auth", "status"]),
+            };
+        match runner.resolve_binary(agent_name) {
+            Ok(binary) => {
+                let authenticated = runner
+                    .run(&host::CommandSpec::new(binary).args(auth_args.iter().copied()))
+                    .is_ok_and(|output| output.success());
+                if !authenticated {
+                    issues.push(format!(
+                        "원격 {} 에이전트가 인증되지 않았습니다. 호스트에서 직접 로그인해 주세요.",
+                        if agent_name == "codex" {
+                            "Codex"
+                        } else {
+                            "Claude"
+                        }
+                    ));
+                }
+            }
+            Err(_) => issues.push(format!(
+                "원격 호스트에 {} 에이전트가 설치되지 않았습니다.",
+                if agent_name == "codex" {
+                    "Codex"
+                } else {
+                    "Claude"
+                }
+            )),
+        }
+    }
 
     Ok(AutoHuntHealth {
         project_id: project.id.clone(),
@@ -2240,6 +2408,14 @@ async fn repair_auto_hunt(
         .map_err(|error| error.to_string())?;
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
+        let config = read_cli_config(&config_path)?;
+        let runner = project_runner(&config, &project_id, &home)?;
+        if runner.is_remote() {
+            return Err(format!(
+                "{}에서 `briar` CLI와 Briar Auto Hunt 스킬을 설치하거나 업데이트한 뒤 다시 검사해 주세요.",
+                runner.label()
+            ));
+        }
         install_auto_hunt_assets(&resource_directory, &home)?;
         auto_hunt_health_sync(&config_path, &resource_directory, &home, &project_id)
     })
@@ -2288,6 +2464,8 @@ async fn project_llm_chat(
     );
     let approval_app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
+        let (runner, workspace) =
+            connected_project_workspace_on_host(&config_path, &project_id, &home)?;
         let readiness = project_repository_readiness_at(&config_path, &project_id, &home)?;
         if readiness.requires_github && !readiness.pr_ready {
             return Err(format!(
@@ -2295,7 +2473,6 @@ async fn project_llm_chat(
                 readiness.issues.join(" ")
             ));
         }
-        let workspace = connected_project_workspace(&config_path, &project_id)?;
         let settings = project_llm_settings_from(&config_path, &project_id)?;
         let provider = request
             .conversation_id
@@ -2309,8 +2486,7 @@ async fn project_llm_chat(
                 "이 대화의 에이전트 프로바이더가 앱 설정에서 비활성화되어 있습니다.".to_string(),
             );
         }
-        let execution_path = cli_execution_path(&home)?;
-        let backend = agent::discover_backend(provider, &home, &execution_path, &claude_runner)?;
+        let backend = agent::discover_backend(provider, runner, &claude_runner)?;
         let (model, effort) = if provider == settings.provider {
             (settings.model, settings.effort)
         } else {
@@ -2370,6 +2546,7 @@ fn project_chat_execution(
         model,
         effort,
         event_sink: None,
+        environment: Vec::new(),
     }
 }
 
@@ -2402,16 +2579,6 @@ async fn start_project_auto_hunt(
     tauri::async_runtime::spawn_blocking(move || {
         let (runner, workspace) =
             connected_project_workspace_on_host(&config_path, &project_id, &home)?;
-        if runner.is_remote() {
-            // The agent layer still builds its sandbox home from local config
-            // directories, so refuse rather than run against a path that does
-            // not exist on this machine. Remote launch lands with the sandbox
-            // port in docs/plans/remote-execution-hosts.md §1.7.
-            return Err(format!(
-                "{} 호스트에서는 아직 자동사냥을 실행할 수 없습니다. 원격 실행 준비가 끝나면 사용할 수 있습니다.",
-                runner.label()
-            ));
-        }
         let settings = project_llm_settings_from(&config_path, &project_id)?;
         if !app_provider_settings_from(&config_path)?.is_enabled(settings.provider) {
             return Err(
@@ -2419,19 +2586,15 @@ async fn start_project_auto_hunt(
             );
         }
         let execution_path = cli_execution_path(&home)?;
-        let cli_environment = agent::AutoHuntCliEnvironment::prepare(
+        let cli_environment = agent::AutoHuntCliEnvironment::prepare_on_host(
+            runner.clone(),
             &home,
             &execution_path,
             &workspace,
             &project_id,
             &request.api_url,
         )?;
-        let backend = agent::discover_backend(
-            settings.provider,
-            &home,
-            cli_environment.execution_path(),
-            &claude_runner,
-        )?;
+        let backend = agent::discover_backend(settings.provider, runner, &claude_runner)?;
         let provider = settings.provider;
         let approve = |method: &str, params: &serde_json::Value| {
             let provider_name = match provider {
@@ -2457,6 +2620,7 @@ async fn start_project_auto_hunt(
                 model: settings.model,
                 effort: settings.effort,
                 event_sink,
+                environment: cli_environment.environment().to_vec(),
             },
             request,
             &approve,
@@ -2696,7 +2860,7 @@ async fn connect_local_project(
             .into_os_string()
             .into_string()
             .map_err(|_| "Git 저장소 경로를 표시할 수 없습니다.".to_string())?;
-        let inspection = inspect_velen_sync(Some(auto_hunt.velen_org.clone()))?;
+        let inspection = inspect_velen_on(runner.as_ref(), Some(auto_hunt.velen_org.clone()))?;
         if auto_hunt.linear_enabled {
             let source = auto_hunt
                 .linear_source
@@ -2710,11 +2874,12 @@ async fn connect_local_project(
                 return Err("선택한 Linear 소스를 Velen에서 사용할 수 없습니다.".to_string());
             }
         }
-        install_auto_hunt_assets(&resource_directory, &home)?;
-        let execution_path = cli_execution_path(&home)?;
-        let provider = if agent::codex_binary(&home).is_ok() {
+        if !runner.is_remote() {
+            install_auto_hunt_assets(&resource_directory, &home)?;
+        }
+        let provider = if runner.resolve_binary("codex").is_ok() {
             agent::AgentProviderKind::Codex
-        } else if agent::claude_binary(&home, &execution_path).is_ok() {
+        } else if runner.resolve_binary("claude").is_ok() {
             agent::AgentProviderKind::Claude
         } else {
             agent::AgentProviderKind::Codex

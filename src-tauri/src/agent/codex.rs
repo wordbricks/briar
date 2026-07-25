@@ -6,10 +6,14 @@ use std::{
     fs,
     io::{BufRead, BufReader, Read, Write},
     path::{Path, PathBuf},
-    process::{Child, ChildStdin, Command, Stdio},
+    process::{Child, ChildStdin},
     sync::{Arc, Mutex},
     thread,
 };
+
+use crate::host::{CommandRunner, CommandSpec};
+#[cfg(test)]
+use std::process::Command;
 
 use super::{
     AgentBackend, AgentEvent, AgentEventDirection, AgentEventSink, AgentProviderEvent,
@@ -40,8 +44,10 @@ pub(crate) struct ProjectAutoHuntRequest {
 }
 
 pub(crate) struct AutoHuntCliEnvironment {
-    _directory: tempfile::TempDir,
+    _directory: Option<tempfile::TempDir>,
+    remote_directory: Option<(Arc<dyn CommandRunner>, String)>,
     execution_path: OsString,
+    environment: Vec<(String, String)>,
 }
 
 impl AutoHuntCliEnvironment {
@@ -101,14 +107,161 @@ impl AutoHuntCliEnvironment {
         let execution_path = env::join_paths(paths)
             .map_err(|error| format!("자동사냥 CLI 실행 경로를 만들지 못했습니다: {error}"))?;
         Ok(Self {
-            _directory: directory,
+            _directory: Some(directory),
+            remote_directory: None,
             execution_path,
+            environment: Vec::new(),
         })
     }
 
+    pub(crate) fn prepare_on_host(
+        runner: Arc<dyn CommandRunner>,
+        home: &Path,
+        execution_path: &OsStr,
+        workspace: &Path,
+        project_id: &str,
+        api_url: &str,
+    ) -> Result<Self, String> {
+        if !runner.is_remote() {
+            let mut environment =
+                Self::prepare(home, execution_path, workspace, project_id, api_url)?;
+            environment.environment = vec![(
+                "PATH".to_string(),
+                environment.execution_path.to_string_lossy().into_owned(),
+            )];
+            return Ok(environment);
+        }
+
+        let shell = runner.resolve_binary("sh")?;
+        let bun = runner.resolve_binary("bun")?;
+        let velen = runner.resolve_binary("velen")?;
+        // Resolve after PATH bootstrap so the returned value is the same PATH
+        // the agent would receive from a normal SSH invocation.
+        let path_output =
+            runner.run(&CommandSpec::new(shell.clone()).args(["-c", "printf '%s' \"$PATH\""]))?;
+        if !path_output.success() || path_output.stdout.is_empty() {
+            return Err(format!(
+                "원격 실행 PATH를 확인하지 못했습니다: {}",
+                path_output.failure_message()
+            ));
+        }
+        let setup = r#"set -eu
+umask 077
+bundle=$3
+if [ ! -f "$bundle" ]; then
+  printf 'Briar CLI bundle is missing: %s\n' "$bundle" >&2
+  exit 2
+fi
+directory=$(mktemp -d "${TMPDIR:-/tmp}/briar-auto-hunt.XXXXXX")
+cleanup() { rm -rf -- "$directory"; }
+trap cleanup EXIT HUP INT TERM
+mkdir -p "$directory/home/.config" "$directory/bin" "$directory/lib"
+for cli in briar velen; do
+  source_directory="$HOME/.config/$cli"
+  destination="$directory/home/.config/$cli"
+  if [ -d "$source_directory" ]; then
+    mkdir -p "$destination"
+    cp -R "$source_directory/." "$destination/"
+  fi
+done
+cp "$bundle" "$directory/lib/briar.js"
+ln -s "$1" "$directory/bin/.briar-bun"
+ln -s "$2" "$directory/bin/.velen"
+cat > "$directory/bin/briar" <<'BRIAR_WRAPPER'
+#!/bin/sh
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+export HOME="$root/home"
+export XDG_CONFIG_HOME="$HOME/.config"
+exec "$root/bin/.briar-bun" "$root/lib/briar.js" "$@"
+BRIAR_WRAPPER
+cat > "$directory/bin/velen" <<'VELEN_WRAPPER'
+#!/bin/sh
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+export HOME="$root/home"
+export XDG_CONFIG_HOME="$HOME/.config"
+exec "$root/bin/.velen" "$@"
+VELEN_WRAPPER
+chmod 700 "$directory" "$directory/home" "$directory/home/.config" "$directory/bin" "$directory/lib"
+chmod 700 "$directory/bin/briar" "$directory/bin/velen"
+chmod 600 "$directory/lib/briar.js"
+chmod -R go-rwx "$directory/home/.config"
+trap - EXIT HUP INT TERM
+printf '%s\n' "$directory"
+"#;
+        let home_output =
+            runner.run(&CommandSpec::new(shell.clone()).args(["-c", "printf '%s' \"$HOME\""]))?;
+        if !home_output.success() || home_output.stdout.is_empty() {
+            return Err(format!(
+                "원격 홈 폴더를 확인하지 못했습니다: {}",
+                home_output.failure_message()
+            ));
+        }
+        let briar_bundle = format!(
+            "{}/.local/share/briar/briar.js",
+            home_output.stdout_trimmed()
+        );
+        let setup_output = runner.run(
+            &CommandSpec::new(shell)
+                .args([
+                    "-c".to_string(),
+                    setup.to_string(),
+                    "briar-auto-hunt-setup".to_string(),
+                    bun,
+                    velen,
+                    briar_bundle,
+                ])
+                .working_directory(workspace),
+        )?;
+        if !setup_output.success() {
+            return Err(format!(
+                "원격 자동사냥 CLI 환경을 만들지 못했습니다: {}",
+                setup_output.failure_message()
+            ));
+        }
+        let directory = setup_output.stdout_trimmed();
+        validate_remote_temp_directory(&directory, "briar-auto-hunt.")?;
+        let environment_path = format!("{directory}/bin:{}", path_output.stdout);
+        Ok(Self {
+            _directory: None,
+            remote_directory: Some((runner, directory)),
+            execution_path: OsString::from(&environment_path),
+            environment: vec![
+                ("PATH".to_string(), environment_path),
+                ("BRIAR_PROJECT_ID".to_string(), project_id.to_string()),
+                ("BRIAR_API_URL".to_string(), api_url.to_string()),
+            ],
+        })
+    }
+
+    #[cfg(test)]
     pub(crate) fn execution_path(&self) -> &OsStr {
         &self.execution_path
     }
+
+    pub(crate) fn environment(&self) -> &[(String, String)] {
+        &self.environment
+    }
+}
+
+impl Drop for AutoHuntCliEnvironment {
+    fn drop(&mut self) {
+        if let Some((runner, directory)) = self.remote_directory.take() {
+            let _ = runner.run(&CommandSpec::new("rm").args(["-rf".to_string(), directory]));
+        }
+    }
+}
+
+fn validate_remote_temp_directory(directory: &str, prefix: &str) -> Result<(), String> {
+    let path = Path::new(directory);
+    let name = path.file_name().and_then(OsStr::to_str).unwrap_or_default();
+    if !path.is_absolute()
+        || directory.lines().count() != 1
+        || !name.starts_with(prefix)
+        || name.len() <= prefix.len()
+    {
+        return Err("원격 임시 폴더 경로가 안전하지 않습니다.".to_string());
+    }
+    Ok(())
 }
 
 fn copy_secure_tree(source: &Path, destination: &Path) -> Result<(), String> {
@@ -314,8 +467,8 @@ pub(crate) fn codex_binary(home: &Path) -> Result<PathBuf, String> {
 }
 
 pub(crate) fn chat(
-    binary: &Path,
-    execution_path: &std::ffi::OsStr,
+    runner: Arc<dyn CommandRunner>,
+    binary: &str,
     project_id: &str,
     workspace_root: &Path,
     execution: ChatExecution,
@@ -326,7 +479,8 @@ pub(crate) fn chat(
     if message.is_empty() {
         return Err("LLM에 보낼 메시지를 입력하세요.".to_string());
     }
-    let workspace_root = fs::canonicalize(workspace_root)
+    let workspace_root = runner
+        .canonicalize(workspace_root)
         .map_err(|error| format!("프로젝트 워크스페이스를 열지 못했습니다: {error}"))?;
     let workspace = workspace_root
         .to_str()
@@ -338,10 +492,11 @@ pub(crate) fn chat(
         .transpose()?;
 
     let mut connection = CodexConnection::start(
+        runner.clone(),
         binary,
-        execution_path,
         &workspace_root,
         execution.network_access,
+        &execution.environment,
         execution.event_sink,
     )?;
     connection.send(&initialize_request())?;
@@ -364,7 +519,7 @@ pub(crate) fn chat(
         .get("cwd")
         .and_then(Value::as_str)
         .ok_or_else(|| "Codex App Server가 워크스페이스를 반환하지 않았습니다.".to_string())?;
-    verify_workspace(&workspace_root, active_workspace)?;
+    verify_workspace(runner.as_ref(), &workspace_root, active_workspace)?;
 
     connection.send(&turn_request(
         active_thread_id,
@@ -416,6 +571,7 @@ pub(crate) fn start_auto_hunt_with(
             model: execution.model,
             effort: execution.effort,
             event_sink: Some(execution.event_sink),
+            environment: execution.environment,
         },
         ProjectLlmRequest {
             message,
@@ -555,8 +711,13 @@ fn decode_conversation_id<'a>(
     Ok(thread_id)
 }
 
-fn verify_workspace(expected: &Path, actual: &str) -> Result<(), String> {
-    let actual = fs::canonicalize(actual)
+fn verify_workspace(
+    runner: &dyn CommandRunner,
+    expected: &Path,
+    actual: &str,
+) -> Result<(), String> {
+    let actual = runner
+        .canonicalize(Path::new(actual))
         .map_err(|error| format!("Codex 워크스페이스를 확인하지 못했습니다: {error}"))?;
     if actual != expected {
         return Err("Codex 대화가 프로젝트 워크스페이스에서 시작되지 않았습니다.".to_string());
@@ -575,21 +736,21 @@ struct CodexConnection {
 
 impl CodexConnection {
     fn start(
-        binary: &Path,
-        execution_path: &std::ffi::OsStr,
+        runner: Arc<dyn CommandRunner>,
+        binary: &str,
         workspace: &Path,
         network_access: bool,
+        environment: &[(String, String)],
         event_sink: Option<AgentEventSink>,
     ) -> Result<Self, String> {
-        let mut command = Command::new(binary);
-        command.args(app_server_args(network_access));
-        let mut child = command
-            .current_dir(workspace)
-            .env("PATH", execution_path)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
+        let mut spec = CommandSpec::new(binary)
+            .args(app_server_args(network_access))
+            .working_directory(workspace);
+        for (key, value) in environment {
+            spec = spec.env(key, value);
+        }
+        let mut child = runner
+            .spawn_piped(&spec)
             .map_err(|error| format!("Codex App Server를 시작하지 못했습니다: {error}"))?;
         let stdin = child
             .stdin
@@ -1023,7 +1184,12 @@ mod tests {
             fs::read_to_string(&briar_config).expect("source config should remain readable"),
             "original-briar"
         );
-        let snapshot_home = cli_environment._directory.path().join("home");
+        let snapshot_home = cli_environment
+            ._directory
+            .as_ref()
+            .expect("local environment should own a temp directory")
+            .path()
+            .join("home");
         assert_eq!(
             fs::read_to_string(snapshot_home.join(".config/briar/config.json"))
                 .expect("snapshot should receive Briar changes"),
@@ -1226,11 +1392,13 @@ printf '%s\n' '{"method":"turn/completed","params":{"threadId":"thread-1","turn"
         let recorded_events = Arc::new(Mutex::new(Vec::new()));
         let sink_events = recorded_events.clone();
 
+        let runner: Arc<dyn CommandRunner> = Arc::new(crate::host::LocalRunner::new(
+            std::env::var_os("PATH").expect("PATH should exist"),
+            directory.clone(),
+        ));
         let response = chat(
-            &binary,
-            std::env::var_os("PATH")
-                .expect("PATH should exist")
-                .as_os_str(),
+            runner,
+            binary.to_str().expect("binary path should be utf-8"),
             "project-1",
             &workspace,
             ChatExecution {
@@ -1246,6 +1414,7 @@ printf '%s\n' '{"method":"turn/completed","params":{"threadId":"thread-1","turn"
                         .push(event);
                     Ok(())
                 })),
+                environment: Vec::new(),
             },
             ProjectLlmRequest {
                 message: "Summarize the repository".to_string(),
