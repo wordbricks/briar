@@ -1,4 +1,4 @@
-//! Provider-neutral entry point for Briar's local coding-agent backends.
+//! Provider-neutral entry point for Briar's coding-agent backends.
 //!
 //! Backends keep their native transport and protocol handling private while
 //! exposing the small project-scoped execution contract Briar needs.
@@ -8,9 +8,12 @@ mod codex;
 
 use std::{
     ffi::OsStr,
+    io::Write,
     path::{Path, PathBuf},
     sync::Arc,
 };
+
+use crate::host::{CommandRunner, CommandSpec};
 
 pub(crate) use codex::{AutoHuntCliEnvironment, ProjectAutoHuntRequest, ProjectAutoHuntResponse};
 
@@ -148,6 +151,7 @@ pub(crate) struct ChatExecution {
     pub(crate) model: Option<String>,
     pub(crate) effort: Option<ModelEffort>,
     pub(crate) event_sink: Option<AgentEventSink>,
+    pub(crate) environment: Vec<(String, String)>,
 }
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
@@ -200,6 +204,7 @@ pub(crate) struct AutoHuntExecution {
     pub(crate) model: Option<String>,
     pub(crate) effort: Option<ModelEffort>,
     pub(crate) event_sink: AgentEventSink,
+    pub(crate) environment: Vec<(String, String)>,
 }
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
@@ -254,15 +259,15 @@ pub(crate) trait AgentBackend {
 }
 
 pub(crate) struct CodexBackend {
-    binary: PathBuf,
-    execution_path: std::ffi::OsString,
+    binary: String,
+    runner: Arc<dyn CommandRunner>,
 }
 
 impl CodexBackend {
-    pub(crate) fn discover(home: &Path, execution_path: &OsStr) -> Result<Self, String> {
+    pub(crate) fn discover(runner: Arc<dyn CommandRunner>) -> Result<Self, String> {
         Ok(Self {
-            binary: codex::codex_binary(home)?,
-            execution_path: execution_path.to_os_string(),
+            binary: runner.resolve_binary("codex")?,
+            runner,
         })
     }
 }
@@ -277,8 +282,8 @@ impl AgentBackend for CodexBackend {
         approve: &dyn Fn(&str, &serde_json::Value) -> bool,
     ) -> Result<ProjectLlmResponse, String> {
         codex::chat(
+            self.runner.clone(),
             &self.binary,
-            &self.execution_path,
             project_id,
             workspace_root,
             execution,
@@ -294,12 +299,11 @@ pub(crate) struct ClaudeBackend {
 
 impl ClaudeBackend {
     pub(crate) fn discover(
-        home: &Path,
-        execution_path: &OsStr,
-        runner: &Path,
+        command_runner: Arc<dyn CommandRunner>,
+        runner_bundle: &Path,
     ) -> Result<Self, String> {
         Ok(Self {
-            runtime: claude::ClaudeRuntime::discover(home, execution_path, runner)?,
+            runtime: claude::ClaudeRuntime::discover(command_runner, runner_bundle)?,
         })
     }
 }
@@ -351,16 +355,121 @@ impl AgentBackend for AgentBackendHandle {
 
 pub(crate) fn discover_backend(
     provider: AgentProviderKind,
-    home: &Path,
-    execution_path: &OsStr,
+    runner: Arc<dyn CommandRunner>,
     claude_runner: &Path,
 ) -> Result<AgentBackendHandle, String> {
     match provider {
-        AgentProviderKind::Codex => {
-            CodexBackend::discover(home, execution_path).map(AgentBackendHandle::Codex)
+        AgentProviderKind::Codex => CodexBackend::discover(runner).map(AgentBackendHandle::Codex),
+        AgentProviderKind::Claude => {
+            ClaudeBackend::discover(runner, claude_runner).map(AgentBackendHandle::Claude)
         }
-        AgentProviderKind::Claude => ClaudeBackend::discover(home, execution_path, claude_runner)
-            .map(AgentBackendHandle::Claude),
+    }
+}
+
+/// A bundled runner materialized on the execution host. Local runs use the
+/// bundle in place; SSH runs upload it to a mode-0700 temporary directory and
+/// remove that directory when the backend is dropped.
+pub(super) struct HostRunnerFile {
+    path: String,
+    cleanup: Option<(Arc<dyn CommandRunner>, String)>,
+}
+
+impl HostRunnerFile {
+    pub(super) fn prepare(
+        runner: Arc<dyn CommandRunner>,
+        local_bundle: &Path,
+        filename: &str,
+    ) -> Result<Self, String> {
+        if !local_bundle.is_file() {
+            return Err(
+                "Briar 에이전트 runner 번들을 찾지 못했습니다. 앱을 다시 설치하세요.".to_string(),
+            );
+        }
+        if !runner.is_remote() {
+            return Ok(Self {
+                path: local_bundle.to_string_lossy().into_owned(),
+                cleanup: None,
+            });
+        }
+
+        let shell = runner.resolve_binary("sh")?;
+        let directory_output = runner.run(&CommandSpec::new(shell.clone()).args([
+            "-c",
+            "umask 077; mktemp -d \"${TMPDIR:-/tmp}/briar-agent.XXXXXX\"",
+        ]))?;
+        if !directory_output.success() {
+            return Err(format!(
+                "원격 에이전트 임시 폴더를 만들지 못했습니다: {}",
+                directory_output.failure_message()
+            ));
+        }
+        let directory = directory_output.stdout_trimmed();
+        validate_remote_agent_directory(&directory)?;
+        let path = format!("{directory}/{filename}");
+        let mut child = runner.spawn_piped(&CommandSpec::new(shell).args([
+            "-c".to_string(),
+            "umask 077; cat > \"$1\"; chmod 700 \"$1\"".to_string(),
+            "briar-agent-upload".to_string(),
+            path.clone(),
+        ]))?;
+        let mut stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| "원격 에이전트 runner 업로드 입력을 열지 못했습니다.".to_string())?;
+        let contents = std::fs::read(local_bundle)
+            .map_err(|error| format!("에이전트 runner 번들을 읽지 못했습니다: {error}"))?;
+        if let Err(error) = stdin.write_all(&contents) {
+            let _ = child.kill();
+            let _ = child.wait();
+            let _ =
+                runner.run(&CommandSpec::new("rm").args(["-rf".to_string(), directory.clone()]));
+            return Err(format!(
+                "원격 에이전트 runner를 전송하지 못했습니다: {error}"
+            ));
+        }
+        drop(stdin);
+        let output = child
+            .wait_with_output()
+            .map_err(|error| format!("원격 에이전트 runner 전송을 완료하지 못했습니다: {error}"))?;
+        if !output.status.success() {
+            let _ =
+                runner.run(&CommandSpec::new("rm").args(["-rf".to_string(), directory.clone()]));
+            let message = String::from_utf8_lossy(&output.stderr).trim().to_string();
+            return Err(if message.is_empty() {
+                "원격 에이전트 runner 전송이 실패했습니다.".to_string()
+            } else {
+                format!("원격 에이전트 runner 전송이 실패했습니다: {message}")
+            });
+        }
+        Ok(Self {
+            path,
+            cleanup: Some((runner, directory)),
+        })
+    }
+
+    pub(super) fn path(&self) -> &str {
+        &self.path
+    }
+}
+
+fn validate_remote_agent_directory(directory: &str) -> Result<(), String> {
+    let path = Path::new(directory);
+    let name = path.file_name().and_then(OsStr::to_str).unwrap_or_default();
+    if !path.is_absolute()
+        || directory.lines().count() != 1
+        || !name.starts_with("briar-agent.")
+        || name.len() <= "briar-agent.".len()
+    {
+        return Err("원격 에이전트 임시 폴더 경로가 안전하지 않습니다.".to_string());
+    }
+    Ok(())
+}
+
+impl Drop for HostRunnerFile {
+    fn drop(&mut self) {
+        if let Some((runner, directory)) = self.cleanup.take() {
+            let _ = runner.run(&CommandSpec::new("rm").args(["-rf".to_string(), directory]));
+        }
     }
 }
 
@@ -392,7 +501,9 @@ pub(crate) fn start_auto_hunt(
 
 #[cfg(test)]
 mod tests {
-    use super::AgentProviderKind;
+    use super::{validate_remote_agent_directory, AgentProviderKind, HostRunnerFile};
+    use crate::host::{CommandRunner, LocalRunner};
+    use std::sync::Arc;
 
     #[test]
     fn resolves_the_original_provider_from_a_project_conversation() {
@@ -408,5 +519,37 @@ mod tests {
             AgentProviderKind::for_conversation_id("project-2", "briar:project-1:thread-1"),
             None
         );
+    }
+
+    #[test]
+    fn only_accepts_narrow_remote_agent_temp_directories() {
+        assert!(validate_remote_agent_directory("/tmp/briar-agent.a1b2c3").is_ok());
+        for unsafe_path in [
+            "/",
+            "/tmp",
+            "tmp/briar-agent.a1b2c3",
+            "/tmp/not-briar.a1b2c3",
+            "/tmp/briar-agent.\n/tmp/other",
+        ] {
+            assert!(
+                validate_remote_agent_directory(unsafe_path).is_err(),
+                "{unsafe_path:?} must not be removable"
+            );
+        }
+    }
+
+    #[test]
+    fn keeps_a_local_runner_bundle_in_place() {
+        let directory = tempfile::tempdir().expect("temp directory");
+        let bundle = directory.path().join("runner.js");
+        std::fs::write(&bundle, "console.log('ok')").expect("runner bundle");
+        let runner: Arc<dyn CommandRunner> = Arc::new(LocalRunner::new(
+            std::env::var_os("PATH").unwrap_or_default(),
+            directory.path().to_path_buf(),
+        ));
+        let prepared =
+            HostRunnerFile::prepare(runner, &bundle, "runner.js").expect("local runner file");
+        assert_eq!(prepared.path(), bundle.to_string_lossy());
+        assert!(bundle.is_file());
     }
 }

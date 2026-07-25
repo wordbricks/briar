@@ -86,7 +86,7 @@ export function App() {
     null,
   );
   const [companionPage, setCompanionPage] = useState<
-    "issues" | "inbox" | "session"
+    "issues" | "search" | "inbox" | "session"
   >("issues");
   const [companionStatus, setCompanionStatus] =
     useState<CompanionStatusFilter>("all");
@@ -275,13 +275,17 @@ export function App() {
   ) {
     content = (
       <ProjectOnboarding
-        canCancel={briar.projects.length > 0 && briar.isCreatingProject}
+        canCancel={briar.projects.length > 0}
         connection={briar.projectConnection}
         error={briar.error}
         loading={briar.loading}
         onCancel={briar.cancelProjectCreation}
-        onConnect={async (settings, repositoryPath) => {
-          const connected = await briar.connectProject(settings, repositoryPath);
+        onConnect={async (settings, repositoryPath, executionHostId) => {
+          const connected = await briar.connectProject(
+            settings,
+            repositoryPath,
+            executionHostId,
+          );
           if (connected) {
             setRequestedRunId(null);
             setRequestedSessionId(null);
@@ -300,7 +304,7 @@ export function App() {
     );
   } else {
     content = (
-      <jelly-theme mode="light" className="app-shell">
+      <div className="app-shell">
         <WindowNavigationControls
           canGoBack={canGoBack}
           canGoForward={canGoForward}
@@ -315,6 +319,7 @@ export function App() {
             activePage={activePage}
             activeOrganizationId={briar.activeOrganizationId}
             activeProjectId={briar.activeProjectId}
+            connectedProjectIds={briar.connectedProjectIds}
             isOpen={isSidebarOpen}
             onAddProject={briar.startProjectCreation}
             onAutoHuntOpen={() => navigateToPage("auto-hunt")}
@@ -497,10 +502,12 @@ export function App() {
             healthError={briar.healthError}
             healthLoading={briar.healthLoading}
             isCreatingIssue={briar.isCreatingIssue}
+            needsLocalConnection={!briar.isActiveProjectConnectedLocally}
             recoveringRunId={briar.recoveringRunId}
             recoveryError={briar.recoveryError}
             requestedRunId={requestedRunId}
             isSidebarOpen={isSidebarOpen}
+            onConnectRepository={briar.reconnectProject}
             onCreateIssue={briar.addIssue}
             onHealthRefresh={() => void briar.refreshHealth()}
             onLoadAttachment={briar.readIssueAttachment}
@@ -514,7 +521,7 @@ export function App() {
             onSendIssueMessage={sendIssueMessage}
           />
         )}
-      </jelly-theme>
+      </div>
     );
   }
 
@@ -524,8 +531,7 @@ export function App() {
       return <CompanionEmptyState onLogout={() => void briar.logout()} />;
     }
     return (
-      <jelly-theme
-        mode="light"
+      <div
         className={`app-shell companion-shell platform-${mobilePlatform}`}
       >
         <CompanionHeader
@@ -569,6 +575,7 @@ export function App() {
             <CompanionBottomNavigation
               activeDestination="inbox"
               onInboxOpen={() => {}}
+              onSearchOpen={() => setCompanionPage("search")}
               onStatusChange={(status) => {
                 setCompanionStatus(status);
                 setCompanionPage("issues");
@@ -602,6 +609,7 @@ export function App() {
             <CompanionBottomNavigation
               activeDestination="inbox"
               onInboxOpen={() => setCompanionPage("inbox")}
+              onSearchOpen={() => setCompanionPage("search")}
               onStatusChange={(status) => {
                 setCompanionStatus(status);
                 setCompanionPage("issues");
@@ -612,6 +620,7 @@ export function App() {
         ) : (
           <HuntDashboard
             companionMode
+            companionSearchMode={companionPage === "search"}
             companionStatus={companionStatus}
             companionUnreadInboxCount={inbox.unreadCount}
             dashboard={briar.dashboard}
@@ -625,7 +634,11 @@ export function App() {
             requestedRunId={requestedRunId}
             isSidebarOpen
             onCompanionInboxOpen={() => setCompanionPage("inbox")}
-            onCompanionStatusChange={setCompanionStatus}
+            onCompanionSearchOpen={() => setCompanionPage("search")}
+            onCompanionStatusChange={(status) => {
+              setCompanionStatus(status);
+              setCompanionPage("issues");
+            }}
             onCreateIssue={briar.addIssue}
             onHealthRefresh={() => {}}
             onLoadAttachment={briar.readIssueAttachment}
@@ -639,7 +652,7 @@ export function App() {
             onSendIssueMessage={sendIssueMessage}
           />
         )}
-      </jelly-theme>
+      </div>
     );
   }
 

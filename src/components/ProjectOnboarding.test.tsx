@@ -6,15 +6,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { ProjectOnboarding } from "./ProjectOnboarding";
 
-class TestJellySelect extends HTMLElement {
-  value = "";
-  syncOptions() {}
-}
-
-if (!customElements.get("jelly-select")) {
-  customElements.define("jelly-select", TestJellySelect);
-}
-
 const baseProps = {
   connection: null,
   error: null,
@@ -76,7 +67,7 @@ describe("ProjectOnboarding", () => {
       />,
     );
 
-    expect(markup).toContain('<jelly-select label="Velen 조직"');
+    expect(markup).toContain('<select aria-label="Velen 조직" class="native-select"');
     expect(markup).toContain("워크플로우 자동 생성");
     expect(markup).toContain("Agent backend");
     expect(markup).toContain("저장소 선택");
@@ -84,7 +75,7 @@ describe("ProjectOnboarding", () => {
     expect(markup).toContain(">확인 ");
     expect(markup).not.toContain('label="Auto Hunt 워크플로"');
     expect(markup).not.toContain('aria-pressed="true"');
-    expect(markup).not.toContain("<select");
+    expect(markup).toContain('type="checkbox"');
   });
 
   it("keeps first-project onboarding non-cancellable", () => {
@@ -130,7 +121,7 @@ describe("ProjectOnboarding", () => {
     expect(confirm?.disabled).toBe(true);
 
     const select = container.querySelector<HTMLButtonElement>(
-      ".setup-repository-action",
+      ".repository-setup .setup-repository-action",
     );
     await act(async () => select?.click());
 
@@ -138,6 +129,7 @@ describe("ProjectOnboarding", () => {
     expect(onRepositoryInspect).toHaveBeenCalledWith(
       "/Users/jay/git/briar",
       expect.objectContaining({ preset: "local" }),
+      "local",
     );
     expect(container.textContent).toContain("/Users/jay/git/briar");
     expect(container.textContent).toContain("push 권한 확인됨");
@@ -150,6 +142,7 @@ describe("ProjectOnboarding", () => {
         linearEnabled: false,
       }),
       "/Users/jay/git/briar",
+      "local",
     );
 
     await act(async () => root.unmount());

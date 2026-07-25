@@ -11,6 +11,7 @@ const sidebarProps = {
   activePage: "issues" as const,
   activeOrganizationId: "organization-1",
   activeProjectId: "project-1",
+  connectedProjectIds: ["project-1"],
   isOpen: true,
   onAddProject: () => undefined,
   onAutoHuntOpen: () => undefined,
@@ -71,7 +72,7 @@ describe("Sidebar", () => {
     expect(markup).not.toContain("도움말");
     expect(markup).not.toContain('href="#help"');
     expect(markup).toContain('aria-label="Briar 프로젝트 메뉴"');
-    expect(markup).not.toContain("<jelly-select");
+    expect(markup).not.toContain("<select");
   });
 
   it("switches organizations from the brand control", async () => {
@@ -364,6 +365,31 @@ describe("Sidebar", () => {
 
     await act(async () => root.unmount());
     container.remove();
+  });
+
+  it("flags projects that are not connected on this computer", () => {
+    const markup = renderToStaticMarkup(
+      <Sidebar {...sidebarProps} connectedProjectIds={[]} />,
+    );
+
+    expect(markup).toContain("sidebar-project-disconnected");
+    expect(markup).toContain(
+      "Briar: 이 컴퓨터에 저장소가 연결되지 않았습니다",
+    );
+  });
+
+  it("keeps connected projects unflagged", () => {
+    const markup = renderToStaticMarkup(<Sidebar {...sidebarProps} />);
+
+    expect(markup).not.toContain("sidebar-project-disconnected");
+  });
+
+  it("leaves projects unflagged when the local state is unknown", () => {
+    const markup = renderToStaticMarkup(
+      <Sidebar {...sidebarProps} connectedProjectIds={null} />,
+    );
+
+    expect(markup).not.toContain("sidebar-project-disconnected");
   });
 
   it("switches and persists the language from the account submenu", async () => {

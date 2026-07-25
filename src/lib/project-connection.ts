@@ -75,6 +75,23 @@ export type ConnectedLocalProject = {
   workflow: AutoHuntWorkflow;
 };
 
+export type ExecutionHost = {
+  id: string;
+  label: string;
+  kind: "local" | "ssh";
+  alias?: string;
+  hostname?: string;
+  username?: string;
+  port?: number;
+};
+
+export type ResolvedSshHost = {
+  alias: string;
+  hostname: string;
+  username?: string;
+  port?: number;
+};
+
 const isTauri = () => "__TAURI_INTERNALS__" in window;
 
 export async function loadConnectedProjectIds(): Promise<string[] | null> {
@@ -103,6 +120,7 @@ export async function pickGitRepository(): Promise<string | null> {
 export async function inspectRepositoryReadiness(
   repositoryPath: string,
   workflow: AutoHuntWorkflow,
+  executionHostId = "local",
 ) {
   if (!isTauri()) {
     throw new Error("Git 저장소 검사는 Briar 데스크톱 앱에서 사용할 수 있습니다.");
@@ -111,7 +129,41 @@ export async function inspectRepositoryReadiness(
   return invoke<RepositoryReadiness>("inspect_repository_readiness", {
     repositoryPath,
     workflow,
+    executionHostId,
   });
+}
+
+export async function listExecutionHosts(): Promise<ExecutionHost[]> {
+  if (!isTauri()) {
+    return [{ id: "local", label: "이 컴퓨터", kind: "local" }];
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<ExecutionHost[]>("list_execution_hosts");
+}
+
+export async function resolveSshHost(alias: string) {
+  if (!isTauri()) {
+    throw new Error("SSH 호스트 확인은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<ResolvedSshHost>("resolve_ssh_host", { alias });
+}
+
+export async function addSshHost(alias: string, label?: string) {
+  if (!isTauri()) {
+    throw new Error("SSH 호스트 추가는 Briar 데스크톱 앱에서 사용할 수 있습니다.");
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<ExecutionHost>("add_ssh_host", {
+    alias,
+    label: label?.trim() || null,
+  });
+}
+
+export async function removeSshHost(hostId: string) {
+  if (!isTauri()) return [];
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<string[]>("remove_ssh_host", { hostId });
 }
 
 export async function loadProjectRepositoryReadiness(projectId: string) {
@@ -146,6 +198,7 @@ export async function connectLocalProject(input: {
   projectId: string;
   agentToken: string;
   repositoryPath: string;
+  executionHostId?: string;
   autoHunt: LocalAutoHuntConfig;
 }) {
   if (!isTauri()) {
@@ -157,6 +210,7 @@ export async function connectLocalProject(input: {
     projectId: input.projectId,
     agentToken: input.agentToken,
     repositoryPath: input.repositoryPath,
+    executionHostId: input.executionHostId ?? "local",
     autoHunt: input.autoHunt,
   });
 }
@@ -195,12 +249,18 @@ export async function updateLocalProjectLinear(
   });
 }
 
-export async function inspectVelen(org?: string | null) {
+export async function inspectVelen(
+  org?: string | null,
+  executionHostId = "local",
+) {
   if (!isTauri()) {
     throw new Error("Velen 설정은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
   }
   const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<VelenInspection>("inspect_velen", { org: org || null });
+  return invoke<VelenInspection>("inspect_velen", {
+    org: org || null,
+    executionHostId,
+  });
 }
 
 export async function loadAutoHuntHealth(projectId: string) {

@@ -12,6 +12,8 @@ import {
   LoaderCircle,
   LogOut,
   RefreshCw,
+  Server,
+  ServerCog,
   UploadCloud,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -21,8 +23,13 @@ import type {
   RepositoryReadiness,
   VelenInspection,
 } from "../lib/project-connection";
+import {
+  addSshHost,
+  listExecutionHosts,
+  type ExecutionHost,
+} from "../lib/project-connection";
 import type { SessionUser } from "../types";
-import { JellySelect } from "./JellySelect";
+import { NativeSelect } from "./NativeSelect";
 import { Logo } from "./Logo";
 import {
   normalizeAutoHuntWorkflow,
@@ -38,6 +45,7 @@ type Props = {
   onConnect: (
     settings: LocalAutoHuntConfig,
     repositoryPath: string,
+    executionHostId: string,
   ) => Promise<unknown>;
   onCreate: (input: { name: string }) => Promise<unknown>;
   onLogout: () => void;
@@ -45,8 +53,12 @@ type Props = {
   onRepositoryInspect: (
     repositoryPath: string,
     workflow: LocalAutoHuntConfig["workflow"],
+    executionHostId: string,
   ) => Promise<RepositoryReadiness>;
-  onVelenOrgChange: (org?: string | null) => Promise<VelenInspection | null>;
+  onVelenOrgChange: (
+    org?: string | null,
+    executionHostId?: string,
+  ) => Promise<VelenInspection | null>;
   user: SessionUser;
   velen: VelenInspection | null;
 };
@@ -77,7 +89,30 @@ export function ProjectOnboarding({
     useState<RepositoryReadiness | null>(null);
   const [repositoryError, setRepositoryError] = useState<string | null>(null);
   const [selectingRepository, setSelectingRepository] = useState(false);
+  const [executionHosts, setExecutionHosts] = useState<ExecutionHost[]>([
+    { id: "local", label: "이 컴퓨터", kind: "local" },
+  ]);
+  const [executionHostId, setExecutionHostId] = useState("local");
+  const [sshAlias, setSshAlias] = useState("");
+  const [sshLabel, setSshLabel] = useState("");
+  const [addingHost, setAddingHost] = useState(false);
   const initialWorkflow = normalizeAutoHuntWorkflow(connection?.workflow);
+  const executionHost = executionHosts.find(
+    (host) => host.id === executionHostId,
+  ) ?? executionHosts[0];
+
+  useEffect(() => {
+    if (!connection) return;
+    let cancelled = false;
+    void listExecutionHosts()
+      .then((hosts) => {
+        if (!cancelled && hosts.length > 0) setExecutionHosts(hosts);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [connection]);
 
   useEffect(() => {
     if (!velen || velenOrg) return;
@@ -111,18 +146,28 @@ export function ProjectOnboarding({
       linearSource: linearEnabled ? linearSource || null : null,
       linearTeam: linearEnabled ? linearTeam || null : null,
       workflow: initialWorkflow,
-    }, repositoryPath).catch(() => undefined);
+    }, repositoryPath, executionHostId).catch(() => undefined);
   };
 
   const selectRepository = async () => {
+    if (executionHost?.kind === "ssh" && !repositoryPath.trim()) {
+      setRepositoryError("원격 호스트의 Git 저장소 절대 경로를 입력하세요.");
+      return;
+    }
     setSelectingRepository(true);
     setRepositoryError(null);
     try {
-      const selected = await onRepositorySelect();
+      const selected = executionHost?.kind === "ssh"
+        ? repositoryPath.trim()
+        : await onRepositorySelect();
       if (!selected) return;
       setRepositoryPath(selected);
       setRepositoryReadiness(null);
-      const readiness = await onRepositoryInspect(selected, initialWorkflow);
+      const readiness = await onRepositoryInspect(
+        selected,
+        initialWorkflow,
+        executionHostId,
+      );
       setRepositoryPath(readiness.repositoryPath);
       setRepositoryReadiness(readiness);
     } catch (caught) {
@@ -135,8 +180,33 @@ export function ProjectOnboarding({
     }
   };
 
+  const addExecutionHost = async () => {
+    if (!sshAlias.trim()) return;
+    setAddingHost(true);
+    setRepositoryError(null);
+    try {
+      const host = await addSshHost(sshAlias, sshLabel);
+      setExecutionHosts((current) => [
+        ...current.filter((candidate) => candidate.id !== host.id),
+        host,
+      ]);
+      setExecutionHostId(host.id);
+      setRepositoryPath("");
+      setRepositoryReadiness(null);
+      setSshAlias("");
+      setSshLabel("");
+      await onVelenOrgChange(undefined, host.id);
+    } catch (caught) {
+      setRepositoryError(
+        caught instanceof Error ? caught.message : String(caught),
+      );
+    } finally {
+      setAddingHost(false);
+    }
+  };
+
   return (
-    <jelly-theme mode="light" className="onboarding-shell">
+    <div className="onboarding-shell">
       <header className="onboarding-topbar">
         <Logo />
         <div className="onboarding-topbar-actions">
@@ -150,7 +220,7 @@ export function ProjectOnboarding({
           </button>
         </div>
       </header>
-      <jelly-card className="onboarding-card">
+      <main className="onboarding-card">
         <div className="onboarding-icon">
           {connection ? <Check size={24} /> : <FolderGit2 size={24} />}
         </div>
@@ -161,6 +231,71 @@ export function ProjectOnboarding({
             <p className="onboarding-copy">{t("onboarding.connectDescription")}</p>
 
             <div className="setup-grid">
+              <section className="setup-section">
+                <div className="setup-section-heading">
+                  <ServerCog size={18} />
+                  <div>
+                    <strong>실행 호스트</strong>
+                    <span>
+                      Codex와 Claude를 실행하고 저장소를 보관하는 컴퓨터입니다.
+                    </span>
+                  </div>
+                </div>
+                <div className="settings-fields">
+                  <label>
+                    <span>호스트</span>
+                    <NativeSelect
+                      label="실행 호스트"
+                      options={executionHosts.map((host) => ({
+                        label: host.kind === "ssh"
+                          ? `${host.label} · SSH`
+                          : host.label,
+                        value: host.id,
+                      }))}
+                      value={executionHostId}
+                      onValueChange={(hostId) => {
+                        setExecutionHostId(hostId);
+                        setRepositoryPath("");
+                        setRepositoryReadiness(null);
+                        setRepositoryError(null);
+                        void onVelenOrgChange(undefined, hostId);
+                      }}
+                    />
+                  </label>
+                  <label>
+                    <span>SSH 별칭 <small>~/.ssh/config</small></span>
+                    <input
+                      aria-label="SSH 별칭"
+                      className="native-input"
+                      onChange={(event) => setSshAlias(event.currentTarget.value)}
+                      placeholder="build-box"
+                      value={sshAlias}
+                    />
+                  </label>
+                  <label>
+                    <span>표시 이름 <small>{t("common.optional")}</small></span>
+                    <input
+                      aria-label="SSH 호스트 표시 이름"
+                      className="native-input"
+                      onChange={(event) => setSshLabel(event.currentTarget.value)}
+                      placeholder="원격 빌드 호스트"
+                      value={sshLabel}
+                    />
+                  </label>
+                  <button
+                    className="setup-repository-action"
+                    disabled={addingHost || !sshAlias.trim()}
+                    onClick={() => void addExecutionHost()}
+                    type="button"
+                  >
+                    {addingHost
+                      ? <LoaderCircle className="spin" size={14} />
+                      : <Server size={14} />}
+                    SSH 호스트 추가
+                  </button>
+                </div>
+              </section>
+
               <section className="setup-section">
                 <div className="setup-section-heading">
                   <ListChecks size={18} />
@@ -180,10 +315,27 @@ export function ProjectOnboarding({
                 <div className="setup-section-heading">
                   {repositoryPath ? <Check size={18} /> : <FolderOpen size={18} />}
                   <div>
-                    <strong>{t("onboarding.localRepository")}</strong>
-                    <span className={repositoryPath ? "repository-path" : undefined} title={repositoryPath || undefined}>
-                      {repositoryPath || t("onboarding.folderPicker")}
-                    </span>
+                    <strong>
+                      {executionHost?.kind === "ssh"
+                        ? "원격 Git 저장소"
+                        : t("onboarding.localRepository")}
+                    </strong>
+                    {executionHost?.kind === "ssh" ? (
+                      <input
+                        aria-label="원격 Git 저장소 경로"
+                        className="native-input"
+                        onChange={(event) => {
+                          setRepositoryPath(event.currentTarget.value);
+                          setRepositoryReadiness(null);
+                        }}
+                        placeholder="/home/dev/project"
+                        value={repositoryPath}
+                      />
+                    ) : (
+                      <span className={repositoryPath ? "repository-path" : undefined} title={repositoryPath || undefined}>
+                        {repositoryPath || t("onboarding.folderPicker")}
+                      </span>
+                    )}
                   </div>
                   <button
                     className="setup-repository-action"
@@ -194,11 +346,15 @@ export function ProjectOnboarding({
                     {selectingRepository ? (
                       <LoaderCircle aria-hidden="true" className="spin" size={14} />
                     ) : (
-                      <FolderOpen aria-hidden="true" size={14} />
+                      executionHost?.kind === "ssh"
+                        ? <RefreshCw aria-hidden="true" size={14} />
+                        : <FolderOpen aria-hidden="true" size={14} />
                     )}
                     {selectingRepository
                       ? t("onboarding.repositorySelecting")
-                      : repositoryPath
+                      : executionHost?.kind === "ssh"
+                        ? "원격 저장소 검사"
+                        : repositoryPath
                         ? t("onboarding.repositoryChange")
                         : t("onboarding.repositorySelect")}
                   </button>
@@ -245,7 +401,7 @@ export function ProjectOnboarding({
                   <div className="settings-fields single-field">
                     <label>
                       <span>{t("onboarding.organization")}</span>
-                      <JellySelect
+                      <NativeSelect
                         label={t("onboarding.velenOrg")}
                         options={velen.organizations.map((organization) => ({
                           label: organization.name,
@@ -255,7 +411,7 @@ export function ProjectOnboarding({
                         onValueChange={(org) => {
                           setVelenOrg(org);
                           setLinearSource("");
-                          void onVelenOrgChange(org);
+                          void onVelenOrgChange(org, executionHostId);
                         }}
                       />
                     </label>
@@ -267,20 +423,22 @@ export function ProjectOnboarding({
                 <div className="setup-section-heading">
                   <Link2 size={18} />
                   <div><strong>{t("onboarding.linear")}</strong><span>{t("onboarding.linearDescription")}</span></div>
-                  <jelly-switch
-                    aria-label={t("onboarding.linear")}
-                    checked={linearEnabled}
-                    disabled={!velen}
-                    size="small"
-                    variant="mint"
-                    onChange={(event) => setLinearEnabled((event.currentTarget as HTMLElement & { checked?: boolean }).checked ?? false)}
-                  />
+                  <label className="native-switch">
+                    <input
+                      aria-label={t("onboarding.linear")}
+                      checked={linearEnabled}
+                      disabled={!velen}
+                      onChange={(event) => setLinearEnabled(event.currentTarget.checked)}
+                      type="checkbox"
+                    />
+                    <span aria-hidden="true" />
+                  </label>
                 </div>
                 {linearEnabled ? (
                   <div className="settings-fields">
                     <label>
                       <span>{t("onboarding.linearSource")}</span>
-                      <JellySelect
+                      <NativeSelect
                         label={t("onboarding.linearSource")}
                         onValueChange={setLinearSource}
                         options={linearSources.map((source) => ({
@@ -306,7 +464,7 @@ export function ProjectOnboarding({
               </section>
             </div>
 
-            {error ? <jelly-alert variant="rose" className="login-error">{error}</jelly-alert> : null}
+            {error ? <div className="login-error" role="alert">{error}</div> : null}
             <button
               className="onboarding-primary-action"
               disabled={loading || selectingRepository || !repositoryReadiness?.gitReady || !velen || !velenOrg || (linearEnabled && !linearSource)}
@@ -339,7 +497,7 @@ export function ProjectOnboarding({
                   value={name}
                 />
               </label>
-              {error ? <jelly-alert variant="rose" className="login-error">{error}</jelly-alert> : null}
+              {error ? <div className="login-error" role="alert">{error}</div> : null}
               <button
                 className="onboarding-primary-action"
                 disabled={loading || !name.trim()}
@@ -350,7 +508,7 @@ export function ProjectOnboarding({
             </form>
           </>
         )}
-      </jelly-card>
-    </jelly-theme>
+      </main>
+    </div>
   );
 }

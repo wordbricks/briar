@@ -4,6 +4,7 @@ import {
   AtSign,
   Bold,
   Bot,
+  Check,
   ChevronRight,
   CircleAlert,
   Clock3,
@@ -16,6 +17,7 @@ import {
   Italic,
   Link2,
   List,
+  ListFilter,
   LoaderCircle,
   MessageCircle,
   Paperclip,
@@ -49,7 +51,7 @@ import {
 } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { JellySelect } from "./JellySelect";
+import { NativeSelect } from "./NativeSelect";
 import {
   CompanionBottomNavigation,
   type CompanionStatusFilter,
@@ -89,6 +91,7 @@ type KanbanColumn = {
 
 export function HuntDashboard({
   companionMode = false,
+  companionSearchMode = false,
   companionStatus,
   companionUnreadInboxCount = 0,
   dashboard,
@@ -97,9 +100,11 @@ export function HuntDashboard({
   healthError,
   healthLoading,
   isCreatingIssue,
+  needsLocalConnection = false,
   recoveringRunId,
   recoveryError,
   isSidebarOpen,
+  onConnectRepository,
   onCreateIssue,
   onHealthRefresh,
   onLoadAttachment,
@@ -109,6 +114,7 @@ export function HuntDashboard({
   onRetryRun,
   onCancelRun,
   onCompanionInboxOpen,
+  onCompanionSearchOpen,
   onCompanionStatusChange,
   onRepair,
   onRequestedRunOpen,
@@ -116,6 +122,7 @@ export function HuntDashboard({
   requestedRunId = null,
 }: {
   companionMode?: boolean;
+  companionSearchMode?: boolean;
   companionStatus?: CompanionStatusFilter;
   companionUnreadInboxCount?: number;
   dashboard: DashboardPayload | null;
@@ -124,9 +131,11 @@ export function HuntDashboard({
   healthError: string | null;
   healthLoading: boolean;
   isCreatingIssue: boolean;
+  needsLocalConnection?: boolean;
   recoveringRunId: string | null;
   recoveryError: string | null;
   isSidebarOpen: boolean;
+  onConnectRepository?: () => void;
   onCreateIssue: (input: CreateIssueInput) => Promise<unknown>;
   onHealthRefresh: () => void;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
@@ -136,6 +145,7 @@ export function HuntDashboard({
   onRetryRun: (runId: string) => Promise<unknown>;
   onCancelRun: (runId: string) => Promise<unknown>;
   onCompanionInboxOpen?: () => void;
+  onCompanionSearchOpen?: () => void;
   onCompanionStatusChange?: (status: CompanionStatusFilter) => void;
   onRepair: () => void;
   onRequestedRunOpen?: () => void;
@@ -148,6 +158,8 @@ export function HuntDashboard({
   const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [source, setSource] = useState<SourceFilter>("all");
+  const [isSourceFilterOpen, setIsSourceFilterOpen] = useState(false);
+  const sourceFilterRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<DashboardView>("kanban");
   const [internalStatus, setInternalStatus] = useState<StatusFilter>("all");
   const status = companionMode && companionStatus
@@ -161,6 +173,25 @@ export function HuntDashboard({
   const [draggedRunId, setDraggedRunId] = useState<string | null>(null);
   const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!isSourceFilterOpen) return;
+
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (!sourceFilterRef.current?.contains(event.target as Node)) {
+        setIsSourceFilterOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsSourceFilterOpen(false);
+    };
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isSourceFilterOpen]);
+
   const runs = dashboard?.runs ?? [];
   const selected = runs.find((run) => run.id === selectedRunId) ?? null;
   const activeCount = runs.filter((run) => !["completed", "cancelled"].includes(run.status)).length;
@@ -169,7 +200,10 @@ export function HuntDashboard({
     ["completed", "cancelled"].includes(run.status)
   ).length;
   const filtered = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
+    const normalized =
+      !companionMode || companionSearchMode
+        ? query.trim().toLowerCase()
+        : "";
     return runs.filter((run) => {
       if (source !== "all" && run.source !== source) return false;
       if (status === "active" && ["completed", "cancelled"].includes(run.status)) return false;
@@ -180,7 +214,7 @@ export function HuntDashboard({
       ) return false;
       return !normalized || `${run.title} ${run.sourceKey} ${run.repository}`.toLowerCase().includes(normalized);
     });
-  }, [query, runs, source, status]);
+  }, [companionMode, companionSearchMode, query, runs, source, status]);
 
   useEffect(() => {
     if (!requestedRunId) return;
@@ -292,11 +326,75 @@ export function HuntDashboard({
       </header>}
       <div className="dashboard-scroll">
         {error && <div className="error-banner"><CircleAlert size={16} />{error}</div>}
+        {needsLocalConnection && (
+          <div className="connect-banner">
+            <span aria-hidden="true"><FolderGit2 size={16} /></span>
+            <div>
+              <strong>{t("dashboard.connectRepositoryTitle")}</strong>
+              <small>{t("dashboard.connectRepositoryDescription")}</small>
+            </div>
+            <button onClick={onConnectRepository} type="button">
+              <FolderGit2 size={13} />{t("dashboard.connectRepository")}
+            </button>
+          </div>
+        )}
 
         <div className="queue-header">
-          <div>
-            <h2>{t("dashboard.queue")}</h2>
-            <span>{t("dashboard.taskCount", { count: filtered.length })}</span>
+          <div className="queue-heading">
+            <div className="queue-heading-copy">
+              <h2>
+                {companionMode && companionSearchMode
+                  ? t("companion.navSearch")
+                  : t("dashboard.queue")}
+              </h2>
+              <span>{t("dashboard.taskCount", { count: filtered.length })}</span>
+            </div>
+            {companionMode && (
+              <div className="companion-source-filter" ref={sourceFilterRef}>
+                <button
+                  aria-controls="companion-source-filter-menu"
+                  aria-expanded={isSourceFilterOpen}
+                  aria-haspopup="menu"
+                  aria-label={t("dashboard.filter")}
+                  className={`companion-filter-trigger${source !== "all" ? " active" : ""}`}
+                  onClick={() => setIsSourceFilterOpen((current) => !current)}
+                  type="button"
+                >
+                  <ListFilter size={18} />
+                </button>
+                {isSourceFilterOpen && (
+                  <div
+                    aria-label={t("dashboard.filter")}
+                    className="companion-filter-menu"
+                    id="companion-source-filter-menu"
+                    role="menu"
+                  >
+                    {(["all", "issue", "feedback", "error"] as const).map(
+                      (value) => (
+                        <button
+                          aria-checked={source === value}
+                          className={source === value ? "active" : ""}
+                          key={value}
+                          onClick={() => {
+                            setSource(value);
+                            setIsSourceFilterOpen(false);
+                          }}
+                          role="menuitemradio"
+                          type="button"
+                        >
+                          <span>
+                            {value === "all"
+                              ? t("dashboard.all")
+                              : t(`source.${value}` as MessageKey)}
+                          </span>
+                          {source === value && <Check size={15} />}
+                        </button>
+                      ),
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <div className="queue-tools">
             {!companionMode && (
@@ -309,14 +407,26 @@ export function HuntDashboard({
                 <Plus size={14} />{t("dashboard.createIssue")}
               </button>
             )}
-            <label className="search-box"><Search size={15} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("dashboard.search")} /></label>
-            <div className="source-filter">
-              {(["all", "issue", "feedback", "error"] as const).map((value) => (
-                <button key={value} className={source === value ? "active" : ""} onClick={() => setSource(value)}>
-                  {value === "all" ? t("dashboard.all") : t(`source.${value}` as MessageKey)}
-                </button>
-              ))}
-            </div>
+            {(!companionMode || companionSearchMode) && (
+              <label className="search-box">
+                <Search size={15} />
+                <input
+                  autoFocus={companionSearchMode}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={t("dashboard.search")}
+                />
+              </label>
+            )}
+            {!companionMode && (
+              <div className="source-filter">
+                {(["all", "issue", "feedback", "error"] as const).map((value) => (
+                  <button key={value} className={source === value ? "active" : ""} onClick={() => setSource(value)}>
+                    {value === "all" ? t("dashboard.all") : t(`source.${value}` as MessageKey)}
+                  </button>
+                ))}
+              </div>
+            )}
             {!companionMode && (
               <div
                 aria-label={t("dashboard.viewMode")}
@@ -435,9 +545,10 @@ export function HuntDashboard({
       </div>
       {companionMode && (
         <CompanionBottomNavigation
-          activeDestination={status}
+          activeDestination={companionSearchMode ? "search" : status}
           onCreate={() => setIsIssueDialogOpen(true)}
           onInboxOpen={() => onCompanionInboxOpen?.()}
+          onSearchOpen={() => onCompanionSearchOpen?.()}
           onStatusChange={setStatus}
           unreadInboxCount={companionUnreadInboxCount}
         />
@@ -677,7 +788,7 @@ export function CreateIssueDialog({
               </div>
             )}
           </div>
-          <JellySelect
+          <NativeSelect
             className="issue-priority-select"
             label={t("issue.priority")}
             onValueChange={setPriority}
