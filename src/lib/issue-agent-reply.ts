@@ -1,3 +1,4 @@
+import type { IssueMessage } from "../types";
 import type { AgentProvider } from "./project-llm";
 
 type IssueSession = {
@@ -17,6 +18,12 @@ export type IssueAgentConversation = {
 
 export function mentionsBriar(body: string) {
   return /(^|[^\p{L}\p{N}_])@briar(?=$|[^\p{L}\p{N}_])/iu.test(body);
+}
+
+export function agentReplyParentMessageId(
+  message: Pick<IssueMessage, "id" | "parentMessageId">,
+) {
+  return message.parentMessageId ?? message.id;
 }
 
 export function briarMentionAtCaret(body: string, caret: number) {

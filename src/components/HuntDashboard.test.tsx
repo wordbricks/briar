@@ -478,7 +478,7 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
-  it("inserts @briar and renders the provider reply in the conversation", async () => {
+  it("inserts @briar and places the provider reply in its thread", async () => {
     const createdAt = new Date().toISOString();
     const userMessage: IssueMessage = {
       id: "message-user",
@@ -493,6 +493,7 @@ describe("HuntDashboard", () => {
     const agentMessage: IssueMessage = {
       ...userMessage,
       id: "message-agent",
+      parentMessageId: userMessage.id,
       body: "Codex가 처리한 변경 내용을 설명합니다.",
       author: {
         id: null,
@@ -553,7 +554,16 @@ describe("HuntDashboard", () => {
 
     expect(sentBody).toBe("@briar 변경 내용을 설명해 줘");
     expect(container.textContent).toContain(userMessage.body);
-    expect(container.textContent).toContain(agentMessage.body);
+    expect(
+      container.querySelector(".issue-message-list")?.textContent,
+    ).not.toContain(agentMessage.body);
+    const threadSummary = container.querySelector<HTMLButtonElement>(
+      ".issue-thread-summary",
+    );
+    expect(threadSummary?.textContent).toContain("답장 1개");
+    await act(async () => threadSummary?.click());
+    expect(container.querySelector(".issue-thread-content")?.textContent)
+      .toContain(agentMessage.body);
     expect(
       container.querySelector('.issue-message-avatar.agent[aria-label="Briar · Codex"]'),
     ).not.toBeNull();

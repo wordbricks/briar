@@ -70,6 +70,7 @@ import {
 import { isMobileCompanion } from "../lib/platform";
 import { chatWithProjectLlm } from "../lib/project-llm";
 import {
+  agentReplyParentMessageId,
   providerForConversation,
   type IssueAgentConversation,
 } from "../lib/issue-agent-reply";
@@ -1316,6 +1317,7 @@ export function useBriar() {
       const persistMessage = async (
         messageBody: string,
         conversation: IssueAgentConversation | null,
+        parentMessageId: string | null,
       ) => {
         let message: IssueMessage;
         if (demoMode) {
@@ -1323,7 +1325,7 @@ export function useBriar() {
           message = {
             id: crypto.randomUUID(),
             runId,
-            parentMessageId: input.parentMessageId,
+            parentMessageId,
             body: messageBody,
             author: conversation
               ? {
@@ -1348,14 +1350,14 @@ export function useBriar() {
           if (!token) throw new Error("메시지를 보내려면 로그인이 필요합니다.");
           message = await createIssueMessage(token, activeProjectId, runId, {
             body: messageBody,
-            parentMessageId: input.parentMessageId,
+            parentMessageId,
             agentConversationId: conversation?.conversationId ?? null,
           });
         }
         return cacheMessage(message);
       };
 
-      const message = await persistMessage(body, null);
+      const message = await persistMessage(body, null, input.parentMessageId);
       if (!agentConversation) return { message, agentReply: null };
 
       const run = dashboard?.runs.find((candidate) => candidate.id === runId);
@@ -1390,10 +1392,14 @@ export function useBriar() {
         if (!provider) {
           throw new Error("AI 프로바이더 대화 식별자가 유효하지 않습니다.");
         }
-        return persistMessage(replyBody, {
-          conversationId: response.conversationId,
-          provider,
-        });
+        return persistMessage(
+          replyBody,
+          {
+            conversationId: response.conversationId,
+            provider,
+          },
+          agentReplyParentMessageId(message),
+        );
       });
       return { message, agentReply };
     },
