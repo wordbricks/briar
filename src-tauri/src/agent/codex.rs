@@ -1093,6 +1093,20 @@ mod tests {
     }
 
     #[test]
+    fn opens_all_codex_permissions_for_unrestricted_project_replies() {
+        let request = thread_request(
+            "/repo",
+            Some("thread-1"),
+            None,
+            ApprovalPolicy::Never,
+            SandboxMode::DangerFullAccess,
+        );
+
+        assert_eq!(request["params"]["sandbox"], "danger-full-access");
+        assert_eq!(request["params"]["approvalPolicy"], "never");
+    }
+
+    #[test]
     fn configures_auto_hunt_for_workspace_writes_and_configurable_issue_limit() {
         let request = thread_request(
             "/repo",

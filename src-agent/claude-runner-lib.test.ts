@@ -56,6 +56,26 @@ describe("Claude runner", () => {
     });
   });
 
+  it("opens every Claude permission for unrestricted project replies", () => {
+    const canUseTool = vi.fn();
+    const options = claudeOptions(
+      {
+        ...request,
+        sandboxMode: "dangerFullAccess",
+        networkAccess: true,
+      },
+      canUseTool,
+    );
+
+    expect(options.permissionMode).toBe("bypassPermissions");
+    expect(options.allowDangerouslySkipPermissions).toBe(true);
+    expect(options.sandbox).toBeUndefined();
+    expect(options.tools).toBeUndefined();
+    expect(options.allowedTools).toBeUndefined();
+    expect(options.disallowedTools).toBeUndefined();
+    expect(options.canUseTool).toBeUndefined();
+  });
+
   it("normalizes streamed and final assistant text", () => {
     const state: ClaudeEventState = {
       activeMessageId: null,
