@@ -5,3 +5,10 @@ useDefault = true
 description = "Cargo registry checksums are public package integrity hashes"
 targetRules = ["generic-api-key"]
 paths = ['''(^|/)src-tauri/Cargo\.lock$''']
+
+[[allowlists]]
+description = "Apple App Store Connect issuer IDs are public release identifiers"
+targetRules = ["generic-api-key"]
+regexTarget = "line"
+paths = ['''(^|/)config/release\.env$''']
+regexes = ['''^APPLE_API_ISSUER=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$''']
