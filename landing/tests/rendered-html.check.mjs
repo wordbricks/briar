@@ -38,8 +38,9 @@ test("server-renders the finished Briar landing page", async () => {
   assert.match(html, /macOS Apple Silicon/);
   assert.match(
     html,
-    /https:\/\/briar-api\.wbai\.workers\.dev\/releases\/v1\.1\.1\/Briar_1\.1\.1_aarch64\.dmg/,
+    /https:\/\/briar-api\.wbai\.workers\.dev\/releases\/latest\/mac-aarch64\.dmg/,
   );
+  assert.match(html, /최신 릴리즈 · macOS Apple Silicon · 서명 및 공증 완료/);
   assert.match(html, /https:\/\/github\.com\/wordbricks\/briar/);
   assert.match(html, /http:\/\/localhost\/og\.png/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
