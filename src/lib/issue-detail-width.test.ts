@@ -16,12 +16,14 @@ function firstRule(selector: string) {
 
 describe("issue detail width", () => {
   it("keeps the issue titlebar only slightly taller than its contents", () => {
-    const titlebarRule = firstRule(".run-page-shell > .topbar");
+    const topbarRule = firstRule(".topbar");
+    const runTitlebarRule = firstRule(".run-page-shell > .topbar");
     const backButtonRule = firstRule(".run-page-titlebar-back");
 
-    expect(titlebarRule).toContain("height:40px");
-    expect(titlebarRule).toContain("flex-basis:40px");
-    expect(backButtonRule).toContain("height:28px");
+    expect(topbarRule).toContain("height: 30px");
+    expect(topbarRule).toContain("flex: 0 0 30px");
+    expect(runTitlebarRule).toContain("gap:10px");
+    expect(backButtonRule).toContain("height:24px");
   });
 
   it("fills the parent and keeps the properties rail compact", () => {
