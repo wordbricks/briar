@@ -8,7 +8,7 @@
  */
 
 export type ExecutionWorkerState = "online" | "stale" | "disabled";
-export type AgentProvider = "codex" | "claude";
+export type AgentProvider = "codex" | "claude" | "grok";
 export type TranscriptDirection = "client" | "server";
 
 export type ExecutionWorkerRow = {

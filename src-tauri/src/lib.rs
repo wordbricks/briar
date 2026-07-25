@@ -346,6 +346,7 @@ struct OnboardingPrerequisites {
     git: OnboardingPrerequisiteStatus,
     codex: OnboardingPrerequisiteStatus,
     claude: OnboardingPrerequisiteStatus,
+    grok: OnboardingPrerequisiteStatus,
     velen: OnboardingPrerequisiteStatus,
 }
 
@@ -421,6 +422,8 @@ struct AppProviderSettings {
     codex: bool,
     #[serde(default = "enabled_by_default")]
     claude: bool,
+    #[serde(default = "enabled_by_default")]
+    grok: bool,
 }
 
 impl Default for AppProviderSettings {
@@ -428,6 +431,7 @@ impl Default for AppProviderSettings {
         Self {
             codex: true,
             claude: true,
+            grok: true,
         }
     }
 }
@@ -437,7 +441,12 @@ impl AppProviderSettings {
         match provider {
             agent::AgentProviderKind::Codex => self.codex,
             agent::AgentProviderKind::Claude => self.claude,
+            agent::AgentProviderKind::Grok => self.grok,
         }
+    }
+
+    fn any_enabled(self) -> bool {
+        self.codex || self.claude || self.grok
     }
 }
 
@@ -654,6 +663,7 @@ fn inspect_onboarding_prerequisites_sync(home: &Path) -> OnboardingPrerequisites
         git: inspect_cli(git_binary(home)),
         codex: inspect_cli(agent::codex_binary(home)),
         claude: inspect_cli(agent::claude_binary(home, &execution_path)),
+        grok: inspect_cli(agent::grok_binary(home, &execution_path)),
         velen: inspect_velen_prerequisite_with(velen_binary(), home),
     }
 }
@@ -728,6 +738,32 @@ fn install_brew_package(home: &Path, package: &str) -> Result<(), String> {
     ))
 }
 
+fn install_grok_cli(home: &Path) -> Result<(), String> {
+    let execution_path = cli_execution_path(home)?;
+    let shell = which::which_in("bash", Some(&execution_path), home)
+        .or_else(|_| which::which_in("sh", Some(&execution_path), home))
+        .map_err(|_| "Grok 설치에 필요한 shell을 찾지 못했습니다.".to_string())?;
+    let output = Command::new(shell)
+        .env("PATH", &execution_path)
+        .env("HOME", home)
+        .args([
+            "-c",
+            "curl -fsSL https://x.ai/cli/install.sh | bash",
+        ])
+        .output()
+        .map_err(|error| format!("Grok CLI 설치 명령을 실행하지 못했습니다: {error}"))?;
+    if output.status.success() {
+        return Ok(());
+    }
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let message = [stderr.trim(), stdout.trim()]
+        .into_iter()
+        .find(|part| !part.is_empty())
+        .unwrap_or("unknown error");
+    Err(format!("Grok CLI를 설치하지 못했습니다: {message}"))
+}
+
 #[tauri::command]
 async fn install_onboarding_prerequisite(
     app: tauri::AppHandle,
@@ -739,6 +775,7 @@ async fn install_onboarding_prerequisite(
             "git" => install_brew_package(&home, "git")?,
             "codex" => install_cli_package(&home, "@openai/codex")?,
             "claude" => install_cli_package(&home, "@anthropic-ai/claude-code")?,
+            "grok" => install_grok_cli(&home)?,
             "velen" => install_cli_package(&home, "@wordbricks/velen")?,
             _ => return Err("지원하지 않는 필수 도구입니다.".to_string()),
         }
@@ -747,6 +784,7 @@ async fn install_onboarding_prerequisite(
             "git" => prerequisites.git.installed,
             "codex" => prerequisites.codex.installed,
             "claude" => prerequisites.claude.installed,
+            "grok" => prerequisites.grok.installed,
             "velen" => prerequisites.velen.installed,
             _ => false,
         };
@@ -782,6 +820,7 @@ async fn login_onboarding_velen(app: tauri::AppHandle) -> Result<OnboardingPrere
 fn cli_execution_path(home: &Path) -> Result<OsString, String> {
     let mut paths = vec![
         home.join(".local/bin"),
+        home.join(".grok/bin"),
         home.join(".bun/bin"),
         home.join(".cargo/bin"),
         PathBuf::from("/opt/homebrew/bin"),
@@ -2003,7 +2042,7 @@ fn update_app_provider_settings_at(
     config_path: &Path,
     settings: AppProviderSettings,
 ) -> Result<AppProviderSettings, String> {
-    if !settings.codex && !settings.claude {
+    if !settings.any_enabled() {
         return Err("하나 이상의 에이전트 프로바이더를 활성화해야 합니다.".to_string());
     }
     let contents = fs::read_to_string(config_path)
@@ -2052,10 +2091,7 @@ fn approval_request_message(
         .and_then(|cwd| cwd.as_str())
         .map(|cwd| format!("\n\n위치: {cwd}"))
         .unwrap_or_default();
-    let provider_name = match provider {
-        agent::AgentProviderKind::Codex => "Codex",
-        agent::AgentProviderKind::Claude => "Claude",
-    };
+    let provider_name = provider.display_name();
     format!("{provider_name}가 다음 작업의 승인을 요청했습니다.\n\n{action}{cwd}")
 }
 
@@ -2079,6 +2115,15 @@ fn update_project_llm_settings_at(
         && settings.effort == Some(agent::ModelEffort::Ultra)
     {
         return Err("Claude는 ultra effort를 지원하지 않습니다.".to_string());
+    }
+    if settings.provider == agent::AgentProviderKind::Grok
+        && matches!(
+            settings.effort,
+            Some(agent::ModelEffort::Ultra | agent::ModelEffort::Xhigh | agent::ModelEffort::Max)
+        )
+    {
+        // Grok maps these to high server-side; keep the stricter client message for clarity.
+        return Err("Grok effort는 low, medium, high만 지원합니다.".to_string());
     }
     let contents = fs::read_to_string(config_path)
         .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
@@ -2252,7 +2297,7 @@ fn install_auto_hunt_assets(resource_directory: &Path, home: &Path) -> Result<()
     if !skill_source.is_dir() {
         return Err("Briar Auto Hunt 스킬 번들을 찾지 못했습니다.".to_string());
     }
-    let skill_destinations = [".codex", ".claude"]
+    let skill_destinations = [".codex", ".claude", ".grok"]
         .map(|directory| home.join(directory).join("skills").join("briar-auto-hunt"));
     for skill_destination in &skill_destinations {
         copy_directory(&skill_source, skill_destination)?;
@@ -2414,6 +2459,7 @@ fn auto_hunt_health_sync_with(
     let skill_directory = match project.llm.clone().unwrap_or_default().provider {
         agent::AgentProviderKind::Codex => ".codex",
         agent::AgentProviderKind::Claude => ".claude",
+        agent::AgentProviderKind::Grok => ".grok",
     };
     let skill_path = execution_home
         .join(skill_directory)
@@ -2480,6 +2526,7 @@ fn auto_hunt_health_sync_with(
             match project.llm.clone().unwrap_or_default().provider {
                 agent::AgentProviderKind::Codex => ("codex", &["login", "status"]),
                 agent::AgentProviderKind::Claude => ("claude", &["auth", "status"]),
+                agent::AgentProviderKind::Grok => ("grok", &["--version"]),
             };
         match runner.resolve_binary(agent_name) {
             Ok(binary) => {
@@ -2489,22 +2536,26 @@ fn auto_hunt_health_sync_with(
                 if !authenticated {
                     issues.push(format!(
                         "원격 {} 에이전트가 인증되지 않았습니다. 호스트에서 직접 로그인해 주세요.",
-                        if agent_name == "codex" {
-                            "Codex"
-                        } else {
-                            "Claude"
+                        match agent_name {
+                            "codex" => "Codex",
+                            "claude" => "Claude",
+                            "grok" => "Grok",
+                            other => other,
                         }
                     ));
                 }
             }
-            Err(_) => issues.push(format!(
-                "원격 호스트에 {} 에이전트가 설치되지 않았습니다.",
-                if agent_name == "codex" {
-                    "Codex"
-                } else {
-                    "Claude"
-                }
-            )),
+            Err(_) => {
+                issues.push(format!(
+                    "원격 호스트에서 {} CLI를 찾지 못했습니다.",
+                    match agent_name {
+                        "codex" => "Codex",
+                        "claude" => "Claude",
+                        "grok" => "Grok",
+                        other => other,
+                    }
+                ));
+            }
         }
     }
 
@@ -2616,6 +2667,11 @@ async fn project_llm_chat(
         "agent/claude-runner.js",
         "dist-agent/claude-runner.js",
     );
+    let grok_runner = bundled_path(
+        &resource_directory,
+        "agent/grok-runner.js",
+        "dist-agent/grok-runner.js",
+    );
     let approval_app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let (runner, workspace) =
@@ -2640,17 +2696,21 @@ async fn project_llm_chat(
                 "이 대화의 에이전트 프로바이더가 앱 설정에서 비활성화되어 있습니다.".to_string(),
             );
         }
-        let backend = agent::discover_backend(provider, runner, &claude_runner)?;
+        let backend = agent::discover_backend(
+            provider,
+            runner,
+            agent::AgentRunnerBundles {
+                claude: &claude_runner,
+                grok: &grok_runner,
+            },
+        )?;
         let (model, effort) = if provider == settings.provider {
             (settings.model, settings.effort)
         } else {
             (None, None)
         };
         let approve = |method: &str, params: &serde_json::Value| {
-            let provider_name = match provider {
-                agent::AgentProviderKind::Codex => "Codex",
-                agent::AgentProviderKind::Claude => "Claude",
-            };
+            let provider_name = provider.display_name();
             approval_app
                 .dialog()
                 .message(approval_request_message(provider, method, params))
@@ -2728,6 +2788,11 @@ async fn start_project_auto_hunt(
         "agent/claude-runner.js",
         "dist-agent/claude-runner.js",
     );
+    let grok_runner = bundled_path(
+        &resource_directory,
+        "agent/grok-runner.js",
+        "dist-agent/grok-runner.js",
+    );
     let event_sink = create_auto_hunt_event_sink(&app, &request.session_id)?;
     let approval_app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
@@ -2748,13 +2813,17 @@ async fn start_project_auto_hunt(
             &project_id,
             &request.api_url,
         )?;
-        let backend = agent::discover_backend(settings.provider, runner, &claude_runner)?;
+        let backend = agent::discover_backend(
+            settings.provider,
+            runner,
+            agent::AgentRunnerBundles {
+                claude: &claude_runner,
+                grok: &grok_runner,
+            },
+        )?;
         let provider = settings.provider;
         let approve = |method: &str, params: &serde_json::Value| {
-            let provider_name = match provider {
-                agent::AgentProviderKind::Codex => "Codex",
-                agent::AgentProviderKind::Claude => "Claude",
-            };
+            let provider_name = provider.display_name();
             approval_app
                 .dialog()
                 .message(approval_request_message(provider, method, params))
@@ -3035,6 +3104,8 @@ async fn connect_local_project(
             agent::AgentProviderKind::Codex
         } else if runner.resolve_binary("claude").is_ok() {
             agent::AgentProviderKind::Claude
+        } else if runner.resolve_binary("grok").is_ok() {
+            agent::AgentProviderKind::Grok
         } else {
             agent::AgentProviderKind::Codex
         };
@@ -3699,6 +3770,7 @@ mod tests {
             AppProviderSettings {
                 codex: false,
                 claude: true,
+                grok: true,
             },
         )
         .expect("provider settings should save");
@@ -3929,6 +4001,9 @@ mod tests {
             .is_file());
         assert!(home
             .join(".claude/skills/briar-auto-hunt/SKILL.md")
+            .is_file());
+        assert!(home
+            .join(".grok/skills/briar-auto-hunt/SKILL.md")
             .is_file());
         assert_eq!(
             read_trimmed_file(&home.join(".codex/skills/briar-auto-hunt/VERSION")),

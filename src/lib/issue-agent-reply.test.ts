@@ -99,6 +99,12 @@ describe("issue agent replies", () => {
         "briar:claude:project-1:session-1",
       ),
     ).toBe("claude");
+    expect(
+      providerForConversation(
+        "project-1",
+        "briar:grok:project-1:session-1",
+      ),
+    ).toBe("grok");
     expect(providerForConversation("project-2", "briar:project-1:thread-1"))
       .toBeNull();
   });

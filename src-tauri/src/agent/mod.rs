@@ -5,6 +5,7 @@
 
 mod claude;
 mod codex;
+mod grok;
 
 use std::{
     ffi::OsStr,
@@ -23,6 +24,7 @@ pub(crate) enum AgentProviderKind {
     #[default]
     Codex,
     Claude,
+    Grok,
 }
 
 impl AgentProviderKind {
@@ -34,11 +36,26 @@ impl AgentProviderKind {
         {
             return Some(Self::Claude);
         }
+        let grok_prefix = format!("briar:grok:{project_id}:");
+        if conversation_id
+            .strip_prefix(&grok_prefix)
+            .is_some_and(|id| !id.is_empty())
+        {
+            return Some(Self::Grok);
+        }
         let codex_prefix = format!("briar:{project_id}:");
         conversation_id
             .strip_prefix(&codex_prefix)
             .filter(|id| !id.is_empty())
             .map(|_| Self::Codex)
+    }
+
+    pub(crate) fn display_name(self) -> &'static str {
+        match self {
+            Self::Codex => "Codex",
+            Self::Claude => "Claude",
+            Self::Grok => "Grok",
+        }
     }
 }
 
@@ -328,9 +345,45 @@ impl AgentBackend for ClaudeBackend {
     }
 }
 
+pub(crate) struct GrokBackend {
+    runtime: grok::GrokRuntime,
+}
+
+impl GrokBackend {
+    pub(crate) fn discover(
+        command_runner: Arc<dyn CommandRunner>,
+        runner_bundle: &Path,
+    ) -> Result<Self, String> {
+        Ok(Self {
+            runtime: grok::GrokRuntime::discover(command_runner, runner_bundle)?,
+        })
+    }
+}
+
+impl AgentBackend for GrokBackend {
+    fn run(
+        &self,
+        project_id: &str,
+        workspace_root: &Path,
+        execution: ChatExecution,
+        request: ProjectLlmRequest,
+        approve: &dyn Fn(&str, &serde_json::Value) -> bool,
+    ) -> Result<ProjectLlmResponse, String> {
+        grok::chat(
+            &self.runtime,
+            project_id,
+            workspace_root,
+            execution,
+            request,
+            approve,
+        )
+    }
+}
+
 pub(crate) enum AgentBackendHandle {
     Codex(CodexBackend),
     Claude(ClaudeBackend),
+    Grok(GrokBackend),
 }
 
 impl AgentBackend for AgentBackendHandle {
@@ -349,19 +402,30 @@ impl AgentBackend for AgentBackendHandle {
             Self::Claude(backend) => {
                 backend.run(project_id, workspace_root, execution, request, approve)
             }
+            Self::Grok(backend) => {
+                backend.run(project_id, workspace_root, execution, request, approve)
+            }
         }
     }
+}
+
+pub(crate) struct AgentRunnerBundles<'a> {
+    pub(crate) claude: &'a Path,
+    pub(crate) grok: &'a Path,
 }
 
 pub(crate) fn discover_backend(
     provider: AgentProviderKind,
     runner: Arc<dyn CommandRunner>,
-    claude_runner: &Path,
+    runners: AgentRunnerBundles<'_>,
 ) -> Result<AgentBackendHandle, String> {
     match provider {
         AgentProviderKind::Codex => CodexBackend::discover(runner).map(AgentBackendHandle::Codex),
         AgentProviderKind::Claude => {
-            ClaudeBackend::discover(runner, claude_runner).map(AgentBackendHandle::Claude)
+            ClaudeBackend::discover(runner, runners.claude).map(AgentBackendHandle::Claude)
+        }
+        AgentProviderKind::Grok => {
+            GrokBackend::discover(runner, runners.grok).map(AgentBackendHandle::Grok)
         }
     }
 }
@@ -481,6 +545,10 @@ pub(crate) fn claude_binary(home: &Path, execution_path: &OsStr) -> Result<PathB
     claude::claude_binary(home, execution_path)
 }
 
+pub(crate) fn grok_binary(home: &Path, execution_path: &OsStr) -> Result<PathBuf, String> {
+    grok::grok_binary(home, execution_path)
+}
+
 pub(crate) fn start_auto_hunt(
     backend: &dyn AgentBackend,
     project_id: &str,
@@ -514,6 +582,10 @@ mod tests {
         assert_eq!(
             AgentProviderKind::for_conversation_id("project-1", "briar:claude:project-1:session-1"),
             Some(AgentProviderKind::Claude)
+        );
+        assert_eq!(
+            AgentProviderKind::for_conversation_id("project-1", "briar:grok:project-1:session-1"),
+            Some(AgentProviderKind::Grok)
         );
         assert_eq!(
             AgentProviderKind::for_conversation_id("project-2", "briar:project-1:thread-1"),

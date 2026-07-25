@@ -64,6 +64,11 @@ const providerStatuses: OnboardingPrerequisites = {
     version: "2.1.206",
     authenticated: true,
   },
+  grok: {
+    installed: true,
+    version: "0.2.112",
+    authenticated: true,
+  },
   velen: {
     installed: true,
     version: "velen 1.0.0",
@@ -147,6 +152,7 @@ describe("AppSettings", () => {
     vi.mocked(loadAppProviderSettings).mockResolvedValue({
       codex: true,
       claude: true,
+      grok: true,
     });
     vi.mocked(updateAppProviderSettings).mockImplementation(
       async (settings) => settings,
@@ -200,6 +206,7 @@ describe("AppSettings", () => {
     expect(updateAppProviderSettings).toHaveBeenCalledWith({
       codex: true,
       claude: false,
+      grok: true,
     });
     expect(
       container.querySelector<HTMLInputElement>('[aria-label="Claude enabled"]')

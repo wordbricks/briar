@@ -365,7 +365,7 @@ const workerRegisterSchema = z
   .object({
     label: z.string().trim().min(1).max(100),
     hostFingerprint: z.string().regex(/^[0-9a-f]{64}$/u),
-    agentProvider: z.enum(["codex", "claude"]),
+    agentProvider: z.enum(["codex", "claude", "grok"]),
     versions: z.record(z.string().max(64), z.string().max(64)).default({}),
   })
   .strict();
@@ -392,7 +392,7 @@ const transcriptSchema = z
       .regex(/^[A-Za-z0-9_-]+$/u),
     runId: z.string().uuid().nullable().optional(),
     workerId: z.string().trim().min(1).max(128).nullable().optional(),
-    agentProvider: z.enum(["codex", "claude"]),
+    agentProvider: z.enum(["codex", "claude", "grok"]),
     events: z
       .array(
         z
@@ -766,7 +766,11 @@ const issueMessageJson = (message: IssueMessageRow) => ({
     id: message.author_agent_provider ? null : message.author_user_id,
     name: message.author_agent_provider
       ? `Briar · ${
-          message.author_agent_provider === "codex" ? "Codex" : "Claude"
+          message.author_agent_provider === "codex"
+            ? "Codex"
+            : message.author_agent_provider === "grok"
+              ? "Grok"
+              : "Claude"
         }`
       : message.author_name ?? "알 수 없는 사용자",
     image: message.author_agent_provider ? null : message.author_image,
@@ -1173,9 +1177,11 @@ async function route(
     const agentProvider = input.agentConversationId
       ? input.agentConversationId.startsWith(`briar:claude:${project.id}:`)
         ? "claude"
-        : input.agentConversationId.startsWith(`briar:${project.id}:`)
-          ? "codex"
-          : null
+        : input.agentConversationId.startsWith(`briar:grok:${project.id}:`)
+          ? "grok"
+          : input.agentConversationId.startsWith(`briar:${project.id}:`)
+            ? "codex"
+            : null
       : null;
     if (input.agentConversationId && !agentProvider) {
       throw new HttpError(400, "Agent conversation does not belong to this project");

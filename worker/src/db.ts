@@ -123,7 +123,7 @@ export type IssueMessageRow = {
   run_id: string;
   parent_message_id: string | null;
   author_user_id: string | null;
-  author_agent_provider: "codex" | "claude" | null;
+  author_agent_provider: "codex" | "claude" | "grok" | null;
   author_name: string | null;
   author_image: string | null;
   body: string;
@@ -623,7 +623,7 @@ export async function createIssueMessage(
     runId: string;
     parentMessageId: string | null;
     authorUserId: string | null;
-    authorAgentProvider: "codex" | "claude" | null;
+    authorAgentProvider: "codex" | "claude" | "grok" | null;
     body: string;
     createdAt: string;
   },

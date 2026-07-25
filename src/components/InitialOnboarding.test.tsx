@@ -30,6 +30,11 @@ vi.mock("../lib/initial-onboarding", async (importOriginal) => {
         version: null,
         authenticated: false,
       },
+      grok: {
+        installed: false,
+        version: null,
+        authenticated: false,
+      },
       velen: {
         installed: true,
         version: "velen 1.0.0",
@@ -49,6 +54,11 @@ vi.mock("../lib/initial-onboarding", async (importOriginal) => {
         authenticated: true,
       },
       claude: {
+        installed: false,
+        version: null,
+        authenticated: false,
+      },
+      grok: {
         installed: false,
         version: null,
         authenticated: false,
@@ -138,6 +148,11 @@ describe("InitialOnboarding", () => {
         version: "2.1.218",
         authenticated: true,
       },
+      grok: {
+        installed: false,
+        version: null,
+        authenticated: false,
+      },
       velen: {
         installed: true,
         version: "velen 1.0.0",
@@ -174,6 +189,11 @@ describe("InitialOnboarding", () => {
         authenticated: true,
       },
       claude: {
+        installed: false,
+        version: null,
+        authenticated: false,
+      },
+      grok: {
         installed: false,
         version: null,
         authenticated: false,

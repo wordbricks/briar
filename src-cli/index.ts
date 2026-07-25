@@ -67,7 +67,7 @@ const projectConfigSchema = z
     agentToken: z.string(),
     repositoryRemote: z.string().optional(),
     llm: z
-      .object({ provider: z.enum(["codex", "claude"]) })
+      .object({ provider: z.enum(["codex", "claude", "grok"]) })
       .passthrough()
       .optional(),
     autoHunt: autoHuntConfigSchema.optional(),
@@ -856,20 +856,21 @@ const claimedRunSchema = z.object({
 /**
  * Agent launcher for a claimed issue.
  *
- * Only the Claude path exists as a standalone runner today
- * (dist-agent/claude-runner.js). The Codex app-server client still lives in the
- * desktop's Rust layer, so `briar worker` cannot drive it until that client is
- * ported to src-agent — see docs/plans/remote-execution-hosts.md §2.4.
+ * Claude and Grok have standalone runners (dist-agent/*-runner.js). The Codex
+ * app-server client still lives in the desktop's Rust layer, so `briar worker`
+ * cannot drive Codex until that client is ported to src-agent — see
+ * docs/plans/remote-execution-hosts.md §2.4. Runner wiring for Claude/Grok in
+ * the CLI worker loop is still pending; issue execution remains desktop-led.
  */
 async function runClaimedIssue(project: ProjectConfig, issue: ClaimedIssue) {
   const provider = project.llm?.provider ?? "codex";
-  if (provider !== "claude") {
+  if (provider !== "claude" && provider !== "grok") {
     throw new Error(
       `이 프로젝트는 ${provider} 에이전트를 사용하도록 설정되어 있어 워커에서 실행할 수 없습니다. Codex 러너 이식이 끝나면 사용할 수 있습니다.`,
     );
   }
   throw new Error(
-    `Claude 러너 연결이 아직 준비되지 않았습니다: ${issue.sourceKey}는 데스크톱 앱에서 실행하세요.`,
+    `${provider === "grok" ? "Grok" : "Claude"} 러너 연결이 아직 준비되지 않았습니다: ${issue.sourceKey}는 데스크톱 앱에서 실행하세요.`,
   );
 }
 
