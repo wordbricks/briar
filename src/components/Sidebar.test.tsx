@@ -72,7 +72,7 @@ describe("Sidebar", () => {
     expect(markup).not.toContain("도움말");
     expect(markup).not.toContain('href="#help"');
     expect(markup).toContain('aria-label="Briar 프로젝트 메뉴"');
-    expect(markup).not.toContain("<jelly-select");
+    expect(markup).not.toContain("<select");
   });
 
   it("switches organizations from the brand control", async () => {

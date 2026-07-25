@@ -7,7 +7,6 @@ import { NativeLaunchIntro } from "./components/NativeLaunchIntro";
 import { I18nProvider } from "./i18n";
 import { installAppZoomShortcuts } from "./lib/app-zoom";
 import { isNativeLaunchIntroWindow } from "./lib/launch-intro";
-import "./lib/jelly-ui";
 import "./styles.css";
 
 const nativeLaunchIntro = isNativeLaunchIntroWindow();

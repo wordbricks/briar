@@ -42,7 +42,7 @@ record every decision in the incident timeline.
 
 ## Close
 
-Verify login session, Briar project selection through `<jelly-select>`, Auto
+Verify login session, Briar project selection through the native select control, Auto
 Hunt status ingestion, a fresh update check, checksums, notarization, and both
 main workflows. Record the incident cause, affected versions/users, recovery
 commands, final SHA, and follow-up issue in Briar.
