@@ -110,7 +110,7 @@ export function InitialOnboarding({
   };
 
   return (
-    <jelly-theme mode="light" className="initial-onboarding-shell">
+    <div className="initial-onboarding-shell">
       <main
         aria-label={t("initialOnboarding.label")}
         className="initial-onboarding"
@@ -294,6 +294,6 @@ export function InitialOnboarding({
           </section>
         )}
       </main>
-    </jelly-theme>
+    </div>
   );
 }

@@ -168,7 +168,7 @@ describe("HuntDashboard", () => {
     );
   });
 
-  it("uses Jelly Select for issue priority and accepts image or video files", () => {
+  it("uses a native select for issue priority and accepts image or video files", () => {
     const markup = renderToStaticMarkup(
       <CreateIssueDialog
         isSubmitting={false}
@@ -177,8 +177,7 @@ describe("HuntDashboard", () => {
       />,
     );
 
-    expect(markup).toContain('<jelly-select class="issue-priority-select" label="우선순위"');
-    expect(markup).not.toContain("<select");
+    expect(markup).toContain('<select aria-label="우선순위" class="native-select issue-priority-select"');
     expect(markup).toContain('type="file"');
     expect(markup).toContain('aria-label="이미지 또는 영상 첨부"');
     expect(markup).toContain("video/quicktime");

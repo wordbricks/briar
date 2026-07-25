@@ -22,7 +22,7 @@ import type {
   VelenInspection,
 } from "../lib/project-connection";
 import type { SessionUser } from "../types";
-import { JellySelect } from "./JellySelect";
+import { NativeSelect } from "./NativeSelect";
 import { Logo } from "./Logo";
 import {
   normalizeAutoHuntWorkflow,
@@ -136,7 +136,7 @@ export function ProjectOnboarding({
   };
 
   return (
-    <jelly-theme mode="light" className="onboarding-shell">
+    <div className="onboarding-shell">
       <header className="onboarding-topbar">
         <Logo />
         <div className="onboarding-topbar-actions">
@@ -150,7 +150,7 @@ export function ProjectOnboarding({
           </button>
         </div>
       </header>
-      <jelly-card className="onboarding-card">
+      <main className="onboarding-card">
         <div className="onboarding-icon">
           {connection ? <Check size={24} /> : <FolderGit2 size={24} />}
         </div>
@@ -245,7 +245,7 @@ export function ProjectOnboarding({
                   <div className="settings-fields single-field">
                     <label>
                       <span>{t("onboarding.organization")}</span>
-                      <JellySelect
+                      <NativeSelect
                         label={t("onboarding.velenOrg")}
                         options={velen.organizations.map((organization) => ({
                           label: organization.name,
@@ -267,20 +267,22 @@ export function ProjectOnboarding({
                 <div className="setup-section-heading">
                   <Link2 size={18} />
                   <div><strong>{t("onboarding.linear")}</strong><span>{t("onboarding.linearDescription")}</span></div>
-                  <jelly-switch
-                    aria-label={t("onboarding.linear")}
-                    checked={linearEnabled}
-                    disabled={!velen}
-                    size="small"
-                    variant="mint"
-                    onChange={(event) => setLinearEnabled((event.currentTarget as HTMLElement & { checked?: boolean }).checked ?? false)}
-                  />
+                  <label className="native-switch">
+                    <input
+                      aria-label={t("onboarding.linear")}
+                      checked={linearEnabled}
+                      disabled={!velen}
+                      onChange={(event) => setLinearEnabled(event.currentTarget.checked)}
+                      type="checkbox"
+                    />
+                    <span aria-hidden="true" />
+                  </label>
                 </div>
                 {linearEnabled ? (
                   <div className="settings-fields">
                     <label>
                       <span>{t("onboarding.linearSource")}</span>
-                      <JellySelect
+                      <NativeSelect
                         label={t("onboarding.linearSource")}
                         onValueChange={setLinearSource}
                         options={linearSources.map((source) => ({
@@ -306,7 +308,7 @@ export function ProjectOnboarding({
               </section>
             </div>
 
-            {error ? <jelly-alert variant="rose" className="login-error">{error}</jelly-alert> : null}
+            {error ? <div className="login-error" role="alert">{error}</div> : null}
             <button
               className="onboarding-primary-action"
               disabled={loading || selectingRepository || !repositoryReadiness?.gitReady || !velen || !velenOrg || (linearEnabled && !linearSource)}
@@ -339,7 +341,7 @@ export function ProjectOnboarding({
                   value={name}
                 />
               </label>
-              {error ? <jelly-alert variant="rose" className="login-error">{error}</jelly-alert> : null}
+              {error ? <div className="login-error" role="alert">{error}</div> : null}
               <button
                 className="onboarding-primary-action"
                 disabled={loading || !name.trim()}
@@ -350,7 +352,7 @@ export function ProjectOnboarding({
             </form>
           </>
         )}
-      </jelly-card>
-    </jelly-theme>
+      </main>
+    </div>
   );
 }

@@ -5,20 +5,12 @@ import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CreateIssueDialog } from "./HuntDashboard";
 
-class TestJellySelect extends HTMLElement {
-  value = "";
-  syncOptions() {}
-}
-
 describe("CreateIssueDialog clipboard attachments", () => {
   let container: HTMLDivElement;
 
   beforeEach(() => {
     (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
       .IS_REACT_ACT_ENVIRONMENT = true;
-    if (!customElements.get("jelly-select")) {
-      customElements.define("jelly-select", TestJellySelect);
-    }
     container = document.createElement("div");
     document.body.append(container);
     URL.createObjectURL = vi.fn(() => "blob:clipboard-preview");

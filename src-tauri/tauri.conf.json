@@ -55,8 +55,7 @@
       "../dist-agent/claude-runner.js": "agent/claude-runner.js",
       "../scripts/briar-launcher": "cli/briar",
       "../skills/briar-auto-hunt/": "skills/briar-auto-hunt/",
-      "../third-party/claude-agent-sdk-LICENSE.md": "licenses/claude-agent-sdk-LICENSE.md",
-      "../third-party/jelly-ui-LICENSE": "licenses/jelly-ui-LICENSE"
+      "../third-party/claude-agent-sdk-LICENSE.md": "licenses/claude-agent-sdk-LICENSE.md"
     },
     "macOS": {
       "minimumSystemVersion": "12.0",

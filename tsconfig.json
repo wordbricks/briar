@@ -15,9 +15,6 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "paths": {
-      "jelly-ui-source/*": ["./node_modules/jelly-ui/src/*"]
-    },
     "types": ["vite/client", "bun"]
   },
   "include": ["src", "src-agent", "src-cli", "vite.config.ts"]
