@@ -31,6 +31,10 @@ const agents = [
   { name: "Human", state: "2 approvals", tone: "blue" },
 ] as const;
 
+const MAC_DOWNLOAD_URL =
+  "https://briar-api.wbai.workers.dev/releases/v1.1.1/Briar_1.1.1_aarch64.dmg";
+const GITHUB_URL = "https://github.com/wordbricks/briar";
+
 function Brand() {
   return (
     <a className="brand" href="#top" aria-label="Briar 홈">
@@ -358,12 +362,11 @@ export default function Home() {
             <a href="#agents">에이전트</a>
           </nav>
           <a
-            className="header-cta"
-            href="https://github.com/wordbricks/briar"
-            target="_blank"
-            rel="noreferrer"
+            className="header-cta header-download"
+            href={MAC_DOWNLOAD_URL}
+            aria-label="Mac용 Briar 1.1.1 다운로드"
           >
-            GitHub <Arrow />
+            Mac용 다운로드 <span aria-hidden="true">↓</span>
           </a>
         </div>
       </header>
@@ -385,17 +388,19 @@ export default function Home() {
         <div className="hero-actions">
           <a
             className="button button-primary"
-            href="https://github.com/wordbricks/briar"
-            target="_blank"
-            rel="noreferrer"
+            href={MAC_DOWNLOAD_URL}
+            aria-label="Mac용 Briar 1.1.1 다운로드"
           >
-            GitHub에서 시작하기 <Arrow />
+            Mac용 Briar 다운로드 <span aria-hidden="true">↓</span>
           </a>
           <a className="button button-secondary" href="#workflow">
             작동 방식 보기 <span aria-hidden="true">↓</span>
           </a>
         </div>
         <div className="hero-meta">
+          <span>
+            <i>⌘</i> macOS Apple Silicon
+          </span>
           <span>
             <i>✓</i> Repository-agnostic
           </span>
@@ -626,14 +631,26 @@ export default function Home() {
           결과에는 확신을 가지세요.
         </h2>
         <p>Briar로 사람과 에이전트가 함께 일하는 개발 흐름을 시작하세요.</p>
-        <a
-          className="button button-primary"
-          href="https://github.com/wordbricks/briar"
-          target="_blank"
-          rel="noreferrer"
-        >
-          GitHub에서 Briar 보기 <Arrow />
-        </a>
+        <div className="final-actions">
+          <a
+            className="button button-primary"
+            href={MAC_DOWNLOAD_URL}
+            aria-label="Mac용 Briar 1.1.1 다운로드"
+          >
+            Mac용 Briar 다운로드 <span aria-hidden="true">↓</span>
+          </a>
+          <a
+            className="button button-secondary"
+            href={GITHUB_URL}
+            target="_blank"
+            rel="noreferrer"
+          >
+            GitHub에서 보기 <Arrow />
+          </a>
+        </div>
+        <small className="download-note">
+          v1.1.1 · macOS Apple Silicon · 서명 및 공증 완료
+        </small>
       </section>
 
       <footer>
@@ -642,7 +659,7 @@ export default function Home() {
           <p>Agent development, with a clear line of sight.</p>
           <div>
             <a
-              href="https://github.com/wordbricks/briar"
+              href={GITHUB_URL}
               target="_blank"
               rel="noreferrer"
             >
