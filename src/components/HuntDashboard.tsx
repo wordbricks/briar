@@ -1589,11 +1589,9 @@ function IssueMessageItem({
           </time>
         </header>
         <p>{message.body}</p>
-        {onOpenThread && (
+        {onOpenThread && message.replyCount > 0 && (
           <button
-            className={`issue-thread-trigger${
-              message.replyCount > 0 ? " has-replies" : ""
-            }`}
+            className="issue-thread-summary"
             onClick={(event) =>
               onOpenThread(message.id, event.currentTarget)
             }
@@ -1601,12 +1599,29 @@ function IssueMessageItem({
             type="button"
           >
             <MessageCircle size={14} />
-            {message.replyCount > 0
-              ? t("run.replies", { count: message.replyCount })
-              : t("run.replyInThread")}
+            {t("run.replies", { count: message.replyCount })}
           </button>
         )}
       </div>
+      {onOpenThread && (
+        <div
+          aria-label={t("run.replyInThread")}
+          className="issue-message-actions"
+          role="toolbar"
+        >
+          <button
+            aria-label={t("run.replyInThread")}
+            className="issue-thread-trigger"
+            onClick={(event) =>
+              onOpenThread(message.id, event.currentTarget)
+            }
+            title={t("run.replyInThread")}
+            type="button"
+          >
+            <MessageCircle aria-hidden="true" size={16} />
+          </button>
+        </div>
+      )}
     </article>
   );
 }

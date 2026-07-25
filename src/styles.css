@@ -562,7 +562,7 @@ jelly-theme { color: var(--ink); }
 .issue-conversation > header h2 { margin:0; color:#3e403b; font-size:12px; letter-spacing:-.01em; }
 .issue-conversation > header small { min-width:22px; min-height:20px; padding:0 6px; display:grid; place-items:center; border-radius:999px; color:#7d7f78; background:#f0f0ec; font:600 7.5px "DM Mono",monospace; }
 .issue-message-list { min-height:0; flex:1; margin:8px 0 12px; display:grid; align-content:start; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; scrollbar-width:thin; }
-.issue-message { min-width:0; padding:11px 10px; display:grid; grid-template-columns:34px minmax(0,1fr); align-items:start; gap:10px; border-radius:10px; transition:background-color .12s ease-out; }
+.issue-message { min-width:0; position:relative; padding:6px 10px; display:grid; grid-template-columns:34px minmax(0,1fr); align-items:start; gap:10px; border-radius:10px; transition:background-color .12s ease-out; }
 .issue-message:hover { background:#fafaf7; }
 .issue-message-avatar { width:34px; height:34px; overflow:hidden; display:grid; place-items:center; border:1px solid rgba(83,72,118,.1); border-radius:9px; color:#fff; background:linear-gradient(145deg,#8068ce,#5943a4); object-fit:cover; font-size:12px; font-weight:760; }
 .issue-message-avatar.agent { color:#5f4aab; border-color:#dcd4f3; background:#f1edfc; }
@@ -571,11 +571,16 @@ jelly-theme { color: var(--ink); }
 .issue-message > div > header strong { overflow:hidden; color:#33342f; font-size:10.5px; text-overflow:ellipsis; white-space:nowrap; }
 .issue-message > div > header time { color:#a1a39c; font:500 7.5px "DM Mono",monospace; }
 .issue-message > div > p { margin:2px 0 0; color:#555750; font-size:10px; line-height:1.65; overflow-wrap:anywhere; white-space:pre-wrap; }
-.issue-thread-trigger { min-height:25px; margin:5px 0 -3px; padding:0 7px; display:inline-flex; align-items:center; gap:5px; border:0; border-radius:7px; color:#7865bb; background:transparent; cursor:pointer; font-size:8.5px; font-weight:650; opacity:0; transition:opacity .12s ease-out,background-color .12s ease-out,transform .1s ease-out; }
-.issue-message:hover .issue-thread-trigger,.issue-message:focus-within .issue-thread-trigger,.issue-thread-trigger.has-replies { opacity:1; }
-.issue-thread-trigger:hover { background:#f0ecfb; }
-.issue-thread-trigger:active { transform:scale(.97); }
-.issue-thread-trigger:focus-visible { outline:2px solid #8b70dd; outline-offset:1px; opacity:1; }
+.issue-message-actions { position:absolute; z-index:2; top:-12px; right:8px; padding:3px; display:flex; align-items:center; border:1px solid #dedfd9; border-radius:9px; background:#fff; box-shadow:0 4px 12px rgba(43,42,37,.10); opacity:0; pointer-events:none; transform:translateY(2px); transition:opacity .12s ease-out,transform .12s ease-out; }
+.issue-message:hover .issue-message-actions,.issue-message:focus-within .issue-message-actions { opacity:1; pointer-events:auto; transform:translateY(0); }
+.issue-thread-trigger { width:28px; height:28px; padding:0; display:grid; place-items:center; border:0; border-radius:6px; color:#73756e; background:transparent; cursor:pointer; transition:color .12s ease-out,background-color .12s ease-out,transform .1s ease-out; }
+.issue-thread-trigger:hover { color:#5f4aab; background:#f0ecfb; }
+.issue-thread-trigger:active { transform:scale(.94); }
+.issue-thread-trigger:focus-visible { outline:2px solid #8b70dd; outline-offset:1px; }
+.issue-thread-summary { min-height:23px; margin:2px 0 -2px; padding:0 6px; display:inline-flex; align-items:center; gap:5px; border:0; border-radius:6px; color:#7865bb; background:transparent; cursor:pointer; font-size:8.5px; font-weight:650; transition:background-color .12s ease-out,transform .1s ease-out; }
+.issue-thread-summary:hover { background:#f0ecfb; }
+.issue-thread-summary:active { transform:scale(.97); }
+.issue-thread-summary:focus-visible { outline:2px solid #8b70dd; outline-offset:1px; }
 .issue-message-state,.issue-message-empty { min-height:86px; margin:0; display:flex; align-items:center; justify-content:center; gap:7px; border:1px dashed #dedfd9; border-radius:11px; color:#92948d; background:#fafaf7; font-size:9px; text-align:center; }
 button.issue-message-state { width:100%; cursor:pointer; }
 .issue-message-state.error { color:#a54253; border-color:#efc7ce; background:#fff6f7; }
@@ -616,7 +621,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .issue-thread-divider::before { content:""; width:100%; height:1px; background:#e7e7e2; }
 .issue-thread-divider span { position:absolute; left:0; padding-right:8px; color:#92948d; background:rgba(255,255,255,.94); font-size:8px; font-weight:650; }
 @media (hover:none) {
-  .issue-thread-trigger { opacity:1; }
+  .issue-message-actions { top:4px; opacity:1; pointer-events:auto; transform:none; }
 }
 @media (max-width:560px) {
   .issue-thread-drawer { width:100vw; border-left:0; }
