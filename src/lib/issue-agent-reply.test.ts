@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  agentReplyParentMessageId,
   briarMentionAtCaret,
   issueAgentConversation,
   mentionsBriar,
@@ -7,6 +8,21 @@ import {
 } from "./issue-agent-reply";
 
 describe("issue agent replies", () => {
+  it("places agent replies in the mention message thread", () => {
+    expect(
+      agentReplyParentMessageId({
+        id: "root-mention",
+        parentMessageId: null,
+      }),
+    ).toBe("root-mention");
+    expect(
+      agentReplyParentMessageId({
+        id: "thread-mention",
+        parentMessageId: "thread-root",
+      }),
+    ).toBe("thread-root");
+  });
+
   it("recognizes a standalone @briar mention without matching email-like text", () => {
     expect(mentionsBriar("@briar 이 변경을 설명해 줘")).toBe(true);
     expect(mentionsBriar("Could you check this, @BRIAR?")).toBe(true);
