@@ -300,7 +300,7 @@ export function App() {
     );
   } else {
     content = (
-      <jelly-theme mode="light" className="app-shell">
+      <div className="app-shell">
         <WindowNavigationControls
           canGoBack={canGoBack}
           canGoForward={canGoForward}
@@ -517,7 +517,7 @@ export function App() {
             onSendIssueMessage={sendIssueMessage}
           />
         )}
-      </jelly-theme>
+      </div>
     );
   }
 
@@ -527,8 +527,7 @@ export function App() {
       return <CompanionEmptyState onLogout={() => void briar.logout()} />;
     }
     return (
-      <jelly-theme
-        mode="light"
+      <div
         className={`app-shell companion-shell platform-${mobilePlatform}`}
       >
         <CompanionHeader
@@ -649,7 +648,7 @@ export function App() {
             onSendIssueMessage={sendIssueMessage}
           />
         )}
-      </jelly-theme>
+      </div>
     );
   }
 

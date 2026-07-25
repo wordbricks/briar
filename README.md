@@ -20,7 +20,7 @@ Repository source code stays local. Agents send only task state and Git metadata
 - Project-scoped LLM conversations through Codex App Server or Claude Agent SDK
 - Mandatory Velen CLI preflight and repository-specific Velen organization/source settings
 - Optional Linear integration through a configured Velen source
-- Jelly UI components in a light desktop theme
+- Native React controls in a light desktop theme
 - Universal run status plus repository-specific workflow stages selected at connection time
 - Exceptional states: `blocked`, `failed`, `cancelled`
 - A demo dashboard when no Worker URL is configured

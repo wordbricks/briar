@@ -49,7 +49,7 @@ import {
 } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { JellySelect } from "./JellySelect";
+import { NativeSelect } from "./NativeSelect";
 import {
   CompanionBottomNavigation,
   type CompanionStatusFilter,
@@ -715,7 +715,7 @@ export function CreateIssueDialog({
               </div>
             )}
           </div>
-          <JellySelect
+          <NativeSelect
             className="issue-priority-select"
             label={t("issue.priority")}
             onValueChange={setPriority}
