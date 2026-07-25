@@ -3,6 +3,9 @@ import { CircleAlert, Download, LoaderCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "../i18n";
 
+/** How often the signed update channel is re-checked while the app is open. */
+export const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
+
 const isTauri = () =>
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
@@ -11,26 +14,49 @@ export function UpdateControl() {
   const [available, setAvailable] = useState<Update | null>(null);
   const [isInstalling, setIsInstalling] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const hasChecked = useRef(false);
   const isMounted = useRef(false);
+  const isInstallingRef = useRef(false);
+
+  useEffect(() => {
+    isInstallingRef.current = isInstalling;
+  }, [isInstalling]);
 
   useEffect(() => {
     isMounted.current = true;
-
-    if (isTauri() && !hasChecked.current) {
-      hasChecked.current = true;
-      void import("@tauri-apps/plugin-updater")
-        .then(({ check }) => check())
-        .then((update) => {
-          if (isMounted.current) setAvailable(update);
-        })
-        .catch(() => {
-          // A background check should not surface UI unless an update exists.
-        });
+    if (!isTauri()) {
+      return () => {
+        isMounted.current = false;
+      };
     }
 
+    let cancelled = false;
+    let inFlight = false;
+
+    const checkForUpdate = async () => {
+      if (cancelled || inFlight || isInstallingRef.current) return;
+      inFlight = true;
+      try {
+        const { check } = await import("@tauri-apps/plugin-updater");
+        const update = await check();
+        if (!cancelled && isMounted.current && !isInstallingRef.current) {
+          setAvailable(update);
+        }
+      } catch {
+        // A background check should not surface UI unless an update exists.
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    void checkForUpdate();
+    const intervalId = window.setInterval(() => {
+      void checkForUpdate();
+    }, UPDATE_CHECK_INTERVAL_MS);
+
     return () => {
+      cancelled = true;
       isMounted.current = false;
+      window.clearInterval(intervalId);
     };
   }, []);
 
