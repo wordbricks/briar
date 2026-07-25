@@ -275,7 +275,7 @@ export function App() {
   ) {
     content = (
       <ProjectOnboarding
-        canCancel={briar.projects.length > 0 && briar.isCreatingProject}
+        canCancel={briar.projects.length > 0}
         connection={briar.projectConnection}
         error={briar.error}
         loading={briar.loading}
@@ -315,6 +315,7 @@ export function App() {
             activePage={activePage}
             activeOrganizationId={briar.activeOrganizationId}
             activeProjectId={briar.activeProjectId}
+            connectedProjectIds={briar.connectedProjectIds}
             isOpen={isSidebarOpen}
             onAddProject={briar.startProjectCreation}
             onAutoHuntOpen={() => navigateToPage("auto-hunt")}
@@ -497,10 +498,12 @@ export function App() {
             healthError={briar.healthError}
             healthLoading={briar.healthLoading}
             isCreatingIssue={briar.isCreatingIssue}
+            needsLocalConnection={!briar.isActiveProjectConnectedLocally}
             recoveringRunId={briar.recoveringRunId}
             recoveryError={briar.recoveryError}
             requestedRunId={requestedRunId}
             isSidebarOpen={isSidebarOpen}
+            onConnectRepository={briar.reconnectProject}
             onCreateIssue={briar.addIssue}
             onHealthRefresh={() => void briar.refreshHealth()}
             onLoadAttachment={briar.readIssueAttachment}

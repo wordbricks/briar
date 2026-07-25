@@ -2,6 +2,7 @@ import {
   Activity,
   Bot,
   Building2,
+  CircleAlert,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -17,6 +18,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useI18n, type Locale } from "../i18n";
+import { isProjectConnectedLocally } from "../lib/local-project-connection";
 import type { RepositoryReadiness } from "../lib/project-connection";
 import type { Organization, Project, SessionUser } from "../types";
 import { UpdateControl } from "./UpdateControl";
@@ -25,6 +27,7 @@ export function Sidebar({
   activePage,
   activeOrganizationId,
   activeProjectId,
+  connectedProjectIds,
   isOpen,
   onAddProject,
   onAutoHuntOpen,
@@ -54,6 +57,7 @@ export function Sidebar({
     | "settings";
   activeOrganizationId: string | null;
   activeProjectId: string | null;
+  connectedProjectIds: string[] | null;
   isOpen: boolean;
   onAddProject: () => void;
   onAutoHuntOpen: () => void;
@@ -425,12 +429,20 @@ export function Sidebar({
             const isActive = project.id === activeProjectId;
             const isMenuOpen = project.id === openProjectMenuId;
             const readiness = projectReadiness[project.id];
+            const needsConnection = !isProjectConnectedLocally(
+              connectedProjectIds,
+              project.id,
+            );
             const needsAttention =
-              readiness?.requiresGithub && !readiness.prReady;
+              !needsConnection && readiness?.requiresGithub && !readiness.prReady;
 
             return (
               <section className="sidebar-project-group" key={project.id}>
-                <div className={`sidebar-project-row${needsAttention ? " has-warning" : ""}`}>
+                <div
+                  className={`sidebar-project-row${
+                    needsConnection || needsAttention ? " has-warning" : ""
+                  }`}
+                >
                   <button
                     aria-expanded={isActive}
                     className="sidebar-project-heading"
@@ -441,7 +453,20 @@ export function Sidebar({
                     <span>{project.name}</span>
                     {isActive && <i aria-label={t("sidebar.currentProject")} />}
                   </button>
-                  {needsAttention ? (
+                  {needsConnection ? (
+                    <span
+                      aria-label={t("sidebar.projectNotConnected", {
+                        name: project.name,
+                      })}
+                      className="sidebar-project-disconnected"
+                      role="img"
+                      title={t("sidebar.projectNotConnected", {
+                        name: project.name,
+                      })}
+                    >
+                      <CircleAlert size={18} strokeWidth={2.1} />
+                    </span>
+                  ) : needsAttention ? (
                     <button
                       aria-label={t("repositorySetup.open", { name: project.name })}
                       className="sidebar-project-warning"
