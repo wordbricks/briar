@@ -43,6 +43,8 @@ button { color: inherit; }
 .agent-usage-provider-icon.claude { color:#ca6d43; }
 .agent-usage-provider-icon.codex { color:#3e4643; }
 .agent-usage-provider-icon.grok { color:#17181b; }
+.agent-usage-provider-icon img,
+.agent-usage-provider-icon svg { display:block; }
 .agent-usage-meter { display:flex; align-items:center; gap:6px; }
 .agent-usage-meter > small { width:16px; color:#898b84; font:500 8px "DM Mono",monospace; }
 .agent-usage-meter > i { width:36px; height:5px; overflow:hidden; border-radius:999px; background:#e8e9e4; }
@@ -806,7 +808,12 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .initial-prerequisites-list { margin-top:24px; display:grid; gap:8px; }
 .initial-prerequisite-row { min-height:76px; padding:12px 14px; display:grid; grid-template-columns:42px minmax(0,1fr) auto; gap:13px; align-items:center; border:1px solid #e3e4de; border-radius:14px; background:#fff; }
 .initial-prerequisite-icon { width:42px; height:42px; display:grid; place-items:center; border-radius:12px; color:#fff; font:750 15px "DM Mono",monospace; }
-.initial-prerequisite-icon.git { background:linear-gradient(145deg,#d84b2e,#f47a56); }.initial-prerequisite-icon.codex { background:linear-gradient(145deg,#32342f,#575a52); }.initial-prerequisite-icon.claude { background:linear-gradient(145deg,#c96b45,#e39467); }.initial-prerequisite-icon.grok { background:linear-gradient(145deg,#1a1a1f,#3a3a42); }.initial-prerequisite-icon.velen { background:linear-gradient(145deg,#674fc0,#8d74dd); }
+.initial-prerequisite-icon.git { background:linear-gradient(145deg,#d84b2e,#f47a56); }
+.initial-prerequisite-icon.codex { color:#30312d; background:#f1f2ee; }
+.initial-prerequisite-icon.claude { background:#fff1e9; }
+.initial-prerequisite-icon.grok { background:#ececf1; }
+.initial-prerequisite-icon.velen { background:linear-gradient(145deg,#674fc0,#8d74dd); }
+.initial-prerequisite-icon img { display:block; width:20px; height:20px; object-fit:contain; }
 .initial-prerequisite-row > div strong { display:flex; align-items:center; gap:8px; font-size:12px; }
 .initial-prerequisite-row > div strong em { padding:3px 6px; border-radius:999px; color:#7258c4; background:#f0ebff; font-size:7px; font-style:normal; font-weight:750; }
 .initial-prerequisite-row > div p { margin:7px 0 0; color:#888a83; font-size:9px; }
@@ -1949,6 +1956,8 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .source-control-provider-icon.codex { color:#30312d; background:#f1f2ee; }
 .source-control-provider-icon.claude { color:#d66f45; background:#fff1e9; }
 .source-control-provider-icon.grok { color:#111114; background:#ececf1; }
+.source-control-provider-icon img,
+.source-control-provider-icon svg { display:block; }
 .source-control-provider-copy {
   min-width:0;
   display:grid;

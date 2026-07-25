@@ -13,7 +13,6 @@ import {
   LoaderCircle,
   RefreshCw,
   Settings2,
-  Sparkles,
   SlidersHorizontal,
 } from "lucide-react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
@@ -28,6 +27,7 @@ import {
   type AgentProvider,
   type AppProviderSettings,
 } from "../lib/project-llm";
+import { ClaudeIcon, CodexIcon, GrokIcon } from "./AgentIcons";
 import type { RepositoryReadiness } from "../lib/project-connection";
 import { Logo } from "./Logo";
 
@@ -296,7 +296,7 @@ export function AppSettings({
                   enabled={providerSettings?.codex ?? false}
                   icon={
                     <span className="source-control-provider-icon codex">
-                      <Bot size={20} strokeWidth={1.9} />
+                      <CodexIcon size={20} />
                     </span>
                   }
                   name="Codex"
@@ -336,7 +336,7 @@ export function AppSettings({
                   enabled={providerSettings?.claude ?? false}
                   icon={
                     <span className="source-control-provider-icon claude">
-                      <Sparkles size={19} strokeWidth={1.8} />
+                      <ClaudeIcon size={19} />
                     </span>
                   }
                   name="Claude"
@@ -376,7 +376,7 @@ export function AppSettings({
                   enabled={providerSettings?.grok ?? false}
                   icon={
                     <span className="source-control-provider-icon grok">
-                      <Cloud size={19} strokeWidth={1.8} />
+                      <GrokIcon size={19} />
                     </span>
                   }
                   name="Grok"
