@@ -18,6 +18,7 @@ import {
   type OnboardingPrerequisites,
   type PrerequisiteId,
 } from "../lib/initial-onboarding";
+import { ClaudeIcon, CodexIcon, GrokIcon } from "./AgentIcons";
 
 type Step = "welcome" | "prerequisites";
 
@@ -183,15 +184,17 @@ export function InitialOnboarding({
                 return (
                   <article className="initial-prerequisite-row" key={id}>
                     <span className={`initial-prerequisite-icon ${id}`}>
-                      {id === "git"
-                        ? "G"
-                        : id === "codex"
-                          ? "C"
-                          : id === "claude"
-                            ? "A"
-                            : id === "grok"
-                              ? "X"
-                              : "V"}
+                      {id === "git" ? (
+                        "G"
+                      ) : id === "codex" ? (
+                        <CodexIcon size={20} />
+                      ) : id === "claude" ? (
+                        <ClaudeIcon size={20} />
+                      ) : id === "grok" ? (
+                        <GrokIcon size={20} />
+                      ) : (
+                        "V"
+                      )}
                     </span>
                     <div>
                       <strong>

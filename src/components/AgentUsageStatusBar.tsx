@@ -1,10 +1,7 @@
 import {
   ArrowLeft,
-  Bot,
   ChevronRight,
   RefreshCw,
-  Sparkles,
-  X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "../i18n";
@@ -17,6 +14,7 @@ import {
   type AgentUsageSnapshot,
   type AgentUsageWindow,
 } from "../lib/agent-usage";
+import { AgentProviderIcon } from "./AgentIcons";
 
 const refreshIntervalMs = 5 * 60_000;
 const historyLimit = 12;
@@ -43,13 +41,7 @@ function ProviderIcon({
 }) {
   return (
     <span className={`agent-usage-provider-icon ${provider}`}>
-      {provider === "claude" ? (
-        <Sparkles aria-hidden size={12} strokeWidth={1.8} />
-      ) : provider === "grok" ? (
-        <X aria-hidden size={12} strokeWidth={1.8} />
-      ) : (
-        <Bot aria-hidden size={12} strokeWidth={1.8} />
-      )}
+      <AgentProviderIcon provider={provider} size={12} />
     </span>
   );
 }
