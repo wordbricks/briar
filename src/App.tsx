@@ -298,6 +298,7 @@ export function App() {
         onLogout={() => void briar.logout()}
         onRepositorySelect={briar.selectProjectRepository}
         onRepositoryInspect={briar.inspectProjectRepository}
+        onWorkspaceCreate={briar.createProjectRepository}
         onVelenOrgChange={briar.refreshVelen}
         user={briar.user}
         velen={briar.velen}
