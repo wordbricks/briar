@@ -18,24 +18,45 @@ Store two independently controlled encrypted backups of the private key and
 password. Losing the key prevents future updates to every installed app that
 trusts its public half. Never commit either value.
 
-The release operator's password manager must inject these variables into the
-local release shell:
+Production credentials are stored in the ignored `.env.release` file and
+decrypted by dotenvx when `release:macos:production` starts. Create the file
+from the checked-in schema:
+
+```sh
+cp .env.release.example .env.release
+```
+
+Populate each value with `dotenvx set`. When importing values that are already
+exported by a password manager, this form keeps the secret itself out of shell
+history:
+
+```sh
+bunx dotenvx set APPLE_CERTIFICATE "$APPLE_CERTIFICATE" -f .env.release
+```
+
+Repeat that command for the following variables:
 
 - `APPLE_CERTIFICATE` — base64 Developer ID Application `.p12`
 - `APPLE_CERTIFICATE_PASSWORD` and `KEYCHAIN_PASSWORD`
-- `APPLE_API_KEY`, `APPLE_API_ISSUER`, and `APPLE_API_KEY_CONTENT`
+- `APPLE_API_KEY_CONTENT`
 - `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
+
+Publishing additionally requires `CLOUDFLARE_API_TOKEN` in `.env.release` and
+an authenticated GitHub CLI session from `gh auth login`.
+
+Set these non-secret values in the checked-in `config/release.env`:
+
+- `APPLE_API_KEY` and `APPLE_API_ISSUER`
 - `BRIAR_UPDATER_PUBLIC_KEY` — base64-encoded `.pub` file emitted by the Tauri
   signer
-
-Publishing additionally requires:
-
-- `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`
-- an authenticated GitHub CLI session from `gh auth login`
+- `CLOUDFLARE_ACCOUNT_ID`
 
 Limit the Cloudflare token to R2 object read/write on the `briar-releases`
 bucket. Worker deployment uses a separate credential. Keep all credentials
-outside the repository and inject them only for the duration of the command.
+outside the repository. Dotenvx writes the matching private decryption key to
+the ignored `.env.keys` file by default. On another trusted release host,
+inject `DOTENV_PRIVATE_KEY_RELEASE` from the password manager instead of
+copying or committing `.env.keys`.
 
 The release host requires macOS, Bun 1.3.14, Rust 1.96.0, Xcode command-line
 tools, Syft, `gh`, `jq`, and a clean checkout with access to `origin`.
@@ -47,7 +68,8 @@ tools, Syft, `gh`, `jq`, and a clean checkout with access to `origin`.
 3. Create and push an annotated, signed `vX.Y.Z` tag on a commit contained in
    `origin/main`.
 4. Check out that exact tag on the trusted macOS release host.
-5. Export the release credentials from the local password manager.
+5. Provision `.env.release` and inject its dotenvx decryption key on the trusted
+   release host.
 6. Build and verify the notarized artifacts without publishing:
 
    ```sh

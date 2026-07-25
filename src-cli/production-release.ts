@@ -9,16 +9,13 @@ const requiredProductionSecrets = [
   "APPLE_CERTIFICATE",
   "APPLE_CERTIFICATE_PASSWORD",
   "KEYCHAIN_PASSWORD",
-  "APPLE_API_KEY",
-  "APPLE_API_ISSUER",
   "APPLE_API_KEY_CONTENT",
   "TAURI_SIGNING_PRIVATE_KEY",
   "TAURI_SIGNING_PRIVATE_KEY_PASSWORD",
 ] as const;
-const requiredPublishingSecrets = [
-  "CLOUDFLARE_API_TOKEN",
-  "CLOUDFLARE_ACCOUNT_ID",
-] as const;
+const requiredProductionConfig = ["APPLE_API_KEY", "APPLE_API_ISSUER"] as const;
+const requiredPublishingSecrets = ["CLOUDFLARE_API_TOKEN"] as const;
+const requiredPublishingConfig = ["CLOUDFLARE_ACCOUNT_ID"] as const;
 
 function requireSemver(version: string) {
   if (!semverPattern.test(version)) throw new Error("version must be stable SemVer.");
@@ -49,6 +46,13 @@ export function validateProductionEnvironment(
   const missing = required.filter((name) => !env[name]?.trim());
   if (missing.length > 0) {
     throw new Error(`Missing Production secrets: ${missing.join(", ")}`);
+  }
+  const requiredConfig = publish
+    ? [...requiredProductionConfig, ...requiredPublishingConfig]
+    : requiredProductionConfig;
+  const missingConfig = requiredConfig.filter((name) => !env[name]?.trim());
+  if (missingConfig.length > 0) {
+    throw new Error(`Missing Production config: ${missingConfig.join(", ")}`);
   }
   productionUpdaterConfig(env);
 }
