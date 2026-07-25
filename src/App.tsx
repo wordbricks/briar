@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AutoHuntSessions } from "./components/AutoHuntSessions";
-import { AppSettings } from "./components/AppSettings";
+import { AgentUsageStatusBar } from "./components/AgentUsageStatusBar";
+import {
+  AppSettings,
+  type SettingsSection,
+} from "./components/AppSettings";
 import {
   CompanionBottomNavigation,
   type CompanionStatusFilter,
@@ -70,6 +74,8 @@ export function App() {
       (previewsLaunchIntro || shouldShowLaunchIntro()),
   );
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [appSettingsSection, setAppSettingsSection] =
+    useState<SettingsSection>("source-control");
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(
     hasCompletedInitialOnboarding,
   );
@@ -306,15 +312,16 @@ export function App() {
     );
   } else {
     content = (
-      <div className="app-shell">
-        <WindowNavigationControls
-          canGoBack={canGoBack}
-          canGoForward={canGoForward}
-          isSidebarOpen={isSidebarOpen}
-          onBack={goBack}
-          onForward={goForward}
-          onSidebarToggle={() => setIsSidebarOpen((open) => !open)}
-        />
+      <div className="desktop-app-frame">
+        <div className="app-shell">
+          <WindowNavigationControls
+            canGoBack={canGoBack}
+            canGoForward={canGoForward}
+            isSidebarOpen={isSidebarOpen}
+            onBack={goBack}
+            onForward={goForward}
+            onSidebarToggle={() => setIsSidebarOpen((open) => !open)}
+          />
         {activePage !== "settings" &&
         activePage !== "organization-settings" ? (
           <Sidebar
@@ -350,7 +357,10 @@ export function App() {
               briar.setActiveProjectId(projectId);
               navigateToPage("project-settings");
             }}
-            onSettings={() => navigateToPage("settings")}
+            onSettings={() => {
+              setAppSettingsSection("source-control");
+              navigateToPage("settings");
+            }}
             onLogout={() => void briar.logout()}
             organizations={briar.organizations}
             projects={briar.projects}
@@ -409,6 +419,7 @@ export function App() {
         ) : activePage === "settings" && activeProject ? (
           <AppSettings
             error={briar.projectReadinessError[activeProject.id] ?? null}
+            initialSection={appSettingsSection}
             isSidebarOpen={isSidebarOpen}
             loading={briar.projectReadinessLoadingId === activeProject.id}
             onBack={() => (canGoBack ? goBack() : navigateToPage("issues"))}
@@ -522,7 +533,14 @@ export function App() {
             onRequestedRunOpen={() => setRequestedRunId(null)}
             onSendIssueMessage={sendIssueMessage}
           />
-        )}
+          )}
+        </div>
+        <AgentUsageStatusBar
+          onManageAccounts={() => {
+            setAppSettingsSection("providers");
+            navigateToPage("settings");
+          }}
+        />
       </div>
     );
   }
