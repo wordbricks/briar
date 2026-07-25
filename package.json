@@ -28,7 +28,7 @@
     "cli": "bun run src-cli/index.ts",
     "cli:build": "bun build src-cli/index.ts --target=bun --outfile dist-cli/briar.js",
     "cli:install": "bun run cli:build && sh scripts/install-cli.sh",
-    "agent:build": "bun build src-agent/claude-runner.ts --target=bun --outfile dist-agent/claude-runner.js",
+    "agent:build": "bun build src-agent/claude-runner.ts --target=bun --outfile dist-agent/claude-runner.js && bun build src-agent/grok-runner.ts --target=bun --outfile dist-agent/grok-runner.js",
     "d1:migrate:local": "wrangler d1 migrations apply briar-db --local",
     "d1:migrate:remote": "wrangler d1 migrations apply briar-db --remote",
     "audit:dependencies": "bash scripts/audit-dependencies.sh",

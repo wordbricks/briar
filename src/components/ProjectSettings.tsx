@@ -123,9 +123,14 @@ export function ProjectSettings({
   const workflowJson = workflowContract
     ? JSON.stringify(workflowContract, null, 2)
     : "";
-  const providerName = provider === "codex" ? "Codex" : "Claude";
+  const providerName =
+    provider === "codex" ? "Codex" : provider === "grok" ? "Grok" : "Claude";
   const providerRuntimeName =
-    provider === "codex" ? "Codex App Server" : "Claude Agent SDK";
+    provider === "codex"
+      ? "Codex App Server"
+      : provider === "grok"
+        ? "Grok CLI (ACP)"
+        : "Claude Agent SDK";
 
   useEffect(() => {
     let cancelled = false;

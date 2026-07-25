@@ -43,6 +43,7 @@ pub(crate) const REMOTE_PATH_BOOTSTRAP: &str = r#"prepend_path_if_dir() {
   fi
 }
 prepend_path_if_dir "$HOME/.local/bin"
+prepend_path_if_dir "$HOME/.grok/bin"
 prepend_path_if_dir "$HOME/bin"
 prepend_path_if_dir "$HOME/.bun/bin"
 prepend_path_if_dir "$HOME/.cargo/bin"

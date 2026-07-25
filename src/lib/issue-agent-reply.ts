@@ -57,6 +57,7 @@ export function providerForConversation(
   conversationId: string,
 ): AgentProvider | null {
   if (conversationId.startsWith(`briar:claude:${projectId}:`)) return "claude";
+  if (conversationId.startsWith(`briar:grok:${projectId}:`)) return "grok";
   if (conversationId.startsWith(`briar:${projectId}:`)) return "codex";
   return null;
 }

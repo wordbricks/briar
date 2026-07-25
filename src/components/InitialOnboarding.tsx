@@ -21,8 +21,14 @@ import {
 
 type Step = "welcome" | "prerequisites";
 
-const prerequisiteIds: PrerequisiteId[] = ["git", "codex", "claude", "velen"];
-const agentPrerequisiteIds: PrerequisiteId[] = ["codex", "claude"];
+const prerequisiteIds: PrerequisiteId[] = [
+  "git",
+  "codex",
+  "claude",
+  "grok",
+  "velen",
+];
+const agentPrerequisiteIds: PrerequisiteId[] = ["codex", "claude", "grok"];
 
 export function InitialOnboarding({
   onComplete,
@@ -183,7 +189,9 @@ export function InitialOnboarding({
                           ? "C"
                           : id === "claude"
                             ? "A"
-                            : "V"}
+                            : id === "grok"
+                              ? "X"
+                              : "V"}
                     </span>
                     <div>
                       <strong>
@@ -201,7 +209,7 @@ export function InitialOnboarding({
                       <p>
                         {t(
                           `initialOnboarding.${
-                            id === "claude" ? "codex" : id
+                            id === "claude" || id === "grok" ? "codex" : id
                           }Description`,
                         )}
                       </p>

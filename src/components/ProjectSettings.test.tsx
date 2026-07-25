@@ -79,6 +79,7 @@ describe("ProjectSettings", () => {
     expect(await optionValues("project-agent-provider")).toEqual([
       "codex",
       "claude",
+      "grok",
     ]);
     expect(await optionValues("project-approval-policy")).toEqual([
       "untrusted",

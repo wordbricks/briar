@@ -1358,7 +1358,11 @@ export function useBriar() {
               ? {
                   id: null,
                   name: `Briar · ${
-                    conversation.provider === "codex" ? "Codex" : "Claude"
+                    conversation.provider === "codex"
+                      ? "Codex"
+                      : conversation.provider === "grok"
+                        ? "Grok"
+                        : "Claude"
                   }`,
                   image: null,
                   provider: conversation.provider,

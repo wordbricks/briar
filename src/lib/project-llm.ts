@@ -3,7 +3,7 @@ export type JsonSchema = Record<string, unknown> | boolean;
 export const approvalPolicies = ["untrusted", "on-request", "never"] as const;
 export type ApprovalPolicy = (typeof approvalPolicies)[number];
 
-export const agentProviders = ["codex", "claude"] as const;
+export const agentProviders = ["codex", "claude", "grok"] as const;
 export type AgentProvider = (typeof agentProviders)[number];
 
 export type AppProviderSettings = Record<AgentProvider, boolean>;
@@ -11,6 +11,7 @@ export type AppProviderSettings = Record<AgentProvider, boolean>;
 export const defaultAppProviderSettings: AppProviderSettings = {
   codex: true,
   claude: true,
+  grok: true,
 };
 
 export type AgentModelOption = {
@@ -31,6 +32,9 @@ export type ModelEffort = (typeof modelEfforts)[number];
 export const agentEfforts: Record<AgentProvider, readonly ModelEffort[]> = {
   codex: modelEfforts,
   claude: modelEfforts.filter((effort) => effort !== "ultra"),
+  grok: modelEfforts.filter(
+    (effort) => effort !== "ultra" && effort !== "xhigh" && effort !== "max",
+  ),
 };
 
 export const agentModels: Record<AgentProvider, AgentModelOption[]> = {
@@ -46,6 +50,11 @@ export const agentModels: Record<AgentProvider, AgentModelOption[]> = {
     { value: "opus", label: "Claude Opus" },
     { value: "haiku", label: "Claude Haiku" },
     { value: "fable", label: "Claude Fable" },
+  ],
+  grok: [
+    { value: "", label: "Provider default" },
+    { value: "grok-4.5", label: "Grok 4.5" },
+    { value: "grok-build", label: "Grok Build" },
   ],
 };
 

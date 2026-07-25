@@ -353,6 +353,46 @@ export function AppSettings({
                     ) : null
                   }
                 />
+                <ProviderRow
+                  available={Boolean(
+                    providerStatuses?.grok.installed &&
+                      providerStatuses.grok.authenticated,
+                  )}
+                  description={providerDescription({
+                    authenticated: providerStatuses?.grok.authenticated,
+                    enabled: providerSettings?.grok ?? false,
+                    installed: providerStatuses?.grok.installed,
+                    loading: providersLoading && !providerStatuses,
+                    providerName: "Grok CLI",
+                    t,
+                  })}
+                  disabled={providerSaving !== null}
+                  enabled={providerSettings?.grok ?? false}
+                  icon={
+                    <span className="source-control-provider-icon grok">
+                      <Cloud size={19} strokeWidth={1.8} />
+                    </span>
+                  }
+                  name="Grok"
+                  onToggle={(enabled) => void toggleProvider("grok", enabled)}
+                  title={
+                    <>
+                      Grok
+                      {providerStatuses?.grok.version ? (
+                        <code>{providerStatuses.grok.version}</code>
+                      ) : null}
+                    </>
+                  }
+                  trailing={
+                    providerSaving === "grok" ? (
+                      <LoaderCircle
+                        aria-label={t("common.saving")}
+                        className="provider-saving spin"
+                        size={16}
+                      />
+                    ) : null
+                  }
+                />
               </div>
 
               {providerError ? (

@@ -89,6 +89,7 @@ describe("detached execution workers", () => {
       "migrations/0011_issue_message_agents.sql",
       "migrations/0012_organization_handles.sql",
       "migrations/0013_execution_workers.sql",
+      "migrations/0014_agent_provider_grok.sql",
     ]) {
       await executeSql(db, await readFile(resolve(migration), "utf8"));
     }

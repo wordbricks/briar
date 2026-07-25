@@ -53,6 +53,7 @@
     "resources": {
       "../dist-cli/briar.js": "cli/briar.js",
       "../dist-agent/claude-runner.js": "agent/claude-runner.js",
+      "../dist-agent/grok-runner.js": "agent/grok-runner.js",
       "../scripts/briar-launcher": "cli/briar",
       "../skills/briar-auto-hunt/": "skills/briar-auto-hunt/",
       "../third-party/claude-agent-sdk-LICENSE.md": "licenses/claude-agent-sdk-LICENSE.md"
