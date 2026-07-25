@@ -6,6 +6,7 @@ dist-worker
 release-artifacts
 .env
 .env.local
+.env.release
 .env.keys
 .env.keys.*
 .dev.vars

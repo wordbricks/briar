@@ -46,10 +46,25 @@ describe("Production release contract", () => {
   it("requires publishing credentials only for publication", () => {
     const environment = completeEnvironment();
     delete environment.CLOUDFLARE_API_TOKEN;
-    delete environment.CLOUDFLARE_ACCOUNT_ID;
     expect(() => validateProductionEnvironment(environment, "1.0.0")).not.toThrow();
     expect(() => validateProductionEnvironment(environment, "1.0.0", true)).toThrow(
-      "CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID",
+      "Missing Production secrets: CLOUDFLARE_API_TOKEN",
+    );
+  });
+
+  it("reports missing public release configuration separately", () => {
+    const environment = completeEnvironment();
+    delete environment.APPLE_API_ISSUER;
+    expect(() => validateProductionEnvironment(environment, "1.0.0")).toThrow(
+      "Missing Production config: APPLE_API_ISSUER",
+    );
+
+    const publishingEnvironment = completeEnvironment();
+    delete publishingEnvironment.CLOUDFLARE_ACCOUNT_ID;
+    expect(() =>
+      validateProductionEnvironment(publishingEnvironment, "1.0.0", true),
+    ).toThrow(
+      "Missing Production config: CLOUDFLARE_ACCOUNT_ID",
     );
   });
 

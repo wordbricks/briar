@@ -4,10 +4,12 @@ set -euo pipefail
 workspace_root="$(cd "$(dirname "$0")/.." && pwd -P)"
 artifact_root="$workspace_root/release-artifacts"
 release_env="$workspace_root/config/release.env"
+release_secrets="$workspace_root/.env.release"
 publish=false
 release_temp=""
 release_environment_file=""
 original_keychains=()
+original_args=("$@")
 
 usage() {
   cat <<'EOF'
@@ -18,8 +20,8 @@ release from the exact signed vX.Y.Z tag at HEAD. By default it stops after
 creating local artifacts. Pass --publish to create and publish the GitHub
 Release, upload immutable versioned objects to R2, and promote latest.json.
 
-All credentials must already be exported in the environment. See
-docs/operations/production-release.md for the required variables.
+Credentials are decrypted from .env.release with dotenvx. See
+docs/operations/production-release.md for setup and required variables.
 EOF
 }
 
@@ -76,6 +78,20 @@ while [[ $# -gt 0 ]]; do
   esac
   shift
 done
+
+if [[ "${BRIAR_RELEASE_SECRETS_LOADED:-}" != "true" ]]; then
+  [[ -f "$release_secrets" ]] ||
+    fail "Missing $release_secrets. Copy .env.release.example and populate it with dotenvx."
+  dotenvx_bin="$workspace_root/node_modules/.bin/dotenvx"
+  [[ -x "$dotenvx_bin" ]] ||
+    fail "Missing dotenvx. Run 'bun install --frozen-lockfile' first."
+  exec "$dotenvx_bin" run \
+    --strict \
+    --redact \
+    --overload \
+    -f "$release_secrets" \
+    -- env BRIAR_RELEASE_SECRETS_LOADED=true "$0" "${original_args[@]}"
+fi
 
 [[ "$(uname -s)" == "Darwin" ]] || fail "Production macOS releases require macOS."
 

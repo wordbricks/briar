@@ -295,6 +295,11 @@ bun run release:macos:production
 bun run release:macos:production -- --publish
 ```
 
+Production credentials are loaded from the ignored `.env.release` file through
+dotenvx. Start from `.env.release.example`; keep the corresponding
+`DOTENV_PRIVATE_KEY_RELEASE` in the release operator's password manager.
+Public signing and publishing identifiers live in `config/release.env`.
+
 The Production command only mutates GitHub and R2 when `--publish` is explicit.
 See [the local Production release runbook](docs/operations/production-release.md)
 for host, credential, signed-tag, and rollback requirements.
