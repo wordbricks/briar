@@ -251,6 +251,7 @@ describe("HuntDashboard", () => {
     expect(markup).toContain('class="kanban-card');
     expect(markup).toContain('class="kanban-card-copy"');
     expect(markup).toContain('draggable="true"');
+    expect(markup).toContain('aria-label="백로그"');
     expect(markup).toContain('aria-label="차단"');
     expect(markup).toContain('aria-label="실패"');
     expect(markup).toContain('aria-label="취소"');

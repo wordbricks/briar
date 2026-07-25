@@ -5,6 +5,7 @@ export const autoHuntSources = ["issue", "error", "feedback"] as const;
  * stage instead of being encoded in this state machine.
  */
 export const autoHuntRunStatuses = [
+  "backlog",
   "queued",
   "running",
   "blocked",
@@ -169,6 +170,7 @@ export function progressForAutoHuntRun(
 ) {
   if (status === "completed") return 100;
   if (status === "cancelled") return 0;
+  if (status === "backlog") return 0;
   if (status === "queued") return 5;
   const index = workflow.stages.findIndex((stage) => stage.id === workflowStage);
   if (index < 0) return status === "blocked" || status === "failed" ? 50 : 10;

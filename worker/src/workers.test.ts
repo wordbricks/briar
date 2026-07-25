@@ -90,6 +90,7 @@ describe("detached execution workers", () => {
       "migrations/0012_organization_handles.sql",
       "migrations/0013_execution_workers.sql",
       "migrations/0014_agent_provider_grok.sql",
+      "migrations/0015_backlog_status.sql",
     ]) {
       await executeSql(db, await readFile(resolve(migration), "utf8"));
     }
@@ -292,6 +293,37 @@ describe("detached execution workers", () => {
     await expect(
       assertWorkerHasNoRunInFlight(db, projectId, "worker-e"),
     ).resolves.toBeUndefined();
+  });
+
+  it("does not treat backlog work as held or leased Auto Hunt work", async () => {
+    await register("backlog");
+    await recordHuntEvent(db, projectId, queuedEvent("issue-backlog", 1));
+    const claimed = await claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: "f".repeat(64),
+      claimedBy: "worker-backlog",
+      claimedAt: atMinute(2),
+      leaseExpiresAt: leaseExpiryFrom(atMinute(2)),
+    });
+    await attributeRunToWorker(db, projectId, {
+      runId: claimed!.id,
+      workerId: "worker-backlog",
+      observedAt: atMinute(2),
+    });
+    await db
+      .prepare(
+        `update briar_hunt_runs
+         set stage = 'queued', status = 'backlog', claim_token_hash = null,
+             claimed_by = null, claimed_at = null, lease_expires_at = null
+         where id = ?`,
+      )
+      .bind(claimed!.id)
+      .run();
+
+    await expect(
+      assertWorkerHasNoRunInFlight(db, projectId, "worker-backlog"),
+    ).resolves.toBeUndefined();
+    expect(await countLeasedRuns(db, projectId, atMinute(3))).toBe(0);
+    expect(await reapStalledHuntRuns(db, projectId, atMinute(60))).toEqual([]);
   });
 
   it("renews a lease for the holder and rejects a superseded token", async () => {

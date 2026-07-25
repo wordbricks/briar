@@ -88,6 +88,7 @@ export function defaultPlacementForLinearType(
       return { status: "cancelled", workflowStage: null };
     case "triage":
     case "backlog":
+      return { status: "backlog", workflowStage: null };
     case "unstarted":
     default:
       return { status: "queued", workflowStage: null };

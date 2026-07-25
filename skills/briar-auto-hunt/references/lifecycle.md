@@ -6,6 +6,7 @@ Auto Hunt separates universal execution status from repository-specific progress
 
 | Status | Meaning |
 | --- | --- |
+| `backlog` | Work is tracked but is not eligible for Auto Hunt |
 | `queued` | Work is waiting for an agent |
 | `running` | Work is active at a configured workflow stage |
 | `blocked` | External action is required |

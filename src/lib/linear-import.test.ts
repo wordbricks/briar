@@ -57,6 +57,10 @@ const sampleStates: LinearWorkflowStateSummary[] = [
 
 describe("linear-import", () => {
   it("round-trips placement keys", () => {
+    expect(parsePlacementKey("status:backlog")).toEqual({
+      status: "backlog",
+      workflowStage: null,
+    });
     expect(placementKey({ status: "queued", workflowStage: null })).toBe(
       "status:queued",
     );
@@ -76,6 +80,14 @@ describe("linear-import", () => {
 
   it("defaults Linear state types to Briar placements", () => {
     expect(defaultPlacementForLinearType("backlog", "analyzing")).toEqual({
+      status: "backlog",
+      workflowStage: null,
+    });
+    expect(defaultPlacementForLinearType("triage", "analyzing")).toEqual({
+      status: "backlog",
+      workflowStage: null,
+    });
+    expect(defaultPlacementForLinearType("unstarted", "analyzing")).toEqual({
       status: "queued",
       workflowStage: null,
     });
@@ -103,6 +115,10 @@ describe("linear-import", () => {
     expect(mapping["s-progress"]).toEqual({
       status: "running",
       workflowStage: "analyzing",
+    });
+    expect(mapping["s-backlog"]).toEqual({
+      status: "backlog",
+      workflowStage: null,
     });
   });
 

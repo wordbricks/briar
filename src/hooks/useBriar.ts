@@ -1667,6 +1667,7 @@ export function useBriar() {
                   runs: current.runs.map((run) => {
                     if (run.id !== runId) return run;
                     const workflowStage =
+                      placement.status === "backlog" ||
                       placement.status === "queued"
                         ? null
                         : placement.status === "running"
@@ -1682,6 +1683,7 @@ export function useBriar() {
                             (stage) => stage.id === workflowStage,
                           )?.label
                         : {
+                            backlog: "백로그",
                             queued: "대기",
                             blocked: "차단",
                             failed: "실패",
