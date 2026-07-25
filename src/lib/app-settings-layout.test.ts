@@ -11,25 +11,28 @@ const styles = readFileSync(
 );
 
 describe("application settings shell", () => {
-  it("shares the main page sidebar and topbar primitives", () => {
+  it("uses a dedicated settings shell with sidebar and main content", () => {
     expect(component).toContain(
       'className={`sidebar app-settings-sidebar${\n          isSidebarOpen ? "" : " sidebar-collapsed"\n        }`}',
     );
-    expect(component).toContain(
-      'className={`topbar app-settings-topbar${\n            isSidebarOpen ? "" : " sidebar-closed"\n          }`}',
-    );
     expect(component).toContain('className="main-content app-settings-main"');
+    expect(component).toContain('className="app-settings-back"');
+    expect(component).toContain('className="app-settings-search"');
+    expect(component).toContain('className="app-settings-page-header"');
   });
 
-  it("keeps the settings navigation aligned to the main sidebar rhythm", () => {
+  it("keeps the settings navigation aligned to a clean grouped sidebar", () => {
     expect(styles).toMatch(
       /\.sidebar \{[^}]*width: 252px;[^}]*flex: 0 0 252px;/u,
     );
     expect(styles).toMatch(
-      /\.app-settings-brand \{[^}]*height:88px;[^}]*padding:46px 17px 0;/u,
+      /\.app-settings-sidebar \{[^}]*background:#f5f5f4;/u,
     );
     expect(styles).toMatch(
-      /\.app-settings-sidebar nav \{[^}]*padding:3px 10px 16px;[^}]*gap:2px;/u,
+      /\.app-settings-nav-group button\.active \{[^}]*background:rgba\(48,49,45,\.09\);/u,
+    );
+    expect(styles).toMatch(
+      /\.app-settings-page-header h1 \{[^}]*font-size:24px;/u,
     );
   });
 });
