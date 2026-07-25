@@ -146,8 +146,44 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("<strong>검색</strong>");
     expect(markup).toContain("<strong>Inbox</strong>");
     expect(markup).not.toContain('class="search-box"');
+    expect(markup).toContain('aria-label="필터"');
+    expect(markup).not.toContain('class="source-filter"');
     expect(markup).not.toContain('class="companion-search-trigger"');
     expect(markup).not.toContain('class="status-tabs"');
+  });
+
+  it("opens the companion source filter from the queue heading", async () => {
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        companionMode
+        dashboard={demoDashboard}
+      />,
+    ));
+
+    const trigger = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="필터"]',
+    );
+    expect(trigger?.getAttribute("aria-expanded")).toBe("false");
+
+    await act(async () => trigger?.click());
+
+    const menu = container.querySelector('[role="menu"]');
+    expect(trigger?.getAttribute("aria-expanded")).toBe("true");
+    expect(menu?.querySelectorAll('[role="menuitemradio"]')).toHaveLength(4);
+    expect(menu?.textContent).toContain("전체");
+    expect(menu?.textContent).toContain("피드백");
+
+    const feedback = Array.from(
+      menu?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]') ?? [],
+    ).find((button) => button.textContent?.includes("피드백"));
+    await act(async () => feedback?.click());
+
+    expect(container.querySelector('[role="menu"]')).toBeNull();
+    expect(trigger?.className).toContain("active");
+    await act(async () => root.unmount());
   });
 
   it("renders task search on the companion Search page", () => {

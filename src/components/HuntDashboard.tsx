@@ -4,6 +4,7 @@ import {
   AtSign,
   Bold,
   Bot,
+  Check,
   ChevronRight,
   CircleAlert,
   Clock3,
@@ -16,6 +17,7 @@ import {
   Italic,
   Link2,
   List,
+  ListFilter,
   LoaderCircle,
   MessageCircle,
   Paperclip,
@@ -156,6 +158,8 @@ export function HuntDashboard({
   const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [source, setSource] = useState<SourceFilter>("all");
+  const [isSourceFilterOpen, setIsSourceFilterOpen] = useState(false);
+  const sourceFilterRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<DashboardView>("kanban");
   const [internalStatus, setInternalStatus] = useState<StatusFilter>("all");
   const status = companionMode && companionStatus
@@ -168,6 +172,25 @@ export function HuntDashboard({
   const [isIssueDialogOpen, setIsIssueDialogOpen] = useState(false);
   const [draggedRunId, setDraggedRunId] = useState<string | null>(null);
   const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isSourceFilterOpen) return;
+
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (!sourceFilterRef.current?.contains(event.target as Node)) {
+        setIsSourceFilterOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsSourceFilterOpen(false);
+    };
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isSourceFilterOpen]);
 
   const runs = dashboard?.runs ?? [];
   const selected = runs.find((run) => run.id === selectedRunId) ?? null;
@@ -317,13 +340,61 @@ export function HuntDashboard({
         )}
 
         <div className="queue-header">
-          <div>
-            <h2>
-              {companionMode && companionSearchMode
-                ? t("companion.navSearch")
-                : t("dashboard.queue")}
-            </h2>
-            <span>{t("dashboard.taskCount", { count: filtered.length })}</span>
+          <div className="queue-heading">
+            <div className="queue-heading-copy">
+              <h2>
+                {companionMode && companionSearchMode
+                  ? t("companion.navSearch")
+                  : t("dashboard.queue")}
+              </h2>
+              <span>{t("dashboard.taskCount", { count: filtered.length })}</span>
+            </div>
+            {companionMode && (
+              <div className="companion-source-filter" ref={sourceFilterRef}>
+                <button
+                  aria-controls="companion-source-filter-menu"
+                  aria-expanded={isSourceFilterOpen}
+                  aria-haspopup="menu"
+                  aria-label={t("dashboard.filter")}
+                  className={`companion-filter-trigger${source !== "all" ? " active" : ""}`}
+                  onClick={() => setIsSourceFilterOpen((current) => !current)}
+                  type="button"
+                >
+                  <ListFilter size={18} />
+                </button>
+                {isSourceFilterOpen && (
+                  <div
+                    aria-label={t("dashboard.filter")}
+                    className="companion-filter-menu"
+                    id="companion-source-filter-menu"
+                    role="menu"
+                  >
+                    {(["all", "issue", "feedback", "error"] as const).map(
+                      (value) => (
+                        <button
+                          aria-checked={source === value}
+                          className={source === value ? "active" : ""}
+                          key={value}
+                          onClick={() => {
+                            setSource(value);
+                            setIsSourceFilterOpen(false);
+                          }}
+                          role="menuitemradio"
+                          type="button"
+                        >
+                          <span>
+                            {value === "all"
+                              ? t("dashboard.all")
+                              : t(`source.${value}` as MessageKey)}
+                          </span>
+                          {source === value && <Check size={15} />}
+                        </button>
+                      ),
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <div className="queue-tools">
             {!companionMode && (
@@ -347,13 +418,15 @@ export function HuntDashboard({
                 />
               </label>
             )}
-            <div className="source-filter">
-              {(["all", "issue", "feedback", "error"] as const).map((value) => (
-                <button key={value} className={source === value ? "active" : ""} onClick={() => setSource(value)}>
-                  {value === "all" ? t("dashboard.all") : t(`source.${value}` as MessageKey)}
-                </button>
-              ))}
-            </div>
+            {!companionMode && (
+              <div className="source-filter">
+                {(["all", "issue", "feedback", "error"] as const).map((value) => (
+                  <button key={value} className={source === value ? "active" : ""} onClick={() => setSource(value)}>
+                    {value === "all" ? t("dashboard.all") : t(`source.${value}` as MessageKey)}
+                  </button>
+                ))}
+              </div>
+            )}
             {!companionMode && (
               <div
                 aria-label={t("dashboard.viewMode")}
