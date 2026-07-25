@@ -456,7 +456,13 @@ describe("HuntDashboard", () => {
     const trigger = container.querySelector<HTMLButtonElement>(
       ".issue-thread-trigger",
     );
-    expect(trigger?.textContent).toContain("답장 1개");
+    expect(trigger?.getAttribute("title")).toBe("스레드에서 답장하기");
+    expect(trigger?.getAttribute("aria-label")).toBe("스레드에서 답장하기");
+    expect(
+      container.querySelector(".issue-message-actions")?.getAttribute("role"),
+    ).toBe("toolbar");
+    expect(container.querySelector(".issue-thread-summary")?.textContent)
+      .toContain("답장 1개");
     await act(async () => trigger?.click());
     expect(container.querySelector('[role="dialog"]')).not.toBeNull();
     expect(container.querySelector(".issue-thread-content")?.textContent).toContain(
