@@ -28,4 +28,12 @@ describe("issue conversation layout", () => {
       ".issue-message:hover .issue-message-actions,.issue-message:focus-within .issue-message-actions",
     );
   });
+
+  it("makes the existing thread summary a full-width click target", () => {
+    const summaryRule = firstRule(".issue-thread-summary");
+
+    expect(summaryRule).toContain("width:100%");
+    expect(summaryRule).toContain("min-height:38px");
+    expect(summaryRule).toContain("display:flex");
+  });
 });
