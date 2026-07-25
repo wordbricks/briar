@@ -1,4 +1,4 @@
-import { Inbox, ListTodo, Plus } from "lucide-react";
+import { Inbox, ListTodo, Plus, Search } from "lucide-react";
 import { useI18n } from "../i18n";
 
 export type CompanionStatusFilter =
@@ -7,18 +7,20 @@ export type CompanionStatusFilter =
   | "attention"
   | "completed";
 
-type CompanionDestination = CompanionStatusFilter | "inbox";
+type CompanionDestination = CompanionStatusFilter | "inbox" | "search";
 
 export function CompanionBottomNavigation({
   activeDestination,
   onCreate,
   onInboxOpen,
+  onSearchOpen,
   onStatusChange,
   unreadInboxCount,
 }: {
   activeDestination: CompanionDestination;
   onCreate?: () => void;
   onInboxOpen: () => void;
+  onSearchOpen: () => void;
   onStatusChange: (status: CompanionStatusFilter) => void;
   unreadInboxCount: number;
 }) {
@@ -30,6 +32,7 @@ export function CompanionBottomNavigation({
     value: CompanionDestination;
   }> = [
     { icon: ListTodo, label: t("companion.navTasks"), value: "all" },
+    { icon: Search, label: t("companion.navSearch"), value: "search" },
     {
       count: unreadInboxCount,
       icon: Inbox,
@@ -51,6 +54,7 @@ export function CompanionBottomNavigation({
               key={destination.value}
               onClick={() => {
                 if (destination.value === "inbox") onInboxOpen();
+                else if (destination.value === "search") onSearchOpen();
                 else onStatusChange(destination.value);
               }}
               type="button"

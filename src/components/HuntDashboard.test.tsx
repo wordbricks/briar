@@ -143,9 +143,29 @@ describe("HuntDashboard", () => {
     expect(markup).toContain('aria-label="이슈 만들기"');
     expect(markup).toContain('class="companion-bottom-nav"');
     expect(markup).toContain('class="companion-fab"');
+    expect(markup).toContain("<strong>검색</strong>");
     expect(markup).toContain("<strong>Inbox</strong>");
+    expect(markup).not.toContain('class="search-box"');
     expect(markup).not.toContain('class="companion-search-trigger"');
     expect(markup).not.toContain('class="status-tabs"');
+  });
+
+  it("renders task search on the companion Search page", () => {
+    const markup = renderToStaticMarkup(
+      <HuntDashboard
+        {...dashboardProps}
+        companionMode
+        companionSearchMode
+        dashboard={demoDashboard}
+      />,
+    );
+
+    expect(markup).toContain("<h2>검색</h2>");
+    expect(markup).toContain('class="search-box"');
+    expect(markup).toContain('placeholder="작업 검색"');
+    expect(markup).toContain(
+      '<button aria-current="page" class="active" type="button">',
+    );
   });
 
   it("uses Jelly Select for issue priority and accepts image or video files", () => {
