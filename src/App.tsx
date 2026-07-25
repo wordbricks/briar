@@ -11,6 +11,7 @@ import {
 } from "./components/CompanionBottomNavigation";
 import { CompanionEmptyState, CompanionHeader } from "./components/CompanionHeader";
 import { CompanionSettings } from "./components/CompanionSettings";
+import { ConnectionHealth } from "./components/ConnectionHealth";
 import { HuntDashboard } from "./components/HuntDashboard";
 import { Inbox } from "./components/Inbox";
 import { InitialOnboarding } from "./components/InitialOnboarding";
@@ -527,9 +528,6 @@ export function App() {
           <HuntDashboard
             dashboard={briar.dashboard}
             error={briar.error}
-            health={briar.health}
-            healthError={briar.healthError}
-            healthLoading={briar.healthLoading}
             isCreatingIssue={briar.isCreatingIssue}
             needsLocalConnection={!briar.isActiveProjectConnectedLocally}
             recoveringRunId={briar.recoveringRunId}
@@ -538,25 +536,32 @@ export function App() {
             isSidebarOpen={isSidebarOpen}
             onConnectRepository={briar.reconnectProject}
             onCreateIssue={briar.addIssue}
-            onHealthRefresh={() => void briar.refreshHealth()}
             onLoadAttachment={briar.readIssueAttachment}
             onLoadIssueMessages={briar.readIssueMessages}
             onMoveRun={briar.moveRun}
-            onReconnect={briar.reconnectProject}
             onRetryRun={briar.retryRun}
             onCancelRun={briar.cancelRun}
-            onRepair={() => void briar.repairHealth()}
             onRequestedRunOpen={() => setRequestedRunId(null)}
             onSendIssueMessage={sendIssueMessage}
           />
           )}
         </div>
-        <AgentUsageStatusBar
-          onManageAccounts={() => {
-            setAppSettingsSection("providers");
-            navigateToPage("settings");
-          }}
-        />
+        <div className="app-status-bar">
+          <AgentUsageStatusBar
+            onManageAccounts={() => {
+              setAppSettingsSection("providers");
+              navigateToPage("settings");
+            }}
+          />
+          <ConnectionHealth
+            error={briar.healthError}
+            health={briar.health}
+            loading={briar.healthLoading}
+            onReconnect={briar.reconnectProject}
+            onRefresh={() => void briar.refreshHealth()}
+            onRepair={() => void briar.repairHealth()}
+          />
+        </div>
       </div>
     );
   }
@@ -676,9 +681,6 @@ export function App() {
             companionUnreadInboxCount={inbox.unreadCount}
             dashboard={briar.dashboard}
             error={briar.error}
-            health={null}
-            healthError={null}
-            healthLoading={false}
             isCreatingIssue={briar.isCreatingIssue}
             recoveringRunId={briar.recoveringRunId}
             recoveryError={briar.recoveryError}
@@ -691,15 +693,12 @@ export function App() {
               setCompanionPage("issues");
             }}
             onCreateIssue={briar.addIssue}
-            onHealthRefresh={() => {}}
             onLoadAttachment={briar.readIssueAttachment}
             onLoadIssueMessages={briar.readIssueMessages}
             onMoveRun={briar.moveRun}
-            onReconnect={() => {}}
             onRequestedRunOpen={() => setRequestedRunId(null)}
             onRetryRun={briar.retryRun}
             onCancelRun={briar.cancelRun}
-            onRepair={() => {}}
             onSendIssueMessage={sendIssueMessage}
           />
         )}
