@@ -22,6 +22,18 @@ import {
   writeServiceDefinition,
   type ClaimedIssue,
 } from "./worker";
+import {
+  allocateIssueWorktree,
+  defaultWorktreeRoot,
+  listIssueWorktrees,
+  projectWorktreeRoot,
+  removeIssueWorktree,
+  resolveBaseRef,
+  samePath,
+  type GitRunner,
+  type IssueWorktree,
+  type WorktreeSettings,
+} from "./worktree";
 
 const workflowStageIdSchema = z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/u);
 
@@ -43,10 +55,26 @@ const workflowConfigSchema = z.object({
   release: z.object({ enabled: z.boolean() }).optional(),
 });
 
+const worktreeConfigSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    root: z.string().min(1).optional(),
+    branchPrefix: z.string().min(1).optional(),
+  })
+  .passthrough();
+
+const claimWorktreeSchema = z.object({
+  path: z.string().min(1),
+  branch: z.string().min(1),
+  baseRef: z.string().min(1),
+  baseSha: z.string().min(1),
+});
+
 const autoHuntConfigSchema = z
   .object({
     velenOrg: z.string().min(1).optional(),
     dataSource: z.string().min(1).optional(),
+    worktrees: worktreeConfigSchema.optional(),
     linear: z
       .object({
         enabled: z.boolean(),
@@ -77,6 +105,7 @@ const projectConfigSchema = z
         sourceKey: z.string().min(1),
         token: z.string().startsWith("briar_claim_"),
         leaseExpiresAt: z.string().datetime({ offset: true }),
+        worktree: claimWorktreeSchema.optional(),
       })
       .optional(),
   })
@@ -255,18 +284,63 @@ function gitCommonDirectory(repositoryPath: string) {
   return resolve(repositoryPath, commonDirectory);
 }
 
+const defaultWorktreeBranchPrefix = "briar";
+
+/** Git runner for worktree work: keeps stderr so failures stay reportable. */
+const runGit: GitRunner = (gitArgs, options = {}) => {
+  const result = Bun.spawnSync(["git", ...gitArgs], {
+    cwd: options.cwd ?? process.cwd(),
+    stdout: "pipe",
+    stderr: "pipe",
+    env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+    ...(options.timeoutMs ? { timeout: options.timeoutMs } : {}),
+  });
+  return {
+    // A timeout kills the child, leaving exitCode null; treat that as failure.
+    exitCode: result.exitCode ?? 1,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  };
+};
+
+function worktreeSettings(project: ProjectConfig): WorktreeSettings {
+  const configured = project.autoHunt?.worktrees;
+  return {
+    root:
+      process.env.BRIAR_WORKTREE_ROOT?.trim() ||
+      configured?.root ||
+      defaultWorktreeRoot(homedir()),
+    branchPrefix: configured?.branchPrefix || defaultWorktreeBranchPrefix,
+  };
+}
+
+/** Per-issue worktrees are the default; a project can opt out explicitly. */
+function worktreesEnabled(project: ProjectConfig): boolean {
+  return project.autoHunt?.worktrees?.enabled !== false;
+}
+
+function activeClaimWorktree(project: ProjectConfig) {
+  const worktree = project.activeClaim?.worktree;
+  if (!worktree) {
+    throw new Error("이 프로젝트에 진행 중인 claim의 워크트리가 없습니다.");
+  }
+  return worktree;
+}
+
 async function currentProject(config: Config): Promise<ProjectConfig> {
   const repositoryPath = await currentRepositoryPath();
   const remote = gitValue(["remote", "get-url", "origin"]);
   const commonDirectory = gitCommonDirectory(repositoryPath);
   const matchesRepository = (candidate: ProjectConfig) => {
-    if (resolve(candidate.repositoryPath) === repositoryPath) return true;
+    // samePath, not string equality: git reports canonical paths, so a repo or
+    // worktree reached through a symlink must still match its stored project.
+    if (samePath(candidate.repositoryPath, repositoryPath)) return true;
     if (remote && candidate.repositoryRemote === remote) return true;
     const candidateCommonDirectory = gitCommonDirectory(candidate.repositoryPath);
     return Boolean(
       commonDirectory &&
         candidateCommonDirectory &&
-        commonDirectory === candidateCommonDirectory,
+        samePath(commonDirectory, candidateCommonDirectory),
     );
   };
   const requestedProjectId = process.env.BRIAR_PROJECT_ID?.trim();
@@ -399,6 +473,9 @@ async function configureAutoHunt() {
   if (!linearDisabled && !linearSource && has("--enable-linear")) {
     throw new Error("--enable-linear requires --linear-source");
   }
+  if (has("--enable-worktrees") && has("--disable-worktrees")) {
+    throw new Error("--enable-worktrees와 --disable-worktrees를 함께 쓸 수 없습니다.");
+  }
   const nextAutoHunt = {
     ...project.autoHunt,
     velenOrg,
@@ -423,6 +500,13 @@ async function configureAutoHunt() {
       }
       return workflowForPreset(parsed);
     })(),
+    worktrees: {
+      ...project.autoHunt?.worktrees,
+      ...(has("--disable-worktrees") ? { enabled: false } : {}),
+      ...(has("--enable-worktrees") ? { enabled: true } : {}),
+      ...(value("--worktree-root") ? { root: resolve(required("--worktree-root")) } : {}),
+      ...(value("--branch-prefix") ? { branchPrefix: required("--branch-prefix") } : {}),
+    },
   };
   const nextProject = {
     ...project,
@@ -476,6 +560,13 @@ async function autoHuntDoctor() {
       linearSource: project.autoHunt?.linear?.source ?? null,
       dataSource: project.autoHunt?.dataSource ?? null,
       workflow: project.autoHunt?.workflow ?? workflowForPreset("local"),
+      worktrees: {
+        enabled: worktreesEnabled(project),
+        root: projectWorktreeRoot(worktreeSettings(project).root, project.id),
+        branchPrefix: worktreeSettings(project).branchPrefix,
+        // null means no origin/HEAD and no main/master: allocation would fail.
+        baseRef: resolveBaseRef(runGit, project.repositoryPath),
+      },
       requestIds: [result.auth.requestId, result.org.requestId, result.linear?.requestId].filter(
         Boolean,
       ),
@@ -595,6 +686,9 @@ async function nextHunt() {
       : candidate,
   );
   await saveConfig(config);
+  // The claim is persisted before the worktree exists: a crash here must lose
+  // the checkout, never the claim token needed to report or release the run.
+  const { worktree, worktreeError } = await claimWorktree(config, project, issue);
   const attachments = await Promise.all(
     issue.attachments.map(async (attachment) => {
       try {
@@ -621,9 +715,123 @@ async function nextHunt() {
   const { claimToken: _claimToken, ...publicIssue } = issue;
   console.log(
     JSON.stringify({
-      issue: { ...publicIssue, attachments },
+      issue: { ...publicIssue, attachments, worktree },
+      ...(worktreeError ? { worktreeError } : {}),
     }),
   );
+}
+
+/**
+ * Give the claimed run its own checkout, cut from the freshly fetched remote
+ * base. Allocation failures are reported in the payload instead of thrown: the
+ * run is already claimed, so the agent must stay able to record `blocked`
+ * against it rather than losing the claim to an exception.
+ */
+async function claimWorktree(
+  config: Config,
+  project: ProjectConfig,
+  issue: { runId: string; sourceKey: string; title: string },
+): Promise<{
+  worktree: (IssueWorktree & { warning?: string }) | null;
+  worktreeError: string | null;
+}> {
+  if (!worktreesEnabled(project) || has("--no-worktree")) {
+    return { worktree: null, worktreeError: null };
+  }
+  try {
+    const worktree = await allocateIssueWorktree({
+      repositoryPath: project.repositoryPath,
+      projectId: project.id,
+      issue,
+      settings: worktreeSettings(project),
+      git: runGit,
+      ...(value("--base-branch") ? { baseRef: required("--base-branch") } : {}),
+    });
+    config.projects = config.projects.map((candidate) =>
+      candidate.id === project.id && candidate.activeClaim
+        ? {
+            ...candidate,
+            activeClaim: {
+              ...candidate.activeClaim,
+              worktree: {
+                path: worktree.path,
+                branch: worktree.branch,
+                baseRef: worktree.baseRef,
+                baseSha: worktree.baseSha,
+              },
+            },
+          }
+        : candidate,
+    );
+    await saveConfig(config);
+    return { worktree, worktreeError: null };
+  } catch (error) {
+    return {
+      worktree: null,
+      worktreeError: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+async function worktreeShow() {
+  const config = await loadConfig();
+  const project = await currentProject(config);
+  const settings = worktreeSettings(project);
+  console.log(
+    JSON.stringify({
+      projectId: project.id,
+      root: projectWorktreeRoot(settings.root, project.id),
+      branchPrefix: settings.branchPrefix,
+      sourceKey: project.activeClaim?.sourceKey ?? null,
+      worktree: activeClaimWorktree(project),
+    }),
+  );
+}
+
+async function worktreeList() {
+  const config = await loadConfig();
+  const project = await currentProject(config);
+  const root = projectWorktreeRoot(worktreeSettings(project).root, project.id);
+  console.log(
+    JSON.stringify({
+      projectId: project.id,
+      root,
+      worktrees: listIssueWorktrees(runGit, project.repositoryPath, root),
+    }),
+  );
+}
+
+async function worktreeRemove() {
+  const config = await loadConfig();
+  const project = await currentProject(config);
+  const root = projectWorktreeRoot(worktreeSettings(project).root, project.id);
+  const target = resolve(value("--path") ?? activeClaimWorktree(project).path);
+  // Only ever remove a registered worktree under this project's root, so a
+  // wrong `--path` cannot take out the main checkout or an unrelated tree.
+  const registered = listIssueWorktrees(runGit, project.repositoryPath, root).find((worktree) =>
+    samePath(worktree.path, target),
+  );
+  if (!registered?.branch) {
+    throw new Error(`이 프로젝트의 Auto Hunt 워크트리가 아닙니다: ${target}`);
+  }
+  const result = removeIssueWorktree(
+    runGit,
+    project.repositoryPath,
+    { path: registered.path, branch: registered.branch },
+    { force: has("--force") },
+  );
+  if (
+    project.activeClaim?.worktree &&
+    samePath(project.activeClaim.worktree.path, registered.path)
+  ) {
+    config.projects = config.projects.map((candidate) => {
+      if (candidate.id !== project.id || !candidate.activeClaim) return candidate;
+      const { worktree: _removed, ...activeClaim } = candidate.activeClaim;
+      return { ...candidate, activeClaim };
+    });
+    await saveConfig(config);
+  }
+  console.log(JSON.stringify({ path: registered.path, branch: registered.branch, ...result }));
 }
 
 async function optionalText(valueFlag: string, fileFlag: string) {
@@ -1027,10 +1235,15 @@ const usage = `Briar CLI
   briar project create [--name <name>]
   briar connect --project-id <uuid> --agent-token <token>
   briar auto-hunt doctor
-  briar auto-hunt next
+  briar auto-hunt next [--no-worktree] [--base-branch <ref>]
+  briar auto-hunt worktree show
+  briar auto-hunt worktree list
+  briar auto-hunt worktree remove [--path <worktree>] [--force]
   briar auto-hunt configure --velen-org <slug> [--data-source <provider://source>]
     [--enable-linear --linear-source <linear://source> --linear-team <key>]
     [--disable-linear] [--workflow-preset <local|review|release|research>]
+    [--enable-worktrees|--disable-worktrees] [--worktree-root <dir>]
+    [--branch-prefix <prefix>]
   briar auto-hunt record --source-key <key> --title <title>
     --status <queued|running|blocked|failed|completed|cancelled>
     [--workflow-stage <configured-stage>]
@@ -1050,6 +1263,7 @@ Compatibility:
 Environment:
   BRIAR_API_URL       Cloudflare Worker URL
   BRIAR_AGENT_TOKEN   Project-scoped ingest token
+  BRIAR_WORKTREE_ROOT Parent directory for per-issue worktrees
 `;
 
 async function main() {
@@ -1062,6 +1276,12 @@ async function main() {
   if (args[0] === "connect") return connectProject();
   if (args[0] === "auto-hunt" && args[1] === "doctor") return autoHuntDoctor();
   if (args[0] === "auto-hunt" && args[1] === "next") return nextHunt();
+  if (args[0] === "auto-hunt" && args[1] === "worktree") {
+    if (args[2] === "show") return worktreeShow();
+    if (args[2] === "list") return worktreeList();
+    if (args[2] === "remove") return worktreeRemove();
+    throw new Error("briar auto-hunt worktree <show|list|remove>");
+  }
   if (args[0] === "auto-hunt" && args[1] === "configure") {
     return configureAutoHunt();
   }

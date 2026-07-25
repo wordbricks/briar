@@ -274,6 +274,24 @@ struct StoredAutoHuntConfig {
     github_repository: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     workflow: Option<WorkflowConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    worktrees: Option<StoredWorktreeConfig>,
+    #[serde(flatten)]
+    extra: BTreeMap<String, serde_json::Value>,
+}
+
+/// Per-issue worktree settings owned by the CLI (`briar auto-hunt configure`).
+/// The app only reads them, to learn which directory agents must be able to
+/// write in.
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StoredWorktreeConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    enabled: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    root: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    branch_prefix: Option<String>,
     #[serde(flatten)]
     extra: BTreeMap<String, serde_json::Value>,
 }
@@ -303,6 +321,9 @@ impl From<AutoHuntConfig> for StoredAutoHuntConfig {
             }),
             github_repository: config.github_repository,
             workflow: Some(config.workflow),
+            // Worktree settings belong to the CLI; callers carry the stored
+            // value over instead of letting an app-side save erase it.
+            worktrees: None,
             extra: BTreeMap::new(),
         }
     }
@@ -1620,6 +1641,16 @@ fn write_cli_connection(
         }
     };
     config.api_url = api_url;
+    // `briar auto-hunt configure` owns the worktree block, so a settings save
+    // from the app must not silently reset it.
+    let stored_worktrees = config
+        .projects
+        .iter()
+        .find(|project| project.id == project_id)
+        .and_then(|project| project.auto_hunt.as_ref())
+        .and_then(|auto_hunt| auto_hunt.worktrees.clone());
+    let mut auto_hunt: StoredAutoHuntConfig = agent_config.auto_hunt.into();
+    auto_hunt.worktrees = stored_worktrees;
     config.projects.retain(|project| project.id != project_id);
     config.projects.push(CliProject {
         id: project_id,
@@ -1630,7 +1661,7 @@ fn write_cli_connection(
         repository_remote,
         agent_token,
         llm: Some(agent_config.llm),
-        auto_hunt: Some(agent_config.auto_hunt.into()),
+        auto_hunt: Some(auto_hunt),
         extra: BTreeMap::new(),
     });
 
@@ -2737,6 +2768,41 @@ async fn project_llm_chat(
     .map_err(|error| error.to_string())?
 }
 
+/// Directory that holds this project's per-issue worktrees. Must mirror the
+/// CLI's own resolution (`worktreeSettings` in src-cli/index.ts): env override,
+/// then project config, then `~/briar/worktrees`, all suffixed by project id.
+fn project_worktree_root(
+    config_path: &Path,
+    project_id: &str,
+    home: &Path,
+) -> Result<Option<PathBuf>, String> {
+    let config = read_cli_config(config_path)?;
+    let project = config
+        .projects
+        .iter()
+        .find(|project| project.id == project_id)
+        .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
+    let settings = project
+        .auto_hunt
+        .as_ref()
+        .and_then(|auto_hunt| auto_hunt.worktrees.as_ref());
+    if settings.and_then(|settings| settings.enabled) == Some(false) {
+        return Ok(None);
+    }
+    let root = std::env::var("BRIAR_WORKTREE_ROOT")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .or_else(|| {
+            settings
+                .and_then(|settings| settings.root.clone())
+                .filter(|root| !root.trim().is_empty())
+        })
+        .map(PathBuf::from)
+        .unwrap_or_else(|| home.join("briar").join("worktrees"));
+    Ok(Some(root.join(project_id)))
+}
+
 fn project_chat_execution(
     full_access: bool,
     approval_policy: agent::ApprovalPolicy,
@@ -2759,6 +2825,8 @@ fn project_chat_execution(
         effort,
         event_sink: None,
         environment: Vec::new(),
+        // Project chat runs in the checkout only; Auto Hunt widens this.
+        workspace_write_roots: Vec::new(),
     }
 }
 
@@ -2811,6 +2879,18 @@ async fn start_project_auto_hunt(
             &project_id,
             &request.api_url,
         )?;
+        // Each issue is worked in its own worktree outside the checkout, so the
+        // agent's write sandbox has to include the worktree root as well as cwd.
+        let worktree_root = project_worktree_root(&config_path, &project_id, &home)?;
+        let workspace_write_roots = match worktree_root {
+            Some(root) => {
+                fs::create_dir_all(&root).map_err(|error| {
+                    format!("자동사냥 워크트리 폴더를 만들지 못했습니다: {error}")
+                })?;
+                vec![path_display_string(root)?]
+            }
+            None => Vec::new(),
+        };
         let backend = agent::discover_backend(
             settings.provider,
             runner,
@@ -2842,6 +2922,7 @@ async fn start_project_auto_hunt(
                 effort: settings.effort,
                 event_sink,
                 environment: cli_environment.environment().to_vec(),
+                workspace_write_roots,
             },
             request,
             &approve,
@@ -4303,6 +4384,141 @@ mod tests {
             .expect("host should resolve")
             .is_local());
         assert!(remove_ssh_host_from(&config_path, &saved.id).is_err());
+    }
+
+    /// Write a project whose auto-hunt block carries CLI-owned worktree settings.
+    fn config_with_worktree_settings(config_path: &Path, worktrees: StoredWorktreeConfig) {
+        let config = CliConfig {
+            api_url: "http://127.0.0.1:8787".to_string(),
+            user_token: None,
+            agent_providers: AppProviderSettings::default(),
+            projects: vec![CliProject {
+                id: "project-1".to_string(),
+                repository_path: "/repo".to_string(),
+                execution_host_id: None,
+                repository_remote: None,
+                agent_token: "briar_agent_x".to_string(),
+                llm: None,
+                auto_hunt: Some(StoredAutoHuntConfig {
+                    velen_org: Some("wordbricks".to_string()),
+                    data_source: None,
+                    linear: None,
+                    github_repository: None,
+                    workflow: None,
+                    worktrees: Some(worktrees),
+                    extra: BTreeMap::new(),
+                }),
+                extra: BTreeMap::new(),
+            }],
+            ssh_hosts: Vec::new(),
+            extra: BTreeMap::new(),
+        };
+        write_cli_config(config_path, &config).expect("config should be written");
+    }
+
+    #[test]
+    fn resolves_the_configured_auto_hunt_worktree_root_per_project() {
+        let config_path = host_test_config_path("worktree-root");
+        config_with_worktree_settings(
+            &config_path,
+            StoredWorktreeConfig {
+                enabled: None,
+                root: Some("/custom/worktrees".to_string()),
+                branch_prefix: None,
+                extra: BTreeMap::new(),
+            },
+        );
+        assert_eq!(
+            project_worktree_root(&config_path, "project-1", Path::new("/Users/dev"))
+                .expect("root should resolve"),
+            Some(PathBuf::from("/custom/worktrees/project-1"))
+        );
+    }
+
+    #[test]
+    fn falls_back_to_the_default_worktree_root_and_honors_opt_out() {
+        let config_path = host_test_config_path("worktree-default");
+        config_with_worktree_settings(
+            &config_path,
+            StoredWorktreeConfig {
+                enabled: None,
+                root: None,
+                branch_prefix: None,
+                extra: BTreeMap::new(),
+            },
+        );
+        assert_eq!(
+            project_worktree_root(&config_path, "project-1", Path::new("/Users/dev"))
+                .expect("root should resolve"),
+            Some(PathBuf::from("/Users/dev/briar/worktrees/project-1"))
+        );
+
+        let disabled_path = host_test_config_path("worktree-disabled");
+        config_with_worktree_settings(
+            &disabled_path,
+            StoredWorktreeConfig {
+                enabled: Some(false),
+                root: None,
+                branch_prefix: None,
+                extra: BTreeMap::new(),
+            },
+        );
+        // Opted out: no extra writable root is granted to the agent.
+        assert_eq!(
+            project_worktree_root(&disabled_path, "project-1", Path::new("/Users/dev"))
+                .expect("root should resolve"),
+            None
+        );
+    }
+
+    #[test]
+    fn saving_project_settings_keeps_cli_owned_worktree_settings() {
+        let config_path = host_test_config_path("worktree-preserve");
+        config_with_worktree_settings(
+            &config_path,
+            StoredWorktreeConfig {
+                enabled: None,
+                root: Some("/custom/worktrees".to_string()),
+                branch_prefix: Some("hunt".to_string()),
+                extra: BTreeMap::new(),
+            },
+        );
+
+        write_cli_connection(
+            &config_path,
+            CliConnectionInput {
+                api_url: "http://127.0.0.1:8787".to_string(),
+                project_id: "project-1".to_string(),
+                agent_token: "briar_agent_x".to_string(),
+                repository_path: "/repo".to_string(),
+                repository_remote: None,
+                execution_host: None,
+            },
+            LocalProjectAgentConfig {
+                llm: agent::ProjectLlmSettings::default(),
+                auto_hunt: AutoHuntConfig {
+                    velen_org: "wordbricks".to_string(),
+                    data_source: None,
+                    linear_enabled: false,
+                    linear_source: None,
+                    linear_team: None,
+                    github_repository: None,
+                    workflow: default_workflow(),
+                },
+            },
+        )
+        .expect("settings should save");
+
+        let worktrees = read_cli_config(&config_path)
+            .expect("config should reload")
+            .projects
+            .into_iter()
+            .find(|project| project.id == "project-1")
+            .and_then(|project| project.auto_hunt)
+            .and_then(|auto_hunt| auto_hunt.worktrees)
+            .expect("worktree settings should survive an app-side save");
+        assert_eq!(worktrees.root.as_deref(), Some("/custom/worktrees"));
+        assert_eq!(worktrees.branch_prefix.as_deref(), Some("hunt"));
     }
 
     #[test]

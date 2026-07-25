@@ -17,6 +17,8 @@ export type ClaudeRunnerRequest = {
   approvalPolicy: "untrusted" | "on-request" | "never";
   sandboxMode: "readOnly" | "workspaceWrite" | "dangerFullAccess";
   networkAccess: boolean;
+  /** Directories outside cwd the agent may write in (Auto Hunt worktrees). */
+  additionalDirectories?: string[];
   claudeBinary: string;
 };
 
@@ -93,6 +95,9 @@ export function claudeOptions(
 
   return {
     cwd: request.workspaceRoot,
+    ...(request.additionalDirectories?.length
+      ? { additionalDirectories: request.additionalDirectories }
+      : {}),
     ...(request.conversationId ? { resume: request.conversationId } : {}),
     ...(request.model?.trim() ? { model: request.model.trim() } : {}),
     ...(request.effort ? { effort: request.effort } : {}),

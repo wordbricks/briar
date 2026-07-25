@@ -496,6 +496,7 @@ pub(crate) fn chat(
         binary,
         &workspace_root,
         execution.network_access,
+        &execution.workspace_write_roots,
         &execution.environment,
         execution.event_sink,
     )?;
@@ -572,6 +573,7 @@ pub(crate) fn start_auto_hunt_with(
             effort: execution.effort,
             event_sink: Some(execution.event_sink),
             environment: execution.environment,
+            workspace_write_roots: execution.workspace_write_roots,
         },
         ProjectLlmRequest {
             message,
@@ -740,11 +742,12 @@ impl CodexConnection {
         binary: &str,
         workspace: &Path,
         network_access: bool,
+        workspace_write_roots: &[String],
         environment: &[(String, String)],
         event_sink: Option<AgentEventSink>,
     ) -> Result<Self, String> {
         let mut spec = CommandSpec::new(binary)
-            .args(app_server_args(network_access))
+            .args(app_server_args(network_access, workspace_write_roots))
             .working_directory(workspace);
         for (key, value) in environment {
             spec = spec.env(key, value);
@@ -951,12 +954,40 @@ impl CodexConnection {
     }
 }
 
-fn app_server_args(network_access: bool) -> Vec<&'static str> {
-    let mut arguments = vec!["app-server", "--listen", "stdio://"];
+fn app_server_args(network_access: bool, workspace_write_roots: &[String]) -> Vec<String> {
+    let mut arguments = vec![
+        "app-server".to_string(),
+        "--listen".to_string(),
+        "stdio://".to_string(),
+    ];
     if network_access {
-        arguments.extend(["--config", "sandbox_workspace_write.network_access=true"]);
+        arguments.extend([
+            "--config".to_string(),
+            "sandbox_workspace_write.network_access=true".to_string(),
+        ]);
+    }
+    if !workspace_write_roots.is_empty() {
+        // `--config` values parse as TOML, so the roots are passed as a TOML
+        // array of strings. Auto Hunt worktrees live outside the checkout and
+        // would otherwise be read-only to a workspace-write sandbox.
+        arguments.extend([
+            "--config".to_string(),
+            format!(
+                "sandbox_workspace_write.writable_roots={}",
+                toml_string_array(workspace_write_roots)
+            ),
+        ]);
     }
     arguments
+}
+
+/// Render paths as a TOML array of basic strings, escaping what TOML requires.
+fn toml_string_array(values: &[String]) -> String {
+    let items: Vec<String> = values
+        .iter()
+        .map(|value| format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\"")))
+        .collect();
+    format!("[{}]", items.join(","))
 }
 
 impl Drop for CodexConnection {
@@ -1291,7 +1322,7 @@ mod tests {
         assert!(instructions.contains("briar auto-hunt next"));
         assert!(instructions.contains("at most 3 issues"));
         assert_eq!(
-            app_server_args(true),
+            app_server_args(true, &[]),
             vec![
                 "app-server",
                 "--listen",
@@ -1301,8 +1332,33 @@ mod tests {
             ]
         );
         assert_eq!(
-            app_server_args(false),
+            app_server_args(false, &[]),
             vec!["app-server", "--listen", "stdio://"]
+        );
+    }
+
+    #[test]
+    fn declares_auto_hunt_worktree_roots_as_writable() {
+        let arguments = app_server_args(
+            true,
+            &[
+                "/Users/dev/briar/worktrees/project-1".to_string(),
+                "/tmp/other \"root\"".to_string(),
+            ],
+        );
+        assert_eq!(
+            arguments.last().map(String::as_str),
+            Some(
+                r#"sandbox_workspace_write.writable_roots=["/Users/dev/briar/worktrees/project-1","/tmp/other \"root\""]"#
+            )
+        );
+        // The roots ride on their own `--config`, leaving network_access intact.
+        assert_eq!(
+            arguments
+                .iter()
+                .filter(|argument| argument.as_str() == "--config")
+                .count(),
+            2
         );
     }
 
@@ -1415,6 +1471,7 @@ printf '%s\n' '{"method":"turn/completed","params":{"threadId":"thread-1","turn"
                     Ok(())
                 })),
                 environment: Vec::new(),
+                workspace_write_roots: Vec::new(),
             },
             ProjectLlmRequest {
                 message: "Summarize the repository".to_string(),
