@@ -17,6 +17,22 @@ describe("ProjectSettings", () => {
     const onUpdateLinear = vi.fn(
       async (linear: ProjectSettingsData["linear"]) => linear,
     );
+    const onConnectLinearImport = vi.fn(async () => ({
+      viewer: {
+        name: "Demo",
+        email: null,
+        organizationName: "Demo Org",
+      },
+      teams: [],
+    }));
+    const onLoadLinearImportStates = vi.fn(async () => ({ states: [] }));
+    const onImportLinearIssues = vi.fn(async () => ({
+      imported: 0,
+      skipped: 0,
+      failed: 0,
+      total: 0,
+      truncated: false,
+    }));
     const onRefreshVelen = vi.fn(async () => ({
       authenticated: true,
       email: "jay@example.com",
@@ -43,12 +59,16 @@ describe("ProjectSettings", () => {
           onRegenerateWorkflow={onRegenerateWorkflow}
           onUpdateAutomation={onUpdateAutomation}
           onUpdateLinear={onUpdateLinear}
+          onConnectLinearImport={onConnectLinearImport}
+          onLoadLinearImportStates={onLoadLinearImportStates}
+          onImportLinearIssues={onImportLinearIssues}
           onRefreshVelen={onRefreshVelen}
           project={{
             id: "project-1",
             name: "Briar",
             createdAt: "2026-07-22T00:00:00Z",
           }}
+          repositoryConnected
           velen={await onRefreshVelen()}
         />,
       );
@@ -211,12 +231,25 @@ describe("ProjectSettings", () => {
           onRegenerateWorkflow={async () => undefined}
           onUpdateAutomation={async (automation) => automation}
           onUpdateLinear={async (linear) => linear}
+          onConnectLinearImport={async () => ({
+            viewer: { name: "Demo", email: null, organizationName: "Demo" },
+            teams: [],
+          })}
+          onLoadLinearImportStates={async () => ({ states: [] })}
+          onImportLinearIssues={async () => ({
+            imported: 0,
+            skipped: 0,
+            failed: 0,
+            total: 0,
+            truncated: false,
+          })}
           onRefreshVelen={async () => null}
           project={{
             id: "project-1",
             name: "Briar",
             createdAt: "2026-07-22T00:00:00Z",
           }}
+          repositoryConnected
           velen={null}
         />,
       );

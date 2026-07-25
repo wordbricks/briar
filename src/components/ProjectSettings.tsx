@@ -33,6 +33,12 @@ import {
   type AutoHuntAutomation,
 } from "../lib/auto-hunt-automation";
 import type { VelenInspection } from "../lib/project-connection";
+import type {
+  LinearImportConnectResult,
+  LinearImportResult,
+  LinearImportStatesResult,
+} from "../lib/linear-import";
+import { LinearIssueImport } from "./LinearIssueImport";
 import { SelectMenu } from "./SelectMenu";
 
 export function ProjectSettings({
@@ -44,8 +50,12 @@ export function ProjectSettings({
   onRegenerateWorkflow,
   onUpdateAutomation,
   onUpdateLinear,
+  onConnectLinearImport,
+  onLoadLinearImportStates,
+  onImportLinearIssues,
   onRefreshVelen,
   project,
+  repositoryConnected,
   velen,
 }: {
   dashboard: DashboardPayload | null;
@@ -60,8 +70,19 @@ export function ProjectSettings({
   onUpdateLinear: (
     linear: ProjectSettingsData["linear"],
   ) => Promise<ProjectSettingsData["linear"]>;
+  onConnectLinearImport: (apiKey: string) => Promise<LinearImportConnectResult>;
+  onLoadLinearImportStates: (input: {
+    apiKey: string;
+    teamIds: string[];
+  }) => Promise<LinearImportStatesResult>;
+  onImportLinearIssues: (input: {
+    apiKey: string;
+    teamIds: string[];
+    statusMapping: Record<string, string>;
+  }) => Promise<LinearImportResult>;
   onRefreshVelen: (org?: string | null) => Promise<VelenInspection | null>;
   project: Project;
+  repositoryConnected: boolean;
   velen: VelenInspection | null;
 }) {
   const { localeTag, t } = useI18n();
@@ -483,6 +504,15 @@ export function ProjectSettings({
               </p>
             ) : null}
           </section>
+
+          <LinearIssueImport
+            onConnect={onConnectLinearImport}
+            onImport={onImportLinearIssues}
+            onLoadStates={onLoadLinearImportStates}
+            projectId={project.id}
+            repositoryConnected={repositoryConnected}
+            workflow={workflow}
+          />
 
           <section className="project-settings-auto-run">
             <header>

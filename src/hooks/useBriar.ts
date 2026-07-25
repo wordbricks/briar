@@ -2,16 +2,19 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   beginDeviceAuthorization,
   cancelHuntRun,
+  connectLinearImport,
   createAgentToken,
   createOrganization as createRemoteOrganization,
   createIssue,
   createIssueMessage,
   createProject,
   deleteProject as deleteRemoteProject,
+  importLinearIssues,
   isApiConfigured,
   loadDashboard,
   loadIssueAttachment,
   loadIssueMessages,
+  loadLinearImportStates,
   loadOrganizations,
   loadProjects,
   loadSession,
@@ -27,6 +30,7 @@ import {
   demoDashboard,
   demoRepositoryReadiness,
 } from "../lib/demo-data";
+import { isRepositoryConnectedForImport } from "../lib/linear-import";
 import {
   connectLocalProject,
   createProjectWorkspace,
@@ -1125,6 +1129,128 @@ export function useBriar() {
     [dashboard, token],
   );
 
+  const assertRepositoryReadyForLinearImport = useCallback(
+    (projectId: string) => {
+      const githubRepository =
+        dashboard?.project.id === projectId
+          ? dashboard.settings.githubRepository
+          : null;
+      const repositoryPath =
+        health?.projectId === projectId ? health.repositoryPath : null;
+      const ready = isRepositoryConnectedForImport({
+        projectId,
+        connectedProjectIds,
+        githubRepository,
+        repositoryPath,
+      });
+      if (!ready) {
+        throw new Error(
+          "저장소를 연결한 뒤에 Linear 이슈를 가져올 수 있습니다.",
+        );
+      }
+    },
+    [connectedProjectIds, dashboard, health],
+  );
+
+  const connectLinearForImport = useCallback(
+    async (projectId: string, apiKey: string) => {
+      assertRepositoryReadyForLinearImport(projectId);
+      if (demoMode) {
+        return {
+          viewer: {
+            name: "Demo User",
+            email: "demo@example.com",
+            organizationName: "Demo Org",
+          },
+          teams: [
+            { id: "team-demo", name: "Demo Team", key: "DEMO" },
+            { id: "team-briar", name: "Briar", key: "BRI" },
+          ],
+        };
+      }
+      if (!token) throw new Error("로그인이 필요합니다.");
+      return connectLinearImport(token, projectId, apiKey);
+    },
+    [assertRepositoryReadyForLinearImport, token],
+  );
+
+  const loadLinearStatesForImport = useCallback(
+    async (
+      projectId: string,
+      input: { apiKey: string; teamIds: string[] },
+    ) => {
+      assertRepositoryReadyForLinearImport(projectId);
+      if (demoMode) {
+        return {
+          states: [
+            {
+              id: "state-backlog",
+              name: "Backlog",
+              type: "backlog",
+              color: "#bec2c8",
+              position: 0,
+              teamId: input.teamIds[0] ?? "team-demo",
+              teamKey: "DEMO",
+              teamName: "Demo Team",
+            },
+            {
+              id: "state-started",
+              name: "In Progress",
+              type: "started",
+              color: "#f2c94c",
+              position: 1,
+              teamId: input.teamIds[0] ?? "team-demo",
+              teamKey: "DEMO",
+              teamName: "Demo Team",
+            },
+            {
+              id: "state-done",
+              name: "Done",
+              type: "completed",
+              color: "#5e6ad2",
+              position: 2,
+              teamId: input.teamIds[0] ?? "team-demo",
+              teamKey: "DEMO",
+              teamName: "Demo Team",
+            },
+          ],
+        };
+      }
+      if (!token) throw new Error("로그인이 필요합니다.");
+      return loadLinearImportStates(token, projectId, input);
+    },
+    [assertRepositoryReadyForLinearImport, token],
+  );
+
+  const runLinearIssueImport = useCallback(
+    async (
+      projectId: string,
+      input: {
+        apiKey: string;
+        teamIds: string[];
+        statusMapping: Record<string, string>;
+      },
+    ) => {
+      assertRepositoryReadyForLinearImport(projectId);
+      if (demoMode) {
+        return {
+          imported: 3,
+          skipped: 0,
+          failed: 0,
+          total: 3,
+          truncated: false,
+        };
+      }
+      if (!token) throw new Error("로그인이 필요합니다.");
+      const result = await importLinearIssues(token, projectId, input);
+      if (activeProjectId === projectId) {
+        setDashboard(await loadDashboard(token, projectId));
+      }
+      return result;
+    },
+    [activeProjectId, assertRepositoryReadyForLinearImport, token],
+  );
+
   const saveLinearIntegration = useCallback(
     async (projectId: string, linear: ProjectSettings["linear"]) => {
       if (!dashboard || dashboard.project.id !== projectId) {
@@ -1662,6 +1788,9 @@ export function useBriar() {
     regenerateWorkflow,
     saveAutoHuntAutomation,
     saveLinearIntegration,
+    connectLinearForImport,
+    loadLinearStatesForImport,
+    runLinearIssueImport,
     recoveringRunId,
     recoveryError,
     refresh,

@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { validateIssueAttachments } from "./issue-attachments";
 import type {
+  LinearImportConnectResult,
+  LinearImportResult,
+  LinearImportStatesResult,
+} from "./linear-import";
+import type {
   CreateIssueInput,
   DashboardPayload,
   HuntRunPlacement,
@@ -439,5 +444,54 @@ export async function updateProjectSettings(
     `/projects/${projectId}/settings`,
     token,
     { method: "PUT", body: JSON.stringify(settings) },
+  );
+}
+
+export async function connectLinearImport(
+  token: string,
+  projectId: string,
+  apiKey: string,
+) {
+  return request<LinearImportConnectResult>(
+    `/projects/${projectId}/linear/connect`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify({ apiKey }),
+    },
+  );
+}
+
+export async function loadLinearImportStates(
+  token: string,
+  projectId: string,
+  input: { apiKey: string; teamIds: string[] },
+) {
+  return request<LinearImportStatesResult>(
+    `/projects/${projectId}/linear/states`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export async function importLinearIssues(
+  token: string,
+  projectId: string,
+  input: {
+    apiKey: string;
+    teamIds: string[];
+    statusMapping: Record<string, string>;
+  },
+) {
+  return request<LinearImportResult>(
+    `/projects/${projectId}/linear/import`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
   );
 }
