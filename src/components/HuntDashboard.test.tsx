@@ -5,7 +5,6 @@ import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { demoDashboard } from "../lib/demo-data";
-import type { AutoHuntHealth } from "../lib/project-connection";
 import type { IssueMessage } from "../types";
 import {
   CreateIssueDialog,
@@ -15,22 +14,16 @@ import {
 
 const dashboardProps = {
   error: null,
-  health: null,
-  healthError: null,
-  healthLoading: false,
   isCreatingIssue: false,
   recoveringRunId: null,
   recoveryError: null,
   isSidebarOpen: true,
   onCreateIssue: async () => undefined,
-  onHealthRefresh: () => undefined,
   onLoadAttachment: async () => new Blob(),
   onLoadIssueMessages: async () => [],
   onMoveRun: async () => undefined,
-  onReconnect: () => undefined,
   onRetryRun: async () => undefined,
   onCancelRun: async () => undefined,
-  onRepair: () => undefined,
   onSendIssueMessage: async () => {
     throw new Error("not implemented in this test");
   },
@@ -38,29 +31,6 @@ const dashboardProps = {
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true;
-
-const healthyHealth: AutoHuntHealth = {
-  projectId: "project-1",
-  healthy: true,
-  repositoryPath: "/Users/jay/git/briar",
-  repositoryRemote: "https://github.com/wordbricks/briar.git",
-  repositoryHealthy: true,
-  cliPath: "/Users/jay/.local/bin/briar",
-  cliInstalled: true,
-  cliVersion: "0.2.0",
-  cliExpectedVersion: "0.2.0",
-  cliCurrent: true,
-  skillPath: "/Users/jay/.codex/skills/briar-auto-hunt",
-  skillInstalled: true,
-  skillVersion: "0.2.0",
-  skillExpectedVersion: "0.2.0",
-  skillCurrent: true,
-  velenOrg: "wordbricks",
-  velenAuthenticated: true,
-  velenEmail: "jay@example.com",
-  velenHealthy: true,
-  issues: [],
-};
 
 describe("HuntDashboard", () => {
   it("offers issue creation from the work queue", () => {
@@ -852,19 +822,17 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
-  it("shows Auto Hunt health as a compact topbar status trigger", () => {
+  it("keeps a drag topbar without embedding Auto Hunt health", () => {
     const markup = renderToStaticMarkup(
       <HuntDashboard
         {...dashboardProps}
         dashboard={null}
-        health={healthyHealth}
       />,
     );
 
-    expect(markup).toContain('aria-haspopup="dialog"');
-    expect(markup).toContain("Auto Hunt 연결 상태: 실행 준비 완료");
-    expect(markup).not.toContain("D1 연결됨");
-    expect(markup).not.toContain("health-panel");
+    expect(markup).toContain("topbar");
+    expect(markup).not.toContain("health-trigger");
+    expect(markup).not.toContain("Auto Hunt 연결 상태");
     expect(markup).not.toContain("Briar CLI");
   });
 

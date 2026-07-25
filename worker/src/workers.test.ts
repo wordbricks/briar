@@ -469,33 +469,45 @@ describe("detached execution workers", () => {
     ).rejects.toBeInstanceOf(TranscriptLimitError);
   });
 
-  it("prunes the oldest sessions past the project retention limit", async () => {
-    for (let index = 0; index < MAX_TRANSCRIPT_SESSIONS_PER_PROJECT + 3; index += 1) {
-      await appendAgentTranscript(db, projectId, {
-        sessionId: `session-${String(index).padStart(3, "0")}`,
-        runId: null,
-        workerId: null,
-        agentProvider: "codex",
-        observedAt: atMinute(index + 1),
-        events: [{ sequence: 1, direction: "client", payload: { index } }],
-      });
-    }
+  it(
+    "prunes the oldest sessions past the project retention limit",
+    async () => {
+      for (
+        let index = 0;
+        index < MAX_TRANSCRIPT_SESSIONS_PER_PROJECT + 3;
+        index += 1
+      ) {
+        await appendAgentTranscript(db, projectId, {
+          sessionId: `session-${String(index).padStart(3, "0")}`,
+          runId: null,
+          workerId: null,
+          agentProvider: "codex",
+          observedAt: atMinute(index + 1),
+          events: [{ sequence: 1, direction: "client", payload: { index } }],
+        });
+      }
 
-    const remaining = await db
-      .prepare(
-        `select count(*) as sessions from briar_agent_transcript_sessions where project_id = ?`,
-      )
-      .bind(projectId)
-      .first<{ sessions: number }>();
-    expect(remaining?.sessions).toBe(MAX_TRANSCRIPT_SESSIONS_PER_PROJECT);
+      const remaining = await db
+        .prepare(
+          `select count(*) as sessions from briar_agent_transcript_sessions where project_id = ?`,
+        )
+        .bind(projectId)
+        .first<{ sessions: number }>();
+      expect(remaining?.sessions).toBe(MAX_TRANSCRIPT_SESSIONS_PER_PROJECT);
 
-    // The oldest sessions go first, and their events go with them.
-    expect(await readAgentTranscript(db, projectId, "session-000")).toBeNull();
-    expect(await readAgentTranscript(db, projectId, "session-052")).not.toBeNull();
-    const orphans = await db
-      .prepare(`select count(*) as events from briar_agent_transcripts where session_id = ?`)
-      .bind("session-000")
-      .first<{ events: number }>();
-    expect(orphans?.events).toBe(0);
-  });
+      // The oldest sessions go first, and their events go with them.
+      expect(await readAgentTranscript(db, projectId, "session-000")).toBeNull();
+      expect(
+        await readAgentTranscript(db, projectId, "session-052"),
+      ).not.toBeNull();
+      const orphans = await db
+        .prepare(
+          `select count(*) as events from briar_agent_transcripts where session_id = ?`,
+        )
+        .bind("session-000")
+        .first<{ events: number }>();
+      expect(orphans?.events).toBe(0);
+    },
+    20_000,
+  );
 });

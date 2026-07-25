@@ -4,7 +4,8 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AutoHuntHealth } from "../lib/project-connection";
-import { ConnectionHealth } from "./HuntDashboard";
+import { I18nProvider } from "../i18n";
+import { ConnectionHealth } from "./ConnectionHealth";
 
 const health: AutoHuntHealth = {
   projectId: "project-1",
@@ -35,33 +36,38 @@ describe("ConnectionHealth", () => {
   beforeEach(() => {
     (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
       .IS_REACT_ACT_ENVIRONMENT = true;
+    localStorage.setItem("briar.locale.v1", "ko");
     container = document.createElement("div");
     document.body.append(container);
   });
 
   afterEach(() => {
     container.remove();
+    localStorage.removeItem("briar.locale.v1");
     vi.restoreAllMocks();
   });
 
-  it("opens health details from the status dot and closes on Escape", async () => {
+  it("opens health details from the status bar trigger and closes on Escape", async () => {
     const onRepair = vi.fn();
     const root = createRoot(container);
     await act(async () => {
       root.render(
-        <ConnectionHealth
-          error={null}
-          health={health}
-          loading={false}
-          onReconnect={() => undefined}
-          onRefresh={() => undefined}
-          onRepair={onRepair}
-        />,
+        <I18nProvider>
+          <ConnectionHealth
+            error={null}
+            health={health}
+            loading={false}
+            onReconnect={() => undefined}
+            onRefresh={() => undefined}
+            onRepair={onRepair}
+          />
+        </I18nProvider>,
       );
     });
 
     const trigger = container.querySelector<HTMLButtonElement>(".health-trigger");
     expect(trigger?.getAttribute("aria-expanded")).toBe("false");
+    expect(trigger?.textContent).toContain("확인 필요");
     expect(container.querySelector('[role="dialog"]')).toBeNull();
 
     await act(async () => trigger?.click());
