@@ -125,6 +125,29 @@ mod tests {
     }
 
     #[test]
+    fn spawns_with_piped_stdio_for_the_agent_protocol() {
+        use std::io::{BufRead, BufReader, Write};
+
+        let mut child = runner()
+            .spawn_piped(
+                &CommandSpec::new("sh").args(["-c", "read line; printf '%s\\n' \"$line\""]),
+            )
+            .unwrap();
+        child
+            .stdin
+            .as_mut()
+            .unwrap()
+            .write_all(b"{\"type\":\"run\"}\n")
+            .unwrap();
+        let mut line = String::new();
+        BufReader::new(child.stdout.as_mut().unwrap())
+            .read_line(&mut line)
+            .unwrap();
+        assert_eq!(line.trim(), "{\"type\":\"run\"}");
+        let _ = child.wait();
+    }
+
+    #[test]
     fn resolves_a_binary_that_exists_on_path() {
         assert!(runner().resolve_binary("sh").unwrap().contains("sh"));
     }

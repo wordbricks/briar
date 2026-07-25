@@ -19,7 +19,10 @@ use std::{
 
 pub(crate) use local::LocalRunner;
 pub(crate) use shell::shell_quote;
-pub(crate) use ssh::{parse_ssh_resolve_output, SshAuth, SshHost, SshResolvedTarget, SshRunner};
+
+pub(crate) use ssh::{
+    parse_ssh_resolve_output, ssh_command, SshAuth, SshHost, SshResolvedTarget, SshRunner,
+};
 
 pub(crate) const LOCAL_EXECUTION_HOST_ID: &str = "local";
 const SSH_EXECUTION_HOST_PREFIX: &str = "ssh:";
@@ -158,7 +161,11 @@ pub(crate) trait CommandRunner: Send + Sync {
     /// Absolute path of a tool on this host, or a Korean error naming it.
     fn resolve_binary(&self, tool: &str) -> Result<String, String>;
     fn run(&self, spec: &CommandSpec) -> Result<CommandOutput, String>;
-    /// Spawn with piped stdio. The agents' stdio JSON protocol rides this.
+    /// Spawn with piped stdio. The agents' line-delimited JSON protocol rides
+    /// this unchanged on both hosts.
+    // Exercised by the runner tests; the agent backends move onto it with the
+    // remote sandbox-home work in docs/plans/remote-execution-hosts.md 1.7.
+    #[allow(dead_code)]
     fn spawn_piped(&self, spec: &CommandSpec) -> Result<Child, String>;
     fn canonicalize(&self, path: &Path) -> Result<PathBuf, String>;
 
@@ -176,7 +183,10 @@ pub(crate) fn runner_for(
     auth: SshAuth,
 ) -> Result<Arc<dyn CommandRunner>, String> {
     match host {
-        ExecutionHostId::Local => Ok(Arc::new(LocalRunner::new(execution_path, home.to_path_buf()))),
+        ExecutionHostId::Local => Ok(Arc::new(LocalRunner::new(
+            execution_path,
+            home.to_path_buf(),
+        ))),
         ExecutionHostId::Ssh { host_id } => {
             let host = hosts
                 .iter()
@@ -203,7 +213,10 @@ mod tests {
         assert_eq!(ExecutionHostId::parse(None), ExecutionHostId::Local);
         assert_eq!(ExecutionHostId::parse(Some("")), ExecutionHostId::Local);
         assert_eq!(ExecutionHostId::parse(Some("   ")), ExecutionHostId::Local);
-        assert_eq!(ExecutionHostId::parse(Some("local")), ExecutionHostId::Local);
+        assert_eq!(
+            ExecutionHostId::parse(Some("local")),
+            ExecutionHostId::Local
+        );
     }
 
     #[test]

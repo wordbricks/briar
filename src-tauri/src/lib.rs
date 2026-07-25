@@ -36,6 +36,10 @@ struct StoredSession {
 struct CliProject {
     id: String,
     repository_path: String,
+    /// Which machine this project executes on. Absent means the local machine,
+    /// so configs written before remote hosts existed keep working unchanged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    execution_host_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     repository_remote: Option<String>,
     agent_token: String,
@@ -118,7 +122,46 @@ struct ConnectedLocalProject {
     workflow: WorkflowConfig,
 }
 
-fn infer_repository_checks(repository: &Path, workflow: &mut WorkflowConfig) {
+/// Does a repository file exist on the host that owns the repository?
+fn repository_file_exists(runner: &dyn host::CommandRunner, path: &Path) -> bool {
+    if !runner.is_remote() {
+        return path.exists();
+    }
+    let Ok(test) = runner.resolve_binary("test") else {
+        // `test` is a shell builtin on hosts without the standalone binary.
+        return runner
+            .run(&host::CommandSpec::new("sh").args([
+                "-c".to_string(),
+                format!("test -e {}", host::shell_quote(&path.to_string_lossy())),
+            ]))
+            .map(|output| output.success())
+            .unwrap_or(false);
+    };
+    runner
+        .run(
+            &host::CommandSpec::new(test)
+                .args(["-e".to_string(), path.to_string_lossy().to_string()]),
+        )
+        .map(|output| output.success())
+        .unwrap_or(false)
+}
+
+fn repository_file_text(runner: &dyn host::CommandRunner, path: &Path) -> Option<String> {
+    if !runner.is_remote() {
+        return fs::read_to_string(path).ok();
+    }
+    let cat = runner.resolve_binary("cat").ok()?;
+    let output = runner
+        .run(&host::CommandSpec::new(cat).args([path.to_string_lossy().to_string()]))
+        .ok()?;
+    output.success().then_some(output.stdout)
+}
+
+fn infer_repository_checks_on(
+    runner: &dyn host::CommandRunner,
+    repository: &Path,
+    workflow: &mut WorkflowConfig,
+) {
     let Some(stage) = workflow
         .stages
         .iter_mut()
@@ -127,8 +170,8 @@ fn infer_repository_checks(repository: &Path, workflow: &mut WorkflowConfig) {
         return;
     };
     let package_json = repository.join("package.json");
-    if package_json.exists() {
-        let Ok(contents) = fs::read_to_string(package_json) else {
+    if repository_file_exists(runner, &package_json) {
+        let Some(contents) = repository_file_text(runner, &package_json) else {
             return;
         };
         let Ok(package) = serde_json::from_str::<serde_json::Value>(&contents) else {
@@ -140,24 +183,43 @@ fn infer_repository_checks(repository: &Path, workflow: &mut WorkflowConfig) {
         else {
             return;
         };
-        let runner =
-            if repository.join("bun.lock").exists() || repository.join("bun.lockb").exists() {
-                "bun run"
-            } else if repository.join("pnpm-lock.yaml").exists() {
-                "pnpm"
-            } else if repository.join("yarn.lock").exists() {
-                "yarn"
-            } else {
-                "npm run"
-            };
+        let package_manager = if repository_file_exists(runner, &repository.join("bun.lock"))
+            || repository_file_exists(runner, &repository.join("bun.lockb"))
+        {
+            "bun run"
+        } else if repository_file_exists(runner, &repository.join("pnpm-lock.yaml")) {
+            "pnpm"
+        } else if repository_file_exists(runner, &repository.join("yarn.lock")) {
+            "yarn"
+        } else {
+            "npm run"
+        };
         stage.checks = ["test", "build"]
             .into_iter()
             .filter(|name| scripts.contains_key(*name))
-            .map(|name| format!("{runner} {name}"))
+            .map(|name| format!("{package_manager} {name}"))
             .collect();
-    } else if repository.join("Cargo.toml").exists() {
+    } else if repository_file_exists(runner, &repository.join("Cargo.toml")) {
         stage.checks = vec!["cargo test".to_string(), "cargo build".to_string()];
     }
+}
+
+/// Origin remote URL, read on whichever host owns the repository.
+fn repository_remote_on(runner: &dyn host::CommandRunner, path: &Path) -> Option<String> {
+    if !runner.is_remote() {
+        return repository_remote(path);
+    }
+    let git = runner.resolve_binary("git").ok()?;
+    let output = runner
+        .run(
+            &host::CommandSpec::new(git)
+                .args(["remote", "get-url", "origin"])
+                .env("GIT_TERMINAL_PROMPT", "0")
+                .working_directory(path),
+        )
+        .ok()?;
+    let remote = output.stdout_trimmed();
+    (output.success() && !remote.is_empty()).then_some(remote)
 }
 
 fn default_workflow() -> WorkflowConfig {
@@ -344,6 +406,10 @@ struct CliConfig {
     agent_providers: AppProviderSettings,
     #[serde(default)]
     projects: Vec<CliProject>,
+    /// Saved SSH execution hosts. Local to this machine: never sent to the
+    /// Worker, and holding no secrets — OpenSSH owns key and agent resolution.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    ssh_hosts: Vec<host::SshHost>,
     #[serde(flatten)]
     extra: BTreeMap<String, serde_json::Value>,
 }
@@ -1254,15 +1320,29 @@ struct LocalProjectAgentConfig {
     auto_hunt: AutoHuntConfig,
 }
 
-fn write_cli_connection(
-    config_path: &Path,
+/// Everything a project connection records about where and how it runs.
+struct CliConnectionInput {
     api_url: String,
     project_id: String,
     agent_token: String,
     repository_path: String,
     repository_remote: Option<String>,
+    execution_host: Option<host::ExecutionHostId>,
+}
+
+fn write_cli_connection(
+    config_path: &Path,
+    connection: CliConnectionInput,
     agent_config: LocalProjectAgentConfig,
 ) -> Result<(), String> {
+    let CliConnectionInput {
+        api_url,
+        project_id,
+        agent_token,
+        repository_path,
+        repository_remote,
+        execution_host,
+    } = connection;
     if api_url.trim().is_empty() || project_id.trim().is_empty() {
         return Err("Briar 프로젝트 연결 정보가 올바르지 않습니다.".to_string());
     }
@@ -1280,6 +1360,7 @@ fn write_cli_connection(
             user_token: None,
             agent_providers: AppProviderSettings::default(),
             projects: Vec::new(),
+            ssh_hosts: Vec::new(),
             extra: BTreeMap::new(),
         }
     };
@@ -1288,6 +1369,9 @@ fn write_cli_connection(
     config.projects.push(CliProject {
         id: project_id,
         repository_path,
+        execution_host_id: execution_host
+            .filter(|host| !host.is_local())
+            .map(|host| host.as_stored()),
         repository_remote,
         agent_token,
         llm: Some(agent_config.llm),
@@ -1366,11 +1450,99 @@ fn cli_config_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         .join("config.json"))
 }
 
-fn connected_project_workspace(config_path: &Path, project_id: &str) -> Result<PathBuf, String> {
+fn read_cli_config(config_path: &Path) -> Result<CliConfig, String> {
+    if !config_path.exists() {
+        return Ok(CliConfig {
+            api_url: String::new(),
+            user_token: None,
+            agent_providers: AppProviderSettings::default(),
+            projects: Vec::new(),
+            ssh_hosts: Vec::new(),
+            extra: BTreeMap::new(),
+        });
+    }
     let contents = fs::read_to_string(config_path)
         .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
-    let config = serde_json::from_str::<CliConfig>(&contents)
-        .map_err(|error| format!("Briar 로컬 설정이 손상되었습니다: {error}"))?;
+    serde_json::from_str::<CliConfig>(&contents)
+        .map_err(|error| format!("Briar 로컬 설정이 손상되었습니다: {error}"))
+}
+
+/// Execution host a project is bound to. Unknown or missing values resolve to
+/// the local machine, so a config from another build never blocks startup.
+fn project_execution_host(
+    config: &CliConfig,
+    project_id: &str,
+) -> Result<host::ExecutionHostId, String> {
+    let project = config
+        .projects
+        .iter()
+        .find(|project| project.id == project_id)
+        .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
+    Ok(host::ExecutionHostId::parse(
+        project.execution_host_id.as_deref(),
+    ))
+}
+
+fn project_repository_path(config: &CliConfig, project_id: &str) -> Result<PathBuf, String> {
+    config
+        .projects
+        .iter()
+        .find(|project| project.id == project_id)
+        .map(|project| PathBuf::from(&project.repository_path))
+        .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())
+}
+
+/// Build the runner for a project's host. Local projects keep the exact
+/// binary-resolution behaviour they had before hosts existed.
+fn project_runner(
+    config: &CliConfig,
+    project_id: &str,
+    home: &Path,
+) -> Result<Arc<dyn host::CommandRunner>, String> {
+    let execution_host = project_execution_host(config, project_id)?;
+    host::runner_for(
+        &execution_host,
+        &config.ssh_hosts,
+        cli_execution_path(home)?,
+        home,
+        host::SshAuth::default(),
+    )
+}
+
+/// Resolve a repository root through a runner: the configured path must be the
+/// git root on that host. Mirrors the original local-only check.
+fn resolve_workspace_with(
+    runner: &dyn host::CommandRunner,
+    repository_path: &Path,
+) -> Result<PathBuf, String> {
+    let configured = runner
+        .canonicalize(repository_path)
+        .map_err(|error| format!("연결된 프로젝트 폴더를 열지 못했습니다: {error}"))?;
+    let git = runner.resolve_binary("git")?;
+    let output = runner.run(
+        &host::CommandSpec::new(git)
+            .args(["rev-parse", "--show-toplevel"])
+            // Never let git stop for credentials on a host with no terminal.
+            .env("GIT_TERMINAL_PROMPT", "0")
+            .working_directory(&configured),
+    )?;
+    if !output.success() {
+        return Err(format!(
+            "Git 저장소 폴더를 선택하세요. ({})",
+            output.failure_message()
+        ));
+    }
+    let root = runner
+        .canonicalize(Path::new(&output.stdout_trimmed()))
+        .map_err(|error| format!("프로젝트 Git 루트를 열지 못했습니다: {error}"))?;
+    if configured != root {
+        return Err("연결된 프로젝트 경로가 Git 저장소 루트가 아닙니다.".to_string());
+    }
+    Ok(root)
+}
+
+fn connected_project_workspace(config_path: &Path, project_id: &str) -> Result<PathBuf, String> {
+    let config = read_cli_config(config_path)?;
     let project = config
         .projects
         .iter()
@@ -1384,6 +1556,205 @@ fn connected_project_workspace(config_path: &Path, project_id: &str) -> Result<P
         return Err("연결된 프로젝트 경로가 Git 저장소 루트가 아닙니다.".to_string());
     }
     Ok(root)
+}
+
+/// Workspace root for a project on whichever host owns it.
+fn connected_project_workspace_on_host(
+    config_path: &Path,
+    project_id: &str,
+    home: &Path,
+) -> Result<(Arc<dyn host::CommandRunner>, PathBuf), String> {
+    let config = read_cli_config(config_path)?;
+    let runner = project_runner(&config, project_id, home)?;
+    if !runner.is_remote() {
+        return Ok((
+            runner,
+            connected_project_workspace(config_path, project_id)?,
+        ));
+    }
+    let repository_path = project_repository_path(&config, project_id)?;
+    let workspace = resolve_workspace_with(runner.as_ref(), &repository_path)?;
+    Ok((runner, workspace))
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ExecutionHostSummary {
+    id: String,
+    label: String,
+    kind: host::ExecutionHostKind,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    alias: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    hostname: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    username: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    port: Option<u16>,
+}
+
+fn execution_host_summaries(config: &CliConfig) -> Vec<ExecutionHostSummary> {
+    let mut hosts = vec![ExecutionHostSummary {
+        id: host::LOCAL_EXECUTION_HOST_ID.to_string(),
+        label: "이 컴퓨터".to_string(),
+        kind: host::ExecutionHostKind::Local,
+        alias: None,
+        hostname: None,
+        username: None,
+        port: None,
+    }];
+    hosts.extend(config.ssh_hosts.iter().map(|ssh| ExecutionHostSummary {
+        id: host::ssh_execution_host_id(&ssh.id),
+        label: ssh.label.clone(),
+        kind: host::ExecutionHostKind::Ssh,
+        alias: Some(ssh.alias.clone()),
+        hostname: ssh.hostname.clone(),
+        username: ssh.username.clone(),
+        port: ssh.port,
+    }));
+    hosts
+}
+
+/// Ask OpenSSH what an alias actually resolves to, instead of parsing
+/// `~/.ssh/config` ourselves: ProxyJump, Match blocks, and Include all apply.
+fn resolve_ssh_alias(alias: &str) -> Result<host::SshResolvedTarget, String> {
+    let trimmed = alias.trim();
+    if trimmed.is_empty() {
+        return Err("SSH 호스트 별칭을 입력하세요.".to_string());
+    }
+    if trimmed.starts_with('-') {
+        return Err("SSH 호스트 별칭이 올바르지 않습니다.".to_string());
+    }
+    let output = Command::new(host::ssh_command())
+        .args(["-G", trimmed])
+        .output()
+        .map_err(|error| format!("ssh 명령을 실행하지 못했습니다: {error}"))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(if stderr.is_empty() {
+            "SSH 설정에서 호스트를 확인하지 못했습니다.".to_string()
+        } else {
+            stderr
+        });
+    }
+    Ok(host::parse_ssh_resolve_output(
+        trimmed,
+        &String::from_utf8_lossy(&output.stdout),
+    ))
+}
+
+fn add_ssh_host_to(
+    config_path: &Path,
+    label: String,
+    resolved: host::SshResolvedTarget,
+) -> Result<host::SshHost, String> {
+    let label = label.trim().to_string();
+    if label.is_empty() || label.chars().count() > 100 {
+        return Err("SSH 호스트 이름은 1자 이상 100자 이하여야 합니다.".to_string());
+    }
+    let mut config = read_cli_config(config_path)?;
+    let entry = host::SshHost {
+        id: format!(
+            "ssh-{}-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|elapsed| elapsed.as_millis())
+                .unwrap_or_default(),
+            config.ssh_hosts.len()
+        ),
+        label,
+        alias: resolved.alias,
+        hostname: Some(resolved.hostname),
+        username: resolved.username,
+        port: resolved.port,
+        last_required_passphrase: None,
+    };
+    // Re-adding the same alias replaces the stale record rather than stacking
+    // duplicates that all point at one machine.
+    config
+        .ssh_hosts
+        .retain(|existing| existing.alias != entry.alias);
+    config.ssh_hosts.push(entry.clone());
+    write_cli_config(config_path, &config)?;
+    Ok(entry)
+}
+
+/// Removing a host unbinds the projects pinned to it so they fall back to the
+/// local machine instead of stranding on an id that no longer resolves.
+fn remove_ssh_host_from(config_path: &Path, host_id: &str) -> Result<Vec<String>, String> {
+    let mut config = read_cli_config(config_path)?;
+    let before = config.ssh_hosts.len();
+    config.ssh_hosts.retain(|existing| existing.id != host_id);
+    if config.ssh_hosts.len() == before {
+        return Err("삭제할 SSH 호스트를 찾지 못했습니다.".to_string());
+    }
+    let stored = host::ssh_execution_host_id(host_id);
+    let mut unbound = Vec::new();
+    for project in &mut config.projects {
+        if project.execution_host_id.as_deref() == Some(stored.as_str()) {
+            project.execution_host_id = None;
+            unbound.push(project.id.clone());
+        }
+    }
+    write_cli_config(config_path, &config)?;
+    Ok(unbound)
+}
+
+#[tauri::command]
+async fn list_execution_hosts(app: tauri::AppHandle) -> Result<Vec<ExecutionHostSummary>, String> {
+    let config_path = cli_config_path(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        Ok(execution_host_summaries(&read_cli_config(&config_path)?))
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn resolve_ssh_host(alias: String) -> Result<host::SshResolvedTarget, String> {
+    tauri::async_runtime::spawn_blocking(move || resolve_ssh_alias(&alias))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn add_ssh_host(
+    app: tauri::AppHandle,
+    alias: String,
+    label: Option<String>,
+) -> Result<ExecutionHostSummary, String> {
+    let config_path = cli_config_path(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let resolved = resolve_ssh_alias(&alias)?;
+        let label = label
+            .map(|label| label.trim().to_string())
+            .filter(|label| !label.is_empty())
+            .unwrap_or_else(|| resolved.alias.clone());
+        let saved = add_ssh_host_to(&config_path, label, resolved)?;
+        Ok(ExecutionHostSummary {
+            id: host::ssh_execution_host_id(&saved.id),
+            label: saved.label,
+            kind: host::ExecutionHostKind::Ssh,
+            alias: Some(saved.alias),
+            hostname: saved.hostname,
+            username: saved.username,
+            port: saved.port,
+        })
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn remove_ssh_host(app: tauri::AppHandle, host_id: String) -> Result<Vec<String>, String> {
+    let config_path = cli_config_path(&app)?;
+    let host_id = host::ExecutionHostId::parse(Some(&host_id))
+        .ssh_host_id()
+        .map(str::to_string)
+        .unwrap_or(host_id);
+    tauri::async_runtime::spawn_blocking(move || remove_ssh_host_from(&config_path, &host_id))
+        .await
+        .map_err(|error| error.to_string())?
 }
 
 fn project_llm_settings_from(
@@ -2029,7 +2400,18 @@ async fn start_project_auto_hunt(
     let event_sink = create_auto_hunt_event_sink(&app, &request.session_id)?;
     let approval_app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let workspace = connected_project_workspace(&config_path, &project_id)?;
+        let (runner, workspace) =
+            connected_project_workspace_on_host(&config_path, &project_id, &home)?;
+        if runner.is_remote() {
+            // The agent layer still builds its sandbox home from local config
+            // directories, so refuse rather than run against a path that does
+            // not exist on this machine. Remote launch lands with the sandbox
+            // port in docs/plans/remote-execution-hosts.md §1.7.
+            return Err(format!(
+                "{} 호스트에서는 아직 자동사냥을 실행할 수 없습니다. 원격 실행 준비가 끝나면 사용할 수 있습니다.",
+                runner.label()
+            ));
+        }
         let settings = project_llm_settings_from(&config_path, &project_id)?;
         if !app_provider_settings_from(&config_path)?.is_enabled(settings.provider) {
             return Err(
@@ -2283,6 +2665,7 @@ async fn connect_local_project(
     project_id: String,
     agent_token: String,
     repository_path: String,
+    execution_host_id: Option<String>,
     mut auto_hunt: AutoHuntConfig,
 ) -> Result<ConnectedLocalProject, String> {
     let config_path = cli_config_path(&app)?;
@@ -2292,9 +2675,22 @@ async fn connect_local_project(
         .map_err(|error| error.to_string())?;
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
-        let root = git_repository_root(Path::new(&repository_path))?;
-        let remote = repository_remote(&root);
-        infer_repository_checks(&root, &mut auto_hunt.workflow);
+        let execution_host = host::ExecutionHostId::parse(execution_host_id.as_deref());
+        let config = read_cli_config(&config_path)?;
+        let runner = host::runner_for(
+            &execution_host,
+            &config.ssh_hosts,
+            cli_execution_path(&home)?,
+            &home,
+            host::SshAuth::default(),
+        )?;
+        let root = if runner.is_remote() {
+            resolve_workspace_with(runner.as_ref(), Path::new(&repository_path))?
+        } else {
+            git_repository_root(Path::new(&repository_path))?
+        };
+        let remote = repository_remote_on(runner.as_ref(), &root);
+        infer_repository_checks_on(runner.as_ref(), &root, &mut auto_hunt.workflow);
         let workflow = auto_hunt.workflow.clone();
         let root_string = root
             .into_os_string()
@@ -2325,11 +2721,14 @@ async fn connect_local_project(
         };
         write_cli_connection(
             &config_path,
-            api_url,
-            project_id,
-            agent_token,
-            root_string.clone(),
-            remote,
+            CliConnectionInput {
+                api_url,
+                project_id,
+                agent_token,
+                repository_path: root_string.clone(),
+                repository_remote: remote,
+                execution_host: Some(execution_host),
+            },
             LocalProjectAgentConfig {
                 llm: agent::ProjectLlmSettings {
                     provider,
@@ -2556,6 +2955,10 @@ pub fn run() {
             login_project_github,
             disconnect_local_project,
             connect_local_project,
+            list_execution_hosts,
+            resolve_ssh_host,
+            add_ssh_host,
+            remove_ssh_host,
             inspect_velen,
             auto_hunt_health,
             repair_auto_hunt
@@ -2763,11 +3166,14 @@ mod tests {
 
         write_cli_connection(
             &config_path,
-            "https://briar.example.com".to_string(),
-            "new-project".to_string(),
-            "briar_agent_new".to_string(),
-            "/new/repository".to_string(),
-            Some("git@github.com:example/repository.git".to_string()),
+            CliConnectionInput {
+                api_url: "https://briar.example.com".to_string(),
+                project_id: "new-project".to_string(),
+                agent_token: "briar_agent_new".to_string(),
+                repository_path: "/new/repository".to_string(),
+                repository_remote: Some("git@github.com:example/repository.git".to_string()),
+                execution_host: None,
+            },
             LocalProjectAgentConfig {
                 llm: agent::ProjectLlmSettings::default(),
                 auto_hunt: AutoHuntConfig {
@@ -2836,7 +3242,11 @@ mod tests {
         .expect("package manifest should be written");
         let mut workflow = default_workflow();
 
-        infer_repository_checks(&directory, &mut workflow);
+        let runner = host::LocalRunner::new(
+            std::env::var_os("PATH").unwrap_or_default(),
+            std::env::temp_dir(),
+        );
+        infer_repository_checks_on(&runner, &directory, &mut workflow);
 
         let validation = workflow
             .stages
@@ -3212,11 +3622,14 @@ mod tests {
         install_auto_hunt_assets(&resources, &home).expect("assets should install");
         write_cli_connection(
             &config_path,
-            "https://briar.example.com".to_string(),
-            "11111111-1111-4111-8111-111111111111".to_string(),
-            "briar_agent_test".to_string(),
-            repository,
-            Some("https://github.com/wordbricks/briar.git".to_string()),
+            CliConnectionInput {
+                api_url: "https://briar.example.com".to_string(),
+                project_id: "11111111-1111-4111-8111-111111111111".to_string(),
+                agent_token: "briar_agent_test".to_string(),
+                repository_path: repository,
+                repository_remote: Some("https://github.com/wordbricks/briar.git".to_string()),
+                execution_host: None,
+            },
             LocalProjectAgentConfig {
                 llm: agent::ProjectLlmSettings::default(),
                 auto_hunt: AutoHuntConfig {
@@ -3280,5 +3693,204 @@ mod tests {
         assert!(repaired.healthy);
         assert!(repaired.cli_current);
         fs::remove_dir_all(home).expect("test home should be removed");
+    }
+
+    fn host_test_config_path(name: &str) -> PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be after the epoch")
+            .as_nanos();
+        let directory = std::env::temp_dir().join(format!("briar-host-test-{name}-{unique}"));
+        fs::create_dir_all(&directory).expect("test directory should be created");
+        directory.join("config.json")
+    }
+
+    #[test]
+    fn a_config_without_host_fields_stays_local() {
+        let config_path = host_test_config_path("legacy");
+        fs::write(
+            &config_path,
+            r#"{
+  "apiUrl": "https://briar.example.com",
+  "projects": [
+    { "id": "project-1", "repositoryPath": "/repo", "agentToken": "briar_agent_x" }
+  ]
+}"#,
+        )
+        .expect("legacy config should be written");
+
+        let config = read_cli_config(&config_path).expect("legacy config should load");
+        assert!(config.ssh_hosts.is_empty());
+        assert_eq!(
+            project_execution_host(&config, "project-1").expect("host should resolve"),
+            host::ExecutionHostId::Local
+        );
+        assert_eq!(
+            execution_host_summaries(&config)
+                .iter()
+                .map(|host| host.id.clone())
+                .collect::<Vec<_>>(),
+            vec!["local".to_string()]
+        );
+    }
+
+    #[test]
+    fn saving_a_host_keeps_the_project_binding_readable() {
+        let config_path = host_test_config_path("bind");
+        write_cli_connection(
+            &config_path,
+            CliConnectionInput {
+                api_url: "https://briar.example.com".to_string(),
+                project_id: "project-1".to_string(),
+                agent_token: "briar_agent_x".to_string(),
+                repository_path: "/repo".to_string(),
+                repository_remote: None,
+                execution_host: None,
+            },
+            LocalProjectAgentConfig {
+                llm: agent::ProjectLlmSettings::default(),
+                auto_hunt: AutoHuntConfig {
+                    velen_org: "example".to_string(),
+                    data_source: None,
+                    linear_enabled: false,
+                    linear_source: None,
+                    linear_team: None,
+                    github_repository: None,
+                    workflow: default_workflow(),
+                },
+            },
+        )
+        .expect("connection should be written");
+
+        let saved = add_ssh_host_to(
+            &config_path,
+            "build box".to_string(),
+            host::SshResolvedTarget {
+                alias: "build-box".to_string(),
+                hostname: "10.0.0.5".to_string(),
+                username: Some("dev".to_string()),
+                port: Some(2222),
+            },
+        )
+        .expect("host should be saved");
+
+        let mut config = read_cli_config(&config_path).expect("config should load");
+        assert_eq!(config.ssh_hosts.len(), 1);
+        assert_eq!(config.ssh_hosts[0].label, "build box");
+        assert_eq!(config.ssh_hosts[0].port, Some(2222));
+
+        // A local project stays local until it is explicitly rebound.
+        assert!(project_execution_host(&config, "project-1")
+            .expect("host should resolve")
+            .is_local());
+
+        config.projects[0].execution_host_id = Some(host::ssh_execution_host_id(&saved.id));
+        write_cli_config(&config_path, &config).expect("config should be written");
+        let rebound = read_cli_config(&config_path).expect("config should reload");
+        assert_eq!(
+            project_execution_host(&rebound, "project-1")
+                .expect("host should resolve")
+                .ssh_host_id(),
+            Some(saved.id.as_str())
+        );
+        assert_eq!(
+            project_repository_path(&rebound, "project-1").expect("path should resolve"),
+            PathBuf::from("/repo")
+        );
+    }
+
+    #[test]
+    fn re_adding_the_same_alias_replaces_the_stale_record() {
+        let config_path = host_test_config_path("realias");
+        let target = |hostname: &str| host::SshResolvedTarget {
+            alias: "build-box".to_string(),
+            hostname: hostname.to_string(),
+            username: None,
+            port: None,
+        };
+        add_ssh_host_to(&config_path, "first".to_string(), target("10.0.0.5"))
+            .expect("first host should be saved");
+        add_ssh_host_to(&config_path, "second".to_string(), target("10.0.0.9"))
+            .expect("second host should be saved");
+
+        let config = read_cli_config(&config_path).expect("config should load");
+        assert_eq!(config.ssh_hosts.len(), 1);
+        assert_eq!(config.ssh_hosts[0].label, "second");
+        assert_eq!(config.ssh_hosts[0].hostname.as_deref(), Some("10.0.0.9"));
+    }
+
+    #[test]
+    fn removing_a_host_unbinds_the_projects_pinned_to_it() {
+        let config_path = host_test_config_path("unbind");
+        let saved = add_ssh_host_to(
+            &config_path,
+            "build box".to_string(),
+            host::SshResolvedTarget {
+                alias: "build-box".to_string(),
+                hostname: "10.0.0.5".to_string(),
+                username: None,
+                port: None,
+            },
+        )
+        .expect("host should be saved");
+        let mut config = read_cli_config(&config_path).expect("config should load");
+        config.projects.push(CliProject {
+            id: "project-1".to_string(),
+            repository_path: "/repo".to_string(),
+            execution_host_id: Some(host::ssh_execution_host_id(&saved.id)),
+            repository_remote: None,
+            agent_token: "briar_agent_x".to_string(),
+            llm: None,
+            auto_hunt: None,
+            extra: BTreeMap::new(),
+        });
+        write_cli_config(&config_path, &config).expect("config should be written");
+
+        let unbound =
+            remove_ssh_host_from(&config_path, &saved.id).expect("host should be removed");
+        assert_eq!(unbound, vec!["project-1".to_string()]);
+
+        let after = read_cli_config(&config_path).expect("config should reload");
+        assert!(after.ssh_hosts.is_empty());
+        assert!(project_execution_host(&after, "project-1")
+            .expect("host should resolve")
+            .is_local());
+        assert!(remove_ssh_host_from(&config_path, &saved.id).is_err());
+    }
+
+    #[test]
+    fn rejects_unusable_host_labels_and_aliases() {
+        let config_path = host_test_config_path("labels");
+        let target = host::SshResolvedTarget {
+            alias: "build-box".to_string(),
+            hostname: "10.0.0.5".to_string(),
+            username: None,
+            port: None,
+        };
+        assert!(add_ssh_host_to(&config_path, "   ".to_string(), target.clone()).is_err());
+        assert!(add_ssh_host_to(&config_path, "x".repeat(101), target).is_err());
+        assert!(resolve_ssh_alias("  ").is_err());
+        // A leading dash would otherwise be read by ssh as an option.
+        assert!(resolve_ssh_alias("-oProxyCommand=touch /tmp/briar-pwned").is_err());
+    }
+
+    #[test]
+    fn resolves_a_workspace_root_through_a_runner() {
+        let runner = host::LocalRunner::new(
+            std::env::var_os("PATH").unwrap_or_default(),
+            std::env::temp_dir(),
+        );
+        let repository = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("workspace root should exist");
+        let resolved =
+            resolve_workspace_with(&runner, repository).expect("git root should resolve");
+        assert_eq!(
+            resolved,
+            fs::canonicalize(repository).expect("repository should canonicalize")
+        );
+
+        let not_a_repository = std::env::temp_dir();
+        assert!(resolve_workspace_with(&runner, &not_a_repository).is_err());
     }
 }

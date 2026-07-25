@@ -267,10 +267,6 @@ impl SshRunner {
         }
     }
 
-    pub(crate) fn host(&self) -> &SshHost {
-        &self.host
-    }
-
     fn ssh_command_for(&self, script: &str) -> Result<Command, String> {
         let args = ssh_script_args(&self.host, &self.auth, script)?;
         let mut command = Command::new(ssh_command());
@@ -508,11 +504,8 @@ mod tests {
 
     #[test]
     fn askpass_environment_forces_the_helper_and_carries_the_secret() {
-        let directory = std::env::temp_dir().join(format!(
-            "briar-askpass-{}-{}",
-            std::process::id(),
-            "helper"
-        ));
+        let directory =
+            std::env::temp_dir().join(format!("briar-askpass-{}-{}", std::process::id(), "helper"));
         let auth = SshAuth {
             interactive: true,
             secret: Some("hunter2".to_string()),
