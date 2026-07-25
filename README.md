@@ -296,11 +296,10 @@ bun run release:macos:production -- --publish
 ```
 
 Production credentials are loaded from the checked-in, encrypted `.env.release`
-file through dotenvx. The private `.env.keys` file remains ignored; keep
-`DOTENV_PRIVATE_KEY_RELEASE` in the release operator's password manager and
-inject it on each trusted release host. Run `bun run secrets:verify-encrypted`
-before committing secret-file changes. Public signing and publishing
-identifiers live in `config/release.env`.
+file through dotenvx. The private `.env.keys` file remains ignored and must be
+present on the release host; without it the Production release command exits.
+Run `bun run secrets:verify-encrypted` before committing secret-file changes.
+Public signing and publishing identifiers live in `config/release.env`.
 
 The Production command only mutates GitHub and R2 when `--publish` is explicit.
 See [the local Production release runbook](docs/operations/production-release.md)

@@ -20,8 +20,9 @@ release from the exact signed vX.Y.Z tag at HEAD. By default it stops after
 creating local artifacts. Pass --publish to create and publish the GitHub
 Release, upload immutable versioned objects to R2, and promote latest.json.
 
-Credentials are decrypted from .env.release with dotenvx. See
-docs/operations/production-release.md for setup and required variables.
+Credentials are decrypted from .env.release with dotenvx using the ignored
+.env.keys file. See docs/operations/production-release.md for setup and
+required variables.
 EOF
 }
 
@@ -82,6 +83,9 @@ done
 if [[ "${BRIAR_RELEASE_SECRETS_LOADED:-}" != "true" ]]; then
   [[ -f "$release_secrets" ]] ||
     fail "Missing checked-in encrypted release environment at $release_secrets."
+  release_keys="$workspace_root/.env.keys"
+  [[ -f "$release_keys" ]] ||
+    fail "Missing .env.keys; cannot decrypt release secrets and will not continue."
   dotenvx_bin="$workspace_root/node_modules/.bin/dotenvx"
   [[ -x "$dotenvx_bin" ]] ||
     fail "Missing dotenvx. Run 'bun install --frozen-lockfile' first."
