@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AutoHuntSessions } from "./components/AutoHuntSessions";
 import { AgentUsageStatusBar } from "./components/AgentUsageStatusBar";
+import { AppVersionStatus } from "./components/AppVersionStatus";
 import {
   AppSettings,
   type SettingsSection,
@@ -553,6 +554,7 @@ export function App() {
               navigateToPage("settings");
             }}
           />
+          <AppVersionStatus />
           <ConnectionHealth
             error={briar.healthError}
             health={briar.health}

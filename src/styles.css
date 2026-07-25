@@ -40,6 +40,8 @@ button { color: inherit; }
 .agent-usage-status-provider { min-width:0; display:flex; align-items:center; gap:6px; }
 .agent-usage-status-provider + .agent-usage-status-provider { padding-left:12px; border-left:1px solid #dedfd9; }
 .agent-usage-status-provider > small { overflow:hidden; color:#777972; font-size:9px; text-overflow:ellipsis; }
+.app-version-status { flex:0 0 auto; height:100%; padding:0 10px; display:flex; align-items:center; border-left:1px solid #dedfd9; }
+.app-version-status > small { color:#777972; font:500 9px "DM Mono",ui-monospace,monospace; letter-spacing:.01em; white-space:nowrap; }
 .app-status-bar > .health-menu { flex:0 0 auto; margin-left:0; display:flex; align-items:center; padding:0 8px 0 6px; border-left:1px solid #dedfd9; }
 .agent-usage-provider-icon { width:18px; height:18px; flex:0 0 18px; display:grid; place-items:center; border:1px solid #dedfd9; border-radius:6px; background:#fff; }
 .agent-usage-provider-icon.claude { color:#ca6d43; }
