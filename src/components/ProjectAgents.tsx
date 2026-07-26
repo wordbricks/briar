@@ -2,6 +2,7 @@ import {
   Bot,
   CircleAlert,
   LoaderCircle,
+  Pencil,
   Plus,
   Sparkles,
   X,
@@ -11,6 +12,7 @@ import { useI18n } from "../i18n";
 import {
   createProjectAgent,
   loadProjectAgents,
+  updateProjectAgent,
 } from "../lib/api";
 import {
   agentModels,
@@ -21,6 +23,7 @@ import type {
   CreateProjectAgentInput,
   Project,
   ProjectAgent,
+  UpdateProjectAgentInput,
 } from "../types";
 import { NativeSelect } from "./NativeSelect";
 
@@ -42,8 +45,9 @@ export function ProjectAgents({
   const { locale, localeTag, t } = useI18n();
   const [agents, setAgents] = useState<ProjectAgent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isCreating, setIsCreating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingAgent, setEditingAgent] = useState<ProjectAgent | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -71,7 +75,7 @@ export function ProjectAgents({
   }, [locale, project.id, token]);
 
   const addAgent = async (input: CreateProjectAgentInput) => {
-    setIsCreating(true);
+    setIsSubmitting(true);
     setError(null);
     try {
       const createdAt = new Date().toISOString();
@@ -90,8 +94,46 @@ export function ProjectAgents({
       setAgents((current) => [...current, agent]);
       setIsDialogOpen(false);
     } finally {
-      setIsCreating(false);
+      setIsSubmitting(false);
     }
+  };
+
+  const editAgent = async (input: UpdateProjectAgentInput) => {
+    if (!editingAgent) return;
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const updatedAt = new Date().toISOString();
+      const agent = token
+        ? await updateProjectAgent(token, project.id, editingAgent.id, input)
+        : {
+            ...editingAgent,
+            name: input.name ?? `${providerLabels[input.provider]} Agent`,
+            provider: input.provider,
+            model: input.model,
+            responsibility: input.responsibility,
+            updatedAt,
+          };
+      setAgents((current) =>
+        current.map((candidate) =>
+          candidate.id === agent.id ? agent : candidate,
+        ),
+      );
+      setIsDialogOpen(false);
+      setEditingAgent(null);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const openCreateDialog = () => {
+    setEditingAgent(null);
+    setIsDialogOpen(true);
+  };
+
+  const closeDialog = () => {
+    setIsDialogOpen(false);
+    setEditingAgent(null);
   };
 
   return (
@@ -116,7 +158,7 @@ export function ProjectAgents({
             </div>
             <button
               className="project-agent-create"
-              onClick={() => setIsDialogOpen(true)}
+              onClick={openCreateDialog}
               type="button"
             >
               <Plus size={15} />
@@ -151,7 +193,7 @@ export function ProjectAgents({
                 </span>
                 <strong>{t("agents.emptyTitle")}</strong>
                 <p>{t("agents.emptyDescription")}</p>
-                <button onClick={() => setIsDialogOpen(true)} type="button">
+                <button onClick={openCreateDialog} type="button">
                   <Plus size={14} />
                   {t("agents.create")}
                 </button>
@@ -191,6 +233,19 @@ export function ProjectAgents({
                           }).format(new Date(agent.createdAt)),
                         })}
                       </time>
+                      <button
+                        aria-label={t("agents.editAgent", {
+                          name: agent.name,
+                        })}
+                        onClick={() => {
+                          setEditingAgent(agent);
+                          setIsDialogOpen(true);
+                        }}
+                        type="button"
+                      >
+                        <Pencil size={12} />
+                        {t("agents.edit")}
+                      </button>
                     </footer>
                   </article>
                 ))}
@@ -201,10 +256,12 @@ export function ProjectAgents({
       </div>
 
       {isDialogOpen && (
-        <CreateProjectAgentDialog
-          isSubmitting={isCreating}
-          onClose={() => setIsDialogOpen(false)}
-          onCreate={addAgent}
+        <ProjectAgentDialog
+          agent={editingAgent}
+          isSubmitting={isSubmitting}
+          key={editingAgent?.id ?? "create"}
+          onClose={closeDialog}
+          onSubmit={editingAgent ? editAgent : addAgent}
         />
       )}
     </main>
@@ -219,21 +276,28 @@ function modelLabel(agent: ProjectAgent, providerDefault: string) {
   );
 }
 
-export function CreateProjectAgentDialog({
+export function ProjectAgentDialog({
+  agent,
   isSubmitting,
   onClose,
-  onCreate,
+  onSubmit,
 }: {
+  agent: ProjectAgent | null;
   isSubmitting: boolean;
   onClose: () => void;
-  onCreate: (input: CreateProjectAgentInput) => Promise<void>;
+  onSubmit: (input: CreateProjectAgentInput) => Promise<void>;
 }) {
   const { t } = useI18n();
-  const [name, setName] = useState("");
-  const [provider, setProvider] = useState<AgentProvider>("codex");
-  const [model, setModel] = useState("");
-  const [responsibility, setResponsibility] = useState("");
+  const [name, setName] = useState(agent?.name ?? "");
+  const [provider, setProvider] = useState<AgentProvider>(
+    agent?.provider ?? "codex",
+  );
+  const [model, setModel] = useState(agent?.model ?? "");
+  const [responsibility, setResponsibility] = useState(
+    agent?.responsibility ?? "",
+  );
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const isEditing = agent !== null;
 
   return (
     <div
@@ -243,14 +307,16 @@ export function CreateProjectAgentDialog({
       }}
     >
       <form
-        aria-label={t("agents.createDialog")}
+        aria-label={t(
+          isEditing ? "agents.editDialog" : "agents.createDialog",
+        )}
         aria-modal="true"
         className="project-agent-dialog"
         onSubmit={(event) => {
           event.preventDefault();
           if (!responsibility.trim() || isSubmitting) return;
           setSubmitError(null);
-          void onCreate({
+          void onSubmit({
             name: name.trim() || null,
             provider,
             model: model || null,
@@ -265,8 +331,12 @@ export function CreateProjectAgentDialog({
       >
         <header>
           <div>
-            <p className="eyebrow">{t("agents.newEyebrow")}</p>
-            <h2>{t("agents.create")}</h2>
+            <p className="eyebrow">
+              {t(isEditing ? "agents.editEyebrow" : "agents.newEyebrow")}
+            </p>
+            <h2>
+              {t(isEditing ? "agents.editDialog" : "agents.create")}
+            </h2>
           </div>
           <button
             aria-label={t("common.close")}
@@ -362,13 +432,36 @@ export function CreateProjectAgentDialog({
           >
             {isSubmitting ? (
               <LoaderCircle className="spin" size={14} />
+            ) : isEditing ? (
+              <Pencil size={14} />
             ) : (
               <Plus size={14} />
             )}
-            {isSubmitting ? t("agents.creating") : t("agents.create")}
+            {isSubmitting
+              ? t(isEditing ? "agents.updating" : "agents.creating")
+              : t(isEditing ? "common.save" : "agents.create")}
           </button>
         </footer>
       </form>
     </div>
+  );
+}
+
+export function CreateProjectAgentDialog({
+  isSubmitting,
+  onClose,
+  onCreate,
+}: {
+  isSubmitting: boolean;
+  onClose: () => void;
+  onCreate: (input: CreateProjectAgentInput) => Promise<void>;
+}) {
+  return (
+    <ProjectAgentDialog
+      agent={null}
+      isSubmitting={isSubmitting}
+      onClose={onClose}
+      onSubmit={onCreate}
+    />
   );
 }

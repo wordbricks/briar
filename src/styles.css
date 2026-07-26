@@ -1420,7 +1420,10 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .project-agent-card > section { padding:16px 17px 18px; flex:1; }
 .project-agent-card > section small { color:#969890; font-size:7.5px; font-weight:700; letter-spacing:.055em; text-transform:uppercase; }
 .project-agent-card > section p { margin:8px 0 0; color:#555750; font-size:9px; line-height:1.68; overflow-wrap:anywhere; }
-.project-agent-card > footer { min-height:37px; padding:0 17px; display:flex; align-items:center; border-top:1px solid #eeeee9; color:#a0a29b; background:#fafaf7; font:500 7.5px "DM Mono",monospace; }
+.project-agent-card > footer { min-height:37px; padding:0 10px 0 17px; display:flex; align-items:center; justify-content:space-between; gap:10px; border-top:1px solid #eeeee9; color:#a0a29b; background:#fafaf7; font:500 7.5px "DM Mono",monospace; }
+.project-agent-card > footer button { height:27px; padding:0 8px; display:flex; align-items:center; gap:5px; border:1px solid transparent; border-radius:8px; color:#6851b4; background:transparent; cursor:pointer; font-family:inherit; font-size:8px; font-weight:650; }
+.project-agent-card > footer button:hover { border-color:#ddd5f1; background:#f2edff; }
+.project-agent-card > footer button:focus-visible { outline:2px solid #8b70dd; outline-offset:1px; }
 .project-agents-state { min-height:330px; padding:40px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; border:1px dashed #d9dad4; border-radius:16px; color:#8d8f87; background:#fff; }
 .project-agents-state > span { width:50px; height:50px; margin-bottom:15px; display:grid; place-items:center; border-radius:15px; color:#6851b4; background:#eeeafd; }
 .project-agents-state strong { margin-top:8px; color:#4a4b46; font-size:11px; }

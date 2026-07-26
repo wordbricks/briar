@@ -170,6 +170,8 @@ export type CreateProjectAgentScheduleInput = {
   timeZone: string;
 };
 
+export type UpdateProjectAgentInput = CreateProjectAgentInput;
+
 export type Organization = {
   id: string;
   name: string;

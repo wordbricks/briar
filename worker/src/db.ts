@@ -281,22 +281,26 @@ export async function createOrganization(
     created_at: createdAt,
   };
   await db.batch([
-    db.prepare(
-      `insert into briar_organizations
+    db
+      .prepare(
+        `insert into briar_organizations
          (id, name, handle, created_at, updated_at)
        values (?, ?, ?, ?, ?)`,
-    ).bind(
-      organization.id,
-      organization.name,
-      organization.handle,
-      createdAt,
-      createdAt,
-    ),
-    db.prepare(
-      `insert into briar_organization_members
+      )
+      .bind(
+        organization.id,
+        organization.name,
+        organization.handle,
+        createdAt,
+        createdAt,
+      ),
+    db
+      .prepare(
+        `insert into briar_organization_members
          (organization_id, user_id, role, created_at, updated_at)
        values (?, ?, 'owner', ?, ?)`,
-    ).bind(organization.id, input.ownerUserId, createdAt, createdAt),
+      )
+      .bind(organization.id, input.ownerUserId, createdAt, createdAt),
   ]);
   return organization;
 }
@@ -325,9 +329,7 @@ export async function updateOrganization(
     )
     .bind(organizationId)
     .first<Omit<OrganizationRow, "role">>()
-    .then((organization) =>
-      organization ? { ...organization, role } : null,
-    );
+    .then((organization) => (organization ? { ...organization, role } : null));
 }
 
 export async function isOrganizationHandleAvailable(
@@ -346,10 +348,13 @@ export async function getOrganizationRole(
   organizationId: string,
   userId: string,
 ) {
-  const row = await db.prepare(
-    `select role from briar_organization_members
+  const row = await db
+    .prepare(
+      `select role from briar_organization_members
      where organization_id = ? and user_id = ?`,
-  ).bind(organizationId, userId).first<{ role: OrganizationRole }>();
+    )
+    .bind(organizationId, userId)
+    .first<{ role: OrganizationRole }>();
   return row?.role ?? null;
 }
 
@@ -357,15 +362,18 @@ export async function listOrganizationMembers(
   db: D1Database,
   organizationId: string,
 ) {
-  const result = await db.prepare(
-    `select member.user_id, user.name, user.email, user.image,
+  const result = await db
+    .prepare(
+      `select member.user_id, user.name, user.email, user.image,
             member.role, member.created_at
      from briar_organization_members member
      join "user" on user.id = member.user_id
      where member.organization_id = ?
      order by case member.role when 'owner' then 0 when 'admin' then 1 else 2 end,
               lower(user.name), lower(user.email)`,
-  ).bind(organizationId).all<OrganizationMemberRow>();
+    )
+    .bind(organizationId)
+    .all<OrganizationMemberRow>();
   return result.results;
 }
 
@@ -375,19 +383,23 @@ export async function addOrganizationMember(
   email: string,
   role: Exclude<OrganizationRole, "owner">,
 ) {
-  const user = await db.prepare(
-    `select id from "user" where lower(email) = lower(?)`,
-  ).bind(email).first<{ id: string }>();
+  const user = await db
+    .prepare(`select id from "user" where lower(email) = lower(?)`)
+    .bind(email)
+    .first<{ id: string }>();
   if (!user) return null;
   const now = new Date().toISOString();
-  await db.prepare(
-    `insert into briar_organization_members
+  await db
+    .prepare(
+      `insert into briar_organization_members
        (organization_id, user_id, role, created_at, updated_at)
      values (?, ?, ?, ?, ?)
      on conflict(organization_id, user_id) do update set
        role = excluded.role, updated_at = excluded.updated_at
      where briar_organization_members.role != 'owner'`,
-  ).bind(organizationId, user.id, role, now, now).run();
+    )
+    .bind(organizationId, user.id, role, now, now)
+    .run();
   return user.id;
 }
 
@@ -396,10 +408,13 @@ export async function removeOrganizationMember(
   organizationId: string,
   userId: string,
 ) {
-  const result = await db.prepare(
-    `delete from briar_organization_members
+  const result = await db
+    .prepare(
+      `delete from briar_organization_members
      where organization_id = ? and user_id = ? and role != 'owner'`,
-  ).bind(organizationId, userId).run();
+    )
+    .bind(organizationId, userId)
+    .run();
   return result.meta.changes > 0;
 }
 
@@ -536,10 +551,7 @@ export async function deleteProject(
   return result.meta.changes > 0;
 }
 
-export async function listProjectAgents(
-  db: D1Database,
-  projectId: string,
-) {
+export async function listProjectAgents(db: D1Database, projectId: string) {
   const result = await db
     .prepare(
       `select id, project_id, name, provider, model, responsibility,
@@ -676,6 +688,46 @@ export async function createProjectAgentSchedule(
     )
     .bind(id, projectId)
     .first<ProjectAgentScheduleRow>();
+}
+
+export async function updateProjectAgent(
+  db: D1Database,
+  projectId: string,
+  agentId: string,
+  input: {
+    name: string;
+    provider: ProjectAgentProvider;
+    model: string | null;
+    responsibility: string;
+  },
+) {
+  const updatedAt = new Date().toISOString();
+  const result = await db
+    .prepare(
+      `update briar_project_agents
+       set name = ?, provider = ?, model = ?, responsibility = ?, updated_at = ?
+       where id = ? and project_id = ?`,
+    )
+    .bind(
+      input.name,
+      input.provider,
+      input.model,
+      input.responsibility,
+      updatedAt,
+      agentId,
+      projectId,
+    )
+    .run();
+  if (result.meta.changes === 0) return null;
+  return db
+    .prepare(
+      `select id, project_id, name, provider, model, responsibility,
+              kind, created_at, updated_at
+       from briar_project_agents
+       where id = ? and project_id = ?`,
+    )
+    .bind(agentId, projectId)
+    .first<ProjectAgentRow>();
 }
 
 export async function getProjectSettings(db: D1Database, projectId: string) {
@@ -966,10 +1018,7 @@ export async function rollbackNewAppIssue(
   return result.meta.changes === 1;
 }
 
-export async function getNextQueuedHuntRun(
-  db: D1Database,
-  projectId: string,
-) {
+export async function getNextQueuedHuntRun(db: D1Database, projectId: string) {
   return await db
     .prepare(
       `select run.*,
@@ -1052,7 +1101,7 @@ export async function assertQueuedHuntClaim(
       lease_expires_at: string | null;
       context_json: string | null;
       claim_token_valid: number;
-  }>();
+    }>();
   if (!run) return;
   if (run.status !== "queued") {
     if (claimTokenHash && run.claim_token_valid !== 1) {
@@ -1060,7 +1109,9 @@ export async function assertQueuedHuntClaim(
     }
     return;
   }
-  const context: unknown = run.context_json ? JSON.parse(run.context_json) : null;
+  const context: unknown = run.context_json
+    ? JSON.parse(run.context_json)
+    : null;
   const appCreated =
     context !== null &&
     typeof context === "object" &&
@@ -1205,7 +1256,9 @@ const assertCompletionEligible = async (
   const completedStageIds = new Set(
     completedStages.results.map((event) => event.workflow_stage),
   );
-  const missingStages = requiredStages.filter((stage) => !completedStageIds.has(stage));
+  const missingStages = requiredStages.filter(
+    (stage) => !completedStageIds.has(stage),
+  );
   if (missingStages.length > 0) {
     throw new HuntTransitionError(
       `Auto Hunt completion requires workflow stages: ${missingStages.join(", ")}`,
@@ -1221,11 +1274,15 @@ const assertCompletionEligible = async (
     requiredStages.includes("production_qa") &&
     !["passed", "skipped"].includes(run.production_qa_status ?? "")
   ) {
-    throw new HuntTransitionError("Auto Hunt completion requires Production QA");
+    throw new HuntTransitionError(
+      "Auto Hunt completion requires Production QA",
+    );
   }
   const resultSummary = input.resultSummary ?? run.result_summary;
   if (!resultSummary?.trim()) {
-    throw new HuntTransitionError("Auto Hunt completion requires a result summary");
+    throw new HuntTransitionError(
+      "Auto Hunt completion requires a result summary",
+    );
   }
   const settings = await getProjectSettings(db, projectId);
   const trackerProvider = input.tracker?.provider ?? run.tracker_provider;
@@ -1311,9 +1368,13 @@ const legacyStageFor = (
   if (status === "backlog") return "queued";
   if (status !== "running") return status;
   return workflowStage &&
-    ["analyzing", "implementing", "pr_open", "staging_qa", "production_qa"].includes(
-      workflowStage,
-    )
+    [
+      "analyzing",
+      "implementing",
+      "pr_open",
+      "staging_qa",
+      "production_qa",
+    ].includes(workflowStage)
     ? (workflowStage as AutoHuntStage)
     : "implementing";
 };
@@ -1380,10 +1441,16 @@ export async function recordHuntEvent(
 
   const runId =
     existingRun?.id ??
-    (await digestRunId(projectId, normalizedInput.source, normalizedInput.sourceKey));
+    (await digestRunId(
+      projectId,
+      normalizedInput.source,
+      normalizedInput.sourceKey,
+    ));
   const eventId = crypto.randomUUID();
   const recordedAt = new Date().toISOString();
-  const completedAt = ["completed", "cancelled"].includes(normalizedInput.status)
+  const completedAt = ["completed", "cancelled"].includes(
+    normalizedInput.status,
+  )
     ? normalizedInput.occurredAt
     : null;
   const mergedPullRequestUrls = normalizedUrls([
@@ -1540,36 +1607,61 @@ export async function recordHuntEvent(
            )`,
       )
       .bind(
-        normalizedInput.occurredAt, normalizedInput.title,
-        normalizedInput.occurredAt, normalizedInput.status,
-        normalizedInput.stage,
-        normalizedInput.occurredAt, normalizedInput.status,
+        normalizedInput.occurredAt,
+        normalizedInput.title,
+        normalizedInput.occurredAt,
         normalizedInput.status,
-        normalizedInput.occurredAt, normalizedInput.workflowStage,
-        normalizedInput.occurredAt, normalizedInput.detail,
-        normalizedInput.occurredAt, normalizedInput.priority,
-        normalizedInput.occurredAt, normalizedInput.repository,
-        normalizedInput.occurredAt, normalizedInput.branch,
-        normalizedInput.occurredAt, normalizedInput.commitSha,
+        normalizedInput.stage,
+        normalizedInput.occurredAt,
+        normalizedInput.status,
+        normalizedInput.status,
+        normalizedInput.occurredAt,
+        normalizedInput.workflowStage,
+        normalizedInput.occurredAt,
+        normalizedInput.detail,
+        normalizedInput.occurredAt,
+        normalizedInput.priority,
+        normalizedInput.occurredAt,
+        normalizedInput.repository,
+        normalizedInput.occurredAt,
+        normalizedInput.branch,
+        normalizedInput.occurredAt,
+        normalizedInput.commitSha,
         normalizedInput.tracker?.provider ?? null,
         normalizedInput.tracker?.issueId ?? null,
         normalizedInput.tracker?.identifier ?? null,
         normalizedInput.tracker?.url ?? null,
-        normalizedInput.occurredAt, normalizedInput.tracker?.state ?? null,
-        normalizedInput.occurredAt, normalizedInput.issueDescription,
-        normalizedInput.occurredAt, normalizedInput.resultSummary,
+        normalizedInput.occurredAt,
+        normalizedInput.tracker?.state ?? null,
+        normalizedInput.occurredAt,
+        normalizedInput.issueDescription,
+        normalizedInput.occurredAt,
+        normalizedInput.resultSummary,
         stableJson(mergedPullRequestUrls),
-        normalizedInput.occurredAt, normalizedInput.targetSha,
+        normalizedInput.occurredAt,
+        normalizedInput.targetSha,
         normalizedInput.sourceCreatedAt,
-        normalizedInput.occurredAt, normalizedInput.stage, qaStatus,
-        normalizedInput.occurredAt, normalizedInput.stage, qaStatus,
-        normalizedInput.occurredAt, normalizedInput.stagingQaDetail,
-        normalizedInput.occurredAt, normalizedInput.productionQaDetail,
+        normalizedInput.occurredAt,
+        normalizedInput.stage,
+        qaStatus,
+        normalizedInput.occurredAt,
+        normalizedInput.stage,
+        qaStatus,
+        normalizedInput.occurredAt,
+        normalizedInput.stagingQaDetail,
+        normalizedInput.occurredAt,
+        normalizedInput.productionQaDetail,
         normalizedInput.occurredAt,
         normalizedInput.context ? stableJson(normalizedInput.context) : null,
-        normalizedInput.occurredAt, normalizedInput.status,
-        normalizedInput.occurredAt, normalizedInput.status,
-        normalizedInput.occurredAt, recordedAt, runId, eventAttempt, eventId,
+        normalizedInput.occurredAt,
+        normalizedInput.status,
+        normalizedInput.occurredAt,
+        normalizedInput.status,
+        normalizedInput.occurredAt,
+        recordedAt,
+        runId,
+        eventAttempt,
+        eventId,
       ),
   ]);
 
@@ -1637,7 +1729,7 @@ export async function recoverHuntRun(
     };
   }
 
-  if (!( ["blocked", "failed"] as AutoHuntRunStatus[]).includes(run.status)) {
+  if (!(["blocked", "failed"] as AutoHuntRunStatus[]).includes(run.status)) {
     return {
       outcome: "ineligible",
       attempt: run.current_attempt,
@@ -1772,10 +1864,7 @@ export async function recoverHuntRun(
 }
 
 export type HuntMoveOutcome =
-  | "moved"
-  | "unchanged"
-  | "already_moved"
-  | "not_found";
+  "moved" | "unchanged" | "already_moved" | "not_found";
 
 export async function moveHuntRun(
   db: D1Database,
@@ -1837,8 +1926,7 @@ export async function moveHuntRun(
   }
   if (
     run.status === input.status &&
-    (input.status !== "running" ||
-      run.workflow_stage === targetWorkflowStage)
+    (input.status !== "running" || run.workflow_stage === targetWorkflowStage)
   ) {
     return {
       outcome: "unchanged",
@@ -2035,8 +2123,7 @@ export async function importLinearHuntRuns(
       }
 
       let status = raw.status;
-      let workflowStage =
-        status === "running" ? raw.workflowStage : null;
+      let workflowStage = status === "running" ? raw.workflowStage : null;
       if (
         status === "running" &&
         (!workflowStage || !workflowStageIds.has(workflowStage))
@@ -2061,9 +2148,7 @@ export async function importLinearHuntRuns(
           ? "Linear에서 가져온 이슈가 Auto Hunt 처리를 기다리고 있습니다."
           : `Linear에서 가져왔으며 ${status} 상태로 설정되었습니다.`;
       const resultSummary =
-        status === "completed"
-          ? "Imported from Linear as completed."
-          : null;
+        status === "completed" ? "Imported from Linear as completed." : null;
       const priority =
         raw.priority != null && raw.priority >= 1 && raw.priority <= 4
           ? raw.priority
@@ -2178,7 +2263,9 @@ export async function recordQaResult(
   if (!run) return "not_found";
 
   const statusColumn =
-    input.environment === "staging" ? "staging_qa_status" : "production_qa_status";
+    input.environment === "staging"
+      ? "staging_qa_status"
+      : "production_qa_status";
   const expectedStage =
     input.environment === "staging" ? "staging_qa" : "production_qa";
   const currentStatus = run[statusColumn];
