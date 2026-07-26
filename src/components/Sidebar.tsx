@@ -15,6 +15,7 @@ import {
   Plus,
   Settings,
   Languages,
+  Sparkles,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useI18n, type Locale } from "../i18n";
@@ -30,6 +31,7 @@ export function Sidebar({
   connectedProjectIds,
   isOpen,
   onAddProject,
+  onAgentsOpen,
   onAutoHuntOpen,
   onInboxOpen,
   onIssuesOpen,
@@ -49,6 +51,7 @@ export function Sidebar({
 }: {
   activePage:
     | "issues"
+    | "agents"
     | "auto-hunt"
     | "inbox"
     | "project-settings"
@@ -60,6 +63,7 @@ export function Sidebar({
   connectedProjectIds: string[] | null;
   isOpen: boolean;
   onAddProject: () => void;
+  onAgentsOpen: () => void;
   onAutoHuntOpen: () => void;
   onInboxOpen: () => void;
   onIssuesOpen: () => void;
@@ -531,6 +535,18 @@ export function Sidebar({
                       <span>{t("sidebar.issues")}</span>
                     </a>
                     <a
+                      aria-current={activePage === "agents" ? "page" : undefined}
+                      className={`sidebar-project-view${activePage === "agents" ? " active" : ""}`}
+                      href="#agents"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        onAgentsOpen();
+                      }}
+                    >
+                      <Bot size={14} strokeWidth={1.7} />
+                      <span>{t("sidebar.agents")}</span>
+                    </a>
+                    <a
                       aria-current={activePage === "auto-hunt" ? "page" : undefined}
                       className={`sidebar-project-view${activePage === "auto-hunt" ? " active" : ""}`}
                       href="#auto-hunt"
@@ -539,7 +555,7 @@ export function Sidebar({
                         onAutoHuntOpen();
                       }}
                     >
-                      <Bot size={14} strokeWidth={1.7} />
+                      <Sparkles size={14} strokeWidth={1.7} />
                       <span>{t("sidebar.autoHunt")}</span>
                     </a>
                   </div>

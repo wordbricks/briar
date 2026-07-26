@@ -10,6 +10,7 @@ import {
   addOrganizationMember,
   createOrganization,
   createIssueMessage,
+  createProjectAgent,
   createProject,
   createIssueAttachments,
   deleteProject,
@@ -25,6 +26,7 @@ import {
   listOrganizationMembers,
   isOrganizationHandleAvailable,
   listProjects,
+  listProjectAgents,
   moveHuntRun,
   recoverHuntRun,
   recordHuntEvent,
@@ -159,6 +161,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db,
       await readFile(resolve("migrations/0015_backlog_status.sql"), "utf8"),
     );
+    await executeSql(
+      db,
+      await readFile(resolve("migrations/0016_project_agents.sql"), "utf8"),
+    );
   });
 
   afterAll(async () => {
@@ -195,6 +201,26 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     expect(
       await db.prepare("pragma foreign_key_check").all(),
     ).toMatchObject({ results: [] });
+  });
+
+  it("creates and lists agents scoped to a project", async () => {
+    const agent = await createProjectAgent(db, projectId, {
+      name: "Sentry 오류 탐지 에이전트",
+      provider: "claude",
+      model: "opus",
+      responsibility: "Sentry 오류를 분석해 이슈를 만들고 담당자에게 배정합니다.",
+    });
+
+    expect(agent).toMatchObject({
+      project_id: projectId,
+      name: "Sentry 오류 탐지 에이전트",
+      provider: "claude",
+      model: "opus",
+    });
+    await expect(listProjectAgents(db, projectId)).resolves.toEqual([agent]);
+    await expect(
+      listProjectAgents(db, "22222222-2222-4222-8222-222222222222"),
+    ).resolves.toEqual([]);
   });
 
   it("stores automation settings and preserves them for older settings clients", async () => {

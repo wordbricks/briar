@@ -7,11 +7,13 @@ import type {
 } from "./linear-import";
 import type {
   CreateIssueInput,
+  CreateProjectAgentInput,
   DashboardPayload,
   HuntRunPlacement,
   IssueAttachment,
   IssueMessage,
   Project,
+  ProjectAgent,
   Organization,
   OrganizationMember,
   ProjectSettings,
@@ -36,6 +38,16 @@ const projectSchema = z.object({
   organizationName: z.string(),
   role: z.enum(["owner", "admin", "member"]),
   createdAt: z.string(),
+});
+const projectAgentSchema = z.object({
+  id: z.string().uuid(),
+  projectId: z.string().uuid(),
+  name: z.string(),
+  provider: z.enum(["codex", "claude", "grok"]),
+  model: z.string().nullable(),
+  responsibility: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
 });
 const organizationSchema = z.object({
   id: z.string().uuid(),
@@ -270,6 +282,33 @@ export async function createProject(
 
 export async function deleteProject(token: string, projectId: string) {
   return request<void>(`/projects/${projectId}`, token, { method: "DELETE" });
+}
+
+export async function loadProjectAgents(
+  token: string,
+  projectId: string,
+): Promise<ProjectAgent[]> {
+  const result = await request<{ agents: unknown[] }>(
+    `/projects/${projectId}/agents`,
+    token,
+  );
+  return z.array(projectAgentSchema).parse(result.agents);
+}
+
+export async function createProjectAgent(
+  token: string,
+  projectId: string,
+  input: CreateProjectAgentInput,
+): Promise<ProjectAgent> {
+  const result = await request<{ agent: unknown }>(
+    `/projects/${projectId}/agents`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+  return projectAgentSchema.parse(result.agent);
 }
 
 export async function createIssue(

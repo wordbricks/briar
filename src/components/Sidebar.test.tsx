@@ -14,6 +14,7 @@ const sidebarProps = {
   connectedProjectIds: ["project-1"],
   isOpen: true,
   onAddProject: () => undefined,
+  onAgentsOpen: () => undefined,
   onAutoHuntOpen: () => undefined,
   onInboxOpen: () => undefined,
   onIssuesOpen: () => undefined,
@@ -67,6 +68,7 @@ describe("Sidebar", () => {
     expect(markup).toContain('aria-haspopup="menu"');
     expect(markup).toContain('aria-label="계정 메뉴"');
     expect(markup).toContain("이슈");
+    expect(markup).toContain("에이전트");
     expect(markup).toContain("받은 편지함");
     expect(markup).toContain("자동사냥");
     expect(markup).not.toContain("도움말");
