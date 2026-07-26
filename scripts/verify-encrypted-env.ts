@@ -21,6 +21,10 @@ export const encryptedEnvPolicies: Readonly<Record<string, EncryptedEnvPolicy>> 
       "TAURI_SIGNING_PRIVATE_KEY",
       "TAURI_SIGNING_PRIVATE_KEY_PASSWORD",
       "CLOUDFLARE_API_TOKEN",
+      "ANDROID_KEYSTORE_BASE64",
+      "ANDROID_KEYSTORE_PASSWORD",
+      "ANDROID_KEY_ALIAS",
+      "ANDROID_KEY_PASSWORD",
     ],
   },
 };
