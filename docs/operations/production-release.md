@@ -35,6 +35,8 @@ Repeat that command for the following variables:
 - `APPLE_CERTIFICATE_PASSWORD` and `KEYCHAIN_PASSWORD`
 - `APPLE_API_KEY_CONTENT`
 - `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
+- `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`,
+  `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`
 
 Publishing additionally requires `CLOUDFLARE_API_TOKEN` in `.env.release` and
 an authenticated GitHub CLI session from `gh auth login`. The current Wrangler
