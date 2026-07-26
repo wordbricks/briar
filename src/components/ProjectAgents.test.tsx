@@ -3,6 +3,8 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
+import type { DashboardPayload } from "../types";
 import {
   CreateProjectAgentDialog,
   ProjectAgents,
@@ -35,17 +37,32 @@ async function mount(node: React.ReactNode) {
   return container;
 }
 
+const project = {
+  id: "project-1",
+  name: "Briar",
+  createdAt: "2026-07-26T00:00:00.000Z",
+};
+
+const dashboard = {
+  project,
+  runs: [],
+} as unknown as DashboardPayload;
+
+const projectAgentsProps = {
+  dashboard,
+  error: null,
+  isSidebarOpen: true,
+  onStart: () => "session-new",
+  project,
+  sessions: [] as AutoHuntSession[],
+  token: null,
+};
+
 describe("ProjectAgents", () => {
   it("shows the example responsibility-based agent roster in demo mode", async () => {
     const container = await mount(
       <ProjectAgents
-        isSidebarOpen
-        project={{
-          id: "project-1",
-          name: "Briar",
-          createdAt: "2026-07-26T00:00:00.000Z",
-        }}
-        token={null}
+        {...projectAgentsProps}
       />,
     );
     await act(async () => Promise.resolve());
@@ -111,13 +128,7 @@ describe("ProjectAgents", () => {
   it("opens a prefilled editor from an agent card and saves the changes", async () => {
     const container = await mount(
       <ProjectAgents
-        isSidebarOpen
-        project={{
-          id: "project-1",
-          name: "Briar",
-          createdAt: "2026-07-26T00:00:00.000Z",
-        }}
-        token={null}
+        {...projectAgentsProps}
       />,
     );
     await act(async () => Promise.resolve());
@@ -168,5 +179,74 @@ describe("ProjectAgents", () => {
     expect(
       container.querySelector('form[aria-label="에이전트 편집"]'),
     ).toBeNull();
+  });
+
+  it("opens an agent detail page with only that agent's sessions", async () => {
+    const sessions: AutoHuntSession[] = [
+      {
+        id: "legacy-auto-session",
+        projectId: project.id,
+        status: "completed",
+        issues: [{
+          runId: "run-auto",
+          runNumber: 1,
+          sourceKey: "AUTO-1",
+          title: "자동 사냥 이슈",
+          outcome: "completed",
+          summary: null,
+        }],
+        startedAt: "2026-07-26T01:00:00.000Z",
+        completedAt: "2026-07-26T01:10:00.000Z",
+        conversationId: "thread-auto",
+        workspaceRoot: "/repo",
+        summary: null,
+        error: null,
+        events: [],
+      },
+      {
+        id: "sentry-session",
+        projectId: project.id,
+        agentId: "demo-agent-sentry",
+        status: "completed",
+        issues: [{
+          runId: "run-sentry",
+          runNumber: 2,
+          sourceKey: "SENTRY-1",
+          title: "Sentry 오류 조사",
+          outcome: "completed",
+          summary: null,
+        }],
+        startedAt: "2026-07-26T02:00:00.000Z",
+        completedAt: "2026-07-26T02:10:00.000Z",
+        conversationId: "thread-sentry",
+        workspaceRoot: "/repo",
+        summary: null,
+        error: null,
+        events: [],
+      },
+    ];
+    const container = await mount(
+      <ProjectAgents {...projectAgentsProps} sessions={sessions} />,
+    );
+    await act(async () => Promise.resolve());
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(
+          'button[aria-label="자동 사냥 에이전트 세부 정보 열기"]',
+        )
+        ?.click();
+    });
+
+    expect(container.querySelector("#project-agent-detail")).not.toBeNull();
+    expect(container.textContent).toContain("자동 사냥 이슈");
+    expect(container.textContent).not.toContain("Sentry 오류 조사");
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".project-agent-detail-back")
+        ?.click();
+    });
+    expect(container.querySelector("#project-agents")).not.toBeNull();
   });
 });

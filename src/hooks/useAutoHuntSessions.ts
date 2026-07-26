@@ -47,6 +47,7 @@ export type AutoHuntSessionEvent = {
 export type AutoHuntSession = {
   id: string;
   projectId: string;
+  agentId?: string;
   status: AutoHuntSessionStatus;
   issues: AutoHuntSessionIssue[];
   startedAt: string;
@@ -150,6 +151,7 @@ export function useAutoHuntSessions(
     runs: HuntRun[],
     onSettled?: () => void,
     options?: {
+      agentId?: string;
       maxIssues?: number;
       trigger?: AutoHuntSession["trigger"];
     },
@@ -170,6 +172,7 @@ export function useAutoHuntSessions(
     const session: AutoHuntSession = {
       id: crypto.randomUUID(),
       projectId,
+      agentId: options?.agentId,
       status: "running",
       issues: candidates.map((run) => ({
         runId: run.id,

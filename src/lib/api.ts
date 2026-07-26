@@ -50,6 +50,7 @@ const projectAgentSchema = z.object({
   provider: z.enum(["codex", "claude", "grok"]),
   model: z.string().nullable(),
   responsibility: z.string(),
+  kind: z.enum(["auto_hunt", "custom"]),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
