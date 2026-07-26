@@ -300,6 +300,9 @@ const organizationInputSchema = z.object({
     .max(63)
     .regex(/^[a-z0-9-]+$/u),
 });
+export const organizationUpdateInputSchema = organizationInputSchema.pick({
+  name: true,
+});
 const organizationHandleSchema = organizationInputSchema.shape.handle;
 const organizationMemberInputSchema = z.object({
   email: z.string().trim().email().max(320),
@@ -955,7 +958,7 @@ async function route(
     if (!canManageOrganization(role)) {
       throw new HttpError(403, "Organization admin access required");
     }
-    const input = organizationInputSchema.parse(await readJson(request));
+    const input = organizationUpdateInputSchema.parse(await readJson(request));
     const organization = await updateOrganization(
       db,
       organizationMatch[1],
