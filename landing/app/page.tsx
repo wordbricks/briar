@@ -35,6 +35,7 @@ const agents = [
 const MAC_DOWNLOAD_URL =
   "https://briar-api.wbai.workers.dev/releases/latest/mac-aarch64.dmg";
 const GITHUB_URL = "https://github.com/wordbricks/briar";
+const ANDROID_DOWNLOAD_URL = `${GITHUB_URL}/releases/latest`;
 
 function Brand() {
   return (
@@ -394,6 +395,13 @@ export default function Home() {
           >
             Mac용 Briar 다운로드 <span aria-hidden="true">↓</span>
           </a>
+          <a
+            className="button button-secondary"
+            href={ANDROID_DOWNLOAD_URL}
+            aria-label="Android용 Briar 최신 릴리즈 다운로드"
+          >
+            Android용 다운로드 <span aria-hidden="true">↓</span>
+          </a>
           <a className="button button-secondary" href="#workflow">
             작동 방식 보기 <span aria-hidden="true">↓</span>
           </a>
@@ -401,6 +409,9 @@ export default function Home() {
         <div className="hero-meta">
           <span>
             <i>⌘</i> macOS Apple Silicon
+          </span>
+          <span>
+            <i>●</i> Android companion
           </span>
           <span>
             <i>✓</i> Repository-agnostic
@@ -642,6 +653,13 @@ export default function Home() {
           </a>
           <a
             className="button button-secondary"
+            href={ANDROID_DOWNLOAD_URL}
+            aria-label="Android용 Briar 최신 릴리즈 다운로드"
+          >
+            Android용 다운로드 <span aria-hidden="true">↓</span>
+          </a>
+          <a
+            className="button button-secondary"
             href={GITHUB_URL}
             target="_blank"
             rel="noreferrer"
@@ -650,7 +668,7 @@ export default function Home() {
           </a>
         </div>
         <small className="download-note">
-          최신 릴리즈 · macOS Apple Silicon · 서명 및 공증 완료
+          최신 릴리즈 · macOS Apple Silicon · Android companion
         </small>
       </section>
 
