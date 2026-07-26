@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
-import worker from "./index";
+import worker, { organizationUpdateInputSchema } from "./index";
 
 describe("Worker HTTP contract", () => {
+  it("accepts a name-only organization update", () => {
+    expect(
+      organizationUpdateInputSchema.parse({ name: "  Briar Labs  " }),
+    ).toEqual({
+      name: "Briar Labs",
+    });
+  });
+
   it("renders mobile Companion authorization and returns to the app", async () => {
     const response = await worker.fetch(
       new Request(
