@@ -11,6 +11,7 @@ import {
   createOrganization,
   createIssueMessage,
   createProjectAgent,
+  createProjectAgentSchedule,
   createProject,
   createIssueAttachments,
   deleteProject,
@@ -27,6 +28,7 @@ import {
   isOrganizationHandleAvailable,
   listProjects,
   listProjectAgents,
+  listProjectAgentSchedules,
   moveHuntRun,
   recoverHuntRun,
   recordHuntEvent,
@@ -169,6 +171,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db,
       await readFile(resolve("migrations/0017_default_auto_hunt_agent.sql"), "utf8"),
     );
+    await executeSql(
+      db,
+      await readFile(resolve("migrations/0018_project_agent_schedules.sql"), "utf8"),
+    );
   });
 
   afterAll(async () => {
@@ -243,6 +249,44 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await expect(
       listProjectAgents(db, "22222222-2222-4222-8222-222222222222"),
     ).resolves.toEqual([]);
+  });
+
+  it("creates recurring schedules for an agent in the same project", async () => {
+    const agent = (await listProjectAgents(db, projectId))[0];
+    const schedule = await createProjectAgentSchedule(db, projectId, {
+      agentId: agent.id,
+      name: "Weekday repository audit",
+      recurrence: "weekdays",
+      timeOfDay: "09:00",
+      dayOfWeek: null,
+      timeZone: "Asia/Seoul",
+    });
+
+    expect(schedule).toMatchObject({
+      project_id: projectId,
+      agent_id: agent.id,
+      agent_name: "Auto Hunt agent",
+      agent_provider: "codex",
+      name: "Weekday repository audit",
+      recurrence: "weekdays",
+      time_of_day: "09:00",
+      day_of_week: null,
+      time_zone: "Asia/Seoul",
+      enabled: 1,
+    });
+    await expect(listProjectAgentSchedules(db, projectId)).resolves.toEqual([
+      schedule,
+    ]);
+    await expect(
+      createProjectAgentSchedule(db, projectId, {
+        agentId: "22222222-2222-4222-8222-222222222222",
+        name: "Missing agent",
+        recurrence: "daily",
+        timeOfDay: "12:00",
+        dayOfWeek: null,
+        timeZone: "Etc/UTC",
+      }),
+    ).resolves.toBeNull();
   });
 
   it("stores automation settings and preserves them for older settings clients", async () => {

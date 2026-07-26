@@ -8,6 +8,7 @@ import {
 } from "./lib/auto-hunt-contract";
 import type { AutoHuntAutomation } from "./lib/auto-hunt-automation";
 import type { AgentProvider } from "./lib/project-llm";
+import type { ProjectAgentScheduleRecurrence } from "./lib/project-agent-schedule";
 
 export const huntStatuses = autoHuntRunStatuses;
 export type HuntStatus = AutoHuntRunStatus;
@@ -142,6 +143,31 @@ export type CreateProjectAgentInput = {
   provider: AgentProvider;
   model: string | null;
   responsibility: string;
+};
+
+export type ProjectAgentSchedule = {
+  id: string;
+  projectId: string;
+  agentId: string;
+  agentName: string;
+  agentProvider: AgentProvider;
+  name: string;
+  recurrence: ProjectAgentScheduleRecurrence;
+  timeOfDay: string;
+  dayOfWeek: number | null;
+  timeZone: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateProjectAgentScheduleInput = {
+  agentId: string;
+  name: string;
+  recurrence: ProjectAgentScheduleRecurrence;
+  timeOfDay: string;
+  dayOfWeek: number | null;
+  timeZone: string;
 };
 
 export type Organization = {

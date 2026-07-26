@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createProjectAgent, loadProjectAgents, loadSession } from "./api";
+import {
+  createProjectAgent,
+  createProjectAgentSchedule,
+  loadProjectAgents,
+  loadSession,
+} from "./api";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -91,6 +96,61 @@ describe("API errors", () => {
         "/projects/22222222-2222-4222-8222-222222222222/agents?locale=zh",
       ),
       expect.any(Object),
+    );
+  });
+
+  it("creates an agent schedule with its recurrence and time zone", async () => {
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        const input = JSON.parse(String(init?.body));
+        return new Response(
+          JSON.stringify({
+            schedule: {
+              id: "11111111-1111-4111-8111-111111111111",
+              projectId: "22222222-2222-4222-8222-222222222222",
+              agentId: input.agentId,
+              agentName: "Auto Hunt agent",
+              agentProvider: "codex",
+              name: input.name,
+              recurrence: input.recurrence,
+              timeOfDay: input.timeOfDay,
+              dayOfWeek: input.dayOfWeek,
+              timeZone: input.timeZone,
+              enabled: true,
+              createdAt: "2026-07-27T00:00:00.000Z",
+              updatedAt: "2026-07-27T00:00:00.000Z",
+            },
+          }),
+          { status: 201, headers: { "Content-Type": "application/json" } },
+        );
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const schedule = await createProjectAgentSchedule(
+      "token",
+      "22222222-2222-4222-8222-222222222222",
+      {
+        agentId: "33333333-3333-4333-8333-333333333333",
+        name: "Weekday repository audit",
+        recurrence: "weekdays",
+        timeOfDay: "09:00",
+        dayOfWeek: null,
+        timeZone: "Asia/Seoul",
+      },
+    );
+
+    expect(schedule).toMatchObject({
+      agentName: "Auto Hunt agent",
+      recurrence: "weekdays",
+      timeOfDay: "09:00",
+      timeZone: "Asia/Seoul",
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "/projects/22222222-2222-4222-8222-222222222222/agent-schedules",
+      ),
+      expect.objectContaining({ method: "POST" }),
     );
   });
 });

@@ -113,6 +113,8 @@ describe("ProjectSchedule", () => {
           isSidebarOpen
           now={now}
           onRunOpen={() => undefined}
+          project={dashboard.project}
+          token={null}
         />
       </I18nProvider>,
     );

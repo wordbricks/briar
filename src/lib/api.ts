@@ -9,12 +9,14 @@ import type {
 import type {
   CreateIssueInput,
   CreateProjectAgentInput,
+  CreateProjectAgentScheduleInput,
   DashboardPayload,
   HuntRunPlacement,
   IssueAttachment,
   IssueMessage,
   Project,
   ProjectAgent,
+  ProjectAgentSchedule,
   Organization,
   OrganizationMember,
   ProjectSettings,
@@ -47,6 +49,21 @@ const projectAgentSchema = z.object({
   provider: z.enum(["codex", "claude", "grok"]),
   model: z.string().nullable(),
   responsibility: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+const projectAgentScheduleSchema = z.object({
+  id: z.string().uuid(),
+  projectId: z.string().uuid(),
+  agentId: z.string().uuid(),
+  agentName: z.string(),
+  agentProvider: z.enum(["codex", "claude", "grok"]),
+  name: z.string(),
+  recurrence: z.enum(["daily", "weekdays", "weekly"]),
+  timeOfDay: z.string(),
+  dayOfWeek: z.number().int().min(0).max(6).nullable(),
+  timeZone: z.string(),
+  enabled: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -311,6 +328,33 @@ export async function createProjectAgent(
     },
   );
   return projectAgentSchema.parse(result.agent);
+}
+
+export async function loadProjectAgentSchedules(
+  token: string,
+  projectId: string,
+): Promise<ProjectAgentSchedule[]> {
+  const result = await request<{ schedules: unknown[] }>(
+    `/projects/${projectId}/agent-schedules`,
+    token,
+  );
+  return z.array(projectAgentScheduleSchema).parse(result.schedules);
+}
+
+export async function createProjectAgentSchedule(
+  token: string,
+  projectId: string,
+  input: CreateProjectAgentScheduleInput,
+): Promise<ProjectAgentSchedule> {
+  const result = await request<{ schedule: unknown }>(
+    `/projects/${projectId}/agent-schedules`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+  return projectAgentScheduleSchema.parse(result.schedule);
 }
 
 export async function createIssue(

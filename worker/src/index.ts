@@ -24,6 +24,10 @@ import {
   type ProjectAgentLocale,
 } from "../../src/lib/project-agent";
 import {
+  normalizeProjectAgentScheduleDay,
+  projectAgentScheduleRecurrences,
+} from "../../src/lib/project-agent-schedule";
+import {
   maxIssueMultipartBytes,
   validateIssueAttachments,
 } from "../../src/lib/issue-attachments";
@@ -36,6 +40,7 @@ import {
   createIssueAttachments,
   createOrganization,
   createProjectAgent,
+  createProjectAgentSchedule,
   createProject,
   deleteProject,
   EventKeyConflictError,
@@ -57,6 +62,7 @@ import {
   listOrganizations,
   listProjects,
   listProjectAgents,
+  listProjectAgentSchedules,
   moveHuntRun,
   recoverHuntRun,
   recordHuntEvent,
@@ -73,6 +79,7 @@ import {
   type IssueMessageRow,
   type ProjectRow,
   type ProjectAgentRow,
+  type ProjectAgentScheduleRow,
   type ProjectSettingsRow,
   type OrganizationMemberRow,
   type OrganizationRole,
@@ -307,6 +314,25 @@ const projectAgentInputSchema = z
     responsibility: z.string().trim().min(1).max(2_000),
   })
   .strict();
+export const projectAgentScheduleInputSchema = z
+  .object({
+    agentId: z.string().uuid(),
+    name: z.string().trim().min(1).max(120),
+    recurrence: z.enum(projectAgentScheduleRecurrences),
+    timeOfDay: z
+      .string()
+      .regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/u),
+    dayOfWeek: z.number().int().min(0).max(6).nullable().optional(),
+    timeZone: z.string().trim().min(1).max(100),
+  })
+  .strict()
+  .transform((input) => ({
+    ...input,
+    dayOfWeek: normalizeProjectAgentScheduleDay(
+      input.recurrence,
+      input.dayOfWeek,
+    ),
+  }));
 const organizationInputSchema = z.object({
   name: z.string().trim().min(1).max(100),
   handle: z
@@ -764,6 +790,22 @@ const projectAgentJson = (
   };
 };
 
+const projectAgentScheduleJson = (row: ProjectAgentScheduleRow) => ({
+  id: row.id,
+  projectId: row.project_id,
+  agentId: row.agent_id,
+  agentName: row.agent_name,
+  agentProvider: row.agent_provider,
+  name: row.name,
+  recurrence: row.recurrence,
+  timeOfDay: row.time_of_day,
+  dayOfWeek: row.day_of_week,
+  timeZone: row.time_zone,
+  enabled: row.enabled === 1,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+
 const organizationJson = (row: OrganizationRow) => ({
   id: row.id,
   name: row.name,
@@ -1187,6 +1229,36 @@ async function route(
       responsibility: input.responsibility,
     });
     return json({ agent: projectAgentJson(agent) }, 201);
+  }
+
+  const projectAgentSchedulesMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/agent-schedules$/u,
+  );
+  if (projectAgentSchedulesMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      projectAgentSchedulesMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const schedules = await listProjectAgentSchedules(db, project.id);
+    return json({
+      schedules: schedules.map(projectAgentScheduleJson),
+    });
+  }
+  if (projectAgentSchedulesMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      projectAgentSchedulesMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const input = projectAgentScheduleInputSchema.parse(await readJson(request));
+    const schedule = await createProjectAgentSchedule(db, project.id, input);
+    if (!schedule) throw new HttpError(404, "Project agent not found");
+    return json({ schedule: projectAgentScheduleJson(schedule) }, 201);
   }
 
   const linearConnectMatch = pathname.match(

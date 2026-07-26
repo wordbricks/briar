@@ -16,6 +16,7 @@ import {
   type AutoHuntAutomation,
 } from "../../src/lib/auto-hunt-automation";
 import { defaultProjectAgentCopy } from "../../src/lib/project-agent";
+import type { ProjectAgentScheduleRecurrence } from "../../src/lib/project-agent-schedule";
 
 type ProjectAgentProvider = "codex" | "claude" | "grok";
 type ProjectAgentKind = "auto_hunt" | "custom";
@@ -68,6 +69,22 @@ export type ProjectAgentRow = {
   model: string | null;
   responsibility: string;
   kind: ProjectAgentKind;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ProjectAgentScheduleRow = {
+  id: string;
+  project_id: string;
+  agent_id: string;
+  agent_name: string;
+  agent_provider: ProjectAgentProvider;
+  name: string;
+  recurrence: ProjectAgentScheduleRecurrence;
+  time_of_day: string;
+  day_of_week: number | null;
+  time_zone: string;
+  enabled: number;
   created_at: string;
   updated_at: string;
 };
@@ -578,6 +595,87 @@ export async function createProjectAgent(
     )
     .run();
   return agent;
+}
+
+export async function listProjectAgentSchedules(
+  db: D1Database,
+  projectId: string,
+) {
+  const result = await db
+    .prepare(
+      `select schedule.id, schedule.project_id, schedule.agent_id,
+              agent.name as agent_name, agent.provider as agent_provider,
+              schedule.name, schedule.recurrence, schedule.time_of_day,
+              schedule.day_of_week, schedule.time_zone, schedule.enabled,
+              schedule.created_at, schedule.updated_at
+       from briar_project_agent_schedules schedule
+       join briar_project_agents agent on agent.id = schedule.agent_id
+       where schedule.project_id = ?
+       order by schedule.created_at, schedule.id`,
+    )
+    .bind(projectId)
+    .all<ProjectAgentScheduleRow>();
+  return result.results;
+}
+
+export async function createProjectAgentSchedule(
+  db: D1Database,
+  projectId: string,
+  input: {
+    agentId: string;
+    name: string;
+    recurrence: ProjectAgentScheduleRecurrence;
+    timeOfDay: string;
+    dayOfWeek: number | null;
+    timeZone: string;
+  },
+) {
+  const agent = await db
+    .prepare(
+      `select id
+       from briar_project_agents
+       where id = ? and project_id = ?`,
+    )
+    .bind(input.agentId, projectId)
+    .first<{ id: string }>();
+  if (!agent) return null;
+
+  const id = crypto.randomUUID();
+  const createdAt = new Date().toISOString();
+  await db
+    .prepare(
+      `insert into briar_project_agent_schedules (
+         id, project_id, agent_id, name, recurrence, time_of_day,
+         day_of_week, time_zone, enabled, created_at, updated_at
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+    )
+    .bind(
+      id,
+      projectId,
+      input.agentId,
+      input.name,
+      input.recurrence,
+      input.timeOfDay,
+      input.dayOfWeek,
+      input.timeZone,
+      createdAt,
+      createdAt,
+    )
+    .run();
+
+  return await db
+    .prepare(
+      `select schedule.id, schedule.project_id, schedule.agent_id,
+              agent.name as agent_name, agent.provider as agent_provider,
+              schedule.name, schedule.recurrence, schedule.time_of_day,
+              schedule.day_of_week, schedule.time_zone, schedule.enabled,
+              schedule.created_at, schedule.updated_at
+       from briar_project_agent_schedules schedule
+       join briar_project_agents agent on agent.id = schedule.agent_id
+       where schedule.id = ? and schedule.project_id = ?`,
+    )
+    .bind(id, projectId)
+    .first<ProjectAgentScheduleRow>();
 }
 
 export async function getProjectSettings(db: D1Database, projectId: string) {
