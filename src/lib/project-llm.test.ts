@@ -39,6 +39,8 @@ describe("project LLM gateway", () => {
       projectId: "project-1",
       fullAccess: false,
       workspaceMode: "connected",
+      workspaceRunId: null,
+      workspaceBranch: null,
       request: {
         message: "Summarize this project",
         conversationId: null,
@@ -66,6 +68,31 @@ describe("project LLM gateway", () => {
     expect(invoke).toHaveBeenCalledWith(
       "project_llm_chat",
       expect.objectContaining({ fullAccess: true }),
+    );
+  });
+
+  it("routes issue conversations by run and registered branch", async () => {
+    invoke.mockResolvedValue({
+      conversationId: "briar:project-1:thread-1",
+      message: "done",
+      workspaceRoot: "/worktrees/issue-run-1",
+    });
+
+    await chatWithProjectLlm({
+      projectId: "project-1",
+      message: "Explain the completed work",
+      workspaceMode: "issueWorktree",
+      workspaceRunId: "11111111-2222-3333-4444-555555555555",
+      workspaceBranch: "briar/issue-run-11111111",
+    });
+
+    expect(invoke).toHaveBeenCalledWith(
+      "project_llm_chat",
+      expect.objectContaining({
+        workspaceMode: "issueWorktree",
+        workspaceRunId: "11111111-2222-3333-4444-555555555555",
+        workspaceBranch: "briar/issue-run-11111111",
+      }),
     );
   });
 

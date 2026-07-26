@@ -1524,6 +1524,9 @@ export function useBriar() {
         projectId: activeProjectId,
         fullAccess: true,
         conversationId: agentConversation.conversationId,
+        workspaceMode: "issueWorktree",
+        workspaceRunId: runId,
+        workspaceBranch: run?.branch ?? null,
         message: [
           "A user sent a message in an issue conversation where Briar should respond.",
           "Reply to the user based on the prior Auto Hunt conversation and the issue snapshot below.",
