@@ -354,7 +354,18 @@ button { color: inherit; }
 .project-settings-back:hover { color:#363732; background:#f1f1ec; }
 .project-settings-back:focus-visible { outline:2px solid #8b70dd; outline-offset:2px; }
 .project-settings-scroll { min-height:0; flex:1; overflow-y:auto; padding:48px 36px 64px; }
-.project-settings-content { width:min(860px,100%); margin:0 auto; }
+.project-settings-nav { padding-top:4px; }
+.project-settings-scroll > .project-settings-card,
+.project-settings-scroll > .project-settings-linear,
+.project-settings-scroll > .project-settings-import-panel,
+.project-settings-scroll > .project-settings-auto-run,
+.project-settings-scroll > .project-settings-automation,
+.project-settings-scroll > .project-settings-llm,
+.project-settings-scroll > .project-settings-danger { width:min(720px,100%); margin-left:auto; margin-right:auto; }
+.project-settings-scroll > .project-settings-linear,
+.project-settings-scroll > .project-settings-auto-run,
+.project-settings-scroll > .project-settings-automation,
+.project-settings-scroll > .project-settings-llm { margin-top:0; }
 .project-settings-heading { margin-bottom:28px; }
 .project-settings-heading h1 { margin:0; font-size:30px; line-height:1.15; letter-spacing:-1px; }
 .project-settings-heading > p:last-child { margin:9px 0 0; color:var(--muted); font-size:11px; }
