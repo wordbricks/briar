@@ -79,6 +79,7 @@ export type ProjectLlmChatInput = {
   instructions?: string | null;
   outputSchema?: JsonSchema | null;
   fullAccess?: boolean;
+  workspaceMode?: "connected" | "latestRemoteBase";
 };
 
 export type ProjectLlmChatResponse = {
@@ -118,6 +119,7 @@ export async function chatWithProjectLlm(
   return invoke<ProjectLlmChatResponse>("project_llm_chat", {
     projectId: input.projectId,
     fullAccess: input.fullAccess ?? false,
+    workspaceMode: input.workspaceMode ?? "connected",
     request: {
       message: input.message,
       conversationId: input.conversationId ?? null,

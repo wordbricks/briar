@@ -38,6 +38,7 @@ describe("project LLM gateway", () => {
     expect(invoke).toHaveBeenCalledWith("project_llm_chat", {
       projectId: "project-1",
       fullAccess: false,
+      workspaceMode: "connected",
       request: {
         message: "Summarize this project",
         conversationId: null,

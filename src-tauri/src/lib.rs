@@ -1863,6 +1863,191 @@ fn connected_project_workspace_on_host(
     Ok((runner, workspace))
 }
 
+#[derive(Clone, Copy, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+enum ProjectWorkspaceMode {
+    #[default]
+    Connected,
+    LatestRemoteBase,
+}
+
+struct LatestRemoteWorkspace {
+    root: PathBuf,
+    checkout: PathBuf,
+}
+
+fn remote_head_branch(output: &str) -> Option<&str> {
+    output.lines().find_map(|line| {
+        let (reference, target) = line.split_once('\t')?;
+        if target.trim() != "HEAD" {
+            return None;
+        }
+        reference.trim().strip_prefix("ref: refs/heads/")
+    })
+}
+
+fn create_analysis_temp_root(runner: &dyn host::CommandRunner) -> Result<PathBuf, String> {
+    if !runner.is_remote() {
+        return tempfile::Builder::new()
+            .prefix("briar-workflow-analysis-")
+            .tempdir()
+            .map(|directory| directory.keep())
+            .map_err(|error| format!("워크플로우 분석 임시 폴더를 만들지 못했습니다: {error}"));
+    }
+
+    let mktemp = runner.resolve_binary("mktemp")?;
+    let output = runner.run(&host::CommandSpec::new(mktemp).args(["-d"]))?;
+    if !output.success() {
+        return Err(format!(
+            "원격 워크플로우 분석 임시 폴더를 만들지 못했습니다: {}",
+            output.failure_message()
+        ));
+    }
+    let root = PathBuf::from(output.stdout_trimmed());
+    if !root.is_absolute() {
+        return Err("원격 호스트가 절대 임시 경로를 반환하지 않았습니다.".to_string());
+    }
+    Ok(root)
+}
+
+fn remove_analysis_temp_root(runner: &dyn host::CommandRunner, root: &Path) -> Result<(), String> {
+    if !runner.is_remote() {
+        return fs::remove_dir(root)
+            .map_err(|error| format!("워크플로우 분석 임시 폴더를 정리하지 못했습니다: {error}"));
+    }
+    let rmdir = runner.resolve_binary("rmdir")?;
+    let output =
+        runner.run(&host::CommandSpec::new(rmdir).args([root.to_string_lossy().into_owned()]))?;
+    if output.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "원격 워크플로우 분석 임시 폴더를 정리하지 못했습니다: {}",
+            output.failure_message()
+        ))
+    }
+}
+
+fn prepare_latest_remote_workspace(
+    runner: &dyn host::CommandRunner,
+    connected_workspace: &Path,
+) -> Result<Option<LatestRemoteWorkspace>, String> {
+    let git = runner.resolve_binary("git")?;
+    let origin = runner.run(
+        &host::CommandSpec::new(git.clone())
+            .args(["remote", "get-url", "origin"])
+            .working_directory(connected_workspace),
+    )?;
+    if !origin.success() {
+        // A newly initialized local project has no remote yet. Its connected
+        // checkout is the only available source of truth.
+        return Ok(None);
+    }
+
+    let remote_head = runner.run(
+        &host::CommandSpec::new(git.clone())
+            .args(["ls-remote", "--symref", "origin", "HEAD"])
+            .env("GIT_TERMINAL_PROMPT", "0")
+            .env("GCM_INTERACTIVE", "Never")
+            .working_directory(connected_workspace),
+    )?;
+    if !remote_head.success() {
+        return Err(format!(
+            "최신 origin 기본 브랜치를 확인하지 못했습니다: {}",
+            remote_head.failure_message()
+        ));
+    }
+    let branch = remote_head_branch(&remote_head.stdout)
+        .ok_or_else(|| "origin의 기본 브랜치를 확인하지 못했습니다.".to_string())?;
+    let remote_ref = format!("refs/remotes/origin/{branch}");
+    let refspec = format!("+refs/heads/{branch}:{remote_ref}");
+    let fetch = runner.run(
+        &host::CommandSpec::new(git.clone())
+            .args([
+                "-c",
+                "maintenance.auto=false",
+                "-c",
+                "gc.auto=0",
+                "fetch",
+                "--no-tags",
+                "origin",
+                refspec.as_str(),
+            ])
+            .env("GIT_TERMINAL_PROMPT", "0")
+            .env("GCM_INTERACTIVE", "Never")
+            .working_directory(connected_workspace),
+    )?;
+    if !fetch.success() {
+        return Err(format!(
+            "최신 origin/{branch} 코드를 가져오지 못했습니다: {}",
+            fetch.failure_message()
+        ));
+    }
+    let revision = runner.run(
+        &host::CommandSpec::new(git.clone())
+            .args(["rev-parse", "--verify", remote_ref.as_str()])
+            .working_directory(connected_workspace),
+    )?;
+    if !revision.success() {
+        return Err(format!(
+            "가져온 origin/{branch} 커밋을 확인하지 못했습니다: {}",
+            revision.failure_message()
+        ));
+    }
+    let commit = revision.stdout_trimmed();
+    let root = create_analysis_temp_root(runner)?;
+    let checkout = root.join("repository");
+    let add = runner.run(
+        &host::CommandSpec::new(git)
+            .args([
+                "-c",
+                "core.hooksPath=/dev/null",
+                "worktree",
+                "add",
+                "--detach",
+                checkout.to_string_lossy().as_ref(),
+                commit.as_str(),
+            ])
+            .working_directory(connected_workspace),
+    )?;
+    if !add.success() {
+        let cleanup = remove_analysis_temp_root(runner, &root).err();
+        return Err(format!(
+            "최신 origin/{branch} 분석 워크트리를 만들지 못했습니다: {}{}",
+            add.failure_message(),
+            cleanup
+                .map(|error| format!(" ({error})"))
+                .unwrap_or_default()
+        ));
+    }
+    Ok(Some(LatestRemoteWorkspace { root, checkout }))
+}
+
+fn remove_latest_remote_workspace(
+    runner: &dyn host::CommandRunner,
+    connected_workspace: &Path,
+    workspace: &LatestRemoteWorkspace,
+) -> Result<(), String> {
+    let git = runner.resolve_binary("git")?;
+    let remove = runner.run(
+        &host::CommandSpec::new(git)
+            .args([
+                "worktree",
+                "remove",
+                "--force",
+                workspace.checkout.to_string_lossy().as_ref(),
+            ])
+            .working_directory(connected_workspace),
+    )?;
+    if !remove.success() {
+        return Err(format!(
+            "워크플로우 분석 워크트리를 정리하지 못했습니다: {}",
+            remove.failure_message()
+        ));
+    }
+    remove_analysis_temp_root(runner, &workspace.root)
+}
+
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ExecutionHostSummary {
@@ -2683,6 +2868,7 @@ async fn project_llm_chat(
     app: tauri::AppHandle,
     project_id: String,
     full_access: Option<bool>,
+    workspace_mode: Option<ProjectWorkspaceMode>,
     request: agent::ProjectLlmRequest,
 ) -> Result<agent::ProjectLlmResponse, String> {
     let config_path = cli_config_path(&app)?;
@@ -2703,7 +2889,7 @@ async fn project_llm_chat(
     );
     let approval_app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let (runner, workspace) =
+        let (runner, connected_workspace) =
             connected_project_workspace_on_host(&config_path, &project_id, &home)?;
         let readiness = project_repository_readiness_at(&config_path, &project_id, &home)?;
         if readiness.requires_github && !readiness.pr_ready {
@@ -2725,9 +2911,19 @@ async fn project_llm_chat(
                 "이 대화의 에이전트 프로바이더가 앱 설정에서 비활성화되어 있습니다.".to_string(),
             );
         }
+        let latest_workspace = match workspace_mode.unwrap_or_default() {
+            ProjectWorkspaceMode::Connected => None,
+            ProjectWorkspaceMode::LatestRemoteBase => {
+                prepare_latest_remote_workspace(runner.as_ref(), &connected_workspace)?
+            }
+        };
+        let workspace = latest_workspace
+            .as_ref()
+            .map(|workspace| workspace.checkout.as_path())
+            .unwrap_or(connected_workspace.as_path());
         let backend = agent::discover_backend(
             provider,
-            runner,
+            runner.clone(),
             agent::AgentRunnerBundles {
                 claude: &claude_runner,
                 grok: &grok_runner,
@@ -2750,10 +2946,10 @@ async fn project_llm_chat(
                 ))
                 .blocking_show()
         };
-        agent::AgentBackend::run(
+        let result = agent::AgentBackend::run(
             &backend,
             &project_id,
-            &workspace,
+            workspace,
             project_chat_execution(
                 full_access.unwrap_or(false),
                 settings.approval_policy,
@@ -2762,7 +2958,18 @@ async fn project_llm_chat(
             ),
             request,
             &approve,
-        )
+        );
+        let cleanup = latest_workspace.as_ref().map(|workspace| {
+            remove_latest_remote_workspace(runner.as_ref(), &connected_workspace, workspace)
+        });
+        match (result, cleanup) {
+            (Ok(response), None | Some(Ok(()))) => Ok(response),
+            (Err(error), None | Some(Ok(()))) => Err(error),
+            (Ok(_), Some(Err(cleanup))) => Err(cleanup),
+            (Err(error), Some(Err(cleanup))) => {
+                Err(format!("{error} (분석 워크트리 정리 실패: {cleanup})"))
+            }
+        }
     })
     .await
     .map_err(|error| error.to_string())?
@@ -3475,6 +3682,138 @@ mod tests {
         assert_eq!(execution.approval_policy, agent::ApprovalPolicy::OnRequest);
         assert_eq!(execution.sandbox_mode, agent::SandboxMode::ReadOnly);
         assert!(!execution.network_access);
+    }
+
+    #[test]
+    fn parses_the_remote_default_branch_from_ls_remote() {
+        assert_eq!(
+            remote_head_branch(
+                "ref: refs/heads/main\tHEAD\n0123456789abcdef0123456789abcdef01234567\tHEAD\n"
+            ),
+            Some("main")
+        );
+        assert_eq!(
+            remote_head_branch("0123456789abcdef0123456789abcdef01234567\tHEAD\n"),
+            None
+        );
+    }
+
+    #[test]
+    fn workflow_analysis_uses_and_removes_the_latest_remote_checkout() {
+        let Ok(git) = which::which("git") else {
+            return;
+        };
+        let root = tempfile::tempdir().expect("temporary repository root");
+        let remote = root.path().join("remote.git");
+        let publisher = root.path().join("publisher");
+        let connected = root.path().join("connected");
+
+        let run = |cwd: &Path, args: &[&str]| {
+            let output = Command::new(&git)
+                .arg("-C")
+                .arg(cwd)
+                .args(args)
+                .output()
+                .expect("git command");
+            assert!(
+                output.status.success(),
+                "git {:?} failed: {}",
+                args,
+                String::from_utf8_lossy(&output.stderr)
+            );
+            String::from_utf8_lossy(&output.stdout).trim().to_string()
+        };
+
+        fs::create_dir_all(&publisher).expect("publisher directory");
+        run(&publisher, &["init", "-b", "main"]);
+        run(&publisher, &["config", "user.name", "Briar Test"]);
+        run(
+            &publisher,
+            &["config", "user.email", "briar-test@example.com"],
+        );
+        fs::write(publisher.join("version.txt"), "old\n").expect("old version");
+        run(&publisher, &["add", "version.txt"]);
+        run(&publisher, &["commit", "-m", "old version"]);
+
+        let init_remote = Command::new(&git)
+            .args(["init", "--bare", "-b", "main"])
+            .arg(&remote)
+            .output()
+            .expect("bare remote");
+        assert!(
+            init_remote.status.success(),
+            "{}",
+            String::from_utf8_lossy(&init_remote.stderr)
+        );
+        run(
+            &publisher,
+            &["remote", "add", "origin", remote.to_string_lossy().as_ref()],
+        );
+        run(&publisher, &["push", "-u", "origin", "main"]);
+
+        let clone = Command::new(&git)
+            .arg("clone")
+            .arg(&remote)
+            .arg(&connected)
+            .output()
+            .expect("connected clone");
+        assert!(
+            clone.status.success(),
+            "{}",
+            String::from_utf8_lossy(&clone.stderr)
+        );
+        fs::write(publisher.join("version.txt"), "latest\n").expect("latest version");
+        run(&publisher, &["add", "version.txt"]);
+        run(&publisher, &["commit", "-m", "latest version"]);
+        let latest_sha = run(&publisher, &["rev-parse", "HEAD"]);
+        run(&publisher, &["push", "origin", "main"]);
+
+        assert_eq!(
+            fs::read_to_string(connected.join("version.txt")).expect("connected version"),
+            "old\n"
+        );
+        let runner = host::LocalRunner::new(
+            env::var_os("PATH").unwrap_or_default(),
+            root.path().to_path_buf(),
+        );
+        let latest = prepare_latest_remote_workspace(&runner, &connected)
+            .expect("latest workspace")
+            .expect("origin workspace");
+        assert_eq!(
+            fs::read_to_string(latest.checkout.join("version.txt")).expect("analysis version"),
+            "latest\n"
+        );
+        assert_eq!(run(&latest.checkout, &["rev-parse", "HEAD"]), latest_sha);
+
+        remove_latest_remote_workspace(&runner, &connected, &latest).expect("cleanup");
+        assert!(!latest.root.exists());
+    }
+
+    #[test]
+    fn workflow_analysis_uses_the_connected_checkout_without_an_origin() {
+        let Ok(git) = which::which("git") else {
+            return;
+        };
+        let repository = tempfile::tempdir().expect("temporary repository");
+        let init = Command::new(&git)
+            .arg("-C")
+            .arg(repository.path())
+            .args(["init", "-b", "main"])
+            .output()
+            .expect("git init");
+        assert!(
+            init.status.success(),
+            "{}",
+            String::from_utf8_lossy(&init.stderr)
+        );
+        let runner = host::LocalRunner::new(
+            env::var_os("PATH").unwrap_or_default(),
+            repository.path().to_path_buf(),
+        );
+
+        assert!(prepare_latest_remote_workspace(&runner, repository.path())
+            .expect("connected fallback")
+            .is_none());
     }
 
     #[test]

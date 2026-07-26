@@ -38,6 +38,7 @@ describe("project workflow generator", () => {
       expect.objectContaining({
         projectId: "project-1",
         outputSchema: expect.objectContaining({ type: "object" }),
+        workspaceMode: "latestRemoteBase",
       }),
     );
   });
