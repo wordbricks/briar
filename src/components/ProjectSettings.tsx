@@ -1,14 +1,17 @@
 import {
   AlertTriangle,
   ArrowLeft,
+  ArrowRight,
   Bot,
   Check,
+  CheckCircle2,
   Copy,
   Download,
   GitBranch,
   Link2,
   LoaderCircle,
   RefreshCw,
+  Rocket,
   ShieldCheck,
   SlidersHorizontal,
   Trash2,
@@ -847,12 +850,104 @@ export function ProjectSettings({
               ) : null}
             </div>
             {workflowContract ? (
-              <div className="project-workflow-contract">
-                <div>
+              <div
+                aria-label={t("settings.workflowDiagram")}
+                className="project-workflow-contract"
+                role="group"
+              >
+                <div className="project-workflow-repository">
                   <span>{t("settings.repository")}</span>
                   <strong>{dashboard?.settings.githubRepository ?? t("settings.noRepository")}</strong>
+                  <span className="project-workflow-version">
+                    {workflow?.preset ?? "custom"} · v{workflowContract.version}
+                  </span>
                 </div>
-                <pre aria-label={t("settings.workflowJson")}><code>{workflowJson}</code></pre>
+                <div className="project-workflow-diagram">
+                  <ol className="project-workflow-stages">
+                    {workflowContract.stages.map((stage, index) => (
+                      <li key={`${stage.id}-${index}`}>
+                        <article
+                          className={`project-workflow-stage ${
+                            stage.required ? "required" : "optional"
+                          }`}
+                        >
+                          <header>
+                            <span>{index + 1}</span>
+                            <em>
+                              {t(
+                                stage.required
+                                  ? "common.required"
+                                  : "common.optional",
+                              )}
+                            </em>
+                          </header>
+                          <strong>{stage.label}</strong>
+                          <code>{stage.id}</code>
+                          {stage.evidence?.length ? (
+                            <div className="project-workflow-stage-detail">
+                              <span>{t("settings.workflowEvidence")}</span>
+                              <ul>
+                                {stage.evidence.map((item) => (
+                                  <li key={item}>{item}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          ) : null}
+                          {stage.checks?.length ? (
+                            <div className="project-workflow-stage-detail">
+                              <span>{t("settings.workflowChecks")}</span>
+                              <ul className="project-workflow-checks">
+                                {stage.checks.map((check) => (
+                                  <li key={check}>{check}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          ) : null}
+                        </article>
+                        {index < workflowContract.stages.length - 1 ? (
+                          <span
+                            aria-hidden="true"
+                            className="project-workflow-connector"
+                          >
+                            <ArrowRight size={17} strokeWidth={1.8} />
+                          </span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ol>
+                  <footer className="project-workflow-summary">
+                    <div>
+                      <CheckCircle2 size={18} strokeWidth={1.8} />
+                      <span>
+                        <small>{t("settings.workflowCompletion")}</small>
+                        <strong>
+                          {t("settings.workflowRequiredStageCount", {
+                            count: workflowContract.completion.requiredStages.length,
+                          })}
+                        </strong>
+                      </span>
+                    </div>
+                    <div
+                      className={
+                        workflowContract.release.enabled
+                          ? "project-workflow-release enabled"
+                          : "project-workflow-release"
+                      }
+                    >
+                      <Rocket size={18} strokeWidth={1.8} />
+                      <span>
+                        <small>{t("settings.workflowRelease")}</small>
+                        <strong>
+                          {t(
+                            workflowContract.release.enabled
+                              ? "settings.workflowReleaseEnabled"
+                              : "settings.workflowReleaseDisabled",
+                          )}
+                        </strong>
+                      </span>
+                    </div>
+                  </footer>
+                </div>
               </div>
             ) : (
               <p className="project-settings-empty">{t("settings.loadingWorkflow")}</p>
