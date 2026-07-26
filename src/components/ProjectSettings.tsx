@@ -2,15 +2,18 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
+  Bot,
   Check,
   CheckCircle2,
   Copy,
+  Download,
   GitBranch,
   Link2,
   LoaderCircle,
   RefreshCw,
   Rocket,
   ShieldCheck,
+  SlidersHorizontal,
   Trash2,
   Zap,
 } from "lucide-react";
@@ -43,6 +46,13 @@ import type {
 } from "../lib/linear-import";
 import { LinearIssueImport } from "./LinearIssueImport";
 import { SelectMenu } from "./SelectMenu";
+
+type ProjectSettingsSection =
+  | "general"
+  | "issue-import"
+  | "auto-hunt"
+  | "workflow"
+  | "agent";
 
 export function ProjectSettings({
   dashboard,
@@ -89,6 +99,8 @@ export function ProjectSettings({
   velen: VelenInspection | null;
 }) {
   const { localeTag, t } = useI18n();
+  const [activeSection, setActiveSection] =
+    useState<ProjectSettingsSection>("general");
   const [isConfirming, setIsConfirming] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [approvalPolicy, setApprovalPolicy] = useState<ApprovalPolicy>("never");
@@ -340,25 +352,99 @@ export function ProjectSettings({
       setLinearSaving(false);
     }
   };
+  const navigationItems = [
+    {
+      id: "general" as const,
+      icon: <SlidersHorizontal size={16} strokeWidth={1.75} />,
+      label: t("settings.navGeneral"),
+      description: t("settings.navGeneralDescription"),
+    },
+    {
+      id: "issue-import" as const,
+      icon: <Download size={16} strokeWidth={1.75} />,
+      label: t("settings.navIssueImport"),
+      description: t("settings.navIssueImportDescription"),
+    },
+    {
+      id: "auto-hunt" as const,
+      icon: <Zap size={16} strokeWidth={1.75} />,
+      label: t("settings.navAutoHunt"),
+      description: t("settings.navAutoHuntDescription"),
+    },
+    {
+      id: "workflow" as const,
+      icon: <GitBranch size={16} strokeWidth={1.75} />,
+      label: t("settings.navWorkflow"),
+      description: t("settings.navWorkflowDescription"),
+    },
+    {
+      id: "agent" as const,
+      icon: <Bot size={16} strokeWidth={1.75} />,
+      label: t("settings.navAgent"),
+      description: t("settings.navAgentDescription"),
+    },
+  ];
+  const activeItem = navigationItems.find((item) => item.id === activeSection);
 
   return (
-    <main className="main-content project-settings-page">
-      <header className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region="deep">
-        <button className="project-settings-back" onClick={onBack} type="button">
-          <ArrowLeft size={16} strokeWidth={1.8} />
+    <main className="app-settings project-settings-page">
+      <aside
+        aria-hidden={!isSidebarOpen}
+        aria-label={t("settings.navigation")}
+        className={`sidebar app-settings-sidebar project-settings-sidebar${
+          isSidebarOpen ? "" : " sidebar-collapsed"
+        }`}
+        id="app-sidebar"
+        inert={!isSidebarOpen ? true : undefined}
+      >
+        <div className="app-settings-sidebar-toolbar" data-tauri-drag-region />
+
+        <button className="app-settings-back" onClick={onBack} type="button">
+          <ArrowLeft size={16} strokeWidth={1.9} />
           <span>{t("settings.back")}</span>
         </button>
-      </header>
 
-      <div className="project-settings-scroll">
-        <div className="project-settings-content">
-          <header className="project-settings-heading">
-            <p className="eyebrow">PROJECT SETTINGS</p>
-            <h1>{t("settings.title")}</h1>
-            <p>{t("settings.description", { name: project.name })}</p>
+        <nav className="app-settings-nav project-settings-nav">
+          <div className="app-settings-nav-group">
+            <p>{t("settings.title")}</p>
+            {navigationItems.map((item) => (
+              <button
+                aria-current={activeSection === item.id ? "page" : undefined}
+                className={activeSection === item.id ? "active" : ""}
+                data-project-settings-section={item.id}
+                key={item.id}
+                onClick={() => setActiveSection(item.id)}
+                type="button"
+              >
+                {item.icon}
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </div>
+        </nav>
+      </aside>
+
+      <section className="main-content app-settings-main project-settings-main">
+        <div
+          className={`app-settings-main-toolbar${
+            isSidebarOpen ? "" : " sidebar-closed"
+          }`}
+          data-tauri-drag-region="deep"
+        />
+
+        <div className="app-settings-scroll project-settings-scroll">
+          <header className="app-settings-page-header">
+            <h1>{activeItem?.label ?? t("settings.title")}</h1>
+            <p>
+              {activeItem?.description ??
+                t("settings.description", { name: project.name })}
+            </p>
           </header>
 
-          <section className="project-settings-card">
+          <section
+            className="project-settings-card"
+            hidden={activeSection !== "general"}
+          >
             <div>
               <span>{t("settings.projectName")}</span>
               <strong>{project.name}</strong>
@@ -366,7 +452,10 @@ export function ProjectSettings({
             <small>{t("settings.created", { date: new Date(project.createdAt).toLocaleDateString(localeTag) })}</small>
           </section>
 
-          <section className="project-settings-linear">
+          <section
+            className="project-settings-linear"
+            hidden={activeSection !== "issue-import"}
+          >
             <header>
               <span className="project-settings-linear-icon">
                 <Link2 size={18} strokeWidth={1.8} />
@@ -508,16 +597,24 @@ export function ProjectSettings({
             ) : null}
           </section>
 
-          <LinearIssueImport
-            onConnect={onConnectLinearImport}
-            onImport={onImportLinearIssues}
-            onLoadStates={onLoadLinearImportStates}
-            projectId={project.id}
-            repositoryConnected={repositoryConnected}
-            workflow={workflow}
-          />
+          <div
+            className="project-settings-import-panel"
+            hidden={activeSection !== "issue-import"}
+          >
+            <LinearIssueImport
+              onConnect={onConnectLinearImport}
+              onImport={onImportLinearIssues}
+              onLoadStates={onLoadLinearImportStates}
+              projectId={project.id}
+              repositoryConnected={repositoryConnected}
+              workflow={workflow}
+            />
+          </div>
 
-          <section className="project-settings-auto-run">
+          <section
+            className="project-settings-auto-run"
+            hidden={activeSection !== "auto-hunt"}
+          >
             <header>
               <span className="project-settings-auto-run-icon">
                 <Zap size={18} strokeWidth={1.8} />
@@ -692,7 +789,10 @@ export function ProjectSettings({
             ) : null}
           </section>
 
-          <section className="project-settings-automation">
+          <section
+            className="project-settings-automation"
+            hidden={activeSection !== "workflow"}
+          >
             <header>
               <span className="project-settings-automation-icon">
                 <GitBranch size={18} strokeWidth={1.8} />
@@ -854,7 +954,10 @@ export function ProjectSettings({
             )}
           </section>
 
-          <section className="project-settings-llm">
+          <section
+            className="project-settings-llm"
+            hidden={activeSection !== "agent"}
+          >
             <header>
               <span className="project-settings-llm-icon">
                 <ShieldCheck size={18} strokeWidth={1.8} />
@@ -987,7 +1090,10 @@ export function ProjectSettings({
             {settingsError && <p className="project-settings-llm-error">{settingsError}</p>}
           </section>
 
-          <section className="project-settings-danger">
+          <section
+            className="project-settings-danger"
+            hidden={activeSection !== "general"}
+          >
             <div>
               <span className="danger-icon"><AlertTriangle size={18} strokeWidth={1.8} /></span>
               <span>
@@ -1001,7 +1107,7 @@ export function ProjectSettings({
             </button>
           </section>
         </div>
-      </div>
+      </section>
 
       {isConfirming && (
         <div className="dialog-backdrop" role="presentation">
