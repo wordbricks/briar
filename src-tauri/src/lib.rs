@@ -37,6 +37,10 @@ struct StoredSession {
 struct CliProject {
     id: String,
     repository_path: String,
+    /// API environment that issued this project's agent token. Legacy entries
+    /// omit it and remain readable until the next connection save.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    api_url: Option<String>,
     /// Which machine this project executes on. Absent means the local machine,
     /// so configs written before remote hosts existed keep working unchanged.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1655,7 +1659,12 @@ fn write_cli_connection(
             extra: BTreeMap::new(),
         }
     };
-    config.api_url = api_url;
+    if !config.api_url.trim().is_empty()
+        && config.api_url.trim_end_matches('/') != api_url.trim_end_matches('/')
+    {
+        config.user_token = None;
+    }
+    config.api_url = api_url.clone();
     // `briar auto-hunt configure` owns the worktree block, so a settings save
     // from the app must not silently reset it.
     let stored_auto_hunt = config
@@ -1672,6 +1681,7 @@ fn write_cli_connection(
     config.projects.push(CliProject {
         id: project_id,
         repository_path,
+        api_url: Some(api_url),
         execution_host_id: execution_host
             .filter(|host| !host.is_local())
             .map(|host| host.as_stored()),
@@ -4245,7 +4255,7 @@ branch refs/heads/briar/second-11111111
     }
 
     #[test]
-    fn writes_cli_connection_without_losing_existing_config() {
+    fn writes_cli_connection_without_losing_non_auth_config() {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("clock should be after unix epoch")
@@ -4313,7 +4323,7 @@ branch refs/heads/briar/second-11111111
         )
         .expect("saved config should be valid json");
         assert_eq!(saved["apiUrl"], "https://briar.example.com");
-        assert_eq!(saved["userToken"], "existing-user-token");
+        assert!(saved["userToken"].is_null());
         assert_eq!(saved["customSetting"], true);
         assert_eq!(saved["projects"].as_array().map(Vec::len), Some(2));
         assert_eq!(saved["projects"][0]["label"], "keep me");
@@ -4322,6 +4332,7 @@ branch refs/heads/briar/second-11111111
             saved["projects"][0]["autoHunt"]["linear"]["customLinearSetting"],
             true
         );
+        assert_eq!(saved["projects"][1]["apiUrl"], "https://briar.example.com");
         assert_eq!(
             saved["projects"][0]["autoHunt"]["customAutoHuntSetting"],
             true
@@ -4958,6 +4969,7 @@ branch refs/heads/briar/second-11111111
         config.projects.push(CliProject {
             id: "project-1".to_string(),
             repository_path: "/repo".to_string(),
+            api_url: None,
             execution_host_id: Some(host::ssh_execution_host_id(&saved.id)),
             repository_remote: None,
             agent_token: "briar_agent_x".to_string(),
@@ -4996,6 +5008,7 @@ branch refs/heads/briar/second-11111111
             projects: vec![CliProject {
                 id: "project-1".to_string(),
                 repository_path: "/repo".to_string(),
+                api_url: Some("http://127.0.0.1:8787".to_string()),
                 execution_host_id: None,
                 repository_remote: None,
                 agent_token: "briar_agent_x".to_string(),
