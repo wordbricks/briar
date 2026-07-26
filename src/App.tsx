@@ -525,6 +525,8 @@ export function App() {
               setRequestedRunId(runId);
               navigateToPage("issues");
             }}
+            project={activeProject}
+            token={briar.token}
           />
         ) : activePage === "auto-hunt" && activeProject ? (
           <AutoHuntSessions

@@ -1,7 +1,40 @@
 import { describe, expect, it } from "vitest";
-import worker, { organizationUpdateInputSchema } from "./index";
+import worker, {
+  organizationUpdateInputSchema,
+  projectAgentScheduleInputSchema,
+} from "./index";
 
 describe("Worker HTTP contract", () => {
+  it("normalizes recurring agent schedule input", () => {
+    expect(
+      projectAgentScheduleInputSchema.parse({
+        agentId: "11111111-1111-4111-8111-111111111111",
+        name: "  Weekly audit  ",
+        recurrence: "weekly",
+        timeOfDay: "09:30",
+        dayOfWeek: 1,
+        timeZone: "Asia/Seoul",
+      }),
+    ).toEqual({
+      agentId: "11111111-1111-4111-8111-111111111111",
+      name: "Weekly audit",
+      recurrence: "weekly",
+      timeOfDay: "09:30",
+      dayOfWeek: 1,
+      timeZone: "Asia/Seoul",
+    });
+    expect(
+      projectAgentScheduleInputSchema.parse({
+        agentId: "11111111-1111-4111-8111-111111111111",
+        name: "Daily audit",
+        recurrence: "daily",
+        timeOfDay: "08:00",
+        dayOfWeek: 4,
+        timeZone: "Etc/UTC",
+      }).dayOfWeek,
+    ).toBeNull();
+  });
+
   it("accepts a name-only organization update", () => {
     expect(
       organizationUpdateInputSchema.parse({ name: "  Briar Labs  " }),

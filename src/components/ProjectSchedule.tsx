@@ -1,9 +1,15 @@
 import {
   Bot,
   CalendarClock,
+  CalendarPlus,
   ChevronLeft,
   ChevronRight,
+  CircleAlert,
   Clock3,
+  LoaderCircle,
+  Plus,
+  Repeat2,
+  X,
 } from "lucide-react";
 import {
   useEffect,
@@ -15,13 +21,31 @@ import {
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
 import {
+  createProjectAgentSchedule,
+  loadProjectAgentSchedules,
+  loadProjectAgents,
+} from "../lib/api";
+import { demoProjectAgents } from "../lib/demo-project-agents";
+import {
+  isValidProjectAgentScheduleTime,
+  normalizeProjectAgentScheduleDay,
+  type ProjectAgentScheduleRecurrence,
+} from "../lib/project-agent-schedule";
+import {
   addCalendarDays,
   minutesIntoCalendarDay,
   scheduleSegmentsForWeek,
   startOfCalendarWeek,
   type ScheduleSegment,
 } from "../lib/project-schedule";
-import type { DashboardPayload } from "../types";
+import type {
+  CreateProjectAgentScheduleInput,
+  DashboardPayload,
+  Project,
+  ProjectAgent,
+  ProjectAgentSchedule,
+} from "../types";
+import { NativeSelect } from "./NativeSelect";
 
 const dayCount = 7;
 
@@ -78,19 +102,29 @@ export function ProjectSchedule({
   isSidebarOpen,
   now: providedNow,
   onRunOpen,
+  project,
+  token,
 }: {
   dashboard: DashboardPayload | null;
   isSidebarOpen: boolean;
   now?: Date;
   onRunOpen: (runId: string) => void;
+  project: Project;
+  token: string | null;
 }) {
-  const { localeTag, t } = useI18n();
+  const { locale, localeTag, t } = useI18n();
   const [liveNow, setLiveNow] = useState(() => providedNow ?? new Date());
   const now = providedNow ?? liveNow;
   const [weekStart, setWeekStart] = useState(() =>
     startOfCalendarWeek(now),
   );
   const calendarScrollRef = useRef<HTMLDivElement>(null);
+  const [agents, setAgents] = useState<ProjectAgent[]>([]);
+  const [schedules, setSchedules] = useState<ProjectAgentSchedule[]>([]);
+  const [isScheduleDataLoading, setIsScheduleDataLoading] = useState(true);
+  const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
+  const [isCreatingSchedule, setIsCreatingSchedule] = useState(false);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
   const days = useMemo(
     () =>
       Array.from({ length: dayCount }, (_, index) =>
@@ -116,6 +150,71 @@ export function ProjectSchedule({
     const intervalId = window.setInterval(() => setLiveNow(new Date()), 60_000);
     return () => window.clearInterval(intervalId);
   }, [providedNow]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsScheduleDataLoading(true);
+    setScheduleError(null);
+    const load = token
+      ? Promise.all([
+          loadProjectAgents(token, project.id, locale),
+          loadProjectAgentSchedules(token, project.id),
+        ])
+      : Promise.resolve([
+          demoProjectAgents(project.id, locale),
+          [] as ProjectAgentSchedule[],
+        ] as const);
+    void load
+      .then(([nextAgents, nextSchedules]) => {
+        if (cancelled) return;
+        setAgents(nextAgents);
+        setSchedules(nextSchedules);
+      })
+      .catch((caught) => {
+        if (!cancelled) {
+          setScheduleError(
+            caught instanceof Error ? caught.message : String(caught),
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsScheduleDataLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [locale, project.id, token]);
+
+  const addSchedule = async (input: CreateProjectAgentScheduleInput) => {
+    setIsCreatingSchedule(true);
+    setScheduleError(null);
+    try {
+      const agent = agents.find((candidate) => candidate.id === input.agentId);
+      if (!agent) throw new Error(t("schedule.agentRequired"));
+      const createdAt = new Date().toISOString();
+      const schedule = token
+        ? await createProjectAgentSchedule(token, project.id, input)
+        : {
+            id: crypto.randomUUID(),
+            projectId: project.id,
+            agentId: agent.id,
+            agentName: agent.name,
+            agentProvider: agent.provider,
+            name: input.name,
+            recurrence: input.recurrence,
+            timeOfDay: input.timeOfDay,
+            dayOfWeek: input.dayOfWeek,
+            timeZone: input.timeZone,
+            enabled: true,
+            createdAt,
+            updatedAt: createdAt,
+          };
+      setSchedules((current) => [...current, schedule]);
+      setIsScheduleDialogOpen(false);
+    } finally {
+      setIsCreatingSchedule(false);
+    }
+  };
 
   useEffect(() => {
     const scroll = calendarScrollRef.current;
@@ -155,18 +254,68 @@ export function ProjectSchedule({
           <h1>{t("schedule.title")}</h1>
           <p>{t("schedule.description")}</p>
         </div>
-        <div className="project-schedule-summary">
-          <span>
-            <strong>{visibleRuns}</strong>
-            {t("schedule.runs")}
-          </span>
-          <i />
-          <span>
-            <strong>{formatDuration(totalMinutes)}</strong>
-            {t("schedule.agentTime")}
-          </span>
+        <div className="project-schedule-heading-actions">
+          <div className="project-schedule-summary">
+            <span>
+              <strong>{visibleRuns}</strong>
+              {t("schedule.runs")}
+            </span>
+            <i />
+            <span>
+              <strong>{formatDuration(totalMinutes)}</strong>
+              {t("schedule.agentTime")}
+            </span>
+            <i />
+            <span>
+              <strong>{schedules.length}</strong>
+              {t("schedule.automations")}
+            </span>
+          </div>
+          <button
+            className="project-schedule-create"
+            disabled={isScheduleDataLoading || agents.length === 0}
+            onClick={() => setIsScheduleDialogOpen(true)}
+            type="button"
+          >
+            {isScheduleDataLoading ? (
+              <LoaderCircle className="spin" size={15} />
+            ) : (
+              <Plus size={15} />
+            )}
+            {t("schedule.create")}
+          </button>
         </div>
       </section>
+
+      {scheduleError && (
+        <div className="project-schedule-error" role="alert">
+          <CircleAlert size={15} />
+          <span>{scheduleError}</span>
+        </div>
+      )}
+
+      {schedules.length > 0 && (
+        <section
+          aria-label={t("schedule.automations")}
+          className="project-schedule-plans"
+        >
+          {schedules.map((schedule) => (
+            <article key={schedule.id}>
+              <span className={`provider-${schedule.agentProvider}`}>
+                <CalendarClock size={15} />
+              </span>
+              <div>
+                <strong>{schedule.name}</strong>
+                <small>{schedule.agentName}</small>
+              </div>
+              <em>
+                <Repeat2 size={12} />
+                {formatScheduleCadence(schedule, localeTag, t)}
+              </em>
+            </article>
+          ))}
+        </section>
+      )}
 
       <section
         aria-label={t("schedule.calendarLabel")}
@@ -322,6 +471,270 @@ export function ProjectSchedule({
           </div>
         </div>
       </section>
+
+      {isScheduleDialogOpen && (
+        <CreateProjectAgentScheduleDialog
+          agents={agents}
+          isSubmitting={isCreatingSchedule}
+          onClose={() => setIsScheduleDialogOpen(false)}
+          onCreate={addSchedule}
+        />
+      )}
     </main>
+  );
+}
+
+type Translate = (
+  key: MessageKey,
+  variables?: Record<string, string | number>,
+) => string;
+
+function formatScheduleCadence(
+  schedule: ProjectAgentSchedule,
+  localeTag: string,
+  t: Translate,
+) {
+  const recurrence =
+    schedule.recurrence === "daily"
+      ? t("schedule.recurrence.daily")
+      : schedule.recurrence === "weekdays"
+        ? t("schedule.recurrence.weekdays")
+        : new Intl.DateTimeFormat(localeTag, { weekday: "long" }).format(
+            addCalendarDays(new Date(2026, 6, 26), schedule.dayOfWeek ?? 1),
+          );
+  return `${recurrence} · ${schedule.timeOfDay}`;
+}
+
+export function CreateProjectAgentScheduleDialog({
+  agents,
+  isSubmitting,
+  onClose,
+  onCreate,
+}: {
+  agents: ProjectAgent[];
+  isSubmitting: boolean;
+  onClose: () => void;
+  onCreate: (input: CreateProjectAgentScheduleInput) => Promise<void>;
+}) {
+  const { localeTag, t } = useI18n();
+  const [name, setName] = useState("");
+  const [agentId, setAgentId] = useState(agents[0]?.id ?? "");
+  const [recurrence, setRecurrence] =
+    useState<ProjectAgentScheduleRecurrence>("weekdays");
+  const [timeOfDay, setTimeOfDay] = useState("09:00");
+  const [dayOfWeek, setDayOfWeek] = useState(1);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const timeZone =
+    Intl.DateTimeFormat().resolvedOptions().timeZone || "Etc/UTC";
+  const selectedAgent = agents.find((agent) => agent.id === agentId);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !isSubmitting) onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isSubmitting, onClose]);
+
+  const dayOptions = Array.from({ length: 7 }, (_, index) => ({
+    label: new Intl.DateTimeFormat(localeTag, { weekday: "long" }).format(
+      addCalendarDays(new Date(2026, 6, 26), index),
+    ),
+    value: String(index),
+  }));
+
+  return (
+    <div
+      className="dialog-backdrop project-schedule-dialog-backdrop"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !isSubmitting) onClose();
+      }}
+    >
+      <form
+        aria-label={t("schedule.createDialog")}
+        aria-modal="true"
+        className="project-schedule-dialog"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (
+            !name.trim() ||
+            !agentId ||
+            !isValidProjectAgentScheduleTime(timeOfDay) ||
+            isSubmitting
+          ) {
+            return;
+          }
+          setSubmitError(null);
+          void onCreate({
+            agentId,
+            name: name.trim(),
+            recurrence,
+            timeOfDay,
+            dayOfWeek: normalizeProjectAgentScheduleDay(
+              recurrence,
+              dayOfWeek,
+            ),
+            timeZone,
+          }).catch((caught) => {
+            setSubmitError(
+              caught instanceof Error ? caught.message : String(caught),
+            );
+          });
+        }}
+        role="dialog"
+      >
+        <header>
+          <div>
+            <p className="eyebrow">
+              <CalendarPlus size={13} />
+              {t("schedule.newEyebrow")}
+            </p>
+            <h2>{t("schedule.create")}</h2>
+            <p>{t("schedule.createDescription")}</p>
+          </div>
+          <button
+            aria-label={t("common.close")}
+            disabled={isSubmitting}
+            onClick={onClose}
+            type="button"
+          >
+            <X size={18} />
+          </button>
+        </header>
+
+        <div className="project-schedule-form">
+          <label>
+            <span>
+              {t("schedule.name")} <em>{t("common.required")}</em>
+            </span>
+            <input
+              autoFocus
+              maxLength={120}
+              onChange={(event) => setName(event.target.value)}
+              placeholder={t("schedule.namePlaceholder")}
+              value={name}
+            />
+          </label>
+
+          <label>
+            <span>
+              {t("schedule.agent")} <em>{t("common.required")}</em>
+            </span>
+            <NativeSelect
+              label={t("schedule.agent")}
+              onValueChange={setAgentId}
+              options={agents.map((agent) => ({
+                label: `${agent.name} · ${agent.provider}`,
+                value: agent.id,
+              }))}
+              value={agentId}
+            />
+          </label>
+
+          {selectedAgent && (
+            <div className="project-schedule-agent-preview">
+              <span className={`provider-${selectedAgent.provider}`}>
+                <Bot size={18} />
+              </span>
+              <div>
+                <strong>{selectedAgent.name}</strong>
+                <p>{selectedAgent.responsibility}</p>
+              </div>
+            </div>
+          )}
+
+          <div className="project-schedule-form-cadence">
+            <label>
+              <span>
+                {t("schedule.recurrence")} <em>{t("common.required")}</em>
+              </span>
+              <NativeSelect
+                label={t("schedule.recurrence")}
+                onValueChange={(value) =>
+                  setRecurrence(value as ProjectAgentScheduleRecurrence)
+                }
+                options={[
+                  {
+                    label: t("schedule.recurrence.daily"),
+                    value: "daily",
+                  },
+                  {
+                    label: t("schedule.recurrence.weekdays"),
+                    value: "weekdays",
+                  },
+                  {
+                    label: t("schedule.recurrence.weekly"),
+                    value: "weekly",
+                  },
+                ]}
+                value={recurrence}
+              />
+            </label>
+            {recurrence === "weekly" && (
+              <label>
+                <span>
+                  {t("schedule.day")} <em>{t("common.required")}</em>
+                </span>
+                <NativeSelect
+                  label={t("schedule.day")}
+                  onValueChange={(value) => setDayOfWeek(Number(value))}
+                  options={dayOptions}
+                  value={String(dayOfWeek)}
+                />
+              </label>
+            )}
+            <label>
+              <span>
+                {t("schedule.time")} <em>{t("common.required")}</em>
+              </span>
+              <input
+                aria-label={t("schedule.time")}
+                onChange={(event) => setTimeOfDay(event.target.value)}
+                required
+                type="time"
+                value={timeOfDay}
+              />
+            </label>
+          </div>
+
+          <div className="project-schedule-timezone-note">
+            <Clock3 size={14} />
+            <span>
+              {t("schedule.timeZone", { timeZone })}
+            </span>
+          </div>
+
+          {submitError && (
+            <p className="project-schedule-form-error" role="alert">
+              <CircleAlert size={14} />
+              {submitError}
+            </p>
+          )}
+        </div>
+
+        <footer>
+          <button disabled={isSubmitting} onClick={onClose} type="button">
+            {t("common.cancel")}
+          </button>
+          <button
+            className="project-schedule-submit"
+            disabled={
+              isSubmitting ||
+              !name.trim() ||
+              !agentId ||
+              !isValidProjectAgentScheduleTime(timeOfDay)
+            }
+            type="submit"
+          >
+            {isSubmitting ? (
+              <LoaderCircle className="spin" size={15} />
+            ) : (
+              <Plus size={15} />
+            )}
+            {isSubmitting ? t("schedule.creating") : t("schedule.create")}
+          </button>
+        </footer>
+      </form>
+    </div>
   );
 }

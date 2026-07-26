@@ -9,12 +9,14 @@ import type {
 import type {
   CreateIssueInput,
   CreateProjectAgentInput,
+  CreateProjectAgentScheduleInput,
   DashboardPayload,
   HuntRunPlacement,
   IssueAttachment,
   IssueMessage,
   Project,
   ProjectAgent,
+  ProjectAgentSchedule,
   Organization,
   OrganizationMember,
   ProjectSettings,
@@ -48,6 +50,21 @@ const projectAgentSchema = z.object({
   provider: z.enum(["codex", "claude", "grok"]),
   model: z.string().nullable(),
   responsibility: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+const projectAgentScheduleSchema = z.object({
+  id: z.string().uuid(),
+  projectId: z.string().uuid(),
+  agentId: z.string().uuid(),
+  agentName: z.string(),
+  agentProvider: z.enum(["codex", "claude", "grok"]),
+  name: z.string(),
+  recurrence: z.enum(["daily", "weekdays", "weekly"]),
+  timeOfDay: z.string(),
+  dayOfWeek: z.number().int().min(0).max(6).nullable(),
+  timeZone: z.string(),
+  enabled: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -112,10 +129,7 @@ export type DeviceAuthorization = {
   interval: number;
 };
 
-export type DeviceClientId =
-  | "briar-mobile"
-  | "briar-android"
-  | "briar-desktop";
+export type DeviceClientId = "briar-mobile" | "briar-android" | "briar-desktop";
 
 export async function beginDeviceAuthorization(
   clientId: DeviceClientId = "briar-desktop",
@@ -149,7 +163,8 @@ export async function beginDeviceAuthorization(
 
 type DeviceTokenResponse = {
   access_token?: string;
-  error?: "authorization_pending" | "slow_down" | "access_denied" | "expired_token";
+  error?:
+    "authorization_pending" | "slow_down" | "access_denied" | "expired_token";
   error_description?: string;
 };
 
@@ -185,7 +200,9 @@ export async function loadProjects(token: string): Promise<Project[]> {
   return z.array(projectSchema).parse(result.projects);
 }
 
-export async function loadOrganizations(token: string): Promise<Organization[]> {
+export async function loadOrganizations(
+  token: string,
+): Promise<Organization[]> {
   const result = await request<{ organizations: unknown[] }>(
     "/organizations",
     token,
@@ -197,10 +214,14 @@ export async function createOrganization(
   token: string,
   input: { name: string; handle: string },
 ) {
-  const result = await request<{ organization: unknown }>("/organizations", token, {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
+  const result = await request<{ organization: unknown }>(
+    "/organizations",
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
   return { organization: organizationSchema.parse(result.organization) };
 }
 
@@ -314,6 +335,33 @@ export async function createProjectAgent(
   return projectAgentSchema.parse(result.agent);
 }
 
+export async function loadProjectAgentSchedules(
+  token: string,
+  projectId: string,
+): Promise<ProjectAgentSchedule[]> {
+  const result = await request<{ schedules: unknown[] }>(
+    `/projects/${projectId}/agent-schedules`,
+    token,
+  );
+  return z.array(projectAgentScheduleSchema).parse(result.schedules);
+}
+
+export async function createProjectAgentSchedule(
+  token: string,
+  projectId: string,
+  input: CreateProjectAgentScheduleInput,
+): Promise<ProjectAgentSchedule> {
+  const result = await request<{ schedule: unknown }>(
+    `/projects/${projectId}/agent-schedules`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+  return projectAgentScheduleSchema.parse(result.schedule);
+}
+
 export async function updateProjectAgent(
   token: string,
   projectId: string,
@@ -362,11 +410,7 @@ export async function createIssue(
     sourceKey: string;
     stage: "queued";
     attachments: IssueAttachment[];
-  }>(
-    `/projects/${projectId}/issues`,
-    token,
-    { method: "POST", body: form },
-  );
+  }>(`/projects/${projectId}/issues`, token, { method: "POST", body: form });
 }
 
 export async function loadIssueAttachment(
@@ -422,11 +466,7 @@ export async function createIssueMessage(
 
 export type HuntRecoveryResult = {
   runId: string;
-  outcome:
-    | "retried"
-    | "cancelled"
-    | "already_retried"
-    | "already_cancelled";
+  outcome: "retried" | "cancelled" | "already_retried" | "already_cancelled";
   attempt: number;
   stage: "queued" | "cancelled";
 };
@@ -489,9 +529,13 @@ export async function moveHuntRun(
 }
 
 export async function createAgentToken(token: string, projectId: string) {
-  return request<{ agentToken: string }>(`/projects/${projectId}/agent-token`, token, {
-    method: "POST",
-  });
+  return request<{ agentToken: string }>(
+    `/projects/${projectId}/agent-token`,
+    token,
+    {
+      method: "POST",
+    },
+  );
 }
 
 export async function updateProjectSettings(

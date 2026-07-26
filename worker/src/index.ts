@@ -24,6 +24,10 @@ import {
   type ProjectAgentLocale,
 } from "../../src/lib/project-agent";
 import {
+  normalizeProjectAgentScheduleDay,
+  projectAgentScheduleRecurrences,
+} from "../../src/lib/project-agent-schedule";
+import {
   maxIssueMultipartBytes,
   validateIssueAttachments,
 } from "../../src/lib/issue-attachments";
@@ -36,6 +40,7 @@ import {
   createIssueAttachments,
   createOrganization,
   createProjectAgent,
+  createProjectAgentSchedule,
   createProject,
   deleteProject,
   EventKeyConflictError,
@@ -57,6 +62,7 @@ import {
   listOrganizations,
   listProjects,
   listProjectAgents,
+  listProjectAgentSchedules,
   moveHuntRun,
   recoverHuntRun,
   recordHuntEvent,
@@ -74,6 +80,7 @@ import {
   type IssueMessageRow,
   type ProjectRow,
   type ProjectAgentRow,
+  type ProjectAgentScheduleRow,
   type ProjectSettingsRow,
   type OrganizationMemberRow,
   type OrganizationRole,
@@ -147,8 +154,14 @@ const workflowSchema = z
             id: workflowStageIdSchema,
             label: z.string().trim().min(1).max(80),
             required: z.boolean(),
-            evidence: z.array(z.string().trim().min(1).max(120)).max(20).optional(),
-            checks: z.array(z.string().trim().min(1).max(500)).max(20).optional(),
+            evidence: z
+              .array(z.string().trim().min(1).max(120))
+              .max(20)
+              .optional(),
+            checks: z
+              .array(z.string().trim().min(1).max(500))
+              .max(20)
+              .optional(),
           })
           .strict(),
       )
@@ -176,9 +189,13 @@ const statusForLegacyStage = (stage: AutoHuntStage): AutoHuntRunStatus => {
 const workflowStageForLegacyStage = (
   stage: AutoHuntStage,
 ): AutoHuntWorkflowStageId | null =>
-  ["analyzing", "implementing", "pr_open", "staging_qa", "production_qa"].includes(
-    stage,
-  )
+  [
+    "analyzing",
+    "implementing",
+    "pr_open",
+    "staging_qa",
+    "production_qa",
+  ].includes(stage)
     ? (stage as AutoHuntWorkflowStageId)
     : null;
 
@@ -189,9 +206,13 @@ const legacyStageForProgress = (
   if (status === "backlog") return "queued";
   if (status !== "running") return status;
   return workflowStage &&
-    ["analyzing", "implementing", "pr_open", "staging_qa", "production_qa"].includes(
-      workflowStage,
-    )
+    [
+      "analyzing",
+      "implementing",
+      "pr_open",
+      "staging_qa",
+      "production_qa",
+    ].includes(workflowStage)
     ? (workflowStage as AutoHuntStage)
     : "implementing";
 };
@@ -201,7 +222,10 @@ const httpsUrl = z
   .string()
   .url()
   .max(1_000)
-  .refine((value) => new URL(value).protocol === "https:", "HTTPS URL required");
+  .refine(
+    (value) => new URL(value).protocol === "https:",
+    "HTTPS URL required",
+  );
 const trackerSchema = z
   .object({
     provider: z.string().trim().min(1).max(50),
@@ -227,7 +251,11 @@ const eventSchema = z
     detail: z.string().max(4_000).nullable().optional(),
     priority: z.number().int().min(1).max(4).nullable().optional(),
     branch: nullableTrimmed(500),
-    commitSha: z.string().regex(/^[0-9a-f]{7,64}$/u).nullable().optional(),
+    commitSha: z
+      .string()
+      .regex(/^[0-9a-f]{7,64}$/u)
+      .nullable()
+      .optional(),
     tracker: trackerSchema.nullable().optional(),
     issueDescription: z.string().max(100_000).nullable().optional(),
     resultSummary: z.string().max(100_000).nullable().optional(),
@@ -236,8 +264,16 @@ const eventSchema = z
       .max(20)
       .default([])
       .transform((urls) => [...new Set(urls)].sort()),
-    targetSha: z.string().regex(/^[0-9a-f]{7,64}$/u).nullable().optional(),
-    sourceCreatedAt: z.string().datetime({ offset: true }).nullable().optional(),
+    targetSha: z
+      .string()
+      .regex(/^[0-9a-f]{7,64}$/u)
+      .nullable()
+      .optional(),
+    sourceCreatedAt: z
+      .string()
+      .datetime({ offset: true })
+      .nullable()
+      .optional(),
     qaStatus: z.literal("pending").nullable().optional(),
     stagingQaDetail: z.string().max(100_000).nullable().optional(),
     productionQaDetail: z.string().max(100_000).nullable().optional(),
@@ -268,7 +304,11 @@ const eventSchema = z
       });
     }
     const qaStage = input.workflowStage ?? input.stage;
-    if (input.qaStatus && qaStage !== "staging_qa" && qaStage !== "production_qa") {
+    if (
+      input.qaStatus &&
+      qaStage !== "staging_qa" &&
+      qaStage !== "production_qa"
+    ) {
       context.addIssue({
         code: "custom",
         message: "QA status requires a QA stage",
@@ -308,6 +348,23 @@ const projectAgentInputSchema = z
     responsibility: z.string().trim().min(1).max(2_000),
   })
   .strict();
+export const projectAgentScheduleInputSchema = z
+  .object({
+    agentId: z.string().uuid(),
+    name: z.string().trim().min(1).max(120),
+    recurrence: z.enum(projectAgentScheduleRecurrences),
+    timeOfDay: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/u),
+    dayOfWeek: z.number().int().min(0).max(6).nullable().optional(),
+    timeZone: z.string().trim().min(1).max(100),
+  })
+  .strict()
+  .transform((input) => ({
+    ...input,
+    dayOfWeek: normalizeProjectAgentScheduleDay(
+      input.recurrence,
+      input.dayOfWeek,
+    ),
+  }));
 const organizationInputSchema = z.object({
   name: z.string().trim().min(1).max(100),
   handle: z
@@ -352,7 +409,10 @@ const linearImportInputSchema = z
     apiKey: z.string().trim().min(10).max(500),
     teamIds: z.array(z.string().trim().min(1).max(100)).min(1).max(50),
     statusMapping: z
-      .record(z.string().trim().min(1).max(100), z.string().trim().min(1).max(100))
+      .record(
+        z.string().trim().min(1).max(100),
+        z.string().trim().min(1).max(100),
+      )
       .refine((value) => Object.keys(value).length > 0, {
         message: "statusMapping is required",
       }),
@@ -363,7 +423,13 @@ const issueMessageInputSchema = z
   .object({
     body: z.string().trim().min(1).max(10_000),
     parentMessageId: z.string().uuid().nullable().optional(),
-    agentConversationId: z.string().trim().min(1).max(1_000).nullable().optional(),
+    agentConversationId: z
+      .string()
+      .trim()
+      .min(1)
+      .max(1_000)
+      .nullable()
+      .optional(),
   })
   .strict();
 
@@ -510,7 +576,12 @@ const projectSettingsSchema = z
     linear: z
       .object({
         enabled: z.boolean(),
-        source: z.string().trim().regex(/^linear:\/\/.+/u).max(300).nullable(),
+        source: z
+          .string()
+          .trim()
+          .regex(/^linear:\/\/.+/u)
+          .max(300)
+          .nullable(),
         teamKey: z.string().trim().min(1).max(100).nullable(),
       })
       .strict(),
@@ -562,9 +633,13 @@ const qaResultSchema = z
   })
   .strict();
 
-async function readJson(request: Request, maxBytes = 262_144): Promise<unknown> {
+async function readJson(
+  request: Request,
+  maxBytes = 262_144,
+): Promise<unknown> {
   const declaredLength = Number(request.headers.get("content-length") ?? "0");
-  if (declaredLength > maxBytes) throw new HttpError(413, "Request body too large");
+  if (declaredLength > maxBytes)
+    throw new HttpError(413, "Request body too large");
   if (!request.body) throw new HttpError(400, "Request body is required");
 
   const reader = request.body.getReader();
@@ -692,7 +767,11 @@ const workerJson = (
   label: worker.label,
   agentProvider: worker.agent_provider,
   versions: parseJsonObject(worker.versions_json) ?? {},
-  state: workerStateAt(worker.last_heartbeat_at, observedAt, worker.state as never),
+  state: workerStateAt(
+    worker.last_heartbeat_at,
+    observedAt,
+    worker.state as never,
+  ),
   lastHeartbeatAt: worker.last_heartbeat_at,
   createdAt: worker.created_at,
 });
@@ -711,7 +790,10 @@ async function requireAgentProject(db: D1Database, request: Request) {
   if (!token.startsWith("briar_agent_")) {
     throw new HttpError(401, "Invalid agent token");
   }
-  const projectId = await findProjectIdByAgentTokenHash(db, await sha256(token));
+  const projectId = await findProjectIdByAgentTokenHash(
+    db,
+    await sha256(token),
+  );
   if (!projectId) throw new HttpError(401, "Invalid agent token");
   return projectId;
 }
@@ -725,7 +807,8 @@ async function requireProjectAccess(
   const authorization = request.headers.get("authorization") ?? "";
   if (authorization.startsWith("Bearer briar_agent_")) {
     const agentProjectId = await requireAgentProject(db, request);
-    if (agentProjectId !== projectId) throw new HttpError(404, "Attachment not found");
+    if (agentProjectId !== projectId)
+      throw new HttpError(404, "Attachment not found");
     return;
   }
   const session = await requireSession(auth, request);
@@ -764,6 +847,22 @@ const projectAgentJson = (
     updatedAt: row.updated_at,
   };
 };
+
+const projectAgentScheduleJson = (row: ProjectAgentScheduleRow) => ({
+  id: row.id,
+  projectId: row.project_id,
+  agentId: row.agent_id,
+  agentName: row.agent_name,
+  agentProvider: row.agent_provider,
+  name: row.name,
+  recurrence: row.recurrence,
+  timeOfDay: row.time_of_day,
+  dayOfWeek: row.day_of_week,
+  timeZone: row.time_zone,
+  enabled: row.enabled === 1,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
 
 const organizationJson = (row: OrganizationRow) => ({
   id: row.id,
@@ -852,7 +951,7 @@ const issueMessageJson = (message: IssueMessageRow) => ({
               ? "Grok"
               : "Claude"
         }`
-      : message.author_name ?? "알 수 없는 사용자",
+      : (message.author_name ?? "알 수 없는 사용자"),
     image: message.author_agent_provider ? null : message.author_image,
     provider: message.author_agent_provider,
   },
@@ -982,9 +1081,7 @@ async function route(
     return json({ organization: organizationJson(organization) }, 201);
   }
 
-  const organizationMatch = pathname.match(
-    /^\/organizations\/([0-9a-f-]+)$/u,
-  );
+  const organizationMatch = pathname.match(/^\/organizations\/([0-9a-f-]+)$/u);
   if (organizationMatch && request.method === "PUT") {
     const session = await requireSession(auth, request);
     const role = await getOrganizationRole(
@@ -1017,7 +1114,10 @@ async function route(
       session.user.id,
     );
     if (!role) throw new HttpError(404, "Organization not found");
-    const members = await listOrganizationMembers(db, organizationMembersMatch[1]);
+    const members = await listOrganizationMembers(
+      db,
+      organizationMembersMatch[1],
+    );
     return json({ members: members.map(organizationMemberJson) });
   }
   if (organizationMembersMatch && request.method === "POST") {
@@ -1040,7 +1140,10 @@ async function route(
     if (!userId) {
       throw new HttpError(404, "A Briar user with that email was not found");
     }
-    const members = await listOrganizationMembers(db, organizationMembersMatch[1]);
+    const members = await listOrganizationMembers(
+      db,
+      organizationMembersMatch[1],
+    );
     return json({ members: members.map(organizationMemberJson) });
   }
 
@@ -1085,8 +1188,9 @@ async function route(
       organizations = [organization];
     }
     const organization =
-      organizations.find((candidate) => candidate.id === input.organizationId) ??
-      (input.organizationId ? null : organizations[0]);
+      organizations.find(
+        (candidate) => candidate.id === input.organizationId,
+      ) ?? (input.organizationId ? null : organizations[0]);
     if (!organization || !canManageOrganization(organization.role)) {
       throw new HttpError(403, "Organization admin access required");
     }
@@ -1112,7 +1216,9 @@ async function route(
       throw new HttpError(403, "Organization owner access required");
     }
     const attachments = await listIssueAttachments(db, project.id);
-    const attachmentKeys = attachments.map((attachment) => attachment.object_key);
+    const attachmentKeys = attachments.map(
+      (attachment) => attachment.object_key,
+    );
     for (let offset = 0; offset < attachmentKeys.length; offset += 1_000) {
       await attachmentsBucket.delete(
         attachmentKeys.slice(offset, offset + 1_000),
@@ -1124,9 +1230,7 @@ async function route(
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
-  const settingsMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/settings$/u,
-  );
+  const settingsMatch = pathname.match(/^\/projects\/([0-9a-f-]+)\/settings$/u);
   if (settingsMatch && request.method === "GET") {
     const session = await requireSession(auth, request);
     const project = await getProject(db, settingsMatch[1], session.user.id);
@@ -1159,7 +1263,11 @@ async function route(
   );
   if (projectAgentsMatch && request.method === "GET") {
     const session = await requireSession(auth, request);
-    const project = await getProject(db, projectAgentsMatch[1], session.user.id);
+    const project = await getProject(
+      db,
+      projectAgentsMatch[1],
+      session.user.id,
+    );
     if (!project) throw new HttpError(404, "Project not found");
     const agents = await listProjectAgents(db, project.id);
     const locale = normalizeProjectAgentLocale(
@@ -1172,7 +1280,11 @@ async function route(
   }
   if (projectAgentsMatch && request.method === "POST") {
     const session = await requireSession(auth, request);
-    const project = await getProject(db, projectAgentsMatch[1], session.user.id);
+    const project = await getProject(
+      db,
+      projectAgentsMatch[1],
+      session.user.id,
+    );
     if (!project) throw new HttpError(404, "Project not found");
     const input = projectAgentInputSchema.parse(await readJson(request));
     const providerName =
@@ -1190,6 +1302,38 @@ async function route(
     return json({ agent: projectAgentJson(agent) }, 201);
   }
 
+  const projectAgentSchedulesMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/agent-schedules$/u,
+  );
+  if (projectAgentSchedulesMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      projectAgentSchedulesMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const schedules = await listProjectAgentSchedules(db, project.id);
+    return json({
+      schedules: schedules.map(projectAgentScheduleJson),
+    });
+  }
+  if (projectAgentSchedulesMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      projectAgentSchedulesMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const input = projectAgentScheduleInputSchema.parse(
+      await readJson(request),
+    );
+    const schedule = await createProjectAgentSchedule(db, project.id, input);
+    if (!schedule) throw new HttpError(404, "Project agent not found");
+    return json({ schedule: projectAgentScheduleJson(schedule) }, 201);
+  }
+
   const projectAgentMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/agents\/([0-9a-f-]+)$/u,
   );
@@ -1204,12 +1348,17 @@ async function route(
         : input.provider === "claude"
           ? "Claude"
           : "Grok";
-    const agent = await updateProjectAgent(db, project.id, projectAgentMatch[2], {
-      name: input.name ?? `${providerName} Agent`,
-      provider: input.provider,
-      model: input.model ?? null,
-      responsibility: input.responsibility,
-    });
+    const agent = await updateProjectAgent(
+      db,
+      project.id,
+      projectAgentMatch[2],
+      {
+        name: input.name ?? `${providerName} Agent`,
+        provider: input.provider,
+        model: input.model ?? null,
+        responsibility: input.responsibility,
+      },
+    );
     if (!agent) throw new HttpError(404, "Agent not found");
     return json({ agent: projectAgentJson(agent) });
   }
@@ -1219,7 +1368,11 @@ async function route(
   );
   if (linearConnectMatch && request.method === "POST") {
     const session = await requireSession(auth, request);
-    const project = await getProject(db, linearConnectMatch[1], session.user.id);
+    const project = await getProject(
+      db,
+      linearConnectMatch[1],
+      session.user.id,
+    );
     if (!project) throw new HttpError(404, "Project not found");
     const input = linearApiKeySchema.parse(await readJson(request));
     try {
@@ -1227,7 +1380,10 @@ async function route(
       return json({ viewer, teams });
     } catch (error) {
       if (error instanceof LinearApiError) {
-        throw new HttpError(error.status === 401 || error.status === 403 ? 401 : 502, error.message);
+        throw new HttpError(
+          error.status === 401 || error.status === 403 ? 401 : 502,
+          error.message,
+        );
       }
       throw error;
     }
@@ -1242,11 +1398,17 @@ async function route(
     if (!project) throw new HttpError(404, "Project not found");
     const input = linearStatesInputSchema.parse(await readJson(request));
     try {
-      const states = await fetchLinearWorkflowStates(input.apiKey, input.teamIds);
+      const states = await fetchLinearWorkflowStates(
+        input.apiKey,
+        input.teamIds,
+      );
       return json({ states });
     } catch (error) {
       if (error instanceof LinearApiError) {
-        throw new HttpError(error.status === 401 || error.status === 403 ? 401 : 502, error.message);
+        throw new HttpError(
+          error.status === 401 || error.status === 403 ? 401 : 502,
+          error.message,
+        );
       }
       throw error;
     }
@@ -1278,7 +1440,8 @@ async function route(
       }
       if (
         placement.status === "running" &&
-        (!placement.workflowStage || !workflowStageIds.has(placement.workflowStage))
+        (!placement.workflowStage ||
+          !workflowStageIds.has(placement.workflowStage))
       ) {
         throw new HttpError(
           400,
@@ -1297,7 +1460,10 @@ async function route(
       const runs = issues.map((issue) => {
         const mapped =
           (issue.state ? statusMap.get(issue.state.id) : null) ??
-          defaultPlacementForLinearType(issue.state?.type ?? "unstarted", firstStageId);
+          defaultPlacementForLinearType(
+            issue.state?.type ?? "unstarted",
+            firstStageId,
+          );
         return {
           sourceKey: linearSourceKey(issue.id),
           title: issue.title,
@@ -1328,7 +1494,10 @@ async function route(
       });
     } catch (error) {
       if (error instanceof LinearApiError) {
-        throw new HttpError(error.status === 401 || error.status === 403 ? 401 : 502, error.message);
+        throw new HttpError(
+          error.status === 401 || error.status === 403 ? 401 : 502,
+          error.message,
+        );
       }
       throw error;
     }
@@ -1418,7 +1587,11 @@ async function route(
   );
   if (issueMessagesMatch && request.method === "GET") {
     const session = await requireSession(auth, request);
-    const project = await getProject(db, issueMessagesMatch[1], session.user.id);
+    const project = await getProject(
+      db,
+      issueMessagesMatch[1],
+      session.user.id,
+    );
     if (!project) throw new HttpError(404, "Project not found");
     const run = await getHuntRunForProject(
       db,
@@ -1431,9 +1604,15 @@ async function route(
   }
   if (issueMessagesMatch && request.method === "POST") {
     const session = await requireSession(auth, request);
-    const project = await getProject(db, issueMessagesMatch[1], session.user.id);
+    const project = await getProject(
+      db,
+      issueMessagesMatch[1],
+      session.user.id,
+    );
     if (!project) throw new HttpError(404, "Project not found");
-    const input = issueMessageInputSchema.parse(await readJson(request, 16_384));
+    const input = issueMessageInputSchema.parse(
+      await readJson(request, 16_384),
+    );
     const agentProvider = input.agentConversationId
       ? input.agentConversationId.startsWith(`briar:claude:${project.id}:`)
         ? "claude"
@@ -1444,7 +1623,10 @@ async function route(
             : null
       : null;
     if (input.agentConversationId && !agentProvider) {
-      throw new HttpError(400, "Agent conversation does not belong to this project");
+      throw new HttpError(
+        400,
+        "Agent conversation does not belong to this project",
+      );
     }
     const message = await createIssueMessage(db, {
       id: crypto.randomUUID(),
@@ -1465,9 +1647,7 @@ async function route(
     return json({ message: issueMessageJson(message) }, 201);
   }
 
-  const issuesMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/issues$/u,
-  );
+  const issuesMatch = pathname.match(/^\/projects\/([0-9a-f-]+)\/issues$/u);
   if (issuesMatch && request.method === "POST") {
     const session = await requireSession(auth, request);
     const project = await getProject(db, issuesMatch[1], session.user.id);
@@ -1495,13 +1675,20 @@ async function route(
     let runId: string | null = null;
     try {
       for (const attachment of storedAttachments) {
-        await attachmentsBucket.put(attachment.object_key, attachment.file.stream(), {
-          httpMetadata: {
-            contentType: attachment.content_type,
-            contentDisposition: contentDisposition(attachment.filename),
+        await attachmentsBucket.put(
+          attachment.object_key,
+          attachment.file.stream(),
+          {
+            httpMetadata: {
+              contentType: attachment.content_type,
+              contentDisposition: contentDisposition(attachment.filename),
+            },
+            customMetadata: {
+              attachmentId: attachment.id,
+              projectId: project.id,
+            },
           },
-          customMetadata: { attachmentId: attachment.id, projectId: project.id },
-        });
+        );
         uploadedKeys.push(attachment.object_key);
       }
       runId = await recordHuntEvent(db, project.id, {
@@ -1515,7 +1702,8 @@ async function route(
         occurredAt,
         actor: "briar-app",
         repository: settings?.github_repository ?? project.name,
-        detail: "Briar 앱에서 생성된 이슈가 Auto Hunt 처리를 기다리고 있습니다.",
+        detail:
+          "Briar 앱에서 생성된 이슈가 Auto Hunt 처리를 기다리고 있습니다.",
         priority: input.priority ?? null,
         branch: null,
         commitSha: null,
@@ -1706,7 +1894,9 @@ async function route(
     return json(result, 202);
   }
 
-  const projectWorkersMatch = pathname.match(/^\/projects\/([0-9a-f-]+)\/workers$/u);
+  const projectWorkersMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/workers$/u,
+  );
   if (projectWorkersMatch && request.method === "GET") {
     const projectId = projectWorkersMatch[1];
     await requireProjectAccess(auth, db, request, projectId);
@@ -1732,9 +1922,17 @@ async function route(
       new URL(request.url).searchParams.get("afterSequence") ?? "0",
       10,
     );
-    const transcript = await readAgentTranscript(db, projectId, transcriptMatch[2], {
-      afterSequence: Number.isFinite(afterSequence) && afterSequence > 0 ? afterSequence : 0,
-    });
+    const transcript = await readAgentTranscript(
+      db,
+      projectId,
+      transcriptMatch[2],
+      {
+        afterSequence:
+          Number.isFinite(afterSequence) && afterSequence > 0
+            ? afterSequence
+            : 0,
+      },
+    );
     if (!transcript) throw new HttpError(404, "Transcript not found");
     return json({
       session: {
