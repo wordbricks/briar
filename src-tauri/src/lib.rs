@@ -276,6 +276,20 @@ struct StoredAutoHuntConfig {
     workflow: Option<WorkflowConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     worktrees: Option<StoredWorktreeConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    sandbox: Option<StoredSandboxConfig>,
+    #[serde(flatten)]
+    extra: BTreeMap<String, serde_json::Value>,
+}
+
+/// Sandbox settings owned by the CLI (`briar auto-hunt configure`). Absent or
+/// `fullAccess: false` keeps agent writes confined to the checkout and the
+/// per-issue worktree root.
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StoredSandboxConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    full_access: Option<bool>,
     #[serde(flatten)]
     extra: BTreeMap<String, serde_json::Value>,
 }
@@ -321,9 +335,10 @@ impl From<AutoHuntConfig> for StoredAutoHuntConfig {
             }),
             github_repository: config.github_repository,
             workflow: Some(config.workflow),
-            // Worktree settings belong to the CLI; callers carry the stored
-            // value over instead of letting an app-side save erase it.
+            // Worktree and sandbox settings belong to the CLI; callers carry the
+            // stored values over instead of letting an app-side save erase them.
             worktrees: None,
+            sandbox: None,
             extra: BTreeMap::new(),
         }
     }
@@ -1643,14 +1658,16 @@ fn write_cli_connection(
     config.api_url = api_url;
     // `briar auto-hunt configure` owns the worktree block, so a settings save
     // from the app must not silently reset it.
-    let stored_worktrees = config
+    let stored_auto_hunt = config
         .projects
         .iter()
         .find(|project| project.id == project_id)
-        .and_then(|project| project.auto_hunt.as_ref())
-        .and_then(|auto_hunt| auto_hunt.worktrees.clone());
+        .and_then(|project| project.auto_hunt.as_ref());
+    let stored_worktrees = stored_auto_hunt.and_then(|auto_hunt| auto_hunt.worktrees.clone());
+    let stored_sandbox = stored_auto_hunt.and_then(|auto_hunt| auto_hunt.sandbox.clone());
     let mut auto_hunt: StoredAutoHuntConfig = agent_config.auto_hunt.into();
     auto_hunt.worktrees = stored_worktrees;
+    auto_hunt.sandbox = stored_sandbox;
     config.projects.retain(|project| project.id != project_id);
     config.projects.push(CliProject {
         id: project_id,
@@ -3158,6 +3175,19 @@ fn project_worktree_root(
     Ok(Some(root.join(project_id)))
 }
 
+/// Whether this project opted its Auto Hunt sessions out of the filesystem
+/// sandbox. Off unless the CLI wrote `autoHunt.sandbox.fullAccess: true`.
+fn project_auto_hunt_full_access(config_path: &Path, project_id: &str) -> Result<bool, String> {
+    Ok(read_cli_config(config_path)?
+        .projects
+        .iter()
+        .find(|project| project.id == project_id)
+        .and_then(|project| project.auto_hunt.as_ref())
+        .and_then(|auto_hunt| auto_hunt.sandbox.as_ref())
+        .and_then(|sandbox| sandbox.full_access)
+        .unwrap_or(false))
+}
+
 fn project_chat_execution(
     full_access: bool,
     approval_policy: agent::ApprovalPolicy,
@@ -3236,13 +3266,20 @@ async fn start_project_auto_hunt(
         )?;
         // Each issue is worked in its own worktree outside the checkout, so the
         // agent's write sandbox has to include the worktree root as well as cwd.
+        let full_access = project_auto_hunt_full_access(&config_path, &project_id)?;
         let worktree_root = project_worktree_root(&config_path, &project_id, &home)?;
         let workspace_write_roots = match worktree_root {
             Some(root) => {
                 fs::create_dir_all(&root).map_err(|error| {
                     format!("자동사냥 워크트리 폴더를 만들지 못했습니다: {error}")
                 })?;
-                vec![path_display_string(root)?]
+                // Declared roots only mean something to a sandbox; with full
+                // access there is nothing to widen.
+                if full_access {
+                    Vec::new()
+                } else {
+                    vec![path_display_string(root)?]
+                }
             }
             None => Vec::new(),
         };
@@ -3278,6 +3315,7 @@ async fn start_project_auto_hunt(
                 event_sink,
                 environment: cli_environment.environment().to_vec(),
                 workspace_write_roots,
+                full_access,
             },
             request,
             &approve,
@@ -4943,6 +4981,14 @@ branch refs/heads/briar/second-11111111
 
     /// Write a project whose auto-hunt block carries CLI-owned worktree settings.
     fn config_with_worktree_settings(config_path: &Path, worktrees: StoredWorktreeConfig) {
+        config_with_cli_owned_settings(config_path, Some(worktrees), None)
+    }
+
+    fn config_with_cli_owned_settings(
+        config_path: &Path,
+        worktrees: Option<StoredWorktreeConfig>,
+        sandbox: Option<StoredSandboxConfig>,
+    ) {
         let config = CliConfig {
             api_url: "http://127.0.0.1:8787".to_string(),
             user_token: None,
@@ -4960,7 +5006,8 @@ branch refs/heads/briar/second-11111111
                     linear: None,
                     github_repository: None,
                     workflow: None,
-                    worktrees: Some(worktrees),
+                    worktrees,
+                    sandbox,
                     extra: BTreeMap::new(),
                 }),
                 extra: BTreeMap::new(),
@@ -5074,6 +5121,67 @@ branch refs/heads/briar/second-11111111
             .expect("worktree settings should survive an app-side save");
         assert_eq!(worktrees.root.as_deref(), Some("/custom/worktrees"));
         assert_eq!(worktrees.branch_prefix.as_deref(), Some("hunt"));
+    }
+
+    #[test]
+    fn auto_hunt_keeps_its_sandbox_unless_a_project_opts_out() {
+        let config_path = host_test_config_path("sandbox-default");
+        config_with_cli_owned_settings(&config_path, None, None);
+        assert!(!project_auto_hunt_full_access(&config_path, "project-1")
+            .expect("sandbox setting should resolve"));
+
+        let opted_out = host_test_config_path("sandbox-full-access");
+        config_with_cli_owned_settings(
+            &opted_out,
+            None,
+            Some(StoredSandboxConfig {
+                full_access: Some(true),
+                extra: BTreeMap::new(),
+            }),
+        );
+        assert!(project_auto_hunt_full_access(&opted_out, "project-1")
+            .expect("sandbox setting should resolve"));
+    }
+
+    #[test]
+    fn saving_project_settings_keeps_the_sandbox_opt_out() {
+        let config_path = host_test_config_path("sandbox-preserve");
+        config_with_cli_owned_settings(
+            &config_path,
+            None,
+            Some(StoredSandboxConfig {
+                full_access: Some(true),
+                extra: BTreeMap::new(),
+            }),
+        );
+
+        write_cli_connection(
+            &config_path,
+            CliConnectionInput {
+                api_url: "http://127.0.0.1:8787".to_string(),
+                project_id: "project-1".to_string(),
+                agent_token: "briar_agent_x".to_string(),
+                repository_path: "/repo".to_string(),
+                repository_remote: None,
+                execution_host: None,
+            },
+            LocalProjectAgentConfig {
+                llm: agent::ProjectLlmSettings::default(),
+                auto_hunt: AutoHuntConfig {
+                    velen_org: "wordbricks".to_string(),
+                    data_source: None,
+                    linear_enabled: false,
+                    linear_source: None,
+                    linear_team: None,
+                    github_repository: None,
+                    workflow: default_workflow(),
+                },
+            },
+        )
+        .expect("settings should save");
+
+        assert!(project_auto_hunt_full_access(&config_path, "project-1")
+            .expect("sandbox setting should survive an app-side save"));
     }
 
     #[test]
