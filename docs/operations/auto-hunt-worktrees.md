@@ -102,6 +102,13 @@ briar auto-hunt configure --velen-org <slug> \
 `--enable-worktrees` turns it back on. The block is owned by the CLI and is
 preserved when the app saves project settings.
 
+Issue conversation replies follow the same isolation rule. When a user mentions
+`@briar`, the app resolves the run's recorded branch (or its run-id token before
+the branch has been recorded) against Git's registered worktree list and resumes
+the agent conversation with that worktree as its workspace. If the original
+worktree has already been removed, the reply fails explicitly instead of
+running in the shared connected checkout.
+
 Removal is conservative by design:
 
 1. It refuses while the worktree has uncommitted or untracked changes, before

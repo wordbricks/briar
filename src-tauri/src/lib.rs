@@ -1869,6 +1869,135 @@ enum ProjectWorkspaceMode {
     #[default]
     Connected,
     LatestRemoteBase,
+    IssueWorktree,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct RegisteredGitWorktree {
+    path: PathBuf,
+    branch: Option<String>,
+}
+
+fn parse_registered_git_worktrees(output: &str) -> Vec<RegisteredGitWorktree> {
+    let mut worktrees = Vec::new();
+    let mut path = None;
+    let mut branch = None;
+    let flush = |worktrees: &mut Vec<RegisteredGitWorktree>,
+                 path: &mut Option<PathBuf>,
+                 branch: &mut Option<String>| {
+        if let Some(path) = path.take() {
+            worktrees.push(RegisteredGitWorktree {
+                path,
+                branch: branch.take(),
+            });
+        } else {
+            branch.take();
+        }
+    };
+
+    for line in output.lines() {
+        if let Some(value) = line.strip_prefix("worktree ") {
+            flush(&mut worktrees, &mut path, &mut branch);
+            path = Some(PathBuf::from(value.trim()));
+        } else if let Some(value) = line.strip_prefix("branch ") {
+            branch = Some(
+                value
+                    .trim()
+                    .strip_prefix("refs/heads/")
+                    .unwrap_or(value.trim())
+                    .to_string(),
+            );
+        }
+    }
+    flush(&mut worktrees, &mut path, &mut branch);
+    worktrees
+}
+
+fn auto_hunt_run_token(run_id: &str) -> Result<String, String> {
+    let compact = run_id.replace('-', "").to_ascii_lowercase();
+    if compact.len() != 32
+        || !compact
+            .bytes()
+            .all(|character| character.is_ascii_hexdigit())
+    {
+        return Err("이슈 run ID가 올바르지 않습니다.".to_string());
+    }
+    Ok(compact[..8].to_string())
+}
+
+fn branch_matches_auto_hunt_run(branch: &str, run_token: &str) -> bool {
+    let leaf = branch.rsplit('/').next().unwrap_or(branch);
+    let marker = format!("-{run_token}");
+    if leaf.ends_with(&marker) {
+        return true;
+    }
+    leaf.rsplit_once(&format!("{marker}-"))
+        .is_some_and(|(_, suffix)| {
+            !suffix.is_empty() && suffix.bytes().all(|byte| byte.is_ascii_digit())
+        })
+}
+
+fn select_issue_worktree(
+    worktree_list: &str,
+    run_id: &str,
+    recorded_branch: Option<&str>,
+) -> Result<PathBuf, String> {
+    let run_token = auto_hunt_run_token(run_id)?;
+    let recorded_branch = recorded_branch
+        .map(str::trim)
+        .filter(|branch| !branch.is_empty());
+    let matches = parse_registered_git_worktrees(worktree_list)
+        .into_iter()
+        .filter(|worktree| {
+            worktree.branch.as_deref().is_some_and(|branch| {
+                recorded_branch
+                    .map(|recorded| branch == recorded)
+                    .unwrap_or_else(|| branch_matches_auto_hunt_run(branch, &run_token))
+            })
+        })
+        .collect::<Vec<_>>();
+
+    match matches.as_slice() {
+        [worktree] => Ok(worktree.path.clone()),
+        [] => Err(
+            "이 이슈의 원래 Auto Hunt 워크트리를 찾지 못했습니다. 워크트리가 삭제되었는지 확인해 주세요."
+                .to_string(),
+        ),
+        _ => Err(
+            "이슈 run과 일치하는 Auto Hunt 워크트리가 여러 개라서 안전하게 선택할 수 없습니다."
+                .to_string(),
+        ),
+    }
+}
+
+fn resolve_issue_worktree(
+    runner: &dyn host::CommandRunner,
+    connected_workspace: &Path,
+    run_id: &str,
+    recorded_branch: Option<&str>,
+) -> Result<PathBuf, String> {
+    let git = runner.resolve_binary("git")?;
+    let output = runner.run(
+        &host::CommandSpec::new(git)
+            .args(["worktree", "list", "--porcelain"])
+            .env("GIT_TERMINAL_PROMPT", "0")
+            .working_directory(connected_workspace),
+    )?;
+    if !output.success() {
+        return Err(format!(
+            "Auto Hunt 워크트리 목록을 읽지 못했습니다: {}",
+            output.failure_message()
+        ));
+    }
+    let selected = select_issue_worktree(&output.stdout, run_id, recorded_branch)?;
+    let selected = runner
+        .canonicalize(&selected)
+        .map_err(|error| format!("이슈의 Auto Hunt 워크트리를 열지 못했습니다: {error}"))?;
+    let connected = runner.canonicalize(connected_workspace)?;
+    if selected == connected {
+        return Err("연결된 공용 저장소는 이슈 워크트리로 사용할 수 없습니다.".to_string());
+    }
+    Ok(selected)
 }
 
 struct LatestRemoteWorkspace {
@@ -2869,6 +2998,8 @@ async fn project_llm_chat(
     project_id: String,
     full_access: Option<bool>,
     workspace_mode: Option<ProjectWorkspaceMode>,
+    workspace_run_id: Option<String>,
+    workspace_branch: Option<String>,
     request: agent::ProjectLlmRequest,
 ) -> Result<agent::ProjectLlmResponse, String> {
     let config_path = cli_config_path(&app)?;
@@ -2911,15 +3042,32 @@ async fn project_llm_chat(
                 "이 대화의 에이전트 프로바이더가 앱 설정에서 비활성화되어 있습니다.".to_string(),
             );
         }
-        let latest_workspace = match workspace_mode.unwrap_or_default() {
+        let workspace_mode = workspace_mode.unwrap_or_default();
+        let latest_workspace = match workspace_mode {
             ProjectWorkspaceMode::Connected => None,
             ProjectWorkspaceMode::LatestRemoteBase => {
                 prepare_latest_remote_workspace(runner.as_ref(), &connected_workspace)?
             }
+            ProjectWorkspaceMode::IssueWorktree => None,
         };
-        let workspace = latest_workspace
-            .as_ref()
-            .map(|workspace| workspace.checkout.as_path())
+        let issue_workspace = match workspace_mode {
+            ProjectWorkspaceMode::IssueWorktree => Some(resolve_issue_worktree(
+                runner.as_ref(),
+                &connected_workspace,
+                workspace_run_id
+                    .as_deref()
+                    .ok_or_else(|| "이슈 워크트리 실행에는 run ID가 필요합니다.".to_string())?,
+                workspace_branch.as_deref(),
+            )?),
+            ProjectWorkspaceMode::Connected | ProjectWorkspaceMode::LatestRemoteBase => None,
+        };
+        let workspace = issue_workspace
+            .as_deref()
+            .or_else(|| {
+                latest_workspace
+                    .as_ref()
+                    .map(|workspace| workspace.checkout.as_path())
+            })
             .unwrap_or(connected_workspace.as_path());
         let backend = agent::discover_backend(
             provider,
@@ -3658,6 +3806,74 @@ pub fn run() {
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn selects_an_issue_worktree_by_recorded_branch() {
+        let output = "\
+worktree /repo
+HEAD aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+branch refs/heads/main
+
+worktree /worktrees/fix-login-11111111
+HEAD bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+branch refs/heads/briar/fix-login-11111111
+";
+
+        assert_eq!(
+            select_issue_worktree(
+                output,
+                "11111111-2222-3333-4444-555555555555",
+                Some("briar/fix-login-11111111"),
+            )
+            .expect("recorded branch should resolve"),
+            PathBuf::from("/worktrees/fix-login-11111111")
+        );
+    }
+
+    #[test]
+    fn recovers_an_issue_worktree_from_the_run_token_without_a_recorded_branch() {
+        let output = "\
+worktree /repo
+HEAD aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+branch refs/heads/main
+
+worktree /worktrees/fix-login-11111111-2
+HEAD bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+branch refs/heads/briar/fix-login-11111111-2
+";
+
+        assert_eq!(
+            select_issue_worktree(output, "11111111-2222-3333-4444-555555555555", None,)
+                .expect("run token should resolve"),
+            PathBuf::from("/worktrees/fix-login-11111111-2")
+        );
+    }
+
+    #[test]
+    fn refuses_to_fall_back_when_the_issue_worktree_is_missing_or_ambiguous() {
+        let missing = "\
+worktree /repo
+HEAD aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+branch refs/heads/main
+";
+        assert!(
+            select_issue_worktree(missing, "11111111-2222-3333-4444-555555555555", None,).is_err()
+        );
+
+        let ambiguous = "\
+worktree /worktrees/first-11111111
+HEAD aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+branch refs/heads/briar/first-11111111
+
+worktree /worktrees/second-11111111
+HEAD bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+branch refs/heads/briar/second-11111111
+";
+        assert!(
+            select_issue_worktree(ambiguous, "11111111-2222-3333-4444-555555555555", None,)
+                .is_err()
+        );
+    }
 
     #[test]
     fn unrestricted_project_chat_bypasses_approvals_and_sandboxing() {
