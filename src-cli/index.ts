@@ -34,6 +34,10 @@ import {
   type IssueWorktree,
   type WorktreeSettings,
 } from "./worktree";
+import {
+  sameApiEnvironment,
+  selectProjectForApi,
+} from "./config-environment";
 
 const workflowStageIdSchema = z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/u);
 
@@ -101,6 +105,7 @@ const projectConfigSchema = z
     id: z.string().uuid(),
     repositoryPath: z.string(),
     agentToken: z.string(),
+    apiUrl: z.string().url().optional(),
     repositoryRemote: z.string().optional(),
     llm: z
       .object({ provider: z.enum(["codex", "claude", "grok"]) })
@@ -149,10 +154,16 @@ const required = (name: string) => {
 
 async function loadConfig(): Promise<Config> {
   try {
-    const config = configSchema.parse(JSON.parse(await readFile(configPath, "utf8")));
+    const config = configSchema.parse(
+      JSON.parse(await readFile(configPath, "utf8")),
+    );
+    const apiUrl = process.env.BRIAR_API_URL ?? config.apiUrl;
     return {
       ...config,
-      apiUrl: process.env.BRIAR_API_URL ?? config.apiUrl,
+      apiUrl,
+      userToken: sameApiEnvironment(apiUrl, config.apiUrl)
+        ? config.userToken
+        : undefined,
     };
   } catch {
     return { apiUrl: defaultApiUrl, projects: [] };
@@ -352,12 +363,11 @@ async function currentProject(config: Config): Promise<ProjectConfig> {
     );
   };
   const requestedProjectId = process.env.BRIAR_PROJECT_ID?.trim();
-  const project = requestedProjectId
-    ? config.projects.find(
-        (candidate) =>
-          candidate.id === requestedProjectId && matchesRepository(candidate),
-      )
-    : config.projects.find(matchesRepository);
+  const project = selectProjectForApi(
+    config.projects.filter(matchesRepository),
+    config.apiUrl,
+    requestedProjectId,
+  );
   if (!project) {
     if (requestedProjectId) {
       throw new Error(
@@ -390,6 +400,7 @@ async function createProject() {
       repositoryPath,
       repositoryRemote: gitValue(["remote", "get-url", "origin"]) ?? undefined,
       agentToken: result.agentToken,
+      apiUrl: config.apiUrl,
     },
   ];
   await saveConfig(config);
@@ -409,6 +420,7 @@ async function connectProject() {
       repositoryPath,
       repositoryRemote: gitValue(["remote", "get-url", "origin"]) ?? undefined,
       agentToken,
+      apiUrl: config.apiUrl,
     },
   ];
   await saveConfig(config);
