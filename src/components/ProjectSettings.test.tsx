@@ -144,7 +144,7 @@ describe("ProjectSettings", () => {
       "Claude가 읽기 전용 경계를 넘어야 할 때 승인을 요청합니다.",
     );
     expect(container.querySelector(".project-settings-automation")?.textContent).toContain(
-      "completion",
+      "완료 조건",
     );
     expect(container.querySelector(".project-settings-auto-run")?.textContent).toContain(
       "자동 실행 조건",
@@ -156,8 +156,13 @@ describe("ProjectSettings", () => {
       "bun run test",
     );
     expect(container.querySelector(".project-workflow-contract")?.textContent).toContain(
-      '"enabled": false',
+      "릴리스비활성",
     );
+    expect(container.querySelector(".project-workflow-contract pre")).toBeNull();
+    expect(container.querySelectorAll(".project-workflow-stage")).toHaveLength(3);
+    expect(
+      container.querySelector(".project-workflow-contract")?.getAttribute("aria-label"),
+    ).toBe("Auto Hunt 워크플로 다이어그램");
 
     const regenerateButton = Array.from(
       container.querySelectorAll<HTMLButtonElement>(
