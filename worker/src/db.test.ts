@@ -165,6 +165,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db,
       await readFile(resolve("migrations/0016_project_agents.sql"), "utf8"),
     );
+    await executeSql(
+      db,
+      await readFile(resolve("migrations/0017_default_auto_hunt_agent.sql"), "utf8"),
+    );
   });
 
   afterAll(async () => {
@@ -203,7 +207,20 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ).toMatchObject({ results: [] });
   });
 
-  it("creates and lists agents scoped to a project", async () => {
+  it("backfills one default Auto Hunt agent for an existing project", async () => {
+    await expect(listProjectAgents(db, projectId)).resolves.toEqual([
+      expect.objectContaining({
+        project_id: projectId,
+        name: "Auto Hunt agent",
+        provider: "codex",
+        model: null,
+        responsibility: "Perform Auto Hunt for every queued issue.",
+        kind: "auto_hunt",
+      }),
+    ]);
+  });
+
+  it("creates and lists custom agents scoped to a project", async () => {
     const agent = await createProjectAgent(db, projectId, {
       name: "Sentry 오류 탐지 에이전트",
       provider: "claude",
@@ -217,7 +234,12 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       provider: "claude",
       model: "opus",
     });
-    await expect(listProjectAgents(db, projectId)).resolves.toEqual([agent]);
+    await expect(listProjectAgents(db, projectId)).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "auto_hunt" }),
+        agent,
+      ]),
+    );
     await expect(
       listProjectAgents(db, "22222222-2222-4222-8222-222222222222"),
     ).resolves.toEqual([]);
@@ -368,6 +390,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       agentTokenHash: "d".repeat(64),
     });
 
+    await expect(listProjectAgents(db, project.id)).resolves.toEqual([
+      expect.objectContaining({
+        project_id: project.id,
+        provider: "codex",
+        kind: "auto_hunt",
+      }),
+    ]);
     await expect(deleteProject(db, project.id, "someone-else")).resolves.toBe(false);
     await expect(getProject(db, project.id, "owner")).resolves.not.toBeNull();
     await expect(deleteProject(db, project.id, "owner")).resolves.toBe(true);

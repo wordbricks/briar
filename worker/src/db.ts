@@ -15,8 +15,10 @@ import {
   normalizeAutoHuntAutomation,
   type AutoHuntAutomation,
 } from "../../src/lib/auto-hunt-automation";
+import { defaultProjectAgentCopy } from "../../src/lib/project-agent";
 
 type ProjectAgentProvider = "codex" | "claude" | "grok";
+type ProjectAgentKind = "auto_hunt" | "custom";
 
 export type ProjectRow = {
   id: string;
@@ -65,6 +67,7 @@ export type ProjectAgentRow = {
   provider: ProjectAgentProvider;
   model: string | null;
   responsibility: string;
+  kind: ProjectAgentKind;
   created_at: string;
   updated_at: string;
 };
@@ -419,6 +422,18 @@ export async function createProject(
     member_role: "owner",
     created_at: createdAt,
   };
+  const defaultAgentCopy = defaultProjectAgentCopy("en");
+  const defaultAgent: ProjectAgentRow = {
+    id: crypto.randomUUID(),
+    project_id: project.id,
+    name: defaultAgentCopy.name,
+    provider: "codex",
+    model: null,
+    responsibility: defaultAgentCopy.responsibility,
+    kind: "auto_hunt",
+    created_at: createdAt,
+    updated_at: createdAt,
+  };
   await db.batch([
     db
       .prepare(
@@ -443,6 +458,24 @@ export async function createProject(
          ) values (?, ?, ?)`,
       )
       .bind(project.id, createdAt, createdAt),
+    db
+      .prepare(
+        `insert into briar_project_agents (
+           id, project_id, name, provider, model, responsibility,
+           created_at, updated_at, kind
+         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        defaultAgent.id,
+        defaultAgent.project_id,
+        defaultAgent.name,
+        defaultAgent.provider,
+        defaultAgent.model,
+        defaultAgent.responsibility,
+        defaultAgent.created_at,
+        defaultAgent.updated_at,
+        defaultAgent.kind,
+      ),
   ]);
   return project;
 }
@@ -493,7 +526,7 @@ export async function listProjectAgents(
   const result = await db
     .prepare(
       `select id, project_id, name, provider, model, responsibility,
-              created_at, updated_at
+              kind, created_at, updated_at
        from briar_project_agents
        where project_id = ?
        order by created_at, id`,
@@ -521,6 +554,7 @@ export async function createProjectAgent(
     provider: input.provider,
     model: input.model,
     responsibility: input.responsibility,
+    kind: "custom",
     created_at: createdAt,
     updated_at: createdAt,
   };
@@ -528,8 +562,8 @@ export async function createProjectAgent(
     .prepare(
       `insert into briar_project_agents (
          id, project_id, name, provider, model, responsibility,
-         created_at, updated_at
-       ) values (?, ?, ?, ?, ?, ?, ?, ?)`,
+         created_at, updated_at, kind
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       agent.id,
@@ -540,6 +574,7 @@ export async function createProjectAgent(
       agent.responsibility,
       agent.created_at,
       agent.updated_at,
+      agent.kind,
     )
     .run();
   return agent;

@@ -50,11 +50,11 @@ describe("ProjectAgents", () => {
     );
     await act(async () => Promise.resolve());
 
-    expect(container.textContent).toContain("Jay 자동 사냥 에이전트");
+    expect(container.textContent).toContain("자동 사냥 에이전트");
     expect(container.textContent).toContain("Sentry 오류 탐지 에이전트");
     expect(container.textContent).toContain("Feedback 분석 에이전트");
     expect(container.textContent).toContain(
-      "Jay한테 assign된 todo 이슈를 3개씩 처리하는 에이전트",
+      "모든 대기중인 이슈에 대해서 자동사냥을 수행하는것",
     );
   });
 

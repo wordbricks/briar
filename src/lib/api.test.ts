@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createProjectAgent, loadSession } from "./api";
+import { createProjectAgent, loadProjectAgents, loadSession } from "./api";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -66,6 +66,31 @@ describe("API errors", () => {
         "/projects/22222222-2222-4222-8222-222222222222/agents",
       ),
       expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("requests project agents in the active locale", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ agents: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      loadProjectAgents(
+        "token",
+        "22222222-2222-4222-8222-222222222222",
+        "zh",
+      ),
+    ).resolves.toEqual([]);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "/projects/22222222-2222-4222-8222-222222222222/agents?locale=zh",
+      ),
+      expect.any(Object),
     );
   });
 });
