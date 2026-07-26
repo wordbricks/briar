@@ -16,6 +16,8 @@ import {
   type AutoHuntAutomation,
 } from "../../src/lib/auto-hunt-automation";
 
+type ProjectAgentProvider = "codex" | "claude" | "grok";
+
 export type ProjectRow = {
   id: string;
   name: string;
@@ -52,6 +54,17 @@ export type ProjectSettingsRow = {
   github_repository: string | null;
   workflow_json: string;
   auto_hunt_automation_json: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ProjectAgentRow = {
+  id: string;
+  project_id: string;
+  name: string;
+  provider: ProjectAgentProvider;
+  model: string | null;
+  responsibility: string;
   created_at: string;
   updated_at: string;
 };
@@ -471,6 +484,65 @@ export async function deleteProject(
     .bind(projectId, userId)
     .run();
   return result.meta.changes > 0;
+}
+
+export async function listProjectAgents(
+  db: D1Database,
+  projectId: string,
+) {
+  const result = await db
+    .prepare(
+      `select id, project_id, name, provider, model, responsibility,
+              created_at, updated_at
+       from briar_project_agents
+       where project_id = ?
+       order by created_at, id`,
+    )
+    .bind(projectId)
+    .all<ProjectAgentRow>();
+  return result.results;
+}
+
+export async function createProjectAgent(
+  db: D1Database,
+  projectId: string,
+  input: {
+    name: string;
+    provider: ProjectAgentProvider;
+    model: string | null;
+    responsibility: string;
+  },
+) {
+  const createdAt = new Date().toISOString();
+  const agent: ProjectAgentRow = {
+    id: crypto.randomUUID(),
+    project_id: projectId,
+    name: input.name,
+    provider: input.provider,
+    model: input.model,
+    responsibility: input.responsibility,
+    created_at: createdAt,
+    updated_at: createdAt,
+  };
+  await db
+    .prepare(
+      `insert into briar_project_agents (
+         id, project_id, name, provider, model, responsibility,
+         created_at, updated_at
+       ) values (?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      agent.id,
+      agent.project_id,
+      agent.name,
+      agent.provider,
+      agent.model,
+      agent.responsibility,
+      agent.created_at,
+      agent.updated_at,
+    )
+    .run();
+  return agent;
 }
 
 export async function getProjectSettings(db: D1Database, projectId: string) {

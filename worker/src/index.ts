@@ -30,6 +30,7 @@ import {
   createIssueMessage,
   createIssueAttachments,
   createOrganization,
+  createProjectAgent,
   createProject,
   deleteProject,
   EventKeyConflictError,
@@ -50,6 +51,7 @@ import {
   listOrganizationMembers,
   listOrganizations,
   listProjects,
+  listProjectAgents,
   moveHuntRun,
   recoverHuntRun,
   recordHuntEvent,
@@ -65,6 +67,7 @@ import {
   type IssueAttachmentRow,
   type IssueMessageRow,
   type ProjectRow,
+  type ProjectAgentRow,
   type ProjectSettingsRow,
   type OrganizationMemberRow,
   type OrganizationRole,
@@ -291,6 +294,14 @@ const projectInputSchema = z.object({
   name: z.string().trim().min(1).max(100),
   organizationId: z.string().uuid().optional(),
 });
+const projectAgentInputSchema = z
+  .object({
+    name: z.string().trim().min(1).max(100).nullable().optional(),
+    provider: z.enum(["codex", "claude", "grok"]),
+    model: z.string().trim().min(1).max(100).nullable().optional(),
+    responsibility: z.string().trim().min(1).max(2_000),
+  })
+  .strict();
 const organizationInputSchema = z.object({
   name: z.string().trim().min(1).max(100),
   handle: z
@@ -728,6 +739,17 @@ function projectJson(row: ProjectRow) {
   };
 }
 
+const projectAgentJson = (row: ProjectAgentRow) => ({
+  id: row.id,
+  projectId: row.project_id,
+  name: row.name,
+  provider: row.provider,
+  model: row.model,
+  responsibility: row.responsibility,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+
 const organizationJson = (row: OrganizationRow) => ({
   id: row.id,
   name: row.name,
@@ -1115,6 +1137,36 @@ async function route(
       automation: input.automation,
     });
     return json({ settings: settingsJson(settings) });
+  }
+
+  const projectAgentsMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/agents$/u,
+  );
+  if (projectAgentsMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, projectAgentsMatch[1], session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    const agents = await listProjectAgents(db, project.id);
+    return json({ agents: agents.map(projectAgentJson) });
+  }
+  if (projectAgentsMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, projectAgentsMatch[1], session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    const input = projectAgentInputSchema.parse(await readJson(request));
+    const providerName =
+      input.provider === "codex"
+        ? "Codex"
+        : input.provider === "claude"
+          ? "Claude"
+          : "Grok";
+    const agent = await createProjectAgent(db, project.id, {
+      name: input.name ?? `${providerName} Agent`,
+      provider: input.provider,
+      model: input.model ?? null,
+      responsibility: input.responsibility,
+    });
+    return json({ agent: projectAgentJson(agent) }, 201);
   }
 
   const linearConnectMatch = pathname.match(

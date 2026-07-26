@@ -126,6 +126,24 @@ export type Project = {
   createdAt: string;
 };
 
+export type ProjectAgent = {
+  id: string;
+  projectId: string;
+  name: string;
+  provider: AgentProvider;
+  model: string | null;
+  responsibility: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateProjectAgentInput = {
+  name: string | null;
+  provider: AgentProvider;
+  model: string | null;
+  responsibility: string;
+};
+
 export type Organization = {
   id: string;
   name: string;

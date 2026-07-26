@@ -21,6 +21,7 @@ import { LoginScreen } from "./components/LoginScreen";
 import { OrganizationSettings } from "./components/OrganizationSettings";
 import { OrganizationCreate } from "./components/OrganizationCreate";
 import { ProjectOnboarding } from "./components/ProjectOnboarding";
+import { ProjectAgents } from "./components/ProjectAgents";
 import { ProjectRepositorySetupDialog } from "./components/ProjectRepositorySetupDialog";
 import { ProjectSettings } from "./components/ProjectSettings";
 import { Sidebar } from "./components/Sidebar";
@@ -50,6 +51,7 @@ import { isRepositoryConnectedForImport } from "./lib/linear-import";
 
 type ActivePage =
   | "issues"
+  | "agents"
   | "auto-hunt"
   | "inbox"
   | "project-settings"
@@ -334,6 +336,7 @@ export function App() {
             connectedProjectIds={briar.connectedProjectIds}
             isOpen={isSidebarOpen}
             onAddProject={briar.startProjectCreation}
+            onAgentsOpen={() => navigateToPage("agents")}
             onAutoHuntOpen={() => navigateToPage("auto-hunt")}
             onInboxOpen={() => navigateToPage("inbox")}
             onIssuesOpen={() => navigateToPage("issues")}
@@ -504,6 +507,12 @@ export function App() {
               repositoryPath: briar.health?.repositoryPath,
             })}
             velen={briar.velen}
+          />
+        ) : activePage === "agents" && activeProject ? (
+          <ProjectAgents
+            isSidebarOpen={isSidebarOpen}
+            project={activeProject}
+            token={briar.token}
           />
         ) : activePage === "auto-hunt" && activeProject ? (
           <AutoHuntSessions
