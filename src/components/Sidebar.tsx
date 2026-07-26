@@ -2,6 +2,7 @@ import {
   Activity,
   Bot,
   Building2,
+  CalendarDays,
   CircleAlert,
   ChevronDown,
   ChevronLeft,
@@ -32,6 +33,7 @@ export function Sidebar({
   isOpen,
   onAddProject,
   onAgentsOpen,
+  onScheduleOpen,
   onAutoHuntOpen,
   onInboxOpen,
   onIssuesOpen,
@@ -52,6 +54,7 @@ export function Sidebar({
   activePage:
     | "issues"
     | "agents"
+    | "schedule"
     | "auto-hunt"
     | "inbox"
     | "project-settings"
@@ -64,6 +67,7 @@ export function Sidebar({
   isOpen: boolean;
   onAddProject: () => void;
   onAgentsOpen: () => void;
+  onScheduleOpen: () => void;
   onAutoHuntOpen: () => void;
   onInboxOpen: () => void;
   onIssuesOpen: () => void;
@@ -545,6 +549,18 @@ export function Sidebar({
                     >
                       <Bot size={14} strokeWidth={1.7} />
                       <span>{t("sidebar.agents")}</span>
+                    </a>
+                    <a
+                      aria-current={activePage === "schedule" ? "page" : undefined}
+                      className={`sidebar-project-view${activePage === "schedule" ? " active" : ""}`}
+                      href="#schedule"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        onScheduleOpen();
+                      }}
+                    >
+                      <CalendarDays size={14} strokeWidth={1.7} />
+                      <span>{t("sidebar.schedule")}</span>
                     </a>
                     <a
                       aria-current={activePage === "auto-hunt" ? "page" : undefined}
