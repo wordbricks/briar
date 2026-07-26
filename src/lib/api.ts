@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { validateIssueAttachments } from "./issue-attachments";
+import type { ProjectAgentLocale } from "./project-agent";
 import type {
   LinearImportConnectResult,
   LinearImportResult,
@@ -287,9 +288,10 @@ export async function deleteProject(token: string, projectId: string) {
 export async function loadProjectAgents(
   token: string,
   projectId: string,
+  locale: ProjectAgentLocale,
 ): Promise<ProjectAgent[]> {
   const result = await request<{ agents: unknown[] }>(
-    `/projects/${projectId}/agents`,
+    `/projects/${projectId}/agents?locale=${encodeURIComponent(locale)}`,
     token,
   );
   return z.array(projectAgentSchema).parse(result.agents);

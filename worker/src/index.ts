@@ -19,6 +19,11 @@ import {
   normalizeAutoHuntAutomation,
 } from "../../src/lib/auto-hunt-automation";
 import {
+  defaultProjectAgentCopy,
+  normalizeProjectAgentLocale,
+  type ProjectAgentLocale,
+} from "../../src/lib/project-agent";
+import {
   maxIssueMultipartBytes,
   validateIssueAttachments,
 } from "../../src/lib/issue-attachments";
@@ -739,16 +744,25 @@ function projectJson(row: ProjectRow) {
   };
 }
 
-const projectAgentJson = (row: ProjectAgentRow) => ({
-  id: row.id,
-  projectId: row.project_id,
-  name: row.name,
-  provider: row.provider,
-  model: row.model,
-  responsibility: row.responsibility,
-  createdAt: row.created_at,
-  updatedAt: row.updated_at,
-});
+const projectAgentJson = (
+  row: ProjectAgentRow,
+  locale: ProjectAgentLocale = "en",
+) => {
+  const copy =
+    row.kind === "auto_hunt"
+      ? defaultProjectAgentCopy(locale)
+      : { name: row.name, responsibility: row.responsibility };
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    name: copy.name,
+    provider: row.provider,
+    model: row.model,
+    responsibility: copy.responsibility,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+};
 
 const organizationJson = (row: OrganizationRow) => ({
   id: row.id,
@@ -1147,7 +1161,13 @@ async function route(
     const project = await getProject(db, projectAgentsMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
     const agents = await listProjectAgents(db, project.id);
-    return json({ agents: agents.map(projectAgentJson) });
+    const locale = normalizeProjectAgentLocale(
+      new URL(request.url).searchParams.get("locale") ??
+        request.headers.get("accept-language"),
+    );
+    return json({
+      agents: agents.map((agent) => projectAgentJson(agent, locale)),
+    });
   }
   if (projectAgentsMatch && request.method === "POST") {
     const session = await requireSession(auth, request);

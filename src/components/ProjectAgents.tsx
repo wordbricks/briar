@@ -16,6 +16,7 @@ import {
   agentModels,
   type AgentProvider,
 } from "../lib/project-llm";
+import { defaultProjectAgentCopy } from "../lib/project-agent";
 import type {
   CreateProjectAgentInput,
   Project,
@@ -29,16 +30,20 @@ const providerLabels: Record<AgentProvider, string> = {
   grok: "Grok",
 };
 
-function demoAgents(projectId: string): ProjectAgent[] {
+function demoAgents(
+  projectId: string,
+  locale: "ko" | "en" | "zh",
+): ProjectAgent[] {
   const createdAt = new Date("2026-07-26T09:00:00.000Z").toISOString();
+  const defaultAgent = defaultProjectAgentCopy(locale);
   return [
     {
       id: "demo-agent-jay",
       projectId,
-      name: "Jay 자동 사냥 에이전트",
+      name: defaultAgent.name,
       provider: "codex",
-      model: "gpt-5.6-terra",
-      responsibility: "Jay한테 assign된 todo 이슈를 3개씩 처리하는 에이전트",
+      model: null,
+      responsibility: defaultAgent.responsibility,
       createdAt,
       updatedAt: createdAt,
     },
@@ -76,7 +81,7 @@ export function ProjectAgents({
   project: Project;
   token: string | null;
 }) {
-  const { localeTag, t } = useI18n();
+  const { locale, localeTag, t } = useI18n();
   const [agents, setAgents] = useState<ProjectAgent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
@@ -88,8 +93,8 @@ export function ProjectAgents({
     setIsLoading(true);
     setError(null);
     const load = token
-      ? loadProjectAgents(token, project.id)
-      : Promise.resolve(demoAgents(project.id));
+      ? loadProjectAgents(token, project.id, locale)
+      : Promise.resolve(demoAgents(project.id, locale));
     void load
       .then((nextAgents) => {
         if (!cancelled) setAgents(nextAgents);
@@ -105,7 +110,7 @@ export function ProjectAgents({
     return () => {
       cancelled = true;
     };
-  }, [project.id, token]);
+  }, [locale, project.id, token]);
 
   const addAgent = async (input: CreateProjectAgentInput) => {
     setIsCreating(true);
