@@ -22,6 +22,7 @@ import { OrganizationSettings } from "./components/OrganizationSettings";
 import { OrganizationCreate } from "./components/OrganizationCreate";
 import { ProjectOnboarding } from "./components/ProjectOnboarding";
 import { ProjectAgents } from "./components/ProjectAgents";
+import { ProjectSchedule } from "./components/ProjectSchedule";
 import { ProjectRepositorySetupDialog } from "./components/ProjectRepositorySetupDialog";
 import { ProjectSettings } from "./components/ProjectSettings";
 import { Sidebar } from "./components/Sidebar";
@@ -52,6 +53,7 @@ import { isRepositoryConnectedForImport } from "./lib/linear-import";
 type ActivePage =
   | "issues"
   | "agents"
+  | "schedule"
   | "auto-hunt"
   | "inbox"
   | "project-settings"
@@ -337,6 +339,7 @@ export function App() {
             isOpen={isSidebarOpen}
             onAddProject={briar.startProjectCreation}
             onAgentsOpen={() => navigateToPage("agents")}
+            onScheduleOpen={() => navigateToPage("schedule")}
             onAutoHuntOpen={() => navigateToPage("auto-hunt")}
             onInboxOpen={() => navigateToPage("inbox")}
             onIssuesOpen={() => navigateToPage("issues")}
@@ -513,6 +516,15 @@ export function App() {
             isSidebarOpen={isSidebarOpen}
             project={activeProject}
             token={briar.token}
+          />
+        ) : activePage === "schedule" && activeProject ? (
+          <ProjectSchedule
+            dashboard={briar.dashboard}
+            isSidebarOpen={isSidebarOpen}
+            onRunOpen={(runId) => {
+              setRequestedRunId(runId);
+              navigateToPage("issues");
+            }}
           />
         ) : activePage === "auto-hunt" && activeProject ? (
           <AutoHuntSessions
