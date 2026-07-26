@@ -580,6 +580,46 @@ export async function createProjectAgent(
   return agent;
 }
 
+export async function updateProjectAgent(
+  db: D1Database,
+  projectId: string,
+  agentId: string,
+  input: {
+    name: string;
+    provider: ProjectAgentProvider;
+    model: string | null;
+    responsibility: string;
+  },
+) {
+  const updatedAt = new Date().toISOString();
+  const result = await db
+    .prepare(
+      `update briar_project_agents
+       set name = ?, provider = ?, model = ?, responsibility = ?, updated_at = ?
+       where id = ? and project_id = ?`,
+    )
+    .bind(
+      input.name,
+      input.provider,
+      input.model,
+      input.responsibility,
+      updatedAt,
+      agentId,
+      projectId,
+    )
+    .run();
+  if (result.meta.changes === 0) return null;
+  return db
+    .prepare(
+      `select id, project_id, name, provider, model, responsibility,
+              kind, created_at, updated_at
+       from briar_project_agents
+       where id = ? and project_id = ?`,
+    )
+    .bind(agentId, projectId)
+    .first<ProjectAgentRow>();
+}
+
 export async function getProjectSettings(db: D1Database, projectId: string) {
   return await db
     .prepare(

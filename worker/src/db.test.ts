@@ -32,6 +32,7 @@ import {
   recordHuntEvent,
   recordQaResult,
   updateProjectSettings,
+  updateProjectAgent,
   updateOrganization,
 } from "./db";
 
@@ -243,6 +244,39 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await expect(
       listProjectAgents(db, "22222222-2222-4222-8222-222222222222"),
     ).resolves.toEqual([]);
+  });
+
+  it("updates a project agent only within its project", async () => {
+    const current = (await listProjectAgents(db, projectId))[0];
+    const updated = await updateProjectAgent(db, projectId, current.id, {
+      name: "Release coordinator",
+      provider: "claude",
+      model: "sonnet",
+      responsibility: "Coordinates release checks and reports the result.",
+    });
+
+    expect(updated).toMatchObject({
+      id: current.id,
+      project_id: projectId,
+      name: "Release coordinator",
+      provider: "claude",
+      model: "sonnet",
+      responsibility: "Coordinates release checks and reports the result.",
+      kind: "auto_hunt",
+    });
+    await expect(
+      updateProjectAgent(
+        db,
+        "22222222-2222-4222-8222-222222222222",
+        current.id,
+        {
+          name: "Wrong project",
+          provider: "grok",
+          model: null,
+          responsibility: "Must not update another project.",
+        },
+      ),
+    ).resolves.toBeNull();
   });
 
   it("stores automation settings and preserves them for older settings clients", async () => {

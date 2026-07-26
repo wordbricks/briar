@@ -144,6 +144,8 @@ export type CreateProjectAgentInput = {
   responsibility: string;
 };
 
+export type UpdateProjectAgentInput = CreateProjectAgentInput;
+
 export type Organization = {
   id: string;
   name: string;

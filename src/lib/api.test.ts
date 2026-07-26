@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createProjectAgent, loadProjectAgents, loadSession } from "./api";
+import {
+  createProjectAgent,
+  loadProjectAgents,
+  loadSession,
+  updateProjectAgent,
+} from "./api";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -91,6 +96,52 @@ describe("API errors", () => {
         "/projects/22222222-2222-4222-8222-222222222222/agents?locale=zh",
       ),
       expect.any(Object),
+    );
+  });
+
+  it("updates a project agent through its scoped endpoint", async () => {
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        const input = JSON.parse(String(init?.body));
+        return new Response(
+          JSON.stringify({
+            agent: {
+              id: "11111111-1111-4111-8111-111111111111",
+              projectId: "22222222-2222-4222-8222-222222222222",
+              ...input,
+              createdAt: "2026-07-26T00:00:00.000Z",
+              updatedAt: "2026-07-27T00:00:00.000Z",
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      updateProjectAgent(
+        "token",
+        "22222222-2222-4222-8222-222222222222",
+        "11111111-1111-4111-8111-111111111111",
+        {
+          name: "Release agent",
+          provider: "claude",
+          model: "sonnet",
+          responsibility: "릴리스 상태를 점검합니다.",
+        },
+      ),
+    ).resolves.toMatchObject({
+      name: "Release agent",
+      provider: "claude",
+      model: "sonnet",
+      responsibility: "릴리스 상태를 점검합니다.",
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "/projects/22222222-2222-4222-8222-222222222222/agents/11111111-1111-4111-8111-111111111111",
+      ),
+      expect.objectContaining({ method: "PUT" }),
     );
   });
 });

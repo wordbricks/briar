@@ -107,4 +107,66 @@ describe("ProjectAgents", () => {
         "Jay한테 assign된 todo 이슈를 3개씩 처리하는 에이전트",
     });
   });
+
+  it("opens a prefilled editor from an agent card and saves the changes", async () => {
+    const container = await mount(
+      <ProjectAgents
+        isSidebarOpen
+        project={{
+          id: "project-1",
+          name: "Briar",
+          createdAt: "2026-07-26T00:00:00.000Z",
+        }}
+        token={null}
+      />,
+    );
+    await act(async () => Promise.resolve());
+
+    const editButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="자동 사냥 에이전트 편집"]',
+    );
+    expect(editButton).not.toBeNull();
+    await act(async () => editButton?.click());
+
+    const form = container.querySelector<HTMLFormElement>(
+      'form[aria-label="에이전트 편집"]',
+    );
+    const name = form?.querySelector<HTMLInputElement>("input");
+    const responsibility = form?.querySelector<HTMLTextAreaElement>("textarea");
+    expect(name?.value).toBe("자동 사냥 에이전트");
+    expect(responsibility?.value).toBe(
+      "모든 대기중인 이슈에 대해서 자동사냥을 수행하는것",
+    );
+
+    await act(async () => {
+      if (name) {
+        Object.getOwnPropertyDescriptor(
+          HTMLInputElement.prototype,
+          "value",
+        )?.set?.call(name, "릴리스 점검 에이전트");
+        name.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      if (responsibility) {
+        Object.getOwnPropertyDescriptor(
+          HTMLTextAreaElement.prototype,
+          "value",
+        )?.set?.call(responsibility, "릴리스 상태를 점검하고 결과를 보고합니다.");
+        responsibility.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    });
+    await act(async () => {
+      form?.dispatchEvent(
+        new Event("submit", { bubbles: true, cancelable: true }),
+      );
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("릴리스 점검 에이전트");
+    expect(container.textContent).toContain(
+      "릴리스 상태를 점검하고 결과를 보고합니다.",
+    );
+    expect(
+      container.querySelector('form[aria-label="에이전트 편집"]'),
+    ).toBeNull();
+  });
 });

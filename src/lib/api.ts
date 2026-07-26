@@ -19,6 +19,7 @@ import type {
   OrganizationMember,
   ProjectSettings,
   SessionUser,
+  UpdateProjectAgentInput,
 } from "../types";
 
 const apiUrl = import.meta.env.VITE_BRIAR_API_URL?.replace(/\/$/u, "") ?? "";
@@ -307,6 +308,23 @@ export async function createProjectAgent(
     token,
     {
       method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+  return projectAgentSchema.parse(result.agent);
+}
+
+export async function updateProjectAgent(
+  token: string,
+  projectId: string,
+  agentId: string,
+  input: UpdateProjectAgentInput,
+): Promise<ProjectAgent> {
+  const result = await request<{ agent: unknown }>(
+    `/projects/${projectId}/agents/${agentId}`,
+    token,
+    {
+      method: "PUT",
       body: JSON.stringify(input),
     },
   );

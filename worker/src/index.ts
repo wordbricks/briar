@@ -64,6 +64,7 @@ import {
   replaceProjectAgentToken,
   removeOrganizationMember,
   rollbackNewAppIssue,
+  updateProjectAgent,
   updateProjectSettings,
   updateOrganization,
   type HuntEventRow,
@@ -749,7 +750,7 @@ const projectAgentJson = (
   locale: ProjectAgentLocale = "en",
 ) => {
   const copy =
-    row.kind === "auto_hunt"
+    row.kind === "auto_hunt" && row.updated_at === row.created_at
       ? defaultProjectAgentCopy(locale)
       : { name: row.name, responsibility: row.responsibility };
   return {
@@ -1187,6 +1188,30 @@ async function route(
       responsibility: input.responsibility,
     });
     return json({ agent: projectAgentJson(agent) }, 201);
+  }
+
+  const projectAgentMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/agents\/([0-9a-f-]+)$/u,
+  );
+  if (projectAgentMatch && request.method === "PUT") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, projectAgentMatch[1], session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    const input = projectAgentInputSchema.parse(await readJson(request));
+    const providerName =
+      input.provider === "codex"
+        ? "Codex"
+        : input.provider === "claude"
+          ? "Claude"
+          : "Grok";
+    const agent = await updateProjectAgent(db, project.id, projectAgentMatch[2], {
+      name: input.name ?? `${providerName} Agent`,
+      provider: input.provider,
+      model: input.model ?? null,
+      responsibility: input.responsibility,
+    });
+    if (!agent) throw new HttpError(404, "Agent not found");
+    return json({ agent: projectAgentJson(agent) });
   }
 
   const linearConnectMatch = pathname.match(
