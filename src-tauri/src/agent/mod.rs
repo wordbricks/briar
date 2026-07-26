@@ -226,6 +226,9 @@ pub(crate) struct AutoHuntExecution {
     pub(crate) event_sink: AgentEventSink,
     pub(crate) environment: Vec<(String, String)>,
     pub(crate) workspace_write_roots: Vec<String>,
+    /// Opt-in per project: drop the filesystem sandbox entirely instead of
+    /// confining writes to the checkout and the worktree root.
+    pub(crate) full_access: bool,
 }
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]

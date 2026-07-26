@@ -566,8 +566,10 @@ pub(crate) fn start_auto_hunt_with(
         project_id,
         workspace_root,
         ChatExecution {
+            // Approval policy is deliberately left as configured: pairing full
+            // access with on-request approvals keeps a guard in place.
             approval_policy: execution.approval_policy,
-            sandbox_mode: SandboxMode::WorkspaceWrite,
+            sandbox_mode: auto_hunt_sandbox_mode(execution.full_access),
             network_access: true,
             model: execution.model,
             effort: execution.effort,
@@ -593,6 +595,16 @@ pub(crate) fn start_auto_hunt_with(
         workspace_root: response.workspace_root,
         result,
     })
+}
+
+/// Sandbox an Auto Hunt session runs under. Confined to the workspace and the
+/// declared worktree roots unless the project opted into full access.
+fn auto_hunt_sandbox_mode(full_access: bool) -> SandboxMode {
+    if full_access {
+        SandboxMode::DangerFullAccess
+    } else {
+        SandboxMode::WorkspaceWrite
+    }
 }
 
 fn auto_hunt_instructions(issue_count: usize) -> String {
@@ -1335,6 +1347,12 @@ mod tests {
             app_server_args(false, &[]),
             vec!["app-server", "--listen", "stdio://"]
         );
+    }
+
+    #[test]
+    fn auto_hunt_keeps_the_workspace_sandbox_unless_full_access_is_chosen() {
+        assert_eq!(auto_hunt_sandbox_mode(false), SandboxMode::WorkspaceWrite);
+        assert_eq!(auto_hunt_sandbox_mode(true), SandboxMode::DangerFullAccess);
     }
 
     #[test]

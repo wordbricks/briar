@@ -79,7 +79,9 @@ export type ProjectLlmChatInput = {
   instructions?: string | null;
   outputSchema?: JsonSchema | null;
   fullAccess?: boolean;
-  workspaceMode?: "connected" | "latestRemoteBase";
+  workspaceMode?: "connected" | "latestRemoteBase" | "issueWorktree";
+  workspaceRunId?: string | null;
+  workspaceBranch?: string | null;
 };
 
 export type ProjectLlmChatResponse = {
@@ -105,9 +107,9 @@ const isTauri = () =>
 
 /**
  * The only Briar frontend gateway for model-backed project features.
- * The native layer resolves projectId to the connected Git root and talks to
- * the selected local agent backend; callers cannot supply or override a
- * filesystem workspace.
+ * The native layer resolves projectId and optional issue identity to a
+ * registered Git workspace and talks to the selected local agent backend;
+ * callers cannot supply or override a filesystem path.
  */
 export async function chatWithProjectLlm(
   input: ProjectLlmChatInput,
@@ -120,6 +122,8 @@ export async function chatWithProjectLlm(
     projectId: input.projectId,
     fullAccess: input.fullAccess ?? false,
     workspaceMode: input.workspaceMode ?? "connected",
+    workspaceRunId: input.workspaceRunId ?? null,
+    workspaceBranch: input.workspaceBranch ?? null,
     request: {
       message: input.message,
       conversationId: input.conversationId ?? null,
