@@ -87,6 +87,18 @@ describe("AutoHuntSessions", () => {
   it("opens session details as a page and returns to the session list", async () => {
     const session: AutoHuntSession = {
       id: "session-1",
+      dispatchGroupId: "session-1",
+      workers: [],
+      dispatchEvents: [{
+        dispatchGroupId: "session-1",
+        cursor: 2,
+        type: "worker_status",
+        workerSessionId: "session-1-w1",
+        runId: "run-1",
+        status: "completed",
+        message: "BRIAR-1 워커가 completed 상태가 되었습니다.",
+        occurredAt: "2026-07-22T01:09:00Z",
+      }],
       projectId: "project-1",
       status: "completed",
       issues: [{
@@ -125,6 +137,9 @@ describe("AutoHuntSessions", () => {
     expect(container.querySelector('[role="dialog"]')).toBeNull();
     expect(detailPage?.textContent).toContain("삭제 오류 수정");
     expect(detailPage?.textContent).toContain("수정하고 검증했습니다.");
+    expect(detailPage?.textContent).toContain(
+      "BRIAR-1 워커가 completed 상태가 되었습니다.",
+    );
     expect(detailPage?.textContent).toContain("세션을 시작했습니다.");
     expect(detailPage?.textContent).toContain("Agent 메시지");
     expect(detailPage?.textContent).toContain("아직 Agent 메시지가 없습니다.");
@@ -141,6 +156,9 @@ describe("AutoHuntSessions", () => {
   it("does not render a duplicate running status callout in session details", async () => {
     const session: AutoHuntSession = {
       id: "session-running",
+      dispatchGroupId: "session-running",
+      workers: [],
+      dispatchEvents: [],
       projectId: "project-1",
       status: "running",
       issues: [{

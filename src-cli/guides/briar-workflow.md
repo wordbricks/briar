@@ -19,10 +19,12 @@ When Briar invokes a saved project agent, the runtime instructions include three
 inputs: the agent responsibility, the agent-specific Skill generated with that agent, and
 the current repository-derived project workflow. Treat them as one execution contract.
 
-For Auto Hunt agents, the agent Skill requires loading this version-matched guide and
-claiming queued work through `briar queue claim`. After a claim, the run's workflow
-snapshot is authoritative if it differs from the project workflow attached at invocation.
-Never substitute a preset or a generic stage sequence for either workflow.
+For a host-dispatched Auto Hunt worker, the Briar runtime has already claimed the run,
+created its worktree, and started the agent there. Do not call `briar queue claim` or
+create another worktree in that worker. Use the bound run ID explicitly for every run
+and evidence command. Its workflow snapshot is authoritative if it differs from the
+project workflow attached at invocation. Manual workflow sessions that were not assigned
+a run may still claim work as described below.
 
 ## Inspect the project
 
@@ -138,6 +140,13 @@ Evidence statuses:
 Use `--url` for a PR, CI run, deployment, or monitoring target. Use `--metadata-json` for
 structured provider details. Do not conceal earlier failed evidence; record a new semantic
 key only for a genuinely new observation.
+
+Inspect the current attempt's canonical evidence when supervising or handing
+off a run:
+
+```sh
+briar run evidence list --run '<run-id>'
+```
 
 Typical evidence mapping:
 

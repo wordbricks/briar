@@ -170,6 +170,32 @@ export function AutoHuntSessions({
                 </div>
               </section>
 
+              {selectedSession.dispatchEvents.length > 0 && (
+                <section className="auto-hunt-dialog-section">
+                  <h3>{t("autoHunt.workerTimeline")}</h3>
+                  <div className="auto-hunt-timeline">
+                    {selectedSession.dispatchEvents.map((dispatchEvent) => (
+                      <div
+                        className={`auto-hunt-session-event ${dispatchEvent.status}`}
+                        key={`${dispatchEvent.dispatchGroupId}:${dispatchEvent.cursor}`}
+                      >
+                        <i />
+                        <span>
+                          <strong>{dispatchEvent.message}</strong>
+                          <small>
+                            <Clock3 size={12} />
+                            {formatDate(dispatchEvent.occurredAt, localeTag)}
+                            {dispatchEvent.workerSessionId
+                              ? ` · ${dispatchEvent.workerSessionId}`
+                              : ""}
+                          </small>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
               {(selectedSession.summary || selectedSession.error) && (
                 <section className={`auto-hunt-summary${selectedSession.error ? " error" : ""}`}>
                   <h3>{agentCopy(t("autoHunt.summary"))}</h3>

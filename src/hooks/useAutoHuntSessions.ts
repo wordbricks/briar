@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  listenToAutoHuntDispatchEvents,
+  loadAutoHuntDispatch,
   startProjectAutoHunt,
   type AutoHuntAgentResponse,
+  type AutoHuntDispatchEvent,
+  type AutoHuntDispatchGroup,
+  type AutoHuntWorkerResult,
 } from "../lib/auto-hunt-agent";
 import {
   defaultAutoHuntMaxIssues,
@@ -46,6 +51,7 @@ export type AutoHuntSessionEvent = {
 
 export type AutoHuntSession = {
   id: string;
+  dispatchGroupId: string;
   projectId: string;
   agentId?: string;
   status: AutoHuntSessionStatus;
@@ -57,6 +63,8 @@ export type AutoHuntSession = {
   summary: string | null;
   error: string | null;
   events: AutoHuntSessionEvent[];
+  dispatchEvents: AutoHuntDispatchEvent[];
+  workers: AutoHuntWorkerResult[];
   trigger?: {
     type: "manual" | "automatic";
     reasons: AutoHuntAutomaticTrigger[];
@@ -81,6 +89,9 @@ function readSessions(): AutoHuntSession[] {
     return restored.map((storedSession) => {
       const session = {
         ...storedSession,
+        dispatchGroupId: storedSession.dispatchGroupId ?? storedSession.id,
+        workers: storedSession.workers ?? [],
+        dispatchEvents: storedSession.dispatchEvents ?? [],
         trigger: storedSession.trigger ?? { type: "manual" as const, reasons: [] },
       };
       return session.status === "running"
@@ -105,12 +116,14 @@ function completedSession(
 ): AutoHuntSession {
   return {
     ...session,
+    dispatchGroupId: response.dispatchGroupId,
     status: "completed",
     completedAt,
     conversationId: response.conversationId,
     workspaceRoot: response.workspaceRoot,
     summary: response.result.summary,
     error: null,
+    workers: response.workers,
     issues: session.issues.map((issue) => {
       const result = response.result.issues.find(
         (candidate) => candidate.sourceKey === issue.sourceKey,
@@ -120,6 +133,61 @@ function completedSession(
         : { ...issue, outcome: "skipped", summary: null };
     }),
     events: [...session.events, event("completed", completedAt)],
+  };
+}
+
+function outcomeForWorker(
+  status: AutoHuntDispatchGroup["workers"][number]["status"],
+): AutoHuntSessionIssueOutcome {
+  if (status === "completed" || status === "blocked" || status === "failed") {
+    return status;
+  }
+  if (status === "cancelled") return "skipped";
+  return "pending";
+}
+
+function reconcileDispatch(
+  session: AutoHuntSession,
+  dispatch: AutoHuntDispatchGroup,
+): AutoHuntSession {
+  const workers: AutoHuntWorkerResult[] = dispatch.workers.map((worker) => ({
+    sessionId: worker.sessionId,
+    runId: worker.runId,
+    sourceKey: worker.sourceKey,
+    conversationId: worker.conversationId,
+    workspaceRoot: worker.workspaceRoot,
+    outcome: worker.status === "cancelled"
+      ? "cancelled"
+      : outcomeForWorker(worker.status),
+    summary: worker.summary ?? "",
+    evidence: dispatch.events
+      .filter((event) =>
+        event.runId === worker.runId &&
+        event.type === "worker_evidence" &&
+        event.data
+      )
+      .map((event) => event.data!),
+  }));
+  return {
+    ...session,
+    dispatchGroupId: dispatch.dispatchGroupId,
+    status: dispatch.status,
+    completedAt: dispatch.completedAt,
+    error: dispatch.error,
+    workers,
+    dispatchEvents: dispatch.events,
+    issues: session.issues.map((issue) => {
+      const worker = dispatch.workers.find(
+        (candidate) => candidate.runId === issue.runId,
+      );
+      return worker
+        ? {
+            ...issue,
+            outcome: outcomeForWorker(worker.status),
+            summary: worker.summary,
+          }
+        : issue;
+    }),
   };
 }
 
@@ -137,6 +205,68 @@ export function useAutoHuntSessions(
       // Session tracking remains available in memory when storage is unavailable.
     }
   }, [sessions]);
+
+  useEffect(() => {
+    const recoverable = sessionsRef.current.filter(
+      (session) =>
+        session.status === "running" || session.status === "interrupted",
+    );
+    if (recoverable.length === 0) return;
+    let active = true;
+    void Promise.all(recoverable.map(async (session) => ({
+      sessionId: session.id,
+      dispatch: await loadAutoHuntDispatch(
+        session.dispatchGroupId || session.id,
+      ),
+    }))).then((loaded) => {
+      if (!active) return;
+      const dispatches = new Map(
+        loaded
+          .filter((entry) => entry.dispatch !== null)
+          .map((entry) => [entry.sessionId, entry.dispatch!]),
+      );
+      if (dispatches.size === 0) return;
+      setSessions((current) => current.map((session) => {
+        const dispatch = dispatches.get(session.id);
+        return dispatch ? reconcileDispatch(session, dispatch) : session;
+      }));
+    }).catch(() => {
+      // The interrupted local snapshot remains visible when native recovery
+      // state is unavailable; starting a new session is never inferred here.
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    let unlisten: () => void = () => undefined;
+    void listenToAutoHuntDispatchEvents((event) => {
+      if (!active) return;
+      const session = sessionsRef.current.find(
+        (candidate) => candidate.dispatchGroupId === event.dispatchGroupId,
+      );
+      if (!session) return;
+      void loadAutoHuntDispatch(event.dispatchGroupId, 0).then((dispatch) => {
+        if (!active || !dispatch) return;
+        setSessions((current) => current.map((candidate) =>
+          candidate.dispatchGroupId === event.dispatchGroupId
+            ? reconcileDispatch(candidate, dispatch)
+            : candidate));
+      });
+    }).then((stop) => {
+      if (!active) {
+        stop();
+        return;
+      }
+      unlisten = stop;
+    });
+    return () => {
+      active = false;
+      unlisten();
+    };
+  }, []);
 
   const removeProjectSessions = useCallback((projectId: string) => {
     const remaining = sessionsRef.current.filter(
@@ -171,6 +301,7 @@ export function useAutoHuntSessions(
     const startedAt = new Date().toISOString();
     const session: AutoHuntSession = {
       id: crypto.randomUUID(),
+      dispatchGroupId: "",
       projectId,
       agentId: options.agent.id,
       status: "running",
@@ -189,8 +320,11 @@ export function useAutoHuntSessions(
       summary: null,
       error: null,
       events: [event("started", startedAt)],
+      workers: [],
+      dispatchEvents: [],
       trigger: options.trigger ?? { type: "manual", reasons: [] },
     };
+    session.dispatchGroupId = session.id;
     sessionsRef.current = [session, ...sessionsRef.current];
     setSessions(sessionsRef.current);
 

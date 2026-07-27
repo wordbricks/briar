@@ -71,18 +71,22 @@ commands inside the worktree.
 
 ## Agent write access
 
-Worktrees live outside the checkout, so the agent's write sandbox has to be
-widened to include the root. The app resolves the root the same way the CLI
-does, creates it, and passes it to the provider before the session starts:
+Auto Hunt worktree creation is a host control-plane operation. The desktop
+runtime invokes the isolated Briar CLI before starting a worker, so
+`git worktree add` writes the connected repository's shared `.git/refs` and
+`.git/worktrees` with host authority rather than from inside an agent sandbox.
+Only after allocation succeeds does the app start a worker with that exact
+worktree as its `cwd`.
 
-- **Codex** — `--config sandbox_workspace_write.writable_roots=["<root>"]` on
-  `codex app-server`, alongside the existing `network_access` override.
-- **Claude** — `additionalDirectories` in the Agent SDK options.
-- **Grok** — nothing to widen; its ACP session is approval-gated rather than
-  filesystem-sandboxed.
+Every worker gets its own isolated Briar config snapshot and absolute
+`BRIAR_CLI`/`BRIAR_CONFIG_HOME` bindings. Login-shell PATH changes therefore
+cannot redirect run reporting to another project's config. The worker is told
+to use the assigned run ID explicitly and cannot claim another queue item.
 
-Turning worktrees off (`--disable-worktrees`) also stops the extra writable
-root from being granted.
+Because the provider starts inside the final checkout, Codex and Claude grant
+their normal workspace-write permissions to that checkout and its linked Git
+metadata. The broad project worktree root is no longer added as a writable
+directory.
 
 Reads are **not** restricted in either sandbox: an agent can read anything the
 user can, including other repositories and dotfiles. Only writes are confined —
@@ -111,8 +115,35 @@ worktree. The configured approval policy is deliberately left alone when full
 access is on, so pairing it with `on-request` approvals keeps a human gate in
 place; combining it with `never` leaves none.
 
-When full access is on, no writable roots are declared — there is no sandbox to
-widen.
+When full access is on, the worker still starts in its assigned worktree, but
+there is no filesystem sandbox around it.
+
+## Dispatch groups and worker recovery
+
+One Auto Hunt request is persisted as a dispatch group. Each claimed run is
+linked to a stable child worker session and workspace:
+
+```text
+dispatchGroupId
+  └─ worker sessionId → runId → worktree path → conversationId
+```
+
+Allocation, progress messages, approval waits, and terminal worker states are
+stored as monotonic cursor events. After each worker terminates, the host reads
+that run's canonical evidence with `briar run evidence list --run <id>` and
+copies the structured records into `worker_evidence` cursor events. The UI
+subscribes live and can reload the same state after its React view is recreated.
+If the desktop process itself restarts, its app-server children cannot survive;
+startup marks any orphaned running group `interrupted` and preserves its
+run/worktree references for inspection. Server claim leases remain
+authoritative and make abandoned queued runs recoverable.
+
+After every child reaches a terminal state, Briar invokes the saved project
+agent once more as the dispatch coordinator. That turn is read-only, receives
+the canonical worker reports, and may only produce the user-facing aggregate
+summary; it cannot change outcomes, claim work, or edit a checkout. If the
+coordinator summary fails, the runtime preserves all worker results and falls
+back to a deterministic count summary.
 
 ## Operating it
 

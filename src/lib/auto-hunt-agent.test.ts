@@ -210,6 +210,7 @@ describe("startProjectAutoHunt", () => {
       }],
       "session-1",
       {
+        id: "agent-auto-hunt",
         name: "Auto Hunt agent",
         provider: "codex",
         model: null,
@@ -223,6 +224,7 @@ describe("startProjectAutoHunt", () => {
       request: {
         sessionId: "session-1",
         apiUrl: "http://127.0.0.1:8788",
+        agentId: "agent-auto-hunt",
         agentName: "Auto Hunt agent",
         agentProvider: "codex",
         agentModel: null,
@@ -256,6 +258,7 @@ describe("startProjectAutoHunt", () => {
       }],
       "session-2",
       {
+        id: "agent-release",
         name: "Release hunter",
         provider: "claude",
         model: "sonnet",
@@ -267,6 +270,7 @@ describe("startProjectAutoHunt", () => {
     expect(invoke).toHaveBeenCalledWith("start_project_auto_hunt", {
       projectId: "535a1867-ba4c-430f-9c11-ddd46513ec7f",
       request: expect.objectContaining({
+        agentId: "agent-release",
         agentName: "Release hunter",
         agentProvider: "claude",
         agentModel: "sonnet",
