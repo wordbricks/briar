@@ -45,7 +45,6 @@ describe("API errors", () => {
               provider: input.provider,
               model: input.model,
               responsibility: input.responsibility,
-              kind: "custom",
               createdAt: "2026-07-26T00:00:00.000Z",
               updatedAt: "2026-07-26T00:00:00.000Z",
             },
@@ -71,6 +70,7 @@ describe("API errors", () => {
       provider: "grok",
       model: "grok-4.5",
       responsibility: "피드백을 분석해 액션 아이템 이슈를 만듭니다.",
+      kind: "custom",
     });
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining(
@@ -100,6 +100,93 @@ describe("API errors", () => {
       ),
       expect.any(Object),
     );
+  });
+
+  it("normalizes legacy project agents that omit kind", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        return new Response(
+          JSON.stringify({
+            agents: [
+              {
+                id: "11111111-1111-4111-8111-111111111111",
+                projectId: "22222222-2222-4222-8222-222222222222",
+                name: "자동 사냥 에이전트",
+                provider: "codex",
+                model: null,
+                responsibility:
+                  "모든 대기중인 이슈에 대해서 자동사냥을 수행하는것",
+                createdAt: "2026-07-26T00:00:00.000Z",
+                updatedAt: "2026-07-26T00:00:00.000Z",
+              },
+              {
+                id: "33333333-3333-4333-8333-333333333333",
+                projectId: "22222222-2222-4222-8222-222222222222",
+                name: "Feedback agent",
+                provider: "grok",
+                model: null,
+                responsibility: "Analyze feedback.",
+                createdAt: "2026-07-26T00:00:00.000Z",
+                updatedAt: "2026-07-26T00:00:00.000Z",
+              },
+            ],
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }),
+    );
+
+    await expect(
+      loadProjectAgents(
+        "token",
+        "22222222-2222-4222-8222-222222222222",
+        "ko",
+      ),
+    ).resolves.toMatchObject([
+      { kind: "auto_hunt" },
+      { kind: "custom" },
+    ]);
+  });
+
+  it("rejects explicit unsupported project agent kinds", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        return new Response(
+          JSON.stringify({
+            agents: [
+              {
+                id: "11111111-1111-4111-8111-111111111111",
+                projectId: "22222222-2222-4222-8222-222222222222",
+                name: "Unknown agent",
+                provider: "codex",
+                model: null,
+                responsibility: "Unknown responsibility.",
+                kind: "unknown",
+                createdAt: "2026-07-26T00:00:00.000Z",
+                updatedAt: "2026-07-26T00:00:00.000Z",
+              },
+            ],
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }),
+    );
+
+    await expect(
+      loadProjectAgents(
+        "token",
+        "22222222-2222-4222-8222-222222222222",
+        "en",
+      ),
+    ).rejects.toMatchObject({ name: "ZodError" });
   });
 
   it("creates an agent schedule with its recurrence and time zone", async () => {
@@ -235,7 +322,6 @@ describe("API errors", () => {
               id: "11111111-1111-4111-8111-111111111111",
               projectId: "22222222-2222-4222-8222-222222222222",
               ...input,
-              kind: "custom",
               createdAt: "2026-07-26T00:00:00.000Z",
               updatedAt: "2026-07-27T00:00:00.000Z",
             },
@@ -263,6 +349,7 @@ describe("API errors", () => {
       provider: "claude",
       model: "sonnet",
       responsibility: "릴리스 상태를 점검합니다.",
+      kind: "custom",
     });
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining(
