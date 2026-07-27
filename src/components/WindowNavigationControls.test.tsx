@@ -21,6 +21,7 @@ describe("WindowNavigationControls", () => {
   it("exposes disabled states and invokes enabled history actions", async () => {
     const onBack = vi.fn();
     const onForward = vi.fn();
+    const onSettings = vi.fn();
     const root = createRoot(container);
     await act(async () =>
       root.render(
@@ -31,6 +32,7 @@ describe("WindowNavigationControls", () => {
             isSidebarOpen
             onBack={onBack}
             onForward={onForward}
+            onSettings={onSettings}
             onSidebarToggle={() => undefined}
           />
         </I18nProvider>,
@@ -67,6 +69,7 @@ describe("WindowNavigationControls", () => {
   it("maps Command-bracket shortcuts to backward and forward actions", async () => {
     const onBack = vi.fn();
     const onForward = vi.fn();
+    const onSettings = vi.fn();
     const root = createRoot(container);
     await act(async () =>
       root.render(
@@ -77,6 +80,7 @@ describe("WindowNavigationControls", () => {
             isSidebarOpen={false}
             onBack={onBack}
             onForward={onForward}
+            onSettings={onSettings}
             onSidebarToggle={() => undefined}
           />
         </I18nProvider>,
@@ -104,6 +108,52 @@ describe("WindowNavigationControls", () => {
 
     expect(onBack).toHaveBeenCalledOnce();
     expect(onForward).toHaveBeenCalledOnce();
+    await act(async () => root.unmount());
+  });
+
+  it("opens settings with Command-comma", async () => {
+    const onSettings = vi.fn();
+    const root = createRoot(container);
+    await act(async () =>
+      root.render(
+        <I18nProvider>
+          <WindowNavigationControls
+            canGoBack={false}
+            canGoForward={false}
+            isSidebarOpen
+            onBack={() => undefined}
+            onForward={() => undefined}
+            onSettings={onSettings}
+            onSidebarToggle={() => undefined}
+          />
+        </I18nProvider>,
+      ),
+    );
+
+    const settingsShortcut = new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      code: "Comma",
+      key: ",",
+      metaKey: true,
+    });
+    await act(async () => {
+      window.dispatchEvent(settingsShortcut);
+    });
+
+    expect(settingsShortcut.defaultPrevented).toBe(true);
+    expect(onSettings).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          bubbles: true,
+          code: "Comma",
+          key: ",",
+        }),
+      );
+    });
+    expect(onSettings).toHaveBeenCalledOnce();
     await act(async () => root.unmount());
   });
 });

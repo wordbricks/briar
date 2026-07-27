@@ -314,6 +314,11 @@ export function App() {
     setIsLaunchIntroVisible(false);
   }, []);
 
+  const openAppSettings = useCallback(() => {
+    setAppSettingsSection("source-control");
+    navigateToPage("settings");
+  }, [navigateToPage]);
+
   let content: React.ReactNode;
 
   if (shouldShowInitialOnboarding) {
@@ -381,6 +386,7 @@ export function App() {
             isSidebarOpen={isSidebarOpen}
             onBack={goBack}
             onForward={goForward}
+            onSettings={openAppSettings}
             onSidebarToggle={() => setIsSidebarOpen((open) => !open)}
           />
         {activePage !== "settings" &&
@@ -419,10 +425,7 @@ export function App() {
               briar.setActiveProjectId(projectId);
               navigateToPage("project-settings");
             }}
-            onSettings={() => {
-              setAppSettingsSection("source-control");
-              navigateToPage("settings");
-            }}
+            onSettings={openAppSettings}
             onLogout={() => void briar.logout()}
             organizations={briar.organizations}
             projects={briar.projects}
