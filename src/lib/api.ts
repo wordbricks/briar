@@ -552,6 +552,7 @@ export async function createIssue(
       runId: string;
       sourceKey: string;
       stage: "queued";
+      status: "backlog" | "queued";
       attachments: IssueAttachment[];
     }>(`/projects/${projectId}/issues`, token, {
       method: "POST",
@@ -564,6 +565,7 @@ export async function createIssue(
   form.set("title", input.title);
   form.set("description", input.description ?? "");
   form.set("priority", input.priority === null ? "" : String(input.priority));
+  form.set("status", input.status);
   for (const attachment of input.attachments) {
     form.append("attachments", attachment, attachment.name);
   }
@@ -571,6 +573,7 @@ export async function createIssue(
     runId: string;
     sourceKey: string;
     stage: "queued";
+    status: "backlog" | "queued";
     attachments: IssueAttachment[];
   }>(`/projects/${projectId}/issues`, token, { method: "POST", body: form });
 }
