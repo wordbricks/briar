@@ -309,4 +309,144 @@ describe("ProjectSchedule agent filter", () => {
     await act(async () => root.unmount());
     container.remove();
   });
+
+  it("opens run details, edits the schedule, and deletes it from the context menu", async () => {
+    const schedule = calendarSchedule(
+      "44444444-4444-4444-8444-444444444444",
+      agentA,
+      "Daily review",
+    );
+    const run = calendarRun(
+      "77777777-7777-4777-8777-777777777777",
+      schedule.id,
+      agentA,
+      schedule.name,
+      "2026-07-27T01:00:00.000Z",
+      "2026-07-27T01:20:00.000Z",
+    );
+    run.resultSummary =
+      "Reviewed the release branch and found no blocking issues.";
+    let currentSchedule = schedule;
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (init?.method === "PUT") {
+          currentSchedule = {
+            ...currentSchedule,
+            ...JSON.parse(String(init.body)),
+            updatedAt: "2026-07-27T02:00:00.000Z",
+          };
+          return new Response(
+            JSON.stringify({ schedule: currentSchedule }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        if (init?.method === "DELETE") {
+          return new Response(null, { status: 204 });
+        }
+        const body = url.endsWith("/agent-schedule-runs")
+          ? { runs: [run] }
+          : url.endsWith("/agent-schedules")
+            ? { schedules: [currentSchedule] }
+            : { agents: [agentA] };
+        return new Response(JSON.stringify(body), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <I18nProvider>
+          <ProjectSchedule
+            isSidebarOpen
+            now={new Date("2026-07-27T03:00:00.000Z")}
+            project={project}
+            token="token"
+          />
+        </I18nProvider>,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    const completedEvent = container.querySelector<HTMLButtonElement>(
+      ".project-schedule-event.completed",
+    );
+    await act(async () => completedEvent?.click());
+    expect(container.textContent).toContain("Session content");
+    expect(container.textContent).toContain(
+      "Reviewed the release branch and found no blocking issues.",
+    );
+
+    const editButton = container.querySelector<HTMLButtonElement>(
+      ".project-schedule-detail-actions button",
+    );
+    await act(async () => editButton?.click());
+    const nameInput = container.querySelector<HTMLInputElement>(
+      '.project-schedule-dialog input:not([type="time"])',
+    );
+    expect(nameInput?.value).toBe("Daily review");
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set?.call(nameInput, "Updated daily review");
+      nameInput?.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      container
+        .querySelector<HTMLFormElement>(".project-schedule-dialog")
+        ?.dispatchEvent(
+          new Event("submit", { bubbles: true, cancelable: true }),
+        );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(container.textContent).toContain("Updated daily review");
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(`/agent-schedules/${schedule.id}`),
+      expect.objectContaining({ method: "PUT" }),
+    );
+
+    const updatedEvent = container.querySelector<HTMLButtonElement>(
+      ".project-schedule-event.completed",
+    );
+    await act(async () => {
+      updatedEvent?.dispatchEvent(
+        new MouseEvent("contextmenu", {
+          bubbles: true,
+          cancelable: true,
+          clientX: 240,
+          clientY: 180,
+        }),
+      );
+    });
+    const contextDelete = container.querySelector<HTMLButtonElement>(
+      ".project-schedule-context-menu .danger",
+    );
+    expect(contextDelete?.textContent).toContain("Delete schedule");
+    await act(async () => contextDelete?.click());
+    expect(container.textContent).toContain("permanently deleted");
+    const confirmDelete = container.querySelector<HTMLButtonElement>(
+      ".project-schedule-delete-dialog .danger",
+    );
+    await act(async () => {
+      confirmDelete?.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(
+      container.querySelector(".project-schedule-event"),
+    ).toBeNull();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(`/agent-schedules/${schedule.id}`),
+      expect.objectContaining({ method: "DELETE" }),
+    );
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
 });

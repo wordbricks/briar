@@ -1,5 +1,6 @@
 import {
   Bot,
+  CalendarDays,
   CalendarClock,
   CalendarPlus,
   ChevronLeft,
@@ -8,7 +9,9 @@ import {
   Clock3,
   ListFilter,
   LoaderCircle,
+  Pencil,
   Plus,
+  Trash2,
   X,
 } from "lucide-react";
 import {
@@ -22,9 +25,11 @@ import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
 import {
   createProjectAgentSchedule,
+  deleteProjectAgentSchedule,
   loadProjectAgentSchedules,
   loadProjectAgentScheduleRuns,
   loadProjectAgents,
+  updateProjectAgentSchedule,
 } from "../lib/api";
 import { demoProjectAgents } from "../lib/demo-project-agents";
 import {
@@ -46,6 +51,7 @@ import type {
   ProjectAgent,
   ProjectAgentSchedule,
   ProjectAgentScheduleRun,
+  UpdateProjectAgentScheduleInput,
 } from "../types";
 import { NativeSelect } from "./NativeSelect";
 import { SelectMenu } from "./SelectMenu";
@@ -138,7 +144,18 @@ export function ProjectSchedule({
   );
   const [isScheduleDataLoading, setIsScheduleDataLoading] = useState(true);
   const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
-  const [isCreatingSchedule, setIsCreatingSchedule] = useState(false);
+  const [editingSchedule, setEditingSchedule] =
+    useState<ProjectAgentSchedule | null>(null);
+  const [selectedOccurrence, setSelectedOccurrence] =
+    useState<ScheduleOccurrenceSegment | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    occurrence: ScheduleOccurrenceSegment;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [scheduleToDelete, setScheduleToDelete] =
+    useState<ProjectAgentSchedule | null>(null);
+  const [isMutatingSchedule, setIsMutatingSchedule] = useState(false);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [agentFilter, setAgentFilter] = useState(allAgentsFilter);
   const availableAgents = useMemo(
@@ -282,7 +299,7 @@ export function ProjectSchedule({
   }, [locale, project.id, token]);
 
   const addSchedule = async (input: CreateProjectAgentScheduleInput) => {
-    setIsCreatingSchedule(true);
+    setIsMutatingSchedule(true);
     setScheduleError(null);
     try {
       const agent = agents.find((candidate) => candidate.id === input.agentId);
@@ -308,9 +325,85 @@ export function ProjectSchedule({
       setSchedules((current) => [...current, schedule]);
       setIsScheduleDialogOpen(false);
     } finally {
-      setIsCreatingSchedule(false);
+      setIsMutatingSchedule(false);
     }
   };
+
+  const saveSchedule = async (input: UpdateProjectAgentScheduleInput) => {
+    if (!editingSchedule) return;
+    setIsMutatingSchedule(true);
+    setScheduleError(null);
+    try {
+      const agent = agents.find((candidate) => candidate.id === input.agentId);
+      if (!agent) throw new Error(t("schedule.agentRequired"));
+      const updated = token
+        ? await updateProjectAgentSchedule(
+            token,
+            project.id,
+            editingSchedule.id,
+            input,
+          )
+        : {
+            ...editingSchedule,
+            ...input,
+            agentName: agent.name,
+            agentProvider: agent.provider,
+            updatedAt: new Date().toISOString(),
+          };
+      setSchedules((current) =>
+        current.map((schedule) =>
+          schedule.id === updated.id ? updated : schedule,
+        ),
+      );
+      setEditingSchedule(null);
+      setSelectedOccurrence(null);
+    } finally {
+      setIsMutatingSchedule(false);
+    }
+  };
+
+  const removeSchedule = async (schedule: ProjectAgentSchedule) => {
+    setIsMutatingSchedule(true);
+    setScheduleError(null);
+    try {
+      if (token) {
+        await deleteProjectAgentSchedule(token, project.id, schedule.id);
+      }
+      setSchedules((current) =>
+        current.filter((candidate) => candidate.id !== schedule.id),
+      );
+      setScheduleRuns((current) =>
+        current.filter((run) => run.scheduleId !== schedule.id),
+      );
+      setScheduleToDelete(null);
+      setSelectedOccurrence(null);
+      setEditingSchedule(null);
+      setContextMenu(null);
+    } catch (caught) {
+      setScheduleError(
+        caught instanceof Error ? caught.message : String(caught),
+      );
+      throw caught;
+    } finally {
+      setIsMutatingSchedule(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    window.addEventListener("click", close);
+    window.addEventListener("resize", close);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("click", close);
+      window.removeEventListener("resize", close);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [contextMenu]);
 
   useEffect(() => {
     const scroll = calendarScrollRef.current;
@@ -524,12 +617,27 @@ export function ProjectSchedule({
                         time: `${formatTime(segment.start, localeTag)}–${formatTime(segment.end, localeTag)}`,
                       });
                       return (
-                        <article
+                        <button
                           aria-label={label}
                           className={`project-schedule-event ${segment.status}`}
                           key={segment.id}
+                          onClick={() => {
+                            setContextMenu(null);
+                            setSelectedOccurrence(segment);
+                          }}
+                          onContextMenu={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            setSelectedOccurrence(null);
+                            setContextMenu({
+                              occurrence: segment,
+                              x: Math.min(event.clientX, window.innerWidth - 190),
+                              y: Math.min(event.clientY, window.innerHeight - 110),
+                            });
+                          }}
                           style={style}
                           title={label}
+                          type="button"
                         >
                           <span className="project-schedule-event-agent">
                             <Bot size={11} />
@@ -543,7 +651,7 @@ export function ProjectSchedule({
                             {segment.schedule.name}
                           </span>
                           <small>{t(statusKey)}</small>
-                        </article>
+                        </button>
                       );
                     })}
                   </div>
@@ -576,12 +684,322 @@ export function ProjectSchedule({
       {isScheduleDialogOpen && (
         <CreateProjectAgentScheduleDialog
           agents={agents}
-          isSubmitting={isCreatingSchedule}
+          isSubmitting={isMutatingSchedule}
           onClose={() => setIsScheduleDialogOpen(false)}
           onCreate={addSchedule}
         />
       )}
+      {selectedOccurrence && !editingSchedule && !scheduleToDelete && (
+        <ProjectAgentScheduleDetails
+          occurrence={selectedOccurrence}
+          onClose={() => setSelectedOccurrence(null)}
+          onDelete={() => setScheduleToDelete(selectedOccurrence.schedule)}
+          onEdit={() => setEditingSchedule(selectedOccurrence.schedule)}
+        />
+      )}
+      {editingSchedule && (
+        <CreateProjectAgentScheduleDialog
+          agents={agents}
+          isSubmitting={isMutatingSchedule}
+          onClose={() => setEditingSchedule(null)}
+          onCreate={addSchedule}
+          onUpdate={saveSchedule}
+          schedule={editingSchedule}
+        />
+      )}
+      {contextMenu && (
+        <div
+          aria-label={t("schedule.contextMenu")}
+          className="project-schedule-context-menu"
+          onClick={(event) => event.stopPropagation()}
+          role="menu"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+        >
+          <button
+            onClick={() => {
+              setEditingSchedule(contextMenu.occurrence.schedule);
+              setContextMenu(null);
+            }}
+            role="menuitem"
+            type="button"
+          >
+            <Pencil size={14} />
+            {t("schedule.edit")}
+          </button>
+          <button
+            className="danger"
+            onClick={() => {
+              setScheduleToDelete(contextMenu.occurrence.schedule);
+              setContextMenu(null);
+            }}
+            role="menuitem"
+            type="button"
+          >
+            <Trash2 size={14} />
+            {t("schedule.delete")}
+          </button>
+        </div>
+      )}
+      {scheduleToDelete && (
+        <DeleteProjectAgentScheduleDialog
+          isDeleting={isMutatingSchedule}
+          onClose={() => setScheduleToDelete(null)}
+          onDelete={() => removeSchedule(scheduleToDelete)}
+          schedule={scheduleToDelete}
+        />
+      )}
     </main>
+  );
+}
+
+export function ProjectAgentScheduleDetails({
+  occurrence,
+  onClose,
+  onDelete,
+  onEdit,
+}: {
+  occurrence: ScheduleOccurrenceSegment;
+  onClose: () => void;
+  onDelete: () => void;
+  onEdit: () => void;
+}) {
+  const { localeTag, t } = useI18n();
+  const { agent, run, schedule, start, status } = occurrence;
+  const statusKey = `schedule.status.${status}` as MessageKey;
+  const recurrenceKey =
+    `schedule.recurrence.${schedule.recurrence}` as MessageKey;
+  const occurrenceDate = new Intl.DateTimeFormat(localeTag, {
+    dateStyle: "full",
+  }).format(start);
+  const recurrenceDetail =
+    schedule.recurrence === "weekly"
+      ? `${t(recurrenceKey)} · ${new Intl.DateTimeFormat(localeTag, {
+          weekday: "long",
+        }).format(start)}`
+      : t(recurrenceKey);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  return (
+    <div
+      className="project-schedule-detail-backdrop"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section
+        aria-label={t("schedule.detailsDialog", { name: schedule.name })}
+        aria-modal="true"
+        className="project-schedule-detail"
+        role="dialog"
+      >
+        <header>
+          <i
+            aria-hidden="true"
+            style={{ backgroundColor: agent.calendarColor }}
+          />
+          <div>
+            <p className="eyebrow">
+              <CalendarDays size={13} />
+              {t("schedule.detailsEyebrow")}
+            </p>
+            <h2>{schedule.name}</h2>
+            <p>
+              {occurrenceDate} · {formatTime(start, localeTag)}
+            </p>
+          </div>
+          <div className="project-schedule-detail-actions">
+            <button
+              aria-label={t("schedule.edit")}
+              onClick={onEdit}
+              title={t("schedule.edit")}
+              type="button"
+            >
+              <Pencil size={16} />
+            </button>
+            <button
+              aria-label={t("schedule.delete")}
+              className="danger"
+              onClick={onDelete}
+              title={t("schedule.delete")}
+              type="button"
+            >
+              <Trash2 size={16} />
+            </button>
+            <button
+              aria-label={t("common.close")}
+              onClick={onClose}
+              type="button"
+            >
+              <X size={17} />
+            </button>
+          </div>
+        </header>
+
+        <div className="project-schedule-detail-content">
+          <dl className="project-schedule-detail-meta">
+            <div>
+              <dt>{t("schedule.statusLabel")}</dt>
+              <dd>
+                <span className={`project-schedule-status-pill ${status}`}>
+                  {t(statusKey)}
+                </span>
+              </dd>
+            </div>
+            <div>
+              <dt>{t("schedule.agent")}</dt>
+              <dd>
+                <Bot size={14} />
+                <span>
+                  <strong>{agent.name}</strong>
+                  <small>{agent.provider}</small>
+                </span>
+              </dd>
+            </div>
+            <div>
+              <dt>{t("schedule.recurrence")}</dt>
+              <dd>{recurrenceDetail}</dd>
+            </div>
+            <div>
+              <dt>{t("schedule.timeZoneLabel")}</dt>
+              <dd>{schedule.timeZone}</dd>
+            </div>
+          </dl>
+
+          <section className="project-schedule-session">
+            <header>
+              <span>
+                <Bot size={16} />
+              </span>
+              <div>
+                <strong>{t("schedule.sessionContent")}</strong>
+                <small>
+                  {run
+                    ? t("schedule.sessionRunId", { id: run.id.slice(0, 8) })
+                    : t("schedule.sessionNotStarted")}
+                </small>
+              </div>
+            </header>
+            {run ? (
+              <>
+                <dl>
+                  <div>
+                    <dt>{t("schedule.startedAt")}</dt>
+                    <dd>
+                      {new Intl.DateTimeFormat(localeTag, {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      }).format(new Date(run.startedAt))}
+                    </dd>
+                  </div>
+                  {run.completedAt && (
+                    <div>
+                      <dt>{t("schedule.completedAt")}</dt>
+                      <dd>
+                        {new Intl.DateTimeFormat(localeTag, {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        }).format(new Date(run.completedAt))}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+                <div
+                  className={`project-schedule-session-message ${run.status}`}
+                >
+                  {run.resultSummary || run.error || t("schedule.sessionRunning")}
+                </div>
+              </>
+            ) : (
+              <p className="project-schedule-session-empty">
+                {status === "missed"
+                  ? t("schedule.sessionMissed")
+                  : t("schedule.sessionScheduled")}
+              </p>
+            )}
+          </section>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+export function DeleteProjectAgentScheduleDialog({
+  isDeleting,
+  onClose,
+  onDelete,
+  schedule,
+}: {
+  isDeleting: boolean;
+  onClose: () => void;
+  onDelete: () => Promise<void>;
+  schedule: ProjectAgentSchedule;
+}) {
+  const { t } = useI18n();
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !isDeleting) onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isDeleting, onClose]);
+
+  return (
+    <div
+      className="dialog-backdrop project-schedule-delete-backdrop"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !isDeleting) onClose();
+      }}
+    >
+      <section
+        aria-label={t("schedule.deleteDialog", { name: schedule.name })}
+        aria-modal="true"
+        className="project-schedule-delete-dialog"
+        role="alertdialog"
+      >
+        <span>
+          <Trash2 size={20} />
+        </span>
+        <div>
+          <h2>{t("schedule.deleteTitle", { name: schedule.name })}</h2>
+          <p>{t("schedule.deleteDescription")}</p>
+          {deleteError && <small role="alert">{deleteError}</small>}
+        </div>
+        <footer>
+          <button disabled={isDeleting} onClick={onClose} type="button">
+            {t("common.cancel")}
+          </button>
+          <button
+            className="danger"
+            disabled={isDeleting}
+            onClick={() => {
+              setDeleteError(null);
+              void onDelete().catch((caught) =>
+                setDeleteError(
+                  caught instanceof Error ? caught.message : String(caught),
+                ),
+              );
+            }}
+            type="button"
+          >
+            {isDeleting ? (
+              <LoaderCircle className="spin" size={14} />
+            ) : (
+              <Trash2 size={14} />
+            )}
+            {isDeleting ? t("schedule.deleting") : t("schedule.delete")}
+          </button>
+        </footer>
+      </section>
+    </div>
   );
 }
 
@@ -590,23 +1008,36 @@ export function CreateProjectAgentScheduleDialog({
   isSubmitting,
   onClose,
   onCreate,
+  onUpdate,
+  schedule,
 }: {
   agents: ProjectAgent[];
   isSubmitting: boolean;
   onClose: () => void;
   onCreate: (input: CreateProjectAgentScheduleInput) => Promise<void>;
+  onUpdate?: (input: UpdateProjectAgentScheduleInput) => Promise<void>;
+  schedule?: ProjectAgentSchedule;
 }) {
   const { localeTag, t } = useI18n();
-  const [name, setName] = useState("");
-  const [agentId, setAgentId] = useState(agents[0]?.id ?? "");
+  const [name, setName] = useState(schedule?.name ?? "");
+  const [agentId, setAgentId] = useState(
+    schedule?.agentId ?? agents[0]?.id ?? "",
+  );
   const [recurrence, setRecurrence] =
-    useState<ProjectAgentScheduleRecurrence>("weekdays");
-  const [timeOfDay, setTimeOfDay] = useState("09:00");
-  const [dayOfWeek, setDayOfWeek] = useState(1);
+    useState<ProjectAgentScheduleRecurrence>(
+      schedule?.recurrence ?? "weekdays",
+    );
+  const [timeOfDay, setTimeOfDay] = useState(
+    schedule?.timeOfDay ?? "09:00",
+  );
+  const [dayOfWeek, setDayOfWeek] = useState(schedule?.dayOfWeek ?? 1);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const timeZone =
-    Intl.DateTimeFormat().resolvedOptions().timeZone || "Etc/UTC";
+    schedule?.timeZone ||
+    Intl.DateTimeFormat().resolvedOptions().timeZone ||
+    "Etc/UTC";
   const selectedAgent = agents.find((agent) => agent.id === agentId);
+  const isEditing = Boolean(schedule);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -631,7 +1062,9 @@ export function CreateProjectAgentScheduleDialog({
       }}
     >
       <form
-        aria-label={t("schedule.createDialog")}
+        aria-label={t(
+          isEditing ? "schedule.editDialog" : "schedule.createDialog",
+        )}
         aria-modal="true"
         className="project-schedule-dialog"
         onSubmit={(event) => {
@@ -645,7 +1078,7 @@ export function CreateProjectAgentScheduleDialog({
             return;
           }
           setSubmitError(null);
-          void onCreate({
+          const input = {
             agentId,
             name: name.trim(),
             recurrence,
@@ -655,7 +1088,9 @@ export function CreateProjectAgentScheduleDialog({
               dayOfWeek,
             ),
             timeZone,
-          }).catch((caught) => {
+          };
+          const save = isEditing && onUpdate ? onUpdate : onCreate;
+          void save(input).catch((caught) => {
             setSubmitError(
               caught instanceof Error ? caught.message : String(caught),
             );
@@ -666,11 +1101,23 @@ export function CreateProjectAgentScheduleDialog({
         <header>
           <div>
             <p className="eyebrow">
-              <CalendarPlus size={13} />
-              {t("schedule.newEyebrow")}
+              {isEditing ? <Pencil size={13} /> : <CalendarPlus size={13} />}
+              {t(
+                isEditing
+                  ? "schedule.editEyebrow"
+                  : "schedule.newEyebrow",
+              )}
             </p>
-            <h2>{t("schedule.create")}</h2>
-            <p>{t("schedule.createDescription")}</p>
+            <h2>
+              {t(isEditing ? "schedule.edit" : "schedule.create")}
+            </h2>
+            <p>
+              {t(
+                isEditing
+                  ? "schedule.editDescription"
+                  : "schedule.createDescription",
+              )}
+            </p>
           </div>
           <button
             aria-label={t("common.close")}
@@ -688,7 +1135,7 @@ export function CreateProjectAgentScheduleDialog({
               {t("schedule.name")} <em>{t("common.required")}</em>
             </span>
             <input
-              autoFocus
+              autoFocus={!isEditing}
               maxLength={120}
               onChange={(event) => setName(event.target.value)}
               placeholder={t("schedule.namePlaceholder")}
@@ -808,10 +1255,14 @@ export function CreateProjectAgentScheduleDialog({
           >
             {isSubmitting ? (
               <LoaderCircle className="spin" size={15} />
+            ) : isEditing ? (
+              <Pencil size={15} />
             ) : (
               <Plus size={15} />
             )}
-            {isSubmitting ? t("schedule.creating") : t("schedule.create")}
+            {isSubmitting
+              ? t(isEditing ? "schedule.updating" : "schedule.creating")
+              : t(isEditing ? "schedule.saveChanges" : "schedule.create")}
           </button>
         </footer>
       </form>

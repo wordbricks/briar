@@ -46,6 +46,7 @@ import {
   createProjectAgent,
   createProjectAgentSchedule,
   createProject,
+  deleteProjectAgentSchedule,
   deleteProject,
   EventKeyConflictError,
   findProjectIdByAgentTokenHash,
@@ -77,6 +78,7 @@ import {
   renewProjectAgentScheduleRunLease,
   rollbackNewAppIssue,
   updateProjectAgent,
+  updateProjectAgentSchedule,
   updateProjectSettings,
   updateOrganization,
   type HuntEventRow,
@@ -1418,6 +1420,53 @@ async function route(
     const schedule = await createProjectAgentSchedule(db, project.id, input);
     if (!schedule) throw new HttpError(404, "Project agent not found");
     return json({ schedule: projectAgentScheduleJson(schedule) }, 201);
+  }
+
+  const projectAgentScheduleMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/agent-schedules\/([0-9a-f-]+)$/u,
+  );
+  if (projectAgentScheduleMatch && request.method === "PUT") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      projectAgentScheduleMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const input = projectAgentScheduleInputSchema.parse(
+      await readJson(request),
+    );
+    const schedule = await updateProjectAgentSchedule(
+      db,
+      project.id,
+      projectAgentScheduleMatch[2],
+      input,
+    );
+    if (!schedule) {
+      throw new HttpError(404, "Project agent schedule not found");
+    }
+    return json({ schedule: projectAgentScheduleJson(schedule) });
+  }
+  if (projectAgentScheduleMatch && request.method === "DELETE") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      projectAgentScheduleMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const result = await deleteProjectAgentSchedule(
+      db,
+      project.id,
+      projectAgentScheduleMatch[2],
+    );
+    if (result === "not_found") {
+      throw new HttpError(404, "Project agent schedule not found");
+    }
+    if (result === "running") {
+      throw new HttpError(409, "A schedule run is currently active");
+    }
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   const projectAgentScheduleRunsMatch = pathname.match(

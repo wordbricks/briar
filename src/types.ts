@@ -173,6 +173,9 @@ export type CreateProjectAgentScheduleInput = {
   timeZone: string;
 };
 
+export type UpdateProjectAgentScheduleInput =
+  CreateProjectAgentScheduleInput;
+
 export type ProjectAgentScheduleRun = {
   id: string;
   projectId: string;

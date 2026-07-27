@@ -16,6 +16,7 @@ import {
   createProjectAgentSchedule,
   createProject,
   createIssueAttachments,
+  deleteProjectAgentSchedule,
   deleteProject,
   getProject,
   getProjectSettings,
@@ -39,6 +40,7 @@ import {
   renewProjectAgentScheduleRunLease,
   updateProjectSettings,
   updateProjectAgent,
+  updateProjectAgentSchedule,
   updateOrganization,
 } from "./db";
 
@@ -329,6 +331,64 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ).resolves.toBeNull();
   });
 
+  it("updates and deletes a recurring schedule within its project", async () => {
+    const agent = (await listProjectAgents(db, projectId))[0];
+    const schedule = await createProjectAgentSchedule(db, projectId, {
+      agentId: agent.id,
+      name: "Original schedule",
+      recurrence: "daily",
+      timeOfDay: "08:00",
+      dayOfWeek: null,
+      timeZone: "Etc/UTC",
+    });
+
+    await expect(
+      updateProjectAgentSchedule(db, projectId, schedule!.id, {
+        agentId: agent.id,
+        name: "Weekly release review",
+        recurrence: "weekly",
+        timeOfDay: "16:30",
+        dayOfWeek: 5,
+        timeZone: "Asia/Seoul",
+      }),
+    ).resolves.toMatchObject({
+      id: schedule!.id,
+      name: "Weekly release review",
+      recurrence: "weekly",
+      time_of_day: "16:30",
+      day_of_week: 5,
+      time_zone: "Asia/Seoul",
+    });
+    await expect(
+      updateProjectAgentSchedule(
+        db,
+        "22222222-2222-4222-8222-222222222222",
+        schedule!.id,
+        {
+          agentId: agent.id,
+          name: "Wrong project",
+          recurrence: "daily",
+          timeOfDay: "09:00",
+          dayOfWeek: null,
+          timeZone: "Etc/UTC",
+        },
+      ),
+    ).resolves.toBeNull();
+    await expect(
+      deleteProjectAgentSchedule(
+        db,
+        "22222222-2222-4222-8222-222222222222",
+        schedule!.id,
+      ),
+    ).resolves.toBe("not_found");
+    await expect(
+      deleteProjectAgentSchedule(db, projectId, schedule!.id),
+    ).resolves.toBe("deleted");
+    await expect(
+      deleteProjectAgentSchedule(db, projectId, schedule!.id),
+    ).resolves.toBe("not_found");
+  });
+
   it("claims a due schedule once and advances its next occurrence", async () => {
     const agent = (await listProjectAgents(db, projectId))[0];
     const schedule = await createProjectAgentSchedule(db, projectId, {
@@ -367,6 +427,9 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         observedAt: "2026-07-27T09:00:10.000Z",
       }),
     ).resolves.toBeNull();
+    await expect(
+      deleteProjectAgentSchedule(db, projectId, schedule!.id),
+    ).resolves.toBe("running");
     await expect(
       db
         .prepare(
