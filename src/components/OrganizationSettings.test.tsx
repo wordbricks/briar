@@ -100,7 +100,7 @@ describe("OrganizationSettings", () => {
         .find((button) => button.textContent?.trim() === "초대")
         ?.click();
     });
-    const dialog = container.querySelector<HTMLFormElement>('[role="dialog"]');
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
     expect(dialog?.textContent).toContain("멤버 초대");
     expect(document.activeElement).toBe(
       dialog?.querySelector('input[type="email"]'),
@@ -112,9 +112,9 @@ describe("OrganizationSettings", () => {
       setInputValue(email, "new@wordbricks.ai");
     });
     await act(async () => {
-      dialog?.dispatchEvent(
-        new Event("submit", { bubbles: true, cancelable: true }),
-      );
+      dialog
+        ?.querySelector("form")
+        ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     });
 
     expect(addOrganizationMember).toHaveBeenCalledWith(

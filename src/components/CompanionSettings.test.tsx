@@ -15,7 +15,7 @@ describe("CompanionSettings", () => {
       />,
     );
 
-    expect(markup).toContain("<h1>설정</h1>");
+    expect(markup).toMatch(/<h1[^>]*>설정<\/h1>/);
     expect(markup).toContain("Jay");
     expect(markup).toContain("jay@example.com");
     expect(markup).toContain('aria-label="앱 아이콘 선택"');
