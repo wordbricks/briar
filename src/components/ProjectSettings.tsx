@@ -328,16 +328,15 @@ export function ProjectSettings({
             </p>
           </header>
 
-          <section
-            className="project-settings-card"
-            hidden={activeSection !== "general"}
-          >
-            <div>
-              <span>{t("settings.projectName")}</span>
-              <strong>{project.name}</strong>
-            </div>
-            <small>{t("settings.created", { date: new Date(project.createdAt).toLocaleDateString(localeTag) })}</small>
-          </section>
+          {activeSection === "general" ? (
+            <section className="project-settings-card">
+              <div>
+                <span>{t("settings.projectName")}</span>
+                <strong>{project.name}</strong>
+              </div>
+              <small>{t("settings.created", { date: new Date(project.createdAt).toLocaleDateString(localeTag) })}</small>
+            </section>
+          ) : null}
 
           <section
             className="project-settings-linear"
