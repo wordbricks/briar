@@ -129,6 +129,7 @@ export function ProjectAgents({
             projectId: project.id,
             name: input.name ?? `${providerLabels[input.provider]} Agent`,
             avatar: input.avatar ?? null,
+            codexPet: null,
             provider: input.provider,
             model: input.model,
             responsibility: input.responsibility,
@@ -162,6 +163,8 @@ export function ProjectAgents({
           name: input.name ?? `${providerLabels[input.provider]} Agent`,
           avatar:
             input.avatar === undefined ? agent.avatar : input.avatar,
+          codexPet:
+            input.codexPet === undefined ? agent.codexPet : input.codexPet,
           provider: input.provider,
           model: input.model,
           responsibility: input.responsibility,
@@ -373,7 +376,6 @@ export function ProjectAgents({
     </main>
   );
 }
-
 function modelLabel(agent: ProjectAgent, providerDefault: string) {
   if (!agent.model) return providerDefault;
   return (

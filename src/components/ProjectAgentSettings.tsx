@@ -29,12 +29,10 @@ import {
   projectAgentAvatarAccept,
   projectAgentAvatarFromFile,
 } from "../lib/project-agent-avatar";
-import type {
-  Project,
-  ProjectAgent,
-  UpdateProjectAgentInput,
-} from "../types";
+import { projectAgentAvatarFromCodexPet } from "../lib/codex-pets";
+import type { Project, ProjectAgent, UpdateProjectAgentInput } from "../types";
 import { SelectMenu } from "./SelectMenu";
+import { CodexPetAttribution, CodexPetPicker } from "./CodexPetPicker";
 
 const providerLabels: Record<AgentProvider, string> = {
   codex: "Codex",
@@ -58,11 +56,13 @@ export function ProjectAgentSettings({
   const { t } = useI18n();
   const [name, setName] = useState(agent.name);
   const [avatar, setAvatar] = useState(agent.avatar);
+  const [codexPet, setCodexPet] = useState(agent.codexPet);
   const [responsibility, setResponsibility] = useState(agent.responsibility);
   const [calendarColor, setCalendarColor] = useState(agent.calendarColor);
   const [savedProfile, setSavedProfile] = useState({
     name: agent.name,
     avatar: agent.avatar,
+    codexPet: agent.codexPet,
     responsibility: agent.responsibility,
     calendarColor: agent.calendarColor,
   });
@@ -123,6 +123,7 @@ export function ProjectAgentSettings({
   const profileChanged =
     name !== savedProfile.name ||
     avatar !== savedProfile.avatar ||
+    codexPet?.slug !== savedProfile.codexPet?.slug ||
     responsibility !== savedProfile.responsibility ||
     calendarColor !== savedProfile.calendarColor;
   const runtimeChanged =
@@ -144,6 +145,7 @@ export function ProjectAgentSettings({
       const saved = await onSave({
         name: name.trim() || null,
         avatar,
+        codexPet,
         provider: agent.provider,
         model: agent.model,
         responsibility: responsibility.trim(),
@@ -152,16 +154,20 @@ export function ProjectAgentSettings({
       const nextProfile = {
         name: saved.name,
         avatar: saved.avatar,
+        codexPet: saved.codexPet,
         responsibility: saved.responsibility,
         calendarColor: saved.calendarColor,
       };
       setName(nextProfile.name);
       setAvatar(nextProfile.avatar);
+      setCodexPet(nextProfile.codexPet);
       setResponsibility(nextProfile.responsibility);
       setCalendarColor(nextProfile.calendarColor);
       setSavedProfile(nextProfile);
     } catch (caught) {
-      setProfileError(caught instanceof Error ? caught.message : String(caught));
+      setProfileError(
+        caught instanceof Error ? caught.message : String(caught),
+      );
     } finally {
       setProfileSaving(false);
     }
@@ -183,7 +189,9 @@ export function ProjectAgentSettings({
       setApprovalPolicy(saved.approvalPolicy);
       setSavedRuntime(saved);
     } catch (caught) {
-      setRuntimeError(caught instanceof Error ? caught.message : String(caught));
+      setRuntimeError(
+        caught instanceof Error ? caught.message : String(caught),
+      );
     } finally {
       setRuntimeSaving(false);
     }
@@ -258,7 +266,9 @@ export function ProjectAgentSettings({
                   <span className="project-agent-avatar-actions">
                     <label className="project-agent-avatar-upload">
                       <ImagePlus size={14} />
-                      {t(avatar ? "agents.replaceAvatar" : "agents.uploadAvatar")}
+                      {t(
+                        avatar ? "agents.replaceAvatar" : "agents.uploadAvatar",
+                      )}
                       <input
                         accept={projectAgentAvatarAccept}
                         aria-label={t("agents.uploadAvatar")}
@@ -269,7 +279,10 @@ export function ProjectAgentSettings({
                           if (!file) return;
                           setProfileError(null);
                           void projectAgentAvatarFromFile(file)
-                            .then(setAvatar)
+                            .then((nextAvatar) => {
+                              setAvatar(nextAvatar);
+                              setCodexPet(null);
+                            })
                             .catch(() =>
                               setProfileError(t("agents.avatarUploadFailed")),
                             );
@@ -283,6 +296,7 @@ export function ProjectAgentSettings({
                         disabled={profileSaving}
                         onClick={() => {
                           setAvatar(null);
+                          setCodexPet(null);
                           setProfileError(null);
                         }}
                         type="button"
@@ -293,6 +307,26 @@ export function ProjectAgentSettings({
                     ) : null}
                     <small>{t("agents.avatarHint")}</small>
                   </span>
+                </div>
+                <div className="project-agent-codex-pet-row">
+                  <CodexPetPicker
+                    disabled={profileSaving}
+                    onSelect={async (pet) => {
+                      setProfileError(null);
+                      const nextAvatar =
+                        await projectAgentAvatarFromCodexPet(pet);
+                      setAvatar(nextAvatar);
+                      setCodexPet({
+                        slug: pet.slug,
+                        name: pet.name,
+                        author: pet.author,
+                        license: pet.license,
+                        spriteVersion: pet.spriteVersion,
+                        spriteSheetUrl: null,
+                      });
+                    }}
+                  />
+                  {codexPet ? <CodexPetAttribution pet={codexPet} /> : null}
                 </div>
               </div>
               <label>
@@ -428,7 +462,8 @@ export function ProjectAgentSettings({
                 id="project-agent-runtime-effort"
                 label={t("settings.effort")}
                 onValueChange={(value) =>
-                  setRuntimeEffort((value as ModelEffort) || null)}
+                  setRuntimeEffort((value as ModelEffort) || null)
+                }
                 options={[
                   {
                     label: t("settings.providerDefaultEffort"),
@@ -451,7 +486,8 @@ export function ProjectAgentSettings({
                 id="project-agent-runtime-approval"
                 label={t("settings.approvalRequest")}
                 onValueChange={(value) =>
-                  setApprovalPolicy(value as ApprovalPolicy)}
+                  setApprovalPolicy(value as ApprovalPolicy)
+                }
                 options={[
                   {
                     description: t("settings.approvalUntrustedDescription"),

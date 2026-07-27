@@ -473,12 +473,22 @@ describe("API errors", () => {
     const fetchMock = vi.fn(
       async (_input: RequestInfo | URL, init?: RequestInit) => {
         const input = JSON.parse(String(init?.body));
+        expect(input.codexPet).toEqual({ slug: "firefly--lingxiaotian" });
         return new Response(
           JSON.stringify({
             agent: {
               id: "11111111-1111-4111-8111-111111111111",
               projectId: "22222222-2222-4222-8222-222222222222",
               ...input,
+              codexPet: {
+                slug: "firefly--lingxiaotian",
+                name: "Firefly",
+                author: "Lingxiaotian",
+                license: "CC BY-NC 4.0",
+                spriteVersion: 1,
+                spriteSheetUrl:
+                  "/projects/22222222-2222-4222-8222-222222222222/agents/11111111-1111-4111-8111-111111111111/spritesheet",
+              },
               skill: "# Release agent\n\n릴리스 상태를 점검합니다.",
               createdAt: "2026-07-26T00:00:00.000Z",
               updatedAt: "2026-07-27T00:00:00.000Z",
@@ -498,6 +508,14 @@ describe("API errors", () => {
         {
           name: "Release agent",
           avatar: "data:image/webp;base64,aA==",
+          codexPet: {
+            slug: "firefly--lingxiaotian",
+            name: "Firefly",
+            author: "Lingxiaotian",
+            license: "CC BY-NC 4.0",
+            spriteVersion: 1,
+            spriteSheetUrl: null,
+          },
           provider: "claude",
           model: "sonnet",
           responsibility: "릴리스 상태를 점검합니다.",
@@ -507,6 +525,10 @@ describe("API errors", () => {
     ).resolves.toMatchObject({
       name: "Release agent",
       avatar: "data:image/webp;base64,aA==",
+      codexPet: expect.objectContaining({
+        slug: "firefly--lingxiaotian",
+        spriteSheetUrl: expect.stringContaining("/spritesheet"),
+      }),
       provider: "claude",
       model: "sonnet",
       responsibility: "릴리스 상태를 점검합니다.",

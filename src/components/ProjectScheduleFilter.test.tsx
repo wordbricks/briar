@@ -19,6 +19,7 @@ const agentA: ProjectAgent = {
   projectId,
   name: "Agent A",
   avatar: null,
+  codexPet: null,
   kind: "custom",
   provider: "codex",
   model: null,
