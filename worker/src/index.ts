@@ -363,6 +363,7 @@ const issueInputSchema = z
     title: z.string().trim().min(1).max(300),
     description: z.string().trim().max(100_000).nullable().optional(),
     priority: z.number().int().min(1).max(4).nullable().optional(),
+    status: z.enum(["backlog", "queued"]).default("queued"),
   })
   .strict();
 
@@ -441,6 +442,7 @@ export async function readIssueRequest(request: Request) {
 
   const description = form.get("description");
   const priority = form.get("priority");
+  const status = form.get("status");
   return {
     input: issueInputSchema.parse({
       title: form.get("title"),
@@ -450,6 +452,7 @@ export async function readIssueRequest(request: Request) {
           : null,
       priority:
         typeof priority === "string" && priority ? Number(priority) : null,
+      status: typeof status === "string" && status ? status : undefined,
     }),
     attachments,
   };
@@ -1832,6 +1835,9 @@ async function route(
     const issueId = crypto.randomUUID();
     const sourceKey = `briar-issue:${issueId}`;
     const occurredAt = new Date().toISOString();
+    const detail = input.status === "backlog"
+      ? "Briar 앱에서 생성된 이슈가 백로그에 추가되었습니다."
+      : "Briar 앱에서 생성된 이슈가 Auto Hunt 처리를 기다리고 있습니다.";
     const storedAttachments: Array<IssueAttachmentInput & { file: File }> =
       attachments.map((file) => {
         const id = crypto.randomUUID();
@@ -1869,14 +1875,13 @@ async function route(
         sourceKey,
         title: input.title,
         stage: "queued",
-        status: "queued",
+        status: input.status,
         workflowStage: null,
-        eventKey: `${sourceKey}:queued:intake`,
+        eventKey: `${sourceKey}:${input.status}:intake`,
         occurredAt,
         actor: "briar-app",
         repository: settings?.github_repository ?? project.name,
-        detail:
-          "Briar 앱에서 생성된 이슈가 Auto Hunt 처리를 기다리고 있습니다.",
+        detail,
         priority: input.priority ?? null,
         branch: null,
         commitSha: null,
@@ -1907,7 +1912,7 @@ async function route(
           runId,
           sourceKey,
           stage: "queued",
-          status: "queued",
+          status: input.status,
           attachments: attachmentRows.map(attachmentJson),
         },
         201,

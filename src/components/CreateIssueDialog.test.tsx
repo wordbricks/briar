@@ -131,7 +131,58 @@ describe("CreateIssueDialog clipboard attachments", () => {
       attachments: [],
       description: null,
       priority: 2,
+      status: "queued",
       title: "Keyboard-created issue",
+    });
+
+    await act(async () => root.unmount());
+  });
+
+  it("creates an issue in backlog when that status is selected", async () => {
+    const onCreate = vi.fn(async () => undefined);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <CreateIssueDialog
+          isSubmitting={false}
+          onClose={() => undefined}
+          onCreate={onCreate}
+        />,
+      );
+    });
+
+    const titleInput =
+      container.querySelector<HTMLInputElement>(".issue-title-input");
+    await act(async () => {
+      const valueSetter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set;
+      valueSetter?.call(titleInput, "Backlog issue");
+      titleInput?.dispatchEvent(new Event("input", { bubbles: true }));
+      container
+        .querySelector<HTMLButtonElement>(
+          ".issue-status-select .select-menu-trigger",
+        )
+        ?.click();
+    });
+    await act(async () => {
+      document
+        .querySelector<HTMLButtonElement>(
+          '[role="option"][data-value="backlog"]',
+        )
+        ?.click();
+    });
+    await act(async () => {
+      container.querySelector<HTMLFormElement>("form")?.requestSubmit();
+    });
+
+    expect(onCreate).toHaveBeenCalledWith({
+      attachments: [],
+      description: null,
+      priority: 2,
+      status: "backlog",
+      title: "Backlog issue",
     });
 
     await act(async () => root.unmount());

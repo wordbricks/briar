@@ -202,10 +202,12 @@ describe("HuntDashboard", () => {
 
     expect(markup).toContain("새 이슈");
     expect(markup).toContain(">GG<");
-    expect(markup).toContain("할 일");
+    expect(markup).toContain("대기");
     expect(markup).toContain("담당자");
     expect(markup).toContain("프로젝트");
     expect(markup).toContain("라벨");
+    expect(markup).toContain('aria-haspopup="listbox" aria-label="상태"');
+    expect(markup).toContain("native-select issue-status-select");
     expect(markup).toContain('aria-haspopup="listbox" aria-label="우선순위"');
     expect(markup).toContain("native-select issue-priority-select");
     expect(markup).toContain('type="file"');

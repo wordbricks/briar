@@ -1433,6 +1433,9 @@ export function useBriar() {
             byteSize: file.size,
             url: URL.createObjectURL(file),
           }));
+          const detail = input.status === "backlog"
+            ? "Briar 앱에서 생성된 이슈가 백로그에 추가되었습니다."
+            : "Briar 앱에서 생성된 이슈가 Auto Hunt 처리를 기다리고 있습니다.";
           const run: HuntRun = {
             id: crypto.randomUUID(),
             runNumber:
@@ -1441,11 +1444,11 @@ export function useBriar() {
             source: "issue",
             sourceKey,
             title: input.title.trim(),
-            status: "queued",
+            status: input.status,
             workflowStage: null,
             workflow: dashboard.settings.workflow,
-            progress: 5,
-            detail: "Briar 앱에서 생성된 이슈가 Auto Hunt 처리를 기다리고 있습니다.",
+            progress: input.status === "backlog" ? 0 : 5,
+            detail,
             priority: input.priority,
             repository:
               dashboard.settings.githubRepository ?? dashboard.project.name,
@@ -1478,9 +1481,9 @@ export function useBriar() {
               {
                 id: crypto.randomUUID(),
                 attempt: 1,
-                status: "queued",
+                status: input.status,
                 workflowStage: null,
-                detail: "Briar 앱에서 생성된 이슈가 Auto Hunt 처리를 기다리고 있습니다.",
+                detail,
                 actor: "briar-app",
                 qaStatus: null,
                 trackerState: null,
@@ -1494,7 +1497,12 @@ export function useBriar() {
           setDashboard((current) =>
             current ? { ...current, runs: [run, ...current.runs] } : current,
           );
-          return { runId: run.id, sourceKey, stage: "queued" as const };
+          return {
+            runId: run.id,
+            sourceKey,
+            stage: "queued" as const,
+            status: input.status,
+          };
         }
         if (!token) throw new Error("로그인이 필요합니다.");
         const result = await createIssue(token, activeProjectId, input);

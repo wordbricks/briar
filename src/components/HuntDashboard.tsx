@@ -600,6 +600,7 @@ export function CreateIssueDialog({
   const { t } = useI18n();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [status, setStatus] = useState<"backlog" | "queued">("queued");
   const [priority, setPriority] = useState("2");
   const [attachments, setAttachments] = useState<File[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
@@ -663,6 +664,7 @@ export function CreateIssueDialog({
             title: title.trim(),
             description: description.trim() || null,
             priority: Number(priority),
+            status,
             attachments,
           }).catch((error) =>
             setSubmitError(error instanceof Error ? error.message : String(error)),
@@ -685,7 +687,7 @@ export function CreateIssueDialog({
                   type="button"
                 >
                   {projectName}
-                  <ChevronDown size={15} />
+                  <ChevronDown size={12} />
                 </button>
               </>
             )}
@@ -697,72 +699,83 @@ export function CreateIssueDialog({
             type="button"
             aria-label={t("common.close")}
           >
-            <X size={22} />
+            <X size={16} />
           </button>
         </header>
         <div className="issue-form-body">
-          <input
-            aria-label={t("issue.title")}
-            autoFocus
-            className="issue-title-input"
-            maxLength={300}
-            onChange={(event) => setTitle(event.target.value)}
-            placeholder={t("issue.titlePlaceholder")}
-            required
-            value={title}
-          />
-          <textarea
-            aria-label={t("issue.description")}
-            className="issue-description-input"
-            maxLength={100000}
-            onChange={(event) => setDescription(event.target.value)}
-            placeholder={t("issue.descriptionPlaceholder")}
-            value={description}
-          />
-          {attachments.length > 0 && (
-            <div className="issue-attachment-list">
-              {attachments.map((file, index) => (
-                <SelectedAttachment
-                  file={file}
-                  key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
-                  onRemove={() => {
-                    setAttachments((current) =>
-                      current.filter(
-                        (_, candidateIndex) => candidateIndex !== index,
-                      ),
-                    );
-                    setAttachmentError(null);
-                  }}
-                />
-              ))}
-            </div>
-          )}
-          {(submitError || attachmentError) && (
-            <div className="issue-form-error">
-              <CircleAlert size={14} />
-              {submitError ?? attachmentError}
-            </div>
-          )}
+          <div
+            className={`issue-editor-content${
+              attachments.length > 0 ? " has-attachments" : ""
+            }`}
+          >
+            <input
+              aria-label={t("issue.title")}
+              autoFocus
+              className="issue-title-input"
+              maxLength={300}
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder={t("issue.titlePlaceholder")}
+              required
+              value={title}
+            />
+            <textarea
+              aria-label={t("issue.description")}
+              className="issue-description-input"
+              maxLength={100000}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder={t("issue.descriptionPlaceholder")}
+              value={description}
+            />
+            {attachments.length > 0 && (
+              <div
+                aria-label={t("issue.attachments")}
+                className="issue-attachment-list"
+              >
+                {attachments.map((file, index) => (
+                  <SelectedAttachment
+                    file={file}
+                    key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
+                    onRemove={() => {
+                      setAttachments((current) =>
+                        current.filter(
+                          (_, candidateIndex) => candidateIndex !== index,
+                        ),
+                      );
+                      setAttachmentError(null);
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+            {(submitError || attachmentError) && (
+              <div className="issue-form-error">
+                <CircleAlert size={14} />
+                {submitError ?? attachmentError}
+              </div>
+            )}
+          </div>
           <div className="issue-metadata-bar">
+            <NativeSelect
+              className="issue-status-select"
+              label={t("dashboard.status")}
+              onValueChange={(value) =>
+                setStatus(value === "backlog" ? "backlog" : "queued")
+              }
+              options={[
+                { label: t("status.backlog"), value: "backlog" },
+                { label: t("status.queued"), value: "queued" },
+              ]}
+              value={status}
+            />
             <button
               aria-disabled="true"
               className="issue-metadata-chip"
               disabled
               type="button"
             >
-              <i aria-hidden="true" />
-              {t("issue.todo")}
-              <ChevronDown size={15} />
-            </button>
-            <button
-              aria-disabled="true"
-              className="issue-metadata-chip"
-              disabled
-              type="button"
-            >
-              <UserRound size={17} />
+              <UserRound size={13} />
               {t("issue.assignee")}
-              <ChevronDown size={15} />
+              <ChevronDown size={12} />
             </button>
             <NativeSelect
               className="issue-priority-select"
@@ -782,9 +795,9 @@ export function CreateIssueDialog({
               disabled
               type="button"
             >
-              <FolderKanban size={17} />
+              <FolderKanban size={13} />
               {t("issue.project")}
-              <ChevronDown size={15} />
+              <ChevronDown size={12} />
             </button>
             <button
               aria-disabled="true"
@@ -792,12 +805,12 @@ export function CreateIssueDialog({
               disabled
               type="button"
             >
-              <Tag size={17} />
+              <Tag size={13} />
               {t("issue.labels")}
-              <ChevronDown size={15} />
+              <ChevronDown size={12} />
             </button>
             <label className="issue-attachment-trigger">
-              <Paperclip size={17} />
+              <Paperclip size={13} />
               <span>
                 {attachments.length > 0
                   ? t("issue.attachmentCount", {
@@ -844,7 +857,7 @@ export function CreateIssueDialog({
               disabled={isSubmitting || !title.trim()}
               type="submit"
             >
-              {isSubmitting && <LoaderCircle className="spin" size={15} />}
+              {isSubmitting && <LoaderCircle className="spin" size={13} />}
               {isSubmitting ? t("issue.submitting") : t("issue.submit")}
             </button>
           </div>
@@ -870,17 +883,30 @@ function SelectedAttachment({
   }, [file]);
   const isImage = file.type.startsWith("image/");
   return (
-    <div className="issue-attachment-item">
-      <span className="issue-attachment-preview">
+    <figure className="issue-attachment-item">
+      <div className="issue-attachment-preview">
         {previewUrl && isImage ? (
-          <img alt="" src={previewUrl} />
+          <img alt={file.name} src={previewUrl} />
+        ) : previewUrl ? (
+          <video controls muted playsInline preload="metadata" src={previewUrl} />
         ) : (
-          <Video size={17} />
+          <Video size={22} />
         )}
-      </span>
-      <span><strong>{file.name}</strong><small>{formatAttachmentBytes(file.size)}</small></span>
-      <button aria-label={t("issue.remove", { name: file.name })} onClick={onRemove} type="button"><Trash2 size={14} /></button>
-    </div>
+      </div>
+      <figcaption>
+        <span>
+          <strong>{file.name}</strong>
+          <small>{formatAttachmentBytes(file.size)}</small>
+        </span>
+        <button
+          aria-label={t("issue.remove", { name: file.name })}
+          onClick={onRemove}
+          type="button"
+        >
+          <Trash2 size={14} />
+        </button>
+      </figcaption>
+    </figure>
   );
 }
 
