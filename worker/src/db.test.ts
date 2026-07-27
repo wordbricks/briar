@@ -198,6 +198,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         "utf8",
       ),
     );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0020_project_agent_calendar_color.sql"),
+        "utf8",
+      ),
+    );
   });
 
   afterAll(async () => {
@@ -250,6 +257,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         provider: "codex",
         model: null,
         responsibility: "Perform Auto Hunt for every queued issue.",
+        calendar_color: "#3275d5",
         kind: "auto_hunt",
       }),
     ]);
@@ -262,6 +270,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       model: "opus",
       responsibility:
         "Sentry 오류를 분석해 이슈를 만들고 담당자에게 배정합니다.",
+      calendarColor: "#8b5cf6",
     });
 
     expect(agent).toMatchObject({
@@ -269,6 +278,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       name: "Sentry 오류 탐지 에이전트",
       provider: "claude",
       model: "opus",
+      calendar_color: "#8b5cf6",
     });
     await expect(listProjectAgents(db, projectId)).resolves.toEqual(
       expect.arrayContaining([
@@ -498,6 +508,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       provider: "claude",
       model: "sonnet",
       responsibility: "Coordinates release checks and reports the result.",
+      calendarColor: "#0f9f76",
     });
 
     expect(updated).toMatchObject({
@@ -507,6 +518,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       provider: "claude",
       model: "sonnet",
       responsibility: "Coordinates release checks and reports the result.",
+      calendar_color: "#0f9f76",
       kind: "auto_hunt",
     });
     await expect(
@@ -519,6 +531,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
           provider: "grok",
           model: null,
           responsibility: "Must not update another project.",
+          calendarColor: "#d97706",
         },
       ),
     ).resolves.toBeNull();

@@ -19,6 +19,7 @@ import {
   normalizeAutoHuntAutomation,
 } from "../../src/lib/auto-hunt-automation";
 import {
+  defaultProjectAgentCalendarColor,
   defaultProjectAgentCopy,
   normalizeProjectAgentLocale,
   type ProjectAgentLocale,
@@ -352,6 +353,11 @@ const projectAgentInputSchema = z
     provider: z.enum(["codex", "claude", "grok"]),
     model: z.string().trim().min(1).max(100).nullable().optional(),
     responsibility: z.string().trim().min(1).max(2_000),
+    calendarColor: z
+      .string()
+      .trim()
+      .regex(/^#[0-9a-f]{6}$/iu)
+      .default(defaultProjectAgentCalendarColor),
   })
   .strict();
 export const projectAgentScheduleInputSchema = z
@@ -895,6 +901,7 @@ const projectAgentJson = (
     provider: row.provider,
     model: row.model,
     responsibility: copy.responsibility,
+    calendarColor: row.calendar_color,
     kind: row.kind,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -1376,6 +1383,7 @@ async function route(
       provider: input.provider,
       model: input.model ?? null,
       responsibility: input.responsibility,
+      calendarColor: input.calendarColor,
     });
     return json({ agent: projectAgentJson(agent) }, 201);
   }
@@ -1529,6 +1537,7 @@ async function route(
         provider: input.provider,
         model: input.model ?? null,
         responsibility: input.responsibility,
+        calendarColor: input.calendarColor,
       },
     );
     if (!agent) throw new HttpError(404, "Agent not found");

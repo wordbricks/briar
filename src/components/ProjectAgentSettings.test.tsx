@@ -25,6 +25,7 @@ describe("ProjectAgentSettings", () => {
       provider: "codex" as const,
       model: null,
       responsibility: "Process queued issues.",
+      calendarColor: "#3275d5",
       kind: "auto_hunt" as const,
       createdAt: "2026-07-26T00:00:00.000Z",
       updatedAt: "2026-07-26T00:00:00.000Z",
@@ -62,6 +63,11 @@ describe("ProjectAgentSettings", () => {
     expect(
       container.querySelector("#project-agent-runtime-approval"),
     ).not.toBeNull();
+    expect(
+      container.querySelector<HTMLInputElement>(
+        'input[aria-label="캘린더 색상"]',
+      )?.value,
+    ).toBe("#3275d5");
 
     const providerTrigger = container.querySelector<HTMLButtonElement>(
       "#project-agent-runtime-provider",
