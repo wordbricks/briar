@@ -14,6 +14,9 @@ export const autoHuntRunStatuses = [
   "cancelled",
 ] as const;
 
+export const autoHuntEvidenceTypeMaxLength = 120;
+export const autoHuntEvidenceTypePattern = /^[^\u0000-\u001f\u007f]+$/u;
+
 export const autoHuntWorkflowStageCatalog = [
   { id: "analyzing", label: "분석", tone: "blue", evidence: ["repository"], checks: undefined },
   { id: "planning", label: "계획", tone: "cyan", evidence: ["repository"], checks: undefined },

@@ -6,6 +6,8 @@ import { basename, isAbsolute, join, resolve } from "node:path";
 import { z } from "zod";
 import packageJson from "../package.json";
 import {
+  autoHuntEvidenceTypeMaxLength,
+  autoHuntEvidenceTypePattern,
   autoHuntRunStatuses,
   autoHuntSources,
   repositoryWorkflowPendingStageId,
@@ -38,6 +40,12 @@ import {
 import { getSkillGuide, skillGuides } from "./skill-guides";
 
 const workflowStageIdSchema = z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/u);
+const evidenceTypeSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(autoHuntEvidenceTypeMaxLength)
+  .regex(autoHuntEvidenceTypePattern);
 
 const workflowConfigSchema = z
   .object({
@@ -47,7 +55,7 @@ const workflowConfigSchema = z
         id: workflowStageIdSchema,
         label: z.string().min(1),
         required: z.boolean(),
-        evidence: z.array(z.string().min(1)).optional(),
+        evidence: z.array(evidenceTypeSchema).optional(),
         checks: z.array(z.string().min(1)).optional(),
       }),
     ).min(1),
@@ -1121,10 +1129,10 @@ async function addRunEvidence() {
     url: value("--url") ?? null,
     metadata: metadataValue ? JSON.parse(metadataValue) : null,
   };
-  z.object({
+  const parsed = z.object({
     evidenceKey: z.string().min(1).max(300),
     stage: workflowStageIdSchema,
-    type: z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/u),
+    type: evidenceTypeSchema,
     status: z.enum(["pending", "passed", "failed", "skipped"]),
     observedAt: z.string().datetime({ offset: true }),
     actor: z.string().min(1),
@@ -1137,7 +1145,7 @@ async function addRunEvidence() {
     config.apiUrl,
     `/runs/${runId}/evidence`,
     process.env.BRIAR_AGENT_TOKEN ?? project.agentToken,
-    { method: "POST", body: JSON.stringify(input) },
+    { method: "POST", body: JSON.stringify(parsed) },
   );
   console.log(JSON.stringify(result));
 }
