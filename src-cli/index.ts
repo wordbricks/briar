@@ -6,10 +6,8 @@ import { basename, join, resolve } from "node:path";
 import { z } from "zod";
 import packageJson from "../package.json";
 import {
-  autoHuntQaEnvironments,
   autoHuntRunStatuses,
   autoHuntSources,
-  autoHuntStages,
   autoHuntWorkflowPresets,
   workflowForPreset,
 } from "../src/lib/auto-hunt-contract";
@@ -38,6 +36,7 @@ import {
   sameApiEnvironment,
   selectProjectForApi,
 } from "./config-environment";
+import { getSkillGuide, skillGuides } from "./skill-guides";
 
 const workflowStageIdSchema = z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/u);
 
@@ -81,6 +80,8 @@ const claimWorktreeSchema = z.object({
   baseSha: z.string().min(1),
 });
 
+const workspaceModeSchema = z.enum(["project", "worktree", "current", "none"]);
+
 const autoHuntConfigSchema = z
   .object({
     velenOrg: z.string().min(1).optional(),
@@ -116,9 +117,10 @@ const projectConfigSchema = z
       .object({
         runId: z.string().uuid(),
         sourceKey: z.string().min(1),
-        token: z.string().startsWith("briar_claim_"),
+        token: z.string().startsWith("briar_claim_").optional(),
         leaseExpiresAt: z.string().datetime({ offset: true }),
         worktree: claimWorktreeSchema.optional(),
+        finished: z.boolean().optional(),
       })
       .optional(),
   })
@@ -487,7 +489,7 @@ function ensureConfiguredVelen(project?: ProjectConfig) {
   return { auth, org, linear };
 }
 
-async function configureAutoHunt() {
+async function configureProject() {
   const config = await loadConfig();
   const project = await currentProject(config);
   const disableVelen = has("--disable-velen");
@@ -594,7 +596,7 @@ async function configureAutoHunt() {
   );
 }
 
-async function autoHuntDoctor() {
+async function projectDoctor() {
   const config = await loadConfig();
   const project = await currentProject(config);
   const velen = ensureConfiguredVelen(project);
@@ -622,6 +624,17 @@ async function autoHuntDoctor() {
       requestIds: [velen?.auth.requestId, velen?.org.requestId, velen?.linear?.requestId].filter(
         Boolean,
       ),
+    }),
+  );
+}
+
+async function showWorkflow() {
+  const config = await loadConfig();
+  const project = await currentProject(config);
+  console.log(
+    JSON.stringify({
+      projectId: project.id,
+      workflow: project.autoHunt?.workflow ?? workflowForPreset("local"),
     }),
   );
 }
@@ -697,32 +710,33 @@ async function downloadClaimAttachment(
   return path;
 }
 
-async function nextHunt() {
+async function claimWork() {
   const config = await loadConfig();
   const project = await currentProject(config);
   ensureConfiguredVelen(project);
   if (
     project.activeClaim &&
+    !project.activeClaim.finished &&
     Date.parse(project.activeClaim.leaseExpiresAt) > Date.now()
   ) {
     throw new Error(
-      `이미 처리 중인 Auto Hunt claim이 있습니다: ${project.activeClaim.sourceKey}`,
+      `이미 처리 중인 claim이 있습니다: ${project.activeClaim.sourceKey}`,
     );
   }
-  const result = await request<{ issue: unknown }>(
+  const result = await request<{ work: unknown }>(
     config.apiUrl,
-    "/ingest/queue/claim",
+    "/queue/claims",
     process.env.BRIAR_AGENT_TOKEN ?? project.agentToken,
     {
       method: "POST",
-      body: JSON.stringify({ claimedBy: value("--actor") ?? "briar-auto-hunt" }),
+      body: JSON.stringify({ claimedBy: value("--actor") ?? "briar-workflow" }),
     },
   );
-  if (result.issue === null) {
-    console.log(JSON.stringify({ issue: null }));
+  if (result.work === null) {
+    console.log(JSON.stringify({ work: null }));
     return;
   }
-  const issue = queuedIssueSchema.parse(result.issue);
+  const issue = queuedIssueSchema.parse(result.work);
   const agentToken = process.env.BRIAR_AGENT_TOKEN ?? project.agentToken;
   config.projects = config.projects.map((candidate) =>
     candidate.id === project.id
@@ -738,9 +752,13 @@ async function nextHunt() {
       : candidate,
   );
   await saveConfig(config);
-  // The claim is persisted before the worktree exists: a crash here must lose
-  // the checkout, never the claim token needed to report or release the run.
-  const { worktree, worktreeError } = await claimWorktree(config, project, issue);
+  // Persist the claim before workspace allocation so a crash cannot lose the
+  // token needed to report or release the run.
+  const { workspace, workspaceError } = await allocateClaimWorkspace(
+    config,
+    project,
+    issue,
+  );
   const attachments = await Promise.all(
     issue.attachments.map(async (attachment) => {
       try {
@@ -767,28 +785,42 @@ async function nextHunt() {
   const { claimToken: _claimToken, ...publicIssue } = issue;
   console.log(
     JSON.stringify({
-      issue: { ...publicIssue, attachments, worktree },
-      ...(worktreeError ? { worktreeError } : {}),
+      work: { ...publicIssue, attachments, workspace },
+      ...(workspaceError ? { workspaceError } : {}),
     }),
   );
 }
 
 /**
- * Give the claimed run its own checkout, cut from the freshly fetched remote
- * base. Allocation failures are reported in the payload instead of thrown: the
- * run is already claimed, so the agent must stay able to record `blocked`
- * against it rather than losing the claim to an exception.
+ * Resolve the claimed run's workspace. Allocation failures stay in the
+ * response because the run is already claimed and must remain reportable.
  */
-async function claimWorktree(
+async function allocateClaimWorkspace(
   config: Config,
   project: ProjectConfig,
   issue: { runId: string; sourceKey: string; title: string },
 ): Promise<{
-  worktree: (IssueWorktree & { warning?: string }) | null;
-  worktreeError: string | null;
+  workspace:
+    | ({ type: "worktree" } & IssueWorktree & { warning?: string })
+    | { type: "current"; path: string }
+    | null;
+  workspaceError: string | null;
 }> {
-  if (!worktreesEnabled(project) || has("--no-worktree")) {
-    return { worktree: null, worktreeError: null };
+  const requestedMode = workspaceModeSchema.parse(value("--workspace") ?? "project");
+  const mode =
+    requestedMode === "project"
+      ? worktreesEnabled(project)
+        ? "worktree"
+        : "current"
+      : requestedMode;
+  if (mode === "none") {
+    return { workspace: null, workspaceError: null };
+  }
+  if (mode === "current") {
+    return {
+      workspace: { type: "current", path: project.repositoryPath },
+      workspaceError: null,
+    };
   }
   try {
     const worktree = await allocateIssueWorktree({
@@ -816,11 +848,14 @@ async function claimWorktree(
         : candidate,
     );
     await saveConfig(config);
-    return { worktree, worktreeError: null };
+    return {
+      workspace: { type: "worktree", ...worktree },
+      workspaceError: null,
+    };
   } catch (error) {
     return {
-      worktree: null,
-      worktreeError: error instanceof Error ? error.message : String(error),
+      workspace: null,
+      workspaceError: error instanceof Error ? error.message : String(error),
     };
   }
 }
@@ -864,7 +899,7 @@ async function worktreeRemove() {
     samePath(worktree.path, target),
   );
   if (!registered?.branch) {
-    throw new Error(`이 프로젝트의 Auto Hunt 워크트리가 아닙니다: ${target}`);
+    throw new Error(`이 프로젝트의 워크트리가 아닙니다: ${target}`);
   }
   const result = removeIssueWorktree(
     runGit,
@@ -892,7 +927,7 @@ async function optionalText(valueFlag: string, fileFlag: string) {
   return value(valueFlag) ?? null;
 }
 
-async function recordHunt() {
+async function addRunEvent(forcedStatus?: string) {
   const config = await loadConfig();
   const project = await currentProject(config);
   const repositoryRoot = await currentRepositoryPath();
@@ -910,16 +945,19 @@ async function recordHunt() {
     issueId || issueIdentifier || issueUrl || issueState,
   );
   const contextValue = value("--context-json");
+  const runId = value("--run") ?? project.activeClaim?.runId ?? null;
+  const sourceKey = value("--source-key") ?? project.activeClaim?.sourceKey ?? null;
+  const title = value("--title");
   const input = {
-    source: value("--source") ?? "issue",
-    sourceKey: required("--source-key"),
-    title: required("--title"),
-    stage: value("--stage"),
-    status: value("--status"),
+    runId,
+    source: value("--source") ?? (runId ? null : "issue"),
+    sourceKey,
+    title: title ?? null,
+    status: forcedStatus ?? value("--status"),
     workflowStage: value("--workflow-stage"),
     eventKey: required("--event-key"),
     occurredAt: value("--observed-at") ?? value("--occurred-at") ?? new Date().toISOString(),
-    actor: value("--actor") ?? "briar-auto-hunt",
+    actor: value("--actor") ?? "briar-workflow",
     repository,
     detail: value("--status-detail") ?? value("--detail") ?? null,
     priority: value("--priority") ? Number(value("--priority")) : null,
@@ -941,19 +979,18 @@ async function recordHunt() {
     pullRequestUrls: values("--pull-request-url"),
     targetSha: value("--target-sha") ?? null,
     sourceCreatedAt: value("--source-created-at") ?? null,
-    qaStatus: value("--qa-status") ?? null,
-    stagingQaDetail: await optionalText("--staging-qa-detail", "--staging-qa-detail-file"),
-    productionQaDetail: await optionalText(
-      "--production-qa-detail",
-      "--production-qa-detail-file",
-    ),
     context: contextValue ? JSON.parse(contextValue) : null,
   };
+  if (forcedStatus === "completed" && !input.resultSummary?.trim()) {
+    throw new Error(
+      "run complete requires --result-summary or --result-summary-file",
+    );
+  }
   z.object({
-    source: z.enum(autoHuntSources),
-    sourceKey: z.string().min(1),
-    title: z.string().min(1),
-    stage: z.enum(autoHuntStages).optional(),
+    runId: z.string().uuid().nullable(),
+    source: z.enum(autoHuntSources).nullable(),
+    sourceKey: z.string().min(1).nullable(),
+    title: z.string().min(1).nullable(),
     status: z.enum(autoHuntRunStatuses).optional(),
     workflowStage: workflowStageIdSchema.nullable().optional(),
     eventKey: z.string().min(1),
@@ -978,13 +1015,16 @@ async function recordHunt() {
     pullRequestUrls: z.array(z.string().url()).max(20),
     targetSha: z.string().regex(/^[0-9a-f]{7,64}$/u).nullable(),
     sourceCreatedAt: z.string().datetime({ offset: true }).nullable(),
-    qaStatus: z.literal("pending").nullable(),
-    stagingQaDetail: z.string().nullable(),
-    productionQaDetail: z.string().nullable(),
     context: z.record(z.string(), z.unknown()).nullable(),
   }).superRefine((progress, context) => {
-    if (!progress.stage && !progress.status) {
-      context.addIssue({ code: "custom", message: "--status or --stage is required" });
+    if (!progress.runId && (!progress.source || !progress.sourceKey || !progress.title)) {
+      context.addIssue({
+        code: "custom",
+        message: "--source, --source-key, and --title are required without --run",
+      });
+    }
+    if (!progress.status) {
+      context.addIssue({ code: "custom", message: "--status is required" });
     }
     if (progress.status === "running" && !progress.workflowStage) {
       context.addIssue({
@@ -1000,25 +1040,30 @@ async function recordHunt() {
     stage: string;
   }>(
     config.apiUrl,
-    "/ingest/events",
+    "/run-events",
     agentToken,
     {
       method: "POST",
       body: JSON.stringify(input),
       headers:
-        project.activeClaim?.sourceKey === input.sourceKey
+        project.activeClaim?.runId === input.runId && project.activeClaim.token
           ? { "X-Briar-Claim-Token": project.activeClaim.token }
           : undefined,
     },
   );
-  if (
-    project.activeClaim?.sourceKey === input.sourceKey &&
-    input.status !== "queued" &&
-    input.stage !== "queued"
-  ) {
+  if (project.activeClaim?.runId === result.runId) {
     config.projects = config.projects.map((candidate) =>
       candidate.id === project.id
-        ? { ...candidate, activeClaim: undefined }
+        ? {
+            ...candidate,
+            activeClaim: candidate.activeClaim && input.status !== "queued"
+              ? {
+                  ...candidate.activeClaim,
+                  token: undefined,
+                  finished: ["completed", "cancelled"].includes(input.status ?? ""),
+                }
+              : candidate.activeClaim,
+          }
         : candidate,
     );
     await saveConfig(config);
@@ -1026,43 +1071,53 @@ async function recordHunt() {
   console.log(JSON.stringify(result));
 }
 
-async function recordQa() {
+async function addRunEvidence() {
   const config = await loadConfig();
   const project = await currentProject(config);
+  const runId = value("--run") ?? project.activeClaim?.runId;
+  if (!runId) throw new Error("--run is required when there is no active claim");
+  const metadataValue = value("--metadata-json");
   const input = {
-    runId: required("--run-id"),
-    environment: required("--environment"),
-    result: required("--result"),
+    evidenceKey: required("--key"),
+    stage: required("--stage"),
+    type: required("--type"),
+    status: required("--status"),
     observedAt: value("--observed-at") ?? new Date().toISOString(),
-    actor: value("--actor") ?? "briar-auto-hunt",
+    actor: value("--actor") ?? "briar-workflow",
     detail: await optionalText("--detail", "--detail-file"),
+    command: value("--command") ?? null,
+    url: value("--url") ?? null,
+    metadata: metadataValue ? JSON.parse(metadataValue) : null,
   };
   z.object({
-    runId: z
-      .string()
-      .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u),
-    environment: z.enum(autoHuntQaEnvironments),
-    result: z.enum(["passed", "skipped"]),
+    evidenceKey: z.string().min(1).max(300),
+    stage: workflowStageIdSchema,
+    type: z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/u),
+    status: z.enum(["pending", "passed", "failed", "skipped"]),
     observedAt: z.string().datetime({ offset: true }),
     actor: z.string().min(1),
     detail: z.string().nullable(),
+    command: z.string().min(1).max(2_000).nullable(),
+    url: z.string().url().nullable(),
+    metadata: z.record(z.string(), z.unknown()).nullable(),
   }).parse(input);
   const result = await request(
     config.apiUrl,
-    "/ingest/qa-results",
+    `/runs/${runId}/evidence`,
     process.env.BRIAR_AGENT_TOKEN ?? project.agentToken,
     { method: "POST", body: JSON.stringify(input) },
   );
   console.log(JSON.stringify(result));
 }
 
-async function recoverHunt(action: "retry" | "cancel") {
+async function recoverRun(action: "retry" | "cancel") {
   const config = await loadConfig();
   const project = await currentProject(config);
-  const runId = required("--run-id");
+  const runId = value("--run") ?? project.activeClaim?.runId;
+  if (!runId) throw new Error("--run is required when there is no active claim");
   const input = {
     requestId: value("--request-id") ?? crypto.randomUUID(),
-    actor: value("--actor") ?? "briar-auto-hunt",
+    actor: value("--actor") ?? "briar-workflow",
     reason: value("--reason") ?? null,
   };
   z.object({
@@ -1078,7 +1133,7 @@ async function recoverHunt(action: "retry" | "cancel") {
     stage: string;
   }>(
     config.apiUrl,
-    `/ingest/runs/${runId}/${action}`,
+    `/runs/${runId}/${action}`,
     process.env.BRIAR_AGENT_TOKEN ?? project.agentToken,
     { method: "POST", body: JSON.stringify(input) },
   );
@@ -1146,7 +1201,7 @@ async function workerCommand() {
   const provider = project.llm?.provider ?? "codex";
 
   const registration = workerRegistrationSchema.parse(
-    await request(config.apiUrl, "/ingest/workers/register", agentToken, {
+    await request(config.apiUrl, "/workers/register", agentToken, {
       method: "POST",
       body: JSON.stringify({
         label,
@@ -1163,23 +1218,23 @@ async function workerCommand() {
   const result = await runWorkerLoop(
     {
       claim: async () => {
-        const claimed = await request<{ issue: unknown }>(
+        const claimed = await request<{ work: unknown }>(
           config.apiUrl,
-          "/ingest/queue/claim",
+          "/queue/claims",
           agentToken,
           {
             method: "POST",
             body: JSON.stringify({ claimedBy: label, workerId }),
           },
         );
-        return claimed.issue === null
+        return claimed.work === null
           ? null
-          : claimedRunSchema.parse(claimed.issue);
+          : claimedRunSchema.parse(claimed.work);
       },
       renewLease: async (issue) => {
         await request(
           config.apiUrl,
-          `/ingest/runs/${issue.runId}/lease`,
+          `/runs/${issue.runId}/lease`,
           agentToken,
           {
             method: "POST",
@@ -1190,7 +1245,7 @@ async function workerCommand() {
       heartbeat: async () => {
         await request(
           config.apiUrl,
-          `/ingest/workers/${workerId}/heartbeat`,
+          `/workers/${workerId}/heartbeat`,
           agentToken,
           {
             method: "POST",
@@ -1278,38 +1333,94 @@ async function workerService(action: "install" | "uninstall") {
   );
 }
 
+const skillsUsage = `Briar bundled skill guides
+
+  briar skills list [--json]
+  briar skills get <topic> [--json]
+`;
+
+function listSkillGuides() {
+  const topics = skillGuides.map(({ name, description }) => ({ name, description }));
+  if (has("--json")) {
+    console.log(JSON.stringify({ version: cliVersion, topics }, null, 2));
+    return;
+  }
+  process.stdout.write(
+    `${topics.map((topic) => `${topic.name}: ${topic.description}`).join("\n")}\n`,
+  );
+}
+
+function showSkillGuide() {
+  const topic = args[2];
+  if (!topic || topic === "--help") {
+    console.log("Usage: briar skills get <topic> [--json]");
+    return;
+  }
+  const guide = getSkillGuide(topic);
+  if (!guide) {
+    throw new Error(
+      `Unknown skill topic "${topic}". Available topics: ${skillGuides
+        .map((candidate) => candidate.name)
+        .join(", ")}`,
+    );
+  }
+  if (has("--json")) {
+    console.log(
+      JSON.stringify(
+        {
+          name: guide.name,
+          version: cliVersion,
+          markdown: guide.markdown,
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+  process.stdout.write(
+    guide.markdown.endsWith("\n") ? guide.markdown : `${guide.markdown}\n`,
+  );
+}
+
 const usage = `Briar CLI
 
   briar login
+  briar skills list [--json]
+  briar skills get <topic> [--json]
   briar project create [--name <name>]
   briar connect --project-id <uuid> --agent-token <token>
-  briar auto-hunt doctor
-  briar auto-hunt next [--no-worktree] [--base-branch <ref>]
-  briar auto-hunt worktree show
-  briar auto-hunt worktree list
-  briar auto-hunt worktree remove [--path <worktree>] [--force]
-  briar auto-hunt configure [--velen-org <slug> | --disable-velen]
+  briar project doctor
+  briar project configure [--velen-org <slug> | --disable-velen]
     [--data-source <provider://source>]
     [--enable-linear --linear-source <linear://source> --linear-team <key>]
     [--disable-linear] [--workflow-preset <local|review|release|research>]
     [--enable-worktrees|--disable-worktrees] [--worktree-root <dir>]
     [--branch-prefix <prefix>]
     [--enable-full-access --i-understand-the-risk | --disable-full-access]
-  briar auto-hunt record --source-key <key> --title <title>
+  briar workflow show
+  briar queue claim [--workspace <project|worktree|current|none>]
+    [--base-branch <ref>]
+  briar worktree show
+  briar worktree list
+  briar worktree remove [--path <worktree>] [--force]
+  briar run event add [--run <uuid>]
+    [--source <issue|feedback|error> --source-key <key> --title <title>]
     --status <backlog|queued|running|blocked|failed|completed|cancelled>
-    [--workflow-stage <configured-stage>]
-    --event-key <retry-stable-key> [Wordbricks-compatible progress flags]
-  briar auto-hunt qa-result --run-id <uuid> --environment <staging|production>
-    --result <passed|skipped>
-  briar auto-hunt retry --run-id <uuid> [--request-id <uuid>] [--reason <text>]
-  briar auto-hunt cancel --run-id <uuid> [--request-id <uuid>] [--reason <text>]
+    [--workflow-stage <configured-stage>] --event-key <retry-stable-key>
+  briar run complete [--run <uuid>] --event-key <retry-stable-key>
+    --result-summary-file <path>
+  briar run evidence add [--run <uuid>] --key <retry-stable-key>
+    --stage <configured-stage> --type <type>
+    --status <pending|passed|failed|skipped>
+    [--detail <text>|--detail-file <path>] [--command <command>]
+    [--url <url>] [--metadata-json <json>]
+  briar run retry [--run <uuid>] [--request-id <uuid>] [--reason <text>]
+  briar run cancel [--run <uuid>] [--request-id <uuid>] [--reason <text>]
   briar worker [--project <uuid>] [--label <text>] [--max-issues <n>] [--once]
   briar worker status [--project <uuid>]
   briar worker install-service [--project <uuid>] [--briar-binary <path>]
   briar worker uninstall-service [--project <uuid>]
-
-Compatibility:
-  briar hunt record ...   Alias of briar auto-hunt record
 
 Environment:
   BRIAR_API_URL       Cloudflare Worker URL
@@ -1318,29 +1429,44 @@ Environment:
 `;
 
 async function main() {
+  if (args.length === 0 || args[0] === "help" || args[0] === "--help") {
+    console.log(usage);
+    return;
+  }
   if (args[0] === "--version" || args[0] === "version") {
     console.log(`briar ${cliVersion}`);
     return;
   }
+  if (
+    args[0] === "skills" &&
+    (!args[1] || args[1] === "help" || args[1] === "--help")
+  ) {
+    console.log(skillsUsage);
+    return;
+  }
+  if (args[0] === "skills" && args[1] === "list") return listSkillGuides();
+  if (args[0] === "skills" && args[1] === "get") return showSkillGuide();
   if (args[0] === "login") return login();
   if (args[0] === "project" && args[1] === "create") return createProject();
   if (args[0] === "connect") return connectProject();
-  if (args[0] === "auto-hunt" && args[1] === "doctor") return autoHuntDoctor();
-  if (args[0] === "auto-hunt" && args[1] === "next") return nextHunt();
-  if (args[0] === "auto-hunt" && args[1] === "worktree") {
-    if (args[2] === "show") return worktreeShow();
-    if (args[2] === "list") return worktreeList();
-    if (args[2] === "remove") return worktreeRemove();
-    throw new Error("briar auto-hunt worktree <show|list|remove>");
+  if (args[0] === "project" && args[1] === "doctor") return projectDoctor();
+  if (args[0] === "project" && args[1] === "configure") return configureProject();
+  if (args[0] === "workflow" && args[1] === "show") return showWorkflow();
+  if (args[0] === "queue" && args[1] === "claim") return claimWork();
+  if (args[0] === "worktree" && args[1] === "show") return worktreeShow();
+  if (args[0] === "worktree" && args[1] === "list") return worktreeList();
+  if (args[0] === "worktree" && args[1] === "remove") return worktreeRemove();
+  if (args[0] === "run" && args[1] === "event" && args[2] === "add") {
+    return addRunEvent();
   }
-  if (args[0] === "auto-hunt" && args[1] === "configure") {
-    return configureAutoHunt();
+  if (args[0] === "run" && args[1] === "complete") {
+    return addRunEvent("completed");
   }
-  if (args[0] === "auto-hunt" && args[1] === "record") return recordHunt();
-  if (args[0] === "auto-hunt" && args[1] === "qa-result") return recordQa();
-  if (args[0] === "auto-hunt" && args[1] === "retry") return recoverHunt("retry");
-  if (args[0] === "auto-hunt" && args[1] === "cancel") return recoverHunt("cancel");
-  if (args[0] === "hunt" && args[1] === "record") return recordHunt();
+  if (args[0] === "run" && args[1] === "evidence" && args[2] === "add") {
+    return addRunEvidence();
+  }
+  if (args[0] === "run" && args[1] === "retry") return recoverRun("retry");
+  if (args[0] === "run" && args[1] === "cancel") return recoverRun("cancel");
   if (args[0] === "worker" && args[1] === "status") return workerStatus();
   if (args[0] === "worker" && args[1] === "install-service") {
     return workerService("install");
@@ -1349,7 +1475,7 @@ async function main() {
     return workerService("uninstall");
   }
   if (args[0] === "worker") return workerCommand();
-  console.log(usage);
+  throw new Error(`Unknown command: ${args.join(" ")}`);
 }
 
 main().catch((error: unknown) => {

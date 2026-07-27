@@ -1,11 +1,11 @@
-# Auto Hunt Worktrees
+# Workflow Worktrees
 
 Auto Hunt gives every claimed issue its own git worktree, created from the
 latest remote base branch. Work only inside the worktree that
-`briar auto-hunt next` returns (`issue.worktree.path`) and never edit the
+`briar queue claim` returns (`work.workspace.path`) and never edit the
 connected repository checkout, which every run shares. Manage worktrees through
-`briar auto-hunt worktree list|show|remove` rather than raw `git worktree`
-commands. See [docs/operations/auto-hunt-worktrees.md](docs/operations/auto-hunt-worktrees.md).
+`briar worktree list|show|remove` rather than raw `git worktree`
+commands. See [docs/operations/workflow-worktrees.md](docs/operations/workflow-worktrees.md).
 
 Gitignored files a fresh checkout needs (currently `.env.keys`) belong in
 `.worktreeinclude`; add new ones there or worktree runs will fail on commands

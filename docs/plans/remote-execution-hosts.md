@@ -80,7 +80,7 @@ The plan is delivered in two phases that share one host model.
 | Local tool invocation is uniformly `which::which_in` + `Command::new().current_dir().env("PATH", …)` | [lib.rs:473](../../src-tauri/src/lib.rs), 507, 517, 786, 1012 |
 | Project → repository path binding is per machine | [lib.rs:1368](../../src-tauri/src/lib.rs) (`connected_project_workspace`) |
 | Queue claiming with a claim token and 15-minute lease already exists | [worker/src/index.ts:1261](../../worker/src/index.ts), `migrations/0004_auto_hunt_claims.sql` |
-| Timeline ingest already exists and is token-authenticated | `POST /ingest/events`, [worker/src/index.ts:1329](../../worker/src/index.ts) |
+| Timeline API already exists and is token-authenticated | `POST /run-events`, [worker/src/index.ts](../../worker/src/index.ts) |
 | The agent claims and records work through the CLI, not through the desktop | [src-cli/index.ts](../../src-cli/index.ts), skill prompt at [codex.rs:442](../../src-tauri/src/agent/codex.rs) |
 | Agent transcripts are stored as local JSONL per session | [lib.rs:2075](../../src-tauri/src/lib.rs) (`auto_hunt_event_path`) |
 
@@ -281,14 +281,14 @@ does not change if the payload store moves.
 All under the existing `briar_agent_` bearer-token scope
 (`requireAgentProject`):
 
-- `POST /ingest/workers/register` → `{ workerId }`, idempotent on
+- `POST /workers/register` → `{ workerId }`, idempotent on
   `(project_id, host_fingerprint)`.
-- `POST /ingest/workers/:id/heartbeat` → accepts current versions and a
+- `POST /workers/:id/heartbeat` → accepts current versions and a
   liveness state; marks workers `stale` after a fixed miss window.
-- `POST /ingest/runs/:runId/lease` → renews the 15-minute lease using the claim
+- `POST /runs/:runId/lease` → renews the 15-minute lease using the claim
   token, so long runs stop losing their claim. Today the lease is set once at
   claim time and never extended ([index.ts:1261](../../worker/src/index.ts)).
-- `POST /ingest/transcripts` → batched, sequence-numbered agent events, capped
+- `POST /transcripts` → batched, sequence-numbered agent events, capped
   per §2.1, and pruning old sessions in the same request.
 - `GET /projects/:id/workers` and `GET /projects/:id/sessions/:sessionId/transcript`
   → session-authenticated dashboard reads.
@@ -323,7 +323,7 @@ briar worker install-service [--project <id>] [--label <text>]
 briar worker uninstall-service
 ```
 
-Loop: register → heartbeat → `POST /ingest/queue/claim` → resolve the local
+Loop: register → heartbeat → `POST /queue/claims` → resolve the local
 repository path from this machine's `~/.config/briar/config.json` → launch the
 agent → stream transcript events → renew the lease while running → release or
 report on completion → back off when the queue is empty. Exactly one issue in

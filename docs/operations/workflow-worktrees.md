@@ -1,4 +1,4 @@
-# Auto Hunt per-issue worktrees
+# Workflow worktrees
 
 Every claimed Auto Hunt issue gets its own git worktree, cut from the freshly
 fetched remote base branch. Two runs never share a checkout, no run starts on
@@ -95,13 +95,13 @@ relies on the skill contract rather than on enforcement.
 A project can drop the filesystem sandbox entirely:
 
 ```sh
-briar auto-hunt configure --enable-full-access --i-understand-the-risk
+briar project configure --enable-full-access --i-understand-the-risk
 ```
 
 This switches codex to `danger-full-access` and claude to `bypassPermissions`,
 so agents can write anywhere the user can. It is off by default, requires the
 explicit risk acknowledgement flag, and `--disable-full-access` reverses it.
-`briar auto-hunt doctor` reports the current value under `sandbox.fullAccess`.
+`briar project doctor` reports the current value under `sandbox.fullAccess`.
 
 Understand what it removes before enabling it. Auto Hunt input — issue titles,
 descriptions, attachments, repository content — is untrusted by contract, the
@@ -117,14 +117,14 @@ widen.
 ## Operating it
 
 ```sh
-briar auto-hunt doctor                 # worktrees.enabled/root/branchPrefix/baseRef
-briar auto-hunt worktree list          # every worktree under this project's root
-briar auto-hunt worktree show          # the active claim's worktree
-briar auto-hunt worktree remove [--path <dir>] [--force]
+briar project doctor                   # worktrees.enabled/root/branchPrefix/baseRef
+briar worktree list                    # every worktree under this project's root
+briar worktree show                    # the active claim's worktree
+briar worktree remove [--path <dir>] [--force]
 ```
 
 ```sh
-briar auto-hunt configure \
+briar project configure \
   --worktree-root ~/briar/worktrees --branch-prefix briar
 ```
 
@@ -152,7 +152,7 @@ Removal is conservative by design:
 
 | Symptom | Cause | Action |
 | --- | --- | --- |
-| `worktreeError` in the `next` payload, no worktree | fetch failed with no local base ref, or no base ref exists | record `blocked`; check the remote and `doctor`'s `worktrees.baseRef` |
+| `workspaceError` in the claim payload, no workspace | fetch failed with no local base ref, or no base ref exists | record `blocked`; check the remote and `doctor`'s `worktrees.baseRef` |
 | `worktrees.baseRef` is `null` | no `origin/HEAD` and no `main`/`master` | `git remote set-head origin -a`, or pass `--base-branch` |
 | Removal refuses | uncommitted or untracked files | commit, discard, or pass `--force` |
 | `preservedBranch` in the removal result | the branch holds commits the base ref does not | merge, push, or delete it deliberately |

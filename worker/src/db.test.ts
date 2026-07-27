@@ -36,6 +36,7 @@ import {
   moveHuntRun,
   recoverHuntRun,
   recordHuntEvent,
+  recordRunEvidence,
   recordQaResult,
   renewProjectAgentScheduleRunLease,
   updateProjectSettings,
@@ -206,6 +207,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         resolve("migrations/0020_project_agent_calendar_color.sql"),
         "utf8",
       ),
+    );
+    await executeSql(
+      db,
+      await readFile(resolve("migrations/0021_run_evidence.sql"), "utf8"),
     );
   });
 
@@ -672,6 +677,27 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       projectId,
       event("staging_qa", 6, { qaStatus: "pending", targetSha: "abcdef1" }),
     );
+    for (const [stage, type, minute] of [
+      ["analyzing", "velen", 6.1],
+      ["analyzing", "repository", 6.2],
+      ["implementing", "diff", 6.3],
+      ["pr_open", "pull_request", 6.4],
+      ["staging_qa", "staging", 6.5],
+    ] as const) {
+      await recordRunEvidence(db, projectId, {
+        runId,
+        evidenceKey: `${stage}:${type}`,
+        stage,
+        type,
+        status: "passed",
+        detail: `${type} verified`,
+        command: null,
+        url: null,
+        metadata: null,
+        actor: "vitest",
+        observedAt: atMinute(minute),
+      });
+    }
     expect(
       await recordQaResult(db, projectId, {
         runId,
@@ -693,7 +719,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         projectId,
         event("completed", 9, { resultSummary: "too early" }),
       ),
-    ).rejects.toThrow("Production QA");
+    ).rejects.toThrow("production_qa:production");
     expect(
       await recordQaResult(db, projectId, {
         runId,
@@ -704,6 +730,19 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         detail: "production verified",
       }),
     ).toBe("passed");
+    await recordRunEvidence(db, projectId, {
+      runId,
+      evidenceKey: "production_qa:production",
+      stage: "production_qa",
+      type: "production",
+      status: "passed",
+      detail: "production verified",
+      command: null,
+      url: null,
+      metadata: null,
+      actor: "vitest",
+      observedAt: atMinute(10.5),
+    });
     await expect(
       recordHuntEvent(db, projectId, event("completed", 11)),
     ).rejects.toThrow("result summary");
@@ -967,6 +1006,26 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         workflowStage: "local_qa",
       }),
     );
+    for (const [stage, type, minute] of [
+      ["analyzing", "velen", 33.1],
+      ["analyzing", "repository", 33.2],
+      ["implementing", "diff", 33.3],
+      ["local_qa", "test", 33.4],
+    ] as const) {
+      await recordRunEvidence(db, projectId, {
+        runId,
+        evidenceKey: `${stage}:${type}`,
+        stage,
+        type,
+        status: "passed",
+        detail: `${type} verified`,
+        command: type === "test" ? "bun run test" : null,
+        url: null,
+        metadata: null,
+        actor: "vitest",
+        observedAt: atMinute(minute),
+      });
+    }
     await recordHuntEvent(
       db,
       projectId,

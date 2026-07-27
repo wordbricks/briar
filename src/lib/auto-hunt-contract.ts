@@ -20,7 +20,7 @@ export const autoHuntWorkflowStageCatalog = [
   { id: "implementing", label: "구현", tone: "violet", evidence: ["diff"], checks: undefined },
   { id: "reviewing", label: "리뷰", tone: "indigo", evidence: ["diff"], checks: undefined },
   { id: "pr_open", label: "PR 검증", tone: "indigo", evidence: ["pull_request"], checks: undefined },
-  { id: "local_qa", label: "로컬 검증", tone: "amber", evidence: undefined, checks: ["bun run test", "bun run build"] },
+  { id: "local_qa", label: "로컬 검증", tone: "amber", evidence: ["test"], checks: ["bun run test", "bun run build"] },
   { id: "ci_qa", label: "CI 검증", tone: "amber", evidence: ["ci"], checks: undefined },
   { id: "staging_qa", label: "Stage QA", tone: "orange", evidence: ["staging"], checks: undefined },
   { id: "production_qa", label: "Production QA", tone: "orange", evidence: ["production"], checks: undefined },
@@ -177,8 +177,8 @@ export function progressForAutoHuntRun(
   return Math.round(((index + 1) / (workflow.stages.length + 1)) * 100);
 }
 
-/** @deprecated Compatibility contract for installed pre-workflow CLIs. */
-export const autoHuntStages = [
+/** Compact stage projection used by the dashboard and persisted run rows. */
+export const dashboardStages = [
   "queued",
   "analyzing",
   "implementing",
@@ -191,15 +191,14 @@ export const autoHuntStages = [
   "cancelled",
 ] as const;
 
-export type AutoHuntStage = (typeof autoHuntStages)[number];
+export type DashboardStage = (typeof dashboardStages)[number];
 
 export const autoHuntQaStatuses = ["pending", "passed", "skipped"] as const;
 export const autoHuntQaEnvironments = ["staging", "production"] as const;
 export type AutoHuntQaStatus = (typeof autoHuntQaStatuses)[number];
 export type AutoHuntQaEnvironment = (typeof autoHuntQaEnvironments)[number];
 
-/** @deprecated Use progressForAutoHuntRun with the run workflow snapshot. */
-export const progressForAutoHuntStage: Record<AutoHuntStage, number> = {
+export const dashboardStageProgress: Record<DashboardStage, number> = {
   queued: 5,
   analyzing: 25,
   implementing: 45,

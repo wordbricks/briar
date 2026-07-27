@@ -15,8 +15,9 @@ Repository source code stays local. Agents send only task state and Git metadata
 - D1 migrations for Better Auth and Auto Hunt state
 - Persistent desktop sessions stored in a permission-restricted app config file
 - Project-scoped Agent ingest tokens stored as SHA-256 hashes
-- `briar` CLI for login, repository connection, queued issue intake, and Auto Hunt event recording
-- A validated `briar-auto-hunt` skill installed for Codex and Claude
+- `briar` CLI for project setup, queue claims, run events, evidence, and worktrees
+- A validated `briar-workflow` skill installed for Codex, Claude, and Grok
+- Version-matched workflow guidance embedded in the CLI and served by `briar skills get`
 - Project-scoped LLM conversations through Codex App Server or Claude Agent SDK
 - Optional Velen CLI context with repository-specific organization/source settings
 - Optional Linear integration through a configured Velen source
@@ -29,7 +30,7 @@ Repository source code stays local. Agents send only task state and Git metadata
 
 ```mermaid
 flowchart LR
-  A["Local Agent / Codex or Claude"] -->|"briar auto-hunt next / record"| C["Briar CLI"]
+  A["Local Agent / Codex, Claude, or Grok"] -->|"briar queue / run / worktree"| C["Briar CLI"]
   A -.->|"optional context and Linear"| V["Velen CLI"]
   C -->|"project Bearer token"| W["Cloudflare Worker"]
   D["Briar Tauri app"] -->|"Better Auth Device Flow"| W
@@ -229,30 +230,38 @@ You can also create and connect a project from inside a Git repository with the 
 briar project create --name wordbricks
 ```
 
+The installed Skill is intentionally a small discovery stub. Load the full guide from the
+same CLI binary that will execute the workflow:
+
+```bash
+briar skills list
+briar skills get briar-workflow
+```
+
 Record the universal status and configured workflow stage using a stable, retry-safe event key:
 
 ```bash
-briar auto-hunt next
+briar project doctor
+briar workflow show
+briar queue claim
 
-briar auto-hunt record \
+briar run event add \
   --source issue \
   --source-key WB-142 \
   --title "Fix checkout race" \
   --status queued \
   --event-key WB-142:queued:1 \
-  --status-detail "Auto Hunt queued"
+  --status-detail "Queued for execution"
 
-briar auto-hunt record \
-  --source issue \
-  --source-key WB-142 \
-  --title "Fix checkout race" \
+briar run event add \
+  --run "<run-id>" \
   --status running \
   --workflow-stage implementing \
   --event-key WB-142:implementing:1 \
   --status-detail "Agent is implementing the fix"
 ```
 
-The app can create a titled, described, prioritized issue directly in the Auto Hunt queue. Each run snapshots the project's workflow so later setting changes do not rewrite active or historical work. After `doctor`, `briar auto-hunt next` atomically claims the highest-priority oldest queued issue with a 15-minute lease so concurrent Codex runs do not duplicate work. The claim token is stored only in the mode-`0600` local config, sent on the first processing transition, and then removed. The CLI discovers the repository, worktree, branch, commit SHA, and `origin` URL automatically. Reusing an event key with identical data is safe; reusing it with different data is rejected. Completion requires every required snapshot stage and a result summary. Stage/Production QA is required only when that stage is configured; a linked Linear issue must also be terminal.
+The app can create titled, described, prioritized work in the queue. Each run snapshots the project's workflow so later settings do not rewrite active or historical work. `briar queue claim` atomically claims the highest-priority oldest item with a 15-minute lease. The claim token is stored only in the mode-`0600` local config, sent on the first processing transition, and then removed. The CLI discovers repository, workspace, branch, commit SHA, and `origin` URL automatically. Event and evidence keys are retry-safe: identical retries succeed and changed payloads conflict. Completion requires every required snapshot stage, its configured evidence, a result summary, and a terminal linked Linear issue when enabled.
 
 ## Local CI and signoff
 

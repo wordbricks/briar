@@ -216,7 +216,7 @@ describe("HuntDashboard", () => {
           ...demoDashboard.runs[0],
           status: "queued" as const,
           workflowStage: null,
-          claimedBy: "briar-auto-hunt",
+          claimedBy: "briar-workflow",
           claimedAt: new Date().toISOString(),
           leaseExpiresAt: new Date(Date.now() + 60_000).toISOString(),
           claimAttempts: 1,
@@ -230,7 +230,7 @@ describe("HuntDashboard", () => {
       />,
     );
 
-    expect(markup).toContain("briar-auto-hunt 할당");
+    expect(markup).toContain("briar-workflow 할당");
   });
 
   it("renders workflow stages as kanban columns", () => {

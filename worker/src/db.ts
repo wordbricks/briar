@@ -6,7 +6,7 @@ import {
   type AutoHuntQaStatus,
   type AutoHuntRunStatus,
   type AutoHuntSource,
-  type AutoHuntStage,
+  type DashboardStage,
   type AutoHuntWorkflow,
   type AutoHuntWorkflowStageId,
 } from "../../src/lib/auto-hunt-contract";
@@ -129,7 +129,7 @@ export type HuntRunRow = {
   source: AutoHuntSource;
   source_key: string;
   title: string;
-  stage: AutoHuntStage;
+  stage: DashboardStage;
   status: AutoHuntRunStatus;
   workflow_stage: AutoHuntWorkflowStageId | null;
   workflow_snapshot_json: string;
@@ -170,7 +170,7 @@ export type HuntEventRow = {
   run_id: string;
   event_key: string;
   attempt: number;
-  stage: AutoHuntStage;
+  stage: DashboardStage;
   status: AutoHuntRunStatus;
   workflow_stage: AutoHuntWorkflowStageId | null;
   detail: string | null;
@@ -182,6 +182,23 @@ export type HuntEventRow = {
   pull_request_urls: string;
   target_sha: string | null;
   occurred_at: string;
+  recorded_at: string;
+};
+
+export type RunEvidenceRow = {
+  id: string;
+  run_id: string;
+  attempt: number;
+  evidence_key: string;
+  workflow_stage: string;
+  evidence_type: string;
+  status: "pending" | "passed" | "failed" | "skipped";
+  detail: string | null;
+  command: string | null;
+  url: string | null;
+  metadata_json: string | null;
+  actor: string;
+  observed_at: string;
   recorded_at: string;
 };
 
@@ -227,7 +244,7 @@ export type HuntEventInput = {
   source: AutoHuntSource;
   sourceKey: string;
   title: string;
-  stage: AutoHuntStage;
+  stage: DashboardStage;
   status?: AutoHuntRunStatus;
   workflowStage?: AutoHuntWorkflowStageId | null;
   eventKey: string;
@@ -265,7 +282,7 @@ export type ProjectSettingsInput = {
 
 export class EventKeyConflictError extends Error {
   constructor() {
-    super("Event key was reused with different Auto Hunt data");
+    super("Event key was reused with different run data");
   }
 }
 export class HuntTransitionError extends Error {}
@@ -1549,7 +1566,7 @@ export async function assertQueuedHuntClaim(
     )
     .bind(claimTokenHash ?? "", projectId, input.source, input.sourceKey)
     .first<{
-      stage: AutoHuntStage;
+      stage: DashboardStage;
       status: AutoHuntRunStatus;
       claim_token_hash: string | null;
       lease_expires_at: string | null;
@@ -1697,7 +1714,7 @@ const assertCompletionEligible = async (
   input: HuntEventInput,
 ) => {
   if (input.status !== "completed") return;
-  if (!run) throw new HuntTransitionError("Auto Hunt run does not exist");
+  if (!run) throw new HuntTransitionError("Run does not exist");
   const workflow = parseWorkflow(run.workflow_snapshot_json);
   const requiredStages = workflow.completion.requiredStages;
   const completedStages = await db
@@ -1715,28 +1732,37 @@ const assertCompletionEligible = async (
   );
   if (missingStages.length > 0) {
     throw new HuntTransitionError(
-      `Auto Hunt completion requires workflow stages: ${missingStages.join(", ")}`,
+      `Run completion requires workflow stages: ${missingStages.join(", ")}`,
     );
   }
-  if (
-    requiredStages.includes("staging_qa") &&
-    !["passed", "skipped"].includes(run.staging_qa_status ?? "")
-  ) {
-    throw new HuntTransitionError("Auto Hunt completion requires Stage QA");
-  }
-  if (
-    requiredStages.includes("production_qa") &&
-    !["passed", "skipped"].includes(run.production_qa_status ?? "")
-  ) {
-    throw new HuntTransitionError(
-      "Auto Hunt completion requires Production QA",
+  const requiredEvidence = workflow.stages.flatMap((stage) =>
+    requiredStages.includes(stage.id)
+      ? (stage.evidence ?? []).map((type) => ({ stage: stage.id, type }))
+      : [],
+  );
+  if (requiredEvidence.length > 0) {
+    const evidence = await db
+      .prepare(
+        `select workflow_stage, evidence_type from briar_run_evidence
+         where run_id = ? and attempt = ? and status in ('passed', 'skipped')`,
+      )
+      .bind(run.id, run.current_attempt)
+      .all<{ workflow_stage: string; evidence_type: string }>();
+    const accepted = new Set(
+      evidence.results.map((item) => `${item.workflow_stage}:${item.evidence_type}`),
     );
+    const missingEvidence = requiredEvidence
+      .filter((item) => !accepted.has(`${item.stage}:${item.type}`))
+      .map((item) => `${item.stage}:${item.type}`);
+    if (missingEvidence.length > 0) {
+      throw new HuntTransitionError(
+        `Run completion requires evidence: ${missingEvidence.join(", ")}`,
+      );
+    }
   }
   const resultSummary = input.resultSummary ?? run.result_summary;
   if (!resultSummary?.trim()) {
-    throw new HuntTransitionError(
-      "Auto Hunt completion requires a result summary",
-    );
+    throw new HuntTransitionError("Run completion requires a result summary");
   }
   const settings = await getProjectSettings(db, projectId);
   const trackerProvider = input.tracker?.provider ?? run.tracker_provider;
@@ -1747,7 +1773,7 @@ const assertCompletionEligible = async (
     !isTerminalTrackerState(trackerState)
   ) {
     throw new HuntTransitionError(
-      "Auto Hunt completion requires a terminal Linear issue",
+      "Run completion requires a terminal Linear issue",
     );
   }
 };
@@ -1767,7 +1793,7 @@ const assertStageTransition = async (
     return;
   }
   if (run.status === "completed" || run.status === "cancelled") {
-    throw new HuntTransitionError(`Auto Hunt run is already ${run.status}`);
+    throw new HuntTransitionError(`Run is already ${run.status}`);
   }
   if (["blocked", "failed", "cancelled"].includes(input.status ?? "")) return;
   if (input.status !== "running" || !input.workflowStage) return;
@@ -1785,12 +1811,12 @@ const assertStageTransition = async (
     : -1;
   if (nextRank < floorRank) {
     throw new HuntTransitionError(
-      `Auto Hunt workflow cannot regress from rank ${floorRank} to ${nextRank}`,
+      `Workflow cannot regress from rank ${floorRank} to ${nextRank}`,
     );
   }
 };
 
-const legacyStatusForStage = (stage: AutoHuntStage): AutoHuntRunStatus => {
+const statusForDashboardStage = (stage: DashboardStage): AutoHuntRunStatus => {
   if (stage === "queued") return "queued";
   if (["blocked", "failed", "completed", "cancelled"].includes(stage)) {
     return stage as AutoHuntRunStatus;
@@ -1798,8 +1824,8 @@ const legacyStatusForStage = (stage: AutoHuntStage): AutoHuntRunStatus => {
   return "running";
 };
 
-const legacyWorkflowStage = (
-  stage: AutoHuntStage,
+const workflowStageForDashboardStage = (
+  stage: DashboardStage,
 ): AutoHuntWorkflowStageId | null => {
   if (
     [
@@ -1815,10 +1841,10 @@ const legacyWorkflowStage = (
   return null;
 };
 
-const legacyStageFor = (
+const dashboardStageFor = (
   status: AutoHuntRunStatus,
   workflowStage: AutoHuntWorkflowStageId | null,
-): AutoHuntStage => {
+): DashboardStage => {
   if (status === "backlog") return "queued";
   if (status !== "running") return status;
   return workflowStage &&
@@ -1829,7 +1855,7 @@ const legacyStageFor = (
       "staging_qa",
       "production_qa",
     ].includes(workflowStage)
-    ? (workflowStage as AutoHuntStage)
+    ? (workflowStage as DashboardStage)
     : "implementing";
 };
 
@@ -1840,14 +1866,14 @@ export async function recordHuntEvent(
 ) {
   const normalizedInput = {
     ...input,
-    status: input.status ?? legacyStatusForStage(input.stage),
+    status: input.status ?? statusForDashboardStage(input.stage),
     workflowStage:
       input.workflowStage === undefined
-        ? legacyWorkflowStage(input.stage)
+        ? workflowStageForDashboardStage(input.stage)
         : input.workflowStage,
     pullRequestUrls: normalizedUrls(input.pullRequestUrls),
   };
-  normalizedInput.stage = legacyStageFor(
+  normalizedInput.stage = dashboardStageFor(
     normalizedInput.status,
     normalizedInput.workflowStage,
   );
@@ -2138,6 +2164,98 @@ export async function recordHuntEvent(
   return runId;
 }
 
+export async function recordRunEvidence(
+  db: D1Database,
+  projectId: string,
+  input: {
+    runId: string;
+    evidenceKey: string;
+    stage: string;
+    type: string;
+    status: RunEvidenceRow["status"];
+    detail: string | null;
+    command: string | null;
+    url: string | null;
+    metadata: Record<string, unknown> | null;
+    actor: string;
+    observedAt: string;
+  },
+) {
+  const run = await getHuntRunForProject(db, projectId, input.runId);
+  if (!run) return null;
+  const workflow = parseWorkflow(run.workflow_snapshot_json);
+  if (!workflow.stages.some((stage) => stage.id === input.stage)) {
+    throw new HuntTransitionError(
+      `Workflow stage is not configured for this run: ${input.stage}`,
+    );
+  }
+  const metadataJson = input.metadata ? stableJson(input.metadata) : null;
+  const existing = await db
+    .prepare(
+      `select * from briar_run_evidence
+       where run_id = ? and attempt = ? and evidence_key = ?`,
+    )
+    .bind(run.id, run.current_attempt, input.evidenceKey)
+    .first<RunEvidenceRow>();
+  if (existing) {
+    const same =
+      existing.workflow_stage === input.stage &&
+      existing.evidence_type === input.type &&
+      existing.status === input.status &&
+      existing.detail === input.detail &&
+      existing.command === input.command &&
+      existing.url === input.url &&
+      existing.metadata_json === metadataJson &&
+      existing.actor === input.actor &&
+      existing.observed_at === input.observedAt;
+    if (!same) throw new EventKeyConflictError();
+    return existing;
+  }
+  const evidence: RunEvidenceRow = {
+    id: crypto.randomUUID(),
+    run_id: run.id,
+    attempt: run.current_attempt,
+    evidence_key: input.evidenceKey,
+    workflow_stage: input.stage,
+    evidence_type: input.type,
+    status: input.status,
+    detail: input.detail,
+    command: input.command,
+    url: input.url,
+    metadata_json: metadataJson,
+    actor: input.actor,
+    observed_at: input.observedAt,
+    recorded_at: new Date().toISOString(),
+  };
+  await db
+    .prepare(
+      `insert into briar_run_evidence (
+         id, project_id, run_id, attempt, evidence_key, workflow_stage,
+         evidence_type, status, detail, command, url, metadata_json,
+         actor, observed_at, recorded_at
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      evidence.id,
+      projectId,
+      evidence.run_id,
+      evidence.attempt,
+      evidence.evidence_key,
+      evidence.workflow_stage,
+      evidence.evidence_type,
+      evidence.status,
+      evidence.detail,
+      evidence.command,
+      evidence.url,
+      evidence.metadata_json,
+      evidence.actor,
+      evidence.observed_at,
+      evidence.recorded_at,
+    )
+    .run();
+  return evidence;
+}
+
 export type HuntRecoveryAction = "retry" | "cancel";
 export type HuntRecoveryOutcome =
   | "retried"
@@ -2161,7 +2279,7 @@ export async function recoverHuntRun(
 ): Promise<{
   outcome: HuntRecoveryOutcome;
   attempt: number | null;
-  stage: AutoHuntStage | null;
+  stage: DashboardStage | null;
 }> {
   const run = await getHuntRunForProject(db, projectId, input.runId);
   if (!run) return { outcome: "not_found", attempt: null, stage: null };
@@ -2195,7 +2313,7 @@ export async function recoverHuntRun(
   const recordedAt = new Date().toISOString();
   const nextAttempt =
     input.action === "retry" ? run.current_attempt + 1 : run.current_attempt;
-  const nextStage: AutoHuntStage =
+  const nextStage: DashboardStage =
     input.action === "retry" ? "queued" : "cancelled";
   const detail =
     input.reason ??
@@ -2389,7 +2507,7 @@ export async function moveHuntRun(
     };
   }
 
-  const targetStage = legacyStageFor(input.status, targetWorkflowStage);
+  const targetStage = dashboardStageFor(input.status, targetWorkflowStage);
   const targetLabel =
     input.status === "running"
       ? workflow.stages.find((stage) => stage.id === targetWorkflowStage)?.label
@@ -2589,7 +2707,7 @@ export async function importLinearHuntRuns(
         }
       }
 
-      const stage = legacyStageFor(status, workflowStage);
+      const stage = dashboardStageFor(status, workflowStage);
       const runId = await digestRunId(projectId, "issue", sourceKey);
       const eventId = crypto.randomUUID();
       const recordedAt = new Date().toISOString();

@@ -2,16 +2,14 @@ import { z } from "zod";
 import briarMarkSvg from "../../src/assets/briar-mark.svg";
 import briarIconSvg from "../../src-tauri/app-icon.svg";
 import {
-  autoHuntQaEnvironments,
   autoHuntRunStatuses,
   autoHuntSources,
-  autoHuntStages,
   autoHuntWorkflowPresets,
   defaultAutoHuntWorkflow,
   normalizeAutoHuntWorkflow,
   progressForAutoHuntRun,
   type AutoHuntRunStatus,
-  type AutoHuntStage,
+  type DashboardStage,
   type AutoHuntWorkflowStageId,
 } from "../../src/lib/auto-hunt-contract";
 import {
@@ -53,7 +51,6 @@ import {
   getIssueAttachment,
   getOrganizationRole,
   isOrganizationHandleAvailable,
-  getNextQueuedHuntRun,
   getProject,
   getProjectSettings,
   getHuntRunForProject,
@@ -72,7 +69,7 @@ import {
   moveHuntRun,
   recoverHuntRun,
   recordHuntEvent,
-  recordQaResult,
+  recordRunEvidence,
   replaceProjectAgentToken,
   removeOrganizationMember,
   renewProjectAgentScheduleRunLease,
@@ -146,7 +143,6 @@ class HttpError extends Error {
   }
 }
 
-const stageSchema = z.enum(autoHuntStages);
 const runStatusSchema = z.enum(autoHuntRunStatuses);
 const workflowStageIdSchema = z
   .string()
@@ -187,31 +183,10 @@ const workflowSchema = z
   .strict()
   .transform(normalizeAutoHuntWorkflow);
 
-const statusForLegacyStage = (stage: AutoHuntStage): AutoHuntRunStatus => {
-  if (stage === "queued") return "queued";
-  if (["blocked", "failed", "completed", "cancelled"].includes(stage)) {
-    return stage as AutoHuntRunStatus;
-  }
-  return "running";
-};
-
-const workflowStageForLegacyStage = (
-  stage: AutoHuntStage,
-): AutoHuntWorkflowStageId | null =>
-  [
-    "analyzing",
-    "implementing",
-    "pr_open",
-    "staging_qa",
-    "production_qa",
-  ].includes(stage)
-    ? (stage as AutoHuntWorkflowStageId)
-    : null;
-
-const legacyStageForProgress = (
+const dashboardStageForProgress = (
   status: AutoHuntRunStatus,
   workflowStage: AutoHuntWorkflowStageId | null,
-): AutoHuntStage => {
+): DashboardStage => {
   if (status === "backlog") return "queued";
   if (status !== "running") return status;
   return workflowStage &&
@@ -222,7 +197,7 @@ const legacyStageForProgress = (
       "staging_qa",
       "production_qa",
     ].includes(workflowStage)
-    ? (workflowStage as AutoHuntStage)
+    ? (workflowStage as DashboardStage)
     : "implementing";
 };
 const nullableTrimmed = (max: number) =>
@@ -247,11 +222,11 @@ const trackerSchema = z
 
 const eventSchema = z
   .object({
-    source: z.enum(autoHuntSources),
-    sourceKey: z.string().trim().min(1).max(200),
-    title: z.string().trim().min(1).max(300),
-    stage: stageSchema.optional(),
-    status: runStatusSchema.optional(),
+    runId: z.string().uuid().nullable().optional(),
+    source: z.enum(autoHuntSources).nullable().optional(),
+    sourceKey: z.string().trim().min(1).max(200).nullable().optional(),
+    title: z.string().trim().min(1).max(300).nullable().optional(),
+    status: runStatusSchema,
     workflowStage: workflowStageIdSchema.nullable().optional(),
     eventKey: z.string().trim().min(1).max(300),
     occurredAt: z.string().datetime({ offset: true }),
@@ -273,65 +248,31 @@ const eventSchema = z
       .max(20)
       .default([])
       .transform((urls) => [...new Set(urls)].sort()),
-    targetSha: z
-      .string()
-      .regex(/^[0-9a-f]{7,64}$/u)
-      .nullable()
-      .optional(),
-    sourceCreatedAt: z
-      .string()
-      .datetime({ offset: true })
-      .nullable()
-      .optional(),
-    qaStatus: z.literal("pending").nullable().optional(),
-    stagingQaDetail: z.string().max(100_000).nullable().optional(),
-    productionQaDetail: z.string().max(100_000).nullable().optional(),
+    targetSha: z.string().regex(/^[0-9a-f]{7,64}$/u).nullable().optional(),
+    sourceCreatedAt: z.string().datetime({ offset: true }).nullable().optional(),
     context: z.record(z.string(), z.unknown()).nullable().optional(),
   })
   .strict()
   .superRefine((input, context) => {
-    const status = input.status ?? input.stage;
-    if (!input.stage && !input.status) {
+    if (!input.runId && (!input.source || !input.sourceKey || !input.title)) {
       context.addIssue({
         code: "custom",
-        message: "status or legacy stage is required",
-        path: ["status"],
+        message: "source, sourceKey, and title are required without runId",
+        path: ["runId"],
       });
     }
-    if (status === "running" && !input.workflowStage) {
+    if (input.status === "running" && !input.workflowStage) {
       context.addIssue({
         code: "custom",
         message: "running progress requires a workflow stage",
         path: ["workflowStage"],
       });
     }
-    if (status === "blocked" && !input.detail?.trim()) {
+    if (input.status === "blocked" && !input.detail?.trim()) {
       context.addIssue({
         code: "custom",
         message: "blocked progress requires an exact blocker reason",
         path: ["detail"],
-      });
-    }
-    const qaStage = input.workflowStage ?? input.stage;
-    if (
-      input.qaStatus &&
-      qaStage !== "staging_qa" &&
-      qaStage !== "production_qa"
-    ) {
-      context.addIssue({
-        code: "custom",
-        message: "QA status requires a QA stage",
-        path: ["qaStatus"],
-      });
-    }
-    if (
-      (qaStage === "staging_qa" || qaStage === "production_qa") &&
-      input.qaStatus !== "pending"
-    ) {
-      context.addIssue({
-        code: "custom",
-        message: "QA stages require a pending QA status",
-        path: ["qaStatus"],
       });
     }
     if (input.tracker?.provider === "linear" && input.tracker.url) {
@@ -344,6 +285,21 @@ const eventSchema = z
       }
     }
   });
+
+const evidenceSchema = z
+  .object({
+    evidenceKey: z.string().trim().min(1).max(300),
+    stage: workflowStageIdSchema,
+    type: z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/u),
+    status: z.enum(["pending", "passed", "failed", "skipped"]),
+    observedAt: z.string().datetime({ offset: true }),
+    actor: z.string().trim().min(1).max(128),
+    detail: z.string().max(100_000).nullable().optional(),
+    command: z.string().trim().min(1).max(2_000).nullable().optional(),
+    url: httpsUrl.nullable().optional(),
+    metadata: z.record(z.string(), z.unknown()).nullable().optional(),
+  })
+  .strict();
 
 const projectInputSchema = z.object({
   name: z.string().trim().min(1).max(100),
@@ -679,19 +635,6 @@ const projectSettingsSchema = z
       });
     }
   });
-
-const qaResultSchema = z
-  .object({
-    runId: z
-      .string()
-      .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u),
-    environment: z.enum(autoHuntQaEnvironments),
-    result: z.enum(["passed", "skipped"]),
-    actor: z.string().trim().min(1).max(128),
-    observedAt: z.string().datetime({ offset: true }),
-    detail: z.string().max(100_000).nullable().optional(),
-  })
-  .strict();
 
 async function readJson(
   request: Request,
@@ -2060,7 +2003,7 @@ async function route(
     }
   }
 
-  if (pathname === "/ingest/workers/register" && request.method === "POST") {
+  if (pathname === "/workers/register" && request.method === "POST") {
     const projectId = await requireAgentProject(db, request);
     const input = workerRegisterSchema.parse(await readJson(request));
     const observedAt = new Date().toISOString();
@@ -2077,7 +2020,7 @@ async function route(
   }
 
   const workerHeartbeatMatch = pathname.match(
-    /^\/ingest\/workers\/([0-9a-zA-Z-]+)\/heartbeat$/u,
+    /^\/workers\/([0-9a-zA-Z-]+)\/heartbeat$/u,
   );
   if (workerHeartbeatMatch && request.method === "POST") {
     const projectId = await requireAgentProject(db, request);
@@ -2094,7 +2037,7 @@ async function route(
     return json({ worker: workerJson(worker, observedAt), reaped });
   }
 
-  const leaseMatch = pathname.match(/^\/ingest\/runs\/([0-9a-f-]+)\/lease$/u);
+  const leaseMatch = pathname.match(/^\/runs\/([0-9a-f-]+)\/lease$/u);
   if (leaseMatch && request.method === "POST") {
     const projectId = await requireAgentProject(db, request);
     const input = leaseRenewSchema.parse(await readJson(request));
@@ -2110,7 +2053,7 @@ async function route(
     });
   }
 
-  if (pathname === "/ingest/transcripts" && request.method === "POST") {
+  if (pathname === "/transcripts" && request.method === "POST") {
     const projectId = await requireAgentProject(db, request);
     const input = transcriptSchema.parse(await readJson(request));
     const result = await appendAgentTranscript(db, projectId, {
@@ -2183,36 +2126,7 @@ async function route(
     });
   }
 
-  if (pathname === "/ingest/queue/next" && request.method === "GET") {
-    const projectId = await requireAgentProject(db, request);
-    const run = await getNextQueuedHuntRun(db, projectId);
-    const attachments = run
-      ? await listIssueAttachments(db, projectId, run.id)
-      : [];
-    return json({
-      issue: run
-        ? {
-            runId: run.id,
-            runNumber: run.run_number,
-            currentAttempt: run.current_attempt,
-            source: run.source,
-            sourceKey: run.source_key,
-            title: run.title,
-            description: run.issue_description,
-            priority: run.priority,
-            repository: run.repository,
-            sourceCreatedAt: run.source_created_at,
-            context: parseJsonObject(run.context_json),
-            workflow: normalizeAutoHuntWorkflow(
-              JSON.parse(run.workflow_snapshot_json),
-            ),
-            attachments: attachments.map(attachmentJson),
-          }
-        : null,
-    });
-  }
-
-  if (pathname === "/ingest/queue/claim" && request.method === "POST") {
+  if (pathname === "/queue/claims" && request.method === "POST") {
     const projectId = await requireAgentProject(db, request);
     const input = claimInputSchema.parse(await readJson(request));
     const claimedAt = new Date().toISOString();
@@ -2241,7 +2155,7 @@ async function route(
       ? await listIssueAttachments(db, projectId, run.id)
       : [];
     return json({
-      issue: run
+      work: run
         ? {
             runId: run.id,
             runNumber: run.run_number,
@@ -2269,7 +2183,7 @@ async function route(
   }
 
   const agentRecoveryMatch = pathname.match(
-    /^\/ingest\/runs\/([0-9a-f-]+)\/(retry|cancel)$/u,
+    /^\/runs\/([0-9a-f-]+)\/(retry|cancel)$/u,
   );
   if (agentRecoveryMatch && request.method === "POST") {
     const projectId = await requireAgentProject(db, request);
@@ -2291,19 +2205,62 @@ async function route(
     return json({ runId: agentRecoveryMatch[1], ...result });
   }
 
-  if (pathname === "/ingest/events" && request.method === "POST") {
+  const evidenceMatch = pathname.match(
+    /^\/runs\/([0-9a-f-]+)\/evidence$/u,
+  );
+  if (evidenceMatch && request.method === "POST") {
+    const projectId = await requireAgentProject(db, request);
+    const parsed = evidenceSchema.parse(await readJson(request));
+    try {
+      const evidence = await recordRunEvidence(db, projectId, {
+        runId: evidenceMatch[1],
+        ...parsed,
+        detail: parsed.detail ?? null,
+        command: parsed.command ?? null,
+        url: parsed.url ?? null,
+        metadata: parsed.metadata ?? null,
+        observedAt: new Date(parsed.observedAt).toISOString(),
+      });
+      if (!evidence) throw new HttpError(404, "Run not found");
+      return json({
+        runId: evidence.run_id,
+        attempt: evidence.attempt,
+        key: evidence.evidence_key,
+        stage: evidence.workflow_stage,
+        type: evidence.evidence_type,
+        status: evidence.status,
+      });
+    } catch (error) {
+      if (
+        error instanceof EventKeyConflictError ||
+        error instanceof HuntTransitionError
+      ) {
+        throw new HttpError(409, error.message);
+      }
+      throw error;
+    }
+  }
+
+  if (pathname === "/run-events" && request.method === "POST") {
     const projectId = await requireAgentProject(db, request);
     const parsed = eventSchema.parse(await readJson(request));
-    const status = parsed.status ?? statusForLegacyStage(parsed.stage!);
-    const workflowStage =
-      parsed.workflowStage === undefined
-        ? workflowStageForLegacyStage(parsed.stage!)
-        : parsed.workflowStage;
+    const run = parsed.runId
+      ? await getHuntRunForProject(db, projectId, parsed.runId)
+      : null;
+    if (parsed.runId && !run) throw new HttpError(404, "Run not found");
+    const source = parsed.source ?? run?.source;
+    const sourceKey = parsed.sourceKey ?? run?.source_key;
+    const title = parsed.title ?? run?.title;
+    if (!source || !sourceKey || !title) {
+      throw new HttpError(400, "Run identity is incomplete");
+    }
     const input = {
       ...parsed,
-      stage: legacyStageForProgress(status, workflowStage),
-      status,
-      workflowStage,
+      source,
+      sourceKey,
+      title,
+      stage: dashboardStageForProgress(parsed.status, parsed.workflowStage ?? null),
+      workflowStage: parsed.workflowStage ?? null,
       occurredAt: new Date(parsed.occurredAt).toISOString(),
       detail: parsed.detail ?? null,
       priority: parsed.priority ?? null,
@@ -2324,9 +2281,9 @@ async function route(
       sourceCreatedAt: parsed.sourceCreatedAt
         ? new Date(parsed.sourceCreatedAt).toISOString()
         : null,
-      qaStatus: parsed.qaStatus ?? null,
-      stagingQaDetail: parsed.stagingQaDetail ?? null,
-      productionQaDetail: parsed.productionQaDetail ?? null,
+      qaStatus: null,
+      stagingQaDetail: null,
+      productionQaDetail: null,
       context: parsed.context ?? null,
     };
     try {
@@ -2345,7 +2302,6 @@ async function route(
         runId,
         status: input.status,
         workflowStage: input.workflowStage,
-        stage: input.stage,
       });
     } catch (error) {
       if (error instanceof EventKeyConflictError) {
@@ -2359,29 +2315,6 @@ async function route(
       }
       throw error;
     }
-  }
-
-  if (pathname === "/ingest/qa-results" && request.method === "POST") {
-    const projectId = await requireAgentProject(db, request);
-    const input = qaResultSchema.parse(await readJson(request));
-    const outcome = await recordQaResult(db, projectId, {
-      ...input,
-      detail: input.detail ?? null,
-      observedAt: new Date(input.observedAt).toISOString(),
-    });
-    if (outcome === "not_found") throw new HttpError(404, "Run not found");
-    if (outcome === "ineligible") {
-      throw new HttpError(409, "QA result is ineligible");
-    }
-    const run = await getHuntRunForProject(db, projectId, input.runId);
-    return json({
-      runId: input.runId,
-      outcome,
-      issueIdentifier: run?.tracker_issue_identifier ?? null,
-      issueUrl: run?.tracker_issue_url ?? null,
-      pullRequestUrls: run ? parseJsonArray(run.pull_request_urls) : [],
-      targetSha: run?.target_sha ?? null,
-    });
   }
 
   throw new HttpError(404, "Not found");

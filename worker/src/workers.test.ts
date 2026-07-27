@@ -96,6 +96,7 @@ describe("detached execution workers", () => {
       "migrations/0018_project_agent_schedules.sql",
       "migrations/0019_project_agent_schedule_runs.sql",
       "migrations/0020_project_agent_calendar_color.sql",
+      "migrations/0021_run_evidence.sql",
     ]) {
       await executeSql(db, await readFile(resolve(migration), "utf8"));
     }

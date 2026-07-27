@@ -35,7 +35,7 @@ async function cliHome(velenOrg?: string) {
 function runDoctor(home: string) {
   return spawnSync(
     bunExecutable,
-    ["run", "src-cli/index.ts", "auto-hunt", "doctor"],
+    ["run", "src-cli/index.ts", "project", "doctor"],
     {
       cwd: process.cwd(),
       env: {
