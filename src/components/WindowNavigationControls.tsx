@@ -13,6 +13,7 @@ export function WindowNavigationControls({
   isSidebarOpen,
   onBack,
   onForward,
+  onSettings,
   onSidebarToggle,
 }: {
   canGoBack: boolean;
@@ -20,6 +21,7 @@ export function WindowNavigationControls({
   isSidebarOpen: boolean;
   onBack: () => void;
   onForward: () => void;
+  onSettings: () => void;
   onSidebarToggle: () => void;
 }) {
   const { t } = useI18n();
@@ -43,12 +45,15 @@ export function WindowNavigationControls({
         event.preventDefault();
         if (!canGoForward) return;
         onForward();
+      } else if (event.code === "Comma" || event.key === ",") {
+        event.preventDefault();
+        onSettings();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [canGoBack, canGoForward, onBack, onForward]);
+  }, [canGoBack, canGoForward, onBack, onForward, onSettings]);
 
   return (
     <nav
