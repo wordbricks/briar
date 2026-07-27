@@ -134,6 +134,7 @@ export type ProjectAgent = {
   provider: AgentProvider;
   model: string | null;
   responsibility: string;
+  kind: "auto_hunt" | "custom";
   createdAt: string;
   updatedAt: string;
 };

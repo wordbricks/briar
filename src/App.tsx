@@ -54,7 +54,6 @@ type ActivePage =
   | "issues"
   | "agents"
   | "schedule"
-  | "auto-hunt"
   | "inbox"
   | "project-settings"
   | "organization-create"
@@ -340,7 +339,6 @@ export function App() {
             onAddProject={briar.startProjectCreation}
             onAgentsOpen={() => navigateToPage("agents")}
             onScheduleOpen={() => navigateToPage("schedule")}
-            onAutoHuntOpen={() => navigateToPage("auto-hunt")}
             onInboxOpen={() => navigateToPage("inbox")}
             onIssuesOpen={() => navigateToPage("issues")}
             onAddOrganization={() => navigateToPage("organization-create")}
@@ -467,7 +465,7 @@ export function App() {
               } else {
                 setRequestedRunId(null);
                 setRequestedSessionId(message.targetId);
-                navigateToPage("auto-hunt");
+                navigateToPage("agents");
               }
             }}
             unreadCount={inbox.unreadCount}
@@ -513,8 +511,25 @@ export function App() {
           />
         ) : activePage === "agents" && activeProject ? (
           <ProjectAgents
+            dashboard={briar.dashboard}
+            error={briar.error}
             isSidebarOpen={isSidebarOpen}
+            onRequestedSessionOpen={() => setRequestedSessionId(null)}
+            onStart={(agentId, runs) =>
+              autoHunt.startSession(
+                activeProject.id,
+                runs,
+                () => void briar.refresh(),
+                {
+                  agentId,
+                  maxIssues:
+                    briar.dashboard?.settings.automation.maxIssuesPerSession,
+                },
+              )
+            }
             project={activeProject}
+            requestedSessionId={requestedSessionId}
+            sessions={autoHunt.sessions}
             token={briar.token}
           />
         ) : activePage === "schedule" && activeProject ? (
@@ -527,26 +542,6 @@ export function App() {
             }}
             project={activeProject}
             token={briar.token}
-          />
-        ) : activePage === "auto-hunt" && activeProject ? (
-          <AutoHuntSessions
-            dashboard={briar.dashboard}
-            error={briar.error}
-            isSidebarOpen={isSidebarOpen}
-            requestedSessionId={requestedSessionId}
-            onRequestedSessionOpen={() => setRequestedSessionId(null)}
-            onStart={(runs) =>
-              autoHunt.startSession(
-                activeProject.id,
-                runs,
-                () => void briar.refresh(),
-                {
-                  maxIssues:
-                    briar.dashboard?.settings.automation.maxIssuesPerSession,
-                },
-              )
-            }
-            sessions={autoHunt.sessions}
           />
         ) : (
           <HuntDashboard

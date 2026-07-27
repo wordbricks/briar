@@ -6,6 +6,7 @@ import {
   ChevronRight,
   CircleAlert,
   Clock3,
+  ListFilter,
   LoaderCircle,
   Plus,
   Repeat2,
@@ -33,6 +34,7 @@ import {
 } from "../lib/project-agent-schedule";
 import {
   addCalendarDays,
+  agentNameForRun,
   minutesIntoCalendarDay,
   scheduleSegmentsForWeek,
   startOfCalendarWeek,
@@ -46,8 +48,21 @@ import type {
   ProjectAgentSchedule,
 } from "../types";
 import { NativeSelect } from "./NativeSelect";
+import { SelectMenu } from "./SelectMenu";
 
 const dayCount = 7;
+const allAgentsFilter = "all";
+const agentFilterPrefix = "agent:";
+
+function agentFilterValue(name: string) {
+  return `${agentFilterPrefix}${name}`;
+}
+
+function agentNameFromFilter(value: string) {
+  return value.startsWith(agentFilterPrefix)
+    ? value.slice(agentFilterPrefix.length)
+    : null;
+}
 
 function sameLocalDay(left: Date, right: Date) {
   return (
@@ -89,7 +104,7 @@ function formatTime(value: Date, localeTag: string) {
 }
 
 function formatDuration(minutes: number) {
-  const rounded = Math.max(1, Math.round(minutes));
+  const rounded = Math.max(0, Math.round(minutes));
   const hours = Math.floor(rounded / 60);
   const remainder = rounded % 60;
   if (hours === 0) return `${remainder}m`;
@@ -125,6 +140,45 @@ export function ProjectSchedule({
   const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
   const [isCreatingSchedule, setIsCreatingSchedule] = useState(false);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
+  const [agentFilter, setAgentFilter] = useState(allAgentsFilter);
+  const availableAgentNames = useMemo(() => {
+    const names = new Set<string>();
+    for (const agent of agents) names.add(agent.name);
+    for (const schedule of schedules) names.add(schedule.agentName);
+    for (const run of dashboard?.runs ?? []) names.add(agentNameForRun(run));
+    return [...names]
+      .filter((name) => name.trim().length > 0)
+      .sort((left, right) => left.localeCompare(right, localeTag));
+  }, [agents, dashboard?.runs, localeTag, schedules]);
+  const agentFilterOptions = useMemo(
+    () => [
+      { label: t("schedule.allAgents"), value: allAgentsFilter },
+      ...availableAgentNames.map((name) => ({
+        label: name,
+        value: agentFilterValue(name),
+      })),
+    ],
+    [availableAgentNames, t],
+  );
+  const selectedAgentName = agentNameFromFilter(agentFilter);
+  const filteredSchedules = useMemo(
+    () =>
+      selectedAgentName
+        ? schedules.filter(
+            (schedule) => schedule.agentName === selectedAgentName,
+          )
+        : schedules,
+    [schedules, selectedAgentName],
+  );
+  const filteredRuns = useMemo(
+    () =>
+      selectedAgentName
+        ? (dashboard?.runs ?? []).filter(
+            (run) => agentNameForRun(run) === selectedAgentName,
+          )
+        : (dashboard?.runs ?? []),
+    [dashboard?.runs, selectedAgentName],
+  );
   const days = useMemo(
     () =>
       Array.from({ length: dayCount }, (_, index) =>
@@ -133,8 +187,8 @@ export function ProjectSchedule({
     [weekStart],
   );
   const segmentsByDay = useMemo(
-    () => scheduleSegmentsForWeek(dashboard?.runs ?? [], weekStart, now),
-    [dashboard?.runs, now, weekStart],
+    () => scheduleSegmentsForWeek(filteredRuns, weekStart, now),
+    [filteredRuns, now, weekStart],
   );
   const allSegments = segmentsByDay.flat();
   const visibleRuns = new Set(allSegments.map((segment) => segment.run.id)).size;
@@ -144,6 +198,15 @@ export function ProjectSchedule({
   );
   const todayWeek = startOfCalendarWeek(now);
   const isCurrentWeek = todayWeek.getTime() === weekStart.getTime();
+
+  useEffect(() => {
+    if (
+      agentFilter !== allAgentsFilter &&
+      !agentFilterOptions.some((option) => option.value === agentFilter)
+    ) {
+      setAgentFilter(allAgentsFilter);
+    }
+  }, [agentFilter, agentFilterOptions]);
 
   useEffect(() => {
     if (providedNow) return;
@@ -267,7 +330,7 @@ export function ProjectSchedule({
             </span>
             <i />
             <span>
-              <strong>{schedules.length}</strong>
+              <strong>{filteredSchedules.length}</strong>
               {t("schedule.automations")}
             </span>
           </div>
@@ -294,12 +357,12 @@ export function ProjectSchedule({
         </div>
       )}
 
-      {schedules.length > 0 && (
+      {filteredSchedules.length > 0 && (
         <section
           aria-label={t("schedule.automations")}
           className="project-schedule-plans"
         >
-          {schedules.map((schedule) => (
+          {filteredSchedules.map((schedule) => (
             <article key={schedule.id}>
               <span className={`provider-${schedule.agentProvider}`}>
                 <CalendarClock size={15} />
@@ -351,10 +414,25 @@ export function ProjectSchedule({
             </button>
             <strong>{weekRange}</strong>
           </div>
-          <div className="project-schedule-timezone">
-            <Clock3 size={13} />
-            <span>{formatOffset(now)}</span>
-            <span>{timeZone}</span>
+          <div className="project-schedule-toolbar-meta">
+            <div className="project-schedule-agent-filter">
+              <ListFilter aria-hidden="true" size={13} />
+              <SelectMenu
+                align="end"
+                disabled={availableAgentNames.length === 0}
+                id="project-schedule-agent-filter"
+                label={t("schedule.agentFilter")}
+                onValueChange={setAgentFilter}
+                options={agentFilterOptions}
+                size="small"
+                value={agentFilter}
+              />
+            </div>
+            <div className="project-schedule-timezone">
+              <Clock3 size={13} />
+              <span>{formatOffset(now)}</span>
+              <span>{timeZone}</span>
+            </div>
           </div>
         </header>
 
@@ -463,8 +541,18 @@ export function ProjectSchedule({
                   <span>
                     <CalendarClock size={22} />
                   </span>
-                  <strong>{t("schedule.emptyTitle")}</strong>
-                  <p>{t("schedule.emptyDescription")}</p>
+                  <strong>
+                    {selectedAgentName
+                      ? t("schedule.filteredEmptyTitle", {
+                          agent: selectedAgentName,
+                        })
+                      : t("schedule.emptyTitle")}
+                  </strong>
+                  <p>
+                    {selectedAgentName
+                      ? t("schedule.filteredEmptyDescription")
+                      : t("schedule.emptyDescription")}
+                  </p>
                 </div>
               )}
             </div>

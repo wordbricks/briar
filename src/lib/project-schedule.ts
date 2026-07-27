@@ -42,7 +42,7 @@ function validDate(value: string | null | undefined) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function agentForRun(run: HuntRun) {
+export function agentNameForRun(run: HuntRun) {
   if (run.claimedBy?.trim()) return run.claimedBy.trim();
   const eventActor = [...run.events]
     .sort(
@@ -89,7 +89,7 @@ function executionWindow(run: HuntRun, now: Date): ExecutionWindow | null {
       ? end
       : new Date(start.getTime() + 15 * minuteMs);
 
-  return { run, agent: agentForRun(run), start, end: normalizedEnd };
+  return { run, agent: agentNameForRun(run), start, end: normalizedEnd };
 }
 
 export function minutesIntoCalendarDay(value: Date) {

@@ -16,7 +16,6 @@ import {
   Plus,
   Settings,
   Languages,
-  Sparkles,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useI18n, type Locale } from "../i18n";
@@ -34,7 +33,6 @@ export function Sidebar({
   onAddProject,
   onAgentsOpen,
   onScheduleOpen,
-  onAutoHuntOpen,
   onInboxOpen,
   onIssuesOpen,
   onAddOrganization,
@@ -55,7 +53,6 @@ export function Sidebar({
     | "issues"
     | "agents"
     | "schedule"
-    | "auto-hunt"
     | "inbox"
     | "project-settings"
     | "organization-create"
@@ -68,7 +65,6 @@ export function Sidebar({
   onAddProject: () => void;
   onAgentsOpen: () => void;
   onScheduleOpen: () => void;
-  onAutoHuntOpen: () => void;
   onInboxOpen: () => void;
   onIssuesOpen: () => void;
   onAddOrganization: () => void;
@@ -561,18 +557,6 @@ export function Sidebar({
                     >
                       <CalendarDays size={14} strokeWidth={1.7} />
                       <span>{t("sidebar.schedule")}</span>
-                    </a>
-                    <a
-                      aria-current={activePage === "auto-hunt" ? "page" : undefined}
-                      className={`sidebar-project-view${activePage === "auto-hunt" ? " active" : ""}`}
-                      href="#auto-hunt"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        onAutoHuntOpen();
-                      }}
-                    >
-                      <Sparkles size={14} strokeWidth={1.7} />
-                      <span>{t("sidebar.autoHunt")}</span>
                     </a>
                   </div>
                 )}
