@@ -142,13 +142,15 @@ export function ConnectionHealth({
                 }
                 expected={`v${health.skillExpectedVersion}`}
               />
-              <HealthItem
-                healthy={health.velenHealthy}
-                icon={<ShieldCheck size={15} />}
-                label="Velen"
-                value={health.velenOrg ?? t("health.orgUnset")}
-                expected={health.velenEmail ?? undefined}
-              />
+              {health.velenOrg ? (
+                <HealthItem
+                  healthy={health.velenHealthy}
+                  icon={<ShieldCheck size={15} />}
+                  label="Velen"
+                  value={health.velenOrg}
+                  expected={health.velenEmail ?? undefined}
+                />
+              ) : null}
             </div>
           ) : (
             <div className="health-empty">

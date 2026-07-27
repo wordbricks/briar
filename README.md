@@ -2,7 +2,7 @@
 
 # Briar
 
-Briar is a repository-agnostic Agent Development Environment for running and observing production-bound Auto Hunt work. It extracts the Wordbricks workflow into a reusable D1-backed lifecycle, mandatory Velen context, and optional Linear mirroring.
+Briar is a repository-agnostic Agent Development Environment for running and observing production-bound Auto Hunt work. It extracts the Wordbricks workflow into a reusable D1-backed lifecycle with optional Velen context and Linear mirroring.
 
 Repository source code stays local. Agents send only task state and Git metadata to a Cloudflare Worker, while users, projects, and Auto Hunt state are stored in Cloudflare D1.
 
@@ -18,7 +18,7 @@ Repository source code stays local. Agents send only task state and Git metadata
 - `briar` CLI for login, repository connection, queued issue intake, and Auto Hunt event recording
 - A validated `briar-auto-hunt` skill installed for Codex and Claude
 - Project-scoped LLM conversations through Codex App Server or Claude Agent SDK
-- Mandatory Velen CLI preflight and repository-specific Velen organization/source settings
+- Optional Velen CLI context with repository-specific organization/source settings
 - Optional Linear integration through a configured Velen source
 - Native React controls in a light desktop theme
 - Universal run status plus repository-specific workflow stages selected at connection time
@@ -30,7 +30,7 @@ Repository source code stays local. Agents send only task state and Git metadata
 ```mermaid
 flowchart LR
   A["Local Agent / Codex or Claude"] -->|"briar auto-hunt next / record"| C["Briar CLI"]
-  A -->|"context and optional Linear"| V["Velen CLI"]
+  A -.->|"optional context and Linear"| V["Velen CLI"]
   C -->|"project Bearer token"| W["Cloudflare Worker"]
   D["Briar Tauri app"] -->|"Better Auth Device Flow"| W
   D -->|"create issues + polling, 4s"| W
@@ -44,9 +44,10 @@ The Worker owns Better Auth, dashboard APIs, Agent ingest APIs, authorization ch
 
 ## Install
 
-Requirements: Bun, Rust, Tauri system prerequisites, Wrangler 4.x, an
-authenticated Velen CLI, and at least one installed and authenticated coding
-agent: Codex CLI or Claude Code.
+Requirements: Bun, Rust, Tauri system prerequisites, Wrangler 4.x, and at least
+one installed and authenticated coding agent: Codex CLI, Claude Code, or Grok.
+Install and authenticate Velen CLI only for projects that use Velen context or
+Linear mirroring.
 
 ```bash
 bun install
@@ -220,7 +221,7 @@ bun link
 briar login
 ```
 
-After login, create a project from the desktop onboarding screen, select the workflow that matches the repository, choose the Velen organization, optionally select a Linear source, and pick the Git repository. New projects default to the deployment-free `local` workflow; review, release, research, and custom stage selections are available. Briar validates every selection, stores the path/token/settings locally, stores non-secret integration settings in D1, and installs the Briar CLI plus Auto Hunt skills automatically. Each desktop launch also synchronizes those local assets with the bundled app version, so installing an app update updates the CLI and skills on relaunch. The repository path and Agent token are never sent to the Worker as project metadata.
+After login, create a project from the desktop onboarding screen, select the workflow that matches the repository, and pick the Git repository. New projects default to the deployment-free `local` workflow; review, release, research, and custom stage selections are available. Optional Velen context and Velen-backed Linear mirroring can be connected later from project settings. Briar validates every selection, stores the path/token/settings locally, stores non-secret integration settings in D1, and installs the Briar CLI plus Auto Hunt skills automatically. Each desktop launch also synchronizes those local assets with the bundled app version, so installing an app update updates the CLI and skills on relaunch. The repository path and Agent token are never sent to the Worker as project metadata.
 
 You can also create and connect a project from inside a Git repository with the CLI:
 

@@ -55,7 +55,7 @@ describe("Auto Hunt workflows", () => {
       ],
     });
 
-    expect(workflow.stages[0]?.evidence).toEqual(["velen", "repository"]);
+    expect(workflow.stages[0]?.evidence).toEqual(["repository"]);
     expect(workflow.completion.requiredStages).toEqual([
       "analyzing",
       "implementing",
@@ -68,7 +68,7 @@ describe("Auto Hunt workflows", () => {
     const workflow = normalizeAutoHuntWorkflow({
       version: 1,
       stages: [
-        { id: "analyze", label: "분석", required: true, evidence: ["velen", "repository"] },
+        { id: "analyze", label: "분석", required: true, evidence: ["repository"] },
         { id: "implement", label: "구현", required: true, evidence: ["diff"] },
         { id: "validate", label: "로컬 검증", required: true, checks: ["bun run test", "bun run build"] },
       ],

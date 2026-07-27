@@ -61,7 +61,7 @@ export type RepositoryReadiness = {
 };
 
 export type LocalAutoHuntConfig = {
-  velenOrg: string;
+  velenOrg: string | null;
   dataSource?: string | null;
   linearEnabled: boolean;
   linearSource?: string | null;
@@ -267,6 +267,20 @@ export async function updateLocalProjectLinear(
   return invoke<ProjectSettings["linear"]>("update_local_project_linear", {
     projectId,
     linear,
+  });
+}
+
+export async function updateLocalProjectVelenOrg(
+  projectId: string,
+  org: string | null,
+) {
+  if (!isTauri()) {
+    throw new Error("Velen 연결 갱신은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<string | null>("update_local_project_velen_org", {
+    projectId,
+    org,
   });
 }
 

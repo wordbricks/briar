@@ -15,7 +15,7 @@ export const autoHuntRunStatuses = [
 ] as const;
 
 export const autoHuntWorkflowStageCatalog = [
-  { id: "analyzing", label: "분석", tone: "blue", evidence: ["velen", "repository"], checks: undefined },
+  { id: "analyzing", label: "분석", tone: "blue", evidence: ["repository"], checks: undefined },
   { id: "planning", label: "계획", tone: "cyan", evidence: ["repository"], checks: undefined },
   { id: "implementing", label: "구현", tone: "violet", evidence: ["diff"], checks: undefined },
   { id: "reviewing", label: "리뷰", tone: "indigo", evidence: ["diff"], checks: undefined },

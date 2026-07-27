@@ -656,6 +656,13 @@ const projectSettingsSchema = z
   })
   .strict()
   .superRefine((input, context) => {
+    if (input.dataSource && !input.velenOrg) {
+      context.addIssue({
+        code: "custom",
+        message: "Velen data source requires a Velen org",
+        path: ["dataSource"],
+      });
+    }
     if (input.linear.enabled && (!input.velenOrg || !input.linear.source)) {
       context.addIssue({
         code: "custom",

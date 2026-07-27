@@ -311,9 +311,7 @@ export function App() {
         onRepositorySelect={briar.selectProjectRepository}
         onRepositoryInspect={briar.inspectProjectRepository}
         onWorkspaceCreate={briar.createProjectRepository}
-        onVelenOrgChange={briar.refreshVelen}
         user={briar.user}
-        velen={briar.velen}
       />
     );
   } else {
@@ -491,6 +489,9 @@ export function App() {
             onRegenerateWorkflow={() => briar.regenerateWorkflow(activeProject.id)}
             onUpdateAutomation={(automation) =>
               briar.saveAutoHuntAutomation(activeProject.id, automation)
+            }
+            onUpdateVelenOrg={(org) =>
+              briar.saveVelenIntegration(activeProject.id, org)
             }
             onUpdateLinear={(linear) =>
               briar.saveLinearIntegration(activeProject.id, linear)

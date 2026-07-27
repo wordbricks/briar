@@ -3,25 +3,21 @@ import {
   ArrowRight,
   Check,
   CircleAlert,
-  Database,
   FolderGit2,
   FolderOpen,
   FolderPlus,
   GitBranch,
-  Link2,
   ListChecks,
   LoaderCircle,
   LogOut,
-  RefreshCw,
   UploadCloud,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { ProjectConnection } from "../hooks/useBriar";
 import type {
   CreatedProjectWorkspace,
   LocalAutoHuntConfig,
   RepositoryReadiness,
-  VelenInspection,
 } from "../lib/project-connection";
 import { projectWorkspaceRoot } from "../lib/project-connection";
 import {
@@ -30,7 +26,6 @@ import {
   type ProjectStartMode,
 } from "../lib/project-workspace";
 import type { SessionUser } from "../types";
-import { NativeSelect } from "./NativeSelect";
 import { Logo } from "./Logo";
 import {
   normalizeAutoHuntWorkflow,
@@ -57,12 +52,7 @@ type Props = {
     executionHostId: string,
   ) => Promise<RepositoryReadiness>;
   onWorkspaceCreate: (name: string) => Promise<CreatedProjectWorkspace>;
-  onVelenOrgChange: (
-    org?: string | null,
-    executionHostId?: string,
-  ) => Promise<VelenInspection | null>;
   user: SessionUser;
-  velen: VelenInspection | null;
 };
 
 export function ProjectOnboarding({
@@ -77,16 +67,10 @@ export function ProjectOnboarding({
   onRepositorySelect,
   onRepositoryInspect,
   onWorkspaceCreate,
-  onVelenOrgChange,
   user,
-  velen,
 }: Props) {
   const { t } = useI18n();
   const [name, setName] = useState("");
-  const [velenOrg, setVelenOrg] = useState("");
-  const [linearEnabled, setLinearEnabled] = useState(false);
-  const [linearSource, setLinearSource] = useState("");
-  const [linearTeam, setLinearTeam] = useState("");
   const [repositoryPath, setRepositoryPath] = useState("");
   const [repositoryReadiness, setRepositoryReadiness] =
     useState<RepositoryReadiness | null>(null);
@@ -109,25 +93,6 @@ export function ProjectOnboarding({
       cancelled = true;
     };
   }, [connection, workspaceRoot]);
-
-  useEffect(() => {
-    if (!velen || velenOrg) return;
-    setVelenOrg(velen.currentOrg ?? velen.organizations[0]?.slug ?? "");
-  }, [velen, velenOrg]);
-
-  const linearSources = useMemo(
-    () =>
-      (velen?.sources ?? []).filter(
-        (source) => source.provider === "linear" && source.status === "active",
-      ),
-    [velen],
-  );
-
-  useEffect(() => {
-    if (!linearSource && linearSources[0]) {
-      setLinearSource(linearSources[0].sourceRef);
-    }
-  }, [linearSource, linearSources]);
 
   const newProjectPreviewPath = projectWorkspacePath(workspaceRoot, name);
 
@@ -173,12 +138,12 @@ export function ProjectOnboarding({
   };
 
   const connect = async () => {
-    if (!repositoryPath || !velenOrg) return;
+    if (!repositoryPath) return;
     await onConnect({
-      velenOrg,
-      linearEnabled,
-      linearSource: linearEnabled ? linearSource || null : null,
-      linearTeam: linearEnabled ? linearTeam || null : null,
+      velenOrg: null,
+      linearEnabled: false,
+      linearSource: null,
+      linearTeam: null,
       githubRepository: repositoryReadiness?.githubRepository ?? null,
       workflow: initialWorkflow,
     }, repositoryPath, "local").catch(() => undefined);
@@ -234,7 +199,9 @@ export function ProjectOnboarding({
           <>
             <p className="eyebrow">AUTO HUNT CONNECTION</p>
             <h1>{t("onboarding.connectTitle", { name: connection.project.name })}</h1>
-            <p className="onboarding-copy">{t("onboarding.connectDescription")}</p>
+            <p className="onboarding-copy">
+              {t("onboarding.repositoryConnectDescription")}
+            </p>
 
             <div className="setup-grid">
               <section className="setup-section">
@@ -306,88 +273,12 @@ export function ProjectOnboarding({
                 ) : null}
               </section>
 
-              <section className="setup-section">
-                <div className="setup-section-heading">
-                  <Database size={18} />
-                  <div>
-                    <strong>Velen CLI <em>{t("common.required")}</em></strong>
-                    <span>{velen ? `${velen.email ?? t("onboarding.loggedIn")} · ${t("onboarding.authenticated")}` : t("onboarding.checkingInstall")}</span>
-                  </div>
-                  <button className="icon-action" onClick={() => void onVelenOrgChange(velenOrg, "local")} type="button" aria-label={t("onboarding.refreshVelen")}>
-                    <RefreshCw size={15} />
-                  </button>
-                </div>
-                {velen ? (
-                  <div className="settings-fields single-field">
-                    <label>
-                      <span>{t("onboarding.organization")}</span>
-                      <NativeSelect
-                        label={t("onboarding.velenOrg")}
-                        options={velen.organizations.map((organization) => ({
-                          label: organization.name,
-                          value: organization.slug,
-                        }))}
-                        value={velenOrg}
-                        onValueChange={(org) => {
-                          setVelenOrg(org);
-                          setLinearSource("");
-                          void onVelenOrgChange(org, "local");
-                        }}
-                      />
-                    </label>
-                  </div>
-                ) : null}
-              </section>
-
-              <section className="setup-section">
-                <div className="setup-section-heading">
-                  <Link2 size={18} />
-                  <div><strong>{t("onboarding.linear")}</strong><span>{t("onboarding.linearDescription")}</span></div>
-                  <label className="native-switch">
-                    <input
-                      aria-label={t("onboarding.linear")}
-                      checked={linearEnabled}
-                      disabled={!velen}
-                      onChange={(event) => setLinearEnabled(event.currentTarget.checked)}
-                      type="checkbox"
-                    />
-                    <span aria-hidden="true" />
-                  </label>
-                </div>
-                {linearEnabled ? (
-                  <div className="settings-fields">
-                    <label>
-                      <span>{t("onboarding.linearSource")}</span>
-                      <NativeSelect
-                        label={t("onboarding.linearSource")}
-                        onValueChange={setLinearSource}
-                        options={linearSources.map((source) => ({
-                          label: source.sourceKey,
-                          value: source.sourceRef,
-                        }))}
-                        placeholder={t("onboarding.selectLinearSource")}
-                        value={linearSource}
-                      />
-                    </label>
-                    <label>
-                      <span>{t("onboarding.teamKey")} <small>{t("common.optional")}</small></span>
-                      <input
-                        aria-label={t("onboarding.teamKey")}
-                        className="native-input"
-                        onChange={(event) => setLinearTeam(event.currentTarget.value)}
-                        placeholder={t("onboarding.teamKeyExample")}
-                        value={linearTeam}
-                      />
-                    </label>
-                  </div>
-                ) : null}
-              </section>
             </div>
 
             {error ? <div className="login-error" role="alert">{error}</div> : null}
             <button
               className="onboarding-primary-action"
-              disabled={loading || selectingRepository || !repositoryReadiness?.gitReady || !velen || !velenOrg || (linearEnabled && !linearSource)}
+              disabled={loading || selectingRepository || !repositoryReadiness?.gitReady}
               onClick={() => void connect()}
               type="button"
             >

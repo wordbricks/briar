@@ -65,6 +65,7 @@ describe("ProjectSettings", () => {
           onDelete={async () => undefined}
           onRegenerateWorkflow={onRegenerateWorkflow}
           onUpdateAutomation={onUpdateAutomation}
+          onUpdateVelenOrg={async (org) => org}
           onUpdateLinear={onUpdateLinear}
           onConnectLinearImport={onConnectLinearImport}
           onLoadLinearImportStates={onLoadLinearImportStates}
@@ -172,10 +173,14 @@ describe("ProjectSettings", () => {
       container.querySelector<HTMLElement>(".project-settings-linear")?.hidden,
     ).toBe(false);
     expect(container.querySelector(".project-settings-linear")?.textContent).toContain(
-      "Linear 연결",
+      "Velen 연결",
     );
-    const linearTeam = container.querySelector<HTMLInputElement>(
-      '.project-settings-linear input[aria-label="팀 키"]',
+    expect(container.textContent).toContain("Linear 연결");
+    const linearSection = container.querySelectorAll<HTMLElement>(
+      ".project-settings-linear",
+    )[1];
+    const linearTeam = linearSection?.querySelector<HTMLInputElement>(
+      'input[aria-label="팀 키"]',
     );
     await act(async () => {
       if (!linearTeam) return;
@@ -186,8 +191,8 @@ describe("ProjectSettings", () => {
       setter?.call(linearTeam, "BRIAR");
       linearTeam.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    const linearSave = container.querySelector<HTMLButtonElement>(
-      ".project-settings-linear > footer button",
+    const linearSave = linearSection?.querySelector<HTMLButtonElement>(
+      ":scope > footer button",
     );
     await act(async () => linearSave?.click());
     expect(onUpdateLinear).toHaveBeenCalledWith({
@@ -221,6 +226,7 @@ describe("ProjectSettings", () => {
           onDelete={onDelete}
           onRegenerateWorkflow={async () => undefined}
           onUpdateAutomation={async (automation) => automation}
+          onUpdateVelenOrg={async (org) => org}
           onUpdateLinear={async (linear) => linear}
           onConnectLinearImport={async () => ({
             viewer: { name: "Demo", email: null, organizationName: "Demo" },

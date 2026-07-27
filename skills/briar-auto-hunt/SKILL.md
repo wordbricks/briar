@@ -1,18 +1,18 @@
 ---
 name: briar-auto-hunt
-description: Run an autonomous repository task through the workflow configured for that Briar project while recording a durable timeline. Use for issue, feedback, or error work that should be investigated with mandatory Velen CLI context and completed against repository-specific acceptance stages.
+description: Run an autonomous repository task through the workflow configured for that Briar project while recording a durable timeline. Use for issue, feedback, or error work that should follow repository-specific acceptance stages and optionally use configured Velen context.
 ---
 
 # Briar Auto Hunt
 
-Drive one task through the workflow configured for its repository. Treat Briar as the execution audit trail, Velen CLI as the required context gateway, the repository as the implementation source of truth, and Linear as an optional mirror.
+Drive one task through the workflow configured for its repository. Treat Briar as the execution audit trail, the repository as the implementation source of truth, Velen as an optional context gateway, and Linear as an optional Velen-backed mirror.
 
 ## Non-negotiable invariants
 
-- Run `briar auto-hunt doctor` inside the target Git repository before changing files. Stop if Briar or Velen preflight fails.
+- Run `briar auto-hunt doctor` inside the target Git repository before changing files. Stop if Briar preflight fails, or if a configured Velen integration fails its preflight.
 - Work every issue inside the worktree `briar auto-hunt next` allocates for it (`issue.worktree.path`). `cd` there before reading or editing anything, and never edit the connected repository checkout — it is shared by every run. When the payload has `worktreeError` instead of a worktree, record `blocked` with that message and claim nothing else.
 - Read the `workflow` returned by doctor. Follow its ordered stages exactly; never invent staging, production, PR, or deployment work that is not configured.
-- Use Velen CLI during investigation. Do not silently replace Velen with direct source credentials or another client.
+- When `doctor` reports a Velen organization, use Velen CLI during investigation. When no organization is configured, continue with repository evidence and do not substitute direct source credentials.
 - Keep one stable `source`, `source-key`, title, and Briar run for the whole task.
 - Record Briar first at every stage. Use retry-stable event keys.
 - Record `completed` only after every required configured stage has evidence and a result summary exists.
@@ -28,7 +28,7 @@ Drive one task through the workflow configured for its repository. Treat Briar a
 
 ## Load the workflow references
 
-Read [lifecycle.md](references/lifecycle.md) before starting. Read [velen-and-linear.md](references/velen-and-linear.md) when gathering context or when `doctor` reports Linear enabled. Read [release-and-qa.md](references/release-and-qa.md) only when the configured workflow contains PR, CI, staging, production, or monitoring stages.
+Read [lifecycle.md](references/lifecycle.md) before starting. Read [velen-and-linear.md](references/velen-and-linear.md) when `doctor` reports a Velen organization or Linear enabled. Read [release-and-qa.md](references/release-and-qa.md) only when the configured workflow contains PR, CI, staging, production, or monitoring stages.
 
 ## One worktree per issue
 
@@ -85,7 +85,7 @@ Each claim comes with its own git worktree, cut from the freshly fetched remote 
      --status-detail '<evidence or intent>'
    ```
 
-   Use Velen evidence in investigation stages, repository evidence in implementation stages, and actual check/release evidence in verification stages. A stage can be repeated with a new semantic event key, but cannot move backward within an attempt.
+   Use configured Velen context and repository evidence in investigation stages, repository evidence in implementation stages, and actual check/release evidence in verification stages. A stage can be repeated with a new semantic event key, but cannot move backward within an attempt.
 
 5. Record completion after all required stages:
 
