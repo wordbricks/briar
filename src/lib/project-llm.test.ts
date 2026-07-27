@@ -9,6 +9,7 @@ import {
   createProjectChat,
   loadAppProviderSettings,
   loadProjectLlmSettings,
+  runProjectAgent,
   runProjectAgentSchedule,
   updateAppProviderSettings,
   updateProjectLlmSettings,
@@ -96,6 +97,45 @@ describe("project LLM gateway", () => {
         conversationId: null,
         instructions: "Run the claimed schedule and summarize the result.",
         outputSchema: null,
+      },
+    });
+    expect(invoke.mock.calls[0]?.[1]).not.toHaveProperty("workspaceRoot");
+  });
+
+  it("runs a saved agent turn that may request host Auto Hunt dispatch", async () => {
+    invoke.mockResolvedValue({
+      conversationId: "briar:project-1:thread-1",
+      workspaceRoot: "/repo",
+      action: "dispatch_auto_hunt",
+      message: "대기 이슈 처리를 요청했습니다.",
+      maxIssues: 3,
+    });
+
+    await runProjectAgent({
+      projectId: "project-1",
+      agent: {
+        id: "agent-1",
+        name: "Release agent",
+        provider: "codex",
+        model: "gpt-5.6-sol",
+        responsibility: "Handle release work.",
+        skill: "# Release agent",
+      },
+      message: "Auto Hunt로 대기 이슈 3개를 처리해 줘",
+      conversationId: null,
+    });
+
+    expect(invoke).toHaveBeenCalledWith("run_project_agent", {
+      projectId: "project-1",
+      request: {
+        agentId: "agent-1",
+        agentName: "Release agent",
+        agentProvider: "codex",
+        agentModel: "gpt-5.6-sol",
+        responsibility: "Handle release work.",
+        skill: "# Release agent",
+        message: "Auto Hunt로 대기 이슈 3개를 처리해 줘",
+        conversationId: null,
       },
     });
     expect(invoke.mock.calls[0]?.[1]).not.toHaveProperty("workspaceRoot");

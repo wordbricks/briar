@@ -43,6 +43,8 @@ pub(crate) struct ProjectAutoHuntRequest {
     pub(crate) session_id: String,
     pub(crate) api_url: String,
     pub(crate) agent_id: String,
+    #[serde(default)]
+    pub(crate) coordinator_conversation_id: Option<String>,
     pub(crate) agent_name: String,
     pub(crate) agent_provider: AgentProviderKind,
     pub(crate) agent_model: Option<String>,
@@ -51,6 +53,45 @@ pub(crate) struct ProjectAutoHuntRequest {
     #[serde(default, skip_deserializing)]
     pub(crate) workflow_json: String,
     pub(crate) issues: Vec<ProjectAutoHuntIssue>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ProjectAgentRunRequest {
+    pub(crate) agent_id: String,
+    pub(crate) agent_name: String,
+    pub(crate) agent_provider: AgentProviderKind,
+    pub(crate) agent_model: Option<String>,
+    pub(crate) responsibility: String,
+    pub(crate) skill: String,
+    pub(crate) message: String,
+    #[serde(default)]
+    pub(crate) conversation_id: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ProjectAgentRunAction {
+    Respond,
+    DispatchAutoHunt,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ProjectAgentRunDecision {
+    action: ProjectAgentRunAction,
+    message: String,
+    max_issues: Option<usize>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ProjectAgentRunResponse {
+    pub(crate) conversation_id: String,
+    pub(crate) workspace_root: String,
+    pub(crate) action: ProjectAgentRunAction,
+    pub(crate) message: String,
+    pub(crate) max_issues: Option<usize>,
 }
 
 pub(crate) struct AutoHuntCliEnvironment {
@@ -665,6 +706,58 @@ pub(crate) fn chat(
     })
 }
 
+pub(crate) fn run_project_agent_with(
+    backend: &dyn AgentBackend,
+    project_id: &str,
+    workspace_root: &Path,
+    execution: ChatExecution,
+    workflow_json: &str,
+    request: ProjectAgentRunRequest,
+    approve: &dyn Fn(&str, &Value) -> bool,
+) -> Result<ProjectAgentRunResponse, String> {
+    let response = backend.run(
+        project_id,
+        workspace_root,
+        execution,
+        ProjectLlmRequest {
+            message: request.message,
+            conversation_id: request.conversation_id,
+            instructions: Some(format!(
+                "Run as the saved project agent `{}`.\n\n## Responsibility\n\n{}\n\n## Agent skill\n\n{}\n\n## Project workflow\n\n{}\n\nHandle the user's request in this single agent conversation. Do not claim queue work or create an issue worktree yourself. If and only if the user explicitly asks to start Auto Hunt or process queued issues through Auto Hunt, return `dispatch_auto_hunt` without running queue, Git, or repository commands; the trusted Briar host runtime will perform the dispatch. A request merely mentioning or discussing an issue is not an Auto Hunt request. For every other request, choose `respond`, complete the work in this session, and report the observed result. Return only the required JSON.",
+                request.agent_name,
+                request.responsibility,
+                request.skill,
+                workflow_json,
+            )),
+            output_schema: Some(project_agent_run_output_schema()),
+        },
+        approve,
+    )?;
+    let decision = serde_json::from_str::<ProjectAgentRunDecision>(&response.message)
+        .map_err(|error| format!("에이전트 실행 결정을 읽지 못했습니다: {error}"))?;
+    if decision.message.trim().is_empty() {
+        return Err("에이전트가 빈 결과를 반환했습니다.".to_string());
+    }
+    if decision
+        .max_issues
+        .is_some_and(|count| count == 0 || count > MAX_AUTO_HUNT_ISSUES)
+    {
+        return Err(format!(
+            "에이전트가 요청한 자동사냥 건수는 1~{MAX_AUTO_HUNT_ISSUES} 범위여야 합니다."
+        ));
+    }
+    if decision.action == ProjectAgentRunAction::Respond && decision.max_issues.is_some() {
+        return Err("일반 응답에는 자동사냥 처리 건수를 지정할 수 없습니다.".to_string());
+    }
+    Ok(ProjectAgentRunResponse {
+        conversation_id: response.conversation_id,
+        workspace_root: response.workspace_root,
+        action: decision.action,
+        message: decision.message,
+        max_issues: decision.max_issues,
+    })
+}
+
 /// Run exactly one already-claimed issue in its host-allocated worktree.
 ///
 /// Queue selection and `git worktree add` are control-plane responsibilities;
@@ -757,7 +850,7 @@ pub(crate) fn summarize_auto_hunt_dispatch_with(
         },
         ProjectLlmRequest {
             message,
-            conversation_id: None,
+            conversation_id: request.coordinator_conversation_id.clone(),
             instructions: Some(format!(
                 "Act as the coordinator for project agent `{}`. Your workers were created and monitored by the Briar host runtime. Report their completed, blocked, failed, or cancelled outcomes concisely. Never run commands, claim work, edit files, or invent evidence. Return only the required JSON.",
                 request.agent_name,
@@ -834,6 +927,31 @@ fn auto_hunt_output_schema() -> Value {
                         "summary": { "type": "string" }
                     }
                 }
+            }
+        }
+    })
+}
+
+fn project_agent_run_output_schema() -> Value {
+    json!({
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["action", "message", "maxIssues"],
+        "properties": {
+            "action": {
+                "type": "string",
+                "enum": ["respond", "dispatch_auto_hunt"]
+            },
+            "message": { "type": "string", "minLength": 1 },
+            "maxIssues": {
+                "anyOf": [
+                    {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": MAX_AUTO_HUNT_ISSUES
+                    },
+                    { "type": "null" }
+                ]
             }
         }
     })
@@ -1372,6 +1490,10 @@ mod tests {
             assert!(request.message.contains("group-1"));
             assert!(request.message.contains("worker-1"));
             assert_eq!(
+                request.conversation_id.as_deref(),
+                Some("briar:project-1:initial-coordinator")
+            );
+            assert_eq!(
                 request
                     .output_schema
                     .as_ref()
@@ -1381,6 +1503,38 @@ mod tests {
             Ok(ProjectLlmResponse {
                 conversation_id: "briar:project-1:coordinator-thread".to_string(),
                 message: r#"{"summary":"워커 1개가 완료되었습니다."}"#.to_string(),
+                workspace_root: workspace_root.to_string_lossy().into_owned(),
+            })
+        }
+    }
+
+    struct ProjectAgentBackend;
+
+    impl AgentBackend for ProjectAgentBackend {
+        fn run(
+            &self,
+            _project_id: &str,
+            workspace_root: &Path,
+            execution: ChatExecution,
+            request: ProjectLlmRequest,
+            _approve: &dyn Fn(&str, &Value) -> bool,
+        ) -> Result<ProjectLlmResponse, String> {
+            assert_eq!(execution.sandbox_mode, SandboxMode::WorkspaceWrite);
+            assert!(execution.network_access);
+            assert!(request.instructions.as_deref().is_some_and(|instructions| {
+                instructions.contains("If and only if the user explicitly asks")
+                    && instructions.contains("Do not claim queue work")
+            }));
+            assert_eq!(
+                request
+                    .output_schema
+                    .as_ref()
+                    .map(|schema| &schema["required"]),
+                Some(&json!(["action", "message", "maxIssues"]))
+            );
+            Ok(ProjectLlmResponse {
+                conversation_id: "briar:project-1:initial-coordinator".to_string(),
+                message: r#"{"action":"dispatch_auto_hunt","message":"Auto Hunt를 요청했습니다.","maxIssues":2}"#.to_string(),
                 workspace_root: workspace_root.to_string_lossy().into_owned(),
             })
         }
@@ -1725,6 +1879,9 @@ mod tests {
                 session_id: "group-1".to_string(),
                 api_url: "https://api.example.com".to_string(),
                 agent_id: "agent-1".to_string(),
+                coordinator_conversation_id: Some(
+                    "briar:project-1:initial-coordinator".to_string(),
+                ),
                 agent_name: "Coordinator".to_string(),
                 agent_provider: AgentProviderKind::Codex,
                 agent_model: None,
@@ -1755,6 +1912,45 @@ mod tests {
         assert_eq!(
             response.conversation_id,
             "briar:project-1:coordinator-thread"
+        );
+    }
+
+    #[test]
+    fn saved_agent_explicitly_requests_host_auto_hunt_dispatch() {
+        let response = run_project_agent_with(
+            &ProjectAgentBackend,
+            "project-1",
+            Path::new("/repo"),
+            ChatExecution {
+                approval_policy: ApprovalPolicy::OnRequest,
+                sandbox_mode: SandboxMode::WorkspaceWrite,
+                network_access: true,
+                model: Some("gpt-5.6-sol".to_string()),
+                effort: Some(ModelEffort::High),
+                event_sink: None,
+                environment: Vec::new(),
+                workspace_write_roots: Vec::new(),
+            },
+            r#"{"stages":[]}"#,
+            ProjectAgentRunRequest {
+                agent_id: "agent-1".to_string(),
+                agent_name: "Coordinator".to_string(),
+                agent_provider: AgentProviderKind::Codex,
+                agent_model: Some("gpt-5.6-sol".to_string()),
+                responsibility: "Handle user work".to_string(),
+                skill: "# Coordinator".to_string(),
+                message: "Auto Hunt로 대기 이슈 2개를 처리해 줘".to_string(),
+                conversation_id: None,
+            },
+            &|_, _| false,
+        )
+        .expect("agent decision");
+
+        assert_eq!(response.action, ProjectAgentRunAction::DispatchAutoHunt);
+        assert_eq!(response.max_issues, Some(2));
+        assert_eq!(
+            response.conversation_id,
+            "briar:project-1:initial-coordinator"
         );
     }
 

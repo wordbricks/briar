@@ -199,7 +199,7 @@ describe("ProjectAgents", () => {
     expect(container.textContent).toContain("릴리스 점검 에이전트");
   });
 
-  it("opens an agent detail page with only that agent's sessions", async () => {
+  it("opens general work first and keeps Auto Hunt as an explicit mode", async () => {
     const sessions: AutoHuntSession[] = [
       {
         id: "legacy-auto-session",
@@ -263,9 +263,24 @@ describe("ProjectAgents", () => {
     });
 
     expect(container.querySelector("#project-agent-detail")).not.toBeNull();
+    expect(container.textContent).toContain("에이전트에게 작업 요청");
+    expect(container.textContent).not.toContain("자동 사냥 이슈");
+
+    await act(async () => {
+      Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
+        .find((button) => button.textContent?.trim() === "Auto Hunt")
+        ?.click();
+    });
+
     expect(container.textContent).toContain("자동 사냥 이슈");
     expect(container.textContent).not.toContain("Sentry 오류 조사");
 
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".project-agent-detail-back")
+        ?.click();
+    });
+    expect(container.querySelector("#project-agent-detail")).not.toBeNull();
     await act(async () => {
       container
         .querySelector<HTMLButtonElement>(".project-agent-detail-back")

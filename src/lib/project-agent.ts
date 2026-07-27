@@ -59,7 +59,8 @@ export function projectAgentSkill({
 - Record every required stage and its evidence before completing a run.`
     : `- Read the attached project workflow before acting.
 - Follow its required stages, checks, evidence, and completion rules when they apply.
-- Work only in the connected repository and report the observed result.`;
+- Follow the invocation's workspace and execution-mode instructions; do not infer queue work.
+- Report only results that were actually observed.`;
   return `# ${name.trim()}
 
 ## Responsibility

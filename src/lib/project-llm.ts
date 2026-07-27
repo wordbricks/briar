@@ -98,6 +98,28 @@ export type ProjectAgentScheduleExecutionInput = {
   instructions: string;
 };
 
+export type ProjectAgentRunInput = {
+  projectId: string;
+  agent: {
+    id: string;
+    name: string;
+    provider: AgentProvider;
+    model: string | null;
+    responsibility: string;
+    skill: string;
+  };
+  message: string;
+  conversationId?: string | null;
+};
+
+export type ProjectAgentRunResponse = {
+  conversationId: string;
+  workspaceRoot: string;
+  action: "respond" | "dispatch_auto_hunt";
+  message: string;
+  maxIssues: number | null;
+};
+
 export type ProjectChatMessage = {
   message: string;
   instructions?: string | null;
@@ -163,6 +185,33 @@ export async function runProjectAgentSchedule(
       conversationId: null,
       instructions: input.instructions,
       outputSchema: null,
+    },
+  });
+}
+
+/**
+ * Run one user-requested turn for a saved agent. The agent either completes the
+ * request in this conversation or explicitly asks the Briar host to dispatch
+ * Auto Hunt; it never claims queue work itself.
+ */
+export async function runProjectAgent(
+  input: ProjectAgentRunInput,
+): Promise<ProjectAgentRunResponse> {
+  if (!isTauri()) {
+    throw new Error("에이전트는 Briar 데스크톱 앱에서 실행할 수 있습니다.");
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<ProjectAgentRunResponse>("run_project_agent", {
+    projectId: input.projectId,
+    request: {
+      agentId: input.agent.id,
+      agentName: input.agent.name,
+      agentProvider: input.agent.provider,
+      agentModel: input.agent.model,
+      responsibility: input.agent.responsibility,
+      skill: input.agent.skill,
+      message: input.message,
+      conversationId: input.conversationId ?? null,
     },
   });
 }

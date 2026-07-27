@@ -17,9 +17,10 @@ use std::{
 use crate::host::{CommandRunner, CommandSpec};
 
 pub(crate) use codex::{
-    AutoHuntCliEnvironment, AutoHuntCoordinatorResponse, ProjectAutoHuntIssue,
-    ProjectAutoHuntIssueResult, ProjectAutoHuntRequest, ProjectAutoHuntResponse,
-    ProjectAutoHuntResult, ProjectAutoHuntWorkerResponse, MAX_AUTO_HUNT_ISSUES,
+    AutoHuntCliEnvironment, AutoHuntCoordinatorResponse, ProjectAgentRunRequest,
+    ProjectAgentRunResponse, ProjectAutoHuntIssue, ProjectAutoHuntIssueResult,
+    ProjectAutoHuntRequest, ProjectAutoHuntResponse, ProjectAutoHuntResult,
+    ProjectAutoHuntWorkerResponse, MAX_AUTO_HUNT_ISSUES,
 };
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, serde::Deserialize, serde::Serialize)]
@@ -576,6 +577,26 @@ pub(crate) fn start_auto_hunt_worker(
         execution,
         request,
         issue,
+        approve,
+    )
+}
+
+pub(crate) fn run_project_agent(
+    backend: &dyn AgentBackend,
+    project_id: &str,
+    workspace_root: &Path,
+    execution: ChatExecution,
+    workflow_json: &str,
+    request: ProjectAgentRunRequest,
+    approve: &dyn Fn(&str, &serde_json::Value) -> bool,
+) -> Result<ProjectAgentRunResponse, String> {
+    codex::run_project_agent_with(
+        backend,
+        project_id,
+        workspace_root,
+        execution,
+        workflow_json,
+        request,
         approve,
     )
 }

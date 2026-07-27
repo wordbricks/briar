@@ -3479,6 +3479,117 @@ async fn project_llm_chat(
 }
 
 #[tauri::command]
+async fn run_project_agent(
+    app: tauri::AppHandle,
+    project_id: String,
+    request: agent::ProjectAgentRunRequest,
+) -> Result<agent::ProjectAgentRunResponse, String> {
+    if request.agent_id.trim().is_empty()
+        || request.agent_id.len() > 128
+        || request.agent_name.trim().is_empty()
+        || request.agent_name.len() > 100
+        || request
+            .agent_model
+            .as_ref()
+            .is_some_and(|model| model.trim().is_empty() || model.len() > 100)
+        || request.responsibility.trim().is_empty()
+        || request.responsibility.len() > 2_000
+        || request.skill.trim().is_empty()
+        || request.skill.len() > 10_000
+        || request.message.trim().is_empty()
+        || request.message.len() > 20_000
+    {
+        return Err("에이전트 실행 요청이 올바르지 않습니다.".to_string());
+    }
+    if request
+        .conversation_id
+        .as_deref()
+        .is_some_and(|conversation_id| {
+            agent::AgentProviderKind::for_conversation_id(&project_id, conversation_id)
+                != Some(request.agent_provider)
+        })
+    {
+        return Err("이 대화는 선택한 에이전트 프로바이더와 일치하지 않습니다.".to_string());
+    }
+    let config_path = cli_config_path(&app)?;
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    let resource_directory = app
+        .path()
+        .resource_dir()
+        .map_err(|error| error.to_string())?;
+    let claude_runner = bundled_path(
+        &resource_directory,
+        "agent/claude-runner.js",
+        "dist-agent/claude-runner.js",
+    );
+    let grok_runner = bundled_path(
+        &resource_directory,
+        "agent/grok-runner.js",
+        "dist-agent/grok-runner.js",
+    );
+    let approval_app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let (runner, workspace) =
+            connected_project_workspace_on_host(&config_path, &project_id, &home)?;
+        let provider = request.agent_provider;
+        if !app_provider_settings_from(&config_path)?.is_enabled(provider) {
+            return Err(
+                "선택한 에이전트 프로바이더가 앱 설정에서 비활성화되어 있습니다.".to_string(),
+            );
+        }
+        let settings = project_llm_settings_from(&config_path, &project_id)?;
+        let workflow_json = project_auto_hunt_workflow_json(&config_path, &project_id)?;
+        let backend = agent::discover_backend(
+            provider,
+            runner,
+            agent::AgentRunnerBundles {
+                claude: &claude_runner,
+                grok: &grok_runner,
+            },
+        )?;
+        let model = request
+            .agent_model
+            .clone()
+            .filter(|value| !value.trim().is_empty());
+        let effort = (provider == settings.provider)
+            .then_some(settings.effort)
+            .flatten();
+        let approve = |method: &str, params: &serde_json::Value| {
+            let provider_name = provider.display_name();
+            approval_app
+                .dialog()
+                .message(approval_request_message(provider, method, params))
+                .title(format!("{provider_name} 에이전트 작업 승인"))
+                .buttons(MessageDialogButtons::OkCancelCustom(
+                    "승인".to_string(),
+                    "거절".to_string(),
+                ))
+                .blocking_show()
+        };
+        agent::run_project_agent(
+            &backend,
+            &project_id,
+            &workspace,
+            agent::ChatExecution {
+                approval_policy: settings.approval_policy,
+                sandbox_mode: agent::SandboxMode::WorkspaceWrite,
+                network_access: true,
+                model,
+                effort,
+                event_sink: None,
+                environment: Vec::new(),
+                workspace_write_roots: Vec::new(),
+            },
+            &workflow_json,
+            request,
+            &approve,
+        )
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
 async fn run_project_agent_schedule(
     app: tauri::AppHandle,
     project_id: String,
@@ -3815,6 +3926,7 @@ fn emit_latest_auto_hunt_dispatch_event(
 }
 
 fn validate_project_auto_hunt_request(
+    project_id: &str,
     request: &agent::ProjectAutoHuntRequest,
 ) -> Result<(), String> {
     validate_auto_hunt_session_id(&request.session_id)?;
@@ -3841,6 +3953,16 @@ fn validate_project_auto_hunt_request(
         || request.skill.len() > 10_000
     {
         return Err("자동사냥 에이전트 설정이 올바르지 않습니다.".to_string());
+    }
+    if request
+        .coordinator_conversation_id
+        .as_deref()
+        .is_some_and(|conversation_id| {
+            agent::AgentProviderKind::for_conversation_id(project_id, conversation_id)
+                != Some(request.agent_provider)
+        })
+    {
+        return Err("조정 대화가 선택한 프로젝트와 프로바이더에 속하지 않습니다.".to_string());
     }
     Ok(())
 }
@@ -3893,7 +4015,7 @@ async fn start_project_auto_hunt(
     project_id: String,
     mut request: agent::ProjectAutoHuntRequest,
 ) -> Result<agent::ProjectAutoHuntResponse, String> {
-    validate_project_auto_hunt_request(&request)?;
+    validate_project_auto_hunt_request(&project_id, &request)?;
     let api_url = request.api_url.trim();
     if api_url.is_empty()
         || api_url.chars().any(char::is_whitespace)
@@ -3926,6 +4048,7 @@ async fn start_project_auto_hunt(
         &request.session_id,
         &project_id,
         &request.agent_id,
+        request.coordinator_conversation_id.clone(),
         request.issues.len(),
     )?;
     emit_latest_auto_hunt_dispatch_event(&app, &created_dispatch);
@@ -4915,6 +5038,7 @@ pub fn run() {
             inspect_repository_readiness,
             connected_project_ids,
             project_llm_chat,
+            run_project_agent,
             run_project_agent_schedule,
             start_project_auto_hunt,
             load_auto_hunt_app_server_events,

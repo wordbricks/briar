@@ -135,6 +135,9 @@ export async function startProjectAutoHunt(
     ProjectAgent,
     "id" | "name" | "provider" | "model" | "responsibility" | "skill"
   >,
+  options: {
+    coordinatorConversationId?: string | null;
+  } = {},
 ): Promise<AutoHuntAgentResponse> {
   if (!isTauri()) {
     throw new Error("자동사냥은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
@@ -157,6 +160,7 @@ export async function startProjectAutoHunt(
       sessionId,
       apiUrl: briarApiUrl,
       agentId: agent.id,
+      coordinatorConversationId: options.coordinatorConversationId ?? null,
       agentName: agent.name,
       agentProvider: agent.provider,
       agentModel: agent.model,

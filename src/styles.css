@@ -1959,6 +1959,21 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .project-agent-dialog > footer .project-agent-submit { min-width:116px; border-color:#654bb8; color:#fff; background:#654bb8; }
 .project-agent-dialog > footer button:disabled { opacity:.55; cursor:not-allowed; }
 .project-agent-detail-back { margin-bottom:10px; }
+.project-agent-run-scroll { min-height:0; flex:1; overflow:auto; background:var(--background); }
+.project-agent-run-hero { min-height:190px; border-bottom:1px solid var(--border); border-radius:0; background:radial-gradient(circle at 82% 18%,rgba(50,117,213,.11),transparent 34%),linear-gradient(135deg,#fff 0%,#f8faff 100%); }
+.project-agent-run-panel { width:min(880px,calc(100% - 48px)); margin:28px auto 56px; display:grid; gap:18px; }
+.project-agent-run-panel > header { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.project-agent-run-messages { display:grid; gap:12px; }
+.project-agent-run-message { max-width:82%; padding:14px 16px; display:grid; gap:7px; border:1px solid var(--border); border-radius:16px; background:var(--card); box-shadow:var(--shadow-sm); }
+.project-agent-run-message.user { justify-self:end; border-color:#d9e5fa; background:#f3f7ff; }
+.project-agent-run-message.agent { justify-self:start; }
+.project-agent-run-message small { color:var(--muted-foreground); font-size:var(--text-2xs); font-weight:var(--font-weight-semibold); }
+.project-agent-run-message p { margin:0; white-space:pre-wrap; color:var(--foreground); font-size:var(--text-sm); line-height:var(--leading-lg); }
+.project-agent-run-message > span { width:max-content; }
+.project-agent-run-composer { padding:16px; display:grid; gap:12px; border:1px solid var(--border); border-radius:18px; background:var(--card); box-shadow:var(--shadow-sm); }
+.project-agent-run-composer textarea { min-height:120px; resize:vertical; }
+.project-agent-run-composer > div { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.project-agent-run-composer > div > span { max-width:560px; }
 .project-agent-settings-scroll { min-height:0; flex:1; overflow-y:auto; background:#fafaf8; }
 .project-agent-settings-content { width:min(760px,100%); margin:0 auto; padding:28px 36px 64px; }
 .project-agent-settings-back { margin-bottom:18px; }
@@ -2112,6 +2127,10 @@ button.issue-message-state { width:100%; cursor:pointer; }
   .project-agent-grid { grid-template-columns:1fr; }
   .project-agent-form-runtime { grid-template-columns:1fr; }
   .project-agent-dialog { width:calc(100vw - 28px); max-height:calc(100dvh - 28px); }
+  .project-agent-run-panel { width:calc(100% - 36px); margin-top:20px; }
+  .project-agent-run-message { max-width:94%; }
+  .project-agent-run-composer > div { align-items:stretch; flex-direction:column; }
+  .project-agent-run-composer > div > button { width:100%; }
 }
 @media (max-width:760px) {
   .initial-welcome-card { grid-template-columns:1fr; }

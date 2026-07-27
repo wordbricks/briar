@@ -283,6 +283,7 @@ export function useAutoHuntSessions(
     options: {
       agent: ProjectAgent;
       maxIssues?: number;
+      coordinatorConversationId?: string | null;
       trigger?: AutoHuntSession["trigger"];
     },
   ) => {
@@ -328,7 +329,9 @@ export function useAutoHuntSessions(
     sessionsRef.current = [session, ...sessionsRef.current];
     setSessions(sessionsRef.current);
 
-    void runner(projectId, candidates, session.id, options.agent)
+    void runner(projectId, candidates, session.id, options.agent, {
+      coordinatorConversationId: options.coordinatorConversationId,
+    })
       .then((response) => {
         const completedAt = new Date().toISOString();
         setSessions((current) => current.map((candidate) =>

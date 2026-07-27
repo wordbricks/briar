@@ -5,6 +5,33 @@ fetched remote base branch. Two runs never share a checkout, no run starts on
 another run's uncommitted files, and the connected repository checkout is only
 ever used as an object store — never edited by an agent.
 
+## Invocation boundary
+
+Opening a saved project agent does not start Auto Hunt. It starts one ordinary
+agent conversation in the connected project workspace:
+
+```text
+user starts an agent
+  └─ ordinary request → agent completes it in the same conversation
+  └─ explicit Auto Hunt request
+       └─ agent returns a structured dispatch request
+            └─ Briar host runtime claims runs, allocates worktrees,
+               starts workers, and monitors them
+```
+
+The agent cannot claim queue work or allocate an issue worktree during this
+initial turn. It may return `dispatch_auto_hunt` only when the user explicitly
+asks to start Auto Hunt or to process queued issues through Auto Hunt; merely
+mentioning, inspecting, or discussing an issue remains ordinary single-session
+work. The host validates the structured request and owns every subsequent
+queue, Git, and worker lifecycle operation.
+
+The initial conversation id is retained as the dispatch coordinator id. Once
+all workers terminate, the host resumes that same conversation in read-only
+mode with canonical worker reports. This makes the agent that requested the
+dispatch the agent that reports the aggregate result, without granting it
+control-plane access.
+
 ## Where things live
 
 | | Value |
@@ -138,12 +165,14 @@ startup marks any orphaned running group `interrupted` and preserves its
 run/worktree references for inspection. Server claim leases remain
 authoritative and make abandoned queued runs recoverable.
 
-After every child reaches a terminal state, Briar invokes the saved project
-agent once more as the dispatch coordinator. That turn is read-only, receives
-the canonical worker reports, and may only produce the user-facing aggregate
-summary; it cannot change outcomes, claim work, or edit a checkout. If the
-coordinator summary fails, the runtime preserves all worker results and falls
-back to a deterministic count summary.
+After every child reaches a terminal state, Briar resumes the saved project
+agent conversation that requested the dispatch. This coordinator turn is
+read-only, receives the canonical worker reports, and may only produce the
+user-facing aggregate summary; it cannot change outcomes, claim work, or edit a
+checkout. Direct Auto Hunt launches that have no initial conversation still
+create a fresh coordinator conversation. If the coordinator summary fails, the
+runtime preserves all worker results and falls back to a deterministic count
+summary.
 
 ## Operating it
 
