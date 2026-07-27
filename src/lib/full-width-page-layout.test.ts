@@ -12,6 +12,9 @@ describe("full-width application pages", () => {
       /\.auto-hunt-scroll \{[^}]*padding:0;[^}]*display:flex;[^}]*overflow:hidden;/,
     );
     expect(styles).toMatch(
+      /\.auto-hunt-session-detail-scroll \{[^}]*padding:0;[^}]*display:block;[^}]*overflow-y:auto;/,
+    );
+    expect(styles).toMatch(
       /\.auto-hunt-hero \{[^}]*border:0;[^}]*border-bottom:1px solid var\(--border\);[^}]*border-radius:0;[^}]*box-shadow:none;/,
     );
     expect(styles).toMatch(
