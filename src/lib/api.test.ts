@@ -4,10 +4,12 @@ import {
   completeProjectAgentScheduleRun,
   createProjectAgent,
   createProjectAgentSchedule,
+  deleteProjectAgentSchedule,
   loadProjectAgentScheduleRuns,
   loadProjectAgents,
   loadSession,
   updateProjectAgent,
+  updateProjectAgentSchedule,
 } from "./api";
 
 afterEach(() => {
@@ -243,6 +245,66 @@ describe("API errors", () => {
         "/projects/22222222-2222-4222-8222-222222222222/agent-schedules",
       ),
       expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("updates and deletes an agent schedule through its scoped endpoint", async () => {
+    const projectId = "22222222-2222-4222-8222-222222222222";
+    const scheduleId = "11111111-1111-4111-8111-111111111111";
+    const agentId = "33333333-3333-4333-8333-333333333333";
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(
+        async (_input: RequestInfo | URL, init?: RequestInit) => {
+          const input = JSON.parse(String(init?.body));
+          return new Response(
+            JSON.stringify({
+              schedule: {
+                id: scheduleId,
+                projectId,
+                agentId,
+                agentName: "Release agent",
+                agentProvider: "codex",
+                ...input,
+                enabled: true,
+                createdAt: "2026-07-27T00:00:00.000Z",
+                updatedAt: "2026-07-27T01:00:00.000Z",
+              },
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        },
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const input = {
+      agentId,
+      name: "Weekly release review",
+      recurrence: "weekly" as const,
+      timeOfDay: "16:30",
+      dayOfWeek: 5,
+      timeZone: "Asia/Seoul",
+    };
+    await expect(
+      updateProjectAgentSchedule("token", projectId, scheduleId, input),
+    ).resolves.toMatchObject(input);
+    await expect(
+      deleteProjectAgentSchedule("token", projectId, scheduleId),
+    ).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining(
+        `/projects/${projectId}/agent-schedules/${scheduleId}`,
+      ),
+      expect.objectContaining({ method: "PUT" }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining(
+        `/projects/${projectId}/agent-schedules/${scheduleId}`,
+      ),
+      expect.objectContaining({ method: "DELETE" }),
     );
   });
 

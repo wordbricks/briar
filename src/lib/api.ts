@@ -28,6 +28,7 @@ import type {
   ProjectSettings,
   SessionUser,
   UpdateProjectAgentInput,
+  UpdateProjectAgentScheduleInput,
 } from "../types";
 
 const apiUrl = import.meta.env.VITE_BRIAR_API_URL?.replace(/\/$/u, "") ?? "";
@@ -425,6 +426,35 @@ export async function createProjectAgentSchedule(
     },
   );
   return projectAgentScheduleSchema.parse(result.schedule);
+}
+
+export async function updateProjectAgentSchedule(
+  token: string,
+  projectId: string,
+  scheduleId: string,
+  input: UpdateProjectAgentScheduleInput,
+): Promise<ProjectAgentSchedule> {
+  const result = await request<{ schedule: unknown }>(
+    `/projects/${projectId}/agent-schedules/${scheduleId}`,
+    token,
+    {
+      method: "PUT",
+      body: JSON.stringify(input),
+    },
+  );
+  return projectAgentScheduleSchema.parse(result.schedule);
+}
+
+export async function deleteProjectAgentSchedule(
+  token: string,
+  projectId: string,
+  scheduleId: string,
+) {
+  return request<void>(
+    `/projects/${projectId}/agent-schedules/${scheduleId}`,
+    token,
+    { method: "DELETE" },
+  );
 }
 
 export async function loadProjectAgentScheduleRuns(

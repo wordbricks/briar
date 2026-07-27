@@ -741,6 +741,102 @@ export async function createProjectAgentSchedule(
     .first<ProjectAgentScheduleRow>();
 }
 
+export async function updateProjectAgentSchedule(
+  db: D1Database,
+  projectId: string,
+  scheduleId: string,
+  input: {
+    agentId: string;
+    name: string;
+    recurrence: ProjectAgentScheduleRecurrence;
+    timeOfDay: string;
+    dayOfWeek: number | null;
+    timeZone: string;
+  },
+) {
+  const observedAt = new Date().toISOString();
+  const nextRunAt = nextProjectAgentScheduleRunAt(
+    {
+      recurrence: input.recurrence,
+      timeOfDay: input.timeOfDay,
+      dayOfWeek: input.dayOfWeek,
+      timeZone: input.timeZone,
+    },
+    new Date(Date.parse(observedAt) - 60_000),
+  );
+  const updated = await db
+    .prepare(
+      `update briar_project_agent_schedules
+       set agent_id = ?, name = ?, recurrence = ?, time_of_day = ?,
+           day_of_week = ?, time_zone = ?, next_run_at = ?, updated_at = ?
+       where id = ? and project_id = ?
+         and exists (
+           select 1 from briar_project_agents agent
+           where agent.id = ? and agent.project_id = ?
+         )
+       returning id`,
+    )
+    .bind(
+      input.agentId,
+      input.name,
+      input.recurrence,
+      input.timeOfDay,
+      input.dayOfWeek,
+      input.timeZone,
+      nextRunAt,
+      observedAt,
+      scheduleId,
+      projectId,
+      input.agentId,
+      projectId,
+    )
+    .first<{ id: string }>();
+  if (!updated) return null;
+  return db
+    .prepare(
+      `select schedule.id, schedule.project_id, schedule.agent_id,
+              agent.name as agent_name, agent.provider as agent_provider,
+              schedule.name, schedule.recurrence, schedule.time_of_day,
+              schedule.day_of_week, schedule.time_zone, schedule.enabled,
+              schedule.next_run_at,
+              schedule.created_at, schedule.updated_at
+       from briar_project_agent_schedules schedule
+       join briar_project_agents agent on agent.id = schedule.agent_id
+       where schedule.id = ? and schedule.project_id = ?`,
+    )
+    .bind(scheduleId, projectId)
+    .first<ProjectAgentScheduleRow>();
+}
+
+export async function deleteProjectAgentSchedule(
+  db: D1Database,
+  projectId: string,
+  scheduleId: string,
+): Promise<"deleted" | "running" | "not_found"> {
+  const result = await db
+    .prepare(
+      `delete from briar_project_agent_schedules
+       where id = ? and project_id = ?
+         and not exists (
+           select 1 from briar_project_agent_schedule_runs run
+           where run.schedule_id = briar_project_agent_schedules.id
+             and run.project_id = briar_project_agent_schedules.project_id
+             and run.status = 'running'
+         )`,
+    )
+    .bind(scheduleId, projectId)
+    .run();
+  if (result.meta.changes === 1) return "deleted";
+  const schedule = await db
+    .prepare(
+      `select id from briar_project_agent_schedules
+       where id = ? and project_id = ?`,
+    )
+    .bind(scheduleId, projectId)
+    .first<{ id: string }>();
+  return schedule ? "running" : "not_found";
+}
+
 const scheduleRunSelect = `
   select run.id, run.project_id, run.schedule_id,
          schedule.name as schedule_name,
