@@ -44,6 +44,22 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("이슈 만들기");
   });
 
+  it("shows a safe projectless state after onboarding is deferred", () => {
+    const markup = renderToStaticMarkup(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={null}
+        noProject
+        onAddProject={() => undefined}
+      />,
+    );
+
+    expect(markup).toContain("아직 프로젝트가 없습니다.");
+    expect(markup).toContain("프로젝트 만들기");
+    expect(markup).not.toContain("이슈 만들기");
+    expect(markup).not.toContain("자동사냥 칸반 보드");
+  });
+
   it("uses the kanban as the full dashboard surface", () => {
     const markup = renderToStaticMarkup(
       <HuntDashboard

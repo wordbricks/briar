@@ -50,6 +50,7 @@ type Props = {
   ) => Promise<unknown>;
   onCreate: (input: { name: string }) => Promise<unknown>;
   onLogout: () => void;
+  onSkip: () => void;
   onRepositorySelect: () => Promise<string | null>;
   onRepositoryInspect: (
     repositoryPath: string,
@@ -74,6 +75,7 @@ export function ProjectOnboarding({
   onConnect,
   onCreate,
   onLogout,
+  onSkip,
   onRepositorySelect,
   onRepositoryInspect,
   onWorkspaceCreate,
@@ -539,6 +541,14 @@ export function ProjectOnboarding({
                   ? t("onboarding.creating")
                   : t("onboarding.createProject")} <ArrowRight size={17} />
               </button>
+              {!canCancel ? (
+                <div className="onboarding-skip">
+                  <button onClick={onSkip} type="button">
+                    {t("onboarding.skipProject")}
+                  </button>
+                  <p>{t("onboarding.skipProjectDescription")}</p>
+                </div>
+              ) : null}
             </form>
           </>
         )}
