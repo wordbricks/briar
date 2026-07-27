@@ -62,6 +62,9 @@ order, and signed provenance contract are documented in
 [`production-release.md`](production-release.md). Incident response and SLOs
 live in [`incident-runbook.md`](incident-runbook.md).
 
+iOS TestFlight uploads and their final App Store Connect states are recorded in
+[`ios-testflight-releases.md`](ios-testflight-releases.md).
+
 ## Rollback
 
 - Worker: redeploy a known-good main SHA or use `wrangler rollback`.
