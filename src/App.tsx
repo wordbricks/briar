@@ -141,6 +141,7 @@ export function App() {
   const [requestedSessionId, setRequestedSessionId] = useState<string | null>(
     null,
   );
+  const [isIssueDialogOpen, setIsIssueDialogOpen] = useState(false);
   const [companionPage, setCompanionPage] = useState<
     "issues" | "search" | "inbox" | "session" | "settings"
   >("issues");
@@ -402,6 +403,10 @@ export function App() {
             onScheduleOpen={() => navigateToPage("schedule")}
             onInboxOpen={() => navigateToPage("inbox")}
             onIssuesOpen={() => navigateToPage("issues")}
+            onCreateIssue={() => {
+              navigateToPage("issues");
+              setIsIssueDialogOpen(true);
+            }}
             onAddOrganization={() => navigateToPage("organization-create")}
             onOrganizationChange={(organizationId) => {
               briar.setActiveOrganizationId(organizationId);
@@ -609,6 +614,7 @@ export function App() {
             dashboard={briar.dashboard}
             error={briar.error}
             isCreatingIssue={briar.isCreatingIssue}
+            isIssueDialogOpen={isIssueDialogOpen}
             updatingIssueId={briar.updatingIssueId}
             needsLocalConnection={!briar.isActiveProjectConnectedLocally}
             noProject={!activeProject}
@@ -619,6 +625,7 @@ export function App() {
             onConnectRepository={briar.reconnectProject}
             onAddProject={briar.startProjectCreation}
             onCreateIssue={briar.addIssue}
+            onIssueDialogOpenChange={setIsIssueDialogOpen}
             onUpdateIssue={briar.editIssue}
             onLoadAttachment={briar.readIssueAttachment}
             onLoadIssueMessages={briar.readIssueMessages}
@@ -774,6 +781,7 @@ export function App() {
             dashboard={briar.dashboard}
             error={briar.error}
             isCreatingIssue={briar.isCreatingIssue}
+            isIssueDialogOpen={isIssueDialogOpen}
             updatingIssueId={briar.updatingIssueId}
             recoveringRunId={briar.recoveringRunId}
             recoveryError={briar.recoveryError}
@@ -786,6 +794,7 @@ export function App() {
               setCompanionPage("issues");
             }}
             onCreateIssue={briar.addIssue}
+            onIssueDialogOpenChange={setIsIssueDialogOpen}
             onUpdateIssue={briar.editIssue}
             onLoadAttachment={briar.readIssueAttachment}
             onLoadIssueMessages={briar.readIssueMessages}

@@ -18,6 +18,7 @@ const sidebarProps = {
   onScheduleOpen: () => undefined,
   onInboxOpen: () => undefined,
   onIssuesOpen: () => undefined,
+  onCreateIssue: () => undefined,
   onAddOrganization: () => undefined,
   onLogout: () => undefined,
   onOrganizationChange: () => undefined,
@@ -68,6 +69,8 @@ describe("Sidebar", () => {
     expect(markup).toContain('aria-haspopup="menu"');
     expect(markup).toContain('aria-label="계정 메뉴"');
     expect(markup).toContain("이슈");
+    expect(markup).toContain('class="sidebar-issue-add"');
+    expect(markup).toContain('aria-label="이슈 만들기"');
     expect(markup).toContain("에이전트");
     expect(markup).toContain("스케줄");
     expect(markup).toContain("받은 편지함");
@@ -76,6 +79,29 @@ describe("Sidebar", () => {
     expect(markup).not.toContain('href="#help"');
     expect(markup).toContain('aria-label="Briar 프로젝트 메뉴"');
     expect(markup).not.toContain("<select");
+  });
+
+  it("opens issue creation from the Issues row action", async () => {
+    const onCreateIssue = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <Sidebar {...sidebarProps} onCreateIssue={onCreateIssue} />,
+      );
+    });
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".sidebar-issue-add")
+        ?.click();
+    });
+
+    expect(onCreateIssue).toHaveBeenCalledOnce();
+
+    await act(async () => root.unmount());
+    container.remove();
   });
 
   it("switches organizations from the brand control", async () => {
