@@ -127,7 +127,10 @@ xcrun stapler validate src-tauri/target/release/bundle/macos/Briar.app
 
 Tauri requires every updater archive to carry a signature; signature checks
 cannot be disabled. The app exposes an explicit update check and only installs
-archives accepted by its compiled public key.
+archives accepted by its compiled public key. After the updater relaunches the
+new app, desktop startup compares the installed Briar CLI and Auto Hunt skill
+versions with the new bundle and synchronizes stale or missing local assets
+before the main interface loads.
 
 References: [Tauri updater](https://v2.tauri.app/plugin/updater/),
 [macOS signing and notarization](https://v2.tauri.app/distribute/sign/macos/),

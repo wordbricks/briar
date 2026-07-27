@@ -2715,6 +2715,39 @@ fn read_trimmed_file(path: &Path) -> Option<String> {
         .filter(|value| !value.is_empty())
 }
 
+fn auto_hunt_assets_are_current(resource_directory: &Path, home: &Path) -> bool {
+    let cli_directory = home.join(".local").join("share").join("briar");
+    let cli_current = home.join(".local").join("bin").join("briar").is_file()
+        && cli_directory.join("briar.js").is_file()
+        && read_trimmed_file(&cli_directory.join("VERSION")).as_deref()
+            == Some(env!("CARGO_PKG_VERSION"));
+    if !cli_current {
+        return false;
+    }
+
+    let skill_source = bundled_path(
+        resource_directory,
+        "skills/briar-auto-hunt",
+        "skills/briar-auto-hunt",
+    );
+    let expected_version = read_trimmed_file(&skill_source.join("VERSION"))
+        .unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string());
+    [".codex", ".claude", ".grok"].iter().all(|directory| {
+        let skill = home.join(directory).join("skills").join("briar-auto-hunt");
+        skill.join("SKILL.md").is_file()
+            && read_trimmed_file(&skill.join("VERSION")).as_deref()
+                == Some(expected_version.as_str())
+    })
+}
+
+fn sync_auto_hunt_assets(resource_directory: &Path, home: &Path) -> Result<bool, String> {
+    if auto_hunt_assets_are_current(resource_directory, home) {
+        return Ok(false);
+    }
+    install_auto_hunt_assets(resource_directory, home)?;
+    Ok(true)
+}
+
 fn read_trimmed_file_on(runner: &dyn host::CommandRunner, path: &Path) -> Option<String> {
     let shell = runner.resolve_binary("sh").ok()?;
     let output = runner
@@ -3862,6 +3895,16 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build());
     builder
         .setup(|_app| {
+            #[cfg(desktop)]
+            {
+                let resource_directory = _app.path().resource_dir()?;
+                let home = _app.path().home_dir()?;
+                if let Err(error) = sync_auto_hunt_assets(&resource_directory, &home) {
+                    eprintln!(
+                        "Briar CLI and Auto Hunt skill automatic synchronization failed: {error}"
+                    );
+                }
+            }
             #[cfg(all(target_os = "macos", not(dev)))]
             if let Some(main) = _app.get_webview_window("main") {
                 main.hide()?;
@@ -4758,6 +4801,32 @@ branch refs/heads/briar/second-11111111
             .join(".claude/skills/briar-auto-hunt/SKILL.md")
             .is_file());
         assert!(home.join(".grok/skills/briar-auto-hunt/SKILL.md").is_file());
+        assert_eq!(
+            read_trimmed_file(&home.join(".codex/skills/briar-auto-hunt/VERSION")),
+            Some(env!("CARGO_PKG_VERSION").to_string())
+        );
+        assert!(
+            !sync_auto_hunt_assets(&resources, &home).expect("current assets should be checked")
+        );
+
+        fs::write(home.join(".local/share/briar/VERSION"), "0.0.0\n")
+            .expect("CLI version should be made stale");
+        assert!(
+            sync_auto_hunt_assets(&resources, &home).expect("stale assets should be synchronized")
+        );
+        assert_eq!(
+            read_trimmed_file(&home.join(".local/share/briar/VERSION")),
+            Some(env!("CARGO_PKG_VERSION").to_string())
+        );
+
+        fs::write(
+            home.join(".codex/skills/briar-auto-hunt/VERSION"),
+            "0.0.0\n",
+        )
+        .expect("skill version should be made stale");
+        assert!(
+            sync_auto_hunt_assets(&resources, &home).expect("stale skill should be synchronized")
+        );
         assert_eq!(
             read_trimmed_file(&home.join(".codex/skills/briar-auto-hunt/VERSION")),
             Some(env!("CARGO_PKG_VERSION").to_string())
