@@ -338,12 +338,12 @@ body { overflow: hidden; font-synthesis: none; }
 .project-settings-scroll > .project-settings-card,
 .project-settings-scroll > .project-settings-linear,
 .project-settings-scroll > .project-settings-import-panel,
-.project-settings-scroll > .project-settings-auto-run,
+.project-settings-scroll > .project-settings-agent-configuration,
 .project-settings-scroll > .project-settings-automation,
 .project-settings-scroll > .project-remote-connection,
 .project-settings-scroll > .project-settings-danger { width:min(720px,100%); margin-left:auto; margin-right:auto; }
 .project-settings-scroll > .project-settings-linear,
-.project-settings-scroll > .project-settings-auto-run,
+.project-settings-scroll > .project-settings-agent-configuration,
 .project-settings-scroll > .project-settings-automation,
 .project-settings-scroll > .project-remote-connection { margin-top:16px; }
 .project-remote-connection { padding:22px; border:1px solid var(--border); border-radius:calc(var(--radius) + 6px); background:var(--card); box-shadow:var(--shadow-sm); }
@@ -475,28 +475,9 @@ body { overflow: hidden; font-synthesis: none; }
 .project-settings-linear-import-success { display:flex; align-items:center; gap:7px; margin:0; padding:10px 12px; border-radius:10px; color:#1f6b4a; background:#e8f8f0; font-size:var(--text-2xs); font-weight:600; }
 .project-settings-linear-import-truncated { margin:0; color:#9a6b1f; font-size:var(--text-2xs); }
 .project-settings-linear-import-footnote { margin:12px 0 0; color:#9a9ba8; font-size:var(--text-2xs); }
-.project-settings-auto-run { margin-top:18px; padding:20px; border:1px solid #d9d2ef; border-radius:15px; background:linear-gradient(145deg,#fff 0%,#fbf9ff 100%); box-shadow:0 5px 18px rgba(38,42,32,.035); }
-.project-settings-auto-run > header { display:flex; align-items:flex-start; gap:11px; }
-.project-settings-auto-run > header > span:nth-child(2) { min-width:0; display:grid; gap:5px; }
-.project-settings-auto-run > header strong { color:#40384f; font-size:var(--text-xs); }
-.project-settings-auto-run > header small { color:#827b8d; font-size:var(--text-2xs); line-height:1.5; }
-.project-settings-auto-run-icon { width:32px; height:32px; flex:0 0 32px; display:grid; place-items:center; border-radius:9px; color:#6b4fc1; background:#eee8ff; }
 .project-settings-toggle { margin-left:auto; display:flex; align-items:center; gap:7px; color:#665a78; font-size:var(--text-2xs); font-weight:600; cursor:pointer; }
-.project-settings-toggle input,.project-settings-auto-run-condition-check input { width:15px; height:15px; margin:0; accent-color:#684dbc; }
-.project-settings-auto-run-rules { margin-top:18px; display:grid; gap:9px; }
-.project-settings-auto-run-rules > label:first-child { min-height:58px; padding:10px 12px; display:grid; grid-template-columns:minmax(0,1fr) 74px; align-items:center; gap:4px 12px; border:1px solid #e3dff0; border-radius:10px; background:var(--card); }
-.project-settings-auto-run-rules > label:first-child > span { color:#4d4856; font-size:var(--text-2xs); font-weight:600; }
-.project-settings-auto-run-rules > label:first-child > small { grid-column:1; color:#96909e; font-size:var(--text-2xs); }
-.project-settings-auto-run input[type="number"] { width:74px; height:32px; padding:0 8px; border:1px solid #d9d4e4; border-radius:8px; color:#494451; background:var(--card); font:600 var(--text-2xs) "DM Mono",monospace; }
-.project-settings-auto-run input:focus-visible { outline:2px solid #8b70dd; outline-offset:1px; }
-.project-settings-auto-run input:disabled { color:#aaa5af; background:#f3f1f5; cursor:not-allowed; }
-.project-settings-auto-run-condition { min-height:58px; padding:10px 12px; display:grid; grid-template-columns:minmax(0,1fr) 74px 34px; align-items:center; gap:8px; border:1px solid #e7e3ed; border-radius:10px; background:rgba(255,255,255,.82); }
-.project-settings-auto-run-condition-check { min-width:0; display:flex; align-items:center; gap:10px; cursor:pointer; }
-.project-settings-auto-run-condition-check > span { min-width:0; display:grid; gap:4px; }
-.project-settings-auto-run-condition-check strong { color:#4d4856; font-size:var(--text-2xs); }
-.project-settings-auto-run-condition-check small { color:#96909e; font-size:var(--text-2xs); line-height:1.45; }
-.project-settings-auto-run-condition > em { color:#898391; font-size:var(--text-2xs); font-style:normal; }
-.project-settings-sandbox { margin-top:12px; padding:12px; display:flex; align-items:center; gap:10px; border:1px solid #d9e5df; border-radius:10px; background:#f8fcfa; }
+.project-settings-toggle input { width:15px; height:15px; margin:0; accent-color:#684dbc; }
+.project-settings-sandbox { padding:16px; display:flex; align-items:center; gap:10px; border:1px solid #d9e5df; border-radius:12px; background:#f8fcfa; box-shadow:0 5px 18px rgba(38,42,32,.035); }
 .project-settings-sandbox.unrestricted { border-color:#ead9b9; background:#fffaf0; }
 .project-settings-sandbox-icon { width:30px; height:30px; flex:0 0 30px; display:grid; place-items:center; border-radius:8px; color:#39745f; background:#e5f3ed; }
 .project-settings-sandbox.unrestricted .project-settings-sandbox-icon { color:#9a6515; background:#fff0cf; }
@@ -504,11 +485,6 @@ body { overflow: hidden; font-synthesis: none; }
 .project-settings-sandbox strong { color:#4d4856; font-size:var(--text-2xs); }
 .project-settings-sandbox small { color:#88818e; font-size:var(--text-2xs); line-height:1.5; }
 .project-settings-sandbox-error { margin:8px 0 0; color:#a33d4e; font-size:var(--text-2xs); }
-.project-settings-auto-run > footer { margin-top:13px; display:flex; align-items:center; justify-content:space-between; gap:16px; }
-.project-settings-auto-run > footer p { margin:0; color:#8b8593; font-size:var(--text-2xs); line-height:1.55; }
-.project-settings-auto-run > footer button { min-width:88px; height:34px; padding:0 12px; display:flex; align-items:center; justify-content:center; gap:6px; border:1px solid #6d52c7; border-radius:9px; color:#fff; background:#6d52c7; cursor:pointer; font-size:var(--text-2xs); font-weight:600; }
-.project-settings-auto-run > footer button:disabled { border-color:#dedbe7; color:#98939f; background:#f1eff5; cursor:default; }
-.project-settings-auto-run-error { margin:10px 0 0; color:#a33d4e; font-size:var(--text-2xs); }
 .project-settings-automation { margin-top:18px; padding:20px; border:1px solid var(--border); border-radius:15px; background:var(--card); box-shadow:0 5px 18px rgba(38,42,32,.035); }
 .project-settings-automation > header { display:flex; align-items:flex-start; gap:11px; }
 .project-settings-automation > header > span:nth-child(2) { min-width:0; display:grid; gap:5px; }

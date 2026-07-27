@@ -547,9 +547,6 @@ export function App() {
               resetNavigation("issues");
             }}
             onRegenerateWorkflow={() => briar.regenerateWorkflow(activeProject.id)}
-            onUpdateAutomation={(automation) =>
-              briar.saveAutoHuntAutomation(activeProject.id, automation)
-            }
             onUpdateVelenOrg={(org) =>
               briar.saveVelenIntegration(activeProject.id, org)
             }
