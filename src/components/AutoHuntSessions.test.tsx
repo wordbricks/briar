@@ -62,6 +62,7 @@ describe("AutoHuntSessions", () => {
           provider: "codex",
           model: null,
           responsibility: "Process queued issues.",
+          calendarColor: "#3275d5",
           kind: "auto_hunt",
           createdAt: "2026-07-22T00:00:00Z",
           updatedAt: "2026-07-22T00:00:00Z",

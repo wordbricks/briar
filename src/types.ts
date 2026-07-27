@@ -134,6 +134,7 @@ export type ProjectAgent = {
   provider: AgentProvider;
   model: string | null;
   responsibility: string;
+  calendarColor: string;
   kind: "auto_hunt" | "custom";
   createdAt: string;
   updatedAt: string;
@@ -144,6 +145,7 @@ export type CreateProjectAgentInput = {
   provider: AgentProvider;
   model: string | null;
   responsibility: string;
+  calendarColor: string;
 };
 
 export type ProjectAgentSchedule = {

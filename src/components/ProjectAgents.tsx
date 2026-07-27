@@ -21,6 +21,7 @@ import {
   type AgentProvider,
 } from "../lib/project-llm";
 import { demoProjectAgents } from "../lib/demo-project-agents";
+import { defaultProjectAgentCalendarColor } from "../lib/project-agent";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import type {
   CreateProjectAgentInput,
@@ -128,6 +129,7 @@ export function ProjectAgents({
             provider: input.provider,
             model: input.model,
             responsibility: input.responsibility,
+            calendarColor: input.calendarColor,
             kind: "custom" as const,
             createdAt,
             updatedAt: createdAt,
@@ -293,6 +295,12 @@ export function ProjectAgents({
                         <span>
                           {modelLabel(agent, t("agents.providerDefaultModel"))}
                         </span>
+                        <i
+                          aria-hidden="true"
+                          className="project-agent-calendar-color"
+                          style={{ backgroundColor: agent.calendarColor }}
+                        />
+                        <span>{t("agents.calendarColor")}</span>
                       </div>
                       <section>
                         <small>{t("agents.responsibility")}</small>
@@ -368,6 +376,9 @@ export function ProjectAgentDialog({
   const [responsibility, setResponsibility] = useState(
     agent?.responsibility ?? "",
   );
+  const [calendarColor, setCalendarColor] = useState(
+    agent?.calendarColor ?? defaultProjectAgentCalendarColor,
+  );
   const [submitError, setSubmitError] = useState<string | null>(null);
   const isEditing = agent !== null;
 
@@ -393,6 +404,7 @@ export function ProjectAgentDialog({
             provider,
             model: model || null,
             responsibility: responsibility.trim(),
+            calendarColor,
           }).catch((caught) => {
             setSubmitError(
               caught instanceof Error ? caught.message : String(caught),
@@ -484,6 +496,21 @@ export function ProjectAgentDialog({
               value={responsibility}
             />
             <small>{t("agents.responsibilityHint")}</small>
+          </label>
+          <label className="project-agent-color-field">
+            <span>
+              {t("agents.calendarColor")} <em>{t("common.required")}</em>
+            </span>
+            <div>
+              <input
+                aria-label={t("agents.calendarColor")}
+                onChange={(event) => setCalendarColor(event.target.value)}
+                type="color"
+                value={calendarColor}
+              />
+              <code>{calendarColor.toUpperCase()}</code>
+            </div>
+            <small>{t("agents.calendarColorHint")}</small>
           </label>
           {submitError && (
             <div className="project-agent-form-error" role="alert">

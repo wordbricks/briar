@@ -14,6 +14,7 @@ const agent: ProjectAgent = {
   provider: "codex",
   model: null,
   responsibility: "Run the queued issue workflow.",
+  calendarColor: "#3275d5",
   kind: "auto_hunt",
   createdAt: "2026-07-27T00:00:00.000Z",
   updatedAt: "2026-07-27T00:00:00.000Z",

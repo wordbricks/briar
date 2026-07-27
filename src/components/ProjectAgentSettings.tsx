@@ -55,11 +55,13 @@ export function ProjectAgentSettings({
   const [provider, setProvider] = useState<AgentProvider>(agent.provider);
   const [model, setModel] = useState(agent.model ?? "");
   const [responsibility, setResponsibility] = useState(agent.responsibility);
+  const [calendarColor, setCalendarColor] = useState(agent.calendarColor);
   const [savedProfile, setSavedProfile] = useState({
     name: agent.name,
     provider: agent.provider,
     model: agent.model ?? "",
     responsibility: agent.responsibility,
+    calendarColor: agent.calendarColor,
   });
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
@@ -119,7 +121,8 @@ export function ProjectAgentSettings({
     name !== savedProfile.name ||
     provider !== savedProfile.provider ||
     model !== savedProfile.model ||
-    responsibility !== savedProfile.responsibility;
+    responsibility !== savedProfile.responsibility ||
+    calendarColor !== savedProfile.calendarColor;
   const runtimeChanged =
     runtimeProvider !== savedRuntime.provider ||
     runtimeModel !== savedRuntime.model ||
@@ -141,17 +144,20 @@ export function ProjectAgentSettings({
         provider,
         model: model || null,
         responsibility: responsibility.trim(),
+        calendarColor,
       });
       const nextProfile = {
         name: saved.name,
         provider: saved.provider,
         model: saved.model ?? "",
         responsibility: saved.responsibility,
+        calendarColor: saved.calendarColor,
       };
       setName(nextProfile.name);
       setProvider(nextProfile.provider);
       setModel(nextProfile.model);
       setResponsibility(nextProfile.responsibility);
+      setCalendarColor(nextProfile.calendarColor);
       setSavedProfile(nextProfile);
     } catch (caught) {
       setProfileError(caught instanceof Error ? caught.message : String(caught));
@@ -290,6 +296,19 @@ export function ProjectAgentSettings({
                   value={responsibility}
                 />
                 <small>{t("agents.responsibilityHint")}</small>
+              </label>
+              <label className="project-agent-color-field">
+                <span>{t("agents.calendarColor")}</span>
+                <div>
+                  <input
+                    aria-label={t("agents.calendarColor")}
+                    onChange={(event) => setCalendarColor(event.target.value)}
+                    type="color"
+                    value={calendarColor}
+                  />
+                  <code>{calendarColor.toUpperCase()}</code>
+                </div>
+                <small>{t("agents.calendarColorHint")}</small>
               </label>
             </div>
 
