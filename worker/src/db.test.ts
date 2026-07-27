@@ -19,6 +19,7 @@ import {
   createProjectAgentSchedule,
   createProject,
   createIssueAttachments,
+  deleteIssue,
   deleteProjectAgentSchedule,
   deleteProject,
   getProject,
@@ -1480,6 +1481,59 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         updated_at: atMinute(19),
       }),
     );
+  });
+
+  it("deletes an issue and cascades its stored records", async () => {
+    const sourceKey = "deletable-issue";
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("cancelled", 19, {
+        sourceKey,
+        eventKey: `${sourceKey}:cancelled`,
+        title: "Delete this issue",
+      }),
+    );
+    const attachmentId = "44444444-4444-4444-8444-444444444444";
+    await createIssueAttachments(db, projectId, runId, [
+      {
+        id: attachmentId,
+        object_key: `issue-attachments/${projectId}/${runId}/${attachmentId}`,
+        filename: "delete-me.png",
+        content_type: "image/png",
+        byte_size: 128,
+      },
+    ]);
+
+    await expect(deleteIssue(db, projectId, runId, atMinute(20))).resolves.toBe(
+      "deleted",
+    );
+    expect(await getHuntRunForProject(db, projectId, runId)).toBeNull();
+    expect(await listIssueAttachments(db, projectId, runId)).toEqual([]);
+    expect(
+      await db
+        .prepare("select count(*) as count from briar_hunt_events where run_id = ?")
+        .bind(runId)
+        .first<number>("count"),
+    ).toBe(0);
+  });
+
+  it("does not delete an active issue", async () => {
+    const sourceKey = "active-delete-guard";
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("analyzing", 20, {
+        sourceKey,
+        eventKey: `${sourceKey}:analyzing`,
+        title: "Active issue",
+      }),
+    );
+
+    await expect(deleteIssue(db, projectId, runId, atMinute(21))).resolves.toBe(
+      "active",
+    );
+    expect(await getHuntRunForProject(db, projectId, runId)).not.toBeNull();
   });
 
   it("returns the highest-priority oldest queued run", async () => {

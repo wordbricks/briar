@@ -22,6 +22,7 @@ import {
   ListFilter,
   LoaderCircle,
   MessageCircle,
+  MoreHorizontal,
   Paperclip,
   Pencil,
   Plus,
@@ -37,12 +38,21 @@ import {
   Video,
   X,
 } from "lucide-react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
   EmptyState,
   ErrorBanner,
   MainContent,
 } from "@/components/layout";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Typography } from "@/components/ui/typography";
 import {
@@ -107,6 +117,7 @@ export function HuntDashboard({
   dashboard,
   error,
   isCreatingIssue,
+  deletingIssueId,
   updatingIssueId,
   needsLocalConnection = false,
   noProject = false,
@@ -116,6 +127,7 @@ export function HuntDashboard({
   onConnectRepository,
   onAddProject,
   onCreateIssue,
+  onDeleteIssue,
   onUpdateIssue,
   onLoadAttachment,
   onLoadIssueMessages,
@@ -136,6 +148,7 @@ export function HuntDashboard({
   dashboard: DashboardPayload | null;
   error: string | null;
   isCreatingIssue: boolean;
+  deletingIssueId: string | null;
   updatingIssueId: string | null;
   needsLocalConnection?: boolean;
   noProject?: boolean;
@@ -145,6 +158,7 @@ export function HuntDashboard({
   onConnectRepository?: () => void;
   onAddProject?: () => void;
   onCreateIssue: (input: CreateIssueInput) => Promise<unknown>;
+  onDeleteIssue: (runId: string) => Promise<unknown>;
   onUpdateIssue: (runId: string, input: UpdateIssueInput) => Promise<unknown>;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onLoadIssueMessages: (runId: string) => Promise<IssueMessage[]>;
@@ -341,11 +355,16 @@ export function HuntDashboard({
       <RunPage
         companionMode={companionMode}
         error={recoveryError}
+        isDeletingIssue={deletingIssueId === selected.id}
         isRecovering={recoveringRunId === selected.id}
         isUpdatingIssue={updatingIssueId === selected.id}
         isSidebarOpen={isSidebarOpen}
         onBack={() => setSelectedRunId(null)}
         onCancel={() => onCancelRun(selected.id)}
+        onDelete={async () => {
+          await onDeleteIssue(selected.id);
+          setSelectedRunId(null);
+        }}
         onLoadAttachment={onLoadAttachment}
         onLoadIssueMessages={() => onLoadIssueMessages(selected.id)}
         onMove={(placement) => onMoveRun(selected.id, placement)}
@@ -1250,11 +1269,13 @@ function IssueList({
 export function RunPage({
   companionMode = false,
   error,
+  isDeletingIssue = false,
   isRecovering,
   isUpdatingIssue = false,
   isSidebarOpen,
   onBack,
   onCancel,
+  onDelete,
   onLoadAttachment,
   onLoadIssueMessages,
   onMove,
@@ -1265,11 +1286,13 @@ export function RunPage({
 }: {
   companionMode?: boolean;
   error: string | null;
+  isDeletingIssue?: boolean;
   isRecovering: boolean;
   isUpdatingIssue?: boolean;
   isSidebarOpen: boolean;
   onBack: () => void;
   onCancel: () => Promise<unknown>;
+  onDelete?: () => Promise<unknown>;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onLoadIssueMessages: () => Promise<IssueMessage[]>;
   onMove: (placement: HuntRunPlacement) => Promise<unknown>;
@@ -1290,6 +1313,8 @@ export function RunPage({
     : t(`issue.priority${run.priority}` as MessageKey);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [contentSplit, setContentSplit] = useState(50);
   const [isResizingContent, setIsResizingContent] = useState(false);
   const contentRef = useRef<HTMLDivElement | null>(null);
@@ -1396,6 +1421,13 @@ export function RunPage({
           >
             {run.title}
           </strong>
+          {(onUpdateIssue || onDelete) && (
+            <IssueActionsMenu
+              disabled={isUpdatingIssue || isDeletingIssue}
+              onDelete={onDelete ? () => setIsDeleteDialogOpen(true) : undefined}
+              onEdit={onUpdateIssue ? () => setIsEditDialogOpen(true) : undefined}
+            />
+          )}
         </header>
       )}
       <div className="run-page-scroll">
@@ -1419,21 +1451,22 @@ export function RunPage({
                     <div className="run-page-title-row">
                       <small>AH-{run.runNumber}</small>
                       <h1 id="run-page-title">{run.title}</h1>
+                      {(onUpdateIssue || onDelete) && (
+                        <IssueActionsMenu
+                          disabled={isUpdatingIssue || isDeletingIssue}
+                          onDelete={
+                            onDelete ? () => setIsDeleteDialogOpen(true) : undefined
+                          }
+                          onEdit={
+                            onUpdateIssue
+                              ? () => setIsEditDialogOpen(true)
+                              : undefined
+                          }
+                        />
+                      )}
                     </div>
                   </div>
                   <div className="run-page-meta">
-                    {onUpdateIssue && (
-                      <button
-                        aria-label={t("issue.edit")}
-                        className="run-page-edit"
-                        disabled={isUpdatingIssue}
-                        onClick={() => setIsEditDialogOpen(true)}
-                        type="button"
-                      >
-                        <Pencil size={13} />
-                        {t("issue.edit")}
-                      </button>
-                    )}
                     <span className={`status-pill ${meta.tone}`}>{label}</span>
                     <small>
                       {t("run.attempt", { count: run.currentAttempt })} ·{" "}
@@ -1449,18 +1482,6 @@ export function RunPage({
               <div className="run-page-summary">
                 <IssueActivity run={run} />
                 <div className="run-page-meta">
-                  {onUpdateIssue && (
-                    <button
-                      aria-label={t("issue.edit")}
-                      className="run-page-edit"
-                      disabled={isUpdatingIssue}
-                      onClick={() => setIsEditDialogOpen(true)}
-                      type="button"
-                    >
-                      <Pencil size={13} />
-                      {t("issue.edit")}
-                    </button>
-                  )}
                   <span className={`status-pill ${meta.tone}`}>{label}</span>
                   <small>
                     {t("run.attempt", { count: run.currentAttempt })} ·{" "}
@@ -1619,7 +1640,119 @@ export function RunPage({
           run={run}
         />
       )}
+      <Dialog
+        onOpenChange={(open) => {
+          if (isDeletingIssue) return;
+          setIsDeleteDialogOpen(open);
+          if (!open) setDeleteError(null);
+        }}
+        open={isDeleteDialogOpen}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="mb-2 grid size-10 place-items-center rounded-xl bg-destructive/10 text-destructive">
+              <Trash2 size={20} strokeWidth={1.8} />
+            </div>
+            <DialogTitle>{t("issue.deleteTitle", { title: run.title })}</DialogTitle>
+            <DialogDescription>
+              {t("issue.deleteDescription")}
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError ? (
+            <p className="text-xs text-destructive" role="alert">
+              {deleteError}
+            </p>
+          ) : null}
+          <DialogFooter>
+            <Button
+              disabled={isDeletingIssue}
+              onClick={() => setIsDeleteDialogOpen(false)}
+              type="button"
+              variant="outline"
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              disabled={isDeletingIssue || !onDelete}
+              onClick={() => {
+                if (!onDelete) return;
+                setDeleteError(null);
+                void onDelete().catch((caught) => {
+                  setDeleteError(
+                    caught instanceof Error ? caught.message : String(caught),
+                  );
+                });
+              }}
+              type="button"
+              variant="destructive"
+            >
+              {isDeletingIssue ? (
+                <LoaderCircle className="spin" size={15} />
+              ) : (
+                <Trash2 size={15} />
+              )}
+              {isDeletingIssue ? t("issue.deleting") : t("issue.delete")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MainContent>
+  );
+}
+
+function IssueActionsMenu({
+  disabled,
+  onDelete,
+  onEdit,
+}: {
+  disabled: boolean;
+  onDelete?: () => void;
+  onEdit?: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild>
+        <button
+          aria-label={t("issue.actions")}
+          className="run-page-actions-trigger"
+          disabled={disabled}
+          type="button"
+        >
+          {disabled ? (
+            <LoaderCircle className="spin" size={15} />
+          ) : (
+            <MoreHorizontal size={17} />
+          )}
+        </button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          align="end"
+          className="run-page-actions-menu"
+          sideOffset={6}
+        >
+          {onEdit ? (
+            <DropdownMenu.Item
+              className="run-page-actions-item"
+              onSelect={onEdit}
+            >
+              <Pencil size={14} />
+              {t("issue.edit")}
+            </DropdownMenu.Item>
+          ) : null}
+          {onDelete ? (
+            <DropdownMenu.Item
+              className="run-page-actions-item danger"
+              onSelect={onDelete}
+            >
+              <Trash2 size={14} />
+              {t("issue.delete")}
+            </DropdownMenu.Item>
+          ) : null}
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
   );
 }
 

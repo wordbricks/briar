@@ -612,6 +612,7 @@ export function App() {
             dashboard={briar.dashboard}
             error={briar.error}
             isCreatingIssue={briar.isCreatingIssue}
+            deletingIssueId={briar.deletingIssueId}
             updatingIssueId={briar.updatingIssueId}
             needsLocalConnection={!briar.isActiveProjectConnectedLocally}
             noProject={!activeProject}
@@ -622,6 +623,7 @@ export function App() {
             onConnectRepository={briar.reconnectProject}
             onAddProject={briar.startProjectCreation}
             onCreateIssue={briar.addIssue}
+            onDeleteIssue={briar.deleteIssue}
             onUpdateIssue={briar.editIssue}
             onLoadAttachment={briar.readIssueAttachment}
             onLoadIssueMessages={briar.readIssueMessages}
@@ -777,6 +779,7 @@ export function App() {
             dashboard={briar.dashboard}
             error={briar.error}
             isCreatingIssue={briar.isCreatingIssue}
+            deletingIssueId={briar.deletingIssueId}
             updatingIssueId={briar.updatingIssueId}
             recoveringRunId={briar.recoveringRunId}
             recoveryError={briar.recoveryError}
@@ -789,6 +792,7 @@ export function App() {
               setCompanionPage("issues");
             }}
             onCreateIssue={briar.addIssue}
+            onDeleteIssue={briar.deleteIssue}
             onUpdateIssue={briar.editIssue}
             onLoadAttachment={briar.readIssueAttachment}
             onLoadIssueMessages={briar.readIssueMessages}

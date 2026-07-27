@@ -682,6 +682,16 @@ export async function updateIssue(
   });
 }
 
+export async function deleteIssue(
+  token: string,
+  projectId: string,
+  runId: string,
+) {
+  await request<void>(`/projects/${projectId}/runs/${runId}`, token, {
+    method: "DELETE",
+  });
+}
+
 export async function loadIssueAttachment(
   token: string,
   attachment: IssueAttachment,
