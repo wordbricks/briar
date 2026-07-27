@@ -122,6 +122,7 @@ describe("ProjectAgents", () => {
       model: null,
       responsibility:
         "Jay한테 assign된 todo 이슈를 3개씩 처리하는 에이전트",
+      calendarColor: "#3275d5",
     });
   });
 

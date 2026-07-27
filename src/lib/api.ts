@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { validateIssueAttachments } from "./issue-attachments";
 import {
+  defaultProjectAgentCalendarColor,
   defaultProjectAgentCopy,
   type ProjectAgentLocale,
 } from "./project-agent";
@@ -55,6 +56,10 @@ const projectAgentSchema = z.object({
   provider: z.enum(["codex", "claude", "grok"]),
   model: z.string().nullable(),
   responsibility: z.string(),
+  calendarColor: z
+    .string()
+    .regex(/^#[0-9a-f]{6}$/iu)
+    .default(defaultProjectAgentCalendarColor),
   kind: z.enum(["auto_hunt", "custom"]).optional(),
   createdAt: z.string(),
   updatedAt: z.string(),

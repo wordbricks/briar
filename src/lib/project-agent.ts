@@ -1,5 +1,8 @@
 export type ProjectAgentLocale = "ko" | "en" | "zh";
 
+export const defaultProjectAgentCalendarColor = "#3275d5";
+export const projectAgentCalendarColorPattern = /^#[0-9a-f]{6}$/iu;
+
 type DefaultProjectAgentCopy = {
   name: string;
   responsibility: string;

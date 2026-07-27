@@ -9,7 +9,6 @@ import {
   ListFilter,
   LoaderCircle,
   Plus,
-  Repeat2,
   X,
 } from "lucide-react";
 import {
@@ -36,9 +35,10 @@ import {
 import {
   addCalendarDays,
   minutesIntoCalendarDay,
+  scheduleOccurrenceSegmentsForWeek,
   scheduleSegmentsForWeek,
   startOfCalendarWeek,
-  type ScheduleSegment,
+  type ScheduleOccurrenceSegment,
 } from "../lib/project-schedule";
 import type {
   CreateProjectAgentScheduleInput,
@@ -72,12 +72,13 @@ function sameLocalDay(left: Date, right: Date) {
   );
 }
 
-function hash(value: string) {
-  let result = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    result = (result * 31 + value.charCodeAt(index)) | 0;
-  }
-  return Math.abs(result);
+function contrastingTextColor(color: string) {
+  const red = Number.parseInt(color.slice(1, 3), 16);
+  const green = Number.parseInt(color.slice(3, 5), 16);
+  const blue = Number.parseInt(color.slice(5, 7), 16);
+  return red * 0.299 + green * 0.587 + blue * 0.114 > 160
+    ? "#1f2937"
+    : "#ffffff";
 }
 
 function formatOffset(date: Date) {
@@ -203,12 +204,25 @@ export function ProjectSchedule({
     [weekStart],
   );
   const segmentsByDay = useMemo(
-    () => scheduleSegmentsForWeek(filteredRuns, weekStart, now),
-    [filteredRuns, now, weekStart],
+    () =>
+      scheduleOccurrenceSegmentsForWeek(
+        filteredSchedules,
+        filteredRuns,
+        agents,
+        weekStart,
+        now,
+      ),
+    [agents, filteredRuns, filteredSchedules, now, weekStart],
   );
   const allSegments = segmentsByDay.flat();
-  const visibleRuns = new Set(allSegments.map((segment) => segment.run.id)).size;
-  const totalMinutes = allSegments.reduce(
+  const executionSegments = useMemo(
+    () => scheduleSegmentsForWeek(filteredRuns, weekStart, now).flat(),
+    [filteredRuns, now, weekStart],
+  );
+  const visibleRuns = new Set(
+    allSegments.flatMap((segment) => (segment.run ? [segment.run.id] : [])),
+  ).size;
+  const totalMinutes = executionSegments.reduce(
     (total, segment) => total + segment.endMinute - segment.startMinute,
     0,
   );
@@ -301,7 +315,7 @@ export function ProjectSchedule({
   useEffect(() => {
     const scroll = calendarScrollRef.current;
     if (!scroll) return;
-    const firstSegment = allSegments.reduce<ScheduleSegment | null>(
+    const firstSegment = allSegments.reduce<ScheduleOccurrenceSegment | null>(
       (first, segment) =>
         !first || segment.startMinute < first.startMinute ? segment : first,
       null,
@@ -374,36 +388,6 @@ export function ProjectSchedule({
           <CircleAlert size={15} />
           <span>{scheduleError}</span>
         </div>
-      )}
-
-      {filteredSchedules.length > 0 && (
-        <section
-          aria-label={t("schedule.automations")}
-          className="project-schedule-plans"
-        >
-          {filteredSchedules.map((schedule) => (
-            <article key={schedule.id}>
-              <span
-                className={`provider-${
-                  agentById.get(schedule.agentId)?.provider ??
-                  schedule.agentProvider
-                }`}
-              >
-                <CalendarClock size={15} />
-              </span>
-              <div>
-                <strong>{schedule.name}</strong>
-                <small>
-                  {agentById.get(schedule.agentId)?.name ?? schedule.agentName}
-                </small>
-              </div>
-              <em>
-                <Repeat2 size={12} />
-                {formatScheduleCadence(schedule, localeTag, t)}
-              </em>
-            </article>
-          ))}
-        </section>
       )}
 
       <section
@@ -524,34 +508,39 @@ export function ProjectSchedule({
                         height: `${height}%`,
                         left: `calc(${segment.lane * laneWidth}% + 3px)`,
                         width: `calc(${laneWidth}% - 6px)`,
-                      } satisfies CSSProperties;
+                        "--agent-color": segment.agent.calendarColor,
+                        "--agent-contrast": contrastingTextColor(
+                          segment.agent.calendarColor,
+                        ),
+                      } satisfies CSSProperties & {
+                        "--agent-color": string;
+                        "--agent-contrast": string;
+                      };
                       const statusKey =
-                        `status.${segment.run.status}` as MessageKey;
-                      const color = hash(segment.agent) % 6;
+                        `schedule.status.${segment.status}` as MessageKey;
                       const label = t("schedule.runLabel", {
-                        agent: segment.agent,
-                        title: segment.run.scheduleName,
+                        agent: segment.agent.name,
+                        title: segment.schedule.name,
                         time: `${formatTime(segment.start, localeTag)}–${formatTime(segment.end, localeTag)}`,
                       });
                       return (
                         <article
                           aria-label={label}
-                          className={`project-schedule-event color-${color} ${segment.run.status}`}
+                          className={`project-schedule-event ${segment.status}`}
                           key={segment.id}
                           style={style}
                           title={label}
                         >
                           <span className="project-schedule-event-agent">
                             <Bot size={11} />
-                            <strong>{segment.agent}</strong>
-                            {segment.run.status === "running" && <i />}
+                            <strong>{segment.agent.name}</strong>
+                            {segment.status === "running" && <i />}
                           </span>
                           <time>
-                            {formatTime(segment.start, localeTag)} –{" "}
-                            {formatTime(segment.end, localeTag)}
+                            {formatTime(segment.start, localeTag)}
                           </time>
                           <span className="project-schedule-event-title">
-                            {segment.run.scheduleName}
+                            {segment.schedule.name}
                           </span>
                           <small>{t(statusKey)}</small>
                         </article>
@@ -594,27 +583,6 @@ export function ProjectSchedule({
       )}
     </main>
   );
-}
-
-type Translate = (
-  key: MessageKey,
-  variables?: Record<string, string | number>,
-) => string;
-
-function formatScheduleCadence(
-  schedule: ProjectAgentSchedule,
-  localeTag: string,
-  t: Translate,
-) {
-  const recurrence =
-    schedule.recurrence === "daily"
-      ? t("schedule.recurrence.daily")
-      : schedule.recurrence === "weekdays"
-        ? t("schedule.recurrence.weekdays")
-        : new Intl.DateTimeFormat(localeTag, { weekday: "long" }).format(
-            addCalendarDays(new Date(2026, 6, 26), schedule.dayOfWeek ?? 1),
-          );
-  return `${recurrence} · ${schedule.timeOfDay}`;
 }
 
 export function CreateProjectAgentScheduleDialog({

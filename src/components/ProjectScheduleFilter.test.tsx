@@ -22,6 +22,7 @@ const agentA: ProjectAgent = {
   provider: "codex",
   model: null,
   responsibility: "Review changes.",
+  calendarColor: "#3275d5",
   createdAt: "2026-07-27T00:00:00.000Z",
   updatedAt: "2026-07-27T00:00:00.000Z",
 };
@@ -44,6 +45,7 @@ function calendarRun(
   scheduleName: string,
   startedAt = "2026-07-27T01:00:00.000Z",
   completedAt = "2026-07-27T02:00:00.000Z",
+  status: ProjectAgentScheduleRun["status"] = "completed",
 ): ProjectAgentScheduleRun {
   return {
     id,
@@ -57,13 +59,36 @@ function calendarRun(
       model: agent.model,
       responsibility: agent.responsibility,
     },
-    status: "completed",
+    status,
     scheduledFor: startedAt,
     leaseExpiresAt: null,
     startedAt,
     completedAt,
-    resultSummary: "Completed.",
-    error: null,
+    resultSummary: status === "completed" ? "Completed." : null,
+    error: status === "failed" ? "Execution failed." : null,
+  };
+}
+
+function calendarSchedule(
+  id: string,
+  agent: ProjectAgent,
+  name: string,
+  timeOfDay = "10:00",
+): ProjectAgentSchedule {
+  return {
+    id,
+    projectId,
+    agentId: agent.id,
+    agentName: agent.name,
+    agentProvider: agent.provider,
+    name,
+    recurrence: "daily",
+    timeOfDay,
+    dayOfWeek: null,
+    timeZone: "Asia/Seoul",
+    enabled: true,
+    createdAt: agent.createdAt,
+    updatedAt: agent.updatedAt,
   };
 }
 
@@ -109,6 +134,18 @@ describe("ProjectSchedule agent filter", () => {
   it("filters agent execution history and summary metrics by agent id", async () => {
     stubScheduleApi({
       agents: [agentA, agentB, agentC],
+      schedules: [
+        calendarSchedule(
+          "44444444-4444-4444-8444-444444444444",
+          agentA,
+          "Review calendar layout",
+        ),
+        calendarSchedule(
+          "55555555-5555-4555-8555-555555555555",
+          agentB,
+          "Audit release notes",
+        ),
+      ],
       runs: [
         calendarRun(
           "77777777-7777-4777-8777-777777777777",
@@ -121,6 +158,9 @@ describe("ProjectSchedule agent filter", () => {
           "55555555-5555-4555-8555-555555555555",
           agentB,
           "Audit release notes",
+          "2026-07-27T01:00:00.000Z",
+          "2026-07-27T02:00:00.000Z",
+          "failed",
         ),
         calendarRun(
           "99999999-9999-4999-8999-999999999999",
@@ -153,6 +193,17 @@ describe("ProjectSchedule agent filter", () => {
     expect(container.textContent).toContain("Review calendar layout");
     expect(container.textContent).toContain("Audit release notes");
     expect(container.textContent).not.toContain("Stale Agent A");
+    expect(
+      container.querySelector(".project-schedule-event.completed"),
+    ).not.toBeNull();
+    expect(
+      container.querySelector(".project-schedule-event.failed"),
+    ).not.toBeNull();
+    expect(
+      container
+        .querySelector<HTMLElement>(".project-schedule-event.completed")
+        ?.style.getPropertyValue("--agent-color"),
+    ).toBe(agentA.calendarColor);
     const trigger = container.querySelector<HTMLButtonElement>(
       "#project-schedule-agent-filter",
     );
@@ -175,7 +226,7 @@ describe("ProjectSchedule agent filter", () => {
     );
     await act(async () => agentCOption?.click());
 
-    expect(container.textContent).toContain("No work was recorded for Agent C.");
+    expect(container.textContent).toContain("No scheduled work for Agent C.");
     expect(container.textContent).toContain("0m");
 
     await act(async () => root.unmount());
@@ -236,6 +287,13 @@ describe("ProjectSchedule agent filter", () => {
 
     expect(container.textContent).toContain("Agent A audit");
     expect(container.textContent).toContain("Agent B report");
+    expect(container.querySelector(".project-schedule-plans")).toBeNull();
+    expect(
+      container.querySelector(".project-schedule-event.missed"),
+    ).not.toBeNull();
+    expect(
+      container.querySelector(".project-schedule-event.scheduled"),
+    ).not.toBeNull();
     const trigger = container.querySelector<HTMLButtonElement>(
       "#project-schedule-agent-filter",
     );

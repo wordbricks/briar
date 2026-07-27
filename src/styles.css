@@ -1295,16 +1295,6 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .project-schedule-create:disabled { opacity:.55; cursor:not-allowed; box-shadow:none; }
 .project-schedule-create:focus-visible { outline:2px solid #3975d2; outline-offset:2px; }
 .project-schedule-error { min-height:34px; padding:8px 16px; display:flex; align-items:center; gap:7px; flex:0 0 auto; border-bottom:1px solid #f0cdd4; color:#a13e50; background:#fff5f7; font-size:8.5px; }
-.project-schedule-plans { min-height:58px; padding:8px 13px; display:flex; align-items:stretch; gap:8px; flex:0 0 auto; overflow-x:auto; border-bottom:1px solid #e5e6e1; background:#fafbf9; scrollbar-width:thin; }
-.project-schedule-plans article { min-width:230px; max-width:320px; padding:7px 10px; display:grid; grid-template-columns:30px minmax(0,1fr) auto; align-items:center; gap:8px; border:1px solid #e0e3df; border-radius:10px; background:#fff; box-shadow:0 3px 10px rgba(43,49,45,.035); }
-.project-schedule-plans article > span { width:30px; height:30px; display:grid; place-items:center; border-radius:9px; color:#326fc8; background:#e7f0fe; }
-.project-schedule-plans article > span.provider-claude { color:#ad6540; background:#fff0e8; }
-.project-schedule-plans article > span.provider-grok { color:#39776f; background:#e7f5f2; }
-.project-schedule-plans article > div { min-width:0; display:grid; gap:3px; }
-.project-schedule-plans strong,.project-schedule-plans small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.project-schedule-plans strong { color:#444740; font-size:8.5px; }
-.project-schedule-plans small { color:#8b8e87; font-size:7.5px; }
-.project-schedule-plans em { display:flex; align-items:center; gap:4px; color:#55739c; font:600 7px "DM Mono",monospace; font-style:normal; white-space:nowrap; }
 .project-schedule-calendar { min-height:0; flex:1; display:flex; flex-direction:column; background:#fff; }
 .project-schedule-toolbar { min-height:52px; padding:0 16px 0 13px; display:flex; align-items:center; justify-content:space-between; gap:16px; border-bottom:1px solid #e4e6e2; background:#fff; }
 .project-schedule-period { min-width:0; display:flex; align-items:center; gap:4px; }
@@ -1339,7 +1329,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .project-schedule-day-column.today { background-color:#fbfdff; }
 .project-schedule-now { height:1px; position:absolute; z-index:7; right:0; left:0; pointer-events:none; background:#dc3d36; }
 .project-schedule-now span { width:8px; height:8px; position:absolute; top:50%; left:-4px; border:2px solid #fff; border-radius:50%; background:#dc3d36; box-shadow:0 1px 4px rgba(174,37,32,.28); transform:translateY(-50%); }
-.project-schedule-event { min-height:18px; padding:5px 6px; position:absolute; z-index:3; overflow:hidden; display:flex; align-items:flex-start; flex-direction:column; gap:2px; border:0; border-left:3px solid rgba(30,77,139,.34); border-radius:6px; color:#123761; background:#dcecff; box-shadow:0 1px 3px rgba(24,65,117,.12); text-align:left; }
+.project-schedule-event { min-height:18px; padding:4px 6px; position:absolute; z-index:3; overflow:hidden; display:flex; align-items:flex-start; flex-direction:column; gap:2px; border:1.5px solid var(--agent-color); border-radius:7px; color:var(--agent-color); background:rgba(255,255,255,.94); box-shadow:0 1px 2px rgba(24,36,52,.06); text-align:left; }
 .project-schedule-event-agent { max-width:100%; display:flex; align-items:center; gap:3px; }
 .project-schedule-event-agent svg { flex:0 0 auto; opacity:.72; }
 .project-schedule-event-agent strong { overflow:hidden; font-size:8px; line-height:1.25; text-overflow:ellipsis; white-space:nowrap; }
@@ -1347,13 +1337,9 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .project-schedule-event time { font:560 7px "DM Mono",monospace; opacity:.76; white-space:nowrap; }
 .project-schedule-event-title { width:100%; overflow:hidden; display:-webkit-box; font-size:7.5px; line-height:1.35; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
 .project-schedule-event small { margin-top:auto; font-size:6.5px; font-weight:650; opacity:.68; }
-.project-schedule-event.color-1 { border-left-color:rgba(104,69,180,.35); color:#40266f; background:#e9e1fa; box-shadow:0 1px 3px rgba(77,46,139,.11); }
-.project-schedule-event.color-2 { border-left-color:rgba(34,126,93,.35); color:#195641; background:#dff3eb; box-shadow:0 1px 3px rgba(30,105,79,.11); }
-.project-schedule-event.color-3 { border-left-color:rgba(190,96,34,.35); color:#783c18; background:#faeadc; box-shadow:0 1px 3px rgba(151,75,27,.11); }
-.project-schedule-event.color-4 { border-left-color:rgba(186,55,86,.35); color:#70263a; background:#f9e1e7; box-shadow:0 1px 3px rgba(145,42,66,.11); }
-.project-schedule-event.color-5 { border-left-color:rgba(41,125,134,.35); color:#20555b; background:#dff1f2; box-shadow:0 1px 3px rgba(31,100,107,.11); }
-.project-schedule-event.failed,.project-schedule-event.blocked { filter:saturate(.68); }
-.project-schedule-event.cancelled { opacity:.66; }
+.project-schedule-event.running { background:color-mix(in srgb,var(--agent-color) 12%,#fff); }
+.project-schedule-event.completed { border-color:var(--agent-color); color:var(--agent-contrast); background:var(--agent-color); box-shadow:0 2px 5px color-mix(in srgb,var(--agent-color) 28%,transparent); }
+.project-schedule-event.failed,.project-schedule-event.missed { border-color:#d84a53; color:#fff; background:#d84a53; box-shadow:0 2px 5px rgba(180,45,57,.2); }
 .project-schedule-empty { width:min(330px,calc(100% - 110px)); min-height:130px; position:absolute; z-index:5; top:300px; left:calc(50% + 32px); padding:20px; display:flex; align-items:center; justify-content:center; flex-direction:column; border:1px solid #e3e5e1; border-radius:15px; color:#90928c; background:rgba(255,255,255,.94); box-shadow:0 12px 32px rgba(51,57,52,.08); text-align:center; transform:translateX(-50%); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); }
 .project-schedule-empty > span { width:40px; height:40px; display:grid; place-items:center; border-radius:12px; color:#3d73c5; background:#e7f0fe; }
 .project-schedule-empty strong { margin-top:12px; color:#4a4d48; font-size:9.5px; }
@@ -1422,6 +1408,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .project-agent-card-open > header > div > span::before { content:""; width:6px; height:6px; border-radius:50%; background:#55b894; box-shadow:0 0 0 3px rgba(85,184,148,.11); }
 .project-agent-runtime { min-height:36px; margin:0 17px; padding:0 10px; display:flex; align-items:center; gap:8px; border:1px solid #e8e6ee; border-radius:9px; color:#6f697b; background:#faf9fd; font:600 8px "DM Mono",monospace; }
 .project-agent-runtime i { width:3px; height:3px; border-radius:50%; background:#b7b2c2; }
+.project-agent-runtime .project-agent-calendar-color { width:7px; height:7px; margin-left:2px; border:1px solid rgba(0,0,0,.08); }
 .project-agent-card-open > section { padding:16px 17px 18px; flex:1; }
 .project-agent-card-open > section small { color:#969890; font-size:7.5px; font-weight:700; letter-spacing:.055em; text-transform:uppercase; }
 .project-agent-card-open > section p { margin:8px 0 0; color:#555750; font-size:9px; line-height:1.68; overflow-wrap:anywhere; }
@@ -1450,6 +1437,9 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .project-agent-form input,.project-agent-form textarea { width:100%; padding:12px 13px; border:1px solid #e1e2dc; border-radius:11px; outline:none; color:#3f403b; background:#fafaf7; font-size:11px; resize:vertical; }
 .project-agent-form input:focus,.project-agent-form textarea:focus { border-color:#8068ce; background:#fff; box-shadow:0 0 0 3px rgba(128,104,206,.12); }
 .project-agent-form label > small { color:#999b94; font-size:8px; font-weight:500; line-height:1.5; }
+.project-agent-color-field > div { height:42px; padding:0 11px; display:flex; align-items:center; gap:10px; border:1px solid #e1e2dc; border-radius:11px; background:#fafaf7; }
+.project-agent-form .project-agent-color-field input[type="color"] { width:28px; height:28px; padding:2px; border:1px solid #d7dad5; border-radius:8px; background:#fff; cursor:pointer; }
+.project-agent-color-field code { color:#555a54; font:600 9px "DM Mono",monospace; }
 .project-agent-form-runtime { display:grid; grid-template-columns:1fr 1.35fr; gap:11px; }
 .project-agent-form .native-select { width:100%; }
 .project-agent-form .select-menu-trigger { width:100%; height:42px; border-radius:11px; }

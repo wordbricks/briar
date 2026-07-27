@@ -64,6 +64,7 @@ describe("API errors", () => {
         provider: "grok",
         model: "grok-4.5",
         responsibility: "피드백을 분석해 액션 아이템 이슈를 만듭니다.",
+        calendarColor: "#0f9f76",
       },
     );
 
@@ -386,6 +387,7 @@ describe("API errors", () => {
           provider: "claude",
           model: "sonnet",
           responsibility: "릴리스 상태를 점검합니다.",
+          calendarColor: "#8b5cf6",
         },
       ),
     ).resolves.toMatchObject({

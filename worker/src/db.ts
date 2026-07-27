@@ -15,7 +15,10 @@ import {
   normalizeAutoHuntAutomation,
   type AutoHuntAutomation,
 } from "../../src/lib/auto-hunt-automation";
-import { defaultProjectAgentCopy } from "../../src/lib/project-agent";
+import {
+  defaultProjectAgentCalendarColor,
+  defaultProjectAgentCopy,
+} from "../../src/lib/project-agent";
 import {
   nextProjectAgentScheduleRunAt,
   type ProjectAgentScheduleRecurrence,
@@ -71,6 +74,7 @@ export type ProjectAgentRow = {
   provider: ProjectAgentProvider;
   model: string | null;
   responsibility: string;
+  calendar_color: string;
   kind: ProjectAgentKind;
   created_at: string;
   updated_at: string;
@@ -492,6 +496,7 @@ export async function createProject(
     provider: "codex",
     model: null,
     responsibility: defaultAgentCopy.responsibility,
+    calendar_color: defaultProjectAgentCalendarColor,
     kind: "auto_hunt",
     created_at: createdAt,
     updated_at: createdAt,
@@ -524,8 +529,8 @@ export async function createProject(
       .prepare(
         `insert into briar_project_agents (
            id, project_id, name, provider, model, responsibility,
-           created_at, updated_at, kind
-         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           calendar_color, created_at, updated_at, kind
+         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         defaultAgent.id,
@@ -534,6 +539,7 @@ export async function createProject(
         defaultAgent.provider,
         defaultAgent.model,
         defaultAgent.responsibility,
+        defaultAgent.calendar_color,
         defaultAgent.created_at,
         defaultAgent.updated_at,
         defaultAgent.kind,
@@ -584,7 +590,7 @@ export async function deleteProject(
 export async function listProjectAgents(db: D1Database, projectId: string) {
   const result = await db
     .prepare(
-      `select id, project_id, name, provider, model, responsibility,
+      `select id, project_id, name, provider, model, responsibility, calendar_color,
               kind, created_at, updated_at
        from briar_project_agents
        where project_id = ?
@@ -603,6 +609,7 @@ export async function createProjectAgent(
     provider: ProjectAgentProvider;
     model: string | null;
     responsibility: string;
+    calendarColor: string;
   },
 ) {
   const createdAt = new Date().toISOString();
@@ -613,6 +620,7 @@ export async function createProjectAgent(
     provider: input.provider,
     model: input.model,
     responsibility: input.responsibility,
+    calendar_color: input.calendarColor,
     kind: "custom",
     created_at: createdAt,
     updated_at: createdAt,
@@ -621,8 +629,8 @@ export async function createProjectAgent(
     .prepare(
       `insert into briar_project_agents (
          id, project_id, name, provider, model, responsibility,
-         created_at, updated_at, kind
-       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         calendar_color, created_at, updated_at, kind
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       agent.id,
@@ -631,6 +639,7 @@ export async function createProjectAgent(
       agent.provider,
       agent.model,
       agent.responsibility,
+      agent.calendar_color,
       agent.created_at,
       agent.updated_at,
       agent.kind,
@@ -1045,13 +1054,15 @@ export async function updateProjectAgent(
     provider: ProjectAgentProvider;
     model: string | null;
     responsibility: string;
+    calendarColor: string;
   },
 ) {
   const updatedAt = new Date().toISOString();
   const result = await db
     .prepare(
       `update briar_project_agents
-       set name = ?, provider = ?, model = ?, responsibility = ?, updated_at = ?
+       set name = ?, provider = ?, model = ?, responsibility = ?,
+           calendar_color = ?, updated_at = ?
        where id = ? and project_id = ?`,
     )
     .bind(
@@ -1059,6 +1070,7 @@ export async function updateProjectAgent(
       input.provider,
       input.model,
       input.responsibility,
+      input.calendarColor,
       updatedAt,
       agentId,
       projectId,
@@ -1067,7 +1079,7 @@ export async function updateProjectAgent(
   if (result.meta.changes === 0) return null;
   return db
     .prepare(
-      `select id, project_id, name, provider, model, responsibility,
+      `select id, project_id, name, provider, model, responsibility, calendar_color,
               kind, created_at, updated_at
        from briar_project_agents
        where id = ? and project_id = ?`,
