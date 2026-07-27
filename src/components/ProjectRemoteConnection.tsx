@@ -62,6 +62,36 @@ export function ProjectRemoteConnection({ projectId }: { projectId: string }) {
     }
   }, []);
 
+  const refreshHosts = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const sshHosts = (await listExecutionHosts()).filter(
+        (host) => host.kind === "ssh",
+      );
+      setHosts(sshHosts);
+      const selectedHostId = sshHosts.some(
+        (host) => host.id === executionHostId,
+      )
+        ? executionHostId
+        : (sshHosts[0]?.id ?? "");
+      setExecutionHostId(selectedHostId);
+      if (selectedHostId) {
+        await browse(
+          selectedHostId,
+          selectedHostId === executionHostId ? path || undefined : undefined,
+        );
+      } else {
+        setPath("");
+        setListing(null);
+      }
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -185,7 +215,7 @@ export function ProjectRemoteConnection({ projectId }: { projectId: string }) {
         <button
           aria-label={t("settings.remoteRefresh")}
           disabled={loading || browsing}
-          onClick={() => void browse(executionHostId, path || undefined)}
+          onClick={() => void refreshHosts()}
           type="button"
         >
           <RefreshCw
@@ -234,6 +264,9 @@ export function ProjectRemoteConnection({ projectId }: { projectId: string }) {
               {t("settings.remoteAddHost")}
             </button>
           </div>
+          <p className="project-remote-host-source">
+            {t("settings.remoteHostSource")}
+          </p>
 
           {showAddHost || hosts.length === 0 ? (
             <div className="project-remote-add-host-form">

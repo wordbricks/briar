@@ -6,7 +6,7 @@
 //! working exactly as they do in the user's own shell.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     ffi::OsString,
     fs,
     path::{Path, PathBuf},
@@ -97,6 +97,152 @@ pub(crate) fn ssh_command() -> &'static str {
     } else {
         "ssh"
     }
+}
+
+/// Literal host aliases declared in the user's OpenSSH config.
+///
+/// OpenSSH can resolve one known alias with `ssh -G`, but it does not expose a
+/// command that lists aliases. We therefore read only `Host` and `Include`
+/// directives, follow included files, and leave every other directive to
+/// OpenSSH itself. Wildcard and negated patterns are not selectable machines.
+pub(crate) fn discover_ssh_config_aliases(home: &Path) -> Result<Vec<String>, String> {
+    let mut aliases = Vec::new();
+    let mut seen_aliases = HashSet::new();
+    let mut visited_files = HashSet::new();
+    collect_ssh_config_aliases(
+        &home.join(".ssh").join("config"),
+        home,
+        &mut visited_files,
+        &mut seen_aliases,
+        &mut aliases,
+    )?;
+    Ok(aliases)
+}
+
+fn collect_ssh_config_aliases(
+    config_path: &Path,
+    home: &Path,
+    visited_files: &mut HashSet<PathBuf>,
+    seen_aliases: &mut HashSet<String>,
+    aliases: &mut Vec<String>,
+) -> Result<(), String> {
+    if !config_path.exists() {
+        return Ok(());
+    }
+    let resolved_path = fs::canonicalize(config_path).unwrap_or_else(|_| config_path.to_path_buf());
+    if !visited_files.insert(resolved_path) {
+        return Ok(());
+    }
+    let contents = fs::read_to_string(config_path).map_err(|error| {
+        format!(
+            "SSH 설정을 읽지 못했습니다 ({}): {error}",
+            config_path.display()
+        )
+    })?;
+    for line in contents.lines() {
+        let tokens = ssh_config_tokens(line);
+        let Some(keyword) = tokens.first() else {
+            continue;
+        };
+        if keyword.eq_ignore_ascii_case("host") {
+            for alias in tokens.iter().skip(1) {
+                if alias.starts_with('-')
+                    || alias.contains('*')
+                    || alias.contains('?')
+                    || alias.contains('!')
+                {
+                    continue;
+                }
+                if seen_aliases.insert(alias.to_ascii_lowercase()) {
+                    aliases.push(alias.clone());
+                }
+            }
+        } else if keyword.eq_ignore_ascii_case("include") {
+            for pattern in tokens.iter().skip(1) {
+                for included_path in ssh_include_paths(config_path, home, pattern) {
+                    collect_ssh_config_aliases(
+                        &included_path,
+                        home,
+                        visited_files,
+                        seen_aliases,
+                        aliases,
+                    )?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn ssh_config_tokens(line: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+    let mut quote = None;
+    let mut escaped = false;
+    for character in line.trim().chars() {
+        if escaped {
+            current.push(character);
+            escaped = false;
+            continue;
+        }
+        if character == '\\' {
+            escaped = true;
+            continue;
+        }
+        if let Some(expected) = quote {
+            if character == expected {
+                quote = None;
+            } else {
+                current.push(character);
+            }
+            continue;
+        }
+        if character == '"' || character == '\'' {
+            quote = Some(character);
+        } else if character == '#' {
+            break;
+        } else if character.is_whitespace() || (character == '=' && tokens.is_empty()) {
+            if !current.is_empty() {
+                tokens.push(std::mem::take(&mut current));
+            }
+        } else {
+            current.push(character);
+        }
+    }
+    if escaped {
+        current.push('\\');
+    }
+    if !current.is_empty() {
+        tokens.push(current);
+    }
+    tokens
+}
+
+fn ssh_include_paths(config_path: &Path, home: &Path, pattern: &str) -> Vec<PathBuf> {
+    let expanded = if pattern == "~" {
+        home.to_path_buf()
+    } else if let Some(relative) = pattern.strip_prefix("~/") {
+        home.join(relative)
+    } else {
+        let path = PathBuf::from(pattern);
+        if path.is_absolute() {
+            path
+        } else {
+            config_path
+                .parent()
+                .unwrap_or_else(|| Path::new(""))
+                .join(path)
+        }
+    };
+    let Some(pattern) = expanded.to_str() else {
+        return Vec::new();
+    };
+    let Ok(paths) = glob::glob(pattern) else {
+        return Vec::new();
+    };
+    let mut paths = paths.filter_map(Result::ok).collect::<Vec<_>>();
+    paths.sort();
+    paths
 }
 
 /// Connection options shared by every SSH invocation Briar makes.
@@ -386,6 +532,7 @@ impl CommandRunner for SshRunner {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     fn host() -> SshHost {
         SshHost {
@@ -397,6 +544,54 @@ mod tests {
             port: Some(2222),
             last_required_passphrase: None,
         }
+    }
+
+    fn ssh_config_test_home(name: &str) -> PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be after the epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!("briar-ssh-config-{name}-{unique}"))
+    }
+
+    #[test]
+    fn discovers_literal_hosts_and_included_configs() {
+        let home = ssh_config_test_home("aliases");
+        let ssh = home.join(".ssh");
+        fs::create_dir_all(ssh.join("conf.d")).expect("ssh config directory should exist");
+        fs::write(
+            ssh.join("config"),
+            r#"
+Host work kiwi *
+  User dev
+Include conf.d/*.conf
+Host !blocked build-?
+"#,
+        )
+        .expect("root config should be written");
+        fs::write(
+            ssh.join("conf.d").join("personal.conf"),
+            "Host lab WORK\n  HostName 10.0.0.8\n",
+        )
+        .expect("included config should be written");
+
+        assert_eq!(
+            discover_ssh_config_aliases(&home).expect("aliases should be discovered"),
+            vec!["work", "kiwi", "lab"]
+        );
+        fs::remove_dir_all(home).expect("test home should be removed");
+    }
+
+    #[test]
+    fn accepts_equals_quotes_and_comments_in_host_directives() {
+        assert_eq!(
+            ssh_config_tokens(r#"Host="build box" staging # ignored"#),
+            vec!["Host", "build box", "staging"]
+        );
+        assert_eq!(
+            ssh_config_tokens("Include ~/.ssh/conf.d/*.conf"),
+            vec!["Include", "~/.ssh/conf.d/*.conf"]
+        );
     }
 
     #[test]
