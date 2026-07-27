@@ -2725,13 +2725,13 @@ fn auto_hunt_assets_are_current(resource_directory: &Path, home: &Path) -> bool 
 
     let skill_source = bundled_path(
         resource_directory,
-        "skills/briar-auto-hunt",
-        "skills/briar-auto-hunt",
+        "skills/briar-workflow",
+        "skills/briar-workflow",
     );
     let expected_version = read_trimmed_file(&skill_source.join("VERSION"))
         .unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string());
     [".codex", ".claude", ".grok"].iter().all(|directory| {
-        let skill = home.join(directory).join("skills").join("briar-auto-hunt");
+        let skill = home.join(directory).join("skills").join("briar-workflow");
         skill.join("SKILL.md").is_file()
             && read_trimmed_file(&skill.join("VERSION")).as_deref()
                 == Some(expected_version.as_str())
@@ -4836,16 +4836,13 @@ branch refs/heads/briar/second-11111111
             Some(env!("CARGO_PKG_VERSION").to_string())
         );
 
-        fs::write(
-            home.join(".codex/skills/briar-auto-hunt/VERSION"),
-            "0.0.0\n",
-        )
-        .expect("skill version should be made stale");
+        fs::write(home.join(".codex/skills/briar-workflow/VERSION"), "0.0.0\n")
+            .expect("skill version should be made stale");
         assert!(
             sync_auto_hunt_assets(&resources, &home).expect("stale skill should be synchronized")
         );
         assert_eq!(
-            read_trimmed_file(&home.join(".codex/skills/briar-auto-hunt/VERSION")),
+            read_trimmed_file(&home.join(".codex/skills/briar-workflow/VERSION")),
             Some(env!("CARGO_PKG_VERSION").to_string())
         );
         fs::remove_dir_all(home).expect("test home should be removed");
