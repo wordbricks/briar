@@ -2160,6 +2160,31 @@ struct ExecutionHostSummary {
     port: Option<u16>,
 }
 
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ProjectExecutionConnection {
+    execution_host_id: String,
+    repository_path: String,
+    repository_remote: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RemoteDirectoryEntry {
+    name: String,
+    path: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RemoteDirectoryListing {
+    path: String,
+    parent_path: Option<String>,
+    entries: Vec<RemoteDirectoryEntry>,
+    git_repository: bool,
+    repository_remote: Option<String>,
+}
+
 fn execution_host_summaries(config: &CliConfig) -> Vec<ExecutionHostSummary> {
     let mut hosts = vec![ExecutionHostSummary {
         id: host::LOCAL_EXECUTION_HOST_ID.to_string(),
@@ -2272,6 +2297,172 @@ async fn list_execution_hosts(app: tauri::AppHandle) -> Result<Vec<ExecutionHost
     let config_path = cli_config_path(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
         Ok(execution_host_summaries(&read_cli_config(&config_path)?))
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn load_project_execution_connection(
+    app: tauri::AppHandle,
+    project_id: String,
+) -> Result<ProjectExecutionConnection, String> {
+    let config_path = cli_config_path(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let config = read_cli_config(&config_path)?;
+        let project = config
+            .projects
+            .iter()
+            .find(|project| project.id == project_id)
+            .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
+        Ok(ProjectExecutionConnection {
+            execution_host_id: host::ExecutionHostId::parse(project.execution_host_id.as_deref())
+                .as_stored(),
+            repository_path: project.repository_path.clone(),
+            repository_remote: project.repository_remote.clone(),
+        })
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+fn remote_directory_listing(
+    runner: &dyn host::CommandRunner,
+    local_home: &Path,
+    requested_path: Option<&str>,
+) -> Result<RemoteDirectoryListing, String> {
+    if !runner.is_remote() {
+        return Err("원격 폴더 탐색에는 SSH 실행 호스트를 선택해야 합니다.".to_string());
+    }
+    let requested = requested_path
+        .map(str::trim)
+        .filter(|path| !path.is_empty())
+        .map(PathBuf::from)
+        .unwrap_or(host_home_directory(runner, local_home)?);
+    let path = runner.canonicalize(&requested)?;
+    let find = runner
+        .resolve_binary("find")
+        .map_err(|_| "원격 호스트에서 find 명령을 찾지 못했습니다.".to_string())?;
+    let output = runner.run(&host::CommandSpec::new(find).args([
+        path.to_string_lossy().into_owned(),
+        "-mindepth".to_string(),
+        "1".to_string(),
+        "-maxdepth".to_string(),
+        "1".to_string(),
+        "-type".to_string(),
+        "d".to_string(),
+        "-print0".to_string(),
+    ]))?;
+    if !output.success() {
+        return Err(format!(
+            "원격 폴더 목록을 불러오지 못했습니다: {}",
+            output.failure_message()
+        ));
+    }
+    let mut entries = output
+        .stdout
+        .split('\0')
+        .filter(|entry| !entry.is_empty())
+        .filter_map(|entry| {
+            let entry_path = PathBuf::from(entry);
+            let name = entry_path.file_name()?.to_string_lossy().into_owned();
+            (name != ".git").then(|| RemoteDirectoryEntry {
+                name,
+                path: entry_path.to_string_lossy().into_owned(),
+            })
+        })
+        .collect::<Vec<_>>();
+    entries.sort_by(|left, right| {
+        left.name
+            .to_lowercase()
+            .cmp(&right.name.to_lowercase())
+            .then_with(|| left.name.cmp(&right.name))
+    });
+    entries.truncate(500);
+
+    let repository_root = resolve_workspace_with(runner, &path).ok();
+    let git_repository = repository_root.as_ref() == Some(&path);
+    let repository_remote = git_repository
+        .then(|| repository_remote_on(runner, &path))
+        .flatten();
+    let parent_path = path
+        .parent()
+        .map(|parent| parent.to_string_lossy().into_owned());
+    Ok(RemoteDirectoryListing {
+        path: path.to_string_lossy().into_owned(),
+        parent_path,
+        entries,
+        git_repository,
+        repository_remote,
+    })
+}
+
+#[tauri::command]
+async fn list_remote_directory(
+    app: tauri::AppHandle,
+    execution_host_id: String,
+    path: Option<String>,
+) -> Result<RemoteDirectoryListing, String> {
+    let config_path = cli_config_path(&app)?;
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let config = read_cli_config(&config_path)?;
+        let execution_host = host::ExecutionHostId::parse(Some(&execution_host_id));
+        let runner = host::runner_for(
+            &execution_host,
+            &config.ssh_hosts,
+            cli_execution_path(&home)?,
+            &home,
+            host::SshAuth::default(),
+        )?;
+        remote_directory_listing(runner.as_ref(), &home, path.as_deref())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn update_project_execution_connection(
+    app: tauri::AppHandle,
+    project_id: String,
+    execution_host_id: String,
+    repository_path: String,
+) -> Result<ProjectExecutionConnection, String> {
+    let config_path = cli_config_path(&app)?;
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut config = read_cli_config(&config_path)?;
+        let execution_host = host::ExecutionHostId::parse(Some(&execution_host_id));
+        if execution_host.is_local() {
+            return Err("Remote connection에는 SSH 실행 호스트를 선택해야 합니다.".to_string());
+        }
+        let runner = host::runner_for(
+            &execution_host,
+            &config.ssh_hosts,
+            cli_execution_path(&home)?,
+            &home,
+            host::SshAuth::default(),
+        )?;
+        let root = resolve_workspace_with(runner.as_ref(), Path::new(&repository_path))?;
+        let remote = repository_remote_on(runner.as_ref(), &root);
+        let root = root
+            .into_os_string()
+            .into_string()
+            .map_err(|_| "원격 Git 저장소 경로를 표시할 수 없습니다.".to_string())?;
+        let project = config
+            .projects
+            .iter_mut()
+            .find(|project| project.id == project_id)
+            .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
+        project.execution_host_id = Some(execution_host.as_stored());
+        project.repository_path = root.clone();
+        project.repository_remote = remote.clone();
+        write_cli_config(&config_path, &config)?;
+        Ok(ProjectExecutionConnection {
+            execution_host_id: execution_host.as_stored(),
+            repository_path: root,
+            repository_remote: remote,
+        })
     })
     .await
     .map_err(|error| error.to_string())?
@@ -4625,6 +4816,9 @@ pub fn run() {
             disconnect_local_project,
             connect_local_project,
             list_execution_hosts,
+            load_project_execution_connection,
+            list_remote_directory,
+            update_project_execution_connection,
             resolve_ssh_host,
             add_ssh_host,
             remove_ssh_host,
