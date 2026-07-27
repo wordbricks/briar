@@ -116,4 +116,38 @@ describe("SelectMenu", () => {
     await act(async () => root.unmount());
     container.remove();
   });
+
+  it("renders the portaled listbox above the trigger's ancestor layer", async () => {
+    const container = document.createElement("div");
+    container.style.position = "fixed";
+    container.style.zIndex = "1001";
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <SelectMenu
+          id="modal-select"
+          label="Recurrence"
+          onValueChange={() => undefined}
+          options={[
+            { label: "Daily", value: "daily" },
+            { label: "Weekdays", value: "weekdays" },
+          ]}
+          value="weekdays"
+        />,
+      );
+    });
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>("#modal-select")?.click();
+    });
+
+    const listbox =
+      document.querySelector<HTMLDivElement>("#modal-select-listbox");
+    expect(listbox?.style.zIndex).toBe("1002");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
 });

@@ -25,7 +25,28 @@ type MenuPosition = {
   maxHeight: number;
   top?: number;
   width: number;
+  zIndex: number;
 };
+
+const defaultMenuZIndex = 120;
+
+function getMenuZIndex(trigger: HTMLElement) {
+  let zIndex = defaultMenuZIndex;
+  let ancestor = trigger.parentElement;
+
+  while (ancestor) {
+    const ancestorZIndex = Number.parseInt(
+      window.getComputedStyle(ancestor).zIndex,
+      10,
+    );
+    if (Number.isFinite(ancestorZIndex)) {
+      zIndex = Math.max(zIndex, ancestorZIndex + 1);
+    }
+    ancestor = ancestor.parentElement;
+  }
+
+  return zIndex;
+}
 
 export function SelectMenu({
   align = "start",
@@ -111,6 +132,7 @@ export function SelectMenu({
       left,
       maxHeight: availableHeight,
       width,
+      zIndex: getMenuZIndex(trigger),
     });
   }, [align, options]);
 
@@ -244,6 +266,7 @@ export function SelectMenu({
         left: menuPosition.left,
         top: menuPosition.top,
         width: menuPosition.width,
+        zIndex: menuPosition.zIndex,
       } as CSSProperties)
     : undefined;
 
