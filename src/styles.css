@@ -2254,6 +2254,30 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .companion-settings-identity { margin-top: 14px; display: grid; gap: 4px; }
 .companion-settings-identity strong { font-size: 15px; }
 .companion-settings-identity small { color: #777871; font-size: 12px; }
+.companion-settings-description { margin: 8px 0 0; color: #777871; font-size: 12px; line-height: 1.45; }
+.companion-settings-app-icons { margin-top: 14px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.companion-settings-app-icons button {
+  min-width: 0;
+  min-height: 74px;
+  padding: 9px;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid rgba(63,61,69,.10);
+  border-radius: 14px;
+  color: #575952;
+  background: #fafaf8;
+  font-size: 12px;
+  text-align: left;
+}
+.companion-settings-app-icons button:disabled { opacity: .68; }
+.companion-settings-app-icons button[aria-checked="true"] { border-color: rgba(91,67,170,.28); color: #5b43aa; background: #f0ecfb; font-weight: 700; }
+.companion-settings-app-icons button:focus-visible { outline: 2px solid #765bd0; outline-offset: 2px; }
+.companion-settings-app-icons img { width: 48px; height: 48px; display: block; border-radius: 11px; }
+.companion-settings-app-icons span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.companion-settings-app-icons svg { justify-self: end; }
+.companion-settings-error { margin: 10px 2px 0; color: #b34141; font-size: 12px; line-height: 1.4; }
 .companion-settings-language { margin-top: 12px; display: grid; gap: 3px; }
 .companion-settings-language button {
   min-height: 46px;

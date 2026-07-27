@@ -1,7 +1,9 @@
 package app.briar.companion
 
 import android.content.ActivityNotFoundException
+import android.content.ComponentName
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.webkit.JavascriptInterface
@@ -28,6 +30,7 @@ class MainActivity : TauriActivity() {
     super.onWebViewCreate(webView)
     appWebView = webView
     webView.addJavascriptInterface(BriarAndroidAuthBridge(), AUTH_BRIDGE)
+    webView.addJavascriptInterface(BriarAndroidIconBridge(), ICON_BRIDGE)
     if (pendingAuthReturn) {
       notifyAuthReturn(true)
     }
@@ -83,9 +86,76 @@ class MainActivity : TauriActivity() {
     }
   }
 
+  inner class BriarAndroidIconBridge {
+    @JavascriptInterface
+    fun current(): String = currentAppIcon()
+
+    @JavascriptInterface
+    fun set(icon: String): Boolean {
+      if (icon !in ICON_ALIASES) return false
+      return try {
+        switchAppIcon(icon)
+        true
+      } catch (_: RuntimeException) {
+        false
+      }
+    }
+  }
+
+  private fun currentAppIcon(): String {
+    for (icon in listOf("gray", "pink", "green")) {
+      val alias = ICON_ALIASES.getValue(icon)
+      if (
+        packageManager.getComponentEnabledSetting(iconComponent(alias)) ==
+          PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+      ) {
+        return icon
+      }
+    }
+    return "purple"
+  }
+
+  private fun switchAppIcon(icon: String) {
+    val selectedAlias = ICON_ALIASES.getValue(icon)
+    packageManager.setComponentEnabledSetting(
+      iconComponent(selectedAlias),
+      if (icon == "purple") {
+        PackageManager.COMPONENT_ENABLED_STATE_DEFAULT
+      } else {
+        PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+      },
+      PackageManager.DONT_KILL_APP,
+    )
+
+    ICON_ALIASES
+      .filterKeys { it != icon }
+      .forEach { (otherIcon, alias) ->
+        packageManager.setComponentEnabledSetting(
+          iconComponent(alias),
+          if (otherIcon == "purple") {
+            PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+          } else {
+            PackageManager.COMPONENT_ENABLED_STATE_DEFAULT
+          },
+          PackageManager.DONT_KILL_APP,
+        )
+      }
+  }
+
+  private fun iconComponent(alias: String): ComponentName =
+    ComponentName(this, "$packageName.$alias")
+
   companion object {
     private const val AUTH_BRIDGE = "BriarAndroidAuth"
+    private const val ICON_BRIDGE = "BriarAndroidIcon"
     private const val AUTH_RETURN_HOST = "auth-complete"
     private const val AUTH_RETURN_SCHEME = "briar-companion"
+    private val ICON_ALIASES =
+      mapOf(
+        "purple" to "MainActivityPurple",
+        "gray" to "MainActivityGray",
+        "pink" to "MainActivityPink",
+        "green" to "MainActivityGreen",
+      )
   }
 }

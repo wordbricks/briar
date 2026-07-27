@@ -474,6 +474,60 @@ fn clear_session_token(app: tauri::AppHandle) -> Result<(), String> {
     clear_session_token_at(&session_file_path(&app)?)
 }
 
+fn valid_app_icon(icon: &str) -> bool {
+    matches!(icon, "purple" | "gray" | "pink" | "green")
+}
+
+#[cfg(target_os = "ios")]
+unsafe extern "C" {
+    fn briar_ios_current_app_icon(buffer: *mut std::ffi::c_char, length: usize) -> i32;
+    fn briar_ios_set_app_icon(icon: *const std::ffi::c_char) -> i32;
+}
+
+#[tauri::command]
+fn current_app_icon() -> Result<String, String> {
+    #[cfg(target_os = "ios")]
+    {
+        let mut buffer = [0 as std::ffi::c_char; 32];
+        let has_alternate_icon =
+            unsafe { briar_ios_current_app_icon(buffer.as_mut_ptr(), buffer.len()) } == 1;
+        if !has_alternate_icon {
+            return Ok("purple".to_string());
+        }
+        let icon = unsafe { std::ffi::CStr::from_ptr(buffer.as_ptr()) }
+            .to_str()
+            .map_err(|_| "The selected iOS app icon is invalid.".to_string())?;
+        return Ok(if valid_app_icon(icon) {
+            icon.to_string()
+        } else {
+            "purple".to_string()
+        });
+    }
+    #[cfg(not(target_os = "ios"))]
+    Err("Native app icon selection is only handled by this command on iOS.".to_string())
+}
+
+#[tauri::command]
+fn set_app_icon(icon: String) -> Result<(), String> {
+    if !valid_app_icon(&icon) {
+        return Err("Unsupported app icon.".to_string());
+    }
+    #[cfg(target_os = "ios")]
+    {
+        let icon_name = (icon != "purple")
+            .then(|| std::ffi::CString::new(icon).expect("validated icon names contain no nulls"));
+        let pointer = icon_name
+            .as_ref()
+            .map_or(std::ptr::null(), |name| name.as_ptr());
+        if unsafe { briar_ios_set_app_icon(pointer) } == 1 {
+            return Ok(());
+        }
+        return Err("This device does not support alternate app icons.".to_string());
+    }
+    #[cfg(not(target_os = "ios"))]
+    Err("Native app icon selection is only handled by this command on iOS.".to_string())
+}
+
 fn git_repository_root(path: &Path) -> Result<PathBuf, String> {
     if !path.is_dir() {
         return Err("선택한 폴더를 찾을 수 없습니다.".to_string());
@@ -3921,6 +3975,8 @@ pub fn run() {
             read_session_token,
             write_session_token,
             clear_session_token,
+            current_app_icon,
+            set_app_icon,
             validate_repository_path,
             project_workspace_root,
             create_project_workspace,

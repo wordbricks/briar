@@ -10,6 +10,58 @@
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
+	<key>CFBundleIcons</key>
+	<dict>
+		<key>CFBundlePrimaryIcon</key>
+		<dict>
+			<key>CFBundleIconName</key>
+			<string>AppIcon</string>
+		</dict>
+		<key>CFBundleAlternateIcons</key>
+		<dict>
+			<key>gray</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>AppIconGray</string>
+			</dict>
+			<key>pink</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>AppIconPink</string>
+			</dict>
+			<key>green</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>AppIconGreen</string>
+			</dict>
+		</dict>
+	</dict>
+	<key>CFBundleIcons~ipad</key>
+	<dict>
+		<key>CFBundlePrimaryIcon</key>
+		<dict>
+			<key>CFBundleIconName</key>
+			<string>AppIcon</string>
+		</dict>
+		<key>CFBundleAlternateIcons</key>
+		<dict>
+			<key>gray</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>AppIconGray</string>
+			</dict>
+			<key>pink</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>AppIconPink</string>
+			</dict>
+			<key>green</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>AppIconGreen</string>
+			</dict>
+		</dict>
+	</dict>
 	<key>CFBundleName</key>
 	<string>$(PRODUCT_NAME)</string>
 	<key>CFBundlePackageType</key>
