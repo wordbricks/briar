@@ -190,22 +190,28 @@ describe("HuntDashboard", () => {
     );
   });
 
-  it("uses the custom dropdown for issue priority and accepts image or video files", () => {
+  it("renders the issue editor metadata and accepts image or video files", () => {
     const markup = renderToStaticMarkup(
       <CreateIssueDialog
         isSubmitting={false}
         onClose={() => undefined}
         onCreate={async () => undefined}
+        projectName="GG"
       />,
     );
 
+    expect(markup).toContain("새 이슈");
+    expect(markup).toContain(">GG<");
+    expect(markup).toContain("할 일");
+    expect(markup).toContain("담당자");
+    expect(markup).toContain("프로젝트");
+    expect(markup).toContain("라벨");
     expect(markup).toContain('aria-haspopup="listbox" aria-label="우선순위"');
     expect(markup).toContain("native-select issue-priority-select");
     expect(markup).toContain('type="file"');
     expect(markup).toContain('aria-label="이미지 또는 영상 첨부"');
     expect(markup).toContain("video/quicktime");
-    expect(markup).toContain("이미지는 ⌘V");
-    expect(markup).toContain("생성 즉시 작업 큐");
+    expect(markup).toContain("Enter로 등록");
   });
 
   it("shows an active queue claim", () => {

@@ -73,6 +73,11 @@ describe("ProjectAgents", () => {
     expect(container.textContent).toContain(
       "모든 대기중인 이슈에 대해서 자동사냥을 수행하는것",
     );
+    const createCard = container.querySelector<HTMLButtonElement>(
+      ".project-agent-create-card",
+    );
+    expect(createCard?.textContent).toContain("에이전트 만들기");
+    expect(createCard?.textContent).toContain("책임과 프로바이더, 모델");
   });
 
   it("submits provider, default model, and a concrete responsibility", async () => {
