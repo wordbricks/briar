@@ -1,5 +1,6 @@
 import {
   Bot,
+  ChevronRight,
   CircleAlert,
   LoaderCircle,
   Pencil,
@@ -19,12 +20,16 @@ import {
   type AgentProvider,
 } from "../lib/project-llm";
 import { demoProjectAgents } from "../lib/demo-project-agents";
+import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import type {
   CreateProjectAgentInput,
+  DashboardPayload,
+  HuntRun,
   Project,
   ProjectAgent,
   UpdateProjectAgentInput,
 } from "../types";
+import { AutoHuntSessions } from "./AutoHuntSessions";
 import { NativeSelect } from "./NativeSelect";
 
 const providerLabels: Record<AgentProvider, string> = {
@@ -34,12 +39,24 @@ const providerLabels: Record<AgentProvider, string> = {
 };
 
 export function ProjectAgents({
+  dashboard,
+  error: appError,
   isSidebarOpen,
+  onRequestedSessionOpen,
+  onStart,
   project,
+  requestedSessionId = null,
+  sessions,
   token,
 }: {
+  dashboard: DashboardPayload | null;
+  error: string | null;
   isSidebarOpen: boolean;
+  onRequestedSessionOpen?: () => void;
+  onStart: (agentId: string, runs: HuntRun[]) => string;
   project: Project;
+  requestedSessionId?: string | null;
+  sessions: AutoHuntSession[];
   token: string | null;
 }) {
   const { locale, localeTag, t } = useI18n();
@@ -48,6 +65,7 @@ export function ProjectAgents({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingAgent, setEditingAgent] = useState<ProjectAgent | null>(null);
+  const [selectedAgent, setSelectedAgent] = useState<ProjectAgent | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -74,6 +92,25 @@ export function ProjectAgents({
     };
   }, [locale, project.id, token]);
 
+  useEffect(() => {
+    setSelectedAgent(null);
+  }, [project.id]);
+
+  useEffect(() => {
+    if (!requestedSessionId || agents.length === 0) return;
+    const requestedSession = sessions.find(
+      (session) =>
+        session.projectId === project.id &&
+        session.id === requestedSessionId,
+    );
+    if (!requestedSession) return;
+    const agent =
+      agents.find((candidate) => candidate.id === requestedSession.agentId) ??
+      agents.find((candidate) => candidate.kind === "auto_hunt");
+    if (!agent) return;
+    setSelectedAgent(agent);
+  }, [agents, project.id, requestedSessionId, sessions]);
+
   const addAgent = async (input: CreateProjectAgentInput) => {
     setIsSubmitting(true);
     setError(null);
@@ -88,6 +125,7 @@ export function ProjectAgents({
             provider: input.provider,
             model: input.model,
             responsibility: input.responsibility,
+            kind: "custom" as const,
             createdAt,
             updatedAt: createdAt,
           };
@@ -119,6 +157,7 @@ export function ProjectAgents({
           candidate.id === agent.id ? agent : candidate,
         ),
       );
+      setSelectedAgent((current) => current?.id === agent.id ? agent : current);
       setIsDialogOpen(false);
       setEditingAgent(null);
     } finally {
@@ -135,6 +174,22 @@ export function ProjectAgents({
     setIsDialogOpen(false);
     setEditingAgent(null);
   };
+
+  if (selectedAgent) {
+    return (
+      <AutoHuntSessions
+        agent={selectedAgent}
+        dashboard={dashboard}
+        error={appError}
+        isSidebarOpen={isSidebarOpen}
+        onAgentBack={() => setSelectedAgent(null)}
+        onRequestedSessionOpen={onRequestedSessionOpen}
+        onStart={(runs) => onStart(selectedAgent.id, runs)}
+        requestedSessionId={requestedSessionId}
+        sessions={sessions}
+      />
+    );
+  }
 
   return (
     <main className="main-content project-agents-page" id="project-agents">
@@ -205,26 +260,33 @@ export function ProjectAgents({
               >
                 {agents.map((agent) => (
                   <article className="project-agent-card" key={agent.id}>
-                    <header>
-                      <span className={`project-agent-avatar ${agent.provider}`}>
-                        <Bot size={19} />
-                      </span>
-                      <div>
-                        <h2>{agent.name}</h2>
-                        <span>{t("agents.ready")}</span>
+                    <button
+                      aria-label={t("agents.openAgent", { name: agent.name })}
+                      className="project-agent-card-open"
+                      onClick={() => setSelectedAgent(agent)}
+                      type="button"
+                    >
+                      <header>
+                        <span className={`project-agent-avatar ${agent.provider}`}>
+                          <Bot size={19} />
+                        </span>
+                        <div>
+                          <h2>{agent.name}</h2>
+                          <span>{t("agents.ready")}</span>
+                        </div>
+                      </header>
+                      <div className="project-agent-runtime">
+                        <span>{providerLabels[agent.provider]}</span>
+                        <i aria-hidden="true" />
+                        <span>
+                          {modelLabel(agent, t("agents.providerDefaultModel"))}
+                        </span>
                       </div>
-                    </header>
-                    <div className="project-agent-runtime">
-                      <span>{providerLabels[agent.provider]}</span>
-                      <i aria-hidden="true" />
-                      <span>
-                        {modelLabel(agent, t("agents.providerDefaultModel"))}
-                      </span>
-                    </div>
-                    <section>
-                      <small>{t("agents.responsibility")}</small>
-                      <p>{agent.responsibility}</p>
-                    </section>
+                      <section>
+                        <small>{t("agents.responsibility")}</small>
+                        <p>{agent.responsibility}</p>
+                      </section>
+                    </button>
                     <footer>
                       <time dateTime={agent.createdAt}>
                         {t("agents.created", {
@@ -246,6 +308,7 @@ export function ProjectAgents({
                         <Pencil size={12} />
                         {t("agents.edit")}
                       </button>
+                      <ChevronRight aria-hidden="true" size={14} />
                     </footer>
                   </article>
                 ))}

@@ -843,6 +843,7 @@ const projectAgentJson = (
     provider: row.provider,
     model: row.model,
     responsibility: copy.responsibility,
+    kind: row.kind,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

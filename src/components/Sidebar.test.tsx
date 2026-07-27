@@ -16,7 +16,6 @@ const sidebarProps = {
   onAddProject: () => undefined,
   onAgentsOpen: () => undefined,
   onScheduleOpen: () => undefined,
-  onAutoHuntOpen: () => undefined,
   onInboxOpen: () => undefined,
   onIssuesOpen: () => undefined,
   onAddOrganization: () => undefined,
@@ -72,7 +71,7 @@ describe("Sidebar", () => {
     expect(markup).toContain("에이전트");
     expect(markup).toContain("스케줄");
     expect(markup).toContain("받은 편지함");
-    expect(markup).toContain("자동사냥");
+    expect(markup).not.toContain('href="#auto-hunt"');
     expect(markup).not.toContain("도움말");
     expect(markup).not.toContain('href="#help"');
     expect(markup).toContain('aria-label="Briar 프로젝트 메뉴"');
@@ -422,7 +421,7 @@ describe("Sidebar", () => {
     });
 
     expect(container.textContent).toContain("Issues");
-    expect(container.textContent).toContain("Auto Hunt");
+    expect(container.textContent).not.toContain("Auto Hunt");
     expect(window.localStorage.getItem("briar.locale.v1")).toBe("en");
     expect(document.documentElement.lang).toBe("en-US");
 
@@ -446,7 +445,7 @@ describe("Sidebar", () => {
     });
 
     expect(container.textContent).toContain("问题");
-    expect(container.textContent).toContain("自动狩猎");
+    expect(container.textContent).not.toContain("自动狩猎");
     expect(window.localStorage.getItem("briar.locale.v1")).toBe("zh");
     expect(document.documentElement.lang).toBe("zh-CN");
     await act(async () => root.unmount());
