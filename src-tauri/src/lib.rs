@@ -161,7 +161,7 @@ fn repository_workflow_bootstrap() -> WorkflowConfig {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct StoredAutoHuntConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -182,16 +182,27 @@ struct StoredAutoHuntConfig {
     extra: BTreeMap<String, serde_json::Value>,
 }
 
-/// Sandbox settings owned by the CLI (`briar project configure`). Absent or
-/// `fullAccess: false` keeps agent writes confined to the checkout and the
-/// per-issue worktree root.
-#[derive(Clone, Deserialize, Serialize)]
+/// Auto Hunt filesystem access. Full access is the default; an explicit
+/// `fullAccess: false` confines writes to the checkout and worktree root.
+#[derive(Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct StoredSandboxConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     full_access: Option<bool>,
     #[serde(flatten)]
     extra: BTreeMap<String, serde_json::Value>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ProjectSandboxSettings {
+    full_access: bool,
+}
+
+impl Default for ProjectSandboxSettings {
+    fn default() -> Self {
+        Self { full_access: true }
+    }
 }
 
 /// Per-issue worktree settings owned by the CLI (`briar project configure`).
@@ -1607,8 +1618,8 @@ fn write_cli_connection(
         config.user_token = None;
     }
     config.api_url = api_url.clone();
-    // `briar project configure` owns the worktree block, so a settings save
-    // from the app must not silently reset it.
+    // Preserve CLI-owned worktree settings and the project sandbox choice when
+    // the app refreshes the rest of the connection record.
     let stored_auto_hunt = config
         .projects
         .iter()
@@ -1618,7 +1629,10 @@ fn write_cli_connection(
     let stored_sandbox = stored_auto_hunt.and_then(|auto_hunt| auto_hunt.sandbox.clone());
     let mut auto_hunt: StoredAutoHuntConfig = agent_config.auto_hunt.into();
     auto_hunt.worktrees = stored_worktrees;
-    auto_hunt.sandbox = stored_sandbox;
+    auto_hunt.sandbox = Some(stored_sandbox.unwrap_or_else(|| StoredSandboxConfig {
+        full_access: Some(ProjectSandboxSettings::default().full_access),
+        extra: BTreeMap::new(),
+    }));
     config.projects.retain(|project| project.id != project_id);
     config.projects.push(CliProject {
         id: project_id,
@@ -3687,8 +3701,9 @@ fn project_worktree_root(
     Ok(Some(root.join(project_id)))
 }
 
-/// Whether this project opted its Auto Hunt sessions out of the filesystem
-/// sandbox. Off unless the CLI wrote `autoHunt.sandbox.fullAccess: true`.
+/// Whether this project's Auto Hunt sessions run without a filesystem sandbox.
+/// Full access is the default; `autoHunt.sandbox.fullAccess: false` opts into
+/// workspace-confined writes.
 fn project_auto_hunt_full_access(config_path: &Path, project_id: &str) -> Result<bool, String> {
     Ok(read_cli_config(config_path)?
         .projects
@@ -3697,7 +3712,49 @@ fn project_auto_hunt_full_access(config_path: &Path, project_id: &str) -> Result
         .and_then(|project| project.auto_hunt.as_ref())
         .and_then(|auto_hunt| auto_hunt.sandbox.as_ref())
         .and_then(|sandbox| sandbox.full_access)
-        .unwrap_or(false))
+        .unwrap_or(true))
+}
+
+fn project_sandbox_settings_from(
+    config_path: &Path,
+    project_id: &str,
+) -> Result<ProjectSandboxSettings, String> {
+    let config = read_cli_config(config_path)?;
+    let project = config
+        .projects
+        .iter()
+        .find(|project| project.id == project_id)
+        .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
+    Ok(ProjectSandboxSettings {
+        full_access: project
+            .auto_hunt
+            .as_ref()
+            .and_then(|auto_hunt| auto_hunt.sandbox.as_ref())
+            .and_then(|sandbox| sandbox.full_access)
+            .unwrap_or(true),
+    })
+}
+
+fn update_project_sandbox_settings_at(
+    config_path: &Path,
+    project_id: &str,
+    settings: ProjectSandboxSettings,
+) -> Result<ProjectSandboxSettings, String> {
+    let mut config = read_cli_config(config_path)?;
+    let project = config
+        .projects
+        .iter_mut()
+        .find(|project| project.id == project_id)
+        .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
+    let auto_hunt = project
+        .auto_hunt
+        .get_or_insert_with(StoredAutoHuntConfig::default);
+    let sandbox = auto_hunt
+        .sandbox
+        .get_or_insert_with(StoredSandboxConfig::default);
+    sandbox.full_access = Some(settings.full_access);
+    write_cli_config(config_path, &config)?;
+    Ok(settings)
 }
 
 fn project_auto_hunt_uses_velen(config_path: &Path, project_id: &str) -> Result<bool, String> {
@@ -4668,6 +4725,33 @@ async fn update_project_llm_settings(
 }
 
 #[tauri::command]
+async fn load_project_sandbox_settings(
+    app: tauri::AppHandle,
+    project_id: String,
+) -> Result<ProjectSandboxSettings, String> {
+    let config_path = cli_config_path(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        project_sandbox_settings_from(&config_path, &project_id)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn update_project_sandbox_settings(
+    app: tauri::AppHandle,
+    project_id: String,
+    settings: ProjectSandboxSettings,
+) -> Result<ProjectSandboxSettings, String> {
+    let config_path = cli_config_path(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        update_project_sandbox_settings_at(&config_path, &project_id, settings)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
 async fn update_local_project_workflow(
     app: tauri::AppHandle,
     project_id: String,
@@ -5048,6 +5132,8 @@ pub fn run() {
             update_app_provider_settings,
             load_project_llm_settings,
             update_project_llm_settings,
+            load_project_sandbox_settings,
+            update_project_sandbox_settings,
             update_local_project_workflow,
             update_local_project_linear,
             update_local_project_velen_org,
@@ -5604,6 +5690,10 @@ branch refs/heads/briar/second-11111111
         assert_eq!(saved["projects"][1]["repositoryPath"], "/new/repository");
         assert_eq!(saved["projects"][1]["llm"]["approvalPolicy"], "never");
         assert_eq!(saved["projects"][1]["autoHunt"]["linear"]["enabled"], false);
+        assert_eq!(
+            saved["projects"][1]["autoHunt"]["sandbox"]["fullAccess"],
+            true
+        );
         assert_eq!(
             saved["projects"][1]["autoHunt"]["workflow"]["stages"]
                 .as_array()
@@ -6510,36 +6600,56 @@ branch refs/heads/briar/second-11111111
     }
 
     #[test]
-    fn auto_hunt_keeps_its_sandbox_unless_a_project_opts_out() {
+    fn auto_hunt_defaults_to_full_access_and_allows_a_workspace_sandbox() {
         let config_path = host_test_config_path("sandbox-default");
         config_with_cli_owned_settings(&config_path, None, None);
-        assert!(!project_auto_hunt_full_access(&config_path, "project-1")
+        assert!(project_auto_hunt_full_access(&config_path, "project-1")
             .expect("sandbox setting should resolve"));
 
-        let opted_out = host_test_config_path("sandbox-full-access");
+        let sandboxed = host_test_config_path("sandbox-workspace-only");
         config_with_cli_owned_settings(
-            &opted_out,
+            &sandboxed,
             None,
             Some(StoredSandboxConfig {
-                full_access: Some(true),
+                full_access: Some(false),
                 extra: BTreeMap::new(),
             }),
         );
-        assert!(project_auto_hunt_full_access(&opted_out, "project-1")
+        assert!(!project_auto_hunt_full_access(&sandboxed, "project-1")
             .expect("sandbox setting should resolve"));
     }
 
     #[test]
-    fn saving_project_settings_keeps_the_sandbox_opt_out() {
+    fn app_settings_can_change_and_preserve_the_workspace_sandbox() {
         let config_path = host_test_config_path("sandbox-preserve");
         config_with_cli_owned_settings(
             &config_path,
             None,
             Some(StoredSandboxConfig {
-                full_access: Some(true),
+                full_access: Some(false),
                 extra: BTreeMap::new(),
             }),
         );
+
+        assert!(
+            !project_sandbox_settings_from(&config_path, "project-1")
+                .expect("sandbox setting should load")
+                .full_access
+        );
+        update_project_sandbox_settings_at(
+            &config_path,
+            "project-1",
+            ProjectSandboxSettings { full_access: true },
+        )
+        .expect("sandbox setting should update");
+        assert!(project_auto_hunt_full_access(&config_path, "project-1")
+            .expect("updated sandbox setting should resolve"));
+        update_project_sandbox_settings_at(
+            &config_path,
+            "project-1",
+            ProjectSandboxSettings { full_access: false },
+        )
+        .expect("sandbox setting should update");
 
         write_cli_connection(
             &config_path,
@@ -6566,7 +6676,7 @@ branch refs/heads/briar/second-11111111
         )
         .expect("settings should save");
 
-        assert!(project_auto_hunt_full_access(&config_path, "project-1")
+        assert!(!project_auto_hunt_full_access(&config_path, "project-1")
             .expect("sandbox setting should survive an app-side save"));
     }
 

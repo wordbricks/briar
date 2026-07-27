@@ -496,6 +496,14 @@ body { overflow: hidden; font-synthesis: none; }
 .project-settings-auto-run-condition-check strong { color:#4d4856; font-size:var(--text-2xs); }
 .project-settings-auto-run-condition-check small { color:#96909e; font-size:var(--text-2xs); line-height:1.45; }
 .project-settings-auto-run-condition > em { color:#898391; font-size:var(--text-2xs); font-style:normal; }
+.project-settings-sandbox { margin-top:12px; padding:12px; display:flex; align-items:center; gap:10px; border:1px solid #d9e5df; border-radius:10px; background:#f8fcfa; }
+.project-settings-sandbox.unrestricted { border-color:#ead9b9; background:#fffaf0; }
+.project-settings-sandbox-icon { width:30px; height:30px; flex:0 0 30px; display:grid; place-items:center; border-radius:8px; color:#39745f; background:#e5f3ed; }
+.project-settings-sandbox.unrestricted .project-settings-sandbox-icon { color:#9a6515; background:#fff0cf; }
+.project-settings-sandbox > span:nth-child(2) { min-width:0; display:grid; gap:4px; }
+.project-settings-sandbox strong { color:#4d4856; font-size:var(--text-2xs); }
+.project-settings-sandbox small { color:#88818e; font-size:var(--text-2xs); line-height:1.5; }
+.project-settings-sandbox-error { margin:8px 0 0; color:#a33d4e; font-size:var(--text-2xs); }
 .project-settings-auto-run > footer { margin-top:13px; display:flex; align-items:center; justify-content:space-between; gap:16px; }
 .project-settings-auto-run > footer p { margin:0; color:#8b8593; font-size:var(--text-2xs); line-height:1.55; }
 .project-settings-auto-run > footer button { min-width:88px; height:34px; padding:0 12px; display:flex; align-items:center; justify-content:center; gap:6px; border:1px solid #6d52c7; border-radius:9px; color:#fff; background:#6d52c7; cursor:pointer; font-size:var(--text-2xs); font-weight:600; }

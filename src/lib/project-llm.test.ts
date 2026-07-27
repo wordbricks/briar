@@ -9,10 +9,12 @@ import {
   createProjectChat,
   loadAppProviderSettings,
   loadProjectLlmSettings,
+  loadProjectSandboxSettings,
   runProjectAgent,
   runProjectAgentSchedule,
   updateAppProviderSettings,
   updateProjectLlmSettings,
+  updateProjectSandboxSettings,
 } from "./project-llm";
 
 describe("project LLM gateway", () => {
@@ -261,5 +263,30 @@ describe("project LLM gateway", () => {
     expect(invoke).toHaveBeenNthCalledWith(2, "update_app_provider_settings", {
       settings: { codex: false, claude: true, grok: true },
     });
+  });
+
+  it("loads and updates the project Auto Hunt filesystem access", async () => {
+    invoke
+      .mockResolvedValueOnce({ fullAccess: true })
+      .mockResolvedValueOnce({ fullAccess: false });
+
+    await expect(loadProjectSandboxSettings("project-1")).resolves.toEqual({
+      fullAccess: true,
+    });
+    await expect(
+      updateProjectSandboxSettings("project-1", { fullAccess: false }),
+    ).resolves.toEqual({ fullAccess: false });
+
+    expect(invoke).toHaveBeenNthCalledWith(1, "load_project_sandbox_settings", {
+      projectId: "project-1",
+    });
+    expect(invoke).toHaveBeenNthCalledWith(
+      2,
+      "update_project_sandbox_settings",
+      {
+        projectId: "project-1",
+        settings: { fullAccess: false },
+      },
+    );
   });
 });
