@@ -55,6 +55,12 @@ const projectAgentSchema = z.object({
   id: z.string().uuid(),
   projectId: z.string().uuid(),
   name: z.string(),
+  avatar: z
+    .string()
+    .max(400_000)
+    .regex(/^data:image\/(?:jpeg|png|webp);base64,/u)
+    .nullable()
+    .default(null),
   provider: z.enum(["codex", "claude", "grok"]),
   model: z.string().nullable(),
   responsibility: z.string(),

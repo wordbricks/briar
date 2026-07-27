@@ -128,6 +128,7 @@ export function ProjectAgents({
             id: crypto.randomUUID(),
             projectId: project.id,
             name: input.name ?? `${providerLabels[input.provider]} Agent`,
+            avatar: input.avatar ?? null,
             provider: input.provider,
             model: input.model,
             responsibility: input.responsibility,
@@ -159,6 +160,8 @@ export function ProjectAgents({
       : {
           ...agent,
           name: input.name ?? `${providerLabels[input.provider]} Agent`,
+          avatar:
+            input.avatar === undefined ? agent.avatar : input.avatar,
           provider: input.provider,
           model: input.model,
           responsibility: input.responsibility,
@@ -289,7 +292,11 @@ export function ProjectAgents({
                     >
                       <header>
                         <span className={`project-agent-avatar ${agent.provider}`}>
-                          <Bot size={19} />
+                          {agent.avatar ? (
+                            <img alt="" src={agent.avatar} />
+                          ) : (
+                            <Bot size={19} />
+                          )}
                         </span>
                         <div>
                           <h2>{agent.name}</h2>

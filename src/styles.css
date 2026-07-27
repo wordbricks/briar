@@ -1846,7 +1846,8 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .project-agent-card-open { min-width:0; flex:1; padding:0; display:flex; flex-direction:column; border:0; color:inherit; background:transparent; text-align:left; cursor:pointer; font:inherit; }
 .project-agent-card-open:focus-visible { outline:3px solid rgba(79,128,200,.24); outline-offset:-3px; }
 .project-agent-card-open > header { min-height:90px; padding:20px 20px 14px; display:grid; grid-template-columns:46px minmax(0,1fr); align-items:center; gap:13px; }
-.project-agent-avatar { width:46px; height:46px; display:grid; place-items:center; border:1px solid #dfdfdc; border-radius:12px; color:#777873; background:#f7f7f5; }
+.project-agent-avatar { width:46px; height:46px; overflow:hidden; display:grid; place-items:center; border:1px solid #dfdfdc; border-radius:12px; color:#777873; background:#f7f7f5; }
+.project-agent-avatar img { width:100%; height:100%; display:block; object-fit:cover; }
 .project-agent-avatar.claude { color:#9b664b; background:#fff7f2; }
 .project-agent-avatar.grok { color:#39776f; background:#f0f8f6; }
 .project-agent-card-open > header > div { min-width:0; display:grid; gap:5px; }
@@ -1916,6 +1917,17 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .project-agent-settings-card > header small { color:#85828b; font-size:9px; line-height:1.5; }
 .project-agent-settings-card-icon { width:34px; height:34px; flex:0 0 34px; display:grid; place-items:center; border-radius:10px; color:#6650b4; background:#eeeafd; }
 .project-agent-settings-fields { margin-top:20px; display:grid; gap:17px; }
+.project-agent-avatar-field { min-width:0; display:grid; gap:7px; color:#686a63; font-size:9px; font-weight:650; }
+.project-agent-avatar-field > div { min-width:0; display:flex; align-items:center; gap:14px; }
+.project-agent-avatar-preview { width:72px; height:72px; flex:0 0 72px; overflow:hidden; display:grid; place-items:center; border:1px solid #dedbe8; border-radius:18px; color:#6650b4; background:#f1edfc; }
+.project-agent-avatar-preview img { width:100%; height:100%; display:block; object-fit:cover; }
+.project-agent-avatar-actions { min-width:0; display:flex; align-items:center; flex-wrap:wrap; gap:7px; }
+.project-agent-avatar-actions > small { width:100%; color:#999b94; font-size:8px; font-weight:500; line-height:1.5; }
+.project-agent-avatar-upload,.project-agent-avatar-remove { min-height:32px; padding:0 10px; display:inline-flex; align-items:center; justify-content:center; gap:6px; border:1px solid #d9d5e5; border-radius:9px; color:#62586d; background:#fff; cursor:pointer; font-size:9px; font-weight:650; }
+.project-agent-avatar-upload:hover,.project-agent-avatar-remove:hover:not(:disabled) { border-color:#bfb5dc; color:#564096; background:#faf8ff; }
+.project-agent-avatar-upload:focus-within,.project-agent-avatar-remove:focus-visible { outline:2px solid #8b70dd; outline-offset:2px; }
+.project-agent-avatar-upload input { width:1px; height:1px; overflow:hidden; position:absolute; padding:0; border:0; clip:rect(0 0 0 0); white-space:nowrap; }
+.project-agent-avatar-remove:disabled { cursor:default; opacity:.55; }
 .project-agent-settings-fields label { min-width:0; display:grid; gap:7px; color:#686a63; font-size:9px; font-weight:650; }
 .project-agent-settings-fields input,.project-agent-settings-fields textarea { width:100%; padding:12px 13px; border:1px solid #e1e2dc; border-radius:11px; outline:none; color:#3f403b; background:#fafaf7; font-size:11px; resize:vertical; }
 .project-agent-settings-fields input:focus,.project-agent-settings-fields textarea:focus { border-color:#8068ce; background:#fff; box-shadow:0 0 0 3px rgba(128,104,206,.12); }

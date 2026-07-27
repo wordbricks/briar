@@ -22,6 +22,7 @@ describe("ProjectAgentSettings", () => {
       id: "agent-1",
       projectId: "project-1",
       name: "Auto Hunt agent",
+      avatar: null,
       provider: "codex" as const,
       model: null,
       responsibility: "Process queued issues.",
@@ -52,9 +53,15 @@ describe("ProjectAgentSettings", () => {
 
     expect(
       container.querySelector<HTMLInputElement>(
-        ".project-agent-settings-fields input",
+        '.project-agent-settings-fields input[placeholder="예: Jay 자동 사냥 에이전트"]',
       )?.value,
     ).toBe("Auto Hunt agent");
+    expect(
+      container.querySelector('input[aria-label="이미지 업로드"]'),
+    ).not.toBeNull();
+    expect(
+      container.querySelector(".project-agent-settings-fields .native-select"),
+    ).toBeNull();
     expect(container.textContent).toContain("프로젝트 실행 기본값");
     expect(
       container.querySelector("#project-agent-runtime-provider"),

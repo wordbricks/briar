@@ -307,6 +307,12 @@ const projectInputSchema = z.object({
 const projectAgentInputSchema = z
   .object({
     name: z.string().trim().min(1).max(100).nullable().optional(),
+    avatar: z
+      .string()
+      .max(400_000)
+      .regex(/^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/]+={0,2}$/iu)
+      .nullable()
+      .optional(),
     provider: z.enum(["codex", "claude", "grok"]),
     model: z.string().trim().min(1).max(100).nullable().optional(),
     responsibility: z.string().trim().min(1).max(2_000),
@@ -845,6 +851,7 @@ const projectAgentJson = (
     id: row.id,
     projectId: row.project_id,
     name: copy.name,
+    avatar: row.avatar,
     provider: row.provider,
     model: row.model,
     responsibility: copy.responsibility,
@@ -1330,6 +1337,7 @@ async function route(
           : "Grok";
     const agent = await createProjectAgent(db, project.id, {
       name: input.name ?? `${providerName} Agent`,
+      avatar: input.avatar ?? null,
       provider: input.provider,
       model: input.model ?? null,
       responsibility: input.responsibility,
@@ -1541,6 +1549,7 @@ async function route(
       projectAgentMatch[2],
       {
         name: input.name ?? `${providerName} Agent`,
+        avatar: input.avatar,
         provider: input.provider,
         model: input.model ?? null,
         responsibility: input.responsibility,

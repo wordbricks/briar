@@ -17,6 +17,7 @@ export function demoProjectAgents(
       id: "demo-agent-auto-hunt",
       projectId,
       name: defaultAgent.name,
+      avatar: null,
       provider: "codex",
       model: null,
       responsibility: defaultAgent.responsibility,
@@ -30,6 +31,7 @@ export function demoProjectAgents(
       id: "demo-agent-sentry",
       projectId,
       name: "Sentry 오류 탐지 에이전트",
+      avatar: null,
       provider: "claude",
       model: "opus",
       responsibility:
@@ -48,6 +50,7 @@ export function demoProjectAgents(
       id: "demo-agent-feedback",
       projectId,
       name: "Feedback 분석 에이전트",
+      avatar: null,
       provider: "grok",
       model: "grok-4.5",
       responsibility:

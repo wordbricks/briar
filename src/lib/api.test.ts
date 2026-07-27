@@ -456,6 +456,7 @@ describe("API errors", () => {
         "11111111-1111-4111-8111-111111111111",
         {
           name: "Release agent",
+          avatar: "data:image/webp;base64,aA==",
           provider: "claude",
           model: "sonnet",
           responsibility: "릴리스 상태를 점검합니다.",
@@ -464,6 +465,7 @@ describe("API errors", () => {
       ),
     ).resolves.toMatchObject({
       name: "Release agent",
+      avatar: "data:image/webp;base64,aA==",
       provider: "claude",
       model: "sonnet",
       responsibility: "릴리스 상태를 점검합니다.",
