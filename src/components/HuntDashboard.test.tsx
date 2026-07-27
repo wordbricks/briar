@@ -316,7 +316,9 @@ describe("HuntDashboard", () => {
       ".issue-activity-trigger",
     );
     expect(activityTrigger?.getAttribute("aria-label")).toBe("상태 히스토리 열기");
-    expect(activityTrigger?.textContent).toContain("구현");
+    expect(activityTrigger?.querySelector("strong")?.textContent).toBe(
+      demoDashboard.runs[0].events[0].detail,
+    );
     expect(activityTrigger?.textContent).toContain("시도 1");
     expect(activityTrigger?.textContent).not.toContain("기록 3개");
     expect(container.querySelectorAll(".issue-activity .timeline-event")).toHaveLength(0);
@@ -341,8 +343,9 @@ describe("HuntDashboard", () => {
     const descriptionPane = container.querySelector(".issue-description-pane");
     expect(descriptionPane).not.toBeNull();
     expect(descriptionPane?.querySelector(":scope > header")).toBeNull();
-    expect(descriptionPane?.querySelector(".issue-description-markdown p")?.textContent)
-      .toBe(demoDashboard.runs[0].detail);
+    expect(descriptionPane?.querySelector(".issue-description-markdown")).toBeNull();
+    expect(descriptionPane?.querySelector(".issue-description-empty")).not.toBeNull();
+    expect(descriptionPane?.textContent).not.toContain(demoDashboard.runs[0].detail);
     const content = container.querySelector<HTMLElement>(".run-page-content");
     const contentDivider = container.querySelector<HTMLElement>(
       ".issue-content-divider",
