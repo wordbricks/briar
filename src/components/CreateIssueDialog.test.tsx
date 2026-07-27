@@ -89,4 +89,51 @@ describe("CreateIssueDialog clipboard attachments", () => {
 
     await act(async () => root.unmount());
   });
+
+  it("submits with Command+Enter when the title is present", async () => {
+    const onCreate = vi.fn(async () => undefined);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <CreateIssueDialog
+          isSubmitting={false}
+          onClose={() => undefined}
+          onCreate={onCreate}
+          projectName="GG"
+        />,
+      );
+    });
+
+    const titleInput =
+      container.querySelector<HTMLInputElement>(".issue-title-input");
+    expect(titleInput).not.toBeNull();
+
+    await act(async () => {
+      const valueSetter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set;
+      valueSetter?.call(titleInput, "Keyboard-created issue");
+      titleInput?.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    await act(async () => {
+      container.querySelector("textarea")?.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          bubbles: true,
+          key: "Enter",
+          metaKey: true,
+        }),
+      );
+    });
+
+    expect(onCreate).toHaveBeenCalledWith({
+      attachments: [],
+      description: null,
+      priority: 2,
+      title: "Keyboard-created issue",
+    });
+
+    await act(async () => root.unmount());
+  });
 });
