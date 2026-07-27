@@ -30,6 +30,7 @@ import type {
   SessionUser,
   UpdateProjectAgentInput,
   UpdateProjectAgentScheduleInput,
+  UpdateIssueInput,
 } from "../types";
 
 const apiUrl = import.meta.env.VITE_BRIAR_API_URL?.replace(/\/$/u, "") ?? "";
@@ -598,6 +599,23 @@ export async function createIssue(
     status: "backlog" | "queued";
     attachments: IssueAttachment[];
   }>(`/projects/${projectId}/issues`, token, { method: "POST", body: form });
+}
+
+export async function updateIssue(
+  token: string,
+  projectId: string,
+  runId: string,
+  input: UpdateIssueInput,
+) {
+  return request<{
+    runId: string;
+    title: string;
+    description: string | null;
+    priority: number | null;
+  }>(`/projects/${projectId}/runs/${runId}`, token, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
 }
 
 export async function loadIssueAttachment(

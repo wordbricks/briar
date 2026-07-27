@@ -78,6 +78,7 @@ import {
   updateProjectAgentSchedule,
   updateProjectSettings,
   updateOrganization,
+  updateIssue,
   type HuntEventRow,
   type HuntRunRow,
   type IssueAttachmentInput,
@@ -369,6 +370,19 @@ const issueInputSchema = z
     description: z.string().trim().max(100_000).nullable().optional(),
     priority: z.number().int().min(1).max(4).nullable().optional(),
     status: z.enum(["backlog", "queued"]).default("queued"),
+  })
+  .strict();
+
+export const issueUpdateInputSchema = issueInputSchema
+  .pick({
+    title: true,
+    description: true,
+    priority: true,
+  })
+  .required({
+    title: true,
+    description: true,
+    priority: true,
   })
   .strict();
 
@@ -1052,7 +1066,7 @@ function dashboardRunJson(
     leaseExpiresAt: run.lease_expires_at,
     claimAttempts: run.claim_attempts,
     startedAt: run.started_at,
-    updatedAt: run.last_event_at,
+    updatedAt: run.updated_at,
     completedAt: run.completed_at,
     eventCount: run.event_count,
     events: events.map(dashboardEventJson),
@@ -1978,6 +1992,35 @@ async function route(
   const recoveryMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/(retry|cancel)$/u,
   );
+
+  const issueUpdateMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)$/u,
+  );
+  if (issueUpdateMatch && request.method === "PATCH") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, issueUpdateMatch[1], session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    const input = issueUpdateInputSchema.parse(await readJson(request));
+    const run = await updateIssue(
+      db,
+      project.id,
+      issueUpdateMatch[2],
+      {
+        title: input.title,
+        description: input.description ?? null,
+        priority: input.priority ?? null,
+        updatedAt: new Date().toISOString(),
+      },
+    );
+    if (!run) throw new HttpError(404, "Run not found");
+    return json({
+      runId: run.id,
+      title: run.title,
+      description: run.issue_description,
+      priority: run.priority,
+    });
+  }
+
   if (recoveryMatch && request.method === "POST") {
     const session = await requireSession(auth, request);
     const project = await getProject(db, recoveryMatch[1], session.user.id);

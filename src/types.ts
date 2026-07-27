@@ -38,6 +38,12 @@ export type CreateIssueInput = {
   attachments: File[];
 };
 
+export type UpdateIssueInput = {
+  title: string;
+  description: string | null;
+  priority: number | null;
+};
+
 export type HuntEvent = {
   id: string;
   attempt: number;
