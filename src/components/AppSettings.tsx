@@ -1,6 +1,5 @@
 import {
   Archive,
-  ArrowLeft,
   Bot,
   Cable,
   ChevronDown,
@@ -12,11 +11,33 @@ import {
   Link2,
   LoaderCircle,
   RefreshCw,
-  Search,
   Settings2,
   SlidersHorizontal,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+
+import {
+  ProviderIcon,
+  ProviderRow,
+  SettingsBackButton,
+  SettingsCard,
+  SettingsGroupHeading,
+  SettingsIconButton,
+  SettingsMain,
+  SettingsNav,
+  SettingsNavGroup,
+  SettingsNavItem,
+  SettingsNote,
+  SettingsPageHeader,
+  SettingsPlaceholder,
+  SettingsScroll,
+  SettingsSearch,
+  SettingsSection as SettingsContent,
+  SettingsShell,
+  SettingsSidebar,
+  SettingsAlert,
+} from "@/components/settings";
+import { Typography } from "@/components/ui/typography";
 import { useI18n } from "../i18n";
 import {
   inspectOnboardingPrerequisites,
@@ -275,103 +296,71 @@ export function AppSettings({
   const sectionDescription = sectionDescriptions[activeSection];
 
   return (
-    <main className="app-settings">
-      <aside
-        aria-hidden={!isSidebarOpen}
-        aria-label={t("appSettings.navigation")}
-        className={`sidebar app-settings-sidebar${
-          isSidebarOpen ? "" : " sidebar-collapsed"
-        }`}
-        id="app-sidebar"
-        inert={!isSidebarOpen ? true : undefined}
-      >
-        <div
-          className="app-settings-sidebar-toolbar"
-          data-tauri-drag-region
+    <SettingsShell>
+      <SettingsSidebar isOpen={isSidebarOpen} label={t("appSettings.navigation")}>
+        <SettingsBackButton onClick={onBack}>
+          {t("appSettings.back")}
+        </SettingsBackButton>
+
+        <SettingsSearch
+          label={t("appSettings.search")}
+          onChange={setSearchQuery}
+          value={searchQuery}
         />
 
-        <button className="app-settings-back" onClick={onBack} type="button">
-          <ArrowLeft size={16} strokeWidth={1.9} />
-          <span>{t("appSettings.back")}</span>
-        </button>
-
-        <label className="app-settings-search">
-          <Search aria-hidden="true" size={14} strokeWidth={1.9} />
-          <input
-            aria-label={t("appSettings.search")}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder={t("appSettings.search")}
-            type="search"
-            value={searchQuery}
-          />
-        </label>
-
-        <nav className="app-settings-nav">
+        <SettingsNav>
           {filteredGroups.map((group) => (
-            <div className="app-settings-nav-group" key={group.id}>
-              <p>{group.label}</p>
+            <SettingsNavGroup key={group.id} label={group.label}>
               {group.items.map((item) => (
-                <button
-                  aria-current={activeSection === item.id ? "page" : undefined}
-                  className={activeSection === item.id ? "active" : ""}
+                <SettingsNavItem
+                  active={activeSection === item.id}
+                  icon={item.icon}
                   key={item.id}
                   onClick={() => setActiveSection(item.id)}
-                  type="button"
                 >
-                  {item.icon}
-                  <span>{item.label}</span>
-                </button>
+                  {item.label}
+                </SettingsNavItem>
               ))}
-            </div>
+            </SettingsNavGroup>
           ))}
-        </nav>
-      </aside>
+        </SettingsNav>
+      </SettingsSidebar>
 
-      <section className="main-content app-settings-main">
-        <div
-          className={`app-settings-main-toolbar${
-            isSidebarOpen ? "" : " sidebar-closed"
-          }`}
-          data-tauri-drag-region="deep"
-        />
-
-        <div className="app-settings-scroll">
-          <header className="app-settings-page-header">
-            <h1>{activeItem?.label ?? t("appSettings.title")}</h1>
-            <p>{sectionDescription}</p>
-          </header>
+      <SettingsMain isSidebarOpen={isSidebarOpen}>
+        <SettingsScroll>
+          <SettingsPageHeader
+            description={sectionDescription}
+            title={activeItem?.label ?? t("appSettings.title")}
+          />
 
           {activeSection === "providers" ? (
-            <div className="source-control-settings provider-settings">
+            <SettingsContent>
               <SettingsGroupHeading
                 action={
-                  <div className="provider-heading-actions">
+                  <div className="flex items-center justify-end gap-2">
                     {providersChecked ? (
-                      <span>{t("appSettings.checkedJustNow")}</span>
+                      <Typography tone="muted" variant="caption">
+                        {t("appSettings.checkedJustNow")}
+                      </Typography>
                     ) : null}
-                    <button
+                    <SettingsIconButton
                       aria-label={t("appSettings.refreshProviders")}
-                      className="source-control-refresh"
                       disabled={providersLoading || providerSaving !== null}
                       onClick={() => void refreshProviders()}
                       title={t("appSettings.refreshProviders")}
-                      type="button"
                     >
                       {providersLoading ? (
                         <LoaderCircle className="spin" size={16} />
                       ) : (
                         <RefreshCw size={16} />
                       )}
-                    </button>
+                    </SettingsIconButton>
                   </div>
                 }
                 title={t("appSettings.providers")}
               />
 
-              <div
-                aria-busy={providersLoading || providerSaving !== null}
-                className="source-control-card provider-card"
-              >
+              <SettingsCard aria-busy={providersLoading || providerSaving !== null}>
                 <ProviderRow
                   available={Boolean(
                     providerStatuses?.codex.installed &&
@@ -388,9 +377,9 @@ export function AppSettings({
                   disabled={providerSaving !== null}
                   enabled={providerSettings?.codex ?? false}
                   icon={
-                    <span className="source-control-provider-icon codex">
+                    <ProviderIcon tone="codex">
                       <CodexIcon size={20} />
-                    </span>
+                    </ProviderIcon>
                   }
                   name="Codex"
                   onToggle={(enabled) => void toggleProvider("codex", enabled)}
@@ -406,7 +395,7 @@ export function AppSettings({
                     providerSaving === "codex" ? (
                       <LoaderCircle
                         aria-label={t("common.saving")}
-                        className="provider-saving spin"
+                        className="spin"
                         size={16}
                       />
                     ) : null
@@ -428,9 +417,9 @@ export function AppSettings({
                   disabled={providerSaving !== null}
                   enabled={providerSettings?.claude ?? false}
                   icon={
-                    <span className="source-control-provider-icon claude">
+                    <ProviderIcon tone="claude">
                       <ClaudeIcon size={19} />
-                    </span>
+                    </ProviderIcon>
                   }
                   name="Claude"
                   onToggle={(enabled) => void toggleProvider("claude", enabled)}
@@ -446,7 +435,7 @@ export function AppSettings({
                     providerSaving === "claude" ? (
                       <LoaderCircle
                         aria-label={t("common.saving")}
-                        className="provider-saving spin"
+                        className="spin"
                         size={16}
                       />
                     ) : null
@@ -468,9 +457,9 @@ export function AppSettings({
                   disabled={providerSaving !== null}
                   enabled={providerSettings?.grok ?? false}
                   icon={
-                    <span className="source-control-provider-icon grok">
+                    <ProviderIcon tone="grok">
                       <GrokIcon size={19} />
-                    </span>
+                    </ProviderIcon>
                   }
                   name="Grok"
                   onToggle={(enabled) => void toggleProvider("grok", enabled)}
@@ -486,46 +475,40 @@ export function AppSettings({
                     providerSaving === "grok" ? (
                       <LoaderCircle
                         aria-label={t("common.saving")}
-                        className="provider-saving spin"
+                        className="spin"
                         size={16}
                       />
                     ) : null
                   }
                 />
-              </div>
+              </SettingsCard>
 
-              {providerError ? (
-                <p className="source-control-error" role="alert">
-                  {providerError}
-                </p>
-              ) : null}
-              <p className="source-control-project-note provider-project-note">
+              {providerError ? <SettingsAlert>{providerError}</SettingsAlert> : null}
+              <SettingsNote>
                 {t("appSettings.providerScope", { project: projectName })}
-              </p>
-            </div>
+              </SettingsNote>
+            </SettingsContent>
           ) : activeSection === "source-control" ? (
-            <div className="source-control-settings">
+            <SettingsContent>
               <SettingsGroupHeading
                 action={
-                  <button
+                  <SettingsIconButton
                     aria-label={t("appSettings.refresh")}
-                    className="source-control-refresh"
                     disabled={loading}
                     onClick={() => void onRefresh()}
                     title={t("appSettings.refresh")}
-                    type="button"
                   >
                     {loading ? (
                       <LoaderCircle className="spin" size={16} />
                     ) : (
                       <RefreshCw size={16} />
                     )}
-                  </button>
+                  </SettingsIconButton>
                 }
                 title={t("appSettings.versionControl")}
               />
 
-              <div className="source-control-card">
+              <SettingsCard>
                 <ProviderRow
                   available={readiness?.gitInstalled ?? false}
                   description={
@@ -535,9 +518,9 @@ export function AppSettings({
                   }
                   enabled={Boolean(readiness?.gitInstalled && gitEnabled)}
                   icon={
-                    <span className="source-control-provider-icon git">
+                    <ProviderIcon tone="git">
                       <GitBranch size={18} strokeWidth={2.2} />
-                    </span>
+                    </ProviderIcon>
                   }
                   name="Git"
                   onToggle={(enabled) => {
@@ -554,27 +537,44 @@ export function AppSettings({
                   }
                   trailing={
                     readiness?.gitInstalled ? (
-                      <button
+                      <SettingsIconButton
                         aria-expanded={gitExpanded}
                         aria-label={t("appSettings.gitDetails")}
-                        className="source-control-disclosure"
                         onClick={() => setGitExpanded((expanded) => !expanded)}
-                        type="button"
                       >
-                        <ChevronDown size={16} />
-                      </button>
+                        <ChevronDown
+                          className={gitExpanded ? "rotate-180 transition-transform" : "transition-transform"}
+                          size={16}
+                        />
+                      </SettingsIconButton>
                     ) : null
                   }
                 />
                 {gitExpanded && readiness ? (
-                  <div className="source-control-details">
-                    <span>
-                      <strong>{t("appSettings.repository")}</strong>
-                      <code>{readiness.repositoryPath}</code>
+                  <div className="mx-[18px] mb-0 mt-[-1px] grid grid-cols-2 gap-3.5 border-t border-border/80 py-3 pl-12">
+                    <span className="grid min-w-0 gap-1">
+                      <Typography
+                        as="strong"
+                        className="tracking-wide uppercase"
+                        tone="muted"
+                        variant="micro"
+                      >
+                        {t("appSettings.repository")}
+                      </Typography>
+                      <code className="truncate font-mono text-xs font-medium text-muted-foreground">
+                        {readiness.repositoryPath}
+                      </code>
                     </span>
-                    <span>
-                      <strong>{t("appSettings.remote")}</strong>
-                      <code>
+                    <span className="grid min-w-0 gap-1">
+                      <Typography
+                        as="strong"
+                        className="tracking-wide uppercase"
+                        tone="muted"
+                        variant="micro"
+                      >
+                        {t("appSettings.remote")}
+                      </Typography>
+                      <code className="truncate font-mono text-xs font-medium text-muted-foreground">
                         {readiness.remote ?? t("appSettings.notConnected")}
                       </code>
                     </span>
@@ -585,20 +585,16 @@ export function AppSettings({
                   badge={t("appSettings.comingSoon")}
                   description={t("appSettings.jujutsuDescription")}
                   enabled={false}
-                  icon={
-                    <span className="source-control-provider-icon jujutsu">
-                      jj
-                    </span>
-                  }
+                  icon={<ProviderIcon tone="jujutsu">jj</ProviderIcon>}
                   name="Jujutsu"
                   title="Jujutsu"
                 />
-              </div>
+              </SettingsCard>
 
               <SettingsGroupHeading
                 title={t("appSettings.sourceControlProviders")}
               />
-              <div className="source-control-card">
+              <SettingsCard>
                 <ProviderRow
                   available={Boolean(readiness?.ghInstalled)}
                   description={
@@ -614,9 +610,9 @@ export function AppSettings({
                   }
                   enabled={Boolean(readiness?.ghInstalled && githubEnabled)}
                   icon={
-                    <span className="source-control-provider-icon github">
+                    <ProviderIcon tone="github">
                       <Github size={20} strokeWidth={1.9} />
-                    </span>
+                    </ProviderIcon>
                   }
                   name="GitHub"
                   onToggle={(enabled) => {
@@ -637,9 +633,9 @@ export function AppSettings({
                   description={t("appSettings.gitlabUnavailable")}
                   enabled={false}
                   icon={
-                    <span className="source-control-provider-icon gitlab">
+                    <ProviderIcon tone="gitlab">
                       <Gitlab size={20} strokeWidth={1.8} />
-                    </span>
+                    </ProviderIcon>
                   }
                   name="GitLab"
                   title="GitLab"
@@ -649,9 +645,9 @@ export function AppSettings({
                   description={t("appSettings.azureUnavailable")}
                   enabled={false}
                   icon={
-                    <span className="source-control-provider-icon azure">
+                    <ProviderIcon tone="azure">
                       <Cloud size={20} strokeWidth={1.8} />
-                    </span>
+                    </ProviderIcon>
                   }
                   name="Azure DevOps"
                   title="Azure DevOps"
@@ -662,107 +658,30 @@ export function AppSettings({
                   description={t("appSettings.bitbucketUnavailable")}
                   enabled={false}
                   icon={
-                    <span className="source-control-provider-icon bitbucket">
+                    <ProviderIcon tone="bitbucket">
                       <Cable size={19} strokeWidth={1.9} />
-                    </span>
+                    </ProviderIcon>
                   }
                   name="Bitbucket"
                   title="Bitbucket"
                 />
-              </div>
+              </SettingsCard>
 
-              {error ? (
-                <p className="source-control-error" role="alert">
-                  {error}
-                </p>
-              ) : null}
-              <p className="source-control-project-note">
+              {error ? <SettingsAlert>{error}</SettingsAlert> : null}
+              <SettingsNote>
                 {t("appSettings.projectScope", { project: projectName })}
-              </p>
-            </div>
+              </SettingsNote>
+            </SettingsContent>
           ) : (
-            <div className="app-settings-placeholder">
-              <span>
-                <Settings2 size={22} strokeWidth={1.7} />
-              </span>
-              <h2>{activeItem?.label}</h2>
-              <p>{t("appSettings.sectionPlaceholder")}</p>
-            </div>
+            <SettingsPlaceholder
+              description={t("appSettings.sectionPlaceholder")}
+              icon={<Settings2 size={22} strokeWidth={1.7} />}
+              title={activeItem?.label}
+            />
           )}
-        </div>
-      </section>
-    </main>
-  );
-}
-
-function SettingsGroupHeading({
-  action,
-  title,
-}: {
-  action?: ReactNode;
-  title: string;
-}) {
-  return (
-    <div className="source-control-section-heading">
-      <h2>{title}</h2>
-      {action}
-    </div>
-  );
-}
-
-function ProviderRow({
-  available,
-  badge,
-  description,
-  disabled = false,
-  enabled,
-  icon,
-  name,
-  onToggle,
-  title,
-  trailing,
-}: {
-  available: boolean;
-  badge?: string;
-  description: string;
-  disabled?: boolean;
-  enabled: boolean;
-  icon: ReactNode;
-  name: string;
-  onToggle?: (enabled: boolean) => void;
-  title: ReactNode;
-  trailing?: ReactNode;
-}) {
-  return (
-    <div
-      className={`source-control-provider${available ? "" : " unavailable"}`}
-    >
-      <span
-        aria-label={available ? "Available" : "Unavailable"}
-        className={`source-control-status ${available ? "available" : "unavailable"}`}
-      />
-      {icon}
-      <div className="source-control-provider-copy">
-        <div>
-          <strong>{title}</strong>
-          {badge ? (
-            <span className="source-control-badge">{badge}</span>
-          ) : null}
-        </div>
-        <p>{description}</p>
-      </div>
-      {trailing}
-      <label className="source-control-switch">
-        <input
-          aria-label={`${name} enabled`}
-          checked={enabled}
-          disabled={disabled || !available || !onToggle}
-          onChange={(event) => onToggle?.(event.currentTarget.checked)}
-          type="checkbox"
-        />
-        <span aria-hidden="true" />
-      </label>
-    </div>
+        </SettingsScroll>
+      </SettingsMain>
+    </SettingsShell>
   );
 }
 

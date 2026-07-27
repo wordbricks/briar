@@ -1,6 +1,5 @@
 import {
   AlertTriangle,
-  ArrowLeft,
   ArrowRight,
   Check,
   CheckCircle2,
@@ -18,6 +17,30 @@ import {
   Zap,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+
+import {
+  SettingsBackButton,
+  SettingsMain,
+  SettingsNav,
+  SettingsNavGroup,
+  SettingsNavItem,
+  SettingsPageHeader,
+  SettingsScroll,
+  SettingsShell,
+  SettingsSidebar,
+} from "@/components/settings";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Typography } from "@/components/ui/typography";
 import type { DashboardPayload, Project, ProjectSettings as ProjectSettingsData } from "../types";
 import { useI18n } from "../i18n";
 import {
@@ -330,67 +353,61 @@ export function ProjectSettings({
   const activeItem = navigationItems.find((item) => item.id === activeSection);
 
   return (
-    <main className="app-settings project-settings-page">
-      <aside
-        aria-hidden={!isSidebarOpen}
-        aria-label={t("settings.navigation")}
-        className={`sidebar app-settings-sidebar project-settings-sidebar${
-          isSidebarOpen ? "" : " sidebar-collapsed"
-        }`}
-        id="app-sidebar"
-        inert={!isSidebarOpen ? true : undefined}
+    <SettingsShell className="project-settings-page">
+      <SettingsSidebar
+        className="project-settings-sidebar"
+        isOpen={isSidebarOpen}
+        label={t("settings.navigation")}
       >
-        <div className="app-settings-sidebar-toolbar" data-tauri-drag-region />
+        <SettingsBackButton onClick={onBack}>
+          {t("settings.back")}
+        </SettingsBackButton>
 
-        <button className="app-settings-back" onClick={onBack} type="button">
-          <ArrowLeft size={16} strokeWidth={1.9} />
-          <span>{t("settings.back")}</span>
-        </button>
-
-        <nav className="app-settings-nav project-settings-nav">
-          <div className="app-settings-nav-group">
-            <p>{t("settings.title")}</p>
+        <SettingsNav className="project-settings-nav">
+          <SettingsNavGroup label={t("settings.title")}>
             {navigationItems.map((item) => (
-              <button
-                aria-current={activeSection === item.id ? "page" : undefined}
-                className={activeSection === item.id ? "active" : ""}
+              <SettingsNavItem
+                active={activeSection === item.id}
                 data-project-settings-section={item.id}
+                icon={item.icon}
                 key={item.id}
                 onClick={() => setActiveSection(item.id)}
-                type="button"
               >
-                {item.icon}
-                <span>{item.label}</span>
-              </button>
+                {item.label}
+              </SettingsNavItem>
             ))}
-          </div>
-        </nav>
-      </aside>
+          </SettingsNavGroup>
+        </SettingsNav>
+      </SettingsSidebar>
 
-      <section className="main-content app-settings-main project-settings-main">
-        <div
-          className={`app-settings-main-toolbar${
-            isSidebarOpen ? "" : " sidebar-closed"
-          }`}
-          data-tauri-drag-region="deep"
-        />
-
-        <div className="app-settings-scroll project-settings-scroll">
-          <header className="app-settings-page-header">
-            <h1>{activeItem?.label ?? t("settings.title")}</h1>
-            <p>
-              {activeItem?.description ??
-                t("settings.description", { name: project.name })}
-            </p>
-          </header>
+      <SettingsMain
+        className="project-settings-main"
+        isSidebarOpen={isSidebarOpen}
+      >
+        <SettingsScroll className="project-settings-scroll">
+          <SettingsPageHeader
+            description={
+              activeItem?.description ??
+              t("settings.description", { name: project.name })
+            }
+            title={activeItem?.label ?? t("settings.title")}
+          />
 
           {activeSection === "general" ? (
-            <section className="project-settings-card">
-              <div>
-                <span>{t("settings.projectName")}</span>
-                <strong>{project.name}</strong>
+            <section className="project-settings-card mx-auto flex min-h-[84px] w-full max-w-[720px] items-center justify-between rounded-xl border border-border bg-card px-5 py-4 shadow-xs">
+              <div className="grid gap-1">
+                <Typography tone="muted" variant="caption">
+                  {t("settings.projectName")}
+                </Typography>
+                <Typography as="strong" variant="body">
+                  {project.name}
+                </Typography>
               </div>
-              <small>{t("settings.created", { date: new Date(project.createdAt).toLocaleDateString(localeTag) })}</small>
+              <Typography as="small" tone="muted" variant="caption">
+                {t("settings.created", {
+                  date: new Date(project.createdAt).toLocaleDateString(localeTag),
+                })}
+              </Typography>
             </section>
           ) : null}
 
@@ -522,24 +539,22 @@ export function ProjectSettings({
                 >
                   <RefreshCw className={linearLoading ? "spin" : undefined} size={14} />
                 </button>
-                <label className="project-settings-toggle">
-                  <input
+                <label className="project-settings-toggle flex items-center gap-2">
+                  <Switch
                     checked={linear.enabled}
                     disabled={
                       linearLoading ||
                       linearSaving ||
                       !dashboard?.settings.velenOrg
                     }
-                    onChange={(event) => {
-                      const enabled = event.currentTarget.checked;
+                    onCheckedChange={(enabled) => {
                       setLinear((current) => {
                         const source = current.source ?? linearSources[0]?.sourceRef ?? null;
                         return { ...current, enabled, source };
                       });
                     }}
-                    type="checkbox"
                   />
-                  <span>
+                  <span className="text-xs font-medium text-muted-foreground">
                     {t(linear.enabled ? "settings.linearOn" : "settings.linearOff")}
                   </span>
                 </label>
@@ -582,7 +597,7 @@ export function ProjectSettings({
                   <span>
                     {t("settings.linearTeam")} <small>{t("common.optional")}</small>
                   </span>
-                  <input
+                  <Input
                     aria-label={t("settings.linearTeam")}
                     disabled={linearSaving}
                     onChange={(event) => {
@@ -661,26 +676,26 @@ export function ProjectSettings({
                 <strong>{t("settings.autoRunTitle")}</strong>
                 <small>{t("settings.autoRunDescription")}</small>
               </span>
-              <label className="project-settings-toggle">
-                <input
+              <label className="project-settings-toggle flex items-center gap-2">
+                <Switch
                   checked={automation.enabled}
-                  onChange={(event) => {
-                    const enabled = event.currentTarget.checked;
+                  onCheckedChange={(enabled) => {
                     setAutomation((current) => ({
                       ...current,
                       enabled,
                     }));
                   }}
-                  type="checkbox"
                 />
-                <span>{t(automation.enabled ? "settings.autoRunOn" : "settings.autoRunOff")}</span>
+                <span className="text-xs font-medium text-muted-foreground">
+                  {t(automation.enabled ? "settings.autoRunOn" : "settings.autoRunOff")}
+                </span>
               </label>
             </header>
 
             <div className="project-settings-auto-run-rules">
               <label>
                 <span>{t("settings.autoRunMaxIssues")}</span>
-                <input
+                <Input
                   max={10}
                   min={1}
                   onChange={(event) => {
@@ -990,61 +1005,84 @@ export function ProjectSettings({
           </section>
 
           <section
-            className="project-settings-danger"
+            className="project-settings-danger mx-auto mt-4 flex w-full max-w-[720px] items-center justify-between gap-4 rounded-xl border border-destructive/20 bg-destructive/5 px-5 py-4"
             hidden={activeSection !== "general"}
           >
-            <div>
-              <span className="danger-icon"><AlertTriangle size={18} strokeWidth={1.8} /></span>
-              <span>
-                <strong>{t("settings.danger")}</strong>
-                <small>{t("settings.dangerDescription")}</small>
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="danger-icon grid size-9 place-items-center rounded-lg bg-destructive/10 text-destructive">
+                <AlertTriangle size={18} strokeWidth={1.8} />
+              </span>
+              <span className="grid min-w-0 gap-1">
+                <Typography as="strong" variant="body">
+                  {t("settings.danger")}
+                </Typography>
+                <Typography as="small" tone="muted" variant="caption">
+                  {t("settings.dangerDescription")}
+                </Typography>
               </span>
             </div>
-            <button onClick={() => setIsConfirming(true)} type="button">
+            <Button
+              onClick={() => setIsConfirming(true)}
+              type="button"
+              variant="destructive"
+            >
               <Trash2 size={15} strokeWidth={1.8} />
               {t("settings.deleteProject")}
-            </button>
+            </Button>
           </section>
-        </div>
-      </section>
+        </SettingsScroll>
+      </SettingsMain>
 
-      {isConfirming && (
-        <div className="dialog-backdrop" role="presentation">
-          <section
-            aria-describedby="delete-project-description"
-            aria-labelledby="delete-project-title"
-            aria-modal="true"
-            className="delete-project-dialog"
-            role="dialog"
-          >
-            <span className="delete-project-dialog-icon"><Trash2 size={20} strokeWidth={1.8} /></span>
-            <h2 id="delete-project-title">{t("settings.deleteTitle", { name: project.name })}</h2>
-            <p id="delete-project-description">
+      <Dialog
+        onOpenChange={(open) => {
+          if (!isDeleting) setIsConfirming(open);
+        }}
+        open={isConfirming}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="mb-2 grid size-10 place-items-center rounded-xl bg-destructive/10 text-destructive">
+              <Trash2 size={20} strokeWidth={1.8} />
+            </div>
+            <DialogTitle id="delete-project-title">
+              {t("settings.deleteTitle", { name: project.name })}
+            </DialogTitle>
+            <DialogDescription id="delete-project-description">
               {t("settings.deleteDescription")}
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError ? (
+            <p className="text-xs text-destructive" role="alert">
+              {deleteError}
             </p>
-            {deleteError && <p className="delete-project-error">{deleteError}</p>}
-            <footer>
-              <button
-                disabled={isDeleting}
-                onClick={() => setIsConfirming(false)}
-                ref={cancelButtonRef}
-                type="button"
-              >
-                {t("common.cancel")}
-              </button>
-              <button
-                className="delete-project-confirm"
-                disabled={isDeleting}
-                onClick={() => void confirmDelete()}
-                type="button"
-              >
-                {isDeleting ? <LoaderCircle className="spin" size={15} /> : <Trash2 size={15} />}
-                {t("settings.delete")}
-              </button>
-            </footer>
-          </section>
-        </div>
-      )}
-    </main>
+          ) : null}
+          <DialogFooter>
+            <Button
+              disabled={isDeleting}
+              onClick={() => setIsConfirming(false)}
+              ref={cancelButtonRef}
+              type="button"
+              variant="outline"
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              className="delete-project-confirm"
+              disabled={isDeleting}
+              onClick={() => void confirmDelete()}
+              type="button"
+              variant="destructive"
+            >
+              {isDeleting ? (
+                <LoaderCircle className="spin" size={15} />
+              ) : (
+                <Trash2 size={15} />
+              )}
+              {t("settings.delete")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </SettingsShell>
   );
 }

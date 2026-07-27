@@ -1,0 +1,186 @@
+/*
+  Briar design tokens
+  -------------------
+  Single source of truth for color, type, radius, and elevation.
+  Semantic names follow shadcn conventions; values preserve Briar's warm paper + violet brand.
+*/
+
+:root {
+  /* Fonts */
+  --font-sans:
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    "Apple SD Gothic Neo",
+    "Noto Sans KR",
+    sans-serif;
+  --font-mono:
+    "DM Mono",
+    ui-monospace,
+    "SF Mono",
+    Menlo,
+    Consolas,
+    monospace;
+
+  /*
+    Type scale (desktop-dense product UI)
+    Prefer these over ad-hoc px values.
+  */
+  --text-2xs: 0.625rem; /* 10px — micro meta, meters */
+  --text-xs: 0.6875rem; /* 11px — captions, helper */
+  --text-sm: 0.75rem; /* 12px — compact UI / labels */
+  --text-base: 0.8125rem; /* 13px — default body */
+  --text-md: 0.875rem; /* 14px — emphasized body */
+  --text-lg: 1rem; /* 16px — section titles */
+  --text-xl: 1.125rem; /* 18px — card titles / brand */
+  --text-2xl: 1.375rem; /* 22px — panel headings */
+  --text-3xl: 1.75rem; /* 28px — page titles */
+  --text-4xl: 2.125rem; /* 34px — display / hero */
+
+  --leading-2xs: 1rem;
+  --leading-xs: 1rem;
+  --leading-sm: 1.125rem;
+  --leading-base: 1.25rem;
+  --leading-md: 1.375rem;
+  --leading-lg: 1.5rem;
+  --leading-xl: 1.5rem;
+  --leading-2xl: 1.75rem;
+  --leading-3xl: 2rem;
+  --leading-4xl: 2.375rem;
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --tracking-tighter: -0.03em;
+  --tracking-tight: -0.02em;
+  --tracking-normal: -0.01em;
+  --tracking-wide: 0.04em;
+
+  /* shadcn semantic colors (light) */
+  --background: #f7f7f3;
+  --foreground: #22231f;
+
+  --card: #ffffff;
+  --card-foreground: #22231f;
+
+  --popover: #ffffff;
+  --popover-foreground: #22231f;
+
+  --primary: #6046b8;
+  --primary-foreground: #faf9ff;
+
+  --secondary: #f0f0ec;
+  --secondary-foreground: #30312d;
+
+  /* muted = soft surface; muted-foreground = secondary text */
+  --muted: #f4f5ef;
+  --muted-foreground: #73756f;
+
+  /* accent = soft brand wash; primary = solid brand */
+  --accent: #f0ecfb;
+  --accent-foreground: #4a3594;
+
+  --destructive: #d85c70;
+  --destructive-foreground: #fff8f9;
+
+  --success: #4eb895;
+  --success-foreground: #f3fcf8;
+
+  --warning: #d58a3d;
+  --warning-foreground: #fffaf3;
+
+  --border: #e3e4dd;
+  --input: #dcded8;
+  --ring: #8b70dd;
+
+  --sidebar: rgba(244, 244, 242, 0.94);
+  --sidebar-foreground: #5f605b;
+  --sidebar-border: rgba(56, 57, 52, 0.09);
+  --sidebar-accent: rgba(48, 49, 45, 0.085);
+  --sidebar-accent-foreground: #30312d;
+
+  --radius: 0.625rem;
+
+  /* Elevation */
+  --shadow-xs: 0 1px 2px rgba(35, 36, 32, 0.05);
+  --shadow-sm: 0 2px 8px rgba(35, 36, 32, 0.06);
+  --shadow-md: 0 8px 24px rgba(30, 31, 28, 0.1);
+  --shadow-lg: 0 16px 44px rgba(30, 31, 28, 0.16);
+  --shadow-xl: 0 20px 58px rgba(30, 31, 28, 0.22);
+
+  --focus-ring: 2px solid var(--ring);
+
+  /*
+    Legacy aliases used by styles.css
+    ---------------------------------
+    --muted / --accent previously meant text color / brand purple.
+    Those meanings moved to --muted-foreground / --primary.
+    Keep ink/line/surface/etc. stable for the large legacy stylesheet.
+  */
+  --ink: var(--foreground);
+  --faint: #a0a29a;
+  --line: var(--border);
+  --surface: var(--card);
+  --surface-soft: #f4f5ef;
+  --mint: var(--success);
+  --rose: var(--destructive);
+  /* brand solid (legacy code often used --accent as fill) */
+  --brand: var(--primary);
+  --traffic-light-safe-inset: 84px;
+  --window-navigation-content-inset: 188px;
+}
+
+/* Optional dark surface for future chrome / companion themes */
+.dark {
+  --background: #121214;
+  --foreground: #f2f2ef;
+
+  --card: #1a1a1d;
+  --card-foreground: #f2f2ef;
+
+  --popover: #1a1a1d;
+  --popover-foreground: #f2f2ef;
+
+  --primary: #8c72ff;
+  --primary-foreground: #120f22;
+
+  --secondary: #242428;
+  --secondary-foreground: #e8e8e3;
+
+  --muted: #1e1e22;
+  --muted-foreground: #9b9ba3;
+
+  --accent: #24212f;
+  --accent-foreground: #d4cbff;
+
+  --destructive: #e56b7d;
+  --destructive-foreground: #1a0a0d;
+
+  --success: #6ed5a3;
+  --success-foreground: #0a1a12;
+
+  --warning: #e0a04a;
+  --warning-foreground: #1a1208;
+
+  --border: #2a2a30;
+  --input: #2a2a30;
+  --ring: #a894ff;
+
+  --sidebar: #161618;
+  --sidebar-foreground: #c4c4bc;
+  --sidebar-border: #26262c;
+  --sidebar-accent: #242428;
+  --sidebar-accent-foreground: #f2f2ef;
+
+  --ink: var(--foreground);
+  --faint: #9b9ba3;
+  --line: var(--border);
+  --surface: var(--card);
+  --surface-soft: #1e1e22;
+  --mint: var(--success);
+  --rose: var(--destructive);
+  --brand: var(--primary);
+}

@@ -161,8 +161,8 @@ describe("ProjectSettings", () => {
     expect(container.querySelector(".project-settings-auto-run")?.textContent).toContain(
       "자동 실행 조건",
     );
-    const autoRunToggle = container.querySelector<HTMLInputElement>(
-      ".project-settings-auto-run .project-settings-toggle input",
+    const autoRunToggle = container.querySelector<HTMLButtonElement>(
+      ".project-settings-auto-run .project-settings-toggle button[role='switch']",
     );
     await act(async () => autoRunToggle?.click());
     const autoRunSave = container.querySelector<HTMLButtonElement>(
@@ -275,12 +275,14 @@ describe("ProjectSettings", () => {
     );
     await act(async () => deleteButton?.click());
     expect(onDelete).not.toHaveBeenCalled();
-    expect(container.querySelector('[role="dialog"]')?.textContent).toContain(
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain(
       "Briar 프로젝트를 삭제할까요?",
     );
 
     await act(async () => {
-      container.querySelector<HTMLButtonElement>(".delete-project-confirm")?.click();
+      document
+        .querySelector<HTMLButtonElement>(".delete-project-confirm")
+        ?.click();
     });
     expect(onDelete).toHaveBeenCalledOnce();
 

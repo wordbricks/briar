@@ -116,10 +116,12 @@ describe("AppSettings", () => {
     expect(container.textContent).toContain("Azure DevOps");
     expect(container.textContent).toContain("Bitbucket");
 
-    const gitToggle = container.querySelector<HTMLInputElement>(
+    const gitToggle = container.querySelector<HTMLButtonElement>(
       '[aria-label="Git enabled"]',
     );
-    expect(gitToggle?.checked).toBe(true);
+    expect(gitToggle?.getAttribute("data-state") ?? gitToggle?.getAttribute("aria-checked")).toMatch(
+      /checked|true/,
+    );
     await act(async () => gitToggle?.click());
     expect(
       window.localStorage.getItem(
@@ -184,18 +186,20 @@ describe("AppSettings", () => {
     expect(container.textContent).toContain(
       "Enabled · Available in project settings.",
     );
-    expect(
-      container.querySelector<HTMLInputElement>('[aria-label="Codex enabled"]')
-        ?.checked,
-    ).toBe(true);
-    expect(
-      container.querySelector<HTMLInputElement>('[aria-label="Claude enabled"]')
-        ?.checked,
-    ).toBe(true);
+    const switchState = (label: string) =>
+      container
+        .querySelector<HTMLButtonElement>(`[aria-label="${label}"]`)
+        ?.getAttribute("data-state") ??
+      container
+        .querySelector<HTMLButtonElement>(`[aria-label="${label}"]`)
+        ?.getAttribute("aria-checked");
+
+    expect(switchState("Codex enabled")).toMatch(/checked|true/);
+    expect(switchState("Claude enabled")).toMatch(/checked|true/);
 
     await act(async () => {
       container
-        .querySelector<HTMLInputElement>('[aria-label="Claude enabled"]')
+        .querySelector<HTMLButtonElement>('[aria-label="Claude enabled"]')
         ?.click();
     });
     expect(updateAppProviderSettings).toHaveBeenCalledWith({
@@ -203,10 +207,7 @@ describe("AppSettings", () => {
       claude: false,
       grok: true,
     });
-    expect(
-      container.querySelector<HTMLInputElement>('[aria-label="Claude enabled"]')
-        ?.checked,
-    ).toBe(false);
+    expect(switchState("Claude enabled")).toMatch(/unchecked|false/);
 
     await act(async () => {
       container

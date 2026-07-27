@@ -1,14 +1,40 @@
 import {
-  ArrowLeft,
   Building2,
   Download,
   Search,
   Trash2,
   UserPlus,
   Users,
-  X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+
+import {
+  SettingsAlert,
+  SettingsBackButton,
+  SettingsIdentity,
+  SettingsMain,
+  SettingsNav,
+  SettingsNavGroup,
+  SettingsNavItem,
+  SettingsPageHeader,
+  SettingsScroll,
+  SettingsShell,
+  SettingsSidebar,
+} from "@/components/settings";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Typography } from "@/components/ui/typography";
+import { cn } from "@/lib/utils";
 import { useI18n } from "../i18n";
 import {
   addOrganizationMember,
@@ -150,317 +176,334 @@ export function OrganizationSettings({
   };
 
   return (
-    <div className="organization-settings-layout">
-      <aside
-        aria-hidden={!isSidebarOpen}
-        className={`organization-settings-sidebar${
-          isSidebarOpen ? "" : " organization-settings-sidebar-collapsed"
-        }`}
-        id="app-sidebar"
-        inert={!isSidebarOpen ? true : undefined}
+    <SettingsShell className="bg-background">
+      <SettingsSidebar
+        className="bg-[#f1f1f0]"
+        isOpen={isSidebarOpen}
+        label={t("organization.navigation")}
       >
-        <div className="organization-settings-sidebar-toolbar" data-tauri-drag-region />
-        <button
-          className="organization-settings-back"
-          onClick={onBack}
-          type="button"
-        >
-          <ArrowLeft size={18} strokeWidth={1.8} />
-          <span>{t("organization.backToApp")}</span>
-        </button>
+        <SettingsBackButton onClick={onBack}>
+          {t("organization.backToApp")}
+        </SettingsBackButton>
 
-        <div className="organization-settings-identity">
-          <span>
-            <Building2 aria-hidden="true" size={17} strokeWidth={1.8} />
-          </span>
-          <div>
-            <strong>{organization.name}</strong>
-            <small>{t("organization.settingsLabel")}</small>
-          </div>
-        </div>
+        <SettingsIdentity
+          icon={<Building2 aria-hidden="true" size={17} strokeWidth={1.8} />}
+          subtitle={t("organization.settingsLabel")}
+          title={organization.name}
+        />
 
-        <nav aria-label={t("organization.navigation")}>
-          <p>{t("organization.organizationSection")}</p>
-          <button
-            aria-current={activeSection === "general" ? "page" : undefined}
-            className={activeSection === "general" ? "active" : ""}
-            onClick={() => setActiveSection("general")}
-            type="button"
-          >
-            <Building2 aria-hidden="true" size={16} strokeWidth={1.8} />
-            <span>{t("organization.general")}</span>
-          </button>
-          <button
-            aria-current={activeSection === "members" ? "page" : undefined}
-            className={activeSection === "members" ? "active" : ""}
-            onClick={() => setActiveSection("members")}
-            type="button"
-          >
-            <Users aria-hidden="true" size={16} strokeWidth={1.8} />
-            <span>{t("organization.membersAndInvites")}</span>
-          </button>
-        </nav>
-      </aside>
+        <SettingsNav>
+          <SettingsNavGroup label={t("organization.organizationSection")}>
+            <SettingsNavItem
+              active={activeSection === "general"}
+              icon={<Building2 aria-hidden="true" size={16} strokeWidth={1.8} />}
+              onClick={() => setActiveSection("general")}
+            >
+              {t("organization.general")}
+            </SettingsNavItem>
+            <SettingsNavItem
+              active={activeSection === "members"}
+              icon={<Users aria-hidden="true" size={16} strokeWidth={1.8} />}
+              onClick={() => setActiveSection("members")}
+            >
+              {t("organization.membersAndInvites")}
+            </SettingsNavItem>
+          </SettingsNavGroup>
+        </SettingsNav>
+      </SettingsSidebar>
 
-      <main className="organization-settings">
-        <div className="organization-settings-content">
-          {activeSection === "general" ? (
-            <>
-              <header className="organization-settings-header">
-                <h1>{t("organization.settingsTitle")}</h1>
-                <p>
-                  {t("organization.settingsDescription", {
+      <SettingsMain className="bg-[#fbfbfd]" isSidebarOpen={isSidebarOpen}>
+        <SettingsScroll className="pt-[clamp(40px,8vw,76px)]">
+          <div className="mx-auto w-full max-w-[980px]">
+            {activeSection === "general" ? (
+              <>
+                <SettingsPageHeader
+                  className="mb-12 max-w-none"
+                  description={t("organization.settingsDescription", {
                     name: organization.name,
                   })}
-                </p>
-              </header>
+                  title={t("organization.settingsTitle")}
+                />
 
-              <section className="organization-general-section">
-                <h2>{t("organization.general")}</h2>
-                <form
-                  className="organization-general-card"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    if (!canSaveOrganizationName) return;
-                    setIsRenaming(true);
-                    setRenameError(null);
-                    setRenameSaved(false);
-                    void onRename(organizationId, normalizedOrganizationName)
-                      .then((updatedOrganization) => {
-                        setOrganizationName(updatedOrganization.name);
-                        setRenameSaved(true);
-                      })
-                      .catch((caught) =>
-                        setRenameError(
-                          caught instanceof Error
-                            ? caught.message
-                            : String(caught),
-                        ),
-                      )
-                      .finally(() => setIsRenaming(false));
-                  }}
-                >
-                  <div>
-                    <label htmlFor="organization-name">
-                      {t("organization.organizationName")}
-                    </label>
-                    <p>{t("organization.organizationNameDescription")}</p>
-                  </div>
-                  <div className="organization-general-control">
-                    <input
-                      autoComplete="organization"
-                      disabled={!canManage || isRenaming}
-                      id="organization-name"
-                      maxLength={100}
-                      onChange={(event) => {
-                        setOrganizationName(event.target.value);
-                        setRenameSaved(false);
-                        setRenameError(null);
-                      }}
-                      required
-                      value={organizationName}
-                    />
-                    <button disabled={!canSaveOrganizationName} type="submit">
-                      {isRenaming ? t("common.saving") : t("common.save")}
-                    </button>
-                  </div>
-                  {!canManage ? (
-                    <p className="organization-general-note">
-                      {t("organization.namePermission")}
-                    </p>
-                  ) : renameError ? (
-                    <p className="organization-general-error" role="alert">
-                      {renameError}
-                    </p>
-                  ) : renameSaved ? (
-                    <p className="organization-general-saved" role="status">
-                      {t("organization.nameSaved")}
-                    </p>
-                  ) : null}
-                </form>
-              </section>
-            </>
-          ) : (
-            <>
-              <header className="organization-members-header">
-                <div>
-                  <h1>{t("organization.membersTitle")}</h1>
-                  <p>
-                    {t("organization.membersDescription", {
-                      name: organization.name,
-                    })}
-                  </p>
-                </div>
-              </header>
-
-              <div className="organization-members-toolbar">
-        <label className="organization-members-search">
-          <Search aria-hidden="true" size={17} strokeWidth={1.8} />
-          <input
-            aria-label={t("organization.search")}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={t("organization.searchPlaceholder")}
-            ref={searchRef}
-            type="search"
-            value={query}
-          />
-        </label>
-        <SelectMenu
-          className="organization-role-filter"
-          label={t("organization.roleFilter")}
-          onValueChange={(value) => setRoleFilter(value as RoleFilter)}
-          options={[
-            { label: t("organization.filterAll"), value: "all" },
-            { label: t("organization.role.owner"), value: "owner" },
-            { label: t("organization.role.admin"), value: "admin" },
-            { label: t("organization.role.member"), value: "member" },
-          ]}
-          size="small"
-          value={roleFilter}
-        />
-        <div className="organization-members-actions">
-          <button
-            className="organization-export-button"
-            disabled={members.length === 0}
-            onClick={exportMembers}
-            type="button"
-          >
-            <Download aria-hidden="true" size={15} strokeWidth={1.8} />
-            {t("organization.exportCsv")}
-          </button>
-          {canManage && (
-            <button
-              className="organization-invite-button"
-              onClick={() => {
-                setError(null);
-                setIsInviteOpen(true);
-              }}
-              type="button"
-            >
-              <UserPlus aria-hidden="true" size={15} strokeWidth={1.8} />
-              {t("organization.invite")}
-            </button>
-          )}
-        </div>
-              </div>
-
-              {error && !isInviteOpen && (
-        <p className="organization-settings-error" role="alert">
-          {error}
-        </p>
-              )}
-
-              <section
-        aria-label={t("organization.memberList")}
-        className="organization-member-table"
-      >
-        <div className="organization-member-table-head" role="row">
-          <span>{t("organization.name")}</span>
-          <span>{t("organization.email")}</span>
-          <span>{t("organization.role")}</span>
-          <span>{t("organization.joined")}</span>
-          <span className="visually-hidden">{t("organization.actions")}</span>
-        </div>
-        <div className="organization-member-group">
-          <strong>{t("organization.active")}</strong>
-          <span>{members.length}</span>
-        </div>
-        {loading ? (
-          <p className="organization-member-empty">{t("organization.loading")}</p>
-        ) : filteredMembers.length === 0 ? (
-          <p className="organization-member-empty">
-            {members.length === 0
-              ? t("organization.noMembers")
-              : t("organization.noResults")}
-          </p>
-        ) : (
-          filteredMembers.map((member) => (
-            <div className="organization-member-row" key={member.userId}>
-              <div className="organization-member-identity">
-                <div className="organization-member-avatar">
-                  {member.image ? (
-                    <img alt="" src={member.image} />
-                  ) : (
-                    member.name.slice(0, 1).toUpperCase()
-                  )}
-                </div>
-                <div>
-                  <strong>{member.name}</strong>
-                  <small>{member.email.split("@")[0]}</small>
-                </div>
-              </div>
-              <span className="organization-member-email">{member.email}</span>
-              <span
-                className={`organization-member-role role-${member.role}`}
-              >
-                {roleLabel(member.role)}
-              </span>
-              <time dateTime={member.createdAt}>
-                {new Intl.DateTimeFormat(dateLocale, {
-                  month: "short",
-                  year: "numeric",
-                }).format(new Date(member.createdAt))}
-              </time>
-              {organization.role === "owner" && member.role !== "owner" ? (
-                <button
-                  aria-label={t("organization.removeMember", {
-                    name: member.name,
-                  })}
-                  className="organization-member-remove"
-                  disabled={removingMemberId === member.userId}
-                  onClick={() => {
-                    setRemovingMemberId(member.userId);
-                    setError(null);
-                    void removeOrganizationMember(
-                      token,
-                      organizationId,
-                      member.userId,
-                    )
-                      .then(() =>
-                        setMembers((current) =>
-                          current.filter(
-                            (item) => item.userId !== member.userId,
+                <section className="w-full max-w-[820px]">
+                  <Typography as="h2" className="mb-3.5" variant="bodyLg">
+                    {t("organization.general")}
+                  </Typography>
+                  <form
+                    className="grid grid-cols-1 items-center gap-x-8 gap-y-4 rounded-xl border border-border bg-card p-6 shadow-xs md:grid-cols-[minmax(200px,1fr)_minmax(260px,360px)]"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      if (!canSaveOrganizationName) return;
+                      setIsRenaming(true);
+                      setRenameError(null);
+                      setRenameSaved(false);
+                      void onRename(organizationId, normalizedOrganizationName)
+                        .then((updatedOrganization) => {
+                          setOrganizationName(updatedOrganization.name);
+                          setRenameSaved(true);
+                        })
+                        .catch((caught) =>
+                          setRenameError(
+                            caught instanceof Error
+                              ? caught.message
+                              : String(caught),
                           ),
-                        ),
-                      )
-                      .catch((caught) =>
-                        setError(
-                          caught instanceof Error
-                            ? caught.message
-                            : String(caught),
-                        ),
-                      )
-                      .finally(() => setRemovingMemberId(null));
-                  }}
-                  title={t("organization.removeMember", { name: member.name })}
-                  type="button"
-                >
-                  <Trash2 size={15} strokeWidth={1.7} />
-                </button>
-              ) : (
-                <span aria-hidden="true" />
-              )}
-            </div>
-          ))
-        )}
-              </section>
-            </>
-          )}
-        </div>
+                        )
+                        .finally(() => setIsRenaming(false));
+                    }}
+                  >
+                    <div>
+                      <Label htmlFor="organization-name">
+                        {t("organization.organizationName")}
+                      </Label>
+                      <Typography className="mt-1.5" tone="muted" variant="caption">
+                        {t("organization.organizationNameDescription")}
+                      </Typography>
+                    </div>
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                      <Input
+                        autoComplete="organization"
+                        disabled={!canManage || isRenaming}
+                        id="organization-name"
+                        maxLength={100}
+                        onChange={(event) => {
+                          setOrganizationName(event.target.value);
+                          setRenameSaved(false);
+                          setRenameError(null);
+                        }}
+                        required
+                        value={organizationName}
+                      />
+                      <Button disabled={!canSaveOrganizationName} type="submit">
+                        {isRenaming ? t("common.saving") : t("common.save")}
+                      </Button>
+                    </div>
+                    {!canManage ? (
+                      <Typography
+                        className="md:col-start-2 -mt-1"
+                        tone="muted"
+                        variant="caption"
+                      >
+                        {t("organization.namePermission")}
+                      </Typography>
+                    ) : renameError ? (
+                      <Typography
+                        className="md:col-start-2 -mt-1 text-destructive"
+                        role="alert"
+                        variant="caption"
+                      >
+                        {renameError}
+                      </Typography>
+                    ) : renameSaved ? (
+                      <Typography
+                        className="md:col-start-2 -mt-1 text-success"
+                        role="status"
+                        variant="caption"
+                      >
+                        {t("organization.nameSaved")}
+                      </Typography>
+                    ) : null}
+                  </form>
+                </section>
+              </>
+            ) : (
+              <>
+                <SettingsPageHeader
+                  className="mb-7 max-w-none"
+                  description={t("organization.membersDescription", {
+                    name: organization.name,
+                  })}
+                  title={t("organization.membersTitle")}
+                />
 
-        {isInviteOpen && (
-        <div
-          className="organization-invite-overlay"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget && !saving) {
-              setIsInviteOpen(false);
-            }
-          }}
-        >
+                <div className="mb-4 flex flex-wrap items-center gap-2">
+                  <label className="flex h-9 min-w-[220px] flex-1 items-center gap-2 rounded-md border border-border bg-card px-2.5 text-muted-foreground focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20">
+                    <Search aria-hidden="true" size={17} strokeWidth={1.8} />
+                    <Input
+                      aria-label={t("organization.search")}
+                      className="h-full border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+                      onChange={(event) => setQuery(event.target.value)}
+                      placeholder={t("organization.searchPlaceholder")}
+                      ref={searchRef}
+                      type="search"
+                      value={query}
+                    />
+                  </label>
+                  <SelectMenu
+                    className="organization-role-filter"
+                    label={t("organization.roleFilter")}
+                    onValueChange={(value) => setRoleFilter(value as RoleFilter)}
+                    options={[
+                      { label: t("organization.filterAll"), value: "all" },
+                      { label: t("organization.role.owner"), value: "owner" },
+                      { label: t("organization.role.admin"), value: "admin" },
+                      { label: t("organization.role.member"), value: "member" },
+                    ]}
+                    size="small"
+                    value={roleFilter}
+                  />
+                  <div className="ml-auto flex flex-wrap items-center gap-2">
+                    <Button
+                      disabled={members.length === 0}
+                      onClick={exportMembers}
+                      type="button"
+                      variant="outline"
+                    >
+                      <Download aria-hidden="true" size={15} strokeWidth={1.8} />
+                      {t("organization.exportCsv")}
+                    </Button>
+                    {canManage ? (
+                      <Button
+                        onClick={() => {
+                          setError(null);
+                          setIsInviteOpen(true);
+                        }}
+                        type="button"
+                      >
+                        <UserPlus aria-hidden="true" size={15} strokeWidth={1.8} />
+                        {t("organization.invite")}
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+
+                {error && !isInviteOpen ? (
+                  <SettingsAlert className="mb-4 mt-0">{error}</SettingsAlert>
+                ) : null}
+
+                <section
+                  aria-label={t("organization.memberList")}
+                  className="overflow-hidden rounded-xl border border-border bg-card"
+                >
+                  <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1.4fr)_100px_100px_40px] gap-3 border-b border-border px-4 py-2.5 text-micro font-medium tracking-wide text-muted-foreground uppercase">
+                    <span>{t("organization.name")}</span>
+                    <span>{t("organization.email")}</span>
+                    <span>{t("organization.role")}</span>
+                    <span>{t("organization.joined")}</span>
+                    <span className="visually-hidden">{t("organization.actions")}</span>
+                  </div>
+                  <div className="flex items-center justify-between border-b border-border bg-muted/60 px-4 py-2">
+                    <Typography as="strong" variant="bodySm">
+                      {t("organization.active")}
+                    </Typography>
+                    <Badge variant="secondary">{members.length}</Badge>
+                  </div>
+                  {loading ? (
+                    <Typography className="p-8 text-center" tone="muted" variant="bodySm">
+                      {t("organization.loading")}
+                    </Typography>
+                  ) : filteredMembers.length === 0 ? (
+                    <Typography className="p-8 text-center" tone="muted" variant="bodySm">
+                      {members.length === 0
+                        ? t("organization.noMembers")
+                        : t("organization.noResults")}
+                    </Typography>
+                  ) : (
+                    filteredMembers.map((member) => (
+                      <div
+                        className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1.4fr)_100px_100px_40px] items-center gap-3 border-b border-border/80 px-4 py-3 last:border-b-0"
+                        key={member.userId}
+                      >
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          <div className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-full bg-secondary text-xs font-semibold text-foreground">
+                            {member.image ? (
+                              <img alt="" className="size-full object-cover" src={member.image} />
+                            ) : (
+                              member.name.slice(0, 1).toUpperCase()
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <Typography as="strong" className="block truncate" variant="bodySm">
+                              {member.name}
+                            </Typography>
+                            <Typography as="small" className="truncate" tone="muted" variant="micro">
+                              {member.email.split("@")[0]}
+                            </Typography>
+                          </div>
+                        </div>
+                        <Typography as="span" className="truncate" tone="muted" variant="bodySm">
+                          {member.email}
+                        </Typography>
+                        <Badge
+                          className={cn(
+                            "justify-center capitalize",
+                            member.role === "owner" && "bg-accent text-accent-foreground",
+                            member.role === "admin" && "bg-secondary",
+                          )}
+                          variant="secondary"
+                        >
+                          {roleLabel(member.role)}
+                        </Badge>
+                        <time
+                          className="text-xs text-muted-foreground"
+                          dateTime={member.createdAt}
+                        >
+                          {new Intl.DateTimeFormat(dateLocale, {
+                            month: "short",
+                            year: "numeric",
+                          }).format(new Date(member.createdAt))}
+                        </time>
+                        {organization.role === "owner" && member.role !== "owner" ? (
+                          <Button
+                            aria-label={t("organization.removeMember", {
+                              name: member.name,
+                            })}
+                            className="size-8 text-muted-foreground hover:text-destructive"
+                            disabled={removingMemberId === member.userId}
+                            onClick={() => {
+                              setRemovingMemberId(member.userId);
+                              setError(null);
+                              void removeOrganizationMember(
+                                token,
+                                organizationId,
+                                member.userId,
+                              )
+                                .then(() =>
+                                  setMembers((current) =>
+                                    current.filter(
+                                      (item) => item.userId !== member.userId,
+                                    ),
+                                  ),
+                                )
+                                .catch((caught) =>
+                                  setError(
+                                    caught instanceof Error
+                                      ? caught.message
+                                      : String(caught),
+                                  ),
+                                )
+                                .finally(() => setRemovingMemberId(null));
+                            }}
+                            size="icon-sm"
+                            title={t("organization.removeMember", {
+                              name: member.name,
+                            })}
+                            type="button"
+                            variant="ghost"
+                          >
+                            <Trash2 size={15} strokeWidth={1.7} />
+                          </Button>
+                        ) : (
+                          <span aria-hidden="true" />
+                        )}
+                      </div>
+                    ))
+                  )}
+                </section>
+              </>
+            )}
+          </div>
+        </SettingsScroll>
+      </SettingsMain>
+
+      <Dialog
+        onOpenChange={(open) => {
+          if (!saving) setIsInviteOpen(open);
+        }}
+        open={isInviteOpen}
+      >
+        <DialogContent className="sm:max-w-md">
           <form
-            aria-modal="true"
-            aria-labelledby="organization-invite-title"
-            className="organization-invite-dialog"
             onSubmit={(event) => {
               event.preventDefault();
               setSaving(true);
@@ -479,81 +522,69 @@ export function OrganizationSettings({
                 )
                 .finally(() => setSaving(false));
             }}
-            role="dialog"
           >
-            <header>
-              <div>
-                <h2 id="organization-invite-title">
-                  {t("organization.inviteTitle")}
-                </h2>
-                <p>
-                  {t("organization.inviteDescription", {
-                    name: organization.name,
-                  })}
-                </p>
+            <DialogHeader>
+              <DialogTitle>{t("organization.inviteTitle")}</DialogTitle>
+              <DialogDescription>
+                {t("organization.inviteDescription", {
+                  name: organization.name,
+                })}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="mt-4 grid gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="organization-invite-email">
+                  {t("organization.inviteEmail")}
+                </Label>
+                <Input
+                  id="organization-invite-email"
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder={t("organization.inviteEmailPlaceholder")}
+                  ref={inviteEmailRef}
+                  required
+                  type="email"
+                  value={email}
+                />
               </div>
-              <button
-                aria-label={t("common.close")}
+              <div className="grid gap-2">
+                <Label>{t("organization.inviteRole")}</Label>
+                <SelectMenu
+                  label={t("organization.inviteRole")}
+                  onValueChange={(value) =>
+                    setRole(value as "admin" | "member")}
+                  options={[
+                    {
+                      label: t("organization.role.member"),
+                      value: "member",
+                    },
+                    {
+                      label: t("organization.role.admin"),
+                      value: "admin",
+                    },
+                  ]}
+                  value={role}
+                />
+              </div>
+              {error ? <SettingsAlert className="mt-0">{error}</SettingsAlert> : null}
+            </div>
+            <DialogFooter className="mt-6">
+              <Button
                 disabled={saving}
                 onClick={() => setIsInviteOpen(false)}
                 type="button"
-              >
-                <X size={17} strokeWidth={1.8} />
-              </button>
-            </header>
-            <label>
-              <span>{t("organization.inviteEmail")}</span>
-              <input
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder={t("organization.inviteEmailPlaceholder")}
-                ref={inviteEmailRef}
-                required
-                type="email"
-                value={email}
-              />
-            </label>
-            <label>
-              <span>{t("organization.inviteRole")}</span>
-              <SelectMenu
-                label={t("organization.inviteRole")}
-                onValueChange={(value) =>
-                  setRole(value as "admin" | "member")}
-                options={[
-                  {
-                    label: t("organization.role.member"),
-                    value: "member",
-                  },
-                  {
-                    label: t("organization.role.admin"),
-                    value: "admin",
-                  },
-                ]}
-                value={role}
-              />
-            </label>
-            {error && (
-              <p className="organization-invite-error" role="alert">
-                {error}
-              </p>
-            )}
-            <footer>
-              <button
-                disabled={saving}
-                onClick={() => setIsInviteOpen(false)}
-                type="button"
+                variant="outline"
               >
                 {t("common.cancel")}
-              </button>
-              <button disabled={saving} type="submit">
+              </Button>
+              <Button disabled={saving} type="submit">
                 {saving
                   ? t("organization.inviting")
                   : t("organization.sendInvite")}
-              </button>
-            </footer>
+              </Button>
+            </DialogFooter>
           </form>
-        </div>
-        )}
-      </main>
-    </div>
+        </DialogContent>
+      </Dialog>
+    </SettingsShell>
   );
 }
