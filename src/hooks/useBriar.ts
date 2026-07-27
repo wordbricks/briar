@@ -1449,6 +1449,7 @@ export function useBriar() {
             runNumber:
               Math.max(0, ...dashboard.runs.map((candidate) => candidate.runNumber)) + 1,
             currentAttempt: 1,
+            currentRevision: 1,
             source: "issue",
             sourceKey,
             title: input.title.trim(),
@@ -1489,6 +1490,7 @@ export function useBriar() {
               {
                 id: crypto.randomUUID(),
                 attempt: 1,
+                revision: 1,
                 status: input.status,
                 workflowStage: null,
                 detail,
@@ -1765,6 +1767,8 @@ export function useBriar() {
                     return {
                       ...run,
                       currentAttempt: attempt,
+                      currentRevision:
+                        action === "retry" ? 1 : run.currentRevision,
                       status,
                       workflowStage:
                         action === "retry" ? null : run.workflowStage,
@@ -1781,6 +1785,8 @@ export function useBriar() {
                         {
                           id: crypto.randomUUID(),
                           attempt,
+                          revision:
+                            action === "retry" ? 1 : run.currentRevision,
                           status,
                           workflowStage:
                             action === "retry" ? null : run.workflowStage,
@@ -1847,6 +1853,23 @@ export function useBriar() {
                       placement.status === "queued"
                         ? run.currentAttempt + 1
                         : run.currentAttempt;
+                    const currentStageIndex = run.workflow.stages.findIndex(
+                      (stage) => stage.id === run.workflowStage,
+                    );
+                    const targetStageIndex = run.workflow.stages.findIndex(
+                      (stage) => stage.id === workflowStage,
+                    );
+                    const isRegression =
+                      placement.status === "running" &&
+                      currentStageIndex >= 0 &&
+                      targetStageIndex >= 0 &&
+                      targetStageIndex < currentStageIndex;
+                    const currentRevision =
+                      placement.status === "queued"
+                        ? 1
+                        : isRegression
+                          ? run.currentRevision + 1
+                          : run.currentRevision;
                     const targetLabel =
                       placement.status === "running"
                         ? run.workflow.stages.find(
@@ -1864,6 +1887,7 @@ export function useBriar() {
                     return {
                       ...run,
                       currentAttempt,
+                      currentRevision,
                       status: placement.status,
                       workflowStage,
                       progress: progressForAutoHuntRun(
@@ -1872,6 +1896,9 @@ export function useBriar() {
                         run.workflow,
                       ),
                       detail,
+                      commitSha: isRegression ? null : run.commitSha,
+                      targetSha: isRegression ? null : run.targetSha,
+                      resultSummary: isRegression ? null : run.resultSummary,
                       claimedBy: null,
                       claimedAt: null,
                       leaseExpiresAt: null,
@@ -1885,6 +1912,7 @@ export function useBriar() {
                         {
                           id: crypto.randomUUID(),
                           attempt: currentAttempt,
+                          revision: currentRevision,
                           status: placement.status,
                           workflowStage,
                           detail,

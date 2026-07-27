@@ -69,6 +69,7 @@ import {
   listIssueMessages,
   listDashboardRuns,
   listRunEvidence,
+  listRunStageRevisions,
   listOrganizationMembers,
   listOrganizations,
   listProjects,
@@ -77,6 +78,7 @@ import {
   listProjectAgentSchedules,
   moveHuntRun,
   recoverHuntRun,
+  reworkHuntRun,
   recordHuntEvent,
   recordRunEvidence,
   replaceProjectAgentToken,
@@ -674,6 +676,15 @@ const recoveryAgentInputSchema = recoveryUserInputSchema.extend({
   actor: z.string().trim().min(1).max(128),
 });
 
+export const runReworkInputSchema = z
+  .object({
+    requestId: z.string().uuid(),
+    workflowStage: workflowStageIdSchema,
+    reason: z.string().trim().min(1).max(4_000),
+    actor: z.string().trim().min(1).max(128),
+  })
+  .strict();
+
 const moveRunInputSchema = z
   .object({
     requestId: z.string().uuid(),
@@ -1082,6 +1093,7 @@ const parseJsonObject = (value: string | null) => {
 const dashboardEventJson = (event: HuntEventRow) => ({
   id: event.id,
   attempt: event.attempt,
+  revision: event.revision,
   status: event.status,
   workflowStage: event.workflow_stage,
   detail: event.detail,
@@ -1135,6 +1147,7 @@ function dashboardRunJson(
     id: run.id,
     runNumber: run.run_number,
     currentAttempt: run.current_attempt,
+    currentRevision: run.current_revision,
     source: run.source,
     sourceKey: run.source_key,
     title: run.title,
@@ -2445,6 +2458,7 @@ async function route(
             runId: run.id,
             runNumber: run.run_number,
             currentAttempt: run.current_attempt,
+            currentRevision: run.current_revision,
             source: run.source,
             sourceKey: run.source_key,
             title: run.title,
@@ -2490,16 +2504,49 @@ async function route(
     return json({ runId: agentRecoveryMatch[1], ...result });
   }
 
+  const reworkMatch = pathname.match(/^\/runs\/([0-9a-f-]+)\/rework$/u);
+  if (reworkMatch && request.method === "POST") {
+    const projectId = await requireAgentProject(db, request);
+    const input = runReworkInputSchema.parse(await readJson(request));
+    try {
+      const result = await reworkHuntRun(db, projectId, {
+        runId: reworkMatch[1],
+        workflowStage: input.workflowStage,
+        requestId: input.requestId,
+        actor: input.actor,
+        reason: input.reason,
+        occurredAt: new Date().toISOString(),
+      });
+      if (result.outcome === "not_found") {
+        throw new HttpError(404, "Run not found");
+      }
+      return json({ runId: reworkMatch[1], ...result });
+    } catch (error) {
+      if (error instanceof HuntTransitionError) {
+        throw new HttpError(409, error.message);
+      }
+      throw error;
+    }
+  }
+
   const evidenceMatch = pathname.match(/^\/runs\/([0-9a-f-]+)\/evidence$/u);
   if (evidenceMatch && request.method === "GET") {
     const projectId = await requireAgentProject(db, request);
     const evidence = await listRunEvidence(db, projectId, evidenceMatch[1]);
-    if (!evidence) throw new HttpError(404, "Run not found");
+    const revisions = await listRunStageRevisions(
+      db,
+      projectId,
+      evidenceMatch[1],
+    );
+    if (!evidence || !revisions) throw new HttpError(404, "Run not found");
     return json({
       runId: evidenceMatch[1],
+      attempt: revisions.attempt,
+      revision: revisions.revision,
       evidence: evidence.map((item) => ({
         key: item.evidence_key,
         attempt: item.attempt,
+        revision: item.revision,
         stage: item.workflow_stage,
         type: item.evidence_type,
         status: item.status,
@@ -2510,6 +2557,11 @@ async function route(
         actor: item.actor,
         observedAt: item.observed_at,
         recordedAt: item.recorded_at,
+        requiredRevision:
+          revisions.requirements.get(item.workflow_stage) ?? 1,
+        canonical:
+          item.revision >=
+          (revisions.requirements.get(item.workflow_stage) ?? 1),
       })),
     });
   }

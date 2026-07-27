@@ -5,6 +5,7 @@ import worker, {
   projectAgentScheduleInputSchema,
   projectAgentScheduleRunCompletionSchema,
   runEvidenceInputSchema,
+  runReworkInputSchema,
 } from "./index";
 
 describe("Worker HTTP contract", () => {
@@ -19,6 +20,30 @@ describe("Worker HTTP contract", () => {
         actor: "briar-workflow",
       }).type,
     ).toBe("signoff/app worker");
+  });
+
+  it("requires an explicit earlier stage and reason for run rework", () => {
+    expect(
+      runReworkInputSchema.parse({
+        requestId: "11111111-1111-4111-8111-111111111111",
+        workflowStage: "implementing",
+        reason: "Local QA found a product-code defect.",
+        actor: "briar-workflow",
+      }),
+    ).toEqual({
+      requestId: "11111111-1111-4111-8111-111111111111",
+      workflowStage: "implementing",
+      reason: "Local QA found a product-code defect.",
+      actor: "briar-workflow",
+    });
+    expect(() =>
+      runReworkInputSchema.parse({
+        requestId: "11111111-1111-4111-8111-111111111111",
+        workflowStage: "implementing",
+        reason: " ",
+        actor: "briar-workflow",
+      }),
+    ).toThrow();
   });
 
   it("normalizes recurring agent schedule input", () => {

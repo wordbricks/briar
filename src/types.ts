@@ -52,6 +52,7 @@ export type UpdateIssueInput = {
 export type HuntEvent = {
   id: string;
   attempt: number;
+  revision: number;
   status: HuntStatus;
   workflowStage: AutoHuntWorkflowStageId | null;
   detail: string | null;
@@ -91,6 +92,7 @@ export type HuntRun = {
   id: string;
   runNumber: number;
   currentAttempt: number;
+  currentRevision: number;
   source: HuntSource;
   sourceKey: string;
   title: string;
