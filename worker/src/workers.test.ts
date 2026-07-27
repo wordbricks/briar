@@ -120,7 +120,7 @@ describe("detached execution workers", () => {
         project_id, velen_org, linear_enabled, workflow_json, created_at, updated_at
       ) values (
         '${projectId}', 'example', 0,
-        '{"version":1,"preset":"local","stages":[{"id":"analyzing","label":"분석","required":true},{"id":"implementing","label":"구현","required":true},{"id":"local_qa","label":"로컬 검증","required":true}]}',
+        '{"version":1,"stages":[{"id":"analyzing","label":"분석","required":true},{"id":"implementing","label":"구현","required":true}],"completion":{"requiredStages":["analyzing","implementing"]},"release":{"enabled":false}}',
         '${atMinute(0)}', '${atMinute(0)}'
       );
     `,

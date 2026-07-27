@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { validateIssueAttachments } from "./issue-attachments";
+import type { AutoHuntWorkflow } from "./auto-hunt-contract";
 import {
   defaultProjectAgentCalendarColor,
   defaultProjectAgentCopy,
@@ -57,6 +58,7 @@ const projectAgentSchema = z.object({
   provider: z.enum(["codex", "claude", "grok"]),
   model: z.string().nullable(),
   responsibility: z.string(),
+  skill: z.string(),
   calendarColor: z
     .string()
     .regex(/^#[0-9a-f]{6}$/iu)
@@ -102,6 +104,18 @@ const projectAgentScheduleSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
 });
+const autoHuntWorkflowSchema: z.ZodType<AutoHuntWorkflow> = z.object({
+  version: z.literal(1),
+  stages: z.array(z.object({
+    id: z.string(),
+    label: z.string(),
+    required: z.boolean(),
+    evidence: z.array(z.string()).optional(),
+    checks: z.array(z.string()).optional(),
+  })),
+  completion: z.object({ requiredStages: z.array(z.string()) }),
+  release: z.object({ enabled: z.boolean() }),
+});
 const projectAgentScheduleRunSchema = z.object({
   id: z.string().uuid(),
   projectId: z.string().uuid(),
@@ -113,7 +127,9 @@ const projectAgentScheduleRunSchema = z.object({
     provider: true,
     model: true,
     responsibility: true,
+    skill: true,
   }),
+  workflow: autoHuntWorkflowSchema,
   status: z.enum(["running", "completed", "failed"]),
   scheduledFor: z.string(),
   leaseExpiresAt: z.string().nullable(),

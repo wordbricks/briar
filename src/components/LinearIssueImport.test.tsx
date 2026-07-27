@@ -3,7 +3,7 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
-import { workflowForPreset } from "../lib/auto-hunt-contract";
+import { repositoryWorkflowBootstrap } from "../lib/auto-hunt-contract";
 import { LinearIssueImport } from "./LinearIssueImport";
 
 describe("LinearIssueImport", () => {
@@ -62,7 +62,7 @@ describe("LinearIssueImport", () => {
           onLoadStates={onLoadStates}
           projectId="project-1"
           repositoryConnected
-          workflow={workflowForPreset("local")}
+          workflow={repositoryWorkflowBootstrap}
         />,
       );
     });
@@ -145,7 +145,7 @@ describe("LinearIssueImport", () => {
           onLoadStates={async () => ({ states: [] })}
           projectId="project-1"
           repositoryConnected={false}
-          workflow={workflowForPreset("local")}
+          workflow={repositoryWorkflowBootstrap}
         />,
       );
     });

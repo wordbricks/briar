@@ -244,7 +244,6 @@ describe("HuntDashboard", () => {
   it("renders workflow stages as kanban columns", () => {
     const customWorkflow = {
       version: 1 as const,
-      preset: "custom" as const,
       stages: [
         { id: "analyzing", label: "Analyze", required: true },
         { id: "security_review", label: "Security review", required: true },

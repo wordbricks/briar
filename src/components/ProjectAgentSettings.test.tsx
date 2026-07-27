@@ -25,6 +25,7 @@ describe("ProjectAgentSettings", () => {
       provider: "codex" as const,
       model: null,
       responsibility: "Process queued issues.",
+      skill: "# Auto Hunt agent\n\nProcess queued issues.",
       calendarColor: "#3275d5",
       kind: "auto_hunt" as const,
       createdAt: "2026-07-26T00:00:00.000Z",

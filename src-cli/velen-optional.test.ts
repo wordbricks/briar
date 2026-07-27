@@ -5,6 +5,12 @@ import { spawnSync } from "node:child_process";
 import { afterEach, describe, expect, it } from "vitest";
 
 const temporaryHomes: string[] = [];
+const repositoryWorkflow = {
+  version: 1,
+  stages: [{ id: "analyzing", label: "Analyze", required: true }],
+  completion: { requiredStages: ["analyzing"] },
+  release: { enabled: false },
+} as const;
 const bunExecutable = spawnSync("/usr/bin/env", ["which", "bun"], {
   encoding: "utf8",
 }).stdout.trim();
@@ -25,6 +31,7 @@ async function cliHome(velenOrg?: string) {
         autoHunt: {
           ...(velenOrg ? { velenOrg } : {}),
           linear: { enabled: false },
+          workflow: repositoryWorkflow,
         },
       }],
     }),

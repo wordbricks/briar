@@ -94,7 +94,7 @@ describe("ProjectOnboarding", () => {
     expect(markup).not.toContain("실행 호스트");
     expect(markup).not.toContain("SSH 별칭");
     expect(markup).not.toContain("SSH 호스트 추가");
-    expect(markup).toContain("백그라운드");
+    expect(markup).toContain("완료되어야 연결");
     expect(markup).toContain(">확인 ");
     expect(markup).not.toContain('label="Auto Hunt 워크플로"');
     expect(markup).not.toContain('aria-pressed="true"');
@@ -172,7 +172,7 @@ describe("ProjectOnboarding", () => {
     );
     expect(onRepositoryInspect).toHaveBeenCalledWith(
       "/Users/jay/git/briar",
-      expect.objectContaining({ preset: "local" }),
+      expect.objectContaining({ version: 1 }),
       "local",
     );
     expect(nameInput?.value).toBe("briar");
@@ -217,7 +217,7 @@ describe("ProjectOnboarding", () => {
     expect(onWorkspaceCreate).toHaveBeenCalledWith("atlas");
     expect(onRepositoryInspect).toHaveBeenCalledWith(
       "/Users/jay/Briar/atlas",
-      expect.objectContaining({ preset: "local" }),
+      expect.objectContaining({ version: 1 }),
       "local",
     );
     expect(onCreate).toHaveBeenCalledWith({ name: "atlas" });
@@ -288,7 +288,7 @@ describe("ProjectOnboarding", () => {
     expect(onRepositorySelect).toHaveBeenCalledOnce();
     expect(onRepositoryInspect).toHaveBeenCalledWith(
       "/Users/jay/git/briar",
-      expect.objectContaining({ preset: "local" }),
+      expect.objectContaining({ version: 1 }),
       "local",
     );
     expect(container.textContent).toContain("/Users/jay/git/briar");

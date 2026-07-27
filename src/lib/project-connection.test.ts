@@ -6,7 +6,7 @@ import {
   inspectVelen,
   listExecutionHosts,
 } from "./project-connection";
-import { defaultAutoHuntWorkflow } from "./auto-hunt-contract";
+import { repositoryWorkflowBootstrap } from "./auto-hunt-contract";
 import { briarApiUrl } from "./api";
 
 const { invoke } = vi.hoisted(() => ({ invoke: vi.fn() }));
@@ -23,12 +23,12 @@ describe("remote project connection", () => {
   it("passes the selected SSH host to repository inspection and connection", async () => {
     await inspectRepositoryReadiness(
       "/home/dev/briar",
-      defaultAutoHuntWorkflow,
+      repositoryWorkflowBootstrap,
       "ssh:ssh-1",
     );
     expect(invoke).toHaveBeenCalledWith("inspect_repository_readiness", {
       repositoryPath: "/home/dev/briar",
-      workflow: defaultAutoHuntWorkflow,
+      workflow: repositoryWorkflowBootstrap,
       executionHostId: "ssh:ssh-1",
     });
 
@@ -40,7 +40,7 @@ describe("remote project connection", () => {
       autoHunt: {
         velenOrg: "wordbricks",
         linearEnabled: false,
-        workflow: defaultAutoHuntWorkflow,
+        workflow: repositoryWorkflowBootstrap,
       },
     });
     expect(invoke).toHaveBeenLastCalledWith("connect_local_project", {

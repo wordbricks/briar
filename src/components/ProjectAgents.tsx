@@ -20,7 +20,10 @@ import {
   type AgentProvider,
 } from "../lib/project-llm";
 import { demoProjectAgents } from "../lib/demo-project-agents";
-import { defaultProjectAgentCalendarColor } from "../lib/project-agent";
+import {
+  defaultProjectAgentCalendarColor,
+  projectAgentSkill,
+} from "../lib/project-agent";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import type {
   CreateProjectAgentInput,
@@ -55,7 +58,7 @@ export function ProjectAgents({
   error: string | null;
   isSidebarOpen: boolean;
   onRequestedSessionOpen?: () => void;
-  onStart: (agentId: string, runs: HuntRun[]) => string;
+  onStart: (agent: ProjectAgent, runs: HuntRun[]) => string;
   project: Project;
   requestedSessionId?: string | null;
   sessions: AutoHuntSession[];
@@ -128,6 +131,11 @@ export function ProjectAgents({
             provider: input.provider,
             model: input.model,
             responsibility: input.responsibility,
+            skill: projectAgentSkill({
+              name: input.name ?? `${providerLabels[input.provider]} Agent`,
+              responsibility: input.responsibility,
+              kind: "custom",
+            }),
             calendarColor: input.calendarColor,
             kind: "custom" as const,
             createdAt,
@@ -154,6 +162,11 @@ export function ProjectAgents({
           provider: input.provider,
           model: input.model,
           responsibility: input.responsibility,
+          skill: projectAgentSkill({
+            name: input.name ?? `${providerLabels[input.provider]} Agent`,
+            responsibility: input.responsibility,
+            kind: agent.kind,
+          }),
           updatedAt,
         };
     setAgents((current) =>
@@ -197,7 +210,7 @@ export function ProjectAgents({
         isSidebarOpen={isSidebarOpen}
         onAgentBack={() => setSelectedAgent(null)}
         onRequestedSessionOpen={onRequestedSessionOpen}
-        onStart={(runs) => onStart(selectedAgent.id, runs)}
+        onStart={(runs) => onStart(selectedAgent, runs)}
         requestedSessionId={requestedSessionId}
         sessions={sessions}
       />

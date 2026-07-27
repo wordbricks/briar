@@ -51,8 +51,11 @@ import {
   isMacDesktopTauri,
 } from "./lib/platform";
 import { automaticTriggersFor } from "./lib/auto-hunt-automation";
+import { loadProjectAgents } from "./lib/api";
 import { issueAgentConversation } from "./lib/issue-agent-reply";
 import { isRepositoryConnectedForImport } from "./lib/linear-import";
+import { normalizeProjectAgentLocale } from "./lib/project-agent";
+import type { ProjectAgent } from "./types";
 
 type ActivePage =
   | "issues"
@@ -67,6 +70,8 @@ type ActivePage =
 export function App() {
   const briar = useBriar();
   const autoHunt = useAutoHuntSessions();
+  const [activeAutoHuntAgent, setActiveAutoHuntAgent] =
+    useState<ProjectAgent | null>(null);
   const inbox = useInbox(
     briar.user?.id ?? null,
     briar.dashboard,
@@ -83,6 +88,36 @@ export function App() {
       !usesNativeLaunchIntro &&
       (previewsLaunchIntro || shouldShowLaunchIntro()),
   );
+
+  useEffect(() => {
+    if (!briar.token || !briar.activeProjectId) {
+      setActiveAutoHuntAgent(null);
+      return;
+    }
+    setActiveAutoHuntAgent(null);
+    let cancelled = false;
+    void loadProjectAgents(
+      briar.token,
+      briar.activeProjectId,
+      normalizeProjectAgentLocale(navigator.language),
+    )
+      .then((agents) => {
+        if (!cancelled) {
+          setActiveAutoHuntAgent(
+            agents.find((agent) => agent.kind === "auto_hunt") ?? null,
+          );
+        }
+      })
+      .catch((caught) => {
+        if (!cancelled) {
+          setActiveAutoHuntAgent(null);
+          console.error("Failed to load the Auto Hunt agent", caught);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [briar.activeProjectId, briar.token]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [appSettingsSection, setAppSettingsSection] =
     useState<SettingsSection>("source-control");
@@ -174,6 +209,8 @@ export function App() {
     if (
       !runsOnDesktopTauri ||
       briar.companionMode ||
+      !activeAutoHuntAgent ||
+      activeAutoHuntAgent.projectId !== dashboard?.project.id ||
       !dashboard?.settings.automation.enabled ||
       autoHunt.sessions.some(
         (session) =>
@@ -202,6 +239,7 @@ export function App() {
         dashboard.runs,
         () => void briar.refresh(),
         {
+          agent: activeAutoHuntAgent,
           maxIssues: dashboard.settings.automation.maxIssuesPerSession,
           trigger: { type: "automatic", reasons },
         },
@@ -212,6 +250,7 @@ export function App() {
   }, [
     autoHunt.sessions,
     autoHunt.startSession,
+    activeAutoHuntAgent,
     briar.companionMode,
     briar.dashboard,
     briar.refresh,
@@ -539,13 +578,13 @@ export function App() {
             error={briar.error}
             isSidebarOpen={isSidebarOpen}
             onRequestedSessionOpen={() => setRequestedSessionId(null)}
-            onStart={(agentId, runs) =>
+            onStart={(agent, runs) =>
               autoHunt.startSession(
                 activeProject.id,
                 runs,
                 () => void briar.refresh(),
                 {
-                  agentId,
+                  agent,
                   maxIssues:
                     briar.dashboard?.settings.automation.maxIssuesPerSession,
                 },
@@ -689,17 +728,24 @@ export function App() {
               isSidebarOpen
               onBack={() => setCompanionPage("inbox")}
               onRequestedSessionOpen={() => setRequestedSessionId(null)}
-              onStart={(runs) =>
-                autoHunt.startSession(
+              onStart={(runs) => {
+                if (
+                  !activeAutoHuntAgent ||
+                  activeAutoHuntAgent.projectId !== briar.activeProjectId
+                ) {
+                  throw new Error("자동사냥 에이전트를 불러오지 못했습니다.");
+                }
+                return autoHunt.startSession(
                   briar.activeProjectId!,
                   runs,
                   () => void briar.refresh(),
                   {
+                    agent: activeAutoHuntAgent,
                     maxIssues:
                       briar.dashboard?.settings.automation.maxIssuesPerSession,
                   },
-                )
-              }
+                );
+              }}
               requestedSessionId={requestedSessionId}
               sessions={autoHunt.sessions}
             />

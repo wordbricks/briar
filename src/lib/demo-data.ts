@@ -1,10 +1,23 @@
 import type { DashboardPayload, HuntEvent, HuntRun } from "../types";
-import { workflowForPreset } from "./auto-hunt-contract";
+import { normalizeAutoHuntWorkflow } from "./auto-hunt-contract";
 import { defaultAutoHuntAutomation } from "./auto-hunt-automation";
 import type { RepositoryReadiness } from "./project-connection";
 
 const now = Date.now();
 const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
+const demoWorkflow = normalizeAutoHuntWorkflow({
+  version: 1,
+  stages: [
+    { id: "analyzing", label: "Analyze", required: true },
+    { id: "implementing", label: "Implement", required: true },
+    {
+      id: "local_qa",
+      label: "Local validation",
+      required: true,
+      checks: ["bun run test", "bun run build"],
+    },
+  ],
+});
 
 const runDefaults = {
   currentAttempt: 1,
@@ -25,7 +38,7 @@ const runDefaults = {
   claimedAt: null,
   leaseExpiresAt: null,
   claimAttempts: 0,
-  workflow: workflowForPreset("local"),
+  workflow: structuredClone(demoWorkflow),
 } satisfies Pick<
   HuntRun,
   | "priority"
@@ -221,7 +234,7 @@ export const demoDashboard: DashboardPayload = {
       teamKey: "GG",
     },
     githubRepository: "wordbricks/briar",
-    workflow: workflowForPreset("local"),
+    workflow: structuredClone(demoWorkflow),
     automation: structuredClone(defaultAutoHuntAutomation),
   },
   runs,

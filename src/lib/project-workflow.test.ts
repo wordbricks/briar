@@ -11,7 +11,7 @@ import { generateProjectWorkflow } from "./project-workflow";
 describe("project workflow generator", () => {
   beforeEach(() => chatWithProjectLlm.mockReset());
 
-  it("generates a custom workflow through the project Codex gateway", async () => {
+  it("generates a repository workflow through the project agent gateway", async () => {
     chatWithProjectLlm.mockResolvedValue({
       conversationId: "briar:project-1:thread-1",
       workspaceRoot: "/repo",
@@ -30,7 +30,6 @@ describe("project workflow generator", () => {
     });
 
     await expect(generateProjectWorkflow("project-1")).resolves.toMatchObject({
-      preset: "custom",
       release: { enabled: false },
       stages: [{ id: "analyzing" }, { id: "implementing" }, { id: "local_qa" }],
     });

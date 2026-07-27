@@ -1,53 +1,43 @@
 import { describe, expect, it } from "vitest";
 import {
-  defaultAutoHuntWorkflow,
   normalizeAutoHuntWorkflow,
   progressForAutoHuntRun,
-  workflowForPreset,
+  repositoryWorkflowBootstrap,
 } from "./auto-hunt-contract";
 import { demoDashboard } from "./demo-data";
 import { eventMeta, runMeta } from "./stages";
 
 describe("Auto Hunt workflows", () => {
-  it("defaults new projects to a deployment-free local workflow", () => {
-    expect(defaultAutoHuntWorkflow.preset).toBe("local");
-    expect(defaultAutoHuntWorkflow.stages.map((stage) => stage.id)).toEqual([
-      "analyzing",
-      "implementing",
-      "local_qa",
+  it("marks the pre-analysis contract as pending instead of inventing stages", () => {
+    expect(repositoryWorkflowBootstrap.stages.map((stage) => stage.id)).toEqual([
+      "repository_workflow_pending",
     ]);
-    expect(defaultAutoHuntWorkflow.stages.map((stage) => stage.id)).not.toContain(
+    expect(repositoryWorkflowBootstrap.stages.map((stage) => stage.id)).not.toContain(
       "production_qa",
     );
-    expect(defaultAutoHuntWorkflow.completion.requiredStages).toEqual([
-      "analyzing",
-      "implementing",
-      "local_qa",
+    expect(repositoryWorkflowBootstrap.completion.requiredStages).toEqual([
+      "repository_workflow_pending",
     ]);
-    expect(defaultAutoHuntWorkflow.release.enabled).toBe(false);
-    expect(defaultAutoHuntWorkflow.stages.at(-1)?.checks).toEqual([
-      "bun run test",
-      "bun run build",
-    ]);
+    expect(repositoryWorkflowBootstrap.release.enabled).toBe(false);
   });
 
-  it("keeps deployment stages in an explicit release preset", () => {
-    expect(workflowForPreset("release").stages.map((stage) => stage.id)).toEqual([
-      "analyzing",
-      "implementing",
-      "pr_open",
-      "staging_qa",
-      "production_qa",
-    ]);
+  it("calculates progress from repository-defined stages", () => {
+    const workflow = normalizeAutoHuntWorkflow({
+      version: 1,
+      stages: [
+        { id: "analyzing", label: "Analyze", required: true },
+        { id: "implementing", label: "Implement", required: true },
+        { id: "local_qa", label: "Validate", required: true },
+      ],
+    });
     expect(
-      progressForAutoHuntRun("running", "local_qa", defaultAutoHuntWorkflow),
+      progressForAutoHuntRun("running", "local_qa", workflow),
     ).toBe(75);
   });
 
-  it("upgrades legacy workflow settings to the execution contract", () => {
+  it("normalizes a repository workflow to the execution contract", () => {
     const workflow = normalizeAutoHuntWorkflow({
       version: 1,
-      preset: "local",
       stages: [
         { id: "analyzing", label: "분석", required: true },
         { id: "implementing", label: "구현", required: true },
@@ -76,7 +66,6 @@ describe("Auto Hunt workflows", () => {
       release: { enabled: false },
     });
 
-    expect(workflow.preset).toBe("custom");
     expect(workflow.stages.map((stage) => stage.id)).toEqual([
       "analyze",
       "implement",

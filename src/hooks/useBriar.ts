@@ -73,8 +73,9 @@ import {
 } from "../lib/auth-session";
 import { startDashboardPolling } from "../lib/dashboard-polling";
 import {
-  defaultAutoHuntWorkflow,
+  isRepositoryWorkflowPending,
   progressForAutoHuntRun,
+  repositoryWorkflowBootstrap,
 } from "../lib/auto-hunt-contract";
 import {
   defaultAutoHuntAutomation,
@@ -84,6 +85,7 @@ import {
 import { isMobileCompanion } from "../lib/platform";
 import { chatWithProjectLlm } from "../lib/project-llm";
 import { runProjectAgentSchedule } from "../lib/project-llm";
+import { projectAgentRuntimeInstructions } from "../lib/project-agent";
 import { startProjectAgentSchedulePolling } from "../lib/project-agent-schedule-runner";
 import {
   agentReplyParentMessageId,
@@ -172,7 +174,7 @@ const emptyDashboard = (project: Project): DashboardPayload => ({
     dataSource: null,
     linear: { enabled: false, source: null, teamKey: null },
     githubRepository: null,
-    workflow: structuredClone(defaultAutoHuntWorkflow),
+    workflow: structuredClone(repositoryWorkflowBootstrap),
     automation: structuredClone(defaultAutoHuntAutomation),
   },
   runs: [],
@@ -241,6 +243,7 @@ export function useBriar() {
   const pollTimer = useRef<number | null>(null);
   const pollLoginNow = useRef<(() => void) | null>(null);
   const loginAttempt = useRef(0);
+  const workflowGenerationAttempts = useRef(new Set<string>());
 
   const clearLoginTimer = useCallback(() => {
     if (pollTimer.current === null) return;
@@ -405,12 +408,16 @@ export function useBriar() {
             provider: run.agent.provider,
             model: run.agent.model,
             message: run.agent.responsibility,
-            instructions: [
-              `Run the scheduled automation "${run.scheduleName}".`,
-              `It was scheduled for ${run.scheduledFor}.`,
-              "Work from the connected project root and complete the agent responsibility.",
-              "Do not ask for interactive approval. Return a concise result summary.",
-            ].join("\n"),
+            instructions: projectAgentRuntimeInstructions({
+              skill: run.agent.skill,
+              workflow: run.workflow,
+              invocation: [
+                `Run the scheduled automation "${run.scheduleName}".`,
+                `It was scheduled for ${run.scheduledFor}.`,
+                "Work from the connected project root and complete the agent responsibility.",
+                "Do not ask for interactive approval. Return a concise result summary.",
+              ].join("\n"),
+            }),
           }),
         log: (message, caught) => console.error(message, caught),
       },
@@ -937,6 +944,13 @@ export function useBriar() {
       setConnectedProjectIds((current) =>
         withConnectedProject(current, connection.project.id),
       );
+      const generatedWorkflow = await generateProjectWorkflow(
+        connection.project.id,
+      );
+      await updateLocalProjectWorkflow(
+        connection.project.id,
+        generatedWorkflow,
+      );
 
       const initialSettings: ProjectSettings = {
         velenOrg: autoHunt.velenOrg,
@@ -947,7 +961,7 @@ export function useBriar() {
           teamKey: autoHunt.linearTeam ?? null,
         },
         githubRepository: autoHunt.githubRepository ?? null,
-        workflow: autoHunt.workflow,
+        workflow: generatedWorkflow,
         automation: structuredClone(defaultAutoHuntAutomation),
       };
       let savedSettings = initialSettings;
@@ -972,39 +986,7 @@ export function useBriar() {
       setIsCreatingProject(false);
       setError(null);
       void refreshHealth();
-
-      void (async () => {
-        try {
-          const generatedWorkflow = await generateProjectWorkflow(
-            connection.project.id,
-          );
-          await updateLocalProjectWorkflow(
-            connection.project.id,
-            generatedWorkflow,
-          );
-          let generatedSettings = {
-            ...initialSettings,
-            workflow: generatedWorkflow,
-          };
-          if (token) {
-            const saved = await updateProjectSettings(
-              token,
-              connection.project.id,
-              generatedSettings,
-            );
-            generatedSettings = saved.settings;
-          }
-          setDashboard((current) =>
-            current?.project.id === connection.project.id
-              ? { ...current, settings: generatedSettings }
-              : current,
-          );
-          await refreshProjectReadiness(connection.project.id);
-        } catch (caught) {
-          const message = caught instanceof Error ? caught.message : String(caught);
-          setError(`프로젝트는 연결했지만 백그라운드 코드 분석에 실패했습니다: ${message}`);
-        }
-      })();
+      await refreshProjectReadiness(connection.project.id);
 
       return connected.repositoryPath;
     } catch (caught) {
@@ -1012,6 +994,9 @@ export function useBriar() {
       if (connectedLocally) {
         try {
           await disconnectLocalProject(connection.project.id);
+          setConnectedProjectIds((current) =>
+            withoutConnectedProject(current, connection.project.id),
+          );
         } catch (cleanupError) {
           const cleanup = cleanupError instanceof Error
             ? cleanupError.message
@@ -1138,6 +1123,26 @@ export function useBriar() {
     },
     [dashboard, refreshProjectReadiness, token],
   );
+
+  useEffect(() => {
+    const projectId = dashboard?.project.id;
+    if (
+      demoMode ||
+      companionMode ||
+      !token ||
+      !projectId ||
+      !connectedProjectIds?.includes(projectId) ||
+      !isRepositoryWorkflowPending(dashboard.settings.workflow) ||
+      workflowGenerationAttempts.current.has(projectId)
+    ) {
+      return;
+    }
+    workflowGenerationAttempts.current.add(projectId);
+    void regenerateWorkflow(projectId).catch((caught) => {
+      const message = caught instanceof Error ? caught.message : String(caught);
+      setError(`저장소 기반 워크플로우 생성에 실패했습니다: ${message}`);
+    });
+  }, [connectedProjectIds, dashboard, regenerateWorkflow, token]);
 
   const saveAutoHuntAutomation = useCallback(
     async (projectId: string, automation: AutoHuntAutomation) => {
