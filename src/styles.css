@@ -1449,6 +1449,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .project-agent-settings-fields input,.project-agent-settings-fields textarea { width:100%; padding:12px 13px; border:1px solid #e1e2dc; border-radius:11px; outline:none; color:#3f403b; background:#fafaf7; font-size:11px; resize:vertical; }
 .project-agent-settings-fields input:focus,.project-agent-settings-fields textarea:focus { border-color:#8068ce; background:#fff; box-shadow:0 0 0 3px rgba(128,104,206,.12); }
 .project-agent-settings-fields label > small { color:#999b94; font-size:8px; font-weight:500; line-height:1.5; }
+.project-agent-settings-fields .project-agent-color-field input[type="color"] { width:28px; height:28px; padding:2px; border:1px solid #d7dad5; border-radius:8px; background:#fff; cursor:pointer; }
 .project-agent-settings-field-grid { display:grid; grid-template-columns:1fr 1.35fr; gap:11px; }
 .project-agent-settings-fields .native-select,.project-agent-settings-fields .select-menu-trigger { width:100%; }
 .project-agent-settings-fields .select-menu-trigger { height:42px; border-radius:11px; }
