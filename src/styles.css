@@ -1315,6 +1315,10 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .project-schedule-period .project-schedule-today { width:auto; margin-left:5px; padding:0 11px; font-size:8.5px; font-weight:650; }
 .project-schedule-period .project-schedule-today:disabled { color:#afb0ac; background:#f7f7f5; cursor:default; }
 .project-schedule-period strong { margin-left:10px; overflow:hidden; color:#3b3d39; font-size:11px; text-overflow:ellipsis; white-space:nowrap; }
+.project-schedule-toolbar-meta { min-width:0; display:flex; align-items:center; justify-content:flex-end; gap:13px; }
+.project-schedule-agent-filter { width:166px; display:flex; align-items:center; gap:6px; color:#777b76; }
+.project-schedule-agent-filter > svg { flex:0 0 auto; }
+.project-schedule-agent-filter .select-menu-trigger { height:30px; border-radius:9px; color:#565954; background:#fafaf8; }
 .project-schedule-timezone { display:flex; align-items:center; gap:6px; color:#8c8e88; font:500 7.5px "DM Mono",monospace; white-space:nowrap; }
 .project-schedule-timezone svg { color:#777b76; }
 .project-schedule-timezone span + span::before { content:"·"; margin-right:6px; color:#b2b3ae; }
@@ -1489,6 +1493,8 @@ button.issue-message-state { width:100%; cursor:pointer; }
   .project-schedule-toolbar { min-height:78px; padding:9px 12px; align-items:flex-start; flex-direction:column; gap:7px; }
   .project-schedule-period { width:100%; }
   .project-schedule-period strong { margin-left:auto; }
+  .project-schedule-toolbar-meta { width:100%; justify-content:space-between; }
+  .project-schedule-agent-filter { width:min(190px,55%); }
   .project-schedule-timezone { padding-left:2px; }
   .project-schedule-grid,.project-schedule-days,.project-schedule-week { min-width:780px; }
   .project-schedule-days,.project-schedule-week { grid-template-columns:54px repeat(7,minmax(103px,1fr)); }
