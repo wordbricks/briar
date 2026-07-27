@@ -5,11 +5,13 @@ import {
   Bold,
   Bot,
   Check,
+  ChevronDown,
   ChevronRight,
   CircleAlert,
   Clock3,
   Code2,
   Columns3,
+  FolderKanban,
   FolderGit2,
   GitCommitHorizontal,
   GitFork,
@@ -28,6 +30,7 @@ import {
   Send,
   Signal,
   Smile,
+  Tag,
   Trash2,
   UserRound,
   Video,
@@ -576,6 +579,7 @@ export function HuntDashboard({
             await onCreateIssue(input);
             setIsIssueDialogOpen(false);
           }}
+          projectName={dashboard?.project.name}
         />
       )}
     </main>
@@ -586,10 +590,12 @@ export function CreateIssueDialog({
   isSubmitting,
   onClose,
   onCreate,
+  projectName,
 }: {
   isSubmitting: boolean;
   onClose: () => void;
   onCreate: (input: CreateIssueInput) => Promise<void>;
+  projectName?: string;
 }) {
   const { t } = useI18n();
   const [title, setTitle] = useState("");
@@ -607,10 +613,33 @@ export function CreateIssueDialog({
     if (!error) setAttachments(next);
   };
 
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !isSubmitting) onClose();
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [isSubmitting, onClose]);
+
   return (
-    <div className="dialog-backdrop" onMouseDown={(event) => event.target === event.currentTarget && !isSubmitting && onClose()}>
+    <div
+      className="dialog-backdrop issue-dialog-backdrop"
+      onMouseDown={(event) =>
+        event.target === event.currentTarget && !isSubmitting && onClose()
+      }
+    >
       <form
         className="issue-dialog"
+        onKeyDown={(event) => {
+          if (
+            event.key === "Enter" &&
+            (event.metaKey || event.ctrlKey) &&
+            !isSubmitting
+          ) {
+            event.preventDefault();
+            event.currentTarget.requestSubmit();
+          }
+        }}
         onPaste={(event) => {
           const items = Array.from(event.clipboardData.items);
           const pastedImages = items
@@ -644,75 +673,181 @@ export function CreateIssueDialog({
         aria-label={t("issue.dialog")}
       >
         <header>
-          <div><p className="eyebrow">AUTO HUNT ISSUE</p><h2>{t("dashboard.createIssue")}</h2></div>
-          <button disabled={isSubmitting} onClick={onClose} type="button" aria-label={t("common.close")}><X size={18} /></button>
+          <div className="issue-dialog-context">
+            <strong>{t("issue.newIssue")}</strong>
+            {projectName && (
+              <>
+                <span aria-hidden="true">/</span>
+                <button
+                  aria-disabled="true"
+                  className="issue-project-context"
+                  disabled
+                  type="button"
+                >
+                  {projectName}
+                  <ChevronDown size={15} />
+                </button>
+              </>
+            )}
+          </div>
+          <button
+            className="issue-dialog-close"
+            disabled={isSubmitting}
+            onClick={onClose}
+            type="button"
+            aria-label={t("common.close")}
+          >
+            <X size={22} />
+          </button>
         </header>
         <div className="issue-form-body">
-          <label>
-            <span>{t("issue.title")} <em>{t("common.required")}</em></span>
-            <input autoFocus maxLength={300} onChange={(event) => setTitle(event.target.value)} placeholder={t("issue.titlePlaceholder")} required value={title} />
-          </label>
-          <label>
-            <span>{t("issue.description")}</span>
-            <textarea maxLength={100000} onChange={(event) => setDescription(event.target.value)} placeholder={t("issue.descriptionPlaceholder")} rows={6} value={description} />
-          </label>
-          <div className="issue-attachment-field">
-            <span>{t("issue.attachments")} <em>{t("issue.pasteHint")}</em></span>
-            <label className="issue-attachment-button">
-              <Paperclip size={15} />
-              <span>{t("issue.chooseFile")}</span>
-              <small>{t("issue.fileHint")}</small>
+          <input
+            aria-label={t("issue.title")}
+            autoFocus
+            className="issue-title-input"
+            maxLength={300}
+            onChange={(event) => setTitle(event.target.value)}
+            placeholder={t("issue.titlePlaceholder")}
+            required
+            value={title}
+          />
+          <textarea
+            aria-label={t("issue.description")}
+            className="issue-description-input"
+            maxLength={100000}
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder={t("issue.descriptionPlaceholder")}
+            value={description}
+          />
+          {attachments.length > 0 && (
+            <div className="issue-attachment-list">
+              {attachments.map((file, index) => (
+                <SelectedAttachment
+                  file={file}
+                  key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
+                  onRemove={() => {
+                    setAttachments((current) =>
+                      current.filter(
+                        (_, candidateIndex) => candidateIndex !== index,
+                      ),
+                    );
+                    setAttachmentError(null);
+                  }}
+                />
+              ))}
+            </div>
+          )}
+          {(submitError || attachmentError) && (
+            <div className="issue-form-error">
+              <CircleAlert size={14} />
+              {submitError ?? attachmentError}
+            </div>
+          )}
+          <div className="issue-metadata-bar">
+            <button
+              aria-disabled="true"
+              className="issue-metadata-chip"
+              disabled
+              type="button"
+            >
+              <i aria-hidden="true" />
+              {t("issue.todo")}
+              <ChevronDown size={15} />
+            </button>
+            <button
+              aria-disabled="true"
+              className="issue-metadata-chip"
+              disabled
+              type="button"
+            >
+              <UserRound size={17} />
+              {t("issue.assignee")}
+              <ChevronDown size={15} />
+            </button>
+            <NativeSelect
+              className="issue-priority-select"
+              label={t("issue.priority")}
+              onValueChange={setPriority}
+              options={[
+                { label: t("issue.priority1"), value: "1" },
+                { label: t("issue.priority2"), value: "2" },
+                { label: t("issue.priority3"), value: "3" },
+                { label: t("issue.priority4"), value: "4" },
+              ]}
+              value={priority}
+            />
+            <button
+              aria-disabled="true"
+              className="issue-metadata-chip"
+              disabled
+              type="button"
+            >
+              <FolderKanban size={17} />
+              {t("issue.project")}
+              <ChevronDown size={15} />
+            </button>
+            <button
+              aria-disabled="true"
+              className="issue-metadata-chip"
+              disabled
+              type="button"
+            >
+              <Tag size={17} />
+              {t("issue.labels")}
+              <ChevronDown size={15} />
+            </button>
+            <label className="issue-attachment-trigger">
+              <Paperclip size={17} />
+              <span>
+                {attachments.length > 0
+                  ? t("issue.attachmentCount", {
+                      count: attachments.length,
+                    })
+                  : t("issue.attachments")}
+              </span>
               <input
                 accept={issueAttachmentAccept}
                 aria-label={t("issue.attachmentLabel")}
-                disabled={isSubmitting || attachments.length >= maxIssueAttachmentCount}
+                disabled={
+                  isSubmitting ||
+                  attachments.length >= maxIssueAttachmentCount
+                }
                 multiple
                 onChange={(event) => {
-                  const selected = Array.from(event.currentTarget.files ?? []);
+                  const selected = Array.from(
+                    event.currentTarget.files ?? [],
+                  );
                   event.currentTarget.value = "";
                   addAttachments(selected);
                 }}
                 type="file"
               />
             </label>
-            {attachments.length > 0 && (
-              <div className="issue-attachment-list">
-                {attachments.map((file, index) => (
-                  <SelectedAttachment
-                    file={file}
-                    key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
-                    onRemove={() => {
-                      setAttachments((current) =>
-                        current.filter((_, candidateIndex) => candidateIndex !== index),
-                      );
-                      setAttachmentError(null);
-                    }}
-                  />
-                ))}
-              </div>
-            )}
           </div>
-          <NativeSelect
-            className="issue-priority-select"
-            label={t("issue.priority")}
-            onValueChange={setPriority}
-            options={[
-              { label: t("issue.priority1"), value: "1" },
-              { label: t("issue.priority2"), value: "2" },
-              { label: t("issue.priority3"), value: "3" },
-              { label: t("issue.priority4"), value: "4" },
-            ]}
-            value={priority}
-          />
-          {(submitError || attachmentError) && <div className="issue-form-error"><CircleAlert size={14} />{submitError ?? attachmentError}</div>}
-          <p>{t("issue.queuedHint")}</p>
         </div>
         <footer>
-          <button disabled={isSubmitting} onClick={onClose} type="button">{t("common.cancel")}</button>
-          <button className="issue-submit-button" disabled={isSubmitting || !title.trim()} type="submit">
-            {isSubmitting ? <LoaderCircle className="spin" size={14} /> : <Plus size={14} />}
-            {isSubmitting ? t("issue.submitting") : t("issue.submit")}
-          </button>
+          <span className="issue-submit-hint">
+            <kbd>⌘</kbd>
+            {t("issue.submitHint")}
+          </span>
+          <div>
+            <button
+              className="issue-cancel-button"
+              disabled={isSubmitting}
+              onClick={onClose}
+              type="button"
+            >
+              {t("common.cancel")}
+            </button>
+            <button
+              className="issue-submit-button"
+              disabled={isSubmitting || !title.trim()}
+              type="submit"
+            >
+              {isSubmitting && <LoaderCircle className="spin" size={15} />}
+              {isSubmitting ? t("issue.submitting") : t("issue.submit")}
+            </button>
+          </div>
         </footer>
       </form>
     </div>
