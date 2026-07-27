@@ -23,6 +23,10 @@ import {
 } from "../../src/lib/project-agent";
 import {
   nextProjectAgentScheduleRunAt,
+  parseProjectAgentScheduleDays,
+  serializeProjectAgentScheduleDays,
+  type ProjectAgentScheduleIntervalUnit,
+  type ProjectAgentScheduleNotificationLevel,
   type ProjectAgentScheduleRecurrence,
 } from "../../src/lib/project-agent-schedule";
 
@@ -94,8 +98,13 @@ export type ProjectAgentScheduleRow = {
   agent_provider: ProjectAgentProvider;
   name: string;
   recurrence: ProjectAgentScheduleRecurrence;
+  frequency: ProjectAgentScheduleRecurrence | null;
   time_of_day: string;
   day_of_week: number | null;
+  interval_value: number;
+  interval_unit: ProjectAgentScheduleIntervalUnit;
+  days_of_week: string | null;
+  notification_level: ProjectAgentScheduleNotificationLevel;
   time_zone: string;
   enabled: number;
   next_run_at: string | null;
@@ -718,6 +727,27 @@ export async function createProjectAgent(
   return agent;
 }
 
+type ProjectAgentScheduleInput = {
+  agentId: string;
+  name: string;
+  recurrence: ProjectAgentScheduleRecurrence;
+  timeOfDay: string;
+  dayOfWeek: number | null;
+  intervalValue?: number;
+  intervalUnit?: ProjectAgentScheduleIntervalUnit;
+  daysOfWeek?: number[];
+  notificationLevel?: ProjectAgentScheduleNotificationLevel;
+  timeZone: string;
+};
+
+function persistedProjectAgentScheduleRecurrence(
+  input: ProjectAgentScheduleInput,
+): "daily" | "weekdays" | "weekly" {
+  if (input.recurrence === "interval") return "daily";
+  if (input.recurrence === "custom") return "daily";
+  return input.recurrence;
+}
+
 export async function listProjectAgentSchedules(
   db: D1Database,
   projectId: string,
@@ -726,8 +756,11 @@ export async function listProjectAgentSchedules(
     .prepare(
       `select schedule.id, schedule.project_id, schedule.agent_id,
               agent.name as agent_name, agent.provider as agent_provider,
-              schedule.name, schedule.recurrence, schedule.time_of_day,
-              schedule.day_of_week, schedule.time_zone, schedule.enabled,
+              schedule.name, schedule.recurrence, schedule.frequency,
+              schedule.time_of_day, schedule.day_of_week,
+              schedule.interval_value, schedule.interval_unit,
+              schedule.days_of_week, schedule.notification_level,
+              schedule.time_zone, schedule.enabled,
               schedule.next_run_at,
               schedule.created_at, schedule.updated_at
        from briar_project_agent_schedules schedule
@@ -743,14 +776,7 @@ export async function listProjectAgentSchedules(
 export async function createProjectAgentSchedule(
   db: D1Database,
   projectId: string,
-  input: {
-    agentId: string;
-    name: string;
-    recurrence: ProjectAgentScheduleRecurrence;
-    timeOfDay: string;
-    dayOfWeek: number | null;
-    timeZone: string;
-  },
+  input: ProjectAgentScheduleInput,
 ) {
   const agent = await db
     .prepare(
@@ -769,25 +795,41 @@ export async function createProjectAgentSchedule(
       recurrence: input.recurrence,
       timeOfDay: input.timeOfDay,
       dayOfWeek: input.dayOfWeek,
+      intervalValue: input.intervalValue,
+      intervalUnit: input.intervalUnit,
+      daysOfWeek: input.daysOfWeek,
+      anchorAt: createdAt,
       timeZone: input.timeZone,
     },
-    new Date(Date.parse(createdAt) - 60_000),
+    new Date(
+      Date.parse(createdAt) -
+        (input.recurrence === "interval" ? 0 : 60_000),
+    ),
   );
+  const persistedRecurrence = persistedProjectAgentScheduleRecurrence(input);
   await db
     .prepare(
       `insert into briar_project_agent_schedules (
-         id, project_id, agent_id, name, recurrence, time_of_day,
-         day_of_week, time_zone, enabled, next_run_at, created_at, updated_at
-       ) values (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+         id, project_id, agent_id, name, recurrence, frequency, time_of_day,
+         day_of_week, interval_value, interval_unit, days_of_week,
+         notification_level, time_zone, enabled, next_run_at, created_at,
+         updated_at
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
     )
     .bind(
       id,
       projectId,
       input.agentId,
       input.name,
+      persistedRecurrence,
       input.recurrence,
       input.timeOfDay,
       input.dayOfWeek,
+      input.intervalValue ?? 1,
+      input.intervalUnit ??
+        (input.recurrence === "interval" ? "hour" : "day"),
+      serializeProjectAgentScheduleDays(input.daysOfWeek),
+      input.notificationLevel ?? "important_updates",
       input.timeZone,
       nextRunAt,
       createdAt,
@@ -799,8 +841,11 @@ export async function createProjectAgentSchedule(
     .prepare(
       `select schedule.id, schedule.project_id, schedule.agent_id,
               agent.name as agent_name, agent.provider as agent_provider,
-              schedule.name, schedule.recurrence, schedule.time_of_day,
-              schedule.day_of_week, schedule.time_zone, schedule.enabled,
+              schedule.name, schedule.recurrence, schedule.frequency,
+              schedule.time_of_day, schedule.day_of_week,
+              schedule.interval_value, schedule.interval_unit,
+              schedule.days_of_week, schedule.notification_level,
+              schedule.time_zone, schedule.enabled,
               schedule.next_run_at,
               schedule.created_at, schedule.updated_at
        from briar_project_agent_schedules schedule
@@ -815,30 +860,41 @@ export async function updateProjectAgentSchedule(
   db: D1Database,
   projectId: string,
   scheduleId: string,
-  input: {
-    agentId: string;
-    name: string;
-    recurrence: ProjectAgentScheduleRecurrence;
-    timeOfDay: string;
-    dayOfWeek: number | null;
-    timeZone: string;
-  },
+  input: ProjectAgentScheduleInput,
 ) {
   const observedAt = new Date().toISOString();
+  const existing = await db
+    .prepare(
+      `select created_at
+       from briar_project_agent_schedules
+       where id = ? and project_id = ?`,
+    )
+    .bind(scheduleId, projectId)
+    .first<{ created_at: string }>();
   const nextRunAt = nextProjectAgentScheduleRunAt(
     {
       recurrence: input.recurrence,
       timeOfDay: input.timeOfDay,
       dayOfWeek: input.dayOfWeek,
+      intervalValue: input.intervalValue,
+      intervalUnit: input.intervalUnit,
+      daysOfWeek: input.daysOfWeek,
+      anchorAt: existing?.created_at ?? observedAt,
       timeZone: input.timeZone,
     },
-    new Date(Date.parse(observedAt) - 60_000),
+    new Date(
+      Date.parse(observedAt) -
+        (input.recurrence === "interval" ? 0 : 60_000),
+    ),
   );
+  const persistedRecurrence = persistedProjectAgentScheduleRecurrence(input);
   const updated = await db
     .prepare(
       `update briar_project_agent_schedules
-       set agent_id = ?, name = ?, recurrence = ?, time_of_day = ?,
-           day_of_week = ?, time_zone = ?, next_run_at = ?, updated_at = ?
+       set agent_id = ?, name = ?, recurrence = ?, frequency = ?,
+           time_of_day = ?, day_of_week = ?, interval_value = ?,
+           interval_unit = ?, days_of_week = ?, notification_level = ?,
+           time_zone = ?, next_run_at = ?, updated_at = ?
        where id = ? and project_id = ?
          and exists (
            select 1 from briar_project_agents agent
@@ -849,9 +905,15 @@ export async function updateProjectAgentSchedule(
     .bind(
       input.agentId,
       input.name,
+      persistedRecurrence,
       input.recurrence,
       input.timeOfDay,
       input.dayOfWeek,
+      input.intervalValue ?? 1,
+      input.intervalUnit ??
+        (input.recurrence === "interval" ? "hour" : "day"),
+      serializeProjectAgentScheduleDays(input.daysOfWeek),
+      input.notificationLevel ?? "important_updates",
       input.timeZone,
       nextRunAt,
       observedAt,
@@ -866,8 +928,11 @@ export async function updateProjectAgentSchedule(
     .prepare(
       `select schedule.id, schedule.project_id, schedule.agent_id,
               agent.name as agent_name, agent.provider as agent_provider,
-              schedule.name, schedule.recurrence, schedule.time_of_day,
-              schedule.day_of_week, schedule.time_zone, schedule.enabled,
+              schedule.name, schedule.recurrence, schedule.frequency,
+              schedule.time_of_day, schedule.day_of_week,
+              schedule.interval_value, schedule.interval_unit,
+              schedule.days_of_week, schedule.notification_level,
+              schedule.time_zone, schedule.enabled,
               schedule.next_run_at,
               schedule.created_at, schedule.updated_at
        from briar_project_agent_schedules schedule
@@ -952,16 +1017,21 @@ async function initializeProjectAgentScheduleNextRuns(
 ) {
   const schedules = await db
     .prepare(
-      `select id, recurrence, time_of_day, day_of_week, time_zone, created_at
+      `select id, coalesce(frequency, recurrence) as frequency,
+              time_of_day, day_of_week, interval_value, interval_unit,
+              days_of_week, time_zone, created_at
        from briar_project_agent_schedules
        where project_id = ? and enabled = 1 and next_run_at is null`,
     )
     .bind(projectId)
     .all<{
       id: string;
-      recurrence: ProjectAgentScheduleRecurrence;
+      frequency: ProjectAgentScheduleRecurrence;
       time_of_day: string;
       day_of_week: number | null;
+      interval_value: number;
+      interval_unit: ProjectAgentScheduleIntervalUnit;
+      days_of_week: string | null;
       time_zone: string;
       created_at: string;
     }>();
@@ -972,12 +1042,18 @@ async function initializeProjectAgentScheduleNextRuns(
     );
     const nextRunAt = nextProjectAgentScheduleRunAt(
       {
-        recurrence: schedule.recurrence,
+        recurrence: schedule.frequency,
         timeOfDay: schedule.time_of_day,
         dayOfWeek: schedule.day_of_week,
+        intervalValue: schedule.interval_value,
+        intervalUnit: schedule.interval_unit,
+        daysOfWeek: parseProjectAgentScheduleDays(schedule.days_of_week),
+        anchorAt: schedule.created_at,
         timeZone: schedule.time_zone,
       },
-      new Date(startAt - 60_000),
+      new Date(
+        startAt - (schedule.frequency === "interval" ? 0 : 60_000),
+      ),
     );
     await db
       .prepare(
@@ -1055,8 +1131,10 @@ export async function claimDueProjectAgentScheduleRun(
   const schedule = await db
     .prepare(
       `select schedule.id, schedule.agent_id, schedule.next_run_at,
-              schedule.recurrence, schedule.time_of_day,
-              schedule.day_of_week, schedule.time_zone
+              coalesce(schedule.frequency, schedule.recurrence) as frequency,
+              schedule.time_of_day, schedule.day_of_week,
+              schedule.interval_value, schedule.interval_unit,
+              schedule.days_of_week, schedule.time_zone, schedule.created_at
        from briar_project_agent_schedules schedule
        where schedule.project_id = ? and schedule.enabled = 1
          and schedule.next_run_at is not null
@@ -1074,18 +1152,26 @@ export async function claimDueProjectAgentScheduleRun(
       id: string;
       agent_id: string;
       next_run_at: string;
-      recurrence: ProjectAgentScheduleRecurrence;
+      frequency: ProjectAgentScheduleRecurrence;
       time_of_day: string;
       day_of_week: number | null;
+      interval_value: number;
+      interval_unit: ProjectAgentScheduleIntervalUnit;
+      days_of_week: string | null;
       time_zone: string;
+      created_at: string;
     }>();
   if (!schedule) return null;
 
   const nextRunAt = nextProjectAgentScheduleRunAt(
     {
-      recurrence: schedule.recurrence,
+      recurrence: schedule.frequency,
       timeOfDay: schedule.time_of_day,
       dayOfWeek: schedule.day_of_week,
+      intervalValue: schedule.interval_value,
+      intervalUnit: schedule.interval_unit,
+      daysOfWeek: parseProjectAgentScheduleDays(schedule.days_of_week),
+      anchorAt: schedule.created_at,
       timeZone: schedule.time_zone,
     },
     new Date(

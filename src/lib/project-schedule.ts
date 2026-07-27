@@ -273,8 +273,18 @@ export function scheduleOccurrenceSegmentsForWeek(
       Math.max(weekStart.getTime() - 1, createdAt.getTime() - 1),
     );
 
-    for (let occurrenceCount = 0; occurrenceCount < dayCount + 1; occurrenceCount += 1) {
-      const start = new Date(nextProjectAgentScheduleRunAt(schedule, cursor));
+    const occurrenceLimit = schedule.recurrence === "interval" ? 512 : 32;
+    for (
+      let occurrenceCount = 0;
+      occurrenceCount < occurrenceLimit;
+      occurrenceCount += 1
+    ) {
+      const start = new Date(
+        nextProjectAgentScheduleRunAt(
+          { ...schedule, anchorAt: schedule.createdAt },
+          cursor,
+        ),
+      );
       if (start.getTime() >= weekEnd.getTime()) break;
       cursor = start;
       if (start.getTime() < weekStart.getTime()) continue;

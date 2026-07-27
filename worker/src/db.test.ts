@@ -254,6 +254,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         "utf8",
       ),
     );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0026_flexible_project_agent_schedules.sql"),
+        "utf8",
+      ),
+    );
   });
 
   afterAll(async () => {
@@ -450,6 +457,34 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await expect(
       deleteProjectAgentSchedule(db, projectId, schedule!.id),
     ).resolves.toBe("not_found");
+  });
+
+  it("persists a custom multi-day cadence and notification preference", async () => {
+    const agent = (await listProjectAgents(db, projectId))[0];
+    const schedule = await createProjectAgentSchedule(db, projectId, {
+      agentId: agent.id,
+      name: "Alternating release checks",
+      recurrence: "custom",
+      timeOfDay: "09:00",
+      dayOfWeek: null,
+      intervalValue: 2,
+      intervalUnit: "week",
+      daysOfWeek: [1, 3, 5],
+      notificationLevel: "none",
+      timeZone: "Etc/UTC",
+    });
+
+    expect(schedule).toMatchObject({
+      recurrence: "daily",
+      frequency: "custom",
+      interval_value: 2,
+      interval_unit: "week",
+      days_of_week: "1,3,5",
+      notification_level: "none",
+    });
+    await expect(
+      deleteProjectAgentSchedule(db, projectId, schedule!.id),
+    ).resolves.toBe("deleted");
   });
 
   it("claims a due schedule once and advances its next occurrence", async () => {

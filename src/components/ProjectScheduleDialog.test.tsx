@@ -93,6 +93,89 @@ describe("CreateProjectAgentScheduleDialog", () => {
       recurrence: "weekdays",
       timeOfDay: "09:00",
       dayOfWeek: null,
+      intervalValue: 1,
+      intervalUnit: "day",
+      daysOfWeek: [],
+      notificationLevel: "important_updates",
+      timeZone: expect.any(String),
+    });
+  });
+
+  it("submits a custom multi-day weekly cadence", async () => {
+    const onCreate = vi.fn(async () => undefined);
+    const container = await mount(
+      <I18nProvider>
+        <CreateProjectAgentScheduleDialog
+          agents={[agent]}
+          isSubmitting={false}
+          onClose={() => undefined}
+          onCreate={onCreate}
+        />
+      </I18nProvider>,
+    );
+
+    const click = async (element: Element | null | undefined) => {
+      expect(element).not.toBeNull();
+      await act(async () => {
+        element?.dispatchEvent(
+          new MouseEvent("click", { bubbles: true, cancelable: true }),
+        );
+      });
+    };
+    await click(
+      container.querySelector(
+        ".project-schedule-frequency [role=\"combobox\"]",
+      ),
+    );
+    await click(
+      [...document.querySelectorAll('[role="option"]')].find(
+        (option) =>
+          option.textContent === "사용자화" ||
+          option.textContent === "Custom",
+      ),
+    );
+
+    const name = container.querySelector<HTMLInputElement>(
+      'input:not([type="time"]):not([type="number"])',
+    );
+    const interval = container.querySelector<HTMLInputElement>(
+      'input[type="number"]',
+    );
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set?.call(name, "격주 릴리스 점검");
+      name?.dispatchEvent(new Event("input", { bubbles: true }));
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set?.call(interval, "2");
+      interval?.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const dayButtons = container.querySelectorAll(
+      ".project-schedule-day-picker button",
+    );
+    await click(dayButtons[2]);
+    await act(async () => {
+      container
+        .querySelector<HTMLFormElement>("form")
+        ?.dispatchEvent(
+          new Event("submit", { bubbles: true, cancelable: true }),
+        );
+      await Promise.resolve();
+    });
+
+    expect(onCreate).toHaveBeenCalledWith({
+      agentId: agent.id,
+      name: "격주 릴리스 점검",
+      recurrence: "custom",
+      timeOfDay: "09:00",
+      dayOfWeek: null,
+      intervalValue: 2,
+      intervalUnit: "week",
+      daysOfWeek: [1, 2],
+      notificationLevel: "important_updates",
       timeZone: expect.any(String),
     });
   });

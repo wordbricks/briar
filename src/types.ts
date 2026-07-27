@@ -9,7 +9,11 @@ import {
 import type { AutoHuntAutomation } from "./lib/auto-hunt-automation";
 import type { ProjectAgentCodexPet } from "./lib/codex-pets";
 import type { AgentProvider } from "./lib/project-llm";
-import type { ProjectAgentScheduleRecurrence } from "./lib/project-agent-schedule";
+import type {
+  ProjectAgentScheduleIntervalUnit,
+  ProjectAgentScheduleNotificationLevel,
+  ProjectAgentScheduleRecurrence,
+} from "./lib/project-agent-schedule";
 
 export const huntStatuses = autoHuntRunStatuses;
 export type HuntStatus = AutoHuntRunStatus;
@@ -171,6 +175,10 @@ export type ProjectAgentSchedule = {
   recurrence: ProjectAgentScheduleRecurrence;
   timeOfDay: string;
   dayOfWeek: number | null;
+  intervalValue?: number;
+  intervalUnit?: ProjectAgentScheduleIntervalUnit;
+  daysOfWeek?: number[];
+  notificationLevel?: ProjectAgentScheduleNotificationLevel;
   timeZone: string;
   enabled: boolean;
   createdAt: string;
@@ -183,6 +191,10 @@ export type CreateProjectAgentScheduleInput = {
   recurrence: ProjectAgentScheduleRecurrence;
   timeOfDay: string;
   dayOfWeek: number | null;
+  intervalValue?: number;
+  intervalUnit?: ProjectAgentScheduleIntervalUnit;
+  daysOfWeek?: number[];
+  notificationLevel?: ProjectAgentScheduleNotificationLevel;
   timeZone: string;
 };
 

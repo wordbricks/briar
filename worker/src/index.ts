@@ -25,6 +25,11 @@ import {
 import {
   isValidProjectAgentScheduleTimeZone,
   normalizeProjectAgentScheduleDay,
+  normalizeProjectAgentScheduleDays,
+  normalizeProjectAgentScheduleInterval,
+  parseProjectAgentScheduleDays,
+  projectAgentScheduleIntervalUnits,
+  projectAgentScheduleNotificationLevels,
   projectAgentScheduleRecurrences,
 } from "../../src/lib/project-agent-schedule";
 import {
@@ -355,6 +360,15 @@ export const projectAgentScheduleInputSchema = z
     recurrence: z.enum(projectAgentScheduleRecurrences),
     timeOfDay: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/u),
     dayOfWeek: z.number().int().min(0).max(6).nullable().optional(),
+    intervalValue: z.number().int().min(1).max(999).optional(),
+    intervalUnit: z.enum(projectAgentScheduleIntervalUnits).optional(),
+    daysOfWeek: z
+      .array(z.number().int().min(0).max(6))
+      .max(7)
+      .optional(),
+    notificationLevel: z
+      .enum(projectAgentScheduleNotificationLevels)
+      .optional(),
     timeZone: z
       .string()
       .trim()
@@ -363,12 +377,64 @@ export const projectAgentScheduleInputSchema = z
       .refine(isValidProjectAgentScheduleTimeZone, "Invalid IANA time zone"),
   })
   .strict()
+  .superRefine((input, context) => {
+    const intervalUnit =
+      input.intervalUnit ??
+      (input.recurrence === "interval"
+        ? "hour"
+        : input.recurrence === "custom"
+          ? "week"
+          : "day");
+    if (
+      input.recurrence === "interval" &&
+      intervalUnit !== "minute" &&
+      intervalUnit !== "hour"
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Interval schedules use minutes or hours",
+        path: ["intervalUnit"],
+      });
+    }
+    if (
+      input.recurrence === "custom" &&
+      intervalUnit !== "day" &&
+      intervalUnit !== "week"
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Custom schedules repeat daily or weekly",
+        path: ["intervalUnit"],
+      });
+    }
+    if (
+      input.recurrence === "custom" &&
+      intervalUnit === "week" &&
+      normalizeProjectAgentScheduleDays(input.daysOfWeek).length === 0
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Choose at least one weekday",
+        path: ["daysOfWeek"],
+      });
+    }
+  })
   .transform((input) => ({
     ...input,
     dayOfWeek: normalizeProjectAgentScheduleDay(
       input.recurrence,
       input.dayOfWeek,
     ),
+    intervalValue: normalizeProjectAgentScheduleInterval(input.intervalValue),
+    intervalUnit:
+      input.intervalUnit ??
+      (input.recurrence === "interval"
+        ? "hour"
+        : input.recurrence === "custom"
+          ? "week"
+          : "day"),
+    daysOfWeek: normalizeProjectAgentScheduleDays(input.daysOfWeek),
+    notificationLevel: input.notificationLevel ?? "important_updates",
   }));
 const organizationInputSchema = z.object({
   name: z.string().trim().min(1).max(100),
@@ -916,9 +982,13 @@ const projectAgentScheduleJson = (row: ProjectAgentScheduleRow) => ({
   agentName: row.agent_name,
   agentProvider: row.agent_provider,
   name: row.name,
-  recurrence: row.recurrence,
+  recurrence: row.frequency ?? row.recurrence,
   timeOfDay: row.time_of_day,
   dayOfWeek: row.day_of_week,
+  intervalValue: row.interval_value,
+  intervalUnit: row.interval_unit,
+  daysOfWeek: parseProjectAgentScheduleDays(row.days_of_week),
+  notificationLevel: row.notification_level,
   timeZone: row.time_zone,
   enabled: row.enabled === 1,
   createdAt: row.created_at,

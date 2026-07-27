@@ -42,6 +42,10 @@ import { demoProjectAgents } from "../lib/demo-project-agents";
 import {
   isValidProjectAgentScheduleTime,
   normalizeProjectAgentScheduleDay,
+  normalizeProjectAgentScheduleDays,
+  normalizeProjectAgentScheduleInterval,
+  type ProjectAgentScheduleIntervalUnit,
+  type ProjectAgentScheduleNotificationLevel,
   type ProjectAgentScheduleRecurrence,
 } from "../lib/project-agent-schedule";
 import {
@@ -1048,6 +1052,30 @@ export function CreateProjectAgentScheduleDialog({
     schedule?.timeOfDay ?? "09:00",
   );
   const [dayOfWeek, setDayOfWeek] = useState(schedule?.dayOfWeek ?? 1);
+  const [intervalValue, setIntervalValue] = useState(
+    schedule?.intervalValue ?? 1,
+  );
+  const [intervalUnit, setIntervalUnit] =
+    useState<ProjectAgentScheduleIntervalUnit>(
+      schedule?.intervalUnit ??
+        (schedule?.recurrence === "interval"
+          ? "hour"
+          : schedule?.recurrence === "custom"
+            ? "week"
+            : "day"),
+    );
+  const [daysOfWeek, setDaysOfWeek] = useState(() =>
+    normalizeProjectAgentScheduleDays(
+      schedule?.daysOfWeek ??
+        (schedule?.recurrence === "weekly"
+          ? [schedule.dayOfWeek ?? 1]
+          : [1]),
+    ),
+  );
+  const [notificationLevel, setNotificationLevel] =
+    useState<ProjectAgentScheduleNotificationLevel>(
+      schedule?.notificationLevel ?? "important_updates",
+    );
   const [submitError, setSubmitError] = useState<string | null>(null);
   const timeZone =
     schedule?.timeZone ||
@@ -1070,6 +1098,39 @@ export function CreateProjectAgentScheduleDialog({
     ),
     value: String(index),
   }));
+  const shortDayOptions = Array.from({ length: 7 }, (_, index) => ({
+    label: new Intl.DateTimeFormat(localeTag, { weekday: "short" }).format(
+      addCalendarDays(new Date(2026, 6, 26), index),
+    ),
+    value: index,
+  }));
+  const normalizedIntervalValue =
+    normalizeProjectAgentScheduleInterval(intervalValue);
+  const isCustomWeekly =
+    recurrence === "custom" && intervalUnit === "week";
+  const hasValidCustomDays = !isCustomWeekly || daysOfWeek.length > 0;
+  const canSubmit =
+    Boolean(name.trim() && agentId) &&
+    isValidProjectAgentScheduleTime(timeOfDay) &&
+    hasValidCustomDays;
+
+  const changeRecurrence = (value: string) => {
+    const next = value as ProjectAgentScheduleRecurrence;
+    setRecurrence(next);
+    if (next === "interval") {
+      setIntervalUnit("hour");
+    } else if (next === "custom") {
+      setIntervalUnit("week");
+    }
+  };
+
+  const toggleDay = (day: number) => {
+    setDaysOfWeek((current) =>
+      current.includes(day)
+        ? current.filter((value) => value !== day)
+        : normalizeProjectAgentScheduleDays([...current, day]),
+    );
+  };
 
   return (
     <div
@@ -1086,12 +1147,7 @@ export function CreateProjectAgentScheduleDialog({
         className="project-schedule-dialog"
         onSubmit={(event) => {
           event.preventDefault();
-          if (
-            !name.trim() ||
-            !agentId ||
-            !isValidProjectAgentScheduleTime(timeOfDay) ||
-            isSubmitting
-          ) {
+          if (!canSubmit || isSubmitting) {
             return;
           }
           setSubmitError(null);
@@ -1104,6 +1160,10 @@ export function CreateProjectAgentScheduleDialog({
               recurrence,
               dayOfWeek,
             ),
+            intervalValue: normalizedIntervalValue,
+            intervalUnit,
+            daysOfWeek: isCustomWeekly ? daysOfWeek : [],
+            notificationLevel,
             timeZone,
           };
           const save = isEditing && onUpdate ? onUpdate : onCreate;
@@ -1187,17 +1247,17 @@ export function CreateProjectAgentScheduleDialog({
             </div>
           )}
 
-          <div className="project-schedule-form-cadence">
-            <label>
-              <span>
-                {t("schedule.recurrence")} <em>{t("common.required")}</em>
-              </span>
+          <div className="project-schedule-frequency">
+            <div className="project-schedule-frequency-row">
+              <span>{t("schedule.repeat")}</span>
               <NativeSelect
-                label={t("schedule.recurrence")}
-                onValueChange={(value) =>
-                  setRecurrence(value as ProjectAgentScheduleRecurrence)
-                }
+                label={t("schedule.repeat")}
+                onValueChange={changeRecurrence}
                 options={[
+                  {
+                    label: t("schedule.recurrence.interval"),
+                    value: "interval",
+                  },
                   {
                     label: t("schedule.recurrence.daily"),
                     value: "daily",
@@ -1210,35 +1270,160 @@ export function CreateProjectAgentScheduleDialog({
                     label: t("schedule.recurrence.weekly"),
                     value: "weekly",
                   },
+                  {
+                    label: t("schedule.recurrence.custom"),
+                    value: "custom",
+                  },
                 ]}
                 value={recurrence}
               />
-            </label>
+            </div>
+
+            {recurrence === "custom" && (
+              <div className="project-schedule-frequency-row">
+                <span>{t("schedule.repeats")}</span>
+                <NativeSelect
+                  label={t("schedule.repeats")}
+                  onValueChange={(value) =>
+                    setIntervalUnit(
+                      value as ProjectAgentScheduleIntervalUnit,
+                    )
+                  }
+                  options={[
+                    {
+                      label: t("schedule.repeats.daily"),
+                      value: "day",
+                    },
+                    {
+                      label: t("schedule.repeats.weekly"),
+                      value: "week",
+                    },
+                  ]}
+                  value={intervalUnit}
+                />
+              </div>
+            )}
+
+            {(recurrence === "interval" || recurrence === "custom") && (
+              <div className="project-schedule-frequency-row">
+                <span>{t("schedule.every")}</span>
+                <div className="project-schedule-interval-control">
+                  <input
+                    aria-label={t("schedule.every")}
+                    inputMode="numeric"
+                    max={999}
+                    min={1}
+                    onChange={(event) =>
+                      setIntervalValue(Number(event.target.value))
+                    }
+                    type="number"
+                    value={intervalValue}
+                  />
+                  {recurrence === "interval" ? (
+                    <NativeSelect
+                      label={t("schedule.intervalUnit")}
+                      onValueChange={(value) =>
+                        setIntervalUnit(
+                          value as ProjectAgentScheduleIntervalUnit,
+                        )
+                      }
+                      options={[
+                        {
+                          label: t("schedule.unit.minutes"),
+                          value: "minute",
+                        },
+                        {
+                          label: t("schedule.unit.hours"),
+                          value: "hour",
+                        },
+                      ]}
+                      value={intervalUnit}
+                    />
+                  ) : (
+                    <strong>
+                      {t(
+                        intervalUnit === "day"
+                          ? "schedule.unit.days"
+                          : "schedule.unit.weeks",
+                      )}
+                    </strong>
+                  )}
+                </div>
+              </div>
+            )}
+
             {recurrence === "weekly" && (
-              <label>
-                <span>
-                  {t("schedule.day")} <em>{t("common.required")}</em>
-                </span>
+              <div className="project-schedule-frequency-row">
+                <span>{t("schedule.on")}</span>
                 <NativeSelect
                   label={t("schedule.day")}
                   onValueChange={(value) => setDayOfWeek(Number(value))}
                   options={dayOptions}
                   value={String(dayOfWeek)}
                 />
-              </label>
+              </div>
             )}
-            <label>
-              <span>
-                {t("schedule.time")} <em>{t("common.required")}</em>
-              </span>
-              <input
-                aria-label={t("schedule.time")}
-                onChange={(event) => setTimeOfDay(event.target.value)}
-                required
-                type="time"
-                value={timeOfDay}
+
+            {isCustomWeekly && (
+              <div className="project-schedule-frequency-row project-schedule-frequency-days">
+                <span>{t("schedule.on")}</span>
+                <div
+                  aria-label={t("schedule.days")}
+                  className="project-schedule-day-picker"
+                  role="group"
+                >
+                  {shortDayOptions.map((option) => (
+                    <button
+                      aria-pressed={daysOfWeek.includes(option.value)}
+                      key={option.value}
+                      onClick={() => toggleDay(option.value)}
+                      type="button"
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+                {!hasValidCustomDays && (
+                  <small>{t("schedule.daysRequired")}</small>
+                )}
+              </div>
+            )}
+
+            {recurrence !== "interval" && (
+              <div className="project-schedule-frequency-row">
+                <span>{t("schedule.at")}</span>
+                <input
+                  aria-label={t("schedule.time")}
+                  onChange={(event) => setTimeOfDay(event.target.value)}
+                  required
+                  type="time"
+                  value={timeOfDay}
+                />
+              </div>
+            )}
+
+            <div className="project-schedule-frequency-row">
+              <span>{t("schedule.notifications")}</span>
+              <NativeSelect
+                label={t("schedule.notifications")}
+                onValueChange={(value) =>
+                  setNotificationLevel(
+                    value as ProjectAgentScheduleNotificationLevel,
+                  )
+                }
+                options={[
+                  {
+                    label: t("schedule.notifications.important"),
+                    value: "important_updates",
+                  },
+                  {
+                    label: t("schedule.notifications.none"),
+                    value: "none",
+                  },
+                ]}
+                value={notificationLevel}
               />
-            </label>
+            </div>
           </div>
 
           <div className="project-schedule-timezone-note">
@@ -1264,9 +1449,7 @@ export function CreateProjectAgentScheduleDialog({
             className="project-schedule-submit"
             disabled={
               isSubmitting ||
-              !name.trim() ||
-              !agentId ||
-              !isValidProjectAgentScheduleTime(timeOfDay)
+              !canSubmit
             }
             type="submit"
           >
