@@ -1,0 +1,4 @@
+interface:
+  display_name: "Briar Workflow"
+  short_description: "Execute and track work through a Briar workflow"
+  default_prompt: "Use $briar-workflow to execute this repository task through its configured workflow and record its events and evidence in Briar."

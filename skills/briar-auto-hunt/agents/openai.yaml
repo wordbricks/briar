@@ -1,4 +1,0 @@
-interface:
-  display_name: "Briar Auto Hunt"
-  short_description: "Run repository-specific Auto Hunt work with Briar tracking"
-  default_prompt: "Use $briar-auto-hunt to complete this repository task through its configured project workflow while recording each status and stage in Briar."

@@ -31,9 +31,9 @@ function displayMetaForStatus(status: DisplayStatus) {
   const runStatus = statusMeta[status as AutoHuntRunStatus];
   if (runStatus) return runStatus;
 
-  const legacyStage = workflowStageMeta[status as AutoHuntWorkflowStageId];
-  return legacyStage
-    ? { label: legacyStage.label, tone: legacyStage.tone }
+  const matchingStage = workflowStageMeta[status as AutoHuntWorkflowStageId];
+  return matchingStage
+    ? { label: matchingStage.label, tone: matchingStage.tone }
     : { label: status, tone: "slate" };
 }
 

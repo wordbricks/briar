@@ -18,7 +18,7 @@ const health: AutoHuntHealth = {
   cliVersion: "0.0.9",
   cliExpectedVersion: "1.0.0",
   cliCurrent: false,
-  skillPath: "/Users/jay/.codex/skills/briar-auto-hunt",
+  skillPath: "/Users/jay/.codex/skills/briar-workflow",
   skillInstalled: true,
   skillVersion: "1.0.0",
   skillExpectedVersion: "1.0.0",

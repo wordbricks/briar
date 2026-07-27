@@ -287,7 +287,7 @@ struct StoredAutoHuntConfig {
     extra: BTreeMap<String, serde_json::Value>,
 }
 
-/// Sandbox settings owned by the CLI (`briar auto-hunt configure`). Absent or
+/// Sandbox settings owned by the CLI (`briar project configure`). Absent or
 /// `fullAccess: false` keeps agent writes confined to the checkout and the
 /// per-issue worktree root.
 #[derive(Clone, Deserialize, Serialize)]
@@ -299,7 +299,7 @@ struct StoredSandboxConfig {
     extra: BTreeMap<String, serde_json::Value>,
 }
 
-/// Per-issue worktree settings owned by the CLI (`briar auto-hunt configure`).
+/// Per-issue worktree settings owned by the CLI (`briar project configure`).
 /// The app only reads them, to learn which directory agents must be able to
 /// write in.
 #[derive(Clone, Deserialize, Serialize)]
@@ -1615,7 +1615,7 @@ fn write_cli_connection(
         config.user_token = None;
     }
     config.api_url = api_url.clone();
-    // `briar auto-hunt configure` owns the worktree block, so a settings save
+    // `briar project configure` owns the worktree block, so a settings save
     // from the app must not silently reset it.
     let stored_auto_hunt = config
         .projects
@@ -2654,15 +2654,20 @@ fn bundled_path(resource_directory: &Path, bundled: &str, development: &str) -> 
 fn install_auto_hunt_assets(resource_directory: &Path, home: &Path) -> Result<(), String> {
     let skill_source = bundled_path(
         resource_directory,
-        "skills/briar-auto-hunt",
-        "skills/briar-auto-hunt",
+        "skills/briar-workflow",
+        "skills/briar-workflow",
     );
     if !skill_source.is_dir() {
-        return Err("Briar Auto Hunt 스킬 번들을 찾지 못했습니다.".to_string());
+        return Err("Briar Workflow 스킬 번들을 찾지 못했습니다.".to_string());
     }
     let skill_destinations = [".codex", ".claude", ".grok"]
-        .map(|directory| home.join(directory).join("skills").join("briar-auto-hunt"));
+        .map(|directory| home.join(directory).join("skills").join("briar-workflow"));
     for skill_destination in &skill_destinations {
+        let stale_references = skill_destination.join("references");
+        if stale_references.exists() {
+            fs::remove_dir_all(&stale_references)
+                .map_err(|error| format!("이전 스킬 참조를 제거하지 못했습니다: {error}"))?;
+        }
         copy_directory(&skill_source, skill_destination)?;
     }
 
@@ -2720,13 +2725,13 @@ fn auto_hunt_assets_are_current(resource_directory: &Path, home: &Path) -> bool 
 
     let skill_source = bundled_path(
         resource_directory,
-        "skills/briar-auto-hunt",
-        "skills/briar-auto-hunt",
+        "skills/briar-workflow",
+        "skills/briar-workflow",
     );
     let expected_version = read_trimmed_file(&skill_source.join("VERSION"))
         .unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string());
     [".codex", ".claude", ".grok"].iter().all(|directory| {
-        let skill = home.join(directory).join("skills").join("briar-auto-hunt");
+        let skill = home.join(directory).join("skills").join("briar-workflow");
         skill.join("SKILL.md").is_file()
             && read_trimmed_file(&skill.join("VERSION")).as_deref()
                 == Some(expected_version.as_str())
@@ -2847,8 +2852,8 @@ fn auto_hunt_health_sync_with(
 
     let skill_source = bundled_path(
         resource_directory,
-        "skills/briar-auto-hunt",
-        "skills/briar-auto-hunt",
+        "skills/briar-workflow",
+        "skills/briar-workflow",
     );
     let skill_expected_version = read_trimmed_file(&skill_source.join("VERSION"))
         .unwrap_or_else(|| expected_version.clone());
@@ -2860,15 +2865,15 @@ fn auto_hunt_health_sync_with(
     let skill_path = execution_home
         .join(skill_directory)
         .join("skills")
-        .join("briar-auto-hunt");
+        .join("briar-workflow");
     let skill_installed =
         read_trimmed_file_on(runner.as_ref(), &skill_path.join("SKILL.md")).is_some();
     let skill_version = read_trimmed_file_on(runner.as_ref(), &skill_path.join("VERSION"));
     let skill_current = skill_version.as_deref() == Some(skill_expected_version.as_str());
     if !skill_installed {
-        issues.push("Briar Auto Hunt 스킬이 설치되지 않았습니다.".to_string());
+        issues.push("Briar Workflow 스킬이 설치되지 않았습니다.".to_string());
     } else if !skill_current {
-        issues.push("Auto Hunt 스킬 버전이 앱 번들과 다릅니다.".to_string());
+        issues.push("Workflow 스킬 버전이 앱 번들과 다릅니다.".to_string());
     }
 
     let velen_org = project
@@ -2903,7 +2908,7 @@ fn auto_hunt_health_sync_with(
                 .and_then(|binary| {
                     runner.run(
                         &host::CommandSpec::new(binary)
-                            .args(["auto-hunt", "doctor"])
+                            .args(["project", "doctor"])
                             .env("BRIAR_PROJECT_ID", project_id)
                             .env("BRIAR_API_URL", &config.api_url)
                             .working_directory(repository_path),
@@ -2912,7 +2917,7 @@ fn auto_hunt_health_sync_with(
                 .is_ok_and(|output| output.success());
             if !cli_connected {
                 issues.push(
-                    "원격 Briar CLI가 이 프로젝트에 연결되지 않았습니다. 원격 저장소에서 `briar connect`와 `briar auto-hunt configure`를 실행해 주세요."
+                    "원격 Briar CLI가 이 프로젝트에 연결되지 않았습니다. 원격 저장소에서 `briar connect`와 `briar project configure`를 실행해 주세요."
                         .to_string(),
                 );
             }
@@ -3012,7 +3017,7 @@ async fn repair_auto_hunt(
         let runner = project_runner(&config, &project_id, &home)?;
         if runner.is_remote() {
             return Err(format!(
-                "{}에서 `briar` CLI와 Briar Auto Hunt 스킬을 설치하거나 업데이트한 뒤 다시 검사해 주세요.",
+                "{}에서 `briar` CLI와 Briar Workflow 스킬을 설치하거나 업데이트한 뒤 다시 검사해 주세요.",
                 runner.label()
             ));
         }
@@ -4794,6 +4799,10 @@ branch refs/heads/briar/second-11111111
             .as_nanos();
         let home = std::env::temp_dir().join(format!("briar-assets-test-{unique}"));
         let resources = home.join("missing-resources");
+        let stale_references = home.join(".codex/skills/briar-workflow/references");
+        fs::create_dir_all(&stale_references).expect("stale references should be created");
+        fs::write(stale_references.join("lifecycle.md"), "stale")
+            .expect("stale reference should be written");
 
         install_auto_hunt_assets(&resources, &home).expect("assets should install");
 
@@ -4803,15 +4812,14 @@ branch refs/heads/briar/second-11111111
             read_trimmed_file(&home.join(".local/share/briar/VERSION")),
             Some(env!("CARGO_PKG_VERSION").to_string())
         );
+        assert!(home.join(".codex/skills/briar-workflow/SKILL.md").is_file());
         assert!(home
-            .join(".codex/skills/briar-auto-hunt/SKILL.md")
+            .join(".claude/skills/briar-workflow/SKILL.md")
             .is_file());
-        assert!(home
-            .join(".claude/skills/briar-auto-hunt/SKILL.md")
-            .is_file());
-        assert!(home.join(".grok/skills/briar-auto-hunt/SKILL.md").is_file());
+        assert!(home.join(".grok/skills/briar-workflow/SKILL.md").is_file());
+        assert!(!stale_references.exists());
         assert_eq!(
-            read_trimmed_file(&home.join(".codex/skills/briar-auto-hunt/VERSION")),
+            read_trimmed_file(&home.join(".codex/skills/briar-workflow/VERSION")),
             Some(env!("CARGO_PKG_VERSION").to_string())
         );
         assert!(
@@ -4828,16 +4836,13 @@ branch refs/heads/briar/second-11111111
             Some(env!("CARGO_PKG_VERSION").to_string())
         );
 
-        fs::write(
-            home.join(".codex/skills/briar-auto-hunt/VERSION"),
-            "0.0.0\n",
-        )
-        .expect("skill version should be made stale");
+        fs::write(home.join(".codex/skills/briar-workflow/VERSION"), "0.0.0\n")
+            .expect("skill version should be made stale");
         assert!(
             sync_auto_hunt_assets(&resources, &home).expect("stale skill should be synchronized")
         );
         assert_eq!(
-            read_trimmed_file(&home.join(".codex/skills/briar-auto-hunt/VERSION")),
+            read_trimmed_file(&home.join(".codex/skills/briar-workflow/VERSION")),
             Some(env!("CARGO_PKG_VERSION").to_string())
         );
         fs::remove_dir_all(home).expect("test home should be removed");

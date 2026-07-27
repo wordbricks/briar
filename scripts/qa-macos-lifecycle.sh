@@ -115,8 +115,8 @@ assert_app_bundle() {
     echo "Installed app is not arm64." >&2
     exit 1
   fi
-  if [[ "$(tr -d '\n' < "$app/Contents/Resources/skills/briar-auto-hunt/VERSION")" != "$expected_version" ]]; then
-    echo "Bundled Auto Hunt skill version does not match the app." >&2
+  if [[ "$(tr -d '\n' < "$app/Contents/Resources/skills/briar-workflow/VERSION")" != "$expected_version" ]]; then
+    echo "Bundled workflow skill version does not match the app." >&2
     exit 1
   fi
   if ! codesign --verify --deep --strict "$app"; then
