@@ -12,7 +12,7 @@ describe("full-width application pages", () => {
       /\.auto-hunt-scroll \{[^}]*padding:0;[^}]*display:flex;[^}]*overflow:hidden;/,
     );
     expect(styles).toMatch(
-      /\.auto-hunt-hero \{[^}]*border:0;[^}]*border-bottom:1px solid var\(--line\);[^}]*border-radius:0;[^}]*box-shadow:none;/,
+      /\.auto-hunt-hero \{[^}]*border:0;[^}]*border-bottom:1px solid var\(--border\);[^}]*border-radius:0;[^}]*box-shadow:none;/,
     );
     expect(styles).toMatch(
       /\.auto-hunt-session-panel \{[^}]*flex:1;[^}]*margin:0;[^}]*border:0;[^}]*border-radius:0;[^}]*box-shadow:none;/,
