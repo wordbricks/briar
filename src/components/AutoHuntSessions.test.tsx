@@ -59,6 +59,7 @@ describe("AutoHuntSessions", () => {
           id: "agent-auto",
           projectId: "project-1",
           name: "Auto Hunt agent",
+          avatar: null,
           provider: "codex",
           model: null,
           responsibility: "Process queued issues.",

@@ -242,6 +242,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db,
       await readFile(resolve("migrations/0023_project_agent_skills.sql"), "utf8"),
     );
+    await executeSql(
+      db,
+      await readFile(resolve("migrations/0024_project_agent_avatars.sql"), "utf8"),
+    );
   });
 
   afterAll(async () => {
@@ -300,6 +304,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       expect.objectContaining({
         project_id: projectId,
         name: "Auto Hunt agent",
+        avatar: null,
         provider: "codex",
         model: null,
         responsibility: "Perform Auto Hunt for every queued issue.",
@@ -620,8 +625,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
 
   it("updates a project agent only within its project", async () => {
     const current = (await listProjectAgents(db, projectId))[0];
+    const avatar = "data:image/png;base64,aA==";
     const updated = await updateProjectAgent(db, projectId, current.id, {
       name: "Release coordinator",
+      avatar,
       provider: "claude",
       model: "sonnet",
       responsibility: "Coordinates release checks and reports the result.",
@@ -632,6 +639,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       id: current.id,
       project_id: projectId,
       name: "Release coordinator",
+      avatar,
       provider: "claude",
       model: "sonnet",
       responsibility: "Coordinates release checks and reports the result.",

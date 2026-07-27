@@ -73,6 +73,7 @@ export type ProjectAgentRow = {
   id: string;
   project_id: string;
   name: string;
+  avatar: string | null;
   provider: ProjectAgentProvider;
   model: string | null;
   responsibility: string;
@@ -515,6 +516,7 @@ export async function createProject(
     id: crypto.randomUUID(),
     project_id: project.id,
     name: defaultAgentCopy.name,
+    avatar: null,
     provider: "codex",
     model: null,
     responsibility: defaultAgentCopy.responsibility,
@@ -622,7 +624,7 @@ export async function deleteProject(
 export async function listProjectAgents(db: D1Database, projectId: string) {
   const result = await db
     .prepare(
-      `select id, project_id, name, provider, model, responsibility, skill_markdown, calendar_color,
+      `select id, project_id, name, avatar, provider, model, responsibility, skill_markdown, calendar_color,
               kind, created_at, updated_at
        from briar_project_agents
        where project_id = ?
@@ -638,6 +640,7 @@ export async function createProjectAgent(
   projectId: string,
   input: {
     name: string;
+    avatar?: string | null;
     provider: ProjectAgentProvider;
     model: string | null;
     responsibility: string;
@@ -649,6 +652,7 @@ export async function createProjectAgent(
     id: crypto.randomUUID(),
     project_id: projectId,
     name: input.name,
+    avatar: input.avatar ?? null,
     provider: input.provider,
     model: input.model,
     responsibility: input.responsibility,
@@ -665,14 +669,15 @@ export async function createProjectAgent(
   await db
     .prepare(
       `insert into briar_project_agents (
-         id, project_id, name, provider, model, responsibility,
+         id, project_id, name, avatar, provider, model, responsibility,
          skill_markdown, calendar_color, created_at, updated_at, kind
-       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       agent.id,
       agent.project_id,
       agent.name,
+      agent.avatar,
       agent.provider,
       agent.model,
       agent.responsibility,
@@ -1188,6 +1193,7 @@ export async function updateProjectAgent(
   agentId: string,
   input: {
     name: string;
+    avatar?: string | null;
     provider: ProjectAgentProvider;
     model: string | null;
     responsibility: string;
@@ -1211,12 +1217,15 @@ export async function updateProjectAgent(
   const result = await db
     .prepare(
       `update briar_project_agents
-       set name = ?, provider = ?, model = ?, responsibility = ?,
+       set name = ?, avatar = case when ? = 1 then ? else avatar end,
+           provider = ?, model = ?, responsibility = ?,
            skill_markdown = ?, calendar_color = ?, updated_at = ?
        where id = ? and project_id = ?`,
     )
     .bind(
       input.name,
+      input.avatar === undefined ? 0 : 1,
+      input.avatar ?? null,
       input.provider,
       input.model,
       input.responsibility,
@@ -1230,7 +1239,7 @@ export async function updateProjectAgent(
   if (result.meta.changes === 0) return null;
   return db
     .prepare(
-      `select id, project_id, name, provider, model, responsibility, skill_markdown, calendar_color,
+      `select id, project_id, name, avatar, provider, model, responsibility, skill_markdown, calendar_color,
               kind, created_at, updated_at
        from briar_project_agents
        where id = ? and project_id = ?`,

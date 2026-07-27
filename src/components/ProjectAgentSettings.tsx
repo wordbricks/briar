@@ -3,9 +3,11 @@ import {
   Bot,
   Check,
   CircleAlert,
+  ImagePlus,
   LoaderCircle,
   Save,
   ShieldCheck,
+  Trash2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useI18n } from "../i18n";
@@ -23,12 +25,15 @@ import {
   type ApprovalPolicy,
   type ModelEffort,
 } from "../lib/project-llm";
+import {
+  projectAgentAvatarAccept,
+  projectAgentAvatarFromFile,
+} from "../lib/project-agent-avatar";
 import type {
   Project,
   ProjectAgent,
   UpdateProjectAgentInput,
 } from "../types";
-import { NativeSelect } from "./NativeSelect";
 import { SelectMenu } from "./SelectMenu";
 
 const providerLabels: Record<AgentProvider, string> = {
@@ -52,14 +57,12 @@ export function ProjectAgentSettings({
 }) {
   const { t } = useI18n();
   const [name, setName] = useState(agent.name);
-  const [provider, setProvider] = useState<AgentProvider>(agent.provider);
-  const [model, setModel] = useState(agent.model ?? "");
+  const [avatar, setAvatar] = useState(agent.avatar);
   const [responsibility, setResponsibility] = useState(agent.responsibility);
   const [calendarColor, setCalendarColor] = useState(agent.calendarColor);
   const [savedProfile, setSavedProfile] = useState({
     name: agent.name,
-    provider: agent.provider,
-    model: agent.model ?? "",
+    avatar: agent.avatar,
     responsibility: agent.responsibility,
     calendarColor: agent.calendarColor,
   });
@@ -119,8 +122,7 @@ export function ProjectAgentSettings({
 
   const profileChanged =
     name !== savedProfile.name ||
-    provider !== savedProfile.provider ||
-    model !== savedProfile.model ||
+    avatar !== savedProfile.avatar ||
     responsibility !== savedProfile.responsibility ||
     calendarColor !== savedProfile.calendarColor;
   const runtimeChanged =
@@ -141,21 +143,20 @@ export function ProjectAgentSettings({
     try {
       const saved = await onSave({
         name: name.trim() || null,
-        provider,
-        model: model || null,
+        avatar,
+        provider: agent.provider,
+        model: agent.model,
         responsibility: responsibility.trim(),
         calendarColor,
       });
       const nextProfile = {
         name: saved.name,
-        provider: saved.provider,
-        model: saved.model ?? "",
+        avatar: saved.avatar,
         responsibility: saved.responsibility,
         calendarColor: saved.calendarColor,
       };
       setName(nextProfile.name);
-      setProvider(nextProfile.provider);
-      setModel(nextProfile.model);
+      setAvatar(nextProfile.avatar);
       setResponsibility(nextProfile.responsibility);
       setCalendarColor(nextProfile.calendarColor);
       setSavedProfile(nextProfile);
@@ -244,6 +245,56 @@ export function ProjectAgentSettings({
             </header>
 
             <div className="project-agent-settings-fields">
+              <div className="project-agent-avatar-field">
+                <span>{t("agents.avatar")}</span>
+                <div>
+                  <span className="project-agent-avatar-preview">
+                    {avatar ? (
+                      <img alt="" src={avatar} />
+                    ) : (
+                      <Bot aria-hidden="true" size={26} />
+                    )}
+                  </span>
+                  <span className="project-agent-avatar-actions">
+                    <label className="project-agent-avatar-upload">
+                      <ImagePlus size={14} />
+                      {t(avatar ? "agents.replaceAvatar" : "agents.uploadAvatar")}
+                      <input
+                        accept={projectAgentAvatarAccept}
+                        aria-label={t("agents.uploadAvatar")}
+                        disabled={profileSaving}
+                        onChange={(event) => {
+                          const file = event.currentTarget.files?.[0];
+                          event.currentTarget.value = "";
+                          if (!file) return;
+                          setProfileError(null);
+                          void projectAgentAvatarFromFile(file)
+                            .then(setAvatar)
+                            .catch(() =>
+                              setProfileError(t("agents.avatarUploadFailed")),
+                            );
+                        }}
+                        type="file"
+                      />
+                    </label>
+                    {avatar ? (
+                      <button
+                        className="project-agent-avatar-remove"
+                        disabled={profileSaving}
+                        onClick={() => {
+                          setAvatar(null);
+                          setProfileError(null);
+                        }}
+                        type="button"
+                      >
+                        <Trash2 size={13} />
+                        {t("agents.removeAvatar")}
+                      </button>
+                    ) : null}
+                    <small>{t("agents.avatarHint")}</small>
+                  </span>
+                </div>
+              </div>
               <label>
                 <span>{t("agents.name")}</span>
                 <input
@@ -253,38 +304,6 @@ export function ProjectAgentSettings({
                   value={name}
                 />
               </label>
-              <div className="project-agent-settings-field-grid">
-                <label>
-                  <span>{t("agents.provider")}</span>
-                  <NativeSelect
-                    label={t("agents.provider")}
-                    onValueChange={(value) => {
-                      setProvider(value as AgentProvider);
-                      setModel("");
-                    }}
-                    options={agentProviders.map((candidate) => ({
-                      label: providerLabels[candidate],
-                      value: candidate,
-                    }))}
-                    value={provider}
-                  />
-                </label>
-                <label>
-                  <span>{t("agents.model")}</span>
-                  <NativeSelect
-                    label={t("agents.model")}
-                    onValueChange={setModel}
-                    options={agentModels[provider].map((option) => ({
-                      ...option,
-                      label:
-                        option.value === ""
-                          ? t("agents.providerDefaultModel")
-                          : option.label,
-                    }))}
-                    value={model}
-                  />
-                </label>
-              </div>
               <label>
                 <span>{t("agents.responsibility")}</span>
                 <textarea

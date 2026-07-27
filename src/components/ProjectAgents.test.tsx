@@ -150,7 +150,9 @@ describe("ProjectAgents", () => {
     const form = settingsPage?.querySelector<HTMLFormElement>(
       "form.project-agent-settings-card",
     );
-    const name = form?.querySelector<HTMLInputElement>("input");
+    const name = form?.querySelector<HTMLInputElement>(
+      'input:not([type="file"]):not([type="color"])',
+    );
     const responsibility = form?.querySelector<HTMLTextAreaElement>("textarea");
     expect(settingsPage?.textContent).toContain("에이전트 설정");
     expect(settingsPage?.textContent).toContain("프로젝트 실행 기본값");

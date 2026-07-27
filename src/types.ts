@@ -132,6 +132,7 @@ export type ProjectAgent = {
   id: string;
   projectId: string;
   name: string;
+  avatar: string | null;
   provider: AgentProvider;
   model: string | null;
   responsibility: string;
@@ -144,6 +145,7 @@ export type ProjectAgent = {
 
 export type CreateProjectAgentInput = {
   name: string | null;
+  avatar?: string | null;
   provider: AgentProvider;
   model: string | null;
   responsibility: string;
