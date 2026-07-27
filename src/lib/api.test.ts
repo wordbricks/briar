@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  claimProjectAgentScheduleRun,
+  completeProjectAgentScheduleRun,
   createProjectAgent,
   createProjectAgentSchedule,
   loadProjectAgents,
@@ -153,6 +155,74 @@ describe("API errors", () => {
       ),
       expect.objectContaining({ method: "POST" }),
     );
+  });
+
+  it("claims and completes a due agent schedule run", async () => {
+    const claimToken = `briar_schedule_claim_${"a".repeat(64)}`;
+    const run = {
+      id: "11111111-1111-4111-8111-111111111111",
+      projectId: "22222222-2222-4222-8222-222222222222",
+      scheduleId: "33333333-3333-4333-8333-333333333333",
+      scheduleName: "Daily project audit",
+      agent: {
+        id: "44444444-4444-4444-8444-444444444444",
+        name: "Repository auditor",
+        provider: "codex",
+        model: null,
+        responsibility: "Audit the connected repository.",
+      },
+      status: "running",
+      scheduledFor: "2026-07-27T09:00:00.000Z",
+      leaseExpiresAt: "2026-07-27T11:00:00.000Z",
+      startedAt: "2026-07-27T09:00:01.000Z",
+      completedAt: null,
+      resultSummary: null,
+      error: null,
+    } as const;
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ run: { ...run, claimToken } }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            run: {
+              ...run,
+              status: "completed",
+              leaseExpiresAt: null,
+              completedAt: "2026-07-27T09:01:00.000Z",
+              resultSummary: "Audit completed.",
+            },
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      claimProjectAgentScheduleRun(
+        "token",
+        "22222222-2222-4222-8222-222222222222",
+      ),
+    ).resolves.toMatchObject({ id: run.id, claimToken });
+    await expect(
+      completeProjectAgentScheduleRun(
+        "token",
+        "22222222-2222-4222-8222-222222222222",
+        run.id,
+        { claimToken, status: "completed", resultSummary: "Audit completed." },
+      ),
+    ).resolves.toMatchObject({
+      status: "completed",
+      resultSummary: "Audit completed.",
+    });
   });
 
   it("updates a project agent through its scoped endpoint", async () => {

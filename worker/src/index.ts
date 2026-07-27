@@ -24,6 +24,7 @@ import {
   type ProjectAgentLocale,
 } from "../../src/lib/project-agent";
 import {
+  isValidProjectAgentScheduleTimeZone,
   normalizeProjectAgentScheduleDay,
   projectAgentScheduleRecurrences,
 } from "../../src/lib/project-agent-schedule";
@@ -35,7 +36,9 @@ import { createAuth, type BriarAuth } from "./auth";
 import {
   addOrganizationMember,
   assertQueuedHuntClaim,
+  claimDueProjectAgentScheduleRun,
   claimNextQueuedHuntRun,
+  completeProjectAgentScheduleRun,
   createIssueMessage,
   createIssueAttachments,
   createOrganization,
@@ -69,6 +72,7 @@ import {
   recordQaResult,
   replaceProjectAgentToken,
   removeOrganizationMember,
+  renewProjectAgentScheduleRunLease,
   rollbackNewAppIssue,
   updateProjectAgent,
   updateProjectSettings,
@@ -80,6 +84,7 @@ import {
   type IssueMessageRow,
   type ProjectRow,
   type ProjectAgentRow,
+  type ProjectAgentScheduleRunRow,
   type ProjectAgentScheduleRow,
   type ProjectSettingsRow,
   type OrganizationMemberRow,
@@ -355,7 +360,12 @@ export const projectAgentScheduleInputSchema = z
     recurrence: z.enum(projectAgentScheduleRecurrences),
     timeOfDay: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/u),
     dayOfWeek: z.number().int().min(0).max(6).nullable().optional(),
-    timeZone: z.string().trim().min(1).max(100),
+    timeZone: z
+      .string()
+      .trim()
+      .min(1)
+      .max(100)
+      .refine(isValidProjectAgentScheduleTimeZone, "Invalid IANA time zone"),
   })
   .strict()
   .transform((input) => ({
@@ -507,6 +517,40 @@ const leaseRenewSchema = z
     claimToken: z.string().trim().min(1).max(200),
   })
   .strict();
+
+const projectAgentScheduleClaimTokenSchema = z
+  .string()
+  .trim()
+  .regex(/^briar_schedule_claim_[0-9a-f]{64}$/u);
+
+const projectAgentScheduleRunRenewSchema = z
+  .object({ claimToken: projectAgentScheduleClaimTokenSchema })
+  .strict();
+
+export const projectAgentScheduleRunCompletionSchema = z
+  .object({
+    claimToken: projectAgentScheduleClaimTokenSchema,
+    status: z.enum(["completed", "failed"]),
+    resultSummary: z.string().trim().min(1).max(100_000).nullable().optional(),
+    error: z.string().trim().min(1).max(4_000).nullable().optional(),
+  })
+  .strict()
+  .superRefine((input, context) => {
+    if (input.status === "completed" && !input.resultSummary) {
+      context.addIssue({
+        code: "custom",
+        message: "completed runs require a result summary",
+        path: ["resultSummary"],
+      });
+    }
+    if (input.status === "failed" && !input.error) {
+      context.addIssue({
+        code: "custom",
+        message: "failed runs require an error",
+        path: ["error"],
+      });
+    }
+  });
 
 const transcriptSchema = z
   .object({
@@ -863,6 +907,31 @@ const projectAgentScheduleJson = (row: ProjectAgentScheduleRow) => ({
   enabled: row.enabled === 1,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
+});
+
+const projectAgentScheduleRunJson = (
+  row: ProjectAgentScheduleRunRow,
+  claimToken?: string,
+) => ({
+  id: row.id,
+  projectId: row.project_id,
+  scheduleId: row.schedule_id,
+  scheduleName: row.schedule_name,
+  agent: {
+    id: row.agent_id,
+    name: row.agent_name,
+    provider: row.agent_provider,
+    model: row.agent_model,
+    responsibility: row.agent_responsibility,
+  },
+  status: row.status,
+  scheduledFor: row.scheduled_for,
+  leaseExpiresAt: row.lease_expires_at,
+  startedAt: row.started_at,
+  completedAt: row.completed_at,
+  resultSummary: row.result_summary,
+  error: row.error,
+  ...(claimToken ? { claimToken } : {}),
 });
 
 const organizationJson = (row: OrganizationRow) => ({
@@ -1333,6 +1402,85 @@ async function route(
     const schedule = await createProjectAgentSchedule(db, project.id, input);
     if (!schedule) throw new HttpError(404, "Project agent not found");
     return json({ schedule: projectAgentScheduleJson(schedule) }, 201);
+  }
+
+  const projectAgentScheduleRunsClaimMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/agent-schedule-runs\/claim$/u,
+  );
+  if (projectAgentScheduleRunsClaimMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      projectAgentScheduleRunsClaimMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const observedAt = new Date().toISOString();
+    const claimToken = `briar_schedule_claim_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
+    const run = await claimDueProjectAgentScheduleRun(db, project.id, {
+      claimTokenHash: await sha256(claimToken),
+      observedAt,
+    });
+    return json({
+      run: run ? projectAgentScheduleRunJson(run, claimToken) : null,
+    });
+  }
+
+  const projectAgentScheduleRunCompleteMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/agent-schedule-runs\/([0-9a-f-]+)\/complete$/u,
+  );
+  if (projectAgentScheduleRunCompleteMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      projectAgentScheduleRunCompleteMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const input = projectAgentScheduleRunCompletionSchema.parse(
+      await readJson(request),
+    );
+    const run = await completeProjectAgentScheduleRun(
+      db,
+      project.id,
+      projectAgentScheduleRunCompleteMatch[2],
+      {
+        claimTokenHash: await sha256(input.claimToken),
+        status: input.status,
+        resultSummary: input.resultSummary ?? null,
+        error: input.error ?? null,
+        observedAt: new Date().toISOString(),
+      },
+    );
+    if (!run) throw new HttpError(409, "Schedule run claim is no longer active");
+    return json({ run: projectAgentScheduleRunJson(run) });
+  }
+
+  const projectAgentScheduleRunRenewMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/agent-schedule-runs\/([0-9a-f-]+)\/renew$/u,
+  );
+  if (projectAgentScheduleRunRenewMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      projectAgentScheduleRunRenewMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const input = projectAgentScheduleRunRenewSchema.parse(
+      await readJson(request),
+    );
+    const run = await renewProjectAgentScheduleRunLease(
+      db,
+      project.id,
+      projectAgentScheduleRunRenewMatch[2],
+      {
+        claimTokenHash: await sha256(input.claimToken),
+        observedAt: new Date().toISOString(),
+      },
+    );
+    if (!run) throw new HttpError(409, "Schedule run claim is no longer active");
+    return json({ leaseExpiresAt: run.lease_expires_at });
   }
 
   const projectAgentMatch = pathname.match(

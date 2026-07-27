@@ -9,6 +9,7 @@ import {
   createProjectChat,
   loadAppProviderSettings,
   loadProjectLlmSettings,
+  runProjectAgentSchedule,
   updateAppProviderSettings,
   updateProjectLlmSettings,
 } from "./project-llm";
@@ -69,6 +70,35 @@ describe("project LLM gateway", () => {
       "project_llm_chat",
       expect.objectContaining({ fullAccess: true }),
     );
+  });
+
+  it("runs a scheduled agent by identity without accepting a workspace path", async () => {
+    invoke.mockResolvedValue({
+      conversationId: "briar:project-1:thread-1",
+      message: "audit complete",
+      workspaceRoot: "/repo",
+    });
+
+    await runProjectAgentSchedule({
+      projectId: "project-1",
+      provider: "claude",
+      model: "sonnet",
+      message: "Audit the repository.",
+      instructions: "Run the claimed schedule and summarize the result.",
+    });
+
+    expect(invoke).toHaveBeenCalledWith("run_project_agent_schedule", {
+      projectId: "project-1",
+      provider: "claude",
+      model: "sonnet",
+      request: {
+        message: "Audit the repository.",
+        conversationId: null,
+        instructions: "Run the claimed schedule and summarize the result.",
+        outputSchema: null,
+      },
+    });
+    expect(invoke.mock.calls[0]?.[1]).not.toHaveProperty("workspaceRoot");
   });
 
   it("routes issue conversations by run and registered branch", async () => {

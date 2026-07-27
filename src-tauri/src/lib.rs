@@ -3150,6 +3150,68 @@ async fn project_llm_chat(
     .map_err(|error| error.to_string())?
 }
 
+#[tauri::command]
+async fn run_project_agent_schedule(
+    app: tauri::AppHandle,
+    project_id: String,
+    provider: agent::AgentProviderKind,
+    model: Option<String>,
+    request: agent::ProjectLlmRequest,
+) -> Result<agent::ProjectLlmResponse, String> {
+    let config_path = cli_config_path(&app)?;
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    let resource_directory = app
+        .path()
+        .resource_dir()
+        .map_err(|error| error.to_string())?;
+    let claude_runner = bundled_path(
+        &resource_directory,
+        "agent/claude-runner.js",
+        "dist-agent/claude-runner.js",
+    );
+    let grok_runner = bundled_path(
+        &resource_directory,
+        "agent/grok-runner.js",
+        "dist-agent/grok-runner.js",
+    );
+    tauri::async_runtime::spawn_blocking(move || {
+        let (runner, workspace) =
+            connected_project_workspace_on_host(&config_path, &project_id, &home)?;
+        if !app_provider_settings_from(&config_path)?.is_enabled(provider) {
+            return Err(
+                "예약된 에이전트의 프로바이더가 앱 설정에서 비활성화되어 있습니다.".to_string(),
+            );
+        }
+        let backend = agent::discover_backend(
+            provider,
+            runner,
+            agent::AgentRunnerBundles {
+                claude: &claude_runner,
+                grok: &grok_runner,
+            },
+        )?;
+        agent::AgentBackend::run(
+            &backend,
+            &project_id,
+            &workspace,
+            agent::ChatExecution {
+                approval_policy: agent::ApprovalPolicy::Never,
+                sandbox_mode: agent::SandboxMode::WorkspaceWrite,
+                network_access: true,
+                model: model.filter(|value| !value.trim().is_empty()),
+                effort: None,
+                event_sink: None,
+                environment: Vec::new(),
+                workspace_write_roots: Vec::new(),
+            },
+            request,
+            &|_, _| false,
+        )
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
 /// Directory that holds this project's per-issue worktrees. Must mirror the
 /// CLI's own resolution (`worktreeSettings` in src-cli/index.ts): env override,
 /// then project config, then `~/briar/worktrees`, all suffixed by project id.
@@ -3824,6 +3886,7 @@ pub fn run() {
             inspect_repository_readiness,
             connected_project_ids,
             project_llm_chat,
+            run_project_agent_schedule,
             start_project_auto_hunt,
             load_auto_hunt_app_server_events,
             load_app_provider_settings,

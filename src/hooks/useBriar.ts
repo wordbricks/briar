@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   beginDeviceAuthorization,
   cancelHuntRun,
+  claimProjectAgentScheduleRun,
+  completeProjectAgentScheduleRun,
   connectLinearImport,
   createAgentToken,
   createOrganization as createRemoteOrganization,
@@ -21,6 +23,7 @@ import {
   isOrganizationHandleAvailable as checkRemoteOrganizationHandle,
   moveHuntRun,
   pollDeviceToken,
+  renewProjectAgentScheduleRun,
   retryHuntRun,
   updateOrganization as updateRemoteOrganization,
   updateProjectSettings,
@@ -79,6 +82,8 @@ import {
 } from "../lib/auto-hunt-automation";
 import { isMobileCompanion } from "../lib/platform";
 import { chatWithProjectLlm } from "../lib/project-llm";
+import { runProjectAgentSchedule } from "../lib/project-llm";
+import { startProjectAgentSchedulePolling } from "../lib/project-agent-schedule-runner";
 import {
   agentReplyParentMessageId,
   providerForConversation,
@@ -375,6 +380,47 @@ export function useBriar() {
     if (demoMode || !token || !activeProjectId) return;
     return startDashboardPolling(() => void refresh());
   }, [activeProjectId, refresh, token]);
+
+  useEffect(() => {
+    if (demoMode || companionMode || !token || connectedProjectIds === null) {
+      return;
+    }
+    const projectIds = projects
+      .map((project) => project.id)
+      .filter((projectId) =>
+        isProjectConnectedLocally(connectedProjectIds, projectId),
+      );
+    if (projectIds.length === 0) return;
+    return startProjectAgentSchedulePolling(
+      {
+        claim: (projectId) => claimProjectAgentScheduleRun(token, projectId),
+        complete: (projectId, runId, input) =>
+          completeProjectAgentScheduleRun(token, projectId, runId, input),
+        renew: (projectId, runId, claimToken) =>
+          renewProjectAgentScheduleRun(
+            token,
+            projectId,
+            runId,
+            claimToken,
+          ),
+        execute: (run) =>
+          runProjectAgentSchedule({
+            projectId: run.projectId,
+            provider: run.agent.provider,
+            model: run.agent.model,
+            message: run.agent.responsibility,
+            instructions: [
+              `Run the scheduled automation "${run.scheduleName}".`,
+              `It was scheduled for ${run.scheduledFor}.`,
+              "Work from the connected project root and complete the agent responsibility.",
+              "Do not ask for interactive approval. Return a concise result summary.",
+            ].join("\n"),
+          }),
+        log: (message, caught) => console.error(message, caught),
+      },
+      projectIds,
+    );
+  }, [connectedProjectIds, projects, token]);
 
   const refreshHealth = useCallback(async () => {
     if (
