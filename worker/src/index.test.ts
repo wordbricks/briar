@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import worker, {
+  issueUpdateInputSchema,
   organizationUpdateInputSchema,
   projectAgentScheduleInputSchema,
   projectAgentScheduleRunCompletionSchema,
@@ -51,6 +52,27 @@ describe("Worker HTTP contract", () => {
     ).toEqual({
       name: "Briar Labs",
     });
+  });
+
+  it("validates editable issue fields", () => {
+    expect(
+      issueUpdateInputSchema.parse({
+        title: "  Updated issue  ",
+        description: null,
+        priority: 1,
+      }),
+    ).toEqual({
+      title: "Updated issue",
+      description: null,
+      priority: 1,
+    });
+    expect(() =>
+      issueUpdateInputSchema.parse({
+        title: "",
+        description: null,
+        priority: 5,
+      }),
+    ).toThrow();
   });
 
   it("requires a matching outcome payload for schedule-run completion", () => {

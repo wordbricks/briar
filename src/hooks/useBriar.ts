@@ -25,6 +25,7 @@ import {
   pollDeviceToken,
   renewProjectAgentScheduleRun,
   retryHuntRun,
+  updateIssue,
   updateOrganization as updateRemoteOrganization,
   updateProjectSettings,
   type DeviceClientId,
@@ -105,6 +106,7 @@ import type {
   Project,
   ProjectSettings,
   SessionUser,
+  UpdateIssueInput,
 } from "../types";
 
 export type ProjectConnection = {
@@ -218,6 +220,7 @@ export function useBriar() {
     useState<ProjectConnection | null>(null);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [isCreatingIssue, setIsCreatingIssue] = useState(false);
+  const [updatingIssueId, setUpdatingIssueId] = useState<string | null>(null);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const [recoveringRunId, setRecoveringRunId] = useState<string | null>(null);
   const issueMessagesByRun = useRef<Record<string, IssueMessage[]>>(
@@ -1535,6 +1538,57 @@ export function useBriar() {
     [token],
   );
 
+  const editIssue = useCallback(
+    async (runId: string, input: UpdateIssueInput) => {
+      if (!activeProjectId || !dashboard) {
+        throw new Error("이슈를 수정할 프로젝트가 없습니다.");
+      }
+      setUpdatingIssueId(runId);
+      setError(null);
+      try {
+        if (demoMode) {
+          const updatedAt = new Date().toISOString();
+          setDashboard((current) =>
+            current
+              ? {
+                  ...current,
+                  runs: current.runs.map((run) =>
+                    run.id === runId
+                      ? {
+                          ...run,
+                          title: input.title.trim(),
+                          issueDescription: input.description,
+                          priority: input.priority,
+                          updatedAt,
+                        }
+                      : run,
+                  ),
+                }
+              : current,
+          );
+          return {
+            runId,
+            title: input.title.trim(),
+            description: input.description,
+            priority: input.priority,
+          };
+        }
+        if (!token) throw new Error("로그인이 필요합니다.");
+        const result = await updateIssue(token, activeProjectId, runId, input);
+        const nextDashboard = await loadDashboard(token, activeProjectId);
+        setDashboard(nextDashboard);
+        return result;
+      } catch (caught) {
+        const message = caught instanceof Error ? caught.message : String(caught);
+        setError(message);
+        throw caught;
+      } finally {
+        setUpdatingIssueId(null);
+      }
+    },
+    [activeProjectId, dashboard, token],
+  );
+
   const readIssueMessages = useCallback(
     async (runId: string) => {
       if (!activeProjectId) throw new Error("메시지를 불러올 프로젝트가 없습니다.");
@@ -1891,6 +1945,7 @@ export function useBriar() {
     healthLoading,
     isCreatingProject,
     isCreatingIssue,
+    updatingIssueId,
     loading,
     login,
     loginCode,
@@ -1917,6 +1972,7 @@ export function useBriar() {
     refreshProjectReadiness,
     refreshVelen,
     readIssueAttachment,
+    editIssue,
     readIssueMessages,
     addIssueMessage,
     setActiveOrganizationId: selectOrganization,

@@ -46,6 +46,7 @@ import {
   updateProjectAgent,
   updateProjectAgentSchedule,
   updateOrganization,
+  updateIssue,
 } from "./db";
 
 const releaseWorkflow = normalizeAutoHuntWorkflow({
@@ -1154,6 +1155,40 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         attachmentId,
       ),
     ).toBeNull();
+  });
+
+  it("updates issue fields without changing workflow state", async () => {
+    const sourceKey = "editable-issue";
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("cancelled", 18, {
+        sourceKey,
+        eventKey: `${sourceKey}:cancelled`,
+        title: "Original title",
+        issueDescription: "Original description",
+        priority: 3,
+      }),
+    );
+
+    const updated = await updateIssue(db, projectId, runId, {
+      title: "Updated title",
+      description: null,
+      priority: 1,
+      updatedAt: atMinute(19),
+    });
+
+    expect(updated).toEqual(
+      expect.objectContaining({
+        id: runId,
+        title: "Updated title",
+        issue_description: null,
+        priority: 1,
+        status: "cancelled",
+        workflow_stage: null,
+        updated_at: atMinute(19),
+      }),
+    );
   });
 
   it("returns the highest-priority oldest queued run", async () => {

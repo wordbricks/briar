@@ -166,6 +166,7 @@ export type HuntRunRow = {
   lease_expires_at: string | null;
   claim_attempts: number;
   started_at: string;
+  updated_at: string;
   completed_at: string | null;
   last_event_at: string;
   event_count: number;
@@ -1325,14 +1326,14 @@ export async function listDashboardRuns(db: D1Database, projectId: string) {
               run.production_qa_detail, run.context_json,
               run.current_attempt, run.claimed_by, run.claimed_at,
               run.lease_expires_at, run.claim_attempts, run.started_at,
-              run.completed_at, run.last_event_at,
+              run.updated_at, run.completed_at, run.last_event_at,
               (select count(*) from briar_hunt_events event
                where event.run_id = run.id) as event_count
        from briar_hunt_runs run
        where run.project_id = ?
        order by
          case when run.status in ('completed', 'cancelled') then 1 else 0 end,
-         run.last_event_at desc
+         run.updated_at desc
        limit 200`,
     )
     .bind(projectId)
@@ -2990,5 +2991,34 @@ export async function getHuntRunForProject(
   return db
     .prepare(`select * from briar_hunt_runs where id = ? and project_id = ?`)
     .bind(runId, projectId)
+    .first<HuntRunRow>();
+}
+
+export async function updateIssue(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  input: {
+    title: string;
+    description: string | null;
+    priority: number | null;
+    updatedAt: string;
+  },
+) {
+  return db
+    .prepare(
+      `update briar_hunt_runs
+       set title = ?, issue_description = ?, priority = ?, updated_at = ?
+       where id = ? and project_id = ?
+       returning *`,
+    )
+    .bind(
+      input.title,
+      input.description,
+      input.priority,
+      input.updatedAt,
+      runId,
+      projectId,
+    )
     .first<HuntRunRow>();
 }

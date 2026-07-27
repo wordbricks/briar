@@ -23,6 +23,7 @@ import {
   LoaderCircle,
   MessageCircle,
   Paperclip,
+  Pencil,
   Plus,
   RefreshCw,
   RotateCcw,
@@ -74,6 +75,7 @@ import type {
   IssueAttachment,
   IssueMessage,
   IssueMessageSendResult,
+  UpdateIssueInput,
 } from "../types";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
@@ -97,6 +99,7 @@ export function HuntDashboard({
   dashboard,
   error,
   isCreatingIssue,
+  updatingIssueId,
   needsLocalConnection = false,
   noProject = false,
   recoveringRunId,
@@ -105,6 +108,7 @@ export function HuntDashboard({
   onConnectRepository,
   onAddProject,
   onCreateIssue,
+  onUpdateIssue,
   onLoadAttachment,
   onLoadIssueMessages,
   onMoveRun,
@@ -124,6 +128,7 @@ export function HuntDashboard({
   dashboard: DashboardPayload | null;
   error: string | null;
   isCreatingIssue: boolean;
+  updatingIssueId: string | null;
   needsLocalConnection?: boolean;
   noProject?: boolean;
   recoveringRunId: string | null;
@@ -132,6 +137,7 @@ export function HuntDashboard({
   onConnectRepository?: () => void;
   onAddProject?: () => void;
   onCreateIssue: (input: CreateIssueInput) => Promise<unknown>;
+  onUpdateIssue: (runId: string, input: UpdateIssueInput) => Promise<unknown>;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onLoadIssueMessages: (runId: string) => Promise<IssueMessage[]>;
   onMoveRun: (runId: string, placement: HuntRunPlacement) => Promise<unknown>;
@@ -321,6 +327,7 @@ export function HuntDashboard({
         companionMode={companionMode}
         error={recoveryError}
         isRecovering={recoveringRunId === selected.id}
+        isUpdatingIssue={updatingIssueId === selected.id}
         isSidebarOpen={isSidebarOpen}
         onBack={() => setSelectedRunId(null)}
         onCancel={() => onCancelRun(selected.id)}
@@ -329,6 +336,7 @@ export function HuntDashboard({
         onMove={(placement) => onMoveRun(selected.id, placement)}
         onRetry={() => onRetryRun(selected.id)}
         onSendIssueMessage={(input) => onSendIssueMessage(selected.id, input)}
+        onUpdateIssue={(input) => onUpdateIssue(selected.id, input)}
         run={selected}
       />
     );
@@ -583,6 +591,151 @@ export function HuntDashboard({
         />
       )}
     </main>
+  );
+}
+
+export function EditIssueDialog({
+  isSubmitting,
+  onClose,
+  onUpdate,
+  run,
+}: {
+  isSubmitting: boolean;
+  onClose: () => void;
+  onUpdate: (input: UpdateIssueInput) => Promise<unknown>;
+  run: HuntRun;
+}) {
+  const { t } = useI18n();
+  const [title, setTitle] = useState(run.title);
+  const [description, setDescription] = useState(run.issueDescription ?? "");
+  const [priority, setPriority] = useState(
+    run.priority === null ? "" : String(run.priority),
+  );
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !isSubmitting) onClose();
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [isSubmitting, onClose]);
+
+  return (
+    <div
+      className="dialog-backdrop issue-dialog-backdrop"
+      onMouseDown={(event) =>
+        event.target === event.currentTarget && !isSubmitting && onClose()
+      }
+    >
+      <form
+        aria-label={t("issue.editDialog")}
+        aria-modal="true"
+        className="issue-dialog edit-issue-dialog"
+        onKeyDown={(event) => {
+          if (
+            event.key === "Enter" &&
+            (event.metaKey || event.ctrlKey) &&
+            !isSubmitting
+          ) {
+            event.preventDefault();
+            event.currentTarget.requestSubmit();
+          }
+        }}
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!title.trim() || isSubmitting) return;
+          setSubmitError(null);
+          void onUpdate({
+            title: title.trim(),
+            description: description.trim() || null,
+            priority: priority ? Number(priority) : null,
+          }).catch((error) =>
+            setSubmitError(error instanceof Error ? error.message : String(error)),
+          );
+        }}
+        role="dialog"
+      >
+        <header>
+          <div className="issue-dialog-context">
+            <strong>{t("issue.editIssue")}</strong>
+          </div>
+          <button
+            aria-label={t("common.close")}
+            className="issue-dialog-close"
+            disabled={isSubmitting}
+            onClick={onClose}
+            type="button"
+          >
+            <X size={16} />
+          </button>
+        </header>
+        <div className="issue-form-body">
+          <div className="issue-editor-content">
+            <input
+              aria-label={t("issue.title")}
+              autoFocus
+              className="issue-title-input"
+              maxLength={300}
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder={t("issue.titlePlaceholder")}
+              required
+              value={title}
+            />
+            <textarea
+              aria-label={t("issue.description")}
+              className="issue-description-input"
+              maxLength={100000}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder={t("issue.descriptionPlaceholder")}
+              value={description}
+            />
+            {submitError && (
+              <div className="issue-form-error">
+                <CircleAlert size={14} />
+                {submitError}
+              </div>
+            )}
+          </div>
+          <div className="issue-metadata-bar">
+            <NativeSelect
+              className="issue-priority-select"
+              label={t("issue.priority")}
+              onValueChange={setPriority}
+              options={[
+                { label: t("run.notSet"), value: "" },
+                { label: t("issue.priority1"), value: "1" },
+                { label: t("issue.priority2"), value: "2" },
+                { label: t("issue.priority3"), value: "3" },
+                { label: t("issue.priority4"), value: "4" },
+              ]}
+              value={priority}
+            />
+          </div>
+        </div>
+        <footer>
+          <span />
+          <div>
+            <button
+              className="issue-cancel-button"
+              disabled={isSubmitting}
+              onClick={onClose}
+              type="button"
+            >
+              {t("common.cancel")}
+            </button>
+            <button
+              className="issue-submit-button"
+              disabled={isSubmitting || !title.trim()}
+              type="submit"
+            >
+              {isSubmitting && <LoaderCircle className="spin" size={13} />}
+              {isSubmitting ? t("common.saving") : t("common.save")}
+            </button>
+          </div>
+        </footer>
+      </form>
+    </div>
   );
 }
 
@@ -1072,6 +1225,7 @@ export function RunPage({
   companionMode = false,
   error,
   isRecovering,
+  isUpdatingIssue = false,
   isSidebarOpen,
   onBack,
   onCancel,
@@ -1080,11 +1234,13 @@ export function RunPage({
   onMove,
   onRetry,
   onSendIssueMessage,
+  onUpdateIssue,
   run,
 }: {
   companionMode?: boolean;
   error: string | null;
   isRecovering: boolean;
+  isUpdatingIssue?: boolean;
   isSidebarOpen: boolean;
   onBack: () => void;
   onCancel: () => Promise<unknown>;
@@ -1096,6 +1252,7 @@ export function RunPage({
     body: string;
     parentMessageId: string | null;
   }) => Promise<IssueMessageSendResult>;
+  onUpdateIssue?: (input: UpdateIssueInput) => Promise<unknown>;
   run: HuntRun;
 }) {
   const { localeTag, t } = useI18n();
@@ -1106,6 +1263,7 @@ export function RunPage({
     ? t("run.notSet")
     : t(`issue.priority${run.priority}` as MessageKey);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [contentSplit, setContentSplit] = useState(50);
   const [isResizingContent, setIsResizingContent] = useState(false);
   const contentRef = useRef<HTMLDivElement | null>(null);
@@ -1236,6 +1394,18 @@ export function RunPage({
                     </div>
                   </div>
                   <div className="run-page-meta">
+                    {onUpdateIssue && (
+                      <button
+                        aria-label={t("issue.edit")}
+                        className="run-page-edit"
+                        disabled={isUpdatingIssue}
+                        onClick={() => setIsEditDialogOpen(true)}
+                        type="button"
+                      >
+                        <Pencil size={13} />
+                        {t("issue.edit")}
+                      </button>
+                    )}
                     <span className={`status-pill ${meta.tone}`}>{label}</span>
                     <small>
                       {t("run.attempt", { count: run.currentAttempt })}
@@ -1250,6 +1420,18 @@ export function RunPage({
               <div className="run-page-summary">
                 <IssueActivity run={run} />
                 <div className="run-page-meta">
+                  {onUpdateIssue && (
+                    <button
+                      aria-label={t("issue.edit")}
+                      className="run-page-edit"
+                      disabled={isUpdatingIssue}
+                      onClick={() => setIsEditDialogOpen(true)}
+                      type="button"
+                    >
+                      <Pencil size={13} />
+                      {t("issue.edit")}
+                    </button>
+                  )}
                   <span className={`status-pill ${meta.tone}`}>{label}</span>
                   <small>
                     {t("run.attempt", { count: run.currentAttempt })}
@@ -1396,6 +1578,17 @@ export function RunPage({
           </div>
         </article>
       </div>
+      {isEditDialogOpen && onUpdateIssue && (
+        <EditIssueDialog
+          isSubmitting={isUpdatingIssue}
+          onClose={() => setIsEditDialogOpen(false)}
+          onUpdate={async (input) => {
+            await onUpdateIssue(input);
+            setIsEditDialogOpen(false);
+          }}
+          run={run}
+        />
+      )}
     </main>
   );
 }

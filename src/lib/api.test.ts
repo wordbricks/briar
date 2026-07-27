@@ -10,6 +10,7 @@ import {
   loadSession,
   updateProjectAgent,
   updateProjectAgentSchedule,
+  updateIssue,
 } from "./api";
 import { repositoryWorkflowBootstrap } from "./auto-hunt-contract";
 
@@ -34,6 +35,46 @@ describe("API errors", () => {
       status: 401,
       message: "Unauthorized",
     });
+  });
+
+  it("updates an issue through its project-scoped run endpoint", async () => {
+    const projectId = "22222222-2222-4222-8222-222222222222";
+    const runId = "11111111-1111-4111-8111-111111111111";
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) =>
+        new Response(
+          JSON.stringify({
+            runId,
+            ...JSON.parse(String(init?.body)),
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      updateIssue("token", projectId, runId, {
+        title: "Updated issue",
+        description: "Updated description",
+        priority: 1,
+      }),
+    ).resolves.toEqual({
+      runId,
+      title: "Updated issue",
+      description: "Updated description",
+      priority: 1,
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(`/projects/${projectId}/runs/${runId}`),
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({
+          title: "Updated issue",
+          description: "Updated description",
+          priority: 1,
+        }),
+      }),
+    );
   });
 
   it("creates a project agent with its provider, model, and responsibility", async () => {

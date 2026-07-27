@@ -8,6 +8,7 @@ import { demoDashboard } from "../lib/demo-data";
 import type { IssueMessage } from "../types";
 import {
   CreateIssueDialog,
+  EditIssueDialog,
   HuntDashboard,
   RunPage,
 } from "./HuntDashboard";
@@ -15,10 +16,12 @@ import {
 const dashboardProps = {
   error: null,
   isCreatingIssue: false,
+  updatingIssueId: null,
   recoveringRunId: null,
   recoveryError: null,
   isSidebarOpen: true,
   onCreateIssue: async () => undefined,
+  onUpdateIssue: async () => undefined,
   onLoadAttachment: async () => new Blob(),
   onLoadIssueMessages: async () => [],
   onMoveRun: async () => undefined,
@@ -106,6 +109,7 @@ describe("HuntDashboard", () => {
       container.querySelector<HTMLElement>(".issue-list-row")?.click();
     });
     expect(container.querySelector(".run-page")).not.toBeNull();
+    expect(container.querySelector(".run-page-edit")).not.toBeNull();
     expect(container.querySelector(".issue-list")).toBeNull();
 
     await act(async () => {
@@ -214,6 +218,62 @@ describe("HuntDashboard", () => {
     expect(markup).toContain('aria-label="이미지 또는 영상 첨부"');
     expect(markup).toContain("video/quicktime");
     expect(markup).toContain("Enter로 등록");
+  });
+
+  it("edits an issue title, description, and priority", async () => {
+    let updated:
+      | {
+          title: string;
+          description: string | null;
+          priority: number | null;
+        }
+      | undefined;
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <EditIssueDialog
+          isSubmitting={false}
+          onClose={() => undefined}
+          onUpdate={async (input) => {
+            updated = input;
+          }}
+          run={{ ...demoDashboard.runs[0], priority: 3 }}
+        />,
+      );
+    });
+
+    const title = container.querySelector<HTMLInputElement>(
+      ".issue-title-input",
+    );
+    const description = container.querySelector<HTMLTextAreaElement>(
+      ".issue-description-input",
+    );
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set?.call(title, "수정된 이슈");
+      title?.dispatchEvent(new Event("input", { bubbles: true }));
+      Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )?.set?.call(description, "수정된 설명");
+      description?.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      container.querySelector("form")?.dispatchEvent(
+        new Event("submit", { bubbles: true, cancelable: true }),
+      );
+      await Promise.resolve();
+    });
+
+    expect(updated).toEqual({
+      title: "수정된 이슈",
+      description: "수정된 설명",
+      priority: 3,
+    });
+    await act(async () => root.unmount());
   });
 
   it("shows an active queue claim", () => {
@@ -420,6 +480,7 @@ describe("HuntDashboard", () => {
         onSendIssueMessage={async () => {
           throw new Error("not implemented in this test");
         }}
+        onUpdateIssue={async () => undefined}
         run={demoDashboard.runs[0]}
       />,
     );
@@ -428,6 +489,7 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("run-page-back");
     expect(markup).toContain(`AH-${demoDashboard.runs[0].runNumber}`);
     expect(markup).toContain(`<h1 id="run-page-title">${demoDashboard.runs[0].title}</h1>`);
+    expect(markup).toContain('class="run-page-edit"');
   });
 
   it("renders the issue description as Markdown above the conversation", () => {

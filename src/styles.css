@@ -593,6 +593,10 @@ button { color: inherit; }
 .run-page-title-row h1 { min-width:0; margin:0; overflow:hidden; color:#30312d; font-size:17px; line-height:1.25; letter-spacing:-.025em; text-overflow:ellipsis; white-space:nowrap; }
 .run-page-description { max-width:900px; max-height:3.2em; margin:0; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; white-space:pre-wrap; color:#73756e; font-size:10px; line-height:1.6; }
 .run-page-meta { display:flex; align-items:center; gap:8px; padding-top:1px; }
+.run-page-edit { height:26px; padding:0 9px; display:flex; align-items:center; gap:5px; border:1px solid #deded9; border-radius:8px; color:#64665f; background:#fff; cursor:pointer; font-family:inherit; font-size:9px; font-weight:650; transition:border-color .15s ease,color .15s ease,background-color .15s ease; }
+.run-page-edit:hover:not(:disabled) { border-color:#cfc7e8; color:#624ca9; background:#f5f2fd; }
+.run-page-edit:focus-visible { outline:2px solid #8b70dd; outline-offset:2px; }
+.run-page-edit:disabled { cursor:wait; opacity:.55; }
 .run-page-back { width:max-content; padding:5px 7px 5px 5px; display:flex; align-items:center; gap:5px; border:0; border-radius:8px; color:#777971; background:transparent; cursor:pointer; font-size:9px; font-weight:650; }
 .run-page-back:hover { color:#52418f; background:#f0ecfb; }
 .run-page-back:focus-visible { outline:2px solid #8b70dd; outline-offset:2px; }
