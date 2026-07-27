@@ -4,6 +4,7 @@ dist-cli
 dist-agent
 dist-worker
 release-artifacts
+src-tauri/binaries/bun-*
 .env
 .env.local
 .env.keys

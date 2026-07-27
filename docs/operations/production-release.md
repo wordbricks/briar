@@ -58,8 +58,12 @@ either encrypted environment file. The Production release command requires
 `.env.keys` on the trusted release host; if it is missing the command exits
 without decrypting secrets. Never commit `.env.keys`.
 
-The release host requires macOS, Bun 1.3.14, Rust 1.96.0, Xcode command-line
-tools, Syft, `gh`, `jq`, and a clean checkout with access to `origin`.
+The release host requires macOS, the official Bun 1.3.14 binary, Rust 1.96.0,
+Xcode command-line tools, Syft, `gh`, `jq`, and a clean checkout with access to
+`origin`. The build verifies Bun against `config/bun-runtime.json`, copies it as
+a Tauri sidecar, signs it inside the app, and includes the upstream license
+notice. Production runtime execution uses this bundled copy before any
+user-installed Bun.
 
 ## Local Production release v1
 
@@ -123,6 +127,8 @@ curl --fail --head \
 spctl --assess --type execute --verbose=2 \
   src-tauri/target/release/bundle/macos/Briar.app
 xcrun stapler validate src-tauri/target/release/bundle/macos/Briar.app
+scripts/verify-bundled-runtime.sh \
+  src-tauri/target/release/bundle/macos/Briar.app
 ```
 
 Tauri requires every updater archive to carry a signature; signature checks

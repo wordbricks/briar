@@ -45,5 +45,7 @@ if [[ ! -s "${archives[0]}" || ! -s "${signatures[0]}" ]]; then
   echo "Production dry-run updater output is empty." >&2
   exit 1
 fi
+"$workspace_root/scripts/verify-bundled-runtime.sh" \
+  "$workspace_root/src-tauri/target/release/bundle/macos/Briar.app"
 
 echo "Production updater dry-run passed for Briar v$version."

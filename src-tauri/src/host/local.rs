@@ -46,6 +46,15 @@ impl CommandRunner for LocalRunner {
     }
 
     fn resolve_binary(&self, tool: &str) -> Result<String, String> {
+        if tool == "bun" {
+            if let Some(binary) = crate::bundled_bun_binary() {
+                return Ok(binary.to_string_lossy().into_owned());
+            }
+            #[cfg(all(target_os = "macos", not(debug_assertions)))]
+            return Err(
+                "앱에 포함된 Bun 런타임을 찾지 못했습니다. Briar를 다시 설치하세요.".to_string(),
+            );
+        }
         which::which_in(tool, Some(&self.execution_path), &self.home)
             .map(|path| path.to_string_lossy().to_string())
             .map_err(|_| format!("{tool}을(를) 찾지 못했습니다. 설치되어 있는지 확인해 주세요."))
