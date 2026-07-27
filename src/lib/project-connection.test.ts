@@ -4,7 +4,10 @@ import {
   connectLocalProject,
   inspectRepositoryReadiness,
   inspectVelen,
+  listRemoteDirectory,
   listExecutionHosts,
+  loadProjectExecutionConnection,
+  updateProjectExecutionConnection,
 } from "./project-connection";
 import { repositoryWorkflowBootstrap } from "./auto-hunt-contract";
 import { briarApiUrl } from "./api";
@@ -76,5 +79,34 @@ describe("remote project connection", () => {
       org: "wordbricks",
       executionHostId: "ssh:ssh-1",
     });
+  });
+
+  it("loads, browses, and updates a project's remote execution connection", async () => {
+    await loadProjectExecutionConnection("project-1");
+    await listRemoteDirectory("ssh:ssh-1", "/home/dev");
+    await updateProjectExecutionConnection({
+      projectId: "project-1",
+      executionHostId: "ssh:ssh-1",
+      repositoryPath: "/home/dev/briar",
+    });
+
+    expect(invoke).toHaveBeenNthCalledWith(
+      1,
+      "load_project_execution_connection",
+      { projectId: "project-1" },
+    );
+    expect(invoke).toHaveBeenNthCalledWith(2, "list_remote_directory", {
+      executionHostId: "ssh:ssh-1",
+      path: "/home/dev",
+    });
+    expect(invoke).toHaveBeenNthCalledWith(
+      3,
+      "update_project_execution_connection",
+      {
+        projectId: "project-1",
+        executionHostId: "ssh:ssh-1",
+        repositoryPath: "/home/dev/briar",
+      },
+    );
   });
 });

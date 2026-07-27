@@ -13,6 +13,7 @@ import {
   Plug,
   RefreshCw,
   Rocket,
+  Server,
   SlidersHorizontal,
   Trash2,
   Zap,
@@ -32,11 +33,13 @@ import type {
   LinearImportStatesResult,
 } from "../lib/linear-import";
 import { LinearIssueImport } from "./LinearIssueImport";
+import { ProjectRemoteConnection } from "./ProjectRemoteConnection";
 import { SelectMenu } from "./SelectMenu";
 
 type ProjectSettingsSection =
   | "general"
   | "integrations"
+  | "remote-connection"
   | "issue-import"
   | "auto-hunt"
   | "workflow";
@@ -309,6 +312,12 @@ export function ProjectSettings({
       description: t("settings.navIntegrationsDescription"),
     },
     {
+      id: "remote-connection" as const,
+      icon: <Server size={16} strokeWidth={1.75} />,
+      label: t("settings.navRemoteConnection"),
+      description: t("settings.navRemoteConnectionDescription"),
+    },
+    {
       id: "issue-import" as const,
       icon: <Download size={16} strokeWidth={1.75} />,
       label: t("settings.navIssueImport"),
@@ -392,6 +401,10 @@ export function ProjectSettings({
               </div>
               <small>{t("settings.created", { date: new Date(project.createdAt).toLocaleDateString(localeTag) })}</small>
             </section>
+          ) : null}
+
+          {activeSection === "remote-connection" ? (
+            <ProjectRemoteConnection projectId={project.id} />
           ) : null}
 
           <section

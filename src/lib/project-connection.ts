@@ -97,6 +97,25 @@ export type ResolvedSshHost = {
   port?: number;
 };
 
+export type ProjectExecutionConnection = {
+  executionHostId: string;
+  repositoryPath: string;
+  repositoryRemote?: string;
+};
+
+export type RemoteDirectoryEntry = {
+  name: string;
+  path: string;
+};
+
+export type RemoteDirectoryListing = {
+  path: string;
+  parentPath?: string;
+  entries: RemoteDirectoryEntry[];
+  gitRepository: boolean;
+  repositoryRemote?: string;
+};
+
 const isTauri = () => "__TAURI_INTERNALS__" in window;
 
 export async function loadConnectedProjectIds(): Promise<string[] | null> {
@@ -160,6 +179,44 @@ export async function listExecutionHosts(): Promise<ExecutionHost[]> {
   }
   const { invoke } = await import("@tauri-apps/api/core");
   return invoke<ExecutionHost[]>("list_execution_hosts");
+}
+
+export async function loadProjectExecutionConnection(projectId: string) {
+  if (!isTauri()) return null;
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<ProjectExecutionConnection>("load_project_execution_connection", {
+    projectId,
+  });
+}
+
+export async function listRemoteDirectory(
+  executionHostId: string,
+  path?: string,
+) {
+  if (!isTauri()) {
+    throw new Error("원격 폴더 탐색은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<RemoteDirectoryListing>("list_remote_directory", {
+    executionHostId,
+    path: path?.trim() || null,
+  });
+}
+
+export async function updateProjectExecutionConnection(input: {
+  projectId: string;
+  executionHostId: string;
+  repositoryPath: string;
+}) {
+  if (!isTauri()) {
+    throw new Error("원격 프로젝트 연결은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<ProjectExecutionConnection>("update_project_execution_connection", {
+    projectId: input.projectId,
+    executionHostId: input.executionHostId,
+    repositoryPath: input.repositoryPath,
+  });
 }
 
 export async function resolveSshHost(alias: string) {
