@@ -19,6 +19,11 @@ async function cliHome(velenOrg?: string) {
   const home = await mkdtemp(join(tmpdir(), "briar-optional-velen-"));
   temporaryHomes.push(home);
   const configDirectory = join(home, ".config", "briar");
+  await writeCliConfig(configDirectory, velenOrg);
+  return home;
+}
+
+async function writeCliConfig(configDirectory: string, velenOrg?: string) {
   await mkdir(configDirectory, { recursive: true });
   await writeFile(
     join(configDirectory, "config.json"),
@@ -36,10 +41,9 @@ async function cliHome(velenOrg?: string) {
       }],
     }),
   );
-  return home;
 }
 
-function runDoctor(home: string) {
+function runDoctor(home: string, configDirectory?: string) {
   return spawnSync(
     bunExecutable,
     ["run", "src-cli/index.ts", "project", "doctor"],
@@ -49,6 +53,7 @@ function runDoctor(home: string) {
         ...process.env,
         HOME: home,
         PATH: `${dirname(bunExecutable)}:/usr/bin:/bin`,
+        ...(configDirectory ? { BRIAR_CONFIG_HOME: configDirectory } : {}),
       },
       encoding: "utf8",
     },
@@ -79,5 +84,20 @@ describe("optional Velen CLI preflight", () => {
 
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("Velen CLI");
+  });
+
+  it("uses an explicit Briar config home even when HOME points elsewhere", async () => {
+    const home = await mkdtemp(join(tmpdir(), "briar-unrelated-home-"));
+    const configRoot = await mkdtemp(join(tmpdir(), "briar-explicit-config-"));
+    temporaryHomes.push(home, configRoot);
+    await writeCliConfig(configRoot);
+
+    const result = runDoctor(home, configRoot);
+
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      ok: true,
+      projectId: "11111111-1111-4111-8111-111111111111",
+    });
   });
 });

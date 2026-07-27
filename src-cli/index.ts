@@ -2,7 +2,7 @@
 
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir, platform } from "node:os";
-import { basename, join, resolve } from "node:path";
+import { basename, isAbsolute, join, resolve } from "node:path";
 import { z } from "zod";
 import packageJson from "../package.json";
 import {
@@ -136,7 +136,12 @@ const configSchema = z
 
 type Config = z.infer<typeof configSchema>;
 type ProjectConfig = z.infer<typeof projectConfigSchema>;
-const configDirectory = join(homedir(), ".config", "briar");
+const configuredConfigDirectory = process.env.BRIAR_CONFIG_HOME?.trim();
+if (configuredConfigDirectory && !isAbsolute(configuredConfigDirectory)) {
+  throw new Error("BRIAR_CONFIG_HOME must be an absolute path");
+}
+const configDirectory =
+  configuredConfigDirectory || join(homedir(), ".config", "briar");
 const configPath = join(configDirectory, "config.json");
 const defaultApiUrl = process.env.BRIAR_API_URL ?? "http://127.0.0.1:8787";
 const cliVersion = packageJson.version;
@@ -743,7 +748,8 @@ async function claimWork() {
   if (
     project.activeClaim &&
     !project.activeClaim.finished &&
-    Date.parse(project.activeClaim.leaseExpiresAt) > Date.now()
+    Date.parse(project.activeClaim.leaseExpiresAt) > Date.now() &&
+    !has("--runtime-dispatch")
   ) {
     throw new Error(
       `이미 처리 중인 claim이 있습니다: ${project.activeClaim.sourceKey}`,
@@ -1136,6 +1142,20 @@ async function addRunEvidence() {
   console.log(JSON.stringify(result));
 }
 
+async function listCurrentRunEvidence() {
+  const config = await loadConfig();
+  const project = await currentProject(config);
+  const runId = value("--run") ?? project.activeClaim?.runId;
+  if (!runId) throw new Error("--run is required when there is no active claim");
+  z.string().uuid().parse(runId);
+  const result = await request(
+    config.apiUrl,
+    `/runs/${runId}/evidence`,
+    process.env.BRIAR_AGENT_TOKEN ?? project.agentToken,
+  );
+  console.log(JSON.stringify(result));
+}
+
 async function recoverRun(action: "retry" | "cancel") {
   const config = await loadConfig();
   const project = await currentProject(config);
@@ -1441,6 +1461,7 @@ const usage = `Briar CLI
     --status <pending|passed|failed|skipped>
     [--detail <text>|--detail-file <path>] [--command <command>]
     [--url <url>] [--metadata-json <json>]
+  briar run evidence list [--run <uuid>]
   briar run retry [--run <uuid>] [--request-id <uuid>] [--reason <text>]
   briar run cancel [--run <uuid>] [--request-id <uuid>] [--reason <text>]
   briar worker [--project <uuid>] [--label <text>] [--max-issues <n>] [--once]
@@ -1451,6 +1472,8 @@ const usage = `Briar CLI
 Environment:
   BRIAR_API_URL       Cloudflare Worker URL
   BRIAR_AGENT_TOKEN   Project-scoped ingest token
+  BRIAR_CLI           Absolute CLI path injected into Auto Hunt workers
+  BRIAR_CONFIG_HOME   Absolute directory containing an isolated config.json
   BRIAR_WORKTREE_ROOT Parent directory for per-issue worktrees
 `;
 
@@ -1490,6 +1513,9 @@ async function main() {
   }
   if (args[0] === "run" && args[1] === "evidence" && args[2] === "add") {
     return addRunEvidence();
+  }
+  if (args[0] === "run" && args[1] === "evidence" && args[2] === "list") {
+    return listCurrentRunEvidence();
   }
   if (args[0] === "run" && args[1] === "retry") return recoverRun("retry");
   if (args[0] === "run" && args[1] === "cancel") return recoverRun("cancel");

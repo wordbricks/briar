@@ -16,7 +16,11 @@ use std::{
 
 use crate::host::{CommandRunner, CommandSpec};
 
-pub(crate) use codex::{AutoHuntCliEnvironment, ProjectAutoHuntRequest, ProjectAutoHuntResponse};
+pub(crate) use codex::{
+    AutoHuntCliEnvironment, AutoHuntCoordinatorResponse, ProjectAutoHuntIssue,
+    ProjectAutoHuntIssueResult, ProjectAutoHuntRequest, ProjectAutoHuntResponse,
+    ProjectAutoHuntResult, ProjectAutoHuntWorkerResponse, MAX_AUTO_HUNT_ISSUES,
+};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -556,20 +560,42 @@ pub(crate) fn grok_binary(home: &Path, execution_path: &OsStr) -> Result<PathBuf
     grok::grok_binary(home, execution_path)
 }
 
-pub(crate) fn start_auto_hunt(
+pub(crate) fn start_auto_hunt_worker(
     backend: &dyn AgentBackend,
     project_id: &str,
     workspace_root: &Path,
     execution: AutoHuntExecution,
     request: ProjectAutoHuntRequest,
+    issue: ProjectAutoHuntIssue,
     approve: &dyn Fn(&str, &serde_json::Value) -> bool,
 ) -> Result<ProjectAutoHuntResponse, String> {
-    codex::start_auto_hunt_with(
+    codex::start_auto_hunt_worker_with(
         backend,
         project_id,
         workspace_root,
         execution,
         request,
+        issue,
+        approve,
+    )
+}
+
+pub(crate) fn summarize_auto_hunt_dispatch(
+    backend: &dyn AgentBackend,
+    project_id: &str,
+    workspace_root: &Path,
+    execution: AutoHuntExecution,
+    request: &ProjectAutoHuntRequest,
+    workers: &[ProjectAutoHuntWorkerResponse],
+    approve: &dyn Fn(&str, &serde_json::Value) -> bool,
+) -> Result<AutoHuntCoordinatorResponse, String> {
+    codex::summarize_auto_hunt_dispatch_with(
+        backend,
+        project_id,
+        workspace_root,
+        execution,
+        request,
+        workers,
         approve,
     )
 }

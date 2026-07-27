@@ -1,5 +1,6 @@
 mod agent;
 mod agent_usage;
+mod auto_hunt_dispatch;
 mod host;
 
 use serde::{Deserialize, Serialize};
@@ -24,6 +25,7 @@ use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
 const SESSION_FILE_NAME: &str = "session.json";
 const AUTO_HUNT_EVENT_DIRECTORY: &str = "auto-hunt-sessions";
 const AUTO_HUNT_APP_SERVER_EVENT: &str = "auto-hunt-app-server-event";
+const AUTO_HUNT_DISPATCH_EVENT: &str = "auto-hunt-dispatch-event";
 const DEFAULT_MAIN_WINDOW_SIZE: (f64, f64) = (1280.0, 820.0);
 const ONBOARDING_MAIN_WINDOW_SIZE: (f64, f64) = (980.0, 680.0);
 
@@ -3233,6 +3235,7 @@ async fn run_project_agent_schedule(
 /// Directory that holds this project's per-issue worktrees. Must mirror the
 /// CLI's own resolution (`worktreeSettings` in src-cli/index.ts): env override,
 /// then project config, then `~/briar/worktrees`, all suffixed by project id.
+#[cfg(test)]
 fn project_worktree_root(
     config_path: &Path,
     project_id: &str,
@@ -3335,12 +3338,254 @@ fn project_chat_execution(
     }
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct HostClaimResponse {
+    work: Option<HostClaimedRun>,
+    #[serde(default)]
+    workspace_error: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct HostClaimedRun {
+    run_id: String,
+    run_number: u64,
+    source_key: String,
+    title: String,
+    workflow: serde_json::Value,
+    #[serde(default)]
+    workspace: Option<HostClaimedWorkspace>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct HostClaimedWorkspace {
+    #[serde(rename = "type")]
+    workspace_type: String,
+    path: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct HostRunEvidenceResponse {
+    evidence: Vec<serde_json::Value>,
+}
+
+fn claim_auto_hunt_run_on_host(
+    runner: &dyn host::CommandRunner,
+    cli_environment: &agent::AutoHuntCliEnvironment,
+    connected_workspace: &Path,
+) -> Result<HostClaimResponse, String> {
+    let output = cli_environment.run_briar(
+        runner,
+        connected_workspace,
+        [
+            "queue",
+            "claim",
+            "--workspace",
+            "worktree",
+            "--actor",
+            "briar-auto-hunt-runtime",
+            "--runtime-dispatch",
+        ],
+    )?;
+    if !output.success() {
+        return Err(format!(
+            "호스트가 자동사냥 작업을 claim하지 못했습니다: {}",
+            output.failure_message()
+        ));
+    }
+    serde_json::from_str(output.stdout.trim())
+        .map_err(|error| format!("호스트 claim 결과를 읽지 못했습니다: {error}"))
+}
+
+fn record_auto_hunt_terminal_event(
+    runner: &dyn host::CommandRunner,
+    cli_environment: &agent::AutoHuntCliEnvironment,
+    workspace: &Path,
+    run: &HostClaimedRun,
+    status: &str,
+    cause: &str,
+    detail: &str,
+) -> Result<(), String> {
+    let event_key = format!("{}:{status}:{cause}", run.source_key);
+    let output = cli_environment.run_briar(
+        runner,
+        workspace,
+        [
+            "run",
+            "event",
+            "add",
+            "--run",
+            run.run_id.as_str(),
+            "--status",
+            status,
+            "--event-key",
+            event_key.as_str(),
+            "--status-detail",
+            detail,
+            "--actor",
+            "briar-auto-hunt-runtime",
+        ],
+    )?;
+    if output.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "run {status} 상태를 기록하지 못했습니다: {}",
+            output.failure_message()
+        ))
+    }
+}
+
+struct AutoHuntEvidenceCapture<'a> {
+    runner: &'a dyn host::CommandRunner,
+    cli_environment: &'a agent::AutoHuntCliEnvironment,
+    store: &'a auto_hunt_dispatch::AutoHuntDispatchStore,
+    app: &'a tauri::AppHandle,
+    dispatch_group_id: &'a str,
+}
+
+impl AutoHuntEvidenceCapture<'_> {
+    fn capture(
+        &self,
+        workspace: &Path,
+        run_id: &str,
+        worker_session_id: &str,
+    ) -> Vec<serde_json::Value> {
+        let result = self
+            .cli_environment
+            .run_briar(
+                self.runner,
+                workspace,
+                ["run", "evidence", "list", "--run", run_id],
+            )
+            .and_then(|output| {
+                if !output.success() {
+                    return Err(output.failure_message());
+                }
+                serde_json::from_str::<HostRunEvidenceResponse>(output.stdout.trim())
+                    .map(|response| response.evidence)
+                    .map_err(|error| format!("run evidence 결과를 읽지 못했습니다: {error}"))
+            });
+        match result {
+            Ok(evidence) => {
+                for item in &evidence {
+                    if let Ok(group) = self.store.record_worker_evidence(
+                        self.dispatch_group_id,
+                        worker_session_id,
+                        item.clone(),
+                    ) {
+                        emit_latest_auto_hunt_dispatch_event(self.app, &group);
+                    }
+                }
+                evidence
+            }
+            Err(error) => {
+                if let Ok(group) = self.store.record_worker_progress(
+                    self.dispatch_group_id,
+                    worker_session_id,
+                    "worker_evidence_sync_failed",
+                    format!("canonical run evidence를 불러오지 못했습니다: {error}"),
+                ) {
+                    emit_latest_auto_hunt_dispatch_event(self.app, &group);
+                }
+                Vec::new()
+            }
+        }
+    }
+}
+
+fn emit_latest_auto_hunt_dispatch_event(
+    app: &tauri::AppHandle,
+    group: &auto_hunt_dispatch::AutoHuntDispatchGroup,
+) {
+    if let Some(event) = group.events.last() {
+        let _ = app.emit(AUTO_HUNT_DISPATCH_EVENT, event);
+    }
+}
+
+fn validate_project_auto_hunt_request(
+    request: &agent::ProjectAutoHuntRequest,
+) -> Result<(), String> {
+    validate_auto_hunt_session_id(&request.session_id)?;
+    if request.issues.is_empty() {
+        return Err("대기 상태인 이슈가 없습니다.".to_string());
+    }
+    if request.issues.len() > agent::MAX_AUTO_HUNT_ISSUES {
+        return Err(format!(
+            "한 번의 자동사냥 세션에서는 최대 {}개의 이슈만 처리할 수 있습니다.",
+            agent::MAX_AUTO_HUNT_ISSUES
+        ));
+    }
+    if request.agent_id.trim().is_empty()
+        || request.agent_id.len() > 128
+        || request.agent_name.trim().is_empty()
+        || request.agent_name.len() > 100
+        || request
+            .agent_model
+            .as_ref()
+            .is_some_and(|model| model.trim().is_empty() || model.len() > 100)
+        || request.responsibility.trim().is_empty()
+        || request.responsibility.len() > 2_000
+        || request.skill.trim().is_empty()
+        || request.skill.len() > 10_000
+    {
+        return Err("자동사냥 에이전트 설정이 올바르지 않습니다.".to_string());
+    }
+    Ok(())
+}
+
+fn create_auto_hunt_worker_event_sink(
+    base: agent::AgentEventSink,
+    store: auto_hunt_dispatch::AutoHuntDispatchStore,
+    app: tauri::AppHandle,
+    dispatch_group_id: String,
+    worker_session_id: String,
+) -> agent::AgentEventSink {
+    Arc::new(move |provider_event| {
+        let progress = match provider_event.event.as_ref() {
+            Some(agent::AgentEvent::MessageCompleted { text, phase, .. })
+                if !text.trim().is_empty() =>
+            {
+                Some((
+                    "worker_progress",
+                    match phase.as_deref() {
+                        Some(phase) if !phase.trim().is_empty() => {
+                            format!("[{phase}] {}", text.trim())
+                        }
+                        _ => text.trim().to_string(),
+                    },
+                ))
+            }
+            Some(agent::AgentEvent::TurnCompleted { status }) => Some((
+                "worker_turn_completed",
+                format!("에이전트 turn이 {status} 상태로 종료되었습니다."),
+            )),
+            _ => None,
+        };
+        base(provider_event)?;
+        if let Some((event_type, message)) = progress {
+            let group = store.record_worker_progress(
+                &dispatch_group_id,
+                &worker_session_id,
+                event_type,
+                message,
+            )?;
+            emit_latest_auto_hunt_dispatch_event(&app, &group);
+        }
+        Ok(())
+    })
+}
+
 #[tauri::command]
 async fn start_project_auto_hunt(
     app: tauri::AppHandle,
     project_id: String,
     mut request: agent::ProjectAutoHuntRequest,
 ) -> Result<agent::ProjectAutoHuntResponse, String> {
+    validate_project_auto_hunt_request(&request)?;
     let api_url = request.api_url.trim();
     if api_url.is_empty()
         || api_url.chars().any(char::is_whitespace)
@@ -3364,9 +3609,24 @@ async fn start_project_auto_hunt(
         "agent/grok-runner.js",
         "dist-agent/grok-runner.js",
     );
+    let app_data_directory = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| error.to_string())?;
+    let dispatch_store = auto_hunt_dispatch::AutoHuntDispatchStore::new(&app_data_directory)?;
+    let created_dispatch = dispatch_store.create(
+        &request.session_id,
+        &project_id,
+        &request.agent_id,
+        request.issues.len(),
+    )?;
+    emit_latest_auto_hunt_dispatch_event(&app, &created_dispatch);
+    let dispatch_group_id = request.session_id.clone();
+    let completion_store = dispatch_store.clone();
+    let dispatch_app = app.clone();
     let event_sink = create_auto_hunt_event_sink(&app, &request.session_id)?;
     let approval_app = app.clone();
-    tauri::async_runtime::spawn_blocking(move || {
+    let outcome = tauri::async_runtime::spawn_blocking(move || {
         let (runner, workspace) =
             connected_project_workspace_on_host(&config_path, &project_id, &home)?;
         let settings = project_llm_settings_from(&config_path, &project_id)?;
@@ -3379,37 +3639,10 @@ async fn start_project_auto_hunt(
         let execution_path = cli_execution_path(&home)?;
         let include_velen = project_auto_hunt_uses_velen(&config_path, &project_id)?;
         request.workflow_json = project_auto_hunt_workflow_json(&config_path, &project_id)?;
-        let cli_environment = agent::AutoHuntCliEnvironment::prepare_on_host(
-            runner.clone(),
-            &home,
-            &execution_path,
-            &workspace,
-            &project_id,
-            &request.api_url,
-            include_velen,
-        )?;
-        // Each issue is worked in its own worktree outside the checkout, so the
-        // agent's write sandbox has to include the worktree root as well as cwd.
         let full_access = project_auto_hunt_full_access(&config_path, &project_id)?;
-        let worktree_root = project_worktree_root(&config_path, &project_id, &home)?;
-        let workspace_write_roots = match worktree_root {
-            Some(root) => {
-                fs::create_dir_all(&root).map_err(|error| {
-                    format!("자동사냥 워크트리 폴더를 만들지 못했습니다: {error}")
-                })?;
-                // Declared roots only mean something to a sandbox; with full
-                // access there is nothing to widen.
-                if full_access {
-                    Vec::new()
-                } else {
-                    vec![path_display_string(root)?]
-                }
-            }
-            None => Vec::new(),
-        };
         let backend = agent::discover_backend(
             provider,
-            runner,
+            runner.clone(),
             agent::AgentRunnerBundles {
                 claude: &claude_runner,
                 grok: &grok_runner,
@@ -3422,37 +3655,397 @@ async fn start_project_auto_hunt(
         let effort = (provider == settings.provider)
             .then_some(settings.effort)
             .flatten();
-        let approve = |method: &str, params: &serde_json::Value| {
-            let provider_name = provider.display_name();
-            approval_app
-                .dialog()
-                .message(approval_request_message(provider, method, params))
-                .title(format!("{provider_name} 자동사냥 승인"))
-                .buttons(MessageDialogButtons::OkCancelCustom(
-                    "승인".to_string(),
-                    "거절".to_string(),
-                ))
-                .blocking_show()
-        };
-        agent::start_auto_hunt(
+        let requested_count = request.issues.len();
+        let mut workers = Vec::new();
+        let mut issue_results = Vec::new();
+        let mut first_conversation_id = None;
+        let mut first_workspace = None;
+
+        for index in 0..requested_count {
+            // One isolated config snapshot per worker allows several runs to be
+            // claimed without sharing the CLI's activeClaim state.
+            let cli_environment = agent::AutoHuntCliEnvironment::prepare_on_host(
+                runner.clone(),
+                &home,
+                &execution_path,
+                &workspace,
+                &project_id,
+                &request.api_url,
+                include_velen,
+            )?;
+            let claim = claim_auto_hunt_run_on_host(runner.as_ref(), &cli_environment, &workspace)?;
+            let Some(claimed) = claim.work else {
+                break;
+            };
+            let worker_session_id = format!("{}-w{}", request.session_id, index + 1);
+            let issue = agent::ProjectAutoHuntIssue {
+                run_id: claimed.run_id.clone(),
+                run_number: claimed.run_number,
+                source_key: claimed.source_key.clone(),
+                title: claimed.title.clone(),
+            };
+            let dispatch = dispatch_store.add_worker(
+                &request.session_id,
+                auto_hunt_dispatch::AutoHuntDispatchWorker {
+                    session_id: worker_session_id.clone(),
+                    run_id: claimed.run_id.clone(),
+                    source_key: claimed.source_key.clone(),
+                    title: claimed.title.clone(),
+                    workspace_root: claimed
+                        .workspace
+                        .as_ref()
+                        .map(|workspace| workspace.path.clone()),
+                    conversation_id: None,
+                    status: auto_hunt_dispatch::AutoHuntWorkerStatus::Allocating,
+                    summary: None,
+                    started_at: chrono::Utc::now().to_rfc3339(),
+                    completed_at: None,
+                },
+            )?;
+            emit_latest_auto_hunt_dispatch_event(&dispatch_app, &dispatch);
+
+            let Some(claimed_workspace) = claimed.workspace.as_ref() else {
+                let detail = claim
+                    .workspace_error
+                    .as_deref()
+                    .unwrap_or("호스트가 claim한 run의 전용 worktree를 반환하지 않았습니다.");
+                let record_error = record_auto_hunt_terminal_event(
+                    runner.as_ref(),
+                    &cli_environment,
+                    &workspace,
+                    &claimed,
+                    "blocked",
+                    "workspace-allocation",
+                    detail,
+                )
+                .err();
+                let summary = match record_error {
+                    Some(error) => format!("{detail} ({error})"),
+                    None => detail.to_string(),
+                };
+                issue_results.push(agent::ProjectAutoHuntIssueResult {
+                    source_key: claimed.source_key.clone(),
+                    title: claimed.title.clone(),
+                    outcome: "blocked".to_string(),
+                    summary: summary.clone(),
+                });
+                workers.push(agent::ProjectAutoHuntWorkerResponse {
+                    session_id: worker_session_id.clone(),
+                    run_id: claimed.run_id,
+                    source_key: claimed.source_key,
+                    conversation_id: None,
+                    workspace_root: None,
+                    outcome: "blocked".to_string(),
+                    summary,
+                    evidence: Vec::new(),
+                });
+                let dispatch = dispatch_store.transition_worker(
+                    &request.session_id,
+                    &worker_session_id,
+                    auto_hunt_dispatch::AutoHuntWorkerStatus::Blocked,
+                    None,
+                    None,
+                    workers.last().map(|worker| worker.summary.clone()),
+                )?;
+                emit_latest_auto_hunt_dispatch_event(&dispatch_app, &dispatch);
+                continue;
+            };
+            if claimed_workspace.workspace_type != "worktree" {
+                return Err("호스트가 전용 worktree가 아닌 workspace를 할당했습니다.".to_string());
+            }
+            let worker_workspace = PathBuf::from(&claimed_workspace.path);
+            let dispatch = dispatch_store.transition_worker(
+                &request.session_id,
+                &worker_session_id,
+                auto_hunt_dispatch::AutoHuntWorkerStatus::Running,
+                Some(claimed_workspace.path.clone()),
+                None,
+                Some(format!("{} 워커를 시작했습니다.", claimed.source_key)),
+            )?;
+            emit_latest_auto_hunt_dispatch_event(&dispatch_app, &dispatch);
+            let mut worker_request = request.clone();
+            worker_request.issues = vec![issue.clone()];
+            worker_request.workflow_json = serde_json::to_string_pretty(&claimed.workflow)
+                .map_err(|error| format!("claim workflow를 직렬화하지 못했습니다: {error}"))?;
+            let worker_event_sink = create_auto_hunt_worker_event_sink(
+                event_sink.clone(),
+                dispatch_store.clone(),
+                dispatch_app.clone(),
+                request.session_id.clone(),
+                worker_session_id.clone(),
+            );
+            let approve = |method: &str, params: &serde_json::Value| {
+                if let Ok(dispatch) = dispatch_store.transition_worker(
+                    &request.session_id,
+                    &worker_session_id,
+                    auto_hunt_dispatch::AutoHuntWorkerStatus::NeedsInput,
+                    None,
+                    None,
+                    Some("사용자 승인을 기다리고 있습니다.".to_string()),
+                ) {
+                    emit_latest_auto_hunt_dispatch_event(&dispatch_app, &dispatch);
+                }
+                let provider_name = provider.display_name();
+                let approved = approval_app
+                    .dialog()
+                    .message(approval_request_message(provider, method, params))
+                    .title(format!("{provider_name} 자동사냥 승인"))
+                    .buttons(MessageDialogButtons::OkCancelCustom(
+                        "승인".to_string(),
+                        "거절".to_string(),
+                    ))
+                    .blocking_show();
+                if let Ok(dispatch) = dispatch_store.transition_worker(
+                    &request.session_id,
+                    &worker_session_id,
+                    auto_hunt_dispatch::AutoHuntWorkerStatus::Running,
+                    None,
+                    None,
+                    Some(if approved {
+                        "사용자가 작업을 승인했습니다.".to_string()
+                    } else {
+                        "사용자가 작업을 거절했습니다.".to_string()
+                    }),
+                ) {
+                    emit_latest_auto_hunt_dispatch_event(&dispatch_app, &dispatch);
+                }
+                approved
+            };
+
+            match agent::start_auto_hunt_worker(
+                &backend,
+                &project_id,
+                &worker_workspace,
+                agent::AutoHuntExecution {
+                    approval_policy: settings.approval_policy,
+                    model: model.clone(),
+                    effort,
+                    event_sink: worker_event_sink,
+                    environment: cli_environment.environment().to_vec(),
+                    // The worker starts inside its final worktree. Codex grants
+                    // that checkout and its linked Git metadata together.
+                    workspace_write_roots: Vec::new(),
+                    full_access,
+                },
+                worker_request,
+                issue,
+                &approve,
+            ) {
+                Ok(response) => {
+                    let result = response
+                        .result
+                        .issues
+                        .into_iter()
+                        .next()
+                        .ok_or_else(|| "워커 결과가 비어 있습니다.".to_string())?;
+                    first_conversation_id.get_or_insert_with(|| response.conversation_id.clone());
+                    first_workspace.get_or_insert_with(|| response.workspace_root.clone());
+                    let evidence = AutoHuntEvidenceCapture {
+                        runner: runner.as_ref(),
+                        cli_environment: &cli_environment,
+                        store: &dispatch_store,
+                        app: &dispatch_app,
+                        dispatch_group_id: &request.session_id,
+                    }
+                    .capture(
+                        &worker_workspace,
+                        &claimed.run_id,
+                        &worker_session_id,
+                    );
+                    workers.push(agent::ProjectAutoHuntWorkerResponse {
+                        session_id: worker_session_id.clone(),
+                        run_id: claimed.run_id.clone(),
+                        source_key: claimed.source_key.clone(),
+                        conversation_id: Some(response.conversation_id.clone()),
+                        workspace_root: Some(response.workspace_root.clone()),
+                        outcome: result.outcome.clone(),
+                        summary: result.summary.clone(),
+                        evidence,
+                    });
+                    let dispatch = dispatch_store.transition_worker(
+                        &request.session_id,
+                        &worker_session_id,
+                        auto_hunt_dispatch::AutoHuntWorkerStatus::from_outcome(&result.outcome),
+                        Some(claimed_workspace.path.clone()),
+                        Some(response.conversation_id),
+                        Some(result.summary.clone()),
+                    )?;
+                    emit_latest_auto_hunt_dispatch_event(&dispatch_app, &dispatch);
+                    issue_results.push(result);
+                }
+                Err(error) => {
+                    let record_error = record_auto_hunt_terminal_event(
+                        runner.as_ref(),
+                        &cli_environment,
+                        &worker_workspace,
+                        &claimed,
+                        "failed",
+                        "worker-execution",
+                        &error,
+                    )
+                    .err();
+                    let summary = match record_error {
+                        Some(record_error) => format!("{error} ({record_error})"),
+                        None => error,
+                    };
+                    let evidence = AutoHuntEvidenceCapture {
+                        runner: runner.as_ref(),
+                        cli_environment: &cli_environment,
+                        store: &dispatch_store,
+                        app: &dispatch_app,
+                        dispatch_group_id: &request.session_id,
+                    }
+                    .capture(
+                        &worker_workspace,
+                        &claimed.run_id,
+                        &worker_session_id,
+                    );
+                    issue_results.push(agent::ProjectAutoHuntIssueResult {
+                        source_key: claimed.source_key.clone(),
+                        title: claimed.title.clone(),
+                        outcome: "failed".to_string(),
+                        summary: summary.clone(),
+                    });
+                    workers.push(agent::ProjectAutoHuntWorkerResponse {
+                        session_id: worker_session_id.clone(),
+                        run_id: claimed.run_id.clone(),
+                        source_key: claimed.source_key.clone(),
+                        conversation_id: None,
+                        workspace_root: Some(claimed_workspace.path.clone()),
+                        outcome: "failed".to_string(),
+                        summary,
+                        evidence,
+                    });
+                    let dispatch = dispatch_store.transition_worker(
+                        &request.session_id,
+                        &worker_session_id,
+                        auto_hunt_dispatch::AutoHuntWorkerStatus::Failed,
+                        Some(claimed_workspace.path.clone()),
+                        None,
+                        workers.last().map(|worker| worker.summary.clone()),
+                    )?;
+                    emit_latest_auto_hunt_dispatch_event(&dispatch_app, &dispatch);
+                }
+            }
+        }
+
+        let completed = issue_results
+            .iter()
+            .filter(|result| result.outcome == "completed")
+            .count();
+        let fallback_summary = format!(
+            "{}개 run을 dispatch해 {completed}개를 완료했습니다.",
+            issue_results.len()
+        );
+        let coordinator_started = dispatch_store.record_coordinator_event(
+            &request.session_id,
+            "coordinator_started",
+            "running",
+            "모든 워커가 종료되어 조정 에이전트가 결과를 종합합니다.".to_string(),
+            None,
+        )?;
+        emit_latest_auto_hunt_dispatch_event(&dispatch_app, &coordinator_started);
+        let coordinator = agent::summarize_auto_hunt_dispatch(
             &backend,
             &project_id,
             &workspace,
             agent::AutoHuntExecution {
-                approval_policy: settings.approval_policy,
-                model,
+                approval_policy: agent::ApprovalPolicy::Never,
+                model: model.clone(),
                 effort,
-                event_sink,
-                environment: cli_environment.environment().to_vec(),
-                workspace_write_roots,
-                full_access,
+                event_sink: event_sink.clone(),
+                environment: Vec::new(),
+                workspace_write_roots: Vec::new(),
+                full_access: false,
             },
-            request,
-            &approve,
-        )
+            &request,
+            &workers,
+            &|_, _| false,
+        );
+        let (summary, coordinator_conversation_id, coordinator_workspace) = match coordinator {
+            Ok(coordinator) => {
+                let dispatch = dispatch_store.record_coordinator_event(
+                    &request.session_id,
+                    "coordinator_completed",
+                    "completed",
+                    coordinator.summary.clone(),
+                    Some(coordinator.conversation_id.clone()),
+                )?;
+                emit_latest_auto_hunt_dispatch_event(&dispatch_app, &dispatch);
+                (
+                    coordinator.summary,
+                    Some(coordinator.conversation_id),
+                    Some(coordinator.workspace_root),
+                )
+            }
+            Err(error) => {
+                let dispatch = dispatch_store.record_coordinator_event(
+                    &request.session_id,
+                    "coordinator_failed",
+                    "failed",
+                    format!("조정 에이전트 요약에 실패해 runtime 요약을 사용합니다: {error}"),
+                    None,
+                )?;
+                emit_latest_auto_hunt_dispatch_event(&dispatch_app, &dispatch);
+                (fallback_summary, None, None)
+            }
+        };
+        Ok(agent::ProjectAutoHuntResponse {
+            dispatch_group_id: request.session_id,
+            conversation_id: coordinator_conversation_id
+                .or(first_conversation_id)
+                .unwrap_or_default(),
+            workspace_root: coordinator_workspace
+                .or(first_workspace)
+                .unwrap_or_else(|| path_display_string(workspace.clone()).unwrap_or_default()),
+            workers,
+            result: agent::ProjectAutoHuntResult {
+                summary,
+                issues: issue_results,
+            },
+        })
     })
-    .await
-    .map_err(|error| error.to_string())?
+    .await;
+    match outcome {
+        Ok(Ok(response)) => {
+            let dispatch = completion_store.finish(
+                &dispatch_group_id,
+                auto_hunt_dispatch::AutoHuntDispatchStatus::Completed,
+                None,
+            )?;
+            emit_latest_auto_hunt_dispatch_event(&app, &dispatch);
+            Ok(response)
+        }
+        Ok(Err(error)) => {
+            let persisted = completion_store.finish(
+                &dispatch_group_id,
+                auto_hunt_dispatch::AutoHuntDispatchStatus::Failed,
+                Some(error.clone()),
+            );
+            match persisted {
+                Ok(dispatch) => {
+                    emit_latest_auto_hunt_dispatch_event(&app, &dispatch);
+                    Err(error)
+                }
+                Err(store_error) => Err(format!("{error} ({store_error})")),
+            }
+        }
+        Err(join_error) => {
+            let error = format!("자동사냥 runtime 작업이 비정상 종료되었습니다: {join_error}");
+            let persisted = completion_store.finish(
+                &dispatch_group_id,
+                auto_hunt_dispatch::AutoHuntDispatchStatus::Failed,
+                Some(error.clone()),
+            );
+            match persisted {
+                Ok(dispatch) => {
+                    emit_latest_auto_hunt_dispatch_event(&app, &dispatch);
+                    Err(error)
+                }
+                Err(store_error) => Err(format!("{error} ({store_error})")),
+            }
+        }
+    }
 }
 
 fn validate_auto_hunt_session_id(session_id: &str) -> Result<(), String> {
@@ -3558,6 +4151,30 @@ async fn load_auto_hunt_app_server_events(
                 })
             })
             .collect()
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn load_auto_hunt_dispatch(
+    app: tauri::AppHandle,
+    dispatch_group_id: String,
+    after_cursor: Option<u64>,
+) -> Result<Option<auto_hunt_dispatch::AutoHuntDispatchGroup>, String> {
+    let app_data_directory = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| error.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let store = auto_hunt_dispatch::AutoHuntDispatchStore::new(&app_data_directory)?;
+        let mut group = match store.load(&dispatch_group_id)? {
+            Some(group) => group,
+            None => return Ok(None),
+        };
+        let cursor = after_cursor.unwrap_or(0);
+        group.events.retain(|event| event.cursor > cursor);
+        Ok(Some(group))
     })
     .await
     .map_err(|error| error.to_string())?
@@ -3952,6 +4569,13 @@ pub fn run() {
             {
                 let resource_directory = _app.path().resource_dir()?;
                 let home = _app.path().home_dir()?;
+                let app_data_directory = _app.path().app_data_dir()?;
+                if let Err(error) =
+                    auto_hunt_dispatch::AutoHuntDispatchStore::new(&app_data_directory)
+                        .and_then(|store| store.interrupt_orphaned_groups())
+                {
+                    eprintln!("Auto Hunt dispatch recovery failed: {error}");
+                }
                 if let Err(error) = sync_auto_hunt_assets(&resource_directory, &home) {
                     eprintln!(
                         "Briar CLI and Auto Hunt skill automatic synchronization failed: {error}"
@@ -3986,6 +4610,7 @@ pub fn run() {
             run_project_agent_schedule,
             start_project_auto_hunt,
             load_auto_hunt_app_server_events,
+            load_auto_hunt_dispatch,
             load_app_provider_settings,
             load_agent_usage,
             update_app_provider_settings,

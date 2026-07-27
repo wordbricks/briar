@@ -43,6 +43,8 @@ describe("project agent skills", () => {
     expect(skill).toContain("Perform Auto Hunt for every queued issue.");
     expect(skill).toContain("briar skills get briar-workflow");
     expect(skill).toContain("workflow snapshot");
+    expect(skill).toContain("allocated by the Briar host runtime");
+    expect(skill).not.toContain("Claim queued issues");
   });
 
   it("creates a repository workflow skill for custom agents", () => {

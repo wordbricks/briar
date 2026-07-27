@@ -54,8 +54,8 @@ export function projectAgentSkill({
 }: ProjectAgentSkillInput) {
   const execution = kind === "auto_hunt"
     ? `- Load the installed \`briar-workflow\` guide with \`briar skills get briar-workflow\`.
-- Read the attached project workflow before claiming work.
-- Claim queued issues only through \`briar queue claim\` and follow each run's workflow snapshot in order.
+- Work only on the run and worktree allocated by the Briar host runtime; never claim another run or create another worktree.
+- Read the claimed run's workflow snapshot before acting and use explicit \`--run\` arguments for every run and evidence command.
 - Record every required stage and its evidence before completing a run.`
     : `- Read the attached project workflow before acting.
 - Follow its required stages, checks, evidence, and completion rules when they apply.

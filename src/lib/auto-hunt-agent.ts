@@ -3,6 +3,7 @@ import { briarApiUrl } from "./api";
 import { maxAutoHuntIssuesLimit } from "./auto-hunt-automation";
 
 export const autoHuntAppServerEventName = "auto-hunt-app-server-event";
+export const autoHuntDispatchEventName = "auto-hunt-dispatch-event";
 
 export type AutoHuntAppServerEvent = {
   sessionId: string;
@@ -52,9 +53,71 @@ export type AutoHuntAgentIssueResult = {
   summary: string;
 };
 
+export type AutoHuntWorkerResult = {
+  sessionId: string;
+  runId: string;
+  sourceKey: string;
+  conversationId: string | null;
+  workspaceRoot: string | null;
+  outcome: AutoHuntAgentIssueResult["outcome"] | "pending" | "cancelled";
+  summary: string;
+  evidence: Array<Record<string, unknown>>;
+};
+
+export type AutoHuntDispatchWorkerStatus =
+  | "allocating"
+  | "running"
+  | "needs_input"
+  | "completed"
+  | "blocked"
+  | "failed"
+  | "cancelled";
+
+export type AutoHuntDispatchEvent = {
+  dispatchGroupId: string;
+  cursor: number;
+  type: string;
+  workerSessionId: string | null;
+  runId: string | null;
+  status: string;
+  message: string;
+  data?: Record<string, unknown>;
+  occurredAt: string;
+};
+
+export type AutoHuntDispatchGroup = {
+  version: number;
+  dispatchGroupId: string;
+  projectId: string;
+  agentId: string;
+  coordinatorSessionId: string;
+  coordinatorConversationId: string | null;
+  status: "running" | "completed" | "failed" | "interrupted";
+  maxIssues: number;
+  startedAt: string;
+  completedAt: string | null;
+  error: string | null;
+  nextCursor: number;
+  workers: Array<{
+    sessionId: string;
+    runId: string;
+    sourceKey: string;
+    title: string;
+    workspaceRoot: string | null;
+    conversationId: string | null;
+    status: AutoHuntDispatchWorkerStatus;
+    summary: string | null;
+    startedAt: string;
+    completedAt: string | null;
+  }>;
+  events: AutoHuntDispatchEvent[];
+};
+
 export type AutoHuntAgentResponse = {
+  dispatchGroupId: string;
   conversationId: string;
   workspaceRoot: string;
+  workers: AutoHuntWorkerResult[];
   result: {
     summary: string;
     issues: AutoHuntAgentIssueResult[];
@@ -70,7 +133,7 @@ export async function startProjectAutoHunt(
   sessionId: string,
   agent: Pick<
     ProjectAgent,
-    "name" | "provider" | "model" | "responsibility" | "skill"
+    "id" | "name" | "provider" | "model" | "responsibility" | "skill"
   >,
 ): Promise<AutoHuntAgentResponse> {
   if (!isTauri()) {
@@ -93,6 +156,7 @@ export async function startProjectAutoHunt(
     request: {
       sessionId,
       apiUrl: briarApiUrl,
+      agentId: agent.id,
       agentName: agent.name,
       agentProvider: agent.provider,
       agentModel: agent.model,
@@ -116,6 +180,29 @@ export async function loadAutoHuntAppServerEvents(
   return invoke<AutoHuntAppServerEvent[]>(
     "load_auto_hunt_app_server_events",
     { sessionId },
+  );
+}
+
+export async function loadAutoHuntDispatch(
+  dispatchGroupId: string,
+  afterCursor = 0,
+): Promise<AutoHuntDispatchGroup | null> {
+  if (!isTauri()) return null;
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<AutoHuntDispatchGroup | null>("load_auto_hunt_dispatch", {
+    dispatchGroupId,
+    afterCursor,
+  });
+}
+
+export async function listenToAutoHuntDispatchEvents(
+  onEvent: (event: AutoHuntDispatchEvent) => void,
+): Promise<() => void> {
+  if (!isTauri()) return () => undefined;
+  const { listen } = await import("@tauri-apps/api/event");
+  return listen<AutoHuntDispatchEvent>(
+    autoHuntDispatchEventName,
+    (event) => onEvent(event.payload),
   );
 }
 

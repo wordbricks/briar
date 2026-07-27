@@ -36,6 +36,7 @@ import {
   listProjectAgents,
   listProjectAgentScheduleRuns,
   listProjectAgentSchedules,
+  listRunEvidence,
   moveHuntRun,
   recoverHuntRun,
   recordHuntEvent,
@@ -824,6 +825,15 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       actor: "vitest",
       observedAt: atMinute(10.5),
     });
+    const evidence = await listRunEvidence(db, projectId, runId);
+    expect(evidence?.map((item) => item.evidence_key)).toEqual([
+      "analyzing:velen",
+      "analyzing:repository",
+      "implementing:diff",
+      "pr_open:pull_request",
+      "staging_qa:staging",
+      "production_qa:production",
+    ]);
     await expect(
       recordHuntEvent(db, projectId, event("completed", 11)),
     ).rejects.toThrow("result summary");

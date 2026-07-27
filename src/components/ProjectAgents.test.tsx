@@ -203,6 +203,9 @@ describe("ProjectAgents", () => {
     const sessions: AutoHuntSession[] = [
       {
         id: "legacy-auto-session",
+        dispatchGroupId: "legacy-auto-session",
+        workers: [],
+        dispatchEvents: [],
         projectId: project.id,
         status: "completed",
         issues: [{
@@ -223,6 +226,9 @@ describe("ProjectAgents", () => {
       },
       {
         id: "sentry-session",
+        dispatchGroupId: "sentry-session",
+        workers: [],
+        dispatchEvents: [],
         projectId: project.id,
         agentId: "demo-agent-sentry",
         status: "completed",

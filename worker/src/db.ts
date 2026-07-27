@@ -2351,6 +2351,24 @@ export async function recordRunEvidence(
   return evidence;
 }
 
+export async function listRunEvidence(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+) {
+  const run = await getHuntRunForProject(db, projectId, runId);
+  if (!run) return null;
+  const result = await db
+    .prepare(
+      `select * from briar_run_evidence
+       where project_id = ? and run_id = ? and attempt = ?
+       order by observed_at, recorded_at, id`,
+    )
+    .bind(projectId, runId, run.current_attempt)
+    .all<RunEvidenceRow>();
+  return result.results ?? [];
+}
+
 export type HuntRecoveryAction = "retry" | "cancel";
 export type HuntRecoveryOutcome =
   | "retried"
