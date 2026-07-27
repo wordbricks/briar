@@ -34,6 +34,10 @@ import {
   type IssueWorktree,
   type WorktreeSettings,
 } from "./worktree";
+import {
+  sameApiEnvironment,
+  selectProjectForApi,
+} from "./config-environment";
 
 const workflowStageIdSchema = z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/u);
 
@@ -63,6 +67,13 @@ const worktreeConfigSchema = z
   })
   .passthrough();
 
+const sandboxConfigSchema = z
+  .object({
+    /** True drops the agent's filesystem sandbox for this project's Auto Hunt. */
+    fullAccess: z.boolean().optional(),
+  })
+  .passthrough();
+
 const claimWorktreeSchema = z.object({
   path: z.string().min(1),
   branch: z.string().min(1),
@@ -75,6 +86,7 @@ const autoHuntConfigSchema = z
     velenOrg: z.string().min(1).optional(),
     dataSource: z.string().min(1).optional(),
     worktrees: worktreeConfigSchema.optional(),
+    sandbox: sandboxConfigSchema.optional(),
     linear: z
       .object({
         enabled: z.boolean(),
@@ -93,6 +105,7 @@ const projectConfigSchema = z
     id: z.string().uuid(),
     repositoryPath: z.string(),
     agentToken: z.string(),
+    apiUrl: z.string().url().optional(),
     repositoryRemote: z.string().optional(),
     llm: z
       .object({ provider: z.enum(["codex", "claude", "grok"]) })
@@ -141,10 +154,16 @@ const required = (name: string) => {
 
 async function loadConfig(): Promise<Config> {
   try {
-    const config = configSchema.parse(JSON.parse(await readFile(configPath, "utf8")));
+    const config = configSchema.parse(
+      JSON.parse(await readFile(configPath, "utf8")),
+    );
+    const apiUrl = process.env.BRIAR_API_URL ?? config.apiUrl;
     return {
       ...config,
-      apiUrl: process.env.BRIAR_API_URL ?? config.apiUrl,
+      apiUrl,
+      userToken: sameApiEnvironment(apiUrl, config.apiUrl)
+        ? config.userToken
+        : undefined,
     };
   } catch {
     return { apiUrl: defaultApiUrl, projects: [] };
@@ -344,12 +363,11 @@ async function currentProject(config: Config): Promise<ProjectConfig> {
     );
   };
   const requestedProjectId = process.env.BRIAR_PROJECT_ID?.trim();
-  const project = requestedProjectId
-    ? config.projects.find(
-        (candidate) =>
-          candidate.id === requestedProjectId && matchesRepository(candidate),
-      )
-    : config.projects.find(matchesRepository);
+  const project = selectProjectForApi(
+    config.projects.filter(matchesRepository),
+    config.apiUrl,
+    requestedProjectId,
+  );
   if (!project) {
     if (requestedProjectId) {
       throw new Error(
@@ -382,6 +400,7 @@ async function createProject() {
       repositoryPath,
       repositoryRemote: gitValue(["remote", "get-url", "origin"]) ?? undefined,
       agentToken: result.agentToken,
+      apiUrl: config.apiUrl,
     },
   ];
   await saveConfig(config);
@@ -401,6 +420,7 @@ async function connectProject() {
       repositoryPath,
       repositoryRemote: gitValue(["remote", "get-url", "origin"]) ?? undefined,
       agentToken,
+      apiUrl: config.apiUrl,
     },
   ];
   await saveConfig(config);
@@ -476,6 +496,16 @@ async function configureAutoHunt() {
   if (has("--enable-worktrees") && has("--disable-worktrees")) {
     throw new Error("--enable-worktrees와 --disable-worktrees를 함께 쓸 수 없습니다.");
   }
+  if (has("--enable-full-access") && has("--disable-full-access")) {
+    throw new Error("--enable-full-access와 --disable-full-access를 함께 쓸 수 없습니다.");
+  }
+  // Removing the sandbox is worth one deliberate extra keystroke: Auto Hunt
+  // input is untrusted issue content and the session runs unattended.
+  if (has("--enable-full-access") && !has("--i-understand-the-risk")) {
+    throw new Error(
+      "--enable-full-access는 샌드박스를 완전히 해제해 에이전트가 파일시스템 전체에 쓸 수 있게 합니다. 확인을 위해 --i-understand-the-risk를 함께 지정하세요.",
+    );
+  }
   const nextAutoHunt = {
     ...project.autoHunt,
     velenOrg,
@@ -506,6 +536,11 @@ async function configureAutoHunt() {
       ...(has("--enable-worktrees") ? { enabled: true } : {}),
       ...(value("--worktree-root") ? { root: resolve(required("--worktree-root")) } : {}),
       ...(value("--branch-prefix") ? { branchPrefix: required("--branch-prefix") } : {}),
+    },
+    sandbox: {
+      ...project.autoHunt?.sandbox,
+      ...(has("--enable-full-access") ? { fullAccess: true } : {}),
+      ...(has("--disable-full-access") ? { fullAccess: false } : {}),
     },
   };
   const nextProject = {
@@ -542,6 +577,7 @@ async function configureAutoHunt() {
       velenOrg,
       linearEnabled: nextAutoHunt.linear?.enabled ?? false,
       linearSource: nextAutoHunt.linear?.source ?? null,
+      fullAccess: nextAutoHunt.sandbox?.fullAccess ?? false,
     }),
   );
 }
@@ -566,6 +602,10 @@ async function autoHuntDoctor() {
         branchPrefix: worktreeSettings(project).branchPrefix,
         // null means no origin/HEAD and no main/master: allocation would fail.
         baseRef: resolveBaseRef(runGit, project.repositoryPath),
+      },
+      sandbox: {
+        // false is the default: writes stay inside the checkout and worktree root.
+        fullAccess: project.autoHunt?.sandbox?.fullAccess ?? false,
       },
       requestIds: [result.auth.requestId, result.org.requestId, result.linear?.requestId].filter(
         Boolean,
@@ -1244,6 +1284,7 @@ const usage = `Briar CLI
     [--disable-linear] [--workflow-preset <local|review|release|research>]
     [--enable-worktrees|--disable-worktrees] [--worktree-root <dir>]
     [--branch-prefix <prefix>]
+    [--enable-full-access --i-understand-the-risk | --disable-full-access]
   briar auto-hunt record --source-key <key> --title <title>
     --status <backlog|queued|running|blocked|failed|completed|cancelled>
     [--workflow-stage <configured-stage>]

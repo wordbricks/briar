@@ -7,9 +7,13 @@ import type { HuntEventInput } from "./db";
 import {
   assertQueuedHuntClaim,
   claimNextQueuedHuntRun,
+  claimDueProjectAgentScheduleRun,
   addOrganizationMember,
+  completeProjectAgentScheduleRun,
   createOrganization,
   createIssueMessage,
+  createProjectAgent,
+  createProjectAgentSchedule,
   createProject,
   createIssueAttachments,
   deleteProject,
@@ -25,11 +29,15 @@ import {
   listOrganizationMembers,
   isOrganizationHandleAvailable,
   listProjects,
+  listProjectAgents,
+  listProjectAgentSchedules,
   moveHuntRun,
   recoverHuntRun,
   recordHuntEvent,
   recordQaResult,
+  renewProjectAgentScheduleRunLease,
   updateProjectSettings,
+  updateProjectAgent,
   updateOrganization,
 } from "./db";
 
@@ -101,7 +109,9 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ]) {
       await executeSql(db, await readFile(resolve(migration), "utf8"));
     }
-    await executeSql(db, `
+    await executeSql(
+      db,
+      `
       insert into user (id, name, email, emailVerified, createdAt, updatedAt)
       values ('owner', 'Owner', 'owner@example.com', 1, '${atMinute(0)}', '${atMinute(0)}');
       insert into briar_organizations (id, name, handle, created_at, updated_at)
@@ -128,7 +138,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         '{"version":1,"preset":"release","stages":[{"id":"analyzing","label":"분석","required":true},{"id":"implementing","label":"구현","required":true},{"id":"pr_open","label":"PR 검증","required":true},{"id":"staging_qa","label":"Stage QA","required":true},{"id":"production_qa","label":"Production QA","required":true}]}',
         '${atMinute(0)}', '${atMinute(0)}'
       );
-    `);
+    `,
+    );
     const migrationRunId = await recordHuntEvent(
       db,
       projectId,
@@ -138,13 +149,15 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         title: "Pre-backlog migration sentinel",
       }),
     );
-    await createIssueAttachments(db, projectId, migrationRunId, [{
-      id: "11111111-2222-4333-8444-555555555555",
-      object_key: "issue-attachments/pre-backlog-migration/sentinel",
-      filename: "sentinel.png",
-      content_type: "image/png",
-      byte_size: 8,
-    }]);
+    await createIssueAttachments(db, projectId, migrationRunId, [
+      {
+        id: "11111111-2222-4333-8444-555555555555",
+        object_key: "issue-attachments/pre-backlog-migration/sentinel",
+        filename: "sentinel.png",
+        content_type: "image/png",
+        byte_size: 8,
+      },
+    ]);
     await createIssueMessage(db, {
       id: "66666666-7777-4888-8999-000000000000",
       projectId,
@@ -158,6 +171,31 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await executeSql(
       db,
       await readFile(resolve("migrations/0015_backlog_status.sql"), "utf8"),
+    );
+    await executeSql(
+      db,
+      await readFile(resolve("migrations/0016_project_agents.sql"), "utf8"),
+    );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0017_default_auto_hunt_agent.sql"),
+        "utf8",
+      ),
+    );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0018_project_agent_schedules.sql"),
+        "utf8",
+      ),
+    );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0019_project_agent_schedule_runs.sql"),
+        "utf8",
+      ),
     );
   });
 
@@ -176,25 +214,297 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     expect(run).toMatchObject({ stage: "cancelled", status: "cancelled" });
     expect(
       await db
-        .prepare("select count(*) as count from briar_hunt_events where run_id = ?")
+        .prepare(
+          "select count(*) as count from briar_hunt_events where run_id = ?",
+        )
         .bind(run!.id)
         .first<number>("count"),
     ).toBe(1);
     expect(
       await db
-        .prepare("select count(*) as count from briar_issue_attachments where run_id = ?")
+        .prepare(
+          "select count(*) as count from briar_issue_attachments where run_id = ?",
+        )
         .bind(run!.id)
         .first<number>("count"),
     ).toBe(1);
     expect(
       await db
-        .prepare("select count(*) as count from briar_issue_messages where run_id = ?")
+        .prepare(
+          "select count(*) as count from briar_issue_messages where run_id = ?",
+        )
         .bind(run!.id)
         .first<number>("count"),
     ).toBe(1);
-    expect(
-      await db.prepare("pragma foreign_key_check").all(),
-    ).toMatchObject({ results: [] });
+    expect(await db.prepare("pragma foreign_key_check").all()).toMatchObject({
+      results: [],
+    });
+  });
+
+  it("backfills one default Auto Hunt agent for an existing project", async () => {
+    await expect(listProjectAgents(db, projectId)).resolves.toEqual([
+      expect.objectContaining({
+        project_id: projectId,
+        name: "Auto Hunt agent",
+        provider: "codex",
+        model: null,
+        responsibility: "Perform Auto Hunt for every queued issue.",
+        kind: "auto_hunt",
+      }),
+    ]);
+  });
+
+  it("creates and lists custom agents scoped to a project", async () => {
+    const agent = await createProjectAgent(db, projectId, {
+      name: "Sentry 오류 탐지 에이전트",
+      provider: "claude",
+      model: "opus",
+      responsibility:
+        "Sentry 오류를 분석해 이슈를 만들고 담당자에게 배정합니다.",
+    });
+
+    expect(agent).toMatchObject({
+      project_id: projectId,
+      name: "Sentry 오류 탐지 에이전트",
+      provider: "claude",
+      model: "opus",
+    });
+    await expect(listProjectAgents(db, projectId)).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "auto_hunt" }),
+        agent,
+      ]),
+    );
+    await expect(
+      listProjectAgents(db, "22222222-2222-4222-8222-222222222222"),
+    ).resolves.toEqual([]);
+  });
+
+  it("creates recurring schedules for an agent in the same project", async () => {
+    const agent = (await listProjectAgents(db, projectId))[0];
+    const schedule = await createProjectAgentSchedule(db, projectId, {
+      agentId: agent.id,
+      name: "Weekday repository audit",
+      recurrence: "weekdays",
+      timeOfDay: "09:00",
+      dayOfWeek: null,
+      timeZone: "Asia/Seoul",
+    });
+
+    expect(schedule).toMatchObject({
+      project_id: projectId,
+      agent_id: agent.id,
+      agent_name: "Auto Hunt agent",
+      agent_provider: "codex",
+      name: "Weekday repository audit",
+      recurrence: "weekdays",
+      time_of_day: "09:00",
+      day_of_week: null,
+      time_zone: "Asia/Seoul",
+      enabled: 1,
+    });
+    await expect(listProjectAgentSchedules(db, projectId)).resolves.toEqual([
+      schedule,
+    ]);
+    await expect(
+      createProjectAgentSchedule(db, projectId, {
+        agentId: "22222222-2222-4222-8222-222222222222",
+        name: "Missing agent",
+        recurrence: "daily",
+        timeOfDay: "12:00",
+        dayOfWeek: null,
+        timeZone: "Etc/UTC",
+      }),
+    ).resolves.toBeNull();
+  });
+
+  it("claims a due schedule once and advances its next occurrence", async () => {
+    const agent = (await listProjectAgents(db, projectId))[0];
+    const schedule = await createProjectAgentSchedule(db, projectId, {
+      agentId: agent.id,
+      name: "Daily project audit",
+      recurrence: "daily",
+      timeOfDay: "09:00",
+      dayOfWeek: null,
+      timeZone: "Etc/UTC",
+    });
+    expect(schedule).not.toBeNull();
+    await db
+      .prepare(
+        `update briar_project_agent_schedules
+         set next_run_at = '2026-07-27T09:00:00.000Z'
+         where id = ?`,
+      )
+      .bind(schedule!.id)
+      .run();
+
+    const claimed = await claimDueProjectAgentScheduleRun(db, projectId, {
+      claimTokenHash: "a".repeat(64),
+      observedAt: "2026-07-27T09:00:10.000Z",
+    });
+    expect(claimed).toMatchObject({
+      schedule_id: schedule!.id,
+      schedule_name: "Daily project audit",
+      agent_provider: "codex",
+      agent_responsibility: "Perform Auto Hunt for every queued issue.",
+      status: "running",
+      scheduled_for: "2026-07-27T09:00:00.000Z",
+    });
+    await expect(
+      claimDueProjectAgentScheduleRun(db, projectId, {
+        claimTokenHash: "b".repeat(64),
+        observedAt: "2026-07-27T09:00:10.000Z",
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      db
+        .prepare(
+          `select next_run_at from briar_project_agent_schedules where id = ?`,
+        )
+        .bind(schedule!.id)
+        .first<string>("next_run_at"),
+    ).resolves.toBe("2026-07-28T09:00:00.000Z");
+    await expect(
+      completeProjectAgentScheduleRun(db, projectId, claimed!.id, {
+        claimTokenHash: "a".repeat(64),
+        status: "completed",
+        resultSummary: "Daily audit completed.",
+        error: null,
+        observedAt: "2026-07-27T09:01:00.000Z",
+      }),
+    ).resolves.toMatchObject({ status: "completed" });
+  });
+
+  it("requires the active claim token to complete a scheduled run", async () => {
+    const agent = (await listProjectAgents(db, projectId))[0];
+    const schedule = await createProjectAgentSchedule(db, projectId, {
+      agentId: agent.id,
+      name: "Result reporter",
+      recurrence: "daily",
+      timeOfDay: "10:00",
+      dayOfWeek: null,
+      timeZone: "Etc/UTC",
+    });
+    await db
+      .prepare(
+        `update briar_project_agent_schedules
+         set next_run_at = '2026-07-27T10:00:00.000Z'
+         where id = ?`,
+      )
+      .bind(schedule!.id)
+      .run();
+    const tokenHash = "c".repeat(64);
+    const claimed = await claimDueProjectAgentScheduleRun(db, projectId, {
+      claimTokenHash: tokenHash,
+      observedAt: "2026-07-27T10:00:05.000Z",
+    });
+
+    await expect(
+      completeProjectAgentScheduleRun(db, projectId, claimed!.id, {
+        claimTokenHash: "d".repeat(64),
+        status: "completed",
+        resultSummary: "must not persist",
+        error: null,
+        observedAt: "2026-07-27T10:01:00.000Z",
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      completeProjectAgentScheduleRun(db, projectId, claimed!.id, {
+        claimTokenHash: tokenHash,
+        status: "completed",
+        resultSummary: "Repository audit completed.",
+        error: null,
+        observedAt: "2026-07-27T10:01:00.000Z",
+      }),
+    ).resolves.toMatchObject({
+      status: "completed",
+      result_summary: "Repository audit completed.",
+      completed_at: "2026-07-27T10:01:00.000Z",
+    });
+  });
+
+  it("renews and safely reclaims an expired schedule execution", async () => {
+    const agent = (await listProjectAgents(db, projectId))[0];
+    const schedule = await createProjectAgentSchedule(db, projectId, {
+      agentId: agent.id,
+      name: "Lease recovery",
+      recurrence: "daily",
+      timeOfDay: "11:00",
+      dayOfWeek: null,
+      timeZone: "Etc/UTC",
+    });
+    await db
+      .prepare(
+        `update briar_project_agent_schedules
+         set next_run_at = '2026-07-27T11:00:00.000Z'
+         where id = ?`,
+      )
+      .bind(schedule!.id)
+      .run();
+    const originalHash = "e".repeat(64);
+    const claimed = await claimDueProjectAgentScheduleRun(db, projectId, {
+      claimTokenHash: originalHash,
+      observedAt: "2026-07-27T11:00:00.000Z",
+    });
+    await expect(
+      renewProjectAgentScheduleRunLease(db, projectId, claimed!.id, {
+        claimTokenHash: originalHash,
+        observedAt: "2026-07-27T12:00:00.000Z",
+      }),
+    ).resolves.toMatchObject({
+      id: claimed!.id,
+      lease_expires_at: "2026-07-27T14:00:00.000Z",
+    });
+
+    await expect(
+      claimDueProjectAgentScheduleRun(db, projectId, {
+        claimTokenHash: "f".repeat(64),
+        observedAt: "2026-07-27T13:00:00.000Z",
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      claimDueProjectAgentScheduleRun(db, projectId, {
+        claimTokenHash: "f".repeat(64),
+        observedAt: "2026-07-27T14:00:01.000Z",
+      }),
+    ).resolves.toMatchObject({
+      id: claimed!.id,
+      schedule_id: schedule!.id,
+      started_at: "2026-07-27T14:00:01.000Z",
+    });
+  });
+
+  it("updates a project agent only within its project", async () => {
+    const current = (await listProjectAgents(db, projectId))[0];
+    const updated = await updateProjectAgent(db, projectId, current.id, {
+      name: "Release coordinator",
+      provider: "claude",
+      model: "sonnet",
+      responsibility: "Coordinates release checks and reports the result.",
+    });
+
+    expect(updated).toMatchObject({
+      id: current.id,
+      project_id: projectId,
+      name: "Release coordinator",
+      provider: "claude",
+      model: "sonnet",
+      responsibility: "Coordinates release checks and reports the result.",
+      kind: "auto_hunt",
+    });
+    await expect(
+      updateProjectAgent(
+        db,
+        "22222222-2222-4222-8222-222222222222",
+        current.id,
+        {
+          name: "Wrong project",
+          provider: "grok",
+          model: null,
+          responsibility: "Must not update another project.",
+        },
+      ),
+    ).resolves.toBeNull();
   });
 
   it("stores automation settings and preserves them for older settings clients", async () => {
@@ -307,12 +617,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     const completion = event("completed", 12, {
       resultSummary: "Production verified",
     });
-    await recordHuntEvent(
-      db,
-      projectId,
-      completion,
+    await recordHuntEvent(db, projectId, completion);
+    await expect(recordHuntEvent(db, projectId, completion)).resolves.toBe(
+      runId,
     );
-    await expect(recordHuntEvent(db, projectId, completion)).resolves.toBe(runId);
 
     const run = await db
       .prepare(
@@ -342,7 +650,16 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       agentTokenHash: "d".repeat(64),
     });
 
-    await expect(deleteProject(db, project.id, "someone-else")).resolves.toBe(false);
+    await expect(listProjectAgents(db, project.id)).resolves.toEqual([
+      expect.objectContaining({
+        project_id: project.id,
+        provider: "codex",
+        kind: "auto_hunt",
+      }),
+    ]);
+    await expect(deleteProject(db, project.id, "someone-else")).resolves.toBe(
+      false,
+    );
     await expect(getProject(db, project.id, "owner")).resolves.not.toBeNull();
     await expect(deleteProject(db, project.id, "owner")).resolves.toBe(true);
     await expect(getProject(db, project.id, "owner")).resolves.toBeNull();
@@ -350,10 +667,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
   });
 
   it("shares organization projects with members without granting owner deletion", async () => {
-    await executeSql(db, `
+    await executeSql(
+      db,
+      `
       insert into user (id, name, email, emailVerified, createdAt, updatedAt)
       values ('member', 'Member', 'member@example.com', 1, '${atMinute(0)}', '${atMinute(0)}');
-    `);
+    `,
+    );
     await expect(
       addOrganizationMember(db, projectId, "member@example.com", "member"),
     ).resolves.toBe("member");
@@ -598,7 +918,11 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ]);
     expect(
       await getIssueAttachment(db, projectId, run!.id, attachmentId),
-    ).toEqual(expect.objectContaining({ object_key: expect.stringContaining(attachmentId) }));
+    ).toEqual(
+      expect.objectContaining({
+        object_key: expect.stringContaining(attachmentId),
+      }),
+    );
     expect(
       await getIssueAttachment(
         db,
@@ -832,7 +1156,9 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     });
     expect(
       await db
-        .prepare("select count(*) as count from briar_hunt_events where run_id = ?")
+        .prepare(
+          "select count(*) as count from briar_hunt_events where run_id = ?",
+        )
         .bind(runId)
         .first<number>("count"),
     ).toBe(3);

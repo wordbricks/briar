@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { validateIssueAttachments } from "./issue-attachments";
+import type { ProjectAgentLocale } from "./project-agent";
 import type {
   LinearImportConnectResult,
   LinearImportResult,
@@ -7,15 +8,22 @@ import type {
 } from "./linear-import";
 import type {
   CreateIssueInput,
+  CreateProjectAgentInput,
+  CreateProjectAgentScheduleInput,
   DashboardPayload,
   HuntRunPlacement,
   IssueAttachment,
   IssueMessage,
+  ClaimedProjectAgentScheduleRun,
   Project,
+  ProjectAgent,
+  ProjectAgentSchedule,
+  ProjectAgentScheduleRun,
   Organization,
   OrganizationMember,
   ProjectSettings,
   SessionUser,
+  UpdateProjectAgentInput,
 } from "../types";
 
 const apiUrl = import.meta.env.VITE_BRIAR_API_URL?.replace(/\/$/u, "") ?? "";
@@ -37,6 +45,59 @@ const projectSchema = z.object({
   role: z.enum(["owner", "admin", "member"]),
   createdAt: z.string(),
 });
+const projectAgentSchema = z.object({
+  id: z.string().uuid(),
+  projectId: z.string().uuid(),
+  name: z.string(),
+  provider: z.enum(["codex", "claude", "grok"]),
+  model: z.string().nullable(),
+  responsibility: z.string(),
+  kind: z.enum(["auto_hunt", "custom"]),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+const projectAgentScheduleSchema = z.object({
+  id: z.string().uuid(),
+  projectId: z.string().uuid(),
+  agentId: z.string().uuid(),
+  agentName: z.string(),
+  agentProvider: z.enum(["codex", "claude", "grok"]),
+  name: z.string(),
+  recurrence: z.enum(["daily", "weekdays", "weekly"]),
+  timeOfDay: z.string(),
+  dayOfWeek: z.number().int().min(0).max(6).nullable(),
+  timeZone: z.string(),
+  enabled: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+const projectAgentScheduleRunSchema = z.object({
+  id: z.string().uuid(),
+  projectId: z.string().uuid(),
+  scheduleId: z.string().uuid(),
+  scheduleName: z.string(),
+  agent: projectAgentSchema.pick({
+    id: true,
+    name: true,
+    provider: true,
+    model: true,
+    responsibility: true,
+  }),
+  status: z.enum(["running", "completed", "failed"]),
+  scheduledFor: z.string(),
+  leaseExpiresAt: z.string().nullable(),
+  startedAt: z.string(),
+  completedAt: z.string().nullable(),
+  resultSummary: z.string().nullable(),
+  error: z.string().nullable(),
+});
+const claimedProjectAgentScheduleRunSchema =
+  projectAgentScheduleRunSchema.extend({
+    status: z.literal("running"),
+    claimToken: z
+      .string()
+      .regex(/^briar_schedule_claim_[0-9a-f]{64}$/u),
+  });
 const organizationSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
@@ -98,10 +159,7 @@ export type DeviceAuthorization = {
   interval: number;
 };
 
-export type DeviceClientId =
-  | "briar-mobile"
-  | "briar-android"
-  | "briar-desktop";
+export type DeviceClientId = "briar-mobile" | "briar-android" | "briar-desktop";
 
 export async function beginDeviceAuthorization(
   clientId: DeviceClientId = "briar-desktop",
@@ -135,7 +193,8 @@ export async function beginDeviceAuthorization(
 
 type DeviceTokenResponse = {
   access_token?: string;
-  error?: "authorization_pending" | "slow_down" | "access_denied" | "expired_token";
+  error?:
+    "authorization_pending" | "slow_down" | "access_denied" | "expired_token";
   error_description?: string;
 };
 
@@ -171,7 +230,9 @@ export async function loadProjects(token: string): Promise<Project[]> {
   return z.array(projectSchema).parse(result.projects);
 }
 
-export async function loadOrganizations(token: string): Promise<Organization[]> {
+export async function loadOrganizations(
+  token: string,
+): Promise<Organization[]> {
   const result = await request<{ organizations: unknown[] }>(
     "/organizations",
     token,
@@ -183,10 +244,14 @@ export async function createOrganization(
   token: string,
   input: { name: string; handle: string },
 ) {
-  const result = await request<{ organization: unknown }>("/organizations", token, {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
+  const result = await request<{ organization: unknown }>(
+    "/organizations",
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
   return { organization: organizationSchema.parse(result.organization) };
 }
 
@@ -272,6 +337,134 @@ export async function deleteProject(token: string, projectId: string) {
   return request<void>(`/projects/${projectId}`, token, { method: "DELETE" });
 }
 
+export async function loadProjectAgents(
+  token: string,
+  projectId: string,
+  locale: ProjectAgentLocale,
+): Promise<ProjectAgent[]> {
+  const result = await request<{ agents: unknown[] }>(
+    `/projects/${projectId}/agents?locale=${encodeURIComponent(locale)}`,
+    token,
+  );
+  return z.array(projectAgentSchema).parse(result.agents);
+}
+
+export async function createProjectAgent(
+  token: string,
+  projectId: string,
+  input: CreateProjectAgentInput,
+): Promise<ProjectAgent> {
+  const result = await request<{ agent: unknown }>(
+    `/projects/${projectId}/agents`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+  return projectAgentSchema.parse(result.agent);
+}
+
+export async function loadProjectAgentSchedules(
+  token: string,
+  projectId: string,
+): Promise<ProjectAgentSchedule[]> {
+  const result = await request<{ schedules: unknown[] }>(
+    `/projects/${projectId}/agent-schedules`,
+    token,
+  );
+  return z.array(projectAgentScheduleSchema).parse(result.schedules);
+}
+
+export async function createProjectAgentSchedule(
+  token: string,
+  projectId: string,
+  input: CreateProjectAgentScheduleInput,
+): Promise<ProjectAgentSchedule> {
+  const result = await request<{ schedule: unknown }>(
+    `/projects/${projectId}/agent-schedules`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+  return projectAgentScheduleSchema.parse(result.schedule);
+}
+
+export async function claimProjectAgentScheduleRun(
+  token: string,
+  projectId: string,
+): Promise<ClaimedProjectAgentScheduleRun | null> {
+  const result = await request<{ run: unknown }>(
+    `/projects/${projectId}/agent-schedule-runs/claim`,
+    token,
+    { method: "POST" },
+  );
+  return result.run === null
+    ? null
+    : claimedProjectAgentScheduleRunSchema.parse(result.run);
+}
+
+export async function completeProjectAgentScheduleRun(
+  token: string,
+  projectId: string,
+  runId: string,
+  input:
+    | { claimToken: string; status: "completed"; resultSummary: string }
+    | { claimToken: string; status: "failed"; error: string },
+): Promise<ProjectAgentScheduleRun> {
+  const result = await request<{ run: unknown }>(
+    `/projects/${projectId}/agent-schedule-runs/${runId}/complete`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        claimToken: input.claimToken,
+        status: input.status,
+        resultSummary:
+          input.status === "completed" ? input.resultSummary : null,
+        error: input.status === "failed" ? input.error : null,
+      }),
+    },
+  );
+  return projectAgentScheduleRunSchema.parse(result.run);
+}
+
+export async function renewProjectAgentScheduleRun(
+  token: string,
+  projectId: string,
+  runId: string,
+  claimToken: string,
+) {
+  const result = await request<{ leaseExpiresAt: unknown }>(
+    `/projects/${projectId}/agent-schedule-runs/${runId}/renew`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify({ claimToken }),
+    },
+  );
+  return z.string().parse(result.leaseExpiresAt);
+}
+
+export async function updateProjectAgent(
+  token: string,
+  projectId: string,
+  agentId: string,
+  input: UpdateProjectAgentInput,
+): Promise<ProjectAgent> {
+  const result = await request<{ agent: unknown }>(
+    `/projects/${projectId}/agents/${agentId}`,
+    token,
+    {
+      method: "PUT",
+      body: JSON.stringify(input),
+    },
+  );
+  return projectAgentSchema.parse(result.agent);
+}
+
 export async function createIssue(
   token: string,
   projectId: string,
@@ -303,11 +496,7 @@ export async function createIssue(
     sourceKey: string;
     stage: "queued";
     attachments: IssueAttachment[];
-  }>(
-    `/projects/${projectId}/issues`,
-    token,
-    { method: "POST", body: form },
-  );
+  }>(`/projects/${projectId}/issues`, token, { method: "POST", body: form });
 }
 
 export async function loadIssueAttachment(
@@ -363,11 +552,7 @@ export async function createIssueMessage(
 
 export type HuntRecoveryResult = {
   runId: string;
-  outcome:
-    | "retried"
-    | "cancelled"
-    | "already_retried"
-    | "already_cancelled";
+  outcome: "retried" | "cancelled" | "already_retried" | "already_cancelled";
   attempt: number;
   stage: "queued" | "cancelled";
 };
@@ -430,9 +615,13 @@ export async function moveHuntRun(
 }
 
 export async function createAgentToken(token: string, projectId: string) {
-  return request<{ agentToken: string }>(`/projects/${projectId}/agent-token`, token, {
-    method: "POST",
-  });
+  return request<{ agentToken: string }>(
+    `/projects/${projectId}/agent-token`,
+    token,
+    {
+      method: "POST",
+    },
+  );
 }
 
 export async function updateProjectSettings(

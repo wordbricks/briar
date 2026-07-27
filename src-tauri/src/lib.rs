@@ -37,6 +37,10 @@ struct StoredSession {
 struct CliProject {
     id: String,
     repository_path: String,
+    /// API environment that issued this project's agent token. Legacy entries
+    /// omit it and remain readable until the next connection save.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    api_url: Option<String>,
     /// Which machine this project executes on. Absent means the local machine,
     /// so configs written before remote hosts existed keep working unchanged.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -276,6 +280,20 @@ struct StoredAutoHuntConfig {
     workflow: Option<WorkflowConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     worktrees: Option<StoredWorktreeConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    sandbox: Option<StoredSandboxConfig>,
+    #[serde(flatten)]
+    extra: BTreeMap<String, serde_json::Value>,
+}
+
+/// Sandbox settings owned by the CLI (`briar auto-hunt configure`). Absent or
+/// `fullAccess: false` keeps agent writes confined to the checkout and the
+/// per-issue worktree root.
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StoredSandboxConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    full_access: Option<bool>,
     #[serde(flatten)]
     extra: BTreeMap<String, serde_json::Value>,
 }
@@ -321,9 +339,10 @@ impl From<AutoHuntConfig> for StoredAutoHuntConfig {
             }),
             github_repository: config.github_repository,
             workflow: Some(config.workflow),
-            // Worktree settings belong to the CLI; callers carry the stored
-            // value over instead of letting an app-side save erase it.
+            // Worktree and sandbox settings belong to the CLI; callers carry the
+            // stored values over instead of letting an app-side save erase them.
             worktrees: None,
+            sandbox: None,
             extra: BTreeMap::new(),
         }
     }
@@ -1640,21 +1659,29 @@ fn write_cli_connection(
             extra: BTreeMap::new(),
         }
     };
-    config.api_url = api_url;
+    if !config.api_url.trim().is_empty()
+        && config.api_url.trim_end_matches('/') != api_url.trim_end_matches('/')
+    {
+        config.user_token = None;
+    }
+    config.api_url = api_url.clone();
     // `briar auto-hunt configure` owns the worktree block, so a settings save
     // from the app must not silently reset it.
-    let stored_worktrees = config
+    let stored_auto_hunt = config
         .projects
         .iter()
         .find(|project| project.id == project_id)
-        .and_then(|project| project.auto_hunt.as_ref())
-        .and_then(|auto_hunt| auto_hunt.worktrees.clone());
+        .and_then(|project| project.auto_hunt.as_ref());
+    let stored_worktrees = stored_auto_hunt.and_then(|auto_hunt| auto_hunt.worktrees.clone());
+    let stored_sandbox = stored_auto_hunt.and_then(|auto_hunt| auto_hunt.sandbox.clone());
     let mut auto_hunt: StoredAutoHuntConfig = agent_config.auto_hunt.into();
     auto_hunt.worktrees = stored_worktrees;
+    auto_hunt.sandbox = stored_sandbox;
     config.projects.retain(|project| project.id != project_id);
     config.projects.push(CliProject {
         id: project_id,
         repository_path,
+        api_url: Some(api_url),
         execution_host_id: execution_host
             .filter(|host| !host.is_local())
             .map(|host| host.as_stored()),
@@ -1861,6 +1888,320 @@ fn connected_project_workspace_on_host(
     let repository_path = project_repository_path(&config, project_id)?;
     let workspace = resolve_workspace_with(runner.as_ref(), &repository_path)?;
     Ok((runner, workspace))
+}
+
+#[derive(Clone, Copy, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+enum ProjectWorkspaceMode {
+    #[default]
+    Connected,
+    LatestRemoteBase,
+    IssueWorktree,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct RegisteredGitWorktree {
+    path: PathBuf,
+    branch: Option<String>,
+}
+
+fn parse_registered_git_worktrees(output: &str) -> Vec<RegisteredGitWorktree> {
+    let mut worktrees = Vec::new();
+    let mut path = None;
+    let mut branch = None;
+    let flush = |worktrees: &mut Vec<RegisteredGitWorktree>,
+                 path: &mut Option<PathBuf>,
+                 branch: &mut Option<String>| {
+        if let Some(path) = path.take() {
+            worktrees.push(RegisteredGitWorktree {
+                path,
+                branch: branch.take(),
+            });
+        } else {
+            branch.take();
+        }
+    };
+
+    for line in output.lines() {
+        if let Some(value) = line.strip_prefix("worktree ") {
+            flush(&mut worktrees, &mut path, &mut branch);
+            path = Some(PathBuf::from(value.trim()));
+        } else if let Some(value) = line.strip_prefix("branch ") {
+            branch = Some(
+                value
+                    .trim()
+                    .strip_prefix("refs/heads/")
+                    .unwrap_or(value.trim())
+                    .to_string(),
+            );
+        }
+    }
+    flush(&mut worktrees, &mut path, &mut branch);
+    worktrees
+}
+
+fn auto_hunt_run_token(run_id: &str) -> Result<String, String> {
+    let compact = run_id.replace('-', "").to_ascii_lowercase();
+    if compact.len() != 32
+        || !compact
+            .bytes()
+            .all(|character| character.is_ascii_hexdigit())
+    {
+        return Err("이슈 run ID가 올바르지 않습니다.".to_string());
+    }
+    Ok(compact[..8].to_string())
+}
+
+fn branch_matches_auto_hunt_run(branch: &str, run_token: &str) -> bool {
+    let leaf = branch.rsplit('/').next().unwrap_or(branch);
+    let marker = format!("-{run_token}");
+    if leaf.ends_with(&marker) {
+        return true;
+    }
+    leaf.rsplit_once(&format!("{marker}-"))
+        .is_some_and(|(_, suffix)| {
+            !suffix.is_empty() && suffix.bytes().all(|byte| byte.is_ascii_digit())
+        })
+}
+
+fn select_issue_worktree(
+    worktree_list: &str,
+    run_id: &str,
+    recorded_branch: Option<&str>,
+) -> Result<PathBuf, String> {
+    let run_token = auto_hunt_run_token(run_id)?;
+    let recorded_branch = recorded_branch
+        .map(str::trim)
+        .filter(|branch| !branch.is_empty());
+    let matches = parse_registered_git_worktrees(worktree_list)
+        .into_iter()
+        .filter(|worktree| {
+            worktree.branch.as_deref().is_some_and(|branch| {
+                recorded_branch
+                    .map(|recorded| branch == recorded)
+                    .unwrap_or_else(|| branch_matches_auto_hunt_run(branch, &run_token))
+            })
+        })
+        .collect::<Vec<_>>();
+
+    match matches.as_slice() {
+        [worktree] => Ok(worktree.path.clone()),
+        [] => Err(
+            "이 이슈의 원래 Auto Hunt 워크트리를 찾지 못했습니다. 워크트리가 삭제되었는지 확인해 주세요."
+                .to_string(),
+        ),
+        _ => Err(
+            "이슈 run과 일치하는 Auto Hunt 워크트리가 여러 개라서 안전하게 선택할 수 없습니다."
+                .to_string(),
+        ),
+    }
+}
+
+fn resolve_issue_worktree(
+    runner: &dyn host::CommandRunner,
+    connected_workspace: &Path,
+    run_id: &str,
+    recorded_branch: Option<&str>,
+) -> Result<PathBuf, String> {
+    let git = runner.resolve_binary("git")?;
+    let output = runner.run(
+        &host::CommandSpec::new(git)
+            .args(["worktree", "list", "--porcelain"])
+            .env("GIT_TERMINAL_PROMPT", "0")
+            .working_directory(connected_workspace),
+    )?;
+    if !output.success() {
+        return Err(format!(
+            "Auto Hunt 워크트리 목록을 읽지 못했습니다: {}",
+            output.failure_message()
+        ));
+    }
+    let selected = select_issue_worktree(&output.stdout, run_id, recorded_branch)?;
+    let selected = runner
+        .canonicalize(&selected)
+        .map_err(|error| format!("이슈의 Auto Hunt 워크트리를 열지 못했습니다: {error}"))?;
+    let connected = runner.canonicalize(connected_workspace)?;
+    if selected == connected {
+        return Err("연결된 공용 저장소는 이슈 워크트리로 사용할 수 없습니다.".to_string());
+    }
+    Ok(selected)
+}
+
+struct LatestRemoteWorkspace {
+    root: PathBuf,
+    checkout: PathBuf,
+}
+
+fn remote_head_branch(output: &str) -> Option<&str> {
+    output.lines().find_map(|line| {
+        let (reference, target) = line.split_once('\t')?;
+        if target.trim() != "HEAD" {
+            return None;
+        }
+        reference.trim().strip_prefix("ref: refs/heads/")
+    })
+}
+
+fn create_analysis_temp_root(runner: &dyn host::CommandRunner) -> Result<PathBuf, String> {
+    if !runner.is_remote() {
+        return tempfile::Builder::new()
+            .prefix("briar-workflow-analysis-")
+            .tempdir()
+            .map(|directory| directory.keep())
+            .map_err(|error| format!("워크플로우 분석 임시 폴더를 만들지 못했습니다: {error}"));
+    }
+
+    let mktemp = runner.resolve_binary("mktemp")?;
+    let output = runner.run(&host::CommandSpec::new(mktemp).args(["-d"]))?;
+    if !output.success() {
+        return Err(format!(
+            "원격 워크플로우 분석 임시 폴더를 만들지 못했습니다: {}",
+            output.failure_message()
+        ));
+    }
+    let root = PathBuf::from(output.stdout_trimmed());
+    if !root.is_absolute() {
+        return Err("원격 호스트가 절대 임시 경로를 반환하지 않았습니다.".to_string());
+    }
+    Ok(root)
+}
+
+fn remove_analysis_temp_root(runner: &dyn host::CommandRunner, root: &Path) -> Result<(), String> {
+    if !runner.is_remote() {
+        return fs::remove_dir(root)
+            .map_err(|error| format!("워크플로우 분석 임시 폴더를 정리하지 못했습니다: {error}"));
+    }
+    let rmdir = runner.resolve_binary("rmdir")?;
+    let output =
+        runner.run(&host::CommandSpec::new(rmdir).args([root.to_string_lossy().into_owned()]))?;
+    if output.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "원격 워크플로우 분석 임시 폴더를 정리하지 못했습니다: {}",
+            output.failure_message()
+        ))
+    }
+}
+
+fn prepare_latest_remote_workspace(
+    runner: &dyn host::CommandRunner,
+    connected_workspace: &Path,
+) -> Result<Option<LatestRemoteWorkspace>, String> {
+    let git = runner.resolve_binary("git")?;
+    let origin = runner.run(
+        &host::CommandSpec::new(git.clone())
+            .args(["remote", "get-url", "origin"])
+            .working_directory(connected_workspace),
+    )?;
+    if !origin.success() {
+        // A newly initialized local project has no remote yet. Its connected
+        // checkout is the only available source of truth.
+        return Ok(None);
+    }
+
+    let remote_head = runner.run(
+        &host::CommandSpec::new(git.clone())
+            .args(["ls-remote", "--symref", "origin", "HEAD"])
+            .env("GIT_TERMINAL_PROMPT", "0")
+            .env("GCM_INTERACTIVE", "Never")
+            .working_directory(connected_workspace),
+    )?;
+    if !remote_head.success() {
+        return Err(format!(
+            "최신 origin 기본 브랜치를 확인하지 못했습니다: {}",
+            remote_head.failure_message()
+        ));
+    }
+    let branch = remote_head_branch(&remote_head.stdout)
+        .ok_or_else(|| "origin의 기본 브랜치를 확인하지 못했습니다.".to_string())?;
+    let remote_ref = format!("refs/remotes/origin/{branch}");
+    let refspec = format!("+refs/heads/{branch}:{remote_ref}");
+    let fetch = runner.run(
+        &host::CommandSpec::new(git.clone())
+            .args([
+                "-c",
+                "maintenance.auto=false",
+                "-c",
+                "gc.auto=0",
+                "fetch",
+                "--no-tags",
+                "origin",
+                refspec.as_str(),
+            ])
+            .env("GIT_TERMINAL_PROMPT", "0")
+            .env("GCM_INTERACTIVE", "Never")
+            .working_directory(connected_workspace),
+    )?;
+    if !fetch.success() {
+        return Err(format!(
+            "최신 origin/{branch} 코드를 가져오지 못했습니다: {}",
+            fetch.failure_message()
+        ));
+    }
+    let revision = runner.run(
+        &host::CommandSpec::new(git.clone())
+            .args(["rev-parse", "--verify", remote_ref.as_str()])
+            .working_directory(connected_workspace),
+    )?;
+    if !revision.success() {
+        return Err(format!(
+            "가져온 origin/{branch} 커밋을 확인하지 못했습니다: {}",
+            revision.failure_message()
+        ));
+    }
+    let commit = revision.stdout_trimmed();
+    let root = create_analysis_temp_root(runner)?;
+    let checkout = root.join("repository");
+    let add = runner.run(
+        &host::CommandSpec::new(git)
+            .args([
+                "-c",
+                "core.hooksPath=/dev/null",
+                "worktree",
+                "add",
+                "--detach",
+                checkout.to_string_lossy().as_ref(),
+                commit.as_str(),
+            ])
+            .working_directory(connected_workspace),
+    )?;
+    if !add.success() {
+        let cleanup = remove_analysis_temp_root(runner, &root).err();
+        return Err(format!(
+            "최신 origin/{branch} 분석 워크트리를 만들지 못했습니다: {}{}",
+            add.failure_message(),
+            cleanup
+                .map(|error| format!(" ({error})"))
+                .unwrap_or_default()
+        ));
+    }
+    Ok(Some(LatestRemoteWorkspace { root, checkout }))
+}
+
+fn remove_latest_remote_workspace(
+    runner: &dyn host::CommandRunner,
+    connected_workspace: &Path,
+    workspace: &LatestRemoteWorkspace,
+) -> Result<(), String> {
+    let git = runner.resolve_binary("git")?;
+    let remove = runner.run(
+        &host::CommandSpec::new(git)
+            .args([
+                "worktree",
+                "remove",
+                "--force",
+                workspace.checkout.to_string_lossy().as_ref(),
+            ])
+            .working_directory(connected_workspace),
+    )?;
+    if !remove.success() {
+        return Err(format!(
+            "워크플로우 분석 워크트리를 정리하지 못했습니다: {}",
+            remove.failure_message()
+        ));
+    }
+    remove_analysis_temp_root(runner, &workspace.root)
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -2374,6 +2715,39 @@ fn read_trimmed_file(path: &Path) -> Option<String> {
         .filter(|value| !value.is_empty())
 }
 
+fn auto_hunt_assets_are_current(resource_directory: &Path, home: &Path) -> bool {
+    let cli_directory = home.join(".local").join("share").join("briar");
+    let cli_current = home.join(".local").join("bin").join("briar").is_file()
+        && cli_directory.join("briar.js").is_file()
+        && read_trimmed_file(&cli_directory.join("VERSION")).as_deref()
+            == Some(env!("CARGO_PKG_VERSION"));
+    if !cli_current {
+        return false;
+    }
+
+    let skill_source = bundled_path(
+        resource_directory,
+        "skills/briar-auto-hunt",
+        "skills/briar-auto-hunt",
+    );
+    let expected_version = read_trimmed_file(&skill_source.join("VERSION"))
+        .unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string());
+    [".codex", ".claude", ".grok"].iter().all(|directory| {
+        let skill = home.join(directory).join("skills").join("briar-auto-hunt");
+        skill.join("SKILL.md").is_file()
+            && read_trimmed_file(&skill.join("VERSION")).as_deref()
+                == Some(expected_version.as_str())
+    })
+}
+
+fn sync_auto_hunt_assets(resource_directory: &Path, home: &Path) -> Result<bool, String> {
+    if auto_hunt_assets_are_current(resource_directory, home) {
+        return Ok(false);
+    }
+    install_auto_hunt_assets(resource_directory, home)?;
+    Ok(true)
+}
+
 fn read_trimmed_file_on(runner: &dyn host::CommandRunner, path: &Path) -> Option<String> {
     let shell = runner.resolve_binary("sh").ok()?;
     let output = runner
@@ -2683,6 +3057,9 @@ async fn project_llm_chat(
     app: tauri::AppHandle,
     project_id: String,
     full_access: Option<bool>,
+    workspace_mode: Option<ProjectWorkspaceMode>,
+    workspace_run_id: Option<String>,
+    workspace_branch: Option<String>,
     request: agent::ProjectLlmRequest,
 ) -> Result<agent::ProjectLlmResponse, String> {
     let config_path = cli_config_path(&app)?;
@@ -2703,7 +3080,7 @@ async fn project_llm_chat(
     );
     let approval_app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let (runner, workspace) =
+        let (runner, connected_workspace) =
             connected_project_workspace_on_host(&config_path, &project_id, &home)?;
         let readiness = project_repository_readiness_at(&config_path, &project_id, &home)?;
         if readiness.requires_github && !readiness.pr_ready {
@@ -2725,9 +3102,36 @@ async fn project_llm_chat(
                 "이 대화의 에이전트 프로바이더가 앱 설정에서 비활성화되어 있습니다.".to_string(),
             );
         }
+        let workspace_mode = workspace_mode.unwrap_or_default();
+        let latest_workspace = match workspace_mode {
+            ProjectWorkspaceMode::Connected => None,
+            ProjectWorkspaceMode::LatestRemoteBase => {
+                prepare_latest_remote_workspace(runner.as_ref(), &connected_workspace)?
+            }
+            ProjectWorkspaceMode::IssueWorktree => None,
+        };
+        let issue_workspace = match workspace_mode {
+            ProjectWorkspaceMode::IssueWorktree => Some(resolve_issue_worktree(
+                runner.as_ref(),
+                &connected_workspace,
+                workspace_run_id
+                    .as_deref()
+                    .ok_or_else(|| "이슈 워크트리 실행에는 run ID가 필요합니다.".to_string())?,
+                workspace_branch.as_deref(),
+            )?),
+            ProjectWorkspaceMode::Connected | ProjectWorkspaceMode::LatestRemoteBase => None,
+        };
+        let workspace = issue_workspace
+            .as_deref()
+            .or_else(|| {
+                latest_workspace
+                    .as_ref()
+                    .map(|workspace| workspace.checkout.as_path())
+            })
+            .unwrap_or(connected_workspace.as_path());
         let backend = agent::discover_backend(
             provider,
-            runner,
+            runner.clone(),
             agent::AgentRunnerBundles {
                 claude: &claude_runner,
                 grok: &grok_runner,
@@ -2750,10 +3154,10 @@ async fn project_llm_chat(
                 ))
                 .blocking_show()
         };
-        agent::AgentBackend::run(
+        let result = agent::AgentBackend::run(
             &backend,
             &project_id,
-            &workspace,
+            workspace,
             project_chat_execution(
                 full_access.unwrap_or(false),
                 settings.approval_policy,
@@ -2762,6 +3166,79 @@ async fn project_llm_chat(
             ),
             request,
             &approve,
+        );
+        let cleanup = latest_workspace.as_ref().map(|workspace| {
+            remove_latest_remote_workspace(runner.as_ref(), &connected_workspace, workspace)
+        });
+        match (result, cleanup) {
+            (Ok(response), None | Some(Ok(()))) => Ok(response),
+            (Err(error), None | Some(Ok(()))) => Err(error),
+            (Ok(_), Some(Err(cleanup))) => Err(cleanup),
+            (Err(error), Some(Err(cleanup))) => {
+                Err(format!("{error} (분석 워크트리 정리 실패: {cleanup})"))
+            }
+        }
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn run_project_agent_schedule(
+    app: tauri::AppHandle,
+    project_id: String,
+    provider: agent::AgentProviderKind,
+    model: Option<String>,
+    request: agent::ProjectLlmRequest,
+) -> Result<agent::ProjectLlmResponse, String> {
+    let config_path = cli_config_path(&app)?;
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    let resource_directory = app
+        .path()
+        .resource_dir()
+        .map_err(|error| error.to_string())?;
+    let claude_runner = bundled_path(
+        &resource_directory,
+        "agent/claude-runner.js",
+        "dist-agent/claude-runner.js",
+    );
+    let grok_runner = bundled_path(
+        &resource_directory,
+        "agent/grok-runner.js",
+        "dist-agent/grok-runner.js",
+    );
+    tauri::async_runtime::spawn_blocking(move || {
+        let (runner, workspace) =
+            connected_project_workspace_on_host(&config_path, &project_id, &home)?;
+        if !app_provider_settings_from(&config_path)?.is_enabled(provider) {
+            return Err(
+                "예약된 에이전트의 프로바이더가 앱 설정에서 비활성화되어 있습니다.".to_string(),
+            );
+        }
+        let backend = agent::discover_backend(
+            provider,
+            runner,
+            agent::AgentRunnerBundles {
+                claude: &claude_runner,
+                grok: &grok_runner,
+            },
+        )?;
+        agent::AgentBackend::run(
+            &backend,
+            &project_id,
+            &workspace,
+            agent::ChatExecution {
+                approval_policy: agent::ApprovalPolicy::Never,
+                sandbox_mode: agent::SandboxMode::WorkspaceWrite,
+                network_access: true,
+                model: model.filter(|value| !value.trim().is_empty()),
+                effort: None,
+                event_sink: None,
+                environment: Vec::new(),
+                workspace_write_roots: Vec::new(),
+            },
+            request,
+            &|_, _| false,
         )
     })
     .await
@@ -2801,6 +3278,19 @@ fn project_worktree_root(
         .map(PathBuf::from)
         .unwrap_or_else(|| home.join("briar").join("worktrees"));
     Ok(Some(root.join(project_id)))
+}
+
+/// Whether this project opted its Auto Hunt sessions out of the filesystem
+/// sandbox. Off unless the CLI wrote `autoHunt.sandbox.fullAccess: true`.
+fn project_auto_hunt_full_access(config_path: &Path, project_id: &str) -> Result<bool, String> {
+    Ok(read_cli_config(config_path)?
+        .projects
+        .iter()
+        .find(|project| project.id == project_id)
+        .and_then(|project| project.auto_hunt.as_ref())
+        .and_then(|auto_hunt| auto_hunt.sandbox.as_ref())
+        .and_then(|sandbox| sandbox.full_access)
+        .unwrap_or(false))
 }
 
 fn project_chat_execution(
@@ -2881,13 +3371,20 @@ async fn start_project_auto_hunt(
         )?;
         // Each issue is worked in its own worktree outside the checkout, so the
         // agent's write sandbox has to include the worktree root as well as cwd.
+        let full_access = project_auto_hunt_full_access(&config_path, &project_id)?;
         let worktree_root = project_worktree_root(&config_path, &project_id, &home)?;
         let workspace_write_roots = match worktree_root {
             Some(root) => {
                 fs::create_dir_all(&root).map_err(|error| {
                     format!("자동사냥 워크트리 폴더를 만들지 못했습니다: {error}")
                 })?;
-                vec![path_display_string(root)?]
+                // Declared roots only mean something to a sandbox; with full
+                // access there is nothing to widen.
+                if full_access {
+                    Vec::new()
+                } else {
+                    vec![path_display_string(root)?]
+                }
             }
             None => Vec::new(),
         };
@@ -2923,6 +3420,7 @@ async fn start_project_auto_hunt(
                 event_sink,
                 environment: cli_environment.environment().to_vec(),
                 workspace_write_roots,
+                full_access,
             },
             request,
             &approve,
@@ -3397,6 +3895,16 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build());
     builder
         .setup(|_app| {
+            #[cfg(desktop)]
+            {
+                let resource_directory = _app.path().resource_dir()?;
+                let home = _app.path().home_dir()?;
+                if let Err(error) = sync_auto_hunt_assets(&resource_directory, &home) {
+                    eprintln!(
+                        "Briar CLI and Auto Hunt skill automatic synchronization failed: {error}"
+                    );
+                }
+            }
             #[cfg(all(target_os = "macos", not(dev)))]
             if let Some(main) = _app.get_webview_window("main") {
                 main.hide()?;
@@ -3421,6 +3929,7 @@ pub fn run() {
             inspect_repository_readiness,
             connected_project_ids,
             project_llm_chat,
+            run_project_agent_schedule,
             start_project_auto_hunt,
             load_auto_hunt_app_server_events,
             load_app_provider_settings,
@@ -3453,6 +3962,74 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
+    fn selects_an_issue_worktree_by_recorded_branch() {
+        let output = "\
+worktree /repo
+HEAD aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+branch refs/heads/main
+
+worktree /worktrees/fix-login-11111111
+HEAD bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+branch refs/heads/briar/fix-login-11111111
+";
+
+        assert_eq!(
+            select_issue_worktree(
+                output,
+                "11111111-2222-3333-4444-555555555555",
+                Some("briar/fix-login-11111111"),
+            )
+            .expect("recorded branch should resolve"),
+            PathBuf::from("/worktrees/fix-login-11111111")
+        );
+    }
+
+    #[test]
+    fn recovers_an_issue_worktree_from_the_run_token_without_a_recorded_branch() {
+        let output = "\
+worktree /repo
+HEAD aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+branch refs/heads/main
+
+worktree /worktrees/fix-login-11111111-2
+HEAD bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+branch refs/heads/briar/fix-login-11111111-2
+";
+
+        assert_eq!(
+            select_issue_worktree(output, "11111111-2222-3333-4444-555555555555", None,)
+                .expect("run token should resolve"),
+            PathBuf::from("/worktrees/fix-login-11111111-2")
+        );
+    }
+
+    #[test]
+    fn refuses_to_fall_back_when_the_issue_worktree_is_missing_or_ambiguous() {
+        let missing = "\
+worktree /repo
+HEAD aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+branch refs/heads/main
+";
+        assert!(
+            select_issue_worktree(missing, "11111111-2222-3333-4444-555555555555", None,).is_err()
+        );
+
+        let ambiguous = "\
+worktree /worktrees/first-11111111
+HEAD aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+branch refs/heads/briar/first-11111111
+
+worktree /worktrees/second-11111111
+HEAD bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+branch refs/heads/briar/second-11111111
+";
+        assert!(
+            select_issue_worktree(ambiguous, "11111111-2222-3333-4444-555555555555", None,)
+                .is_err()
+        );
+    }
+
+    #[test]
     fn unrestricted_project_chat_bypasses_approvals_and_sandboxing() {
         let execution = project_chat_execution(
             true,
@@ -3475,6 +4052,138 @@ mod tests {
         assert_eq!(execution.approval_policy, agent::ApprovalPolicy::OnRequest);
         assert_eq!(execution.sandbox_mode, agent::SandboxMode::ReadOnly);
         assert!(!execution.network_access);
+    }
+
+    #[test]
+    fn parses_the_remote_default_branch_from_ls_remote() {
+        assert_eq!(
+            remote_head_branch(
+                "ref: refs/heads/main\tHEAD\n0123456789abcdef0123456789abcdef01234567\tHEAD\n"
+            ),
+            Some("main")
+        );
+        assert_eq!(
+            remote_head_branch("0123456789abcdef0123456789abcdef01234567\tHEAD\n"),
+            None
+        );
+    }
+
+    #[test]
+    fn workflow_analysis_uses_and_removes_the_latest_remote_checkout() {
+        let Ok(git) = which::which("git") else {
+            return;
+        };
+        let root = tempfile::tempdir().expect("temporary repository root");
+        let remote = root.path().join("remote.git");
+        let publisher = root.path().join("publisher");
+        let connected = root.path().join("connected");
+
+        let run = |cwd: &Path, args: &[&str]| {
+            let output = Command::new(&git)
+                .arg("-C")
+                .arg(cwd)
+                .args(args)
+                .output()
+                .expect("git command");
+            assert!(
+                output.status.success(),
+                "git {:?} failed: {}",
+                args,
+                String::from_utf8_lossy(&output.stderr)
+            );
+            String::from_utf8_lossy(&output.stdout).trim().to_string()
+        };
+
+        fs::create_dir_all(&publisher).expect("publisher directory");
+        run(&publisher, &["init", "-b", "main"]);
+        run(&publisher, &["config", "user.name", "Briar Test"]);
+        run(
+            &publisher,
+            &["config", "user.email", "briar-test@example.com"],
+        );
+        fs::write(publisher.join("version.txt"), "old\n").expect("old version");
+        run(&publisher, &["add", "version.txt"]);
+        run(&publisher, &["commit", "-m", "old version"]);
+
+        let init_remote = Command::new(&git)
+            .args(["init", "--bare", "-b", "main"])
+            .arg(&remote)
+            .output()
+            .expect("bare remote");
+        assert!(
+            init_remote.status.success(),
+            "{}",
+            String::from_utf8_lossy(&init_remote.stderr)
+        );
+        run(
+            &publisher,
+            &["remote", "add", "origin", remote.to_string_lossy().as_ref()],
+        );
+        run(&publisher, &["push", "-u", "origin", "main"]);
+
+        let clone = Command::new(&git)
+            .arg("clone")
+            .arg(&remote)
+            .arg(&connected)
+            .output()
+            .expect("connected clone");
+        assert!(
+            clone.status.success(),
+            "{}",
+            String::from_utf8_lossy(&clone.stderr)
+        );
+        fs::write(publisher.join("version.txt"), "latest\n").expect("latest version");
+        run(&publisher, &["add", "version.txt"]);
+        run(&publisher, &["commit", "-m", "latest version"]);
+        let latest_sha = run(&publisher, &["rev-parse", "HEAD"]);
+        run(&publisher, &["push", "origin", "main"]);
+
+        assert_eq!(
+            fs::read_to_string(connected.join("version.txt")).expect("connected version"),
+            "old\n"
+        );
+        let runner = host::LocalRunner::new(
+            env::var_os("PATH").unwrap_or_default(),
+            root.path().to_path_buf(),
+        );
+        let latest = prepare_latest_remote_workspace(&runner, &connected)
+            .expect("latest workspace")
+            .expect("origin workspace");
+        assert_eq!(
+            fs::read_to_string(latest.checkout.join("version.txt")).expect("analysis version"),
+            "latest\n"
+        );
+        assert_eq!(run(&latest.checkout, &["rev-parse", "HEAD"]), latest_sha);
+
+        remove_latest_remote_workspace(&runner, &connected, &latest).expect("cleanup");
+        assert!(!latest.root.exists());
+    }
+
+    #[test]
+    fn workflow_analysis_uses_the_connected_checkout_without_an_origin() {
+        let Ok(git) = which::which("git") else {
+            return;
+        };
+        let repository = tempfile::tempdir().expect("temporary repository");
+        let init = Command::new(&git)
+            .arg("-C")
+            .arg(repository.path())
+            .args(["init", "-b", "main"])
+            .output()
+            .expect("git init");
+        assert!(
+            init.status.success(),
+            "{}",
+            String::from_utf8_lossy(&init.stderr)
+        );
+        let runner = host::LocalRunner::new(
+            env::var_os("PATH").unwrap_or_default(),
+            repository.path().to_path_buf(),
+        );
+
+        assert!(prepare_latest_remote_workspace(&runner, repository.path())
+            .expect("connected fallback")
+            .is_none());
     }
 
     #[test]
@@ -3652,7 +4361,7 @@ mod tests {
     }
 
     #[test]
-    fn writes_cli_connection_without_losing_existing_config() {
+    fn writes_cli_connection_without_losing_non_auth_config() {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("clock should be after unix epoch")
@@ -3720,7 +4429,7 @@ mod tests {
         )
         .expect("saved config should be valid json");
         assert_eq!(saved["apiUrl"], "https://briar.example.com");
-        assert_eq!(saved["userToken"], "existing-user-token");
+        assert!(saved["userToken"].is_null());
         assert_eq!(saved["customSetting"], true);
         assert_eq!(saved["projects"].as_array().map(Vec::len), Some(2));
         assert_eq!(saved["projects"][0]["label"], "keep me");
@@ -3729,6 +4438,7 @@ mod tests {
             saved["projects"][0]["autoHunt"]["linear"]["customLinearSetting"],
             true
         );
+        assert_eq!(saved["projects"][1]["apiUrl"], "https://briar.example.com");
         assert_eq!(
             saved["projects"][0]["autoHunt"]["customAutoHuntSetting"],
             true
@@ -4095,6 +4805,32 @@ mod tests {
             read_trimmed_file(&home.join(".codex/skills/briar-auto-hunt/VERSION")),
             Some(env!("CARGO_PKG_VERSION").to_string())
         );
+        assert!(
+            !sync_auto_hunt_assets(&resources, &home).expect("current assets should be checked")
+        );
+
+        fs::write(home.join(".local/share/briar/VERSION"), "0.0.0\n")
+            .expect("CLI version should be made stale");
+        assert!(
+            sync_auto_hunt_assets(&resources, &home).expect("stale assets should be synchronized")
+        );
+        assert_eq!(
+            read_trimmed_file(&home.join(".local/share/briar/VERSION")),
+            Some(env!("CARGO_PKG_VERSION").to_string())
+        );
+
+        fs::write(
+            home.join(".codex/skills/briar-auto-hunt/VERSION"),
+            "0.0.0\n",
+        )
+        .expect("skill version should be made stale");
+        assert!(
+            sync_auto_hunt_assets(&resources, &home).expect("stale skill should be synchronized")
+        );
+        assert_eq!(
+            read_trimmed_file(&home.join(".codex/skills/briar-auto-hunt/VERSION")),
+            Some(env!("CARGO_PKG_VERSION").to_string())
+        );
         fs::remove_dir_all(home).expect("test home should be removed");
     }
 
@@ -4365,6 +5101,7 @@ mod tests {
         config.projects.push(CliProject {
             id: "project-1".to_string(),
             repository_path: "/repo".to_string(),
+            api_url: None,
             execution_host_id: Some(host::ssh_execution_host_id(&saved.id)),
             repository_remote: None,
             agent_token: "briar_agent_x".to_string(),
@@ -4388,6 +5125,14 @@ mod tests {
 
     /// Write a project whose auto-hunt block carries CLI-owned worktree settings.
     fn config_with_worktree_settings(config_path: &Path, worktrees: StoredWorktreeConfig) {
+        config_with_cli_owned_settings(config_path, Some(worktrees), None)
+    }
+
+    fn config_with_cli_owned_settings(
+        config_path: &Path,
+        worktrees: Option<StoredWorktreeConfig>,
+        sandbox: Option<StoredSandboxConfig>,
+    ) {
         let config = CliConfig {
             api_url: "http://127.0.0.1:8787".to_string(),
             user_token: None,
@@ -4395,6 +5140,7 @@ mod tests {
             projects: vec![CliProject {
                 id: "project-1".to_string(),
                 repository_path: "/repo".to_string(),
+                api_url: Some("http://127.0.0.1:8787".to_string()),
                 execution_host_id: None,
                 repository_remote: None,
                 agent_token: "briar_agent_x".to_string(),
@@ -4405,7 +5151,8 @@ mod tests {
                     linear: None,
                     github_repository: None,
                     workflow: None,
-                    worktrees: Some(worktrees),
+                    worktrees,
+                    sandbox,
                     extra: BTreeMap::new(),
                 }),
                 extra: BTreeMap::new(),
@@ -4519,6 +5266,67 @@ mod tests {
             .expect("worktree settings should survive an app-side save");
         assert_eq!(worktrees.root.as_deref(), Some("/custom/worktrees"));
         assert_eq!(worktrees.branch_prefix.as_deref(), Some("hunt"));
+    }
+
+    #[test]
+    fn auto_hunt_keeps_its_sandbox_unless_a_project_opts_out() {
+        let config_path = host_test_config_path("sandbox-default");
+        config_with_cli_owned_settings(&config_path, None, None);
+        assert!(!project_auto_hunt_full_access(&config_path, "project-1")
+            .expect("sandbox setting should resolve"));
+
+        let opted_out = host_test_config_path("sandbox-full-access");
+        config_with_cli_owned_settings(
+            &opted_out,
+            None,
+            Some(StoredSandboxConfig {
+                full_access: Some(true),
+                extra: BTreeMap::new(),
+            }),
+        );
+        assert!(project_auto_hunt_full_access(&opted_out, "project-1")
+            .expect("sandbox setting should resolve"));
+    }
+
+    #[test]
+    fn saving_project_settings_keeps_the_sandbox_opt_out() {
+        let config_path = host_test_config_path("sandbox-preserve");
+        config_with_cli_owned_settings(
+            &config_path,
+            None,
+            Some(StoredSandboxConfig {
+                full_access: Some(true),
+                extra: BTreeMap::new(),
+            }),
+        );
+
+        write_cli_connection(
+            &config_path,
+            CliConnectionInput {
+                api_url: "http://127.0.0.1:8787".to_string(),
+                project_id: "project-1".to_string(),
+                agent_token: "briar_agent_x".to_string(),
+                repository_path: "/repo".to_string(),
+                repository_remote: None,
+                execution_host: None,
+            },
+            LocalProjectAgentConfig {
+                llm: agent::ProjectLlmSettings::default(),
+                auto_hunt: AutoHuntConfig {
+                    velen_org: "wordbricks".to_string(),
+                    data_source: None,
+                    linear_enabled: false,
+                    linear_source: None,
+                    linear_team: None,
+                    github_repository: None,
+                    workflow: default_workflow(),
+                },
+            },
+        )
+        .expect("settings should save");
+
+        assert!(project_auto_hunt_full_access(&config_path, "project-1")
+            .expect("sandbox setting should survive an app-side save"));
     }
 
     #[test]

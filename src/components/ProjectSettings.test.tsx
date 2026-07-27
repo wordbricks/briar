@@ -103,7 +103,46 @@ describe("ProjectSettings", () => {
       ).find((candidate) => candidate.dataset.value === value);
       await act(async () => option?.click());
     };
+    const openSection = async (
+      section: "general" | "issue-import" | "auto-hunt" | "workflow" | "agent",
+    ) => {
+      const button = container.querySelector<HTMLButtonElement>(
+        `[data-project-settings-section="${section}"]`,
+      );
+      await act(async () => button?.click());
+      return button;
+    };
 
+    expect(container.querySelector(".project-settings-sidebar")).not.toBeNull();
+    expect(
+      Array.from(
+        container.querySelectorAll<HTMLButtonElement>(
+          "[data-project-settings-section]",
+        ),
+      ).map((button) => button.textContent),
+    ).toEqual([
+      "General",
+      "이슈 임포트",
+      "자동사냥",
+      "워크플로우",
+      "에이전트 설정",
+    ]);
+    expect(
+      container
+        .querySelector('[data-project-settings-section="general"]')
+        ?.getAttribute("aria-current"),
+    ).toBe("page");
+    expect(
+      container.querySelector<HTMLElement>(".project-settings-card")?.hidden,
+    ).toBe(false);
+    expect(
+      container.querySelector<HTMLElement>(".project-settings-llm")?.hidden,
+    ).toBe(true);
+
+    await openSection("agent");
+    expect(
+      container.querySelector<HTMLElement>(".project-settings-llm")?.hidden,
+    ).toBe(false);
     expect(await optionValues("project-agent-provider")).toEqual([
       "codex",
       "claude",
@@ -151,21 +190,35 @@ describe("ProjectSettings", () => {
     expect(container.querySelector(".project-settings-llm")?.textContent).toContain(
       "Claude가 읽기 전용 경계를 넘어야 할 때 승인을 요청합니다.",
     );
+    expect(
+      container.querySelector<HTMLElement>(".project-settings-card")?.hidden,
+    ).toBe(true);
+
+    const saveButton = container.querySelector<HTMLButtonElement>(
+      ".project-settings-llm-control > button",
+    );
+    expect(saveButton?.textContent).toContain("저장");
+    await act(async () => saveButton?.click());
+    expect(saveButton?.textContent).toContain("저장됨");
+
+    await openSection("workflow");
+    expect(
+      container.querySelector<HTMLElement>(".project-settings-automation")?.hidden,
+    ).toBe(false);
     expect(container.querySelector(".project-settings-automation")?.textContent).toContain(
-      "completion",
-    );
-    expect(container.querySelector(".project-settings-auto-run")?.textContent).toContain(
-      "자동 실행 조건",
-    );
-    expect(container.querySelector(".project-settings-linear")?.textContent).toContain(
-      "Linear 연결",
+      "완료 조건",
     );
     expect(container.querySelector(".project-workflow-contract")?.textContent).toContain(
       "bun run test",
     );
     expect(container.querySelector(".project-workflow-contract")?.textContent).toContain(
-      '"enabled": false',
+      "릴리스비활성",
     );
+    expect(container.querySelector(".project-workflow-contract pre")).toBeNull();
+    expect(container.querySelectorAll(".project-workflow-stage")).toHaveLength(3);
+    expect(
+      container.querySelector(".project-workflow-contract")?.getAttribute("aria-label"),
+    ).toBe("Auto Hunt 워크플로 다이어그램");
 
     const regenerateButton = Array.from(
       container.querySelectorAll<HTMLButtonElement>(
@@ -178,13 +231,13 @@ describe("ProjectSettings", () => {
       "코드 분석 결과로 워크플로우를 갱신했습니다.",
     );
 
-    const saveButton = container.querySelector<HTMLButtonElement>(
-      ".project-settings-llm-control > button",
+    await openSection("auto-hunt");
+    expect(
+      container.querySelector<HTMLElement>(".project-settings-auto-run")?.hidden,
+    ).toBe(false);
+    expect(container.querySelector(".project-settings-auto-run")?.textContent).toContain(
+      "자동 실행 조건",
     );
-    expect(saveButton?.textContent).toContain("저장");
-    await act(async () => saveButton?.click());
-    expect(saveButton?.textContent).toContain("저장됨");
-
     const autoRunToggle = container.querySelector<HTMLInputElement>(
       ".project-settings-auto-run .project-settings-toggle input",
     );
@@ -197,6 +250,13 @@ describe("ProjectSettings", () => {
       expect.objectContaining({ enabled: true, maxIssuesPerSession: 3 }),
     );
 
+    await openSection("issue-import");
+    expect(
+      container.querySelector<HTMLElement>(".project-settings-linear")?.hidden,
+    ).toBe(false);
+    expect(container.querySelector(".project-settings-linear")?.textContent).toContain(
+      "Linear 연결",
+    );
     const linearTeam = container.querySelector<HTMLInputElement>(
       '.project-settings-linear input[aria-label="팀 키"]',
     );

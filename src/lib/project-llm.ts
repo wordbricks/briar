@@ -79,12 +79,23 @@ export type ProjectLlmChatInput = {
   instructions?: string | null;
   outputSchema?: JsonSchema | null;
   fullAccess?: boolean;
+  workspaceMode?: "connected" | "latestRemoteBase" | "issueWorktree";
+  workspaceRunId?: string | null;
+  workspaceBranch?: string | null;
 };
 
 export type ProjectLlmChatResponse = {
   conversationId: string;
   message: string;
   workspaceRoot: string;
+};
+
+export type ProjectAgentScheduleExecutionInput = {
+  projectId: string;
+  provider: AgentProvider;
+  model: string | null;
+  message: string;
+  instructions: string;
 };
 
 export type ProjectChatMessage = {
@@ -104,9 +115,9 @@ const isTauri = () =>
 
 /**
  * The only Briar frontend gateway for model-backed project features.
- * The native layer resolves projectId to the connected Git root and talks to
- * the selected local agent backend; callers cannot supply or override a
- * filesystem workspace.
+ * The native layer resolves projectId and optional issue identity to a
+ * registered Git workspace and talks to the selected local agent backend;
+ * callers cannot supply or override a filesystem path.
  */
 export async function chatWithProjectLlm(
   input: ProjectLlmChatInput,
@@ -118,11 +129,40 @@ export async function chatWithProjectLlm(
   return invoke<ProjectLlmChatResponse>("project_llm_chat", {
     projectId: input.projectId,
     fullAccess: input.fullAccess ?? false,
+    workspaceMode: input.workspaceMode ?? "connected",
+    workspaceRunId: input.workspaceRunId ?? null,
+    workspaceBranch: input.workspaceBranch ?? null,
     request: {
       message: input.message,
       conversationId: input.conversationId ?? null,
       instructions: input.instructions ?? null,
       outputSchema: input.outputSchema ?? null,
+    },
+  });
+}
+
+/**
+ * Run one claimed schedule in the locally registered project root.
+ *
+ * Callers choose a saved agent identity, never a filesystem path. The native
+ * layer resolves the connected root and confines writes to that workspace.
+ */
+export async function runProjectAgentSchedule(
+  input: ProjectAgentScheduleExecutionInput,
+): Promise<ProjectLlmChatResponse> {
+  if (!isTauri()) {
+    throw new Error("예약 에이전트는 Briar 데스크톱 앱에서 실행할 수 있습니다.");
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<ProjectLlmChatResponse>("run_project_agent_schedule", {
+    projectId: input.projectId,
+    provider: input.provider,
+    model: input.model,
+    request: {
+      message: input.message,
+      conversationId: null,
+      instructions: input.instructions,
+      outputSchema: null,
     },
   });
 }

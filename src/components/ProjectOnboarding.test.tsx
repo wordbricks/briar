@@ -99,6 +99,9 @@ describe("ProjectOnboarding", () => {
     expect(markup).toContain("워크플로우 자동 생성");
     expect(markup).toContain("Agent backend");
     expect(markup).toContain("저장소 선택");
+    expect(markup).not.toContain("실행 호스트");
+    expect(markup).not.toContain("SSH 별칭");
+    expect(markup).not.toContain("SSH 호스트 추가");
     expect(markup).toContain("백그라운드");
     expect(markup).toContain(">확인 ");
     expect(markup).not.toContain('label="Auto Hunt 워크플로"');

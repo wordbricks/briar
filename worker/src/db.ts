@@ -15,6 +15,14 @@ import {
   normalizeAutoHuntAutomation,
   type AutoHuntAutomation,
 } from "../../src/lib/auto-hunt-automation";
+import { defaultProjectAgentCopy } from "../../src/lib/project-agent";
+import {
+  nextProjectAgentScheduleRunAt,
+  type ProjectAgentScheduleRecurrence,
+} from "../../src/lib/project-agent-schedule";
+
+type ProjectAgentProvider = "codex" | "claude" | "grok";
+type ProjectAgentKind = "auto_hunt" | "custom";
 
 export type ProjectRow = {
   id: string;
@@ -52,6 +60,61 @@ export type ProjectSettingsRow = {
   github_repository: string | null;
   workflow_json: string;
   auto_hunt_automation_json: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ProjectAgentRow = {
+  id: string;
+  project_id: string;
+  name: string;
+  provider: ProjectAgentProvider;
+  model: string | null;
+  responsibility: string;
+  kind: ProjectAgentKind;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ProjectAgentScheduleRow = {
+  id: string;
+  project_id: string;
+  agent_id: string;
+  agent_name: string;
+  agent_provider: ProjectAgentProvider;
+  name: string;
+  recurrence: ProjectAgentScheduleRecurrence;
+  time_of_day: string;
+  day_of_week: number | null;
+  time_zone: string;
+  enabled: number;
+  next_run_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ProjectAgentScheduleRunStatus =
+  | "running"
+  | "completed"
+  | "failed";
+
+export type ProjectAgentScheduleRunRow = {
+  id: string;
+  project_id: string;
+  schedule_id: string;
+  schedule_name: string;
+  agent_id: string;
+  agent_name: string;
+  agent_provider: ProjectAgentProvider;
+  agent_model: string | null;
+  agent_responsibility: string;
+  status: ProjectAgentScheduleRunStatus;
+  scheduled_for: string;
+  lease_expires_at: string | null;
+  started_at: string;
+  completed_at: string | null;
+  result_summary: string | null;
+  error: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -248,22 +311,26 @@ export async function createOrganization(
     created_at: createdAt,
   };
   await db.batch([
-    db.prepare(
-      `insert into briar_organizations
+    db
+      .prepare(
+        `insert into briar_organizations
          (id, name, handle, created_at, updated_at)
        values (?, ?, ?, ?, ?)`,
-    ).bind(
-      organization.id,
-      organization.name,
-      organization.handle,
-      createdAt,
-      createdAt,
-    ),
-    db.prepare(
-      `insert into briar_organization_members
+      )
+      .bind(
+        organization.id,
+        organization.name,
+        organization.handle,
+        createdAt,
+        createdAt,
+      ),
+    db
+      .prepare(
+        `insert into briar_organization_members
          (organization_id, user_id, role, created_at, updated_at)
        values (?, ?, 'owner', ?, ?)`,
-    ).bind(organization.id, input.ownerUserId, createdAt, createdAt),
+      )
+      .bind(organization.id, input.ownerUserId, createdAt, createdAt),
   ]);
   return organization;
 }
@@ -292,9 +359,7 @@ export async function updateOrganization(
     )
     .bind(organizationId)
     .first<Omit<OrganizationRow, "role">>()
-    .then((organization) =>
-      organization ? { ...organization, role } : null,
-    );
+    .then((organization) => (organization ? { ...organization, role } : null));
 }
 
 export async function isOrganizationHandleAvailable(
@@ -313,10 +378,13 @@ export async function getOrganizationRole(
   organizationId: string,
   userId: string,
 ) {
-  const row = await db.prepare(
-    `select role from briar_organization_members
+  const row = await db
+    .prepare(
+      `select role from briar_organization_members
      where organization_id = ? and user_id = ?`,
-  ).bind(organizationId, userId).first<{ role: OrganizationRole }>();
+    )
+    .bind(organizationId, userId)
+    .first<{ role: OrganizationRole }>();
   return row?.role ?? null;
 }
 
@@ -324,15 +392,18 @@ export async function listOrganizationMembers(
   db: D1Database,
   organizationId: string,
 ) {
-  const result = await db.prepare(
-    `select member.user_id, user.name, user.email, user.image,
+  const result = await db
+    .prepare(
+      `select member.user_id, user.name, user.email, user.image,
             member.role, member.created_at
      from briar_organization_members member
      join "user" on user.id = member.user_id
      where member.organization_id = ?
      order by case member.role when 'owner' then 0 when 'admin' then 1 else 2 end,
               lower(user.name), lower(user.email)`,
-  ).bind(organizationId).all<OrganizationMemberRow>();
+    )
+    .bind(organizationId)
+    .all<OrganizationMemberRow>();
   return result.results;
 }
 
@@ -342,19 +413,23 @@ export async function addOrganizationMember(
   email: string,
   role: Exclude<OrganizationRole, "owner">,
 ) {
-  const user = await db.prepare(
-    `select id from "user" where lower(email) = lower(?)`,
-  ).bind(email).first<{ id: string }>();
+  const user = await db
+    .prepare(`select id from "user" where lower(email) = lower(?)`)
+    .bind(email)
+    .first<{ id: string }>();
   if (!user) return null;
   const now = new Date().toISOString();
-  await db.prepare(
-    `insert into briar_organization_members
+  await db
+    .prepare(
+      `insert into briar_organization_members
        (organization_id, user_id, role, created_at, updated_at)
      values (?, ?, ?, ?, ?)
      on conflict(organization_id, user_id) do update set
        role = excluded.role, updated_at = excluded.updated_at
      where briar_organization_members.role != 'owner'`,
-  ).bind(organizationId, user.id, role, now, now).run();
+    )
+    .bind(organizationId, user.id, role, now, now)
+    .run();
   return user.id;
 }
 
@@ -363,10 +438,13 @@ export async function removeOrganizationMember(
   organizationId: string,
   userId: string,
 ) {
-  const result = await db.prepare(
-    `delete from briar_organization_members
+  const result = await db
+    .prepare(
+      `delete from briar_organization_members
      where organization_id = ? and user_id = ? and role != 'owner'`,
-  ).bind(organizationId, userId).run();
+    )
+    .bind(organizationId, userId)
+    .run();
   return result.meta.changes > 0;
 }
 
@@ -406,6 +484,18 @@ export async function createProject(
     member_role: "owner",
     created_at: createdAt,
   };
+  const defaultAgentCopy = defaultProjectAgentCopy("en");
+  const defaultAgent: ProjectAgentRow = {
+    id: crypto.randomUUID(),
+    project_id: project.id,
+    name: defaultAgentCopy.name,
+    provider: "codex",
+    model: null,
+    responsibility: defaultAgentCopy.responsibility,
+    kind: "auto_hunt",
+    created_at: createdAt,
+    updated_at: createdAt,
+  };
   await db.batch([
     db
       .prepare(
@@ -430,6 +520,24 @@ export async function createProject(
          ) values (?, ?, ?)`,
       )
       .bind(project.id, createdAt, createdAt),
+    db
+      .prepare(
+        `insert into briar_project_agents (
+           id, project_id, name, provider, model, responsibility,
+           created_at, updated_at, kind
+         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        defaultAgent.id,
+        defaultAgent.project_id,
+        defaultAgent.name,
+        defaultAgent.provider,
+        defaultAgent.model,
+        defaultAgent.responsibility,
+        defaultAgent.created_at,
+        defaultAgent.updated_at,
+        defaultAgent.kind,
+      ),
   ]);
   return project;
 }
@@ -471,6 +579,486 @@ export async function deleteProject(
     .bind(projectId, userId)
     .run();
   return result.meta.changes > 0;
+}
+
+export async function listProjectAgents(db: D1Database, projectId: string) {
+  const result = await db
+    .prepare(
+      `select id, project_id, name, provider, model, responsibility,
+              kind, created_at, updated_at
+       from briar_project_agents
+       where project_id = ?
+       order by created_at, id`,
+    )
+    .bind(projectId)
+    .all<ProjectAgentRow>();
+  return result.results;
+}
+
+export async function createProjectAgent(
+  db: D1Database,
+  projectId: string,
+  input: {
+    name: string;
+    provider: ProjectAgentProvider;
+    model: string | null;
+    responsibility: string;
+  },
+) {
+  const createdAt = new Date().toISOString();
+  const agent: ProjectAgentRow = {
+    id: crypto.randomUUID(),
+    project_id: projectId,
+    name: input.name,
+    provider: input.provider,
+    model: input.model,
+    responsibility: input.responsibility,
+    kind: "custom",
+    created_at: createdAt,
+    updated_at: createdAt,
+  };
+  await db
+    .prepare(
+      `insert into briar_project_agents (
+         id, project_id, name, provider, model, responsibility,
+         created_at, updated_at, kind
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      agent.id,
+      agent.project_id,
+      agent.name,
+      agent.provider,
+      agent.model,
+      agent.responsibility,
+      agent.created_at,
+      agent.updated_at,
+      agent.kind,
+    )
+    .run();
+  return agent;
+}
+
+export async function listProjectAgentSchedules(
+  db: D1Database,
+  projectId: string,
+) {
+  const result = await db
+    .prepare(
+      `select schedule.id, schedule.project_id, schedule.agent_id,
+              agent.name as agent_name, agent.provider as agent_provider,
+              schedule.name, schedule.recurrence, schedule.time_of_day,
+              schedule.day_of_week, schedule.time_zone, schedule.enabled,
+              schedule.next_run_at,
+              schedule.created_at, schedule.updated_at
+       from briar_project_agent_schedules schedule
+       join briar_project_agents agent on agent.id = schedule.agent_id
+       where schedule.project_id = ?
+       order by schedule.created_at, schedule.id`,
+    )
+    .bind(projectId)
+    .all<ProjectAgentScheduleRow>();
+  return result.results;
+}
+
+export async function createProjectAgentSchedule(
+  db: D1Database,
+  projectId: string,
+  input: {
+    agentId: string;
+    name: string;
+    recurrence: ProjectAgentScheduleRecurrence;
+    timeOfDay: string;
+    dayOfWeek: number | null;
+    timeZone: string;
+  },
+) {
+  const agent = await db
+    .prepare(
+      `select id
+       from briar_project_agents
+       where id = ? and project_id = ?`,
+    )
+    .bind(input.agentId, projectId)
+    .first<{ id: string }>();
+  if (!agent) return null;
+
+  const id = crypto.randomUUID();
+  const createdAt = new Date().toISOString();
+  const nextRunAt = nextProjectAgentScheduleRunAt(
+    {
+      recurrence: input.recurrence,
+      timeOfDay: input.timeOfDay,
+      dayOfWeek: input.dayOfWeek,
+      timeZone: input.timeZone,
+    },
+    new Date(Date.parse(createdAt) - 60_000),
+  );
+  await db
+    .prepare(
+      `insert into briar_project_agent_schedules (
+         id, project_id, agent_id, name, recurrence, time_of_day,
+         day_of_week, time_zone, enabled, next_run_at, created_at, updated_at
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+    )
+    .bind(
+      id,
+      projectId,
+      input.agentId,
+      input.name,
+      input.recurrence,
+      input.timeOfDay,
+      input.dayOfWeek,
+      input.timeZone,
+      nextRunAt,
+      createdAt,
+      createdAt,
+    )
+    .run();
+
+  return await db
+    .prepare(
+      `select schedule.id, schedule.project_id, schedule.agent_id,
+              agent.name as agent_name, agent.provider as agent_provider,
+              schedule.name, schedule.recurrence, schedule.time_of_day,
+              schedule.day_of_week, schedule.time_zone, schedule.enabled,
+              schedule.next_run_at,
+              schedule.created_at, schedule.updated_at
+       from briar_project_agent_schedules schedule
+       join briar_project_agents agent on agent.id = schedule.agent_id
+       where schedule.id = ? and schedule.project_id = ?`,
+    )
+    .bind(id, projectId)
+    .first<ProjectAgentScheduleRow>();
+}
+
+const scheduleRunSelect = `
+  select run.id, run.project_id, run.schedule_id,
+         schedule.name as schedule_name,
+         run.agent_id, agent.name as agent_name,
+         agent.provider as agent_provider, agent.model as agent_model,
+         agent.responsibility as agent_responsibility,
+         run.status, run.scheduled_for, run.lease_expires_at,
+         run.started_at, run.completed_at, run.result_summary, run.error,
+         run.created_at, run.updated_at
+  from briar_project_agent_schedule_runs run
+  join briar_project_agent_schedules schedule on schedule.id = run.schedule_id
+  join briar_project_agents agent on agent.id = run.agent_id`;
+
+export const PROJECT_AGENT_SCHEDULE_LEASE_MS = 2 * 60 * 60_000;
+
+const scheduleLeaseExpiresAt = (observedAt: string) =>
+  new Date(
+    Date.parse(observedAt) + PROJECT_AGENT_SCHEDULE_LEASE_MS,
+  ).toISOString();
+
+async function initializeProjectAgentScheduleNextRuns(
+  db: D1Database,
+  projectId: string,
+  observedAt: string,
+) {
+  const schedules = await db
+    .prepare(
+      `select id, recurrence, time_of_day, day_of_week, time_zone, created_at
+       from briar_project_agent_schedules
+       where project_id = ? and enabled = 1 and next_run_at is null`,
+    )
+    .bind(projectId)
+    .all<{
+      id: string;
+      recurrence: ProjectAgentScheduleRecurrence;
+      time_of_day: string;
+      day_of_week: number | null;
+      time_zone: string;
+      created_at: string;
+    }>();
+  for (const schedule of schedules.results ?? []) {
+    const startAt = Math.min(
+      Date.parse(observedAt),
+      Date.parse(schedule.created_at),
+    );
+    const nextRunAt = nextProjectAgentScheduleRunAt(
+      {
+        recurrence: schedule.recurrence,
+        timeOfDay: schedule.time_of_day,
+        dayOfWeek: schedule.day_of_week,
+        timeZone: schedule.time_zone,
+      },
+      new Date(startAt - 60_000),
+    );
+    await db
+      .prepare(
+        `update briar_project_agent_schedules
+         set next_run_at = ?, updated_at = ?
+         where id = ? and project_id = ? and next_run_at is null`,
+      )
+      .bind(nextRunAt, observedAt, schedule.id, projectId)
+      .run();
+  }
+}
+
+async function reclaimExpiredProjectAgentScheduleRun(
+  db: D1Database,
+  projectId: string,
+  input: {
+    claimTokenHash: string;
+    observedAt: string;
+  },
+) {
+  const expired = await db
+    .prepare(
+      `select id
+       from briar_project_agent_schedule_runs
+       where project_id = ? and status = 'running'
+         and lease_expires_at is not null and lease_expires_at <= ?
+       order by scheduled_for, id
+       limit 1`,
+    )
+    .bind(projectId, input.observedAt)
+    .first<{ id: string }>();
+  if (!expired) return null;
+  const run = await db
+    .prepare(
+      `update briar_project_agent_schedule_runs
+       set claim_token_hash = ?, lease_expires_at = ?,
+           started_at = ?, updated_at = ?
+       where id = ? and project_id = ? and status = 'running'
+         and lease_expires_at is not null and lease_expires_at <= ?
+       returning id`,
+    )
+    .bind(
+      input.claimTokenHash,
+      scheduleLeaseExpiresAt(input.observedAt),
+      input.observedAt,
+      input.observedAt,
+      expired.id,
+      projectId,
+      input.observedAt,
+    )
+    .first<{ id: string }>();
+  if (!run) return null;
+  return db
+    .prepare(`${scheduleRunSelect} where run.id = ? and run.project_id = ?`)
+    .bind(run.id, projectId)
+    .first<ProjectAgentScheduleRunRow>();
+}
+
+export async function claimDueProjectAgentScheduleRun(
+  db: D1Database,
+  projectId: string,
+  input: {
+    claimTokenHash: string;
+    observedAt: string;
+  },
+) {
+  const reclaimed = await reclaimExpiredProjectAgentScheduleRun(
+    db,
+    projectId,
+    input,
+  );
+  if (reclaimed) return reclaimed;
+
+  await initializeProjectAgentScheduleNextRuns(db, projectId, input.observedAt);
+  const schedule = await db
+    .prepare(
+      `select schedule.id, schedule.agent_id, schedule.next_run_at,
+              schedule.recurrence, schedule.time_of_day,
+              schedule.day_of_week, schedule.time_zone
+       from briar_project_agent_schedules schedule
+       where schedule.project_id = ? and schedule.enabled = 1
+         and schedule.next_run_at is not null
+         and schedule.next_run_at <= ?
+         and not exists (
+           select 1 from briar_project_agent_schedule_runs active
+           where active.schedule_id = schedule.id and active.status = 'running'
+             and active.lease_expires_at > ?
+         )
+       order by schedule.next_run_at, schedule.id
+       limit 1`,
+    )
+    .bind(projectId, input.observedAt, input.observedAt)
+    .first<{
+      id: string;
+      agent_id: string;
+      next_run_at: string;
+      recurrence: ProjectAgentScheduleRecurrence;
+      time_of_day: string;
+      day_of_week: number | null;
+      time_zone: string;
+    }>();
+  if (!schedule) return null;
+
+  const nextRunAt = nextProjectAgentScheduleRunAt(
+    {
+      recurrence: schedule.recurrence,
+      timeOfDay: schedule.time_of_day,
+      dayOfWeek: schedule.day_of_week,
+      timeZone: schedule.time_zone,
+    },
+    new Date(Math.max(Date.parse(schedule.next_run_at), Date.parse(input.observedAt))),
+  );
+  const runId = crypto.randomUUID();
+  await db.batch([
+    db
+      .prepare(
+        `insert or ignore into briar_project_agent_schedule_runs (
+           id, project_id, schedule_id, agent_id, status, scheduled_for,
+           claim_token_hash, lease_expires_at, started_at, created_at, updated_at
+         )
+         select ?, ?, schedule.id, schedule.agent_id, 'running',
+                schedule.next_run_at, ?, ?, ?, ?, ?
+         from briar_project_agent_schedules schedule
+         where schedule.id = ? and schedule.project_id = ?
+           and schedule.enabled = 1 and schedule.next_run_at = ?
+           and not exists (
+             select 1 from briar_project_agent_schedule_runs active
+             where active.schedule_id = schedule.id and active.status = 'running'
+               and active.lease_expires_at > ?
+           )`,
+      )
+      .bind(
+        runId,
+        projectId,
+        input.claimTokenHash,
+        scheduleLeaseExpiresAt(input.observedAt),
+        input.observedAt,
+        input.observedAt,
+        input.observedAt,
+        schedule.id,
+        projectId,
+        schedule.next_run_at,
+        input.observedAt,
+      ),
+    db
+      .prepare(
+        `update briar_project_agent_schedules
+         set next_run_at = ?, updated_at = ?
+         where id = ? and project_id = ? and next_run_at = ?
+           and exists (
+             select 1 from briar_project_agent_schedule_runs run
+             where run.id = ? and run.claim_token_hash = ?
+           )`,
+      )
+      .bind(
+        nextRunAt,
+        input.observedAt,
+        schedule.id,
+        projectId,
+        schedule.next_run_at,
+        runId,
+        input.claimTokenHash,
+      ),
+  ]);
+  return db
+    .prepare(`${scheduleRunSelect} where run.id = ? and run.project_id = ?`)
+    .bind(runId, projectId)
+    .first<ProjectAgentScheduleRunRow>();
+}
+
+export async function completeProjectAgentScheduleRun(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  input: {
+    claimTokenHash: string;
+    status: Exclude<ProjectAgentScheduleRunStatus, "running">;
+    resultSummary: string | null;
+    error: string | null;
+    observedAt: string;
+  },
+) {
+  const row = await db
+    .prepare(
+      `update briar_project_agent_schedule_runs
+       set status = ?, claim_token_hash = null, lease_expires_at = null,
+           completed_at = ?, result_summary = ?, error = ?, updated_at = ?
+       where id = ? and project_id = ? and status = 'running'
+         and claim_token_hash = ?
+       returning id`,
+    )
+    .bind(
+      input.status,
+      input.observedAt,
+      input.resultSummary,
+      input.error,
+      input.observedAt,
+      runId,
+      projectId,
+      input.claimTokenHash,
+    )
+    .first<{ id: string }>();
+  if (!row) return null;
+  return db
+    .prepare(`${scheduleRunSelect} where run.id = ? and run.project_id = ?`)
+    .bind(runId, projectId)
+    .first<ProjectAgentScheduleRunRow>();
+}
+
+export async function renewProjectAgentScheduleRunLease(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  input: {
+    claimTokenHash: string;
+    observedAt: string;
+  },
+) {
+  return db
+    .prepare(
+      `update briar_project_agent_schedule_runs
+       set lease_expires_at = ?, updated_at = ?
+       where id = ? and project_id = ? and status = 'running'
+         and claim_token_hash = ?
+       returning id, lease_expires_at`,
+    )
+    .bind(
+      scheduleLeaseExpiresAt(input.observedAt),
+      input.observedAt,
+      runId,
+      projectId,
+      input.claimTokenHash,
+    )
+    .first<{ id: string; lease_expires_at: string }>();
+}
+
+export async function updateProjectAgent(
+  db: D1Database,
+  projectId: string,
+  agentId: string,
+  input: {
+    name: string;
+    provider: ProjectAgentProvider;
+    model: string | null;
+    responsibility: string;
+  },
+) {
+  const updatedAt = new Date().toISOString();
+  const result = await db
+    .prepare(
+      `update briar_project_agents
+       set name = ?, provider = ?, model = ?, responsibility = ?, updated_at = ?
+       where id = ? and project_id = ?`,
+    )
+    .bind(
+      input.name,
+      input.provider,
+      input.model,
+      input.responsibility,
+      updatedAt,
+      agentId,
+      projectId,
+    )
+    .run();
+  if (result.meta.changes === 0) return null;
+  return db
+    .prepare(
+      `select id, project_id, name, provider, model, responsibility,
+              kind, created_at, updated_at
+       from briar_project_agents
+       where id = ? and project_id = ?`,
+    )
+    .bind(agentId, projectId)
+    .first<ProjectAgentRow>();
 }
 
 export async function getProjectSettings(db: D1Database, projectId: string) {
@@ -761,10 +1349,7 @@ export async function rollbackNewAppIssue(
   return result.meta.changes === 1;
 }
 
-export async function getNextQueuedHuntRun(
-  db: D1Database,
-  projectId: string,
-) {
+export async function getNextQueuedHuntRun(db: D1Database, projectId: string) {
   return await db
     .prepare(
       `select run.*,
@@ -847,7 +1432,7 @@ export async function assertQueuedHuntClaim(
       lease_expires_at: string | null;
       context_json: string | null;
       claim_token_valid: number;
-  }>();
+    }>();
   if (!run) return;
   if (run.status !== "queued") {
     if (claimTokenHash && run.claim_token_valid !== 1) {
@@ -855,7 +1440,9 @@ export async function assertQueuedHuntClaim(
     }
     return;
   }
-  const context: unknown = run.context_json ? JSON.parse(run.context_json) : null;
+  const context: unknown = run.context_json
+    ? JSON.parse(run.context_json)
+    : null;
   const appCreated =
     context !== null &&
     typeof context === "object" &&
@@ -1000,7 +1587,9 @@ const assertCompletionEligible = async (
   const completedStageIds = new Set(
     completedStages.results.map((event) => event.workflow_stage),
   );
-  const missingStages = requiredStages.filter((stage) => !completedStageIds.has(stage));
+  const missingStages = requiredStages.filter(
+    (stage) => !completedStageIds.has(stage),
+  );
   if (missingStages.length > 0) {
     throw new HuntTransitionError(
       `Auto Hunt completion requires workflow stages: ${missingStages.join(", ")}`,
@@ -1016,11 +1605,15 @@ const assertCompletionEligible = async (
     requiredStages.includes("production_qa") &&
     !["passed", "skipped"].includes(run.production_qa_status ?? "")
   ) {
-    throw new HuntTransitionError("Auto Hunt completion requires Production QA");
+    throw new HuntTransitionError(
+      "Auto Hunt completion requires Production QA",
+    );
   }
   const resultSummary = input.resultSummary ?? run.result_summary;
   if (!resultSummary?.trim()) {
-    throw new HuntTransitionError("Auto Hunt completion requires a result summary");
+    throw new HuntTransitionError(
+      "Auto Hunt completion requires a result summary",
+    );
   }
   const settings = await getProjectSettings(db, projectId);
   const trackerProvider = input.tracker?.provider ?? run.tracker_provider;
@@ -1106,9 +1699,13 @@ const legacyStageFor = (
   if (status === "backlog") return "queued";
   if (status !== "running") return status;
   return workflowStage &&
-    ["analyzing", "implementing", "pr_open", "staging_qa", "production_qa"].includes(
-      workflowStage,
-    )
+    [
+      "analyzing",
+      "implementing",
+      "pr_open",
+      "staging_qa",
+      "production_qa",
+    ].includes(workflowStage)
     ? (workflowStage as AutoHuntStage)
     : "implementing";
 };
@@ -1175,10 +1772,16 @@ export async function recordHuntEvent(
 
   const runId =
     existingRun?.id ??
-    (await digestRunId(projectId, normalizedInput.source, normalizedInput.sourceKey));
+    (await digestRunId(
+      projectId,
+      normalizedInput.source,
+      normalizedInput.sourceKey,
+    ));
   const eventId = crypto.randomUUID();
   const recordedAt = new Date().toISOString();
-  const completedAt = ["completed", "cancelled"].includes(normalizedInput.status)
+  const completedAt = ["completed", "cancelled"].includes(
+    normalizedInput.status,
+  )
     ? normalizedInput.occurredAt
     : null;
   const mergedPullRequestUrls = normalizedUrls([
@@ -1335,36 +1938,61 @@ export async function recordHuntEvent(
            )`,
       )
       .bind(
-        normalizedInput.occurredAt, normalizedInput.title,
-        normalizedInput.occurredAt, normalizedInput.status,
-        normalizedInput.stage,
-        normalizedInput.occurredAt, normalizedInput.status,
+        normalizedInput.occurredAt,
+        normalizedInput.title,
+        normalizedInput.occurredAt,
         normalizedInput.status,
-        normalizedInput.occurredAt, normalizedInput.workflowStage,
-        normalizedInput.occurredAt, normalizedInput.detail,
-        normalizedInput.occurredAt, normalizedInput.priority,
-        normalizedInput.occurredAt, normalizedInput.repository,
-        normalizedInput.occurredAt, normalizedInput.branch,
-        normalizedInput.occurredAt, normalizedInput.commitSha,
+        normalizedInput.stage,
+        normalizedInput.occurredAt,
+        normalizedInput.status,
+        normalizedInput.status,
+        normalizedInput.occurredAt,
+        normalizedInput.workflowStage,
+        normalizedInput.occurredAt,
+        normalizedInput.detail,
+        normalizedInput.occurredAt,
+        normalizedInput.priority,
+        normalizedInput.occurredAt,
+        normalizedInput.repository,
+        normalizedInput.occurredAt,
+        normalizedInput.branch,
+        normalizedInput.occurredAt,
+        normalizedInput.commitSha,
         normalizedInput.tracker?.provider ?? null,
         normalizedInput.tracker?.issueId ?? null,
         normalizedInput.tracker?.identifier ?? null,
         normalizedInput.tracker?.url ?? null,
-        normalizedInput.occurredAt, normalizedInput.tracker?.state ?? null,
-        normalizedInput.occurredAt, normalizedInput.issueDescription,
-        normalizedInput.occurredAt, normalizedInput.resultSummary,
+        normalizedInput.occurredAt,
+        normalizedInput.tracker?.state ?? null,
+        normalizedInput.occurredAt,
+        normalizedInput.issueDescription,
+        normalizedInput.occurredAt,
+        normalizedInput.resultSummary,
         stableJson(mergedPullRequestUrls),
-        normalizedInput.occurredAt, normalizedInput.targetSha,
+        normalizedInput.occurredAt,
+        normalizedInput.targetSha,
         normalizedInput.sourceCreatedAt,
-        normalizedInput.occurredAt, normalizedInput.stage, qaStatus,
-        normalizedInput.occurredAt, normalizedInput.stage, qaStatus,
-        normalizedInput.occurredAt, normalizedInput.stagingQaDetail,
-        normalizedInput.occurredAt, normalizedInput.productionQaDetail,
+        normalizedInput.occurredAt,
+        normalizedInput.stage,
+        qaStatus,
+        normalizedInput.occurredAt,
+        normalizedInput.stage,
+        qaStatus,
+        normalizedInput.occurredAt,
+        normalizedInput.stagingQaDetail,
+        normalizedInput.occurredAt,
+        normalizedInput.productionQaDetail,
         normalizedInput.occurredAt,
         normalizedInput.context ? stableJson(normalizedInput.context) : null,
-        normalizedInput.occurredAt, normalizedInput.status,
-        normalizedInput.occurredAt, normalizedInput.status,
-        normalizedInput.occurredAt, recordedAt, runId, eventAttempt, eventId,
+        normalizedInput.occurredAt,
+        normalizedInput.status,
+        normalizedInput.occurredAt,
+        normalizedInput.status,
+        normalizedInput.occurredAt,
+        recordedAt,
+        runId,
+        eventAttempt,
+        eventId,
       ),
   ]);
 
@@ -1432,7 +2060,7 @@ export async function recoverHuntRun(
     };
   }
 
-  if (!( ["blocked", "failed"] as AutoHuntRunStatus[]).includes(run.status)) {
+  if (!(["blocked", "failed"] as AutoHuntRunStatus[]).includes(run.status)) {
     return {
       outcome: "ineligible",
       attempt: run.current_attempt,
@@ -1567,10 +2195,7 @@ export async function recoverHuntRun(
 }
 
 export type HuntMoveOutcome =
-  | "moved"
-  | "unchanged"
-  | "already_moved"
-  | "not_found";
+  "moved" | "unchanged" | "already_moved" | "not_found";
 
 export async function moveHuntRun(
   db: D1Database,
@@ -1632,8 +2257,7 @@ export async function moveHuntRun(
   }
   if (
     run.status === input.status &&
-    (input.status !== "running" ||
-      run.workflow_stage === targetWorkflowStage)
+    (input.status !== "running" || run.workflow_stage === targetWorkflowStage)
   ) {
     return {
       outcome: "unchanged",
@@ -1830,8 +2454,7 @@ export async function importLinearHuntRuns(
       }
 
       let status = raw.status;
-      let workflowStage =
-        status === "running" ? raw.workflowStage : null;
+      let workflowStage = status === "running" ? raw.workflowStage : null;
       if (
         status === "running" &&
         (!workflowStage || !workflowStageIds.has(workflowStage))
@@ -1856,9 +2479,7 @@ export async function importLinearHuntRuns(
           ? "Linear에서 가져온 이슈가 Auto Hunt 처리를 기다리고 있습니다."
           : `Linear에서 가져왔으며 ${status} 상태로 설정되었습니다.`;
       const resultSummary =
-        status === "completed"
-          ? "Imported from Linear as completed."
-          : null;
+        status === "completed" ? "Imported from Linear as completed." : null;
       const priority =
         raw.priority != null && raw.priority >= 1 && raw.priority <= 4
           ? raw.priority
@@ -1973,7 +2594,9 @@ export async function recordQaResult(
   if (!run) return "not_found";
 
   const statusColumn =
-    input.environment === "staging" ? "staging_qa_status" : "production_qa_status";
+    input.environment === "staging"
+      ? "staging_qa_status"
+      : "production_qa_status";
   const expectedStage =
     input.environment === "staging" ? "staging_qa" : "production_qa";
   const currentStatus = run[statusColumn];

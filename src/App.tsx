@@ -21,6 +21,8 @@ import { LoginScreen } from "./components/LoginScreen";
 import { OrganizationSettings } from "./components/OrganizationSettings";
 import { OrganizationCreate } from "./components/OrganizationCreate";
 import { ProjectOnboarding } from "./components/ProjectOnboarding";
+import { ProjectAgents } from "./components/ProjectAgents";
+import { ProjectSchedule } from "./components/ProjectSchedule";
 import { ProjectRepositorySetupDialog } from "./components/ProjectRepositorySetupDialog";
 import { ProjectSettings } from "./components/ProjectSettings";
 import { Sidebar } from "./components/Sidebar";
@@ -50,7 +52,8 @@ import { isRepositoryConnectedForImport } from "./lib/linear-import";
 
 type ActivePage =
   | "issues"
-  | "auto-hunt"
+  | "agents"
+  | "schedule"
   | "inbox"
   | "project-settings"
   | "organization-create"
@@ -334,7 +337,8 @@ export function App() {
             connectedProjectIds={briar.connectedProjectIds}
             isOpen={isSidebarOpen}
             onAddProject={briar.startProjectCreation}
-            onAutoHuntOpen={() => navigateToPage("auto-hunt")}
+            onAgentsOpen={() => navigateToPage("agents")}
+            onScheduleOpen={() => navigateToPage("schedule")}
             onInboxOpen={() => navigateToPage("inbox")}
             onIssuesOpen={() => navigateToPage("issues")}
             onAddOrganization={() => navigateToPage("organization-create")}
@@ -461,7 +465,7 @@ export function App() {
               } else {
                 setRequestedRunId(null);
                 setRequestedSessionId(message.targetId);
-                navigateToPage("auto-hunt");
+                navigateToPage("agents");
               }
             }}
             unreadCount={inbox.unreadCount}
@@ -510,25 +514,39 @@ export function App() {
             })}
             velen={briar.velen}
           />
-        ) : activePage === "auto-hunt" && activeProject ? (
-          <AutoHuntSessions
+        ) : activePage === "agents" && activeProject ? (
+          <ProjectAgents
             dashboard={briar.dashboard}
             error={briar.error}
             isSidebarOpen={isSidebarOpen}
-            requestedSessionId={requestedSessionId}
             onRequestedSessionOpen={() => setRequestedSessionId(null)}
-            onStart={(runs) =>
+            onStart={(agentId, runs) =>
               autoHunt.startSession(
                 activeProject.id,
                 runs,
                 () => void briar.refresh(),
                 {
+                  agentId,
                   maxIssues:
                     briar.dashboard?.settings.automation.maxIssuesPerSession,
                 },
               )
             }
+            project={activeProject}
+            requestedSessionId={requestedSessionId}
             sessions={autoHunt.sessions}
+            token={briar.token}
+          />
+        ) : activePage === "schedule" && activeProject ? (
+          <ProjectSchedule
+            dashboard={briar.dashboard}
+            isSidebarOpen={isSidebarOpen}
+            onRunOpen={(runId) => {
+              setRequestedRunId(runId);
+              navigateToPage("issues");
+            }}
+            project={activeProject}
+            token={briar.token}
           />
         ) : (
           <HuntDashboard

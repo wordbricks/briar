@@ -934,7 +934,7 @@ export function RunPage({
     { label: t("status.cancelled"), value: "status:cancelled" },
   ];
   const placementValue = placementIdForRun(run);
-  const issueContent = run.issueDescription || run.detail;
+  const issueContent = run.issueDescription?.trim() || null;
   const runAction = async (action: () => Promise<unknown>) => {
     try {
       await action();
@@ -1227,6 +1227,8 @@ function IssueActivity({ run }: { run: HuntRun }) {
         latestDisplay.label,
       )
     : localizeStatus(t, run.status, run.workflowStage, latestDisplay.label);
+  const latestMessage =
+    latestEvent?.detail?.trim() || run.detail?.trim() || latestLabel;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -1258,7 +1260,7 @@ function IssueActivity({ run }: { run: HuntRun }) {
       >
         <span className={`issue-activity-dot ${latestDisplay.tone}`} />
         <span className="issue-activity-latest">
-          <strong>{latestLabel}</strong>
+          <strong>{latestMessage}</strong>
           <small>
             {latestEvent
               ? `${t("run.attempt", { count: latestEvent.attempt })} · ${relativeTime(latestEvent.occurredAt, t)}`

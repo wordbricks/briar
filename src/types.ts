@@ -8,6 +8,7 @@ import {
 } from "./lib/auto-hunt-contract";
 import type { AutoHuntAutomation } from "./lib/auto-hunt-automation";
 import type { AgentProvider } from "./lib/project-llm";
+import type { ProjectAgentScheduleRecurrence } from "./lib/project-agent-schedule";
 
 export const huntStatuses = autoHuntRunStatuses;
 export type HuntStatus = AutoHuntRunStatus;
@@ -125,6 +126,75 @@ export type Project = {
   role?: "owner" | "admin" | "member";
   createdAt: string;
 };
+
+export type ProjectAgent = {
+  id: string;
+  projectId: string;
+  name: string;
+  provider: AgentProvider;
+  model: string | null;
+  responsibility: string;
+  kind: "auto_hunt" | "custom";
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateProjectAgentInput = {
+  name: string | null;
+  provider: AgentProvider;
+  model: string | null;
+  responsibility: string;
+};
+
+export type ProjectAgentSchedule = {
+  id: string;
+  projectId: string;
+  agentId: string;
+  agentName: string;
+  agentProvider: AgentProvider;
+  name: string;
+  recurrence: ProjectAgentScheduleRecurrence;
+  timeOfDay: string;
+  dayOfWeek: number | null;
+  timeZone: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateProjectAgentScheduleInput = {
+  agentId: string;
+  name: string;
+  recurrence: ProjectAgentScheduleRecurrence;
+  timeOfDay: string;
+  dayOfWeek: number | null;
+  timeZone: string;
+};
+
+export type ProjectAgentScheduleRun = {
+  id: string;
+  projectId: string;
+  scheduleId: string;
+  scheduleName: string;
+  agent: Pick<
+    ProjectAgent,
+    "id" | "name" | "provider" | "model" | "responsibility"
+  >;
+  status: "running" | "completed" | "failed";
+  scheduledFor: string;
+  leaseExpiresAt: string | null;
+  startedAt: string;
+  completedAt: string | null;
+  resultSummary: string | null;
+  error: string | null;
+};
+
+export type ClaimedProjectAgentScheduleRun = ProjectAgentScheduleRun & {
+  status: "running";
+  claimToken: string;
+};
+
+export type UpdateProjectAgentInput = CreateProjectAgentInput;
 
 export type Organization = {
   id: string;

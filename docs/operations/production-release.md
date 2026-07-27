@@ -35,6 +35,8 @@ Repeat that command for the following variables:
 - `APPLE_CERTIFICATE_PASSWORD` and `KEYCHAIN_PASSWORD`
 - `APPLE_API_KEY_CONTENT`
 - `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
+- `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`,
+  `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`
 
 Publishing additionally requires `CLOUDFLARE_API_TOKEN` in `.env.release` and
 an authenticated GitHub CLI session from `gh auth login`. The current Wrangler
@@ -125,7 +127,10 @@ xcrun stapler validate src-tauri/target/release/bundle/macos/Briar.app
 
 Tauri requires every updater archive to carry a signature; signature checks
 cannot be disabled. The app exposes an explicit update check and only installs
-archives accepted by its compiled public key.
+archives accepted by its compiled public key. After the updater relaunches the
+new app, desktop startup compares the installed Briar CLI and Auto Hunt skill
+versions with the new bundle and synchronizes stale or missing local assets
+before the main interface loads.
 
 References: [Tauri updater](https://v2.tauri.app/plugin/updater/),
 [macOS signing and notarization](https://v2.tauri.app/distribute/sign/macos/),

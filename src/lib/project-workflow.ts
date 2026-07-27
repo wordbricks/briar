@@ -100,7 +100,7 @@ const workflowOutputSchema: JsonSchema = {
 };
 
 const workflowInstructions = `You design repository-specific Briar Auto Hunt workflows.
-Inspect only the connected repository using read-only tools. Review manifests and scripts, CI configuration, release or deployment configuration, tests, documentation, and repository instructions before deciding.
+Inspect only the provided repository checkout using read-only tools. Briar prepares it from the latest origin default-branch commit when an origin exists, and otherwise uses the connected local checkout. Review manifests and scripts, CI configuration, release or deployment configuration, tests, documentation, and repository instructions before deciding.
 Return only the JSON object required by the output schema.
 
 Rules:
@@ -127,6 +127,7 @@ export async function generateProjectWorkflow(
     message: workflowRequest,
     instructions: workflowInstructions,
     outputSchema: workflowOutputSchema,
+    workspaceMode: "latestRemoteBase",
   });
   let parsed: unknown;
   try {

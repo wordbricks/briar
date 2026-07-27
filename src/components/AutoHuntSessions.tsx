@@ -25,7 +25,7 @@ import type {
   AutoHuntSessionIssueOutcome,
   AutoHuntSessionStatus,
 } from "../hooks/useAutoHuntSessions";
-import type { DashboardPayload, HuntRun } from "../types";
+import type { DashboardPayload, HuntRun, ProjectAgent } from "../types";
 
 function agentCopy(value: string) {
   return value
@@ -35,20 +35,24 @@ function agentCopy(value: string) {
 }
 
 export function AutoHuntSessions({
+  agent,
   companionMode = false,
   dashboard,
   error,
   isSidebarOpen,
+  onAgentBack,
   onBack,
   onRequestedSessionOpen,
   onStart,
   requestedSessionId = null,
   sessions,
 }: {
+  agent?: ProjectAgent;
   companionMode?: boolean;
   dashboard: DashboardPayload | null;
   error: string | null;
   isSidebarOpen: boolean;
+  onAgentBack?: () => void;
   onBack?: () => void;
   onRequestedSessionOpen?: () => void;
   onStart: (runs: HuntRun[]) => string;
@@ -60,14 +64,22 @@ export function AutoHuntSessions({
   const [startError, setStartError] = useState<string | null>(null);
   const projectId = dashboard?.project.id ?? null;
   const projectSessions = useMemo(
-    () => sessions.filter((session) => session.projectId === projectId),
-    [projectId, sessions],
+    () =>
+      sessions.filter(
+        (session) =>
+          session.projectId === projectId &&
+          (!agent ||
+            session.agentId === agent.id ||
+            (agent.kind === "auto_hunt" && !session.agentId)),
+      ),
+    [agent, projectId, sessions],
   );
   const maxIssues =
     dashboard?.settings?.automation?.maxIssuesPerSession ??
     defaultAutoHuntMaxIssues;
   const queued = selectAutoHuntCandidates(dashboard?.runs ?? [], maxIssues);
   const runningSession = projectSessions.find((session) => session.status === "running");
+  const canStart = !agent || agent.kind === "auto_hunt";
   const selectedSession = projectSessions.find(
     (session) => session.id === selectedSessionId,
   ) ?? null;
@@ -238,31 +250,48 @@ export function AutoHuntSessions({
   }
 
   return (
-    <main className="main-content" id="auto-hunt">
+    <main className="main-content" id={agent ? "project-agent-detail" : "auto-hunt"}>
       {!companionMode && <header className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region />}
 
       <div className="auto-hunt-scroll">
         <section className="auto-hunt-hero">
           <div className="auto-hunt-hero-copy">
-            <p className="eyebrow"><Sparkles size={13} />{agentCopy(t("autoHunt.eyebrow"))}</p>
-            <h1>{t("autoHunt.title")}</h1>
-            <p>{agentCopy(t("autoHunt.description"))}</p>
-            <div className="auto-hunt-capacity">
-              <span>{t("autoHunt.available", { count: queued.length })}</span>
-              <span>{t("autoHunt.limit", { count: maxIssues })}</span>
-            </div>
+            {agent && onAgentBack ? (
+              <button
+                className="auto-hunt-session-back project-agent-detail-back"
+                onClick={onAgentBack}
+                type="button"
+              >
+                <ArrowLeft size={16} />
+                {t("agents.back")}
+              </button>
+            ) : null}
+            <p className="eyebrow">
+              {agent ? <Bot size={13} /> : <Sparkles size={13} />}
+              {agent ? t("agents.detailEyebrow") : agentCopy(t("autoHunt.eyebrow"))}
+            </p>
+            <h1>{agent?.name ?? t("autoHunt.title")}</h1>
+            <p>{agent?.responsibility ?? agentCopy(t("autoHunt.description"))}</p>
+            {canStart ? (
+              <div className="auto-hunt-capacity">
+                <span>{t("autoHunt.available", { count: queued.length })}</span>
+                <span>{t("autoHunt.limit", { count: maxIssues })}</span>
+              </div>
+            ) : null}
           </div>
-          <button
-            className="auto-hunt-start-button"
-            disabled={!dashboard || queued.length === 0 || Boolean(runningSession)}
-            onClick={start}
-            type="button"
-          >
-            {runningSession
-              ? <LoaderCircle className="spin" size={18} />
-              : <Play fill="currentColor" size={17} />}
-            {runningSession ? t("autoHunt.running") : t("autoHunt.start")}
-          </button>
+          {canStart ? (
+            <button
+              className="auto-hunt-start-button"
+              disabled={!dashboard || queued.length === 0 || Boolean(runningSession)}
+              onClick={start}
+              type="button"
+            >
+              {runningSession
+                ? <LoaderCircle className="spin" size={18} />
+                : <Play fill="currentColor" size={17} />}
+              {runningSession ? t("autoHunt.running") : t("autoHunt.start")}
+            </button>
+          ) : null}
         </section>
 
         {(error || startError) && (
@@ -272,8 +301,12 @@ export function AutoHuntSessions({
         <section className="auto-hunt-session-panel">
           <header>
             <div>
-              <h2>{t("autoHunt.sessions")}</h2>
-              <p>{t("autoHunt.sessionsDescription")}</p>
+              <h2>{agent ? t("agents.sessions") : t("autoHunt.sessions")}</h2>
+              <p>
+                {agent
+                  ? t("agents.sessionsDescription")
+                  : t("autoHunt.sessionsDescription")}
+              </p>
             </div>
             <span>{projectSessions.length}</span>
           </header>
@@ -281,8 +314,16 @@ export function AutoHuntSessions({
           {projectSessions.length === 0 ? (
             <div className="auto-hunt-empty">
               <span><Bot size={22} /></span>
-              <strong>{t("autoHunt.emptyTitle")}</strong>
-              <p>{queued.length === 0 ? t("autoHunt.noQueued") : t("autoHunt.emptyDescription")}</p>
+              <strong>
+                {agent ? t("agents.emptySessions") : t("autoHunt.emptyTitle")}
+              </strong>
+              <p>
+                {agent && !canStart
+                  ? t("agents.emptySessionsDescription")
+                  : queued.length === 0
+                    ? t("autoHunt.noQueued")
+                    : t("autoHunt.emptyDescription")}
+              </p>
             </div>
           ) : (
             <div className="auto-hunt-session-list">

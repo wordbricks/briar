@@ -2,6 +2,7 @@ import {
   Activity,
   Bot,
   Building2,
+  CalendarDays,
   CircleAlert,
   ChevronDown,
   ChevronLeft,
@@ -30,7 +31,8 @@ export function Sidebar({
   connectedProjectIds,
   isOpen,
   onAddProject,
-  onAutoHuntOpen,
+  onAgentsOpen,
+  onScheduleOpen,
   onInboxOpen,
   onIssuesOpen,
   onAddOrganization,
@@ -49,7 +51,8 @@ export function Sidebar({
 }: {
   activePage:
     | "issues"
-    | "auto-hunt"
+    | "agents"
+    | "schedule"
     | "inbox"
     | "project-settings"
     | "organization-create"
@@ -60,7 +63,8 @@ export function Sidebar({
   connectedProjectIds: string[] | null;
   isOpen: boolean;
   onAddProject: () => void;
-  onAutoHuntOpen: () => void;
+  onAgentsOpen: () => void;
+  onScheduleOpen: () => void;
   onInboxOpen: () => void;
   onIssuesOpen: () => void;
   onAddOrganization: () => void;
@@ -531,16 +535,28 @@ export function Sidebar({
                       <span>{t("sidebar.issues")}</span>
                     </a>
                     <a
-                      aria-current={activePage === "auto-hunt" ? "page" : undefined}
-                      className={`sidebar-project-view${activePage === "auto-hunt" ? " active" : ""}`}
-                      href="#auto-hunt"
+                      aria-current={activePage === "agents" ? "page" : undefined}
+                      className={`sidebar-project-view${activePage === "agents" ? " active" : ""}`}
+                      href="#agents"
                       onClick={(event) => {
                         event.preventDefault();
-                        onAutoHuntOpen();
+                        onAgentsOpen();
                       }}
                     >
                       <Bot size={14} strokeWidth={1.7} />
-                      <span>{t("sidebar.autoHunt")}</span>
+                      <span>{t("sidebar.agents")}</span>
+                    </a>
+                    <a
+                      aria-current={activePage === "schedule" ? "page" : undefined}
+                      className={`sidebar-project-view${activePage === "schedule" ? " active" : ""}`}
+                      href="#schedule"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        onScheduleOpen();
+                      }}
+                    >
+                      <CalendarDays size={14} strokeWidth={1.7} />
+                      <span>{t("sidebar.schedule")}</span>
                     </a>
                   </div>
                 )}

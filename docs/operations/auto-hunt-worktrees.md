@@ -84,6 +84,37 @@ does, creates it, and passes it to the provider before the session starts:
 Turning worktrees off (`--disable-worktrees`) also stops the extra writable
 root from being granted.
 
+Reads are **not** restricted in either sandbox: an agent can read anything the
+user can, including other repositories and dotfiles. Only writes are confined —
+to the checkout, the declared worktree root, and `/tmp`/`$TMPDIR`. Grok has no
+filesystem sandbox at all (its ACP session is approval-gated), so a Grok project
+relies on the skill contract rather than on enforcement.
+
+### Opting out of the sandbox
+
+A project can drop the filesystem sandbox entirely:
+
+```sh
+briar auto-hunt configure --velen-org <slug> \
+  --enable-full-access --i-understand-the-risk
+```
+
+This switches codex to `danger-full-access` and claude to `bypassPermissions`,
+so agents can write anywhere the user can. It is off by default, requires the
+explicit risk acknowledgement flag, and `--disable-full-access` reverses it.
+`briar auto-hunt doctor` reports the current value under `sandbox.fullAccess`.
+
+Understand what it removes before enabling it. Auto Hunt input — issue titles,
+descriptions, attachments, repository content — is untrusted by contract, the
+session runs unattended, and network access is already unrestricted. The
+sandbox is what stops a prompt injection in that input from writing outside the
+worktree. The configured approval policy is deliberately left alone when full
+access is on, so pairing it with `on-request` approvals keeps a human gate in
+place; combining it with `never` leaves none.
+
+When full access is on, no writable roots are declared — there is no sandbox to
+widen.
+
 ## Operating it
 
 ```sh
@@ -101,6 +132,13 @@ briar auto-hunt configure --velen-org <slug> \
 `--disable-worktrees` returns a project to working directly in its checkout;
 `--enable-worktrees` turns it back on. The block is owned by the CLI and is
 preserved when the app saves project settings.
+
+Issue conversation replies follow the same isolation rule. When a user mentions
+`@briar`, the app resolves the run's recorded branch (or its run-id token before
+the branch has been recorded) against Git's registered worktree list and resumes
+the agent conversation with that worktree as its workspace. If the original
+worktree has already been removed, the reply fails explicitly instead of
+running in the shared connected checkout.
 
 Removal is conservative by design:
 
