@@ -23,6 +23,10 @@ describe("Worker HTTP contract", () => {
       recurrence: "weekly",
       timeOfDay: "09:30",
       dayOfWeek: 1,
+      intervalValue: 1,
+      intervalUnit: "day",
+      daysOfWeek: [],
+      notificationLevel: "important_updates",
       timeZone: "Asia/Seoul",
     });
     expect(
@@ -44,6 +48,39 @@ describe("Worker HTTP contract", () => {
         timeZone: "Mars/Olympus",
       }),
     ).toThrow(/Invalid IANA time zone/u);
+  });
+
+  it("normalizes custom schedule days and requires a weekly selection", () => {
+    expect(
+      projectAgentScheduleInputSchema.parse({
+        agentId: "11111111-1111-4111-8111-111111111111",
+        name: "Alternating review",
+        recurrence: "custom",
+        timeOfDay: "09:00",
+        intervalValue: 2,
+        intervalUnit: "week",
+        daysOfWeek: [5, 1, 5],
+        notificationLevel: "none",
+        timeZone: "Asia/Seoul",
+      }),
+    ).toMatchObject({
+      recurrence: "custom",
+      intervalValue: 2,
+      intervalUnit: "week",
+      daysOfWeek: [1, 5],
+      notificationLevel: "none",
+    });
+    expect(() =>
+      projectAgentScheduleInputSchema.parse({
+        agentId: "11111111-1111-4111-8111-111111111111",
+        name: "Missing weekdays",
+        recurrence: "custom",
+        timeOfDay: "09:00",
+        intervalUnit: "week",
+        daysOfWeek: [],
+        timeZone: "Asia/Seoul",
+      }),
+    ).toThrow(/Choose at least one weekday/u);
   });
 
   it("accepts a name-only organization update", () => {

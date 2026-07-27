@@ -77,4 +77,55 @@ describe("project agent schedule timing", () => {
       ),
     ).toBe("2026-03-08T07:30:00.000Z");
   });
+
+  it("keeps interval schedules aligned to their creation instant", () => {
+    const schedule = {
+      recurrence: "interval" as const,
+      intervalValue: 30,
+      intervalUnit: "minute" as const,
+      timeOfDay: "09:00",
+      dayOfWeek: null,
+      timeZone: "Etc/UTC",
+      anchorAt: "2026-07-27T00:00:00.000Z",
+    };
+
+    expect(
+      nextProjectAgentScheduleRunAt(
+        schedule,
+        new Date("2026-07-27T00:00:00.000Z"),
+      ),
+    ).toBe("2026-07-27T00:30:00.000Z");
+    expect(
+      nextProjectAgentScheduleRunAt(
+        schedule,
+        new Date("2026-07-27T01:05:00.000Z"),
+      ),
+    ).toBe("2026-07-27T01:30:00.000Z");
+  });
+
+  it("supports custom multi-day schedules every several weeks", () => {
+    const schedule = {
+      recurrence: "custom" as const,
+      intervalValue: 2,
+      intervalUnit: "week" as const,
+      daysOfWeek: [1, 3],
+      timeOfDay: "09:00",
+      dayOfWeek: null,
+      timeZone: "Etc/UTC",
+      anchorAt: "2026-07-27T00:00:00.000Z",
+    };
+
+    expect(
+      nextProjectAgentScheduleRunAt(
+        schedule,
+        new Date("2026-07-27T10:00:00.000Z"),
+      ),
+    ).toBe("2026-07-29T09:00:00.000Z");
+    expect(
+      nextProjectAgentScheduleRunAt(
+        schedule,
+        new Date("2026-07-29T09:00:00.000Z"),
+      ),
+    ).toBe("2026-08-10T09:00:00.000Z");
+  });
 });

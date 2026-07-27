@@ -1,11 +1,31 @@
 export const projectAgentScheduleRecurrences = [
+  "interval",
   "daily",
   "weekdays",
   "weekly",
+  "custom",
 ] as const;
 
 export type ProjectAgentScheduleRecurrence =
   (typeof projectAgentScheduleRecurrences)[number];
+
+export const projectAgentScheduleIntervalUnits = [
+  "minute",
+  "hour",
+  "day",
+  "week",
+] as const;
+
+export type ProjectAgentScheduleIntervalUnit =
+  (typeof projectAgentScheduleIntervalUnits)[number];
+
+export const projectAgentScheduleNotificationLevels = [
+  "important_updates",
+  "none",
+] as const;
+
+export type ProjectAgentScheduleNotificationLevel =
+  (typeof projectAgentScheduleNotificationLevels)[number];
 
 export function isValidProjectAgentScheduleTime(value: string) {
   return /^(?:[01]\d|2[0-3]):[0-5]\d$/u.test(value);
@@ -30,11 +50,51 @@ export function normalizeProjectAgentScheduleDay(
     : 1;
 }
 
+export function normalizeProjectAgentScheduleInterval(
+  value: number | null | undefined,
+) {
+  return Number.isInteger(value) && value! >= 1 && value! <= 999 ? value! : 1;
+}
+
+export function normalizeProjectAgentScheduleDays(
+  values: readonly number[] | null | undefined,
+) {
+  return [
+    ...new Set(
+      (values ?? []).filter(
+        (value) => Number.isInteger(value) && value >= 0 && value <= 6,
+      ),
+    ),
+  ].sort((left, right) => left - right);
+}
+
+export function serializeProjectAgentScheduleDays(
+  values: readonly number[] | null | undefined,
+) {
+  const normalized = normalizeProjectAgentScheduleDays(values);
+  return normalized.length > 0 ? normalized.join(",") : null;
+}
+
+export function parseProjectAgentScheduleDays(
+  value: string | null | undefined,
+) {
+  return normalizeProjectAgentScheduleDays(
+    value
+      ?.split(",")
+      .map(Number)
+      .filter((day) => Number.isFinite(day)),
+  );
+}
+
 export type ProjectAgentScheduleTiming = {
   recurrence: ProjectAgentScheduleRecurrence;
   timeOfDay: string;
   dayOfWeek: number | null;
   timeZone: string;
+  intervalValue?: number;
+  intervalUnit?: ProjectAgentScheduleIntervalUnit;
+  daysOfWeek?: number[];
+  anchorAt?: string;
 };
 
 type ZonedDateParts = {
@@ -150,16 +210,72 @@ function addUtcDays(date: ZonedDateParts, amount: number): ZonedDateParts {
   };
 }
 
+function calendarDayNumber(date: ZonedDateParts) {
+  return Math.floor(Date.UTC(date.year, date.month - 1, date.day) / 86_400_000);
+}
+
+function intervalMilliseconds(unit: ProjectAgentScheduleIntervalUnit) {
+  if (unit === "minute") return 60_000;
+  if (unit === "hour") return 60 * 60_000;
+  if (unit === "day") return 24 * 60 * 60_000;
+  return 7 * 24 * 60 * 60_000;
+}
+
+function nextIntervalRunAt(
+  schedule: ProjectAgentScheduleTiming,
+  after: Date,
+) {
+  const intervalValue = normalizeProjectAgentScheduleInterval(
+    schedule.intervalValue,
+  );
+  const intervalUnit = schedule.intervalUnit ?? "hour";
+  const duration = intervalValue * intervalMilliseconds(intervalUnit);
+  const parsedAnchor = schedule.anchorAt
+    ? Date.parse(schedule.anchorAt)
+    : Number.NaN;
+  const anchor = Number.isFinite(parsedAnchor) ? parsedAnchor : after.getTime();
+  const elapsed = after.getTime() - anchor;
+  const step = Math.max(1, Math.floor(elapsed / duration) + 1);
+  return new Date(anchor + step * duration).toISOString();
+}
+
 function dateMatches(
   date: ZonedDateParts,
-  recurrence: ProjectAgentScheduleRecurrence,
-  dayOfWeek: number | null,
+  schedule: ProjectAgentScheduleTiming,
+  anchor: ZonedDateParts,
 ) {
+  const { recurrence, dayOfWeek } = schedule;
   if (recurrence === "daily") return true;
   if (recurrence === "weekdays") {
     return date.dayOfWeek >= 1 && date.dayOfWeek <= 5;
   }
-  return date.dayOfWeek === normalizeProjectAgentScheduleDay(recurrence, dayOfWeek);
+  if (recurrence === "weekly") {
+    return (
+      date.dayOfWeek ===
+      normalizeProjectAgentScheduleDay(recurrence, dayOfWeek)
+    );
+  }
+  if (recurrence !== "custom") return false;
+
+  const interval = normalizeProjectAgentScheduleInterval(
+    schedule.intervalValue,
+  );
+  const dayOffset = calendarDayNumber(date) - calendarDayNumber(anchor);
+  if (dayOffset < 0) return false;
+  if ((schedule.intervalUnit ?? "week") === "day") {
+    return dayOffset % interval === 0;
+  }
+
+  const anchorWeek =
+    calendarDayNumber(anchor) - anchor.dayOfWeek;
+  const dateWeek = calendarDayNumber(date) - date.dayOfWeek;
+  const weekOffset = (dateWeek - anchorWeek) / 7;
+  const days = normalizeProjectAgentScheduleDays(schedule.daysOfWeek);
+  return (
+    weekOffset >= 0 &&
+    weekOffset % interval === 0 &&
+    (days.length > 0 ? days : [1]).includes(date.dayOfWeek)
+  );
 }
 
 /**
@@ -173,6 +289,9 @@ export function nextProjectAgentScheduleRunAt(
   schedule: ProjectAgentScheduleTiming,
   after: Date,
 ) {
+  if (schedule.recurrence === "interval") {
+    return nextIntervalRunAt(schedule, after);
+  }
   if (!isValidProjectAgentScheduleTime(schedule.timeOfDay)) {
     throw new RangeError(`Invalid schedule time: ${schedule.timeOfDay}`);
   }
@@ -184,9 +303,19 @@ export function nextProjectAgentScheduleRunAt(
     day: local.day,
     dayOfWeek: local.dayOfWeek,
   };
-  for (let offset = 0; offset <= 8; offset += 1) {
+  const anchorInstant = schedule.anchorAt
+    ? new Date(schedule.anchorAt)
+    : after;
+  const anchor = Number.isNaN(anchorInstant.getTime())
+    ? start
+    : partsAt(anchorInstant, schedule.timeZone);
+  const lookaheadDays =
+    schedule.recurrence === "custom"
+      ? normalizeProjectAgentScheduleInterval(schedule.intervalValue) * 7 + 7
+      : 8;
+  for (let offset = 0; offset <= lookaheadDays; offset += 1) {
     const date = addUtcDays(start, offset);
-    if (!dateMatches(date, schedule.recurrence, schedule.dayOfWeek)) continue;
+    if (!dateMatches(date, schedule, anchor)) continue;
     const candidate = zonedMinuteCandidates(
       date,
       hour,
