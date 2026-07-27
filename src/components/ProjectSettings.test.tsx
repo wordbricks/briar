@@ -116,6 +116,7 @@ describe("ProjectSettings", () => {
     expect(container.querySelector(".project-settings-llm")).toBeNull();
 
     await openSection("workflow");
+    expect(container.querySelector(".project-settings-card")).toBeNull();
     expect(
       container.querySelector<HTMLElement>(".project-settings-automation")?.hidden,
     ).toBe(false);
@@ -146,6 +147,7 @@ describe("ProjectSettings", () => {
     );
 
     await openSection("auto-hunt");
+    expect(container.querySelector(".project-settings-card")).toBeNull();
     expect(
       container.querySelector<HTMLElement>(".project-settings-auto-run")?.hidden,
     ).toBe(false);
@@ -165,6 +167,7 @@ describe("ProjectSettings", () => {
     );
 
     await openSection("issue-import");
+    expect(container.querySelector(".project-settings-card")).toBeNull();
     expect(
       container.querySelector<HTMLElement>(".project-settings-linear")?.hidden,
     ).toBe(false);
@@ -192,6 +195,11 @@ describe("ProjectSettings", () => {
       source: "linear://linear-wordbricks",
       teamKey: "BRIAR",
     });
+
+    await openSection("general");
+    expect(container.querySelector(".project-settings-card")?.textContent).toContain(
+      "Briar",
+    );
 
     await act(async () => root.unmount());
     container.remove();
