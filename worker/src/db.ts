@@ -745,6 +745,21 @@ const scheduleRunSelect = `
   join briar_project_agent_schedules schedule on schedule.id = run.schedule_id
   join briar_project_agents agent on agent.id = run.agent_id`;
 
+export async function listProjectAgentScheduleRuns(
+  db: D1Database,
+  projectId: string,
+) {
+  const result = await db
+    .prepare(
+      `${scheduleRunSelect}
+       where run.project_id = ?
+       order by run.started_at desc, run.id`,
+    )
+    .bind(projectId)
+    .all<ProjectAgentScheduleRunRow>();
+  return result.results;
+}
+
 export const PROJECT_AGENT_SCHEDULE_LEASE_MS = 2 * 60 * 60_000;
 
 const scheduleLeaseExpiresAt = (observedAt: string) =>

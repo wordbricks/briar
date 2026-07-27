@@ -1,11 +1,11 @@
-import type { HuntRun } from "../types";
+import type { ProjectAgentScheduleRun } from "../types";
 
 const dayCount = 7;
 const minuteMs = 60_000;
 
 export type ScheduleSegment = {
   id: string;
-  run: HuntRun;
+  run: ProjectAgentScheduleRun;
   agent: string;
   dayIndex: number;
   start: Date;
@@ -17,7 +17,7 @@ export type ScheduleSegment = {
 };
 
 type ExecutionWindow = {
-  run: HuntRun;
+  run: ProjectAgentScheduleRun;
   agent: string;
   start: Date;
   end: Date;
@@ -42,44 +42,14 @@ function validDate(value: string | null | undefined) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-export function agentNameForRun(run: HuntRun) {
-  if (run.claimedBy?.trim()) return run.claimedBy.trim();
-  const eventActor = [...run.events]
-    .sort(
-      (left, right) =>
-        new Date(right.occurredAt).getTime() -
-        new Date(left.occurredAt).getTime(),
-    )
-    .find((event) => event.actor.trim())?.actor;
-  return eventActor?.trim() || "Briar Agent";
-}
-
-function executionWindow(run: HuntRun, now: Date): ExecutionWindow | null {
-  const chronologicalEvents = run.events
-    .map((event) => ({ event, date: validDate(event.occurredAt) }))
-    .filter(
-      (
-        candidate,
-      ): candidate is { event: HuntRun["events"][number]; date: Date } =>
-        candidate.date !== null,
-    )
-    .sort((left, right) => left.date.getTime() - right.date.getTime());
-  const runningEvent = chronologicalEvents.find(
-    ({ event }) => event.status === "running",
-  );
-  const firstEvent = chronologicalEvents[0];
-  const lastEvent = chronologicalEvents[chronologicalEvents.length - 1];
-  const start =
-    validDate(run.claimedAt) ??
-    runningEvent?.date ??
-    firstEvent?.date ??
-    validDate(run.startedAt);
+function executionWindow(
+  run: ProjectAgentScheduleRun,
+  now: Date,
+): ExecutionWindow | null {
+  const start = validDate(run.startedAt);
   if (!start) return null;
 
-  const recordedEnd =
-    validDate(run.completedAt) ??
-    lastEvent?.date ??
-    validDate(run.updatedAt);
+  const recordedEnd = validDate(run.completedAt);
   const end =
     run.status === "running" && now.getTime() > start.getTime()
       ? now
@@ -89,7 +59,7 @@ function executionWindow(run: HuntRun, now: Date): ExecutionWindow | null {
       ? end
       : new Date(start.getTime() + 15 * minuteMs);
 
-  return { run, agent: agentNameForRun(run), start, end: normalizedEnd };
+  return { run, agent: run.agent.name, start, end: normalizedEnd };
 }
 
 export function minutesIntoCalendarDay(value: Date) {
@@ -136,7 +106,7 @@ function assignLanes(segments: ScheduleSegment[]) {
 }
 
 export function scheduleSegmentsForWeek(
-  runs: HuntRun[],
+  runs: ProjectAgentScheduleRun[],
   weekStart: Date,
   now: Date,
 ) {

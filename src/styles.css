@@ -1311,7 +1311,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .project-schedule-period button { width:29px; height:29px; padding:0; display:grid; place-items:center; border:1px solid #dedfdb; border-radius:8px; color:#6c6e68; background:#fff; cursor:pointer; }
 .project-schedule-period button:hover:not(:disabled) { color:#333631; background:#f5f5f2; }
 .project-schedule-period button:active:not(:disabled) { transform:scale(.95); }
-.project-schedule-period button:focus-visible,.project-schedule-event:focus-visible { z-index:8; outline:2px solid #3975d2; outline-offset:2px; }
+.project-schedule-period button:focus-visible { z-index:8; outline:2px solid #3975d2; outline-offset:2px; }
 .project-schedule-period .project-schedule-today { width:auto; margin-left:5px; padding:0 11px; font-size:8.5px; font-weight:650; }
 .project-schedule-period .project-schedule-today:disabled { color:#afb0ac; background:#f7f7f5; cursor:default; }
 .project-schedule-period strong { margin-left:10px; overflow:hidden; color:#3b3d39; font-size:11px; text-overflow:ellipsis; white-space:nowrap; }
@@ -1339,9 +1339,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .project-schedule-day-column.today { background-color:#fbfdff; }
 .project-schedule-now { height:1px; position:absolute; z-index:7; right:0; left:0; pointer-events:none; background:#dc3d36; }
 .project-schedule-now span { width:8px; height:8px; position:absolute; top:50%; left:-4px; border:2px solid #fff; border-radius:50%; background:#dc3d36; box-shadow:0 1px 4px rgba(174,37,32,.28); transform:translateY(-50%); }
-.project-schedule-event { min-height:18px; padding:5px 6px; position:absolute; z-index:3; overflow:hidden; display:flex; align-items:flex-start; flex-direction:column; gap:2px; border:0; border-left:3px solid rgba(30,77,139,.34); border-radius:6px; color:#123761; background:#dcecff; box-shadow:0 1px 3px rgba(24,65,117,.12); cursor:pointer; text-align:left; transition:filter .12s ease,transform .12s ease,box-shadow .12s ease; }
-.project-schedule-event:hover { z-index:6; filter:saturate(1.08) brightness(.985); box-shadow:0 5px 14px rgba(24,65,117,.18); transform:translateY(-1px); }
-.project-schedule-event:active { transform:scale(.985); }
+.project-schedule-event { min-height:18px; padding:5px 6px; position:absolute; z-index:3; overflow:hidden; display:flex; align-items:flex-start; flex-direction:column; gap:2px; border:0; border-left:3px solid rgba(30,77,139,.34); border-radius:6px; color:#123761; background:#dcecff; box-shadow:0 1px 3px rgba(24,65,117,.12); text-align:left; }
 .project-schedule-event-agent { max-width:100%; display:flex; align-items:center; gap:3px; }
 .project-schedule-event-agent svg { flex:0 0 auto; opacity:.72; }
 .project-schedule-event-agent strong { overflow:hidden; font-size:8px; line-height:1.25; text-overflow:ellipsis; white-space:nowrap; }

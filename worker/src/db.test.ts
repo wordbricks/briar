@@ -30,6 +30,7 @@ import {
   isOrganizationHandleAvailable,
   listProjects,
   listProjectAgents,
+  listProjectAgentScheduleRuns,
   listProjectAgentSchedules,
   moveHuntRun,
   recoverHuntRun,
@@ -373,6 +374,22 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         observedAt: "2026-07-27T09:01:00.000Z",
       }),
     ).resolves.toMatchObject({ status: "completed" });
+    await expect(listProjectAgentScheduleRuns(db, projectId)).resolves.toEqual([
+      expect.objectContaining({
+        id: claimed!.id,
+        agent_id: agent.id,
+        agent_name: "Auto Hunt agent",
+        schedule_name: "Daily project audit",
+        status: "completed",
+        result_summary: "Daily audit completed.",
+      }),
+    ]);
+    await expect(
+      listProjectAgentScheduleRuns(
+        db,
+        "22222222-2222-4222-8222-222222222222",
+      ),
+    ).resolves.toEqual([]);
   });
 
   it("requires the active claim token to complete a scheduled run", async () => {

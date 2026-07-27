@@ -422,6 +422,17 @@ export async function createProjectAgentSchedule(
   return projectAgentScheduleSchema.parse(result.schedule);
 }
 
+export async function loadProjectAgentScheduleRuns(
+  token: string,
+  projectId: string,
+): Promise<ProjectAgentScheduleRun[]> {
+  const result = await request<{ runs: unknown[] }>(
+    `/projects/${projectId}/agent-schedule-runs`,
+    token,
+  );
+  return z.array(projectAgentScheduleRunSchema).parse(result.runs);
+}
+
 export async function claimProjectAgentScheduleRun(
   token: string,
   projectId: string,
