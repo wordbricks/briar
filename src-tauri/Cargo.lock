@@ -301,6 +301,7 @@ version = "1.1.18"
 dependencies = [
  "chrono",
  "dirs",
+ "glob",
  "reqwest",
  "rustls",
  "serde",

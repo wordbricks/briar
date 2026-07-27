@@ -4,6 +4,7 @@ mod auto_hunt_dispatch;
 mod host;
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
     env,
@@ -28,6 +29,7 @@ const AUTO_HUNT_APP_SERVER_EVENT: &str = "auto-hunt-app-server-event";
 const AUTO_HUNT_DISPATCH_EVENT: &str = "auto-hunt-dispatch-event";
 const DEFAULT_MAIN_WINDOW_SIZE: (f64, f64) = (1280.0, 820.0);
 const ONBOARDING_MAIN_WINDOW_SIZE: (f64, f64) = (980.0, 680.0);
+const DISCOVERED_SSH_HOST_ID_PREFIX: &str = "ssh-config-";
 
 #[derive(Deserialize, Serialize)]
 struct StoredSession {
@@ -2207,6 +2209,110 @@ fn execution_host_summaries(config: &CliConfig) -> Vec<ExecutionHostSummary> {
     hosts
 }
 
+fn discovered_ssh_host_id(alias: &str) -> String {
+    let digest = Sha256::digest(alias.to_ascii_lowercase().as_bytes());
+    let suffix = digest[..12]
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    format!("{DISCOVERED_SSH_HOST_ID_PREFIX}{suffix}")
+}
+
+fn sync_discovered_ssh_hosts_with<F>(
+    config_path: &Path,
+    aliases: Vec<String>,
+    mut resolve: F,
+) -> Result<CliConfig, String>
+where
+    F: FnMut(&str) -> Option<host::SshResolvedTarget>,
+{
+    let mut config = read_cli_config(config_path)?;
+    let discovered_aliases = aliases
+        .iter()
+        .map(|alias| alias.to_ascii_lowercase())
+        .collect::<BTreeSet<_>>();
+    let stale_host_ids = config
+        .ssh_hosts
+        .iter()
+        .filter(|saved| {
+            saved.id.starts_with(DISCOVERED_SSH_HOST_ID_PREFIX)
+                && !discovered_aliases.contains(&saved.alias.to_ascii_lowercase())
+        })
+        .map(|saved| host::ssh_execution_host_id(&saved.id))
+        .collect::<BTreeSet<_>>();
+    let previous_host_count = config.ssh_hosts.len();
+    config.ssh_hosts.retain(|saved| {
+        !saved.id.starts_with(DISCOVERED_SSH_HOST_ID_PREFIX)
+            || discovered_aliases.contains(&saved.alias.to_ascii_lowercase())
+    });
+    let mut changed = config.ssh_hosts.len() != previous_host_count;
+    if !stale_host_ids.is_empty() {
+        for project in &mut config.projects {
+            if project
+                .execution_host_id
+                .as_ref()
+                .is_some_and(|host_id| stale_host_ids.contains(host_id))
+            {
+                project.execution_host_id = None;
+                changed = true;
+            }
+        }
+    }
+
+    for alias in aliases {
+        let resolved = resolve(&alias);
+        if let Some(saved) = config
+            .ssh_hosts
+            .iter_mut()
+            .find(|saved| saved.alias.eq_ignore_ascii_case(&alias))
+        {
+            if let Some(target) = resolved {
+                let next = host::SshHost {
+                    id: saved.id.clone(),
+                    label: if saved.id.starts_with(DISCOVERED_SSH_HOST_ID_PREFIX) {
+                        alias.clone()
+                    } else {
+                        saved.label.clone()
+                    },
+                    alias,
+                    hostname: Some(target.hostname),
+                    username: target.username,
+                    port: target.port,
+                    last_required_passphrase: saved.last_required_passphrase,
+                };
+                if *saved != next {
+                    *saved = next;
+                    changed = true;
+                }
+            }
+            continue;
+        }
+        let (hostname, username, port) = resolved
+            .map(|target| (Some(target.hostname), target.username, target.port))
+            .unwrap_or((None, None, None));
+        config.ssh_hosts.push(host::SshHost {
+            id: discovered_ssh_host_id(&alias),
+            label: alias.clone(),
+            alias,
+            hostname,
+            username,
+            port,
+            last_required_passphrase: None,
+        });
+        changed = true;
+    }
+
+    if changed {
+        write_cli_config(config_path, &config)?;
+    }
+    Ok(config)
+}
+
+fn sync_discovered_ssh_hosts(config_path: &Path, home: &Path) -> Result<CliConfig, String> {
+    let aliases = host::discover_ssh_config_aliases(home)?;
+    sync_discovered_ssh_hosts_with(config_path, aliases, |alias| resolve_ssh_alias(alias).ok())
+}
+
 /// Ask OpenSSH what an alias actually resolves to, instead of parsing
 /// `~/.ssh/config` ourselves: ProxyJump, Match blocks, and Include all apply.
 fn resolve_ssh_alias(alias: &str) -> Result<host::SshResolvedTarget, String> {
@@ -2245,15 +2351,22 @@ fn add_ssh_host_to(
         return Err("SSH 호스트 이름은 1자 이상 100자 이하여야 합니다.".to_string());
     }
     let mut config = read_cli_config(config_path)?;
+    let existing_id = config
+        .ssh_hosts
+        .iter()
+        .find(|existing| existing.alias.eq_ignore_ascii_case(&resolved.alias))
+        .map(|existing| existing.id.clone());
     let entry = host::SshHost {
-        id: format!(
-            "ssh-{}-{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|elapsed| elapsed.as_millis())
-                .unwrap_or_default(),
-            config.ssh_hosts.len()
-        ),
+        id: existing_id.unwrap_or_else(|| {
+            format!(
+                "ssh-{}-{}",
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|elapsed| elapsed.as_millis())
+                    .unwrap_or_default(),
+                config.ssh_hosts.len()
+            )
+        }),
         label,
         alias: resolved.alias,
         hostname: Some(resolved.hostname),
@@ -2295,8 +2408,12 @@ fn remove_ssh_host_from(config_path: &Path, host_id: &str) -> Result<Vec<String>
 #[tauri::command]
 async fn list_execution_hosts(app: tauri::AppHandle) -> Result<Vec<ExecutionHostSummary>, String> {
     let config_path = cli_config_path(&app)?;
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
-        Ok(execution_host_summaries(&read_cli_config(&config_path)?))
+        Ok(execution_host_summaries(&sync_discovered_ssh_hosts(
+            &config_path,
+            &home,
+        )?))
     })
     .await
     .map_err(|error| error.to_string())?
@@ -6007,6 +6124,80 @@ branch refs/heads/briar/second-11111111
         assert_eq!(config.ssh_hosts.len(), 1);
         assert_eq!(config.ssh_hosts[0].label, "second");
         assert_eq!(config.ssh_hosts[0].hostname.as_deref(), Some("10.0.0.9"));
+    }
+
+    #[test]
+    fn syncs_literal_ssh_config_hosts_with_stable_ids() {
+        let config_path = host_test_config_path("discover");
+        add_ssh_host_to(
+            &config_path,
+            "Manual build box".to_string(),
+            host::SshResolvedTarget {
+                alias: "build-box".to_string(),
+                hostname: "10.0.0.5".to_string(),
+                username: Some("builder".to_string()),
+                port: None,
+            },
+        )
+        .expect("manual host should be saved");
+
+        let first = sync_discovered_ssh_hosts_with(
+            &config_path,
+            vec!["kiwi".to_string(), "build-box".to_string()],
+            |alias| {
+                Some(host::SshResolvedTarget {
+                    alias: alias.to_string(),
+                    hostname: format!("{alias}.example.com"),
+                    username: Some("dev".to_string()),
+                    port: Some(22),
+                })
+            },
+        )
+        .expect("discovered hosts should sync");
+        assert_eq!(first.ssh_hosts.len(), 2);
+        let kiwi = first
+            .ssh_hosts
+            .iter()
+            .find(|saved| saved.alias == "kiwi")
+            .expect("kiwi should be discovered");
+        assert!(kiwi.id.starts_with(DISCOVERED_SSH_HOST_ID_PREFIX));
+        assert_eq!(kiwi.label, "kiwi");
+        let kiwi_id = kiwi.id.clone();
+        let manual = first
+            .ssh_hosts
+            .iter()
+            .find(|saved| saved.alias == "build-box")
+            .expect("manual host should remain");
+        assert_eq!(manual.label, "Manual build box");
+        assert_eq!(manual.hostname.as_deref(), Some("build-box.example.com"));
+
+        let second =
+            sync_discovered_ssh_hosts_with(&config_path, vec!["kiwi".to_string()], |alias| {
+                Some(host::SshResolvedTarget {
+                    alias: alias.to_string(),
+                    hostname: "10.0.0.9".to_string(),
+                    username: Some("dev".to_string()),
+                    port: Some(2222),
+                })
+            })
+            .expect("repeated discovery should update in place");
+        let kiwi = second
+            .ssh_hosts
+            .iter()
+            .find(|saved| saved.alias == "kiwi")
+            .expect("kiwi should remain");
+        assert_eq!(kiwi.id, kiwi_id);
+        assert_eq!(kiwi.hostname.as_deref(), Some("10.0.0.9"));
+        assert_eq!(kiwi.port, Some(2222));
+        assert!(second
+            .ssh_hosts
+            .iter()
+            .any(|saved| saved.alias == "build-box"));
+
+        let final_config = sync_discovered_ssh_hosts_with(&config_path, Vec::new(), |_| None)
+            .expect("stale discovered hosts should be removed");
+        assert_eq!(final_config.ssh_hosts.len(), 1);
+        assert_eq!(final_config.ssh_hosts[0].alias, "build-box");
     }
 
     #[test]

@@ -366,6 +366,7 @@ body { overflow: hidden; font-synthesis: none; }
 .project-remote-add-host { height:42px; padding:0 13px; display:flex; align-items:center; gap:6px; border:1px solid #dfe1dc; border-radius:11px; color:#565852; background:#fafbf8; cursor:pointer; font-size:var(--text-2xs); font-weight:600; }
 .project-remote-add-host:hover { border-color:#cfd3cc; background:#f4f6f1; }
 .project-remote-add-host:active { transform:scale(.98); }
+.project-remote-host-source { margin:7px 0 0; color:#969892; font:500 8px "DM Mono",ui-monospace,monospace; }
 .project-remote-add-host-form { margin-top:10px; padding:12px; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto; align-items:end; gap:9px; border:1px solid #e3e5df; border-radius:12px; background:#fafbf8; }
 .project-remote-add-host-form label { min-width:0; display:grid; gap:6px; }
 .project-remote-add-host-form input { width:100%; height:36px; padding:0 10px; border:1px solid #dfe1dc; border-radius:9px; color:#353732; background:var(--card); font-size:var(--text-2xs); }
