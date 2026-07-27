@@ -3498,3 +3498,34 @@ export async function updateIssue(
     )
     .first<HuntRunRow>();
 }
+
+export async function deleteIssue(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  observedAt: string,
+): Promise<"deleted" | "active" | "not_found"> {
+  const deleted = await db
+    .prepare(
+      `delete from briar_hunt_runs
+       where id = ? and project_id = ?
+         and status <> 'running'
+         and not (
+           status = 'queued'
+           and lease_expires_at is not null
+           and lease_expires_at > ?
+         )
+       returning id`,
+    )
+    .bind(runId, projectId, observedAt)
+    .first<{ id: string }>();
+  if (deleted) return "deleted";
+  const run = await db
+    .prepare(
+      `select id from briar_hunt_runs
+       where id = ? and project_id = ?`,
+    )
+    .bind(runId, projectId)
+    .first<{ id: string }>();
+  return run ? "active" : "not_found";
+}

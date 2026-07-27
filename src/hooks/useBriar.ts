@@ -10,6 +10,7 @@ import {
   createIssue,
   createIssueMessage,
   createProject,
+  deleteIssue as deleteRemoteIssue,
   deleteProject as deleteRemoteProject,
   importLinearIssues,
   isApiConfigured,
@@ -221,6 +222,7 @@ export function useBriar() {
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [isCreatingIssue, setIsCreatingIssue] = useState(false);
   const [updatingIssueId, setUpdatingIssueId] = useState<string | null>(null);
+  const [deletingIssueId, setDeletingIssueId] = useState<string | null>(null);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const [recoveringRunId, setRecoveringRunId] = useState<string | null>(null);
   const issueMessagesByRun = useRef<Record<string, IssueMessage[]>>(
@@ -1591,6 +1593,38 @@ export function useBriar() {
     [activeProjectId, dashboard, token],
   );
 
+  const removeIssue = useCallback(
+    async (runId: string) => {
+      if (!activeProjectId || !dashboard) {
+        throw new Error("이슈를 삭제할 프로젝트가 없습니다.");
+      }
+      setDeletingIssueId(runId);
+      setError(null);
+      try {
+        if (!demoMode) {
+          if (!token) throw new Error("로그인이 필요합니다.");
+          await deleteRemoteIssue(token, activeProjectId, runId);
+        }
+        setDashboard((current) =>
+          current
+            ? {
+                ...current,
+                runs: current.runs.filter((run) => run.id !== runId),
+              }
+            : current,
+        );
+        delete issueMessagesByRun.current[runId];
+      } catch (caught) {
+        const message = caught instanceof Error ? caught.message : String(caught);
+        setError(message);
+        throw caught;
+      } finally {
+        setDeletingIssueId(null);
+      }
+    },
+    [activeProjectId, dashboard, token],
+  );
+
   const readIssueMessages = useCallback(
     async (runId: string) => {
       if (!activeProjectId) throw new Error("메시지를 불러올 프로젝트가 없습니다.");
@@ -1963,7 +1997,9 @@ export function useBriar() {
       activeProjectId,
     ),
     dashboard,
+    deleteIssue: removeIssue,
     deleteProject: removeProject,
+    deletingIssueId,
     deletingProjectId,
     demoMode,
     companionMode,

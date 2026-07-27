@@ -4,6 +4,7 @@ import {
   completeProjectAgentScheduleRun,
   createProjectAgent,
   createProjectAgentSchedule,
+  deleteIssue,
   deleteProjectAgentSchedule,
   loadProjectAgentScheduleRuns,
   loadProjectAgents,
@@ -74,6 +75,19 @@ describe("API errors", () => {
           priority: 1,
         }),
       }),
+    );
+  });
+
+  it("deletes an issue through its project-scoped run endpoint", async () => {
+    const projectId = "22222222-2222-4222-8222-222222222222";
+    const runId = "11111111-1111-4111-8111-111111111111";
+    const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(deleteIssue("token", projectId, runId)).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(`/projects/${projectId}/runs/${runId}`),
+      expect.objectContaining({ method: "DELETE" }),
     );
   });
 

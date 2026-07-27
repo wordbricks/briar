@@ -3,7 +3,7 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { demoDashboard } from "../lib/demo-data";
 import type { IssueMessage } from "../types";
 import {
@@ -16,11 +16,13 @@ import {
 const dashboardProps = {
   error: null,
   isCreatingIssue: false,
+  deletingIssueId: null,
   updatingIssueId: null,
   recoveringRunId: null,
   recoveryError: null,
   isSidebarOpen: true,
   onCreateIssue: async () => undefined,
+  onDeleteIssue: async () => undefined,
   onUpdateIssue: async () => undefined,
   onLoadAttachment: async () => new Blob(),
   onLoadIssueMessages: async () => [],
@@ -109,7 +111,7 @@ describe("HuntDashboard", () => {
       container.querySelector<HTMLElement>(".issue-list-row")?.click();
     });
     expect(container.querySelector(".run-page")).not.toBeNull();
-    expect(container.querySelector(".run-page-edit")).not.toBeNull();
+    expect(container.querySelector(".run-page-actions-trigger")).not.toBeNull();
     expect(container.querySelector(".issue-list")).toBeNull();
 
     await act(async () => {
@@ -118,6 +120,57 @@ describe("HuntDashboard", () => {
     expect(container.querySelector(".issue-list")).not.toBeNull();
     expect(container.querySelector(".kanban-board")).toBeNull();
     await act(async () => root.unmount());
+  });
+
+  it("shows edit and delete in the title actions menu and confirms deletion", async () => {
+    const onDeleteIssue = vi.fn(async () => undefined);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={demoDashboard}
+        onDeleteIssue={onDeleteIssue}
+      />,
+    ));
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".kanban-card")?.click();
+    });
+
+    const title = container.querySelector(".run-page-window-title");
+    const trigger = container.querySelector<HTMLButtonElement>(
+      ".run-page-actions-trigger",
+    );
+    expect(title?.nextElementSibling).toBe(trigger);
+    expect(container.querySelector(".run-page-edit")).toBeNull();
+
+    await act(async () => {
+      trigger?.dispatchEvent(
+        new MouseEvent("pointerdown", { bubbles: true, button: 0 }),
+      );
+    });
+    const menu = document.body.querySelector('[role="menu"]');
+    expect(menu?.textContent).toContain("수정");
+    expect(menu?.textContent).toContain("삭제");
+
+    const deleteItem = Array.from(
+      menu?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [],
+    ).find((item) => item.textContent?.includes("삭제"));
+    await act(async () => deleteItem?.click());
+    expect(document.body.textContent).toContain(
+      "활동 기록, 대화, 첨부 파일이 영구적으로 삭제됩니다",
+    );
+
+    const confirmButton = Array.from(
+      document.body.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent?.trim() === "삭제");
+    await act(async () => confirmButton?.click());
+    expect(onDeleteIssue).toHaveBeenCalledWith(demoDashboard.runs[0].id);
+    expect(container.querySelector(".run-page")).toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
   });
 
   it("renders the companion queue directly in its parent", () => {
@@ -473,6 +526,7 @@ describe("HuntDashboard", () => {
         isRecovering={false}
         onBack={() => undefined}
         onCancel={async () => undefined}
+        onDelete={async () => undefined}
         onLoadAttachment={async () => new Blob()}
         onLoadIssueMessages={async () => []}
         onMove={async () => undefined}
@@ -489,7 +543,7 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("run-page-back");
     expect(markup).toContain(`AH-${demoDashboard.runs[0].runNumber}`);
     expect(markup).toContain(`<h1 id="run-page-title">${demoDashboard.runs[0].title}</h1>`);
-    expect(markup).toContain('class="run-page-edit"');
+    expect(markup).toContain('class="run-page-actions-trigger"');
   });
 
   it("renders the issue description as Markdown above the conversation", () => {

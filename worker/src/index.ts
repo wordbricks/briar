@@ -52,6 +52,7 @@ import {
   createProjectAgentSchedule,
   createProject,
   deleteProjectAgentSchedule,
+  deleteIssue,
   deleteProject,
   EventKeyConflictError,
   findProjectIdByAgentTokenHash,
@@ -2248,6 +2249,43 @@ async function route(
       description: run.issue_description,
       priority: run.priority,
     });
+  }
+  if (issueUpdateMatch && request.method === "DELETE") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, issueUpdateMatch[1], session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    const attachments = await listIssueAttachments(
+      db,
+      project.id,
+      issueUpdateMatch[2],
+    );
+    const outcome = await deleteIssue(
+      db,
+      project.id,
+      issueUpdateMatch[2],
+      new Date().toISOString(),
+    );
+    if (outcome === "not_found") throw new HttpError(404, "Run not found");
+    if (outcome === "active") {
+      throw new HttpError(409, "An active Auto Hunt issue cannot be deleted");
+    }
+    const attachmentKeys = attachments.map(
+      (attachment) => attachment.object_key,
+    );
+    if (attachmentKeys.length > 0) {
+      try {
+        await attachmentsBucket.delete(attachmentKeys);
+      } catch (error) {
+        console.error(
+          JSON.stringify({
+            message: "deleted issue attachment cleanup failed",
+            error: error instanceof Error ? error.message : String(error),
+            runId: issueUpdateMatch[2],
+          }),
+        );
+      }
+    }
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   if (recoveryMatch && request.method === "POST") {
