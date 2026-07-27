@@ -24,6 +24,7 @@ import type { MessageKey } from "../i18n/messages";
 import {
   createProjectAgentSchedule,
   loadProjectAgentSchedules,
+  loadProjectAgentScheduleRuns,
   loadProjectAgents,
 } from "../lib/api";
 import { demoProjectAgents } from "../lib/demo-project-agents";
@@ -34,7 +35,6 @@ import {
 } from "../lib/project-agent-schedule";
 import {
   addCalendarDays,
-  agentNameForRun,
   minutesIntoCalendarDay,
   scheduleSegmentsForWeek,
   startOfCalendarWeek,
@@ -42,10 +42,10 @@ import {
 } from "../lib/project-schedule";
 import type {
   CreateProjectAgentScheduleInput,
-  DashboardPayload,
   Project,
   ProjectAgent,
   ProjectAgentSchedule,
+  ProjectAgentScheduleRun,
 } from "../types";
 import { NativeSelect } from "./NativeSelect";
 import { SelectMenu } from "./SelectMenu";
@@ -54,11 +54,11 @@ const dayCount = 7;
 const allAgentsFilter = "all";
 const agentFilterPrefix = "agent:";
 
-function agentFilterValue(name: string) {
-  return `${agentFilterPrefix}${name}`;
+function agentFilterValue(id: string) {
+  return `${agentFilterPrefix}${id}`;
 }
 
-function agentNameFromFilter(value: string) {
+function agentIdFromFilter(value: string) {
   return value.startsWith(agentFilterPrefix)
     ? value.slice(agentFilterPrefix.length)
     : null;
@@ -113,17 +113,13 @@ function formatDuration(minutes: number) {
 }
 
 export function ProjectSchedule({
-  dashboard,
   isSidebarOpen,
   now: providedNow,
-  onRunOpen,
   project,
   token,
 }: {
-  dashboard: DashboardPayload | null;
   isSidebarOpen: boolean;
   now?: Date;
-  onRunOpen: (runId: string) => void;
   project: Project;
   token: string | null;
 }) {
@@ -136,48 +132,68 @@ export function ProjectSchedule({
   const calendarScrollRef = useRef<HTMLDivElement>(null);
   const [agents, setAgents] = useState<ProjectAgent[]>([]);
   const [schedules, setSchedules] = useState<ProjectAgentSchedule[]>([]);
+  const [scheduleRuns, setScheduleRuns] = useState<ProjectAgentScheduleRun[]>(
+    [],
+  );
   const [isScheduleDataLoading, setIsScheduleDataLoading] = useState(true);
   const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
   const [isCreatingSchedule, setIsCreatingSchedule] = useState(false);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [agentFilter, setAgentFilter] = useState(allAgentsFilter);
-  const availableAgentNames = useMemo(() => {
-    const names = new Set<string>();
-    for (const agent of agents) names.add(agent.name);
-    for (const schedule of schedules) names.add(schedule.agentName);
-    for (const run of dashboard?.runs ?? []) names.add(agentNameForRun(run));
-    return [...names]
-      .filter((name) => name.trim().length > 0)
-      .sort((left, right) => left.localeCompare(right, localeTag));
-  }, [agents, dashboard?.runs, localeTag, schedules]);
+  const availableAgents = useMemo(
+    () =>
+      [...agents].sort((left, right) =>
+        left.name.localeCompare(right.name, localeTag),
+      ),
+    [agents, localeTag],
+  );
+  const agentById = useMemo(
+    () => new Map(agents.map((agent) => [agent.id, agent])),
+    [agents],
+  );
   const agentFilterOptions = useMemo(
     () => [
       { label: t("schedule.allAgents"), value: allAgentsFilter },
-      ...availableAgentNames.map((name) => ({
-        label: name,
-        value: agentFilterValue(name),
+      ...availableAgents.map((agent) => ({
+        label: agent.name,
+        value: agentFilterValue(agent.id),
       })),
     ],
-    [availableAgentNames, t],
+    [availableAgents, t],
   );
-  const selectedAgentName = agentNameFromFilter(agentFilter);
+  const selectedAgentId = agentIdFromFilter(agentFilter);
+  const selectedAgent = agents.find((agent) => agent.id === selectedAgentId);
   const filteredSchedules = useMemo(
     () =>
-      selectedAgentName
-        ? schedules.filter(
-            (schedule) => schedule.agentName === selectedAgentName,
-          )
+      selectedAgentId
+        ? schedules.filter((schedule) => schedule.agentId === selectedAgentId)
         : schedules,
-    [schedules, selectedAgentName],
+    [schedules, selectedAgentId],
   );
   const filteredRuns = useMemo(
-    () =>
-      selectedAgentName
-        ? (dashboard?.runs ?? []).filter(
-            (run) => agentNameForRun(run) === selectedAgentName,
-          )
-        : (dashboard?.runs ?? []),
-    [dashboard?.runs, selectedAgentName],
+    () => {
+      const definedAgentRuns = scheduleRuns.flatMap((run) => {
+        const agent = agentById.get(run.agent.id);
+        return agent
+          ? [
+              {
+                ...run,
+                agent: {
+                  id: agent.id,
+                  name: agent.name,
+                  provider: agent.provider,
+                  model: agent.model,
+                  responsibility: agent.responsibility,
+                },
+              },
+            ]
+          : [];
+      });
+      return selectedAgentId
+        ? definedAgentRuns.filter((run) => run.agent.id === selectedAgentId)
+        : definedAgentRuns;
+    },
+    [agentById, scheduleRuns, selectedAgentId],
   );
   const days = useMemo(
     () =>
@@ -222,16 +238,19 @@ export function ProjectSchedule({
       ? Promise.all([
           loadProjectAgents(token, project.id, locale),
           loadProjectAgentSchedules(token, project.id),
+          loadProjectAgentScheduleRuns(token, project.id),
         ])
       : Promise.resolve([
           demoProjectAgents(project.id, locale),
           [] as ProjectAgentSchedule[],
+          [] as ProjectAgentScheduleRun[],
         ] as const);
     void load
-      .then(([nextAgents, nextSchedules]) => {
+      .then(([nextAgents, nextSchedules, nextRuns]) => {
         if (cancelled) return;
         setAgents(nextAgents);
         setSchedules(nextSchedules);
+        setScheduleRuns(nextRuns);
       })
       .catch((caught) => {
         if (!cancelled) {
@@ -364,12 +383,19 @@ export function ProjectSchedule({
         >
           {filteredSchedules.map((schedule) => (
             <article key={schedule.id}>
-              <span className={`provider-${schedule.agentProvider}`}>
+              <span
+                className={`provider-${
+                  agentById.get(schedule.agentId)?.provider ??
+                  schedule.agentProvider
+                }`}
+              >
                 <CalendarClock size={15} />
               </span>
               <div>
                 <strong>{schedule.name}</strong>
-                <small>{schedule.agentName}</small>
+                <small>
+                  {agentById.get(schedule.agentId)?.name ?? schedule.agentName}
+                </small>
               </div>
               <em>
                 <Repeat2 size={12} />
@@ -419,7 +445,7 @@ export function ProjectSchedule({
               <ListFilter aria-hidden="true" size={13} />
               <SelectMenu
                 align="end"
-                disabled={availableAgentNames.length === 0}
+                disabled={availableAgents.length === 0}
                 id="project-schedule-agent-filter"
                 label={t("schedule.agentFilter")}
                 onValueChange={setAgentFilter}
@@ -504,18 +530,16 @@ export function ProjectSchedule({
                       const color = hash(segment.agent) % 6;
                       const label = t("schedule.runLabel", {
                         agent: segment.agent,
-                        title: segment.run.title,
+                        title: segment.run.scheduleName,
                         time: `${formatTime(segment.start, localeTag)}–${formatTime(segment.end, localeTag)}`,
                       });
                       return (
-                        <button
+                        <article
                           aria-label={label}
                           className={`project-schedule-event color-${color} ${segment.run.status}`}
                           key={segment.id}
-                          onClick={() => onRunOpen(segment.run.id)}
                           style={style}
                           title={label}
-                          type="button"
                         >
                           <span className="project-schedule-event-agent">
                             <Bot size={11} />
@@ -527,10 +551,10 @@ export function ProjectSchedule({
                             {formatTime(segment.end, localeTag)}
                           </time>
                           <span className="project-schedule-event-title">
-                            {segment.run.title}
+                            {segment.run.scheduleName}
                           </span>
                           <small>{t(statusKey)}</small>
-                        </button>
+                        </article>
                       );
                     })}
                   </div>
@@ -542,14 +566,14 @@ export function ProjectSchedule({
                     <CalendarClock size={22} />
                   </span>
                   <strong>
-                    {selectedAgentName
+                    {selectedAgent
                       ? t("schedule.filteredEmptyTitle", {
-                          agent: selectedAgentName,
+                          agent: selectedAgent.name,
                         })
                       : t("schedule.emptyTitle")}
                   </strong>
                   <p>
-                    {selectedAgentName
+                    {selectedAgent
                       ? t("schedule.filteredEmptyDescription")
                       : t("schedule.emptyDescription")}
                   </p>

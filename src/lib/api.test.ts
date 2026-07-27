@@ -4,6 +4,7 @@ import {
   completeProjectAgentScheduleRun,
   createProjectAgent,
   createProjectAgentSchedule,
+  loadProjectAgentScheduleRuns,
   loadProjectAgents,
   loadSession,
   updateProjectAgent,
@@ -310,6 +311,49 @@ describe("API errors", () => {
       status: "completed",
       resultSummary: "Audit completed.",
     });
+  });
+
+  it("loads agent schedule execution history", async () => {
+    const run = {
+      id: "11111111-1111-4111-8111-111111111111",
+      projectId: "22222222-2222-4222-8222-222222222222",
+      scheduleId: "33333333-3333-4333-8333-333333333333",
+      scheduleName: "Daily project audit",
+      agent: {
+        id: "44444444-4444-4444-8444-444444444444",
+        name: "Repository auditor",
+        provider: "codex",
+        model: null,
+        responsibility: "Audit the connected repository.",
+      },
+      status: "completed",
+      scheduledFor: "2026-07-27T09:00:00.000Z",
+      leaseExpiresAt: null,
+      startedAt: "2026-07-27T09:00:01.000Z",
+      completedAt: "2026-07-27T09:01:00.000Z",
+      resultSummary: "Audit completed.",
+      error: null,
+    } as const;
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ runs: [run] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      loadProjectAgentScheduleRuns(
+        "token",
+        "22222222-2222-4222-8222-222222222222",
+      ),
+    ).resolves.toEqual([run]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "/projects/22222222-2222-4222-8222-222222222222/agent-schedule-runs",
+      ),
+      expect.objectContaining({ headers: expect.any(Headers) }),
+    );
   });
 
   it("updates a project agent through its scoped endpoint", async () => {

@@ -539,12 +539,7 @@ export function App() {
           />
         ) : activePage === "schedule" && activeProject ? (
           <ProjectSchedule
-            dashboard={briar.dashboard}
             isSidebarOpen={isSidebarOpen}
-            onRunOpen={(runId) => {
-              setRequestedRunId(runId);
-              navigateToPage("issues");
-            }}
             project={activeProject}
             token={briar.token}
           />

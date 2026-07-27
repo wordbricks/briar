@@ -65,6 +65,7 @@ import {
   listOrganizations,
   listProjects,
   listProjectAgents,
+  listProjectAgentScheduleRuns,
   listProjectAgentSchedules,
   moveHuntRun,
   recoverHuntRun,
@@ -1402,6 +1403,21 @@ async function route(
     const schedule = await createProjectAgentSchedule(db, project.id, input);
     if (!schedule) throw new HttpError(404, "Project agent not found");
     return json({ schedule: projectAgentScheduleJson(schedule) }, 201);
+  }
+
+  const projectAgentScheduleRunsMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/agent-schedule-runs$/u,
+  );
+  if (projectAgentScheduleRunsMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      projectAgentScheduleRunsMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const runs = await listProjectAgentScheduleRuns(db, project.id);
+    return json({ runs: runs.map((run) => projectAgentScheduleRunJson(run)) });
   }
 
   const projectAgentScheduleRunsClaimMatch = pathname.match(
