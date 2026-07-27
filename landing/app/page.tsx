@@ -1,35 +1,6 @@
-const workflowSteps = [
-  {
-    number: "01",
-    title: "Intake",
-    description:
-      "이슈, 피드백, 에러를 하나의 실행 가능한 작업 큐로 모읍니다.",
-  },
-  {
-    number: "02",
-    title: "Run",
-    description:
-      "Codex와 Claude가 실제 저장소에서 컨텍스트를 읽고 작업을 시작합니다.",
-  },
-  {
-    number: "03",
-    title: "Observe",
-    description:
-      "분석부터 구현, QA까지 모든 진행 상태와 판단 근거를 한눈에 봅니다.",
-  },
-  {
-    number: "04",
-    title: "Ship",
-    description:
-      "검증 결과와 PR을 연결하고, 완료 조건을 충족한 작업만 배포로 보냅니다.",
-  },
-] as const;
-
-const agents = [
-  { name: "Codex", state: "3 running", tone: "violet" },
-  { name: "Claude", state: "1 reviewing", tone: "amber" },
-  { name: "Human", state: "2 approvals", tone: "blue" },
-] as const;
+import { copy, type LandingCopy } from "./i18n";
+import { LanguageSwitcher } from "./language-switcher";
+import { getRequestLocale } from "./request-locale";
 
 // Stable redirect that always resolves to the current Production DMG.
 const MAC_DOWNLOAD_URL =
@@ -37,9 +8,9 @@ const MAC_DOWNLOAD_URL =
 const GITHUB_URL = "https://github.com/wordbricks/briar";
 const ANDROID_DOWNLOAD_URL = `${GITHUB_URL}/releases/latest`;
 
-function Brand() {
+function Brand({ c }: { c: LandingCopy }) {
   return (
-    <a className="brand" href="#top" aria-label="Briar 홈">
+    <a className="brand" href="#top" aria-label={c.aria.brandHome}>
       <span className="brand-mark">
         <img src="/briar-mark.svg" alt="" />
       </span>
@@ -52,9 +23,9 @@ function Arrow() {
   return <span aria-hidden="true">↗</span>;
 }
 
-function ProductStage() {
+function ProductStage({ c }: { c: LandingCopy }) {
   return (
-    <div className="product-stage" aria-label="Briar 작업 대시보드 미리보기">
+    <div className="product-stage" aria-label={c.aria.productPreview}>
       <div className="stage-glow" />
       <div className="product-window">
         <div className="window-topbar">
@@ -112,60 +83,60 @@ function ProductStage() {
             <div className="stage-heading">
               <div>
                 <span className="stage-eyebrow">AUTO HUNT</span>
-                <h2>Agent runs</h2>
+                <h2>{c.dashboard.agentRuns}</h2>
               </div>
-              <button type="button">+ New issue</button>
+              <button type="button">{c.dashboard.newIssue}</button>
             </div>
 
             <div className="stage-metrics">
               <div>
-                <span>Active</span>
+                <span>{c.dashboard.active}</span>
                 <strong>04</strong>
-                <small>↑ 2 today</small>
+                <small>{c.dashboard.today}</small>
               </div>
               <div>
-                <span>Ready to review</span>
+                <span>{c.dashboard.readyToReview}</span>
                 <strong>07</strong>
-                <small>3 PRs linked</small>
+                <small>{c.dashboard.prsLinked}</small>
               </div>
               <div>
-                <span>Success rate</span>
+                <span>{c.dashboard.successRate}</span>
                 <strong>94%</strong>
-                <small>last 30 runs</small>
+                <small>{c.dashboard.lastRuns}</small>
               </div>
             </div>
 
             <div className="run-table">
               <div className="run-table-head">
-                <span>Issue</span>
-                <span>Stage</span>
-                <span>Agent</span>
-                <span>Updated</span>
+                <span>{c.dashboard.issue}</span>
+                <span>{c.dashboard.stage}</span>
+                <span>{c.dashboard.agent}</span>
+                <span>{c.dashboard.updated}</span>
               </div>
               <div className="run-row run-row-active">
                 <span>
                   <i className="priority priority-high" />
                   <b>BRI-124</b>
-                  Agent event stream 연결
+                  {c.dashboard.issues[0]}
                 </span>
                 <span className="stage-pill">
                   <i />
-                  Implementing
+                  {c.dashboard.implementing}
                 </span>
                 <span className="agent-cell">
                   <i>C</i> Codex
                 </span>
-                <time>now</time>
+                <time>{c.dashboard.now}</time>
               </div>
               <div className="run-row">
                 <span>
                   <i className="priority priority-mid" />
                   <b>BRI-121</b>
-                  작업 상세 패널 개선
+                  {c.dashboard.issues[1]}
                 </span>
                 <span className="stage-pill review-pill">
                   <i />
-                  Review
+                  {c.dashboard.review}
                 </span>
                 <span className="agent-cell">
                   <i className="claude-cell">C</i> Claude
@@ -176,11 +147,11 @@ function ProductStage() {
                 <span>
                   <i className="priority priority-low" />
                   <b>BRI-118</b>
-                  세션 복원 회귀 테스트
+                  {c.dashboard.issues[2]}
                 </span>
                 <span className="stage-pill qa-pill">
                   <i />
-                  Local QA
+                  {c.dashboard.localQa}
                 </span>
                 <span className="agent-cell">
                   <i>C</i> Codex
@@ -191,11 +162,11 @@ function ProductStage() {
                 <span>
                   <i className="priority priority-done" />
                   <b>BRI-116</b>
-                  D1 이벤트 스키마
+                  {c.dashboard.issues[3]}
                 </span>
                 <span className="stage-pill done-pill">
                   <i />
-                  Completed
+                  {c.dashboard.completed}
                 </span>
                 <span className="agent-cell">
                   <i className="human-cell">J</i> Jay
@@ -207,39 +178,39 @@ function ProductStage() {
 
           <aside className="stage-activity">
             <div className="activity-head">
-              <span>Live activity</span>
+              <span>{c.dashboard.liveActivity}</span>
               <i />
             </div>
             <div className="activity-item active-activity">
               <span className="activity-icon">C</span>
               <div>
                 <strong>Codex</strong>
-                <p>이벤트 스트림 어댑터를 구현하고 있습니다.</p>
-                <small>Thinking · now</small>
+                <p>{c.dashboard.activityWorking}</p>
+                <small>{c.dashboard.thinkingNow}</small>
               </div>
             </div>
             <div className="activity-line" />
             <div className="activity-item">
               <span className="activity-icon tool-icon">⌘</span>
               <div>
-                <strong>Local QA passed</strong>
+                <strong>{c.dashboard.qaPassed}</strong>
                 <p>142 tests · typecheck · build</p>
-                <small>8 minutes ago</small>
+                <small>{c.dashboard.minutesAgo8}</small>
               </div>
             </div>
             <div className="activity-line" />
             <div className="activity-item">
               <span className="activity-icon pr-icon">↗</span>
               <div>
-                <strong>PR #124 opened</strong>
-                <p>Ready for human review</p>
-                <small>12 minutes ago</small>
+                <strong>{c.dashboard.prOpened}</strong>
+                <p>{c.dashboard.readyForHumanReview}</p>
+                <small>{c.dashboard.minutesAgo12}</small>
               </div>
             </div>
             <div className="activity-command">
               <span>@briar</span>
-              <p>모든 검증을 마치면 리뷰를 요청해줘</p>
-              <button type="button" aria-label="에이전트에게 전송">
+              <p>{c.dashboard.command}</p>
+              <button type="button" aria-label={c.aria.sendCommand}>
                 ↑
               </button>
             </div>
@@ -249,14 +220,14 @@ function ProductStage() {
       <div className="floating-note floating-note-left">
         <span className="note-icon">✓</span>
         <div>
-          <strong>Local QA passed</strong>
+          <strong>{c.dashboard.qaPassed}</strong>
           <small>142 tests · 0 failures</small>
         </div>
       </div>
       <div className="floating-note floating-note-right">
         <span className="note-icon pr-note">↗</span>
         <div>
-          <strong>PR #124 ready</strong>
+          <strong>{c.dashboard.prReady}</strong>
           <small>3 files · +186 −24</small>
         </div>
       </div>
@@ -264,16 +235,16 @@ function ProductStage() {
   );
 }
 
-function WorkflowVisual() {
+function WorkflowVisual({ c }: { c: LandingCopy }) {
   return (
     <div className="workflow-visual">
       <div className="workflow-toolbar">
         <div>
           <span>BRI-124</span>
-          <strong>Agent event stream 연결</strong>
+          <strong>{c.workflow.issueTitle}</strong>
         </div>
         <span className="running-badge">
-          <i /> Running
+          <i /> {c.workflow.running}
         </span>
       </div>
       <div className="workflow-grid">
@@ -283,64 +254,66 @@ function WorkflowVisual() {
             <div className="progress-step step-complete">
               <i>✓</i>
               <div>
-                <strong>Context</strong>
-                <small>Velen context loaded</small>
+                <strong>{c.workflow.context}</strong>
+                <small>{c.workflow.contextLoaded}</small>
               </div>
             </div>
             <div className="progress-line line-complete" />
             <div className="progress-step step-complete">
               <i>✓</i>
               <div>
-                <strong>Analyze</strong>
-                <small>Repository mapped</small>
+                <strong>{c.workflow.analyze}</strong>
+                <small>{c.workflow.repositoryMapped}</small>
               </div>
             </div>
             <div className="progress-line line-live" />
             <div className="progress-step step-live">
               <i>3</i>
               <div>
-                <strong>Implement</strong>
-                <small>Codex working</small>
+                <strong>{c.workflow.implement}</strong>
+                <small>{c.workflow.codexWorking}</small>
               </div>
             </div>
             <div className="progress-line" />
             <div className="progress-step">
               <i>4</i>
               <div>
-                <strong>Local QA</strong>
-                <small>Waiting</small>
+                <strong>{c.workflow.localQa}</strong>
+                <small>{c.workflow.waiting}</small>
               </div>
             </div>
             <div className="progress-line" />
             <div className="progress-step">
               <i>5</i>
               <div>
-                <strong>Review</strong>
-                <small>Waiting</small>
+                <strong>{c.workflow.review}</strong>
+                <small>{c.workflow.waiting}</small>
               </div>
             </div>
           </div>
         </div>
         <div className="workflow-log">
           <div className="log-head">
-            <span>Live execution</span>
-            <small>Connected</small>
+            <span>{c.workflow.liveExecution}</span>
+            <small>{c.workflow.connected}</small>
           </div>
           <pre>
             <span className="log-muted">10:42:08</span>{" "}
-            <span className="log-accent">codex</span> Reading repository context
+            <span className="log-accent">codex</span>{" "}
+            {c.workflow.readingContext}
             {"\n"}
             <span className="log-muted">10:42:12</span>{" "}
-            <span className="log-green">✓</span> AGENTS.md loaded
+            <span className="log-green">✓</span> {c.workflow.agentsLoaded}
             {"\n"}
             <span className="log-muted">10:42:19</span>{" "}
-            <span className="log-green">✓</span> 24 related files mapped
+            <span className="log-green">✓</span> {c.workflow.filesMapped}
             {"\n"}
             <span className="log-muted">10:42:31</span>{" "}
-            <span className="log-accent">codex</span> Implementing adapter
+            <span className="log-accent">codex</span>{" "}
+            {c.workflow.implementingAdapter}
             {"\n"}
             <span className="log-muted">10:43:02</span>{" "}
-            <span className="log-purple">●</span> Writing regression tests
+            <span className="log-purple">●</span> {c.workflow.writingTests}
             {"\n"}
             <span className="log-muted">10:43:07</span>{" "}
             <span className="cursor-block"> </span>
@@ -351,25 +324,56 @@ function WorkflowVisual() {
   );
 }
 
-export default function Home() {
+export default async function Home() {
+  const locale = await getRequestLocale();
+  const c = copy[locale];
+  const agents = [
+    {
+      name: "Codex",
+      state: c.agents.states[0],
+      role: c.agents.roles[0],
+      tone: "violet",
+    },
+    {
+      name: "Claude",
+      state: c.agents.states[1],
+      role: c.agents.roles[1],
+      tone: "amber",
+    },
+    {
+      name: "Human",
+      state: c.agents.states[2],
+      role: c.agents.roles[2],
+      tone: "blue",
+    },
+  ] as const;
+
   return (
     <main id="top">
       <header className="site-header">
         <div className="shell nav-shell">
-          <Brand />
-          <nav aria-label="주요 메뉴">
-            <a href="#product">제품</a>
-            <a href="#workflow">워크플로</a>
-            <a href="#security">보안</a>
-            <a href="#agents">에이전트</a>
+          <Brand c={c} />
+          <nav aria-label={c.aria.mainMenu}>
+            <a href="#product">{c.nav.product}</a>
+            <a href="#workflow">{c.nav.workflow}</a>
+            <a href="#security">{c.nav.security}</a>
+            <a href="#agents">{c.nav.agents}</a>
           </nav>
-          <a
-            className="header-cta header-download"
-            href={MAC_DOWNLOAD_URL}
-            aria-label="Mac용 Briar 최신 버전 다운로드"
-          >
-            Mac용 다운로드 <span aria-hidden="true">↓</span>
-          </a>
+          <div className="header-actions">
+            <LanguageSwitcher
+              locale={locale}
+              label={c.language.label}
+              englishLabel={c.language.english}
+              koreanLabel={c.language.korean}
+            />
+            <a
+              className="header-cta header-download"
+              href={MAC_DOWNLOAD_URL}
+              aria-label={c.aria.macDownload}
+            >
+              {c.nav.macDownload} <span aria-hidden="true">↓</span>
+            </a>
+          </div>
         </div>
       </header>
 
@@ -379,31 +383,28 @@ export default function Home() {
           Agent Development Environment
         </div>
         <h1>
-          이슈에서 PR까지.
+          {c.hero.line1}
           <br />
-          에이전트 작업을 운영하세요.
+          {c.hero.line2}
         </h1>
-        <p>
-          Briar는 사람과 코딩 에이전트가 실제 저장소에서 함께 일하는 과정을
-          연결하고, 관찰하고, 끝까지 완료하는 로컬 우선 개발 환경입니다.
-        </p>
+        <p>{c.hero.description}</p>
         <div className="hero-actions">
           <a
             className="button button-primary"
             href={MAC_DOWNLOAD_URL}
-            aria-label="Mac용 Briar 최신 버전 다운로드"
+            aria-label={c.aria.macDownload}
           >
-            Mac용 Briar 다운로드 <span aria-hidden="true">↓</span>
+            {c.hero.macDownload} <span aria-hidden="true">↓</span>
           </a>
           <a
             className="button button-secondary"
             href={ANDROID_DOWNLOAD_URL}
-            aria-label="Android용 Briar 최신 릴리즈 다운로드"
+            aria-label={c.aria.androidDownload}
           >
-            Android용 다운로드 <span aria-hidden="true">↓</span>
+            {c.hero.androidDownload} <span aria-hidden="true">↓</span>
           </a>
           <a className="button button-secondary" href="#workflow">
-            작동 방식 보기 <span aria-hidden="true">↓</span>
+            {c.hero.howItWorks} <span aria-hidden="true">↓</span>
           </a>
         </div>
         <div className="hero-meta">
@@ -426,21 +427,18 @@ export default function Home() {
       </section>
 
       <section className="hero-product shell" id="product">
-        <ProductStage />
+        <ProductStage c={c} />
       </section>
 
       <section className="principles shell">
         <div className="section-intro section-intro-wide">
           <span className="section-index">01 / PRODUCT</span>
           <h2>
-            에이전트 개발을
+            {c.principles.line1}
             <br />
-            운영 가능한 시스템으로.
+            {c.principles.line2}
           </h2>
-          <p>
-            단발성 자동화를 넘어, 실제 제품팀이 신뢰할 수 있는 실행 흐름으로
-            바꿉니다.
-          </p>
+          <p>{c.principles.description}</p>
         </div>
         <div className="principle-grid">
           <article>
@@ -450,11 +448,8 @@ export default function Home() {
               <i />
               <i />
             </div>
-            <h3>코드는 로컬에</h3>
-            <p>
-              저장소 소스는 기기를 떠나지 않습니다. Briar는 필요한 작업 상태와
-              Git 메타데이터만 안전하게 동기화합니다.
-            </p>
+            <h3>{c.principles.cards[0].title}</h3>
+            <p>{c.principles.cards[0].description}</p>
           </article>
           <article>
             <span className="card-figure">02</span>
@@ -463,11 +458,8 @@ export default function Home() {
               <span>C</span>
               <span>H</span>
             </div>
-            <h3>사람과 에이전트가 함께</h3>
-            <p>
-              Codex, Claude, 그리고 팀의 승인을 하나의 타임라인과 워크플로로
-              연결합니다.
-            </p>
+            <h3>{c.principles.cards[1].title}</h3>
+            <p>{c.principles.cards[1].description}</p>
           </article>
           <article>
             <span className="card-figure">03</span>
@@ -477,11 +469,8 @@ export default function Home() {
               <i />
               <i />
             </div>
-            <h3>끝까지 닫히는 흐름</h3>
-            <p>
-              컨텍스트 수집, 구현, QA, 리뷰, 배포까지 완료 조건을 명확히
-              기록합니다.
-            </p>
+            <h3>{c.principles.cards[2].title}</h3>
+            <p>{c.principles.cards[2].description}</p>
           </article>
         </div>
       </section>
@@ -490,17 +479,14 @@ export default function Home() {
         <div className="shell">
           <div className="section-intro workflow-intro">
             <span className="section-index">02 / WORKFLOW</span>
-            <h2>작업이 스스로 앞으로 나아가도록.</h2>
-            <p>
-              대화와 이슈를 실행 가능한 작업으로 바꾸고, 지금 어디까지
-              진행됐는지 놓치지 마세요.
-            </p>
+            <h2>{c.workflow.title}</h2>
+            <p>{c.workflow.description}</p>
           </div>
           <div className="workflow-layout">
             <ol className="workflow-steps">
-              {workflowSteps.map((step, index) => (
-                <li className={index === 2 ? "is-active" : ""} key={step.number}>
-                  <span>{step.number}</span>
+              {c.workflow.steps.map((step, index) => (
+                <li className={index === 2 ? "is-active" : ""} key={step.title}>
+                  <span>{String(index + 1).padStart(2, "0")}</span>
                   <div>
                     <h3>{step.title}</h3>
                     <p>{step.description}</p>
@@ -508,7 +494,7 @@ export default function Home() {
                 </li>
               ))}
             </ol>
-            <WorkflowVisual />
+            <WorkflowVisual c={c} />
           </div>
         </div>
       </section>
@@ -516,34 +502,25 @@ export default function Home() {
       <section className="agents-section shell" id="agents">
         <div className="section-intro section-intro-centered">
           <span className="section-index">03 / AGENTS</span>
-          <h2>선호하는 에이전트는 그대로.</h2>
-          <p>
-            도구를 바꾸지 않아도 됩니다. Briar가 서로 다른 에이전트의 실행을
-            같은 운영 모델로 연결합니다.
-          </p>
+          <h2>{c.agents.title}</h2>
+          <p>{c.agents.description}</p>
         </div>
         <div className="agent-board">
           <div className="agent-board-top">
-            <span>Active collaborators</span>
+            <span>{c.agents.activeCollaborators}</span>
             <small>
-              <i /> All systems operational
+              <i /> {c.agents.operational}
             </small>
           </div>
           <div className="agent-list">
-            {agents.map((agent, index) => (
+            {agents.map((agent) => (
               <div className="agent-row" key={agent.name}>
                 <span className={`agent-avatar ${agent.tone}`}>
                   {agent.name.charAt(0)}
                 </span>
                 <div>
                   <strong>{agent.name}</strong>
-                  <small>
-                    {index === 0
-                      ? "Implementation & local QA"
-                      : index === 1
-                        ? "Review & reasoning"
-                        : "Direction & approval"}
-                  </small>
+                  <small>{agent.role}</small>
                 </div>
                 <span className="agent-state">{agent.state}</span>
                 <span className="agent-pulse">
@@ -564,68 +541,60 @@ export default function Home() {
           <div className="security-copy">
             <span className="section-index">04 / SECURITY</span>
             <h2>
-              코드는 로컬에.
+              {c.security.line1}
               <br />
-              신뢰는 기본값으로.
+              {c.security.line2}
             </h2>
-            <p>
-              에이전트는 연결된 Git 루트에서만 실행됩니다. 소스 코드는 로컬에
-              남고, 토큰은 해시로 저장되며, 위험한 작업에는 사람의 승인을
-              요구할 수 있습니다.
-            </p>
+            <p>{c.security.description}</p>
             <div className="security-points">
-              <span>
-                <i>✓</i> Repository path never leaves your device
-              </span>
-              <span>
-                <i>✓</i> Permission-aware agent execution
-              </span>
-              <span>
-                <i>✓</i> Auditable, retry-safe event history
-              </span>
+              {c.security.points.map((point) => (
+                <span key={point}>
+                  <i>✓</i> {point}
+                </span>
+              ))}
             </div>
           </div>
-          <div className="security-visual" aria-label="Briar 보안 구조">
+          <div className="security-visual" aria-label={c.aria.securityVisual}>
             <div className="secure-device">
               <div className="device-top">
                 <span />
-                <small>YOUR DEVICE</small>
-                <i>Secure</i>
+                <small>{c.security.yourDevice}</small>
+                <i>{c.security.secure}</i>
               </div>
               <div className="repo-card">
                 <span className="repo-icon">⌘</span>
                 <div>
-                  <strong>Local repository</strong>
+                  <strong>{c.security.localRepository}</strong>
                   <small>/Users/team/product</small>
                 </div>
-                <em>Private</em>
+                <em>{c.security.private}</em>
               </div>
               <div className="secure-agent-row">
                 <span>C</span>
                 <div>
-                  <strong>Agent execution</strong>
-                  <small>cwd locked to Git root</small>
+                  <strong>{c.security.agentExecution}</strong>
+                  <small>{c.security.cwdLocked}</small>
                 </div>
                 <i>✓</i>
               </div>
               <div className="secure-agent-row">
                 <span>⌁</span>
                 <div>
-                  <strong>Source code</strong>
-                  <small>never uploaded</small>
+                  <strong>{c.security.sourceCode}</strong>
+                  <small>{c.security.neverUploaded}</small>
                 </div>
                 <i>✓</i>
               </div>
             </div>
             <div className="secure-bridge">
-              <span>Encrypted state sync</span>
+              <span>{c.security.encryptedSync}</span>
               <i />
             </div>
             <div className="secure-cloud">
               <span>B</span>
               <div>
                 <strong>Briar Cloud</strong>
-                <small>Task state + Git metadata</small>
+                <small>{c.security.cloudDetail}</small>
               </div>
             </div>
           </div>
@@ -636,27 +605,27 @@ export default function Home() {
         <div className="cta-mark">
           <img src="/briar-mark.svg" alt="" />
         </div>
-        <span className="section-index">READY WHEN YOU ARE</span>
+        <span className="section-index">{c.final.eyebrow}</span>
         <h2>
-          에이전트에게 일을 맡기고,
+          {c.final.line1}
           <br />
-          결과에는 확신을 가지세요.
+          {c.final.line2}
         </h2>
-        <p>Briar로 사람과 에이전트가 함께 일하는 개발 흐름을 시작하세요.</p>
+        <p>{c.final.description}</p>
         <div className="final-actions">
           <a
             className="button button-primary"
             href={MAC_DOWNLOAD_URL}
-            aria-label="Mac용 Briar 최신 버전 다운로드"
+            aria-label={c.aria.macDownload}
           >
-            Mac용 Briar 다운로드 <span aria-hidden="true">↓</span>
+            {c.final.macDownload} <span aria-hidden="true">↓</span>
           </a>
           <a
             className="button button-secondary"
             href={ANDROID_DOWNLOAD_URL}
-            aria-label="Android용 Briar 최신 릴리즈 다운로드"
+            aria-label={c.aria.androidDownload}
           >
-            Android용 다운로드 <span aria-hidden="true">↓</span>
+            {c.final.androidDownload} <span aria-hidden="true">↓</span>
           </a>
           <a
             className="button button-secondary"
@@ -664,18 +633,18 @@ export default function Home() {
             target="_blank"
             rel="noreferrer"
           >
-            GitHub에서 보기 <Arrow />
+            {c.final.github} <Arrow />
           </a>
         </div>
         <small className="download-note">
-          최신 릴리즈 · macOS Apple Silicon · Android companion
+          {c.final.note}
         </small>
       </section>
 
       <footer>
         <div className="shell footer-shell">
-          <Brand />
-          <p>Agent development, with a clear line of sight.</p>
+          <Brand c={c} />
+          <p>{c.footer.tagline}</p>
           <div>
             <a
               href={GITHUB_URL}
@@ -684,8 +653,8 @@ export default function Home() {
             >
               GitHub
             </a>
-            <a href="#security">Security</a>
-            <a href="#top">Back to top ↑</a>
+            <a href="#security">{c.footer.security}</a>
+            <a href="#top">{c.footer.backToTop}</a>
           </div>
         </div>
       </footer>

@@ -1,14 +1,26 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-async function render() {
+async function render({ acceptLanguage, cookie } = {}) {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
+  const requestHeaders = new Headers({
+    accept: "text/html",
+    host: "localhost",
+  });
+
+  if (acceptLanguage) {
+    requestHeaders.set("accept-language", acceptLanguage);
+  }
+
+  if (cookie) {
+    requestHeaders.set("cookie", cookie);
+  }
 
   return worker.fetch(
     new Request("http://localhost/", {
-      headers: { accept: "text/html", host: "localhost" },
+      headers: requestHeaders,
     }),
     {
       ASSETS: {
@@ -22,8 +34,8 @@ async function render() {
   );
 }
 
-test("server-renders the finished Briar landing page", async () => {
-  const response = await render();
+test("server-renders Korean for a Korean browser", async () => {
+  const response = await render({ acceptLanguage: "ko-KR,ko;q=0.9" });
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
@@ -33,11 +45,13 @@ test("server-renders the finished Briar landing page", async () => {
   assert.match(html, /이슈에서 PR까지/);
   assert.match(html, /에이전트 작업을 운영하세요/);
   assert.match(html, /코드는 로컬에/);
-  assert.match(html, /Agent event stream 연결/);
+  assert.match(html, /에이전트 이벤트 스트림 연결/);
   assert.match(html, /Mac용 Briar 다운로드/);
   assert.match(html, /macOS Apple Silicon/);
   assert.match(html, /Android용 다운로드/);
   assert.match(html, /Android companion/);
+  assert.match(html, /aria-label="언어"/);
+  assert.match(html, /aria-pressed="true"[^>]*aria-label="한국어"/);
   assert.match(
     html,
     /https:\/\/briar-api\.wbai\.workers\.dev\/releases\/latest\/mac-aarch64\.dmg/,
@@ -50,4 +64,43 @@ test("server-renders the finished Briar landing page", async () => {
   assert.match(html, /https:\/\/github\.com\/wordbricks\/briar/);
   assert.match(html, /http:\/\/localhost\/og\.png/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
+});
+
+test("server-renders English for an English browser", async () => {
+  const response = await render({ acceptLanguage: "en-US,en;q=0.9" });
+  assert.equal(response.status, 200);
+
+  const html = await response.text();
+  assert.match(html, /<html lang="en">/i);
+  assert.match(
+    html,
+    /Briar — The operating system for agent development/,
+  );
+  assert.match(html, /From issue to PR\./);
+  assert.match(html, /Operate your agent work\./);
+  assert.match(html, /Turn agent development/);
+  assert.match(html, /Download Briar for Mac/);
+  assert.match(html, /aria-label="Language"/);
+  assert.match(html, /aria-pressed="true"[^>]*aria-label="English"/);
+});
+
+test("falls back to English when the browser language is unsupported", async () => {
+  const response = await render({ acceptLanguage: "ja-JP,ko;q=0.9" });
+  assert.equal(response.status, 200);
+
+  const html = await response.text();
+  assert.match(html, /<html lang="en">/i);
+  assert.match(html, /From issue to PR\./);
+});
+
+test("saved language choice overrides the browser language", async () => {
+  const response = await render({
+    acceptLanguage: "en-US,en;q=0.9",
+    cookie: "briar-locale=ko",
+  });
+  assert.equal(response.status, 200);
+
+  const html = await response.text();
+  assert.match(html, /<html lang="ko">/i);
+  assert.match(html, /이슈에서 PR까지/);
 });
