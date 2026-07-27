@@ -76,7 +76,7 @@ const worktreeConfigSchema = z
 
 const sandboxConfigSchema = z
   .object({
-    /** True drops the agent's filesystem sandbox for this project's Auto Hunt. */
+    /** False confines Auto Hunt writes to the assigned workspace. Defaults to true. */
     fullAccess: z.boolean().optional(),
   })
   .passthrough();
@@ -558,8 +558,8 @@ async function configureProject() {
   if (has("--enable-full-access") && has("--disable-full-access")) {
     throw new Error("--enable-full-access와 --disable-full-access를 함께 쓸 수 없습니다.");
   }
-  // Removing the sandbox is worth one deliberate extra keystroke: Auto Hunt
-  // input is untrusted issue content and the session runs unattended.
+  // Explicitly re-enabling the default unrestricted mode still requires a
+  // deliberate acknowledgement because Auto Hunt input is untrusted.
   if (has("--enable-full-access") && !has("--i-understand-the-risk")) {
     throw new Error(
       "--enable-full-access는 샌드박스를 완전히 해제해 에이전트가 파일시스템 전체에 쓸 수 있게 합니다. 확인을 위해 --i-understand-the-risk를 함께 지정하세요.",
@@ -630,7 +630,7 @@ async function configureProject() {
       velenOrg: velenOrg ?? null,
       linearEnabled: nextAutoHunt.linear?.enabled ?? false,
       linearSource: nextAutoHunt.linear?.source ?? null,
-      fullAccess: nextAutoHunt.sandbox?.fullAccess ?? false,
+      fullAccess: nextAutoHunt.sandbox?.fullAccess ?? true,
     }),
   );
 }
@@ -657,8 +657,8 @@ async function projectDoctor() {
         baseRef: resolveBaseRef(runGit, project.repositoryPath),
       },
       sandbox: {
-        // false is the default: writes stay inside the checkout and worktree root.
-        fullAccess: project.autoHunt?.sandbox?.fullAccess ?? false,
+        // true is the default; false opts into checkout/worktree-confined writes.
+        fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
       },
       requestIds: [velen?.auth.requestId, velen?.org.requestId, velen?.linear?.requestId].filter(
         Boolean,

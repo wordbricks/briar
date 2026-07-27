@@ -13,6 +13,7 @@ import {
   RefreshCw,
   Rocket,
   Server,
+  ShieldCheck,
   SlidersHorizontal,
   Trash2,
   Zap,
@@ -49,6 +50,11 @@ import {
   normalizeAutoHuntAutomation,
   type AutoHuntAutomation,
 } from "../lib/auto-hunt-automation";
+import {
+  defaultProjectSandboxSettings,
+  loadProjectSandboxSettings,
+  updateProjectSandboxSettings,
+} from "../lib/project-llm";
 import type { VelenInspection } from "../lib/project-connection";
 import type {
   LinearImportConnectResult,
@@ -132,6 +138,10 @@ export function ProjectSettings({
   );
   const [automationSaving, setAutomationSaving] = useState(false);
   const [automationError, setAutomationError] = useState<string | null>(null);
+  const [sandbox, setSandbox] = useState(defaultProjectSandboxSettings);
+  const [sandboxLoading, setSandboxLoading] = useState(true);
+  const [sandboxSaving, setSandboxSaving] = useState(false);
+  const [sandboxError, setSandboxError] = useState<string | null>(null);
   const [linear, setLinear] = useState<ProjectSettingsData["linear"]>(
     () => dashboard?.settings.linear ?? {
       enabled: false,
@@ -177,6 +187,47 @@ export function ProjectSettings({
     setSavedAutomation(next);
     setAutomationError(null);
   }, [dashboard?.settings.automation, project.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setSandboxLoading(true);
+    setSandboxError(null);
+    void loadProjectSandboxSettings(project.id)
+      .then((settings) => {
+        if (!cancelled) setSandbox(settings);
+      })
+      .catch((caught) => {
+        if (!cancelled) {
+          setSandboxError(
+            caught instanceof Error ? caught.message : String(caught),
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setSandboxLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [project.id]);
+
+  const saveSandbox = async (fullAccess: boolean) => {
+    if (sandboxSaving) return;
+    setSandboxSaving(true);
+    setSandboxError(null);
+    try {
+      const saved = await updateProjectSandboxSettings(project.id, {
+        fullAccess,
+      });
+      setSandbox(saved);
+    } catch (caught) {
+      setSandboxError(
+        caught instanceof Error ? caught.message : String(caught),
+      );
+    } finally {
+      setSandboxSaving(false);
+    }
+  };
 
   useEffect(() => {
     const next = dashboard?.settings.linear ?? {
@@ -831,6 +882,51 @@ export function ProjectSettings({
                 </label>
               </div>
             </div>
+            <div
+              className={`project-settings-sandbox${
+                sandbox.fullAccess ? " unrestricted" : ""
+              }`}
+            >
+              <span className="project-settings-sandbox-icon">
+                {sandbox.fullAccess ? (
+                  <AlertTriangle size={17} strokeWidth={1.8} />
+                ) : (
+                  <ShieldCheck size={17} strokeWidth={1.8} />
+                )}
+              </span>
+              <span>
+                <strong>{t("settings.sandboxTitle")}</strong>
+                <small>
+                  {t(
+                    sandbox.fullAccess
+                      ? "settings.sandboxUnrestrictedDescription"
+                      : "settings.sandboxWorkspaceDescription",
+                  )}
+                </small>
+              </span>
+              <label className="project-settings-toggle flex items-center gap-2">
+                <Switch
+                  aria-label={t("settings.sandboxTitle")}
+                  checked={sandbox.fullAccess}
+                  disabled={sandboxLoading || sandboxSaving}
+                  onCheckedChange={(fullAccess) => {
+                    void saveSandbox(fullAccess);
+                  }}
+                />
+                <span className="text-xs font-medium text-muted-foreground">
+                  {t(
+                    sandbox.fullAccess
+                      ? "settings.sandboxUnrestricted"
+                      : "settings.sandboxWorkspace",
+                  )}
+                </span>
+              </label>
+            </div>
+            {sandboxError ? (
+              <p className="project-settings-sandbox-error" role="alert">
+                {sandboxError}
+              </p>
+            ) : null}
             <footer>
               <p>{t("settings.autoRunOrNotice")}</p>
               <button

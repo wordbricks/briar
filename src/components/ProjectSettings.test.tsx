@@ -163,6 +163,15 @@ describe("ProjectSettings", () => {
     expect(container.querySelector(".project-settings-auto-run")?.textContent).toContain(
       "자동 실행 조건",
     );
+    const sandboxControl = container.querySelector<HTMLElement>(
+      ".project-settings-sandbox",
+    );
+    expect(sandboxControl?.textContent).toContain("제한 없음");
+    const sandboxToggle = sandboxControl?.querySelector<HTMLButtonElement>(
+      "button[role='switch']",
+    );
+    await act(async () => sandboxToggle?.click());
+    expect(sandboxControl?.textContent).toContain("워크트리만");
     const autoRunToggle = container.querySelector<HTMLButtonElement>(
       ".project-settings-auto-run .project-settings-toggle button[role='switch']",
     );

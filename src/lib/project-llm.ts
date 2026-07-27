@@ -65,11 +65,19 @@ export type ProjectLlmSettings = {
   approvalPolicy: ApprovalPolicy;
 };
 
+export type ProjectSandboxSettings = {
+  fullAccess: boolean;
+};
+
 export const defaultProjectLlmSettings: ProjectLlmSettings = {
   provider: "codex",
   model: null,
   effort: null,
   approvalPolicy: "never",
+};
+
+export const defaultProjectSandboxSettings: ProjectSandboxSettings = {
+  fullAccess: true,
 };
 
 export type ProjectLlmChatInput = {
@@ -262,6 +270,28 @@ export async function updateProjectLlmSettings(
     model: saved.model ?? null,
     effort: saved.effort ?? null,
   };
+}
+
+export async function loadProjectSandboxSettings(
+  projectId: string,
+): Promise<ProjectSandboxSettings> {
+  if (!isTauri()) return defaultProjectSandboxSettings;
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<ProjectSandboxSettings>("load_project_sandbox_settings", {
+    projectId,
+  });
+}
+
+export async function updateProjectSandboxSettings(
+  projectId: string,
+  settings: ProjectSandboxSettings,
+): Promise<ProjectSandboxSettings> {
+  if (!isTauri()) return settings;
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<ProjectSandboxSettings>("update_project_sandbox_settings", {
+    projectId,
+    settings,
+  });
 }
 
 /**

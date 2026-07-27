@@ -110,40 +110,38 @@ Every worker gets its own isolated Briar config snapshot and absolute
 cannot redirect run reporting to another project's config. The worker is told
 to use the assigned run ID explicitly and cannot claim another queue item.
 
-Because the provider starts inside the final checkout, Codex and Claude grant
-their normal workspace-write permissions to that checkout and its linked Git
-metadata. The broad project worktree root is no longer added as a writable
-directory.
+Auto Hunt uses unrestricted filesystem access by default. Codex runs with
+`danger-full-access` and Claude with `bypassPermissions`, so a worker can write
+anywhere the user account can. The worker still starts in its assigned worktree,
+and repository instructions still require all project edits to stay there.
+Grok has no filesystem sandbox either; its ACP session is approval-gated.
 
-Reads are **not** restricted in either sandbox: an agent can read anything the
-user can, including other repositories and dotfiles. Only writes are confined —
-to the checkout, the declared worktree root, and `/tmp`/`$TMPDIR`. Grok has no
-filesystem sandbox at all (its ACP session is approval-gated), so a Grok project
-relies on the skill contract rather than on enforcement.
+### Enabling the workspace sandbox
 
-### Opting out of the sandbox
+A project can confine writes to the assigned checkout, its linked Git metadata,
+the declared worktree root, and `/tmp`/`$TMPDIR`:
 
-A project can drop the filesystem sandbox entirely:
+```sh
+briar project configure --disable-full-access
+```
+
+This switches Codex to `workspace-write` and enables Claude's workspace
+sandbox. Reads remain unrestricted: an agent can read anything the user can,
+including other repositories and dotfiles. Restore the default with:
 
 ```sh
 briar project configure --enable-full-access --i-understand-the-risk
 ```
 
-This switches codex to `danger-full-access` and claude to `bypassPermissions`,
-so agents can write anywhere the user can. It is off by default, requires the
-explicit risk acknowledgement flag, and `--disable-full-access` reverses it.
-`briar project doctor` reports the current value under `sandbox.fullAccess`.
+The same choice is available in Briar under **Project settings → Auto Hunt →
+Filesystem access**. `briar project doctor` reports the resolved value under
+`sandbox.fullAccess`.
 
-Understand what it removes before enabling it. Auto Hunt input — issue titles,
-descriptions, attachments, repository content — is untrusted by contract, the
-session runs unattended, and network access is already unrestricted. The
-sandbox is what stops a prompt injection in that input from writing outside the
-worktree. The configured approval policy is deliberately left alone when full
-access is on, so pairing it with `on-request` approvals keeps a human gate in
-place; combining it with `never` leaves none.
-
-When full access is on, the worker still starts in its assigned worktree, but
-there is no filesystem sandbox around it.
+Auto Hunt input — issue titles, descriptions, attachments, repository content —
+is untrusted by contract, the session runs unattended, and network access is
+already unrestricted. Workspace-only mode limits the impact of prompt injection
+that attempts to write outside the assigned worktree. The configured approval
+policy remains independent of this setting.
 
 ## Dispatch groups and worker recovery
 
