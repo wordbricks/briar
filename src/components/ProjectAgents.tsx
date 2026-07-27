@@ -6,7 +6,6 @@ import {
   Pencil,
   Plus,
   Settings,
-  Sparkles,
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -218,10 +217,6 @@ export function ProjectAgents({
         >
           <header className="project-agents-heading">
             <div>
-              <p className="eyebrow">
-                <Sparkles size={13} />
-                {t("agents.eyebrow")}
-              </p>
               <h1 id="project-agents-title">{t("agents.title")}</h1>
               <p>{t("agents.description", { project: project.name })}</p>
             </div>
@@ -241,7 +236,6 @@ export function ProjectAgents({
                 <strong>{t("agents.list")}</strong>
                 <span>{t("agents.count", { count: agents.length })}</span>
               </div>
-              <p>{t("agents.listDescription")}</p>
             </header>
 
             {error ? (
@@ -291,16 +285,17 @@ export function ProjectAgents({
                       </header>
                       <div className="project-agent-runtime">
                         <span>{providerLabels[agent.provider]}</span>
-                        <i aria-hidden="true" />
                         <span>
                           {modelLabel(agent, t("agents.providerDefaultModel"))}
                         </span>
-                        <i
-                          aria-hidden="true"
-                          className="project-agent-calendar-color"
-                          style={{ backgroundColor: agent.calendarColor }}
-                        />
-                        <span>{t("agents.calendarColor")}</span>
+                        <span>
+                          <i
+                            aria-hidden="true"
+                            className="project-agent-calendar-color"
+                            style={{ backgroundColor: agent.calendarColor }}
+                          />
+                          {agent.calendarColor.toUpperCase()}
+                        </span>
                       </div>
                       <section>
                         <small>{t("agents.responsibility")}</small>
@@ -329,6 +324,17 @@ export function ProjectAgents({
                     </footer>
                   </article>
                 ))}
+                <button
+                  className="project-agent-create-card"
+                  onClick={openCreateDialog}
+                  type="button"
+                >
+                  <span>
+                    <Plus aria-hidden="true" size={20} />
+                  </span>
+                  <strong>{t("agents.create")}</strong>
+                  <p>{t("agents.createDescription")}</p>
+                </button>
               </div>
             )}
           </div>
