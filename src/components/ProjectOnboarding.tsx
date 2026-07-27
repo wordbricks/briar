@@ -26,6 +26,9 @@ import {
   type ProjectStartMode,
 } from "../lib/project-workspace";
 import type { SessionUser } from "../types";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Typography } from "@/components/ui/typography";
 import { Logo } from "./Logo";
 import {
   normalizeAutoHuntWorkflow,

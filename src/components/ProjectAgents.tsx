@@ -9,6 +9,14 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+
+import {
+  EmptyState,
+  MainContent,
+  PageHeader,
+} from "@/components/layout";
+import { Button } from "@/components/ui/button";
+import { Typography } from "@/components/ui/typography";
 import { useI18n } from "../i18n";
 import {
   createProjectAgent,
@@ -224,7 +232,7 @@ export function ProjectAgents({
   }
 
   return (
-    <main className="main-content project-agents-page" id="project-agents">
+    <MainContent className="project-agents-page" id="project-agents">
       <header
         className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`}
         data-tauri-drag-region
@@ -234,52 +242,65 @@ export function ProjectAgents({
           aria-labelledby="project-agents-title"
           className="project-agents-content"
         >
-          <header className="project-agents-heading">
-            <div>
-              <h1 id="project-agents-title">{t("agents.title")}</h1>
-              <p>{t("agents.description", { project: project.name })}</p>
-            </div>
-            <button
-              className="project-agent-create"
-              onClick={openCreateDialog}
-              type="button"
-            >
-              <Plus size={15} />
-              {t("agents.create")}
-            </button>
-          </header>
+          <PageHeader
+            action={
+              <Button
+                className="project-agent-create"
+                onClick={openCreateDialog}
+                type="button"
+              >
+                <Plus size={15} />
+                {t("agents.create")}
+              </Button>
+            }
+            className="project-agents-heading"
+            description={t("agents.description", { project: project.name })}
+            title={t("agents.title")}
+            titleId="project-agents-title"
+          />
 
           <div className="project-agents-body">
             <header>
               <div>
-                <strong>{t("agents.list")}</strong>
-                <span>{t("agents.count", { count: agents.length })}</span>
+                <Typography as="strong" variant="body">
+                  {t("agents.list")}
+                </Typography>
+                <Typography as="span" tone="muted" variant="caption">
+                  {t("agents.count", { count: agents.length })}
+                </Typography>
               </div>
             </header>
 
             {error ? (
               <div className="project-agents-state error" role="alert">
                 <CircleAlert size={20} />
-                <strong>{t("agents.loadFailed")}</strong>
-                <p>{error}</p>
+                <Typography as="strong" variant="body">
+                  {t("agents.loadFailed")}
+                </Typography>
+                <Typography tone="muted" variant="caption">
+                  {error}
+                </Typography>
               </div>
             ) : isLoading ? (
               <div className="project-agents-state" aria-live="polite">
                 <LoaderCircle className="spin" size={21} />
-                <strong>{t("agents.loading")}</strong>
+                <Typography as="strong" variant="body">
+                  {t("agents.loading")}
+                </Typography>
               </div>
             ) : agents.length === 0 ? (
-              <div className="project-agents-state">
-                <span>
-                  <Bot size={24} />
-                </span>
-                <strong>{t("agents.emptyTitle")}</strong>
-                <p>{t("agents.emptyDescription")}</p>
-                <button onClick={openCreateDialog} type="button">
-                  <Plus size={14} />
-                  {t("agents.create")}
-                </button>
-              </div>
+              <EmptyState
+                action={
+                  <Button onClick={openCreateDialog} type="button">
+                    <Plus size={14} />
+                    {t("agents.create")}
+                  </Button>
+                }
+                className="project-agents-state"
+                description={t("agents.emptyDescription")}
+                icon={<Bot size={24} />}
+                title={t("agents.emptyTitle")}
+              />
             ) : (
               <div
                 aria-label={t("agents.list")}
@@ -373,7 +394,7 @@ export function ProjectAgents({
           onSubmit={addAgent}
         />
       )}
-    </main>
+    </MainContent>
   );
 }
 function modelLabel(agent: ProjectAgent, providerDefault: string) {

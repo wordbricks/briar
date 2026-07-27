@@ -1,4 +1,7 @@
 import { Inbox, ListTodo, Plus, Search } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { useI18n } from "../i18n";
 
 export type CompanionStatusFilter =
@@ -42,15 +45,21 @@ export function CompanionBottomNavigation({
   ];
 
   return (
-    <div className="companion-bottom-chrome">
-      <nav aria-label={t("sidebar.mainMenu")} className="companion-bottom-nav">
+    <div className="companion-bottom-chrome border-t border-border bg-card/95 backdrop-blur">
+      <nav
+        aria-label={t("sidebar.mainMenu")}
+        className="companion-bottom-nav grid grid-cols-3 gap-1 px-2"
+      >
         {destinations.map((destination) => {
           const Icon = destination.icon;
           const isActive = activeDestination === destination.value;
           return (
             <button
               aria-current={isActive ? "page" : undefined}
-              className={isActive ? "active" : ""}
+              className={cn(
+                "flex flex-col items-center gap-1 rounded-lg px-2 py-2 text-muted-foreground transition-colors",
+                isActive && "active text-foreground",
+              )}
               key={destination.value}
               onClick={() => {
                 if (destination.value === "inbox") onInboxOpen();
@@ -59,25 +68,30 @@ export function CompanionBottomNavigation({
               }}
               type="button"
             >
-              <span>
+              <span className="relative">
                 <Icon size={22} />
-                {destination.count ? <i>{destination.count}</i> : null}
+                {destination.count ? (
+                  <i className="absolute -top-1 -right-2 min-w-4 rounded-full bg-primary px-1 text-center text-2xs font-semibold text-primary-foreground not-italic">
+                    {destination.count}
+                  </i>
+                ) : null}
               </span>
-              <strong>{destination.label}</strong>
+              <strong className="text-2xs font-medium">{destination.label}</strong>
             </button>
           );
         })}
       </nav>
-      {onCreate && (
-        <button
+      {onCreate ? (
+        <Button
           aria-label={t("dashboard.createIssue")}
-          className="companion-fab"
+          className="companion-fab size-14 rounded-full shadow-lg"
           onClick={onCreate}
+          size="icon"
           type="button"
         >
           <Plus size={25} />
-        </button>
-      )}
+        </Button>
+      ) : null}
     </div>
   );
 }

@@ -38,6 +38,14 @@ import {
   X,
 } from "lucide-react";
 import {
+  EmptyState,
+  ErrorBanner,
+  MainContent,
+} from "@/components/layout";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Typography } from "@/components/ui/typography";
+import {
   useCallback,
   useEffect,
   useId,
@@ -298,26 +306,33 @@ export function HuntDashboard({
 
   if (noProject) {
     return (
-      <main className="main-content" id="issues">
+      <MainContent id="issues">
         {!companionMode && (
           <header
             className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`}
             data-tauri-drag-region="deep"
           />
         )}
-        <div className="project-empty">
-          <span aria-hidden="true">
-            <FolderGit2 size={24} />
-          </span>
-          <p className="eyebrow">{t("projectEmpty.eyebrow")}</p>
-          <h1>{t("projectEmpty.title")}</h1>
-          <p>{t("projectEmpty.description")}</p>
-          <button onClick={onAddProject} type="button">
-            <Plus size={15} />
-            {t("projectEmpty.createProject")}
-          </button>
-        </div>
-      </main>
+        <EmptyState
+          action={
+            <Button onClick={onAddProject} type="button">
+              <Plus size={15} />
+              {t("projectEmpty.createProject")}
+            </Button>
+          }
+          className="project-empty h-full"
+          description={t("projectEmpty.description")}
+          icon={<FolderGit2 size={24} />}
+          title={
+            <>
+              <Typography as="p" className="eyebrow mb-2" tone="primary" variant="micro">
+                {t("projectEmpty.eyebrow")}
+              </Typography>
+              {t("projectEmpty.title")}
+            </>
+          }
+        />
+      </MainContent>
     );
   }
 
@@ -343,7 +358,7 @@ export function HuntDashboard({
   }
 
   return (
-    <main className="main-content" id="issues">
+    <MainContent id="issues">
       {!companionMode && (
         <header
           className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`}
@@ -351,29 +366,39 @@ export function HuntDashboard({
         />
       )}
       <div className="dashboard-scroll">
-        {error && <div className="error-banner"><CircleAlert size={16} />{error}</div>}
+        {error ? (
+          <ErrorBanner className="error-banner" icon={<CircleAlert size={16} />}>
+            {error}
+          </ErrorBanner>
+        ) : null}
         {needsLocalConnection && (
           <div className="connect-banner">
             <span aria-hidden="true"><FolderGit2 size={16} /></span>
             <div>
-              <strong>{t("dashboard.connectRepositoryTitle")}</strong>
-              <small>{t("dashboard.connectRepositoryDescription")}</small>
+              <Typography as="strong" variant="bodySm">
+                {t("dashboard.connectRepositoryTitle")}
+              </Typography>
+              <Typography as="small" tone="muted" variant="caption">
+                {t("dashboard.connectRepositoryDescription")}
+              </Typography>
             </div>
-            <button onClick={onConnectRepository} type="button">
+            <Button onClick={onConnectRepository} type="button" variant="soft">
               <FolderGit2 size={13} />{t("dashboard.connectRepository")}
-            </button>
+            </Button>
           </div>
         )}
 
         <div className="queue-header">
           <div className="queue-heading">
             <div className="queue-heading-copy">
-              <h2>
+              <Typography as="h2" variant="heading">
                 {companionMode && companionSearchMode
                   ? t("companion.navSearch")
                   : t("dashboard.queue")}
-              </h2>
-              <span>{t("dashboard.taskCount", { count: filtered.length })}</span>
+              </Typography>
+              <Typography as="span" tone="muted" variant="caption">
+                {t("dashboard.taskCount", { count: filtered.length })}
+              </Typography>
             </div>
             {companionMode && (
               <div className="companion-source-filter" ref={sourceFilterRef}>
@@ -424,23 +449,24 @@ export function HuntDashboard({
           </div>
           <div className="queue-tools">
             {!companionMode && (
-              <button
+              <Button
                 aria-label={t("dashboard.createIssue")}
                 className="create-issue-button"
                 onClick={() => setIsIssueDialogOpen(true)}
                 type="button"
               >
                 <Plus size={14} />{t("dashboard.createIssue")}
-              </button>
+              </Button>
             )}
             {(!companionMode || companionSearchMode) && (
               <label className="search-box">
                 <Search size={15} />
-                <input
+                <Input
                   autoFocus={companionSearchMode}
-                  value={query}
+                  className="h-full border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder={t("dashboard.search")}
+                  value={query}
                 />
               </label>
             )}
@@ -590,7 +616,7 @@ export function HuntDashboard({
           projectName={dashboard?.project.name}
         />
       )}
-    </main>
+    </MainContent>
   );
 }
 
@@ -1343,21 +1369,23 @@ export function RunPage({
     setContentSplit(clampContentSplit(nextSplit));
   };
   return (
-    <main className="main-content run-page-shell" id="issue-detail">
+    <MainContent className="run-page-shell" id="issue-detail">
       {!companionMode && (
         <header
           className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`}
           data-tauri-drag-region="deep"
         >
-          <button
+          <Button
             aria-label={t("run.back")}
             className="run-page-titlebar-back"
             onClick={onBack}
+            size="icon-sm"
             title={t("run.back")}
             type="button"
+            variant="ghost"
           >
             <ArrowLeft aria-hidden="true" size={16} />
-          </button>
+          </Button>
           <small className="run-page-window-number">
             AH-{run.runNumber}
           </small>
@@ -1589,7 +1617,7 @@ export function RunPage({
           run={run}
         />
       )}
-    </main>
+    </MainContent>
   );
 }
 

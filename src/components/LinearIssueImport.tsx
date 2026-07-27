@@ -25,6 +25,9 @@ import {
   type LinearWorkflowStateSummary,
 } from "../lib/linear-import";
 import { SelectMenu } from "./SelectMenu";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Typography } from "@/components/ui/typography";
 
 type Step = "apiKey" | "teams" | "mapping" | "done";
 

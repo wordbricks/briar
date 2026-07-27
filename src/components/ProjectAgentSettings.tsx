@@ -33,6 +33,9 @@ import { projectAgentAvatarFromCodexPet } from "../lib/codex-pets";
 import type { Project, ProjectAgent, UpdateProjectAgentInput } from "../types";
 import { SelectMenu } from "./SelectMenu";
 import { CodexPetAttribution, CodexPetPicker } from "./CodexPetPicker";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Typography } from "@/components/ui/typography";
 
 const providerLabels: Record<AgentProvider, string> = {
   codex: "Codex",

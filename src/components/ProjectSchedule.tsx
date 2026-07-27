@@ -21,6 +21,13 @@ import {
   useState,
   type CSSProperties,
 } from "react";
+
+import {
+  MainContent,
+  PageHeader,
+} from "@/components/layout";
+import { Button } from "@/components/ui/button";
+import { Typography } from "@/components/ui/typography";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
 import {
@@ -430,52 +437,61 @@ export function ProjectSchedule({
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   return (
-    <main className="main-content project-schedule-page" id="project-schedule">
+    <MainContent className="project-schedule-page" id="project-schedule">
       <header
         className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`}
         data-tauri-drag-region
       />
-      <section className="project-schedule-heading">
-        <div>
-          <p className="eyebrow">
+      <PageHeader
+        action={
+          <div className="project-schedule-heading-actions flex flex-wrap items-center gap-3">
+            <div className="project-schedule-summary flex flex-wrap items-center gap-3 text-caption text-muted-foreground">
+              <span>
+                <Typography as="strong" className="mr-1" variant="bodySm">
+                  {visibleRuns}
+                </Typography>
+                {t("schedule.runs")}
+              </span>
+              <i className="h-3 w-px bg-border" />
+              <span>
+                <Typography as="strong" className="mr-1" variant="bodySm">
+                  {formatDuration(totalMinutes)}
+                </Typography>
+                {t("schedule.agentTime")}
+              </span>
+              <i className="h-3 w-px bg-border" />
+              <span>
+                <Typography as="strong" className="mr-1" variant="bodySm">
+                  {filteredSchedules.length}
+                </Typography>
+                {t("schedule.automations")}
+              </span>
+            </div>
+            <Button
+              className="project-schedule-create"
+              disabled={isScheduleDataLoading || agents.length === 0}
+              onClick={() => setIsScheduleDialogOpen(true)}
+              type="button"
+            >
+              {isScheduleDataLoading ? (
+                <LoaderCircle className="spin" size={15} />
+              ) : (
+                <Plus size={15} />
+              )}
+              {t("schedule.create")}
+            </Button>
+          </div>
+        }
+        className="project-schedule-heading"
+        description={t("schedule.description")}
+        eyebrow={
+          <>
             <CalendarClock size={13} />
             {t("schedule.eyebrow")}
-          </p>
-          <h1>{t("schedule.title")}</h1>
-          <p>{t("schedule.description")}</p>
-        </div>
-        <div className="project-schedule-heading-actions">
-          <div className="project-schedule-summary">
-            <span>
-              <strong>{visibleRuns}</strong>
-              {t("schedule.runs")}
-            </span>
-            <i />
-            <span>
-              <strong>{formatDuration(totalMinutes)}</strong>
-              {t("schedule.agentTime")}
-            </span>
-            <i />
-            <span>
-              <strong>{filteredSchedules.length}</strong>
-              {t("schedule.automations")}
-            </span>
-          </div>
-          <button
-            className="project-schedule-create"
-            disabled={isScheduleDataLoading || agents.length === 0}
-            onClick={() => setIsScheduleDialogOpen(true)}
-            type="button"
-          >
-            {isScheduleDataLoading ? (
-              <LoaderCircle className="spin" size={15} />
-            ) : (
-              <Plus size={15} />
-            )}
-            {t("schedule.create")}
-          </button>
-        </div>
-      </section>
+          </>
+        }
+        title={t("schedule.title")}
+      />
 
       {scheduleError && (
         <div className="project-schedule-error" role="alert">
@@ -749,7 +765,7 @@ export function ProjectSchedule({
           schedule={scheduleToDelete}
         />
       )}
-    </main>
+    </MainContent>
   );
 }
 

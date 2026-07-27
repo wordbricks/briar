@@ -9,6 +9,16 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+
+import {
+  EmptyState,
+  ErrorBanner,
+  MainContent,
+  PageHero,
+  StatusPill,
+} from "@/components/layout";
+import { Button } from "@/components/ui/button";
+import { Typography } from "@/components/ui/typography";
 import { useAutoHuntAppServerEvents } from "../hooks/useAutoHuntAppServerEvents";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
@@ -118,7 +128,7 @@ export function AutoHuntSessions({
 
   if (selectedSession) {
     return (
-      <main className="main-content" id="auto-hunt-session">
+      <MainContent id="auto-hunt-session">
         {!companionMode && <header className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region />}
 
         <div className="auto-hunt-scroll auto-hunt-session-detail-scroll">
@@ -271,90 +281,107 @@ export function AutoHuntSessions({
             </div>
           </section>
         </div>
-      </main>
+      </MainContent>
     );
   }
 
   return (
-    <main className="main-content" id={agent ? "project-agent-detail" : "auto-hunt"}>
+    <MainContent id={agent ? "project-agent-detail" : "auto-hunt"}>
       {!companionMode && <header className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region />}
 
       <div className="auto-hunt-scroll">
-        <section className="auto-hunt-hero">
-          <div className="auto-hunt-hero-copy">
-            {agent && onAgentBack ? (
-              <button
-                className="auto-hunt-session-back project-agent-detail-back"
-                onClick={onAgentBack}
+        <PageHero
+          action={
+            canStart ? (
+              <Button
+                className="auto-hunt-start-button h-12 min-w-[190px] rounded-xl"
+                disabled={!dashboard || queued.length === 0 || Boolean(runningSession)}
+                onClick={start}
                 type="button"
               >
-                <ArrowLeft size={16} />
-                {t("agents.back")}
-              </button>
-            ) : null}
-            <p className="eyebrow">
+                {runningSession
+                  ? <LoaderCircle className="spin" size={18} />
+                  : <Play fill="currentColor" size={17} />}
+                {runningSession
+                  ? t("autoHunt.running")
+                  : agent
+                    ? t("agents.runNow")
+                    : t("autoHunt.start")}
+              </Button>
+            ) : null
+          }
+          className="auto-hunt-hero"
+          description={agent?.responsibility ?? agentCopy(t("autoHunt.description"))}
+          eyebrow={
+            <>
               {agent ? <Bot size={13} /> : <Sparkles size={13} />}
               {agent ? t("agents.detailEyebrow") : agentCopy(t("autoHunt.eyebrow"))}
-            </p>
-            <h1>{agent?.name ?? t("autoHunt.title")}</h1>
-            <p>{agent?.responsibility ?? agentCopy(t("autoHunt.description"))}</p>
-            {canStart ? (
-              <div className="auto-hunt-capacity">
-                <span>{t("autoHunt.available", { count: queued.length })}</span>
-                <span>{t("autoHunt.limit", { count: maxIssues })}</span>
+            </>
+          }
+          meta={
+            canStart ? (
+              <div className="auto-hunt-capacity flex flex-wrap items-center gap-2">
+                <StatusPill tone="primary">
+                  {t("autoHunt.available", { count: queued.length })}
+                </StatusPill>
+                <StatusPill>
+                  {t("autoHunt.limit", { count: maxIssues })}
+                </StatusPill>
               </div>
-            ) : null}
-          </div>
-          {canStart ? (
-            <button
-              className="auto-hunt-start-button"
-              disabled={!dashboard || queued.length === 0 || Boolean(runningSession)}
-              onClick={start}
-              type="button"
-            >
-              {runningSession
-                ? <LoaderCircle className="spin" size={18} />
-                : <Play fill="currentColor" size={17} />}
-              {runningSession
-                ? t("autoHunt.running")
-                : agent
-                  ? t("agents.runNow")
-                  : t("autoHunt.start")}
-            </button>
-          ) : null}
-        </section>
+            ) : undefined
+          }
+          title={
+            <span className="grid gap-3">
+              {agent && onAgentBack ? (
+                <Button
+                  className="auto-hunt-session-back project-agent-detail-back w-max"
+                  onClick={onAgentBack}
+                  type="button"
+                  variant="ghost"
+                >
+                  <ArrowLeft size={16} />
+                  {t("agents.back")}
+                </Button>
+              ) : null}
+              <span>{agent?.name ?? t("autoHunt.title")}</span>
+            </span>
+          }
+        />
 
         {(error || startError) && (
-          <div className="error-banner"><CircleAlert size={16} />{startError ?? error}</div>
+          <ErrorBanner className="m-4" icon={<CircleAlert size={16} />}>
+            {startError ?? error}
+          </ErrorBanner>
         )}
 
         <section className="auto-hunt-session-panel">
           <header>
             <div>
-              <h2>{agent ? t("agents.sessions") : t("autoHunt.sessions")}</h2>
-              <p>
+              <Typography as="h2" variant="bodyLg">
+                {agent ? t("agents.sessions") : t("autoHunt.sessions")}
+              </Typography>
+              <Typography className="mt-1" tone="muted" variant="caption">
                 {agent
                   ? t("agents.sessionsDescription")
                   : t("autoHunt.sessionsDescription")}
-              </p>
+              </Typography>
             </div>
-            <span>{projectSessions.length}</span>
+            <StatusPill tone="primary">{projectSessions.length}</StatusPill>
           </header>
 
           {projectSessions.length === 0 ? (
-            <div className="auto-hunt-empty">
-              <span><Bot size={22} /></span>
-              <strong>
-                {agent ? t("agents.emptySessions") : t("autoHunt.emptyTitle")}
-              </strong>
-              <p>
-                {agent && !canStart
+            <EmptyState
+              className="auto-hunt-empty"
+              description={
+                agent && !canStart
                   ? t("agents.emptySessionsDescription")
                   : queued.length === 0
                     ? t("autoHunt.noQueued")
-                    : t("autoHunt.emptyDescription")}
-              </p>
-            </div>
+                    : t("autoHunt.emptyDescription")
+              }
+              icon={<Bot size={22} />}
+              title={agent ? t("agents.emptySessions") : t("autoHunt.emptyTitle")}
+            />
           ) : (
             <div className="auto-hunt-session-list">
               {projectSessions.map((session) => (
@@ -383,7 +410,7 @@ export function AutoHuntSessions({
         </section>
       </div>
 
-    </main>
+    </MainContent>
   );
 }
 

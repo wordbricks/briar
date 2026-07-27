@@ -16,6 +16,8 @@ import {
   type OnboardingPrerequisites,
   type PrerequisiteId,
 } from "../lib/initial-onboarding";
+import { Button } from "@/components/ui/button";
+import { Typography } from "@/components/ui/typography";
 import { ClaudeIcon, CodexIcon, GrokIcon } from "./AgentIcons";
 
 type Step = "welcome" | "prerequisites";
