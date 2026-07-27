@@ -581,14 +581,17 @@ export function App() {
             error={briar.error}
             isSidebarOpen={isSidebarOpen}
             onRequestedSessionOpen={() => setRequestedSessionId(null)}
-            onStart={(agent, runs) =>
+            onStart={(agent, runs, options) =>
               autoHunt.startSession(
                 activeProject.id,
                 runs,
                 () => void briar.refresh(),
                 {
                   agent,
+                  coordinatorConversationId:
+                    options?.coordinatorConversationId,
                   maxIssues:
+                    options?.maxIssues ??
                     briar.dashboard?.settings.automation.maxIssuesPerSession,
                 },
               )

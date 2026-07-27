@@ -121,6 +121,7 @@ impl AutoHuntDispatchStore {
         dispatch_group_id: &str,
         project_id: &str,
         agent_id: &str,
+        coordinator_conversation_id: Option<String>,
         max_issues: usize,
     ) -> Result<AutoHuntDispatchGroup, String> {
         let _guard = self
@@ -135,7 +136,7 @@ impl AutoHuntDispatchStore {
             project_id: project_id.to_string(),
             agent_id: agent_id.to_string(),
             coordinator_session_id: format!("{dispatch_group_id}-coordinator"),
-            coordinator_conversation_id: None,
+            coordinator_conversation_id,
             status: AutoHuntDispatchStatus::Running,
             max_issues,
             started_at: started_at.clone(),
@@ -577,7 +578,7 @@ mod tests {
         let directory = tempfile::tempdir().expect("dispatch fixture");
         let store = AutoHuntDispatchStore::new(directory.path()).expect("store");
         store
-            .create("group-1", "project-1", "agent-1", 2)
+            .create("group-1", "project-1", "agent-1", None, 2)
             .expect("group");
         store.add_worker("group-1", worker()).expect("worker");
         store
@@ -642,9 +643,11 @@ mod tests {
         let directory = tempfile::tempdir().expect("dispatch fixture");
         let store = AutoHuntDispatchStore::new(directory.path()).expect("store");
         store
-            .create("group-1", "project-1", "agent-1", 1)
+            .create("group-1", "project-1", "agent-1", None, 1)
             .expect("group");
-        assert!(store.create("group-1", "project-1", "agent-1", 1).is_err());
+        assert!(store
+            .create("group-1", "project-1", "agent-1", None, 1)
+            .is_err());
         store.add_worker("group-1", worker()).expect("worker");
         assert!(store.add_worker("group-1", worker()).is_err());
     }
@@ -654,7 +657,7 @@ mod tests {
         let directory = tempfile::tempdir().expect("dispatch fixture");
         let store = AutoHuntDispatchStore::new(directory.path()).expect("store");
         store
-            .create("group-1", "project-1", "agent-1", 1)
+            .create("group-1", "project-1", "agent-1", None, 1)
             .expect("group");
         store.add_worker("group-1", worker()).expect("worker");
         store

@@ -89,7 +89,9 @@ export function AutoHuntSessions({
     defaultAutoHuntMaxIssues;
   const queued = selectAutoHuntCandidates(dashboard?.runs ?? [], maxIssues);
   const runningSession = projectSessions.find((session) => session.status === "running");
-  const canStart = !agent || agent.kind === "auto_hunt";
+  // Reaching this screen is an explicit Auto Hunt choice. Any saved agent can
+  // be used as the worker/coordinator identity once the user selects this mode.
+  const canStart = true;
   const selectedSession = projectSessions.find(
     (session) => session.id === selectedSessionId,
   ) ?? null;

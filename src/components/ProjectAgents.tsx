@@ -41,8 +41,8 @@ import type {
   ProjectAgent,
   UpdateProjectAgentInput,
 } from "../types";
-import { AutoHuntSessions } from "./AutoHuntSessions";
 import { NativeSelect } from "./NativeSelect";
+import { ProjectAgentDetail } from "./ProjectAgentDetail";
 import { ProjectAgentSettings } from "./ProjectAgentSettings";
 
 const providerLabels: Record<AgentProvider, string> = {
@@ -66,7 +66,14 @@ export function ProjectAgents({
   error: string | null;
   isSidebarOpen: boolean;
   onRequestedSessionOpen?: () => void;
-  onStart: (agent: ProjectAgent, runs: HuntRun[]) => string;
+  onStart: (
+    agent: ProjectAgent,
+    runs: HuntRun[],
+    options?: {
+      coordinatorConversationId?: string | null;
+      maxIssues?: number;
+    },
+  ) => string;
   project: Project;
   requestedSessionId?: string | null;
   sessions: AutoHuntSession[];
@@ -217,14 +224,15 @@ export function ProjectAgents({
 
   if (selectedAgent) {
     return (
-      <AutoHuntSessions
+      <ProjectAgentDetail
         agent={selectedAgent}
         dashboard={dashboard}
         error={appError}
         isSidebarOpen={isSidebarOpen}
-        onAgentBack={() => setSelectedAgent(null)}
+        onBack={() => setSelectedAgent(null)}
         onRequestedSessionOpen={onRequestedSessionOpen}
-        onStart={(runs) => onStart(selectedAgent, runs)}
+        onStartAutoHunt={(runs, options) =>
+          onStart(selectedAgent, runs, options)}
         requestedSessionId={requestedSessionId}
         sessions={sessions}
       />
