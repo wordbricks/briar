@@ -220,7 +220,7 @@ bun link
 briar login
 ```
 
-After login, create a project from the desktop onboarding screen, select the workflow that matches the repository, choose the Velen organization, optionally select a Linear source, and pick the Git repository. New projects default to the deployment-free `local` workflow; review, release, research, and custom stage selections are available. Briar validates every selection, stores the path/token/settings locally, stores non-secret integration settings in D1, and installs the Briar CLI plus Codex skill automatically. The repository path and Agent token are never sent to the Worker as project metadata.
+After login, create a project from the desktop onboarding screen, select the workflow that matches the repository, choose the Velen organization, optionally select a Linear source, and pick the Git repository. New projects default to the deployment-free `local` workflow; review, release, research, and custom stage selections are available. Briar validates every selection, stores the path/token/settings locally, stores non-secret integration settings in D1, and installs the Briar CLI plus Auto Hunt skills automatically. Each desktop launch also synchronizes those local assets with the bundled app version, so installing an app update updates the CLI and skills on relaunch. The repository path and Agent token are never sent to the Worker as project metadata.
 
 You can also create and connect a project from inside a Git repository with the CLI:
 
