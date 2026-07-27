@@ -5,6 +5,13 @@ export const maxProjectAgentAvatarDataUrlLength = 400_000;
 const avatarSize = 256;
 const supportedAvatarTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 
+export function isProjectAgentAvatarDataUrl(value: string): boolean {
+  return (
+    /^data:image\/(?:jpeg|png|webp);base64,/u.test(value) &&
+    value.length <= maxProjectAgentAvatarDataUrlLength
+  );
+}
+
 export async function projectAgentAvatarFromFile(file: File): Promise<string> {
   if (
     !supportedAvatarTypes.has(file.type) ||
@@ -38,10 +45,7 @@ export async function projectAgentAvatarFromFile(file: File): Promise<string> {
     );
 
     const avatar = canvas.toDataURL("image/webp", 0.86);
-    if (
-      !/^data:image\/(?:jpeg|png|webp);base64,/u.test(avatar) ||
-      avatar.length > maxProjectAgentAvatarDataUrlLength
-    ) {
+    if (!isProjectAgentAvatarDataUrl(avatar)) {
       throw new Error("invalid-avatar-output");
     }
     return avatar;
