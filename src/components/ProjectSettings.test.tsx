@@ -84,7 +84,12 @@ describe("ProjectSettings", () => {
     expect(container.textContent).toContain("wordbricks/briar");
 
     const openSection = async (
-      section: "general" | "issue-import" | "auto-hunt" | "workflow",
+      section:
+        | "general"
+        | "integrations"
+        | "issue-import"
+        | "auto-hunt"
+        | "workflow",
     ) => {
       const button = container.querySelector<HTMLButtonElement>(
         `[data-project-settings-section="${section}"]`,
@@ -102,6 +107,7 @@ describe("ProjectSettings", () => {
       ).map((button) => button.textContent),
     ).toEqual([
       "General",
+      "Integrations",
       "이슈 임포트",
       "자동사냥",
       "워크플로우",
@@ -167,18 +173,30 @@ describe("ProjectSettings", () => {
       expect.objectContaining({ enabled: true, maxIssuesPerSession: 3 }),
     );
 
-    await openSection("issue-import");
+    await openSection("integrations");
     expect(container.querySelector(".project-settings-card")).toBeNull();
+    const velenSection = container.querySelector<HTMLElement>(
+      '[data-project-integration="velen"]',
+    );
     expect(
-      container.querySelector<HTMLElement>(".project-settings-linear")?.hidden,
+      velenSection?.hidden,
     ).toBe(false);
-    expect(container.querySelector(".project-settings-linear")?.textContent).toContain(
+    expect(velenSection?.textContent).toContain(
       "Velen 연결",
     );
+    expect(
+      container.querySelector<HTMLElement>(
+        '[data-project-integration="linear"]',
+      )?.hidden,
+    ).toBe(true);
+
+    await openSection("issue-import");
+    expect(velenSection?.hidden).toBe(true);
     expect(container.textContent).toContain("Linear 연결");
-    const linearSection = container.querySelectorAll<HTMLElement>(
-      ".project-settings-linear",
-    )[1];
+    const linearSection = container.querySelector<HTMLElement>(
+      '[data-project-integration="linear"]',
+    );
+    expect(linearSection?.hidden).toBe(false);
     const linearTeam = linearSection?.querySelector<HTMLInputElement>(
       'input[aria-label="팀 키"]',
     );
