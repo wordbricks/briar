@@ -179,6 +179,7 @@ export function ProjectOnboarding({
       linearEnabled,
       linearSource: linearEnabled ? linearSource || null : null,
       linearTeam: linearEnabled ? linearTeam || null : null,
+      githubRepository: repositoryReadiness?.githubRepository ?? null,
       workflow: initialWorkflow,
     }, repositoryPath, "local").catch(() => undefined);
   };

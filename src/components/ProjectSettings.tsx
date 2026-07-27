@@ -56,6 +56,7 @@ type ProjectSettingsSection =
 
 export function ProjectSettings({
   dashboard,
+  githubRepository,
   isDeleting,
   isSidebarOpen,
   onBack,
@@ -72,6 +73,7 @@ export function ProjectSettings({
   velen,
 }: {
   dashboard: DashboardPayload | null;
+  githubRepository: string | null;
   isDeleting: boolean;
   isSidebarOpen: boolean;
   onBack: () => void;
@@ -857,7 +859,7 @@ export function ProjectSettings({
               >
                 <div className="project-workflow-repository">
                   <span>{t("settings.repository")}</span>
-                  <strong>{dashboard?.settings.githubRepository ?? t("settings.noRepository")}</strong>
+                  <strong>{githubRepository ?? t("settings.noRepository")}</strong>
                   <span className="project-workflow-version">
                     {workflow?.preset ?? "custom"} · v{workflowContract.version}
                   </span>

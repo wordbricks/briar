@@ -473,6 +473,11 @@ export function App() {
         ) : activePage === "project-settings" && activeProject ? (
           <ProjectSettings
             dashboard={briar.dashboard}
+            githubRepository={
+              briar.dashboard?.settings.githubRepository ??
+              briar.projectReadiness[activeProject.id]?.githubRepository ??
+              null
+            }
             isDeleting={briar.deletingProjectId === briar.activeProjectId}
             isSidebarOpen={isSidebarOpen}
             onBack={() =>

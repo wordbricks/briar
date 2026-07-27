@@ -51,7 +51,14 @@ describe("ProjectSettings", () => {
     await act(async () => {
       root.render(
         <ProjectSettings
-          dashboard={demoDashboard}
+          dashboard={{
+            ...demoDashboard,
+            settings: {
+              ...demoDashboard.settings,
+              githubRepository: null,
+            },
+          }}
+          githubRepository="wordbricks/briar"
           isDeleting={false}
           isSidebarOpen
           onBack={() => undefined}
@@ -73,6 +80,7 @@ describe("ProjectSettings", () => {
         />,
       );
     });
+    expect(container.textContent).toContain("wordbricks/briar");
 
     const optionValues = async (controlId: string) => {
       const trigger = container.querySelector<HTMLButtonElement>(`#${controlId}`);
@@ -284,6 +292,7 @@ describe("ProjectSettings", () => {
       root.render(
         <ProjectSettings
           dashboard={demoDashboard}
+          githubRepository="wordbricks/briar"
           isDeleting={false}
           isSidebarOpen
           onBack={() => undefined}
