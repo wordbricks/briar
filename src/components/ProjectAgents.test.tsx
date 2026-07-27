@@ -126,7 +126,7 @@ describe("ProjectAgents", () => {
     });
   });
 
-  it("opens a prefilled editor from an agent card and saves the changes", async () => {
+  it("opens a prefilled settings page from the card icon and saves changes", async () => {
     const container = await mount(
       <ProjectAgents
         {...projectAgentsProps}
@@ -134,17 +134,21 @@ describe("ProjectAgents", () => {
     );
     await act(async () => Promise.resolve());
 
-    const editButton = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="자동 사냥 에이전트 편집"]',
+    const settingsButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="자동 사냥 에이전트 설정"]',
     );
-    expect(editButton).not.toBeNull();
-    await act(async () => editButton?.click());
+    expect(settingsButton).not.toBeNull();
+    expect(settingsButton?.textContent).toBe("");
+    await act(async () => settingsButton?.click());
 
-    const form = container.querySelector<HTMLFormElement>(
-      'form[aria-label="에이전트 편집"]',
+    const settingsPage = container.querySelector("#project-agent-settings");
+    const form = settingsPage?.querySelector<HTMLFormElement>(
+      "form.project-agent-settings-card",
     );
     const name = form?.querySelector<HTMLInputElement>("input");
     const responsibility = form?.querySelector<HTMLTextAreaElement>("textarea");
+    expect(settingsPage?.textContent).toContain("에이전트 설정");
+    expect(settingsPage?.textContent).toContain("프로젝트 실행 기본값");
     expect(name?.value).toBe("자동 사냥 에이전트");
     expect(responsibility?.value).toBe(
       "모든 대기중인 이슈에 대해서 자동사냥을 수행하는것",
@@ -177,9 +181,15 @@ describe("ProjectAgents", () => {
     expect(container.textContent).toContain(
       "릴리스 상태를 점검하고 결과를 보고합니다.",
     );
-    expect(
-      container.querySelector('form[aria-label="에이전트 편집"]'),
-    ).toBeNull();
+    expect(container.querySelector("#project-agent-settings")).not.toBeNull();
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".project-agent-settings-back")
+        ?.click();
+    });
+    expect(container.querySelector("#project-agents")).not.toBeNull();
+    expect(container.textContent).toContain("릴리스 점검 에이전트");
   });
 
   it("opens an agent detail page with only that agent's sessions", async () => {

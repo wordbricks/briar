@@ -289,7 +289,11 @@ export function AutoHuntSessions({
               {runningSession
                 ? <LoaderCircle className="spin" size={18} />
                 : <Play fill="currentColor" size={17} />}
-              {runningSession ? t("autoHunt.running") : t("autoHunt.start")}
+              {runningSession
+                ? t("autoHunt.running")
+                : agent
+                  ? t("agents.runNow")
+                  : t("autoHunt.start")}
             </button>
           ) : null}
         </section>

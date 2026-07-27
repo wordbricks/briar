@@ -5,6 +5,7 @@ import {
   LoaderCircle,
   Pencil,
   Plus,
+  Settings,
   Sparkles,
   X,
 } from "lucide-react";
@@ -32,6 +33,7 @@ import type {
 } from "../types";
 import { AutoHuntSessions } from "./AutoHuntSessions";
 import { NativeSelect } from "./NativeSelect";
+import { ProjectAgentSettings } from "./ProjectAgentSettings";
 
 const providerLabels: Record<AgentProvider, string> = {
   codex: "Codex",
@@ -65,7 +67,7 @@ export function ProjectAgents({
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingAgent, setEditingAgent] = useState<ProjectAgent | null>(null);
+  const [settingsAgent, setSettingsAgent] = useState<ProjectAgent | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<ProjectAgent | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -95,6 +97,7 @@ export function ProjectAgents({
 
   useEffect(() => {
     setSelectedAgent(null);
+    setSettingsAgent(null);
   }, [project.id]);
 
   useEffect(() => {
@@ -138,44 +141,53 @@ export function ProjectAgents({
     }
   };
 
-  const editAgent = async (input: UpdateProjectAgentInput) => {
-    if (!editingAgent) return;
-    setIsSubmitting(true);
+  const editAgent = async (
+    agent: ProjectAgent,
+    input: UpdateProjectAgentInput,
+  ) => {
     setError(null);
-    try {
-      const updatedAt = new Date().toISOString();
-      const agent = token
-        ? await updateProjectAgent(token, project.id, editingAgent.id, input)
-        : {
-            ...editingAgent,
-            name: input.name ?? `${providerLabels[input.provider]} Agent`,
-            provider: input.provider,
-            model: input.model,
-            responsibility: input.responsibility,
-            updatedAt,
-          };
-      setAgents((current) =>
-        current.map((candidate) =>
-          candidate.id === agent.id ? agent : candidate,
-        ),
-      );
-      setSelectedAgent((current) => current?.id === agent.id ? agent : current);
-      setIsDialogOpen(false);
-      setEditingAgent(null);
-    } finally {
-      setIsSubmitting(false);
-    }
+    const updatedAt = new Date().toISOString();
+    const updated = token
+      ? await updateProjectAgent(token, project.id, agent.id, input)
+      : {
+          ...agent,
+          name: input.name ?? `${providerLabels[input.provider]} Agent`,
+          provider: input.provider,
+          model: input.model,
+          responsibility: input.responsibility,
+          updatedAt,
+        };
+    setAgents((current) =>
+      current.map((candidate) =>
+        candidate.id === updated.id ? updated : candidate,
+      ),
+    );
+    setSelectedAgent((current) =>
+      current?.id === updated.id ? updated : current
+    );
+    setSettingsAgent(updated);
+    return updated;
   };
 
   const openCreateDialog = () => {
-    setEditingAgent(null);
     setIsDialogOpen(true);
   };
 
   const closeDialog = () => {
     setIsDialogOpen(false);
-    setEditingAgent(null);
   };
+
+  if (settingsAgent) {
+    return (
+      <ProjectAgentSettings
+        agent={settingsAgent}
+        isSidebarOpen={isSidebarOpen}
+        onBack={() => setSettingsAgent(null)}
+        onSave={(input) => editAgent(settingsAgent, input)}
+        project={project}
+      />
+    );
+  }
 
   if (selectedAgent) {
     return (
@@ -304,17 +316,14 @@ export function ProjectAgents({
                         })}
                       </time>
                       <button
-                        aria-label={t("agents.editAgent", {
+                        aria-label={t("agents.settingsAgent", {
                           name: agent.name,
                         })}
-                        onClick={() => {
-                          setEditingAgent(agent);
-                          setIsDialogOpen(true);
-                        }}
+                        className="project-agent-settings-button"
+                        onClick={() => setSettingsAgent(agent)}
                         type="button"
                       >
-                        <Pencil size={12} />
-                        {t("agents.edit")}
+                        <Settings size={14} />
                       </button>
                       <ChevronRight aria-hidden="true" size={14} />
                     </footer>
@@ -328,11 +337,11 @@ export function ProjectAgents({
 
       {isDialogOpen && (
         <ProjectAgentDialog
-          agent={editingAgent}
+          agent={null}
           isSubmitting={isSubmitting}
-          key={editingAgent?.id ?? "create"}
+          key="create"
           onClose={closeDialog}
-          onSubmit={editingAgent ? editAgent : addAgent}
+          onSubmit={addAgent}
         />
       )}
     </main>

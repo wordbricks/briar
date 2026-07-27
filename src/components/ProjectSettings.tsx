@@ -2,7 +2,6 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
-  Bot,
   Check,
   CheckCircle2,
   Copy,
@@ -12,25 +11,11 @@ import {
   LoaderCircle,
   RefreshCw,
   Rocket,
-  ShieldCheck,
   SlidersHorizontal,
   Trash2,
   Zap,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import {
-  agentEfforts,
-  agentModels,
-  agentProviders,
-  defaultAppProviderSettings,
-  loadAppProviderSettings,
-  loadProjectLlmSettings,
-  updateProjectLlmSettings,
-  type AgentProvider,
-  type AppProviderSettings,
-  type ApprovalPolicy,
-  type ModelEffort,
-} from "../lib/project-llm";
 import type { DashboardPayload, Project, ProjectSettings as ProjectSettingsData } from "../types";
 import { useI18n } from "../i18n";
 import {
@@ -51,8 +36,7 @@ type ProjectSettingsSection =
   | "general"
   | "issue-import"
   | "auto-hunt"
-  | "workflow"
-  | "agent";
+  | "workflow";
 
 export function ProjectSettings({
   dashboard,
@@ -105,20 +89,6 @@ export function ProjectSettings({
     useState<ProjectSettingsSection>("general");
   const [isConfirming, setIsConfirming] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [approvalPolicy, setApprovalPolicy] = useState<ApprovalPolicy>("never");
-  const [provider, setProvider] = useState<AgentProvider>("codex");
-  const [model, setModel] = useState<string | null>(null);
-  const [effort, setEffort] = useState<ModelEffort | null>(null);
-  const [providerAvailability, setProviderAvailability] =
-    useState<AppProviderSettings>(defaultAppProviderSettings);
-  const [savedApprovalPolicy, setSavedApprovalPolicy] =
-    useState<ApprovalPolicy>("never");
-  const [savedProvider, setSavedProvider] = useState<AgentProvider>("codex");
-  const [savedModel, setSavedModel] = useState<string | null>(null);
-  const [savedEffort, setSavedEffort] = useState<ModelEffort | null>(null);
-  const [settingsLoading, setSettingsLoading] = useState(true);
-  const [settingsSaving, setSettingsSaving] = useState(false);
-  const [settingsError, setSettingsError] = useState<string | null>(null);
   const [workflowCopied, setWorkflowCopied] = useState(false);
   const [isRegeneratingWorkflow, setIsRegeneratingWorkflow] = useState(false);
   const [workflowError, setWorkflowError] = useState<string | null>(null);
@@ -161,49 +131,6 @@ export function ProjectSettings({
   const workflowJson = workflowContract
     ? JSON.stringify(workflowContract, null, 2)
     : "";
-  const providerName =
-    provider === "codex" ? "Codex" : provider === "grok" ? "Grok" : "Claude";
-  const providerRuntimeName =
-    provider === "codex"
-      ? "Codex App Server"
-      : provider === "grok"
-        ? "Grok CLI (ACP)"
-        : "Claude Agent SDK";
-
-  useEffect(() => {
-    let cancelled = false;
-    setWorkflowError(null);
-    setWorkflowRegenerated(false);
-    setSettingsLoading(true);
-    setSettingsError(null);
-    void Promise.all([
-      loadProjectLlmSettings(project.id),
-      loadAppProviderSettings(),
-    ])
-      .then(([settings, availability]) => {
-        if (cancelled) return;
-        setProvider(settings.provider);
-        setSavedProvider(settings.provider);
-        setModel(settings.model);
-        setSavedModel(settings.model);
-        setEffort(settings.effort);
-        setSavedEffort(settings.effort);
-        setProviderAvailability(availability);
-        setApprovalPolicy(settings.approvalPolicy);
-        setSavedApprovalPolicy(settings.approvalPolicy);
-      })
-      .catch((caught) => {
-        if (!cancelled) {
-          setSettingsError(caught instanceof Error ? caught.message : String(caught));
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setSettingsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [project.id]);
 
   useEffect(() => {
     const next = normalizeAutoHuntAutomation(
@@ -269,31 +196,6 @@ export function ProjectSettings({
     }
   };
 
-  const saveLlmSettings = async () => {
-    setSettingsSaving(true);
-    setSettingsError(null);
-    try {
-      const settings = await updateProjectLlmSettings(project.id, {
-        provider,
-        model,
-        effort,
-        approvalPolicy,
-      });
-      setProvider(settings.provider);
-      setSavedProvider(settings.provider);
-      setModel(settings.model);
-      setSavedModel(settings.model);
-      setEffort(settings.effort);
-      setSavedEffort(settings.effort);
-      setApprovalPolicy(settings.approvalPolicy);
-      setSavedApprovalPolicy(settings.approvalPolicy);
-    } catch (caught) {
-      setSettingsError(caught instanceof Error ? caught.message : String(caught));
-    } finally {
-      setSettingsSaving(false);
-    }
-  };
-
   const regenerateWorkflow = async () => {
     setIsRegeneratingWorkflow(true);
     setWorkflowError(null);
@@ -330,17 +232,6 @@ export function ProjectSettings({
     (source) => source.sourceRef === linear.source,
   );
   const linearChanged = JSON.stringify(linear) !== JSON.stringify(savedLinear);
-  const providerModels = agentModels[provider];
-  const providerEfforts = agentEfforts[provider];
-  const selectedModelKnown = providerModels.some(
-    (option) => option.value === (model ?? ""),
-  );
-  const llmSettingsChanged =
-    provider !== savedProvider ||
-    model !== savedModel ||
-    effort !== savedEffort ||
-    approvalPolicy !== savedApprovalPolicy;
-
   const saveLinear = async () => {
     setLinearSaving(true);
     setLinearError(null);
@@ -378,12 +269,6 @@ export function ProjectSettings({
       icon: <GitBranch size={16} strokeWidth={1.75} />,
       label: t("settings.navWorkflow"),
       description: t("settings.navWorkflowDescription"),
-    },
-    {
-      id: "agent" as const,
-      icon: <Bot size={16} strokeWidth={1.75} />,
-      label: t("settings.navAgent"),
-      description: t("settings.navAgentDescription"),
     },
   ];
   const activeItem = navigationItems.find((item) => item.id === activeSection);
@@ -443,16 +328,15 @@ export function ProjectSettings({
             </p>
           </header>
 
-          <section
-            className="project-settings-card"
-            hidden={activeSection !== "general"}
-          >
-            <div>
-              <span>{t("settings.projectName")}</span>
-              <strong>{project.name}</strong>
-            </div>
-            <small>{t("settings.created", { date: new Date(project.createdAt).toLocaleDateString(localeTag) })}</small>
-          </section>
+          {activeSection === "general" ? (
+            <section className="project-settings-card">
+              <div>
+                <span>{t("settings.projectName")}</span>
+                <strong>{project.name}</strong>
+              </div>
+              <small>{t("settings.created", { date: new Date(project.createdAt).toLocaleDateString(localeTag) })}</small>
+            </section>
+          ) : null}
 
           <section
             className="project-settings-linear"
@@ -836,10 +720,7 @@ export function ProjectSettings({
               </div>
             </header>
             <p className="project-settings-workflow-ai-note">
-              {t("settings.regenerateWorkflowDescription").replace(
-                "Codex App Server",
-                providerRuntimeName,
-              )}
+              {t("settings.workflowAgentDescription")}
             </p>
             <div aria-live="polite">
               {workflowRegenerated ? (
@@ -954,142 +835,6 @@ export function ProjectSettings({
             ) : (
               <p className="project-settings-empty">{t("settings.loadingWorkflow")}</p>
             )}
-          </section>
-
-          <section
-            className="project-settings-llm"
-            hidden={activeSection !== "agent"}
-          >
-            <header>
-              <span className="project-settings-llm-icon">
-                <ShieldCheck size={18} strokeWidth={1.8} />
-              </span>
-              <span>
-                <strong>{t("settings.agentTitle")}</strong>
-                <small>{t("settings.agentDescription")}</small>
-              </span>
-            </header>
-            <div className="project-settings-llm-control">
-              <label htmlFor="project-agent-provider">{t("settings.provider")}</label>
-              <SelectMenu
-                disabled={settingsLoading || settingsSaving}
-                id="project-agent-provider"
-                label={t("settings.provider")}
-                onValueChange={(value) => {
-                  setProvider(value as AgentProvider);
-                  setModel(null);
-                  setEffort(null);
-                }}
-                options={agentProviders.map((candidate) => ({
-                  description: !providerAvailability[candidate]
-                    ? t("settings.providerDisabled")
-                    : undefined,
-                  disabled: !providerAvailability[candidate],
-                  label: candidate === "codex" ? "Codex" : "Claude",
-                  value: candidate,
-                }))}
-                size="small"
-                value={provider}
-              />
-              <label htmlFor="project-agent-model">{t("settings.model")}</label>
-              <SelectMenu
-                disabled={settingsLoading || settingsSaving}
-                id="project-agent-model"
-                label={t("settings.model")}
-                onValueChange={(value) => setModel(value || null)}
-                options={[
-                  ...(!selectedModelKnown && model
-                    ? [{ label: model, value: model }]
-                    : []),
-                  ...providerModels.map((option) => ({
-                    label: option.value
-                      ? option.label
-                      : t("settings.providerDefaultModel"),
-                    value: option.value,
-                  })),
-                ]}
-                size="small"
-                value={model ?? ""}
-              />
-              <label htmlFor="project-agent-effort">{t("settings.effort")}</label>
-              <SelectMenu
-                disabled={settingsLoading || settingsSaving}
-                id="project-agent-effort"
-                label={t("settings.effort")}
-                onValueChange={(value) =>
-                  setEffort((value as ModelEffort) || null)}
-                options={[
-                  {
-                    label: t("settings.providerDefaultEffort"),
-                    value: "",
-                  },
-                  ...providerEfforts.map((candidate) => ({
-                    label: candidate,
-                    value: candidate,
-                  })),
-                ]}
-                size="small"
-                value={effort ?? ""}
-              />
-              <label htmlFor="project-approval-policy">{t("settings.approvalRequest")}</label>
-              <SelectMenu
-                disabled={settingsLoading || settingsSaving}
-                id="project-approval-policy"
-                label={t("settings.approvalRequest")}
-                onValueChange={(value) =>
-                  setApprovalPolicy(value as ApprovalPolicy)}
-                options={[
-                  {
-                    description: t("settings.approvalUntrustedDescription"),
-                    label: t("settings.approvalUntrusted"),
-                    value: "untrusted",
-                  },
-                  {
-                    description: t("settings.approvalOnRequestDescription"),
-                    label: t("settings.approvalOnRequest"),
-                    value: "on-request",
-                  },
-                  {
-                    description: t("settings.approvalNeverDescription"),
-                    label: t("settings.approvalNever"),
-                    value: "never",
-                  },
-                ]}
-                size="small"
-                value={approvalPolicy}
-              />
-              <button
-                disabled={
-                  settingsLoading ||
-                  settingsSaving ||
-                  !providerAvailability[provider] ||
-                  !llmSettingsChanged
-                }
-                onClick={() => void saveLlmSettings()}
-                type="button"
-              >
-                {settingsSaving ? (
-                  <LoaderCircle className="spin" size={14} />
-                ) : !llmSettingsChanged ? (
-                  <Check size={14} />
-                ) : null}
-                {settingsSaving
-                  ? t("common.saving")
-                  : !llmSettingsChanged
-                    ? t("common.saved")
-                    : t("common.save")}
-              </button>
-            </div>
-            <p>
-              {t(
-                approvalPolicy === "untrusted"
-                  ? "settings.approvalUntrustedDescription"
-                  : approvalPolicy === "on-request"
-                    ? "settings.approvalOnRequestDescription"
-                    : "settings.approvalNeverDescription",
-              ).replace("Codex", providerName)}
-            </p>
-            {settingsError && <p className="project-settings-llm-error">{settingsError}</p>}
           </section>
 
           <section
