@@ -57,6 +57,7 @@ impl AutoHuntCliEnvironment {
         workspace: &Path,
         project_id: &str,
         api_url: &str,
+        include_velen: bool,
     ) -> Result<Self, String> {
         let bun_binary = which::which_in("bun", Some(execution_path), workspace)
             .map_err(|_| "Briar CLI 실행에 필요한 Bun을 찾지 못했습니다.".to_string())?;
@@ -67,8 +68,14 @@ impl AutoHuntCliEnvironment {
                     .to_string(),
             );
         }
-        let velen_binary = which::which_in("velen", Some(execution_path), workspace)
-            .map_err(|_| "Velen CLI를 찾지 못했습니다.".to_string())?;
+        let velen_binary = if include_velen {
+            Some(
+                which::which_in("velen", Some(execution_path), workspace)
+                    .map_err(|_| "이 프로젝트에 설정된 Velen CLI를 찾지 못했습니다.".to_string())?,
+            )
+        } else {
+            None
+        };
         let directory = tempfile::Builder::new()
             .prefix("briar-auto-hunt-")
             .tempdir()
@@ -78,8 +85,9 @@ impl AutoHuntCliEnvironment {
         let wrapper_directory = directory.path().join("bin");
         create_secure_directory(&sandbox_config)?;
         create_secure_directory(&wrapper_directory)?;
-        for cli in ["briar", "velen"] {
-            copy_secure_tree(&home.join(".config").join(cli), &sandbox_config.join(cli))?;
+        copy_secure_tree(&home.join(".config/briar"), &sandbox_config.join("briar"))?;
+        if include_velen {
+            copy_secure_tree(&home.join(".config/velen"), &sandbox_config.join("velen"))?;
         }
         write_cli_wrapper(
             &wrapper_directory,
@@ -93,15 +101,17 @@ impl AutoHuntCliEnvironment {
                 ("BRIAR_API_URL", OsStr::new(api_url)),
             ],
         )?;
-        write_cli_wrapper(
-            &wrapper_directory,
-            "velen",
-            &velen_binary,
-            &[],
-            &sandbox_home,
-            &sandbox_config,
-            &[],
-        )?;
+        if let Some(velen_binary) = velen_binary {
+            write_cli_wrapper(
+                &wrapper_directory,
+                "velen",
+                &velen_binary,
+                &[],
+                &sandbox_home,
+                &sandbox_config,
+                &[],
+            )?;
+        }
         let mut paths = vec![wrapper_directory];
         paths.extend(env::split_paths(execution_path));
         let execution_path = env::join_paths(paths)
@@ -121,10 +131,17 @@ impl AutoHuntCliEnvironment {
         workspace: &Path,
         project_id: &str,
         api_url: &str,
+        include_velen: bool,
     ) -> Result<Self, String> {
         if !runner.is_remote() {
-            let mut environment =
-                Self::prepare(home, execution_path, workspace, project_id, api_url)?;
+            let mut environment = Self::prepare(
+                home,
+                execution_path,
+                workspace,
+                project_id,
+                api_url,
+                include_velen,
+            )?;
             environment.environment = vec![(
                 "PATH".to_string(),
                 environment.execution_path.to_string_lossy().into_owned(),
@@ -134,7 +151,11 @@ impl AutoHuntCliEnvironment {
 
         let shell = runner.resolve_binary("sh")?;
         let bun = runner.resolve_binary("bun")?;
-        let velen = runner.resolve_binary("velen")?;
+        let velen = if include_velen {
+            runner.resolve_binary("velen")?
+        } else {
+            String::new()
+        };
         // Resolve after PATH bootstrap so the returned value is the same PATH
         // the agent would receive from a normal SSH invocation.
         let path_output =
@@ -156,17 +177,16 @@ directory=$(mktemp -d "${TMPDIR:-/tmp}/briar-auto-hunt.XXXXXX")
 cleanup() { rm -rf -- "$directory"; }
 trap cleanup EXIT HUP INT TERM
 mkdir -p "$directory/home/.config" "$directory/bin" "$directory/lib"
-for cli in briar velen; do
-  source_directory="$HOME/.config/$cli"
-  destination="$directory/home/.config/$cli"
-  if [ -d "$source_directory" ]; then
-    mkdir -p "$destination"
-    cp -R "$source_directory/." "$destination/"
-  fi
-done
+if [ -d "$HOME/.config/briar" ]; then
+  mkdir -p "$directory/home/.config/briar"
+  cp -R "$HOME/.config/briar/." "$directory/home/.config/briar/"
+fi
+if [ -n "$2" ] && [ -d "$HOME/.config/velen" ]; then
+  mkdir -p "$directory/home/.config/velen"
+  cp -R "$HOME/.config/velen/." "$directory/home/.config/velen/"
+fi
 cp "$bundle" "$directory/lib/briar.js"
 ln -s "$1" "$directory/bin/.briar-bun"
-ln -s "$2" "$directory/bin/.velen"
 cat > "$directory/bin/briar" <<'BRIAR_WRAPPER'
 #!/bin/sh
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
@@ -174,6 +194,8 @@ export HOME="$root/home"
 export XDG_CONFIG_HOME="$HOME/.config"
 exec "$root/bin/.briar-bun" "$root/lib/briar.js" "$@"
 BRIAR_WRAPPER
+if [ -n "$2" ]; then
+ln -s "$2" "$directory/bin/.velen"
 cat > "$directory/bin/velen" <<'VELEN_WRAPPER'
 #!/bin/sh
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
@@ -181,8 +203,10 @@ export HOME="$root/home"
 export XDG_CONFIG_HOME="$HOME/.config"
 exec "$root/bin/.velen" "$@"
 VELEN_WRAPPER
+chmod 700 "$directory/bin/velen"
+fi
 chmod 700 "$directory" "$directory/home" "$directory/home/.config" "$directory/bin" "$directory/lib"
-chmod 700 "$directory/bin/briar" "$directory/bin/velen"
+chmod 700 "$directory/bin/briar"
 chmod 600 "$directory/lib/briar.js"
 chmod -R go-rwx "$directory/home/.config"
 trap - EXIT HUP INT TERM
@@ -1211,6 +1235,7 @@ mod tests {
             fixture.path(),
             "project-local",
             "http://127.0.0.1:8788",
+            true,
         )
         .expect("isolated CLI environment should be prepared");
         let wrapper = which::which_in(
@@ -1260,6 +1285,54 @@ mod tests {
                 & 0o777,
             0o600
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn prepares_auto_hunt_without_velen_when_the_project_does_not_use_it() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let fixture = tempfile::tempdir().expect("fixture directory should exist");
+        let home = fixture.path().join("source-home");
+        let binary_directory = fixture.path().join("source-bin");
+        let briar_entry = home.join(".local/share/briar/briar.js");
+        create_secure_directory(&binary_directory).expect("binary directory should exist");
+        create_secure_directory(
+            briar_entry
+                .parent()
+                .expect("Briar entry should have a parent"),
+        )
+        .expect("Briar library directory should exist");
+        fs::write(&briar_entry, "fixture").expect("Briar fixture entry should be written");
+        let bun = binary_directory.join("bun");
+        fs::write(&bun, "#!/bin/sh\nexit 0\n").expect("fake Bun should be written");
+        fs::set_permissions(&bun, fs::Permissions::from_mode(0o700))
+            .expect("fake Bun should be executable");
+        let source_path =
+            env::join_paths([binary_directory]).expect("fixture execution path should be valid");
+
+        let cli_environment = AutoHuntCliEnvironment::prepare(
+            &home,
+            &source_path,
+            fixture.path(),
+            "project-local",
+            "http://127.0.0.1:8788",
+            false,
+        )
+        .expect("Velen-free CLI environment should be prepared");
+
+        assert!(which::which_in(
+            "briar",
+            Some(cli_environment.execution_path()),
+            fixture.path(),
+        )
+        .is_ok());
+        assert!(which::which_in(
+            "velen",
+            Some(cli_environment.execution_path()),
+            fixture.path(),
+        )
+        .is_err());
     }
 
     #[test]

@@ -5,6 +5,7 @@ import {
   Check,
   CheckCircle2,
   Copy,
+  Database,
   Download,
   GitBranch,
   Link2,
@@ -47,6 +48,7 @@ export function ProjectSettings({
   onDelete,
   onRegenerateWorkflow,
   onUpdateAutomation,
+  onUpdateVelenOrg,
   onUpdateLinear,
   onConnectLinearImport,
   onLoadLinearImportStates,
@@ -66,6 +68,7 @@ export function ProjectSettings({
   onUpdateAutomation: (
     automation: AutoHuntAutomation,
   ) => Promise<AutoHuntAutomation>;
+  onUpdateVelenOrg: (org: string | null) => Promise<string | null>;
   onUpdateLinear: (
     linear: ProjectSettingsData["linear"],
   ) => Promise<ProjectSettingsData["linear"]>;
@@ -118,6 +121,12 @@ export function ProjectSettings({
   const [linearLoading, setLinearLoading] = useState(false);
   const [linearSaving, setLinearSaving] = useState(false);
   const [linearError, setLinearError] = useState<string | null>(null);
+  const [velenOrg, setVelenOrg] = useState(
+    () => dashboard?.settings.velenOrg ?? "",
+  );
+  const [velenLoading, setVelenLoading] = useState(false);
+  const [velenSaving, setVelenSaving] = useState(false);
+  const [velenError, setVelenError] = useState<string | null>(null);
   const cancelButtonRef = useRef<HTMLButtonElement | null>(null);
   const workflow = dashboard?.settings.workflow ?? null;
   const workflowContract = workflow
@@ -153,24 +162,29 @@ export function ProjectSettings({
   }, [dashboard?.settings.linear, project.id]);
 
   useEffect(() => {
+    setVelenOrg(dashboard?.settings.velenOrg ?? "");
+    setVelenError(null);
+  }, [dashboard?.settings.velenOrg, project.id]);
+
+  useEffect(() => {
     const org = dashboard?.settings.velenOrg;
     if (!org) return;
     let cancelled = false;
-    setLinearLoading(true);
-    setLinearError(null);
+    setVelenLoading(true);
+    setVelenError(null);
     void onRefreshVelen(org)
       .then((inspection) => {
         if (!cancelled && !inspection) {
-          setLinearError(t("settings.linearLoadFailed"));
+          setVelenError(t("settings.velenLoadFailed"));
         }
       })
       .catch((caught) => {
         if (!cancelled) {
-          setLinearError(caught instanceof Error ? caught.message : String(caught));
+          setVelenError(caught instanceof Error ? caught.message : String(caught));
         }
       })
       .finally(() => {
-        if (!cancelled) setLinearLoading(false);
+        if (!cancelled) setVelenLoading(false);
       });
     return () => {
       cancelled = true;
@@ -232,6 +246,40 @@ export function ProjectSettings({
     (source) => source.sourceRef === linear.source,
   );
   const linearChanged = JSON.stringify(linear) !== JSON.stringify(savedLinear);
+  const savedVelenOrg = dashboard?.settings.velenOrg ?? "";
+  const velenChanged = velenOrg !== savedVelenOrg;
+  const refreshVelen = async () => {
+    setVelenLoading(true);
+    setVelenError(null);
+    try {
+      const inspection = await onRefreshVelen(velenOrg || null);
+      if (!inspection) {
+        setVelenError(t("settings.velenLoadFailed"));
+        return;
+      }
+      if (!velenOrg) {
+        setVelenOrg(
+          inspection.currentOrg ?? inspection.organizations[0]?.slug ?? "",
+        );
+      }
+    } catch (caught) {
+      setVelenError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setVelenLoading(false);
+    }
+  };
+  const saveVelen = async () => {
+    setVelenSaving(true);
+    setVelenError(null);
+    try {
+      const saved = await onUpdateVelenOrg(velenOrg || null);
+      setVelenOrg(saved ?? "");
+    } catch (caught) {
+      setVelenError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setVelenSaving(false);
+    }
+  };
   const saveLinear = async () => {
     setLinearSaving(true);
     setLinearError(null);
@@ -344,6 +392,96 @@ export function ProjectSettings({
           >
             <header>
               <span className="project-settings-linear-icon">
+                <Database size={18} strokeWidth={1.8} />
+              </span>
+              <span>
+                <strong>{t("settings.velenTitle")}</strong>
+                <small>{t("settings.velenDescription")}</small>
+              </span>
+              <div className="project-settings-linear-actions">
+                <button
+                  aria-label={t("settings.velenRefresh")}
+                  disabled={velenLoading || velenSaving}
+                  onClick={() => void refreshVelen()}
+                  type="button"
+                >
+                  <RefreshCw className={velenLoading ? "spin" : undefined} size={14} />
+                </button>
+              </div>
+            </header>
+
+            <div className="project-settings-linear-fields">
+              <label>
+                <span>{t("settings.velenOrg")}</span>
+                <SelectMenu
+                  disabled={velenLoading || velenSaving}
+                  label={t("settings.velenOrg")}
+                  onValueChange={setVelenOrg}
+                  options={[
+                    { label: t("settings.velenDisconnected"), value: "" },
+                    ...(velenOrg &&
+                    !(velen?.organizations ?? []).some(
+                      (organization) => organization.slug === velenOrg,
+                    )
+                      ? [{
+                          disabled: true,
+                          label: `${velenOrg} · ${t("settings.velenUnavailable")}`,
+                          value: velenOrg,
+                        }]
+                      : []),
+                    ...(velen?.organizations ?? []).map((organization) => ({
+                      label: organization.name,
+                      value: organization.slug,
+                    })),
+                  ]}
+                  size="small"
+                  value={velenOrg}
+                />
+              </label>
+            </div>
+
+            {velenError ? (
+              <p className="project-settings-linear-error" role="alert">
+                <AlertTriangle size={13} /> {velenError}
+              </p>
+            ) : null}
+
+            <footer>
+              <p>
+                {!velenOrg && linear.enabled
+                  ? t("settings.velenDisconnectLinearFirst")
+                  : t("settings.velenOptional")}
+              </p>
+              <button
+                disabled={
+                  velenLoading ||
+                  velenSaving ||
+                  !velenChanged ||
+                  (!velenOrg && linear.enabled)
+                }
+                onClick={() => void saveVelen()}
+                type="button"
+              >
+                {velenSaving ? (
+                  <LoaderCircle className="spin" size={14} />
+                ) : !velenChanged ? (
+                  <Check size={14} />
+                ) : null}
+                {velenSaving
+                  ? t("common.saving")
+                  : !velenChanged
+                    ? t("common.saved")
+                    : t("common.save")}
+              </button>
+            </footer>
+          </section>
+
+          <section
+            className="project-settings-linear"
+            hidden={activeSection !== "issue-import"}
+          >
+            <header>
+              <span className="project-settings-linear-icon">
                 <Link2 size={18} strokeWidth={1.8} />
               </span>
               <span>
@@ -377,7 +515,11 @@ export function ProjectSettings({
                 <label className="project-settings-toggle">
                   <input
                     checked={linear.enabled}
-                    disabled={linearLoading || linearSaving}
+                    disabled={
+                      linearLoading ||
+                      linearSaving ||
+                      !dashboard?.settings.velenOrg
+                    }
                     onChange={(event) => {
                       const enabled = event.currentTarget.checked;
                       setLinear((current) => {

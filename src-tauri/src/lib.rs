@@ -59,7 +59,8 @@ struct CliProject {
 #[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct AutoHuntConfig {
-    velen_org: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    velen_org: Option<String>,
     #[serde(
         default,
         alias = "velenDataSource",
@@ -236,7 +237,7 @@ fn default_workflow() -> WorkflowConfig {
                 id: "analyzing".to_string(),
                 label: "분석".to_string(),
                 required: true,
-                evidence: vec!["velen".to_string(), "repository".to_string()],
+                evidence: vec!["repository".to_string()],
                 checks: Vec::new(),
             },
             WorkflowStageConfig {
@@ -329,7 +330,7 @@ struct StoredLinearConfig {
 impl From<AutoHuntConfig> for StoredAutoHuntConfig {
     fn from(config: AutoHuntConfig) -> Self {
         Self {
-            velen_org: Some(config.velen_org),
+            velen_org: config.velen_org,
             data_source: config.data_source,
             linear: Some(StoredLinearConfig {
                 enabled: config.linear_enabled,
@@ -388,7 +389,6 @@ struct OnboardingPrerequisites {
     codex: OnboardingPrerequisiteStatus,
     claude: OnboardingPrerequisiteStatus,
     grok: OnboardingPrerequisiteStatus,
-    velen: OnboardingPrerequisiteStatus,
 }
 
 #[derive(Clone, Serialize)]
@@ -630,20 +630,6 @@ fn gh_binary(home: &Path) -> Result<PathBuf, String> {
         .map_err(|_| "GitHub CLI가 설치되지 않았습니다.".to_string())
 }
 
-fn velen_binary() -> Result<PathBuf, String> {
-    if let Ok(path) = which::which("velen") {
-        return Ok(path);
-    }
-    let home = dirs::home_dir().ok_or_else(|| "홈 폴더를 찾을 수 없습니다.".to_string())?;
-    for relative in [".local/bin/velen", ".bun/bin/velen"] {
-        let candidate = home.join(relative);
-        if candidate.is_file() {
-            return Ok(candidate);
-        }
-    }
-    Err("Velen CLI가 필요합니다. Velen CLI를 설치한 뒤 Briar를 다시 여세요.".to_string())
-}
-
 fn parse_cli_version(stdout: &[u8]) -> Option<String> {
     let output = String::from_utf8_lossy(stdout);
     let trimmed = output.trim();
@@ -682,22 +668,6 @@ fn inspect_cli(binary: Result<PathBuf, String>) -> OnboardingPrerequisiteStatus 
     }
 }
 
-fn inspect_velen_prerequisite_with(
-    binary: Result<PathBuf, String>,
-    home: &Path,
-) -> OnboardingPrerequisiteStatus {
-    let Ok(binary) = binary else {
-        return OnboardingPrerequisiteStatus {
-            installed: false,
-            version: None,
-            authenticated: false,
-        };
-    };
-    let mut status = inspect_cli(Ok(binary.clone()));
-    status.authenticated = run_velen_json_with(&binary, home, &["auth", "whoami"]).is_ok();
-    status
-}
-
 fn inspect_onboarding_prerequisites_sync(home: &Path) -> OnboardingPrerequisites {
     let execution_path = cli_execution_path(home).unwrap_or_default();
     OnboardingPrerequisites {
@@ -705,7 +675,6 @@ fn inspect_onboarding_prerequisites_sync(home: &Path) -> OnboardingPrerequisites
         codex: inspect_cli(agent::codex_binary(home)),
         claude: inspect_cli(agent::claude_binary(home, &execution_path)),
         grok: inspect_cli(agent::grok_binary(home, &execution_path)),
-        velen: inspect_velen_prerequisite_with(velen_binary(), home),
     }
 }
 
@@ -814,7 +783,6 @@ async fn install_onboarding_prerequisite(
             "codex" => install_cli_package(&home, "@openai/codex")?,
             "claude" => install_cli_package(&home, "@anthropic-ai/claude-code")?,
             "grok" => install_grok_cli(&home)?,
-            "velen" => install_cli_package(&home, "@wordbricks/velen")?,
             _ => return Err("지원하지 않는 필수 도구입니다.".to_string()),
         }
         let prerequisites = inspect_onboarding_prerequisites_sync(&home);
@@ -823,30 +791,11 @@ async fn install_onboarding_prerequisite(
             "codex" => prerequisites.codex.installed,
             "claude" => prerequisites.claude.installed,
             "grok" => prerequisites.grok.installed,
-            "velen" => prerequisites.velen.installed,
             _ => false,
         };
         if !installed {
             return Err(
                 "설치는 완료됐지만 CLI를 찾지 못했습니다. Briar를 다시 열어 주세요.".to_string(),
-            );
-        }
-        Ok(prerequisites)
-    })
-    .await
-    .map_err(|error| error.to_string())?
-}
-
-#[tauri::command]
-async fn login_onboarding_velen(app: tauri::AppHandle) -> Result<OnboardingPrerequisites, String> {
-    let home = app.path().home_dir().map_err(|error| error.to_string())?;
-    tauri::async_runtime::spawn_blocking(move || {
-        let binary = velen_binary()?;
-        run_velen_json_with(&binary, &home, &["auth", "login"])?;
-        let prerequisites = inspect_onboarding_prerequisites_sync(&home);
-        if !prerequisites.velen.authenticated {
-            return Err(
-                "Velen OAuth 로그인은 완료됐지만 인증 상태를 확인하지 못했습니다.".to_string(),
             );
         }
         Ok(prerequisites)
@@ -1305,6 +1254,7 @@ async fn login_project_github(
     .map_err(|error| error.to_string())?
 }
 
+#[cfg(test)]
 fn run_velen_json_with(
     binary: &Path,
     home: &Path,
@@ -2595,6 +2545,49 @@ fn update_project_linear_at(
     Ok(linear)
 }
 
+fn update_project_velen_org_at(
+    config_path: &Path,
+    project_id: &str,
+    org: Option<String>,
+    inspect_velen: &dyn Fn(Option<String>) -> Result<VelenInspection, String>,
+) -> Result<Option<String>, String> {
+    let contents = fs::read_to_string(config_path)
+        .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
+    let mut config = serde_json::from_str::<CliConfig>(&contents)
+        .map_err(|error| format!("Briar 로컬 설정이 손상되었습니다: {error}"))?;
+    let project = config
+        .projects
+        .iter_mut()
+        .find(|project| project.id == project_id)
+        .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
+    let auto_hunt = project
+        .auto_hunt
+        .as_mut()
+        .ok_or_else(|| "이 프로젝트에 Auto Hunt 설정이 없습니다.".to_string())?;
+    let org = org
+        .map(|org| org.trim().to_string())
+        .filter(|org| !org.is_empty());
+
+    if org.is_none()
+        && auto_hunt
+            .linear
+            .as_ref()
+            .is_some_and(|linear| linear.enabled)
+    {
+        return Err("Linear 연결을 먼저 끈 뒤 Velen 연결을 해제하세요.".to_string());
+    }
+    if let Some(org) = org.as_ref() {
+        inspect_velen(Some(org.clone()))?;
+    }
+
+    auto_hunt.velen_org = org.clone();
+    if org.is_none() {
+        auto_hunt.data_source = None;
+    }
+    write_cli_config(config_path, &config)?;
+    Ok(org)
+}
+
 fn validate_generated_workflow(workflow: &WorkflowConfig) -> Result<(), String> {
     if workflow.version != 1 || workflow.stages.is_empty() || workflow.stages.len() > 30 {
         return Err("생성된 워크플로우 버전 또는 단계 수가 올바르지 않습니다.".to_string());
@@ -2897,8 +2890,7 @@ fn auto_hunt_health_sync_with(
             }
         }
     } else {
-        issues.push("Auto Hunt에 Velen 조직이 설정되지 않았습니다.".to_string());
-        (false, None, false)
+        (false, None, true)
     };
 
     if runner.is_remote() {
@@ -3293,6 +3285,16 @@ fn project_auto_hunt_full_access(config_path: &Path, project_id: &str) -> Result
         .unwrap_or(false))
 }
 
+fn project_auto_hunt_uses_velen(config_path: &Path, project_id: &str) -> Result<bool, String> {
+    Ok(read_cli_config(config_path)?
+        .projects
+        .iter()
+        .find(|project| project.id == project_id)
+        .and_then(|project| project.auto_hunt.as_ref())
+        .and_then(|auto_hunt| auto_hunt.velen_org.as_deref())
+        .is_some_and(|org| !org.trim().is_empty()))
+}
+
 fn project_chat_execution(
     full_access: bool,
     approval_policy: agent::ApprovalPolicy,
@@ -3361,6 +3363,7 @@ async fn start_project_auto_hunt(
             );
         }
         let execution_path = cli_execution_path(&home)?;
+        let include_velen = project_auto_hunt_uses_velen(&config_path, &project_id)?;
         let cli_environment = agent::AutoHuntCliEnvironment::prepare_on_host(
             runner.clone(),
             &home,
@@ -3368,6 +3371,7 @@ async fn start_project_auto_hunt(
             &workspace,
             &project_id,
             &request.api_url,
+            include_velen,
         )?;
         // Each issue is worked in its own worktree outside the checkout, so the
         // agent's write sandbox has to include the worktree root as well as cwd.
@@ -3623,6 +3627,20 @@ async fn update_local_project_linear(
 }
 
 #[tauri::command]
+async fn update_local_project_velen_org(
+    app: tauri::AppHandle,
+    project_id: String,
+    org: Option<String>,
+) -> Result<Option<String>, String> {
+    let config_path = cli_config_path(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        update_project_velen_org_at(&config_path, &project_id, org, &inspect_velen_sync)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
 async fn disconnect_local_project(app: tauri::AppHandle, project_id: String) -> Result<(), String> {
     let config_path = cli_config_path(&app)?;
     tauri::async_runtime::spawn_blocking(move || remove_cli_connection(&config_path, &project_id))
@@ -3668,8 +3686,23 @@ async fn connect_local_project(
             .into_os_string()
             .into_string()
             .map_err(|_| "Git 저장소 경로를 표시할 수 없습니다.".to_string())?;
-        let inspection = inspect_velen_on(runner.as_ref(), Some(auto_hunt.velen_org.clone()))?;
+        auto_hunt.velen_org = auto_hunt
+            .velen_org
+            .take()
+            .map(|org| org.trim().to_string())
+            .filter(|org| !org.is_empty());
+        if auto_hunt.data_source.is_some() && auto_hunt.velen_org.is_none() {
+            return Err("Velen data source를 사용하려면 Velen 조직을 설정하세요.".to_string());
+        }
+        let inspection = auto_hunt
+            .velen_org
+            .as_ref()
+            .map(|org| inspect_velen_on(runner.as_ref(), Some(org.clone())))
+            .transpose()?;
         if auto_hunt.linear_enabled {
+            let inspection = inspection
+                .as_ref()
+                .ok_or_else(|| "Linear 연결에는 Velen 조직이 필요합니다.".to_string())?;
             let source = auto_hunt
                 .linear_source
                 .as_deref()
@@ -3919,7 +3952,6 @@ pub fn run() {
             set_main_window_onboarding_mode,
             inspect_onboarding_prerequisites,
             install_onboarding_prerequisite,
-            login_onboarding_velen,
             read_session_token,
             write_session_token,
             clear_session_token,
@@ -3939,6 +3971,7 @@ pub fn run() {
             update_project_llm_settings,
             update_local_project_workflow,
             update_local_project_linear,
+            update_local_project_velen_org,
             project_repository_readiness,
             install_project_github_cli,
             login_project_github,
@@ -4250,54 +4283,6 @@ branch refs/heads/briar/second-11111111
         assert_eq!(main_window_size(false), DEFAULT_MAIN_WINDOW_SIZE);
     }
 
-    #[cfg(unix)]
-    #[test]
-    fn onboarding_requires_an_authenticated_velen_session() {
-        use std::os::unix::fs::PermissionsExt;
-
-        let unique = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("clock should be after unix epoch")
-            .as_nanos();
-        let home = std::env::temp_dir().join(format!("briar-velen-onboarding-test-{unique}"));
-        fs::create_dir_all(&home).expect("test home should be created");
-        let velen = home.join("velen");
-        fs::write(
-            &velen,
-            "#!/bin/sh\n\
-             if [ \"$1\" = \"--version\" ]; then\n\
-               printf '%s\\n' 'velen 1.0.0'\n\
-               exit 0\n\
-             fi\n\
-             printf '%s\\n' '{\"ok\":true,\"data\":{\"user\":{\"email\":\"jay@example.com\"}}}'\n",
-        )
-        .expect("authenticated fake Velen should be written");
-        fs::set_permissions(&velen, fs::Permissions::from_mode(0o755))
-            .expect("fake Velen should be executable");
-
-        let authenticated = inspect_velen_prerequisite_with(Ok(velen.clone()), &home);
-        assert!(authenticated.installed);
-        assert!(authenticated.authenticated);
-        assert_eq!(authenticated.version.as_deref(), Some("velen 1.0.0"));
-
-        fs::write(
-            &velen,
-            "#!/bin/sh\n\
-             if [ \"$1\" = \"--version\" ]; then\n\
-               printf '%s\\n' 'velen 1.0.0'\n\
-               exit 0\n\
-             fi\n\
-             printf '%s\\n' '{\"ok\":false,\"error\":{\"message\":\"Not logged in\"}}'\n\
-             exit 1\n",
-        )
-        .expect("unauthenticated fake Velen should be written");
-        let unauthenticated = inspect_velen_prerequisite_with(Ok(velen), &home);
-        assert!(unauthenticated.installed);
-        assert!(!unauthenticated.authenticated);
-
-        fs::remove_dir_all(home).expect("test home should be removed");
-    }
-
     #[test]
     fn parses_plain_and_json_cli_versions() {
         assert_eq!(
@@ -4412,7 +4397,7 @@ branch refs/heads/briar/second-11111111
             LocalProjectAgentConfig {
                 llm: agent::ProjectLlmSettings::default(),
                 auto_hunt: AutoHuntConfig {
-                    velen_org: "example".to_string(),
+                    velen_org: Some("example".to_string()),
                     data_source: None,
                     linear_enabled: false,
                     linear_source: None,
@@ -4738,6 +4723,30 @@ branch refs/heads/briar/second-11111111
             true
         );
 
+        assert!(update_project_velen_org_at(&config_path, "project-1", None, &inspect,).is_err());
+        update_project_linear_at(
+            &config_path,
+            "project-1",
+            StoredLinearConfig {
+                enabled: false,
+                source: None,
+                team_key: None,
+                extra: BTreeMap::new(),
+            },
+            &inspect,
+        )
+        .expect("Linear should disconnect");
+        assert_eq!(
+            update_project_velen_org_at(&config_path, "project-1", None, &inspect)
+                .expect("optional Velen should disconnect"),
+            None
+        );
+        let disconnected: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&config_path).expect("disconnected config should be readable"),
+        )
+        .expect("disconnected config should be json");
+        assert!(disconnected["projects"][0]["autoHunt"]["velenOrg"].is_null());
+
         fs::remove_dir_all(directory).expect("test config directory should be removed");
     }
 
@@ -4897,7 +4906,7 @@ branch refs/heads/briar/second-11111111
             LocalProjectAgentConfig {
                 llm: agent::ProjectLlmSettings::default(),
                 auto_hunt: AutoHuntConfig {
-                    velen_org: "wordbricks".to_string(),
+                    velen_org: Some("wordbricks".to_string()),
                     data_source: None,
                     linear_enabled: false,
                     linear_source: None,
@@ -4956,6 +4965,29 @@ branch refs/heads/briar/second-11111111
         .expect("repaired health should be readable");
         assert!(repaired.healthy);
         assert!(repaired.cli_current);
+
+        let mut config = read_cli_config(&config_path).expect("config should be readable");
+        config.projects[0]
+            .auto_hunt
+            .as_mut()
+            .expect("Auto Hunt settings should exist")
+            .velen_org = None;
+        write_cli_config(&config_path, &config).expect("optional Velen config should save");
+        let no_inspect = |_: Option<String>| -> Result<VelenInspection, String> {
+            panic!("unconfigured Velen should not be inspected")
+        };
+        let without_velen = auto_hunt_health_sync_with(
+            &config_path,
+            &resources,
+            &home,
+            "11111111-1111-4111-8111-111111111111",
+            &no_inspect,
+        )
+        .expect("health without Velen should be readable");
+        assert!(without_velen.healthy);
+        assert!(without_velen.velen_healthy);
+        assert!(without_velen.velen_org.is_none());
+
         fs::remove_dir_all(home).expect("test home should be removed");
     }
 
@@ -5014,7 +5046,7 @@ branch refs/heads/briar/second-11111111
             LocalProjectAgentConfig {
                 llm: agent::ProjectLlmSettings::default(),
                 auto_hunt: AutoHuntConfig {
-                    velen_org: "example".to_string(),
+                    velen_org: Some("example".to_string()),
                     data_source: None,
                     linear_enabled: false,
                     linear_source: None,
@@ -5244,7 +5276,7 @@ branch refs/heads/briar/second-11111111
             LocalProjectAgentConfig {
                 llm: agent::ProjectLlmSettings::default(),
                 auto_hunt: AutoHuntConfig {
-                    velen_org: "wordbricks".to_string(),
+                    velen_org: Some("wordbricks".to_string()),
                     data_source: None,
                     linear_enabled: false,
                     linear_source: None,
@@ -5313,7 +5345,7 @@ branch refs/heads/briar/second-11111111
             LocalProjectAgentConfig {
                 llm: agent::ProjectLlmSettings::default(),
                 auto_hunt: AutoHuntConfig {
-                    velen_org: "wordbricks".to_string(),
+                    velen_org: Some("wordbricks".to_string()),
                     data_source: None,
                     linear_enabled: false,
                     linear_source: None,

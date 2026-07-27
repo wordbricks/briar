@@ -69,11 +69,6 @@ const providerStatuses: OnboardingPrerequisites = {
     version: "0.2.112",
     authenticated: true,
   },
-  velen: {
-    installed: true,
-    version: "velen 1.0.0",
-    authenticated: true,
-  },
 };
 
 describe("AppSettings", () => {

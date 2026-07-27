@@ -456,26 +456,29 @@ function runVelen(commandArgs: string[]) {
   return velenEnvelopeSchema.parse(JSON.parse(result.stdout.toString()));
 }
 
-function ensureVelen(project?: ProjectConfig) {
+function ensureConfiguredVelen(project?: ProjectConfig) {
+  const configuredOrg = project?.autoHunt?.velenOrg;
+  const linearEnabled = project?.autoHunt?.linear?.enabled ?? false;
+  if (!configuredOrg) {
+    if (linearEnabled) {
+      throw new Error("Linear 연동에는 Velen 조직과 Linear source가 필요합니다.");
+    }
+    if (project?.autoHunt?.dataSource) {
+      throw new Error("Velen data source를 사용하려면 Velen 조직을 설정하세요.");
+    }
+    return null;
+  }
   if (!Bun.file(velenExecutable()).size) {
     throw new Error(
-      "Velen CLI가 필요합니다. `bun install -g @wordbricks/velen`으로 설치하세요.",
+      "이 프로젝트에 설정된 Velen 기능을 사용하려면 `bun install -g @wordbricks/velen`으로 CLI를 설치하세요.",
     );
   }
   const auth = runVelen(["auth", "whoami"]);
-  const configuredOrg = project?.autoHunt?.velenOrg;
-  if (project && !configuredOrg) {
-    throw new Error(
-      "Velen 조직이 설정되지 않았습니다. Briar 앱에서 Auto Hunt 설정을 완료하세요.",
-    );
-  }
-  const org = configuredOrg
-    ? runVelen(["--org", configuredOrg, "org", "current"])
-    : runVelen(["org", "current"]);
-  const linearSource = project?.autoHunt?.linear?.enabled
-    ? project.autoHunt.linear.source
+  const org = runVelen(["--org", configuredOrg, "org", "current"]);
+  const linearSource = linearEnabled
+    ? project?.autoHunt?.linear?.source
     : undefined;
-  if (project?.autoHunt?.linear?.enabled && !linearSource) {
+  if (linearEnabled && !linearSource) {
     throw new Error("Linear 연동이 켜져 있지만 Velen Linear source가 없습니다.");
   }
   const linear = linearSource
@@ -487,7 +490,14 @@ function ensureVelen(project?: ProjectConfig) {
 async function configureAutoHunt() {
   const config = await loadConfig();
   const project = await currentProject(config);
-  const velenOrg = required("--velen-org");
+  const disableVelen = has("--disable-velen");
+  const requestedVelenOrg = value("--velen-org");
+  if (disableVelen && requestedVelenOrg) {
+    throw new Error("--velen-org와 --disable-velen을 함께 쓸 수 없습니다.");
+  }
+  const velenOrg = disableVelen
+    ? undefined
+    : requestedVelenOrg ?? project.autoHunt?.velenOrg;
   const linearDisabled = has("--disable-linear");
   const linearSource = value("--linear-source");
   if (!linearDisabled && !linearSource && has("--enable-linear")) {
@@ -509,10 +519,12 @@ async function configureAutoHunt() {
   const nextAutoHunt = {
     ...project.autoHunt,
     velenOrg,
-    dataSource: value("--data-source") ?? project.autoHunt?.dataSource,
+    dataSource: disableVelen
+      ? undefined
+      : value("--data-source") ?? project.autoHunt?.dataSource,
     githubRepository:
       value("--github-repository") ?? project.autoHunt?.githubRepository,
-    linear: linearDisabled
+    linear: linearDisabled || disableVelen
       ? { enabled: false }
       : linearSource
         ? {
@@ -549,7 +561,7 @@ async function configureAutoHunt() {
       gitValue(["remote", "get-url", "origin"]) ?? project.repositoryRemote,
     autoHunt: nextAutoHunt,
   };
-  ensureVelen(nextProject);
+  ensureConfiguredVelen(nextProject);
   config.projects = config.projects.map((candidate) =>
     candidate.id === project.id ? nextProject : candidate,
   );
@@ -559,7 +571,7 @@ async function configureAutoHunt() {
     await request(config.apiUrl, `/projects/${project.id}/settings`, config.userToken, {
       method: "PUT",
       body: JSON.stringify({
-        velenOrg,
+        velenOrg: velenOrg ?? null,
         dataSource: nextAutoHunt.dataSource ?? null,
         linear: {
           enabled: nextAutoHunt.linear?.enabled ?? false,
@@ -574,7 +586,7 @@ async function configureAutoHunt() {
   console.log(
     JSON.stringify({
       projectId: project.id,
-      velenOrg,
+      velenOrg: velenOrg ?? null,
       linearEnabled: nextAutoHunt.linear?.enabled ?? false,
       linearSource: nextAutoHunt.linear?.source ?? null,
       fullAccess: nextAutoHunt.sandbox?.fullAccess ?? false,
@@ -585,7 +597,7 @@ async function configureAutoHunt() {
 async function autoHuntDoctor() {
   const config = await loadConfig();
   const project = await currentProject(config);
-  const result = ensureVelen(project);
+  const velen = ensureConfiguredVelen(project);
   console.log(
     JSON.stringify({
       ok: true,
@@ -607,7 +619,7 @@ async function autoHuntDoctor() {
         // false is the default: writes stay inside the checkout and worktree root.
         fullAccess: project.autoHunt?.sandbox?.fullAccess ?? false,
       },
-      requestIds: [result.auth.requestId, result.org.requestId, result.linear?.requestId].filter(
+      requestIds: [velen?.auth.requestId, velen?.org.requestId, velen?.linear?.requestId].filter(
         Boolean,
       ),
     }),
@@ -688,7 +700,7 @@ async function downloadClaimAttachment(
 async function nextHunt() {
   const config = await loadConfig();
   const project = await currentProject(config);
-  ensureVelen(project);
+  ensureConfiguredVelen(project);
   if (
     project.activeClaim &&
     Date.parse(project.activeClaim.leaseExpiresAt) > Date.now()
@@ -883,7 +895,6 @@ async function optionalText(valueFlag: string, fileFlag: string) {
 async function recordHunt() {
   const config = await loadConfig();
   const project = await currentProject(config);
-  ensureVelen(project);
   const repositoryRoot = await currentRepositoryPath();
   const agentToken = process.env.BRIAR_AGENT_TOKEN ?? project.agentToken;
   if (!agentToken) throw new Error("Briar Agent 토큰이 없습니다.");
@@ -1018,7 +1029,6 @@ async function recordHunt() {
 async function recordQa() {
   const config = await loadConfig();
   const project = await currentProject(config);
-  ensureVelen(project);
   const input = {
     runId: required("--run-id"),
     environment: required("--environment"),
@@ -1049,7 +1059,6 @@ async function recordQa() {
 async function recoverHunt(action: "retry" | "cancel") {
   const config = await loadConfig();
   const project = await currentProject(config);
-  ensureVelen(project);
   const runId = required("--run-id");
   const input = {
     requestId: value("--request-id") ?? crypto.randomUUID(),
@@ -1131,7 +1140,7 @@ async function workerCommand() {
   if (!project) {
     throw new Error("이 컴퓨터에 연결된 프로젝트를 찾지 못했습니다.");
   }
-  ensureVelen(project);
+  ensureConfiguredVelen(project);
   const agentToken = process.env.BRIAR_AGENT_TOKEN ?? project.agentToken;
   const label = value("--label") ?? defaultWorkerLabel();
   const provider = project.llm?.provider ?? "codex";
@@ -1279,7 +1288,8 @@ const usage = `Briar CLI
   briar auto-hunt worktree show
   briar auto-hunt worktree list
   briar auto-hunt worktree remove [--path <worktree>] [--force]
-  briar auto-hunt configure --velen-org <slug> [--data-source <provider://source>]
+  briar auto-hunt configure [--velen-org <slug> | --disable-velen]
+    [--data-source <provider://source>]
     [--enable-linear --linear-source <linear://source> --linear-team <key>]
     [--disable-linear] [--workflow-preset <local|review|release|research>]
     [--enable-worktrees|--disable-worktrees] [--worktree-root <dir>]

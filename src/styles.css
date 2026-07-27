@@ -838,7 +838,6 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .initial-prerequisite-icon.codex { color:#30312d; background:#f1f2ee; }
 .initial-prerequisite-icon.claude { background:#fff1e9; }
 .initial-prerequisite-icon.grok { background:#ececf1; }
-.initial-prerequisite-icon.velen { background:linear-gradient(145deg,#674fc0,#8d74dd); }
 .initial-prerequisite-icon img { display:block; width:20px; height:20px; object-fit:contain; }
 .initial-prerequisite-row > div strong { display:flex; align-items:center; gap:8px; font-size:12px; }
 .initial-prerequisite-row > div strong em { padding:3px 6px; border-radius:999px; color:#7258c4; background:#f0ebff; font-size:7px; font-style:normal; font-weight:750; }

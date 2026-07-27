@@ -39,9 +39,7 @@ const baseProps = {
     repositoryPath: `/Users/jay/Briar/${name}`,
     created: true,
   }),
-  onVelenOrgChange: async () => null,
   user: { id: "user-1", name: "Jay", email: "jay@example.com" },
-  velen: null,
 };
 
 function mountOnboarding() {
@@ -85,18 +83,11 @@ describe("ProjectOnboarding", () => {
           project: { id: "project-1", name: "Briar", createdAt: "2026-07-22T00:00:00Z" },
           agentToken: "token",
         }}
-        velen={{
-          authenticated: true,
-          currentOrg: "briar",
-          email: "jay@example.com",
-          organizations: [{ name: "Briar", slug: "briar" }],
-          sources: [],
-        }}
       />,
     );
 
-    expect(markup).toContain('aria-haspopup="listbox" aria-label="Velen 조직"');
-    expect(markup).toContain("select-menu-large native-select");
+    expect(markup).not.toContain("Velen");
+    expect(markup).not.toContain("Linear 연동");
     expect(markup).toContain("워크플로우 자동 생성");
     expect(markup).toContain("Agent backend");
     expect(markup).toContain("저장소 선택");
@@ -107,7 +98,6 @@ describe("ProjectOnboarding", () => {
     expect(markup).toContain(">확인 ");
     expect(markup).not.toContain('label="Auto Hunt 워크플로"');
     expect(markup).not.toContain('aria-pressed="true"');
-    expect(markup).toContain('type="checkbox"');
   });
 
   it("keeps first-project onboarding non-cancellable", () => {
@@ -282,13 +272,6 @@ describe("ProjectOnboarding", () => {
         onConnect={onConnect}
         onRepositorySelect={onRepositorySelect}
         onRepositoryInspect={onRepositoryInspect}
-        velen={{
-          authenticated: true,
-          currentOrg: "briar",
-          email: "jay@example.com",
-          organizations: [{ name: "Briar", slug: "briar" }],
-          sources: [],
-        }}
       />,
     ));
 
@@ -315,7 +298,7 @@ describe("ProjectOnboarding", () => {
     await act(async () => confirm?.click());
     expect(onConnect).toHaveBeenCalledWith(
       expect.objectContaining({
-        velenOrg: "briar",
+        velenOrg: null,
         linearEnabled: false,
         githubRepository: "wordbricks/briar",
       }),

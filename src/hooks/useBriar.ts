@@ -48,6 +48,7 @@ import {
   pickGitRepository,
   repairAutoHunt,
   updateLocalProjectLinear,
+  updateLocalProjectVelenOrg,
   updateLocalProjectWorkflow,
   type AutoHuntHealth,
   type LocalAutoHuntConfig,
@@ -370,11 +371,6 @@ export function useBriar() {
       return null;
     }
   }, []);
-
-  useEffect(() => {
-    if (!projectConnection || demoMode) return;
-    void refreshVelen();
-  }, [projectConnection, refreshVelen]);
 
   useEffect(() => {
     if (demoMode || !token || !activeProjectId) return;
@@ -1297,6 +1293,64 @@ export function useBriar() {
     [activeProjectId, assertRepositoryReadyForLinearImport, token],
   );
 
+  const saveVelenIntegration = useCallback(
+    async (projectId: string, org: string | null) => {
+      if (!dashboard || dashboard.project.id !== projectId) {
+        throw new Error("Velen 연결을 저장할 프로젝트 설정이 없습니다.");
+      }
+      const normalized = org?.trim() || null;
+      if (!normalized && dashboard.settings.linear.enabled) {
+        throw new Error("Linear 연결을 먼저 끈 뒤 Velen 연결을 해제하세요.");
+      }
+      if (demoMode) {
+        setDashboard((current) =>
+          current?.project.id === projectId
+            ? {
+                ...current,
+                settings: { ...current.settings, velenOrg: normalized },
+              }
+            : current,
+        );
+        return normalized;
+      }
+      if (!token) throw new Error("로그인이 필요합니다.");
+
+      const previous = dashboard.settings.velenOrg;
+      const local = companionMode
+        ? normalized
+        : await updateLocalProjectVelenOrg(projectId, normalized);
+      try {
+        const result = await updateProjectSettings(token, projectId, {
+          ...dashboard.settings,
+          velenOrg: local,
+          ...(local ? {} : { dataSource: null }),
+        });
+        setDashboard((current) =>
+          current?.project.id === projectId
+            ? { ...current, settings: result.settings }
+            : current,
+        );
+        return result.settings.velenOrg;
+      } catch (caught) {
+        if (!companionMode) {
+          try {
+            await updateLocalProjectVelenOrg(projectId, previous);
+          } catch (rollbackError) {
+            const cause = caught instanceof Error ? caught.message : String(caught);
+            const rollback = rollbackError instanceof Error
+              ? rollbackError.message
+              : String(rollbackError);
+            throw new Error(
+              `Velen 연결 저장에 실패했고 로컬 설정도 복구하지 못했습니다: ${cause} (${rollback})`,
+            );
+          }
+        }
+        throw caught;
+      }
+    },
+    [companionMode, dashboard, token],
+  );
+
   const saveLinearIntegration = useCallback(
     async (projectId: string, linear: ProjectSettings["linear"]) => {
       if (!dashboard || dashboard.project.id !== projectId) {
@@ -1838,6 +1892,7 @@ export function useBriar() {
     renameOrganization,
     regenerateWorkflow,
     saveAutoHuntAutomation,
+    saveVelenIntegration,
     saveLinearIntegration,
     connectLinearForImport,
     loadLinearStatesForImport,

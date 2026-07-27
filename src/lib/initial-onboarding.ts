@@ -1,4 +1,4 @@
-export type PrerequisiteId = "git" | "codex" | "claude" | "grok" | "velen";
+export type PrerequisiteId = "git" | "codex" | "claude" | "grok";
 
 export type PrerequisiteStatus = {
   installed: boolean;
@@ -58,14 +58,4 @@ export async function installOnboardingPrerequisite(
     "install_onboarding_prerequisite",
     { prerequisite },
   );
-}
-
-export async function loginOnboardingVelen() {
-  if (!isTauri()) {
-    throw new Error(
-      "Velen OAuth 로그인은 Briar 데스크톱 앱에서 사용할 수 있습니다.",
-    );
-  }
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<OnboardingPrerequisites>("login_onboarding_velen");
 }

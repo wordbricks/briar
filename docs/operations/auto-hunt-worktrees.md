@@ -95,8 +95,7 @@ relies on the skill contract rather than on enforcement.
 A project can drop the filesystem sandbox entirely:
 
 ```sh
-briar auto-hunt configure --velen-org <slug> \
-  --enable-full-access --i-understand-the-risk
+briar auto-hunt configure --enable-full-access --i-understand-the-risk
 ```
 
 This switches codex to `danger-full-access` and claude to `bypassPermissions`,
@@ -125,7 +124,7 @@ briar auto-hunt worktree remove [--path <dir>] [--force]
 ```
 
 ```sh
-briar auto-hunt configure --velen-org <slug> \
+briar auto-hunt configure \
   --worktree-root ~/briar/worktrees --branch-prefix briar
 ```
 
