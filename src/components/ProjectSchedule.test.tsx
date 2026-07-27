@@ -6,10 +6,8 @@ import {
   scheduleSegmentsForWeek,
   startOfCalendarWeek,
 } from "../lib/project-schedule";
-import type { HuntRun } from "../types";
+import type { ProjectAgentScheduleRun } from "../types";
 import { ProjectSchedule } from "./ProjectSchedule";
-
-const baseRun = demoDashboard.runs[0];
 
 function calendarRun(
   id: string,
@@ -17,19 +15,26 @@ function calendarRun(
   start: string,
   end: string,
   title = `Task ${id}`,
-): HuntRun {
+): ProjectAgentScheduleRun {
   return {
-    ...baseRun,
     id,
-    runNumber: Number(id.replace(/\D/gu, "")) || 1,
-    title,
+    projectId: demoDashboard.project.id,
+    scheduleId: `schedule-${id}`,
+    scheduleName: title,
+    agent: {
+      id: `agent-${id}`,
+      name: agent,
+      provider: "codex",
+      model: null,
+      responsibility: "Run scheduled work.",
+    },
     status: "completed",
-    workflowStage: null,
-    claimedBy: agent,
-    claimedAt: start,
+    scheduledFor: start,
+    leaseExpiresAt: null,
     startedAt: start,
-    updatedAt: end,
     completedAt: end,
+    resultSummary: "Completed.",
+    error: null,
   };
 }
 
@@ -93,37 +98,20 @@ describe("ProjectSchedule", () => {
     });
   });
 
-  it("renders agent history, live time, week controls, and an issue affordance", () => {
-    const dashboard = {
-      ...demoDashboard,
-      runs: [
-        calendarRun(
-          "run-5",
-          "Agent A",
-          "2026-07-27T01:00:00",
-          "2026-07-27T03:00:00",
-          "Review calendar layout",
-        ),
-      ],
-    };
+  it("renders the calendar shell, live time, and week controls", () => {
     const markup = renderToStaticMarkup(
       <I18nProvider>
         <ProjectSchedule
-          dashboard={dashboard}
           isSidebarOpen
           now={now}
-          onRunOpen={() => undefined}
-          project={dashboard.project}
+          project={demoDashboard.project}
           token={null}
         />
       </I18nProvider>,
     );
 
     expect(markup).toContain("에이전트 작업 주간 캘린더");
-    expect(markup).toContain("Agent A");
-    expect(markup).toContain("Review calendar layout");
     expect(markup).toContain("project-schedule-now");
     expect(markup).toContain('aria-label="이전 주"');
-    expect(markup).toContain('aria-label="Agent A, Review calendar layout');
   });
 });
