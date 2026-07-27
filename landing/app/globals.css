@@ -124,6 +124,60 @@ button {
   color: #fff;
 }
 
+.header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-self: end;
+}
+
+.language-switcher {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 8px;
+  border: 1px solid #2c2c32;
+  border-radius: 8px;
+  color: #64646d;
+  background: #101013;
+}
+
+.language-switcher > span {
+  margin-right: 6px;
+  color: #777780;
+  font-size: 12px;
+}
+
+.language-switcher button {
+  padding: 4px;
+  border: 0;
+  color: #686871;
+  background: transparent;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 9px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 180ms ease;
+}
+
+.language-switcher button:hover,
+.language-switcher button.is-active {
+  color: #f0eef8;
+}
+
+.language-switcher button:focus-visible {
+  border-radius: 3px;
+  outline: 2px solid var(--violet);
+  outline-offset: 1px;
+}
+
+.language-switcher i {
+  width: 1px;
+  height: 10px;
+  margin: 0 2px;
+  background: #303037;
+}
+
 .header-cta {
   display: inline-flex;
   gap: 7px;
@@ -2133,6 +2187,10 @@ footer {
 
   .header-cta {
     padding: 8px 11px;
+  }
+
+  .header-actions .header-download {
+    display: none;
   }
 
   .hero {
