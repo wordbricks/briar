@@ -2,6 +2,58 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+  <key>CFBundleIcons</key>
+  <dict>
+    <key>CFBundlePrimaryIcon</key>
+    <dict>
+      <key>CFBundleIconName</key>
+      <string>AppIcon</string>
+    </dict>
+    <key>CFBundleAlternateIcons</key>
+    <dict>
+      <key>gray</key>
+      <dict>
+        <key>CFBundleIconName</key>
+        <string>AppIconGray</string>
+      </dict>
+      <key>pink</key>
+      <dict>
+        <key>CFBundleIconName</key>
+        <string>AppIconPink</string>
+      </dict>
+      <key>green</key>
+      <dict>
+        <key>CFBundleIconName</key>
+        <string>AppIconGreen</string>
+      </dict>
+    </dict>
+  </dict>
+  <key>CFBundleIcons~ipad</key>
+  <dict>
+    <key>CFBundlePrimaryIcon</key>
+    <dict>
+      <key>CFBundleIconName</key>
+      <string>AppIcon</string>
+    </dict>
+    <key>CFBundleAlternateIcons</key>
+    <dict>
+      <key>gray</key>
+      <dict>
+        <key>CFBundleIconName</key>
+        <string>AppIconGray</string>
+      </dict>
+      <key>pink</key>
+      <dict>
+        <key>CFBundleIconName</key>
+        <string>AppIconPink</string>
+      </dict>
+      <key>green</key>
+      <dict>
+        <key>CFBundleIconName</key>
+        <string>AppIconGreen</string>
+      </dict>
+    </dict>
+  </dict>
   <key>ITSAppUsesNonExemptEncryption</key>
   <false/>
 </dict>
