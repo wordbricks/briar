@@ -133,9 +133,9 @@ including other repositories and dotfiles. Restore the default with:
 briar project configure --enable-full-access --i-understand-the-risk
 ```
 
-The same choice is available in Briar under **Project settings → Auto Hunt →
-Filesystem access**. `briar project doctor` reports the resolved value under
-`sandbox.fullAccess`.
+The same choice is available in Briar under **Project settings → Agent
+configuration → Filesystem access**. `briar project doctor` reports the
+resolved value under `sandbox.fullAccess`.
 
 Auto Hunt input — issue titles, descriptions, attachments, repository content —
 is untrusted by contract, the session runs unattended, and network access is
