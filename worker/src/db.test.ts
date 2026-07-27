@@ -7,7 +7,9 @@ import type { HuntEventInput } from "./db";
 import {
   assertQueuedHuntClaim,
   claimNextQueuedHuntRun,
+  claimDueProjectAgentScheduleRun,
   addOrganizationMember,
+  completeProjectAgentScheduleRun,
   createOrganization,
   createIssueMessage,
   createProjectAgent,
@@ -33,6 +35,7 @@ import {
   recoverHuntRun,
   recordHuntEvent,
   recordQaResult,
+  renewProjectAgentScheduleRunLease,
   updateProjectSettings,
   updateProjectAgent,
   updateOrganization,
@@ -187,6 +190,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         "utf8",
       ),
     );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0019_project_agent_schedule_runs.sql"),
+        "utf8",
+      ),
+    );
   });
 
   afterAll(async () => {
@@ -306,6 +316,162 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         timeZone: "Etc/UTC",
       }),
     ).resolves.toBeNull();
+  });
+
+  it("claims a due schedule once and advances its next occurrence", async () => {
+    const agent = (await listProjectAgents(db, projectId))[0];
+    const schedule = await createProjectAgentSchedule(db, projectId, {
+      agentId: agent.id,
+      name: "Daily project audit",
+      recurrence: "daily",
+      timeOfDay: "09:00",
+      dayOfWeek: null,
+      timeZone: "Etc/UTC",
+    });
+    expect(schedule).not.toBeNull();
+    await db
+      .prepare(
+        `update briar_project_agent_schedules
+         set next_run_at = '2026-07-27T09:00:00.000Z'
+         where id = ?`,
+      )
+      .bind(schedule!.id)
+      .run();
+
+    const claimed = await claimDueProjectAgentScheduleRun(db, projectId, {
+      claimTokenHash: "a".repeat(64),
+      observedAt: "2026-07-27T09:00:10.000Z",
+    });
+    expect(claimed).toMatchObject({
+      schedule_id: schedule!.id,
+      schedule_name: "Daily project audit",
+      agent_provider: "codex",
+      agent_responsibility: "Perform Auto Hunt for every queued issue.",
+      status: "running",
+      scheduled_for: "2026-07-27T09:00:00.000Z",
+    });
+    await expect(
+      claimDueProjectAgentScheduleRun(db, projectId, {
+        claimTokenHash: "b".repeat(64),
+        observedAt: "2026-07-27T09:00:10.000Z",
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      db
+        .prepare(
+          `select next_run_at from briar_project_agent_schedules where id = ?`,
+        )
+        .bind(schedule!.id)
+        .first<string>("next_run_at"),
+    ).resolves.toBe("2026-07-28T09:00:00.000Z");
+    await expect(
+      completeProjectAgentScheduleRun(db, projectId, claimed!.id, {
+        claimTokenHash: "a".repeat(64),
+        status: "completed",
+        resultSummary: "Daily audit completed.",
+        error: null,
+        observedAt: "2026-07-27T09:01:00.000Z",
+      }),
+    ).resolves.toMatchObject({ status: "completed" });
+  });
+
+  it("requires the active claim token to complete a scheduled run", async () => {
+    const agent = (await listProjectAgents(db, projectId))[0];
+    const schedule = await createProjectAgentSchedule(db, projectId, {
+      agentId: agent.id,
+      name: "Result reporter",
+      recurrence: "daily",
+      timeOfDay: "10:00",
+      dayOfWeek: null,
+      timeZone: "Etc/UTC",
+    });
+    await db
+      .prepare(
+        `update briar_project_agent_schedules
+         set next_run_at = '2026-07-27T10:00:00.000Z'
+         where id = ?`,
+      )
+      .bind(schedule!.id)
+      .run();
+    const tokenHash = "c".repeat(64);
+    const claimed = await claimDueProjectAgentScheduleRun(db, projectId, {
+      claimTokenHash: tokenHash,
+      observedAt: "2026-07-27T10:00:05.000Z",
+    });
+
+    await expect(
+      completeProjectAgentScheduleRun(db, projectId, claimed!.id, {
+        claimTokenHash: "d".repeat(64),
+        status: "completed",
+        resultSummary: "must not persist",
+        error: null,
+        observedAt: "2026-07-27T10:01:00.000Z",
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      completeProjectAgentScheduleRun(db, projectId, claimed!.id, {
+        claimTokenHash: tokenHash,
+        status: "completed",
+        resultSummary: "Repository audit completed.",
+        error: null,
+        observedAt: "2026-07-27T10:01:00.000Z",
+      }),
+    ).resolves.toMatchObject({
+      status: "completed",
+      result_summary: "Repository audit completed.",
+      completed_at: "2026-07-27T10:01:00.000Z",
+    });
+  });
+
+  it("renews and safely reclaims an expired schedule execution", async () => {
+    const agent = (await listProjectAgents(db, projectId))[0];
+    const schedule = await createProjectAgentSchedule(db, projectId, {
+      agentId: agent.id,
+      name: "Lease recovery",
+      recurrence: "daily",
+      timeOfDay: "11:00",
+      dayOfWeek: null,
+      timeZone: "Etc/UTC",
+    });
+    await db
+      .prepare(
+        `update briar_project_agent_schedules
+         set next_run_at = '2026-07-27T11:00:00.000Z'
+         where id = ?`,
+      )
+      .bind(schedule!.id)
+      .run();
+    const originalHash = "e".repeat(64);
+    const claimed = await claimDueProjectAgentScheduleRun(db, projectId, {
+      claimTokenHash: originalHash,
+      observedAt: "2026-07-27T11:00:00.000Z",
+    });
+    await expect(
+      renewProjectAgentScheduleRunLease(db, projectId, claimed!.id, {
+        claimTokenHash: originalHash,
+        observedAt: "2026-07-27T12:00:00.000Z",
+      }),
+    ).resolves.toMatchObject({
+      id: claimed!.id,
+      lease_expires_at: "2026-07-27T14:00:00.000Z",
+    });
+
+    await expect(
+      claimDueProjectAgentScheduleRun(db, projectId, {
+        claimTokenHash: "f".repeat(64),
+        observedAt: "2026-07-27T13:00:00.000Z",
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      claimDueProjectAgentScheduleRun(db, projectId, {
+        claimTokenHash: "f".repeat(64),
+        observedAt: "2026-07-27T14:00:01.000Z",
+      }),
+    ).resolves.toMatchObject({
+      id: claimed!.id,
+      schedule_id: schedule!.id,
+      started_at: "2026-07-27T14:00:01.000Z",
+    });
   });
 
   it("updates a project agent only within its project", async () => {

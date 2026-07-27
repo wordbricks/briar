@@ -170,6 +170,29 @@ export type CreateProjectAgentScheduleInput = {
   timeZone: string;
 };
 
+export type ProjectAgentScheduleRun = {
+  id: string;
+  projectId: string;
+  scheduleId: string;
+  scheduleName: string;
+  agent: Pick<
+    ProjectAgent,
+    "id" | "name" | "provider" | "model" | "responsibility"
+  >;
+  status: "running" | "completed" | "failed";
+  scheduledFor: string;
+  leaseExpiresAt: string | null;
+  startedAt: string;
+  completedAt: string | null;
+  resultSummary: string | null;
+  error: string | null;
+};
+
+export type ClaimedProjectAgentScheduleRun = ProjectAgentScheduleRun & {
+  status: "running";
+  claimToken: string;
+};
+
 export type UpdateProjectAgentInput = CreateProjectAgentInput;
 
 export type Organization = {

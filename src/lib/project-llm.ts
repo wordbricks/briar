@@ -90,6 +90,14 @@ export type ProjectLlmChatResponse = {
   workspaceRoot: string;
 };
 
+export type ProjectAgentScheduleExecutionInput = {
+  projectId: string;
+  provider: AgentProvider;
+  model: string | null;
+  message: string;
+  instructions: string;
+};
+
 export type ProjectChatMessage = {
   message: string;
   instructions?: string | null;
@@ -129,6 +137,32 @@ export async function chatWithProjectLlm(
       conversationId: input.conversationId ?? null,
       instructions: input.instructions ?? null,
       outputSchema: input.outputSchema ?? null,
+    },
+  });
+}
+
+/**
+ * Run one claimed schedule in the locally registered project root.
+ *
+ * Callers choose a saved agent identity, never a filesystem path. The native
+ * layer resolves the connected root and confines writes to that workspace.
+ */
+export async function runProjectAgentSchedule(
+  input: ProjectAgentScheduleExecutionInput,
+): Promise<ProjectLlmChatResponse> {
+  if (!isTauri()) {
+    throw new Error("예약 에이전트는 Briar 데스크톱 앱에서 실행할 수 있습니다.");
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<ProjectLlmChatResponse>("run_project_agent_schedule", {
+    projectId: input.projectId,
+    provider: input.provider,
+    model: input.model,
+    request: {
+      message: input.message,
+      conversationId: null,
+      instructions: input.instructions,
+      outputSchema: null,
     },
   });
 }

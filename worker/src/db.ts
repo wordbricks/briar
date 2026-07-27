@@ -16,7 +16,10 @@ import {
   type AutoHuntAutomation,
 } from "../../src/lib/auto-hunt-automation";
 import { defaultProjectAgentCopy } from "../../src/lib/project-agent";
-import type { ProjectAgentScheduleRecurrence } from "../../src/lib/project-agent-schedule";
+import {
+  nextProjectAgentScheduleRunAt,
+  type ProjectAgentScheduleRecurrence,
+} from "../../src/lib/project-agent-schedule";
 
 type ProjectAgentProvider = "codex" | "claude" | "grok";
 type ProjectAgentKind = "auto_hunt" | "custom";
@@ -85,6 +88,33 @@ export type ProjectAgentScheduleRow = {
   day_of_week: number | null;
   time_zone: string;
   enabled: number;
+  next_run_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ProjectAgentScheduleRunStatus =
+  | "running"
+  | "completed"
+  | "failed";
+
+export type ProjectAgentScheduleRunRow = {
+  id: string;
+  project_id: string;
+  schedule_id: string;
+  schedule_name: string;
+  agent_id: string;
+  agent_name: string;
+  agent_provider: ProjectAgentProvider;
+  agent_model: string | null;
+  agent_responsibility: string;
+  status: ProjectAgentScheduleRunStatus;
+  scheduled_for: string;
+  lease_expires_at: string | null;
+  started_at: string;
+  completed_at: string | null;
+  result_summary: string | null;
+  error: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -619,6 +649,7 @@ export async function listProjectAgentSchedules(
               agent.name as agent_name, agent.provider as agent_provider,
               schedule.name, schedule.recurrence, schedule.time_of_day,
               schedule.day_of_week, schedule.time_zone, schedule.enabled,
+              schedule.next_run_at,
               schedule.created_at, schedule.updated_at
        from briar_project_agent_schedules schedule
        join briar_project_agents agent on agent.id = schedule.agent_id
@@ -654,12 +685,21 @@ export async function createProjectAgentSchedule(
 
   const id = crypto.randomUUID();
   const createdAt = new Date().toISOString();
+  const nextRunAt = nextProjectAgentScheduleRunAt(
+    {
+      recurrence: input.recurrence,
+      timeOfDay: input.timeOfDay,
+      dayOfWeek: input.dayOfWeek,
+      timeZone: input.timeZone,
+    },
+    new Date(Date.parse(createdAt) - 60_000),
+  );
   await db
     .prepare(
       `insert into briar_project_agent_schedules (
          id, project_id, agent_id, name, recurrence, time_of_day,
-         day_of_week, time_zone, enabled, created_at, updated_at
-       ) values (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+         day_of_week, time_zone, enabled, next_run_at, created_at, updated_at
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -670,6 +710,7 @@ export async function createProjectAgentSchedule(
       input.timeOfDay,
       input.dayOfWeek,
       input.timeZone,
+      nextRunAt,
       createdAt,
       createdAt,
     )
@@ -681,6 +722,7 @@ export async function createProjectAgentSchedule(
               agent.name as agent_name, agent.provider as agent_provider,
               schedule.name, schedule.recurrence, schedule.time_of_day,
               schedule.day_of_week, schedule.time_zone, schedule.enabled,
+              schedule.next_run_at,
               schedule.created_at, schedule.updated_at
        from briar_project_agent_schedules schedule
        join briar_project_agents agent on agent.id = schedule.agent_id
@@ -688,6 +730,295 @@ export async function createProjectAgentSchedule(
     )
     .bind(id, projectId)
     .first<ProjectAgentScheduleRow>();
+}
+
+const scheduleRunSelect = `
+  select run.id, run.project_id, run.schedule_id,
+         schedule.name as schedule_name,
+         run.agent_id, agent.name as agent_name,
+         agent.provider as agent_provider, agent.model as agent_model,
+         agent.responsibility as agent_responsibility,
+         run.status, run.scheduled_for, run.lease_expires_at,
+         run.started_at, run.completed_at, run.result_summary, run.error,
+         run.created_at, run.updated_at
+  from briar_project_agent_schedule_runs run
+  join briar_project_agent_schedules schedule on schedule.id = run.schedule_id
+  join briar_project_agents agent on agent.id = run.agent_id`;
+
+export const PROJECT_AGENT_SCHEDULE_LEASE_MS = 2 * 60 * 60_000;
+
+const scheduleLeaseExpiresAt = (observedAt: string) =>
+  new Date(
+    Date.parse(observedAt) + PROJECT_AGENT_SCHEDULE_LEASE_MS,
+  ).toISOString();
+
+async function initializeProjectAgentScheduleNextRuns(
+  db: D1Database,
+  projectId: string,
+  observedAt: string,
+) {
+  const schedules = await db
+    .prepare(
+      `select id, recurrence, time_of_day, day_of_week, time_zone, created_at
+       from briar_project_agent_schedules
+       where project_id = ? and enabled = 1 and next_run_at is null`,
+    )
+    .bind(projectId)
+    .all<{
+      id: string;
+      recurrence: ProjectAgentScheduleRecurrence;
+      time_of_day: string;
+      day_of_week: number | null;
+      time_zone: string;
+      created_at: string;
+    }>();
+  for (const schedule of schedules.results ?? []) {
+    const startAt = Math.min(
+      Date.parse(observedAt),
+      Date.parse(schedule.created_at),
+    );
+    const nextRunAt = nextProjectAgentScheduleRunAt(
+      {
+        recurrence: schedule.recurrence,
+        timeOfDay: schedule.time_of_day,
+        dayOfWeek: schedule.day_of_week,
+        timeZone: schedule.time_zone,
+      },
+      new Date(startAt - 60_000),
+    );
+    await db
+      .prepare(
+        `update briar_project_agent_schedules
+         set next_run_at = ?, updated_at = ?
+         where id = ? and project_id = ? and next_run_at is null`,
+      )
+      .bind(nextRunAt, observedAt, schedule.id, projectId)
+      .run();
+  }
+}
+
+async function reclaimExpiredProjectAgentScheduleRun(
+  db: D1Database,
+  projectId: string,
+  input: {
+    claimTokenHash: string;
+    observedAt: string;
+  },
+) {
+  const expired = await db
+    .prepare(
+      `select id
+       from briar_project_agent_schedule_runs
+       where project_id = ? and status = 'running'
+         and lease_expires_at is not null and lease_expires_at <= ?
+       order by scheduled_for, id
+       limit 1`,
+    )
+    .bind(projectId, input.observedAt)
+    .first<{ id: string }>();
+  if (!expired) return null;
+  const run = await db
+    .prepare(
+      `update briar_project_agent_schedule_runs
+       set claim_token_hash = ?, lease_expires_at = ?,
+           started_at = ?, updated_at = ?
+       where id = ? and project_id = ? and status = 'running'
+         and lease_expires_at is not null and lease_expires_at <= ?
+       returning id`,
+    )
+    .bind(
+      input.claimTokenHash,
+      scheduleLeaseExpiresAt(input.observedAt),
+      input.observedAt,
+      input.observedAt,
+      expired.id,
+      projectId,
+      input.observedAt,
+    )
+    .first<{ id: string }>();
+  if (!run) return null;
+  return db
+    .prepare(`${scheduleRunSelect} where run.id = ? and run.project_id = ?`)
+    .bind(run.id, projectId)
+    .first<ProjectAgentScheduleRunRow>();
+}
+
+export async function claimDueProjectAgentScheduleRun(
+  db: D1Database,
+  projectId: string,
+  input: {
+    claimTokenHash: string;
+    observedAt: string;
+  },
+) {
+  const reclaimed = await reclaimExpiredProjectAgentScheduleRun(
+    db,
+    projectId,
+    input,
+  );
+  if (reclaimed) return reclaimed;
+
+  await initializeProjectAgentScheduleNextRuns(db, projectId, input.observedAt);
+  const schedule = await db
+    .prepare(
+      `select schedule.id, schedule.agent_id, schedule.next_run_at,
+              schedule.recurrence, schedule.time_of_day,
+              schedule.day_of_week, schedule.time_zone
+       from briar_project_agent_schedules schedule
+       where schedule.project_id = ? and schedule.enabled = 1
+         and schedule.next_run_at is not null
+         and schedule.next_run_at <= ?
+         and not exists (
+           select 1 from briar_project_agent_schedule_runs active
+           where active.schedule_id = schedule.id and active.status = 'running'
+             and active.lease_expires_at > ?
+         )
+       order by schedule.next_run_at, schedule.id
+       limit 1`,
+    )
+    .bind(projectId, input.observedAt, input.observedAt)
+    .first<{
+      id: string;
+      agent_id: string;
+      next_run_at: string;
+      recurrence: ProjectAgentScheduleRecurrence;
+      time_of_day: string;
+      day_of_week: number | null;
+      time_zone: string;
+    }>();
+  if (!schedule) return null;
+
+  const nextRunAt = nextProjectAgentScheduleRunAt(
+    {
+      recurrence: schedule.recurrence,
+      timeOfDay: schedule.time_of_day,
+      dayOfWeek: schedule.day_of_week,
+      timeZone: schedule.time_zone,
+    },
+    new Date(Math.max(Date.parse(schedule.next_run_at), Date.parse(input.observedAt))),
+  );
+  const runId = crypto.randomUUID();
+  await db.batch([
+    db
+      .prepare(
+        `insert or ignore into briar_project_agent_schedule_runs (
+           id, project_id, schedule_id, agent_id, status, scheduled_for,
+           claim_token_hash, lease_expires_at, started_at, created_at, updated_at
+         )
+         select ?, ?, schedule.id, schedule.agent_id, 'running',
+                schedule.next_run_at, ?, ?, ?, ?, ?
+         from briar_project_agent_schedules schedule
+         where schedule.id = ? and schedule.project_id = ?
+           and schedule.enabled = 1 and schedule.next_run_at = ?
+           and not exists (
+             select 1 from briar_project_agent_schedule_runs active
+             where active.schedule_id = schedule.id and active.status = 'running'
+               and active.lease_expires_at > ?
+           )`,
+      )
+      .bind(
+        runId,
+        projectId,
+        input.claimTokenHash,
+        scheduleLeaseExpiresAt(input.observedAt),
+        input.observedAt,
+        input.observedAt,
+        input.observedAt,
+        schedule.id,
+        projectId,
+        schedule.next_run_at,
+        input.observedAt,
+      ),
+    db
+      .prepare(
+        `update briar_project_agent_schedules
+         set next_run_at = ?, updated_at = ?
+         where id = ? and project_id = ? and next_run_at = ?
+           and exists (
+             select 1 from briar_project_agent_schedule_runs run
+             where run.id = ? and run.claim_token_hash = ?
+           )`,
+      )
+      .bind(
+        nextRunAt,
+        input.observedAt,
+        schedule.id,
+        projectId,
+        schedule.next_run_at,
+        runId,
+        input.claimTokenHash,
+      ),
+  ]);
+  return db
+    .prepare(`${scheduleRunSelect} where run.id = ? and run.project_id = ?`)
+    .bind(runId, projectId)
+    .first<ProjectAgentScheduleRunRow>();
+}
+
+export async function completeProjectAgentScheduleRun(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  input: {
+    claimTokenHash: string;
+    status: Exclude<ProjectAgentScheduleRunStatus, "running">;
+    resultSummary: string | null;
+    error: string | null;
+    observedAt: string;
+  },
+) {
+  const row = await db
+    .prepare(
+      `update briar_project_agent_schedule_runs
+       set status = ?, claim_token_hash = null, lease_expires_at = null,
+           completed_at = ?, result_summary = ?, error = ?, updated_at = ?
+       where id = ? and project_id = ? and status = 'running'
+         and claim_token_hash = ?
+       returning id`,
+    )
+    .bind(
+      input.status,
+      input.observedAt,
+      input.resultSummary,
+      input.error,
+      input.observedAt,
+      runId,
+      projectId,
+      input.claimTokenHash,
+    )
+    .first<{ id: string }>();
+  if (!row) return null;
+  return db
+    .prepare(`${scheduleRunSelect} where run.id = ? and run.project_id = ?`)
+    .bind(runId, projectId)
+    .first<ProjectAgentScheduleRunRow>();
+}
+
+export async function renewProjectAgentScheduleRunLease(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  input: {
+    claimTokenHash: string;
+    observedAt: string;
+  },
+) {
+  return db
+    .prepare(
+      `update briar_project_agent_schedule_runs
+       set lease_expires_at = ?, updated_at = ?
+       where id = ? and project_id = ? and status = 'running'
+         and claim_token_hash = ?
+       returning id, lease_expires_at`,
+    )
+    .bind(
+      scheduleLeaseExpiresAt(input.observedAt),
+      input.observedAt,
+      runId,
+      projectId,
+      input.claimTokenHash,
+    )
+    .first<{ id: string; lease_expires_at: string }>();
 }
 
 export async function updateProjectAgent(

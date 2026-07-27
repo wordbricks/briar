@@ -14,9 +14,11 @@ import type {
   HuntRunPlacement,
   IssueAttachment,
   IssueMessage,
+  ClaimedProjectAgentScheduleRun,
   Project,
   ProjectAgent,
   ProjectAgentSchedule,
+  ProjectAgentScheduleRun,
   Organization,
   OrganizationMember,
   ProjectSettings,
@@ -68,6 +70,33 @@ const projectAgentScheduleSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
 });
+const projectAgentScheduleRunSchema = z.object({
+  id: z.string().uuid(),
+  projectId: z.string().uuid(),
+  scheduleId: z.string().uuid(),
+  scheduleName: z.string(),
+  agent: projectAgentSchema.pick({
+    id: true,
+    name: true,
+    provider: true,
+    model: true,
+    responsibility: true,
+  }),
+  status: z.enum(["running", "completed", "failed"]),
+  scheduledFor: z.string(),
+  leaseExpiresAt: z.string().nullable(),
+  startedAt: z.string(),
+  completedAt: z.string().nullable(),
+  resultSummary: z.string().nullable(),
+  error: z.string().nullable(),
+});
+const claimedProjectAgentScheduleRunSchema =
+  projectAgentScheduleRunSchema.extend({
+    status: z.literal("running"),
+    claimToken: z
+      .string()
+      .regex(/^briar_schedule_claim_[0-9a-f]{64}$/u),
+  });
 const organizationSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
@@ -360,6 +389,62 @@ export async function createProjectAgentSchedule(
     },
   );
   return projectAgentScheduleSchema.parse(result.schedule);
+}
+
+export async function claimProjectAgentScheduleRun(
+  token: string,
+  projectId: string,
+): Promise<ClaimedProjectAgentScheduleRun | null> {
+  const result = await request<{ run: unknown }>(
+    `/projects/${projectId}/agent-schedule-runs/claim`,
+    token,
+    { method: "POST" },
+  );
+  return result.run === null
+    ? null
+    : claimedProjectAgentScheduleRunSchema.parse(result.run);
+}
+
+export async function completeProjectAgentScheduleRun(
+  token: string,
+  projectId: string,
+  runId: string,
+  input:
+    | { claimToken: string; status: "completed"; resultSummary: string }
+    | { claimToken: string; status: "failed"; error: string },
+): Promise<ProjectAgentScheduleRun> {
+  const result = await request<{ run: unknown }>(
+    `/projects/${projectId}/agent-schedule-runs/${runId}/complete`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        claimToken: input.claimToken,
+        status: input.status,
+        resultSummary:
+          input.status === "completed" ? input.resultSummary : null,
+        error: input.status === "failed" ? input.error : null,
+      }),
+    },
+  );
+  return projectAgentScheduleRunSchema.parse(result.run);
+}
+
+export async function renewProjectAgentScheduleRun(
+  token: string,
+  projectId: string,
+  runId: string,
+  claimToken: string,
+) {
+  const result = await request<{ leaseExpiresAt: unknown }>(
+    `/projects/${projectId}/agent-schedule-runs/${runId}/renew`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify({ claimToken }),
+    },
+  );
+  return z.string().parse(result.leaseExpiresAt);
 }
 
 export async function updateProjectAgent(

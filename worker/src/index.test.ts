@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import worker, {
   organizationUpdateInputSchema,
   projectAgentScheduleInputSchema,
+  projectAgentScheduleRunCompletionSchema,
 } from "./index";
 
 describe("Worker HTTP contract", () => {
@@ -33,6 +34,15 @@ describe("Worker HTTP contract", () => {
         timeZone: "Etc/UTC",
       }).dayOfWeek,
     ).toBeNull();
+    expect(() =>
+      projectAgentScheduleInputSchema.parse({
+        agentId: "11111111-1111-4111-8111-111111111111",
+        name: "Invalid zone",
+        recurrence: "daily",
+        timeOfDay: "08:00",
+        timeZone: "Mars/Olympus",
+      }),
+    ).toThrow(/Invalid IANA time zone/u);
   });
 
   it("accepts a name-only organization update", () => {
@@ -41,6 +51,31 @@ describe("Worker HTTP contract", () => {
     ).toEqual({
       name: "Briar Labs",
     });
+  });
+
+  it("requires a matching outcome payload for schedule-run completion", () => {
+    const claimToken = `briar_schedule_claim_${"a".repeat(64)}`;
+    expect(
+      projectAgentScheduleRunCompletionSchema.parse({
+        claimToken,
+        status: "completed",
+        resultSummary: "Repository audit completed.",
+        error: null,
+      }),
+    ).toEqual({
+      claimToken,
+      status: "completed",
+      resultSummary: "Repository audit completed.",
+      error: null,
+    });
+    expect(() =>
+      projectAgentScheduleRunCompletionSchema.parse({
+        claimToken,
+        status: "failed",
+        resultSummary: null,
+        error: null,
+      }),
+    ).toThrow(/failed runs require an error/u);
   });
 
   it("renders mobile Companion authorization and returns to the app", async () => {
