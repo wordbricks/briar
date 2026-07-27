@@ -61,6 +61,7 @@ import {
   listIssueAttachments,
   listIssueMessages,
   listDashboardRuns,
+  listRunEvidence,
   listOrganizationMembers,
   listOrganizations,
   listProjects,
@@ -2412,6 +2413,28 @@ async function route(
   }
 
   const evidenceMatch = pathname.match(/^\/runs\/([0-9a-f-]+)\/evidence$/u);
+  if (evidenceMatch && request.method === "GET") {
+    const projectId = await requireAgentProject(db, request);
+    const evidence = await listRunEvidence(db, projectId, evidenceMatch[1]);
+    if (!evidence) throw new HttpError(404, "Run not found");
+    return json({
+      runId: evidenceMatch[1],
+      evidence: evidence.map((item) => ({
+        key: item.evidence_key,
+        attempt: item.attempt,
+        stage: item.workflow_stage,
+        type: item.evidence_type,
+        status: item.status,
+        detail: item.detail,
+        command: item.command,
+        url: item.url,
+        metadata: item.metadata_json ? JSON.parse(item.metadata_json) : null,
+        actor: item.actor,
+        observedAt: item.observed_at,
+        recordedAt: item.recorded_at,
+      })),
+    });
+  }
   if (evidenceMatch && request.method === "POST") {
     const projectId = await requireAgentProject(db, request);
     const parsed = evidenceSchema.parse(await readJson(request));

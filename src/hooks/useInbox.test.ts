@@ -17,6 +17,9 @@ function session(
   const completedAt = "2026-07-24T01:10:00.000Z";
   return {
     id,
+    dispatchGroupId: id,
+    workers: [],
+    dispatchEvents: [],
     projectId: project.id,
     status,
     issues: [
