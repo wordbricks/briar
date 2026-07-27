@@ -102,6 +102,7 @@ describe("detached execution workers", () => {
       "migrations/0024_project_agent_avatars.sql",
       "migrations/0025_project_agent_codex_pets.sql",
       "migrations/0026_flexible_project_agent_schedules.sql",
+      "migrations/0027_run_revisions.sql",
     ]) {
       await executeSql(db, await readFile(resolve(migration), "utf8"));
     }

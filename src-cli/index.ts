@@ -1202,6 +1202,39 @@ async function recoverRun(action: "retry" | "cancel") {
   console.log(JSON.stringify(result));
 }
 
+async function reworkRun() {
+  const config = await loadConfig();
+  const project = await currentProject(config);
+  const runId = value("--run") ?? project.activeClaim?.runId;
+  if (!runId) throw new Error("--run is required when there is no active claim");
+  const input = {
+    requestId: value("--request-id") ?? crypto.randomUUID(),
+    actor: value("--actor") ?? "briar-workflow",
+    workflowStage: required("--to"),
+    reason: required("--reason"),
+  };
+  z.object({
+    requestId: z.string().uuid(),
+    actor: z.string().min(1).max(128),
+    workflowStage: workflowStageIdSchema,
+    reason: z.string().trim().min(1).max(4_000),
+  }).parse(input);
+  z.string().uuid().parse(runId);
+  const result = await request<{
+    runId: string;
+    outcome: string;
+    attempt: number;
+    revision: number;
+    workflowStage: string;
+  }>(
+    config.apiUrl,
+    `/runs/${runId}/rework`,
+    process.env.BRIAR_AGENT_TOKEN ?? project.agentToken,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+  console.log(JSON.stringify(result));
+}
+
 const workerRegistrationSchema = z.object({
   worker: z.object({
     id: z.string().min(1),
@@ -1470,6 +1503,8 @@ const usage = `Briar CLI
     [--detail <text>|--detail-file <path>] [--command <command>]
     [--url <url>] [--metadata-json <json>]
   briar run evidence list [--run <uuid>]
+  briar run rework [--run <uuid>] --to <earlier-stage> --reason <text>
+    [--request-id <uuid>]
   briar run retry [--run <uuid>] [--request-id <uuid>] [--reason <text>]
   briar run cancel [--run <uuid>] [--request-id <uuid>] [--reason <text>]
   briar worker [--project <uuid>] [--label <text>] [--max-issues <n>] [--once]
@@ -1525,6 +1560,7 @@ async function main() {
   if (args[0] === "run" && args[1] === "evidence" && args[2] === "list") {
     return listCurrentRunEvidence();
   }
+  if (args[0] === "run" && args[1] === "rework") return reworkRun();
   if (args[0] === "run" && args[1] === "retry") return recoverRun("retry");
   if (args[0] === "run" && args[1] === "cancel") return recoverRun("cancel");
   if (args[0] === "worker" && args[1] === "status") return workerStatus();

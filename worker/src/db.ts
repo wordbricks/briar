@@ -168,6 +168,7 @@ export type HuntRunRow = {
   production_qa_detail: string | null;
   context_json: string | null;
   current_attempt: number;
+  current_revision: number;
   claim_token_hash: string | null;
   claimed_by: string | null;
   claimed_at: string | null;
@@ -185,6 +186,7 @@ export type HuntEventRow = {
   run_id: string;
   event_key: string;
   attempt: number;
+  revision: number;
   stage: DashboardStage;
   status: AutoHuntRunStatus;
   workflow_stage: AutoHuntWorkflowStageId | null;
@@ -204,6 +206,7 @@ export type RunEvidenceRow = {
   id: string;
   run_id: string;
   attempt: number;
+  revision: number;
   evidence_key: string;
   workflow_stage: string;
   evidence_type: string;
@@ -1829,16 +1832,52 @@ const digestRunId = async (
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 };
 
-const scopedEventKey = async (eventKey: string, attempt: number) => {
-  if (attempt === 1) return eventKey;
+const scopedRunKey = async (
+  key: string,
+  attempt: number,
+  revision: number,
+) => {
+  if (attempt === 1 && revision === 1) return key;
   const digest = new Uint8Array(
-    await crypto.subtle.digest("SHA-256", new TextEncoder().encode(eventKey)),
+    await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key)),
   );
   const fingerprint = [...digest.slice(0, 8)]
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
-  const suffix = `:attempt-${attempt}:${fingerprint}`;
-  return `${eventKey.slice(0, 300 - suffix.length)}${suffix}`;
+  const suffix = `:attempt-${attempt}:revision-${revision}:${fingerprint}`;
+  return `${key.slice(0, 300 - suffix.length)}${suffix}`;
+};
+
+const scopedEvidenceKey = async (key: string, revision: number) => {
+  if (revision === 1) return key;
+  const digest = new Uint8Array(
+    await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key)),
+  );
+  const fingerprint = [...digest.slice(0, 8)]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+  const suffix = `:revision-${revision}:${fingerprint}`;
+  return `${key.slice(0, 300 - suffix.length)}${suffix}`;
+};
+
+const loadStageRevisionRequirements = async (
+  db: D1Database,
+  run: HuntRunRow,
+) => {
+  const result = await db
+    .prepare(
+      `select workflow_stage, required_revision
+       from briar_run_stage_revisions
+       where run_id = ? and attempt = ?`,
+    )
+    .bind(run.id, run.current_attempt)
+    .all<{ workflow_stage: string; required_revision: number }>();
+  return new Map(
+    result.results.map((item) => [
+      item.workflow_stage,
+      item.required_revision,
+    ]),
+  );
 };
 
 const sameEvent = (row: HuntEventRow, input: HuntEventInput) =>
@@ -1891,15 +1930,22 @@ const assertCompletionEligible = async (
   if (!run) throw new HuntTransitionError("Run does not exist");
   const workflow = parseWorkflow(run.workflow_snapshot_json);
   const requiredStages = workflow.completion.requiredStages;
+  const revisionRequirements = await loadStageRevisionRequirements(db, run);
   const completedStages = await db
     .prepare(
-      `select distinct workflow_stage from briar_hunt_events
+      `select workflow_stage, revision from briar_hunt_events
        where run_id = ? and attempt = ? and workflow_stage is not null`,
     )
     .bind(run.id, run.current_attempt)
-    .all<{ workflow_stage: AutoHuntWorkflowStageId }>();
+    .all<{ workflow_stage: AutoHuntWorkflowStageId; revision: number }>();
   const completedStageIds = new Set(
-    completedStages.results.map((event) => event.workflow_stage),
+    completedStages.results
+      .filter(
+        (event) =>
+          event.revision >=
+          (revisionRequirements.get(event.workflow_stage) ?? 1),
+      )
+      .map((event) => event.workflow_stage),
   );
   const missingStages = requiredStages.filter(
     (stage) => !completedStageIds.has(stage),
@@ -1917,15 +1963,23 @@ const assertCompletionEligible = async (
   if (requiredEvidence.length > 0) {
     const evidence = await db
       .prepare(
-        `select workflow_stage, evidence_type from briar_run_evidence
+        `select workflow_stage, evidence_type, revision from briar_run_evidence
          where run_id = ? and attempt = ? and status in ('passed', 'skipped')`,
       )
       .bind(run.id, run.current_attempt)
-      .all<{ workflow_stage: string; evidence_type: string }>();
+      .all<{
+        workflow_stage: string;
+        evidence_type: string;
+        revision: number;
+      }>();
     const accepted = new Set(
-      evidence.results.map(
-        (item) => `${item.workflow_stage}:${item.evidence_type}`,
-      ),
+      evidence.results
+        .filter(
+          (item) =>
+            item.revision >=
+            (revisionRequirements.get(item.workflow_stage) ?? 1),
+        )
+        .map((item) => `${item.workflow_stage}:${item.evidence_type}`),
     );
     const missingEvidence = requiredEvidence
       .filter((item) => !accepted.has(`${item.stage}:${item.type}`))
@@ -2074,9 +2128,11 @@ export async function recordHuntEvent(
     );
   }
   const eventAttempt = existingRun?.current_attempt ?? 1;
-  const storedEventKey = await scopedEventKey(
+  const eventRevision = existingRun?.current_revision ?? 1;
+  const storedEventKey = await scopedRunKey(
     normalizedInput.eventKey,
     eventAttempt,
+    eventRevision,
   );
   await assertStageTransition(db, existingRun, normalizedInput);
   await assertCompletionEligible(db, projectId, existingRun, normalizedInput);
@@ -2084,7 +2140,7 @@ export async function recordHuntEvent(
   if (existingRun) {
     const existingEvent = await db
       .prepare(
-        `select id, run_id, event_key, attempt, stage, status, workflow_stage,
+        `select id, run_id, event_key, attempt, revision, stage, status, workflow_stage,
                 detail, actor, branch, commit_sha, qa_status, tracker_issue_state,
                 pull_request_urls, target_sha, occurred_at, recorded_at
          from briar_hunt_events
@@ -2182,11 +2238,11 @@ export async function recordHuntEvent(
     db
       .prepare(
         `insert into briar_hunt_events (
-           id, run_id, event_key, attempt, stage, status, workflow_stage,
+           id, run_id, event_key, attempt, revision, stage, status, workflow_stage,
            detail, actor, branch, commit_sha,
            qa_status, tracker_issue_state, pull_request_urls, target_sha,
            occurred_at, recorded_at
-         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          on conflict(run_id, event_key) do nothing`,
       )
       .bind(
@@ -2194,6 +2250,7 @@ export async function recordHuntEvent(
         runId,
         storedEventKey,
         eventAttempt,
+        eventRevision,
         normalizedInput.stage,
         normalizedInput.status,
         normalizedInput.workflowStage,
@@ -2329,7 +2386,7 @@ export async function recordHuntEvent(
   if ((results[1]?.meta.changes ?? 0) === 0) {
     const existingEvent = await db
       .prepare(
-        `select id, run_id, event_key, attempt, stage, status, workflow_stage,
+        `select id, run_id, event_key, attempt, revision, stage, status, workflow_stage,
                 detail, actor, branch, commit_sha, qa_status, tracker_issue_state,
                 pull_request_urls, target_sha, occurred_at, recorded_at
          from briar_hunt_events
@@ -2371,12 +2428,16 @@ export async function recordRunEvidence(
     );
   }
   const metadataJson = input.metadata ? stableJson(input.metadata) : null;
+  const storedEvidenceKey = await scopedEvidenceKey(
+    input.evidenceKey,
+    run.current_revision,
+  );
   const existing = await db
     .prepare(
       `select * from briar_run_evidence
        where run_id = ? and attempt = ? and evidence_key = ?`,
     )
-    .bind(run.id, run.current_attempt, input.evidenceKey)
+    .bind(run.id, run.current_attempt, storedEvidenceKey)
     .first<RunEvidenceRow>();
   if (existing) {
     const same =
@@ -2396,7 +2457,8 @@ export async function recordRunEvidence(
     id: crypto.randomUUID(),
     run_id: run.id,
     attempt: run.current_attempt,
-    evidence_key: input.evidenceKey,
+    revision: run.current_revision,
+    evidence_key: storedEvidenceKey,
     workflow_stage: input.stage,
     evidence_type: input.type,
     status: input.status,
@@ -2411,16 +2473,17 @@ export async function recordRunEvidence(
   await db
     .prepare(
       `insert into briar_run_evidence (
-         id, project_id, run_id, attempt, evidence_key, workflow_stage,
+         id, project_id, run_id, attempt, revision, evidence_key, workflow_stage,
          evidence_type, status, detail, command, url, metadata_json,
          actor, observed_at, recorded_at
-       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       evidence.id,
       projectId,
       evidence.run_id,
       evidence.attempt,
+      evidence.revision,
       evidence.evidence_key,
       evidence.workflow_stage,
       evidence.evidence_type,
@@ -2453,6 +2516,214 @@ export async function listRunEvidence(
     .bind(projectId, runId, run.current_attempt)
     .all<RunEvidenceRow>();
   return result.results ?? [];
+}
+
+export async function listRunStageRevisions(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+) {
+  const run = await getHuntRunForProject(db, projectId, runId);
+  if (!run) return null;
+  const requirements = await loadStageRevisionRequirements(db, run);
+  return {
+    attempt: run.current_attempt,
+    revision: run.current_revision,
+    requirements,
+  };
+}
+
+export type HuntReworkOutcome =
+  | "reworked"
+  | "already_reworked"
+  | "not_found";
+
+export async function reworkHuntRun(
+  db: D1Database,
+  projectId: string,
+  input: {
+    runId: string;
+    workflowStage: AutoHuntWorkflowStageId;
+    requestId: string;
+    actor: string;
+    reason: string;
+    occurredAt: string;
+  },
+): Promise<{
+  outcome: HuntReworkOutcome;
+  attempt: number | null;
+  revision: number | null;
+  workflowStage: AutoHuntWorkflowStageId | null;
+}> {
+  const run = await getHuntRunForProject(db, projectId, input.runId);
+  if (!run) {
+    return {
+      outcome: "not_found",
+      attempt: null,
+      revision: null,
+      workflowStage: null,
+    };
+  }
+
+  const eventKey = `workflow:rework:${input.requestId}`;
+  const existingEvent = await db
+    .prepare(
+      `select attempt, revision, workflow_stage from briar_hunt_events
+       where run_id = ? and event_key = ?`,
+    )
+    .bind(run.id, eventKey)
+    .first<
+      Pick<HuntEventRow, "attempt" | "revision" | "workflow_stage">
+    >();
+  if (existingEvent) {
+    return {
+      outcome: "already_reworked",
+      attempt: existingEvent.attempt,
+      revision: existingEvent.revision,
+      workflowStage: existingEvent.workflow_stage,
+    };
+  }
+
+  if (run.status !== "running" || !run.workflow_stage) {
+    throw new HuntTransitionError("Only a running workflow stage can be reworked");
+  }
+  const workflow = parseWorkflow(run.workflow_snapshot_json);
+  const currentRank = workflow.stages.findIndex(
+    (stage) => stage.id === run.workflow_stage,
+  );
+  const targetRank = workflow.stages.findIndex(
+    (stage) => stage.id === input.workflowStage,
+  );
+  if (targetRank < 0) {
+    throw new HuntTransitionError(
+      `Workflow stage is not configured for this run: ${input.workflowStage}`,
+    );
+  }
+  if (currentRank < 0 || targetRank >= currentRank) {
+    throw new HuntTransitionError(
+      `Rework target ${input.workflowStage} must precede ${run.workflow_stage}`,
+    );
+  }
+
+  const nextRevision = run.current_revision + 1;
+  const targetDashboardStage = dashboardStageFor(
+    "running",
+    input.workflowStage,
+  );
+  const recordedAt = new Date().toISOString();
+  const eventId = crypto.randomUUID();
+  const invalidatedStages = workflow.stages.slice(targetRank).map((stage) => stage.id);
+  const results = await db.batch([
+    db
+      .prepare(
+        `update briar_hunt_runs
+         set stage = ?, status = 'running', workflow_stage = ?,
+             detail = ?, current_revision = ?, commit_sha = null,
+             target_sha = null, result_summary = null,
+             staging_qa_status = null, production_qa_status = null,
+             staging_qa_detail = null, production_qa_detail = null,
+             completed_at = null, last_event_at = ?, updated_at = ?
+         where id = ? and project_id = ? and status = 'running'
+           and current_attempt = ? and current_revision = ?
+           and last_event_at = ?`,
+      )
+      .bind(
+        targetDashboardStage,
+        input.workflowStage,
+        input.reason,
+        nextRevision,
+        input.occurredAt,
+        recordedAt,
+        run.id,
+        projectId,
+        run.current_attempt,
+        run.current_revision,
+        run.last_event_at,
+      ),
+    db
+      .prepare(
+        `insert into briar_hunt_events (
+           id, run_id, event_key, attempt, revision, stage, status,
+           workflow_stage, detail, actor, branch, commit_sha, qa_status,
+           tracker_issue_state, pull_request_urls, target_sha,
+           occurred_at, recorded_at
+         )
+         select ?, id, ?, current_attempt, current_revision, ?, 'running',
+                ?, ?, ?, branch, null, null, tracker_issue_state,
+                pull_request_urls, null, ?, ?
+         from briar_hunt_runs
+         where id = ? and project_id = ? and current_attempt = ?
+           and current_revision = ? and last_event_at = ?
+         on conflict(run_id, event_key) do nothing`,
+      )
+      .bind(
+        eventId,
+        eventKey,
+        targetDashboardStage,
+        input.workflowStage,
+        input.reason,
+        input.actor,
+        input.occurredAt,
+        recordedAt,
+        run.id,
+        projectId,
+        run.current_attempt,
+        nextRevision,
+        input.occurredAt,
+      ),
+    ...invalidatedStages.map((stage) =>
+      db
+        .prepare(
+          `insert into briar_run_stage_revisions (
+             run_id, attempt, workflow_stage, required_revision
+           )
+           select id, current_attempt, ?, current_revision
+           from briar_hunt_runs
+           where id = ? and project_id = ? and current_attempt = ?
+             and current_revision = ? and last_event_at = ?
+           on conflict(run_id, attempt, workflow_stage)
+           do update set required_revision = excluded.required_revision`,
+        )
+        .bind(
+          stage,
+          run.id,
+          projectId,
+          run.current_attempt,
+          nextRevision,
+          input.occurredAt,
+        ),
+    ),
+  ]);
+
+  if ((results[0]?.meta.changes ?? 0) === 0) {
+    const duplicate = await db
+      .prepare(
+        `select attempt, revision, workflow_stage from briar_hunt_events
+         where run_id = ? and event_key = ?`,
+      )
+      .bind(run.id, eventKey)
+      .first<
+        Pick<HuntEventRow, "attempt" | "revision" | "workflow_stage">
+      >();
+    if (duplicate) {
+      return {
+        outcome: "already_reworked",
+        attempt: duplicate.attempt,
+        revision: duplicate.revision,
+        workflowStage: duplicate.workflow_stage,
+      };
+    }
+    throw new HuntTransitionError(
+      "Auto Hunt run changed while rework was being recorded",
+    );
+  }
+
+  return {
+    outcome: "reworked",
+    attempt: run.current_attempt,
+    revision: nextRevision,
+    workflowStage: input.workflowStage,
+  };
 }
 
 export type HuntRecoveryAction = "retry" | "cancel";
@@ -2526,7 +2797,7 @@ export async function recoverHuntRun(
           .prepare(
             `update briar_hunt_runs
              set stage = 'queued', status = 'queued', workflow_stage = null,
-                 detail = ?, current_attempt = ?,
+                 detail = ?, current_attempt = ?, current_revision = 1,
                  branch = null, commit_sha = null, result_summary = null,
                  pull_request_urls = '[]',
                  target_sha = null, staging_qa_status = null,
@@ -2707,6 +2978,17 @@ export async function moveHuntRun(
   }
 
   const targetStage = dashboardStageFor(input.status, targetWorkflowStage);
+  const currentRank = run.workflow_stage
+    ? workflow.stages.findIndex((stage) => stage.id === run.workflow_stage)
+    : -1;
+  const targetRank = targetWorkflowStage
+    ? workflow.stages.findIndex((stage) => stage.id === targetWorkflowStage)
+    : -1;
+  const isRegression =
+    input.status === "running" &&
+    currentRank >= 0 &&
+    targetRank >= 0 &&
+    targetRank < currentRank;
   const targetLabel =
     input.status === "running"
       ? workflow.stages.find((stage) => stage.id === targetWorkflowStage)?.label
@@ -2723,6 +3005,15 @@ export async function moveHuntRun(
   const recordedAt = new Date().toISOString();
   const targetAttempt =
     input.status === "queued" ? run.current_attempt + 1 : run.current_attempt;
+  const targetRevision =
+    input.status === "queued"
+      ? 1
+      : isRegression
+        ? run.current_revision + 1
+        : run.current_revision;
+  const invalidatedStages = isRegression
+    ? workflow.stages.slice(targetRank).map((stage) => stage.id)
+    : [];
   const completedAt = ["completed", "cancelled"].includes(input.status)
     ? input.occurredAt
     : null;
@@ -2731,11 +3022,11 @@ export async function moveHuntRun(
     db
       .prepare(
         `insert into briar_hunt_events (
-           id, run_id, event_key, attempt, stage, status, workflow_stage,
+           id, run_id, event_key, attempt, revision, stage, status, workflow_stage,
            detail, actor, branch, commit_sha, qa_status, tracker_issue_state,
            pull_request_urls, target_sha, occurred_at, recorded_at
          )
-         select ?, id, ?, ?, ?, ?, ?, ?, ?, branch, commit_sha,
+         select ?, id, ?, ?, ?, ?, ?, ?, ?, ?, branch, commit_sha,
                 null, tracker_issue_state, pull_request_urls, target_sha, ?, ?
          from briar_hunt_runs
          where id = ? and project_id = ? and current_attempt = ?
@@ -2746,6 +3037,7 @@ export async function moveHuntRun(
         eventId,
         eventKey,
         targetAttempt,
+        targetRevision,
         targetStage,
         input.status,
         targetWorkflowStage,
@@ -2762,7 +3054,14 @@ export async function moveHuntRun(
       .prepare(
         `update briar_hunt_runs
          set stage = ?, status = ?, workflow_stage = ?, detail = ?,
-             current_attempt = ?,
+             current_attempt = ?, current_revision = ?,
+             commit_sha = case when ? then null else commit_sha end,
+             target_sha = case when ? then null else target_sha end,
+             result_summary = case when ? then null else result_summary end,
+             staging_qa_status = case when ? then null else staging_qa_status end,
+             production_qa_status = case when ? then null else production_qa_status end,
+             staging_qa_detail = case when ? then null else staging_qa_detail end,
+             production_qa_detail = case when ? then null else production_qa_detail end,
              claim_token_hash = null, claimed_by = null, claimed_at = null,
              lease_expires_at = null, completed_at = ?, last_event_at = ?,
              updated_at = ?
@@ -2779,6 +3078,14 @@ export async function moveHuntRun(
         targetWorkflowStage,
         detail,
         targetAttempt,
+        targetRevision,
+        isRegression ? 1 : 0,
+        isRegression ? 1 : 0,
+        isRegression ? 1 : 0,
+        isRegression ? 1 : 0,
+        isRegression ? 1 : 0,
+        isRegression ? 1 : 0,
+        isRegression ? 1 : 0,
         completedAt,
         input.occurredAt,
         recordedAt,
@@ -2788,6 +3095,28 @@ export async function moveHuntRun(
         run.last_event_at,
         eventId,
       ),
+    ...invalidatedStages.map((stage) =>
+      db
+        .prepare(
+          `insert into briar_run_stage_revisions (
+             run_id, attempt, workflow_stage, required_revision
+           )
+           select id, current_attempt, ?, current_revision
+           from briar_hunt_runs
+           where id = ? and project_id = ? and current_attempt = ?
+             and current_revision = ? and last_event_at = ?
+           on conflict(run_id, attempt, workflow_stage)
+           do update set required_revision = excluded.required_revision`,
+        )
+        .bind(
+          stage,
+          run.id,
+          projectId,
+          targetAttempt,
+          targetRevision,
+          input.occurredAt,
+        ),
+    ),
   ]);
 
   if ((results[1]?.meta.changes ?? 0) === 0) {
@@ -3054,7 +3383,7 @@ export async function recordQaResult(
   if (!eligible) return "ineligible";
 
   const eventId = crypto.randomUUID();
-  const eventKey = `admin:qa-${input.result === "passed" ? "pass" : "skip"}:${input.environment}:attempt-${run.current_attempt}`;
+  const eventKey = `admin:qa-${input.result === "passed" ? "pass" : "skip"}:${input.environment}:attempt-${run.current_attempt}:revision-${run.current_revision}`;
   const detail =
     input.detail ??
     (input.result === "passed"
@@ -3065,11 +3394,11 @@ export async function recordQaResult(
     db
       .prepare(
         `insert into briar_hunt_events (
-           id, run_id, event_key, attempt, stage, status, workflow_stage,
+           id, run_id, event_key, attempt, revision, stage, status, workflow_stage,
            detail, actor, branch, commit_sha,
            qa_status, tracker_issue_state, pull_request_urls, target_sha,
            occurred_at, recorded_at
-         ) values (?, ?, ?, ?, ?, 'running', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ) values (?, ?, ?, ?, ?, ?, 'running', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          on conflict(run_id, event_key) do nothing`,
       )
       .bind(
@@ -3077,6 +3406,7 @@ export async function recordQaResult(
         run.id,
         eventKey,
         run.current_attempt,
+        run.current_revision,
         expectedStage,
         expectedStage,
         detail,

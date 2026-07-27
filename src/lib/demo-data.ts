@@ -21,6 +21,7 @@ const demoWorkflow = normalizeAutoHuntWorkflow({
 
 const runDefaults = {
   currentAttempt: 1,
+  currentRevision: 1,
   priority: null,
   tracker: null,
   issueDescription: null,
@@ -43,6 +44,7 @@ const runDefaults = {
   HuntRun,
   | "priority"
   | "currentAttempt"
+  | "currentRevision"
   | "tracker"
   | "issueDescription"
   | "attachments"
@@ -70,6 +72,7 @@ const event = (
 ): HuntEvent => ({
   ...input,
   attempt: 1,
+  revision: 1,
   qaStatus: null,
   trackerState: null,
   pullRequestUrls: [],

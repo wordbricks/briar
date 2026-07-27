@@ -1436,7 +1436,8 @@ export function RunPage({
                     )}
                     <span className={`status-pill ${meta.tone}`}>{label}</span>
                     <small>
-                      {t("run.attempt", { count: run.currentAttempt })}
+                      {t("run.attempt", { count: run.currentAttempt })} ·{" "}
+                      {t("run.revision", { count: run.currentRevision })}
                     </small>
                   </div>
                 </div>
@@ -1462,7 +1463,8 @@ export function RunPage({
                   )}
                   <span className={`status-pill ${meta.tone}`}>{label}</span>
                   <small>
-                    {t("run.attempt", { count: run.currentAttempt })}
+                    {t("run.attempt", { count: run.currentAttempt })} ·{" "}
+                    {t("run.revision", { count: run.currentRevision })}
                   </small>
                 </div>
               </div>
@@ -1575,7 +1577,7 @@ export function RunPage({
                   </div>
                   <div className="run-property">
                     <span className="run-property-icon attempt"><RotateCcw size={15} /></span>
-                    <span className="run-property-copy"><small>{t("run.currentAttempt")}</small><strong>{t("run.attempt", { count: run.currentAttempt })}</strong></span>
+                    <span className="run-property-copy"><small>{t("run.currentAttempt")} · {t("run.currentRevision")}</small><strong>{t("run.attempt", { count: run.currentAttempt })} · {t("run.revision", { count: run.currentRevision })}</strong></span>
                   </div>
                 </section>
                 <section>
@@ -1674,7 +1676,7 @@ function IssueActivity({ run }: { run: HuntRun }) {
           <strong>{latestMessage}</strong>
           <small>
             {latestEvent
-              ? `${t("run.attempt", { count: latestEvent.attempt })} · ${relativeTime(latestEvent.occurredAt, t)}`
+              ? `${t("run.attempt", { count: latestEvent.attempt })} · ${t("run.revision", { count: latestEvent.revision })} · ${relativeTime(latestEvent.occurredAt, t)}`
               : t("run.notSet")}
           </small>
         </span>
@@ -1737,7 +1739,8 @@ function IssueActivity({ run }: { run: HuntRun }) {
                             display.label,
                           )}{" "}
                           <em>
-                            {t("run.attempt", { count: event.attempt })}
+                            {t("run.attempt", { count: event.attempt })} ·{" "}
+                            {t("run.revision", { count: event.revision })}
                           </em>
                         </strong>
                         {event.detail && <p>{event.detail}</p>}
