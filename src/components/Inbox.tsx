@@ -7,6 +7,15 @@ import {
   Clock3,
   Inbox as InboxIcon,
 } from "lucide-react";
+
+import {
+  EmptyState,
+  MainContent,
+  PageHeader,
+} from "@/components/layout";
+import { Button } from "@/components/ui/button";
+import { Typography } from "@/components/ui/typography";
+import { cn } from "@/lib/utils";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
 import type {
@@ -32,66 +41,95 @@ export function Inbox({
   const { localeTag, t } = useI18n();
 
   const inboxContent = (
-    <div className="inbox-scroll">
+    <div className="inbox-scroll min-h-0 flex-1 overflow-auto">
       <section className="inbox-content" aria-labelledby="inbox-title">
-        <header className="inbox-heading">
-          <div>
-            <p className="eyebrow"><InboxIcon size={13} />{t("inbox.eyebrow")}</p>
-            <h1 id="inbox-title">{t("inbox.title")}</h1>
-            <p>{t("inbox.description")}</p>
-          </div>
-          {unreadCount > 0 && (
-            <button onClick={onMarkAllRead} type="button">
-              <Check size={14} />
-              {t("inbox.markAllRead")}
-            </button>
-          )}
-        </header>
+        <PageHeader
+          action={
+            unreadCount > 0 ? (
+              <Button onClick={onMarkAllRead} type="button" variant="soft">
+                <Check size={14} />
+                {t("inbox.markAllRead")}
+              </Button>
+            ) : null
+          }
+          className="inbox-heading"
+          description={t("inbox.description")}
+          eyebrow={
+            <>
+              <InboxIcon size={13} />
+              {t("inbox.eyebrow")}
+            </>
+          }
+          title={t("inbox.title")}
+          titleId="inbox-title"
+        />
 
-        <section className="inbox-panel" aria-label={t("inbox.messages")}>
-          <header>
-            <strong>{t("inbox.messages")}</strong>
-            <span>{t("inbox.unreadCount", { count: unreadCount })}</span>
+        <section
+          aria-label={t("inbox.messages")}
+          className="inbox-panel rounded-none border-0 bg-card"
+        >
+          <header className="flex items-center justify-between gap-3 border-b border-border px-8 py-4">
+            <Typography as="strong" variant="body">
+              {t("inbox.messages")}
+            </Typography>
+            <Typography as="span" tone="muted" variant="caption">
+              {t("inbox.unreadCount", { count: unreadCount })}
+            </Typography>
           </header>
 
           {messages.length === 0 ? (
-            <div className="inbox-empty">
-              <span><InboxIcon size={23} /></span>
-              <strong>{t("inbox.emptyTitle")}</strong>
-              <p>{t("inbox.emptyDescription")}</p>
-            </div>
+            <EmptyState
+              className="inbox-empty"
+              description={t("inbox.emptyDescription")}
+              icon={<InboxIcon size={23} />}
+              title={t("inbox.emptyTitle")}
+            />
           ) : (
             <div className="inbox-list">
               {messages.map((message) => (
                 <button
-                  className={`inbox-message${message.isUnread ? " unread" : ""}`}
+                  className={cn(
+                    "inbox-message flex w-full items-center gap-3 border-b border-border/80 px-8 py-4 text-left transition-colors hover:bg-secondary/60",
+                    message.isUnread && "unread bg-accent/30",
+                  )}
                   key={message.id}
                   onClick={() => onOpen(message)}
                   type="button"
                 >
                   <span
-                    className={`inbox-message-icon ${message.kind} ${message.status}`}
+                    className={cn(
+                      "inbox-message-icon grid size-9 shrink-0 place-items-center rounded-lg",
+                      message.kind,
+                      message.status,
+                    )}
                   >
-                    {message.kind === "session"
-                      ? <Bot size={17} />
-                      : message.status === "failed" || message.status === "blocked"
-                        ? <CircleAlert size={17} />
-                        : message.status === "completed"
-                          ? <CheckCircle2 size={17} />
-                          : <Clock3 size={17} />}
+                    {message.kind === "session" ? (
+                      <Bot size={17} />
+                    ) : message.status === "failed" ||
+                      message.status === "blocked" ? (
+                      <CircleAlert size={17} />
+                    ) : message.status === "completed" ? (
+                      <CheckCircle2 size={17} />
+                    ) : (
+                      <Clock3 size={17} />
+                    )}
                   </span>
-                  <span className="inbox-message-copy">
-                    <span>
-                      <strong>{messageTitle(t, message)}</strong>
-                      {message.isUnread && (
+                  <span className="inbox-message-copy min-w-0 flex-1 grid gap-1">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <Typography as="strong" className="truncate" variant="bodySm">
+                        {messageTitle(t, message)}
+                      </Typography>
+                      {message.isUnread ? (
                         <i
                           aria-label={t("inbox.unread")}
-                          className="inbox-unread-dot"
+                          className="inbox-unread-dot size-1.5 shrink-0 rounded-full bg-primary"
                         />
-                      )}
+                      ) : null}
                     </span>
-                    <small>{messageDescription(t, message)}</small>
-                    <em>
+                    <Typography as="small" className="truncate" tone="muted" variant="caption">
+                      {messageDescription(t, message)}
+                    </Typography>
+                    <em className="flex items-center gap-1.5 text-2xs font-normal text-muted-foreground not-italic">
                       <span>{message.projectName}</span>
                       <Clock3 size={11} />
                       <time dateTime={message.occurredAt}>
@@ -99,7 +137,7 @@ export function Inbox({
                       </time>
                     </em>
                   </span>
-                  <ChevronRight size={16} />
+                  <ChevronRight className="shrink-0 text-muted-foreground" size={16} />
                 </button>
               ))}
             </div>
@@ -111,20 +149,20 @@ export function Inbox({
 
   if (companionMode) {
     return (
-      <main className="main-content companion-inbox" id="inbox">
+      <MainContent className="companion-inbox" id="inbox">
         {inboxContent}
-      </main>
+      </MainContent>
     );
   }
 
   return (
-    <main className="main-content" id="inbox">
+    <MainContent id="inbox">
       <header
         className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`}
         data-tauri-drag-region
       />
       {inboxContent}
-    </main>
+    </MainContent>
   );
 }
 

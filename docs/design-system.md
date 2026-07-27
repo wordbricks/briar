@@ -88,6 +88,24 @@ Add more with the shadcn CLI:
 bunx shadcn@latest add select dropdown-menu popover avatar
 ```
 
+## Product pages
+
+Shared page layout primitives live in `src/components/layout/`:
+
+| Export | Role |
+|--------|------|
+| `MainContent` | App main pane (`main-content` compatible) |
+| `PageHeader` / `PageHero` | Page titles with optional eyebrow/actions |
+| `EmptyState` / `ErrorBanner` | Empty and error affordances |
+| `SectionCard` / `Toolbar` / `StatusPill` | Content chrome |
+
+Migrated product surfaces include Login, Inbox, Auto Hunt, Agents, Schedule,
+Issue queue/dashboard, Organization create, Companion chrome, and settings.
+Remaining dialogs/forms should prefer `@/components/ui` controls as they are touched.
+
+Legacy `src/styles.css` is tokenized for type scale and common colors so older
+class-based screens inherit the system even before full JSX rewrites.
+
 ## Settings surfaces (migrated)
 
 Settings screens use shared layout primitives in `src/components/settings/`:

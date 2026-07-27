@@ -23,6 +23,9 @@ import {
   type RemoteDirectoryListing,
 } from "../lib/project-connection";
 import { SelectMenu } from "./SelectMenu";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Typography } from "@/components/ui/typography";
 
 export function ProjectRemoteConnection({ projectId }: { projectId: string }) {
   const { t } = useI18n();

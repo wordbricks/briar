@@ -13,6 +13,8 @@ import {
 import { useEffect, useRef } from "react";
 import { useI18n } from "../i18n";
 import type { RepositoryReadiness } from "../lib/project-connection";
+import { Button } from "@/components/ui/button";
+import { Typography } from "@/components/ui/typography";
 
 export function ProjectRepositorySetupDialog({
   error,

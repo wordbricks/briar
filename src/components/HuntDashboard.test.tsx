@@ -131,10 +131,10 @@ describe("HuntDashboard", () => {
 
     expect(markup).not.toContain("queue-panel");
     expect(markup).toContain('aria-label="이슈 만들기"');
-    expect(markup).toContain('class="companion-bottom-nav"');
-    expect(markup).toContain('class="companion-fab"');
-    expect(markup).toContain("<strong>검색</strong>");
-    expect(markup).toContain("<strong>Inbox</strong>");
+    expect(markup).toContain("companion-bottom-nav");
+    expect(markup).toContain("companion-fab");
+    expect(markup).toContain("검색");
+    expect(markup).toMatch(/<strong[^>]*>Inbox<\/strong>/);
     expect(markup).not.toContain('class="search-box"');
     expect(markup).toContain('aria-label="필터"');
     expect(markup).not.toContain('class="source-filter"');
@@ -186,11 +186,11 @@ describe("HuntDashboard", () => {
       />,
     );
 
-    expect(markup).toContain("<h2>검색</h2>");
+    expect(markup).toMatch(/<h2[^>]*>검색<\/h2>/);
     expect(markup).toContain('class="search-box"');
     expect(markup).toContain('placeholder="작업 검색"');
-    expect(markup).toContain(
-      '<button aria-current="page" class="active" type="button">',
+    expect(markup).toMatch(
+      /aria-current="page"[^>]*class="[^"]*active[^"]*"/,
     );
   });
 

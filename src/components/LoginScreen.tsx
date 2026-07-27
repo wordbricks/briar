@@ -1,6 +1,10 @@
 import { ArrowUpRight, LoaderCircle, X } from "lucide-react";
-import { Logo } from "./Logo";
+
+import { Button } from "@/components/ui/button";
+import { Typography } from "@/components/ui/typography";
+import { cn } from "@/lib/utils";
 import { useI18n } from "../i18n";
+import { Logo } from "./Logo";
 
 export function LoginScreen({
   companionMode = false,
@@ -20,49 +24,101 @@ export function LoginScreen({
   const { t } = useI18n();
   return (
     <main
-      className={`login-shell${companionMode ? " companion-login-shell" : ""}`}
+      className={cn(
+        "login-shell",
+        companionMode && "companion-login-shell",
+      )}
     >
       <div className="login-glow" />
-      <section className="login-card">
-        {loginCode && (
-          <button
+      <section className="login-card rounded-3xl border border-border bg-card shadow-lg">
+        {loginCode ? (
+          <Button
             aria-label={t("login.close")}
-            className="login-close-button"
+            className="login-close-button absolute top-5 right-5 size-9"
             onClick={onCancel}
+            size="icon"
             type="button"
+            variant="ghost"
           >
             <X size={18} />
-          </button>
-        )}
+          </Button>
+        ) : null}
         <Logo />
         <div className="login-copy">
-          <p className="eyebrow">
+          <Typography
+            as="p"
+            className="eyebrow"
+            tone="primary"
+            variant="micro"
+          >
             {companionMode ? t("companion.badge") : t("login.eyebrow")}
-          </p>
-          <h1>{t(companionMode ? "companion.loginTitle" : "login.title").split("\n").map((line, index) => <span key={line}>{index > 0 ? <br /> : null}{line}</span>)}</h1>
-          <p>{t(companionMode ? "companion.loginDescription" : "login.description")}</p>
+          </Typography>
+          <Typography as="h1" variant="title">
+            {t(companionMode ? "companion.loginTitle" : "login.title")
+              .split("\n")
+              .map((line, index) => (
+                <span key={line}>
+                  {index > 0 ? <br /> : null}
+                  {line}
+                </span>
+              ))}
+          </Typography>
+          <Typography className="mt-3" tone="muted" variant="bodySm">
+            {t(
+              companionMode
+                ? "companion.loginDescription"
+                : "login.description",
+            )}
+          </Typography>
         </div>
         {loginCode ? (
-          <div className="device-code-card">
-            <span>
+          <div className="device-code-card rounded-xl border border-primary/20 bg-accent p-4 text-center">
+            <Typography as="span" tone="muted" variant="caption">
               {t(companionMode ? "companion.loginApprove" : "login.approveCode")}
-            </span>
-            <strong>{loginCode}</strong>
-            <small>
+            </Typography>
+            <Typography
+              as="strong"
+              className="mt-2.5 mb-2 block tracking-[0.25em] text-primary"
+              variant="heading"
+            >
+              {loginCode}
+            </Typography>
+            <Typography as="small" tone="muted" variant="micro">
               {t(companionMode ? "companion.loginWaiting" : "login.waiting")}
-            </small>
+            </Typography>
           </div>
         ) : (
-          <button className="google-button" onClick={onLogin} disabled={loading}>
-            {loading ? <LoaderCircle className="spin" size={18} /> : <GoogleIcon />}
-            {t("login.continueGoogle")}
+          <Button
+            className="google-button h-11 w-full justify-between rounded-xl border border-border bg-card px-3.5 text-sm font-semibold text-foreground shadow-xs hover:bg-secondary"
+            disabled={loading}
+            onClick={onLogin}
+            type="button"
+            variant="outline"
+          >
+            {loading ? (
+              <LoaderCircle className="spin" size={18} />
+            ) : (
+              <GoogleIcon />
+            )}
+            <span className="flex-1 text-center">{t("login.continueGoogle")}</span>
             <ArrowUpRight size={16} />
-          </button>
+          </Button>
         )}
-        {error && <p className="login-error">{error}</p>}
-        {companionMode && (
-          <p className="login-footnote">{t("companion.loginSecure")}</p>
-        )}
+        {error ? (
+          <Typography className="login-error mt-3 text-destructive" role="alert" variant="caption">
+            {error}
+          </Typography>
+        ) : null}
+        {companionMode ? (
+          <Typography
+            as="p"
+            className="login-footnote mt-3.5 text-center"
+            tone="muted"
+            variant="micro"
+          >
+            {t("companion.loginSecure")}
+          </Typography>
+        ) : null}
       </section>
     </main>
   );
