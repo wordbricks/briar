@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
     env,
-    ffi::OsString,
+    ffi::{OsStr, OsString},
     fs::{self, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
@@ -804,8 +804,34 @@ async fn install_onboarding_prerequisite(
     .map_err(|error| error.to_string())?
 }
 
-fn cli_execution_path(home: &Path) -> Result<OsString, String> {
-    let mut paths = vec![
+fn bundled_runtime_directories(executable: &Path) -> Vec<PathBuf> {
+    let Some(directory) = executable.parent() else {
+        return Vec::new();
+    };
+    let mut directories = vec![directory.to_path_buf()];
+    if directory.file_name() == Some(OsStr::new("deps")) {
+        if let Some(target_profile) = directory.parent() {
+            directories.push(target_profile.to_path_buf());
+        }
+    }
+    directories
+}
+
+pub(crate) fn bundled_bun_binary() -> Option<PathBuf> {
+    env::current_exe()
+        .ok()
+        .into_iter()
+        .flat_map(|executable| bundled_runtime_directories(&executable))
+        .map(|directory| directory.join("bun"))
+        .find(|candidate| candidate.is_file())
+}
+
+fn cli_execution_path_with_runtime(
+    home: &Path,
+    runtime_directories: impl IntoIterator<Item = PathBuf>,
+) -> Result<OsString, String> {
+    let mut paths = runtime_directories.into_iter().collect::<Vec<_>>();
+    paths.extend([
         home.join(".local/bin"),
         home.join(".grok/bin"),
         home.join("bin"),
@@ -822,11 +848,18 @@ fn cli_execution_path(home: &Path) -> Result<OsString, String> {
         PathBuf::from("/usr/local/bin"),
         PathBuf::from("/usr/bin"),
         PathBuf::from("/bin"),
-    ];
+    ]);
     if let Some(existing) = env::var_os("PATH") {
         paths.extend(env::split_paths(&existing));
     }
     env::join_paths(paths).map_err(|error| format!("CLI 실행 경로를 구성하지 못했습니다: {error}"))
+}
+
+fn cli_execution_path(home: &Path) -> Result<OsString, String> {
+    let runtime_directories = env::current_exe()
+        .map(|executable| bundled_runtime_directories(&executable))
+        .unwrap_or_default();
+    cli_execution_path_with_runtime(home, runtime_directories)
 }
 
 fn workflow_requires_github(workflow: &WorkflowConfig) -> bool {
@@ -4011,7 +4044,7 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn resolves_cli_tools_installed_through_mise_shims() {
+    fn resolves_cli_tools_installed_through_mise_shims_as_a_fallback() {
         use std::os::unix::fs::PermissionsExt;
 
         let home = tempfile::tempdir().expect("fixture home should exist");
@@ -4024,12 +4057,79 @@ mod tests {
 
         let resolved = which::which_in(
             "bun",
-            Some(cli_execution_path(home.path()).expect("CLI PATH should resolve")),
+            Some(
+                cli_execution_path_with_runtime(home.path(), Vec::new())
+                    .expect("CLI PATH should resolve"),
+            ),
             home.path(),
         )
         .expect("Bun should resolve through the mise shim directory");
 
         assert_eq!(resolved, bun);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn prefers_the_bundled_bun_over_user_installed_runtimes() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let home = tempfile::tempdir().expect("fixture home should exist");
+        let bundled = tempfile::tempdir().expect("bundled runtime directory should exist");
+        let user_shims = home.path().join(".local/share/mise/shims");
+        fs::create_dir_all(&user_shims).expect("mise shims directory should exist");
+        for bun in [bundled.path().join("bun"), user_shims.join("bun")] {
+            fs::write(&bun, "#!/bin/sh\nexit 0\n").expect("fixture Bun should be written");
+            fs::set_permissions(&bun, fs::Permissions::from_mode(0o700))
+                .expect("fixture Bun should be executable");
+        }
+
+        let resolved = which::which_in(
+            "bun",
+            Some(
+                cli_execution_path_with_runtime(home.path(), [bundled.path().to_path_buf()])
+                    .expect("CLI PATH should resolve"),
+            ),
+            home.path(),
+        )
+        .expect("Bun should resolve through the bundled runtime directory");
+
+        assert_eq!(resolved, bundled.path().join("bun"));
+    }
+
+    #[test]
+    fn resolves_the_sidecar_next_to_apps_and_test_binaries() {
+        assert_eq!(
+            bundled_runtime_directories(Path::new("/Applications/Briar.app/Contents/MacOS/briar")),
+            vec![PathBuf::from("/Applications/Briar.app/Contents/MacOS")]
+        );
+        assert_eq!(
+            bundled_runtime_directories(Path::new(
+                "/repo/src-tauri/target/debug/deps/briar_lib-test"
+            )),
+            vec![
+                PathBuf::from("/repo/src-tauri/target/debug/deps"),
+                PathBuf::from("/repo/src-tauri/target/debug")
+            ]
+        );
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn resolves_the_prepared_bun_sidecar_from_the_test_target() {
+        let bundled = bundled_bun_binary().expect("prepared Bun sidecar should resolve");
+        assert_eq!(bundled.file_name(), Some(OsStr::new("bun")));
+        let output = Command::new(bundled)
+            .arg("--version")
+            .output()
+            .expect("bundled Bun should execute");
+        assert!(output.status.success());
+        let package: serde_json::Value =
+            serde_json::from_str(include_str!("../../package.json")).expect("package should parse");
+        let expected = package["packageManager"]
+            .as_str()
+            .and_then(|value| value.strip_prefix("bun@"))
+            .expect("packageManager should pin Bun");
+        assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), expected);
     }
 
     #[test]

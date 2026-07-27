@@ -64,6 +64,7 @@ run_app_worker() {
     scripts/package-production-release.sh \
     scripts/release-macos-candidate.sh \
     scripts/release-macos-production.sh \
+    scripts/verify-bundled-runtime.sh \
     scripts/qa-production-updater-build.sh \
     scripts/qa-macos-lifecycle.sh
   bun run build
@@ -89,6 +90,7 @@ run_rust() {
   rustup toolchain install "$rust_toolchain" \
     --profile minimal \
     --component rustfmt,clippy
+  bun run runtime:prepare
   bun run cli:build
   bun run agent:build
   cargo +"$rust_toolchain" fmt --manifest-path src-tauri/Cargo.toml --all --check

@@ -23,6 +23,7 @@ if ! codesign --verify --deep --strict "$app_path"; then
   echo "Briar.app does not have a complete macOS signature." >&2
   exit 1
 fi
+"$workspace_root/scripts/verify-bundled-runtime.sh" "$app_path"
 
 rm -rf "$artifact_root"
 mkdir -p "$artifact_root"

@@ -224,6 +224,7 @@ assert_app_bundle "$installed_app" "$previous_signature_required" "$previous_ver
 mv "$installed_app" "$rollback_app"
 install_dmg "$candidate_dmg" "$installed_app" "$qa_root/mount-candidate"
 assert_app_bundle "$installed_app" true "$candidate_version"
+"$workspace_root/scripts/verify-bundled-runtime.sh" "$installed_app"
 [[ "$(state_hash "$state_root")" == "$initial_state_hash" ]]
 
 candidate_signature="strict-ad-hoc"

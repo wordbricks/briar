@@ -51,16 +51,15 @@ pub(crate) struct AutoHuntCliEnvironment {
 }
 
 impl AutoHuntCliEnvironment {
-    pub(crate) fn prepare(
+    fn prepare_with_binaries(
         home: &Path,
         execution_path: &OsStr,
-        workspace: &Path,
         project_id: &str,
         api_url: &str,
-        include_velen: bool,
+        bun_binary: &Path,
+        velen_binary: Option<&Path>,
     ) -> Result<Self, String> {
-        let bun_binary = which::which_in("bun", Some(execution_path), workspace)
-            .map_err(|_| "Briar CLI 실행에 필요한 Bun을 찾지 못했습니다.".to_string())?;
+        let include_velen = velen_binary.is_some();
         let briar_entry = home.join(".local/share/briar/briar.js");
         if !briar_entry.is_file() {
             return Err(
@@ -68,14 +67,6 @@ impl AutoHuntCliEnvironment {
                     .to_string(),
             );
         }
-        let velen_binary = if include_velen {
-            Some(
-                which::which_in("velen", Some(execution_path), workspace)
-                    .map_err(|_| "이 프로젝트에 설정된 Velen CLI를 찾지 못했습니다.".to_string())?,
-            )
-        } else {
-            None
-        };
         let directory = tempfile::Builder::new()
             .prefix("briar-workflow-")
             .tempdir()
@@ -92,7 +83,7 @@ impl AutoHuntCliEnvironment {
         write_cli_wrapper(
             &wrapper_directory,
             "briar",
-            &bun_binary,
+            bun_binary,
             &[briar_entry.as_os_str()],
             &sandbox_home,
             &sandbox_config,
@@ -105,7 +96,7 @@ impl AutoHuntCliEnvironment {
             write_cli_wrapper(
                 &wrapper_directory,
                 "velen",
-                &velen_binary,
+                velen_binary,
                 &[],
                 &sandbox_home,
                 &sandbox_config,
@@ -124,6 +115,35 @@ impl AutoHuntCliEnvironment {
         })
     }
 
+    #[cfg(test)]
+    pub(crate) fn prepare(
+        home: &Path,
+        execution_path: &OsStr,
+        workspace: &Path,
+        project_id: &str,
+        api_url: &str,
+        include_velen: bool,
+    ) -> Result<Self, String> {
+        let bun_binary = which::which_in("bun", Some(execution_path), workspace)
+            .map_err(|_| "Briar CLI 실행에 필요한 Bun을 찾지 못했습니다.".to_string())?;
+        let velen_binary = if include_velen {
+            Some(
+                which::which_in("velen", Some(execution_path), workspace)
+                    .map_err(|_| "이 프로젝트에 설정된 Velen CLI를 찾지 못했습니다.".to_string())?,
+            )
+        } else {
+            None
+        };
+        Self::prepare_with_binaries(
+            home,
+            execution_path,
+            project_id,
+            api_url,
+            &bun_binary,
+            velen_binary.as_deref(),
+        )
+    }
+
     pub(crate) fn prepare_on_host(
         runner: Arc<dyn CommandRunner>,
         home: &Path,
@@ -134,13 +154,21 @@ impl AutoHuntCliEnvironment {
         include_velen: bool,
     ) -> Result<Self, String> {
         if !runner.is_remote() {
-            let mut environment = Self::prepare(
+            let bun = PathBuf::from(runner.resolve_binary("bun").map_err(|_| {
+                "Briar CLI 실행에 필요한 번들 Bun 런타임을 찾지 못했습니다.".to_string()
+            })?);
+            let velen = if include_velen {
+                Some(PathBuf::from(runner.resolve_binary("velen")?))
+            } else {
+                None
+            };
+            let mut environment = Self::prepare_with_binaries(
                 home,
                 execution_path,
-                workspace,
                 project_id,
                 api_url,
-                include_velen,
+                &bun,
+                velen.as_deref(),
             )?;
             environment.environment = vec![(
                 "PATH".to_string(),
@@ -1333,6 +1361,52 @@ mod tests {
             fixture.path(),
         )
         .is_err());
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn prepares_local_auto_hunt_with_the_bundled_bun() {
+        let fixture = tempfile::tempdir().expect("fixture directory should exist");
+        let home = fixture.path().join("source-home");
+        let briar_entry = home.join(".local/share/briar/briar.js");
+        create_secure_directory(
+            briar_entry
+                .parent()
+                .expect("Briar entry should have a parent"),
+        )
+        .expect("Briar library directory should exist");
+        fs::write(&briar_entry, "process.exit(0);").expect("Briar fixture entry should be written");
+        let runner: Arc<dyn CommandRunner> =
+            Arc::new(crate::host::LocalRunner::new(OsString::new(), home.clone()));
+        let bundled_bun = runner
+            .resolve_binary("bun")
+            .expect("bundled Bun should resolve");
+
+        let cli_environment = AutoHuntCliEnvironment::prepare_on_host(
+            runner,
+            &home,
+            OsStr::new(""),
+            fixture.path(),
+            "project-local",
+            "http://127.0.0.1:8788",
+            false,
+        )
+        .expect("local Auto Hunt environment should use bundled Bun");
+        let wrapper = which::which_in(
+            "briar",
+            Some(cli_environment.execution_path()),
+            fixture.path(),
+        )
+        .expect("Briar wrapper should be first on PATH");
+        let wrapper_contents =
+            fs::read_to_string(&wrapper).expect("Briar wrapper should be readable");
+
+        assert!(wrapper_contents.contains(&bundled_bun));
+        assert!(Command::new(wrapper)
+            .output()
+            .expect("Briar wrapper should execute")
+            .status
+            .success());
     }
 
     #[test]
