@@ -10,6 +10,7 @@ import {
   GitBranch,
   Link2,
   LoaderCircle,
+  Plug,
   RefreshCw,
   Rocket,
   SlidersHorizontal,
@@ -35,6 +36,7 @@ import { SelectMenu } from "./SelectMenu";
 
 type ProjectSettingsSection =
   | "general"
+  | "integrations"
   | "issue-import"
   | "auto-hunt"
   | "workflow";
@@ -301,6 +303,12 @@ export function ProjectSettings({
       description: t("settings.navGeneralDescription"),
     },
     {
+      id: "integrations" as const,
+      icon: <Plug size={16} strokeWidth={1.75} />,
+      label: t("settings.navIntegrations"),
+      description: t("settings.navIntegrationsDescription"),
+    },
+    {
       id: "issue-import" as const,
       icon: <Download size={16} strokeWidth={1.75} />,
       label: t("settings.navIssueImport"),
@@ -388,7 +396,8 @@ export function ProjectSettings({
 
           <section
             className="project-settings-linear"
-            hidden={activeSection !== "issue-import"}
+            data-project-integration="velen"
+            hidden={activeSection !== "integrations"}
           >
             <header>
               <span className="project-settings-linear-icon">
@@ -478,6 +487,7 @@ export function ProjectSettings({
 
           <section
             className="project-settings-linear"
+            data-project-integration="linear"
             hidden={activeSection !== "issue-import"}
           >
             <header>
