@@ -74,7 +74,7 @@ struct AutoHuntConfig {
     linear_team: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     github_repository: Option<String>,
-    #[serde(default = "default_workflow")]
+    #[serde(default = "repository_workflow_bootstrap")]
     workflow: WorkflowConfig,
 }
 
@@ -82,17 +82,11 @@ struct AutoHuntConfig {
 #[serde(rename_all = "camelCase")]
 struct WorkflowConfig {
     version: u8,
-    #[serde(default = "custom_workflow_preset")]
-    preset: String,
     stages: Vec<WorkflowStageConfig>,
     #[serde(default)]
     completion: WorkflowCompletionConfig,
     #[serde(default)]
     release: WorkflowReleaseConfig,
-}
-
-fn custom_workflow_preset() -> String {
-    "custom".to_string()
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -128,88 +122,6 @@ struct ConnectedLocalProject {
     workflow: WorkflowConfig,
 }
 
-/// Does a repository file exist on the host that owns the repository?
-fn repository_file_exists(runner: &dyn host::CommandRunner, path: &Path) -> bool {
-    if !runner.is_remote() {
-        return path.exists();
-    }
-    let Ok(test) = runner.resolve_binary("test") else {
-        // `test` is a shell builtin on hosts without the standalone binary.
-        return runner
-            .run(&host::CommandSpec::new("sh").args([
-                "-c".to_string(),
-                format!("test -e {}", host::shell_quote(&path.to_string_lossy())),
-            ]))
-            .map(|output| output.success())
-            .unwrap_or(false);
-    };
-    runner
-        .run(
-            &host::CommandSpec::new(test)
-                .args(["-e".to_string(), path.to_string_lossy().to_string()]),
-        )
-        .map(|output| output.success())
-        .unwrap_or(false)
-}
-
-fn repository_file_text(runner: &dyn host::CommandRunner, path: &Path) -> Option<String> {
-    if !runner.is_remote() {
-        return fs::read_to_string(path).ok();
-    }
-    let cat = runner.resolve_binary("cat").ok()?;
-    let output = runner
-        .run(&host::CommandSpec::new(cat).args([path.to_string_lossy().to_string()]))
-        .ok()?;
-    output.success().then_some(output.stdout)
-}
-
-fn infer_repository_checks_on(
-    runner: &dyn host::CommandRunner,
-    repository: &Path,
-    workflow: &mut WorkflowConfig,
-) {
-    let Some(stage) = workflow
-        .stages
-        .iter_mut()
-        .find(|stage| stage.id == "local_qa")
-    else {
-        return;
-    };
-    let package_json = repository.join("package.json");
-    if repository_file_exists(runner, &package_json) {
-        let Some(contents) = repository_file_text(runner, &package_json) else {
-            return;
-        };
-        let Ok(package) = serde_json::from_str::<serde_json::Value>(&contents) else {
-            return;
-        };
-        let Some(scripts) = package
-            .get("scripts")
-            .and_then(serde_json::Value::as_object)
-        else {
-            return;
-        };
-        let package_manager = if repository_file_exists(runner, &repository.join("bun.lock"))
-            || repository_file_exists(runner, &repository.join("bun.lockb"))
-        {
-            "bun run"
-        } else if repository_file_exists(runner, &repository.join("pnpm-lock.yaml")) {
-            "pnpm"
-        } else if repository_file_exists(runner, &repository.join("yarn.lock")) {
-            "yarn"
-        } else {
-            "npm run"
-        };
-        stage.checks = ["test", "build"]
-            .into_iter()
-            .filter(|name| scripts.contains_key(*name))
-            .map(|name| format!("{package_manager} {name}"))
-            .collect();
-    } else if repository_file_exists(runner, &repository.join("Cargo.toml")) {
-        stage.checks = vec!["cargo test".to_string(), "cargo build".to_string()];
-    }
-}
-
 /// Origin remote URL, read on whichever host owns the repository.
 fn repository_remote_on(runner: &dyn host::CommandRunner, path: &Path) -> Option<String> {
     if !runner.is_remote() {
@@ -228,39 +140,18 @@ fn repository_remote_on(runner: &dyn host::CommandRunner, path: &Path) -> Option
     (output.success() && !remote.is_empty()).then_some(remote)
 }
 
-fn default_workflow() -> WorkflowConfig {
+fn repository_workflow_bootstrap() -> WorkflowConfig {
     WorkflowConfig {
         version: 1,
-        preset: "local".to_string(),
-        stages: vec![
-            WorkflowStageConfig {
-                id: "analyzing".to_string(),
-                label: "분석".to_string(),
-                required: true,
-                evidence: vec!["repository".to_string()],
-                checks: Vec::new(),
-            },
-            WorkflowStageConfig {
-                id: "implementing".to_string(),
-                label: "구현".to_string(),
-                required: true,
-                evidence: vec!["diff".to_string()],
-                checks: Vec::new(),
-            },
-            WorkflowStageConfig {
-                id: "local_qa".to_string(),
-                label: "로컬 검증".to_string(),
-                required: true,
-                evidence: Vec::new(),
-                checks: vec!["bun run test".to_string(), "bun run build".to_string()],
-            },
-        ],
+        stages: vec![WorkflowStageConfig {
+            id: "repository_workflow_pending".to_string(),
+            label: "Repository workflow pending".to_string(),
+            required: true,
+            evidence: Vec::new(),
+            checks: Vec::new(),
+        }],
         completion: WorkflowCompletionConfig {
-            required_stages: vec![
-                "analyzing".to_string(),
-                "implementing".to_string(),
-                "local_qa".to_string(),
-            ],
+            required_stages: vec!["repository_workflow_pending".to_string()],
         },
         release: WorkflowReleaseConfig { enabled: false },
     }
@@ -1153,7 +1044,7 @@ fn project_repository_readiness_at(
         .as_ref()
         .and_then(|auto_hunt| auto_hunt.workflow.as_ref())
         .cloned()
-        .unwrap_or_else(default_workflow);
+        .unwrap_or_else(repository_workflow_bootstrap);
     let runner = project_runner(&config, project_id, home)?;
     Ok(inspect_repository_readiness_on(
         runner.as_ref(),
@@ -3343,6 +3234,26 @@ fn project_auto_hunt_uses_velen(config_path: &Path, project_id: &str) -> Result<
         .is_some_and(|org| !org.trim().is_empty()))
 }
 
+fn project_auto_hunt_workflow_json(config_path: &Path, project_id: &str) -> Result<String, String> {
+    let config = read_cli_config(config_path)?;
+    let workflow = config
+        .projects
+        .iter()
+        .find(|project| project.id == project_id)
+        .and_then(|project| project.auto_hunt.as_ref())
+        .and_then(|auto_hunt| auto_hunt.workflow.as_ref())
+        .ok_or_else(|| "저장소 기반 워크플로우가 생성되지 않았습니다.".to_string())?;
+    if workflow
+        .stages
+        .iter()
+        .any(|stage| stage.id == "repository_workflow_pending")
+    {
+        return Err("저장소 기반 워크플로우가 생성되지 않았습니다.".to_string());
+    }
+    serde_json::to_string_pretty(workflow)
+        .map_err(|error| format!("프로젝트 워크플로우를 직렬화하지 못했습니다: {error}"))
+}
+
 fn project_chat_execution(
     full_access: bool,
     approval_policy: agent::ApprovalPolicy,
@@ -3374,7 +3285,7 @@ fn project_chat_execution(
 async fn start_project_auto_hunt(
     app: tauri::AppHandle,
     project_id: String,
-    request: agent::ProjectAutoHuntRequest,
+    mut request: agent::ProjectAutoHuntRequest,
 ) -> Result<agent::ProjectAutoHuntResponse, String> {
     let api_url = request.api_url.trim();
     if api_url.is_empty()
@@ -3405,13 +3316,15 @@ async fn start_project_auto_hunt(
         let (runner, workspace) =
             connected_project_workspace_on_host(&config_path, &project_id, &home)?;
         let settings = project_llm_settings_from(&config_path, &project_id)?;
-        if !app_provider_settings_from(&config_path)?.is_enabled(settings.provider) {
+        let provider = request.agent_provider;
+        if !app_provider_settings_from(&config_path)?.is_enabled(provider) {
             return Err(
                 "선택한 에이전트 프로바이더가 앱 설정에서 비활성화되어 있습니다.".to_string(),
             );
         }
         let execution_path = cli_execution_path(&home)?;
         let include_velen = project_auto_hunt_uses_velen(&config_path, &project_id)?;
+        request.workflow_json = project_auto_hunt_workflow_json(&config_path, &project_id)?;
         let cli_environment = agent::AutoHuntCliEnvironment::prepare_on_host(
             runner.clone(),
             &home,
@@ -3441,14 +3354,20 @@ async fn start_project_auto_hunt(
             None => Vec::new(),
         };
         let backend = agent::discover_backend(
-            settings.provider,
+            provider,
             runner,
             agent::AgentRunnerBundles {
                 claude: &claude_runner,
                 grok: &grok_runner,
             },
         )?;
-        let provider = settings.provider;
+        let model = request
+            .agent_model
+            .clone()
+            .filter(|value| !value.trim().is_empty());
+        let effort = (provider == settings.provider)
+            .then_some(settings.effort)
+            .flatten();
         let approve = |method: &str, params: &serde_json::Value| {
             let provider_name = provider.display_name();
             approval_app
@@ -3467,8 +3386,8 @@ async fn start_project_auto_hunt(
             &workspace,
             agent::AutoHuntExecution {
                 approval_policy: settings.approval_policy,
-                model: settings.model,
-                effort: settings.effort,
+                model,
+                effort,
                 event_sink,
                 environment: cli_environment.environment().to_vec(),
                 workspace_write_roots,
@@ -3728,7 +3647,6 @@ async fn connect_local_project(
             git_repository_root(Path::new(&repository_path))?
         };
         let remote = repository_remote_on(runner.as_ref(), &root);
-        infer_repository_checks_on(runner.as_ref(), &root, &mut auto_hunt.workflow);
         let workflow = auto_hunt.workflow.clone();
         let root_string = root
             .into_os_string()
@@ -4541,7 +4459,7 @@ branch refs/heads/briar/second-11111111
                     linear_source: None,
                     linear_team: None,
                     github_repository: None,
-                    workflow: default_workflow(),
+                    workflow: repository_workflow_bootstrap(),
                 },
             },
         )
@@ -4571,49 +4489,14 @@ branch refs/heads/briar/second-11111111
         assert_eq!(saved["projects"][1]["llm"]["approvalPolicy"], "never");
         assert_eq!(saved["projects"][1]["autoHunt"]["linear"]["enabled"], false);
         assert_eq!(
-            saved["projects"][1]["autoHunt"]["workflow"]["preset"],
-            "local"
-        );
-        assert_eq!(
             saved["projects"][1]["autoHunt"]["workflow"]["stages"]
                 .as_array()
                 .map(Vec::len),
-            Some(3)
+            Some(1)
         );
         assert!(saved["projects"][1]["autoHunt"]["linearEnabled"].is_null());
 
         fs::remove_dir_all(directory).expect("test config directory should be removed");
-    }
-
-    #[test]
-    fn infers_local_validation_commands_from_the_repository() {
-        let unique = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("clock should be after unix epoch")
-            .as_nanos();
-        let directory = std::env::temp_dir().join(format!("briar-workflow-test-{unique}"));
-        fs::create_dir_all(&directory).expect("test repository should be created");
-        fs::write(directory.join("bun.lock"), "").expect("bun lock should be written");
-        fs::write(
-            directory.join("package.json"),
-            r#"{"scripts":{"test":"vitest run","build":"vite build","lint":"eslint ."}}"#,
-        )
-        .expect("package manifest should be written");
-        let mut workflow = default_workflow();
-
-        let runner = host::LocalRunner::new(
-            std::env::var_os("PATH").unwrap_or_default(),
-            std::env::temp_dir(),
-        );
-        infer_repository_checks_on(&runner, &directory, &mut workflow);
-
-        let validation = workflow
-            .stages
-            .iter()
-            .find(|stage| stage.id == "local_qa")
-            .expect("local validation stage should exist");
-        assert_eq!(validation.checks, vec!["bun run test", "bun run build"]);
-        fs::remove_dir_all(directory).expect("test repository should be removed");
     }
 
     #[test]
@@ -4743,7 +4626,6 @@ branch refs/heads/briar/second-11111111
       "velenOrg": "wordbricks",
       "workflow": {
         "version": 1,
-        "preset": "local",
         "stages": [{"id":"analyzing","label":"Analyze","required":true}],
         "completion": {"requiredStages":["analyzing"]},
         "release": {"enabled":false}
@@ -4754,8 +4636,7 @@ branch refs/heads/briar/second-11111111
         )
         .expect("test config should be written");
 
-        let mut workflow = default_workflow();
-        workflow.preset = "custom".to_string();
+        let mut workflow = repository_workflow_bootstrap();
         workflow.stages = vec![WorkflowStageConfig {
             id: "repository_qa".to_string(),
             label: "Repository QA".to_string(),
@@ -4773,13 +4654,13 @@ branch refs/heads/briar/second-11111111
         )
         .expect("saved config should be json");
         assert_eq!(
-            saved["projects"][0]["autoHunt"]["workflow"]["preset"],
-            "custom"
-        );
-        assert_eq!(
             saved["projects"][0]["autoHunt"]["workflow"]["stages"][0]["checks"][0],
             "cargo test"
         );
+        let runtime_workflow = project_auto_hunt_workflow_json(&config_path, "project-1")
+            .expect("runtime workflow should load");
+        assert!(runtime_workflow.contains("repository_qa"));
+        assert!(runtime_workflow.contains("cargo test"));
 
         fs::remove_dir_all(directory).expect("test config directory should be removed");
     }
@@ -4900,7 +4781,7 @@ branch refs/heads/briar/second-11111111
 
     #[test]
     fn recognizes_pr_workflows_and_github_remotes() {
-        let mut workflow = default_workflow();
+        let mut workflow = repository_workflow_bootstrap();
         assert!(!workflow_requires_github(&workflow));
         workflow.stages.push(WorkflowStageConfig {
             id: "pr_open".to_string(),
@@ -5050,7 +4931,7 @@ branch refs/heads/briar/second-11111111
                     linear_source: None,
                     linear_team: None,
                     github_repository: Some("wordbricks/briar".to_string()),
-                    workflow: default_workflow(),
+                    workflow: repository_workflow_bootstrap(),
                 },
             },
         )
@@ -5190,7 +5071,7 @@ branch refs/heads/briar/second-11111111
                     linear_source: None,
                     linear_team: None,
                     github_repository: None,
-                    workflow: default_workflow(),
+                    workflow: repository_workflow_bootstrap(),
                 },
             },
         )
@@ -5420,7 +5301,7 @@ branch refs/heads/briar/second-11111111
                     linear_source: None,
                     linear_team: None,
                     github_repository: None,
-                    workflow: default_workflow(),
+                    workflow: repository_workflow_bootstrap(),
                 },
             },
         )
@@ -5489,7 +5370,7 @@ branch refs/heads/briar/second-11111111
                     linear_source: None,
                     linear_team: None,
                     github_repository: None,
-                    workflow: default_workflow(),
+                    workflow: repository_workflow_bootstrap(),
                 },
             },
         )

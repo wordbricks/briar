@@ -4,10 +4,10 @@ import briarIconSvg from "../../src-tauri/app-icon.svg";
 import {
   autoHuntRunStatuses,
   autoHuntSources,
-  autoHuntWorkflowPresets,
-  defaultAutoHuntWorkflow,
+  isRepositoryWorkflowPending,
   normalizeAutoHuntWorkflow,
   progressForAutoHuntRun,
+  repositoryWorkflowBootstrap,
   type AutoHuntRunStatus,
   type DashboardStage,
   type AutoHuntWorkflowStageId,
@@ -151,7 +151,6 @@ const workflowStageIdSchema = z
 const workflowSchema = z
   .object({
     version: z.literal(1),
-    preset: z.enum(autoHuntWorkflowPresets).optional(),
     stages: z
       .array(
         z
@@ -598,7 +597,7 @@ const projectSettingsSchema = z
       })
       .strict(),
     githubRepository: nullableTrimmed(300),
-    workflow: workflowSchema.default(defaultAutoHuntWorkflow),
+    workflow: workflowSchema.default(repositoryWorkflowBootstrap),
     automation: z
       .object({
         enabled: z.boolean(),
@@ -849,6 +848,7 @@ const projectAgentJson = (
     provider: row.provider,
     model: row.model,
     responsibility: copy.responsibility,
+    skill: row.skill_markdown,
     calendarColor: row.calendar_color,
     kind: row.kind,
     createdAt: row.created_at,
@@ -886,7 +886,9 @@ const projectAgentScheduleRunJson = (
     provider: row.agent_provider,
     model: row.agent_model,
     responsibility: row.agent_responsibility,
+    skill: row.agent_skill_markdown,
   },
+  workflow: normalizeAutoHuntWorkflow(JSON.parse(row.workflow_json)),
   status: row.status,
   scheduledFor: row.scheduled_for,
   leaseExpiresAt: row.lease_expires_at,
@@ -927,7 +929,7 @@ const settingsJson = (row: ProjectSettingsRow | null) => ({
   githubRepository: row?.github_repository ?? null,
   workflow: row?.workflow_json
     ? normalizeAutoHuntWorkflow(JSON.parse(row.workflow_json))
-    : structuredClone(defaultAutoHuntWorkflow),
+    : structuredClone(repositoryWorkflowBootstrap),
   automation: row?.auto_hunt_automation_json
     ? normalizeAutoHuntAutomation(JSON.parse(row.auto_hunt_automation_json))
     : structuredClone(defaultAutoHuntAutomation),
@@ -1441,6 +1443,16 @@ async function route(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
+    const settings = await getProjectSettings(db, project.id);
+    const workflow = normalizeAutoHuntWorkflow(
+      settings?.workflow_json ? JSON.parse(settings.workflow_json) : null,
+    );
+    if (isRepositoryWorkflowPending(workflow)) {
+      throw new HttpError(
+        409,
+        "Repository workflow has not been generated",
+      );
+    }
     const observedAt = new Date().toISOString();
     const claimToken = `briar_schedule_claim_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
     const run = await claimDueProjectAgentScheduleRun(db, project.id, {
@@ -1601,7 +1613,7 @@ async function route(
     const settings = await getProjectSettings(db, project.id);
     const workflow = settings?.workflow_json
       ? normalizeAutoHuntWorkflow(JSON.parse(settings.workflow_json))
-      : structuredClone(defaultAutoHuntWorkflow);
+      : structuredClone(repositoryWorkflowBootstrap);
     const firstStageId = workflow.stages[0]?.id ?? null;
     const workflowStageIds = new Set(workflow.stages.map((stage) => stage.id));
 

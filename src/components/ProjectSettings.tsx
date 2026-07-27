@@ -894,7 +894,7 @@ export function ProjectSettings({
                   <span>{t("settings.repository")}</span>
                   <strong>{githubRepository ?? t("settings.noRepository")}</strong>
                   <span className="project-workflow-version">
-                    {workflow?.preset ?? "custom"} · v{workflowContract.version}
+                    v{workflowContract.version}
                   </span>
                 </div>
                 <div className="project-workflow-diagram">

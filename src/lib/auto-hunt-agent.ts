@@ -1,4 +1,4 @@
-import type { HuntRun } from "../types";
+import type { HuntRun, ProjectAgent } from "../types";
 import { briarApiUrl } from "./api";
 import { maxAutoHuntIssuesLimit } from "./auto-hunt-automation";
 
@@ -68,6 +68,10 @@ export async function startProjectAutoHunt(
   projectId: string,
   issues: AutoHuntAgentIssue[],
   sessionId: string,
+  agent: Pick<
+    ProjectAgent,
+    "name" | "provider" | "model" | "responsibility" | "skill"
+  >,
 ): Promise<AutoHuntAgentResponse> {
   if (!isTauri()) {
     throw new Error("자동사냥은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
@@ -89,6 +93,11 @@ export async function startProjectAutoHunt(
     request: {
       sessionId,
       apiUrl: briarApiUrl,
+      agentName: agent.name,
+      agentProvider: agent.provider,
+      agentModel: agent.model,
+      responsibility: agent.responsibility,
+      skill: agent.skill,
       issues: issues.map((issue) => ({
         runId: issue.id,
         runNumber: issue.runNumber,

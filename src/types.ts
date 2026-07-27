@@ -135,6 +135,7 @@ export type ProjectAgent = {
   provider: AgentProvider;
   model: string | null;
   responsibility: string;
+  skill: string;
   calendarColor: string;
   kind: "auto_hunt" | "custom";
   createdAt: string;
@@ -184,8 +185,9 @@ export type ProjectAgentScheduleRun = {
   scheduleName: string;
   agent: Pick<
     ProjectAgent,
-    "id" | "name" | "provider" | "model" | "responsibility"
+    "id" | "name" | "provider" | "model" | "responsibility" | "skill"
   >;
+  workflow: AutoHuntWorkflow;
   status: "running" | "completed" | "failed";
   scheduledFor: string;
   leaseExpiresAt: string | null;

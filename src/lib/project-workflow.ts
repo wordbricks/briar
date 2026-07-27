@@ -106,6 +106,7 @@ Return only the JSON object required by the output schema.
 Rules:
 - Model the stages that an autonomous coding task actually needs in this repository.
 - Prefer these stable ids when they fit: analyzing, planning, implementing, reviewing, pr_open, local_qa, ci_qa, staging_qa, production_qa, monitoring.
+- Never use the reserved repository_workflow_pending stage id.
 - Custom snake_case ids are allowed only when the repository has a genuinely distinct step.
 - Use concise English labels so the stored workflow is portable across UI locales.
 - Include exact validation commands in checks only when they are supported by repository files.
@@ -139,8 +140,5 @@ export async function generateProjectWorkflow(
   if (!generated.success) {
     throw new Error("Codex가 생성한 워크플로우가 실행 계약을 충족하지 않습니다.");
   }
-  return normalizeAutoHuntWorkflow({
-    ...generated.data,
-    preset: "custom",
-  });
+  return normalizeAutoHuntWorkflow(generated.data);
 }

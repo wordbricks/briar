@@ -1,7 +1,8 @@
 import {
-  defaultAutoHuntWorkflow,
   isTerminalTrackerState,
+  isRepositoryWorkflowPending,
   normalizeAutoHuntWorkflow,
+  repositoryWorkflowBootstrap,
   type AutoHuntQaEnvironment,
   type AutoHuntQaStatus,
   type AutoHuntRunStatus,
@@ -18,6 +19,7 @@ import {
 import {
   defaultProjectAgentCalendarColor,
   defaultProjectAgentCopy,
+  projectAgentSkill,
 } from "../../src/lib/project-agent";
 import {
   nextProjectAgentScheduleRunAt,
@@ -74,6 +76,7 @@ export type ProjectAgentRow = {
   provider: ProjectAgentProvider;
   model: string | null;
   responsibility: string;
+  skill_markdown: string;
   calendar_color: string;
   kind: ProjectAgentKind;
   created_at: string;
@@ -112,6 +115,8 @@ export type ProjectAgentScheduleRunRow = {
   agent_provider: ProjectAgentProvider;
   agent_model: string | null;
   agent_responsibility: string;
+  agent_skill_markdown: string;
+  workflow_json: string;
   status: ProjectAgentScheduleRunStatus;
   scheduled_for: string;
   lease_expires_at: string | null;
@@ -290,7 +295,7 @@ export class HuntClaimError extends Error {}
 
 const stableJson = (value: unknown) => JSON.stringify(value);
 const parseWorkflow = (value: string | null | undefined) => {
-  if (!value) return structuredClone(defaultAutoHuntWorkflow);
+  if (!value) return structuredClone(repositoryWorkflowBootstrap);
   return normalizeAutoHuntWorkflow(JSON.parse(value) as AutoHuntWorkflow);
 };
 const normalizedUrls = (urls: string[]) => [...new Set(urls)].sort();
@@ -513,6 +518,10 @@ export async function createProject(
     provider: "codex",
     model: null,
     responsibility: defaultAgentCopy.responsibility,
+    skill_markdown: projectAgentSkill({
+      ...defaultAgentCopy,
+      kind: "auto_hunt",
+    }),
     calendar_color: defaultProjectAgentCalendarColor,
     kind: "auto_hunt",
     created_at: createdAt,
@@ -538,16 +547,21 @@ export async function createProject(
     db
       .prepare(
         `insert into briar_project_settings (
-           project_id, created_at, updated_at
-         ) values (?, ?, ?)`,
+           project_id, workflow_json, created_at, updated_at
+         ) values (?, ?, ?, ?)`,
       )
-      .bind(project.id, createdAt, createdAt),
+      .bind(
+        project.id,
+        stableJson(repositoryWorkflowBootstrap),
+        createdAt,
+        createdAt,
+      ),
     db
       .prepare(
         `insert into briar_project_agents (
            id, project_id, name, provider, model, responsibility,
-           calendar_color, created_at, updated_at, kind
-         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           skill_markdown, calendar_color, created_at, updated_at, kind
+         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         defaultAgent.id,
@@ -556,6 +570,7 @@ export async function createProject(
         defaultAgent.provider,
         defaultAgent.model,
         defaultAgent.responsibility,
+        defaultAgent.skill_markdown,
         defaultAgent.calendar_color,
         defaultAgent.created_at,
         defaultAgent.updated_at,
@@ -607,7 +622,7 @@ export async function deleteProject(
 export async function listProjectAgents(db: D1Database, projectId: string) {
   const result = await db
     .prepare(
-      `select id, project_id, name, provider, model, responsibility, calendar_color,
+      `select id, project_id, name, provider, model, responsibility, skill_markdown, calendar_color,
               kind, created_at, updated_at
        from briar_project_agents
        where project_id = ?
@@ -637,6 +652,11 @@ export async function createProjectAgent(
     provider: input.provider,
     model: input.model,
     responsibility: input.responsibility,
+    skill_markdown: projectAgentSkill({
+      name: input.name,
+      responsibility: input.responsibility,
+      kind: "custom",
+    }),
     calendar_color: input.calendarColor,
     kind: "custom",
     created_at: createdAt,
@@ -646,8 +666,8 @@ export async function createProjectAgent(
     .prepare(
       `insert into briar_project_agents (
          id, project_id, name, provider, model, responsibility,
-         calendar_color, created_at, updated_at, kind
-       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         skill_markdown, calendar_color, created_at, updated_at, kind
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       agent.id,
@@ -656,6 +676,7 @@ export async function createProjectAgent(
       agent.provider,
       agent.model,
       agent.responsibility,
+      agent.skill_markdown,
       agent.calendar_color,
       agent.created_at,
       agent.updated_at,
@@ -860,12 +881,15 @@ const scheduleRunSelect = `
          run.agent_id, agent.name as agent_name,
          agent.provider as agent_provider, agent.model as agent_model,
          agent.responsibility as agent_responsibility,
+         agent.skill_markdown as agent_skill_markdown,
+         settings.workflow_json,
          run.status, run.scheduled_for, run.lease_expires_at,
          run.started_at, run.completed_at, run.result_summary, run.error,
          run.created_at, run.updated_at
   from briar_project_agent_schedule_runs run
   join briar_project_agent_schedules schedule on schedule.id = run.schedule_id
-  join briar_project_agents agent on agent.id = run.agent_id`;
+  join briar_project_agents agent on agent.id = run.agent_id
+  join briar_project_settings settings on settings.project_id = run.project_id`;
 
 export async function listProjectAgentScheduleRuns(
   db: D1Database,
@@ -1171,11 +1195,24 @@ export async function updateProjectAgent(
   },
 ) {
   const updatedAt = new Date().toISOString();
+  const existing = await db
+    .prepare(
+      `select kind from briar_project_agents
+       where id = ? and project_id = ?`,
+    )
+    .bind(agentId, projectId)
+    .first<Pick<ProjectAgentRow, "kind">>();
+  if (!existing) return null;
+  const skill = projectAgentSkill({
+    name: input.name,
+    responsibility: input.responsibility,
+    kind: existing.kind,
+  });
   const result = await db
     .prepare(
       `update briar_project_agents
        set name = ?, provider = ?, model = ?, responsibility = ?,
-           calendar_color = ?, updated_at = ?
+           skill_markdown = ?, calendar_color = ?, updated_at = ?
        where id = ? and project_id = ?`,
     )
     .bind(
@@ -1183,6 +1220,7 @@ export async function updateProjectAgent(
       input.provider,
       input.model,
       input.responsibility,
+      skill,
       input.calendarColor,
       updatedAt,
       agentId,
@@ -1192,7 +1230,7 @@ export async function updateProjectAgent(
   if (result.meta.changes === 0) return null;
   return db
     .prepare(
-      `select id, project_id, name, provider, model, responsibility, calendar_color,
+      `select id, project_id, name, provider, model, responsibility, skill_markdown, calendar_color,
               kind, created_at, updated_at
        from briar_project_agents
        where id = ? and project_id = ?`,
@@ -1881,6 +1919,11 @@ export async function recordHuntEvent(
   const workflowSnapshot = existingRun
     ? parseWorkflow(existingRun.workflow_snapshot_json)
     : parseWorkflow((await getProjectSettings(db, projectId))?.workflow_json);
+  if (!existingRun && isRepositoryWorkflowPending(workflowSnapshot)) {
+    throw new HuntTransitionError(
+      "Repository workflow has not been generated for this project",
+    );
+  }
   if (
     normalizedInput.status === "running" &&
     (!normalizedInput.workflowStage ||
@@ -2647,6 +2690,11 @@ export async function importLinearHuntRuns(
 ): Promise<{ imported: number; skipped: number; failed: number }> {
   const settings = await getProjectSettings(db, projectId);
   const workflowSnapshot = parseWorkflow(settings?.workflow_json);
+  if (isRepositoryWorkflowPending(workflowSnapshot)) {
+    throw new HuntTransitionError(
+      "Repository workflow has not been generated for this project",
+    );
+  }
   const workflowStageIds = new Set(
     workflowSnapshot.stages.map((stage) => stage.id),
   );

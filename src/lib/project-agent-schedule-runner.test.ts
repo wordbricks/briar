@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ClaimedProjectAgentScheduleRun } from "../types";
+import { repositoryWorkflowBootstrap } from "./auto-hunt-contract";
 import {
   executeClaimedProjectAgentSchedule,
   pollProjectAgentSchedulesOnce,
@@ -17,7 +18,9 @@ const run: ClaimedProjectAgentScheduleRun = {
     provider: "codex",
     model: null,
     responsibility: "Audit the connected repository.",
+    skill: "# Auditor\n\nAudit the connected repository.",
   },
+  workflow: repositoryWorkflowBootstrap,
   status: "running",
   claimToken: `briar_schedule_claim_${"a".repeat(64)}`,
   scheduledFor: "2026-07-27T09:00:00.000Z",

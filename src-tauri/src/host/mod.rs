@@ -18,7 +18,6 @@ use std::{
 };
 
 pub(crate) use local::LocalRunner;
-pub(crate) use shell::shell_quote;
 
 pub(crate) use ssh::{
     parse_ssh_resolve_output, ssh_command, SshAuth, SshHost, SshResolvedTarget, SshRunner,

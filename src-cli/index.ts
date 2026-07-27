@@ -8,8 +8,7 @@ import packageJson from "../package.json";
 import {
   autoHuntRunStatuses,
   autoHuntSources,
-  autoHuntWorkflowPresets,
-  workflowForPreset,
+  repositoryWorkflowPendingStageId,
 } from "../src/lib/auto-hunt-contract";
 import {
   defaultWorkerLabel,
@@ -40,23 +39,24 @@ import { getSkillGuide, skillGuides } from "./skill-guides";
 
 const workflowStageIdSchema = z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/u);
 
-const workflowConfigSchema = z.object({
-  version: z.literal(1),
-  preset: z.enum(autoHuntWorkflowPresets).optional(),
-  stages: z.array(
-    z.object({
-      id: workflowStageIdSchema,
-      label: z.string().min(1),
-      required: z.boolean(),
-      evidence: z.array(z.string().min(1)).optional(),
-      checks: z.array(z.string().min(1)).optional(),
-    }),
-  ).min(1),
-  completion: z.object({
-    requiredStages: z.array(workflowStageIdSchema),
-  }).optional(),
-  release: z.object({ enabled: z.boolean() }).optional(),
-});
+const workflowConfigSchema = z
+  .object({
+    version: z.literal(1),
+    stages: z.array(
+      z.object({
+        id: workflowStageIdSchema,
+        label: z.string().min(1),
+        required: z.boolean(),
+        evidence: z.array(z.string().min(1)).optional(),
+        checks: z.array(z.string().min(1)).optional(),
+      }),
+    ).min(1),
+    completion: z.object({
+      requiredStages: z.array(workflowStageIdSchema),
+    }).optional(),
+    release: z.object({ enabled: z.boolean() }).optional(),
+  })
+  .strict();
 
 const worktreeConfigSchema = z
   .object({
@@ -489,7 +489,41 @@ function ensureConfiguredVelen(project?: ProjectConfig) {
   return { auth, org, linear };
 }
 
+function configuredWorkflow(project: ProjectConfig) {
+  const workflow = project.autoHunt?.workflow;
+  if (
+    !workflow ||
+    workflow.stages.some((stage) => stage.id === repositoryWorkflowPendingStageId)
+  ) {
+    throw new Error(
+      "저장소 기반 워크플로우가 아직 생성되지 않았습니다. Briar 앱에서 이 저장소 연결을 완료하세요.",
+    );
+  }
+  return workflow;
+}
+
 async function configureProject() {
+  const allowedOptions = new Set([
+    "--velen-org",
+    "--disable-velen",
+    "--data-source",
+    "--enable-linear",
+    "--linear-source",
+    "--linear-team",
+    "--disable-linear",
+    "--enable-worktrees",
+    "--disable-worktrees",
+    "--worktree-root",
+    "--branch-prefix",
+    "--enable-full-access",
+    "--disable-full-access",
+    "--i-understand-the-risk",
+    "--github-repository",
+  ]);
+  const unknownOption = args.slice(2).find(
+    (argument) => argument.startsWith("--") && !allowedOptions.has(argument),
+  );
+  if (unknownOption) throw new Error(`알 수 없는 옵션입니다: ${unknownOption}`);
   const config = await loadConfig();
   const project = await currentProject(config);
   const disableVelen = has("--disable-velen");
@@ -535,15 +569,7 @@ async function configureProject() {
             teamKey: value("--linear-team") ?? project.autoHunt?.linear?.teamKey,
           }
         : (project.autoHunt?.linear ?? { enabled: false }),
-    workflow: (() => {
-      const preset = value("--workflow-preset");
-      if (!preset) return project.autoHunt?.workflow ?? workflowForPreset("local");
-      const parsed = z.enum(autoHuntWorkflowPresets).parse(preset);
-      if (parsed === "custom") {
-        throw new Error("custom workflow must be configured in the Briar app");
-      }
-      return workflowForPreset(parsed);
-    })(),
+    workflow: configuredWorkflow(project),
     worktrees: {
       ...project.autoHunt?.worktrees,
       ...(has("--disable-worktrees") ? { enabled: false } : {}),
@@ -609,7 +635,7 @@ async function projectDoctor() {
       linearEnabled: project.autoHunt?.linear?.enabled ?? false,
       linearSource: project.autoHunt?.linear?.source ?? null,
       dataSource: project.autoHunt?.dataSource ?? null,
-      workflow: project.autoHunt?.workflow ?? workflowForPreset("local"),
+      workflow: configuredWorkflow(project),
       worktrees: {
         enabled: worktreesEnabled(project),
         root: projectWorktreeRoot(worktreeSettings(project).root, project.id),
@@ -634,7 +660,7 @@ async function showWorkflow() {
   console.log(
     JSON.stringify({
       projectId: project.id,
-      workflow: project.autoHunt?.workflow ?? workflowForPreset("local"),
+      workflow: configuredWorkflow(project),
     }),
   );
 }
@@ -1394,7 +1420,7 @@ const usage = `Briar CLI
   briar project configure [--velen-org <slug> | --disable-velen]
     [--data-source <provider://source>]
     [--enable-linear --linear-source <linear://source> --linear-team <key>]
-    [--disable-linear] [--workflow-preset <local|review|release|research>]
+    [--disable-linear]
     [--enable-worktrees|--disable-worktrees] [--worktree-root <dir>]
     [--branch-prefix <prefix>]
     [--enable-full-access --i-understand-the-risk | --disable-full-access]

@@ -1,3 +1,5 @@
+import type { AutoHuntWorkflow } from "./auto-hunt-contract";
+
 export type ProjectAgentLocale = "ko" | "en" | "zh";
 
 export const defaultProjectAgentCalendarColor = "#3275d5";
@@ -6,6 +8,10 @@ export const projectAgentCalendarColorPattern = /^#[0-9a-f]{6}$/iu;
 type DefaultProjectAgentCopy = {
   name: string;
   responsibility: string;
+};
+
+export type ProjectAgentSkillInput = DefaultProjectAgentCopy & {
+  kind: "auto_hunt" | "custom";
 };
 
 const defaultProjectAgentCopyByLocale: Record<
@@ -39,4 +45,48 @@ export function defaultProjectAgentCopy(
   locale: ProjectAgentLocale,
 ): DefaultProjectAgentCopy {
   return defaultProjectAgentCopyByLocale[locale];
+}
+
+export function projectAgentSkill({
+  name,
+  responsibility,
+  kind,
+}: ProjectAgentSkillInput) {
+  const execution = kind === "auto_hunt"
+    ? `- Load the installed \`briar-workflow\` guide with \`briar skills get briar-workflow\`.
+- Read the attached project workflow before claiming work.
+- Claim queued issues only through \`briar queue claim\` and follow each run's workflow snapshot in order.
+- Record every required stage and its evidence before completing a run.`
+    : `- Read the attached project workflow before acting.
+- Follow its required stages, checks, evidence, and completion rules when they apply.
+- Work only in the connected repository and report the observed result.`;
+  return `# ${name.trim()}
+
+## Responsibility
+
+${responsibility.trim()}
+
+## Execution
+
+${execution}
+`;
+}
+
+export function projectAgentRuntimeInstructions(input: {
+  skill: string;
+  workflow: AutoHuntWorkflow;
+  invocation: string;
+}) {
+  return `${input.invocation.trim()}
+
+## Agent skill
+
+${input.skill.trim()}
+
+## Project workflow
+
+Follow these stages in order. A claimed run's workflow snapshot overrides this project-level snapshot.
+
+${JSON.stringify(input.workflow, null, 2)}
+`;
 }

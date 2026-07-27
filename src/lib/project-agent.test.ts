@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   defaultProjectAgentCopy,
   normalizeProjectAgentLocale,
+  projectAgentRuntimeInstructions,
+  projectAgentSkill,
 } from "./project-agent";
 
 describe("default project agent copy", () => {
@@ -28,5 +30,52 @@ describe("default project agent copy", () => {
     expect(normalizeProjectAgentLocale("zh-CN")).toBe("zh");
     expect(normalizeProjectAgentLocale("en-US")).toBe("en");
     expect(normalizeProjectAgentLocale(null)).toBe("en");
+  });
+});
+
+describe("project agent skills", () => {
+  it("creates an Auto Hunt skill that delegates to the versioned workflow guide", () => {
+    const skill = projectAgentSkill({
+      ...defaultProjectAgentCopy("en"),
+      kind: "auto_hunt",
+    });
+
+    expect(skill).toContain("Perform Auto Hunt for every queued issue.");
+    expect(skill).toContain("briar skills get briar-workflow");
+    expect(skill).toContain("workflow snapshot");
+  });
+
+  it("creates a repository workflow skill for custom agents", () => {
+    const skill = projectAgentSkill({
+      name: "Auditor",
+      responsibility: "Audit the repository.",
+      kind: "custom",
+    });
+
+    expect(skill).toContain("# Auditor");
+    expect(skill).toContain("attached project workflow");
+    expect(skill).not.toContain("briar queue claim");
+  });
+
+  it("attaches the agent skill and ordered project workflow at invocation", () => {
+    const instructions = projectAgentRuntimeInstructions({
+      skill: "# Auditor\n\nAudit the repository.",
+      workflow: {
+        version: 1,
+        stages: [
+          { id: "analyzing", label: "Analyze", required: true },
+          { id: "local_qa", label: "Local QA", required: true },
+        ],
+        completion: { requiredStages: ["analyzing", "local_qa"] },
+        release: { enabled: false },
+      },
+      invocation: "Run the scheduled automation.",
+    });
+
+    expect(instructions).toContain("# Auditor");
+    expect(instructions.indexOf('"analyzing"')).toBeLessThan(
+      instructions.indexOf('"local_qa"'),
+    );
+    expect(instructions).toContain("workflow snapshot overrides");
   });
 });

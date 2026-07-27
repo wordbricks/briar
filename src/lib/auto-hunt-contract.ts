@@ -27,19 +27,9 @@ export const autoHuntWorkflowStageCatalog = [
   { id: "monitoring", label: "모니터링", tone: "emerald", evidence: ["monitoring"], checks: undefined },
 ] as const;
 
-export const autoHuntWorkflowPresets = [
-  "local",
-  "review",
-  "release",
-  "research",
-  "custom",
-] as const;
-
 export type AutoHuntSource = (typeof autoHuntSources)[number];
 export type AutoHuntRunStatus = (typeof autoHuntRunStatuses)[number];
 export type AutoHuntWorkflowStageId = string;
-export type AutoHuntWorkflowPreset =
-  (typeof autoHuntWorkflowPresets)[number];
 
 export type AutoHuntWorkflowStage = {
   id: AutoHuntWorkflowStageId;
@@ -51,7 +41,6 @@ export type AutoHuntWorkflowStage = {
 
 export type AutoHuntWorkflow = {
   version: 1;
-  preset: AutoHuntWorkflowPreset;
   stages: AutoHuntWorkflowStage[];
   completion: {
     requiredStages: AutoHuntWorkflowStageId[];
@@ -61,66 +50,41 @@ export type AutoHuntWorkflow = {
   };
 };
 
-type AutoHuntWorkflowInput = Omit<AutoHuntWorkflow, "preset" | "completion" | "release"> & {
-  preset?: AutoHuntWorkflowPreset;
+type AutoHuntWorkflowInput = Omit<AutoHuntWorkflow, "completion" | "release"> & {
   completion?: AutoHuntWorkflow["completion"];
   release?: AutoHuntWorkflow["release"];
-};
-
-const stageIdsForPreset: Record<
-  Exclude<AutoHuntWorkflowPreset, "custom">,
-  AutoHuntWorkflowStageId[]
-> = {
-  local: ["analyzing", "implementing", "local_qa"],
-  review: ["analyzing", "implementing", "pr_open", "ci_qa"],
-  release: [
-    "analyzing",
-    "implementing",
-    "pr_open",
-    "staging_qa",
-    "production_qa",
-  ],
-  research: ["analyzing", "planning", "reviewing"],
 };
 
 const catalogById: Map<string, (typeof autoHuntWorkflowStageCatalog)[number]> = new Map(
   autoHuntWorkflowStageCatalog.map((stage) => [stage.id, stage]),
 );
 
-export function workflowForPreset(
-  preset: Exclude<AutoHuntWorkflowPreset, "custom">,
-): AutoHuntWorkflow {
-  const stages = stageIdsForPreset[preset].map((id) => {
-    const stage = catalogById.get(id)!;
-    return {
-      id,
-      label: stage.label,
+/**
+ * Temporary contract used only before a repository has been connected and
+ * analyzed. Connected projects replace it before onboarding completes.
+ */
+export const repositoryWorkflowPendingStageId = "repository_workflow_pending";
+export const repositoryWorkflowBootstrap: AutoHuntWorkflow = {
+  version: 1,
+  stages: [
+    {
+      id: repositoryWorkflowPendingStageId,
+      label: "Repository workflow pending",
       required: true,
-      ...(stage.evidence ? { evidence: [...stage.evidence] } : {}),
-      ...(stage.checks ? { checks: [...stage.checks] } : {}),
-    };
-  });
-  return {
-    version: 1,
-    preset,
-    stages,
-    completion: { requiredStages: stages.map((stage) => stage.id) },
-    release: {
-      enabled: stages.some((stage) =>
-        ["staging_qa", "production_qa"].includes(stage.id),
-      ),
     },
-  };
-}
+  ],
+  completion: { requiredStages: [repositoryWorkflowPendingStageId] },
+  release: { enabled: false },
+};
 
-export const defaultAutoHuntWorkflow = workflowForPreset("local");
-export const legacyAutoHuntWorkflow = workflowForPreset("release");
+export const isRepositoryWorkflowPending = (workflow: AutoHuntWorkflow) =>
+  workflow.stages.some((stage) => stage.id === repositoryWorkflowPendingStageId);
 
 export function normalizeAutoHuntWorkflow(
   workflow: AutoHuntWorkflowInput | null | undefined,
 ): AutoHuntWorkflow {
   if (!workflow || workflow.version !== 1 || workflow.stages.length === 0) {
-    return structuredClone(defaultAutoHuntWorkflow);
+    return structuredClone(repositoryWorkflowBootstrap);
   }
   const seen = new Set<AutoHuntWorkflowStageId>();
   const stages = workflow.stages.flatMap((stage) => {
@@ -142,7 +106,7 @@ export function normalizeAutoHuntWorkflow(
       ...(checks?.length ? { checks } : {}),
     }];
   });
-  if (stages.length === 0) return structuredClone(defaultAutoHuntWorkflow);
+  if (stages.length === 0) return structuredClone(repositoryWorkflowBootstrap);
   const stageIds = new Set(stages.map((stage) => stage.id));
   const configuredRequiredStages = workflow.completion?.requiredStages.filter(
     (id) => stageIds.has(id),
@@ -152,7 +116,6 @@ export function normalizeAutoHuntWorkflow(
     : stages.filter((stage) => stage.required).map((stage) => stage.id);
   return {
     version: 1,
-    preset: workflow.preset ?? "custom",
     stages,
     completion: { requiredStages },
     release: {

@@ -11,6 +11,7 @@ import {
   updateProjectAgent,
   updateProjectAgentSchedule,
 } from "./api";
+import { repositoryWorkflowBootstrap } from "./auto-hunt-contract";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -48,6 +49,7 @@ describe("API errors", () => {
               provider: input.provider,
               model: input.model,
               responsibility: input.responsibility,
+              skill: "# Feedback agent\n\nAnalyze feedback.",
               createdAt: "2026-07-26T00:00:00.000Z",
               updatedAt: "2026-07-26T00:00:00.000Z",
             },
@@ -121,6 +123,7 @@ describe("API errors", () => {
                 model: null,
                 responsibility:
                   "모든 대기중인 이슈에 대해서 자동사냥을 수행하는것",
+                skill: "# 자동 사냥 에이전트\n\n자동사냥을 수행합니다.",
                 createdAt: "2026-07-26T00:00:00.000Z",
                 updatedAt: "2026-07-26T00:00:00.000Z",
               },
@@ -131,6 +134,7 @@ describe("API errors", () => {
                 provider: "grok",
                 model: null,
                 responsibility: "Analyze feedback.",
+                skill: "# Feedback agent\n\nAnalyze feedback.",
                 createdAt: "2026-07-26T00:00:00.000Z",
                 updatedAt: "2026-07-26T00:00:00.000Z",
               },
@@ -170,6 +174,7 @@ describe("API errors", () => {
                 provider: "codex",
                 model: null,
                 responsibility: "Unknown responsibility.",
+                skill: "# Unknown agent\n\nUnknown responsibility.",
                 kind: "unknown",
                 createdAt: "2026-07-26T00:00:00.000Z",
                 updatedAt: "2026-07-26T00:00:00.000Z",
@@ -321,7 +326,9 @@ describe("API errors", () => {
         provider: "codex",
         model: null,
         responsibility: "Audit the connected repository.",
+        skill: "# Repository auditor\n\nAudit the connected repository.",
       },
+      workflow: repositoryWorkflowBootstrap,
       status: "running",
       scheduledFor: "2026-07-27T09:00:00.000Z",
       leaseExpiresAt: "2026-07-27T11:00:00.000Z",
@@ -388,7 +395,9 @@ describe("API errors", () => {
         provider: "codex",
         model: null,
         responsibility: "Audit the connected repository.",
+        skill: "# Repository auditor\n\nAudit the connected repository.",
       },
+      workflow: repositoryWorkflowBootstrap,
       status: "completed",
       scheduledFor: "2026-07-27T09:00:00.000Z",
       leaseExpiresAt: null,
@@ -429,6 +438,7 @@ describe("API errors", () => {
               id: "11111111-1111-4111-8111-111111111111",
               projectId: "22222222-2222-4222-8222-222222222222",
               ...input,
+              skill: "# Release agent\n\n릴리스 상태를 점검합니다.",
               createdAt: "2026-07-26T00:00:00.000Z",
               updatedAt: "2026-07-27T00:00:00.000Z",
             },

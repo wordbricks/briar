@@ -8,7 +8,7 @@ import {
   selectAutoHuntCandidates,
   type AutoHuntAutomaticTrigger,
 } from "../lib/auto-hunt-automation";
-import type { HuntRun } from "../types";
+import type { HuntRun, ProjectAgent } from "../types";
 
 const storageKey = "briar.auto-hunt-sessions.v1";
 
@@ -149,9 +149,9 @@ export function useAutoHuntSessions(
   const startSession = useCallback((
     projectId: string,
     runs: HuntRun[],
-    onSettled?: () => void,
-    options?: {
-      agentId?: string;
+    onSettled: (() => void) | undefined,
+    options: {
+      agent: ProjectAgent;
       maxIssues?: number;
       trigger?: AutoHuntSession["trigger"];
     },
@@ -163,7 +163,7 @@ export function useAutoHuntSessions(
     }
     const candidates = selectAutoHuntCandidates(
       runs,
-      options?.maxIssues ?? defaultAutoHuntMaxIssues,
+      options.maxIssues ?? defaultAutoHuntMaxIssues,
     );
     if (candidates.length === 0) {
       throw new Error("대기 상태인 이슈가 없습니다.");
@@ -172,7 +172,7 @@ export function useAutoHuntSessions(
     const session: AutoHuntSession = {
       id: crypto.randomUUID(),
       projectId,
-      agentId: options?.agentId,
+      agentId: options.agent.id,
       status: "running",
       issues: candidates.map((run) => ({
         runId: run.id,
@@ -189,12 +189,12 @@ export function useAutoHuntSessions(
       summary: null,
       error: null,
       events: [event("started", startedAt)],
-      trigger: options?.trigger ?? { type: "manual", reasons: [] },
+      trigger: options.trigger ?? { type: "manual", reasons: [] },
     };
     sessionsRef.current = [session, ...sessionsRef.current];
     setSessions(sessionsRef.current);
 
-    void runner(projectId, candidates, session.id)
+    void runner(projectId, candidates, session.id, options.agent)
       .then((response) => {
         const completedAt = new Date().toISOString();
         setSessions((current) => current.map((candidate) =>

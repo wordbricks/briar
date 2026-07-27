@@ -2,7 +2,10 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { workflowForPreset } from "../../src/lib/auto-hunt-contract";
+import {
+  normalizeAutoHuntWorkflow,
+  repositoryWorkflowBootstrap,
+} from "../../src/lib/auto-hunt-contract";
 import type { HuntEventInput } from "./db";
 import {
   assertQueuedHuntClaim,
@@ -44,6 +47,25 @@ import {
   updateProjectAgentSchedule,
   updateOrganization,
 } from "./db";
+
+const releaseWorkflow = normalizeAutoHuntWorkflow({
+  version: 1,
+  stages: [
+    { id: "analyzing", label: "Analyze", required: true },
+    { id: "implementing", label: "Implement", required: true },
+    { id: "pr_open", label: "Pull request", required: true },
+    { id: "staging_qa", label: "Staging QA", required: true },
+    { id: "production_qa", label: "Production QA", required: true },
+  ],
+});
+const localWorkflow = normalizeAutoHuntWorkflow({
+  version: 1,
+  stages: [
+    { id: "analyzing", label: "Analyze", required: true },
+    { id: "implementing", label: "Implement", required: true },
+    { id: "local_qa", label: "Local validation", required: true },
+  ],
+});
 
 const projectId = "11111111-1111-4111-8111-111111111111";
 const baseTime = Date.parse("2026-07-21T00:00:00Z");
@@ -212,6 +234,14 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db,
       await readFile(resolve("migrations/0021_run_evidence.sql"), "utf8"),
     );
+    await executeSql(
+      db,
+      await readFile(resolve("migrations/0022_remove_workflow_presets.sql"), "utf8"),
+    );
+    await executeSql(
+      db,
+      await readFile(resolve("migrations/0023_project_agent_skills.sql"), "utf8"),
+    );
   });
 
   afterAll(async () => {
@@ -227,6 +257,15 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       .first<{ id: string; stage: string; status: string }>();
 
     expect(run).toMatchObject({ stage: "cancelled", status: "cancelled" });
+    expect(
+      JSON.parse((await getProjectSettings(db, projectId))!.workflow_json),
+    ).toEqual(repositoryWorkflowBootstrap);
+    expect(
+      JSON.parse(
+        (await getHuntRunForProject(db, projectId, run!.id))!
+          .workflow_snapshot_json,
+      ),
+    ).not.toHaveProperty("preset");
     expect(
       await db
         .prepare(
@@ -264,6 +303,9 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         provider: "codex",
         model: null,
         responsibility: "Perform Auto Hunt for every queued issue.",
+        skill_markdown: expect.stringContaining(
+          "briar skills get briar-workflow",
+        ),
         calendar_color: "#3275d5",
         kind: "auto_hunt",
       }),
@@ -285,6 +327,9 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       name: "Sentry 오류 탐지 에이전트",
       provider: "claude",
       model: "opus",
+      skill_markdown: expect.stringContaining(
+        "Sentry 오류를 분석해 이슈를 만들고 담당자에게 배정합니다.",
+      ),
       calendar_color: "#8b5cf6",
     });
     await expect(listProjectAgents(db, projectId)).resolves.toEqual(
@@ -423,6 +468,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       schedule_name: "Daily project audit",
       agent_provider: "codex",
       agent_responsibility: "Perform Auto Hunt for every queued issue.",
+      agent_skill_markdown: expect.stringContaining(
+        "briar skills get briar-workflow",
+      ),
+      workflow_json: JSON.stringify(repositoryWorkflowBootstrap),
       status: "running",
       scheduled_for: "2026-07-27T09:00:00.000Z",
     });
@@ -586,6 +635,9 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       provider: "claude",
       model: "sonnet",
       responsibility: "Coordinates release checks and reports the result.",
+      skill_markdown: expect.stringContaining(
+        "Coordinates release checks and reports the result.",
+      ),
       calendar_color: "#0f9f76",
       kind: "auto_hunt",
     });
@@ -611,7 +663,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       dataSource: null,
       linear: { enabled: false, source: null, teamKey: null },
       githubRepository: "example/repository",
-      workflow: workflowForPreset("release"),
+      workflow: releaseWorkflow,
     };
     await updateProjectSettings(db, projectId, {
       ...baseSettings,
@@ -789,6 +841,17 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         kind: "auto_hunt",
       }),
     ]);
+    const settings = await getProjectSettings(db, project.id);
+    expect(JSON.parse(settings!.workflow_json)).toEqual(
+      repositoryWorkflowBootstrap,
+    );
+    await expect(
+      recordHuntEvent(
+        db,
+        project.id,
+        event("queued", 12, { sourceKey: "workflow-pending" }),
+      ),
+    ).rejects.toThrow("Repository workflow has not been generated");
     await expect(deleteProject(db, project.id, "someone-else")).resolves.toBe(
       false,
     );
@@ -842,7 +905,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         `update briar_project_settings set workflow_json = ? where project_id = ?`,
       )
       .bind(
-        '{"version":1,"preset":"local","stages":[{"id":"analyzing","label":"분석","required":true},{"id":"implementing","label":"구현","required":true},{"id":"local_qa","label":"로컬 검증","required":true}]}',
+        JSON.stringify(localWorkflow),
         projectId,
       )
       .run();

@@ -209,6 +209,13 @@ describe("startProjectAutoHunt", () => {
         title: "settings 페이지 구현",
       }],
       "session-1",
+      {
+        name: "Auto Hunt agent",
+        provider: "codex",
+        model: null,
+        responsibility: "Perform Auto Hunt for every queued issue.",
+        skill: "# Auto Hunt agent\n\nUse `briar skills get briar-workflow`.",
+      },
     );
 
     expect(invoke).toHaveBeenCalledWith("start_project_auto_hunt", {
@@ -216,6 +223,11 @@ describe("startProjectAutoHunt", () => {
       request: {
         sessionId: "session-1",
         apiUrl: "http://127.0.0.1:8788",
+        agentName: "Auto Hunt agent",
+        agentProvider: "codex",
+        agentModel: null,
+        responsibility: "Perform Auto Hunt for every queued issue.",
+        skill: "# Auto Hunt agent\n\nUse `briar skills get briar-workflow`.",
         issues: [{
           runId: "run-1",
           runNumber: 13,
@@ -223,6 +235,44 @@ describe("startProjectAutoHunt", () => {
           title: "settings 페이지 구현",
         }],
       },
+    });
+  });
+
+  it("invokes the selected agent with its provider, model, and skill", async () => {
+    vi.stubGlobal("window", { __TAURI_INTERNALS__: {} });
+    invoke.mockResolvedValue({
+      conversationId: "briar:claude:project-local:thread-1",
+      workspaceRoot: "/repo",
+      result: { summary: "완료", issues: [] },
+    });
+
+    await startProjectAutoHunt(
+      "535a1867-ba4c-430f-9c11-ddd46513ec7f",
+      [{
+        id: "run-1",
+        runNumber: 13,
+        sourceKey: "issue-13",
+        title: "settings 페이지 구현",
+      }],
+      "session-2",
+      {
+        name: "Release hunter",
+        provider: "claude",
+        model: "sonnet",
+        responsibility: "Process every queued release issue.",
+        skill: "# Release hunter\n\nFollow the attached workflow.",
+      },
+    );
+
+    expect(invoke).toHaveBeenCalledWith("start_project_auto_hunt", {
+      projectId: "535a1867-ba4c-430f-9c11-ddd46513ec7f",
+      request: expect.objectContaining({
+        agentName: "Release hunter",
+        agentProvider: "claude",
+        agentModel: "sonnet",
+        responsibility: "Process every queued release issue.",
+        skill: "# Release hunter\n\nFollow the attached workflow.",
+      }),
     });
   });
 });
