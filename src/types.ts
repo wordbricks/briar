@@ -34,6 +34,7 @@ export type CreateIssueInput = {
   title: string;
   description: string | null;
   priority: number | null;
+  status: "backlog" | "queued";
   attachments: File[];
 };
 

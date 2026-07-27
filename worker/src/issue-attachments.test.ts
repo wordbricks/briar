@@ -7,6 +7,7 @@ const issueRequest = (file: File, declaredLength = file.size + 1024) => {
   form.set("title", "Screenshot issue");
   form.set("description", "Please inspect the attachment");
   form.set("priority", "2");
+  form.set("status", "backlog");
   form.append("attachments", file, file.name);
   return new Request("https://briar.example/projects/project/issues", {
     method: "POST",
@@ -25,11 +26,28 @@ describe("issue multipart input", () => {
       title: "Screenshot issue",
       description: "Please inspect the attachment",
       priority: 2,
+      status: "backlog",
     });
     expect(result.attachments).toHaveLength(1);
     expect(result.attachments[0]).toEqual(
       expect.objectContaining({ name: "screen.png", type: "image/png", size: 5 }),
     );
+  });
+
+  it("keeps queued as the default for JSON clients that omit status", async () => {
+    const result = await readIssueRequest(
+      new Request("https://briar.example/projects/project/issues", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: "Legacy issue client",
+          description: null,
+          priority: null,
+        }),
+      }),
+    );
+
+    expect(result.input.status).toBe("queued");
   });
 
   it("rejects unsupported media and oversized multipart bodies", async () => {
