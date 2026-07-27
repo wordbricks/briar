@@ -50,6 +50,36 @@ describe("AutoHuntSessions", () => {
     await act(async () => root.unmount());
   });
 
+  it("labels the manual action Run Now on an agent detail page", async () => {
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <AutoHuntSessions
+        agent={{
+          id: "agent-auto",
+          projectId: "project-1",
+          name: "Auto Hunt agent",
+          provider: "codex",
+          model: null,
+          responsibility: "Process queued issues.",
+          kind: "auto_hunt",
+          createdAt: "2026-07-22T00:00:00Z",
+          updatedAt: "2026-07-22T00:00:00Z",
+        }}
+        dashboard={dashboard}
+        error={null}
+        isSidebarOpen
+        onStart={() => "session-1"}
+        sessions={[]}
+      />,
+    ));
+
+    expect(
+      container.querySelector(".auto-hunt-start-button")?.textContent,
+    ).toContain("지금 실행");
+    await act(async () => root.unmount());
+  });
+
   it("opens session details as a page and returns to the session list", async () => {
     const session: AutoHuntSession = {
       id: "session-1",
