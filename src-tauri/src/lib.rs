@@ -808,10 +808,20 @@ fn cli_execution_path(home: &Path) -> Result<OsString, String> {
     let mut paths = vec![
         home.join(".local/bin"),
         home.join(".grok/bin"),
+        home.join("bin"),
         home.join(".bun/bin"),
         home.join(".cargo/bin"),
+        home.join(".volta/bin"),
+        home.join(".asdf/shims"),
+        home.join(".asdf/bin"),
+        home.join(".local/share/mise/shims"),
+        home.join(".mise/shims"),
+        home.join(".nodenv/shims"),
+        home.join(".nodenv/bin"),
         PathBuf::from("/opt/homebrew/bin"),
         PathBuf::from("/usr/local/bin"),
+        PathBuf::from("/usr/bin"),
+        PathBuf::from("/bin"),
     ];
     if let Some(existing) = env::var_os("PATH") {
         paths.extend(env::split_paths(&existing));
@@ -3998,6 +4008,29 @@ pub fn run() {
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[cfg(unix)]
+    #[test]
+    fn resolves_cli_tools_installed_through_mise_shims() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let home = tempfile::tempdir().expect("fixture home should exist");
+        let shims = home.path().join(".local/share/mise/shims");
+        fs::create_dir_all(&shims).expect("mise shims directory should exist");
+        let bun = shims.join("bun");
+        fs::write(&bun, "#!/bin/sh\nexit 0\n").expect("fixture Bun should be written");
+        fs::set_permissions(&bun, fs::Permissions::from_mode(0o700))
+            .expect("fixture Bun should be executable");
+
+        let resolved = which::which_in(
+            "bun",
+            Some(cli_execution_path(home.path()).expect("CLI PATH should resolve")),
+            home.path(),
+        )
+        .expect("Bun should resolve through the mise shim directory");
+
+        assert_eq!(resolved, bun);
+    }
 
     #[test]
     fn selects_an_issue_worktree_by_recorded_branch() {
