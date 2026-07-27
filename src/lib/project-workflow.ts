@@ -1,15 +1,24 @@
 import { z } from "zod";
 import {
+  autoHuntEvidenceTypeMaxLength,
+  autoHuntEvidenceTypePattern,
   normalizeAutoHuntWorkflow,
   type AutoHuntWorkflow,
 } from "./auto-hunt-contract";
 import { chatWithProjectLlm, type JsonSchema } from "./project-llm";
 
+const evidenceTypeSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(autoHuntEvidenceTypeMaxLength)
+  .regex(autoHuntEvidenceTypePattern);
+
 const workflowStageSchema = z.object({
   id: z.string().trim().min(1).max(64).regex(/^[a-z][a-z0-9_]*$/u),
   label: z.string().trim().min(1).max(80),
   required: z.boolean(),
-  evidence: z.array(z.string().trim().min(1).max(80)).max(20),
+  evidence: z.array(evidenceTypeSchema).max(20),
   checks: z.array(z.string().trim().min(1).max(300)).max(20),
 });
 
@@ -68,7 +77,12 @@ const workflowOutputSchema: JsonSchema = {
           evidence: {
             type: "array",
             maxItems: 20,
-            items: { type: "string", minLength: 1, maxLength: 80 },
+            items: {
+              type: "string",
+              pattern: autoHuntEvidenceTypePattern.source,
+              minLength: 1,
+              maxLength: autoHuntEvidenceTypeMaxLength,
+            },
           },
           checks: {
             type: "array",
@@ -110,7 +124,7 @@ Rules:
 - Custom snake_case ids are allowed only when the repository has a genuinely distinct step.
 - Use concise English labels so the stored workflow is portable across UI locales.
 - Include exact validation commands in checks only when they are supported by repository files.
-- Include evidence names that can be collected during that stage.
+- Include concise evidence names that can be collected during that stage. Evidence names are exact, opaque values and may contain spaces or slashes.
 - Return empty evidence or checks arrays when a stage has none; never omit those fields.
 - Mark a stage required only when every successful Auto Hunt task must complete it.
 - completion.requiredStages must contain exactly the ids marked required, in stage order.

@@ -2,6 +2,8 @@ import { z } from "zod";
 import briarMarkSvg from "../../src/assets/briar-mark.svg";
 import briarIconSvg from "../../src-tauri/app-icon.svg";
 import {
+  autoHuntEvidenceTypeMaxLength,
+  autoHuntEvidenceTypePattern,
   autoHuntRunStatuses,
   autoHuntSources,
   isRepositoryWorkflowPending,
@@ -161,6 +163,12 @@ const workflowStageIdSchema = z
   .string()
   .trim()
   .regex(/^[a-z][a-z0-9_-]{0,63}$/u);
+const evidenceTypeSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(autoHuntEvidenceTypeMaxLength)
+  .regex(autoHuntEvidenceTypePattern);
 const workflowSchema = z
   .object({
     version: z.literal(1),
@@ -172,7 +180,7 @@ const workflowSchema = z
             label: z.string().trim().min(1).max(80),
             required: z.boolean(),
             evidence: z
-              .array(z.string().trim().min(1).max(120))
+              .array(evidenceTypeSchema)
               .max(20)
               .optional(),
             checks: z
@@ -306,11 +314,11 @@ const eventSchema = z
     }
   });
 
-const evidenceSchema = z
+export const runEvidenceInputSchema = z
   .object({
     evidenceKey: z.string().trim().min(1).max(300),
     stage: workflowStageIdSchema,
-    type: z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/u),
+    type: evidenceTypeSchema,
     status: z.enum(["pending", "passed", "failed", "skipped"]),
     observedAt: z.string().datetime({ offset: true }),
     actor: z.string().trim().min(1).max(128),
@@ -2507,7 +2515,7 @@ async function route(
   }
   if (evidenceMatch && request.method === "POST") {
     const projectId = await requireAgentProject(db, request);
-    const parsed = evidenceSchema.parse(await readJson(request));
+    const parsed = runEvidenceInputSchema.parse(await readJson(request));
     try {
       const evidence = await recordRunEvidence(db, projectId, {
         runId: evidenceMatch[1],

@@ -65,7 +65,12 @@ const localWorkflow = normalizeAutoHuntWorkflow({
   stages: [
     { id: "analyzing", label: "Analyze", required: true },
     { id: "implementing", label: "Implement", required: true },
-    { id: "local_qa", label: "Local validation", required: true },
+    {
+      id: "local_qa",
+      label: "Local validation",
+      required: true,
+      evidence: ["signoff/app-worker", "local QA"],
+    },
   ],
 });
 const projectId = "11111111-1111-4111-8111-111111111111";
@@ -1147,7 +1152,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       ["analyzing", "velen", 33.1],
       ["analyzing", "repository", 33.2],
       ["implementing", "diff", 33.3],
-      ["local_qa", "test", 33.4],
+      ["local_qa", "signoff/app-worker", 33.4],
+      ["local_qa", "local QA", 33.5],
     ] as const) {
       await recordRunEvidence(db, projectId, {
         runId,
@@ -1156,7 +1162,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         type,
         status: "passed",
         detail: `${type} verified`,
-        command: type === "test" ? "bun run test" : null,
+        command: type === "local QA" ? "bun run test" : null,
         url: null,
         metadata: null,
         actor: "vitest",

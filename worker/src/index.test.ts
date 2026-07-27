@@ -4,9 +4,23 @@ import worker, {
   organizationUpdateInputSchema,
   projectAgentScheduleInputSchema,
   projectAgentScheduleRunCompletionSchema,
+  runEvidenceInputSchema,
 } from "./index";
 
 describe("Worker HTTP contract", () => {
+  it("accepts exact workflow evidence names containing spaces and slashes", () => {
+    expect(
+      runEvidenceInputSchema.parse({
+        evidenceKey: "LOCAL-1:local_qa:signoff",
+        stage: "local_qa",
+        type: "  signoff/app worker  ",
+        status: "passed",
+        observedAt: "2026-07-28T00:00:00.000Z",
+        actor: "briar-workflow",
+      }).type,
+    ).toBe("signoff/app worker");
+  });
+
   it("normalizes recurring agent schedule input", () => {
     expect(
       projectAgentScheduleInputSchema.parse({
