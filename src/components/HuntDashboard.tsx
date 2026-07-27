@@ -95,10 +95,12 @@ export function HuntDashboard({
   error,
   isCreatingIssue,
   needsLocalConnection = false,
+  noProject = false,
   recoveringRunId,
   recoveryError,
   isSidebarOpen,
   onConnectRepository,
+  onAddProject,
   onCreateIssue,
   onLoadAttachment,
   onLoadIssueMessages,
@@ -120,10 +122,12 @@ export function HuntDashboard({
   error: string | null;
   isCreatingIssue: boolean;
   needsLocalConnection?: boolean;
+  noProject?: boolean;
   recoveringRunId: string | null;
   recoveryError: string | null;
   isSidebarOpen: boolean;
   onConnectRepository?: () => void;
+  onAddProject?: () => void;
   onCreateIssue: (input: CreateIssueInput) => Promise<unknown>;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onLoadIssueMessages: (runId: string) => Promise<IssueMessage[]>;
@@ -282,6 +286,31 @@ export function HuntDashboard({
       ? columns.filter((column) => column.runs.length > 0)
       : columns;
   }, [companionMode, dashboard?.settings.workflow, filtered, status, t]);
+
+  if (noProject) {
+    return (
+      <main className="main-content" id="issues">
+        {!companionMode && (
+          <header
+            className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`}
+            data-tauri-drag-region="deep"
+          />
+        )}
+        <div className="project-empty">
+          <span aria-hidden="true">
+            <FolderGit2 size={24} />
+          </span>
+          <p className="eyebrow">{t("projectEmpty.eyebrow")}</p>
+          <h1>{t("projectEmpty.title")}</h1>
+          <p>{t("projectEmpty.description")}</p>
+          <button onClick={onAddProject} type="button">
+            <Plus size={15} />
+            {t("projectEmpty.createProject")}
+          </button>
+        </div>
+      </main>
+    );
+  }
 
   if (selected) {
     return (
