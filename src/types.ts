@@ -7,6 +7,7 @@ import {
   type AutoHuntWorkflowStageId,
 } from "./lib/auto-hunt-contract";
 import type { AutoHuntAutomation } from "./lib/auto-hunt-automation";
+import type { ProjectAgentCodexPet } from "./lib/codex-pets";
 import type { AgentProvider } from "./lib/project-llm";
 import type { ProjectAgentScheduleRecurrence } from "./lib/project-agent-schedule";
 
@@ -139,6 +140,7 @@ export type ProjectAgent = {
   projectId: string;
   name: string;
   avatar: string | null;
+  codexPet: ProjectAgentCodexPet | null;
   provider: AgentProvider;
   model: string | null;
   responsibility: string;
@@ -152,6 +154,7 @@ export type ProjectAgent = {
 export type CreateProjectAgentInput = {
   name: string | null;
   avatar?: string | null;
+  codexPet?: ProjectAgentCodexPet | null;
   provider: AgentProvider;
   model: string | null;
   responsibility: string;
@@ -183,8 +186,7 @@ export type CreateProjectAgentScheduleInput = {
   timeZone: string;
 };
 
-export type UpdateProjectAgentScheduleInput =
-  CreateProjectAgentScheduleInput;
+export type UpdateProjectAgentScheduleInput = CreateProjectAgentScheduleInput;
 
 export type ProjectAgentScheduleRun = {
   id: string;

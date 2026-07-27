@@ -12,7 +12,6 @@ beforeAll(() => {
     }
   ).IS_REACT_ACT_ENVIRONMENT = true;
 });
-
 describe("ProjectAgentSettings", () => {
   it("shows agent profile fields and the shared project runtime settings", async () => {
     const container = document.createElement("div");
@@ -23,6 +22,7 @@ describe("ProjectAgentSettings", () => {
       projectId: "project-1",
       name: "Auto Hunt agent",
       avatar: null,
+      codexPet: null,
       provider: "codex" as const,
       model: null,
       responsibility: "Process queued issues.",
@@ -59,6 +59,7 @@ describe("ProjectAgentSettings", () => {
     expect(
       container.querySelector('input[aria-label="이미지 업로드"]'),
     ).not.toBeNull();
+    expect(container.textContent).toContain("Codex Pet에서 선택");
     expect(
       container.querySelector(".project-agent-settings-fields .native-select"),
     ).toBeNull();

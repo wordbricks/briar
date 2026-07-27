@@ -67,7 +67,6 @@ const localWorkflow = normalizeAutoHuntWorkflow({
     { id: "local_qa", label: "Local validation", required: true },
   ],
 });
-
 const projectId = "11111111-1111-4111-8111-111111111111";
 const baseTime = Date.parse("2026-07-21T00:00:00Z");
 const atMinute = (minute: number) =>
@@ -246,6 +245,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await executeSql(
       db,
       await readFile(resolve("migrations/0024_project_agent_avatars.sql"), "utf8"),
+    );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0025_project_agent_codex_pets.sql"),
+        "utf8",
+      ),
     );
   });
 
@@ -627,9 +633,21 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
   it("updates a project agent only within its project", async () => {
     const current = (await listProjectAgents(db, projectId))[0];
     const avatar = "data:image/png;base64,aA==";
+    const codexPet = {
+      json: JSON.stringify({
+        slug: "firefly--lingxiaotian",
+        name: "Firefly",
+        author: "Lingxiaotian",
+        license: "CC BY-NC 4.0",
+        spriteVersion: 1,
+      }),
+      objectKey:
+        "project-agent-spritesheets/project/agent/firefly.webp",
+    };
     const updated = await updateProjectAgent(db, projectId, current.id, {
       name: "Release coordinator",
       avatar,
+      codexPet,
       provider: "claude",
       model: "sonnet",
       responsibility: "Coordinates release checks and reports the result.",
@@ -641,6 +659,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       project_id: projectId,
       name: "Release coordinator",
       avatar,
+      avatar_pet_json: codexPet.json,
+      avatar_spritesheet_object_key: codexPet.objectKey,
       provider: "claude",
       model: "sonnet",
       responsibility: "Coordinates release checks and reports the result.",

@@ -74,6 +74,8 @@ export type ProjectAgentRow = {
   project_id: string;
   name: string;
   avatar: string | null;
+  avatar_pet_json: string | null;
+  avatar_spritesheet_object_key: string | null;
   provider: ProjectAgentProvider;
   model: string | null;
   responsibility: string;
@@ -101,10 +103,7 @@ export type ProjectAgentScheduleRow = {
   updated_at: string;
 };
 
-export type ProjectAgentScheduleRunStatus =
-  | "running"
-  | "completed"
-  | "failed";
+export type ProjectAgentScheduleRunStatus = "running" | "completed" | "failed";
 
 export type ProjectAgentScheduleRunRow = {
   id: string;
@@ -518,6 +517,8 @@ export async function createProject(
     project_id: project.id,
     name: defaultAgentCopy.name,
     avatar: null,
+    avatar_pet_json: null,
+    avatar_spritesheet_object_key: null,
     provider: "codex",
     model: null,
     responsibility: defaultAgentCopy.responsibility,
@@ -625,7 +626,8 @@ export async function deleteProject(
 export async function listProjectAgents(db: D1Database, projectId: string) {
   const result = await db
     .prepare(
-      `select id, project_id, name, avatar, provider, model, responsibility, skill_markdown, calendar_color,
+      `select id, project_id, name, avatar, avatar_pet_json,
+              avatar_spritesheet_object_key, provider, model, responsibility, skill_markdown, calendar_color,
               kind, created_at, updated_at
        from briar_project_agents
        where project_id = ?
@@ -636,12 +638,31 @@ export async function listProjectAgents(db: D1Database, projectId: string) {
   return result.results;
 }
 
+export async function getProjectAgent(
+  db: D1Database,
+  projectId: string,
+  agentId: string,
+) {
+  return db
+    .prepare(
+      `select id, project_id, name, avatar, avatar_pet_json,
+              avatar_spritesheet_object_key, provider, model, responsibility,
+              skill_markdown, calendar_color, kind, created_at, updated_at
+       from briar_project_agents
+       where id = ? and project_id = ?`,
+    )
+    .bind(agentId, projectId)
+    .first<ProjectAgentRow>();
+}
+
 export async function createProjectAgent(
   db: D1Database,
   projectId: string,
   input: {
     name: string;
     avatar?: string | null;
+    avatarPetJson?: string | null;
+    avatarSpritesheetObjectKey?: string | null;
     provider: ProjectAgentProvider;
     model: string | null;
     responsibility: string;
@@ -654,6 +675,8 @@ export async function createProjectAgent(
     project_id: projectId,
     name: input.name,
     avatar: input.avatar ?? null,
+    avatar_pet_json: input.avatarPetJson ?? null,
+    avatar_spritesheet_object_key: input.avatarSpritesheetObjectKey ?? null,
     provider: input.provider,
     model: input.model,
     responsibility: input.responsibility,
@@ -670,15 +693,18 @@ export async function createProjectAgent(
   await db
     .prepare(
       `insert into briar_project_agents (
-         id, project_id, name, avatar, provider, model, responsibility,
+         id, project_id, name, avatar, avatar_pet_json,
+         avatar_spritesheet_object_key, provider, model, responsibility,
          skill_markdown, calendar_color, created_at, updated_at, kind
-       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       agent.id,
       agent.project_id,
       agent.name,
       agent.avatar,
+      agent.avatar_pet_json,
+      agent.avatar_spritesheet_object_key,
       agent.provider,
       agent.model,
       agent.responsibility,
@@ -1062,7 +1088,9 @@ export async function claimDueProjectAgentScheduleRun(
       dayOfWeek: schedule.day_of_week,
       timeZone: schedule.time_zone,
     },
-    new Date(Math.max(Date.parse(schedule.next_run_at), Date.parse(input.observedAt))),
+    new Date(
+      Math.max(Date.parse(schedule.next_run_at), Date.parse(input.observedAt)),
+    ),
   );
   const runId = crypto.randomUUID();
   await db.batch([
@@ -1195,6 +1223,10 @@ export async function updateProjectAgent(
   input: {
     name: string;
     avatar?: string | null;
+    codexPet?: {
+      json: string;
+      objectKey: string;
+    } | null;
     provider: ProjectAgentProvider;
     model: string | null;
     responsibility: string;
@@ -1219,6 +1251,9 @@ export async function updateProjectAgent(
     .prepare(
       `update briar_project_agents
        set name = ?, avatar = case when ? = 1 then ? else avatar end,
+           avatar_pet_json = case when ? = 1 then ? else avatar_pet_json end,
+           avatar_spritesheet_object_key =
+             case when ? = 1 then ? else avatar_spritesheet_object_key end,
            provider = ?, model = ?, responsibility = ?,
            skill_markdown = ?, calendar_color = ?, updated_at = ?
        where id = ? and project_id = ?`,
@@ -1227,6 +1262,10 @@ export async function updateProjectAgent(
       input.name,
       input.avatar === undefined ? 0 : 1,
       input.avatar ?? null,
+      input.codexPet === undefined ? 0 : 1,
+      input.codexPet ? input.codexPet.json : null,
+      input.codexPet === undefined ? 0 : 1,
+      input.codexPet ? input.codexPet.objectKey : null,
       input.provider,
       input.model,
       input.responsibility,
@@ -1240,7 +1279,8 @@ export async function updateProjectAgent(
   if (result.meta.changes === 0) return null;
   return db
     .prepare(
-      `select id, project_id, name, avatar, provider, model, responsibility, skill_markdown, calendar_color,
+      `select id, project_id, name, avatar, avatar_pet_json,
+              avatar_spritesheet_object_key, provider, model, responsibility, skill_markdown, calendar_color,
               kind, created_at, updated_at
        from briar_project_agents
        where id = ? and project_id = ?`,
@@ -1797,7 +1837,9 @@ const assertCompletionEligible = async (
       .bind(run.id, run.current_attempt)
       .all<{ workflow_stage: string; evidence_type: string }>();
     const accepted = new Set(
-      evidence.results.map((item) => `${item.workflow_stage}:${item.evidence_type}`),
+      evidence.results.map(
+        (item) => `${item.workflow_stage}:${item.evidence_type}`,
+      ),
     );
     const missingEvidence = requiredEvidence
       .filter((item) => !accepted.has(`${item.stage}:${item.type}`))

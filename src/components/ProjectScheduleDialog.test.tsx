@@ -12,6 +12,7 @@ const agent: ProjectAgent = {
   projectId: "22222222-2222-4222-8222-222222222222",
   name: "Auto Hunt agent",
   avatar: null,
+  codexPet: null,
   provider: "codex",
   model: null,
   responsibility: "Run the queued issue workflow.",

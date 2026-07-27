@@ -111,6 +111,7 @@ describe("ProjectSchedule", () => {
       projectId: demoDashboard.project.id,
       name: "Calendar agent",
       avatar: null,
+      codexPet: null,
       provider: "codex",
       model: null,
       responsibility: "Run calendar work.",

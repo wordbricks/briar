@@ -48,6 +48,7 @@ import {
   deleteProject,
   EventKeyConflictError,
   findProjectIdByAgentTokenHash,
+  getProjectAgent,
   getIssueAttachment,
   getOrganizationRole,
   isOrganizationHandleAvailable,
@@ -93,6 +94,11 @@ import {
   type OrganizationRole,
   type OrganizationRow,
 } from "./db";
+import {
+  codexPetSpriteSheetObjectKey,
+  fetchCodexPet,
+  type StoredCodexPet,
+} from "./codex-pets";
 import {
   fetchLinearIssuesForTeams,
   fetchLinearViewerAndTeams,
@@ -248,8 +254,16 @@ const eventSchema = z
       .max(20)
       .default([])
       .transform((urls) => [...new Set(urls)].sort()),
-    targetSha: z.string().regex(/^[0-9a-f]{7,64}$/u).nullable().optional(),
-    sourceCreatedAt: z.string().datetime({ offset: true }).nullable().optional(),
+    targetSha: z
+      .string()
+      .regex(/^[0-9a-f]{7,64}$/u)
+      .nullable()
+      .optional(),
+    sourceCreatedAt: z
+      .string()
+      .datetime({ offset: true })
+      .nullable()
+      .optional(),
     context: z.record(z.string(), z.unknown()).nullable().optional(),
   })
   .strict()
@@ -312,6 +326,15 @@ const projectAgentInputSchema = z
       .string()
       .max(400_000)
       .regex(/^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/]+={0,2}$/iu)
+      .nullable()
+      .optional(),
+    codexPet: z
+      .object({
+        slug: z
+          .string()
+          .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*(?:--[a-z0-9]+(?:-[a-z0-9]+)*)?$/u),
+      })
+      .strict()
       .nullable()
       .optional(),
     provider: z.enum(["codex", "claude", "grok"]),
@@ -866,6 +889,14 @@ const projectAgentJson = (
     projectId: row.project_id,
     name: copy.name,
     avatar: row.avatar,
+    codexPet: row.avatar_pet_json
+      ? {
+          ...(JSON.parse(row.avatar_pet_json) as StoredCodexPet),
+          spriteSheetUrl: row.avatar_spritesheet_object_key
+            ? `/projects/${row.project_id}/agents/${row.id}/spritesheet`
+            : null,
+        }
+      : null,
     provider: row.provider,
     model: row.model,
     responsibility: copy.responsibility,
@@ -1343,6 +1374,12 @@ async function route(
     );
     if (!project) throw new HttpError(404, "Project not found");
     const input = projectAgentInputSchema.parse(await readJson(request));
+    if (input.codexPet !== undefined) {
+      throw new HttpError(
+        400,
+        "Create the agent before selecting a Codex Pet avatar",
+      );
+    }
     const providerName =
       input.provider === "codex"
         ? "Codex"
@@ -1470,10 +1507,7 @@ async function route(
       settings?.workflow_json ? JSON.parse(settings.workflow_json) : null,
     );
     if (isRepositoryWorkflowPending(workflow)) {
-      throw new HttpError(
-        409,
-        "Repository workflow has not been generated",
-      );
+      throw new HttpError(409, "Repository workflow has not been generated");
     }
     const observedAt = new Date().toISOString();
     const claimToken = `briar_schedule_claim_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
@@ -1512,7 +1546,8 @@ async function route(
         observedAt: new Date().toISOString(),
       },
     );
-    if (!run) throw new HttpError(409, "Schedule run claim is no longer active");
+    if (!run)
+      throw new HttpError(409, "Schedule run claim is no longer active");
     return json({ run: projectAgentScheduleRunJson(run) });
   }
 
@@ -1539,7 +1574,8 @@ async function route(
         observedAt: new Date().toISOString(),
       },
     );
-    if (!run) throw new HttpError(409, "Schedule run claim is no longer active");
+    if (!run)
+      throw new HttpError(409, "Schedule run claim is no longer active");
     return json({ leaseExpiresAt: run.lease_expires_at });
   }
 
@@ -1551,27 +1587,132 @@ async function route(
     const project = await getProject(db, projectAgentMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
     const input = projectAgentInputSchema.parse(await readJson(request));
+    const existing = await getProjectAgent(
+      db,
+      project.id,
+      projectAgentMatch[2],
+    );
+    if (!existing) throw new HttpError(404, "Agent not found");
+    let nextCodexPet:
+      | {
+          json: string;
+          objectKey: string;
+        }
+      | null
+      | undefined;
+    if (input.codexPet === null) {
+      nextCodexPet = null;
+    } else if (input.codexPet) {
+      let fetched;
+      try {
+        fetched = await fetchCodexPet(input.codexPet.slug);
+      } catch {
+        throw new HttpError(
+          502,
+          "Could not download the Codex Pet sprite sheet",
+        );
+      }
+      const objectKey = codexPetSpriteSheetObjectKey(
+        project.id,
+        existing.id,
+        fetched.metadata.slug,
+      );
+      await attachmentsBucket.put(objectKey, fetched.spriteSheet, {
+        customMetadata: {
+          author: fetched.metadata.author,
+          license: fetched.metadata.license,
+          slug: fetched.metadata.slug,
+          source: "https://codexpet.top",
+          spriteVersion: String(fetched.metadata.spriteVersion),
+        },
+        httpMetadata: {
+          contentType: "image/webp",
+        },
+      });
+      nextCodexPet = {
+        json: JSON.stringify(fetched.metadata),
+        objectKey,
+      };
+    }
     const providerName =
       input.provider === "codex"
         ? "Codex"
         : input.provider === "claude"
           ? "Claude"
           : "Grok";
-    const agent = await updateProjectAgent(
+    let agent: ProjectAgentRow | null;
+    try {
+      agent = await updateProjectAgent(
+        db,
+        project.id,
+        projectAgentMatch[2],
+        {
+          name: input.name ?? `${providerName} Agent`,
+          avatar: input.avatar,
+          codexPet: nextCodexPet,
+          provider: input.provider,
+          model: input.model ?? null,
+          responsibility: input.responsibility,
+          calendarColor: input.calendarColor,
+        },
+      );
+    } catch (error) {
+      if (nextCodexPet?.objectKey) {
+        await attachmentsBucket
+          .delete(nextCodexPet.objectKey)
+          .catch(() => undefined);
+      }
+      throw error;
+    }
+    if (!agent) {
+      if (nextCodexPet?.objectKey) {
+        await attachmentsBucket.delete(nextCodexPet.objectKey);
+      }
+      throw new HttpError(404, "Agent not found");
+    }
+    if (
+      input.codexPet !== undefined &&
+      existing.avatar_spritesheet_object_key &&
+      existing.avatar_spritesheet_object_key !==
+        agent.avatar_spritesheet_object_key
+    ) {
+      await attachmentsBucket
+        .delete(existing.avatar_spritesheet_object_key)
+        .catch(() => undefined);
+    }
+    return json({ agent: projectAgentJson(agent) });
+  }
+
+  const projectAgentSpriteSheetMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/agents\/([0-9a-f-]+)\/spritesheet$/u,
+  );
+  if (projectAgentSpriteSheetMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      projectAgentSpriteSheetMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const agent = await getProjectAgent(
       db,
       project.id,
-      projectAgentMatch[2],
-      {
-        name: input.name ?? `${providerName} Agent`,
-        avatar: input.avatar,
-        provider: input.provider,
-        model: input.model ?? null,
-        responsibility: input.responsibility,
-        calendarColor: input.calendarColor,
-      },
+      projectAgentSpriteSheetMatch[2],
     );
-    if (!agent) throw new HttpError(404, "Agent not found");
-    return json({ agent: projectAgentJson(agent) });
+    if (!agent?.avatar_spritesheet_object_key) {
+      throw new HttpError(404, "Agent sprite sheet not found");
+    }
+    const object = await attachmentsBucket.get(
+      agent.avatar_spritesheet_object_key,
+    );
+    if (!object) throw new HttpError(404, "Agent sprite sheet not found");
+    const headers = new Headers(corsHeaders);
+    headers.set("Cache-Control", "private, max-age=300");
+    headers.set("Content-Length", String(object.size));
+    headers.set("Content-Type", "image/webp");
+    headers.set("ETag", object.httpEtag);
+    headers.set("X-Content-Type-Options", "nosniff");
+    return new Response(object.body, { headers });
   }
 
   const linearConnectMatch = pathname.match(
@@ -1870,9 +2011,10 @@ async function route(
     const issueId = crypto.randomUUID();
     const sourceKey = `briar-issue:${issueId}`;
     const occurredAt = new Date().toISOString();
-    const detail = input.status === "backlog"
-      ? "Briar 앱에서 생성된 이슈가 백로그에 추가되었습니다."
-      : "Briar 앱에서 생성된 이슈가 Auto Hunt 처리를 기다리고 있습니다.";
+    const detail =
+      input.status === "backlog"
+        ? "Briar 앱에서 생성된 이슈가 백로그에 추가되었습니다."
+        : "Briar 앱에서 생성된 이슈가 Auto Hunt 처리를 기다리고 있습니다.";
     const storedAttachments: Array<IssueAttachmentInput & { file: File }> =
       attachments.map((file) => {
         const id = crypto.randomUUID();
@@ -2001,17 +2143,12 @@ async function route(
     const project = await getProject(db, issueUpdateMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
     const input = issueUpdateInputSchema.parse(await readJson(request));
-    const run = await updateIssue(
-      db,
-      project.id,
-      issueUpdateMatch[2],
-      {
-        title: input.title,
-        description: input.description ?? null,
-        priority: input.priority ?? null,
-        updatedAt: new Date().toISOString(),
-      },
-    );
+    const run = await updateIssue(db, project.id, issueUpdateMatch[2], {
+      title: input.title,
+      description: input.description ?? null,
+      priority: input.priority ?? null,
+      updatedAt: new Date().toISOString(),
+    });
     if (!run) throw new HttpError(404, "Run not found");
     return json({
       runId: run.id,
@@ -2274,9 +2411,7 @@ async function route(
     return json({ runId: agentRecoveryMatch[1], ...result });
   }
 
-  const evidenceMatch = pathname.match(
-    /^\/runs\/([0-9a-f-]+)\/evidence$/u,
-  );
+  const evidenceMatch = pathname.match(/^\/runs\/([0-9a-f-]+)\/evidence$/u);
   if (evidenceMatch && request.method === "POST") {
     const projectId = await requireAgentProject(db, request);
     const parsed = evidenceSchema.parse(await readJson(request));
@@ -2328,7 +2463,10 @@ async function route(
       source,
       sourceKey,
       title,
-      stage: dashboardStageForProgress(parsed.status, parsed.workflowStage ?? null),
+      stage: dashboardStageForProgress(
+        parsed.status,
+        parsed.workflowStage ?? null,
+      ),
       workflowStage: parsed.workflowStage ?? null,
       occurredAt: new Date(parsed.occurredAt).toISOString(),
       detail: parsed.detail ?? null,

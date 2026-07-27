@@ -62,6 +62,17 @@ const projectAgentSchema = z.object({
     .regex(/^data:image\/(?:jpeg|png|webp);base64,/u)
     .nullable()
     .default(null),
+  codexPet: z
+    .object({
+      slug: z.string(),
+      name: z.string(),
+      author: z.string(),
+      license: z.string(),
+      spriteVersion: z.union([z.literal(1), z.literal(2)]),
+      spriteSheetUrl: z.string().nullable(),
+    })
+    .nullable()
+    .default(null),
   provider: z.enum(["codex", "claude", "grok"]),
   model: z.string().nullable(),
   responsibility: z.string(),
@@ -113,13 +124,15 @@ const projectAgentScheduleSchema = z.object({
 });
 const autoHuntWorkflowSchema: z.ZodType<AutoHuntWorkflow> = z.object({
   version: z.literal(1),
-  stages: z.array(z.object({
-    id: z.string(),
-    label: z.string(),
-    required: z.boolean(),
-    evidence: z.array(z.string()).optional(),
-    checks: z.array(z.string()).optional(),
-  })),
+  stages: z.array(
+    z.object({
+      id: z.string(),
+      label: z.string(),
+      required: z.boolean(),
+      evidence: z.array(z.string()).optional(),
+      checks: z.array(z.string()).optional(),
+    }),
+  ),
   completion: z.object({ requiredStages: z.array(z.string()) }),
   release: z.object({ enabled: z.boolean() }),
 });
@@ -148,9 +161,7 @@ const projectAgentScheduleRunSchema = z.object({
 const claimedProjectAgentScheduleRunSchema =
   projectAgentScheduleRunSchema.extend({
     status: z.literal("running"),
-    claimToken: z
-      .string()
-      .regex(/^briar_schedule_claim_[0-9a-f]{64}$/u),
+    claimToken: z.string().regex(/^briar_schedule_claim_[0-9a-f]{64}$/u),
   });
 const organizationSchema = z.object({
   id: z.string().uuid(),
@@ -418,10 +429,13 @@ export async function createProjectAgent(
     token,
     {
       method: "POST",
-      body: JSON.stringify(input),
+      body: JSON.stringify(projectAgentInputJson(input)),
     },
   );
-  return normalizeProjectAgent(projectAgentSchema.parse(result.agent), "custom");
+  return normalizeProjectAgent(
+    projectAgentSchema.parse(result.agent),
+    "custom",
+  );
 }
 
 export async function loadProjectAgentSchedules(
@@ -558,10 +572,50 @@ export async function updateProjectAgent(
     token,
     {
       method: "PUT",
-      body: JSON.stringify(input),
+      body: JSON.stringify(projectAgentInputJson(input)),
     },
   );
-  return normalizeProjectAgent(projectAgentSchema.parse(result.agent), "custom");
+  return normalizeProjectAgent(
+    projectAgentSchema.parse(result.agent),
+    "custom",
+  );
+}
+
+export async function loadProjectAgentSpriteSheet(
+  token: string,
+  projectId: string,
+  agentId: string,
+): Promise<Blob> {
+  if (!apiUrl) throw new Error("Briar API URL이 설정되지 않았습니다.");
+  const response = await fetch(
+    `${apiUrl}/projects/${encodeURIComponent(projectId)}/agents/${encodeURIComponent(agentId)}/spritesheet`,
+    {
+      headers: {
+        Accept: "image/webp",
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+  if (!response.ok) {
+    throw new ApiError(response.status, "Agent sprite sheet request failed");
+  }
+  const spriteSheet = await response.blob();
+  if (spriteSheet.type !== "image/webp") {
+    throw new Error("Invalid agent sprite sheet");
+  }
+  return spriteSheet;
+}
+
+function projectAgentInputJson(input: CreateProjectAgentInput) {
+  return {
+    ...input,
+    codexPet:
+      input.codexPet === undefined
+        ? undefined
+        : input.codexPet === null
+          ? null
+          : { slug: input.codexPet.slug },
+  };
 }
 
 export async function createIssue(

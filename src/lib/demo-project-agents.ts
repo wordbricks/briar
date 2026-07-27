@@ -18,6 +18,7 @@ export function demoProjectAgents(
       projectId,
       name: defaultAgent.name,
       avatar: null,
+      codexPet: null,
       provider: "codex",
       model: null,
       responsibility: defaultAgent.responsibility,
@@ -32,13 +33,15 @@ export function demoProjectAgents(
       projectId,
       name: "Sentry 오류 탐지 에이전트",
       avatar: null,
+      codexPet: null,
       provider: "claude",
       model: "opus",
       responsibility:
         "Sentry의 에러 내역들을 보고 issue를 만들어서 배정하는 에이전트",
       skill: projectAgentSkill({
         name: "Sentry 오류 탐지 에이전트",
-        responsibility: "Sentry의 에러 내역들을 보고 issue를 만들어서 배정하는 에이전트",
+        responsibility:
+          "Sentry의 에러 내역들을 보고 issue를 만들어서 배정하는 에이전트",
         kind: "custom",
       }),
       calendarColor: "#8b5cf6",
@@ -51,6 +54,7 @@ export function demoProjectAgents(
       projectId,
       name: "Feedback 분석 에이전트",
       avatar: null,
+      codexPet: null,
       provider: "grok",
       model: "grok-4.5",
       responsibility:
