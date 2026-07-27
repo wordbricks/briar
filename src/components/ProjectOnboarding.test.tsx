@@ -14,6 +14,7 @@ const baseProps = {
   onConnect: async () => undefined,
   onCreate: async () => undefined,
   onLogout: () => undefined,
+  onSkip: () => undefined,
   onRepositorySelect: async () => null,
   onRepositoryInspect: async (repositoryPath: string) => ({
     repositoryPath,
@@ -103,7 +104,32 @@ describe("ProjectOnboarding", () => {
     const markup = renderToStaticMarkup(<ProjectOnboarding {...baseProps} />);
 
     expect(markup).toContain("프로젝트 만들기");
+    expect(markup).toContain("나중에 만들기");
     expect(markup).not.toContain("대시보드로 돌아가기");
+  });
+
+  it("lets first-time users continue without creating a project", async () => {
+    const { container, root } = mountOnboarding();
+    const onCreate = vi.fn().mockResolvedValue(undefined);
+    const onSkip = vi.fn();
+
+    await act(async () =>
+      root.render(
+        <ProjectOnboarding
+          {...baseProps}
+          onCreate={onCreate}
+          onSkip={onSkip}
+        />,
+      ),
+    );
+
+    await act(async () => buttonWithText(container, "나중에 만들기")?.click());
+
+    expect(onSkip).toHaveBeenCalledOnce();
+    expect(onCreate).not.toHaveBeenCalled();
+
+    await act(async () => root.unmount());
+    container.remove();
   });
 
   it("offers both an existing repository and a from-scratch start", () => {
@@ -114,6 +140,7 @@ describe("ProjectOnboarding", () => {
     expect(markup).toContain("기존 저장소 연결");
     expect(markup).toContain("처음부터 시작");
     expect(markup).toContain("저장소 선택");
+    expect(markup).not.toContain("나중에 만들기");
   });
 
   it("names a project after the repository it connects", async () => {

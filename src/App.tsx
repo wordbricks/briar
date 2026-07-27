@@ -42,6 +42,10 @@ import {
   markInitialOnboardingComplete,
 } from "./lib/initial-onboarding";
 import {
+  hasDeferredProjectOnboarding,
+  markProjectOnboardingDeferred,
+} from "./lib/project-onboarding";
+import {
   getMobilePlatform,
   isDesktopTauri,
   isMacDesktopTauri,
@@ -85,6 +89,10 @@ export function App() {
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(
     hasCompletedInitialOnboarding,
   );
+  const [
+    deferredProjectOnboardingUserId,
+    setDeferredProjectOnboardingUserId,
+  ] = useState<string | null>(null);
   const {
     current: activePage,
     canGoBack,
@@ -113,6 +121,10 @@ export function App() {
   const activeProject = briar.projects.find(
     (project) => project.id === briar.activeProjectId,
   );
+  const hasDeferredFirstProject =
+    briar.user !== null &&
+    (deferredProjectOnboardingUserId === briar.user.id ||
+      hasDeferredProjectOnboarding(briar.user.id));
   const settingsOrganization = briar.organizations.find(
     (organization) => organization.id === organizationSettingsTarget?.id,
   );
@@ -282,13 +294,13 @@ export function App() {
     );
   } else if (
     !briar.companionMode &&
-    (briar.projects.length === 0 ||
+    ((briar.projects.length === 0 && !hasDeferredFirstProject) ||
       briar.isCreatingProject ||
       briar.projectConnection)
   ) {
     content = (
       <ProjectOnboarding
-        canCancel={briar.projects.length > 0}
+        canCancel={briar.projects.length > 0 || hasDeferredFirstProject}
         connection={briar.projectConnection}
         error={briar.error}
         loading={briar.loading}
@@ -308,6 +320,12 @@ export function App() {
         }}
         onCreate={briar.addProject}
         onLogout={() => void briar.logout()}
+        onSkip={() => {
+          markProjectOnboardingDeferred(briar.user!.id);
+          setDeferredProjectOnboardingUserId(briar.user!.id);
+          briar.cancelProjectCreation();
+          resetNavigation("issues");
+        }}
         onRepositorySelect={briar.selectProjectRepository}
         onRepositoryInspect={briar.inspectProjectRepository}
         onWorkspaceCreate={briar.createProjectRepository}
@@ -550,11 +568,13 @@ export function App() {
             error={briar.error}
             isCreatingIssue={briar.isCreatingIssue}
             needsLocalConnection={!briar.isActiveProjectConnectedLocally}
+            noProject={!activeProject}
             recoveringRunId={briar.recoveringRunId}
             recoveryError={briar.recoveryError}
             requestedRunId={requestedRunId}
             isSidebarOpen={isSidebarOpen}
             onConnectRepository={briar.reconnectProject}
+            onAddProject={briar.startProjectCreation}
             onCreateIssue={briar.addIssue}
             onLoadAttachment={briar.readIssueAttachment}
             onLoadIssueMessages={briar.readIssueMessages}
