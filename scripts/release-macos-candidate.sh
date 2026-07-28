@@ -11,8 +11,9 @@ usage() {
 Usage: scripts/release-macos-candidate.sh [--force]
 
 Builds the ad-hoc macOS release candidate when release, signing, packaging, or
-bundle configuration changed since BRIAR_PREVIOUS_VERSION. Use --force to run
-the full candidate regardless of the change-impact gate.
+bundle configuration changed since BRIAR_PREVIOUS_VERSION. Routine releases
+use this automatic gate. Use --force only to test release-pipeline changes
+regardless of the detected impact.
 EOF
 }
 

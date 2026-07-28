@@ -102,9 +102,11 @@ version and commit at the signed tag. Any missing, extra, modified, or
 wrong-commit artifact fails closed.
 
 `--publish` is required for every GitHub and R2 publication. Publication
-creates a draft GitHub Release, uploads immutable versioned files to the private
-R2 bucket, verifies the public updater archive, publishes the GitHub Release,
-and promotes `releases/latest.json` last.
+creates a draft GitHub Release, uploads immutable versioned files to GitHub and
+the private R2 bucket with four concurrent workers, verifies the public updater
+archive, publishes the GitHub Release, and promotes `releases/latest.json`
+last. Set `BRIAR_RELEASE_UPLOAD_CONCURRENCY` to an integer from 1 through 8 to
+adjust the worker count when diagnosing a provider-side upload issue.
 
 Promotion is fail-closed. The mutable update manifest is the final write, so a
 partial build cannot be offered to installed clients. Versioned R2 objects

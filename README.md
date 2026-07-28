@@ -295,6 +295,11 @@ again and publish all four required statuses:
 bun run ci:signoff
 ```
 
+`ci:signoff` includes the typecheck and all other local checks, runs its four
+independent contexts concurrently, and is the only validation command needed
+after the release commit is pushed. Do not run a separate `bun run check`
+immediately before it.
+
 Pass one or more context names to run or sign off only those phases, for
 example `scripts/ci-local.sh security --signoff`. Release candidates and
 Production releases also run locally:
@@ -313,13 +318,16 @@ Public signing and publishing identifiers live in `config/release.env`.
 
 The candidate command skips its expensive ad-hoc bundle build when the diff
 from `BRIAR_PREVIOUS_VERSION` contains no release, signing, packaging, updater,
-dependency, or bundle-configuration changes; pass `-- --force` to override the
-gate. Candidate and Production builds share a locked Cargo target cache across
-worktrees.
+dependency, or bundle-configuration changes. Routine releases must use this
+automatic gate; reserve `-- --force` for testing changes to the release
+pipeline itself. Candidate and Production builds share a locked Cargo target
+cache across worktrees.
 
 The first Production command builds, signs, notarizes, and verifies the local
 artifacts once. The second command only revalidates and publishes those exact
-files. It does not rebuild, resign, or renotarize them, and only mutates GitHub
-and R2 when `--publish` is explicit.
+files. It uploads immutable GitHub and R2 artifacts concurrently, promotes
+`latest.json` only after every versioned upload succeeds, does not rebuild,
+resign, or renotarize, and only mutates GitHub and R2 when `--publish` is
+explicit.
 See [the local Production release runbook](docs/operations/production-release.md)
 for host, credential, signed-tag, and rollback requirements.
