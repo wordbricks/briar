@@ -22,6 +22,18 @@ describe("full-width application pages", () => {
     );
   });
 
+  it("uses the full project-agent area for sessions", () => {
+    expect(styles).toMatch(
+      /\.project-agent-run-scroll \{[^}]*display:flex;[^}]*flex-direction:column;[^}]*overflow:hidden;/,
+    );
+    expect(styles).toMatch(
+      /\.project-agent-run-hero \{[^}]*flex:0 0 auto;/,
+    );
+    expect(styles).toMatch(
+      /\.project-agent-session-panel \{[^}]*width:100%;[^}]*min-height:0;[^}]*flex:1;[^}]*margin:0;[^}]*border:0;[^}]*border-radius:0;[^}]*box-shadow:none;/,
+    );
+  });
+
   it("uses the Inbox parent area instead of a centered card", () => {
     expect(styles).toMatch(
       /\.inbox-scroll \{[^}]*padding:0;[^}]*display:flex;[^}]*overflow:hidden;/,
