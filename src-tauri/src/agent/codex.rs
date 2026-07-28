@@ -776,7 +776,7 @@ pub(crate) fn run_project_agent_with(
             message: request.message,
             conversation_id: request.conversation_id,
             instructions: Some(format!(
-                "Run as the saved project agent `{}`.\n\n## Responsibility\n\n{}\n\n## Agent skill\n\n{}\n\n## Project workflow\n\n{}\n\nHandle the user's request in this single agent conversation. Do not claim queue work or create an issue worktree yourself. If and only if the user explicitly asks to start Auto Hunt or process queued issues through Auto Hunt, return `dispatch_auto_hunt` without running queue, Git, or repository commands; the trusted Briar host runtime will perform the dispatch. A request merely mentioning or discussing an issue is not an Auto Hunt request. For every other request, choose `respond`, complete the work in this session, and report both the user-facing message and a structured result. Set humanActionRequired only when a person must decide or act, and provide the exact nextAction. Use immediate urgency only when delay increases material risk. Return only the required JSON.",
+                "Run as the saved project agent `{}`.\n\n## Responsibility\n\n{}\n\n## Agent skill\n\n{}\n\n## Project workflow\n\n{}\n\nHandle the user's request in this single agent conversation. Do not claim queue work or create an issue worktree yourself. If and only if the user explicitly asks to start Auto Hunt or process queued issues through Auto Hunt, return `dispatch_auto_hunt` without running queue, Git, or repository commands; the trusted Briar host runtime will perform the dispatch. For `dispatch_auto_hunt`, set `structuredResult` to null because no work has completed yet. A request merely mentioning or discussing an issue is not an Auto Hunt request. For every other request, choose `respond`, complete the work in this session, and report both the user-facing message and a structured result. Set humanActionRequired only when a person must decide or act, and provide the exact nextAction. Use immediate urgency only when delay increases material risk. Return only the required JSON.",
                 request.agent_name,
                 request.responsibility,
                 request.skill,
@@ -802,16 +802,14 @@ pub(crate) fn run_project_agent_with(
     if decision.action == ProjectAgentRunAction::Respond && decision.max_issues.is_some() {
         return Err("일반 응답에는 자동사냥 처리 건수를 지정할 수 없습니다.".to_string());
     }
-    if decision.action == ProjectAgentRunAction::Respond && decision.structured_result.is_none() {
+    let structured_result = match decision.action {
+        ProjectAgentRunAction::Respond => decision.structured_result,
+        ProjectAgentRunAction::DispatchAutoHunt => None,
+    };
+    if decision.action == ProjectAgentRunAction::Respond && structured_result.is_none() {
         return Err("일반 응답에는 구조화된 실행 결과가 필요합니다.".to_string());
     }
-    if decision.action == ProjectAgentRunAction::DispatchAutoHunt
-        && decision.structured_result.is_some()
-    {
-        return Err("자동사냥 요청은 실행 전 결과를 제출할 수 없습니다.".to_string());
-    }
-    if decision
-        .structured_result
+    if structured_result
         .as_ref()
         .is_some_and(|result| result.human_action_required && result.next_action.is_none())
     {
@@ -823,7 +821,7 @@ pub(crate) fn run_project_agent_with(
         action: decision.action,
         message: decision.message,
         max_issues: decision.max_issues,
-        structured_result: decision.structured_result,
+        structured_result,
     })
 }
 
@@ -1644,6 +1642,7 @@ mod tests {
             assert!(request.instructions.as_deref().is_some_and(|instructions| {
                 instructions.contains("If and only if the user explicitly asks")
                     && instructions.contains("Do not claim queue work")
+                    && instructions.contains("set `structuredResult` to null")
             }));
             assert_eq!(
                 request
@@ -1665,6 +1664,25 @@ mod tests {
             Ok(ProjectLlmResponse {
                 conversation_id: "briar:project-1:initial-coordinator".to_string(),
                 message: message.to_string(),
+                workspace_root: workspace_root.to_string_lossy().into_owned(),
+            })
+        }
+    }
+
+    struct PrematureAutoHuntResultBackend;
+
+    impl AgentBackend for PrematureAutoHuntResultBackend {
+        fn run(
+            &self,
+            _project_id: &str,
+            workspace_root: &Path,
+            _execution: ChatExecution,
+            _request: ProjectLlmRequest,
+            _approve: &dyn Fn(&str, &Value) -> bool,
+        ) -> Result<ProjectLlmResponse, String> {
+            Ok(ProjectLlmResponse {
+                conversation_id: "briar:project-1:auto-hunt-coordinator".to_string(),
+                message: r#"{"action":"dispatch_auto_hunt","message":"Dispatch Auto Hunt for the top 2 queued issues.","maxIssues":2,"structuredResult":{"summary":"Requested trusted Briar host runtime to process the top 2 queued issues through Auto Hunt.","outcome":"completed","importance":"important","urgency":"normal","impact":"project","humanActionRequired":false,"nextAction":null,"dueAt":null}}"#.to_string(),
                 workspace_root: workspace_root.to_string_lossy().into_owned(),
             })
         }
@@ -2093,6 +2111,43 @@ mod tests {
             response.conversation_id,
             "briar:project-1:initial-coordinator"
         );
+    }
+
+    #[test]
+    fn auto_hunt_ignores_a_premature_structured_result() {
+        let response = run_project_agent_with(
+            &PrematureAutoHuntResultBackend,
+            "project-1",
+            Path::new("/repo"),
+            ChatExecution {
+                approval_policy: ApprovalPolicy::OnRequest,
+                sandbox_mode: SandboxMode::WorkspaceWrite,
+                network_access: true,
+                model: Some("gpt-5.6-sol".to_string()),
+                effort: Some(ModelEffort::High),
+                event_sink: None,
+                environment: Vec::new(),
+                workspace_write_roots: Vec::new(),
+            },
+            r#"{"stages":[]}"#,
+            ProjectAgentRunRequest {
+                session_id: "session-1".to_string(),
+                agent_id: "agent-1".to_string(),
+                agent_name: "Coordinator".to_string(),
+                agent_provider: AgentProviderKind::Codex,
+                agent_model: Some("gpt-5.6-sol".to_string()),
+                responsibility: "Handle user work".to_string(),
+                skill: "# Coordinator".to_string(),
+                message: "Auto Hunt로 대기 이슈 2개를 처리해 줘".to_string(),
+                conversation_id: None,
+            },
+            &|_, _| false,
+        )
+        .expect("Auto Hunt dispatch should tolerate an early result");
+
+        assert_eq!(response.action, ProjectAgentRunAction::DispatchAutoHunt);
+        assert_eq!(response.max_issues, Some(2));
+        assert!(response.structured_result.is_none());
     }
 
     #[test]
