@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, Check, Languages, Palette, UserRound } from "lucide-react";
+import {
+  ArrowLeft,
+  Bell,
+  Check,
+  Languages,
+  Palette,
+  UserRound,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,6 +23,7 @@ import {
   type AppIconName,
 } from "../lib/app-icon";
 import type { SessionUser } from "../types";
+import { InboxNotificationSettings } from "./InboxNotificationSettings";
 
 export function CompanionSettings({
   onBack,
@@ -161,6 +169,19 @@ export function CompanionSettings({
             {t("companion.appIconError")}
           </Typography>
         ) : null}
+      </section>
+
+      <section className="mb-7 grid gap-3">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Bell aria-hidden="true" size={19} />
+          <Typography as="h2" variant="bodyLg">
+            {t("notifications.title")}
+          </Typography>
+        </div>
+        <Typography tone="muted" variant="bodySm">
+          {t("notifications.description")}
+        </Typography>
+        <InboxNotificationSettings />
       </section>
 
       <section className="grid gap-3">

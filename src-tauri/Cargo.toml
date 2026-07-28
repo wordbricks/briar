@@ -26,6 +26,7 @@ tauri-plugin-dialog = "2.7.2"
 tauri-plugin-opener = "2.5.4"
 tempfile = "3.27.0"
 which = "8.0.0"
+tauri-plugin-notification = "2.3.3"
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 tauri-plugin-process = "=2.3.1"
