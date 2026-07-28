@@ -114,6 +114,34 @@ describe("Inbox messages", () => {
     ]);
   });
 
+  it("creates one message for a task and its linked Auto Hunt dispatch", () => {
+    const taskSession = {
+      ...session("completed", "task-session"),
+      sessionType: "task" as const,
+      request: "Process queued issues with Auto Hunt.",
+      issues: [],
+    };
+    const dispatchSession = {
+      ...session("completed", "dispatch-session"),
+      sessionType: "dispatch" as const,
+      parentSessionId: taskSession.id,
+      request: taskSession.request,
+    };
+
+    const messages = buildCurrentInboxMessages(
+      null,
+      [dispatchSession, taskSession],
+      [project],
+    );
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toMatchObject({
+      id: "session:dispatch-session",
+      title: "Process queued issues with Auto Hunt.",
+      issueCount: 1,
+    });
+  });
+
   it("marks a new message version unread after an earlier version was read", () => {
     const [message] = buildCurrentInboxMessages(
       null,

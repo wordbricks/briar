@@ -76,6 +76,7 @@ export function ProjectAgentDetail({
     runs: HuntRun[],
     options?: {
       coordinatorConversationId?: string | null;
+      parentSessionId?: string;
       maxIssues?: number;
     },
   ) => string;
@@ -125,6 +126,22 @@ export function ProjectAgentDetail({
     if (selectedSession) setIsTaskDialogOpen(false);
   }, [selectedSession]);
 
+  useEffect(() => {
+    if (selectedSession?.sessionType !== "task") return;
+    const dispatchSession = sessions.find(
+      (session) =>
+        session.parentSessionId === selectedSession.id &&
+        session.projectId === agent.projectId &&
+        session.agentId === agent.id,
+    );
+    if (dispatchSession) setSelectedSessionId(dispatchSession.id);
+  }, [
+    agent.id,
+    agent.projectId,
+    selectedSession,
+    sessions,
+  ]);
+
   const openTaskDialog = () => {
     setRequest(agent.responsibility);
     setError(null);
@@ -153,6 +170,7 @@ export function ProjectAgentDetail({
           dispatchAutoHunt: (decision) =>
             onStartAutoHunt(dashboard.runs, {
               coordinatorConversationId: decision.conversationId,
+              parentSessionId: sessionId,
               maxIssues: decision.maxIssues ?? undefined,
             }),
         },

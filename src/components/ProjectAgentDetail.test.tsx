@@ -95,6 +95,7 @@ function ProjectAgentDetailHarness({
     runs: DashboardPayload["runs"],
     options?: {
       coordinatorConversationId?: string | null;
+      parentSessionId?: string;
       maxIssues?: number;
     },
   ) => string;
@@ -159,6 +160,67 @@ function ProjectAgentDetailHarness({
 }
 
 describe("ProjectAgentDetail", () => {
+  it("opens the linked Auto Hunt dispatch instead of its coordinator task", async () => {
+    const coordinatorSession: AutoHuntSession = {
+      id: "task-session",
+      dispatchGroupId: "",
+      projectId: agent.projectId,
+      agentId: agent.id,
+      sessionType: "task",
+      request: "Auto Hunt로 대기 이슈를 처리해 줘",
+      status: "completed",
+      issues: [],
+      startedAt: "2026-07-28T01:00:00.000Z",
+      completedAt: "2026-07-28T01:01:00.000Z",
+      conversationId: "coordinator-conversation",
+      workspaceRoot: "/repo",
+      summary: "Auto Hunt를 요청했습니다.",
+      error: null,
+      events: [],
+      dispatchEvents: [],
+      workers: [],
+    };
+    const dispatchSession: AutoHuntSession = {
+      ...coordinatorSession,
+      id: "dispatch-session",
+      dispatchGroupId: "dispatch-session",
+      sessionType: "dispatch",
+      parentSessionId: coordinatorSession.id,
+      status: "running",
+      completedAt: null,
+      conversationId: null,
+      summary: null,
+      issues: [{
+        runId: "run-1",
+        runNumber: 1,
+        sourceKey: "issue-1",
+        title: "연결된 Auto Hunt 이슈",
+        outcome: "pending",
+        summary: null,
+      }],
+    };
+    const container = await mount(
+      <ProjectAgentDetail
+        agent={agent}
+        dashboard={dashboard}
+        error={null}
+        isSidebarOpen={true}
+        onBack={() => undefined}
+        onSettleTaskSession={() => undefined}
+        onStopSession={async () => true}
+        onStartAutoHunt={() => dispatchSession.id}
+        onStartTaskSession={() => undefined}
+        requestedSessionId={coordinatorSession.id}
+        sessions={[dispatchSession, coordinatorSession]}
+      />,
+    );
+
+    await act(async () => Promise.resolve());
+
+    expect(container.textContent).toContain("연결된 Auto Hunt 이슈");
+    expect(container.textContent).not.toContain("Auto Hunt를 요청했습니다.");
+  });
+
   it("opens the task session detail as soon as the session is created", async () => {
     const response = {
       conversationId: "briar:project-1:ordinary-1",
@@ -282,6 +344,7 @@ describe("ProjectAgentDetail", () => {
     });
     expect(onStartAutoHunt).toHaveBeenCalledWith([], {
       coordinatorConversationId: "briar:project-1:coordinator-1",
+      parentSessionId: "task-session",
       maxIssues: 3,
     });
     expect(onStartTaskSession).toHaveBeenCalledWith(

@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { AutoHuntSession } from "./useAutoHuntSessions";
+import {
+  collapseLinkedAutoHuntSessions,
+  type AutoHuntSession,
+} from "./useAutoHuntSessions";
 import type {
   DashboardPayload,
   HuntRun,
@@ -104,7 +107,7 @@ export function buildCurrentInboxMessages(
     }
   }
 
-  for (const session of sessions) {
+  for (const session of collapseLinkedAutoHuntSessions(sessions)) {
     if (session.status !== "completed" && session.status !== "failed") continue;
     const finalEvent = [...session.events].reverse().find(
       (event) => event.type === session.status,
