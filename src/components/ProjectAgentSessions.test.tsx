@@ -91,4 +91,60 @@ describe("ProjectAgentSessions", () => {
     await act(async () => root.unmount());
     container.remove();
   });
+
+  it("shows a task and its Auto Hunt dispatch as one session", async () => {
+    const onSessionOpen = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    const dispatchSession: AutoHuntSession = {
+      ...taskSession,
+      id: "dispatch-session",
+      dispatchGroupId: "dispatch-session",
+      sessionType: "dispatch",
+      parentSessionId: taskSession.id,
+      request: taskSession.request,
+      status: "running",
+      completedAt: null,
+      conversationId: null,
+      summary: null,
+      issues: [{
+        runId: "run-1",
+        runNumber: 1,
+        sourceKey: "issue-1",
+        title: "Queued issue",
+        outcome: "pending",
+        summary: null,
+      }],
+    };
+
+    await act(async () =>
+      root.render(
+        <ProjectAgentSessions
+          agent={agent}
+          onSessionOpen={onSessionOpen}
+          projectId="project-1"
+          sessions={[dispatchSession, taskSession]}
+        />,
+      ),
+    );
+
+    expect(
+      container.querySelectorAll(".auto-hunt-session-row"),
+    ).toHaveLength(1);
+    expect(container.textContent).toContain(
+      "Review the current release status.",
+    );
+    expect(container.textContent).toContain("1개 이슈");
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".auto-hunt-session-row")
+        ?.click();
+    });
+    expect(onSessionOpen).toHaveBeenCalledWith("dispatch-session");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
 });

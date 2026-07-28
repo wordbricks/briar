@@ -85,6 +85,7 @@ export function ProjectAgents({
     runs: HuntRun[],
     options?: {
       coordinatorConversationId?: string | null;
+      parentSessionId?: string;
       maxIssues?: number;
     },
   ) => string;

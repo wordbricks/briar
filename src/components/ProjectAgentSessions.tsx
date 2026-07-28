@@ -11,6 +11,7 @@ import type {
   AutoHuntSession,
   AutoHuntSessionStatus,
 } from "../hooks/useAutoHuntSessions";
+import { collapseLinkedAutoHuntSessions } from "../hooks/useAutoHuntSessions";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
 import type { ProjectAgent } from "../types";
@@ -28,11 +29,13 @@ export function ProjectAgentSessions({
 }) {
   const { localeTag, t } = useI18n();
   const agentSessions = useMemo(
-    () =>
-      sessions.filter(
+    () => {
+      const matchingSessions = sessions.filter(
         (session) =>
           session.projectId === projectId && session.agentId === agent.id,
-      ),
+      );
+      return collapseLinkedAutoHuntSessions(matchingSessions);
+    },
     [agent.id, projectId, sessions],
   );
 

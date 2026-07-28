@@ -59,6 +59,7 @@ export type AutoHuntSession = {
   trigger?: "manual" | "scheduled";
   scheduleId?: string;
   scheduleRunId?: string;
+  parentSessionId?: string;
   request?: string;
   status: AutoHuntSessionStatus;
   issues: AutoHuntSessionIssue[];
@@ -72,6 +73,17 @@ export type AutoHuntSession = {
   dispatchEvents: AutoHuntDispatchEvent[];
   workers: AutoHuntWorkerResult[];
 };
+
+export function collapseLinkedAutoHuntSessions(
+  sessions: readonly AutoHuntSession[],
+) {
+  const parentSessionIds = new Set(
+    sessions.flatMap((session) =>
+      session.parentSessionId ? [session.parentSessionId] : [],
+    ),
+  );
+  return sessions.filter((session) => !parentSessionIds.has(session.id));
+}
 
 type AutoHuntRunner = typeof startProjectAutoHunt;
 type AutoHuntStopper = typeof stopProjectAgentSession;
@@ -433,6 +445,7 @@ export function useAutoHuntSessions(
       agent: ProjectAgent;
       maxIssues?: number;
       coordinatorConversationId?: string | null;
+      parentSessionId?: string;
     },
   ) => {
     if (sessionsRef.current.some(
@@ -451,6 +464,11 @@ export function useAutoHuntSessions(
       throw new Error("대기 상태인 이슈가 없습니다.");
     }
     const startedAt = new Date().toISOString();
+    const coordinatorSession = options.parentSessionId
+      ? sessionsRef.current.find(
+          (session) => session.id === options.parentSessionId,
+        )
+      : undefined;
     const session: AutoHuntSession = {
       id: crypto.randomUUID(),
       dispatchGroupId: "",
@@ -458,6 +476,8 @@ export function useAutoHuntSessions(
       agentId: options.agent.id,
       sessionType: "dispatch",
       trigger: "manual",
+      parentSessionId: coordinatorSession?.id,
+      request: coordinatorSession?.request,
       status: "running",
       issues: candidates.map((run) => ({
         runId: run.id,
