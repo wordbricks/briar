@@ -215,6 +215,21 @@ pub(crate) struct ProjectLlmRequest {
     pub(crate) output_schema: Option<serde_json::Value>,
 }
 
+const BRIAR_SKILL_INSTRUCTION: &str =
+    "This request is running inside the Briar app; before doing any work, read the installed `briar-workflow` skill completely.";
+
+impl ProjectLlmRequest {
+    fn with_briar_skill_instruction(mut self) -> Self {
+        self.instructions = Some(match self.instructions {
+            Some(instructions) if !instructions.trim().is_empty() => {
+                format!("{BRIAR_SKILL_INSTRUCTION}\n\n{instructions}")
+            }
+            _ => BRIAR_SKILL_INSTRUCTION.to_string(),
+        });
+        self
+    }
+}
+
 #[derive(Debug, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProjectLlmResponse {
@@ -407,6 +422,7 @@ impl AgentBackend for AgentBackendHandle {
         request: ProjectLlmRequest,
         approve: &dyn Fn(&str, &serde_json::Value) -> bool,
     ) -> Result<ProjectLlmResponse, String> {
+        let request = request.with_briar_skill_instruction();
         match self {
             Self::Codex(backend) => {
                 backend.run(project_id, workspace_root, execution, request, approve)
@@ -623,7 +639,10 @@ pub(crate) fn summarize_auto_hunt_dispatch(
 
 #[cfg(test)]
 mod tests {
-    use super::{validate_remote_agent_directory, AgentProviderKind, HostRunnerFile};
+    use super::{
+        validate_remote_agent_directory, AgentProviderKind, HostRunnerFile, ProjectLlmRequest,
+        BRIAR_SKILL_INSTRUCTION,
+    };
     use crate::host::{CommandRunner, LocalRunner};
     use std::sync::Arc;
 
@@ -645,6 +664,20 @@ mod tests {
             AgentProviderKind::for_conversation_id("project-2", "briar:project-1:thread-1"),
             None
         );
+    }
+
+    #[test]
+    fn adds_the_briar_skill_instruction_to_every_request() {
+        let request = ProjectLlmRequest {
+            message: "Inspect the repository".to_string(),
+            conversation_id: None,
+            instructions: Some("Be concise.".to_string()),
+            output_schema: None,
+        }
+        .with_briar_skill_instruction();
+
+        let expected = format!("{BRIAR_SKILL_INSTRUCTION}\n\nBe concise.");
+        assert_eq!(request.instructions.as_deref(), Some(expected.as_str()));
     }
 
     #[test]
