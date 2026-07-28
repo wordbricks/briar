@@ -8,6 +8,7 @@ import {
   type AutoHuntDispatchGroup,
   type AutoHuntWorkerResult,
 } from "../lib/auto-hunt-agent";
+import { stopProjectAgentSession } from "../lib/project-llm";
 import {
   defaultAutoHuntMaxIssues,
   selectAutoHuntCandidates,
@@ -31,7 +32,8 @@ export type AutoHuntSessionEventType =
   | "started"
   | "completed"
   | "failed"
-  | "interrupted";
+  | "interrupted"
+  | "stopped";
 
 export type AutoHuntSessionIssue = {
   runId: string;
@@ -72,6 +74,7 @@ export type AutoHuntSession = {
 };
 
 type AutoHuntRunner = typeof startProjectAutoHunt;
+type AutoHuntStopper = typeof stopProjectAgentSession;
 
 function event(type: AutoHuntSessionEventType, occurredAt: string) {
   return { id: crypto.randomUUID(), type, occurredAt };
@@ -193,6 +196,7 @@ function reconcileDispatch(
 
 export function useAutoHuntSessions(
   runner: AutoHuntRunner = startProjectAutoHunt,
+  stopper: AutoHuntStopper = stopProjectAgentSession,
 ) {
   const [sessions, setSessions] = useState<AutoHuntSession[]>(readSessions);
   const sessionsRef = useRef(sessions);
@@ -357,7 +361,7 @@ export function useAutoHuntSessions(
   ) => {
     const completedAt = new Date().toISOString();
     const next = sessionsRef.current.map((session) =>
-      session.id === sessionId
+      session.id === sessionId && session.status === "running"
         ? {
             ...session,
             status: input.status,
@@ -373,6 +377,30 @@ export function useAutoHuntSessions(
     sessionsRef.current = next;
     setSessions(next);
   }, []);
+
+  const stopSession = useCallback(async (sessionId: string) => {
+    const session = sessionsRef.current.find(
+      (candidate) => candidate.id === sessionId,
+    );
+    if (!session || session.status !== "running") return false;
+    const stopped = await stopper(sessionId);
+    if (!stopped) return false;
+    const completedAt = new Date().toISOString();
+    const next = sessionsRef.current.map((candidate) =>
+      candidate.id === sessionId && candidate.status === "running"
+        ? {
+            ...candidate,
+            status: "interrupted" as const,
+            completedAt,
+            error: null,
+            events: [...candidate.events, event("stopped", completedAt)],
+          }
+        : candidate
+    );
+    sessionsRef.current = next;
+    setSessions(next);
+    return true;
+  }, [stopper]);
 
   const recordTaskSession = useCallback((
     projectId: string,
@@ -459,14 +487,15 @@ export function useAutoHuntSessions(
       .then((response) => {
         const completedAt = new Date().toISOString();
         setSessions((current) => current.map((candidate) =>
-          candidate.id === session.id
+          candidate.id === session.id && candidate.status === "running"
             ? completedSession(candidate, response, completedAt)
             : candidate));
       })
       .catch((caught) => {
         const completedAt = new Date().toISOString();
         const error = caught instanceof Error ? caught.message : String(caught);
-        setSessions((current) => current.map((candidate) => candidate.id === session.id
+        setSessions((current) => current.map((candidate) =>
+          candidate.id === session.id && candidate.status === "running"
           ? {
               ...candidate,
               status: "failed",
@@ -485,6 +514,7 @@ export function useAutoHuntSessions(
     startSession,
     startTaskSession,
     settleTaskSession,
+    stopSession,
     recordTaskSession,
     removeProjectSessions,
   };

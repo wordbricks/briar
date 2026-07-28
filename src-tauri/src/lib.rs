@@ -28,6 +28,7 @@ const AUTO_HUNT_EVENT_DIRECTORY: &str = "auto-hunt-sessions";
 const AUTO_HUNT_APP_SERVER_EVENT: &str = "auto-hunt-app-server-event";
 const AUTO_HUNT_DISPATCH_EVENT: &str = "auto-hunt-dispatch-event";
 const PROJECT_AGENT_SCHEDULE_POLL_EVENT: &str = "project-agent-schedule-poll";
+const AGENT_SESSION_STOPPED_ERROR: &str = "사용자가 에이전트 세션을 중지했습니다.";
 const DEFAULT_MAIN_WINDOW_SIZE: (f64, f64) = (1280.0, 820.0);
 const ONBOARDING_MAIN_WINDOW_SIZE: (f64, f64) = (980.0, 680.0);
 const DISCOVERED_SSH_HOST_ID_PREFIX: &str = "ssh-config-";
@@ -392,6 +393,75 @@ struct SleepPreventionState {
     enabled: AtomicBool,
     #[cfg(target_os = "macos")]
     process: Mutex<Option<Child>>,
+}
+
+#[derive(Clone, Default)]
+struct AgentSessionCancellationState {
+    sessions: Arc<Mutex<BTreeMap<String, Arc<AtomicBool>>>>,
+}
+
+struct AgentSessionCancellation {
+    session_id: String,
+    cancelled: Arc<AtomicBool>,
+    sessions: Arc<Mutex<BTreeMap<String, Arc<AtomicBool>>>>,
+}
+
+impl AgentSessionCancellationState {
+    fn register(&self, session_id: &str) -> Result<AgentSessionCancellation, String> {
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let mut sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| "에이전트 세션 중단 상태 잠금이 손상되었습니다.".to_string())?;
+        if sessions.contains_key(session_id) {
+            return Err("같은 ID의 에이전트 세션이 이미 실행 중입니다.".to_string());
+        }
+        sessions.insert(session_id.to_string(), Arc::clone(&cancelled));
+        Ok(AgentSessionCancellation {
+            session_id: session_id.to_string(),
+            cancelled,
+            sessions: Arc::clone(&self.sessions),
+        })
+    }
+
+    fn stop(&self, session_id: &str) -> Result<bool, String> {
+        let sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| "에이전트 세션 중단 상태 잠금이 손상되었습니다.".to_string())?;
+        let Some(cancelled) = sessions.get(session_id) else {
+            return Ok(false);
+        };
+        cancelled.store(true, Ordering::SeqCst);
+        Ok(true)
+    }
+}
+
+impl AgentSessionCancellation {
+    fn signal(&self) -> Arc<AtomicBool> {
+        Arc::clone(&self.cancelled)
+    }
+}
+
+impl Drop for AgentSessionCancellation {
+    fn drop(&mut self) {
+        if let Ok(mut sessions) = self.sessions.lock() {
+            if sessions
+                .get(&self.session_id)
+                .is_some_and(|current| Arc::ptr_eq(current, &self.cancelled))
+            {
+                sessions.remove(&self.session_id);
+            }
+        }
+    }
+}
+
+fn ensure_agent_session_running(cancelled: &AtomicBool) -> Result<(), String> {
+    if cancelled.load(Ordering::SeqCst) {
+        Err(AGENT_SESSION_STOPPED_ERROR.to_string())
+    } else {
+        Ok(())
+    }
 }
 
 impl Default for SleepPreventionState {
@@ -3609,6 +3679,7 @@ async fn project_llm_chat(
 #[tauri::command]
 async fn run_project_agent(
     app: tauri::AppHandle,
+    session_cancellations: tauri::State<'_, AgentSessionCancellationState>,
     project_id: String,
     request: agent::ProjectAgentRunRequest,
 ) -> Result<agent::ProjectAgentRunResponse, String> {
@@ -3630,6 +3701,8 @@ async fn run_project_agent(
     {
         return Err("에이전트 실행 요청이 올바르지 않습니다.".to_string());
     }
+    let cancellation = session_cancellations.register(&request.session_id)?;
+    let cancellation_signal = cancellation.signal();
     if request
         .conversation_id
         .as_deref()
@@ -3656,9 +3729,12 @@ async fn run_project_agent(
         "agent/grok-runner.js",
         "dist-agent/grok-runner.js",
     );
-    let event_sink = create_auto_hunt_event_sink(&app, &request.session_id)?;
+    let event_sink =
+        create_auto_hunt_event_sink(&app, &request.session_id, Arc::clone(&cancellation_signal))?;
     let approval_app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
+        let _cancellation = cancellation;
+        ensure_agent_session_running(&cancellation_signal)?;
         let (runner, workspace) =
             connected_project_workspace_on_host(&config_path, &project_id, &home)?;
         let provider = request.agent_provider;
@@ -3717,6 +3793,15 @@ async fn run_project_agent(
     })
     .await
     .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+fn stop_project_agent_session(
+    session_cancellations: tauri::State<'_, AgentSessionCancellationState>,
+    session_id: String,
+) -> Result<bool, String> {
+    validate_auto_hunt_session_id(&session_id)?;
+    session_cancellations.stop(&session_id)
 }
 
 /// Directory that holds this project's per-issue worktrees. Must mirror the
@@ -4134,10 +4219,13 @@ fn create_auto_hunt_worker_event_sink(
 #[tauri::command]
 async fn start_project_auto_hunt(
     app: tauri::AppHandle,
+    session_cancellations: tauri::State<'_, AgentSessionCancellationState>,
     project_id: String,
     mut request: agent::ProjectAutoHuntRequest,
 ) -> Result<agent::ProjectAutoHuntResponse, String> {
     validate_project_auto_hunt_request(&project_id, &request)?;
+    let cancellation = session_cancellations.register(&request.session_id)?;
+    let cancellation_signal = cancellation.signal();
     let api_url = request.api_url.trim();
     if api_url.is_empty()
         || api_url.chars().any(char::is_whitespace)
@@ -4177,9 +4265,12 @@ async fn start_project_auto_hunt(
     let dispatch_group_id = request.session_id.clone();
     let completion_store = dispatch_store.clone();
     let dispatch_app = app.clone();
-    let event_sink = create_auto_hunt_event_sink(&app, &request.session_id)?;
+    let event_sink =
+        create_auto_hunt_event_sink(&app, &request.session_id, Arc::clone(&cancellation_signal))?;
     let approval_app = app.clone();
     let outcome = tauri::async_runtime::spawn_blocking(move || {
+        let _cancellation = cancellation;
+        ensure_agent_session_running(&cancellation_signal)?;
         let (runner, workspace) =
             connected_project_workspace_on_host(&config_path, &project_id, &home)?;
         let settings = project_llm_settings_from(&config_path, &project_id)?;
@@ -4215,6 +4306,7 @@ async fn start_project_auto_hunt(
         let mut first_workspace = None;
 
         for index in 0..requested_count {
+            ensure_agent_session_running(&cancellation_signal)?;
             // One isolated config snapshot per worker allows several runs to be
             // claimed without sharing the CLI's activeClaim state.
             let cli_environment = agent::AutoHuntCliEnvironment::prepare_on_host(
@@ -4271,6 +4363,31 @@ async fn start_project_auto_hunt(
                 },
             )?;
             emit_latest_auto_hunt_dispatch_event(&dispatch_app, &dispatch);
+            if cancellation_signal.load(Ordering::SeqCst) {
+                let detail = AGENT_SESSION_STOPPED_ERROR;
+                let _ = record_auto_hunt_terminal_event(
+                    runner.as_ref(),
+                    &cli_environment,
+                    &workspace,
+                    &claimed,
+                    "cancelled",
+                    "session-stopped",
+                    detail,
+                );
+                let dispatch = dispatch_store.transition_worker(
+                    &request.session_id,
+                    &worker_session_id,
+                    auto_hunt_dispatch::AutoHuntWorkerStatus::Cancelled,
+                    claimed
+                        .workspace
+                        .as_ref()
+                        .map(|workspace| workspace.path.clone()),
+                    None,
+                    Some(detail.to_string()),
+                )?;
+                emit_latest_auto_hunt_dispatch_event(&dispatch_app, &dispatch);
+                return Err(detail.to_string());
+            }
 
             let Some(claimed_workspace) = claimed.workspace.as_ref() else {
                 let detail = claim
@@ -4442,6 +4559,28 @@ async fn start_project_auto_hunt(
                     issue_results.push(result);
                 }
                 Err(error) => {
+                    if cancellation_signal.load(Ordering::SeqCst) {
+                        let detail = AGENT_SESSION_STOPPED_ERROR.to_string();
+                        let _ = record_auto_hunt_terminal_event(
+                            runner.as_ref(),
+                            &cli_environment,
+                            &worker_workspace,
+                            &claimed,
+                            "cancelled",
+                            "session-stopped",
+                            &detail,
+                        );
+                        let dispatch = dispatch_store.transition_worker(
+                            &request.session_id,
+                            &worker_session_id,
+                            auto_hunt_dispatch::AutoHuntWorkerStatus::Cancelled,
+                            Some(claimed_workspace.path.clone()),
+                            None,
+                            Some(detail.clone()),
+                        )?;
+                        emit_latest_auto_hunt_dispatch_event(&dispatch_app, &dispatch);
+                        return Err(detail);
+                    }
                     let record_error = record_auto_hunt_terminal_event(
                         runner.as_ref(),
                         &cli_environment,
@@ -4584,6 +4723,15 @@ async fn start_project_auto_hunt(
             emit_latest_auto_hunt_dispatch_event(&app, &dispatch);
             Ok(response)
         }
+        Ok(Err(error)) if error == AGENT_SESSION_STOPPED_ERROR => {
+            let dispatch = completion_store.finish(
+                &dispatch_group_id,
+                auto_hunt_dispatch::AutoHuntDispatchStatus::Interrupted,
+                None,
+            )?;
+            emit_latest_auto_hunt_dispatch_event(&app, &dispatch);
+            Err(error)
+        }
         Ok(Err(error)) => {
             let persisted = completion_store.finish(
                 &dispatch_group_id,
@@ -4641,6 +4789,7 @@ fn auto_hunt_event_path(app: &tauri::AppHandle, session_id: &str) -> Result<Path
 fn create_auto_hunt_event_sink(
     app: &tauri::AppHandle,
     session_id: &str,
+    cancelled: Arc<AtomicBool>,
 ) -> Result<agent::AgentEventSink, String> {
     let path = auto_hunt_event_path(app, session_id)?;
     let directory = path
@@ -4671,6 +4820,7 @@ fn create_auto_hunt_event_sink(
     let event_app = app.clone();
 
     Ok(Arc::new(move |provider_event| {
+        ensure_agent_session_running(&cancelled)?;
         let record = agent::AppServerEventRecord::new(
             session_id.clone(),
             sequence.fetch_add(1, Ordering::Relaxed) + 1,
@@ -5177,6 +5327,7 @@ fn prepare_launch_intro(app: tauri::AppHandle) -> Result<(), String> {
 pub fn run() {
     let builder = tauri::Builder::default()
         .manage(SleepPreventionState::default())
+        .manage(AgentSessionCancellationState::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init());
     #[cfg(any(target_os = "macos", target_os = "ios"))]
@@ -5250,6 +5401,7 @@ pub fn run() {
             connected_project_ids,
             project_llm_chat,
             run_project_agent,
+            stop_project_agent_session,
             start_project_auto_hunt,
             load_auto_hunt_app_server_events,
             load_auto_hunt_dispatch,
@@ -5289,6 +5441,21 @@ pub fn run() {
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn stops_only_the_registered_agent_session_and_cleans_it_up() {
+        let state = AgentSessionCancellationState::default();
+        let registration = state.register("session-1").expect("registration");
+        assert!(!registration.cancelled.load(Ordering::SeqCst));
+        assert!(state.stop("session-1").expect("stop"));
+        assert!(registration.cancelled.load(Ordering::SeqCst));
+        assert!(!state.stop("missing-session").expect("missing"));
+
+        assert!(state.register("session-1").is_err());
+        assert!(registration.cancelled.load(Ordering::SeqCst));
+        drop(registration);
+        assert!(!state.stop("session-1").expect("cleaned up"));
+    }
 
     #[cfg(unix)]
     #[test]

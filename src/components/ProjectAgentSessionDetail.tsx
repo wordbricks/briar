@@ -4,10 +4,12 @@ import {
   CircleAlert,
   Clock3,
   LoaderCircle,
+  OctagonX,
 } from "lucide-react";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { MainContent } from "@/components/layout";
+import { Button } from "@/components/ui/button";
 import type {
   AutoHuntSession,
   AutoHuntSessionIssueOutcome,
@@ -24,10 +26,12 @@ import {
 export function ProjectAgentSessionDetail({
   isSidebarOpen,
   onBack,
+  onStop,
   session,
 }: {
   isSidebarOpen: boolean;
   onBack: () => void;
+  onStop: () => Promise<boolean>;
   session: AutoHuntSession;
 }) {
   const { localeTag, t } = useI18n();
@@ -38,12 +42,31 @@ export function ProjectAgentSessionDetail({
   );
   const eventListRef = useRef<HTMLDivElement>(null);
   const latestAgentMessage = agentMessages[agentMessages.length - 1];
+  const [isStopping, setIsStopping] = useState(false);
+  const [stopError, setStopError] = useState<string | null>(null);
 
   useEffect(() => {
     const eventList = eventListRef.current;
     if (!eventList || agentMessages.length === 0) return;
     eventList.scrollTop = eventList.scrollHeight;
   }, [agentMessages.length, latestAgentMessage?.text.length]);
+
+  const stop = async () => {
+    if (isStopping || session.status !== "running") return;
+    setIsStopping(true);
+    setStopError(null);
+    try {
+      if (!await onStop()) {
+        setStopError(t("agents.stopSessionFailed"));
+      }
+    } catch (caught) {
+      setStopError(
+        caught instanceof Error ? caught.message : String(caught),
+      );
+    } finally {
+      setIsStopping(false);
+    }
+  };
 
   return (
     <MainContent id="project-agent-session">
@@ -77,12 +100,39 @@ export function ProjectAgentSessionDetail({
                 </span>
               </div>
             </div>
-            <span className={`auto-hunt-status ${session.status}`}>
-              {statusLabel(t, session.status)}
-            </span>
+            <div className="auto-hunt-session-page-actions">
+              {session.status === "running" ? (
+                <Button
+                  aria-label={t("agents.stopSession")}
+                  disabled={isStopping}
+                  onClick={() => void stop()}
+                  size="sm"
+                  type="button"
+                  variant="destructive"
+                >
+                  {isStopping ? (
+                    <LoaderCircle className="spin" />
+                  ) : (
+                    <OctagonX />
+                  )}
+                  {isStopping
+                    ? t("agents.stoppingSession")
+                    : t("agents.stopSession")}
+                </Button>
+              ) : null}
+              <span className={`auto-hunt-status ${session.status}`}>
+                {statusLabel(t, session.status)}
+              </span>
+            </div>
           </header>
 
           <div className="auto-hunt-session-detail-body">
+            {stopError ? (
+              <div className="auto-hunt-stop-error" role="alert">
+                <CircleAlert size={14} />
+                {stopError}
+              </div>
+            ) : null}
             {session.sessionType === "task" ? (
               <section className="auto-hunt-dialog-section">
                 <h3>{t("agents.taskInput")}</h3>

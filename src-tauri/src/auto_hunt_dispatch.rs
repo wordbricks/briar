@@ -353,6 +353,21 @@ impl AutoHuntDispatchStore {
         error: Option<String>,
     ) -> Result<AutoHuntDispatchGroup, String> {
         self.update(dispatch_group_id, |group| {
+            if status == AutoHuntDispatchStatus::Interrupted {
+                let completed_at = now();
+                for worker in &mut group.workers {
+                    if matches!(
+                        worker.status,
+                        AutoHuntWorkerStatus::Allocating
+                            | AutoHuntWorkerStatus::Running
+                            | AutoHuntWorkerStatus::NeedsInput
+                    ) {
+                        worker.status = AutoHuntWorkerStatus::Cancelled;
+                        worker.summary = Some("사용자가 에이전트 세션을 중지했습니다.".to_string());
+                        worker.completed_at = Some(completed_at.clone());
+                    }
+                }
+            }
             group.status = status;
             group.completed_at = Some(now());
             group.error = error.clone();
@@ -682,5 +697,37 @@ mod tests {
                 .len(),
             0
         );
+    }
+
+    #[test]
+    fn cancels_active_workers_when_a_dispatch_is_stopped() {
+        let directory = tempfile::tempdir().expect("dispatch fixture");
+        let store = AutoHuntDispatchStore::new(directory.path()).expect("store");
+        store
+            .create("group-1", "project-1", "agent-1", None, 1)
+            .expect("group");
+        store.add_worker("group-1", worker()).expect("worker");
+        store
+            .transition_worker(
+                "group-1",
+                "group-1-w1",
+                AutoHuntWorkerStatus::Running,
+                Some("/worktree".to_string()),
+                None,
+                None,
+            )
+            .expect("running");
+
+        let stopped = store
+            .finish("group-1", AutoHuntDispatchStatus::Interrupted, None)
+            .expect("stopped");
+
+        assert_eq!(stopped.status, AutoHuntDispatchStatus::Interrupted);
+        assert_eq!(stopped.workers[0].status, AutoHuntWorkerStatus::Cancelled);
+        assert_eq!(
+            stopped.workers[0].summary.as_deref(),
+            Some("사용자가 에이전트 세션을 중지했습니다.")
+        );
+        assert!(stopped.workers[0].completed_at.is_some());
     }
 }

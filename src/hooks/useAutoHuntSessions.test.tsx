@@ -13,15 +13,17 @@ type AutoHuntRunner = NonNullable<
 
 let sessionsHook: SessionsHook;
 let runner: AutoHuntRunner | undefined;
+let stopper: Parameters<typeof useAutoHuntSessions>[1] | undefined;
 
 function Harness() {
-  sessionsHook = useAutoHuntSessions(runner);
+  sessionsHook = useAutoHuntSessions(runner, stopper);
   return null;
 }
 
 beforeEach(() => {
   window.localStorage.clear();
   runner = undefined;
+  stopper = undefined;
 });
 
 describe("useAutoHuntSessions", () => {
@@ -168,6 +170,42 @@ describe("useAutoHuntSessions", () => {
     expect(() => {
       sessionsHook.startSession("project-1", runs, undefined, options);
     }).toThrow("이 프로젝트에서 이미 자동사냥 세션이 진행 중입니다.");
+
+    await act(async () => root.unmount());
+  });
+
+  it("stops a running session and ignores late settlement", async () => {
+    stopper = async () => true;
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    await act(async () => root.render(<Harness />));
+
+    await act(async () => {
+      sessionsHook.startTaskSession("project-1", "agent-1", {
+        sessionId: "task-session-1",
+        request: "Long-running audit",
+        startedAt: "2026-07-28T01:00:00.000Z",
+      });
+    });
+    await act(async () => {
+      await sessionsHook.stopSession("task-session-1");
+    });
+    await act(async () => {
+      sessionsHook.settleTaskSession("task-session-1", {
+        status: "failed",
+        conversationId: null,
+        workspaceRoot: null,
+        summary: null,
+        error: "late provider error",
+      });
+    });
+
+    expect(sessionsHook.sessions[0]).toMatchObject({
+      id: "task-session-1",
+      status: "interrupted",
+      error: null,
+    });
+    expect(sessionsHook.sessions[0]?.events.at(-1)?.type).toBe("stopped");
 
     await act(async () => root.unmount());
   });

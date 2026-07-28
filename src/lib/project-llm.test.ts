@@ -11,6 +11,7 @@ import {
   loadProjectLlmSettings,
   loadProjectSandboxSettings,
   runProjectAgent,
+  stopProjectAgentSession,
   updateAppProviderSettings,
   updateProjectLlmSettings,
   updateProjectSandboxSettings,
@@ -113,6 +114,16 @@ describe("project LLM gateway", () => {
       },
     });
     expect(invoke.mock.calls[0]?.[1]).not.toHaveProperty("workspaceRoot");
+  });
+
+  it("requests interruption for one native agent session", async () => {
+    invoke.mockResolvedValue(true);
+
+    await expect(stopProjectAgentSession("session-1")).resolves.toBe(true);
+
+    expect(invoke).toHaveBeenCalledWith("stop_project_agent_session", {
+      sessionId: "session-1",
+    });
   });
 
   it("routes issue conversations by run and registered branch", async () => {

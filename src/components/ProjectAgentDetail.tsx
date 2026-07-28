@@ -55,6 +55,7 @@ export function ProjectAgentDetail({
   onBack,
   onRequestedSessionOpen,
   onSettleTaskSession,
+  onStopSession,
   onStartAutoHunt,
   onStartTaskSession,
   requestedSessionId,
@@ -70,6 +71,7 @@ export function ProjectAgentDetail({
     sessionId: string,
     settlement: ProjectAgentTaskSessionSettlement,
   ) => void;
+  onStopSession: (sessionId: string) => Promise<boolean>;
   onStartAutoHunt: (
     runs: HuntRun[],
     options?: {
@@ -193,6 +195,7 @@ export function ProjectAgentDetail({
       <ProjectAgentSessionDetail
         isSidebarOpen={isSidebarOpen}
         onBack={() => setSelectedSessionId(null)}
+        onStop={() => onStopSession(selectedSession.id)}
         session={selectedSession}
       />
     );

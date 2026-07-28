@@ -540,6 +540,7 @@ export function App() {
             onRequestedSessionOpen={() => setRequestedSessionId(null)}
             onSettleTaskSession={(sessionId, settlement) =>
               autoHunt.settleTaskSession(sessionId, settlement)}
+            onStopSession={(sessionId) => autoHunt.stopSession(sessionId)}
             onStart={(agent, runs, options) =>
               autoHunt.startSession(
                 activeProject.id,

@@ -82,6 +82,7 @@ const dashboard = {
 
 function ProjectAgentDetailHarness({
   onSettleTaskSession,
+  onStopSession = async () => true,
   onStartAutoHunt,
   onStartTaskSession,
 }: {
@@ -89,6 +90,7 @@ function ProjectAgentDetailHarness({
     sessionId: string,
     settlement: ProjectAgentTaskSessionSettlement,
   ) => void;
+  onStopSession?: (sessionId: string) => Promise<boolean>;
   onStartAutoHunt: (
     runs: DashboardPayload["runs"],
     options?: {
@@ -122,6 +124,7 @@ function ProjectAgentDetailHarness({
           ),
         );
       }}
+      onStopSession={onStopSession}
       onStartAutoHunt={onStartAutoHunt}
       onStartTaskSession={(session) => {
         onStartTaskSession(session);
@@ -301,5 +304,42 @@ describe("ProjectAgentDetail", () => {
     expect(document.body.textContent).toContain(
       "대기 이슈 세 건을 Auto Hunt로 요청했습니다.",
     );
+  });
+
+  it("stops a running session from its detail page", async () => {
+    runProjectAgent.mockImplementation(
+      () => new Promise(() => undefined),
+    );
+    const onStopSession = vi.fn(async () => true);
+    const container = await mount(
+      <ProjectAgentDetailHarness
+        onSettleTaskSession={() => undefined}
+        onStartAutoHunt={() => "dispatch-1"}
+        onStartTaskSession={() => undefined}
+        onStopSession={onStopSession}
+      />,
+    );
+
+    await act(async () => {
+      Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
+        .find((button) => button.textContent?.trim() === "작업 실행")
+        ?.click();
+    });
+    await act(async () => {
+      document.querySelector<HTMLFormElement>("form")?.dispatchEvent(
+        new Event("submit", { bubbles: true, cancelable: true }),
+      );
+      await Promise.resolve();
+    });
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(
+          'button[aria-label="세션 정지"]',
+        )
+        ?.click();
+      await Promise.resolve();
+    });
+
+    expect(onStopSession).toHaveBeenCalledWith("task-session");
   });
 });

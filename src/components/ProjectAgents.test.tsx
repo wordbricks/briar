@@ -53,6 +53,7 @@ const projectAgentsProps = {
   error: null,
   isSidebarOpen: true,
   onSettleTaskSession: () => undefined,
+  onStopSession: async () => true,
   onStart: () => "session-new",
   onStartTaskSession: () => undefined,
   project,
