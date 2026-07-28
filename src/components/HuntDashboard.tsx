@@ -1350,8 +1350,10 @@ function KanbanCard({
         </span>
         <span className="kanban-card-copy">
           <strong>{run.title}</strong>
-          {(run.detail || run.issueDescription) && (
-            <span>{run.detail || run.issueDescription}</span>
+          {run.issueDescription && (
+            <span className="kanban-card-description">
+              {run.issueDescription}
+            </span>
           )}
         </span>
         <span className="kanban-card-badges">
@@ -2681,22 +2683,24 @@ function IssueConversation({
   const messageListRef = useRef<HTMLDivElement | null>(null);
   const threadContentRef = useRef<HTMLDivElement | null>(null);
   const threadTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const onLoadRef = useRef(onLoad);
+  onLoadRef.current = onLoad;
 
   const loadMessages = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
     try {
-      setMessages(await onLoad());
+      setMessages(await onLoadRef.current());
     } catch {
       setLoadError(t("run.messagesLoadFailed"));
     } finally {
       setLoading(false);
     }
-  }, [onLoad, t]);
+  }, [t]);
 
   useEffect(() => {
     void loadMessages();
-  }, [loadMessages]);
+  }, [loadMessages, run.id]);
 
   useEffect(() => {
     if (!activeThreadId) return;
