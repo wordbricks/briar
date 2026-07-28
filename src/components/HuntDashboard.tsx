@@ -80,6 +80,8 @@ import {
   CompanionBottomNavigation,
   type CompanionStatusFilter,
 } from "./CompanionBottomNavigation";
+import { ProjectAgentAvatar } from "./ProjectAgentAvatar";
+import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import { eventMeta, runMeta } from "../lib/stages";
 import {
   formatAttachmentBytes,
@@ -97,6 +99,7 @@ import type {
   IssueAttachment,
   IssueMessage,
   IssueMessageSendResult,
+  ProjectAgent,
   RunEvidence,
   UpdateIssueInput,
 } from "../types";
@@ -115,6 +118,7 @@ type KanbanColumn = {
 };
 
 export function HuntDashboard({
+  agents = [],
   companionMode = false,
   companionSearchMode = false,
   companionStatus,
@@ -150,7 +154,10 @@ export function HuntDashboard({
   onSendIssueMessage,
   requestedRunId = null,
   processingIssueIds = new Set<string>(),
+  sessions = [],
+  token = null,
 }: {
+  agents?: ProjectAgent[];
   companionMode?: boolean;
   companionSearchMode?: boolean;
   companionStatus?: CompanionStatusFilter;
@@ -189,6 +196,8 @@ export function HuntDashboard({
   ) => Promise<IssueMessageSendResult>;
   requestedRunId?: string | null;
   processingIssueIds?: ReadonlySet<string>;
+  sessions?: AutoHuntSession[];
+  token?: string | null;
 }) {
   const { t } = useI18n();
   const [query, setQuery] = useState("");
@@ -292,6 +301,36 @@ export function HuntDashboard({
       return !normalized || `${run.title} ${run.sourceKey} ${run.repository}`.toLowerCase().includes(normalized);
     });
   }, [companionMode, companionSearchMode, query, runs, source, status]);
+  const agentAssociationsByRunId = useMemo(() => {
+    const agentById = new Map(agents.map((agent) => [agent.id, agent]));
+    const activeAgents = new Map<string, ProjectAgent>();
+    const performedAgents = new Map<string, ProjectAgent>();
+    const recentSessions = [...sessions].sort(
+      (left, right) =>
+        Date.parse(right.startedAt) - Date.parse(left.startedAt),
+    );
+    for (const session of recentSessions) {
+      if (
+        session.projectId !== dashboard?.project.id ||
+        !session.agentId
+      ) continue;
+      const agent = agentById.get(session.agentId);
+      if (!agent) continue;
+      for (const issue of session.issues) {
+        if (!performedAgents.has(issue.runId)) {
+          performedAgents.set(issue.runId, agent);
+        }
+        if (
+          session.status === "running" &&
+          issue.outcome === "pending" &&
+          !activeAgents.has(issue.runId)
+        ) {
+          activeAgents.set(issue.runId, agent);
+        }
+      }
+    }
+    return { activeAgents, performedAgents };
+  }, [agents, dashboard?.project.id, sessions]);
 
   useEffect(() => {
     if (!requestedRunId) return;
@@ -441,6 +480,10 @@ export function HuntDashboard({
           onRetry={() => onRetryRun(selected.id)}
           onSendIssueMessage={(input) => onSendIssueMessage(selected.id, input)}
           onUpdateIssue={(input) => onUpdateIssue(selected.id, input)}
+          performedAgentName={
+            agentAssociationsByRunId.performedAgents.get(selected.id)?.name ??
+            null
+          }
           run={selected}
         />
         {createIssueDialog}
@@ -681,6 +724,9 @@ export function HuntDashboard({
               <div>
                 {column.runs.length ? column.runs.map((run) => (
                   <KanbanCard
+                    activeAgent={
+                      agentAssociationsByRunId.activeAgents.get(run.id) ?? null
+                    }
                     contextMenuDisabled={companionMode}
                     deletingIssueId={deletingIssueId}
                     isMoving={recoveringRunId === run.id}
@@ -717,6 +763,7 @@ export function HuntDashboard({
                     }
                     run={run}
                     isProcessing={processingIssueIds.has(run.id)}
+                    token={token}
                     updatingIssueId={updatingIssueId}
                   />
                 )) : (
@@ -1310,6 +1357,7 @@ function SelectedAttachment({
 }
 
 function KanbanCard({
+  activeAgent,
   contextMenuDisabled,
   deletingIssueId,
   isMoving,
@@ -1323,8 +1371,10 @@ function KanbanCard({
   onOpen,
   onProcessNow,
   onPriorityChange,
+  token,
   updatingIssueId,
 }: {
+  activeAgent: ProjectAgent | null;
   contextMenuDisabled: boolean;
   deletingIssueId: string | null;
   isMoving: boolean;
@@ -1338,6 +1388,7 @@ function KanbanCard({
   onOpen: () => void;
   onProcessNow?: () => void;
   onPriorityChange: (priority: number | null) => void;
+  token: string | null;
   updatingIssueId: string | null;
 }) {
   const { t } = useI18n();
@@ -1367,7 +1418,7 @@ function KanbanCard({
       <div
         aria-label={t("run.details", { title: run.title })}
         aria-disabled={isMoving}
-        className={`kanban-card ${meta.tone}${isMoving ? " moving" : ""}`}
+        className={`kanban-card ${meta.tone}${isMoving ? " moving" : ""}${activeAgent ? " has-agent" : ""}`}
         draggable={!isMoving}
         onDragEnd={onDragEnd}
         onDragStart={onDragStart}
@@ -1380,6 +1431,19 @@ function KanbanCard({
         role="button"
         tabIndex={0}
       >
+        {activeAgent && (
+          <span
+            aria-label={t("run.assigned", { agent: activeAgent.name })}
+            className="kanban-card-agent-badge"
+            title={t("run.assigned", { agent: activeAgent.name })}
+          >
+            <ProjectAgentAvatar
+              agent={activeAgent}
+              isRunning
+              token={token}
+            />
+          </span>
+        )}
         <span className="kanban-card-kicker">
           <small>AH-{run.runNumber}</small>
           <i><span className={`source-dot ${run.source}`} />{t(`source.${run.source}` as MessageKey)}</i>
@@ -1811,6 +1875,7 @@ export function RunPage({
   onRetry,
   onSendIssueMessage,
   onUpdateIssue,
+  performedAgentName = null,
   run,
 }: {
   companionMode?: boolean;
@@ -1832,6 +1897,7 @@ export function RunPage({
     parentMessageId: string | null;
   }) => Promise<IssueMessageSendResult>;
   onUpdateIssue?: (input: UpdateIssueInput) => Promise<unknown>;
+  performedAgentName?: string | null;
   run: HuntRun;
 }) {
   const { localeTag, t } = useI18n();
@@ -2173,7 +2239,7 @@ export function RunPage({
                   </div>
                   <div className="run-property">
                     <span className="run-property-icon agent"><Bot size={15} /></span>
-                    <span className="run-property-copy"><small>{t("run.agent")}</small><strong>Agent backend</strong></span>
+                    <span className="run-property-copy"><small>{t("run.agent")}</small><strong>{performedAgentName ?? t("run.unassigned")}</strong></span>
                   </div>
                   <div className="run-property">
                     <span className="run-property-icon attempt"><RotateCcw size={15} /></span>

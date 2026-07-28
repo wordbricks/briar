@@ -56,7 +56,7 @@ import { isRepositoryConnectedForImport } from "./lib/linear-import";
 import { loadProjectAgents } from "./lib/api";
 import { demoProjectAgents } from "./lib/demo-project-agents";
 import { useI18n } from "./i18n";
-import type { HuntRun } from "./types";
+import type { HuntRun, ProjectAgent } from "./types";
 
 type ActivePage =
   | "issues"
@@ -146,6 +146,28 @@ export function App() {
   const activeProject = briar.projects.find(
     (project) => project.id === briar.activeProjectId,
   );
+  const [issueAgents, setIssueAgents] = useState<ProjectAgent[]>([]);
+  useEffect(() => {
+    if (!activeProject) {
+      setIssueAgents([]);
+      return;
+    }
+
+    let cancelled = false;
+    const agents = briar.token
+      ? loadProjectAgents(briar.token, activeProject.id, locale)
+      : Promise.resolve(demoProjectAgents(activeProject.id, locale));
+    void agents
+      .then((loadedAgents) => {
+        if (!cancelled) setIssueAgents(loadedAgents);
+      })
+      .catch(() => {
+        if (!cancelled) setIssueAgents([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activePage, activeProject, briar.token, locale]);
   const processingIssueIds = useMemo(() => {
     const runIds = new Set<string>();
     if (quickStartingRunId) runIds.add(quickStartingRunId);
@@ -574,6 +596,7 @@ export function App() {
           />
         ) : (
           <HuntDashboard
+            agents={issueAgents}
             dashboard={briar.dashboard}
             error={quickProcessError ?? briar.error}
             isCreatingIssue={briar.isCreatingIssue}
@@ -602,6 +625,8 @@ export function App() {
             onRequestedRunOpen={() => setRequestedRunId(null)}
             onSendIssueMessage={sendIssueMessage}
             processingIssueIds={processingIssueIds}
+            sessions={autoHunt.sessions}
+            token={briar.token}
           />
           )}
         </div>
@@ -700,6 +725,7 @@ export function App() {
           </>
         ) : (
           <HuntDashboard
+            agents={issueAgents}
             companionMode
             companionSearchMode={companionPage === "search"}
             companionStatus={companionStatus}
@@ -732,6 +758,8 @@ export function App() {
             onRetryRun={briar.retryRun}
             onCancelRun={briar.cancelRun}
             onSendIssueMessage={sendIssueMessage}
+            sessions={autoHunt.sessions}
+            token={briar.token}
           />
         )}
       </div>
