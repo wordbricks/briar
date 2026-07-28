@@ -54,6 +54,9 @@ export type AutoHuntSession = {
   projectId: string;
   agentId?: string;
   sessionType?: "task" | "dispatch";
+  trigger?: "manual" | "scheduled";
+  scheduleId?: string;
+  scheduleRunId?: string;
   request?: string;
   status: AutoHuntSessionStatus;
   issues: AutoHuntSessionIssue[];
@@ -274,6 +277,103 @@ export function useAutoHuntSessions(
     setSessions(remaining);
   }, []);
 
+  const startTaskSession = useCallback((
+    projectId: string,
+    agentId: string,
+    input: {
+      sessionId?: string;
+      request: string;
+      startedAt: string;
+      trigger?: "manual" | "scheduled";
+      scheduleId?: string;
+      scheduleRunId?: string;
+    },
+  ) => {
+    const existing = sessionsRef.current.find(
+      (session) =>
+        (input.scheduleRunId &&
+          session.scheduleRunId === input.scheduleRunId) ||
+        (input.sessionId && session.id === input.sessionId),
+    );
+    if (existing) {
+      if (existing.status !== "running") {
+        const restarted = sessionsRef.current.map((session) =>
+          session.id === existing.id
+            ? {
+                ...session,
+                request: input.request,
+                status: "running" as const,
+                startedAt: input.startedAt,
+                completedAt: null,
+                conversationId: null,
+                workspaceRoot: null,
+                summary: null,
+                error: null,
+                events: [...session.events, event("started", input.startedAt)],
+              }
+            : session
+        );
+        sessionsRef.current = restarted;
+        setSessions(restarted);
+      }
+      return existing.id;
+    }
+    const session: AutoHuntSession = {
+      id: input.sessionId ?? crypto.randomUUID(),
+      dispatchGroupId: "",
+      projectId,
+      agentId,
+      sessionType: "task",
+      trigger: input.trigger ?? "manual",
+      scheduleId: input.scheduleId,
+      scheduleRunId: input.scheduleRunId,
+      request: input.request,
+      status: "running",
+      issues: [],
+      startedAt: input.startedAt,
+      completedAt: null,
+      conversationId: null,
+      workspaceRoot: null,
+      summary: null,
+      error: null,
+      events: [event("started", input.startedAt)],
+      workers: [],
+      dispatchEvents: [],
+    };
+    sessionsRef.current = [session, ...sessionsRef.current];
+    setSessions(sessionsRef.current);
+    return session.id;
+  }, []);
+
+  const settleTaskSession = useCallback((
+    sessionId: string,
+    input: {
+      status: "completed" | "failed";
+      conversationId: string | null;
+      workspaceRoot: string | null;
+      summary: string | null;
+      error: string | null;
+    },
+  ) => {
+    const completedAt = new Date().toISOString();
+    const next = sessionsRef.current.map((session) =>
+      session.id === sessionId
+        ? {
+            ...session,
+            status: input.status,
+            completedAt,
+            conversationId: input.conversationId,
+            workspaceRoot: input.workspaceRoot,
+            summary: input.summary,
+            error: input.error,
+            events: [...session.events, event(input.status, completedAt)],
+          }
+        : session
+    );
+    sessionsRef.current = next;
+    setSessions(next);
+  }, []);
+
   const recordTaskSession = useCallback((
     projectId: string,
     agentId: string,
@@ -288,33 +388,14 @@ export function useAutoHuntSessions(
       error: string | null;
     },
   ) => {
-    const completedAt = new Date().toISOString();
-    const session: AutoHuntSession = {
-      id: input.sessionId,
-      dispatchGroupId: "",
-      projectId,
-      agentId,
-      sessionType: "task",
+    const sessionId = startTaskSession(projectId, agentId, {
+      sessionId: input.sessionId,
       request: input.request,
-      status: input.status,
-      issues: [],
       startedAt: input.startedAt,
-      completedAt,
-      conversationId: input.conversationId,
-      workspaceRoot: input.workspaceRoot,
-      summary: input.summary,
-      error: input.error,
-      events: [
-        event("started", input.startedAt),
-        event(input.status, completedAt),
-      ],
-      workers: [],
-      dispatchEvents: [],
-    };
-    sessionsRef.current = [session, ...sessionsRef.current];
-    setSessions(sessionsRef.current);
-    return session.id;
-  }, []);
+    });
+    settleTaskSession(sessionId, input);
+    return sessionId;
+  }, [settleTaskSession, startTaskSession]);
 
   const startSession = useCallback((
     projectId: string,
@@ -345,6 +426,7 @@ export function useAutoHuntSessions(
       projectId,
       agentId: options.agent.id,
       sessionType: "dispatch",
+      trigger: "manual",
       status: "running",
       issues: candidates.map((run) => ({
         runId: run.id,
@@ -398,6 +480,8 @@ export function useAutoHuntSessions(
   return {
     sessions,
     startSession,
+    startTaskSession,
+    settleTaskSession,
     recordTaskSession,
     removeProjectSessions,
   };

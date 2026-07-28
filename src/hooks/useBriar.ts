@@ -91,6 +91,7 @@ import {
   type IssueAgentConversation,
 } from "../lib/issue-agent-reply";
 import type {
+  ClaimedProjectAgentScheduleRun,
   CreateIssueInput,
   DashboardPayload,
   HuntRun,
@@ -104,6 +105,22 @@ import type {
   SessionUser,
   UpdateIssueInput,
 } from "../types";
+
+export type UseBriarOptions = {
+  startScheduledAgentSession?: (
+    run: ClaimedProjectAgentScheduleRun,
+  ) => string | null;
+  settleScheduledAgentSession?: (
+    sessionId: string,
+    input: {
+      status: "completed" | "failed";
+      conversationId: string | null;
+      workspaceRoot: string | null;
+      summary: string | null;
+      error: string | null;
+    },
+  ) => void;
+};
 
 export type ProjectConnection = {
   project: Project;
@@ -187,7 +204,11 @@ async function readConnectedProjectIds() {
   }
 }
 
-export function useBriar() {
+export function useBriar(options: UseBriarOptions = {}) {
+  const {
+    startScheduledAgentSession,
+    settleScheduledAgentSession,
+  } = options;
   const [user, setUser] = useState<SessionUser | null>(demoMode ? demoUser : null);
   const [token, setToken] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>(
@@ -420,6 +441,8 @@ export function useBriar() {
                   agent,
                   options,
                 ),
+              startSession: startScheduledAgentSession,
+              settleSession: settleScheduledAgentSession,
             },
             token,
             run,
@@ -428,7 +451,13 @@ export function useBriar() {
       },
       projectIds,
     );
-  }, [connectedProjectIds, projects, token]);
+  }, [
+    connectedProjectIds,
+    projects,
+    settleScheduledAgentSession,
+    startScheduledAgentSession,
+    token,
+  ]);
 
   const refreshHealth = useCallback(async () => {
     if (

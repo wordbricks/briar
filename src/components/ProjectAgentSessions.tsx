@@ -82,7 +82,11 @@ export function ProjectAgentSessions({
               </span>
               <span className="auto-hunt-session-count">
                 {session.sessionType === "task"
-                  ? t("agents.runTask")
+                  ? t(
+                      session.trigger === "scheduled"
+                        ? "agents.scheduledRun"
+                        : "agents.runTask",
+                    )
                   : t("autoHunt.issueCount", {
                       count: session.issues.length,
                     })}
