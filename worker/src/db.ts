@@ -1670,6 +1670,7 @@ export async function claimNextQueuedHuntRun(
     claimedBy: string;
     claimedAt: string;
     leaseExpiresAt: string;
+    runId?: string;
   },
 ) {
   return await db
@@ -1682,6 +1683,7 @@ export async function claimNextQueuedHuntRun(
          select id from briar_hunt_runs
          where project_id = ? and status = 'queued'
            and (lease_expires_at is null or lease_expires_at <= ?)
+           and (? is null or id = ?)
          order by
            case when priority is null then 1 else 0 end,
            priority asc,
@@ -1699,6 +1701,8 @@ export async function claimNextQueuedHuntRun(
       input.claimedAt,
       projectId,
       input.claimedAt,
+      input.runId ?? null,
+      input.runId ?? null,
     )
     .first<HuntRunRow>();
 }

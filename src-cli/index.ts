@@ -754,6 +754,8 @@ async function downloadClaimAttachment(
 async function claimWork() {
   const config = await loadConfig();
   const project = await currentProject(config);
+  const runId = value("--run");
+  if (runId) z.string().uuid().parse(runId);
   ensureConfiguredVelen(project);
   if (
     project.activeClaim &&
@@ -771,7 +773,10 @@ async function claimWork() {
     process.env.BRIAR_AGENT_TOKEN ?? project.agentToken,
     {
       method: "POST",
-      body: JSON.stringify({ claimedBy: value("--actor") ?? "briar-workflow" }),
+      body: JSON.stringify({
+        claimedBy: value("--actor") ?? "briar-workflow",
+        ...(runId ? { runId } : {}),
+      }),
     },
   );
   if (result.work === null) {
@@ -1508,7 +1513,7 @@ const usage = `Briar CLI
     [--branch-prefix <prefix>]
     [--enable-full-access --i-understand-the-risk | --disable-full-access]
   briar workflow show
-  briar queue claim [--workspace <project|worktree|current|none>]
+  briar queue claim [--run <uuid>] [--workspace <project|worktree|current|none>]
     [--base-branch <ref>]
   briar worktree show
   briar worktree list

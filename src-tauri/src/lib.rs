@@ -3906,20 +3906,10 @@ fn claim_auto_hunt_run_on_host(
     runner: &dyn host::CommandRunner,
     cli_environment: &agent::AutoHuntCliEnvironment,
     connected_workspace: &Path,
+    run_id: &str,
 ) -> Result<HostClaimResponse, String> {
-    let output = cli_environment.run_briar(
-        runner,
-        connected_workspace,
-        [
-            "queue",
-            "claim",
-            "--workspace",
-            "worktree",
-            "--actor",
-            "briar-auto-hunt-runtime",
-            "--runtime-dispatch",
-        ],
-    )?;
+    let arguments = auto_hunt_claim_arguments(run_id);
+    let output = cli_environment.run_briar(runner, connected_workspace, arguments)?;
     if !output.success() {
         return Err(format!(
             "호스트가 자동사냥 작업을 claim하지 못했습니다: {}",
@@ -3928,6 +3918,20 @@ fn claim_auto_hunt_run_on_host(
     }
     serde_json::from_str(output.stdout.trim())
         .map_err(|error| format!("호스트 claim 결과를 읽지 못했습니다: {error}"))
+}
+
+fn auto_hunt_claim_arguments(run_id: &str) -> Vec<String> {
+    vec![
+        "queue".to_string(),
+        "claim".to_string(),
+        "--run".to_string(),
+        run_id.to_string(),
+        "--workspace".to_string(),
+        "worktree".to_string(),
+        "--actor".to_string(),
+        "briar-auto-hunt-runtime".to_string(),
+        "--runtime-dispatch".to_string(),
+    ]
 }
 
 fn record_auto_hunt_terminal_event(
@@ -4049,6 +4053,13 @@ fn validate_project_auto_hunt_request(
             "한 번의 자동사냥 세션에서는 최대 {}개의 이슈만 처리할 수 있습니다.",
             agent::MAX_AUTO_HUNT_ISSUES
         ));
+    }
+    if request
+        .issues
+        .iter()
+        .any(|issue| auto_hunt_run_token(&issue.run_id).is_err())
+    {
+        return Err("자동사냥 대상 이슈 ID가 올바르지 않습니다.".to_string());
     }
     if request.agent_id.trim().is_empty()
         || request.agent_id.len() > 128
@@ -4215,10 +4226,25 @@ async fn start_project_auto_hunt(
                 &request.api_url,
                 include_velen,
             )?;
-            let claim = claim_auto_hunt_run_on_host(runner.as_ref(), &cli_environment, &workspace)?;
+            let requested_issue = &request.issues[index];
+            let claim = claim_auto_hunt_run_on_host(
+                runner.as_ref(),
+                &cli_environment,
+                &workspace,
+                &requested_issue.run_id,
+            )?;
             let Some(claimed) = claim.work else {
-                break;
+                return Err(format!(
+                    "요청한 이슈 {}을 claim할 수 없습니다. 대기 상태와 기존 실행 여부를 확인해 주세요.",
+                    requested_issue.source_key
+                ));
             };
+            if claimed.run_id != requested_issue.run_id {
+                return Err(format!(
+                    "호스트가 요청한 run {} 대신 {}을 claim했습니다.",
+                    requested_issue.run_id, claimed.run_id
+                ));
+            }
             let worker_session_id = format!("{}-w{}", request.session_id, index + 1);
             let issue = agent::ProjectAutoHuntIssue {
                 run_id: claimed.run_id.clone(),
@@ -5664,6 +5690,26 @@ branch refs/heads/briar/second-11111111
         assert!(validate_auto_hunt_session_id("../session").is_err());
         assert!(validate_auto_hunt_session_id("session.jsonl").is_err());
         assert!(validate_auto_hunt_session_id("").is_err());
+    }
+
+    #[test]
+    fn targets_the_requested_run_when_claiming_auto_hunt_work() {
+        let arguments = auto_hunt_claim_arguments("515b7a2c-8918-5a8f-a292-f0b95090281c");
+
+        assert_eq!(
+            arguments,
+            vec![
+                "queue",
+                "claim",
+                "--run",
+                "515b7a2c-8918-5a8f-a292-f0b95090281c",
+                "--workspace",
+                "worktree",
+                "--actor",
+                "briar-auto-hunt-runtime",
+                "--runtime-dispatch",
+            ],
+        );
     }
 
     #[test]
