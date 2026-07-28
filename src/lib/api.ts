@@ -26,6 +26,7 @@ import type {
   Organization,
   OrganizationMember,
   ProjectSettings,
+  RunEvidence,
   SessionUser,
   UpdateProjectAgentInput,
   UpdateProjectAgentScheduleInput,
@@ -688,6 +689,20 @@ export async function loadIssueMessages(
     token,
   );
   return result.messages;
+}
+
+export async function loadRunEvidence(
+  token: string,
+  projectId: string,
+  runId: string,
+) {
+  const result = await request<{
+    runId: string;
+    attempt: number;
+    revision: number;
+    evidence: RunEvidence[];
+  }>(`/projects/${projectId}/runs/${runId}/evidence`, token);
+  return result.evidence;
 }
 
 export async function createIssueMessage(

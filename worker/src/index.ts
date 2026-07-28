@@ -97,6 +97,7 @@ import {
   type OrganizationMemberRow,
   type OrganizationRole,
   type OrganizationRow,
+  type RunEvidenceRow,
 } from "./db";
 import {
   codexPetSpriteSheetObjectKey,
@@ -1100,6 +1101,27 @@ const issueMessageJson = (message: IssueMessageRow) => ({
   updatedAt: message.updated_at,
 });
 
+const runEvidenceJson = (
+  evidence: RunEvidenceRow,
+  requiredRevision: number,
+) => ({
+  key: evidence.evidence_key,
+  attempt: evidence.attempt,
+  revision: evidence.revision,
+  stage: evidence.workflow_stage,
+  type: evidence.evidence_type,
+  status: evidence.status,
+  detail: evidence.detail,
+  command: evidence.command,
+  url: evidence.url,
+  metadata: evidence.metadata_json ? JSON.parse(evidence.metadata_json) : null,
+  actor: evidence.actor,
+  observedAt: evidence.observed_at,
+  recordedAt: evidence.recorded_at,
+  requiredRevision,
+  canonical: evidence.revision >= requiredRevision,
+});
+
 function dashboardRunJson(
   run: HuntRunRow,
   events: HuntEventRow[],
@@ -2048,6 +2070,35 @@ async function route(
     return json({ message: issueMessageJson(message) }, 201);
   }
 
+  const projectRunEvidenceMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/evidence$/u,
+  );
+  if (projectRunEvidenceMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      projectRunEvidenceMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const [evidence, revisions] = await Promise.all([
+      listRunEvidence(db, project.id, projectRunEvidenceMatch[2]),
+      listRunStageRevisions(db, project.id, projectRunEvidenceMatch[2]),
+    ]);
+    if (!evidence || !revisions) throw new HttpError(404, "Run not found");
+    return json({
+      runId: projectRunEvidenceMatch[2],
+      attempt: revisions.attempt,
+      revision: revisions.revision,
+      evidence: evidence.map((item) =>
+        runEvidenceJson(
+          item,
+          revisions.requirements.get(item.workflow_stage) ?? 1,
+        ),
+      ),
+    });
+  }
+
   const issuesMatch = pathname.match(/^\/projects\/([0-9a-f-]+)\/issues$/u);
   if (issuesMatch && request.method === "POST") {
     const session = await requireSession(auth, request);
@@ -2537,26 +2588,12 @@ async function route(
       runId: evidenceMatch[1],
       attempt: revisions.attempt,
       revision: revisions.revision,
-      evidence: evidence.map((item) => ({
-        key: item.evidence_key,
-        attempt: item.attempt,
-        revision: item.revision,
-        stage: item.workflow_stage,
-        type: item.evidence_type,
-        status: item.status,
-        detail: item.detail,
-        command: item.command,
-        url: item.url,
-        metadata: item.metadata_json ? JSON.parse(item.metadata_json) : null,
-        actor: item.actor,
-        observedAt: item.observed_at,
-        recordedAt: item.recorded_at,
-        requiredRevision:
+      evidence: evidence.map((item) =>
+        runEvidenceJson(
+          item,
           revisions.requirements.get(item.workflow_stage) ?? 1,
-        canonical:
-          item.revision >=
-          (revisions.requirements.get(item.workflow_stage) ?? 1),
-      })),
+        ),
+      ),
     });
   }
   if (evidenceMatch && request.method === "POST") {
