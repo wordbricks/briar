@@ -1,3 +1,5 @@
+import { isProjectAgentAvatarDataUrl } from "./project-agent-avatar";
+
 export const codexPetCatalogUrl =
   "https://raw.githubusercontent.com/legeling/awesome-codex-pet/main/pets.json";
 export const codexPetSiteUrl = "https://codexpet.top";
@@ -175,7 +177,7 @@ function avatarFromFirstSpriteFrame(image: HTMLImageElement): string {
   );
 
   const avatar = canvas.toDataURL("image/webp", 0.9);
-  if (!/^data:image\/webp;base64,/u.test(avatar) || avatar.length > 400_000) {
+  if (!isProjectAgentAvatarDataUrl(avatar)) {
     throw new Error("invalid-avatar-output");
   }
   return avatar;
