@@ -274,6 +274,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     demoMode ? demoDashboard : null,
   );
   const [loading, setLoading] = useState(!demoMode);
+  const [restoringSession, setRestoringSession] = useState(!demoMode);
   const [loginCode, setLoginCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [projectConnection, setProjectConnection] =
@@ -376,6 +377,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       if (cancelled) return;
       if (result.status === "missing" || result.status === "unauthorized") {
         setError(null);
+        setRestoringSession(false);
         setLoading(false);
         return;
       }
@@ -400,6 +402,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       );
       setActiveProjectId(result.projects[0]?.id ?? null);
       setError(null);
+      setRestoringSession(false);
       setLoading(false);
     };
 
@@ -2134,6 +2137,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     runLinearIssueImport,
     recoveringRunId,
     recoveryError,
+    restoringSession,
     refresh,
     refreshHealth,
     refreshProjectReadiness,
