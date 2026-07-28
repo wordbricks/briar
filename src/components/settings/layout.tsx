@@ -3,6 +3,7 @@ import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Typography } from "@/components/ui/typography";
 import { cn } from "@/lib/utils";
 
@@ -323,6 +324,42 @@ export function SettingsCard({
       {...props}
     >
       {children}
+    </div>
+  );
+}
+
+export function SettingsToggleRow({
+  checked,
+  description,
+  disabled = false,
+  label,
+  onCheckedChange,
+  title,
+}: {
+  checked: boolean;
+  description: ReactNode;
+  disabled?: boolean;
+  label: string;
+  onCheckedChange: (checked: boolean) => void;
+  title: ReactNode;
+}) {
+  return (
+    <div className="grid min-h-[72px] grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-[18px] py-4">
+      <div className="grid min-w-0 gap-1">
+        <Typography as="strong" variant="body">
+          {title}
+        </Typography>
+        <Typography as="p" tone="muted" variant="bodySm">
+          {description}
+        </Typography>
+      </div>
+      <Switch
+        aria-label={label}
+        checked={checked}
+        className="justify-self-end data-[state=checked]:bg-foreground"
+        disabled={disabled}
+        onCheckedChange={onCheckedChange}
+      />
     </div>
   );
 }

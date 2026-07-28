@@ -15,14 +15,11 @@ import {
   type AutoHuntWorkflowStageId,
 } from "../../src/lib/auto-hunt-contract";
 import {
-  defaultAutoHuntAutomation,
-  normalizeAutoHuntAutomation,
-} from "../../src/lib/auto-hunt-automation";
+  structuredAgentResultSchema,
+  type StructuredAgentResult,
+} from "../../src/lib/agent-result";
 import {
   defaultProjectAgentCalendarColor,
-  defaultProjectAgentCopy,
-  normalizeProjectAgentLocale,
-  type ProjectAgentLocale,
 } from "../../src/lib/project-agent";
 import {
   isValidProjectAgentScheduleTimeZone,
@@ -52,6 +49,7 @@ import {
   createProjectAgentSchedule,
   createProject,
   deleteProjectAgentSchedule,
+  deleteIssue,
   deleteProject,
   EventKeyConflictError,
   findProjectIdByAgentTokenHash,
@@ -69,6 +67,7 @@ import {
   listIssueMessages,
   listDashboardRuns,
   listRunEvidence,
+  listRunStageRevisions,
   listOrganizationMembers,
   listOrganizations,
   listProjects,
@@ -77,6 +76,7 @@ import {
   listProjectAgentSchedules,
   moveHuntRun,
   recoverHuntRun,
+  reworkHuntRun,
   recordHuntEvent,
   recordRunEvidence,
   replaceProjectAgentToken,
@@ -101,6 +101,7 @@ import {
   type OrganizationMemberRow,
   type OrganizationRole,
   type OrganizationRow,
+  type RunEvidenceRow,
 } from "./db";
 import {
   codexPetSpriteSheetObjectKey,
@@ -263,6 +264,7 @@ const eventSchema = z
     tracker: trackerSchema.nullable().optional(),
     issueDescription: z.string().max(100_000).nullable().optional(),
     resultSummary: z.string().max(100_000).nullable().optional(),
+    structuredResult: structuredAgentResultSchema.nullable().optional(),
     pullRequestUrls: z
       .array(httpsUrl)
       .max(20)
@@ -301,6 +303,35 @@ const eventSchema = z
         code: "custom",
         message: "blocked progress requires an exact blocker reason",
         path: ["detail"],
+      });
+    }
+    if (input.status === "completed" && !input.structuredResult) {
+      context.addIssue({
+        code: "custom",
+        message: "completed runs require a structured result",
+        path: ["structuredResult"],
+      });
+    }
+    if (
+      input.status === "completed" &&
+      input.structuredResult &&
+      !["completed", "partial"].includes(input.structuredResult.outcome)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "completed runs require a completed or partial outcome",
+        path: ["structuredResult", "outcome"],
+      });
+    }
+    if (
+      input.resultSummary &&
+      input.structuredResult &&
+      input.resultSummary !== input.structuredResult.summary
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "resultSummary must match structuredResult.summary",
+        path: ["resultSummary"],
       });
     }
     if (input.tracker?.provider === "linear" && input.tracker.url) {
@@ -617,6 +648,7 @@ export const projectAgentScheduleRunCompletionSchema = z
     claimToken: projectAgentScheduleClaimTokenSchema,
     status: z.enum(["completed", "failed"]),
     resultSummary: z.string().trim().min(1).max(100_000).nullable().optional(),
+    structuredResult: structuredAgentResultSchema,
     error: z.string().trim().min(1).max(4_000).nullable().optional(),
   })
   .strict()
@@ -626,6 +658,30 @@ export const projectAgentScheduleRunCompletionSchema = z
         code: "custom",
         message: "completed runs require a result summary",
         path: ["resultSummary"],
+      });
+    }
+    if (
+      input.resultSummary &&
+      input.resultSummary !== input.structuredResult.summary
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "resultSummary must match structuredResult.summary",
+        path: ["resultSummary"],
+      });
+    }
+    if (input.status === "completed" && input.structuredResult.outcome === "failed") {
+      context.addIssue({
+        code: "custom",
+        message: "completed schedule runs cannot report a failed outcome",
+        path: ["structuredResult", "outcome"],
+      });
+    }
+    if (input.status === "failed" && input.structuredResult.outcome !== "failed") {
+      context.addIssue({
+        code: "custom",
+        message: "failed schedule runs require a failed structured outcome",
+        path: ["structuredResult", "outcome"],
       });
     }
     if (input.status === "failed" && !input.error) {
@@ -674,6 +730,15 @@ const recoveryAgentInputSchema = recoveryUserInputSchema.extend({
   actor: z.string().trim().min(1).max(128),
 });
 
+export const runReworkInputSchema = z
+  .object({
+    requestId: z.string().uuid(),
+    workflowStage: workflowStageIdSchema,
+    reason: z.string().trim().min(1).max(4_000),
+    actor: z.string().trim().min(1).max(128),
+  })
+  .strict();
+
 const moveRunInputSchema = z
   .object({
     requestId: z.string().uuid(),
@@ -716,27 +781,6 @@ const projectSettingsSchema = z
       .strict(),
     githubRepository: nullableTrimmed(300),
     workflow: workflowSchema.default(repositoryWorkflowBootstrap),
-    automation: z
-      .object({
-        enabled: z.boolean(),
-        maxIssuesPerSession: z.number().int().min(1).max(10),
-        schedule: z
-          .object({
-            enabled: z.boolean(),
-            intervalHours: z.number().int().min(1).max(168),
-          })
-          .strict(),
-        queueThreshold: z
-          .object({
-            enabled: z.boolean(),
-            minimumIssues: z.number().int().min(1).max(100),
-          })
-          .strict(),
-        urgentIssue: z.object({ enabled: z.boolean() }).strict(),
-      })
-      .strict()
-      .transform(normalizeAutoHuntAutomation)
-      .optional(),
   })
   .strict()
   .superRefine((input, context) => {
@@ -951,18 +995,11 @@ function projectJson(row: ProjectRow) {
   };
 }
 
-const projectAgentJson = (
-  row: ProjectAgentRow,
-  locale: ProjectAgentLocale = "en",
-) => {
-  const copy =
-    row.kind === "auto_hunt" && row.updated_at === row.created_at
-      ? defaultProjectAgentCopy(locale)
-      : { name: row.name, responsibility: row.responsibility };
+const projectAgentJson = (row: ProjectAgentRow) => {
   return {
     id: row.id,
     projectId: row.project_id,
-    name: copy.name,
+    name: row.name,
     avatar: row.avatar,
     codexPet: row.avatar_pet_json
       ? {
@@ -974,10 +1011,9 @@ const projectAgentJson = (
       : null,
     provider: row.provider,
     model: row.model,
-    responsibility: copy.responsibility,
+    responsibility: row.responsibility,
     skill: row.skill_markdown,
     calendarColor: row.calendar_color,
-    kind: row.kind,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -1026,6 +1062,7 @@ const projectAgentScheduleRunJson = (
   startedAt: row.started_at,
   completedAt: row.completed_at,
   resultSummary: row.result_summary,
+  structuredResult: parseStructuredResult(row.structured_result_json),
   error: row.error,
   ...(claimToken ? { claimToken } : {}),
 });
@@ -1061,9 +1098,6 @@ const settingsJson = (row: ProjectSettingsRow | null) => ({
   workflow: row?.workflow_json
     ? normalizeAutoHuntWorkflow(JSON.parse(row.workflow_json))
     : structuredClone(repositoryWorkflowBootstrap),
-  automation: row?.auto_hunt_automation_json
-    ? normalizeAutoHuntAutomation(JSON.parse(row.auto_hunt_automation_json))
-    : structuredClone(defaultAutoHuntAutomation),
 });
 
 const parseJsonArray = (value: string) => {
@@ -1079,9 +1113,18 @@ const parseJsonObject = (value: string | null) => {
     : null;
 };
 
+const parseStructuredResult = (
+  value: string | null,
+): StructuredAgentResult | null => {
+  const parsed = parseJsonObject(value);
+  const result = structuredAgentResultSchema.safeParse(parsed);
+  return result.success ? result.data : null;
+};
+
 const dashboardEventJson = (event: HuntEventRow) => ({
   id: event.id,
   attempt: event.attempt,
+  revision: event.revision,
   status: event.status,
   workflowStage: event.workflow_stage,
   detail: event.detail,
@@ -1126,6 +1169,27 @@ const issueMessageJson = (message: IssueMessageRow) => ({
   updatedAt: message.updated_at,
 });
 
+const runEvidenceJson = (
+  evidence: RunEvidenceRow,
+  requiredRevision: number,
+) => ({
+  key: evidence.evidence_key,
+  attempt: evidence.attempt,
+  revision: evidence.revision,
+  stage: evidence.workflow_stage,
+  type: evidence.evidence_type,
+  status: evidence.status,
+  detail: evidence.detail,
+  command: evidence.command,
+  url: evidence.url,
+  metadata: evidence.metadata_json ? JSON.parse(evidence.metadata_json) : null,
+  actor: evidence.actor,
+  observedAt: evidence.observed_at,
+  recordedAt: evidence.recorded_at,
+  requiredRevision,
+  canonical: evidence.revision >= requiredRevision,
+});
+
 function dashboardRunJson(
   run: HuntRunRow,
   events: HuntEventRow[],
@@ -1135,6 +1199,7 @@ function dashboardRunJson(
     id: run.id,
     runNumber: run.run_number,
     currentAttempt: run.current_attempt,
+    currentRevision: run.current_revision,
     source: run.source,
     sourceKey: run.source_key,
     title: run.title,
@@ -1163,6 +1228,7 @@ function dashboardRunJson(
     issueDescription: run.issue_description,
     attachments: attachments.map(attachmentJson),
     resultSummary: run.result_summary,
+    structuredResult: parseStructuredResult(run.structured_result_json),
     pullRequestUrls: parseJsonArray(run.pull_request_urls),
     targetSha: run.target_sha,
     sourceCreatedAt: run.source_created_at,
@@ -1419,7 +1485,6 @@ async function route(
       linear: input.linear,
       githubRepository: input.githubRepository ?? null,
       workflow: input.workflow,
-      automation: input.automation,
     });
     return json({ settings: settingsJson(settings) });
   }
@@ -1436,12 +1501,8 @@ async function route(
     );
     if (!project) throw new HttpError(404, "Project not found");
     const agents = await listProjectAgents(db, project.id);
-    const locale = normalizeProjectAgentLocale(
-      new URL(request.url).searchParams.get("locale") ??
-        request.headers.get("accept-language"),
-    );
     return json({
-      agents: agents.map((agent) => projectAgentJson(agent, locale)),
+      agents: agents.map((agent) => projectAgentJson(agent)),
     });
   }
   if (projectAgentsMatch && request.method === "POST") {
@@ -1621,6 +1682,7 @@ async function route(
         claimTokenHash: await sha256(input.claimToken),
         status: input.status,
         resultSummary: input.resultSummary ?? null,
+        structuredResult: input.structuredResult,
         error: input.error ?? null,
         observedAt: new Date().toISOString(),
       },
@@ -2078,6 +2140,35 @@ async function route(
     return json({ message: issueMessageJson(message) }, 201);
   }
 
+  const projectRunEvidenceMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/evidence$/u,
+  );
+  if (projectRunEvidenceMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      projectRunEvidenceMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const [evidence, revisions] = await Promise.all([
+      listRunEvidence(db, project.id, projectRunEvidenceMatch[2]),
+      listRunStageRevisions(db, project.id, projectRunEvidenceMatch[2]),
+    ]);
+    if (!evidence || !revisions) throw new HttpError(404, "Run not found");
+    return json({
+      runId: projectRunEvidenceMatch[2],
+      attempt: revisions.attempt,
+      revision: revisions.revision,
+      evidence: evidence.map((item) =>
+        runEvidenceJson(
+          item,
+          revisions.requirements.get(item.workflow_stage) ?? 1,
+        ),
+      ),
+    });
+  }
+
   const issuesMatch = pathname.match(/^\/projects\/([0-9a-f-]+)\/issues$/u);
   if (issuesMatch && request.method === "POST") {
     const session = await requireSession(auth, request);
@@ -2144,6 +2235,7 @@ async function route(
         tracker: null,
         issueDescription: input.description || null,
         resultSummary: null,
+        structuredResult: null,
         pullRequestUrls: [],
         targetSha: null,
         sourceCreatedAt: occurredAt,
@@ -2235,6 +2327,43 @@ async function route(
       description: run.issue_description,
       priority: run.priority,
     });
+  }
+  if (issueUpdateMatch && request.method === "DELETE") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, issueUpdateMatch[1], session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    const attachments = await listIssueAttachments(
+      db,
+      project.id,
+      issueUpdateMatch[2],
+    );
+    const outcome = await deleteIssue(
+      db,
+      project.id,
+      issueUpdateMatch[2],
+      new Date().toISOString(),
+    );
+    if (outcome === "not_found") throw new HttpError(404, "Run not found");
+    if (outcome === "active") {
+      throw new HttpError(409, "An active Auto Hunt issue cannot be deleted");
+    }
+    const attachmentKeys = attachments.map(
+      (attachment) => attachment.object_key,
+    );
+    if (attachmentKeys.length > 0) {
+      try {
+        await attachmentsBucket.delete(attachmentKeys);
+      } catch (error) {
+        console.error(
+          JSON.stringify({
+            message: "deleted issue attachment cleanup failed",
+            error: error instanceof Error ? error.message : String(error),
+            runId: issueUpdateMatch[2],
+          }),
+        );
+      }
+    }
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   if (recoveryMatch && request.method === "POST") {
@@ -2445,6 +2574,7 @@ async function route(
             runId: run.id,
             runNumber: run.run_number,
             currentAttempt: run.current_attempt,
+            currentRevision: run.current_revision,
             source: run.source,
             sourceKey: run.source_key,
             title: run.title,
@@ -2490,27 +2620,51 @@ async function route(
     return json({ runId: agentRecoveryMatch[1], ...result });
   }
 
+  const reworkMatch = pathname.match(/^\/runs\/([0-9a-f-]+)\/rework$/u);
+  if (reworkMatch && request.method === "POST") {
+    const projectId = await requireAgentProject(db, request);
+    const input = runReworkInputSchema.parse(await readJson(request));
+    try {
+      const result = await reworkHuntRun(db, projectId, {
+        runId: reworkMatch[1],
+        workflowStage: input.workflowStage,
+        requestId: input.requestId,
+        actor: input.actor,
+        reason: input.reason,
+        occurredAt: new Date().toISOString(),
+      });
+      if (result.outcome === "not_found") {
+        throw new HttpError(404, "Run not found");
+      }
+      return json({ runId: reworkMatch[1], ...result });
+    } catch (error) {
+      if (error instanceof HuntTransitionError) {
+        throw new HttpError(409, error.message);
+      }
+      throw error;
+    }
+  }
+
   const evidenceMatch = pathname.match(/^\/runs\/([0-9a-f-]+)\/evidence$/u);
   if (evidenceMatch && request.method === "GET") {
     const projectId = await requireAgentProject(db, request);
     const evidence = await listRunEvidence(db, projectId, evidenceMatch[1]);
-    if (!evidence) throw new HttpError(404, "Run not found");
+    const revisions = await listRunStageRevisions(
+      db,
+      projectId,
+      evidenceMatch[1],
+    );
+    if (!evidence || !revisions) throw new HttpError(404, "Run not found");
     return json({
       runId: evidenceMatch[1],
-      evidence: evidence.map((item) => ({
-        key: item.evidence_key,
-        attempt: item.attempt,
-        stage: item.workflow_stage,
-        type: item.evidence_type,
-        status: item.status,
-        detail: item.detail,
-        command: item.command,
-        url: item.url,
-        metadata: item.metadata_json ? JSON.parse(item.metadata_json) : null,
-        actor: item.actor,
-        observedAt: item.observed_at,
-        recordedAt: item.recorded_at,
-      })),
+      attempt: revisions.attempt,
+      revision: revisions.revision,
+      evidence: evidence.map((item) =>
+        runEvidenceJson(
+          item,
+          revisions.requirements.get(item.workflow_stage) ?? 1,
+        ),
+      ),
     });
   }
   if (evidenceMatch && request.method === "POST") {
@@ -2585,6 +2739,7 @@ async function route(
         : null,
       issueDescription: parsed.issueDescription ?? null,
       resultSummary: parsed.resultSummary ?? null,
+      structuredResult: parsed.structuredResult ?? null,
       targetSha: parsed.targetSha ?? null,
       sourceCreatedAt: parsed.sourceCreatedAt
         ? new Date(parsed.sourceCreatedAt).toISOString()

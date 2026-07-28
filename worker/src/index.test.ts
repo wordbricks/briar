@@ -5,6 +5,7 @@ import worker, {
   projectAgentScheduleInputSchema,
   projectAgentScheduleRunCompletionSchema,
   runEvidenceInputSchema,
+  runReworkInputSchema,
 } from "./index";
 
 describe("Worker HTTP contract", () => {
@@ -19,6 +20,30 @@ describe("Worker HTTP contract", () => {
         actor: "briar-workflow",
       }).type,
     ).toBe("signoff/app worker");
+  });
+
+  it("requires an explicit earlier stage and reason for run rework", () => {
+    expect(
+      runReworkInputSchema.parse({
+        requestId: "11111111-1111-4111-8111-111111111111",
+        workflowStage: "implementing",
+        reason: "Local QA found a product-code defect.",
+        actor: "briar-workflow",
+      }),
+    ).toEqual({
+      requestId: "11111111-1111-4111-8111-111111111111",
+      workflowStage: "implementing",
+      reason: "Local QA found a product-code defect.",
+      actor: "briar-workflow",
+    });
+    expect(() =>
+      runReworkInputSchema.parse({
+        requestId: "11111111-1111-4111-8111-111111111111",
+        workflowStage: "implementing",
+        reason: " ",
+        actor: "briar-workflow",
+      }),
+    ).toThrow();
   });
 
   it("normalizes recurring agent schedule input", () => {
@@ -133,12 +158,32 @@ describe("Worker HTTP contract", () => {
         claimToken,
         status: "completed",
         resultSummary: "Repository audit completed.",
+        structuredResult: {
+          summary: "Repository audit completed.",
+          outcome: "completed",
+          importance: "routine",
+          urgency: "normal",
+          impact: "issue",
+          humanActionRequired: false,
+          nextAction: null,
+          dueAt: null,
+        },
         error: null,
       }),
     ).toEqual({
       claimToken,
       status: "completed",
       resultSummary: "Repository audit completed.",
+      structuredResult: {
+        summary: "Repository audit completed.",
+        outcome: "completed",
+        importance: "routine",
+        urgency: "normal",
+        impact: "issue",
+        humanActionRequired: false,
+        nextAction: null,
+        dueAt: null,
+      },
       error: null,
     });
     expect(() =>
@@ -146,9 +191,37 @@ describe("Worker HTTP contract", () => {
         claimToken,
         status: "failed",
         resultSummary: null,
+        structuredResult: {
+          summary: "Runner stopped.",
+          outcome: "failed",
+          importance: "important",
+          urgency: "time_sensitive",
+          impact: "issue",
+          humanActionRequired: true,
+          nextAction: "Inspect the runner.",
+          dueAt: null,
+        },
         error: null,
       }),
     ).toThrow(/failed runs require an error/u);
+    expect(() =>
+      projectAgentScheduleRunCompletionSchema.parse({
+        claimToken,
+        status: "completed",
+        resultSummary: "A legacy summary.",
+        structuredResult: {
+          summary: "A structured summary.",
+          outcome: "completed",
+          importance: "routine",
+          urgency: "normal",
+          impact: "issue",
+          humanActionRequired: false,
+          nextAction: null,
+          dueAt: null,
+        },
+        error: null,
+      }),
+    ).toThrow(/resultSummary must match structuredResult.summary/u);
   });
 
   it("renders mobile Companion authorization and returns to the app", async () => {

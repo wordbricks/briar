@@ -7,6 +7,7 @@ import type {
   Project,
 } from "../types";
 import type { AutoHuntWorkflowStageId } from "../lib/auto-hunt-contract";
+import type { StructuredAgentResult } from "../lib/agent-result";
 
 const storagePrefix = "briar.inbox.v1";
 
@@ -22,6 +23,8 @@ export type InboxIssueMessage = {
   runNumber: number;
   status: HuntStatus;
   workflowStage: AutoHuntWorkflowStageId | null;
+  priority: number | null;
+  structuredResult: StructuredAgentResult | null;
 };
 
 export type InboxSessionMessage = {
@@ -36,10 +39,17 @@ export type InboxSessionMessage = {
   status: "completed" | "failed";
   issueCount: number;
   error: string | null;
+  summary: string | null;
+  requiresAttention: boolean;
 };
 
 export type InboxMessage = InboxIssueMessage | InboxSessionMessage;
 export type InboxMessageWithReadState = InboxMessage & { isUnread: boolean };
+export type InboxCategory =
+  | "urgent"
+  | "action_required"
+  | "important"
+  | "activity";
 
 type InboxStorage = {
   messages: InboxMessage[];
@@ -88,6 +98,8 @@ export function buildCurrentInboxMessages(
         runNumber: run.runNumber,
         status: run.status,
         workflowStage: run.workflowStage,
+        priority: run.priority,
+        structuredResult: run.structuredResult,
       });
     }
   }
@@ -103,7 +115,9 @@ export function buildCurrentInboxMessages(
       projectId: session.projectId,
       projectName: projectNames.get(session.projectId) ?? "",
       targetId: session.id,
-      title: session.issues.map((issue) => issue.title).join(" · "),
+      title:
+        session.request ??
+        session.issues.map((issue) => issue.title).join(" · "),
       occurredAt:
         finalEvent?.occurredAt ??
         session.completedAt ??
@@ -114,6 +128,12 @@ export function buildCurrentInboxMessages(
       status: session.status,
       issueCount: session.issues.length,
       error: session.error,
+      summary: session.summary,
+      requiresAttention:
+        session.status === "failed" ||
+        session.issues.some((issue) =>
+          ["blocked", "failed"].includes(issue.outcome),
+        ),
     });
   }
 
@@ -160,6 +180,63 @@ export function isInboxMessageUnread(
   readVersions: Record<string, string>,
 ) {
   return readVersions[message.id] !== message.version;
+}
+
+export function classifyInboxMessage(
+  message: InboxMessage,
+): InboxCategory {
+  if (message.kind === "session") {
+    return message.requiresAttention || message.status === "failed"
+      ? "action_required"
+      : "activity";
+  }
+
+  const result = message.structuredResult;
+  if (
+    result?.urgency === "immediate" ||
+    result?.importance === "critical" ||
+    (message.priority === 1 &&
+      (message.status === "blocked" || message.status === "failed"))
+  ) {
+    return "urgent";
+  }
+  if (
+    result?.humanActionRequired ||
+    message.status === "blocked" ||
+    message.status === "failed"
+  ) {
+    return "action_required";
+  }
+  if (
+    result?.importance === "important" ||
+    result?.impact === "project" ||
+    result?.impact === "organization" ||
+    (message.status === "completed" &&
+      message.priority !== null &&
+      message.priority <= 2)
+  ) {
+    return "important";
+  }
+  return "activity";
+}
+
+export function groupInboxMessages(
+  messages: InboxMessageWithReadState[],
+): Record<InboxCategory, InboxMessageWithReadState[]> {
+  return {
+    urgent: messages.filter(
+      (message) => classifyInboxMessage(message) === "urgent",
+    ),
+    action_required: messages.filter(
+      (message) => classifyInboxMessage(message) === "action_required",
+    ),
+    important: messages.filter(
+      (message) => classifyInboxMessage(message) === "important",
+    ),
+    activity: messages.filter(
+      (message) => classifyInboxMessage(message) === "activity",
+    ),
+  };
 }
 
 function readInboxStorage(storageKey: string): InboxStorage {
@@ -290,6 +367,9 @@ export function useInbox(
     messages,
     markAllRead,
     markRead,
-    unreadCount: messages.filter((message) => message.isUnread).length,
+    unreadCount: messages.filter(
+      (message) =>
+        message.isUnread && classifyInboxMessage(message) !== "activity",
+    ).length,
   };
 }

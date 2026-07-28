@@ -11,7 +11,7 @@ This is the version-matched workflow guide embedded in the Briar CLI. Use the sa
 - Treat the workflow as repository-derived; never replace it with generic stage templates.
 - Record stages in order. Never invent PR, CI, deployment, or production work absent from the workflow.
 - Event and evidence keys are idempotency keys. Reuse a key only for an identical retry.
-- Record `completed` only after required stages, required evidence, and the result summary exist.
+- Record `completed` only after required stages, required evidence, and a structured result exist.
 
 ## Saved agent context
 
@@ -109,12 +109,26 @@ briar run event add \
 Later events should use the returned run ID. Useful optional event fields include:
 
 - Git: `--repository`, `--branch`, `--commit-sha`, repeated `--pull-request-url`, `--target-sha`
-- content: `--issue-description-file`, `--result-summary-file`, `--context-json`
+- content: `--issue-description-file`, `--structured-result-file`, `--context-json`
 - tracker: `--tracker-provider`, `--issue-id`, `--issue-identifier`, `--issue-url`, `--issue-state`
 - timing and detail: `--observed-at`, `--status-detail`, `--actor`
 
-Within an attempt, workflow stages cannot move backward. Multiple events in one stage are
+Within a revision, workflow stages cannot move backward. Multiple events in one stage are
 allowed when each represents a distinct milestone with its own stable key.
+
+When review or QA discovers a product-code problem, start a new revision in the
+same attempt and worktree:
+
+```sh
+briar run rework --run '<run-id>' \
+  --to '<earlier-configured-stage>' \
+  --reason '<what must change>'
+```
+
+Rework preserves the active attempt, claim, branch, worktree, and audit history. It
+increments the revision and makes events and evidence from the target stage onward
+non-canonical until those stages are recorded again. Do not use rework for transient
+infrastructure failures; remain in the current QA stage and retry the same check.
 
 ## Record evidence
 
@@ -147,6 +161,9 @@ off a run:
 ```sh
 briar run evidence list --run '<run-id>'
 ```
+
+The evidence response includes each item's revision, the stage's required revision,
+and whether the item is currently canonical.
 
 Typical evidence mapping:
 
@@ -212,20 +229,39 @@ the target actually used, observed behavior, rollback posture when relevant, and
 
 ## Complete, recover, and clean up
 
-Write a summary covering the requested outcome, implementation, evidence for every required
-stage, applicable PR/release references, and remaining risks. Then complete:
+Write a structured JSON result covering the observed outcome, importance, urgency, impact,
+whether a person must act, the exact next action, and any due time. Use this contract:
+
+```json
+{
+  "summary": "What changed and what was verified.",
+  "outcome": "completed",
+  "importance": "routine",
+  "urgency": "normal",
+  "impact": "issue",
+  "humanActionRequired": false,
+  "nextAction": null,
+  "dueAt": null
+}
+```
+
+Allowed values are `completed|partial|blocked|failed` for `outcome`,
+`routine|important|critical` for `importance`, `normal|time_sensitive|immediate`
+for `urgency`, and `issue|project|organization` for `impact`. When
+`humanActionRequired` is true, `nextAction` must state the exact human action.
+Then complete:
 
 ```sh
 briar run complete --run '<run-id>' \
   --event-key '<source-key>:completed:criteria-met' \
-  --result-summary-file '<summary-file>'
+  --structured-result-file '<result-json-file>'
 ```
 
 Completion requires:
 
 - an event for every required stage;
 - passed or skipped evidence for every configured evidence type;
-- a non-empty result summary;
+- a valid structured result;
 - a terminal Linear state when Linear is configured for the run.
 
 On failure:
@@ -242,6 +278,8 @@ briar run cancel --run '<run-id>' --reason '<why it was abandoned>'
 
 Retry creates a new attempt while preserving earlier events and evidence. Reuse a
 `--request-id` only for an identical timed-out retry or cancel request.
+Use rework instead of retry when the same active worker can revise code after review
+or QA feedback.
 
 Worktree commands:
 
