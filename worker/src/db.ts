@@ -11,6 +11,7 @@ import {
   type AutoHuntWorkflow,
   type AutoHuntWorkflowStageId,
 } from "../../src/lib/auto-hunt-contract";
+import type { StructuredAgentResult } from "../../src/lib/agent-result";
 import {
   defaultProjectAgentCalendarColor,
   defaultProjectAgentCopy,
@@ -124,6 +125,7 @@ export type ProjectAgentScheduleRunRow = {
   started_at: string;
   completed_at: string | null;
   result_summary: string | null;
+  structured_result_json: string | null;
   error: string | null;
   created_at: string;
   updated_at: string;
@@ -151,6 +153,7 @@ export type HuntRunRow = {
   tracker_issue_state: string | null;
   issue_description: string | null;
   result_summary: string | null;
+  structured_result_json: string | null;
   pull_request_urls: string;
   target_sha: string | null;
   source_created_at: string | null;
@@ -268,6 +271,7 @@ export type HuntEventInput = {
   tracker: TrackerInput;
   issueDescription: string | null;
   resultSummary: string | null;
+  structuredResult: StructuredAgentResult | null;
   pullRequestUrls: string[];
   targetSha: string | null;
   sourceCreatedAt: string | null;
@@ -969,7 +973,8 @@ const scheduleRunSelect = `
          agent.skill_markdown as agent_skill_markdown,
          settings.workflow_json,
          run.status, run.scheduled_for, run.lease_expires_at,
-         run.started_at, run.completed_at, run.result_summary, run.error,
+         run.started_at, run.completed_at, run.result_summary,
+         run.structured_result_json, run.error,
          run.created_at, run.updated_at
   from briar_project_agent_schedule_runs run
   join briar_project_agent_schedules schedule on schedule.id = run.schedule_id
@@ -1232,6 +1237,7 @@ export async function completeProjectAgentScheduleRun(
     claimTokenHash: string;
     status: Exclude<ProjectAgentScheduleRunStatus, "running">;
     resultSummary: string | null;
+    structuredResult: StructuredAgentResult;
     error: string | null;
     observedAt: string;
   },
@@ -1240,7 +1246,8 @@ export async function completeProjectAgentScheduleRun(
     .prepare(
       `update briar_project_agent_schedule_runs
        set status = ?, claim_token_hash = null, lease_expires_at = null,
-           completed_at = ?, result_summary = ?, error = ?, updated_at = ?
+           completed_at = ?, result_summary = ?, structured_result_json = ?,
+           error = ?, updated_at = ?
        where id = ? and project_id = ? and status = 'running'
          and claim_token_hash = ?
        returning id`,
@@ -1249,6 +1256,7 @@ export async function completeProjectAgentScheduleRun(
       input.status,
       input.observedAt,
       input.resultSummary,
+      stableJson(input.structuredResult),
       input.error,
       input.observedAt,
       runId,
@@ -1417,7 +1425,8 @@ export async function listDashboardRuns(db: D1Database, projectId: string) {
               run.commit_sha, run.tracker_provider, run.tracker_issue_id,
               run.tracker_issue_identifier, run.tracker_issue_url,
               run.tracker_issue_state, run.issue_description,
-              run.result_summary, run.pull_request_urls, run.target_sha,
+              run.result_summary, run.structured_result_json,
+              run.pull_request_urls, run.target_sha,
               run.source_created_at, run.staging_qa_status,
               run.production_qa_status, run.staging_qa_detail,
               run.production_qa_detail, run.context_json,
@@ -2160,11 +2169,12 @@ export async function recordHuntEvent(
            repository, branch, commit_sha, tracker_provider,
            tracker_issue_id, tracker_issue_identifier, tracker_issue_url,
            tracker_issue_state, issue_description, result_summary,
+           structured_result_json,
            pull_request_urls, target_sha, source_created_at,
            staging_qa_status, production_qa_status, staging_qa_detail,
            production_qa_detail, context_json, started_at, completed_at,
            last_event_at, created_at, updated_at
-         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          on conflict(project_id, source, source_key) do nothing`,
       )
       .bind(
@@ -2189,6 +2199,9 @@ export async function recordHuntEvent(
         normalizedInput.tracker?.state ?? null,
         normalizedInput.issueDescription,
         normalizedInput.resultSummary,
+        normalizedInput.structuredResult
+          ? stableJson(normalizedInput.structuredResult)
+          : null,
         stableJson(mergedPullRequestUrls),
         normalizedInput.targetSha,
         normalizedInput.sourceCreatedAt,
@@ -2263,6 +2276,7 @@ export async function recordHuntEvent(
              tracker_issue_state = case when ? >= last_event_at then coalesce(?, tracker_issue_state) else tracker_issue_state end,
              issue_description = case when ? >= last_event_at then coalesce(?, issue_description) else issue_description end,
              result_summary = case when ? >= last_event_at then coalesce(?, result_summary) else result_summary end,
+             structured_result_json = case when ? >= last_event_at then coalesce(?, structured_result_json) else structured_result_json end,
              pull_request_urls = ?,
              target_sha = case when ? >= last_event_at then coalesce(?, target_sha) else target_sha end,
              source_created_at = coalesce(source_created_at, ?),
@@ -2323,6 +2337,10 @@ export async function recordHuntEvent(
         normalizedInput.issueDescription,
         normalizedInput.occurredAt,
         normalizedInput.resultSummary,
+        normalizedInput.occurredAt,
+        normalizedInput.structuredResult
+          ? stableJson(normalizedInput.structuredResult)
+          : null,
         stableJson(mergedPullRequestUrls),
         normalizedInput.occurredAt,
         normalizedInput.targetSha,
@@ -2588,6 +2606,7 @@ export async function reworkHuntRun(
          set stage = ?, status = 'running', workflow_stage = ?,
              detail = ?, current_revision = ?, commit_sha = null,
              target_sha = null, result_summary = null,
+             structured_result_json = null,
              staging_qa_status = null, production_qa_status = null,
              staging_qa_detail = null, production_qa_detail = null,
              completed_at = null, last_event_at = ?, updated_at = ?
@@ -2767,6 +2786,7 @@ export async function recoverHuntRun(
              set stage = 'queued', status = 'queued', workflow_stage = null,
                  detail = ?, current_attempt = ?, current_revision = 1,
                  branch = null, commit_sha = null, result_summary = null,
+                 structured_result_json = null,
                  pull_request_urls = '[]',
                  target_sha = null, staging_qa_status = null,
                  production_qa_status = null, staging_qa_detail = null,
@@ -3026,6 +3046,7 @@ export async function moveHuntRun(
              commit_sha = case when ? then null else commit_sha end,
              target_sha = case when ? then null else target_sha end,
              result_summary = case when ? then null else result_summary end,
+             structured_result_json = case when ? then null else structured_result_json end,
              staging_qa_status = case when ? then null else staging_qa_status end,
              production_qa_status = case when ? then null else production_qa_status end,
              staging_qa_detail = case when ? then null else staging_qa_detail end,
@@ -3047,6 +3068,7 @@ export async function moveHuntRun(
         detail,
         targetAttempt,
         targetRevision,
+        isRegression ? 1 : 0,
         isRegression ? 1 : 0,
         isRegression ? 1 : 0,
         isRegression ? 1 : 0,
@@ -3236,11 +3258,12 @@ export async function importLinearHuntRuns(
                repository, branch, commit_sha, tracker_provider,
                tracker_issue_id, tracker_issue_identifier, tracker_issue_url,
                tracker_issue_state, issue_description, result_summary,
+               structured_result_json,
                pull_request_urls, target_sha, source_created_at,
                staging_qa_status, production_qa_status, staging_qa_detail,
                production_qa_detail, context_json, started_at, completed_at,
                last_event_at, created_at, updated_at
-             ) values (?, ?, 'issue', ?, ?, ?, ?, ?, ?, ?, ?, ?, null, null, ?, ?, ?, ?, ?, ?, ?, '[]', null, ?, null, null, null, null, ?, ?, ?, ?, ?, ?)
+             ) values (?, ?, 'issue', ?, ?, ?, ?, ?, ?, ?, ?, ?, null, null, ?, ?, ?, ?, ?, ?, ?, null, '[]', null, ?, null, null, null, null, ?, ?, ?, ?, ?, ?)
              on conflict(project_id, source, source_key) do nothing`,
           )
           .bind(

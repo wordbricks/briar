@@ -41,10 +41,12 @@ import type {
   ProjectAgent,
   UpdateProjectAgentInput,
 } from "../types";
+import { AgentProviderIcon } from "./AgentIcons";
 import { NativeSelect } from "./NativeSelect";
 import {
   ProjectAgentDetail,
-  type ProjectAgentTaskSessionRecord,
+  type ProjectAgentTaskSessionSettlement,
+  type ProjectAgentTaskSessionStart,
 } from "./ProjectAgentDetail";
 import { ProjectAgentSettings } from "./ProjectAgentSettings";
 
@@ -59,8 +61,9 @@ export function ProjectAgents({
   error: appError,
   isSidebarOpen,
   onRequestedSessionOpen,
-  onRecordTaskSession,
+  onSettleTaskSession,
   onStart,
+  onStartTaskSession,
   project,
   requestedSessionId = null,
   sessions,
@@ -70,9 +73,9 @@ export function ProjectAgents({
   error: string | null;
   isSidebarOpen: boolean;
   onRequestedSessionOpen?: () => void;
-  onRecordTaskSession?: (
-    agent: ProjectAgent,
-    record: ProjectAgentTaskSessionRecord,
+  onSettleTaskSession: (
+    sessionId: string,
+    settlement: ProjectAgentTaskSessionSettlement,
   ) => void;
   onStart: (
     agent: ProjectAgent,
@@ -82,6 +85,10 @@ export function ProjectAgents({
       maxIssues?: number;
     },
   ) => string;
+  onStartTaskSession: (
+    agent: ProjectAgent,
+    session: ProjectAgentTaskSessionStart,
+  ) => void;
   project: Project;
   requestedSessionId?: string | null;
   sessions: AutoHuntSession[];
@@ -235,11 +242,12 @@ export function ProjectAgents({
         error={appError}
         isSidebarOpen={isSidebarOpen}
         onBack={() => setSelectedAgent(null)}
-        onRecordTaskSession={(record) =>
-          onRecordTaskSession?.(selectedAgent, record)}
         onRequestedSessionOpen={onRequestedSessionOpen}
+        onSettleTaskSession={onSettleTaskSession}
         onStartAutoHunt={(runs, options) =>
           onStart(selectedAgent, runs, options)}
+        onStartTaskSession={(session) =>
+          onStartTaskSession(selectedAgent, session)}
         requestedSessionId={requestedSessionId}
         sessions={sessions}
       />
@@ -343,7 +351,17 @@ export function ProjectAgents({
                         </div>
                       </header>
                       <div className="project-agent-runtime">
-                        <span>{providerLabels[agent.provider]}</span>
+                        <span
+                          aria-label={providerLabels[agent.provider]}
+                          className={`project-agent-provider-icon ${agent.provider}`}
+                          role="img"
+                          title={providerLabels[agent.provider]}
+                        >
+                          <AgentProviderIcon
+                            provider={agent.provider}
+                            size={14}
+                          />
+                        </span>
                         <span>
                           {modelLabel(agent, t("agents.providerDefaultModel"))}
                         </span>

@@ -17,6 +17,7 @@ import {
   loadDashboard,
   loadIssueAttachment,
   loadIssueMessages,
+  loadRunEvidence,
   loadLinearImportStates,
   loadOrganizations,
   loadProjects,
@@ -102,6 +103,7 @@ import type {
   Organization,
   Project,
   ProjectSettings,
+  RunEvidence,
   SessionUser,
   UpdateIssueInput,
 } from "../types";
@@ -182,6 +184,45 @@ const initialDemoIssueMessages: Record<string, IssueMessage[]> = {
   ],
 };
 
+const initialDemoRunEvidence: Record<string, RunEvidence[]> = {
+  "demo-1": [
+    {
+      key: "BRIAR-12:analyzing:repository_findings",
+      attempt: 1,
+      revision: 1,
+      stage: "analyzing",
+      type: "repository_findings",
+      status: "passed",
+      detail: "이벤트 스트림과 이슈 상세 화면의 연결 지점을 확인했습니다.",
+      command: "rg -n \"AgentEvent|HuntDashboard\" src src-tauri",
+      url: null,
+      metadata: { filesReviewed: 6 },
+      actor: "briar-workflow",
+      observedAt: demoMessageTime,
+      recordedAt: demoMessageTime,
+      requiredRevision: 1,
+      canonical: true,
+    },
+    {
+      key: "BRIAR-12:implementing:diff",
+      attempt: 1,
+      revision: 1,
+      stage: "implementing",
+      type: "diff",
+      status: "pending",
+      detail: "이벤트 스트림 어댑터와 회귀 테스트를 작성하고 있습니다.",
+      command: null,
+      url: null,
+      metadata: null,
+      actor: "briar-workflow",
+      observedAt: demoReplyTime,
+      recordedAt: demoReplyTime,
+      requiredRevision: 1,
+      canonical: true,
+    },
+  ],
+};
+
 const emptyDashboard = (project: Project): DashboardPayload => ({
   project,
   settings: {
@@ -242,6 +283,9 @@ export function useBriar(options: UseBriarOptions = {}) {
   const [recoveringRunId, setRecoveringRunId] = useState<string | null>(null);
   const issueMessagesByRun = useRef<Record<string, IssueMessage[]>>(
     demoMode ? initialDemoIssueMessages : {},
+  );
+  const runEvidenceByRun = useRef<Record<string, RunEvidence[]>>(
+    demoMode ? initialDemoRunEvidence : {},
   );
   const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const [velen, setVelen] = useState<VelenInspection | null>(null);
@@ -1465,6 +1509,7 @@ export function useBriar(options: UseBriarOptions = {}) {
             issueDescription: input.description,
             attachments,
             resultSummary: null,
+            structuredResult: null,
             pullRequestUrls: [],
             targetSha: null,
             sourceCreatedAt: occurredAt,
@@ -1610,6 +1655,7 @@ export function useBriar(options: UseBriarOptions = {}) {
             : current,
         );
         delete issueMessagesByRun.current[runId];
+        delete runEvidenceByRun.current[runId];
       } catch (caught) {
         const message = caught instanceof Error ? caught.message : String(caught);
         setError(message);
@@ -1632,6 +1678,21 @@ export function useBriar(options: UseBriarOptions = {}) {
         [runId]: messages,
       };
       return messages;
+    },
+    [activeProjectId, token],
+  );
+
+  const readRunEvidence = useCallback(
+    async (runId: string) => {
+      if (!activeProjectId) throw new Error("증빙을 불러올 프로젝트가 없습니다.");
+      if (demoMode) return runEvidenceByRun.current[runId] ?? [];
+      if (!token) throw new Error("증빙을 불러오려면 로그인이 필요합니다.");
+      const evidence = await loadRunEvidence(token, activeProjectId, runId);
+      runEvidenceByRun.current = {
+        ...runEvidenceByRun.current,
+        [runId]: evidence,
+      };
+      return evidence;
     },
     [activeProjectId, token],
   );
@@ -2033,6 +2094,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     readIssueAttachment,
     editIssue,
     readIssueMessages,
+    readRunEvidence,
     addIssueMessage,
     setActiveOrganizationId: selectOrganization,
     setActiveProjectId: selectProject,

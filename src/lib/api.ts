@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { structuredAgentResultSchema } from "./agent-result";
 import { validateIssueAttachments } from "./issue-attachments";
 import type { AutoHuntWorkflow } from "./auto-hunt-contract";
 import {
@@ -26,6 +27,7 @@ import type {
   Organization,
   OrganizationMember,
   ProjectSettings,
+  RunEvidence,
   SessionUser,
   UpdateProjectAgentInput,
   UpdateProjectAgentScheduleInput,
@@ -142,6 +144,7 @@ const projectAgentScheduleRunSchema = z.object({
   startedAt: z.string(),
   completedAt: z.string().nullable(),
   resultSummary: z.string().nullable(),
+  structuredResult: structuredAgentResultSchema.nullable(),
   error: z.string().nullable(),
 });
 const claimedProjectAgentScheduleRunSchema =
@@ -371,7 +374,30 @@ export async function loadDashboard(
   token: string,
   projectId: string,
 ): Promise<DashboardPayload> {
-  return request<DashboardPayload>(`/projects/${projectId}/dashboard`, token);
+  const dashboard = await request<DashboardPayload>(
+    `/projects/${projectId}/dashboard`,
+    token,
+  );
+  return {
+    ...dashboard,
+    runs: dashboard.runs.map((run) => {
+      const events = run.events.map((event) => ({
+        ...event,
+        revision:
+          Number.isInteger(event.revision) && event.revision >= 1
+            ? event.revision
+            : 1,
+      }));
+      return {
+        ...run,
+        currentRevision:
+          Number.isInteger(run.currentRevision) && run.currentRevision >= 1
+            ? run.currentRevision
+            : Math.max(1, ...events.map((event) => event.revision)),
+        events,
+      };
+    }),
+  };
 }
 
 export async function createProject(
@@ -502,8 +528,18 @@ export async function completeProjectAgentScheduleRun(
   projectId: string,
   runId: string,
   input:
-    | { claimToken: string; status: "completed"; resultSummary: string }
-    | { claimToken: string; status: "failed"; error: string },
+    | {
+        claimToken: string;
+        status: "completed";
+        resultSummary: string;
+        structuredResult: z.infer<typeof structuredAgentResultSchema>;
+      }
+    | {
+        claimToken: string;
+        status: "failed";
+        error: string;
+        structuredResult: z.infer<typeof structuredAgentResultSchema>;
+      },
 ): Promise<ProjectAgentScheduleRun> {
   const result = await request<{ run: unknown }>(
     `/projects/${projectId}/agent-schedule-runs/${runId}/complete`,
@@ -515,6 +551,7 @@ export async function completeProjectAgentScheduleRun(
         status: input.status,
         resultSummary:
           input.status === "completed" ? input.resultSummary : null,
+        structuredResult: input.structuredResult,
         error: input.status === "failed" ? input.error : null,
       }),
     },
@@ -688,6 +725,20 @@ export async function loadIssueMessages(
     token,
   );
   return result.messages;
+}
+
+export async function loadRunEvidence(
+  token: string,
+  projectId: string,
+  runId: string,
+) {
+  const result = await request<{
+    runId: string;
+    attempt: number;
+    revision: number;
+    evidence: RunEvidence[];
+  }>(`/projects/${projectId}/runs/${runId}/evidence`, token);
+  return result.evidence;
 }
 
 export async function createIssueMessage(

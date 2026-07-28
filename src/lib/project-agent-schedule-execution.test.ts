@@ -32,6 +32,7 @@ const scheduledRun = (
   startedAt: "2026-07-28T00:00:01.000Z",
   completedAt: null,
   resultSummary: null,
+  structuredResult: null,
   error: null,
 });
 
@@ -68,6 +69,16 @@ const dependencies = (): ProjectAgentScheduleExecutionDependencies => ({
     message: "Responsibility complete.",
     maxIssues: null,
     workspaceRoot: "/repo",
+    structuredResult: {
+      summary: "Responsibility complete.",
+      outcome: "completed",
+      importance: "routine",
+      urgency: "normal",
+      impact: "issue",
+      humanActionRequired: false,
+      nextAction: null,
+      dueAt: null,
+    } as const,
   })),
   startAutoHunt: vi.fn(async () => ({
     dispatchGroupId: "dispatch-1",
@@ -155,6 +166,7 @@ describe("scheduled project agent execution", () => {
       message: "Dispatch the queued work.",
       maxIssues: 3,
       workspaceRoot: "/repo",
+      structuredResult: null,
     });
 
     await expect(
@@ -201,6 +213,7 @@ describe("scheduled project agent execution", () => {
       message: "Dispatch the queued work.",
       maxIssues: null,
       workspaceRoot: "/repo",
+      structuredResult: null,
     });
     vi.mocked(current.loadDashboard).mockResolvedValue({
       ...dashboard,

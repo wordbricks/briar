@@ -116,6 +116,7 @@ export function App() {
   const [requestedSessionId, setRequestedSessionId] = useState<string | null>(
     null,
   );
+  const [isIssueDialogOpen, setIsIssueDialogOpen] = useState(false);
   const [companionPage, setCompanionPage] = useState<
     "issues" | "search" | "inbox" | "settings"
   >("issues");
@@ -303,6 +304,10 @@ export function App() {
             onScheduleOpen={() => navigateToPage("schedule")}
             onInboxOpen={() => navigateToPage("inbox")}
             onIssuesOpen={() => navigateToPage("issues")}
+            onCreateIssue={() => {
+              navigateToPage("issues");
+              setIsIssueDialogOpen(true);
+            }}
             onAddOrganization={() => navigateToPage("organization-create")}
             onOrganizationChange={(organizationId) => {
               briar.setActiveOrganizationId(organizationId);
@@ -479,12 +484,8 @@ export function App() {
             error={briar.error}
             isSidebarOpen={isSidebarOpen}
             onRequestedSessionOpen={() => setRequestedSessionId(null)}
-            onRecordTaskSession={(agent, record) =>
-              autoHunt.recordTaskSession(
-                activeProject.id,
-                agent.id,
-                record,
-              )}
+            onSettleTaskSession={(sessionId, settlement) =>
+              autoHunt.settleTaskSession(sessionId, settlement)}
             onStart={(agent, runs, options) =>
               autoHunt.startSession(
                 activeProject.id,
@@ -498,6 +499,8 @@ export function App() {
                 },
               )
             }
+            onStartTaskSession={(agent, session) =>
+              autoHunt.startTaskSession(activeProject.id, agent.id, session)}
             project={activeProject}
             requestedSessionId={requestedSessionId}
             sessions={autoHunt.sessions}
@@ -514,6 +517,7 @@ export function App() {
             dashboard={briar.dashboard}
             error={briar.error}
             isCreatingIssue={briar.isCreatingIssue}
+            isIssueDialogOpen={isIssueDialogOpen}
             deletingIssueId={briar.deletingIssueId}
             updatingIssueId={briar.updatingIssueId}
             needsLocalConnection={!briar.isActiveProjectConnectedLocally}
@@ -525,10 +529,12 @@ export function App() {
             onConnectRepository={briar.reconnectProject}
             onAddProject={briar.startProjectCreation}
             onCreateIssue={briar.addIssue}
+            onIssueDialogOpenChange={setIsIssueDialogOpen}
             onDeleteIssue={briar.deleteIssue}
             onUpdateIssue={briar.editIssue}
             onLoadAttachment={briar.readIssueAttachment}
             onLoadIssueMessages={briar.readIssueMessages}
+            onLoadRunEvidence={briar.readRunEvidence}
             onMoveRun={briar.moveRun}
             onRetryRun={briar.retryRun}
             onCancelRun={briar.cancelRun}
@@ -639,6 +645,7 @@ export function App() {
             dashboard={briar.dashboard}
             error={briar.error}
             isCreatingIssue={briar.isCreatingIssue}
+            isIssueDialogOpen={isIssueDialogOpen}
             deletingIssueId={briar.deletingIssueId}
             updatingIssueId={briar.updatingIssueId}
             recoveringRunId={briar.recoveringRunId}
@@ -652,10 +659,12 @@ export function App() {
               setCompanionPage("issues");
             }}
             onCreateIssue={briar.addIssue}
+            onIssueDialogOpenChange={setIsIssueDialogOpen}
             onDeleteIssue={briar.deleteIssue}
             onUpdateIssue={briar.editIssue}
             onLoadAttachment={briar.readIssueAttachment}
             onLoadIssueMessages={briar.readIssueMessages}
+            onLoadRunEvidence={briar.readRunEvidence}
             onMoveRun={briar.moveRun}
             onRequestedRunOpen={() => setRequestedRunId(null)}
             onRetryRun={briar.retryRun}

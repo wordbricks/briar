@@ -41,6 +41,7 @@ function calendarRun(
     startedAt: start,
     completedAt: end,
     resultSummary: "Completed.",
+    structuredResult: null,
     error: null,
   };
 }
