@@ -138,7 +138,7 @@ describe("CreateIssueDialog clipboard attachments", () => {
     await act(async () => root.unmount());
   });
 
-  it("submits with Enter from the title input", async () => {
+  it("moves focus to the description with Enter from the title input", async () => {
     const onCreate = vi.fn(async () => undefined);
     const root = createRoot(container);
     await act(async () => {
@@ -172,13 +172,10 @@ describe("CreateIssueDialog clipboard attachments", () => {
     });
 
     expect(enterEvent.defaultPrevented).toBe(true);
-    expect(onCreate).toHaveBeenCalledWith({
-      attachments: [],
-      description: null,
-      priority: 2,
-      status: "queued",
-      title: "Enter-created issue",
-    });
+    expect(document.activeElement).toBe(
+      container.querySelector(".issue-description-input"),
+    );
+    expect(onCreate).not.toHaveBeenCalled();
 
     await act(async () => root.unmount());
   });
