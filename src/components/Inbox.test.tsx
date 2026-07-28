@@ -49,7 +49,7 @@ describe("Inbox", () => {
     vi.restoreAllMocks();
   });
 
-  it("shows prioritized sections and keeps routine activity collapsed", async () => {
+  it("shows one list with attention filters selected by default", async () => {
     const messages = [
       issue("urgent", "Production is blocked", {
         status: "failed",
@@ -107,20 +107,66 @@ describe("Inbox", () => {
       ),
     );
 
-    expect(container.textContent).toContain("긴급1");
-    expect(container.textContent).toContain("확인 필요1");
-    expect(container.textContent).toContain("중요 변경1");
-    expect(container.textContent).toContain("최근 활동1");
+    const filters = [...container.querySelectorAll(".inbox-filter")];
+    expect(filters).toHaveLength(4);
+    expect(
+      filters.map((filter) => filter.getAttribute("aria-pressed")),
+    ).toEqual(["true", "true", "true", "false"]);
     expect(container.textContent).toContain("Production is blocked");
     expect(container.textContent).toContain("다음 행동: Choose the release scope.");
     expect(container.textContent).not.toContain("Routine dependency update");
+    expect(container.querySelectorAll(".inbox-list")).toHaveLength(1);
+    expect(container.querySelectorAll(".inbox-message")).toHaveLength(3);
+    expect(container.querySelector(".inbox-section")).toBeNull();
 
-    const activityToggle = [...container.querySelectorAll("button")].find(
-      (button) => button.textContent?.includes("최근 활동"),
+    const activityFilter = filters.find((button) =>
+      button.textContent?.includes("최근 활동"),
     );
-    await act(async () => activityToggle?.click());
+    await act(async () =>
+      (activityFilter as HTMLButtonElement | undefined)?.click(),
+    );
 
     expect(container.textContent).toContain("Routine dependency update");
-    expect(activityToggle?.getAttribute("aria-expanded")).toBe("true");
+    expect(activityFilter?.getAttribute("aria-pressed")).toBe("true");
+    expect(container.querySelectorAll(".inbox-message")).toHaveLength(4);
+  });
+
+  it("renders compact rows with title and detail content only", async () => {
+    const message = issue("action", "Release scope decision", {
+      structuredResult: {
+        summary: "A release decision is required.",
+        outcome: "partial",
+        importance: "important",
+        urgency: "time_sensitive",
+        impact: "project",
+        humanActionRequired: true,
+        nextAction: "Choose the release scope.",
+        dueAt: null,
+      },
+    });
+
+    await act(async () =>
+      root.render(
+        <I18nProvider>
+          <Inbox
+            isSidebarOpen
+            messages={[message]}
+            onMarkAllRead={vi.fn()}
+            onOpen={vi.fn()}
+            unreadCount={1}
+          />
+        </I18nProvider>,
+      ),
+    );
+
+    const row = container.querySelector(".inbox-message");
+    expect(row?.querySelector(".inbox-message-copy > strong")?.textContent).toBe(
+      "Release scope decision",
+    );
+    expect(row?.querySelector(".inbox-message-detail")?.textContent).toContain(
+      "Briar·다음 행동: Choose the release scope.",
+    );
+    expect(row?.querySelector(".inbox-message-time")).not.toBeNull();
+    expect(row?.querySelector(".inbox-next-action")).toBeNull();
   });
 });
