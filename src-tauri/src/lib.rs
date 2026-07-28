@@ -3744,6 +3744,7 @@ async fn run_project_agent(
             );
         }
         let settings = project_llm_settings_from(&config_path, &project_id)?;
+        let full_access = project_auto_hunt_full_access(&config_path, &project_id)?;
         let workflow_json = project_auto_hunt_workflow_json(&config_path, &project_id)?;
         let backend = agent::discover_backend(
             provider,
@@ -3778,7 +3779,7 @@ async fn run_project_agent(
             &workspace,
             agent::ChatExecution {
                 approval_policy: settings.approval_policy,
-                sandbox_mode: agent::SandboxMode::WorkspaceWrite,
+                sandbox_mode: project_agent_sandbox_mode(full_access),
                 network_access: true,
                 model,
                 effort,
@@ -3950,6 +3951,14 @@ fn project_chat_execution(
         environment: Vec::new(),
         // Project chat runs in the checkout only; Auto Hunt widens this.
         workspace_write_roots: Vec::new(),
+    }
+}
+
+fn project_agent_sandbox_mode(full_access: bool) -> agent::SandboxMode {
+    if full_access {
+        agent::SandboxMode::DangerFullAccess
+    } else {
+        agent::SandboxMode::WorkspaceWrite
     }
 }
 
@@ -6930,11 +6939,16 @@ branch refs/heads/briar/second-11111111
     }
 
     #[test]
-    fn auto_hunt_defaults_to_full_access_and_allows_a_workspace_sandbox() {
+    fn project_filesystem_access_controls_saved_agent_sandbox() {
         let config_path = host_test_config_path("sandbox-default");
         config_with_cli_owned_settings(&config_path, None, None);
-        assert!(project_auto_hunt_full_access(&config_path, "project-1")
-            .expect("sandbox setting should resolve"));
+        let full_access = project_auto_hunt_full_access(&config_path, "project-1")
+            .expect("sandbox setting should resolve");
+        assert!(full_access);
+        assert_eq!(
+            project_agent_sandbox_mode(full_access),
+            agent::SandboxMode::DangerFullAccess
+        );
 
         let sandboxed = host_test_config_path("sandbox-workspace-only");
         config_with_cli_owned_settings(
@@ -6945,8 +6959,13 @@ branch refs/heads/briar/second-11111111
                 extra: BTreeMap::new(),
             }),
         );
-        assert!(!project_auto_hunt_full_access(&sandboxed, "project-1")
-            .expect("sandbox setting should resolve"));
+        let full_access = project_auto_hunt_full_access(&sandboxed, "project-1")
+            .expect("sandbox setting should resolve");
+        assert!(!full_access);
+        assert_eq!(
+            project_agent_sandbox_mode(full_access),
+            agent::SandboxMode::WorkspaceWrite
+        );
     }
 
     #[test]
