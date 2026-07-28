@@ -8,6 +8,7 @@ import {
   deleteProjectAgentSchedule,
   loadProjectAgentScheduleRuns,
   loadProjectAgents,
+  loadRunEvidence,
   loadSession,
   updateProjectAgent,
   updateProjectAgentSchedule,
@@ -89,6 +90,50 @@ describe("API errors", () => {
       expect.stringContaining(`/projects/${projectId}/runs/${runId}`),
       expect.objectContaining({ method: "DELETE" }),
     );
+  });
+
+  it("loads run evidence through the user-authenticated project endpoint", async () => {
+    const projectId = "22222222-2222-4222-8222-222222222222";
+    const runId = "11111111-1111-4111-8111-111111111111";
+    const evidence = [{
+      key: "LOCAL-1:local_qa:local_ci_result",
+      attempt: 1,
+      revision: 2,
+      stage: "local_qa",
+      type: "local_ci_result",
+      status: "passed",
+      detail: "Focused checks passed.",
+      command: "bun run test",
+      url: null,
+      metadata: null,
+      actor: "briar-workflow",
+      observedAt: "2026-07-28T00:00:00.000Z",
+      recordedAt: "2026-07-28T00:00:01.000Z",
+      requiredRevision: 2,
+      canonical: true,
+    }];
+    let capturedInit: RequestInit | undefined;
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        capturedInit = init;
+        return new Response(
+          JSON.stringify({ runId, attempt: 1, revision: 2, evidence }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(loadRunEvidence("token", projectId, runId)).resolves.toEqual(
+      evidence,
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(`/projects/${projectId}/runs/${runId}/evidence`),
+      expect.any(Object),
+    );
+    expect(
+      new Headers(capturedInit?.headers).get("Authorization"),
+    ).toBe("Bearer token");
   });
 
   it("creates a project agent with its provider, model, and responsibility", async () => {
