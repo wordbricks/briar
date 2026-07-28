@@ -3,6 +3,7 @@ import type {
   ProjectAgentScheduleRun,
 } from "../types";
 import type { ProjectLlmChatResponse } from "./project-llm";
+import type { StructuredAgentResult } from "./agent-result";
 import { isDesktopTauri } from "./platform";
 
 export const PROJECT_AGENT_SCHEDULE_POLL_INTERVAL_MS = 15_000;
@@ -18,8 +19,18 @@ export type ProjectAgentScheduleRunnerDependencies = {
     projectId: string,
     runId: string,
     input:
-      | { claimToken: string; status: "completed"; resultSummary: string }
-      | { claimToken: string; status: "failed"; error: string },
+      | {
+          claimToken: string;
+          status: "completed";
+          resultSummary: string;
+          structuredResult: StructuredAgentResult;
+        }
+      | {
+          claimToken: string;
+          status: "failed";
+          error: string;
+          structuredResult: StructuredAgentResult;
+        },
   ) => Promise<ProjectAgentScheduleRun>;
   renew: (
     projectId: string,
@@ -28,7 +39,9 @@ export type ProjectAgentScheduleRunnerDependencies = {
   ) => Promise<unknown>;
   execute: (
     run: ClaimedProjectAgentScheduleRun,
-  ) => Promise<ProjectLlmChatResponse>;
+  ) => Promise<
+    ProjectLlmChatResponse & { structuredResult: StructuredAgentResult }
+  >;
   log: (message: string, error?: unknown) => void;
 };
 
@@ -54,12 +67,12 @@ export async function executeClaimedProjectAgentSchedule(
   }, PROJECT_AGENT_SCHEDULE_RENEW_INTERVAL_MS);
   try {
     const response = await dependencies.execute(run);
-    const resultSummary =
-      response.message.trim() || `${run.agent.name} 실행이 완료되었습니다.`;
+    const resultSummary = response.structuredResult.summary;
     return await dependencies.complete(run.projectId, run.id, {
       claimToken: run.claimToken,
       status: "completed",
       resultSummary: bounded(resultSummary, 100_000),
+      structuredResult: response.structuredResult,
     });
   } catch (error) {
     const message = bounded(describe(error).trim() || "Unknown provider error", 4_000);
@@ -68,6 +81,16 @@ export async function executeClaimedProjectAgentSchedule(
         claimToken: run.claimToken,
         status: "failed",
         error: message,
+        structuredResult: {
+          summary: message,
+          outcome: "failed",
+          importance: "important",
+          urgency: "time_sensitive",
+          impact: "issue",
+          humanActionRequired: true,
+          nextAction: "실패 원인을 확인하고 예약 작업을 다시 실행하세요.",
+          dueAt: null,
+        },
       });
     } catch (completionError) {
       dependencies.log(

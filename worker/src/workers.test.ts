@@ -56,6 +56,7 @@ const queuedEvent = (sourceKey: string, minute: number): HuntEventInput => ({
   tracker: null,
   issueDescription: null,
   resultSummary: null,
+  structuredResult: null,
   pullRequestUrls: [],
   targetSha: null,
   sourceCreatedAt: atMinute(minute),
@@ -103,6 +104,7 @@ describe("detached execution workers", () => {
       "migrations/0025_project_agent_codex_pets.sql",
       "migrations/0026_flexible_project_agent_schedules.sql",
       "migrations/0027_run_revisions.sql",
+      "migrations/0029_structured_agent_results.sql",
     ]) {
       await executeSql(db, await readFile(resolve(migration), "utf8"));
     }

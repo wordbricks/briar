@@ -1509,6 +1509,7 @@ export function useBriar(options: UseBriarOptions = {}) {
             issueDescription: input.description,
             attachments,
             resultSummary: null,
+            structuredResult: null,
             pullRequestUrls: [],
             targetSha: null,
             sourceCreatedAt: occurredAt,

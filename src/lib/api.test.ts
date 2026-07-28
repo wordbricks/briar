@@ -413,6 +413,16 @@ describe("API errors", () => {
 
   it("claims and completes a due agent schedule run", async () => {
     const claimToken = `briar_schedule_claim_${"a".repeat(64)}`;
+    const structuredResult = {
+      summary: "Audit completed.",
+      outcome: "completed",
+      importance: "routine",
+      urgency: "normal",
+      impact: "issue",
+      humanActionRequired: false,
+      nextAction: null,
+      dueAt: null,
+    } as const;
     const run = {
       id: "11111111-1111-4111-8111-111111111111",
       projectId: "22222222-2222-4222-8222-222222222222",
@@ -433,6 +443,7 @@ describe("API errors", () => {
       startedAt: "2026-07-27T09:00:01.000Z",
       completedAt: null,
       resultSummary: null,
+      structuredResult: null,
       error: null,
     } as const;
     const fetchMock = vi
@@ -452,6 +463,7 @@ describe("API errors", () => {
               leaseExpiresAt: null,
               completedAt: "2026-07-27T09:01:00.000Z",
               resultSummary: "Audit completed.",
+              structuredResult,
             },
           }),
           {
@@ -473,11 +485,17 @@ describe("API errors", () => {
         "token",
         "22222222-2222-4222-8222-222222222222",
         run.id,
-        { claimToken, status: "completed", resultSummary: "Audit completed." },
+        {
+          claimToken,
+          status: "completed",
+          resultSummary: "Audit completed.",
+          structuredResult,
+        },
       ),
     ).resolves.toMatchObject({
       status: "completed",
       resultSummary: "Audit completed.",
+      structuredResult,
     });
   });
 
@@ -502,6 +520,16 @@ describe("API errors", () => {
       startedAt: "2026-07-27T09:00:01.000Z",
       completedAt: "2026-07-27T09:01:00.000Z",
       resultSummary: "Audit completed.",
+      structuredResult: {
+        summary: "Audit completed.",
+        outcome: "completed",
+        importance: "routine",
+        urgency: "normal",
+        impact: "issue",
+        humanActionRequired: false,
+        nextAction: null,
+        dueAt: null,
+      },
       error: null,
     } as const;
     const fetchMock = vi.fn(async () =>

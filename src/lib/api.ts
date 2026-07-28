@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { structuredAgentResultSchema } from "./agent-result";
 import { validateIssueAttachments } from "./issue-attachments";
 import type { AutoHuntWorkflow } from "./auto-hunt-contract";
 import {
@@ -143,6 +144,7 @@ const projectAgentScheduleRunSchema = z.object({
   startedAt: z.string(),
   completedAt: z.string().nullable(),
   resultSummary: z.string().nullable(),
+  structuredResult: structuredAgentResultSchema.nullable(),
   error: z.string().nullable(),
 });
 const claimedProjectAgentScheduleRunSchema =
@@ -503,8 +505,18 @@ export async function completeProjectAgentScheduleRun(
   projectId: string,
   runId: string,
   input:
-    | { claimToken: string; status: "completed"; resultSummary: string }
-    | { claimToken: string; status: "failed"; error: string },
+    | {
+        claimToken: string;
+        status: "completed";
+        resultSummary: string;
+        structuredResult: z.infer<typeof structuredAgentResultSchema>;
+      }
+    | {
+        claimToken: string;
+        status: "failed";
+        error: string;
+        structuredResult: z.infer<typeof structuredAgentResultSchema>;
+      },
 ): Promise<ProjectAgentScheduleRun> {
   const result = await request<{ run: unknown }>(
     `/projects/${projectId}/agent-schedule-runs/${runId}/complete`,
@@ -516,6 +528,7 @@ export async function completeProjectAgentScheduleRun(
         status: input.status,
         resultSummary:
           input.status === "completed" ? input.resultSummary : null,
+        structuredResult: input.structuredResult,
         error: input.status === "failed" ? input.error : null,
       }),
     },
