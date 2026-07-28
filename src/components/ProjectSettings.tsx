@@ -1,8 +1,10 @@
 import {
   AlertTriangle,
   ArrowRight,
+  Bot,
   Check,
   CheckCircle2,
+  CircleAlert,
   Copy,
   Database,
   Download,
@@ -12,6 +14,7 @@ import {
   Plug,
   RefreshCw,
   Rocket,
+  Save,
   Server,
   ShieldCheck,
   Sparkles,
@@ -47,9 +50,21 @@ import { Typography } from "@/components/ui/typography";
 import type { DashboardPayload, Project, ProjectSettings as ProjectSettingsData } from "../types";
 import { useI18n } from "../i18n";
 import {
+  agentEfforts,
+  agentModels,
+  agentProviders,
+  defaultAppProviderSettings,
+  defaultProjectLlmSettings,
   defaultProjectSandboxSettings,
+  loadAppProviderSettings,
+  loadProjectLlmSettings,
   loadProjectSandboxSettings,
+  updateProjectLlmSettings,
   updateProjectSandboxSettings,
+  type AgentProvider,
+  type AppProviderSettings,
+  type ApprovalPolicy,
+  type ModelEffort,
 } from "../lib/project-llm";
 import type { VelenInspection } from "../lib/project-connection";
 import type {
@@ -60,6 +75,12 @@ import type {
 import { LinearIssueImport } from "./LinearIssueImport";
 import { ProjectRemoteConnection } from "./ProjectRemoteConnection";
 import { SelectMenu } from "./SelectMenu";
+
+const providerLabels: Record<AgentProvider, string> = {
+  codex: "Codex",
+  claude: "Claude",
+  grok: "Grok",
+};
 
 type ProjectSettingsSection =
   | "general"
@@ -127,6 +148,24 @@ export function ProjectSettings({
   const [workflowError, setWorkflowError] = useState<string | null>(null);
   const [workflowRegenerated, setWorkflowRegenerated] = useState(false);
   const [workflowRevised, setWorkflowRevised] = useState(false);
+  const [runtimeProvider, setRuntimeProvider] = useState<AgentProvider>(
+    defaultProjectLlmSettings.provider,
+  );
+  const [runtimeModel, setRuntimeModel] = useState<string | null>(
+    defaultProjectLlmSettings.model,
+  );
+  const [runtimeEffort, setRuntimeEffort] = useState<ModelEffort | null>(
+    defaultProjectLlmSettings.effort,
+  );
+  const [approvalPolicy, setApprovalPolicy] = useState<ApprovalPolicy>(
+    defaultProjectLlmSettings.approvalPolicy,
+  );
+  const [savedRuntime, setSavedRuntime] = useState(defaultProjectLlmSettings);
+  const [providerAvailability, setProviderAvailability] =
+    useState<AppProviderSettings>(defaultAppProviderSettings);
+  const [runtimeLoading, setRuntimeLoading] = useState(true);
+  const [runtimeSaving, setRuntimeSaving] = useState(false);
+  const [runtimeError, setRuntimeError] = useState<string | null>(null);
   const [sandbox, setSandbox] = useState(defaultProjectSandboxSettings);
   const [sandboxLoading, setSandboxLoading] = useState(true);
   const [sandboxSaving, setSandboxSaving] = useState(false);
@@ -167,6 +206,48 @@ export function ProjectSettings({
   const workflowJson = workflowContract
     ? JSON.stringify(workflowContract, null, 2)
     : "";
+  const runtimeChanged =
+    runtimeProvider !== savedRuntime.provider ||
+    runtimeModel !== savedRuntime.model ||
+    runtimeEffort !== savedRuntime.effort ||
+    approvalPolicy !== savedRuntime.approvalPolicy;
+  const runtimeModels = agentModels[runtimeProvider];
+  const runtimeEfforts = agentEfforts[runtimeProvider];
+  const selectedRuntimeModelKnown = runtimeModels.some(
+    (option) => option.value === (runtimeModel ?? ""),
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    setRuntimeLoading(true);
+    setRuntimeError(null);
+    void Promise.all([
+      loadProjectLlmSettings(project.id),
+      loadAppProviderSettings(),
+    ])
+      .then(([settings, availability]) => {
+        if (cancelled) return;
+        setRuntimeProvider(settings.provider);
+        setRuntimeModel(settings.model);
+        setRuntimeEffort(settings.effort);
+        setApprovalPolicy(settings.approvalPolicy);
+        setSavedRuntime(settings);
+        setProviderAvailability(availability);
+      })
+      .catch((caught) => {
+        if (!cancelled) {
+          setRuntimeError(
+            caught instanceof Error ? caught.message : String(caught),
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setRuntimeLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [project.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -206,6 +287,31 @@ export function ProjectSettings({
       );
     } finally {
       setSandboxSaving(false);
+    }
+  };
+
+  const saveRuntime = async () => {
+    if (runtimeSaving) return;
+    setRuntimeSaving(true);
+    setRuntimeError(null);
+    try {
+      const saved = await updateProjectLlmSettings(project.id, {
+        provider: runtimeProvider,
+        model: runtimeModel,
+        effort: runtimeEffort,
+        approvalPolicy,
+      });
+      setRuntimeProvider(saved.provider);
+      setRuntimeModel(saved.model);
+      setRuntimeEffort(saved.effort);
+      setApprovalPolicy(saved.approvalPolicy);
+      setSavedRuntime(saved);
+    } catch (caught) {
+      setRuntimeError(
+        caught instanceof Error ? caught.message : String(caught),
+      );
+    } finally {
+      setRuntimeSaving(false);
     }
   };
 
@@ -716,6 +822,166 @@ export function ProjectSettings({
             className="project-settings-agent-configuration"
             hidden={activeSection !== "agent-configuration"}
           >
+            <section
+              aria-busy={runtimeLoading || runtimeSaving}
+              className="project-settings-runtime"
+            >
+              <header>
+                <span className="project-settings-runtime-icon">
+                  <Bot size={18} strokeWidth={1.8} />
+                </span>
+                <span>
+                  <strong>{t("settings.runtimeTitle")}</strong>
+                  <small>{t("settings.runtimeDescription")}</small>
+                </span>
+              </header>
+
+              <div className="project-settings-runtime-controls">
+                <label htmlFor="project-runtime-provider">
+                  {t("settings.provider")}
+                </label>
+                <SelectMenu
+                  disabled={runtimeLoading || runtimeSaving}
+                  id="project-runtime-provider"
+                  label={t("settings.provider")}
+                  onValueChange={(value) => {
+                    setRuntimeProvider(value as AgentProvider);
+                    setRuntimeModel(null);
+                    setRuntimeEffort(null);
+                  }}
+                  options={agentProviders.map((candidate) => ({
+                    description: !providerAvailability[candidate]
+                      ? t("settings.providerDisabled")
+                      : undefined,
+                    disabled: !providerAvailability[candidate],
+                    label: providerLabels[candidate],
+                    value: candidate,
+                  }))}
+                  size="small"
+                  value={runtimeProvider}
+                />
+
+                <label htmlFor="project-runtime-model">
+                  {t("settings.model")}
+                </label>
+                <SelectMenu
+                  disabled={runtimeLoading || runtimeSaving}
+                  id="project-runtime-model"
+                  label={t("settings.model")}
+                  onValueChange={(value) => setRuntimeModel(value || null)}
+                  options={[
+                    ...(!selectedRuntimeModelKnown && runtimeModel
+                      ? [{ label: runtimeModel, value: runtimeModel }]
+                      : []),
+                    ...runtimeModels.map((option) => ({
+                      label: option.value
+                        ? option.label
+                        : t("settings.providerDefaultModel"),
+                      value: option.value,
+                    })),
+                  ]}
+                  size="small"
+                  value={runtimeModel ?? ""}
+                />
+
+                <label htmlFor="project-runtime-effort">
+                  {t("settings.effort")}
+                </label>
+                <SelectMenu
+                  disabled={runtimeLoading || runtimeSaving}
+                  id="project-runtime-effort"
+                  label={t("settings.effort")}
+                  onValueChange={(value) =>
+                    setRuntimeEffort((value as ModelEffort) || null)
+                  }
+                  options={[
+                    {
+                      label: t("settings.providerDefaultEffort"),
+                      value: "",
+                    },
+                    ...runtimeEfforts.map((candidate) => ({
+                      label: candidate,
+                      value: candidate,
+                    })),
+                  ]}
+                  size="small"
+                  value={runtimeEffort ?? ""}
+                />
+
+                <label htmlFor="project-runtime-approval">
+                  {t("settings.approvalRequest")}
+                </label>
+                <SelectMenu
+                  disabled={runtimeLoading || runtimeSaving}
+                  id="project-runtime-approval"
+                  label={t("settings.approvalRequest")}
+                  onValueChange={(value) =>
+                    setApprovalPolicy(value as ApprovalPolicy)
+                  }
+                  options={[
+                    {
+                      description: t("settings.approvalUntrustedDescription"),
+                      label: t("settings.approvalUntrusted"),
+                      value: "untrusted",
+                    },
+                    {
+                      description: t("settings.approvalOnRequestDescription"),
+                      label: t("settings.approvalOnRequest"),
+                      value: "on-request",
+                    },
+                    {
+                      description: t("settings.approvalNeverDescription"),
+                      label: t("settings.approvalNever"),
+                      value: "never",
+                    },
+                  ]}
+                  size="small"
+                  value={approvalPolicy}
+                />
+              </div>
+
+              <p className="project-settings-runtime-note">
+                {t(
+                  approvalPolicy === "untrusted"
+                    ? "settings.approvalUntrustedDescription"
+                    : approvalPolicy === "on-request"
+                      ? "settings.approvalOnRequestDescription"
+                      : "settings.approvalNeverDescription",
+                ).replace("Codex", providerLabels[runtimeProvider])}
+              </p>
+              {runtimeError ? (
+                <p className="project-settings-runtime-error" role="alert">
+                  <CircleAlert size={14} />
+                  {runtimeError}
+                </p>
+              ) : null}
+              <footer>
+                <button
+                  disabled={
+                    runtimeLoading ||
+                    runtimeSaving ||
+                    !providerAvailability[runtimeProvider] ||
+                    !runtimeChanged
+                  }
+                  onClick={() => void saveRuntime()}
+                  type="button"
+                >
+                  {runtimeSaving ? (
+                    <LoaderCircle className="spin" size={14} />
+                  ) : !runtimeChanged ? (
+                    <Check size={14} />
+                  ) : (
+                    <Save size={14} />
+                  )}
+                  {runtimeSaving
+                    ? t("common.saving")
+                    : !runtimeChanged
+                      ? t("common.saved")
+                      : t("settings.saveRuntime")}
+                </button>
+              </footer>
+            </section>
+
             <div
               className={`project-settings-sandbox${
                 sandbox.fullAccess ? " unrestricted" : ""

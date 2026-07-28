@@ -578,6 +578,7 @@ export function App() {
                   agent,
                   coordinatorConversationId:
                     options?.coordinatorConversationId,
+                  parentSessionId: options?.parentSessionId,
                   maxIssues: options?.maxIssues,
                 },
               )

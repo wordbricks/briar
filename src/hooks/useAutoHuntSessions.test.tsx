@@ -123,7 +123,10 @@ describe("useAutoHuntSessions", () => {
           startedAt: "2026-07-28T00:00:00.000Z",
         } as HuntRun],
         undefined,
-        { agent: { id: "agent-1" } as ProjectAgent },
+        {
+          agent: { id: "agent-1" } as ProjectAgent,
+          parentSessionId: "task-session-1",
+        },
       );
     });
 
@@ -137,6 +140,8 @@ describe("useAutoHuntSessions", () => {
         expect.objectContaining({
           projectId: "project-1",
           sessionType: "dispatch",
+          parentSessionId: "task-session-1",
+          request: "Process queued issues with Auto Hunt.",
           status: "running",
         }),
       ]),
