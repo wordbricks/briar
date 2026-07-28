@@ -1984,7 +1984,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .project-schedule-dialog button:focus-visible { outline:2px solid #3975d2; outline-offset:2px; }
 .project-agents-scroll { min-height:0; flex:1; overflow-y:auto; background:var(--card); }
 .project-agents-content { min-height:100%; padding:0 34px 54px; }
-.project-agents-heading { min-height:190px; padding:42px 0 35px; display:flex; align-items:center; justify-content:space-between; gap:32px; border-bottom:1px solid #e8e8e5; background:var(--card); }
+.project-agents-heading { min-height:unset; padding:8px 0; display:flex; align-items:center; justify-content:space-between; gap:32px; border-bottom:1px solid #e8e8e5; background:var(--card); }
 .project-agents-heading > div { min-width:0; }
 .project-agents-heading h1 { margin:0; color:#181816; font-size:var(--text-4xl); letter-spacing:-1.1px; }
 .project-agents-heading > div > p:last-child { max-width:610px; margin:14px 0 0; color:#777872; font-size:var(--text-md); line-height:1.6; }
@@ -2232,7 +2232,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
   .project-schedule-days,.project-schedule-week { grid-template-columns:54px repeat(7,minmax(103px,1fr)); }
   .project-schedule-time-gutter span { padding-right:7px; }
   .project-agents-content { padding:0 18px 38px; }
-  .project-agents-heading { min-height:164px; padding:28px 0; gap:18px; }
+  .project-agents-heading { min-height:unset; padding:8px 0; gap:18px; }
   .project-agents-heading h1 { font-size:var(--text-3xl); }
   .project-agent-create { width:38px; padding:0; justify-content:center; font-size:0; }
   .project-agents-body { padding:26px 0 0; }
