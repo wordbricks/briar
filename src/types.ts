@@ -6,6 +6,7 @@ import {
   type AutoHuntWorkflow,
   type AutoHuntWorkflowStageId,
 } from "./lib/auto-hunt-contract";
+import type { StructuredAgentResult } from "./lib/agent-result";
 import type { ProjectAgentCodexPet } from "./lib/codex-pets";
 import type { AgentProvider } from "./lib/project-llm";
 import type {
@@ -87,6 +88,24 @@ export type IssueMessageSendResult = {
   agentReply: Promise<IssueMessage> | null;
 };
 
+export type RunEvidence = {
+  key: string;
+  attempt: number;
+  revision: number;
+  stage: string;
+  type: string;
+  status: "pending" | "passed" | "failed" | "skipped";
+  detail: string | null;
+  command: string | null;
+  url: string | null;
+  metadata: Record<string, unknown> | null;
+  actor: string;
+  observedAt: string;
+  recordedAt: string;
+  requiredRevision: number;
+  canonical: boolean;
+};
+
 export type HuntRun = {
   id: string;
   runNumber: number;
@@ -108,6 +127,7 @@ export type HuntRun = {
   issueDescription: string | null;
   attachments: IssueAttachment[];
   resultSummary: string | null;
+  structuredResult: StructuredAgentResult | null;
   pullRequestUrls: string[];
   targetSha: string | null;
   sourceCreatedAt: string | null;
@@ -216,6 +236,7 @@ export type ProjectAgentScheduleRun = {
   startedAt: string;
   completedAt: string | null;
   resultSummary: string | null;
+  structuredResult: StructuredAgentResult | null;
   error: string | null;
 };
 

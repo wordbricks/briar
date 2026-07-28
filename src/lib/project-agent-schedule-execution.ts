@@ -14,6 +14,7 @@ import type {
   DashboardPayload,
   HuntRun,
 } from "../types";
+import type { StructuredAgentResult } from "./agent-result";
 
 export type ProjectAgentScheduleExecutionDependencies = {
   loadDashboard: (
@@ -56,7 +57,9 @@ export async function executeScheduledProjectAgent(
   dependencies: ProjectAgentScheduleExecutionDependencies,
   token: string,
   run: ClaimedProjectAgentScheduleRun,
-): Promise<ProjectLlmChatResponse> {
+): Promise<
+  ProjectLlmChatResponse & { structuredResult: StructuredAgentResult }
+> {
   const sessionId = dependencies.startSession?.(run) ?? null;
   try {
     const { response, dispatchResult } = await executeProjectAgentTurn(
@@ -96,13 +99,54 @@ export async function executeScheduledProjectAgent(
         conversationId: null,
       },
     );
-    const result = dispatchResult === null
-      ? response
-      : {
+    let result: ProjectLlmChatResponse & {
+      structuredResult: StructuredAgentResult;
+    };
+    if (dispatchResult === null) {
+      if (!response.structuredResult) {
+        throw new Error("에이전트가 구조화된 실행 결과를 제출하지 않았습니다.");
+      }
+      result = {
+        conversationId: response.conversationId,
+        message: response.message,
+        workspaceRoot: response.workspaceRoot,
+        structuredResult: response.structuredResult,
+      };
+    } else {
+      const needsAction = dispatchResult.result.issues.some((issue) =>
+        ["blocked", "failed"].includes(issue.outcome),
+      );
+      const completedCount = dispatchResult.result.issues.filter(
+        (issue) => issue.outcome === "completed",
+      ).length;
+      const outcome: StructuredAgentResult["outcome"] = needsAction
+        ? completedCount > 0
+          ? "partial"
+          : dispatchResult.result.issues.some(
+                (issue) => issue.outcome === "failed",
+              )
+            ? "failed"
+            : "blocked"
+        : "completed";
+      result = {
           conversationId: dispatchResult.conversationId,
           message: dispatchResult.result.summary,
           workspaceRoot: dispatchResult.workspaceRoot,
+          structuredResult: {
+            summary: dispatchResult.result.summary,
+            outcome,
+            importance: needsAction ? "important" : "routine",
+            urgency: needsAction ? "time_sensitive" : "normal",
+            impact:
+              dispatchResult.result.issues.length > 1 ? "project" : "issue",
+            humanActionRequired: needsAction,
+            nextAction: needsAction
+              ? "차단되거나 실패한 이슈를 확인하고 후속 조치를 결정하세요."
+              : null,
+            dueAt: null,
+          },
         };
+    }
     if (sessionId) {
       dependencies.settleSession?.(sessionId, {
         status: "completed",

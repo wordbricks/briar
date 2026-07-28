@@ -3,6 +3,8 @@ import { demoDashboard } from "../lib/demo-data";
 import type { AutoHuntSession } from "./useAutoHuntSessions";
 import {
   buildCurrentInboxMessages,
+  classifyInboxMessage,
+  groupInboxMessages,
   isInboxMessageUnread,
   mergeInboxMessages,
 } from "./useInbox";
@@ -126,5 +128,93 @@ describe("Inbox messages", () => {
     expect(
       isInboxMessageUnread(message, { [message.id]: "previous-version" }),
     ).toBe(true);
+  });
+
+  it("separates urgent, actionable, important, and routine updates", () => {
+    const baseRun = demoDashboard.runs[0];
+    const messages = buildCurrentInboxMessages(
+      {
+        ...demoDashboard,
+        runs: [
+          {
+            ...baseRun,
+            id: "urgent",
+            priority: 1,
+            status: "failed",
+          },
+          {
+            ...baseRun,
+            id: "action",
+            priority: 3,
+            status: "completed",
+            structuredResult: {
+              summary: "A product decision is required.",
+              outcome: "partial",
+              importance: "important",
+              urgency: "time_sensitive",
+              impact: "issue",
+              humanActionRequired: true,
+              nextAction: "Choose the release scope.",
+              dueAt: null,
+            },
+          },
+          {
+            ...baseRun,
+            id: "important",
+            priority: 3,
+            status: "completed",
+            structuredResult: {
+              summary: "The project milestone shipped.",
+              outcome: "completed",
+              importance: "important",
+              urgency: "normal",
+              impact: "project",
+              humanActionRequired: false,
+              nextAction: null,
+              dueAt: null,
+            },
+          },
+          {
+            ...baseRun,
+            id: "activity",
+            priority: 3,
+            status: "completed",
+            structuredResult: {
+              summary: "Routine maintenance completed.",
+              outcome: "completed",
+              importance: "routine",
+              urgency: "normal",
+              impact: "issue",
+              humanActionRequired: false,
+              nextAction: null,
+              dueAt: null,
+            },
+          },
+        ],
+      },
+      [],
+      [project],
+    ).map((message) => ({ ...message, isUnread: true }));
+
+    const grouped = groupInboxMessages(messages);
+
+    expect(grouped.urgent.map((message) => message.targetId)).toEqual([
+      "urgent",
+    ]);
+    expect(grouped.action_required.map((message) => message.targetId)).toEqual([
+      "action",
+    ]);
+    expect(grouped.important.map((message) => message.targetId)).toEqual([
+      "important",
+    ]);
+    expect(grouped.activity.map((message) => message.targetId)).toEqual([
+      "activity",
+    ]);
+    expect(messages.map(classifyInboxMessage)).toEqual([
+      "urgent",
+      "action_required",
+      "important",
+      "activity",
+    ]);
   });
 });

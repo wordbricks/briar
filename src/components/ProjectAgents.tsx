@@ -41,6 +41,7 @@ import type {
   ProjectAgent,
   UpdateProjectAgentInput,
 } from "../types";
+import { AgentProviderIcon } from "./AgentIcons";
 import { NativeSelect } from "./NativeSelect";
 import {
   ProjectAgentDetail,
@@ -350,7 +351,17 @@ export function ProjectAgents({
                         </div>
                       </header>
                       <div className="project-agent-runtime">
-                        <span>{providerLabels[agent.provider]}</span>
+                        <span
+                          aria-label={providerLabels[agent.provider]}
+                          className={`project-agent-provider-icon ${agent.provider}`}
+                          role="img"
+                          title={providerLabels[agent.provider]}
+                        >
+                          <AgentProviderIcon
+                            provider={agent.provider}
+                            size={14}
+                          />
+                        </span>
                         <span>
                           {modelLabel(agent, t("agents.providerDefaultModel"))}
                         </span>

@@ -1,3 +1,5 @@
+import type { StructuredAgentResult } from "./agent-result";
+
 export type JsonSchema = Record<string, unknown> | boolean;
 
 export const approvalPolicies = ["untrusted", "on-request", "never"] as const;
@@ -119,6 +121,7 @@ export type ProjectAgentRunResponse = {
   action: "respond" | "dispatch_auto_hunt";
   message: string;
   maxIssues: number | null;
+  structuredResult: StructuredAgentResult | null;
 };
 
 export type ProjectChatMessage = {
