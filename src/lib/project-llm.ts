@@ -196,6 +196,14 @@ export async function runProjectAgent(
   });
 }
 
+export async function stopProjectAgentSession(
+  sessionId: string,
+): Promise<boolean> {
+  if (!isTauri()) return false;
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<boolean>("stop_project_agent_session", { sessionId });
+}
+
 export async function loadProjectLlmSettings(
   projectId: string,
 ): Promise<ProjectLlmSettings> {
