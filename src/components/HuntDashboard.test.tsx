@@ -5,7 +5,7 @@ import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { demoDashboard } from "../lib/demo-data";
-import type { IssueMessage } from "../types";
+import type { IssueMessage, RunEvidence } from "../types";
 import {
   CreateIssueDialog,
   EditIssueDialog,
@@ -26,6 +26,7 @@ const dashboardProps = {
   onUpdateIssue: async () => undefined,
   onLoadAttachment: async () => new Blob(),
   onLoadIssueMessages: async () => [],
+  onLoadRunEvidence: async () => [],
   onMoveRun: async () => undefined,
   onRetryRun: async () => undefined,
   onCancelRun: async () => undefined,
@@ -529,6 +530,7 @@ describe("HuntDashboard", () => {
         onDelete={async () => undefined}
         onLoadAttachment={async () => new Blob()}
         onLoadIssueMessages={async () => []}
+        onLoadRunEvidence={async () => []}
         onMove={async () => undefined}
         onRetry={async () => undefined}
         onSendIssueMessage={async () => {
@@ -556,6 +558,7 @@ describe("HuntDashboard", () => {
         onCancel={async () => undefined}
         onLoadAttachment={async () => new Blob()}
         onLoadIssueMessages={async () => []}
+        onLoadRunEvidence={async () => []}
         onMove={async () => undefined}
         onRetry={async () => undefined}
         onSendIssueMessage={async () => {
@@ -582,6 +585,90 @@ describe("HuntDashboard", () => {
     expect(markup.indexOf("issue-description-pane")).toBeLessThan(
       markup.indexOf("issue-conversation"),
     );
+  });
+
+  it("loads collected evidence in the issue evidence tab", async () => {
+    const observedAt = "2026-07-28T04:30:00.000Z";
+    const evidence: RunEvidence[] = [
+      {
+        key: "BRIAR-12:analyzing:repository_findings",
+        attempt: 1,
+        revision: 1,
+        stage: "analyzing",
+        type: "repository_findings",
+        status: "passed",
+        detail: "증빙 조회 경로와 화면 연결 지점을 확인했습니다.",
+        command: "bun run test src/components/HuntDashboard.test.tsx",
+        url: "https://example.com/evidence/1",
+        metadata: { suite: "dashboard" },
+        actor: "briar-workflow",
+        observedAt,
+        recordedAt: observedAt,
+        requiredRevision: 1,
+        canonical: true,
+      },
+    ];
+    const onLoadRunEvidence = vi.fn(async () => evidence);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={onLoadRunEvidence}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          run={{
+            ...demoDashboard.runs[0],
+            workflow: {
+              ...demoDashboard.runs[0].workflow,
+              stages: demoDashboard.runs[0].workflow.stages.map((stage) =>
+                stage.id === "analyzing"
+                  ? { ...stage, evidence: ["repository_findings"] }
+                  : stage.id === "local_qa"
+                    ? { ...stage, evidence: ["local_ci_result"] }
+                    : stage,
+              ),
+            },
+          }}
+        />,
+      );
+    });
+
+    const evidenceTab = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
+    ).find((button) => button.textContent?.includes("증빙"));
+    await act(async () => evidenceTab?.click());
+
+    expect(onLoadRunEvidence).toHaveBeenCalledOnce();
+    expect(container.querySelector(".run-evidence-panel")?.textContent).toContain(
+      "repository_findings",
+    );
+    expect(container.querySelector(".run-evidence-panel")?.textContent).toContain(
+      "증빙 조회 경로와 화면 연결 지점을 확인했습니다.",
+    );
+    expect(container.querySelector(".run-evidence-command code")?.textContent)
+      .toContain("HuntDashboard.test.tsx");
+    expect(container.querySelector(".run-evidence-panel")?.textContent).toContain(
+      "local_ci_result",
+    );
+    expect(container.querySelector(".run-evidence-panel")?.textContent).toContain(
+      "기록 안 됨",
+    );
+
+    await act(async () => root.unmount());
+    container.remove();
   });
 
   it("scrolls the conversation to the bottom after loading and sending", async () => {
@@ -619,6 +706,7 @@ describe("HuntDashboard", () => {
           onCancel={async () => undefined}
           onLoadAttachment={async () => new Blob()}
           onLoadIssueMessages={() => loadedMessages}
+          onLoadRunEvidence={async () => []}
           onMove={async () => undefined}
           onRetry={async () => undefined}
           onSendIssueMessage={async () => ({
@@ -711,6 +799,7 @@ describe("HuntDashboard", () => {
           onCancel={async () => undefined}
           onLoadAttachment={async () => new Blob()}
           onLoadIssueMessages={async () => [rootMessage, reply]}
+          onLoadRunEvidence={async () => []}
           onMove={async () => undefined}
           onRetry={async () => undefined}
           onSendIssueMessage={async () => ({
@@ -824,6 +913,7 @@ describe("HuntDashboard", () => {
           onCancel={async () => undefined}
           onLoadAttachment={async () => new Blob()}
           onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
           onMove={async () => undefined}
           onRetry={async () => undefined}
           onSendIssueMessage={async (input) => {
@@ -924,6 +1014,7 @@ describe("HuntDashboard", () => {
           onCancel={async () => undefined}
           onLoadAttachment={async () => new Blob()}
           onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
           onMove={async () => undefined}
           onRetry={async () => undefined}
           onSendIssueMessage={async () => {
@@ -1004,6 +1095,7 @@ describe("HuntDashboard", () => {
         onCancel={async () => undefined}
         onLoadAttachment={async () => new Blob()}
         onLoadIssueMessages={async () => []}
+        onLoadRunEvidence={async () => []}
         onMove={async () => undefined}
         onRetry={async () => undefined}
         onSendIssueMessage={async () => {

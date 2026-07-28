@@ -529,6 +529,7 @@ export function App() {
             onUpdateIssue={briar.editIssue}
             onLoadAttachment={briar.readIssueAttachment}
             onLoadIssueMessages={briar.readIssueMessages}
+            onLoadRunEvidence={briar.readRunEvidence}
             onMoveRun={briar.moveRun}
             onRetryRun={briar.retryRun}
             onCancelRun={briar.cancelRun}
@@ -656,6 +657,7 @@ export function App() {
             onUpdateIssue={briar.editIssue}
             onLoadAttachment={briar.readIssueAttachment}
             onLoadIssueMessages={briar.readIssueMessages}
+            onLoadRunEvidence={briar.readRunEvidence}
             onMoveRun={briar.moveRun}
             onRequestedRunOpen={() => setRequestedRunId(null)}
             onRetryRun={briar.retryRun}
