@@ -8,6 +8,7 @@ import {
   loadOrganizationMembers,
   removeOrganizationMember,
 } from "../lib/api";
+import { organizationLogoFromFile } from "../lib/organization-logo";
 import type { OrganizationMember } from "../types";
 import { OrganizationSettings } from "./OrganizationSettings";
 
@@ -15,6 +16,10 @@ vi.mock("../lib/api", () => ({
   addOrganizationMember: vi.fn(),
   loadOrganizationMembers: vi.fn(),
   removeOrganizationMember: vi.fn(),
+}));
+vi.mock("../lib/organization-logo", () => ({
+  organizationLogoAccept: "image/jpeg,image/png,image/webp",
+  organizationLogoFromFile: vi.fn(),
 }));
 
 const members: OrganizationMember[] = [
@@ -51,6 +56,9 @@ describe("OrganizationSettings", () => {
     vi.mocked(loadOrganizationMembers).mockResolvedValue(members);
     vi.mocked(addOrganizationMember).mockResolvedValue({ members });
     vi.mocked(removeOrganizationMember).mockResolvedValue(undefined);
+    vi.mocked(organizationLogoFromFile).mockResolvedValue(
+      "data:image/webp;base64,bG9nbw==",
+    );
     (
       globalThis as typeof globalThis & {
         IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -71,10 +79,12 @@ describe("OrganizationSettings", () => {
             id: "organization-1",
             name: "Wordbricks",
             handle: "wordbricks",
+            logo: null,
             role: "owner",
             createdAt: "2023-12-01T00:00:00Z",
           }}
           onBack={() => undefined}
+          onLogoChange={vi.fn()}
           onRename={vi.fn()}
           token="token"
         />,
@@ -135,6 +145,7 @@ describe("OrganizationSettings", () => {
       id: "organization-1",
       name: "Briar Labs",
       handle: "wordbricks",
+      logo: null,
       role: "owner",
       createdAt: "2023-12-01T00:00:00Z",
     });
@@ -146,10 +157,12 @@ describe("OrganizationSettings", () => {
             id: "organization-1",
             name: "Wordbricks",
             handle: "wordbricks",
+            logo: null,
             role: "owner",
             createdAt: "2023-12-01T00:00:00Z",
           }}
           onBack={() => undefined}
+          onLogoChange={vi.fn()}
           onRename={onRename}
           token="token"
         />,
@@ -177,6 +190,61 @@ describe("OrganizationSettings", () => {
 
     expect(onRename).toHaveBeenCalledWith("organization-1", "Briar Labs");
     expect(container.textContent).toContain("조직 이름을 저장했습니다.");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("uploads and saves an organization logo", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    const onLogoChange = vi.fn().mockResolvedValue({
+      id: "organization-1",
+      name: "Wordbricks",
+      handle: "wordbricks",
+      logo: "data:image/webp;base64,bG9nbw==",
+      role: "owner",
+      createdAt: "2023-12-01T00:00:00Z",
+    });
+
+    await act(async () => {
+      root.render(
+        <OrganizationSettings
+          organization={{
+            id: "organization-1",
+            name: "Wordbricks",
+            handle: "wordbricks",
+            logo: null,
+            role: "owner",
+            createdAt: "2023-12-01T00:00:00Z",
+          }}
+          onBack={() => undefined}
+          onLogoChange={onLogoChange}
+          onRename={vi.fn()}
+          token="token"
+        />,
+      );
+    });
+
+    const file = new File(["logo"], "logo.png", { type: "image/png" });
+    const input = container.querySelector<HTMLInputElement>(
+      'input[aria-label="로고 업로드"]',
+    )!;
+    Object.defineProperty(input, "files", {
+      configurable: true,
+      value: [file],
+    });
+    await act(async () => {
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    expect(organizationLogoFromFile).toHaveBeenCalledWith(file);
+    expect(onLogoChange).toHaveBeenCalledWith(
+      "organization-1",
+      "data:image/webp;base64,bG9nbw==",
+    );
+    expect(container.textContent).toContain("조직 로고를 저장했습니다.");
 
     await act(async () => root.unmount());
     container.remove();

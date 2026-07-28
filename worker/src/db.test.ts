@@ -52,6 +52,7 @@ import {
   updateProjectAgent,
   updateProjectAgentSchedule,
   updateOrganization,
+  updateOrganizationLogo,
   updateIssue,
 } from "./db";
 
@@ -340,6 +341,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await executeSql(
       db,
       await readFile(resolve("migrations/0030_run_evidence_images.sql"), "utf8"),
+    );
+    await executeSql(
+      db,
+      await readFile(resolve("migrations/0031_organization_logos.sql"), "utf8"),
     );
   }, 30_000);
 
@@ -1317,6 +1322,24 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     expect((await listProjects(db, "owner"))[0]?.organization_name).toBe(
       "Renamed Org",
     );
+  });
+
+  it("stores and removes an organization logo while preserving its role", async () => {
+    const logo = "data:image/webp;base64,bG9nbw==";
+    await expect(
+      updateOrganizationLogo(db, projectId, logo, "owner"),
+    ).resolves.toMatchObject({
+      id: projectId,
+      logo,
+      role: "owner",
+    });
+    await expect(
+      updateOrganizationLogo(db, projectId, null, "owner"),
+    ).resolves.toMatchObject({
+      id: projectId,
+      logo: null,
+      role: "owner",
+    });
   });
 
   it("stores an app-created issue as a queued Auto Hunt run", async () => {

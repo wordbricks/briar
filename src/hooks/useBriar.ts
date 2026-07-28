@@ -29,6 +29,7 @@ import {
   retryHuntRun,
   updateIssue,
   updateOrganization as updateRemoteOrganization,
+  updateOrganizationLogo as updateRemoteOrganizationLogo,
   updateProjectSettings,
   type DeviceClientId,
 } from "../lib/api";
@@ -147,6 +148,7 @@ const demoOrganization: Organization = {
   id: demoDashboard.project.organizationId!,
   name: demoDashboard.project.organizationName!,
   handle: "briar",
+  logo: null,
   role: demoDashboard.project.role!,
   createdAt: demoDashboard.project.createdAt,
 };
@@ -804,6 +806,31 @@ export function useBriar(options: UseBriarOptions = {}) {
     [organizations, token],
   );
 
+  const changeOrganizationLogo = useCallback(
+    async (organizationId: string, logo: string | null) => {
+      const currentOrganization = organizations.find(
+        (organization) => organization.id === organizationId,
+      );
+      if (!currentOrganization) {
+        throw new Error("변경할 조직을 찾을 수 없습니다.");
+      }
+      if (!demoMode && !token) throw new Error("로그인이 필요합니다.");
+      const organization =
+        demoMode || !token
+          ? { ...currentOrganization, logo }
+          : (
+              await updateRemoteOrganizationLogo(token, organizationId, logo)
+            ).organization;
+      setOrganizations((current) =>
+        current.map((candidate) =>
+          candidate.id === organizationId ? organization : candidate,
+        ),
+      );
+      return organization;
+    },
+    [organizations, token],
+  );
+
   const checkOrganizationHandle = useCallback(
     async (handle: string) => {
       if (demoMode) {
@@ -832,6 +859,7 @@ export function useBriar(options: UseBriarOptions = {}) {
           id: crypto.randomUUID(),
           name: input.name.trim(),
           handle: input.handle,
+          logo: null,
           role: "owner",
           createdAt: new Date().toISOString(),
         };
@@ -2095,6 +2123,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     addProject,
     cancelProjectCreation,
     cancelLogin,
+    changeOrganizationLogo,
     checkOrganizationHandle,
     connectProject,
     connectedProjectIds,

@@ -1,6 +1,7 @@
 import {
   Building2,
   Download,
+  ImagePlus,
   Search,
   Trash2,
   UserPlus,
@@ -41,6 +42,10 @@ import {
   loadOrganizationMembers,
   removeOrganizationMember,
 } from "../lib/api";
+import {
+  organizationLogoAccept,
+  organizationLogoFromFile,
+} from "../lib/organization-logo";
 import type { Organization, OrganizationMember } from "../types";
 import { SelectMenu } from "./SelectMenu";
 
@@ -52,6 +57,7 @@ export function OrganizationSettings({
   organization,
   token,
   onBack,
+  onLogoChange,
   onRename,
   isSidebarOpen = true,
   initialSection,
@@ -59,6 +65,10 @@ export function OrganizationSettings({
   organization: Organization;
   token: string;
   onBack: () => void;
+  onLogoChange: (
+    organizationId: string,
+    logo: string | null,
+  ) => Promise<Organization>;
   onRename: (organizationId: string, name: string) => Promise<Organization>;
   isSidebarOpen?: boolean;
   initialSection?: "general" | "members";
@@ -71,6 +81,9 @@ export function OrganizationSettings({
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameError, setRenameError] = useState<string | null>(null);
   const [renameSaved, setRenameSaved] = useState(false);
+  const [isLogoSaving, setIsLogoSaving] = useState(false);
+  const [logoError, setLogoError] = useState<string | null>(null);
+  const [logoSaved, setLogoSaved] = useState(false);
   const [members, setMembers] = useState<OrganizationMember[]>([]);
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
@@ -187,7 +200,17 @@ export function OrganizationSettings({
         </SettingsBackButton>
 
         <SettingsIdentity
-          icon={<Building2 aria-hidden="true" size={17} strokeWidth={1.8} />}
+          icon={
+            organization.logo ? (
+              <img
+                alt=""
+                className="size-full rounded-lg object-cover"
+                src={organization.logo}
+              />
+            ) : (
+              <Building2 aria-hidden="true" size={17} strokeWidth={1.8} />
+            )
+          }
           subtitle={t("organization.settingsLabel")}
           title={organization.name}
         />
@@ -229,6 +252,128 @@ export function OrganizationSettings({
                   <Typography as="h2" className="mb-3.5" variant="bodyLg">
                     {t("organization.general")}
                   </Typography>
+                  <div className="mb-4 grid grid-cols-1 items-center gap-x-8 gap-y-4 rounded-xl border border-border bg-card p-6 shadow-xs md:grid-cols-[minmax(200px,1fr)_minmax(260px,360px)]">
+                    <div>
+                      <Label>{t("organization.logo")}</Label>
+                      <Typography className="mt-1.5" tone="muted" variant="caption">
+                        {t("organization.logoDescription")}
+                      </Typography>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <span className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-xl border border-border bg-secondary text-muted-foreground">
+                        {organization.logo ? (
+                          <img
+                            alt={t("organization.logoPreview", {
+                              name: organization.name,
+                            })}
+                            className="size-full object-cover"
+                            src={organization.logo}
+                          />
+                        ) : (
+                          <Building2 aria-hidden="true" size={25} strokeWidth={1.7} />
+                        )}
+                      </span>
+                      <div className="grid gap-2">
+                        {canManage ? (
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              aria-disabled={isLogoSaving}
+                              asChild
+                              className={cn(
+                                isLogoSaving && "pointer-events-none opacity-50",
+                              )}
+                              size="sm"
+                              type="button"
+                              variant="outline"
+                            >
+                              <label>
+                                <ImagePlus aria-hidden="true" size={15} strokeWidth={1.8} />
+                                {t(
+                                  organization.logo
+                                    ? "organization.replaceLogo"
+                                    : "organization.uploadLogo",
+                                )}
+                                <input
+                                  accept={organizationLogoAccept}
+                                  aria-label={t("organization.uploadLogo")}
+                                  className="sr-only"
+                                  disabled={isLogoSaving}
+                                  onChange={(event) => {
+                                    const file = event.currentTarget.files?.[0];
+                                    event.currentTarget.value = "";
+                                    if (!file) return;
+                                    setIsLogoSaving(true);
+                                    setLogoError(null);
+                                    setLogoSaved(false);
+                                    void organizationLogoFromFile(file)
+                                      .then((logo) =>
+                                        onLogoChange(organizationId, logo),
+                                      )
+                                      .then(() => setLogoSaved(true))
+                                      .catch(() =>
+                                        setLogoError(
+                                          t("organization.logoUploadFailed"),
+                                        ),
+                                      )
+                                      .finally(() => setIsLogoSaving(false));
+                                  }}
+                                  type="file"
+                                />
+                              </label>
+                            </Button>
+                            {organization.logo ? (
+                              <Button
+                                disabled={isLogoSaving}
+                                onClick={() => {
+                                  setIsLogoSaving(true);
+                                  setLogoError(null);
+                                  setLogoSaved(false);
+                                  void onLogoChange(organizationId, null)
+                                    .then(() => setLogoSaved(true))
+                                    .catch(() =>
+                                      setLogoError(
+                                        t("organization.logoUploadFailed"),
+                                      ),
+                                    )
+                                    .finally(() => setIsLogoSaving(false));
+                                }}
+                                size="sm"
+                                type="button"
+                                variant="ghost"
+                              >
+                                <Trash2 aria-hidden="true" size={14} strokeWidth={1.8} />
+                                {t("organization.removeLogo")}
+                              </Button>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <Typography tone="muted" variant="caption">
+                            {t("organization.logoPermission")}
+                          </Typography>
+                        )}
+                        <Typography tone="muted" variant="micro">
+                          {t("organization.logoHint")}
+                        </Typography>
+                        {logoError ? (
+                          <Typography
+                            className="text-destructive"
+                            role="alert"
+                            variant="caption"
+                          >
+                            {logoError}
+                          </Typography>
+                        ) : logoSaved ? (
+                          <Typography
+                            className="text-success"
+                            role="status"
+                            variant="caption"
+                          >
+                            {t("organization.logoSaved")}
+                          </Typography>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
                   <form
                     className="grid grid-cols-1 items-center gap-x-8 gap-y-4 rounded-xl border border-border bg-card p-6 shadow-xs md:grid-cols-[minmax(200px,1fr)_minmax(260px,360px)]"
                     onSubmit={(event) => {

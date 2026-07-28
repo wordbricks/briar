@@ -260,6 +260,7 @@ export type Organization = {
   id: string;
   name: string;
   handle: string;
+  logo: string | null;
   role: "owner" | "admin" | "member";
   createdAt: string;
 };
