@@ -4,6 +4,7 @@ import {
   completeProjectAgentScheduleRun,
   createProjectAgent,
   createProjectAgentSchedule,
+  deleteProjectAgent,
   deleteIssue,
   deleteProjectAgentSchedule,
   loadDashboard,
@@ -662,6 +663,27 @@ describe("API errors", () => {
         "/projects/22222222-2222-4222-8222-222222222222/agents/11111111-1111-4111-8111-111111111111",
       ),
       expect.objectContaining({ method: "PUT" }),
+    );
+  });
+
+  it("deletes an agent through its project-scoped endpoint", async () => {
+    const fetchMock = vi.fn(
+      async () => new Response(null, { status: 204 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      deleteProjectAgent(
+        "token",
+        "22222222-2222-4222-8222-222222222222",
+        "11111111-1111-4111-8111-111111111111",
+      ),
+    ).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "/projects/22222222-2222-4222-8222-222222222222/agents/11111111-1111-4111-8111-111111111111",
+      ),
+      expect.objectContaining({ method: "DELETE" }),
     );
   });
 });

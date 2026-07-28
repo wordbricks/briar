@@ -252,6 +252,40 @@ describe("ProjectAgents", () => {
     expect(container.textContent).toContain("릴리스 점검 에이전트");
   });
 
+  it("deletes an agent from settings after confirmation", async () => {
+    const container = await mount(<ProjectAgents {...projectAgentsProps} />);
+    await act(async () => Promise.resolve());
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(
+          'button[aria-label="자동 사냥 에이전트 설정"]',
+        )
+        ?.click();
+    });
+    await act(async () => {
+      Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
+        .find((button) => button.textContent?.trim() === "에이전트 삭제")
+        ?.click();
+    });
+    expect(document.body.textContent).toContain(
+      "‘자동 사냥 에이전트’ 에이전트를 삭제할까요?",
+    );
+
+    await act(async () => {
+      document.body
+        .querySelector<HTMLButtonElement>(".project-agent-delete-confirm")
+        ?.click();
+      await Promise.resolve();
+    });
+
+    expect(container.querySelector("#project-agents")).not.toBeNull();
+    expect(
+      container.querySelector(
+        'button[aria-label="자동 사냥 에이전트 설정"]',
+      ),
+    ).toBeNull();
+  });
+
   it("shows the selected agent sessions and opens task input in a dialog", async () => {
     const sessions: AutoHuntSession[] = [
       {

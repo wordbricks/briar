@@ -18,19 +18,31 @@ import { projectAgentAvatarFromCodexPet } from "../lib/codex-pets";
 import type { Project, ProjectAgent, UpdateProjectAgentInput } from "../types";
 import { CodexPetAttribution, CodexPetPicker } from "./CodexPetPicker";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Typography } from "@/components/ui/typography";
 
 export function ProjectAgentSettings({
   agent,
+  isDeleteDisabled,
   isSidebarOpen,
   onBack,
+  onDelete,
   onSave,
   project,
 }: {
   agent: ProjectAgent;
+  isDeleteDisabled: boolean;
   isSidebarOpen: boolean;
   onBack: () => void;
+  onDelete: () => Promise<void>;
   onSave: (input: UpdateProjectAgentInput) => Promise<ProjectAgent>;
   project: Project;
 }) {
@@ -49,6 +61,10 @@ export function ProjectAgentSettings({
   });
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const profileChanged =
     name !== savedProfile.name ||
@@ -90,6 +106,18 @@ export function ProjectAgentSettings({
       );
     } finally {
       setProfileSaving(false);
+    }
+  };
+
+  const deleteAgent = async () => {
+    if (isDeleteDisabled || isDeleting) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      await onDelete();
+    } catch (caught) {
+      setDeleteError(caught instanceof Error ? caught.message : String(caught));
+      setIsDeleting(false);
     }
   };
 
@@ -291,8 +319,90 @@ export function ProjectAgentSettings({
             </footer>
           </form>
 
+          <section className="project-agent-settings-card danger">
+            <header>
+              <span className="project-agent-settings-card-icon">
+                <Trash2 size={18} strokeWidth={1.8} />
+              </span>
+              <span>
+                <strong>{t("agents.dangerTitle")}</strong>
+                <small>{t("agents.dangerDescription")}</small>
+              </span>
+            </header>
+            {isDeleteDisabled ? (
+              <p className="project-agent-settings-delete-blocked">
+                <CircleAlert size={14} />
+                {t("agents.deleteBlocked")}
+              </p>
+            ) : null}
+            <footer>
+              <Button
+                disabled={isDeleteDisabled}
+                onClick={() => setIsDeleteDialogOpen(true)}
+                type="button"
+                variant="destructive"
+              >
+                <Trash2 size={15} />
+                {t("agents.deleteAgent")}
+              </Button>
+            </footer>
+          </section>
         </section>
       </div>
+      <Dialog
+        onOpenChange={(open) => {
+          if (isDeleting) return;
+          setIsDeleteDialogOpen(open);
+          if (!open) setDeleteError(null);
+        }}
+        open={isDeleteDialogOpen}
+      >
+        <DialogContent
+          aria-label={t("agents.deleteDialog", { name: agent.name })}
+          className="sm:max-w-md"
+        >
+          <DialogHeader>
+            <div className="mb-2 grid size-10 place-items-center rounded-xl bg-destructive/10 text-destructive">
+              <Trash2 size={20} strokeWidth={1.8} />
+            </div>
+            <DialogTitle>
+              {t("agents.deleteTitle", { name: agent.name })}
+            </DialogTitle>
+            <DialogDescription>
+              {t("agents.deleteDescription")}
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError ? (
+            <p className="text-xs text-destructive" role="alert">
+              {deleteError}
+            </p>
+          ) : null}
+          <DialogFooter>
+            <Button
+              disabled={isDeleting}
+              onClick={() => setIsDeleteDialogOpen(false)}
+              type="button"
+              variant="outline"
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              className="project-agent-delete-confirm"
+              disabled={isDeleting}
+              onClick={() => void deleteAgent()}
+              type="button"
+              variant="destructive"
+            >
+              {isDeleting ? (
+                <LoaderCircle className="spin" size={15} />
+              ) : (
+                <Trash2 size={15} />
+              )}
+              {isDeleting ? t("agents.deleting") : t("agents.deleteAgent")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

@@ -32,13 +32,16 @@ describe("ProjectAgentSettings", () => {
       updatedAt: "2026-07-26T00:00:00.000Z",
     };
     const onSave = vi.fn(async () => agent);
+    const onDelete = vi.fn(async () => undefined);
 
     await act(async () => {
       root.render(
         <ProjectAgentSettings
           agent={agent}
+          isDeleteDisabled={false}
           isSidebarOpen
           onBack={() => undefined}
+          onDelete={onDelete}
           onSave={onSave}
           project={{
             id: "project-1",
@@ -64,11 +67,28 @@ describe("ProjectAgentSettings", () => {
     ).toBeNull();
     expect(container.textContent).not.toContain("프로젝트 실행 기본값");
     expect(container.querySelector("#project-runtime-provider")).toBeNull();
+    expect(container.textContent).toContain("에이전트 삭제");
     expect(
       container.querySelector<HTMLInputElement>(
         'input[aria-label="캘린더 색상"]',
       )?.value,
     ).toBe("#3275d5");
+
+    await act(async () => {
+      Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
+        .find((button) => button.textContent?.trim() === "에이전트 삭제")
+        ?.click();
+    });
+    expect(document.body.textContent).toContain(
+      "‘Auto Hunt agent’ 에이전트를 삭제할까요?",
+    );
+    await act(async () => {
+      document.body
+        .querySelector<HTMLButtonElement>(".project-agent-delete-confirm")
+        ?.click();
+      await Promise.resolve();
+    });
+    expect(onDelete).toHaveBeenCalledTimes(1);
 
     await act(async () => root.unmount());
     container.remove();

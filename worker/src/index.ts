@@ -52,6 +52,7 @@ import {
   createProjectAgent,
   createProjectAgentSchedule,
   createProject,
+  deleteProjectAgent,
   deleteProjectAgentSchedule,
   deleteIssue,
   deleteProject,
@@ -1936,6 +1937,26 @@ async function route(
         .catch(() => undefined);
     }
     return json({ agent: projectAgentJson(agent) });
+  }
+  if (projectAgentMatch && request.method === "DELETE") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, projectAgentMatch[1], session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    const agent = await deleteProjectAgent(
+      db,
+      project.id,
+      projectAgentMatch[2],
+    );
+    if (!agent) throw new HttpError(404, "Agent not found");
+    if (agent === "running") {
+      throw new HttpError(409, "An agent schedule run is currently active");
+    }
+    if (agent.avatar_spritesheet_object_key) {
+      await attachmentsBucket
+        .delete(agent.avatar_spritesheet_object_key)
+        .catch(() => undefined);
+    }
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   const projectAgentSpriteSheetMatch = pathname.match(

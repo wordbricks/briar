@@ -20,6 +20,7 @@ import { Typography } from "@/components/ui/typography";
 import { useI18n } from "../i18n";
 import {
   createProjectAgent,
+  deleteProjectAgent,
   loadProjectAgents,
   updateProjectAgent,
 } from "../lib/api";
@@ -232,6 +233,22 @@ export function ProjectAgents({
     return updated;
   };
 
+  const removeAgent = async (agent: ProjectAgent) => {
+    setError(null);
+    if (token) {
+      await deleteProjectAgent(token, project.id, agent.id);
+    }
+    setAgents((current) =>
+      current.filter((candidate) => candidate.id !== agent.id),
+    );
+    setSelectedAgent((current) =>
+      current?.id === agent.id ? null : current,
+    );
+    setSettingsAgent((current) =>
+      current?.id === agent.id ? null : current,
+    );
+  };
+
   const openCreateDialog = () => {
     setIsDialogOpen(true);
   };
@@ -244,8 +261,10 @@ export function ProjectAgents({
     return (
       <ProjectAgentSettings
         agent={settingsAgent}
+        isDeleteDisabled={runningAgentIds.has(settingsAgent.id)}
         isSidebarOpen={isSidebarOpen}
         onBack={() => setSettingsAgent(null)}
+        onDelete={() => removeAgent(settingsAgent)}
         onSave={(input) => editAgent(settingsAgent, input)}
         project={project}
       />
