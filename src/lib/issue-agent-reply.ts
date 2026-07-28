@@ -1,4 +1,4 @@
-import type { IssueMessage } from "../types";
+import type { HuntRun, IssueMessage } from "../types";
 import type { AgentProvider } from "./project-llm";
 
 type IssueSession = {
@@ -90,4 +90,69 @@ export function issueAgentConversation(
     }
   }
   return { conversationId: null, provider: null };
+}
+
+/**
+ * Keeps issue conversation answers grounded in Briar's durable run record.
+ * Worktrees are deliberately not part of this snapshot because they may not
+ * exist before a run starts or after its cleanup.
+ */
+export function issueConversationSnapshot(
+  run: HuntRun | undefined,
+  messages: readonly IssueMessage[],
+) {
+  return {
+    run: run
+      ? {
+          runId: run.id,
+          runNumber: run.runNumber,
+          source: run.source,
+          sourceKey: run.sourceKey,
+          title: run.title,
+          issueDescription: run.issueDescription,
+          priority: run.priority,
+          status: run.status,
+          workflowStage: run.workflowStage,
+          progress: run.progress,
+          detail: run.detail,
+          repository: run.repository,
+          branch: run.branch,
+          commitSha: run.commitSha,
+          tracker: run.tracker,
+          attachments: run.attachments.map(
+            ({ id, filename, contentType, byteSize }) => ({
+              id,
+              filename,
+              contentType,
+              byteSize,
+            }),
+          ),
+          resultSummary: run.resultSummary,
+          structuredResult: run.structuredResult,
+          pullRequestUrls: run.pullRequestUrls,
+          targetSha: run.targetSha,
+          stagingQaStatus: run.stagingQaStatus,
+          productionQaStatus: run.productionQaStatus,
+          stagingQaDetail: run.stagingQaDetail,
+          productionQaDetail: run.productionQaDetail,
+          context: run.context,
+          claimedBy: run.claimedBy,
+          claimedAt: run.claimedAt,
+          startedAt: run.startedAt,
+          updatedAt: run.updatedAt,
+          completedAt: run.completedAt,
+          events: run.events,
+        }
+      : null,
+    messages: messages.map((message) => ({
+      id: message.id,
+      parentMessageId: message.parentMessageId,
+      body: message.body,
+      author: {
+        name: message.author.name,
+        provider: message.author.provider,
+      },
+      createdAt: message.createdAt,
+    })),
+  };
 }
