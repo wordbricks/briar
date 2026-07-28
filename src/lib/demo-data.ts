@@ -26,6 +26,7 @@ const runDefaults = {
   issueDescription: null,
   attachments: [],
   resultSummary: null,
+  structuredResult: null,
   pullRequestUrls: [],
   targetSha: null,
   sourceCreatedAt: null,
@@ -48,6 +49,7 @@ const runDefaults = {
   | "issueDescription"
   | "attachments"
   | "resultSummary"
+  | "structuredResult"
   | "pullRequestUrls"
   | "targetSha"
   | "sourceCreatedAt"

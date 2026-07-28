@@ -3612,6 +3612,7 @@ async fn run_project_agent(
     project_id: String,
     request: agent::ProjectAgentRunRequest,
 ) -> Result<agent::ProjectAgentRunResponse, String> {
+    validate_auto_hunt_session_id(&request.session_id)?;
     if request.agent_id.trim().is_empty()
         || request.agent_id.len() > 128
         || request.agent_name.trim().is_empty()
@@ -3655,6 +3656,7 @@ async fn run_project_agent(
         "agent/grok-runner.js",
         "dist-agent/grok-runner.js",
     );
+    let event_sink = create_auto_hunt_event_sink(&app, &request.session_id)?;
     let approval_app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let (runner, workspace) =
@@ -3704,7 +3706,7 @@ async fn run_project_agent(
                 network_access: true,
                 model,
                 effort,
-                event_sink: None,
+                event_sink: Some(event_sink),
                 environment: Vec::new(),
                 workspace_write_roots: Vec::new(),
             },

@@ -85,6 +85,7 @@ describe("project LLM gateway", () => {
 
     await runProjectAgent({
       projectId: "project-1",
+      sessionId: "session-1",
       agent: {
         id: "agent-1",
         name: "Release agent",
@@ -100,6 +101,7 @@ describe("project LLM gateway", () => {
     expect(invoke).toHaveBeenCalledWith("run_project_agent", {
       projectId: "project-1",
       request: {
+        sessionId: "session-1",
         agentId: "agent-1",
         agentName: "Release agent",
         agentProvider: "codex",

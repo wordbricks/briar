@@ -1,3 +1,5 @@
+import type { StructuredAgentResult } from "./agent-result";
+
 export type JsonSchema = Record<string, unknown> | boolean;
 
 export const approvalPolicies = ["untrusted", "on-request", "never"] as const;
@@ -100,6 +102,7 @@ export type ProjectLlmChatResponse = {
 
 export type ProjectAgentRunInput = {
   projectId: string;
+  sessionId: string;
   agent: {
     id: string;
     name: string;
@@ -118,6 +121,7 @@ export type ProjectAgentRunResponse = {
   action: "respond" | "dispatch_auto_hunt";
   message: string;
   maxIssues: number | null;
+  structuredResult: StructuredAgentResult | null;
 };
 
 export type ProjectChatMessage = {
@@ -179,6 +183,7 @@ export async function runProjectAgent(
   return invoke<ProjectAgentRunResponse>("run_project_agent", {
     projectId: input.projectId,
     request: {
+      sessionId: input.sessionId,
       agentId: input.agent.id,
       agentName: input.agent.name,
       agentProvider: input.agent.provider,
