@@ -4,16 +4,12 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
 import { demoDashboard } from "../lib/demo-data";
-import type { AutoHuntAutomation } from "../lib/auto-hunt-automation";
 import type { ProjectSettings as ProjectSettingsData } from "../types";
 import { ProjectSettings } from "./ProjectSettings";
 
 describe("ProjectSettings", () => {
   it("keeps project settings focused on project-wide configuration", async () => {
     const onRegenerateWorkflow = vi.fn(async () => undefined);
-    const onUpdateAutomation = vi.fn(async (automation: AutoHuntAutomation) =>
-      automation
-    );
     const onUpdateLinear = vi.fn(
       async (linear: ProjectSettingsData["linear"]) => linear,
     );
@@ -64,7 +60,6 @@ describe("ProjectSettings", () => {
           onBack={() => undefined}
           onDelete={async () => undefined}
           onRegenerateWorkflow={onRegenerateWorkflow}
-          onUpdateAutomation={onUpdateAutomation}
           onUpdateVelenOrg={async (org) => org}
           onUpdateLinear={onUpdateLinear}
           onConnectLinearImport={onConnectLinearImport}
@@ -89,7 +84,7 @@ describe("ProjectSettings", () => {
         | "integrations"
         | "remote-connection"
         | "issue-import"
-        | "auto-hunt"
+        | "agent-configuration"
         | "workflow",
     ) => {
       const button = container.querySelector<HTMLButtonElement>(
@@ -111,9 +106,12 @@ describe("ProjectSettings", () => {
       "Integrations",
       "Remote connection",
       "이슈 임포트",
-      "자동사냥",
+      "에이전트 구성",
       "워크플로우",
     ]);
+    expect(
+      container.querySelector('[data-project-settings-section="auto-hunt"]'),
+    ).toBeNull();
     expect(
       container
         .querySelector('[data-project-settings-section="general"]')
@@ -155,14 +153,13 @@ describe("ProjectSettings", () => {
       "코드 분석 결과로 워크플로우를 갱신했습니다.",
     );
 
-    await openSection("auto-hunt");
+    await openSection("agent-configuration");
     expect(container.querySelector(".project-settings-card")).toBeNull();
     expect(
-      container.querySelector<HTMLElement>(".project-settings-auto-run")?.hidden,
+      container.querySelector<HTMLElement>(
+        ".project-settings-agent-configuration",
+      )?.hidden,
     ).toBe(false);
-    expect(container.querySelector(".project-settings-auto-run")?.textContent).toContain(
-      "자동 실행 조건",
-    );
     const sandboxControl = container.querySelector<HTMLElement>(
       ".project-settings-sandbox",
     );
@@ -172,17 +169,7 @@ describe("ProjectSettings", () => {
     );
     await act(async () => sandboxToggle?.click());
     expect(sandboxControl?.textContent).toContain("워크트리만");
-    const autoRunToggle = container.querySelector<HTMLButtonElement>(
-      ".project-settings-auto-run .project-settings-toggle button[role='switch']",
-    );
-    await act(async () => autoRunToggle?.click());
-    const autoRunSave = container.querySelector<HTMLButtonElement>(
-      ".project-settings-auto-run > footer button",
-    );
-    await act(async () => autoRunSave?.click());
-    expect(onUpdateAutomation).toHaveBeenCalledWith(
-      expect.objectContaining({ enabled: true, maxIssuesPerSession: 3 }),
-    );
+    expect(container.querySelector(".project-settings-auto-run")).toBeNull();
 
     await openSection("integrations");
     expect(container.querySelector(".project-settings-card")).toBeNull();
@@ -254,7 +241,6 @@ describe("ProjectSettings", () => {
           onBack={() => undefined}
           onDelete={onDelete}
           onRegenerateWorkflow={async () => undefined}
-          onUpdateAutomation={async (automation) => automation}
           onUpdateVelenOrg={async (org) => org}
           onUpdateLinear={async (linear) => linear}
           onConnectLinearImport={async () => ({

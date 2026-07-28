@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { AutoHuntSessions } from "./components/AutoHuntSessions";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AgentUsageStatusBar } from "./components/AgentUsageStatusBar";
 import { AppVersionStatus } from "./components/AppVersionStatus";
 import {
@@ -27,7 +26,7 @@ import { ProjectRepositorySetupDialog } from "./components/ProjectRepositorySetu
 import { ProjectSettings } from "./components/ProjectSettings";
 import { Sidebar } from "./components/Sidebar";
 import { WindowNavigationControls } from "./components/WindowNavigationControls";
-import { useBriar } from "./hooks/useBriar";
+import { useBriar, type UseBriarOptions } from "./hooks/useBriar";
 import { useAutoHuntSessions } from "./hooks/useAutoHuntSessions";
 import { useInbox } from "./hooks/useInbox";
 import { useNavigationHistory } from "./hooks/useNavigationHistory";
@@ -50,12 +49,8 @@ import {
   isDesktopTauri,
   isMacDesktopTauri,
 } from "./lib/platform";
-import { automaticTriggersFor } from "./lib/auto-hunt-automation";
-import { loadProjectAgents } from "./lib/api";
 import { issueAgentConversation } from "./lib/issue-agent-reply";
 import { isRepositoryConnectedForImport } from "./lib/linear-import";
-import { normalizeProjectAgentLocale } from "./lib/project-agent";
-import type { ProjectAgent } from "./types";
 
 type ActivePage =
   | "issues"
@@ -68,10 +63,19 @@ type ActivePage =
   | "settings";
 
 export function App() {
-  const briar = useBriar();
   const autoHunt = useAutoHuntSessions();
-  const [activeAutoHuntAgent, setActiveAutoHuntAgent] =
-    useState<ProjectAgent | null>(null);
+  const scheduleSessionOptions = useMemo<UseBriarOptions>(() => ({
+    startScheduledAgentSession: (run) =>
+      autoHunt.startTaskSession(run.projectId, run.agent.id, {
+        request: run.scheduleName,
+        startedAt: run.startedAt,
+        trigger: "scheduled",
+        scheduleId: run.scheduleId,
+        scheduleRunId: run.id,
+      }),
+    settleScheduledAgentSession: autoHunt.settleTaskSession,
+  }), [autoHunt.settleTaskSession, autoHunt.startTaskSession]);
+  const briar = useBriar(scheduleSessionOptions);
   const inbox = useInbox(
     briar.user?.id ?? null,
     briar.dashboard,
@@ -89,35 +93,6 @@ export function App() {
       (previewsLaunchIntro || shouldShowLaunchIntro()),
   );
 
-  useEffect(() => {
-    if (!briar.token || !briar.activeProjectId) {
-      setActiveAutoHuntAgent(null);
-      return;
-    }
-    setActiveAutoHuntAgent(null);
-    let cancelled = false;
-    void loadProjectAgents(
-      briar.token,
-      briar.activeProjectId,
-      normalizeProjectAgentLocale(navigator.language),
-    )
-      .then((agents) => {
-        if (!cancelled) {
-          setActiveAutoHuntAgent(
-            agents.find((agent) => agent.kind === "auto_hunt") ?? null,
-          );
-        }
-      })
-      .catch((caught) => {
-        if (!cancelled) {
-          setActiveAutoHuntAgent(null);
-          console.error("Failed to load the Auto Hunt agent", caught);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [briar.activeProjectId, briar.token]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [appSettingsSection, setAppSettingsSection] =
     useState<SettingsSection>("source-control");
@@ -141,8 +116,9 @@ export function App() {
   const [requestedSessionId, setRequestedSessionId] = useState<string | null>(
     null,
   );
+  const [isIssueDialogOpen, setIsIssueDialogOpen] = useState(false);
   const [companionPage, setCompanionPage] = useState<
-    "issues" | "search" | "inbox" | "session" | "settings"
+    "issues" | "search" | "inbox" | "settings"
   >("issues");
   const [companionStatus, setCompanionStatus] =
     useState<CompanionStatusFilter>("all");
@@ -182,80 +158,6 @@ export function App() {
         : null;
     return briar.addIssueMessage(runId, input, agentConversation);
   };
-
-  useEffect(() => {
-    const dashboard = briar.dashboard;
-    if (
-      !runsOnDesktopTauri ||
-      briar.companionMode ||
-      !dashboard?.settings.automation.enabled
-    ) {
-      return;
-    }
-    const intervalId = window.setInterval(() => {
-      void briar.refresh();
-    }, 15_000);
-    return () => window.clearInterval(intervalId);
-  }, [
-    briar.companionMode,
-    briar.dashboard?.project.id,
-    briar.dashboard?.settings.automation.enabled,
-    briar.refresh,
-    runsOnDesktopTauri,
-  ]);
-
-  useEffect(() => {
-    const dashboard = briar.dashboard;
-    if (
-      !runsOnDesktopTauri ||
-      briar.companionMode ||
-      !activeAutoHuntAgent ||
-      activeAutoHuntAgent.projectId !== dashboard?.project.id ||
-      !dashboard?.settings.automation.enabled ||
-      autoHunt.sessions.some(
-        (session) =>
-          session.projectId === dashboard.project.id &&
-          session.status === "running",
-      )
-    ) {
-      return;
-    }
-    const lastAutomaticStartAt =
-      autoHunt.sessions.find(
-        (session) =>
-          session.projectId === dashboard.project.id &&
-          session.trigger?.type === "automatic",
-      )?.startedAt ?? null;
-    const reasons = automaticTriggersFor(
-      dashboard.settings.automation,
-      dashboard.runs,
-      Date.now(),
-      lastAutomaticStartAt,
-    );
-    if (reasons.length === 0) return;
-    try {
-      autoHunt.startSession(
-        dashboard.project.id,
-        dashboard.runs,
-        () => void briar.refresh(),
-        {
-          agent: activeAutoHuntAgent,
-          maxIssues: dashboard.settings.automation.maxIssuesPerSession,
-          trigger: { type: "automatic", reasons },
-        },
-      );
-    } catch (error) {
-      console.error("Failed to start automatic Auto Hunt session", error);
-    }
-  }, [
-    autoHunt.sessions,
-    autoHunt.startSession,
-    activeAutoHuntAgent,
-    briar.companionMode,
-    briar.dashboard,
-    briar.refresh,
-    runsOnDesktopTauri,
-  ]);
 
   useEffect(() => {
     if (!briar.user || hasCompletedOnboarding) return;
@@ -402,6 +304,10 @@ export function App() {
             onScheduleOpen={() => navigateToPage("schedule")}
             onInboxOpen={() => navigateToPage("inbox")}
             onIssuesOpen={() => navigateToPage("issues")}
+            onCreateIssue={() => {
+              navigateToPage("issues");
+              setIsIssueDialogOpen(true);
+            }}
             onAddOrganization={() => navigateToPage("organization-create")}
             onOrganizationChange={(organizationId) => {
               briar.setActiveOrganizationId(organizationId);
@@ -547,9 +453,6 @@ export function App() {
               resetNavigation("issues");
             }}
             onRegenerateWorkflow={() => briar.regenerateWorkflow(activeProject.id)}
-            onUpdateAutomation={(automation) =>
-              briar.saveAutoHuntAutomation(activeProject.id, automation)
-            }
             onUpdateVelenOrg={(org) =>
               briar.saveVelenIntegration(activeProject.id, org)
             }
@@ -581,6 +484,12 @@ export function App() {
             error={briar.error}
             isSidebarOpen={isSidebarOpen}
             onRequestedSessionOpen={() => setRequestedSessionId(null)}
+            onRecordTaskSession={(agent, record) =>
+              autoHunt.recordTaskSession(
+                activeProject.id,
+                agent.id,
+                record,
+              )}
             onStart={(agent, runs, options) =>
               autoHunt.startSession(
                 activeProject.id,
@@ -590,9 +499,7 @@ export function App() {
                   agent,
                   coordinatorConversationId:
                     options?.coordinatorConversationId,
-                  maxIssues:
-                    options?.maxIssues ??
-                    briar.dashboard?.settings.automation.maxIssuesPerSession,
+                  maxIssues: options?.maxIssues,
                 },
               )
             }
@@ -612,6 +519,8 @@ export function App() {
             dashboard={briar.dashboard}
             error={briar.error}
             isCreatingIssue={briar.isCreatingIssue}
+            isIssueDialogOpen={isIssueDialogOpen}
+            deletingIssueId={briar.deletingIssueId}
             updatingIssueId={briar.updatingIssueId}
             needsLocalConnection={!briar.isActiveProjectConnectedLocally}
             noProject={!activeProject}
@@ -622,9 +531,12 @@ export function App() {
             onConnectRepository={briar.reconnectProject}
             onAddProject={briar.startProjectCreation}
             onCreateIssue={briar.addIssue}
+            onIssueDialogOpenChange={setIsIssueDialogOpen}
+            onDeleteIssue={briar.deleteIssue}
             onUpdateIssue={briar.editIssue}
             onLoadAttachment={briar.readIssueAttachment}
             onLoadIssueMessages={briar.readIssueMessages}
+            onLoadRunEvidence={briar.readRunEvidence}
             onMoveRun={briar.moveRun}
             onRetryRun={briar.retryRun}
             onCancelRun={briar.cancelRun}
@@ -711,7 +623,6 @@ export function App() {
                   setCompanionPage("issues");
                 } else {
                   setRequestedSessionId(message.targetId);
-                  setCompanionPage("session");
                 }
               }}
               unreadCount={inbox.unreadCount}
@@ -719,47 +630,6 @@ export function App() {
             <CompanionBottomNavigation
               activeDestination="inbox"
               onInboxOpen={() => {}}
-              onSearchOpen={() => setCompanionPage("search")}
-              onStatusChange={(status) => {
-                setCompanionStatus(status);
-                setCompanionPage("issues");
-              }}
-              unreadInboxCount={inbox.unreadCount}
-            />
-          </>
-        ) : companionPage === "session" ? (
-          <>
-            <AutoHuntSessions
-              companionMode
-              dashboard={briar.dashboard}
-              error={briar.error}
-              isSidebarOpen
-              onBack={() => setCompanionPage("inbox")}
-              onRequestedSessionOpen={() => setRequestedSessionId(null)}
-              onStart={(runs) => {
-                if (
-                  !activeAutoHuntAgent ||
-                  activeAutoHuntAgent.projectId !== briar.activeProjectId
-                ) {
-                  throw new Error("자동사냥 에이전트를 불러오지 못했습니다.");
-                }
-                return autoHunt.startSession(
-                  briar.activeProjectId!,
-                  runs,
-                  () => void briar.refresh(),
-                  {
-                    agent: activeAutoHuntAgent,
-                    maxIssues:
-                      briar.dashboard?.settings.automation.maxIssuesPerSession,
-                  },
-                );
-              }}
-              requestedSessionId={requestedSessionId}
-              sessions={autoHunt.sessions}
-            />
-            <CompanionBottomNavigation
-              activeDestination="inbox"
-              onInboxOpen={() => setCompanionPage("inbox")}
               onSearchOpen={() => setCompanionPage("search")}
               onStatusChange={(status) => {
                 setCompanionStatus(status);
@@ -777,6 +647,8 @@ export function App() {
             dashboard={briar.dashboard}
             error={briar.error}
             isCreatingIssue={briar.isCreatingIssue}
+            isIssueDialogOpen={isIssueDialogOpen}
+            deletingIssueId={briar.deletingIssueId}
             updatingIssueId={briar.updatingIssueId}
             recoveringRunId={briar.recoveringRunId}
             recoveryError={briar.recoveryError}
@@ -789,9 +661,12 @@ export function App() {
               setCompanionPage("issues");
             }}
             onCreateIssue={briar.addIssue}
+            onIssueDialogOpenChange={setIsIssueDialogOpen}
+            onDeleteIssue={briar.deleteIssue}
             onUpdateIssue={briar.editIssue}
             onLoadAttachment={briar.readIssueAttachment}
             onLoadIssueMessages={briar.readIssueMessages}
+            onLoadRunEvidence={briar.readRunEvidence}
             onMoveRun={briar.moveRun}
             onRequestedRunOpen={() => setRequestedRunId(null)}
             onRetryRun={briar.retryRun}

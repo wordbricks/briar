@@ -20,7 +20,6 @@ const agentA: ProjectAgent = {
   name: "Agent A",
   avatar: null,
   codexPet: null,
-  kind: "custom",
   provider: "codex",
   model: null,
   responsibility: "Review changes.",
@@ -70,6 +69,7 @@ function calendarRun(
     startedAt,
     completedAt,
     resultSummary: status === "completed" ? "Completed." : null,
+    structuredResult: null,
     error: status === "failed" ? "Execution failed." : null,
   };
 }

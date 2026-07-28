@@ -35,6 +35,7 @@ export function Sidebar({
   onScheduleOpen,
   onInboxOpen,
   onIssuesOpen,
+  onCreateIssue,
   onAddOrganization,
   onOrganizationChange,
   onOrganizationSettings,
@@ -67,6 +68,7 @@ export function Sidebar({
   onScheduleOpen: () => void;
   onInboxOpen: () => void;
   onIssuesOpen: () => void;
+  onCreateIssue: () => void;
   onAddOrganization: () => void;
   onOrganizationChange: (organizationId: string) => void;
   onOrganizationSettings: (
@@ -522,18 +524,29 @@ export function Sidebar({
                 </div>
                 {isActive && (
                   <div className="sidebar-project-views">
-                    <a
-                      aria-current={activePage === "issues" ? "page" : undefined}
-                      className={`sidebar-project-view${activePage === "issues" ? " active" : ""}`}
-                      href="#issues"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        onIssuesOpen();
-                      }}
-                    >
-                      <Activity size={14} strokeWidth={1.7} />
-                      <span>{t("sidebar.issues")}</span>
-                    </a>
+                    <div className="sidebar-project-view-row">
+                      <a
+                        aria-current={activePage === "issues" ? "page" : undefined}
+                        className={`sidebar-project-view${activePage === "issues" ? " active" : ""}`}
+                        href="#issues"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          onIssuesOpen();
+                        }}
+                      >
+                        <Activity size={14} strokeWidth={1.7} />
+                        <span>{t("sidebar.issues")}</span>
+                      </a>
+                      <button
+                        aria-label={t("dashboard.createIssue")}
+                        className="sidebar-issue-add"
+                        onClick={onCreateIssue}
+                        title={t("dashboard.createIssue")}
+                        type="button"
+                      >
+                        <Plus aria-hidden="true" size={16} strokeWidth={1.7} />
+                      </button>
+                    </div>
                     <a
                       aria-current={activePage === "agents" ? "page" : undefined}
                       className={`sidebar-project-view${activePage === "agents" ? " active" : ""}`}

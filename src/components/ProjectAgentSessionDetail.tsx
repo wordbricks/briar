@@ -1,0 +1,298 @@
+import {
+  ArrowLeft,
+  Bot,
+  CircleAlert,
+  Clock3,
+  LoaderCircle,
+} from "lucide-react";
+import { useEffect, useMemo, useRef } from "react";
+
+import { MainContent } from "@/components/layout";
+import type {
+  AutoHuntSession,
+  AutoHuntSessionIssueOutcome,
+  AutoHuntSessionStatus,
+} from "../hooks/useAutoHuntSessions";
+import { useAutoHuntAppServerEvents } from "../hooks/useAutoHuntAppServerEvents";
+import { useI18n } from "../i18n";
+import type { MessageKey } from "../i18n/messages";
+import {
+  agentMessagesFromAppServerEvents,
+  naturalLanguageFromAgentMessage,
+} from "../lib/auto-hunt-agent";
+
+export function ProjectAgentSessionDetail({
+  isSidebarOpen,
+  onBack,
+  session,
+}: {
+  isSidebarOpen: boolean;
+  onBack: () => void;
+  session: AutoHuntSession;
+}) {
+  const { localeTag, t } = useI18n();
+  const appServerEvents = useAutoHuntAppServerEvents(session.id);
+  const agentMessages = useMemo(
+    () => agentMessagesFromAppServerEvents(appServerEvents.events),
+    [appServerEvents.events],
+  );
+  const eventListRef = useRef<HTMLDivElement>(null);
+  const latestAgentMessage = agentMessages[agentMessages.length - 1];
+
+  useEffect(() => {
+    const eventList = eventListRef.current;
+    if (!eventList || agentMessages.length === 0) return;
+    eventList.scrollTop = eventList.scrollHeight;
+  }, [agentMessages.length, latestAgentMessage?.text.length]);
+
+  return (
+    <MainContent id="project-agent-session">
+      <header
+        className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`}
+        data-tauri-drag-region
+      />
+
+      <div className="auto-hunt-scroll auto-hunt-session-detail-scroll">
+        <section
+          aria-labelledby="project-agent-session-title"
+          className="auto-hunt-session-page"
+        >
+          <header>
+            <div className="auto-hunt-session-page-heading">
+              <button
+                className="auto-hunt-session-back"
+                onClick={onBack}
+                type="button"
+              >
+                <ArrowLeft size={16} />
+                {t("run.back")}
+              </button>
+              <div>
+                <SessionStatusIcon status={session.status} />
+                <span>
+                  <small>{t("autoHunt.session")}</small>
+                  <h1 id="project-agent-session-title">
+                    {formatDate(session.startedAt, localeTag)}
+                  </h1>
+                </span>
+              </div>
+            </div>
+            <span className={`auto-hunt-status ${session.status}`}>
+              {statusLabel(t, session.status)}
+            </span>
+          </header>
+
+          <div className="auto-hunt-session-detail-body">
+            {session.sessionType === "task" ? (
+              <section className="auto-hunt-dialog-section">
+                <h3>{t("agents.taskInput")}</h3>
+                <p className="project-agent-session-request">
+                  {session.request}
+                </p>
+              </section>
+            ) : (
+              <section className="auto-hunt-dialog-section">
+                <h3>{t("autoHunt.targets")}</h3>
+                <div className="auto-hunt-target-list">
+                  {session.issues.map((issue) => (
+                    <article className="auto-hunt-target" key={issue.runId}>
+                      <span>AH-{issue.runNumber}</span>
+                      <div>
+                        <strong>{issue.title}</strong>
+                        {issue.summary ? <small>{issue.summary}</small> : null}
+                      </div>
+                      <span className={`auto-hunt-outcome ${issue.outcome}`}>
+                        {outcomeLabel(t, issue.outcome)}
+                      </span>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {session.dispatchEvents.length > 0 ? (
+              <section className="auto-hunt-dialog-section">
+                <h3>{t("autoHunt.workerTimeline")}</h3>
+                <div className="auto-hunt-timeline">
+                  {session.dispatchEvents.map((dispatchEvent) => (
+                    <div
+                      className={`auto-hunt-session-event ${dispatchEvent.status}`}
+                      key={`${dispatchEvent.dispatchGroupId}:${dispatchEvent.cursor}`}
+                    >
+                      <i />
+                      <span>
+                        <strong>{dispatchEvent.message}</strong>
+                        <small>
+                          <Clock3 size={12} />
+                          {formatDate(dispatchEvent.occurredAt, localeTag)}
+                          {dispatchEvent.workerSessionId
+                            ? ` · ${dispatchEvent.workerSessionId}`
+                            : ""}
+                        </small>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            {session.summary || session.error ? (
+              <section
+                className={`auto-hunt-summary${session.error ? " error" : ""}`}
+              >
+                <h3>{t("autoHunt.summary")}</h3>
+                <p>{session.error ?? session.summary}</p>
+              </section>
+            ) : null}
+
+            <section className="auto-hunt-dialog-section auto-hunt-app-server-section">
+              <header>
+                <div>
+                  <h3>{t("agents.executionLog")}</h3>
+                  <p>{t("agents.executionLogDescription")}</p>
+                </div>
+                <span className="auto-hunt-event-count">
+                  {session.status === "running" ? (
+                    <i>
+                      <span />
+                      {t("autoHunt.live")}
+                    </i>
+                  ) : null}
+                  {t("autoHunt.eventCount", { count: agentMessages.length })}
+                </span>
+              </header>
+              {appServerEvents.error ? (
+                <div className="auto-hunt-event-state error">
+                  <CircleAlert size={14} />
+                  {appServerEvents.error}
+                </div>
+              ) : appServerEvents.isLoading ? (
+                <div className="auto-hunt-event-state">
+                  <LoaderCircle className="spin" size={14} />
+                  {t("autoHunt.eventsLoading")}
+                </div>
+              ) : agentMessages.length === 0 ? (
+                <div className="auto-hunt-event-state">
+                  {t("autoHunt.eventsEmpty")}
+                </div>
+              ) : (
+                <div className="auto-hunt-agent-messages" ref={eventListRef}>
+                  {agentMessages.map((message) => (
+                    <article
+                      className="auto-hunt-agent-message"
+                      key={message.id}
+                    >
+                      <header>
+                        <span>
+                          <Bot size={13} />
+                        </span>
+                        <strong>
+                          {agentMessagePhase(t, message.phase)}
+                        </strong>
+                        {!message.isComplete ? (
+                          <small className="auto-hunt-message-streaming">
+                            <LoaderCircle className="spin" size={11} />
+                            {t("autoHunt.agentMessage.streaming")}
+                          </small>
+                        ) : null}
+                        <time
+                          dateTime={new Date(
+                            message.updatedAtMs,
+                          ).toISOString()}
+                        >
+                          {formatEventTime(message.updatedAtMs, localeTag)}
+                        </time>
+                      </header>
+                      <p>
+                        {message.text
+                          ? naturalLanguageFromAgentMessage(message.text)
+                          : t("autoHunt.agentMessage.writing")}
+                      </p>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section className="auto-hunt-dialog-section">
+              <h3>{t("autoHunt.timeline")}</h3>
+              <div className="auto-hunt-timeline">
+                {session.events.map((sessionEvent) => (
+                  <div
+                    className={`auto-hunt-session-event ${sessionEvent.type}`}
+                    key={sessionEvent.id}
+                  >
+                    <i />
+                    <span>
+                      <strong>
+                        {t(
+                          `autoHunt.event.${sessionEvent.type}` as MessageKey,
+                        )}
+                      </strong>
+                      <small>
+                        <Clock3 size={12} />
+                        {formatDate(sessionEvent.occurredAt, localeTag)}
+                      </small>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+        </section>
+      </div>
+    </MainContent>
+  );
+}
+
+function SessionStatusIcon({ status }: { status: AutoHuntSessionStatus }) {
+  return (
+    <span className={`auto-hunt-session-icon ${status}`}>
+      {status === "running" ? (
+        <LoaderCircle className="spin" size={17} />
+      ) : (
+        <Bot size={17} />
+      )}
+    </span>
+  );
+}
+
+function statusLabel(
+  t: (key: MessageKey) => string,
+  status: AutoHuntSessionStatus,
+) {
+  return t(`autoHunt.status.${status}` as MessageKey);
+}
+
+function outcomeLabel(
+  t: (key: MessageKey) => string,
+  outcome: AutoHuntSessionIssueOutcome,
+) {
+  return t(`autoHunt.outcome.${outcome}` as MessageKey);
+}
+
+function formatDate(value: string, locale: string) {
+  return new Intl.DateTimeFormat(locale, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function formatEventTime(value: number, locale: string) {
+  return new Intl.DateTimeFormat(locale, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(new Date(value));
+}
+
+function agentMessagePhase(
+  t: (key: MessageKey) => string,
+  phase: string | null,
+) {
+  return phase === "final_answer"
+    ? t("autoHunt.agentMessage.final")
+    : t("autoHunt.agentMessage.commentary");
+}

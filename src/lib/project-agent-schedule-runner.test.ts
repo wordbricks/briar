@@ -7,6 +7,17 @@ import {
   type ProjectAgentScheduleRunnerDependencies,
 } from "./project-agent-schedule-runner";
 
+const structuredResult = {
+  summary: "Audit completed.",
+  outcome: "completed",
+  importance: "routine",
+  urgency: "normal",
+  impact: "issue",
+  humanActionRequired: false,
+  nextAction: null,
+  dueAt: null,
+} as const;
+
 const run: ClaimedProjectAgentScheduleRun = {
   id: "11111111-1111-4111-8111-111111111111",
   projectId: "22222222-2222-4222-8222-222222222222",
@@ -28,6 +39,7 @@ const run: ClaimedProjectAgentScheduleRun = {
   startedAt: "2026-07-27T09:00:01.000Z",
   completedAt: null,
   resultSummary: null,
+  structuredResult: null,
   error: null,
 };
 
@@ -43,6 +55,7 @@ const dependencies = (
     completedAt: "2026-07-27T09:01:00.000Z",
     resultSummary:
       input.status === "completed" ? input.resultSummary : null,
+    structuredResult: input.structuredResult,
     error: input.status === "failed" ? input.error : null,
   })),
   renew: vi.fn(async () => undefined),
@@ -50,6 +63,7 @@ const dependencies = (
     conversationId: "briar:project-1:thread-1",
     message: "Audit completed.",
     workspaceRoot: "/repo",
+    structuredResult,
   })),
   log: vi.fn(),
   ...overrides,
@@ -78,6 +92,7 @@ describe("project agent schedule runner", () => {
       claimToken: run.claimToken,
       status: "completed",
       resultSummary: "Audit completed.",
+      structuredResult,
     });
   });
 
@@ -94,6 +109,16 @@ describe("project agent schedule runner", () => {
       claimToken: run.claimToken,
       status: "failed",
       error: "provider unavailable",
+      structuredResult: {
+        summary: "provider unavailable",
+        outcome: "failed",
+        importance: "important",
+        urgency: "time_sensitive",
+        impact: "issue",
+        humanActionRequired: true,
+        nextAction: "실패 원인을 확인하고 예약 작업을 다시 실행하세요.",
+        dueAt: null,
+      },
     });
   });
 

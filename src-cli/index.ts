@@ -12,6 +12,7 @@ import {
   autoHuntSources,
   repositoryWorkflowPendingStageId,
 } from "../src/lib/auto-hunt-contract";
+import { structuredAgentResultSchema } from "../src/lib/agent-result";
 import {
   defaultWorkerLabel,
   hostFingerprint,
@@ -985,6 +986,13 @@ async function addRunEvent(forcedStatus?: string) {
     issueId || issueIdentifier || issueUrl || issueState,
   );
   const contextValue = value("--context-json");
+  const structuredResultValue = await optionalText(
+    "--structured-result",
+    "--structured-result-file",
+  );
+  const structuredResult = structuredResultValue
+    ? structuredAgentResultSchema.parse(JSON.parse(structuredResultValue))
+    : null;
   const runId = value("--run") ?? project.activeClaim?.runId ?? null;
   const sourceKey = value("--source-key") ?? project.activeClaim?.sourceKey ?? null;
   const title = value("--title");
@@ -1015,15 +1023,27 @@ async function addRunEvent(forcedStatus?: string) {
         }
       : null,
     issueDescription: await optionalText("--issue-description", "--issue-description-file"),
-    resultSummary: await optionalText("--result-summary", "--result-summary-file"),
+    resultSummary:
+      structuredResult?.summary ??
+      (await optionalText("--result-summary", "--result-summary-file")),
+    structuredResult,
     pullRequestUrls: values("--pull-request-url"),
     targetSha: value("--target-sha") ?? null,
     sourceCreatedAt: value("--source-created-at") ?? null,
     context: contextValue ? JSON.parse(contextValue) : null,
   };
-  if (forcedStatus === "completed" && !input.resultSummary?.trim()) {
+  if (forcedStatus === "completed" && !input.structuredResult) {
     throw new Error(
-      "run complete requires --result-summary or --result-summary-file",
+      "run complete requires --structured-result or --structured-result-file",
+    );
+  }
+  if (
+    forcedStatus === "completed" &&
+    input.structuredResult &&
+    !["completed", "partial"].includes(input.structuredResult.outcome)
+  ) {
+    throw new Error(
+      "run complete structured outcome must be completed or partial",
     );
   }
   z.object({
@@ -1052,6 +1072,7 @@ async function addRunEvent(forcedStatus?: string) {
       .nullable(),
     issueDescription: z.string().nullable(),
     resultSummary: z.string().nullable(),
+    structuredResult: structuredAgentResultSchema.nullable(),
     pullRequestUrls: z.array(z.string().url()).max(20),
     targetSha: z.string().regex(/^[0-9a-f]{7,64}$/u).nullable(),
     sourceCreatedAt: z.string().datetime({ offset: true }).nullable(),
@@ -1496,7 +1517,7 @@ const usage = `Briar CLI
     --status <backlog|queued|running|blocked|failed|completed|cancelled>
     [--workflow-stage <configured-stage>] --event-key <retry-stable-key>
   briar run complete [--run <uuid>] --event-key <retry-stable-key>
-    --result-summary-file <path>
+    --structured-result-file <path>
   briar run evidence add [--run <uuid>] --key <retry-stable-key>
     --stage <configured-stage> --type <type>
     --status <pending|passed|failed|skipped>
