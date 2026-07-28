@@ -119,6 +119,7 @@ export function HuntDashboard({
   dashboard,
   error,
   isCreatingIssue,
+  isIssueDialogOpen: controlledIsIssueDialogOpen,
   deletingIssueId,
   updatingIssueId,
   needsLocalConnection = false,
@@ -129,6 +130,7 @@ export function HuntDashboard({
   onConnectRepository,
   onAddProject,
   onCreateIssue,
+  onIssueDialogOpenChange,
   onDeleteIssue,
   onUpdateIssue,
   onLoadAttachment,
@@ -151,6 +153,7 @@ export function HuntDashboard({
   dashboard: DashboardPayload | null;
   error: string | null;
   isCreatingIssue: boolean;
+  isIssueDialogOpen?: boolean;
   deletingIssueId: string | null;
   updatingIssueId: string | null;
   needsLocalConnection?: boolean;
@@ -161,6 +164,7 @@ export function HuntDashboard({
   onConnectRepository?: () => void;
   onAddProject?: () => void;
   onCreateIssue: (input: CreateIssueInput) => Promise<unknown>;
+  onIssueDialogOpenChange?: (isOpen: boolean) => void;
   onDeleteIssue: (runId: string) => Promise<unknown>;
   onUpdateIssue: (runId: string, input: UpdateIssueInput) => Promise<unknown>;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
@@ -193,7 +197,14 @@ export function HuntDashboard({
     ? onCompanionStatusChange
     : setInternalStatus;
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
-  const [isIssueDialogOpen, setIsIssueDialogOpen] = useState(false);
+  const [internalIsIssueDialogOpen, setInternalIsIssueDialogOpen] =
+    useState(false);
+  const isIssueDialogOpen =
+    controlledIsIssueDialogOpen ?? internalIsIssueDialogOpen;
+  const setIsIssueDialogOpen = (isOpen: boolean) => {
+    setInternalIsIssueDialogOpen(isOpen);
+    onIssueDialogOpenChange?.(isOpen);
+  };
   const [draggedRunId, setDraggedRunId] = useState<string | null>(null);
   const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null);
 
@@ -321,6 +332,17 @@ export function HuntDashboard({
       ? columns.filter((column) => column.runs.length > 0)
       : columns;
   }, [companionMode, dashboard?.settings.workflow, filtered, status, t]);
+  const createIssueDialog = isIssueDialogOpen ? (
+    <CreateIssueDialog
+      isSubmitting={isCreatingIssue}
+      onClose={() => setIsIssueDialogOpen(false)}
+      onCreate={async (input) => {
+        await onCreateIssue(input);
+        setIsIssueDialogOpen(false);
+      }}
+      projectName={dashboard?.project.name}
+    />
+  ) : null;
 
   if (noProject) {
     return (
@@ -356,28 +378,31 @@ export function HuntDashboard({
 
   if (selected) {
     return (
-      <RunPage
-        companionMode={companionMode}
-        error={recoveryError}
-        isDeletingIssue={deletingIssueId === selected.id}
-        isRecovering={recoveringRunId === selected.id}
-        isUpdatingIssue={updatingIssueId === selected.id}
-        isSidebarOpen={isSidebarOpen}
-        onBack={() => setSelectedRunId(null)}
-        onCancel={() => onCancelRun(selected.id)}
-        onDelete={async () => {
-          await onDeleteIssue(selected.id);
-          setSelectedRunId(null);
-        }}
-        onLoadAttachment={onLoadAttachment}
-        onLoadIssueMessages={() => onLoadIssueMessages(selected.id)}
-        onLoadRunEvidence={() => onLoadRunEvidence(selected.id)}
-        onMove={(placement) => onMoveRun(selected.id, placement)}
-        onRetry={() => onRetryRun(selected.id)}
-        onSendIssueMessage={(input) => onSendIssueMessage(selected.id, input)}
-        onUpdateIssue={(input) => onUpdateIssue(selected.id, input)}
-        run={selected}
-      />
+      <>
+        <RunPage
+          companionMode={companionMode}
+          error={recoveryError}
+          isDeletingIssue={deletingIssueId === selected.id}
+          isRecovering={recoveringRunId === selected.id}
+          isUpdatingIssue={updatingIssueId === selected.id}
+          isSidebarOpen={isSidebarOpen}
+          onBack={() => setSelectedRunId(null)}
+          onCancel={() => onCancelRun(selected.id)}
+          onDelete={async () => {
+            await onDeleteIssue(selected.id);
+            setSelectedRunId(null);
+          }}
+          onLoadAttachment={onLoadAttachment}
+          onLoadIssueMessages={() => onLoadIssueMessages(selected.id)}
+          onLoadRunEvidence={() => onLoadRunEvidence(selected.id)}
+          onMove={(placement) => onMoveRun(selected.id, placement)}
+          onRetry={() => onRetryRun(selected.id)}
+          onSendIssueMessage={(input) => onSendIssueMessage(selected.id, input)}
+          onUpdateIssue={(input) => onUpdateIssue(selected.id, input)}
+          run={selected}
+        />
+        {createIssueDialog}
+      </>
     );
   }
 
@@ -629,17 +654,7 @@ export function HuntDashboard({
           unreadInboxCount={companionUnreadInboxCount}
         />
       )}
-      {isIssueDialogOpen && (
-        <CreateIssueDialog
-          isSubmitting={isCreatingIssue}
-          onClose={() => setIsIssueDialogOpen(false)}
-          onCreate={async (input) => {
-            await onCreateIssue(input);
-            setIsIssueDialogOpen(false);
-          }}
-          projectName={dashboard?.project.name}
-        />
-      )}
+      {createIssueDialog}
     </MainContent>
   );
 }
@@ -835,9 +850,15 @@ export function CreateIssueDialog({
       <form
         className="issue-dialog"
         onKeyDown={(event) => {
+          const isTitleEnter =
+            event.target instanceof HTMLInputElement &&
+            event.target.classList.contains("issue-title-input") &&
+            !event.metaKey &&
+            !event.ctrlKey;
           if (
             event.key === "Enter" &&
-            (event.metaKey || event.ctrlKey) &&
+            !event.nativeEvent.isComposing &&
+            (isTitleEnter || event.metaKey || event.ctrlKey) &&
             !isSubmitting
           ) {
             event.preventDefault();

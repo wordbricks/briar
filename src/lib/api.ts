@@ -374,7 +374,30 @@ export async function loadDashboard(
   token: string,
   projectId: string,
 ): Promise<DashboardPayload> {
-  return request<DashboardPayload>(`/projects/${projectId}/dashboard`, token);
+  const dashboard = await request<DashboardPayload>(
+    `/projects/${projectId}/dashboard`,
+    token,
+  );
+  return {
+    ...dashboard,
+    runs: dashboard.runs.map((run) => {
+      const events = run.events.map((event) => ({
+        ...event,
+        revision:
+          Number.isInteger(event.revision) && event.revision >= 1
+            ? event.revision
+            : 1,
+      }));
+      return {
+        ...run,
+        currentRevision:
+          Number.isInteger(run.currentRevision) && run.currentRevision >= 1
+            ? run.currentRevision
+            : Math.max(1, ...events.map((event) => event.revision)),
+        events,
+      };
+    }),
+  };
 }
 
 export async function createProject(

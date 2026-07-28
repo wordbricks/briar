@@ -486,7 +486,7 @@ function ensureConfiguredVelen(project?: ProjectConfig) {
   }
   if (!Bun.file(velenExecutable()).size) {
     throw new Error(
-      "이 프로젝트에 설정된 Velen 기능을 사용하려면 `bun install -g @wordbricks/velen`으로 CLI를 설치하세요.",
+      "이 프로젝트에 설정된 Velen CLI 기능을 사용하려면 `bun install -g @wordbricks/velen`으로 CLI를 설치하세요.",
     );
   }
   const auth = runVelen(["auth", "whoami"]);

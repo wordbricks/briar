@@ -21,7 +21,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Typography } from "@/components/ui/typography";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import { useI18n } from "../i18n";
 import { executeProjectAgentTurn } from "../lib/project-agent-execution";
@@ -34,17 +33,13 @@ import type {
 import { ProjectAgentSessionDetail } from "./ProjectAgentSessionDetail";
 import { ProjectAgentSessions } from "./ProjectAgentSessions";
 
-type ProjectAgentMessage = {
-  id: string;
-  role: "user" | "agent";
-  text: string;
-  dispatched: boolean;
-};
-
-export type ProjectAgentTaskSessionRecord = {
+export type ProjectAgentTaskSessionStart = {
   sessionId: string;
   request: string;
   startedAt: string;
+};
+
+export type ProjectAgentTaskSessionSettlement = {
   status: "completed" | "failed";
   conversationId: string | null;
   workspaceRoot: string | null;
@@ -58,9 +53,10 @@ export function ProjectAgentDetail({
   error: appError,
   isSidebarOpen,
   onBack,
-  onRecordTaskSession,
   onRequestedSessionOpen,
+  onSettleTaskSession,
   onStartAutoHunt,
+  onStartTaskSession,
   requestedSessionId,
   sessions,
 }: {
@@ -69,8 +65,11 @@ export function ProjectAgentDetail({
   error: string | null;
   isSidebarOpen: boolean;
   onBack: () => void;
-  onRecordTaskSession?: (record: ProjectAgentTaskSessionRecord) => void;
   onRequestedSessionOpen?: () => void;
+  onSettleTaskSession: (
+    sessionId: string,
+    settlement: ProjectAgentTaskSessionSettlement,
+  ) => void;
   onStartAutoHunt: (
     runs: HuntRun[],
     options?: {
@@ -78,14 +77,13 @@ export function ProjectAgentDetail({
       maxIssues?: number;
     },
   ) => string;
+  onStartTaskSession: (session: ProjectAgentTaskSessionStart) => void;
   requestedSessionId: string | null;
   sessions: AutoHuntSession[];
 }) {
   const { t } = useI18n();
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [request, setRequest] = useState(agent.responsibility);
-  const [conversationId, setConversationId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<ProjectAgentMessage[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
@@ -121,10 +119,12 @@ export function ProjectAgentDetail({
     sessions,
   ]);
 
+  useEffect(() => {
+    if (selectedSession) setIsTaskDialogOpen(false);
+  }, [selectedSession]);
+
   const openTaskDialog = () => {
     setRequest(agent.responsibility);
-    setConversationId(null);
-    setMessages([]);
     setError(null);
     setIsTaskDialogOpen(true);
   };
@@ -133,20 +133,18 @@ export function ProjectAgentDetail({
     const message = request.trim();
     if (!message || isRunning || !dashboard) return;
     setError(null);
-    setRequest("");
-    setMessages((current) => [
-      ...current,
-      {
-        id: crypto.randomUUID(),
-        role: "user",
-        text: message,
-        dispatched: false,
-      },
-    ]);
     const startedAt = new Date().toISOString();
     const sessionId = crypto.randomUUID();
+    let sessionStarted = false;
     setIsRunning(true);
     try {
+      onStartTaskSession({
+        sessionId,
+        request: message,
+        startedAt,
+      });
+      sessionStarted = true;
+      setSelectedSessionId(sessionId);
       const { response } = await executeProjectAgentTurn(
         {
           runAgent: runProjectAgent,
@@ -160,46 +158,31 @@ export function ProjectAgentDetail({
           projectId: dashboard.project.id,
           agent,
           message,
-          conversationId,
+          conversationId: null,
           sessionId,
         },
       );
-      setConversationId(response.conversationId);
-      if (response.action === "respond") {
-        onRecordTaskSession?.({
-          sessionId,
-          request: message,
-          startedAt,
-          status: "completed",
-          conversationId: response.conversationId,
-          workspaceRoot: response.workspaceRoot,
-          summary: response.message,
-          error: null,
-        });
-      }
-      setMessages((current) => [
-        ...current,
-        {
-          id: crypto.randomUUID(),
-          role: "agent",
-          text: response.message,
-          dispatched: response.action === "dispatch_auto_hunt",
-        },
-      ]);
+      onSettleTaskSession(sessionId, {
+        status: "completed",
+        conversationId: response.conversationId,
+        workspaceRoot: response.workspaceRoot,
+        summary: response.message,
+        error: null,
+      });
     } catch (caught) {
       const messageText =
         caught instanceof Error ? caught.message : String(caught);
-      setError(messageText);
-      onRecordTaskSession?.({
-        sessionId,
-        request: message,
-        startedAt,
-        status: "failed",
-        conversationId,
-        workspaceRoot: null,
-        summary: null,
-        error: messageText,
-      });
+      if (sessionStarted) {
+        onSettleTaskSession(sessionId, {
+          status: "failed",
+          conversationId: null,
+          workspaceRoot: null,
+          summary: null,
+          error: messageText,
+        });
+      } else {
+        setError(messageText);
+      }
     } finally {
       setIsRunning(false);
     }
@@ -282,27 +265,6 @@ export function ProjectAgentDetail({
               {t("agents.taskDescription")}
             </DialogDescription>
           </DialogHeader>
-
-          {messages.length > 0 ? (
-            <div className="project-agent-run-messages">
-              {messages.map((message) => (
-                <article
-                  className={`project-agent-run-message ${message.role}`}
-                  key={message.id}
-                >
-                  <small>
-                    {message.role === "user" ? t("agents.you") : agent.name}
-                  </small>
-                  <p>{message.text}</p>
-                  {message.dispatched ? (
-                    <Typography tone="muted" variant="caption">
-                      {t("agents.autoHuntRequested")}
-                    </Typography>
-                  ) : null}
-                </article>
-              ))}
-            </div>
-          ) : null}
 
           {error ? <ErrorBanner>{error}</ErrorBanner> : null}
 
