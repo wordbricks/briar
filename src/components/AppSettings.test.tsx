@@ -13,6 +13,10 @@ import {
   updateAppProviderSettings,
 } from "../lib/project-llm";
 import type { RepositoryReadiness } from "../lib/project-connection";
+import {
+  loadAppRuntimeSettings,
+  updateAppRuntimeSettings,
+} from "../lib/app-runtime-settings";
 import { AppSettings } from "./AppSettings";
 
 vi.mock("../lib/initial-onboarding", () => ({
@@ -27,6 +31,11 @@ vi.mock("../lib/project-llm", async (importOriginal) => {
     updateAppProviderSettings: vi.fn(),
   };
 });
+
+vi.mock("../lib/app-runtime-settings", () => ({
+  loadAppRuntimeSettings: vi.fn(),
+  updateAppRuntimeSettings: vi.fn(),
+}));
 
 const readiness: RepositoryReadiness = {
   repositoryPath: "/Users/jay/git/briar",
@@ -76,6 +85,8 @@ describe("AppSettings", () => {
     vi.mocked(inspectOnboardingPrerequisites).mockReset();
     vi.mocked(loadAppProviderSettings).mockReset();
     vi.mocked(updateAppProviderSettings).mockReset();
+    vi.mocked(loadAppRuntimeSettings).mockReset();
+    vi.mocked(updateAppRuntimeSettings).mockReset();
     window.localStorage.clear();
     window.localStorage.setItem("briar.locale.v1", "en");
     (
@@ -83,6 +94,60 @@ describe("AppSettings", () => {
         IS_REACT_ACT_ENVIRONMENT: boolean;
       }
     ).IS_REACT_ACT_ENVIRONMENT = true;
+  });
+
+  it("persists the Prevent sleep while running setting", async () => {
+    vi.mocked(loadAppRuntimeSettings).mockResolvedValue({
+      preventSleepWhileRunning: false,
+      preventSleepSupported: true,
+    });
+    vi.mocked(updateAppRuntimeSettings).mockResolvedValue({
+      preventSleepWhileRunning: true,
+      preventSleepSupported: true,
+    });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <I18nProvider>
+          <AppSettings
+            error={null}
+            initialSection="general"
+            isSidebarOpen
+            loading={false}
+            onBack={() => undefined}
+            onRefresh={() => Promise.resolve(readiness)}
+            projectId="project-1"
+            projectName="Briar"
+            readiness={readiness}
+          />
+        </I18nProvider>,
+      );
+    });
+
+    expect(container.textContent).toContain("Prevent sleep while running");
+    const toggle = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Prevent sleep while running"]',
+    );
+    expect(
+      toggle?.getAttribute("data-state") ??
+        toggle?.getAttribute("aria-checked"),
+    ).toMatch(/unchecked|false/);
+
+    await act(async () => toggle?.click());
+
+    expect(updateAppRuntimeSettings).toHaveBeenCalledWith({
+      preventSleepWhileRunning: true,
+    });
+    expect(
+      toggle?.getAttribute("data-state") ??
+        toggle?.getAttribute("aria-checked"),
+    ).toMatch(/checked|true/);
+
+    await act(async () => root.unmount());
+    container.remove();
   });
 
   it("shows the Source Control tab and persists provider preferences", async () => {

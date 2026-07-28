@@ -10,6 +10,7 @@ import {
   Keyboard,
   Link2,
   LoaderCircle,
+  Moon,
   RefreshCw,
   Settings2,
   SlidersHorizontal,
@@ -35,6 +36,7 @@ import {
   SettingsSection as SettingsContent,
   SettingsShell,
   SettingsSidebar,
+  SettingsToggleRow,
   SettingsAlert,
 } from "@/components/settings";
 import { Typography } from "@/components/ui/typography";
@@ -49,6 +51,11 @@ import {
   type AgentProvider,
   type AppProviderSettings,
 } from "../lib/project-llm";
+import {
+  loadAppRuntimeSettings,
+  updateAppRuntimeSettings,
+  type AppRuntimeSettings,
+} from "../lib/app-runtime-settings";
 import { ClaudeIcon, CodexIcon, GrokIcon } from "./AgentIcons";
 import type { RepositoryReadiness } from "../lib/project-connection";
 
@@ -142,6 +149,12 @@ export function AppSettings({
     useState<AgentProvider | null>(null);
   const [providerError, setProviderError] = useState<string | null>(null);
   const [providersChecked, setProvidersChecked] = useState(false);
+  const [runtimeSettings, setRuntimeSettings] =
+    useState<AppRuntimeSettings | null>(null);
+  const [runtimeSettingsLoading, setRuntimeSettingsLoading] = useState(false);
+  const [runtimeSettingsSaving, setRuntimeSettingsSaving] = useState(false);
+  const [runtimeSettingsError, setRuntimeSettingsError] =
+    useState<string | null>(null);
 
   useEffect(() => {
     setActiveSection(initialSection);
@@ -177,6 +190,20 @@ export function AppSettings({
     void refreshProviders();
   }, [activeSection, refreshProviders]);
 
+  useEffect(() => {
+    if (activeSection !== "general" || runtimeSettings) return;
+    setRuntimeSettingsLoading(true);
+    setRuntimeSettingsError(null);
+    void loadAppRuntimeSettings()
+      .then(setRuntimeSettings)
+      .catch((caught) =>
+        setRuntimeSettingsError(
+          caught instanceof Error ? caught.message : String(caught),
+        ),
+      )
+      .finally(() => setRuntimeSettingsLoading(false));
+  }, [activeSection, runtimeSettings]);
+
   const toggleProvider = async (
     provider: AgentProvider,
     enabled: boolean,
@@ -203,6 +230,31 @@ export function AppSettings({
       );
     } finally {
       setProviderSaving(null);
+    }
+  };
+
+  const togglePreventSleep = async (enabled: boolean) => {
+    if (!runtimeSettings || runtimeSettingsSaving) return;
+    const previous = runtimeSettings;
+    setRuntimeSettings({
+      ...runtimeSettings,
+      preventSleepWhileRunning: enabled,
+    });
+    setRuntimeSettingsSaving(true);
+    setRuntimeSettingsError(null);
+    try {
+      setRuntimeSettings(
+        await updateAppRuntimeSettings({
+          preventSleepWhileRunning: enabled,
+        }),
+      );
+    } catch (caught) {
+      setRuntimeSettings(previous);
+      setRuntimeSettingsError(
+        caught instanceof Error ? caught.message : String(caught),
+      );
+    } finally {
+      setRuntimeSettingsSaving(false);
     }
   };
 
@@ -333,7 +385,38 @@ export function AppSettings({
             title={activeItem?.label ?? t("appSettings.title")}
           />
 
-          {activeSection === "providers" ? (
+          {activeSection === "general" ? (
+            <SettingsContent>
+              <SettingsGroupHeading title={t("appSettings.power")} />
+              <SettingsCard aria-busy={runtimeSettingsLoading || runtimeSettingsSaving}>
+                <SettingsToggleRow
+                  checked={runtimeSettings?.preventSleepWhileRunning ?? false}
+                  description={
+                    runtimeSettings?.preventSleepSupported === false
+                      ? t("appSettings.preventSleepUnsupported")
+                      : t("appSettings.preventSleepDescription")
+                  }
+                  disabled={
+                    runtimeSettingsLoading ||
+                    runtimeSettingsSaving ||
+                    !runtimeSettings?.preventSleepSupported
+                  }
+                  label={t("appSettings.preventSleep")}
+                  onCheckedChange={(enabled) => void togglePreventSleep(enabled)}
+                  title={
+                    <span className="flex items-center gap-2">
+                      <Moon aria-hidden="true" size={16} strokeWidth={1.8} />
+                      {t("appSettings.preventSleep")}
+                    </span>
+                  }
+                />
+              </SettingsCard>
+              {runtimeSettingsError ? (
+                <SettingsAlert>{runtimeSettingsError}</SettingsAlert>
+              ) : null}
+              <SettingsNote>{t("appSettings.preventSleepNote")}</SettingsNote>
+            </SettingsContent>
+          ) : activeSection === "providers" ? (
             <SettingsContent>
               <SettingsGroupHeading
                 action={
