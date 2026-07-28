@@ -50,6 +50,18 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("이슈 만들기");
   });
 
+  it("shows the create dialog when issue creation is opened externally", () => {
+    const markup = renderToStaticMarkup(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={demoDashboard}
+        isIssueDialogOpen
+      />,
+    );
+
+    expect(markup).toContain('aria-label="새 Auto Hunt 이슈"');
+  });
+
   it("shows a safe projectless state after onboarding is deferred", () => {
     const markup = renderToStaticMarkup(
       <HuntDashboard

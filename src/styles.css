@@ -126,7 +126,7 @@ body { overflow: hidden; font-synthesis: none; }
 .sidebar-section-heading button { width: 28px; height: 28px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 7px; color: #92938e; background: transparent; cursor: pointer; }
 .sidebar-section-heading button:hover { color:var(--foreground); background: rgba(44,45,41,.07); }
 .sidebar-section-heading button:active { transform: scale(.95); }
-.sidebar-section-heading button:focus-visible, .sidebar-project-heading:focus-visible, .sidebar-project-menu-trigger:focus-visible, .sidebar-project-view:focus-visible { outline: 2px solid #8b70dd; outline-offset: -1px; }
+.sidebar-section-heading button:focus-visible, .sidebar-project-heading:focus-visible, .sidebar-project-menu-trigger:focus-visible, .sidebar-project-view:focus-visible, .sidebar-issue-add:focus-visible { outline: 2px solid #8b70dd; outline-offset: -1px; }
 .sidebar-project-list { min-height: 0; padding: 0 10px 16px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(82,83,77,.2) transparent; }
 .organization-settings-layout { min-width:0; flex:1; height:100%; display:flex; background:#f7f7f6; }
 .organization-settings-sidebar { width:252px; flex:0 0 252px; height:100%; display:flex; flex-direction:column; border-right:1px solid rgba(56,57,52,.09); background:#f1f1f0; }
@@ -292,6 +292,11 @@ body { overflow: hidden; font-synthesis: none; }
 .sidebar-project-view:hover { color: #32332f; background: rgba(44,45,41,.055); }
 .sidebar-project-view.active { color:var(--foreground); background: rgba(48,49,45,.085); font-weight:500; }
 .sidebar-project-view svg { color:var(--muted-foreground); }
+.sidebar-project-view-row { position:relative; }
+.sidebar-project-view-row .sidebar-project-view { padding-right:40px; }
+.sidebar-issue-add { width:26px; height:26px; position:absolute; top:5px; right:5px; padding:0; display:grid; place-items:center; border:0; border-radius:7px; color:var(--muted-foreground); background:transparent; cursor:pointer; }
+.sidebar-issue-add:hover { color:var(--foreground); background:rgba(44,45,41,.08); }
+.sidebar-issue-add:active { transform:scale(.94); }
 .sidebar-project-views { display:grid; gap:1px; }
 .sidebar-bottom { flex: 0 0 auto; position: relative; padding: 7px 10px 9px; border-top: 1px solid rgba(56,57,52,.075); background: rgba(244,244,242,.75); }
 .sidebar-footer-row { display: flex; align-items: center; gap: 6px; }
