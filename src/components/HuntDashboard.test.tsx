@@ -93,6 +93,49 @@ describe("HuntDashboard", () => {
     expect(markup).not.toContain('class="metric-grid"');
   });
 
+  it("opens issue actions from a card context menu", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={demoDashboard}
+      />,
+    ));
+
+    const card = container.querySelector<HTMLButtonElement>(".kanban-card");
+    await act(async () => {
+      card?.dispatchEvent(
+        new MouseEvent("contextmenu", {
+          bubbles: true,
+          button: 2,
+          cancelable: true,
+          clientX: 240,
+          clientY: 180,
+        }),
+      );
+    });
+
+    const menu = document.body.querySelector<HTMLElement>(
+      ".issue-context-menu",
+    );
+    expect(menu?.textContent).toContain("상태");
+    expect(menu?.textContent).toContain("우선순위");
+    expect(menu?.textContent).toContain("열기");
+    expect(menu?.textContent).toContain("수정");
+    expect(menu?.textContent).toContain("삭제");
+
+    const editItem = Array.from(
+      menu?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [],
+    ).find((item) => item.textContent?.trim() === "수정");
+    await act(async () => editItem?.click());
+    expect(container.querySelector(".edit-issue-dialog")).not.toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("switches between kanban and list views while preserving issue navigation", async () => {
     const container = document.createElement("div");
     const root = createRoot(container);
@@ -206,6 +249,33 @@ describe("HuntDashboard", () => {
     expect(markup).not.toContain('class="source-filter"');
     expect(markup).not.toContain('class="companion-search-trigger"');
     expect(markup).not.toContain('class="status-tabs"');
+  });
+
+  it("keeps the desktop context menu disabled in companion mode", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        companionMode
+        dashboard={demoDashboard}
+      />,
+    ));
+
+    await act(async () => {
+      container.querySelector<HTMLElement>(".kanban-card")?.dispatchEvent(
+        new MouseEvent("contextmenu", {
+          bubbles: true,
+          button: 2,
+          cancelable: true,
+        }),
+      );
+    });
+    expect(document.body.querySelector(".issue-context-menu")).toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
   });
 
   it("opens the companion source filter from the queue heading", async () => {
