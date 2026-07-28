@@ -20,6 +20,7 @@ import {
   createProject,
   createIssueAttachments,
   createRunEvidenceImages,
+  deleteProjectAgent,
   deleteIssue,
   deleteProjectAgentSchedule,
   deleteProject,
@@ -443,6 +444,60 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await expect(
       listProjectAgents(db, "22222222-2222-4222-8222-222222222222"),
     ).resolves.toEqual([]);
+  });
+
+  it("deletes an agent only within its project and cascades its schedules", async () => {
+    const agent = await createProjectAgent(db, projectId, {
+      name: "Disposable agent",
+      provider: "codex",
+      model: null,
+      responsibility: "Validate deletion behavior.",
+      calendarColor: "#d97706",
+    });
+    const schedule = await createProjectAgentSchedule(db, projectId, {
+      agentId: agent.id,
+      name: "Disposable schedule",
+      recurrence: "daily",
+      timeOfDay: "09:00",
+      dayOfWeek: null,
+      timeZone: "Asia/Seoul",
+    });
+    expect(schedule).not.toBeNull();
+
+    const claimed = await claimDueProjectAgentScheduleRun(db, projectId, {
+      claimTokenHash: "f".repeat(64),
+      observedAt: "2099-07-29T00:00:00.000Z",
+    });
+    expect(claimed).not.toBeNull();
+    await expect(deleteProjectAgent(db, projectId, agent.id)).resolves.toBe(
+      "running",
+    );
+    await db
+      .prepare(
+        `update briar_project_agent_schedule_runs
+         set status = 'failed', completed_at = updated_at
+         where id = ?`,
+      )
+      .bind(claimed!.id)
+      .run();
+
+    await expect(
+      deleteProjectAgent(
+        db,
+        "22222222-2222-4222-8222-222222222222",
+        agent.id,
+      ),
+    ).resolves.toBeNull();
+    await expect(deleteProjectAgent(db, projectId, agent.id)).resolves.toMatchObject({
+      id: agent.id,
+      project_id: projectId,
+    });
+    await expect(listProjectAgents(db, projectId)).resolves.not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: agent.id })]),
+    );
+    await expect(listProjectAgentSchedules(db, projectId)).resolves.not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: schedule!.id })]),
+    );
   });
 
   it("creates recurring schedules for an agent in the same project", async () => {

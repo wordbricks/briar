@@ -768,6 +768,30 @@ export async function createProjectAgent(
   return agent;
 }
 
+export async function deleteProjectAgent(
+  db: D1Database,
+  projectId: string,
+  agentId: string,
+) {
+  const deleted = await db
+    .prepare(
+      `delete from briar_project_agents
+       where id = ? and project_id = ?
+         and not exists (
+           select 1 from briar_project_agent_schedule_runs
+           where project_id = ? and agent_id = ? and status = 'running'
+         )
+       returning id, project_id, name, avatar, avatar_pet_json,
+                 avatar_spritesheet_object_key, provider, model,
+                 responsibility, skill_markdown, calendar_color,
+                 created_at, updated_at`,
+    )
+    .bind(agentId, projectId, projectId, agentId)
+    .first<ProjectAgentRow>();
+  if (deleted) return deleted;
+  return (await getProjectAgent(db, projectId, agentId)) ? "running" : null;
+}
+
 type ProjectAgentScheduleInput = {
   agentId: string;
   name: string;

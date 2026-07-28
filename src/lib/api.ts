@@ -615,6 +615,16 @@ export async function updateProjectAgent(
   return projectAgentSchema.parse(result.agent);
 }
 
+export async function deleteProjectAgent(
+  token: string,
+  projectId: string,
+  agentId: string,
+) {
+  return request<void>(`/projects/${projectId}/agents/${agentId}`, token, {
+    method: "DELETE",
+  });
+}
+
 export async function loadProjectAgentSpriteSheet(
   token: string,
   projectId: string,
