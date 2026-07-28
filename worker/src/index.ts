@@ -15,6 +15,10 @@ import {
   type AutoHuntWorkflowStageId,
 } from "../../src/lib/auto-hunt-contract";
 import {
+  structuredAgentResultSchema,
+  type StructuredAgentResult,
+} from "../../src/lib/agent-result";
+import {
   defaultProjectAgentCalendarColor,
 } from "../../src/lib/project-agent";
 import {
@@ -97,6 +101,7 @@ import {
   type OrganizationMemberRow,
   type OrganizationRole,
   type OrganizationRow,
+  type RunEvidenceRow,
 } from "./db";
 import {
   codexPetSpriteSheetObjectKey,
@@ -259,6 +264,7 @@ const eventSchema = z
     tracker: trackerSchema.nullable().optional(),
     issueDescription: z.string().max(100_000).nullable().optional(),
     resultSummary: z.string().max(100_000).nullable().optional(),
+    structuredResult: structuredAgentResultSchema.nullable().optional(),
     pullRequestUrls: z
       .array(httpsUrl)
       .max(20)
@@ -297,6 +303,35 @@ const eventSchema = z
         code: "custom",
         message: "blocked progress requires an exact blocker reason",
         path: ["detail"],
+      });
+    }
+    if (input.status === "completed" && !input.structuredResult) {
+      context.addIssue({
+        code: "custom",
+        message: "completed runs require a structured result",
+        path: ["structuredResult"],
+      });
+    }
+    if (
+      input.status === "completed" &&
+      input.structuredResult &&
+      !["completed", "partial"].includes(input.structuredResult.outcome)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "completed runs require a completed or partial outcome",
+        path: ["structuredResult", "outcome"],
+      });
+    }
+    if (
+      input.resultSummary &&
+      input.structuredResult &&
+      input.resultSummary !== input.structuredResult.summary
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "resultSummary must match structuredResult.summary",
+        path: ["resultSummary"],
       });
     }
     if (input.tracker?.provider === "linear" && input.tracker.url) {
@@ -613,6 +648,7 @@ export const projectAgentScheduleRunCompletionSchema = z
     claimToken: projectAgentScheduleClaimTokenSchema,
     status: z.enum(["completed", "failed"]),
     resultSummary: z.string().trim().min(1).max(100_000).nullable().optional(),
+    structuredResult: structuredAgentResultSchema,
     error: z.string().trim().min(1).max(4_000).nullable().optional(),
   })
   .strict()
@@ -622,6 +658,30 @@ export const projectAgentScheduleRunCompletionSchema = z
         code: "custom",
         message: "completed runs require a result summary",
         path: ["resultSummary"],
+      });
+    }
+    if (
+      input.resultSummary &&
+      input.resultSummary !== input.structuredResult.summary
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "resultSummary must match structuredResult.summary",
+        path: ["resultSummary"],
+      });
+    }
+    if (input.status === "completed" && input.structuredResult.outcome === "failed") {
+      context.addIssue({
+        code: "custom",
+        message: "completed schedule runs cannot report a failed outcome",
+        path: ["structuredResult", "outcome"],
+      });
+    }
+    if (input.status === "failed" && input.structuredResult.outcome !== "failed") {
+      context.addIssue({
+        code: "custom",
+        message: "failed schedule runs require a failed structured outcome",
+        path: ["structuredResult", "outcome"],
       });
     }
     if (input.status === "failed" && !input.error) {
@@ -1002,6 +1062,7 @@ const projectAgentScheduleRunJson = (
   startedAt: row.started_at,
   completedAt: row.completed_at,
   resultSummary: row.result_summary,
+  structuredResult: parseStructuredResult(row.structured_result_json),
   error: row.error,
   ...(claimToken ? { claimToken } : {}),
 });
@@ -1052,6 +1113,14 @@ const parseJsonObject = (value: string | null) => {
     : null;
 };
 
+const parseStructuredResult = (
+  value: string | null,
+): StructuredAgentResult | null => {
+  const parsed = parseJsonObject(value);
+  const result = structuredAgentResultSchema.safeParse(parsed);
+  return result.success ? result.data : null;
+};
+
 const dashboardEventJson = (event: HuntEventRow) => ({
   id: event.id,
   attempt: event.attempt,
@@ -1100,6 +1169,27 @@ const issueMessageJson = (message: IssueMessageRow) => ({
   updatedAt: message.updated_at,
 });
 
+const runEvidenceJson = (
+  evidence: RunEvidenceRow,
+  requiredRevision: number,
+) => ({
+  key: evidence.evidence_key,
+  attempt: evidence.attempt,
+  revision: evidence.revision,
+  stage: evidence.workflow_stage,
+  type: evidence.evidence_type,
+  status: evidence.status,
+  detail: evidence.detail,
+  command: evidence.command,
+  url: evidence.url,
+  metadata: evidence.metadata_json ? JSON.parse(evidence.metadata_json) : null,
+  actor: evidence.actor,
+  observedAt: evidence.observed_at,
+  recordedAt: evidence.recorded_at,
+  requiredRevision,
+  canonical: evidence.revision >= requiredRevision,
+});
+
 function dashboardRunJson(
   run: HuntRunRow,
   events: HuntEventRow[],
@@ -1138,6 +1228,7 @@ function dashboardRunJson(
     issueDescription: run.issue_description,
     attachments: attachments.map(attachmentJson),
     resultSummary: run.result_summary,
+    structuredResult: parseStructuredResult(run.structured_result_json),
     pullRequestUrls: parseJsonArray(run.pull_request_urls),
     targetSha: run.target_sha,
     sourceCreatedAt: run.source_created_at,
@@ -1591,6 +1682,7 @@ async function route(
         claimTokenHash: await sha256(input.claimToken),
         status: input.status,
         resultSummary: input.resultSummary ?? null,
+        structuredResult: input.structuredResult,
         error: input.error ?? null,
         observedAt: new Date().toISOString(),
       },
@@ -2048,6 +2140,35 @@ async function route(
     return json({ message: issueMessageJson(message) }, 201);
   }
 
+  const projectRunEvidenceMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/evidence$/u,
+  );
+  if (projectRunEvidenceMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      projectRunEvidenceMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const [evidence, revisions] = await Promise.all([
+      listRunEvidence(db, project.id, projectRunEvidenceMatch[2]),
+      listRunStageRevisions(db, project.id, projectRunEvidenceMatch[2]),
+    ]);
+    if (!evidence || !revisions) throw new HttpError(404, "Run not found");
+    return json({
+      runId: projectRunEvidenceMatch[2],
+      attempt: revisions.attempt,
+      revision: revisions.revision,
+      evidence: evidence.map((item) =>
+        runEvidenceJson(
+          item,
+          revisions.requirements.get(item.workflow_stage) ?? 1,
+        ),
+      ),
+    });
+  }
+
   const issuesMatch = pathname.match(/^\/projects\/([0-9a-f-]+)\/issues$/u);
   if (issuesMatch && request.method === "POST") {
     const session = await requireSession(auth, request);
@@ -2114,6 +2235,7 @@ async function route(
         tracker: null,
         issueDescription: input.description || null,
         resultSummary: null,
+        structuredResult: null,
         pullRequestUrls: [],
         targetSha: null,
         sourceCreatedAt: occurredAt,
@@ -2537,26 +2659,12 @@ async function route(
       runId: evidenceMatch[1],
       attempt: revisions.attempt,
       revision: revisions.revision,
-      evidence: evidence.map((item) => ({
-        key: item.evidence_key,
-        attempt: item.attempt,
-        revision: item.revision,
-        stage: item.workflow_stage,
-        type: item.evidence_type,
-        status: item.status,
-        detail: item.detail,
-        command: item.command,
-        url: item.url,
-        metadata: item.metadata_json ? JSON.parse(item.metadata_json) : null,
-        actor: item.actor,
-        observedAt: item.observed_at,
-        recordedAt: item.recorded_at,
-        requiredRevision:
+      evidence: evidence.map((item) =>
+        runEvidenceJson(
+          item,
           revisions.requirements.get(item.workflow_stage) ?? 1,
-        canonical:
-          item.revision >=
-          (revisions.requirements.get(item.workflow_stage) ?? 1),
-      })),
+        ),
+      ),
     });
   }
   if (evidenceMatch && request.method === "POST") {
@@ -2631,6 +2739,7 @@ async function route(
         : null,
       issueDescription: parsed.issueDescription ?? null,
       resultSummary: parsed.resultSummary ?? null,
+      structuredResult: parsed.structuredResult ?? null,
       targetSha: parsed.targetSha ?? null,
       sourceCreatedAt: parsed.sourceCreatedAt
         ? new Date(parsed.sourceCreatedAt).toISOString()

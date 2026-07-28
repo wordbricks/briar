@@ -1,6 +1,6 @@
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -62,7 +62,7 @@ function runDoctor(home: string, configDirectory?: string) {
       env: {
         ...environment,
         HOME: home,
-        PATH: `${dirname(bunExecutable)}:/usr/bin:/bin`,
+        PATH: "/usr/bin:/bin",
         ...(configDirectory ? { BRIAR_CONFIG_HOME: configDirectory } : {}),
       },
       encoding: "utf8",
