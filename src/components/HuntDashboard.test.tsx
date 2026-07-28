@@ -705,6 +705,8 @@ describe("HuntDashboard", () => {
     expect(content?.style.gridTemplateRows).toContain("45fr");
     const conversation = container.querySelector(".issue-conversation");
     expect(conversation).not.toBeNull();
+    expect(conversation?.getAttribute("aria-label")).toBe("대화");
+    expect(conversation?.querySelector(":scope > header")).toBeNull();
     expect(descriptionPane?.nextElementSibling).toBe(contentDivider);
     expect(contentDivider?.nextElementSibling).toBe(conversation);
     expect(

@@ -2824,14 +2824,7 @@ function IssueConversation({
   };
 
   return (
-    <section className="issue-conversation" aria-labelledby="issue-messages-title">
-      <header>
-        <span>
-          <MessageCircle aria-hidden="true" size={16} />
-          <h2 id="issue-messages-title">{t("run.messages")}</h2>
-        </span>
-        {roots.length > 0 && <small>{roots.length}</small>}
-      </header>
+    <section className="issue-conversation" aria-label={t("run.messages")}>
       <div className="issue-message-list" ref={messageListRef}>
         {loading ? (
           <div className="issue-message-state">
