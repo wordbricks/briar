@@ -17,5 +17,6 @@ export {
   SettingsSection,
   SettingsShell,
   SettingsSidebar,
+  SettingsToggleRow,
 } from "./layout";
 export { ProviderIcon, ProviderRow } from "./provider-row";

@@ -3,9 +3,12 @@ import type {
   ProjectAgentScheduleRun,
 } from "../types";
 import type { ProjectLlmChatResponse } from "./project-llm";
+import { isDesktopTauri } from "./platform";
 
 export const PROJECT_AGENT_SCHEDULE_POLL_INTERVAL_MS = 15_000;
 export const PROJECT_AGENT_SCHEDULE_RENEW_INTERVAL_MS = 5 * 60_000;
+export const PROJECT_AGENT_SCHEDULE_POLL_EVENT =
+  "project-agent-schedule-poll";
 
 export type ProjectAgentScheduleRunnerDependencies = {
   claim: (
@@ -105,8 +108,10 @@ export function startProjectAgentSchedulePolling(
   intervalMs = PROJECT_AGENT_SCHEDULE_POLL_INTERVAL_MS,
 ) {
   let running = false;
+  let stopped = false;
+  let unlistenNativeTick: (() => void) | null = null;
   const poll = async () => {
-    if (running) return;
+    if (running || stopped) return;
     running = true;
     try {
       await pollProjectAgentSchedulesOnce(dependencies, projectIds);
@@ -116,5 +121,32 @@ export function startProjectAgentSchedulePolling(
   };
   void poll();
   const timer = window.setInterval(() => void poll(), intervalMs);
-  return () => window.clearInterval(timer);
+  const pollAfterResume = () => void poll();
+  window.addEventListener("focus", pollAfterResume);
+  window.addEventListener("online", pollAfterResume);
+  document.addEventListener("visibilitychange", pollAfterResume);
+  if (isDesktopTauri()) {
+    void import("@tauri-apps/api/event")
+      .then(({ listen }) =>
+        listen(PROJECT_AGENT_SCHEDULE_POLL_EVENT, pollAfterResume),
+      )
+      .then((unlisten) => {
+        if (stopped) {
+          unlisten();
+        } else {
+          unlistenNativeTick = unlisten;
+        }
+      })
+      .catch((error) =>
+        dependencies.log("네이티브 예약 실행 타이머 연결 실패", error),
+      );
+  }
+  return () => {
+    stopped = true;
+    window.clearInterval(timer);
+    window.removeEventListener("focus", pollAfterResume);
+    window.removeEventListener("online", pollAfterResume);
+    document.removeEventListener("visibilitychange", pollAfterResume);
+    unlistenNativeTick?.();
+  };
 }
