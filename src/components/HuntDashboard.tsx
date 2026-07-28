@@ -1349,7 +1349,6 @@ function KanbanCard({
         </span>
         <span className="kanban-card-badges">
           <i className={`status-pill ${meta.tone}`}>{run.status === "running" && <LoaderCircle className="spin" size={11} />}{label}</i>
-          <i className="kanban-progress">{run.progress}%</i>
           {run.priority !== null && <i className="kanban-priority">P{run.priority}</i>}
           {(run.attachments ?? []).length > 0 && <i><Paperclip size={11} />{run.attachments.length}</i>}
         </span>
@@ -1608,7 +1607,6 @@ function IssueList({
         <span role="columnheader">{t("dashboard.task")}</span>
         <span role="columnheader">{t("dashboard.status")}</span>
         <span role="columnheader">{t("issue.priority")}</span>
-        <span role="columnheader">{t("dashboard.progress")}</span>
         <span role="columnheader">{t("dashboard.updated")}</span>
         <span aria-hidden="true" />
       </div>
@@ -1691,12 +1689,6 @@ function IssueList({
                 </span>
                 <span className="issue-list-priority" role="cell">
                   {run.priority === null ? "—" : `P${run.priority}`}
-                </span>
-                <span className="issue-list-progress" role="cell">
-                  <span aria-hidden="true">
-                    <i style={{ width: `${run.progress}%` }} />
-                  </span>
-                  <strong>{run.progress}%</strong>
                 </span>
                 <span className="issue-list-updated" role="cell">
                   {isClaimed
