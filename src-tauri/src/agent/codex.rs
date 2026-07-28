@@ -58,6 +58,7 @@ pub(crate) struct ProjectAutoHuntRequest {
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProjectAgentRunRequest {
+    pub(crate) session_id: String,
     pub(crate) agent_id: String,
     pub(crate) agent_name: String,
     pub(crate) agent_provider: AgentProviderKind,
@@ -1933,6 +1934,7 @@ mod tests {
             },
             r#"{"stages":[]}"#,
             ProjectAgentRunRequest {
+                session_id: "session-1".to_string(),
                 agent_id: "agent-1".to_string(),
                 agent_name: "Coordinator".to_string(),
                 agent_provider: AgentProviderKind::Codex,

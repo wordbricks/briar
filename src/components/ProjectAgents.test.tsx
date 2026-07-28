@@ -269,6 +269,25 @@ describe("ProjectAgents", () => {
     expect(container.textContent).not.toContain("에이전트에게 작업 요청");
 
     await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".auto-hunt-session-row")
+        ?.click();
+    });
+
+    expect(container.querySelector("#project-agent-session")).not.toBeNull();
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(container.textContent).toContain("수행 로그");
+    expect(container.textContent).toContain("세션 타임라인");
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".auto-hunt-session-back")
+        ?.click();
+    });
+
+    expect(container.querySelector("#project-agent-detail")).not.toBeNull();
+
+    await act(async () => {
       Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
         .find((button) => button.textContent?.trim() === "작업 실행")
         ?.click();

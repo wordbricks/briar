@@ -278,6 +278,7 @@ export function useAutoHuntSessions(
     projectId: string,
     agentId: string,
     input: {
+      sessionId: string;
       request: string;
       startedAt: string;
       status: "completed" | "failed";
@@ -289,7 +290,7 @@ export function useAutoHuntSessions(
   ) => {
     const completedAt = new Date().toISOString();
     const session: AutoHuntSession = {
-      id: crypto.randomUUID(),
+      id: input.sessionId,
       dispatchGroupId: "",
       projectId,
       agentId,
