@@ -96,13 +96,18 @@ export function Inbox({
               </Button>
             ) : null
           }
-          className="inbox-heading"
+          className={cn(
+            "inbox-heading",
+            !companionMode && "app-page-header",
+          )}
           description={t("inbox.description")}
           eyebrow={
-            <>
-              <InboxIcon size={13} />
-              {t("inbox.eyebrow")}
-            </>
+            companionMode ? (
+              <>
+                <InboxIcon size={13} />
+                {t("inbox.eyebrow")}
+              </>
+            ) : null
           }
           title={t("inbox.title")}
           titleId="inbox-title"

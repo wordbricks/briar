@@ -46,6 +46,7 @@ import {
   EmptyState,
   ErrorBanner,
   MainContent,
+  PageHeader,
 } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import {
@@ -522,19 +523,19 @@ export function HuntDashboard({
           </div>
         )}
 
-        <div className="queue-header">
-          <div className="queue-heading">
-            <div className="queue-heading-copy">
-              <Typography as="h2" variant="heading">
-                {companionMode && companionSearchMode
-                  ? t("companion.navSearch")
-                  : t("dashboard.queue")}
-              </Typography>
-              <Typography as="span" tone="muted" variant="caption">
-                {t("dashboard.taskCount", { count: filtered.length })}
-              </Typography>
-            </div>
-            {companionMode && (
+        {companionMode ? (
+          <div className="queue-header">
+            <div className="queue-heading">
+              <div className="queue-heading-copy">
+                <Typography as="h2" variant="heading">
+                  {companionSearchMode
+                    ? t("companion.navSearch")
+                    : t("dashboard.queue")}
+                </Typography>
+                <Typography as="span" tone="muted" variant="caption">
+                  {t("dashboard.taskCount", { count: filtered.length })}
+                </Typography>
+              </div>
               <div className="companion-source-filter" ref={sourceFilterRef}>
                 <button
                   aria-controls="companion-source-filter-menu"
@@ -579,10 +580,26 @@ export function HuntDashboard({
                   </div>
                 )}
               </div>
+            </div>
+            {companionSearchMode && (
+              <div className="queue-tools">
+                <label className="search-box">
+                  <Search size={15} />
+                  <Input
+                    autoFocus
+                    className="h-full border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder={t("dashboard.search")}
+                    value={query}
+                  />
+                </label>
+              </div>
             )}
           </div>
-          <div className="queue-tools">
-            {!companionMode && (
+        ) : (
+          <PageHeader
+            action={
+              <div className="queue-tools">
               <Button
                 aria-keyshortcuts="Meta+N"
                 aria-label={t("dashboard.createIssue")}
@@ -592,20 +609,15 @@ export function HuntDashboard({
               >
                 <Plus size={14} />{t("dashboard.createIssue")}
               </Button>
-            )}
-            {(!companionMode || companionSearchMode) && (
               <label className="search-box">
                 <Search size={15} />
                 <Input
-                  autoFocus={companionSearchMode}
                   className="h-full border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder={t("dashboard.search")}
                   value={query}
                 />
               </label>
-            )}
-            {!companionMode && (
               <div className="source-filter">
                 {(["all", "issue", "feedback", "error"] as const).map((value) => (
                   <button key={value} className={source === value ? "active" : ""} onClick={() => setSource(value)}>
@@ -613,8 +625,6 @@ export function HuntDashboard({
                   </button>
                 ))}
               </div>
-            )}
-            {!companionMode && (
               <div
                 aria-label={t("dashboard.viewMode")}
                 className="view-switch"
@@ -643,9 +653,25 @@ export function HuntDashboard({
                   <span>{t("dashboard.list")}</span>
                 </button>
               </div>
-            )}
-          </div>
-        </div>
+              </div>
+            }
+            className="app-page-header queue-header"
+            description={t("dashboard.description")}
+            title={
+              <span className="queue-heading-copy">
+                <span>{t("dashboard.queue")}</span>
+                <Typography
+                  as="span"
+                  className="queue-task-count"
+                  tone="muted"
+                  variant="caption"
+                >
+                  {t("dashboard.taskCount", { count: filtered.length })}
+                </Typography>
+              </span>
+            }
+          />
+        )}
         {!companionMode && <div className="status-tabs">
           <button className={status === "all" ? "active" : ""} onClick={() => setStatus("all")}>{t("dashboard.all")} <span>{runs.length}</span></button>
           <button className={status === "active" ? "active" : ""} onClick={() => setStatus("active")}>{t("dashboard.active")} <span>{activeCount}</span></button>
