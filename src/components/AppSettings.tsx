@@ -1,5 +1,6 @@
 import {
   Archive,
+  Bell,
   Bot,
   Cable,
   ChevronDown,
@@ -57,10 +58,12 @@ import {
   type AppRuntimeSettings,
 } from "../lib/app-runtime-settings";
 import { ClaudeIcon, CodexIcon, GrokIcon } from "./AgentIcons";
+import { InboxNotificationSettings } from "./InboxNotificationSettings";
 import type { RepositoryReadiness } from "../lib/project-connection";
 
 export type SettingsSection =
   | "general"
+  | "notifications"
   | "keybindings"
   | "providers"
   | "source-control"
@@ -270,6 +273,11 @@ export function AppSettings({
             label: t("appSettings.general"),
           },
           {
+            id: "notifications",
+            icon: <Bell size={16} strokeWidth={1.75} />,
+            label: t("notifications.title"),
+          },
+          {
             id: "keybindings",
             icon: <Keyboard size={16} strokeWidth={1.75} />,
             label: t("appSettings.keybindings"),
@@ -339,6 +347,7 @@ export function AppSettings({
   const activeItem = flatNavigation.find((item) => item.id === activeSection);
   const sectionDescriptions: Record<SettingsSection, string> = {
     general: t("appSettings.generalDescription"),
+    notifications: t("notifications.description"),
     keybindings: t("appSettings.keybindingsDescription"),
     providers: t("appSettings.providersDescription"),
     "source-control": t("appSettings.sourceControlDescription"),
@@ -385,7 +394,12 @@ export function AppSettings({
             title={activeItem?.label ?? t("appSettings.title")}
           />
 
-          {activeSection === "general" ? (
+          {activeSection === "notifications" ? (
+            <SettingsContent>
+              <SettingsGroupHeading title={t("notifications.inboxImportance")} />
+              <InboxNotificationSettings />
+            </SettingsContent>
+          ) : activeSection === "general" ? (
             <SettingsContent>
               <SettingsGroupHeading title={t("appSettings.power")} />
               <SettingsCard aria-busy={runtimeSettingsLoading || runtimeSettingsSaving}>
