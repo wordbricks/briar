@@ -10,9 +10,7 @@ type DefaultProjectAgentCopy = {
   responsibility: string;
 };
 
-export type ProjectAgentSkillInput = DefaultProjectAgentCopy & {
-  kind: "auto_hunt" | "custom";
-};
+export type ProjectAgentSkillInput = DefaultProjectAgentCopy;
 
 const defaultProjectAgentCopyByLocale: Record<
   ProjectAgentLocale,
@@ -50,16 +48,11 @@ export function defaultProjectAgentCopy(
 export function projectAgentSkill({
   name,
   responsibility,
-  kind,
 }: ProjectAgentSkillInput) {
-  const execution = kind === "auto_hunt"
-    ? `- Load the installed \`briar-workflow\` guide with \`briar skills get briar-workflow\`.
-- Work only on the run and worktree allocated by the Briar host runtime; never claim another run or create another worktree.
-- Read the claimed run's workflow snapshot before acting and use explicit \`--run\` arguments for every run and evidence command.
-- Record every required stage and its evidence before completing a run.`
-    : `- Read the attached project workflow before acting.
+  const execution = `- Read the attached project workflow before acting.
 - Follow its required stages, checks, evidence, and completion rules when they apply.
-- Work only in the connected repository and report the observed result.`;
+- Follow the invocation's workspace and execution-mode instructions; do not infer queue work.
+- Report only results that were actually observed.`;
   return `# ${name.trim()}
 
 ## Responsibility

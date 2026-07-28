@@ -17,6 +17,7 @@ describe("bundled skill guides", () => {
     expect(guide?.markdown).toContain("# Briar Workflow");
     expect(guide?.markdown).toContain("briar queue claim");
     expect(guide?.markdown).toContain("briar run evidence add");
+    expect(guide?.markdown).toContain("briar run rework");
     expect(guide?.markdown).toContain("## Optional Velen and Linear");
     expect(getSkillGuide("missing")).toBeNull();
   });

@@ -1,3 +1,5 @@
+import type { StructuredAgentResult } from "./agent-result";
+
 export type JsonSchema = Record<string, unknown> | boolean;
 
 export const approvalPolicies = ["untrusted", "on-request", "never"] as const;
@@ -65,11 +67,19 @@ export type ProjectLlmSettings = {
   approvalPolicy: ApprovalPolicy;
 };
 
+export type ProjectSandboxSettings = {
+  fullAccess: boolean;
+};
+
 export const defaultProjectLlmSettings: ProjectLlmSettings = {
   provider: "codex",
   model: null,
   effort: null,
   approvalPolicy: "never",
+};
+
+export const defaultProjectSandboxSettings: ProjectSandboxSettings = {
+  fullAccess: true,
 };
 
 export type ProjectLlmChatInput = {
@@ -90,12 +100,28 @@ export type ProjectLlmChatResponse = {
   workspaceRoot: string;
 };
 
-export type ProjectAgentScheduleExecutionInput = {
+export type ProjectAgentRunInput = {
   projectId: string;
-  provider: AgentProvider;
-  model: string | null;
+  sessionId: string;
+  agent: {
+    id: string;
+    name: string;
+    provider: AgentProvider;
+    model: string | null;
+    responsibility: string;
+    skill: string;
+  };
   message: string;
-  instructions: string;
+  conversationId?: string | null;
+};
+
+export type ProjectAgentRunResponse = {
+  conversationId: string;
+  workspaceRoot: string;
+  action: "respond" | "dispatch_auto_hunt";
+  message: string;
+  maxIssues: number | null;
+  structuredResult: StructuredAgentResult | null;
 };
 
 export type ProjectChatMessage = {
@@ -142,27 +168,30 @@ export async function chatWithProjectLlm(
 }
 
 /**
- * Run one claimed schedule in the locally registered project root.
- *
- * Callers choose a saved agent identity, never a filesystem path. The native
- * layer resolves the connected root and confines writes to that workspace.
+ * Run one turn for a saved Agent. Direct and scheduled callers provide the
+ * invocation message through this same gateway. The Agent either responds in
+ * this conversation or explicitly asks the Briar host to dispatch Auto Hunt;
+ * it never claims queue work itself.
  */
-export async function runProjectAgentSchedule(
-  input: ProjectAgentScheduleExecutionInput,
-): Promise<ProjectLlmChatResponse> {
+export async function runProjectAgent(
+  input: ProjectAgentRunInput,
+): Promise<ProjectAgentRunResponse> {
   if (!isTauri()) {
-    throw new Error("예약 에이전트는 Briar 데스크톱 앱에서 실행할 수 있습니다.");
+    throw new Error("에이전트는 Briar 데스크톱 앱에서 실행할 수 있습니다.");
   }
   const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<ProjectLlmChatResponse>("run_project_agent_schedule", {
+  return invoke<ProjectAgentRunResponse>("run_project_agent", {
     projectId: input.projectId,
-    provider: input.provider,
-    model: input.model,
     request: {
+      sessionId: input.sessionId,
+      agentId: input.agent.id,
+      agentName: input.agent.name,
+      agentProvider: input.agent.provider,
+      agentModel: input.agent.model,
+      responsibility: input.agent.responsibility,
+      skill: input.agent.skill,
       message: input.message,
-      conversationId: null,
-      instructions: input.instructions,
-      outputSchema: null,
+      conversationId: input.conversationId ?? null,
     },
   });
 }
@@ -213,6 +242,28 @@ export async function updateProjectLlmSettings(
     model: saved.model ?? null,
     effort: saved.effort ?? null,
   };
+}
+
+export async function loadProjectSandboxSettings(
+  projectId: string,
+): Promise<ProjectSandboxSettings> {
+  if (!isTauri()) return defaultProjectSandboxSettings;
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<ProjectSandboxSettings>("load_project_sandbox_settings", {
+    projectId,
+  });
+}
+
+export async function updateProjectSandboxSettings(
+  projectId: string,
+  settings: ProjectSandboxSettings,
+): Promise<ProjectSandboxSettings> {
+  if (!isTauri()) return settings;
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<ProjectSandboxSettings>("update_project_sandbox_settings", {
+    projectId,
+    settings,
+  });
 }
 
 /**

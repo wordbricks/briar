@@ -12,9 +12,9 @@ use std::{
     fs::{self, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
-    process::Command,
+    process::{Child, Command},
     sync::{
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, Mutex,
     },
 };
@@ -27,6 +27,7 @@ const SESSION_FILE_NAME: &str = "session.json";
 const AUTO_HUNT_EVENT_DIRECTORY: &str = "auto-hunt-sessions";
 const AUTO_HUNT_APP_SERVER_EVENT: &str = "auto-hunt-app-server-event";
 const AUTO_HUNT_DISPATCH_EVENT: &str = "auto-hunt-dispatch-event";
+const PROJECT_AGENT_SCHEDULE_POLL_EVENT: &str = "project-agent-schedule-poll";
 const DEFAULT_MAIN_WINDOW_SIZE: (f64, f64) = (1280.0, 820.0);
 const ONBOARDING_MAIN_WINDOW_SIZE: (f64, f64) = (980.0, 680.0);
 const DISCOVERED_SSH_HOST_ID_PREFIX: &str = "ssh-config-";
@@ -161,7 +162,7 @@ fn repository_workflow_bootstrap() -> WorkflowConfig {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct StoredAutoHuntConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -182,16 +183,27 @@ struct StoredAutoHuntConfig {
     extra: BTreeMap<String, serde_json::Value>,
 }
 
-/// Sandbox settings owned by the CLI (`briar project configure`). Absent or
-/// `fullAccess: false` keeps agent writes confined to the checkout and the
-/// per-issue worktree root.
-#[derive(Clone, Deserialize, Serialize)]
+/// Auto Hunt filesystem access. Full access is the default; an explicit
+/// `fullAccess: false` confines writes to the checkout and worktree root.
+#[derive(Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct StoredSandboxConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     full_access: Option<bool>,
     #[serde(flatten)]
     extra: BTreeMap<String, serde_json::Value>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ProjectSandboxSettings {
+    full_access: bool,
+}
+
+impl Default for ProjectSandboxSettings {
+    fn default() -> Self {
+        Self { full_access: true }
+    }
 }
 
 /// Per-issue worktree settings owned by the CLI (`briar project configure`).
@@ -342,6 +354,8 @@ struct CliConfig {
     #[serde(default)]
     agent_providers: AppProviderSettings,
     #[serde(default)]
+    app_settings: StoredAppRuntimeSettings,
+    #[serde(default)]
     projects: Vec<CliProject>,
     /// Saved SSH execution hosts. Local to this machine: never sent to the
     /// Worker, and holding no secrets — OpenSSH owns key and agent resolution.
@@ -349,6 +363,101 @@ struct CliConfig {
     ssh_hosts: Vec<host::SshHost>,
     #[serde(flatten)]
     extra: BTreeMap<String, serde_json::Value>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StoredAppRuntimeSettings {
+    #[serde(default)]
+    prevent_sleep_while_running: bool,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AppRuntimeSettings {
+    prevent_sleep_while_running: bool,
+    prevent_sleep_supported: bool,
+}
+
+impl From<StoredAppRuntimeSettings> for AppRuntimeSettings {
+    fn from(settings: StoredAppRuntimeSettings) -> Self {
+        Self {
+            prevent_sleep_while_running: settings.prevent_sleep_while_running,
+            prevent_sleep_supported: cfg!(target_os = "macos"),
+        }
+    }
+}
+
+struct SleepPreventionState {
+    enabled: AtomicBool,
+    #[cfg(target_os = "macos")]
+    process: Mutex<Option<Child>>,
+}
+
+impl Default for SleepPreventionState {
+    fn default() -> Self {
+        Self {
+            enabled: AtomicBool::new(false),
+            #[cfg(target_os = "macos")]
+            process: Mutex::new(None),
+        }
+    }
+}
+
+impl SleepPreventionState {
+    fn set_enabled(&self, enabled: bool) -> Result<(), String> {
+        self.enabled.store(enabled, Ordering::SeqCst);
+        self.refresh()
+    }
+
+    fn refresh(&self) -> Result<(), String> {
+        #[cfg(target_os = "macos")]
+        {
+            let mut process = self
+                .process
+                .lock()
+                .map_err(|_| "절전 방지 상태 잠금이 손상되었습니다.".to_string())?;
+            if self.enabled.load(Ordering::SeqCst) {
+                if process
+                    .as_mut()
+                    .is_some_and(|child| child.try_wait().is_ok_and(|status| status.is_none()))
+                {
+                    return Ok(());
+                }
+                if let Some(mut child) = process.take() {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                }
+                let app_process_id = std::process::id().to_string();
+                *process = Some(
+                    Command::new("/usr/bin/caffeinate")
+                        .args(["-i", "-w", &app_process_id])
+                        .spawn()
+                        .map_err(|error| {
+                            format!("macOS 절전 방지를 시작하지 못했습니다: {error}")
+                        })?,
+                );
+            } else if let Some(mut child) = process.take() {
+                child
+                    .kill()
+                    .map_err(|error| format!("macOS 절전 방지를 중지하지 못했습니다: {error}"))?;
+                let _ = child.wait();
+            }
+        }
+        Ok(())
+    }
+}
+
+impl Drop for SleepPreventionState {
+    fn drop(&mut self) {
+        #[cfg(target_os = "macos")]
+        if let Ok(process) = self.process.get_mut() {
+            if let Some(mut child) = process.take() {
+                let _ = child.kill();
+                let _ = child.wait();
+            }
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
@@ -1596,6 +1705,7 @@ fn write_cli_connection(
             api_url: api_url.clone(),
             user_token: None,
             agent_providers: AppProviderSettings::default(),
+            app_settings: StoredAppRuntimeSettings::default(),
             projects: Vec::new(),
             ssh_hosts: Vec::new(),
             extra: BTreeMap::new(),
@@ -1607,8 +1717,8 @@ fn write_cli_connection(
         config.user_token = None;
     }
     config.api_url = api_url.clone();
-    // `briar project configure` owns the worktree block, so a settings save
-    // from the app must not silently reset it.
+    // Preserve CLI-owned worktree settings and the project sandbox choice when
+    // the app refreshes the rest of the connection record.
     let stored_auto_hunt = config
         .projects
         .iter()
@@ -1618,7 +1728,10 @@ fn write_cli_connection(
     let stored_sandbox = stored_auto_hunt.and_then(|auto_hunt| auto_hunt.sandbox.clone());
     let mut auto_hunt: StoredAutoHuntConfig = agent_config.auto_hunt.into();
     auto_hunt.worktrees = stored_worktrees;
-    auto_hunt.sandbox = stored_sandbox;
+    auto_hunt.sandbox = Some(stored_sandbox.unwrap_or_else(|| StoredSandboxConfig {
+        full_access: Some(ProjectSandboxSettings::default().full_access),
+        extra: BTreeMap::new(),
+    }));
     config.projects.retain(|project| project.id != project_id);
     config.projects.push(CliProject {
         id: project_id,
@@ -1711,6 +1824,7 @@ fn read_cli_config(config_path: &Path) -> Result<CliConfig, String> {
             api_url: String::new(),
             user_token: None,
             agent_providers: AppProviderSettings::default(),
+            app_settings: StoredAppRuntimeSettings::default(),
             projects: Vec::new(),
             ssh_hosts: Vec::new(),
             extra: BTreeMap::new(),
@@ -2656,6 +2770,20 @@ fn app_provider_settings_from(config_path: &Path) -> Result<AppProviderSettings,
     Ok(config.agent_providers)
 }
 
+fn app_runtime_settings_from(config_path: &Path) -> Result<StoredAppRuntimeSettings, String> {
+    Ok(read_cli_config(config_path)?.app_settings)
+}
+
+fn update_app_runtime_settings_at(
+    config_path: &Path,
+    settings: StoredAppRuntimeSettings,
+) -> Result<StoredAppRuntimeSettings, String> {
+    let mut config = read_cli_config(config_path)?;
+    config.app_settings = settings;
+    write_cli_config(config_path, &config)?;
+    Ok(settings)
+}
+
 fn update_app_provider_settings_at(
     config_path: &Path,
     settings: AppProviderSettings,
@@ -3479,13 +3607,39 @@ async fn project_llm_chat(
 }
 
 #[tauri::command]
-async fn run_project_agent_schedule(
+async fn run_project_agent(
     app: tauri::AppHandle,
     project_id: String,
-    provider: agent::AgentProviderKind,
-    model: Option<String>,
-    request: agent::ProjectLlmRequest,
-) -> Result<agent::ProjectLlmResponse, String> {
+    request: agent::ProjectAgentRunRequest,
+) -> Result<agent::ProjectAgentRunResponse, String> {
+    validate_auto_hunt_session_id(&request.session_id)?;
+    if request.agent_id.trim().is_empty()
+        || request.agent_id.len() > 128
+        || request.agent_name.trim().is_empty()
+        || request.agent_name.len() > 100
+        || request
+            .agent_model
+            .as_ref()
+            .is_some_and(|model| model.trim().is_empty() || model.len() > 100)
+        || request.responsibility.trim().is_empty()
+        || request.responsibility.len() > 2_000
+        || request.skill.trim().is_empty()
+        || request.skill.len() > 10_000
+        || request.message.trim().is_empty()
+        || request.message.len() > 20_000
+    {
+        return Err("에이전트 실행 요청이 올바르지 않습니다.".to_string());
+    }
+    if request
+        .conversation_id
+        .as_deref()
+        .is_some_and(|conversation_id| {
+            agent::AgentProviderKind::for_conversation_id(&project_id, conversation_id)
+                != Some(request.agent_provider)
+        })
+    {
+        return Err("이 대화는 선택한 에이전트 프로바이더와 일치하지 않습니다.".to_string());
+    }
     let config_path = cli_config_path(&app)?;
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
     let resource_directory = app
@@ -3502,14 +3656,19 @@ async fn run_project_agent_schedule(
         "agent/grok-runner.js",
         "dist-agent/grok-runner.js",
     );
+    let event_sink = create_auto_hunt_event_sink(&app, &request.session_id)?;
+    let approval_app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let (runner, workspace) =
             connected_project_workspace_on_host(&config_path, &project_id, &home)?;
+        let provider = request.agent_provider;
         if !app_provider_settings_from(&config_path)?.is_enabled(provider) {
             return Err(
-                "예약된 에이전트의 프로바이더가 앱 설정에서 비활성화되어 있습니다.".to_string(),
+                "선택한 에이전트 프로바이더가 앱 설정에서 비활성화되어 있습니다.".to_string(),
             );
         }
+        let settings = project_llm_settings_from(&config_path, &project_id)?;
+        let workflow_json = project_auto_hunt_workflow_json(&config_path, &project_id)?;
         let backend = agent::discover_backend(
             provider,
             runner,
@@ -3518,22 +3677,42 @@ async fn run_project_agent_schedule(
                 grok: &grok_runner,
             },
         )?;
-        agent::AgentBackend::run(
+        let model = request
+            .agent_model
+            .clone()
+            .filter(|value| !value.trim().is_empty());
+        let effort = (provider == settings.provider)
+            .then_some(settings.effort)
+            .flatten();
+        let approve = |method: &str, params: &serde_json::Value| {
+            let provider_name = provider.display_name();
+            approval_app
+                .dialog()
+                .message(approval_request_message(provider, method, params))
+                .title(format!("{provider_name} 에이전트 작업 승인"))
+                .buttons(MessageDialogButtons::OkCancelCustom(
+                    "승인".to_string(),
+                    "거절".to_string(),
+                ))
+                .blocking_show()
+        };
+        agent::run_project_agent(
             &backend,
             &project_id,
             &workspace,
             agent::ChatExecution {
-                approval_policy: agent::ApprovalPolicy::Never,
+                approval_policy: settings.approval_policy,
                 sandbox_mode: agent::SandboxMode::WorkspaceWrite,
                 network_access: true,
-                model: model.filter(|value| !value.trim().is_empty()),
-                effort: None,
-                event_sink: None,
+                model,
+                effort,
+                event_sink: Some(event_sink),
                 environment: Vec::new(),
                 workspace_write_roots: Vec::new(),
             },
+            &workflow_json,
             request,
-            &|_, _| false,
+            &approve,
         )
     })
     .await
@@ -3576,8 +3755,9 @@ fn project_worktree_root(
     Ok(Some(root.join(project_id)))
 }
 
-/// Whether this project opted its Auto Hunt sessions out of the filesystem
-/// sandbox. Off unless the CLI wrote `autoHunt.sandbox.fullAccess: true`.
+/// Whether this project's Auto Hunt sessions run without a filesystem sandbox.
+/// Full access is the default; `autoHunt.sandbox.fullAccess: false` opts into
+/// workspace-confined writes.
 fn project_auto_hunt_full_access(config_path: &Path, project_id: &str) -> Result<bool, String> {
     Ok(read_cli_config(config_path)?
         .projects
@@ -3586,7 +3766,49 @@ fn project_auto_hunt_full_access(config_path: &Path, project_id: &str) -> Result
         .and_then(|project| project.auto_hunt.as_ref())
         .and_then(|auto_hunt| auto_hunt.sandbox.as_ref())
         .and_then(|sandbox| sandbox.full_access)
-        .unwrap_or(false))
+        .unwrap_or(true))
+}
+
+fn project_sandbox_settings_from(
+    config_path: &Path,
+    project_id: &str,
+) -> Result<ProjectSandboxSettings, String> {
+    let config = read_cli_config(config_path)?;
+    let project = config
+        .projects
+        .iter()
+        .find(|project| project.id == project_id)
+        .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
+    Ok(ProjectSandboxSettings {
+        full_access: project
+            .auto_hunt
+            .as_ref()
+            .and_then(|auto_hunt| auto_hunt.sandbox.as_ref())
+            .and_then(|sandbox| sandbox.full_access)
+            .unwrap_or(true),
+    })
+}
+
+fn update_project_sandbox_settings_at(
+    config_path: &Path,
+    project_id: &str,
+    settings: ProjectSandboxSettings,
+) -> Result<ProjectSandboxSettings, String> {
+    let mut config = read_cli_config(config_path)?;
+    let project = config
+        .projects
+        .iter_mut()
+        .find(|project| project.id == project_id)
+        .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
+    let auto_hunt = project
+        .auto_hunt
+        .get_or_insert_with(StoredAutoHuntConfig::default);
+    let sandbox = auto_hunt
+        .sandbox
+        .get_or_insert_with(StoredSandboxConfig::default);
+    sandbox.full_access = Some(settings.full_access);
+    write_cli_config(config_path, &config)?;
+    Ok(settings)
 }
 
 fn project_auto_hunt_uses_velen(config_path: &Path, project_id: &str) -> Result<bool, String> {
@@ -3815,6 +4037,7 @@ fn emit_latest_auto_hunt_dispatch_event(
 }
 
 fn validate_project_auto_hunt_request(
+    project_id: &str,
     request: &agent::ProjectAutoHuntRequest,
 ) -> Result<(), String> {
     validate_auto_hunt_session_id(&request.session_id)?;
@@ -3841,6 +4064,16 @@ fn validate_project_auto_hunt_request(
         || request.skill.len() > 10_000
     {
         return Err("자동사냥 에이전트 설정이 올바르지 않습니다.".to_string());
+    }
+    if request
+        .coordinator_conversation_id
+        .as_deref()
+        .is_some_and(|conversation_id| {
+            agent::AgentProviderKind::for_conversation_id(project_id, conversation_id)
+                != Some(request.agent_provider)
+        })
+    {
+        return Err("조정 대화가 선택한 프로젝트와 프로바이더에 속하지 않습니다.".to_string());
     }
     Ok(())
 }
@@ -3893,7 +4126,7 @@ async fn start_project_auto_hunt(
     project_id: String,
     mut request: agent::ProjectAutoHuntRequest,
 ) -> Result<agent::ProjectAutoHuntResponse, String> {
-    validate_project_auto_hunt_request(&request)?;
+    validate_project_auto_hunt_request(&project_id, &request)?;
     let api_url = request.api_url.trim();
     if api_url.is_empty()
         || api_url.chars().any(char::is_whitespace)
@@ -3926,6 +4159,7 @@ async fn start_project_auto_hunt(
         &request.session_id,
         &project_id,
         &request.agent_id,
+        request.coordinator_conversation_id.clone(),
         request.issues.len(),
     )?;
     emit_latest_auto_hunt_dispatch_event(&app, &created_dispatch);
@@ -4497,6 +4731,16 @@ async fn load_app_provider_settings(app: tauri::AppHandle) -> Result<AppProvider
 }
 
 #[tauri::command]
+async fn load_app_runtime_settings(app: tauri::AppHandle) -> Result<AppRuntimeSettings, String> {
+    let config_path = cli_config_path(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        app_runtime_settings_from(&config_path).map(AppRuntimeSettings::from)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
 async fn load_agent_usage(
     app: tauri::AppHandle,
 ) -> Result<agent_usage::AgentUsageSnapshot, String> {
@@ -4515,6 +4759,22 @@ async fn update_app_provider_settings(
     })
     .await
     .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn update_app_runtime_settings(
+    app: tauri::AppHandle,
+    sleep_prevention: tauri::State<'_, SleepPreventionState>,
+    settings: StoredAppRuntimeSettings,
+) -> Result<AppRuntimeSettings, String> {
+    let config_path = cli_config_path(&app)?;
+    let saved = tauri::async_runtime::spawn_blocking(move || {
+        update_app_runtime_settings_at(&config_path, settings)
+    })
+    .await
+    .map_err(|error| error.to_string())??;
+    sleep_prevention.set_enabled(saved.prevent_sleep_while_running)?;
+    Ok(saved.into())
 }
 
 #[tauri::command]
@@ -4539,6 +4799,33 @@ async fn update_project_llm_settings(
     let config_path = cli_config_path(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
         update_project_llm_settings_at(&config_path, &project_id, settings)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn load_project_sandbox_settings(
+    app: tauri::AppHandle,
+    project_id: String,
+) -> Result<ProjectSandboxSettings, String> {
+    let config_path = cli_config_path(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        project_sandbox_settings_from(&config_path, &project_id)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn update_project_sandbox_settings(
+    app: tauri::AppHandle,
+    project_id: String,
+    settings: ProjectSandboxSettings,
+) -> Result<ProjectSandboxSettings, String> {
+    let config_path = cli_config_path(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        update_project_sandbox_settings_at(&config_path, &project_id, settings)
     })
     .await
     .map_err(|error| error.to_string())?
@@ -4863,6 +5150,7 @@ fn prepare_launch_intro(app: tauri::AppHandle) -> Result<(), String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default()
+        .manage(SleepPreventionState::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init());
     #[cfg(any(target_os = "macos", target_os = "ios"))]
@@ -4875,6 +5163,26 @@ pub fn run() {
         .setup(|_app| {
             #[cfg(desktop)]
             {
+                if let Ok(config_path) = cli_config_path(_app.handle()) {
+                    match app_runtime_settings_from(&config_path) {
+                        Ok(settings) => {
+                            if let Err(error) = _app
+                                .state::<SleepPreventionState>()
+                                .set_enabled(settings.prevent_sleep_while_running)
+                            {
+                                eprintln!("Sleep prevention startup failed: {error}");
+                            }
+                        }
+                        Err(error) => {
+                            eprintln!("App runtime settings startup failed: {error}");
+                        }
+                    }
+                }
+                let schedule_poll_app = _app.handle().clone();
+                std::thread::spawn(move || loop {
+                    std::thread::sleep(std::time::Duration::from_secs(15));
+                    let _ = schedule_poll_app.emit(PROJECT_AGENT_SCHEDULE_POLL_EVENT, ());
+                });
                 let resource_directory = _app.path().resource_dir()?;
                 let home = _app.path().home_dir()?;
                 let app_data_directory = _app.path().app_data_dir()?;
@@ -4915,15 +5223,19 @@ pub fn run() {
             inspect_repository_readiness,
             connected_project_ids,
             project_llm_chat,
-            run_project_agent_schedule,
+            run_project_agent,
             start_project_auto_hunt,
             load_auto_hunt_app_server_events,
             load_auto_hunt_dispatch,
             load_app_provider_settings,
+            load_app_runtime_settings,
             load_agent_usage,
             update_app_provider_settings,
+            update_app_runtime_settings,
             load_project_llm_settings,
             update_project_llm_settings,
+            load_project_sandbox_settings,
+            update_project_sandbox_settings,
             update_local_project_workflow,
             update_local_project_linear,
             update_local_project_velen_org,
@@ -5481,6 +5793,10 @@ branch refs/heads/briar/second-11111111
         assert_eq!(saved["projects"][1]["llm"]["approvalPolicy"], "never");
         assert_eq!(saved["projects"][1]["autoHunt"]["linear"]["enabled"], false);
         assert_eq!(
+            saved["projects"][1]["autoHunt"]["sandbox"]["fullAccess"],
+            true
+        );
+        assert_eq!(
             saved["projects"][1]["autoHunt"]["workflow"]["stages"]
                 .as_array()
                 .map(Vec::len),
@@ -5561,6 +5877,11 @@ branch refs/heads/briar/second-11111111
                 .expect("legacy provider settings should load")
                 .codex
         );
+        assert!(
+            !app_runtime_settings_from(&config_path)
+                .expect("legacy runtime settings should load")
+                .prevent_sleep_while_running
+        );
         update_app_provider_settings_at(
             &config_path,
             AppProviderSettings {
@@ -5570,6 +5891,13 @@ branch refs/heads/briar/second-11111111
             },
         )
         .expect("provider settings should save");
+        update_app_runtime_settings_at(
+            &config_path,
+            StoredAppRuntimeSettings {
+                prevent_sleep_while_running: true,
+            },
+        )
+        .expect("runtime settings should save");
         update_project_llm_settings_at(
             &config_path,
             "project-1",
@@ -5589,6 +5917,7 @@ branch refs/heads/briar/second-11111111
         assert_eq!(saved["customSetting"], true);
         assert_eq!(saved["agentProviders"]["codex"], false);
         assert_eq!(saved["agentProviders"]["claude"], true);
+        assert_eq!(saved["appSettings"]["preventSleepWhileRunning"], true);
         assert_eq!(saved["projects"][0]["llm"]["provider"], "claude");
         assert_eq!(saved["projects"][0]["llm"]["model"], "sonnet");
         assert_eq!(saved["projects"][0]["llm"]["effort"], "high");
@@ -6254,6 +6583,7 @@ branch refs/heads/briar/second-11111111
             api_url: "http://127.0.0.1:8787".to_string(),
             user_token: None,
             agent_providers: AppProviderSettings::default(),
+            app_settings: StoredAppRuntimeSettings::default(),
             projects: vec![CliProject {
                 id: "project-1".to_string(),
                 repository_path: "/repo".to_string(),
@@ -6386,36 +6716,56 @@ branch refs/heads/briar/second-11111111
     }
 
     #[test]
-    fn auto_hunt_keeps_its_sandbox_unless_a_project_opts_out() {
+    fn auto_hunt_defaults_to_full_access_and_allows_a_workspace_sandbox() {
         let config_path = host_test_config_path("sandbox-default");
         config_with_cli_owned_settings(&config_path, None, None);
-        assert!(!project_auto_hunt_full_access(&config_path, "project-1")
+        assert!(project_auto_hunt_full_access(&config_path, "project-1")
             .expect("sandbox setting should resolve"));
 
-        let opted_out = host_test_config_path("sandbox-full-access");
+        let sandboxed = host_test_config_path("sandbox-workspace-only");
         config_with_cli_owned_settings(
-            &opted_out,
+            &sandboxed,
             None,
             Some(StoredSandboxConfig {
-                full_access: Some(true),
+                full_access: Some(false),
                 extra: BTreeMap::new(),
             }),
         );
-        assert!(project_auto_hunt_full_access(&opted_out, "project-1")
+        assert!(!project_auto_hunt_full_access(&sandboxed, "project-1")
             .expect("sandbox setting should resolve"));
     }
 
     #[test]
-    fn saving_project_settings_keeps_the_sandbox_opt_out() {
+    fn app_settings_can_change_and_preserve_the_workspace_sandbox() {
         let config_path = host_test_config_path("sandbox-preserve");
         config_with_cli_owned_settings(
             &config_path,
             None,
             Some(StoredSandboxConfig {
-                full_access: Some(true),
+                full_access: Some(false),
                 extra: BTreeMap::new(),
             }),
         );
+
+        assert!(
+            !project_sandbox_settings_from(&config_path, "project-1")
+                .expect("sandbox setting should load")
+                .full_access
+        );
+        update_project_sandbox_settings_at(
+            &config_path,
+            "project-1",
+            ProjectSandboxSettings { full_access: true },
+        )
+        .expect("sandbox setting should update");
+        assert!(project_auto_hunt_full_access(&config_path, "project-1")
+            .expect("updated sandbox setting should resolve"));
+        update_project_sandbox_settings_at(
+            &config_path,
+            "project-1",
+            ProjectSandboxSettings { full_access: false },
+        )
+        .expect("sandbox setting should update");
 
         write_cli_connection(
             &config_path,
@@ -6442,7 +6792,7 @@ branch refs/heads/briar/second-11111111
         )
         .expect("settings should save");
 
-        assert!(project_auto_hunt_full_access(&config_path, "project-1")
+        assert!(!project_auto_hunt_full_access(&config_path, "project-1")
             .expect("sandbox setting should survive an app-side save"));
     }
 

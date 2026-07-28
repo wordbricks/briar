@@ -10,12 +10,14 @@ import {
   createIssue,
   createIssueMessage,
   createProject,
+  deleteIssue as deleteRemoteIssue,
   deleteProject as deleteRemoteProject,
   importLinearIssues,
   isApiConfigured,
   loadDashboard,
   loadIssueAttachment,
   loadIssueMessages,
+  loadRunEvidence,
   loadLinearImportStates,
   loadOrganizations,
   loadProjects,
@@ -78,16 +80,11 @@ import {
   progressForAutoHuntRun,
   repositoryWorkflowBootstrap,
 } from "../lib/auto-hunt-contract";
-import {
-  defaultAutoHuntAutomation,
-  normalizeAutoHuntAutomation,
-  type AutoHuntAutomation,
-} from "../lib/auto-hunt-automation";
 import { isMobileCompanion } from "../lib/platform";
-import { chatWithProjectLlm } from "../lib/project-llm";
-import { runProjectAgentSchedule } from "../lib/project-llm";
-import { projectAgentRuntimeInstructions } from "../lib/project-agent";
+import { chatWithProjectLlm, runProjectAgent } from "../lib/project-llm";
+import { executeScheduledProjectAgent } from "../lib/project-agent-schedule-execution";
 import { startProjectAgentSchedulePolling } from "../lib/project-agent-schedule-runner";
+import { startProjectAutoHunt } from "../lib/auto-hunt-agent";
 import {
   agentReplyParentMessageId,
   providerForConversation,
@@ -95,6 +92,7 @@ import {
   type IssueAgentConversation,
 } from "../lib/issue-agent-reply";
 import type {
+  ClaimedProjectAgentScheduleRun,
   CreateIssueInput,
   DashboardPayload,
   HuntRun,
@@ -105,9 +103,26 @@ import type {
   Organization,
   Project,
   ProjectSettings,
+  RunEvidence,
   SessionUser,
   UpdateIssueInput,
 } from "../types";
+
+export type UseBriarOptions = {
+  startScheduledAgentSession?: (
+    run: ClaimedProjectAgentScheduleRun,
+  ) => string | null;
+  settleScheduledAgentSession?: (
+    sessionId: string,
+    input: {
+      status: "completed" | "failed";
+      conversationId: string | null;
+      workspaceRoot: string | null;
+      summary: string | null;
+      error: string | null;
+    },
+  ) => void;
+};
 
 export type ProjectConnection = {
   project: Project;
@@ -169,6 +184,45 @@ const initialDemoIssueMessages: Record<string, IssueMessage[]> = {
   ],
 };
 
+const initialDemoRunEvidence: Record<string, RunEvidence[]> = {
+  "demo-1": [
+    {
+      key: "BRIAR-12:analyzing:repository_findings",
+      attempt: 1,
+      revision: 1,
+      stage: "analyzing",
+      type: "repository_findings",
+      status: "passed",
+      detail: "이벤트 스트림과 이슈 상세 화면의 연결 지점을 확인했습니다.",
+      command: "rg -n \"AgentEvent|HuntDashboard\" src src-tauri",
+      url: null,
+      metadata: { filesReviewed: 6 },
+      actor: "briar-workflow",
+      observedAt: demoMessageTime,
+      recordedAt: demoMessageTime,
+      requiredRevision: 1,
+      canonical: true,
+    },
+    {
+      key: "BRIAR-12:implementing:diff",
+      attempt: 1,
+      revision: 1,
+      stage: "implementing",
+      type: "diff",
+      status: "pending",
+      detail: "이벤트 스트림 어댑터와 회귀 테스트를 작성하고 있습니다.",
+      command: null,
+      url: null,
+      metadata: null,
+      actor: "briar-workflow",
+      observedAt: demoReplyTime,
+      recordedAt: demoReplyTime,
+      requiredRevision: 1,
+      canonical: true,
+    },
+  ],
+};
+
 const emptyDashboard = (project: Project): DashboardPayload => ({
   project,
   settings: {
@@ -177,7 +231,6 @@ const emptyDashboard = (project: Project): DashboardPayload => ({
     linear: { enabled: false, source: null, teamKey: null },
     githubRepository: null,
     workflow: structuredClone(repositoryWorkflowBootstrap),
-    automation: structuredClone(defaultAutoHuntAutomation),
   },
   runs: [],
   generatedAt: new Date().toISOString(),
@@ -192,7 +245,11 @@ async function readConnectedProjectIds() {
   }
 }
 
-export function useBriar() {
+export function useBriar(options: UseBriarOptions = {}) {
+  const {
+    startScheduledAgentSession,
+    settleScheduledAgentSession,
+  } = options;
   const [user, setUser] = useState<SessionUser | null>(demoMode ? demoUser : null);
   const [token, setToken] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>(
@@ -221,10 +278,14 @@ export function useBriar() {
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [isCreatingIssue, setIsCreatingIssue] = useState(false);
   const [updatingIssueId, setUpdatingIssueId] = useState<string | null>(null);
+  const [deletingIssueId, setDeletingIssueId] = useState<string | null>(null);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const [recoveringRunId, setRecoveringRunId] = useState<string | null>(null);
   const issueMessagesByRun = useRef<Record<string, IssueMessage[]>>(
     demoMode ? initialDemoIssueMessages : {},
+  );
+  const runEvidenceByRun = useRef<Record<string, RunEvidence[]>>(
+    demoMode ? initialDemoRunEvidence : {},
   );
   const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const [velen, setVelen] = useState<VelenInspection | null>(null);
@@ -406,27 +467,41 @@ export function useBriar() {
             claimToken,
           ),
         execute: (run) =>
-          runProjectAgentSchedule({
-            projectId: run.projectId,
-            provider: run.agent.provider,
-            model: run.agent.model,
-            message: run.agent.responsibility,
-            instructions: projectAgentRuntimeInstructions({
-              skill: run.agent.skill,
-              workflow: run.workflow,
-              invocation: [
-                `Run the scheduled automation "${run.scheduleName}".`,
-                `It was scheduled for ${run.scheduledFor}.`,
-                "Work from the connected project root and complete the agent responsibility.",
-                "Do not ask for interactive approval. Return a concise result summary.",
-              ].join("\n"),
-            }),
-          }),
+          executeScheduledProjectAgent(
+            {
+              loadDashboard,
+              runAgent: runProjectAgent,
+              startAutoHunt: (
+                projectId,
+                issues,
+                sessionId,
+                agent,
+                options,
+              ) =>
+                startProjectAutoHunt(
+                  projectId,
+                  issues,
+                  sessionId,
+                  agent,
+                  options,
+                ),
+              startSession: startScheduledAgentSession,
+              settleSession: settleScheduledAgentSession,
+            },
+            token,
+            run,
+          ),
         log: (message, caught) => console.error(message, caught),
       },
       projectIds,
     );
-  }, [connectedProjectIds, projects, token]);
+  }, [
+    connectedProjectIds,
+    projects,
+    settleScheduledAgentSession,
+    startScheduledAgentSession,
+    token,
+  ]);
 
   const refreshHealth = useCallback(async () => {
     if (
@@ -965,7 +1040,6 @@ export function useBriar() {
         },
         githubRepository: autoHunt.githubRepository ?? null,
         workflow: generatedWorkflow,
-        automation: structuredClone(defaultAutoHuntAutomation),
       };
       let savedSettings = initialSettings;
       if (token) {
@@ -1146,38 +1220,6 @@ export function useBriar() {
       setError(`저장소 기반 워크플로우 생성에 실패했습니다: ${message}`);
     });
   }, [connectedProjectIds, dashboard, regenerateWorkflow, token]);
-
-  const saveAutoHuntAutomation = useCallback(
-    async (projectId: string, automation: AutoHuntAutomation) => {
-      if (!dashboard || dashboard.project.id !== projectId) {
-        throw new Error("자동 실행을 저장할 프로젝트 설정이 없습니다.");
-      }
-      const normalized = normalizeAutoHuntAutomation(automation);
-      if (demoMode) {
-        setDashboard((current) =>
-          current?.project.id === projectId
-            ? {
-                ...current,
-                settings: { ...current.settings, automation: normalized },
-              }
-            : current,
-        );
-        return normalized;
-      }
-      if (!token) throw new Error("로그인이 필요합니다.");
-      const result = await updateProjectSettings(token, projectId, {
-        ...dashboard.settings,
-        automation: normalized,
-      });
-      setDashboard((current) =>
-        current?.project.id === projectId
-          ? { ...current, settings: result.settings }
-          : current,
-      );
-      return result.settings.automation;
-    },
-    [dashboard, token],
-  );
 
   const assertRepositoryReadyForLinearImport = useCallback(
     (projectId: string) => {
@@ -1449,6 +1491,7 @@ export function useBriar() {
             runNumber:
               Math.max(0, ...dashboard.runs.map((candidate) => candidate.runNumber)) + 1,
             currentAttempt: 1,
+            currentRevision: 1,
             source: "issue",
             sourceKey,
             title: input.title.trim(),
@@ -1466,6 +1509,7 @@ export function useBriar() {
             issueDescription: input.description,
             attachments,
             resultSummary: null,
+            structuredResult: null,
             pullRequestUrls: [],
             targetSha: null,
             sourceCreatedAt: occurredAt,
@@ -1489,6 +1533,7 @@ export function useBriar() {
               {
                 id: crypto.randomUUID(),
                 attempt: 1,
+                revision: 1,
                 status: input.status,
                 workflowStage: null,
                 detail,
@@ -1589,6 +1634,39 @@ export function useBriar() {
     [activeProjectId, dashboard, token],
   );
 
+  const removeIssue = useCallback(
+    async (runId: string) => {
+      if (!activeProjectId || !dashboard) {
+        throw new Error("이슈를 삭제할 프로젝트가 없습니다.");
+      }
+      setDeletingIssueId(runId);
+      setError(null);
+      try {
+        if (!demoMode) {
+          if (!token) throw new Error("로그인이 필요합니다.");
+          await deleteRemoteIssue(token, activeProjectId, runId);
+        }
+        setDashboard((current) =>
+          current
+            ? {
+                ...current,
+                runs: current.runs.filter((run) => run.id !== runId),
+              }
+            : current,
+        );
+        delete issueMessagesByRun.current[runId];
+        delete runEvidenceByRun.current[runId];
+      } catch (caught) {
+        const message = caught instanceof Error ? caught.message : String(caught);
+        setError(message);
+        throw caught;
+      } finally {
+        setDeletingIssueId(null);
+      }
+    },
+    [activeProjectId, dashboard, token],
+  );
+
   const readIssueMessages = useCallback(
     async (runId: string) => {
       if (!activeProjectId) throw new Error("메시지를 불러올 프로젝트가 없습니다.");
@@ -1600,6 +1678,21 @@ export function useBriar() {
         [runId]: messages,
       };
       return messages;
+    },
+    [activeProjectId, token],
+  );
+
+  const readRunEvidence = useCallback(
+    async (runId: string) => {
+      if (!activeProjectId) throw new Error("증빙을 불러올 프로젝트가 없습니다.");
+      if (demoMode) return runEvidenceByRun.current[runId] ?? [];
+      if (!token) throw new Error("증빙을 불러오려면 로그인이 필요합니다.");
+      const evidence = await loadRunEvidence(token, activeProjectId, runId);
+      runEvidenceByRun.current = {
+        ...runEvidenceByRun.current,
+        [runId]: evidence,
+      };
+      return evidence;
     },
     [activeProjectId, token],
   );
@@ -1765,6 +1858,8 @@ export function useBriar() {
                     return {
                       ...run,
                       currentAttempt: attempt,
+                      currentRevision:
+                        action === "retry" ? 1 : run.currentRevision,
                       status,
                       workflowStage:
                         action === "retry" ? null : run.workflowStage,
@@ -1781,6 +1876,8 @@ export function useBriar() {
                         {
                           id: crypto.randomUUID(),
                           attempt,
+                          revision:
+                            action === "retry" ? 1 : run.currentRevision,
                           status,
                           workflowStage:
                             action === "retry" ? null : run.workflowStage,
@@ -1847,6 +1944,23 @@ export function useBriar() {
                       placement.status === "queued"
                         ? run.currentAttempt + 1
                         : run.currentAttempt;
+                    const currentStageIndex = run.workflow.stages.findIndex(
+                      (stage) => stage.id === run.workflowStage,
+                    );
+                    const targetStageIndex = run.workflow.stages.findIndex(
+                      (stage) => stage.id === workflowStage,
+                    );
+                    const isRegression =
+                      placement.status === "running" &&
+                      currentStageIndex >= 0 &&
+                      targetStageIndex >= 0 &&
+                      targetStageIndex < currentStageIndex;
+                    const currentRevision =
+                      placement.status === "queued"
+                        ? 1
+                        : isRegression
+                          ? run.currentRevision + 1
+                          : run.currentRevision;
                     const targetLabel =
                       placement.status === "running"
                         ? run.workflow.stages.find(
@@ -1864,6 +1978,7 @@ export function useBriar() {
                     return {
                       ...run,
                       currentAttempt,
+                      currentRevision,
                       status: placement.status,
                       workflowStage,
                       progress: progressForAutoHuntRun(
@@ -1872,6 +1987,9 @@ export function useBriar() {
                         run.workflow,
                       ),
                       detail,
+                      commitSha: isRegression ? null : run.commitSha,
+                      targetSha: isRegression ? null : run.targetSha,
+                      resultSummary: isRegression ? null : run.resultSummary,
                       claimedBy: null,
                       claimedAt: null,
                       leaseExpiresAt: null,
@@ -1885,6 +2003,7 @@ export function useBriar() {
                         {
                           id: crypto.randomUUID(),
                           attempt: currentAttempt,
+                          revision: currentRevision,
                           status: placement.status,
                           workflowStage,
                           detail,
@@ -1935,7 +2054,9 @@ export function useBriar() {
       activeProjectId,
     ),
     dashboard,
+    deleteIssue: removeIssue,
     deleteProject: removeProject,
+    deletingIssueId,
     deletingProjectId,
     demoMode,
     companionMode,
@@ -1959,7 +2080,6 @@ export function useBriar() {
     reconnectProject,
     renameOrganization,
     regenerateWorkflow,
-    saveAutoHuntAutomation,
     saveVelenIntegration,
     saveLinearIntegration,
     connectLinearForImport,
@@ -1974,6 +2094,7 @@ export function useBriar() {
     readIssueAttachment,
     editIssue,
     readIssueMessages,
+    readRunEvidence,
     addIssueMessage,
     setActiveOrganizationId: selectOrganization,
     setActiveProjectId: selectProject,

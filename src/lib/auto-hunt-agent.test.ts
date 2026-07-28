@@ -225,6 +225,7 @@ describe("startProjectAutoHunt", () => {
         sessionId: "session-1",
         apiUrl: "http://127.0.0.1:8788",
         agentId: "agent-auto-hunt",
+        coordinatorConversationId: null,
         agentName: "Auto Hunt agent",
         agentProvider: "codex",
         agentModel: null,
@@ -265,12 +266,18 @@ describe("startProjectAutoHunt", () => {
         responsibility: "Process every queued release issue.",
         skill: "# Release hunter\n\nFollow the attached workflow.",
       },
+      {
+        coordinatorConversationId:
+          "briar:claude:535a1867-ba4c-430f-9c11-ddd46513ec7f:coordinator-1",
+      },
     );
 
     expect(invoke).toHaveBeenCalledWith("start_project_auto_hunt", {
       projectId: "535a1867-ba4c-430f-9c11-ddd46513ec7f",
       request: expect.objectContaining({
         agentId: "agent-release",
+        coordinatorConversationId:
+          "briar:claude:535a1867-ba4c-430f-9c11-ddd46513ec7f:coordinator-1",
         agentName: "Release hunter",
         agentProvider: "claude",
         agentModel: "sonnet",

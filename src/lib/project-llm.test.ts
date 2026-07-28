@@ -9,9 +9,11 @@ import {
   createProjectChat,
   loadAppProviderSettings,
   loadProjectLlmSettings,
-  runProjectAgentSchedule,
+  loadProjectSandboxSettings,
+  runProjectAgent,
   updateAppProviderSettings,
   updateProjectLlmSettings,
+  updateProjectSandboxSettings,
 } from "./project-llm";
 
 describe("project LLM gateway", () => {
@@ -72,30 +74,42 @@ describe("project LLM gateway", () => {
     );
   });
 
-  it("runs a scheduled agent by identity without accepting a workspace path", async () => {
+  it("runs a saved agent turn that may request host Auto Hunt dispatch", async () => {
     invoke.mockResolvedValue({
       conversationId: "briar:project-1:thread-1",
-      message: "audit complete",
       workspaceRoot: "/repo",
+      action: "dispatch_auto_hunt",
+      message: "대기 이슈 처리를 요청했습니다.",
+      maxIssues: 3,
     });
 
-    await runProjectAgentSchedule({
+    await runProjectAgent({
       projectId: "project-1",
-      provider: "claude",
-      model: "sonnet",
-      message: "Audit the repository.",
-      instructions: "Run the claimed schedule and summarize the result.",
+      sessionId: "session-1",
+      agent: {
+        id: "agent-1",
+        name: "Release agent",
+        provider: "codex",
+        model: "gpt-5.6-sol",
+        responsibility: "Handle release work.",
+        skill: "# Release agent",
+      },
+      message: "Auto Hunt로 대기 이슈 3개를 처리해 줘",
+      conversationId: null,
     });
 
-    expect(invoke).toHaveBeenCalledWith("run_project_agent_schedule", {
+    expect(invoke).toHaveBeenCalledWith("run_project_agent", {
       projectId: "project-1",
-      provider: "claude",
-      model: "sonnet",
       request: {
-        message: "Audit the repository.",
+        sessionId: "session-1",
+        agentId: "agent-1",
+        agentName: "Release agent",
+        agentProvider: "codex",
+        agentModel: "gpt-5.6-sol",
+        responsibility: "Handle release work.",
+        skill: "# Release agent",
+        message: "Auto Hunt로 대기 이슈 3개를 처리해 줘",
         conversationId: null,
-        instructions: "Run the claimed schedule and summarize the result.",
-        outputSchema: null,
       },
     });
     expect(invoke.mock.calls[0]?.[1]).not.toHaveProperty("workspaceRoot");
@@ -221,5 +235,30 @@ describe("project LLM gateway", () => {
     expect(invoke).toHaveBeenNthCalledWith(2, "update_app_provider_settings", {
       settings: { codex: false, claude: true, grok: true },
     });
+  });
+
+  it("loads and updates the project Auto Hunt filesystem access", async () => {
+    invoke
+      .mockResolvedValueOnce({ fullAccess: true })
+      .mockResolvedValueOnce({ fullAccess: false });
+
+    await expect(loadProjectSandboxSettings("project-1")).resolves.toEqual({
+      fullAccess: true,
+    });
+    await expect(
+      updateProjectSandboxSettings("project-1", { fullAccess: false }),
+    ).resolves.toEqual({ fullAccess: false });
+
+    expect(invoke).toHaveBeenNthCalledWith(1, "load_project_sandbox_settings", {
+      projectId: "project-1",
+    });
+    expect(invoke).toHaveBeenNthCalledWith(
+      2,
+      "update_project_sandbox_settings",
+      {
+        projectId: "project-1",
+        settings: { fullAccess: false },
+      },
+    );
   });
 });

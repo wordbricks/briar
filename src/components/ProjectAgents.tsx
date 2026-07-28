@@ -41,8 +41,11 @@ import type {
   ProjectAgent,
   UpdateProjectAgentInput,
 } from "../types";
-import { AutoHuntSessions } from "./AutoHuntSessions";
 import { NativeSelect } from "./NativeSelect";
+import {
+  ProjectAgentDetail,
+  type ProjectAgentTaskSessionRecord,
+} from "./ProjectAgentDetail";
 import { ProjectAgentSettings } from "./ProjectAgentSettings";
 
 const providerLabels: Record<AgentProvider, string> = {
@@ -56,6 +59,7 @@ export function ProjectAgents({
   error: appError,
   isSidebarOpen,
   onRequestedSessionOpen,
+  onRecordTaskSession,
   onStart,
   project,
   requestedSessionId = null,
@@ -66,7 +70,18 @@ export function ProjectAgents({
   error: string | null;
   isSidebarOpen: boolean;
   onRequestedSessionOpen?: () => void;
-  onStart: (agent: ProjectAgent, runs: HuntRun[]) => string;
+  onRecordTaskSession?: (
+    agent: ProjectAgent,
+    record: ProjectAgentTaskSessionRecord,
+  ) => void;
+  onStart: (
+    agent: ProjectAgent,
+    runs: HuntRun[],
+    options?: {
+      coordinatorConversationId?: string | null;
+      maxIssues?: number;
+    },
+  ) => string;
   project: Project;
   requestedSessionId?: string | null;
   sessions: AutoHuntSession[];
@@ -118,9 +133,9 @@ export function ProjectAgents({
         session.id === requestedSessionId,
     );
     if (!requestedSession) return;
-    const agent =
-      agents.find((candidate) => candidate.id === requestedSession.agentId) ??
-      agents.find((candidate) => candidate.kind === "auto_hunt");
+    const agent = agents.find(
+      (candidate) => candidate.id === requestedSession.agentId,
+    );
     if (!agent) return;
     setSelectedAgent(agent);
   }, [agents, project.id, requestedSessionId, sessions]);
@@ -144,10 +159,8 @@ export function ProjectAgents({
             skill: projectAgentSkill({
               name: input.name ?? `${providerLabels[input.provider]} Agent`,
               responsibility: input.responsibility,
-              kind: "custom",
             }),
             calendarColor: input.calendarColor,
-            kind: "custom" as const,
             createdAt,
             updatedAt: createdAt,
           };
@@ -179,7 +192,6 @@ export function ProjectAgents({
           skill: projectAgentSkill({
             name: input.name ?? `${providerLabels[input.provider]} Agent`,
             responsibility: input.responsibility,
-            kind: agent.kind,
           }),
           updatedAt,
         };
@@ -217,14 +229,17 @@ export function ProjectAgents({
 
   if (selectedAgent) {
     return (
-      <AutoHuntSessions
+      <ProjectAgentDetail
         agent={selectedAgent}
         dashboard={dashboard}
         error={appError}
         isSidebarOpen={isSidebarOpen}
-        onAgentBack={() => setSelectedAgent(null)}
+        onBack={() => setSelectedAgent(null)}
+        onRecordTaskSession={(record) =>
+          onRecordTaskSession?.(selectedAgent, record)}
         onRequestedSessionOpen={onRequestedSessionOpen}
-        onStart={(runs) => onStart(selectedAgent, runs)}
+        onStartAutoHunt={(runs, options) =>
+          onStart(selectedAgent, runs, options)}
         requestedSessionId={requestedSessionId}
         sessions={sessions}
       />

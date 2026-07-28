@@ -199,7 +199,7 @@ describe("ProjectAgents", () => {
     expect(container.textContent).toContain("릴리스 점검 에이전트");
   });
 
-  it("opens an agent detail page with only that agent's sessions", async () => {
+  it("shows the selected agent sessions and opens task input in a dialog", async () => {
     const sessions: AutoHuntSession[] = [
       {
         id: "legacy-auto-session",
@@ -207,6 +207,7 @@ describe("ProjectAgents", () => {
         workers: [],
         dispatchEvents: [],
         projectId: project.id,
+        agentId: "demo-agent-auto-hunt",
         status: "completed",
         issues: [{
           runId: "run-auto",
@@ -265,7 +266,37 @@ describe("ProjectAgents", () => {
     expect(container.querySelector("#project-agent-detail")).not.toBeNull();
     expect(container.textContent).toContain("자동 사냥 이슈");
     expect(container.textContent).not.toContain("Sentry 오류 조사");
+    expect(container.textContent).not.toContain("에이전트에게 작업 요청");
 
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".auto-hunt-session-row")
+        ?.click();
+    });
+
+    expect(container.querySelector("#project-agent-session")).not.toBeNull();
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(container.textContent).toContain("수행 로그");
+    expect(container.textContent).toContain("세션 타임라인");
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".auto-hunt-session-back")
+        ?.click();
+    });
+
+    expect(container.querySelector("#project-agent-detail")).not.toBeNull();
+
+    await act(async () => {
+      Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
+        .find((button) => button.textContent?.trim() === "작업 실행")
+        ?.click();
+    });
+
+    expect(document.body.textContent).toContain("에이전트에게 작업 요청");
+    expect(document.querySelector<HTMLTextAreaElement>("textarea")?.value).toBe(
+      "모든 대기중인 이슈에 대해서 자동사냥을 수행하는것",
+    );
     await act(async () => {
       container
         .querySelector<HTMLButtonElement>(".project-agent-detail-back")

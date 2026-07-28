@@ -13,9 +13,9 @@ import {
   RefreshCw,
   Rocket,
   Server,
+  ShieldCheck,
   SlidersHorizontal,
   Trash2,
-  Zap,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -45,10 +45,10 @@ import { Typography } from "@/components/ui/typography";
 import type { DashboardPayload, Project, ProjectSettings as ProjectSettingsData } from "../types";
 import { useI18n } from "../i18n";
 import {
-  defaultAutoHuntAutomation,
-  normalizeAutoHuntAutomation,
-  type AutoHuntAutomation,
-} from "../lib/auto-hunt-automation";
+  defaultProjectSandboxSettings,
+  loadProjectSandboxSettings,
+  updateProjectSandboxSettings,
+} from "../lib/project-llm";
 import type { VelenInspection } from "../lib/project-connection";
 import type {
   LinearImportConnectResult,
@@ -64,7 +64,7 @@ type ProjectSettingsSection =
   | "integrations"
   | "remote-connection"
   | "issue-import"
-  | "auto-hunt"
+  | "agent-configuration"
   | "workflow";
 
 export function ProjectSettings({
@@ -75,7 +75,6 @@ export function ProjectSettings({
   onBack,
   onDelete,
   onRegenerateWorkflow,
-  onUpdateAutomation,
   onUpdateVelenOrg,
   onUpdateLinear,
   onConnectLinearImport,
@@ -93,9 +92,6 @@ export function ProjectSettings({
   onBack: () => void;
   onDelete: () => Promise<unknown>;
   onRegenerateWorkflow: () => Promise<unknown>;
-  onUpdateAutomation: (
-    automation: AutoHuntAutomation,
-  ) => Promise<AutoHuntAutomation>;
   onUpdateVelenOrg: (org: string | null) => Promise<string | null>;
   onUpdateLinear: (
     linear: ProjectSettingsData["linear"],
@@ -124,14 +120,10 @@ export function ProjectSettings({
   const [isRegeneratingWorkflow, setIsRegeneratingWorkflow] = useState(false);
   const [workflowError, setWorkflowError] = useState<string | null>(null);
   const [workflowRegenerated, setWorkflowRegenerated] = useState(false);
-  const [automation, setAutomation] = useState<AutoHuntAutomation>(
-    () => normalizeAutoHuntAutomation(dashboard?.settings.automation),
-  );
-  const [savedAutomation, setSavedAutomation] = useState<AutoHuntAutomation>(
-    () => normalizeAutoHuntAutomation(dashboard?.settings.automation),
-  );
-  const [automationSaving, setAutomationSaving] = useState(false);
-  const [automationError, setAutomationError] = useState<string | null>(null);
+  const [sandbox, setSandbox] = useState(defaultProjectSandboxSettings);
+  const [sandboxLoading, setSandboxLoading] = useState(true);
+  const [sandboxSaving, setSandboxSaving] = useState(false);
+  const [sandboxError, setSandboxError] = useState<string | null>(null);
   const [linear, setLinear] = useState<ProjectSettingsData["linear"]>(
     () => dashboard?.settings.linear ?? {
       enabled: false,
@@ -170,13 +162,45 @@ export function ProjectSettings({
     : "";
 
   useEffect(() => {
-    const next = normalizeAutoHuntAutomation(
-      dashboard?.settings.automation ?? defaultAutoHuntAutomation,
-    );
-    setAutomation(next);
-    setSavedAutomation(next);
-    setAutomationError(null);
-  }, [dashboard?.settings.automation, project.id]);
+    let cancelled = false;
+    setSandboxLoading(true);
+    setSandboxError(null);
+    void loadProjectSandboxSettings(project.id)
+      .then((settings) => {
+        if (!cancelled) setSandbox(settings);
+      })
+      .catch((caught) => {
+        if (!cancelled) {
+          setSandboxError(
+            caught instanceof Error ? caught.message : String(caught),
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setSandboxLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [project.id]);
+
+  const saveSandbox = async (fullAccess: boolean) => {
+    if (sandboxSaving) return;
+    setSandboxSaving(true);
+    setSandboxError(null);
+    try {
+      const saved = await updateProjectSandboxSettings(project.id, {
+        fullAccess,
+      });
+      setSandbox(saved);
+    } catch (caught) {
+      setSandboxError(
+        caught instanceof Error ? caught.message : String(caught),
+      );
+    } finally {
+      setSandboxSaving(false);
+    }
+  };
 
   useEffect(() => {
     const next = dashboard?.settings.linear ?? {
@@ -252,21 +276,6 @@ export function ProjectSettings({
     }
   };
 
-  const saveAutomation = async () => {
-    setAutomationSaving(true);
-    setAutomationError(null);
-    try {
-      const saved = await onUpdateAutomation(automation);
-      setAutomation(saved);
-      setSavedAutomation(saved);
-    } catch (caught) {
-      setAutomationError(caught instanceof Error ? caught.message : String(caught));
-    } finally {
-      setAutomationSaving(false);
-    }
-  };
-  const automationChanged =
-    JSON.stringify(automation) !== JSON.stringify(savedAutomation);
   const linearSources = (velen?.sources ?? []).filter(
     (source) => source.provider === "linear" && source.status === "active",
   );
@@ -347,10 +356,10 @@ export function ProjectSettings({
       description: t("settings.navIssueImportDescription"),
     },
     {
-      id: "auto-hunt" as const,
-      icon: <Zap size={16} strokeWidth={1.75} />,
-      label: t("settings.navAutoHunt"),
-      description: t("settings.navAutoHuntDescription"),
+      id: "agent-configuration" as const,
+      icon: <ShieldCheck size={16} strokeWidth={1.75} />,
+      label: t("settings.navAgent"),
+      description: t("settings.navAgentDescription"),
     },
     {
       id: "workflow" as const,
@@ -678,180 +687,53 @@ export function ProjectSettings({
           </div>
 
           <section
-            className="project-settings-auto-run"
-            hidden={activeSection !== "auto-hunt"}
+            className="project-settings-agent-configuration"
+            hidden={activeSection !== "agent-configuration"}
           >
-            <header>
-              <span className="project-settings-auto-run-icon">
-                <Zap size={18} strokeWidth={1.8} />
+            <div
+              className={`project-settings-sandbox${
+                sandbox.fullAccess ? " unrestricted" : ""
+              }`}
+            >
+              <span className="project-settings-sandbox-icon">
+                {sandbox.fullAccess ? (
+                  <AlertTriangle size={17} strokeWidth={1.8} />
+                ) : (
+                  <ShieldCheck size={17} strokeWidth={1.8} />
+                )}
               </span>
               <span>
-                <strong>{t("settings.autoRunTitle")}</strong>
-                <small>{t("settings.autoRunDescription")}</small>
+                <strong>{t("settings.sandboxTitle")}</strong>
+                <small>
+                  {t(
+                    sandbox.fullAccess
+                      ? "settings.sandboxUnrestrictedDescription"
+                      : "settings.sandboxWorkspaceDescription",
+                  )}
+                </small>
               </span>
               <label className="project-settings-toggle flex items-center gap-2">
                 <Switch
-                  checked={automation.enabled}
-                  onCheckedChange={(enabled) => {
-                    setAutomation((current) => ({
-                      ...current,
-                      enabled,
-                    }));
+                  aria-label={t("settings.sandboxTitle")}
+                  checked={sandbox.fullAccess}
+                  disabled={sandboxLoading || sandboxSaving}
+                  onCheckedChange={(fullAccess) => {
+                    void saveSandbox(fullAccess);
                   }}
                 />
                 <span className="text-xs font-medium text-muted-foreground">
-                  {t(automation.enabled ? "settings.autoRunOn" : "settings.autoRunOff")}
+                  {t(
+                    sandbox.fullAccess
+                      ? "settings.sandboxUnrestricted"
+                      : "settings.sandboxWorkspace",
+                  )}
                 </span>
               </label>
-            </header>
-
-            <div className="project-settings-auto-run-rules">
-              <label>
-                <span>{t("settings.autoRunMaxIssues")}</span>
-                <Input
-                  max={10}
-                  min={1}
-                  onChange={(event) => {
-                    const maxIssuesPerSession = Number(event.currentTarget.value);
-                    setAutomation((current) => ({
-                      ...current,
-                      maxIssuesPerSession,
-                    }));
-                  }}
-                  type="number"
-                  value={automation.maxIssuesPerSession}
-                />
-                <small>{t("settings.autoRunMaxIssuesDescription")}</small>
-              </label>
-
-              <div className="project-settings-auto-run-condition">
-                <label className="project-settings-auto-run-condition-check">
-                  <input
-                    checked={automation.schedule.enabled}
-                    disabled={!automation.enabled}
-                    onChange={(event) => {
-                      const enabled = event.currentTarget.checked;
-                      setAutomation((current) => ({
-                        ...current,
-                        schedule: {
-                          ...current.schedule,
-                          enabled,
-                        },
-                      }));
-                    }}
-                    type="checkbox"
-                  />
-                  <span>
-                    <strong>{t("settings.autoRunSchedule")}</strong>
-                    <small>{t("settings.autoRunScheduleDescription")}</small>
-                  </span>
-                </label>
-                <input
-                  aria-label={t("settings.autoRunIntervalHours")}
-                  disabled={!automation.enabled || !automation.schedule.enabled}
-                  max={168}
-                  min={1}
-                  onChange={(event) => {
-                    const intervalHours = Number(event.currentTarget.value);
-                    setAutomation((current) => ({
-                      ...current,
-                      schedule: {
-                        ...current.schedule,
-                        intervalHours,
-                      },
-                    }));
-                  }}
-                  type="number"
-                  value={automation.schedule.intervalHours}
-                />
-                <em>{t("settings.hours")}</em>
-              </div>
-
-              <div className="project-settings-auto-run-condition">
-                <label className="project-settings-auto-run-condition-check">
-                  <input
-                    checked={automation.queueThreshold.enabled}
-                    disabled={!automation.enabled}
-                    onChange={(event) => {
-                      const enabled = event.currentTarget.checked;
-                      setAutomation((current) => ({
-                        ...current,
-                        queueThreshold: {
-                          ...current.queueThreshold,
-                          enabled,
-                        },
-                      }));
-                    }}
-                    type="checkbox"
-                  />
-                  <span>
-                    <strong>{t("settings.autoRunQueue")}</strong>
-                    <small>{t("settings.autoRunQueueDescription")}</small>
-                  </span>
-                </label>
-                <input
-                  aria-label={t("settings.autoRunQueueMinimum")}
-                  disabled={!automation.enabled || !automation.queueThreshold.enabled}
-                  max={100}
-                  min={1}
-                  onChange={(event) => {
-                    const minimumIssues = Number(event.currentTarget.value);
-                    setAutomation((current) => ({
-                      ...current,
-                      queueThreshold: {
-                        ...current.queueThreshold,
-                        minimumIssues,
-                      },
-                    }));
-                  }}
-                  type="number"
-                  value={automation.queueThreshold.minimumIssues}
-                />
-                <em>{t("settings.issuesUnit")}</em>
-              </div>
-
-              <div className="project-settings-auto-run-condition">
-                <label className="project-settings-auto-run-condition-check">
-                  <input
-                    checked={automation.urgentIssue.enabled}
-                    disabled={!automation.enabled}
-                    onChange={(event) => {
-                      const enabled = event.currentTarget.checked;
-                      setAutomation((current) => ({
-                        ...current,
-                        urgentIssue: { enabled },
-                      }));
-                    }}
-                    type="checkbox"
-                  />
-                  <span>
-                    <strong>{t("settings.autoRunUrgent")}</strong>
-                    <small>{t("settings.autoRunUrgentDescription")}</small>
-                  </span>
-                </label>
-              </div>
             </div>
-            <footer>
-              <p>{t("settings.autoRunOrNotice")}</p>
-              <button
-                disabled={automationSaving || !automationChanged}
-                onClick={() => void saveAutomation()}
-                type="button"
-              >
-                {automationSaving ? (
-                  <LoaderCircle className="spin" size={14} />
-                ) : !automationChanged ? (
-                  <Check size={14} />
-                ) : null}
-                {automationSaving
-                  ? t("common.saving")
-                  : !automationChanged
-                    ? t("common.saved")
-                    : t("common.save")}
-              </button>
-            </footer>
-            {automationError ? (
-              <p className="project-settings-auto-run-error">{automationError}</p>
+            {sandboxError ? (
+              <p className="project-settings-sandbox-error" role="alert">
+                {sandboxError}
+              </p>
             ) : null}
           </section>
 

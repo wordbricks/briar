@@ -20,7 +20,13 @@ describe("project workflow generator", () => {
         stages: [
           { id: "analyzing", label: "Analyze", required: true, evidence: ["repository"], checks: [] },
           { id: "implementing", label: "Implement", required: true, evidence: ["diff"], checks: [] },
-          { id: "local_qa", label: "Local validation", required: true, evidence: [], checks: ["bun run test"] },
+          {
+            id: "local_qa",
+            label: "Local validation",
+            required: true,
+            evidence: ["signoff/app-worker", "local QA"],
+            checks: ["bun run test"],
+          },
         ],
         completion: {
           requiredStages: ["analyzing", "implementing", "local_qa"],
@@ -31,7 +37,14 @@ describe("project workflow generator", () => {
 
     await expect(generateProjectWorkflow("project-1")).resolves.toMatchObject({
       release: { enabled: false },
-      stages: [{ id: "analyzing" }, { id: "implementing" }, { id: "local_qa" }],
+      stages: [
+        { id: "analyzing" },
+        { id: "implementing" },
+        {
+          id: "local_qa",
+          evidence: ["signoff/app-worker", "local QA"],
+        },
+      ],
     });
     expect(chatWithProjectLlm).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -6,10 +6,13 @@ import { basename, isAbsolute, join, resolve } from "node:path";
 import { z } from "zod";
 import packageJson from "../package.json";
 import {
+  autoHuntEvidenceTypeMaxLength,
+  autoHuntEvidenceTypePattern,
   autoHuntRunStatuses,
   autoHuntSources,
   repositoryWorkflowPendingStageId,
 } from "../src/lib/auto-hunt-contract";
+import { structuredAgentResultSchema } from "../src/lib/agent-result";
 import {
   defaultWorkerLabel,
   hostFingerprint,
@@ -38,6 +41,12 @@ import {
 import { getSkillGuide, skillGuides } from "./skill-guides";
 
 const workflowStageIdSchema = z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/u);
+const evidenceTypeSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(autoHuntEvidenceTypeMaxLength)
+  .regex(autoHuntEvidenceTypePattern);
 
 const workflowConfigSchema = z
   .object({
@@ -47,7 +56,7 @@ const workflowConfigSchema = z
         id: workflowStageIdSchema,
         label: z.string().min(1),
         required: z.boolean(),
-        evidence: z.array(z.string().min(1)).optional(),
+        evidence: z.array(evidenceTypeSchema).optional(),
         checks: z.array(z.string().min(1)).optional(),
       }),
     ).min(1),
@@ -68,7 +77,7 @@ const worktreeConfigSchema = z
 
 const sandboxConfigSchema = z
   .object({
-    /** True drops the agent's filesystem sandbox for this project's Auto Hunt. */
+    /** False confines Auto Hunt writes to the assigned workspace. Defaults to true. */
     fullAccess: z.boolean().optional(),
   })
   .passthrough();
@@ -550,8 +559,8 @@ async function configureProject() {
   if (has("--enable-full-access") && has("--disable-full-access")) {
     throw new Error("--enable-full-access와 --disable-full-access를 함께 쓸 수 없습니다.");
   }
-  // Removing the sandbox is worth one deliberate extra keystroke: Auto Hunt
-  // input is untrusted issue content and the session runs unattended.
+  // Explicitly re-enabling the default unrestricted mode still requires a
+  // deliberate acknowledgement because Auto Hunt input is untrusted.
   if (has("--enable-full-access") && !has("--i-understand-the-risk")) {
     throw new Error(
       "--enable-full-access는 샌드박스를 완전히 해제해 에이전트가 파일시스템 전체에 쓸 수 있게 합니다. 확인을 위해 --i-understand-the-risk를 함께 지정하세요.",
@@ -622,7 +631,7 @@ async function configureProject() {
       velenOrg: velenOrg ?? null,
       linearEnabled: nextAutoHunt.linear?.enabled ?? false,
       linearSource: nextAutoHunt.linear?.source ?? null,
-      fullAccess: nextAutoHunt.sandbox?.fullAccess ?? false,
+      fullAccess: nextAutoHunt.sandbox?.fullAccess ?? true,
     }),
   );
 }
@@ -649,8 +658,8 @@ async function projectDoctor() {
         baseRef: resolveBaseRef(runGit, project.repositoryPath),
       },
       sandbox: {
-        // false is the default: writes stay inside the checkout and worktree root.
-        fullAccess: project.autoHunt?.sandbox?.fullAccess ?? false,
+        // true is the default; false opts into checkout/worktree-confined writes.
+        fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
       },
       requestIds: [velen?.auth.requestId, velen?.org.requestId, velen?.linear?.requestId].filter(
         Boolean,
@@ -977,6 +986,13 @@ async function addRunEvent(forcedStatus?: string) {
     issueId || issueIdentifier || issueUrl || issueState,
   );
   const contextValue = value("--context-json");
+  const structuredResultValue = await optionalText(
+    "--structured-result",
+    "--structured-result-file",
+  );
+  const structuredResult = structuredResultValue
+    ? structuredAgentResultSchema.parse(JSON.parse(structuredResultValue))
+    : null;
   const runId = value("--run") ?? project.activeClaim?.runId ?? null;
   const sourceKey = value("--source-key") ?? project.activeClaim?.sourceKey ?? null;
   const title = value("--title");
@@ -1007,15 +1023,27 @@ async function addRunEvent(forcedStatus?: string) {
         }
       : null,
     issueDescription: await optionalText("--issue-description", "--issue-description-file"),
-    resultSummary: await optionalText("--result-summary", "--result-summary-file"),
+    resultSummary:
+      structuredResult?.summary ??
+      (await optionalText("--result-summary", "--result-summary-file")),
+    structuredResult,
     pullRequestUrls: values("--pull-request-url"),
     targetSha: value("--target-sha") ?? null,
     sourceCreatedAt: value("--source-created-at") ?? null,
     context: contextValue ? JSON.parse(contextValue) : null,
   };
-  if (forcedStatus === "completed" && !input.resultSummary?.trim()) {
+  if (forcedStatus === "completed" && !input.structuredResult) {
     throw new Error(
-      "run complete requires --result-summary or --result-summary-file",
+      "run complete requires --structured-result or --structured-result-file",
+    );
+  }
+  if (
+    forcedStatus === "completed" &&
+    input.structuredResult &&
+    !["completed", "partial"].includes(input.structuredResult.outcome)
+  ) {
+    throw new Error(
+      "run complete structured outcome must be completed or partial",
     );
   }
   z.object({
@@ -1044,6 +1072,7 @@ async function addRunEvent(forcedStatus?: string) {
       .nullable(),
     issueDescription: z.string().nullable(),
     resultSummary: z.string().nullable(),
+    structuredResult: structuredAgentResultSchema.nullable(),
     pullRequestUrls: z.array(z.string().url()).max(20),
     targetSha: z.string().regex(/^[0-9a-f]{7,64}$/u).nullable(),
     sourceCreatedAt: z.string().datetime({ offset: true }).nullable(),
@@ -1121,10 +1150,10 @@ async function addRunEvidence() {
     url: value("--url") ?? null,
     metadata: metadataValue ? JSON.parse(metadataValue) : null,
   };
-  z.object({
+  const parsed = z.object({
     evidenceKey: z.string().min(1).max(300),
     stage: workflowStageIdSchema,
-    type: z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/u),
+    type: evidenceTypeSchema,
     status: z.enum(["pending", "passed", "failed", "skipped"]),
     observedAt: z.string().datetime({ offset: true }),
     actor: z.string().min(1),
@@ -1137,7 +1166,7 @@ async function addRunEvidence() {
     config.apiUrl,
     `/runs/${runId}/evidence`,
     process.env.BRIAR_AGENT_TOKEN ?? project.agentToken,
-    { method: "POST", body: JSON.stringify(input) },
+    { method: "POST", body: JSON.stringify(parsed) },
   );
   console.log(JSON.stringify(result));
 }
@@ -1191,6 +1220,39 @@ async function recoverRun(action: "retry" | "cancel") {
     );
     await saveConfig(config);
   }
+  console.log(JSON.stringify(result));
+}
+
+async function reworkRun() {
+  const config = await loadConfig();
+  const project = await currentProject(config);
+  const runId = value("--run") ?? project.activeClaim?.runId;
+  if (!runId) throw new Error("--run is required when there is no active claim");
+  const input = {
+    requestId: value("--request-id") ?? crypto.randomUUID(),
+    actor: value("--actor") ?? "briar-workflow",
+    workflowStage: required("--to"),
+    reason: required("--reason"),
+  };
+  z.object({
+    requestId: z.string().uuid(),
+    actor: z.string().min(1).max(128),
+    workflowStage: workflowStageIdSchema,
+    reason: z.string().trim().min(1).max(4_000),
+  }).parse(input);
+  z.string().uuid().parse(runId);
+  const result = await request<{
+    runId: string;
+    outcome: string;
+    attempt: number;
+    revision: number;
+    workflowStage: string;
+  }>(
+    config.apiUrl,
+    `/runs/${runId}/rework`,
+    process.env.BRIAR_AGENT_TOKEN ?? project.agentToken,
+    { method: "POST", body: JSON.stringify(input) },
+  );
   console.log(JSON.stringify(result));
 }
 
@@ -1455,13 +1517,15 @@ const usage = `Briar CLI
     --status <backlog|queued|running|blocked|failed|completed|cancelled>
     [--workflow-stage <configured-stage>] --event-key <retry-stable-key>
   briar run complete [--run <uuid>] --event-key <retry-stable-key>
-    --result-summary-file <path>
+    --structured-result-file <path>
   briar run evidence add [--run <uuid>] --key <retry-stable-key>
     --stage <configured-stage> --type <type>
     --status <pending|passed|failed|skipped>
     [--detail <text>|--detail-file <path>] [--command <command>]
     [--url <url>] [--metadata-json <json>]
   briar run evidence list [--run <uuid>]
+  briar run rework [--run <uuid>] --to <earlier-stage> --reason <text>
+    [--request-id <uuid>]
   briar run retry [--run <uuid>] [--request-id <uuid>] [--reason <text>]
   briar run cancel [--run <uuid>] [--request-id <uuid>] [--reason <text>]
   briar worker [--project <uuid>] [--label <text>] [--max-issues <n>] [--once]
@@ -1517,6 +1581,7 @@ async function main() {
   if (args[0] === "run" && args[1] === "evidence" && args[2] === "list") {
     return listCurrentRunEvidence();
   }
+  if (args[0] === "run" && args[1] === "rework") return reworkRun();
   if (args[0] === "run" && args[1] === "retry") return recoverRun("retry");
   if (args[0] === "run" && args[1] === "cancel") return recoverRun("cancel");
   if (args[0] === "worker" && args[1] === "status") return workerStatus();
