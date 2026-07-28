@@ -156,6 +156,12 @@ const organizationSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
   handle: z.string(),
+  logo: z
+    .string()
+    .max(400_000)
+    .regex(/^data:image\/webp;base64,/u)
+    .nullable()
+    .default(null),
   role: z.enum(["owner", "admin", "member"]),
   createdAt: z.string(),
 });
@@ -333,6 +339,22 @@ export async function updateOrganization(
       body: JSON.stringify({ name }),
     },
   );
+}
+
+export async function updateOrganizationLogo(
+  token: string,
+  organizationId: string,
+  logo: string | null,
+) {
+  const result = await request<{ organization: unknown }>(
+    `/organizations/${organizationId}/logo`,
+    token,
+    {
+      method: "PUT",
+      body: JSON.stringify({ logo }),
+    },
+  );
+  return { organization: organizationSchema.parse(result.organization) };
 }
 
 export async function loadOrganizationMembers(

@@ -98,6 +98,7 @@ body { overflow: hidden; font-synthesis: none; }
 .sidebar-brand:active { transform:scale(.985); }
 .sidebar-brand:focus-visible { outline:2px solid #8b70dd; outline-offset:1px; }
 .sidebar-brand span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.sidebar-organization-logo { width:20px; height:20px; flex:0 0 auto; border-radius:5px; object-fit:cover; }
 .sidebar-brand svg { flex:0 0 auto; color:var(--muted-foreground); transition:transform .16s cubic-bezier(.2,.8,.2,1); }
 .sidebar-brand svg.open { transform:rotate(180deg); }
 .sidebar-organization-menu { width:calc(100% - 12px); position:absolute; z-index:25; top:39px; left:6px; padding:7px; border:1px solid rgba(55,56,51,.10); border-radius:14px; background:rgba(255,255,255,.97); box-shadow:0 16px 44px rgba(30,31,28,.18); backdrop-filter:blur(20px) saturate(150%); -webkit-backdrop-filter:blur(20px) saturate(150%); transform-origin:top left; animation:sidebar-menu-in .14s cubic-bezier(.2,.8,.2,1); }
@@ -107,6 +108,7 @@ body { overflow: hidden; font-synthesis: none; }
 .sidebar-organization-menu button > span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .sidebar-organization-menu button > svg { color:#74756f; }
 .sidebar-organization-menu button > svg:last-child { color:#765bd0; }
+.sidebar-organization-list-logo { width:16px; height:16px; border-radius:4px; object-fit:cover; }
 .sidebar-organization-menu-group { display:grid; gap:1px; }
 .sidebar-organization-menu-group:not(.organization-list) > button { grid-template-columns:minmax(0,1fr) 16px; }
 .sidebar-organization-menu-group:not(.organization-list) > button > svg:last-child { color:var(--muted-foreground); }

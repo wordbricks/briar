@@ -42,6 +42,7 @@ export type OrganizationRow = {
   id: string;
   name: string;
   handle: string;
+  logo: string | null;
   role: OrganizationRole;
   created_at: string;
 };
@@ -319,6 +320,7 @@ export async function listOrganizations(db: D1Database, userId: string) {
   const result = await db
     .prepare(
       `select organization.id, organization.name, organization.handle,
+              organization.logo,
               membership.role,
               organization.created_at
        from briar_organizations organization
@@ -341,6 +343,7 @@ export async function createOrganization(
     id: crypto.randomUUID(),
     name: input.name,
     handle: input.handle,
+    logo: null,
     role: "owner",
     created_at: createdAt,
   };
@@ -387,7 +390,34 @@ export async function updateOrganization(
   if (result.meta.changes === 0) return null;
   return db
     .prepare(
-      `select id, name, handle, created_at
+      `select id, name, handle, logo, created_at
+       from briar_organizations
+       where id = ?`,
+    )
+    .bind(organizationId)
+    .first<Omit<OrganizationRow, "role">>()
+    .then((organization) => (organization ? { ...organization, role } : null));
+}
+
+export async function updateOrganizationLogo(
+  db: D1Database,
+  organizationId: string,
+  logo: string | null,
+  role: OrganizationRole,
+) {
+  const updatedAt = new Date().toISOString();
+  const result = await db
+    .prepare(
+      `update briar_organizations
+       set logo = ?, updated_at = ?
+       where id = ?`,
+    )
+    .bind(logo, updatedAt, organizationId)
+    .run();
+  if (result.meta.changes === 0) return null;
+  return db
+    .prepare(
+      `select id, name, handle, logo, created_at
        from briar_organizations
        where id = ?`,
     )

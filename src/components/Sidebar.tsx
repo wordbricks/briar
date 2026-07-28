@@ -248,6 +248,13 @@ export function Sidebar({
           }}
           type="button"
         >
+          {activeOrganization?.logo ? (
+            <img
+              alt=""
+              className="sidebar-organization-logo"
+              src={activeOrganization.logo}
+            />
+          ) : null}
           <span>{activeOrganization?.name ?? "Briar"}</span>
           <ChevronDown
             aria-hidden="true"
@@ -365,7 +372,15 @@ export function Sidebar({
                       role="menuitemradio"
                       type="button"
                     >
-                      <Building2 aria-hidden="true" size={15} strokeWidth={1.7} />
+                      {organization.logo ? (
+                        <img
+                          alt=""
+                          className="sidebar-organization-list-logo"
+                          src={organization.logo}
+                        />
+                      ) : (
+                        <Building2 aria-hidden="true" size={15} strokeWidth={1.7} />
+                      )}
                       <span>{organization.name}</span>
                       {organization.id === activeOrganization?.id ? (
                         <Check aria-hidden="true" size={15} strokeWidth={1.8} />

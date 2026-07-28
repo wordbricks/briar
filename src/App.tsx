@@ -487,6 +487,7 @@ export function App() {
               canGoBack ? goBack() : navigateToPage("issues")
             }
             organization={settingsOrganization}
+            onLogoChange={briar.changeOrganizationLogo}
             onRename={briar.renameOrganization}
             token={briar.token ?? ""}
           />

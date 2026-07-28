@@ -86,6 +86,7 @@ import {
   updateProjectAgentSchedule,
   updateProjectSettings,
   updateOrganization,
+  updateOrganizationLogo,
   updateIssue,
   type HuntEventRow,
   type HuntRunRow,
@@ -486,6 +487,15 @@ const organizationInputSchema = z.object({
 export const organizationUpdateInputSchema = organizationInputSchema.pick({
   name: true,
 });
+export const organizationLogoInputSchema = z
+  .object({
+    logo: z
+      .string()
+      .max(400_000)
+      .regex(/^data:image\/webp;base64,[a-z0-9+/]+={0,2}$/iu)
+      .nullable(),
+  })
+  .strict();
 const organizationHandleSchema = organizationInputSchema.shape.handle;
 const organizationMemberInputSchema = z.object({
   email: z.string().trim().email().max(320),
@@ -1071,6 +1081,7 @@ const organizationJson = (row: OrganizationRow) => ({
   id: row.id,
   name: row.name,
   handle: row.handle,
+  logo: row.logo,
   role: row.role,
   createdAt: row.created_at,
 });
@@ -1329,6 +1340,30 @@ async function route(
       db,
       organizationMatch[1],
       input.name,
+      role,
+    );
+    if (!organization) throw new HttpError(404, "Organization not found");
+    return json({ organization: organizationJson(organization) });
+  }
+
+  const organizationLogoMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/logo$/u,
+  );
+  if (organizationLogoMatch && request.method === "PUT") {
+    const session = await requireSession(auth, request);
+    const role = await getOrganizationRole(
+      db,
+      organizationLogoMatch[1],
+      session.user.id,
+    );
+    if (!canManageOrganization(role)) {
+      throw new HttpError(403, "Organization admin access required");
+    }
+    const input = organizationLogoInputSchema.parse(await readJson(request));
+    const organization = await updateOrganizationLogo(
+      db,
+      organizationLogoMatch[1],
+      input.logo,
       role,
     );
     if (!organization) throw new HttpError(404, "Organization not found");

@@ -25,6 +25,7 @@ const organizations: Organization[] = [
     id: "organization-1",
     name: "Briar",
     handle: "briar",
+    logo: null,
     role: "owner",
     createdAt: "2026-07-25T00:00:00.000Z",
   },
