@@ -7,6 +7,9 @@
   "permissions": [
     "auth-session:default",
     "core:default",
+    "notification:allow-is-permission-granted",
+    "notification:allow-notify",
+    "notification:allow-request-permission",
     "opener:default"
   ]
 }

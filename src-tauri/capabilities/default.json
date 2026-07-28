@@ -9,6 +9,9 @@
     "core:webview:allow-set-webview-zoom",
     "core:window:allow-start-dragging",
     "dialog:allow-open",
+    "notification:allow-is-permission-granted",
+    "notification:allow-notify",
+    "notification:allow-request-permission",
     "opener:default",
     "process:allow-restart",
     "updater:default"

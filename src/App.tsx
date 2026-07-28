@@ -30,6 +30,7 @@ import { WindowNavigationControls } from "./components/WindowNavigationControls"
 import { useBriar, type UseBriarOptions } from "./hooks/useBriar";
 import { useAutoHuntSessions } from "./hooks/useAutoHuntSessions";
 import { useInbox } from "./hooks/useInbox";
+import { useInboxNotifications } from "./hooks/useInboxNotifications";
 import { useNavigationHistory } from "./hooks/useNavigationHistory";
 import {
   clearLaunchIntroPreview,
@@ -88,6 +89,7 @@ export function App() {
     autoHunt.sessions,
     briar.projects,
   );
+  useInboxNotifications(briar.user?.id ?? null, inbox.messages);
   const mobilePlatform = getMobilePlatform() ?? "android";
   const previewsLaunchIntro = isLaunchIntroPreview();
   const runsOnDesktopTauri = isDesktopTauri();
