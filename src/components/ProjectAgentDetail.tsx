@@ -18,6 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Typography } from "@/components/ui/typography";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import { useI18n } from "../i18n";
+import { executeProjectAgentTurn } from "../lib/project-agent-execution";
 import { runProjectAgent } from "../lib/project-llm";
 import type {
   DashboardPayload,
@@ -95,12 +96,22 @@ export function ProjectAgentDetail({
     ]);
     setIsRunning(true);
     try {
-      const response = await runProjectAgent({
-        projectId: dashboard.project.id,
-        agent,
-        message,
-        conversationId,
-      });
+      const { response, dispatchResult } = await executeProjectAgentTurn(
+        {
+          runAgent: runProjectAgent,
+          dispatchAutoHunt: (decision) =>
+            onStartAutoHunt(dashboard.runs, {
+              coordinatorConversationId: decision.conversationId,
+              maxIssues: decision.maxIssues ?? undefined,
+            }),
+        },
+        {
+          projectId: dashboard.project.id,
+          agent,
+          message,
+          conversationId,
+        },
+      );
       setConversationId(response.conversationId);
       setMessages((current) => [
         ...current,
@@ -111,12 +122,8 @@ export function ProjectAgentDetail({
           dispatched: response.action === "dispatch_auto_hunt",
         },
       ]);
-      if (response.action === "dispatch_auto_hunt") {
-        const sessionId = onStartAutoHunt(dashboard.runs, {
-          coordinatorConversationId: response.conversationId,
-          maxIssues: response.maxIssues ?? undefined,
-        });
-        setOpenedSessionId(sessionId);
+      if (dispatchResult !== null) {
+        setOpenedSessionId(dispatchResult);
         setMode("auto_hunt");
       }
     } catch (caught) {
