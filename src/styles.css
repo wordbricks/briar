@@ -1956,9 +1956,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .project-agent-session-panel { width:min(880px,calc(100% - 48px)); min-height:320px; margin:28px auto 56px; border:1px solid var(--border); border-radius:18px; box-shadow:var(--shadow-sm); }
 .project-agent-task-dialog { max-height:min(760px,calc(100vh - 48px)); overflow-y:auto; }
 .project-agent-task-dialog .project-agent-run-messages { max-height:280px; overflow-y:auto; }
-.project-agent-session-dialog { max-width:720px; max-height:min(760px,calc(100vh - 48px)); overflow-y:auto; }
-.project-agent-session-dialog-body { display:grid; gap:20px; }
-.project-agent-session-dialog-body > section { display:grid; gap:12px; }
+.project-agent-session-request { margin:0; padding:14px 15px; border:1px solid #e5e5df; border-radius:11px; color:var(--foreground); background:var(--muted); font-size:var(--text-2xs); line-height:1.65; white-space:pre-wrap; }
 .project-agent-run-panel > header { display:flex; align-items:center; justify-content:space-between; gap:16px; }
 .project-agent-run-messages { display:grid; gap:12px; }
 .project-agent-run-message { max-width:82%; padding:14px 16px; display:grid; gap:7px; border:1px solid var(--border); border-radius:16px; background:var(--card); box-shadow:var(--shadow-sm); }

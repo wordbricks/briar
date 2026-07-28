@@ -4,7 +4,7 @@ import {
   LoaderCircle,
   Play,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   ErrorBanner,
@@ -31,6 +31,7 @@ import type {
   HuntRun,
   ProjectAgent,
 } from "../types";
+import { ProjectAgentSessionDetail } from "./ProjectAgentSessionDetail";
 import { ProjectAgentSessions } from "./ProjectAgentSessions";
 
 type ProjectAgentMessage = {
@@ -41,6 +42,7 @@ type ProjectAgentMessage = {
 };
 
 export type ProjectAgentTaskSessionRecord = {
+  sessionId: string;
   request: string;
   startedAt: string;
   status: "completed" | "failed";
@@ -86,6 +88,38 @@ export function ProjectAgentDetail({
   const [messages, setMessages] = useState<ProjectAgentMessage[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
+    requestedSessionId,
+  );
+  const selectedSession =
+    sessions.find(
+      (session) =>
+        session.id === selectedSessionId &&
+        session.projectId === agent.projectId &&
+        session.agentId === agent.id,
+    ) ?? null;
+
+  useEffect(() => {
+    if (
+      !requestedSessionId ||
+      !sessions.some(
+        (session) =>
+          session.id === requestedSessionId &&
+          session.projectId === agent.projectId &&
+          session.agentId === agent.id,
+      )
+    ) {
+      return;
+    }
+    setSelectedSessionId(requestedSessionId);
+    onRequestedSessionOpen?.();
+  }, [
+    agent.id,
+    agent.projectId,
+    onRequestedSessionOpen,
+    requestedSessionId,
+    sessions,
+  ]);
 
   const openTaskDialog = () => {
     setRequest(agent.responsibility);
@@ -110,6 +144,7 @@ export function ProjectAgentDetail({
       },
     ]);
     const startedAt = new Date().toISOString();
+    const sessionId = crypto.randomUUID();
     setIsRunning(true);
     try {
       const { response } = await executeProjectAgentTurn(
@@ -126,11 +161,13 @@ export function ProjectAgentDetail({
           agent,
           message,
           conversationId,
+          sessionId,
         },
       );
       setConversationId(response.conversationId);
       if (response.action === "respond") {
         onRecordTaskSession?.({
+          sessionId,
           request: message,
           startedAt,
           status: "completed",
@@ -154,6 +191,7 @@ export function ProjectAgentDetail({
         caught instanceof Error ? caught.message : String(caught);
       setError(messageText);
       onRecordTaskSession?.({
+        sessionId,
         request: message,
         startedAt,
         status: "failed",
@@ -166,6 +204,16 @@ export function ProjectAgentDetail({
       setIsRunning(false);
     }
   };
+
+  if (selectedSession) {
+    return (
+      <ProjectAgentSessionDetail
+        isSidebarOpen={isSidebarOpen}
+        onBack={() => setSelectedSessionId(null)}
+        session={selectedSession}
+      />
+    );
+  }
 
   return (
     <MainContent id="project-agent-detail">
@@ -215,9 +263,8 @@ export function ProjectAgentDetail({
 
         <ProjectAgentSessions
           agent={agent}
-          onRequestedSessionOpen={onRequestedSessionOpen}
+          onSessionOpen={setSelectedSessionId}
           projectId={dashboard?.project.id ?? agent.projectId}
-          requestedSessionId={requestedSessionId}
           sessions={sessions}
         />
       </div>

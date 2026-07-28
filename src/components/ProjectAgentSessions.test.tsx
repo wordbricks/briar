@@ -2,7 +2,7 @@
 
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import type { ProjectAgent } from "../types";
 import { ProjectAgentSessions } from "./ProjectAgentSessions";
@@ -44,6 +44,7 @@ const taskSession: AutoHuntSession = {
 
 describe("ProjectAgentSessions", () => {
   it("shows direct task sessions for only the selected agent", async () => {
+    const onSessionOpen = vi.fn();
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
@@ -51,8 +52,8 @@ describe("ProjectAgentSessions", () => {
       root.render(
         <ProjectAgentSessions
           agent={agent}
+          onSessionOpen={onSessionOpen}
           projectId="project-1"
-          requestedSessionId={null}
           sessions={[
             taskSession,
             {
@@ -84,7 +85,8 @@ describe("ProjectAgentSessions", () => {
         .querySelector<HTMLButtonElement>(".auto-hunt-session-row")
         ?.click();
     });
-    expect(document.body.textContent).toContain("The release is ready.");
+    expect(onSessionOpen).toHaveBeenCalledWith("task-session");
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
 
     await act(async () => root.unmount());
     container.remove();

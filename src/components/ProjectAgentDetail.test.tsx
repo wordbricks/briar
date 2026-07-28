@@ -30,6 +30,7 @@ beforeEach(() => {
   runProjectAgent.mockReset();
   vi.stubGlobal("crypto", {
     randomUUID: vi.fn()
+      .mockReturnValueOnce("task-session")
       .mockReturnValueOnce("message-user")
       .mockReturnValueOnce("message-agent"),
   });
@@ -126,6 +127,7 @@ describe("ProjectAgentDetail", () => {
     expect(onStartAutoHunt).not.toHaveBeenCalled();
     expect(onRecordTaskSession).toHaveBeenCalledWith(
       expect.objectContaining({
+        sessionId: "task-session",
         request: "현재 릴리스 상태를 확인해 줘",
         status: "completed",
         conversationId: "briar:project-1:ordinary-1",
@@ -182,6 +184,7 @@ describe("ProjectAgentDetail", () => {
 
     expect(runProjectAgent).toHaveBeenCalledWith({
       projectId: "project-1",
+      sessionId: "task-session",
       agent,
       message: "Auto Hunt로 대기 이슈 세 건을 처리해 줘",
       conversationId: null,

@@ -281,6 +281,7 @@ export function useAutoHuntSessions(
     projectId: string,
     agentId: string,
     input: {
+      sessionId?: string;
       request: string;
       startedAt: string;
       trigger?: "manual" | "scheduled";
@@ -288,11 +289,12 @@ export function useAutoHuntSessions(
       scheduleRunId?: string;
     },
   ) => {
-    const existing = input.scheduleRunId
-      ? sessionsRef.current.find(
-          (session) => session.scheduleRunId === input.scheduleRunId,
-        )
-      : undefined;
+    const existing = sessionsRef.current.find(
+      (session) =>
+        (input.scheduleRunId &&
+          session.scheduleRunId === input.scheduleRunId) ||
+        (input.sessionId && session.id === input.sessionId),
+    );
     if (existing) {
       if (existing.status !== "running") {
         const restarted = sessionsRef.current.map((session) =>
@@ -317,7 +319,7 @@ export function useAutoHuntSessions(
       return existing.id;
     }
     const session: AutoHuntSession = {
-      id: crypto.randomUUID(),
+      id: input.sessionId ?? crypto.randomUUID(),
       dispatchGroupId: "",
       projectId,
       agentId,
@@ -376,6 +378,7 @@ export function useAutoHuntSessions(
     projectId: string,
     agentId: string,
     input: {
+      sessionId: string;
       request: string;
       startedAt: string;
       status: "completed" | "failed";
@@ -386,6 +389,7 @@ export function useAutoHuntSessions(
     },
   ) => {
     const sessionId = startTaskSession(projectId, agentId, {
+      sessionId: input.sessionId,
       request: input.request,
       startedAt: input.startedAt,
     });
