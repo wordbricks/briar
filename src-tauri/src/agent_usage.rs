@@ -348,7 +348,10 @@ fn read_claude_keychain(home: &Path) -> Option<String> {
         .map(PathBuf::from)
         .unwrap_or_else(|| home.join(".claude"));
     let digest = Sha256::digest(config_directory.to_string_lossy().as_bytes());
-    let suffix = format!("{digest:x}").chars().take(8).collect::<String>();
+    let suffix = digest[..4]
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
     for service in [
         format!("Claude Code-credentials-{suffix}"),
         "Claude Code-credentials".to_string(),
