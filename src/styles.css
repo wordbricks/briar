@@ -1955,16 +1955,8 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .project-agent-run-panel { width:min(880px,calc(100% - 48px)); margin:28px auto 56px; display:grid; gap:18px; }
 .project-agent-session-panel { width:min(880px,calc(100% - 48px)); min-height:320px; margin:28px auto 56px; border:1px solid var(--border); border-radius:18px; box-shadow:var(--shadow-sm); }
 .project-agent-task-dialog { max-height:min(760px,calc(100vh - 48px)); overflow-y:auto; }
-.project-agent-task-dialog .project-agent-run-messages { max-height:280px; overflow-y:auto; }
 .project-agent-session-request { margin:0; padding:14px 15px; border:1px solid #e5e5df; border-radius:11px; color:var(--foreground); background:var(--muted); font-size:var(--text-2xs); line-height:1.65; white-space:pre-wrap; }
 .project-agent-run-panel > header { display:flex; align-items:center; justify-content:space-between; gap:16px; }
-.project-agent-run-messages { display:grid; gap:12px; }
-.project-agent-run-message { max-width:82%; padding:14px 16px; display:grid; gap:7px; border:1px solid var(--border); border-radius:16px; background:var(--card); box-shadow:var(--shadow-sm); }
-.project-agent-run-message.user { justify-self:end; border-color:#d9e5fa; background:#f3f7ff; }
-.project-agent-run-message.agent { justify-self:start; }
-.project-agent-run-message small { color:var(--muted-foreground); font-size:var(--text-2xs); font-weight:var(--font-weight-semibold); }
-.project-agent-run-message p { margin:0; white-space:pre-wrap; color:var(--foreground); font-size:var(--text-sm); line-height:var(--leading-lg); }
-.project-agent-run-message > span { width:max-content; }
 .project-agent-run-composer { padding:16px; display:grid; gap:12px; border:1px solid var(--border); border-radius:18px; background:var(--card); box-shadow:var(--shadow-sm); }
 .project-agent-run-composer textarea { min-height:120px; resize:vertical; }
 .project-agent-run-composer > div { display:flex; align-items:center; justify-content:space-between; gap:16px; }
@@ -2123,7 +2115,6 @@ button.issue-message-state { width:100%; cursor:pointer; }
   .project-agent-form-runtime { grid-template-columns:1fr; }
   .project-agent-dialog { width:calc(100vw - 28px); max-height:calc(100dvh - 28px); }
   .project-agent-run-panel { width:calc(100% - 36px); margin-top:20px; }
-  .project-agent-run-message { max-width:94%; }
   .project-agent-run-composer > div { align-items:stretch; flex-direction:column; }
   .project-agent-run-composer > div > button { width:100%; }
 }

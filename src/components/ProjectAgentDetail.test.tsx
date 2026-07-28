@@ -1,8 +1,9 @@
 /** @vitest-environment jsdom */
 
-import { act } from "react";
+import { act, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import type { DashboardPayload, ProjectAgent } from "../types";
 
 const { runProjectAgent } = vi.hoisted(() => ({
@@ -11,7 +12,11 @@ const { runProjectAgent } = vi.hoisted(() => ({
 
 vi.mock("../lib/project-llm", () => ({ runProjectAgent }));
 
-import { ProjectAgentDetail } from "./ProjectAgentDetail";
+import {
+  ProjectAgentDetail,
+  type ProjectAgentTaskSessionSettlement,
+  type ProjectAgentTaskSessionStart,
+} from "./ProjectAgentDetail";
 
 const mounted: Array<{
   container: HTMLDivElement;
@@ -29,10 +34,7 @@ beforeAll(() => {
 beforeEach(() => {
   runProjectAgent.mockReset();
   vi.stubGlobal("crypto", {
-    randomUUID: vi.fn()
-      .mockReturnValueOnce("task-session")
-      .mockReturnValueOnce("message-user")
-      .mockReturnValueOnce("message-agent"),
+    randomUUID: vi.fn().mockReturnValue("task-session"),
   });
 });
 
@@ -78,28 +80,104 @@ const dashboard = {
   runs: [],
 } as unknown as DashboardPayload;
 
+function ProjectAgentDetailHarness({
+  onSettleTaskSession,
+  onStartAutoHunt,
+  onStartTaskSession,
+}: {
+  onSettleTaskSession: (
+    sessionId: string,
+    settlement: ProjectAgentTaskSessionSettlement,
+  ) => void;
+  onStartAutoHunt: (
+    runs: DashboardPayload["runs"],
+    options?: {
+      coordinatorConversationId?: string | null;
+      maxIssues?: number;
+    },
+  ) => string;
+  onStartTaskSession: (session: ProjectAgentTaskSessionStart) => void;
+}) {
+  const [sessions, setSessions] = useState<AutoHuntSession[]>([]);
+
+  return (
+    <ProjectAgentDetail
+      agent={agent}
+      dashboard={dashboard}
+      error={null}
+      isSidebarOpen={true}
+      onBack={() => undefined}
+      onSettleTaskSession={(sessionId, settlement) => {
+        onSettleTaskSession(sessionId, settlement);
+        setSessions((current) =>
+          current.map((session) =>
+            session.id === sessionId
+              ? {
+                  ...session,
+                  ...settlement,
+                  status: settlement.status,
+                  completedAt: new Date().toISOString(),
+                }
+              : session
+          ),
+        );
+      }}
+      onStartAutoHunt={onStartAutoHunt}
+      onStartTaskSession={(session) => {
+        onStartTaskSession(session);
+        setSessions((current) => [
+          {
+            id: session.sessionId,
+            dispatchGroupId: "",
+            projectId: agent.projectId,
+            agentId: agent.id,
+            sessionType: "task",
+            trigger: "manual",
+            request: session.request,
+            status: "running",
+            issues: [],
+            startedAt: session.startedAt,
+            completedAt: null,
+            conversationId: null,
+            workspaceRoot: null,
+            summary: null,
+            error: null,
+            events: [],
+            dispatchEvents: [],
+            workers: [],
+          },
+          ...current,
+        ]);
+      }}
+      requestedSessionId={null}
+      sessions={sessions}
+    />
+  );
+}
+
 describe("ProjectAgentDetail", () => {
-  it("keeps ordinary work in the current agent conversation", async () => {
-    runProjectAgent.mockResolvedValue({
+  it("opens the task session detail as soon as the session is created", async () => {
+    const response = {
       conversationId: "briar:project-1:ordinary-1",
       workspaceRoot: "/repo",
-      action: "respond",
+      action: "respond" as const,
       message: "릴리스 상태를 확인했습니다.",
       maxIssues: null,
-    });
+    };
+    let resolveRun: ((value: typeof response) => void) | undefined;
+    runProjectAgent.mockImplementation(
+      () => new Promise((resolve) => {
+        resolveRun = resolve;
+      }),
+    );
     const onStartAutoHunt = vi.fn(() => "dispatch-1");
-    const onRecordTaskSession = vi.fn();
+    const onStartTaskSession = vi.fn();
+    const onSettleTaskSession = vi.fn();
     const container = await mount(
-      <ProjectAgentDetail
-        agent={agent}
-        dashboard={dashboard}
-        error={null}
-        isSidebarOpen={true}
-        onBack={() => undefined}
-        onRecordTaskSession={onRecordTaskSession}
+      <ProjectAgentDetailHarness
+        onSettleTaskSession={onSettleTaskSession}
         onStartAutoHunt={onStartAutoHunt}
-        requestedSessionId={null}
-        sessions={[]}
+        onStartTaskSession={onStartTaskSession}
       />,
     );
 
@@ -125,20 +203,35 @@ describe("ProjectAgentDetail", () => {
     });
 
     expect(onStartAutoHunt).not.toHaveBeenCalled();
-    expect(onRecordTaskSession).toHaveBeenCalledWith(
+    expect(onStartTaskSession).toHaveBeenCalledWith(
       expect.objectContaining({
         sessionId: "task-session",
         request: "현재 릴리스 상태를 확인해 줘",
+      }),
+    );
+    expect(onSettleTaskSession).not.toHaveBeenCalled();
+    expect(container.querySelector("#project-agent-session")).not.toBeNull();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.querySelector(".project-agent-run-message")).toBeNull();
+    expect(container.textContent).toContain("진행 중");
+
+    await act(async () => {
+      resolveRun?.(response);
+      await Promise.resolve();
+    });
+
+    expect(onSettleTaskSession).toHaveBeenCalledWith(
+      "task-session",
+      expect.objectContaining({
         status: "completed",
         conversationId: "briar:project-1:ordinary-1",
         summary: "릴리스 상태를 확인했습니다.",
       }),
     );
     expect(document.body.textContent).toContain("릴리스 상태를 확인했습니다.");
-    expect(document.querySelector("form")).not.toBeNull();
   });
 
-  it("hands an explicit Auto Hunt decision to the host with its conversation", async () => {
+  it("records the coordinator session when handing Auto Hunt to the host", async () => {
     runProjectAgent.mockResolvedValue({
       conversationId: "briar:project-1:coordinator-1",
       workspaceRoot: "/repo",
@@ -147,18 +240,13 @@ describe("ProjectAgentDetail", () => {
       maxIssues: 3,
     });
     const onStartAutoHunt = vi.fn(() => "dispatch-1");
-    const onRecordTaskSession = vi.fn();
+    const onStartTaskSession = vi.fn();
+    const onSettleTaskSession = vi.fn();
     const container = await mount(
-      <ProjectAgentDetail
-        agent={agent}
-        dashboard={dashboard}
-        error={null}
-        isSidebarOpen={true}
-        onBack={() => undefined}
-        onRecordTaskSession={onRecordTaskSession}
+      <ProjectAgentDetailHarness
+        onSettleTaskSession={onSettleTaskSession}
         onStartAutoHunt={onStartAutoHunt}
-        requestedSessionId={null}
-        sessions={[]}
+        onStartTaskSession={onStartTaskSession}
       />,
     );
 
@@ -193,9 +281,23 @@ describe("ProjectAgentDetail", () => {
       coordinatorConversationId: "briar:project-1:coordinator-1",
       maxIssues: 3,
     });
-    expect(onRecordTaskSession).not.toHaveBeenCalled();
-    expect(container.textContent).toContain("수행 세션");
-    expect(container.textContent).not.toContain("Auto Hunt");
+    expect(onStartTaskSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: "task-session",
+        request: "Auto Hunt로 대기 이슈 세 건을 처리해 줘",
+      }),
+    );
+    expect(onSettleTaskSession).toHaveBeenCalledWith(
+      "task-session",
+      expect.objectContaining({
+        status: "completed",
+        conversationId: "briar:project-1:coordinator-1",
+        summary: "대기 이슈 세 건을 Auto Hunt로 요청했습니다.",
+      }),
+    );
+    expect(container.querySelector("#project-agent-session")).not.toBeNull();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.querySelector(".project-agent-run-message")).toBeNull();
     expect(document.body.textContent).toContain(
       "대기 이슈 세 건을 Auto Hunt로 요청했습니다.",
     );

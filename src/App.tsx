@@ -479,12 +479,8 @@ export function App() {
             error={briar.error}
             isSidebarOpen={isSidebarOpen}
             onRequestedSessionOpen={() => setRequestedSessionId(null)}
-            onRecordTaskSession={(agent, record) =>
-              autoHunt.recordTaskSession(
-                activeProject.id,
-                agent.id,
-                record,
-              )}
+            onSettleTaskSession={(sessionId, settlement) =>
+              autoHunt.settleTaskSession(sessionId, settlement)}
             onStart={(agent, runs, options) =>
               autoHunt.startSession(
                 activeProject.id,
@@ -498,6 +494,8 @@ export function App() {
                 },
               )
             }
+            onStartTaskSession={(agent, session) =>
+              autoHunt.startTaskSession(activeProject.id, agent.id, session)}
             project={activeProject}
             requestedSessionId={requestedSessionId}
             sessions={autoHunt.sessions}
