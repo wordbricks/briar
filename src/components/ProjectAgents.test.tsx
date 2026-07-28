@@ -78,6 +78,21 @@ describe("ProjectAgents", () => {
     );
     expect(createCard?.textContent).toContain("에이전트 만들기");
     expect(createCard?.textContent).toContain("책임과 프로바이더, 모델");
+
+    const providerIcons = [
+      { provider: "codex", label: "Codex", element: "svg" },
+      { provider: "claude", label: "Claude", element: "svg" },
+      { provider: "grok", label: "Grok", element: "img" },
+    ];
+    for (const { provider, label, element } of providerIcons) {
+      const icon = container.querySelector(
+        `.project-agent-provider-icon.${provider}`,
+      );
+      expect(icon?.getAttribute("aria-label")).toBe(label);
+      expect(icon?.getAttribute("role")).toBe("img");
+      expect(icon?.textContent).toBe("");
+      expect(icon?.querySelector(element)).not.toBeNull();
+    }
   });
 
   it("submits provider, default model, and a concrete responsibility", async () => {
