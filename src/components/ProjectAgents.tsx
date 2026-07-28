@@ -314,7 +314,7 @@ export function ProjectAgents({
                 {t("agents.create")}
               </Button>
             }
-            className="project-agents-heading"
+            className="app-page-header project-agents-heading"
             description={t("agents.description", { project: project.name })}
             title={t("agents.title")}
             titleId="project-agents-title"

@@ -174,7 +174,9 @@ describe("HuntDashboard", () => {
     );
 
     expect(markup).not.toContain("queue-panel");
-    expect(markup).toContain('class="dashboard-scroll"><div class="queue-header"');
+    expect(markup).toContain('class="page-header');
+    expect(markup).toContain("queue-header");
+    expect(markup).toContain("에이전트가 처리하는 작업의 흐름과 병목");
     expect(markup).toContain('class="kanban-board"');
     expect(markup).not.toContain('class="page-heading"');
     expect(markup).not.toContain('class="metric-grid"');

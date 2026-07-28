@@ -1995,7 +1995,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .project-schedule-dialog > footer button:disabled { opacity:.55; cursor:not-allowed; }
 .project-schedule-dialog button:focus-visible { outline:2px solid #3975d2; outline-offset:2px; }
 .project-agents-scroll { min-height:0; flex:1; overflow-y:auto; background:var(--card); }
-.project-agents-content { min-height:100%; padding:0 34px 54px; }
+.project-agents-content { min-height:100%; padding:0 0 54px; }
 .project-agents-heading { min-height:unset; padding:8px 0; display:flex; align-items:center; justify-content:space-between; gap:32px; border-bottom:1px solid #e8e8e5; background:var(--card); }
 .project-agents-heading > div { min-width:0; }
 .project-agents-heading h1 { margin:0; color:#181816; font-size:var(--text-4xl); letter-spacing:-1.1px; }
@@ -2004,7 +2004,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .project-agent-create:hover { background:#343431; }
 .project-agent-create:active { transform:scale(.97); }
 .project-agent-create:focus-visible,.project-agent-create-card:focus-visible,.project-agents-state button:focus-visible,.project-agent-dialog button:focus-visible { outline:2px solid #4f80c8; outline-offset:3px; }
-.project-agents-body { padding:32px 0 0; }
+.project-agents-body { padding:32px 32px 0; }
 .project-agents-body > header { margin-bottom:28px; display:flex; align-items:center; gap:10px; }
 .project-agents-body > header > div { display:flex; align-items:center; gap:10px; }
 .project-agents-body > header strong { color:#242421; font-size:var(--text-md); }
@@ -2242,11 +2242,11 @@ button.issue-message-state { width:100%; cursor:pointer; }
   .project-schedule-grid,.project-schedule-days,.project-schedule-week { min-width:780px; }
   .project-schedule-days,.project-schedule-week { grid-template-columns:54px repeat(7,minmax(103px,1fr)); }
   .project-schedule-time-gutter span { padding-right:7px; }
-  .project-agents-content { padding:0 18px 38px; }
-  .project-agents-heading { min-height:unset; padding:8px 0; gap:18px; }
+  .project-agents-content { padding:0 0 38px; }
+  .project-agents-heading { min-height:unset; padding:10px 18px; gap:18px; }
   .project-agents-heading h1 { font-size:var(--text-3xl); }
   .project-agent-create { width:38px; padding:0; justify-content:center; font-size:0; }
-  .project-agents-body { padding:26px 0 0; }
+  .project-agents-body { padding:26px 18px 0; }
   .project-agent-grid { grid-template-columns:1fr; }
   .project-agent-form-runtime { grid-template-columns:1fr; }
   .project-agent-dialog { width:calc(100vw - 28px); max-height:calc(100dvh - 28px); }
@@ -3516,6 +3516,14 @@ button.issue-message-state { width:100%; cursor:pointer; }
 
 
 /* Shared page header/hero utilities (design system) */
+.page-header.app-page-header {
+  min-height:unset;
+  padding:10px 32px;
+  align-items:center;
+  gap:24px;
+  border-bottom:1px solid var(--border);
+  background:var(--card);
+}
 .page-header h1,.page-hero h1 { margin:0; }
 .queue-heading-copy h1,
 .inbox-heading h1,
@@ -3530,6 +3538,10 @@ button.issue-message-state { width:100%; cursor:pointer; }
   letter-spacing:var(--tracking-tighter);
   color:var(--foreground);
 }
+.page-header.app-page-header h1 {
+  font-size:var(--text-3xl);
+  line-height:var(--leading-3xl);
+}
 .queue-heading-copy > p:not(.eyebrow),
 .inbox-heading > div > p:last-child,
 .project-agents-heading p,
@@ -3539,6 +3551,30 @@ button.issue-message-state { width:100%; cursor:pointer; }
   color:var(--muted-foreground);
   font-size:var(--text-xs);
   line-height:var(--leading-md);
+}
+.page-header.app-page-header > div:first-child > p:last-child {
+  max-width:720px;
+  margin:6px 0 0;
+  color:var(--muted-foreground);
+  font-size:var(--text-xs);
+  line-height:var(--leading-md);
+}
+.queue-heading-copy {
+  display:flex;
+  align-items:baseline;
+  gap:8px;
+}
+.queue-task-count {
+  color:#979991;
+  font-size:var(--text-2xs);
+  font-weight:var(--font-weight-normal);
+  letter-spacing:var(--tracking-normal);
+  white-space:nowrap;
+}
+@media (max-width:760px) {
+  .page-header.app-page-header {
+    padding:10px 18px;
+  }
 }
 .eyebrow {
   color:var(--primary);
