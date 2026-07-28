@@ -44,13 +44,23 @@ async function writeCliConfig(configDirectory: string, velenOrg?: string) {
 }
 
 function runDoctor(home: string, configDirectory?: string) {
+  const environment = { ...process.env };
+  for (const name of [
+    "BRIAR_AGENT_TOKEN",
+    "BRIAR_API_URL",
+    "BRIAR_CONFIG_HOME",
+    "BRIAR_PROJECT_ID",
+    "BRIAR_WORKTREE_ROOT",
+  ]) {
+    delete environment[name];
+  }
   return spawnSync(
     bunExecutable,
     ["run", "src-cli/index.ts", "project", "doctor"],
     {
       cwd: process.cwd(),
       env: {
-        ...process.env,
+        ...environment,
         HOME: home,
         PATH: `${dirname(bunExecutable)}:/usr/bin:/bin`,
         ...(configDirectory ? { BRIAR_CONFIG_HOME: configDirectory } : {}),
@@ -83,7 +93,7 @@ describe("optional Velen CLI preflight", () => {
     const result = runDoctor(await cliHome("wordbricks"));
 
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain("Velen CLI");
+    expect(result.stderr).toContain("@wordbricks/velen");
   });
 
   it("uses an explicit Briar config home even when HOME points elsewhere", async () => {
