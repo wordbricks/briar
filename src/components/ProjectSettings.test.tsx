@@ -10,6 +10,7 @@ import { ProjectSettings } from "./ProjectSettings";
 describe("ProjectSettings", () => {
   it("keeps project settings focused on project-wide configuration", async () => {
     const onRegenerateWorkflow = vi.fn(async () => undefined);
+    const onReviseWorkflow = vi.fn(async () => undefined);
     const onUpdateLinear = vi.fn(
       async (linear: ProjectSettingsData["linear"]) => linear,
     );
@@ -60,6 +61,7 @@ describe("ProjectSettings", () => {
           onBack={() => undefined}
           onDelete={async () => undefined}
           onRegenerateWorkflow={onRegenerateWorkflow}
+          onReviseWorkflow={onReviseWorkflow}
           onUpdateVelenOrg={async (org) => org}
           onUpdateLinear={onUpdateLinear}
           onConnectLinearImport={onConnectLinearImport}
@@ -141,6 +143,34 @@ describe("ProjectSettings", () => {
     expect(
       container.querySelector(".project-workflow-contract")?.getAttribute("aria-label"),
     ).toBe("Auto Hunt 워크플로 다이어그램");
+
+    const revisionInput = container.querySelector<HTMLTextAreaElement>(
+      'textarea[aria-label="자연어로 수정 요청"]',
+    );
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )?.set;
+      setter?.call(
+        revisionInput,
+        "main 에 머지되어야 complete가 되도록 수정해줘",
+      );
+      revisionInput?.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const reviseButton = Array.from(
+      container.querySelectorAll<HTMLButtonElement>(
+        ".project-settings-workflow-revision button",
+      ),
+    ).find((button) => button.textContent?.includes("AI로 수정"));
+    await act(async () => reviseButton?.click());
+    expect(onReviseWorkflow).toHaveBeenCalledWith(
+      "main 에 머지되어야 complete가 되도록 수정해줘",
+    );
+    expect(container.textContent).toContain(
+      "요청에 맞게 워크플로우를 수정했습니다.",
+    );
+    expect(revisionInput?.value).toBe("");
 
     const regenerateButton = Array.from(
       container.querySelectorAll<HTMLButtonElement>(
@@ -241,6 +271,7 @@ describe("ProjectSettings", () => {
           onBack={() => undefined}
           onDelete={onDelete}
           onRegenerateWorkflow={async () => undefined}
+          onReviseWorkflow={async () => undefined}
           onUpdateVelenOrg={async (org) => org}
           onUpdateLinear={async (linear) => linear}
           onConnectLinearImport={async () => ({

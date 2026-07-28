@@ -63,7 +63,10 @@ import {
   withConnectedProject,
   withoutConnectedProject,
 } from "../lib/local-project-connection";
-import { generateProjectWorkflow } from "../lib/project-workflow";
+import {
+  generateProjectWorkflow,
+  reviseProjectWorkflow,
+} from "../lib/project-workflow";
 import {
   clearSessionToken,
   readSessionToken,
@@ -1158,23 +1161,20 @@ export function useBriar(options: UseBriarOptions = {}) {
     });
   }, [activeProjectId, dashboard?.settings.workflow, projects]);
 
-  const regenerateWorkflow = useCallback(
-    async (projectId: string) => {
-      if (demoMode) {
-        throw new Error("워크플로우 재생성은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
-      }
-      if (!token) throw new Error("로그인이 필요합니다.");
-      if (!dashboard || dashboard.project.id !== projectId) {
+  const persistProjectWorkflow = useCallback(
+    async (
+      projectId: string,
+      previousWorkflow: ProjectSettings["workflow"],
+      nextWorkflow: ProjectSettings["workflow"],
+    ) => {
+      if (!token || !dashboard || dashboard.project.id !== projectId) {
         throw new Error("워크플로우를 갱신할 프로젝트 설정이 없습니다.");
       }
-
-      const previousWorkflow = dashboard.settings.workflow;
-      const generatedWorkflow = await generateProjectWorkflow(projectId);
-      await updateLocalProjectWorkflow(projectId, generatedWorkflow);
+      await updateLocalProjectWorkflow(projectId, nextWorkflow);
       try {
         const result = await updateProjectSettings(token, projectId, {
           ...dashboard.settings,
-          workflow: generatedWorkflow,
+          workflow: nextWorkflow,
         });
         setDashboard((current) =>
           current?.project.id === projectId
@@ -1196,9 +1196,55 @@ export function useBriar(options: UseBriarOptions = {}) {
         }
         throw caught;
       }
-      return generatedWorkflow;
+      return nextWorkflow;
     },
     [dashboard, refreshProjectReadiness, token],
+  );
+
+  const regenerateWorkflow = useCallback(
+    async (projectId: string) => {
+      if (demoMode) {
+        throw new Error("워크플로우 재생성은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
+      }
+      if (!token) throw new Error("로그인이 필요합니다.");
+      if (!dashboard || dashboard.project.id !== projectId) {
+        throw new Error("워크플로우를 갱신할 프로젝트 설정이 없습니다.");
+      }
+
+      const previousWorkflow = dashboard.settings.workflow;
+      const generatedWorkflow = await generateProjectWorkflow(projectId);
+      return persistProjectWorkflow(
+        projectId,
+        previousWorkflow,
+        generatedWorkflow,
+      );
+    },
+    [dashboard, persistProjectWorkflow, token],
+  );
+
+  const reviseWorkflow = useCallback(
+    async (projectId: string, requestedChange: string) => {
+      if (demoMode) {
+        throw new Error("워크플로우 수정은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
+      }
+      if (!token) throw new Error("로그인이 필요합니다.");
+      if (!dashboard || dashboard.project.id !== projectId) {
+        throw new Error("워크플로우를 갱신할 프로젝트 설정이 없습니다.");
+      }
+
+      const previousWorkflow = dashboard.settings.workflow;
+      const revisedWorkflow = await reviseProjectWorkflow(
+        projectId,
+        previousWorkflow,
+        requestedChange,
+      );
+      return persistProjectWorkflow(
+        projectId,
+        previousWorkflow,
+        revisedWorkflow,
+      );
+    },
+    [dashboard, persistProjectWorkflow, token],
   );
 
   useEffect(() => {
@@ -2080,6 +2126,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     reconnectProject,
     renameOrganization,
     regenerateWorkflow,
+    reviseWorkflow,
     saveVelenIntegration,
     saveLinearIntegration,
     connectLinearForImport,

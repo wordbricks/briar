@@ -14,6 +14,7 @@ import {
   Rocket,
   Server,
   ShieldCheck,
+  Sparkles,
   SlidersHorizontal,
   Trash2,
 } from "lucide-react";
@@ -41,6 +42,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { Typography } from "@/components/ui/typography";
 import type { DashboardPayload, Project, ProjectSettings as ProjectSettingsData } from "../types";
 import { useI18n } from "../i18n";
@@ -75,6 +77,7 @@ export function ProjectSettings({
   onBack,
   onDelete,
   onRegenerateWorkflow,
+  onReviseWorkflow,
   onUpdateVelenOrg,
   onUpdateLinear,
   onConnectLinearImport,
@@ -92,6 +95,7 @@ export function ProjectSettings({
   onBack: () => void;
   onDelete: () => Promise<unknown>;
   onRegenerateWorkflow: () => Promise<unknown>;
+  onReviseWorkflow: (requestedChange: string) => Promise<unknown>;
   onUpdateVelenOrg: (org: string | null) => Promise<string | null>;
   onUpdateLinear: (
     linear: ProjectSettingsData["linear"],
@@ -118,8 +122,11 @@ export function ProjectSettings({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [workflowCopied, setWorkflowCopied] = useState(false);
   const [isRegeneratingWorkflow, setIsRegeneratingWorkflow] = useState(false);
+  const [isRevisingWorkflow, setIsRevisingWorkflow] = useState(false);
+  const [workflowRevisionRequest, setWorkflowRevisionRequest] = useState("");
   const [workflowError, setWorkflowError] = useState<string | null>(null);
   const [workflowRegenerated, setWorkflowRegenerated] = useState(false);
+  const [workflowRevised, setWorkflowRevised] = useState(false);
   const [sandbox, setSandbox] = useState(defaultProjectSandboxSettings);
   const [sandboxLoading, setSandboxLoading] = useState(true);
   const [sandboxSaving, setSandboxSaving] = useState(false);
@@ -266,6 +273,7 @@ export function ProjectSettings({
     setIsRegeneratingWorkflow(true);
     setWorkflowError(null);
     setWorkflowRegenerated(false);
+    setWorkflowRevised(false);
     try {
       await onRegenerateWorkflow();
       setWorkflowRegenerated(true);
@@ -273,6 +281,24 @@ export function ProjectSettings({
       setWorkflowError(caught instanceof Error ? caught.message : String(caught));
     } finally {
       setIsRegeneratingWorkflow(false);
+    }
+  };
+
+  const reviseWorkflow = async () => {
+    const requestedChange = workflowRevisionRequest.trim();
+    if (!requestedChange) return;
+    setIsRevisingWorkflow(true);
+    setWorkflowError(null);
+    setWorkflowRegenerated(false);
+    setWorkflowRevised(false);
+    try {
+      await onReviseWorkflow(requestedChange);
+      setWorkflowRevisionRequest("");
+      setWorkflowRevised(true);
+    } catch (caught) {
+      setWorkflowError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setIsRevisingWorkflow(false);
     }
   };
 
@@ -751,7 +777,11 @@ export function ProjectSettings({
               </span>
               <div className="project-settings-automation-actions">
                 <button
-                  disabled={isRegeneratingWorkflow || !workflowContract}
+                  disabled={
+                    isRegeneratingWorkflow ||
+                    isRevisingWorkflow ||
+                    !workflowContract
+                  }
                   onClick={() => void regenerateWorkflow()}
                   type="button"
                 >
@@ -784,10 +814,63 @@ export function ProjectSettings({
             <p className="project-settings-workflow-ai-note">
               {t("settings.workflowAgentDescription")}
             </p>
+            <form
+              className="project-settings-workflow-revision"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void reviseWorkflow();
+              }}
+            >
+              <label htmlFor={`workflow-revision-${project.id}`}>
+                {t("settings.workflowRevisionLabel")}
+              </label>
+              <Textarea
+                aria-label={t("settings.workflowRevisionLabel")}
+                disabled={
+                  isRegeneratingWorkflow ||
+                  isRevisingWorkflow ||
+                  !workflowContract
+                }
+                id={`workflow-revision-${project.id}`}
+                maxLength={4_000}
+                onChange={(event) =>
+                  setWorkflowRevisionRequest(event.currentTarget.value)
+                }
+                placeholder={t("settings.workflowRevisionPlaceholder")}
+                rows={3}
+                value={workflowRevisionRequest}
+              />
+              <footer>
+                <small>{t("settings.workflowRevisionDescription")}</small>
+                <button
+                  disabled={
+                    isRegeneratingWorkflow ||
+                    isRevisingWorkflow ||
+                    !workflowContract ||
+                    !workflowRevisionRequest.trim()
+                  }
+                  type="submit"
+                >
+                  {isRevisingWorkflow ? (
+                    <LoaderCircle className="spin" size={14} />
+                  ) : (
+                    <Sparkles size={14} />
+                  )}
+                  {isRevisingWorkflow
+                    ? t("settings.workflowRevising")
+                    : t("settings.workflowRevise")}
+                </button>
+              </footer>
+            </form>
             <div aria-live="polite">
               {workflowRegenerated ? (
                 <p className="project-settings-workflow-success">
                   <Check size={13} />{t("settings.workflowRegenerated")}
+                </p>
+              ) : null}
+              {workflowRevised ? (
+                <p className="project-settings-workflow-success">
+                  <Check size={13} />{t("settings.workflowRevised")}
                 </p>
               ) : null}
               {workflowError ? (
