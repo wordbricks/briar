@@ -340,11 +340,12 @@ const runGit: GitRunner = (gitArgs, options = {}) => {
 
 function worktreeSettings(project: ProjectConfig): WorktreeSettings {
   const configured = project.autoHunt?.worktrees;
+  const worktreeHome = process.env.BRIAR_WORKTREE_HOME?.trim() || homedir();
   return {
     root:
       process.env.BRIAR_WORKTREE_ROOT?.trim() ||
       configured?.root ||
-      defaultWorktreeRoot(homedir()),
+      defaultWorktreeRoot(worktreeHome),
     branchPrefix: configured?.branchPrefix || defaultWorktreeBranchPrefix,
   };
 }

@@ -3721,7 +3721,7 @@ async fn run_project_agent(
 
 /// Directory that holds this project's per-issue worktrees. Must mirror the
 /// CLI's own resolution (`worktreeSettings` in src-cli/index.ts): env override,
-/// then project config, then `~/briar/worktrees`, all suffixed by project id.
+/// then project config, then `~/briar/workspaces`, all suffixed by project id.
 #[cfg(test)]
 fn project_worktree_root(
     config_path: &Path,
@@ -3751,7 +3751,7 @@ fn project_worktree_root(
                 .filter(|root| !root.trim().is_empty())
         })
         .map(PathBuf::from)
-        .unwrap_or_else(|| home.join("briar").join("worktrees"));
+        .unwrap_or_else(|| home.join("briar").join("workspaces"));
     Ok(Some(root.join(project_id)))
 }
 
@@ -6644,7 +6644,7 @@ branch refs/heads/briar/second-11111111
         assert_eq!(
             project_worktree_root(&config_path, "project-1", Path::new("/Users/dev"))
                 .expect("root should resolve"),
-            Some(PathBuf::from("/Users/dev/briar/worktrees/project-1"))
+            Some(PathBuf::from("/Users/dev/briar/workspaces/project-1"))
         );
 
         let disabled_path = host_test_config_path("worktree-disabled");
