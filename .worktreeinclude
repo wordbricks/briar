@@ -1,3 +1,3 @@
 # Gitignored paths copied into each new Auto Hunt worktree.
-# See docs/operations/auto-hunt-worktrees.md. Literal paths only.
+# See docs/operations/workflow-worktrees.md. Literal paths only.
 .env.keys
