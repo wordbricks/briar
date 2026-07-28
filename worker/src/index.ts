@@ -22,6 +22,7 @@ import {
   defaultProjectAgentCalendarColor,
   defaultProjectAgentCopy,
   normalizeProjectAgentLocale,
+  projectAgentSkill,
   type ProjectAgentLocale,
 } from "../../src/lib/project-agent";
 import {
@@ -987,7 +988,14 @@ const projectAgentJson = (
     provider: row.provider,
     model: row.model,
     responsibility: copy.responsibility,
-    skill: row.skill_markdown,
+    skill:
+      row.kind === "auto_hunt"
+        ? projectAgentSkill({
+            name: copy.name,
+            responsibility: copy.responsibility,
+            kind: row.kind,
+          })
+        : row.skill_markdown,
     calendarColor: row.calendar_color,
     kind: row.kind,
     createdAt: row.created_at,
@@ -1029,7 +1037,14 @@ const projectAgentScheduleRunJson = (
     provider: row.agent_provider,
     model: row.agent_model,
     responsibility: row.agent_responsibility,
-    skill: row.agent_skill_markdown,
+    skill:
+      row.agent_kind === "auto_hunt"
+        ? projectAgentSkill({
+            name: row.agent_name,
+            responsibility: row.agent_responsibility,
+            kind: row.agent_kind,
+          })
+        : row.agent_skill_markdown,
   },
   workflow: normalizeAutoHuntWorkflow(JSON.parse(row.workflow_json)),
   status: row.status,

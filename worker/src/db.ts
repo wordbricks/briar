@@ -123,6 +123,7 @@ export type ProjectAgentScheduleRunRow = {
   agent_name: string;
   agent_provider: ProjectAgentProvider;
   agent_model: string | null;
+  agent_kind: ProjectAgentKind;
   agent_responsibility: string;
   agent_skill_markdown: string;
   workflow_json: string;
@@ -980,6 +981,7 @@ const scheduleRunSelect = `
          schedule.name as schedule_name,
          run.agent_id, agent.name as agent_name,
          agent.provider as agent_provider, agent.model as agent_model,
+         agent.kind as agent_kind,
          agent.responsibility as agent_responsibility,
          agent.skill_markdown as agent_skill_markdown,
          settings.workflow_json,

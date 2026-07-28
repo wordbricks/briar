@@ -85,10 +85,10 @@ import {
   type AutoHuntAutomation,
 } from "../lib/auto-hunt-automation";
 import { isMobileCompanion } from "../lib/platform";
-import { chatWithProjectLlm } from "../lib/project-llm";
-import { runProjectAgentSchedule } from "../lib/project-llm";
-import { projectAgentRuntimeInstructions } from "../lib/project-agent";
+import { chatWithProjectLlm, runProjectAgent } from "../lib/project-llm";
+import { executeScheduledProjectAgent } from "../lib/project-agent-schedule-execution";
 import { startProjectAgentSchedulePolling } from "../lib/project-agent-schedule-runner";
+import { startProjectAutoHunt } from "../lib/auto-hunt-agent";
 import {
   agentReplyParentMessageId,
   providerForConversation,
@@ -408,22 +408,28 @@ export function useBriar() {
             claimToken,
           ),
         execute: (run) =>
-          runProjectAgentSchedule({
-            projectId: run.projectId,
-            provider: run.agent.provider,
-            model: run.agent.model,
-            message: run.agent.responsibility,
-            instructions: projectAgentRuntimeInstructions({
-              skill: run.agent.skill,
-              workflow: run.workflow,
-              invocation: [
-                `Run the scheduled automation "${run.scheduleName}".`,
-                `It was scheduled for ${run.scheduledFor}.`,
-                "Work from the connected project root and complete the agent responsibility.",
-                "Do not ask for interactive approval. Return a concise result summary.",
-              ].join("\n"),
-            }),
-          }),
+          executeScheduledProjectAgent(
+            {
+              loadDashboard,
+              runAgent: runProjectAgent,
+              startAutoHunt: (
+                projectId,
+                issues,
+                sessionId,
+                agent,
+                options,
+              ) =>
+                startProjectAutoHunt(
+                  projectId,
+                  issues,
+                  sessionId,
+                  agent,
+                  options,
+                ),
+            },
+            token,
+            run,
+          ),
         log: (message, caught) => console.error(message, caught),
       },
       projectIds,
