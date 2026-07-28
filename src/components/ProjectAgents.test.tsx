@@ -208,7 +208,7 @@ describe("ProjectAgents", () => {
     );
     const responsibility = form?.querySelector<HTMLTextAreaElement>("textarea");
     expect(settingsPage?.textContent).toContain("에이전트 설정");
-    expect(settingsPage?.textContent).toContain("프로젝트 실행 기본값");
+    expect(settingsPage?.textContent).not.toContain("프로젝트 실행 기본값");
     expect(name?.value).toBe("자동 사냥 에이전트");
     expect(responsibility?.value).toBe(
       "모든 대기중인 이슈에 대해서 자동사냥을 수행하는것",
