@@ -93,6 +93,44 @@ describe("HuntDashboard", () => {
     expect(markup).not.toContain('class="metric-grid"');
   });
 
+  it("opens a linked pull request from the issue card icon", async () => {
+    const pullRequestUrl =
+      "https://github.com/example/repository/pull/42";
+    const run = {
+      ...demoDashboard.runs[0],
+      pullRequestUrls: [pullRequestUrl],
+    };
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={{ ...demoDashboard, runs: [run] }}
+      />,
+    ));
+
+    const link = container.querySelector<HTMLAnchorElement>(
+      ".pull-request-icon-link",
+    );
+    expect(link?.href).toBe(pullRequestUrl);
+    expect(link?.target).toBe("_blank");
+    expect(link?.getAttribute("aria-label")).toBe("PR #42 바로 열기");
+    link?.addEventListener("click", (event) => event.preventDefault());
+    await act(async () => link?.click());
+    expect(container.querySelector(".run-page")).toBeNull();
+
+    await act(async () => {
+      container.querySelector<HTMLElement>(".kanban-card")?.click();
+    });
+    const detailLink = container.querySelector<HTMLAnchorElement>(
+      ".run-property-link",
+    );
+    expect(detailLink?.href).toBe(pullRequestUrl);
+    expect(detailLink?.textContent).toContain("PR #42");
+
+    await act(async () => root.unmount());
+  });
+
   it("opens issue actions from a card context menu", async () => {
     const container = document.createElement("div");
     document.body.append(container);

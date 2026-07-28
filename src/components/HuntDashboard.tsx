@@ -15,6 +15,7 @@ import {
   FolderGit2,
   GitCommitHorizontal,
   GitFork,
+  GitPullRequest,
   Image as ImageIcon,
   Italic,
   Link2,
@@ -1294,7 +1295,7 @@ function KanbanCard({
   isProcessing: boolean;
   onDelete: () => void;
   onDragEnd: () => void;
-  onDragStart: (event: DragEvent<HTMLButtonElement>) => void;
+  onDragStart: (event: DragEvent<HTMLElement>) => void;
   onEdit: () => void;
   onMove: (placement: HuntRunPlacement) => void;
   run: HuntRun;
@@ -1327,7 +1328,7 @@ function KanbanCard({
       run={run}
       isProcessing={isProcessing}
     >
-      <button
+      <div
         aria-label={t("run.details", { title: run.title })}
         aria-disabled={isMoving}
         className={`kanban-card ${meta.tone}${isMoving ? " moving" : ""}`}
@@ -1335,7 +1336,13 @@ function KanbanCard({
         onDragEnd={onDragEnd}
         onDragStart={onDragStart}
         onClick={onOpen}
-        type="button"
+        onKeyDown={(event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          onOpen();
+        }}
+        role="button"
+        tabIndex={0}
       >
         <span className="kanban-card-kicker">
           <small>AH-{run.runNumber}</small>
@@ -1354,11 +1361,52 @@ function KanbanCard({
         </span>
         <span className="kanban-card-footer">
           <small>{isClaimed ? t("run.assigned", { agent: run.claimedBy ?? "agent" }) : relativeTime(run.updatedAt, t)}</small>
-          <ChevronRight size={14} />
+          <span className="kanban-card-footer-actions">
+            <PullRequestIconLink urls={run.pullRequestUrls} />
+            <ChevronRight size={14} />
+          </span>
         </span>
-      </button>
+      </div>
     </IssueContextMenu>
   );
+}
+
+function PullRequestIconLink({
+  className = "",
+  urls,
+}: {
+  className?: string;
+  urls: string[];
+}) {
+  const { t } = useI18n();
+  const url = urls.at(-1);
+  if (!url) return null;
+  const label = pullRequestDisplayName(url, urls.length - 1);
+  return (
+    <a
+      aria-label={t("run.openPullRequest", { label })}
+      className={`pull-request-icon-link ${className}`.trim()}
+      href={url}
+      onClick={(event) => event.stopPropagation()}
+      onKeyDown={(event) => event.stopPropagation()}
+      rel="noreferrer"
+      target="_blank"
+      title={t("run.openPullRequest", { label })}
+    >
+      <GitPullRequest aria-hidden="true" size={13} />
+      {urls.length > 1 && <span>{urls.length}</span>}
+    </a>
+  );
+}
+
+function pullRequestDisplayName(url: string, index: number) {
+  try {
+    const match = new URL(url).pathname.match(/\/pull\/(\d+)\/?$/u);
+    if (match) return `PR #${match[1]}`;
+  } catch {
+    // URLs are validated by the API; keep a safe fallback for historical data.
+  }
+  return index === 0 ? "PR" : `PR ${index + 1}`;
 }
 
 function IssueContextMenu({
@@ -1669,7 +1717,10 @@ function IssueList({
                 tabIndex={0}
               >
                 <span className="issue-list-task" role="cell">
-                  <small>AH-{run.runNumber} · {run.sourceKey}</small>
+                  <span className="issue-list-task-kicker">
+                    <small>AH-{run.runNumber} · {run.sourceKey}</small>
+                    <PullRequestIconLink urls={run.pullRequestUrls} />
+                  </span>
                   <strong>{run.title}</strong>
                   {(run.detail || run.issueDescription) && (
                     <span>{run.detail || run.issueDescription}</span>
@@ -2109,6 +2160,28 @@ export function RunPage({
                     <span className="run-property-icon"><GitCommitHorizontal size={15} /></span>
                     <span className="run-property-copy"><small>{t("run.commit")}</small><strong title={run.commitSha ?? undefined}>{run.commitSha ?? "—"}</strong></span>
                   </div>
+                  {run.pullRequestUrls.map((url, index) => {
+                    const label = pullRequestDisplayName(url, index);
+                    return (
+                      <a
+                        aria-label={t("run.openPullRequest", { label })}
+                        className="run-property run-property-link"
+                        href={url}
+                        key={url}
+                        rel="noreferrer"
+                        target="_blank"
+                        title={t("run.openPullRequest", { label })}
+                      >
+                        <span className="run-property-icon pull-request">
+                          <GitPullRequest size={15} />
+                        </span>
+                        <span className="run-property-copy">
+                          <small>{t("run.pullRequest")}</small>
+                          <strong>{label}</strong>
+                        </span>
+                      </a>
+                    );
+                  })}
                   <div className="run-property">
                     <span className="run-property-icon"><Clock3 size={15} /></span>
                     <span className="run-property-copy"><small>{t("run.started")}</small><strong>{formatDate(run.startedAt, localeTag)}</strong></span>

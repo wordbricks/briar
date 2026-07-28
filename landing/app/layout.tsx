@@ -33,8 +33,8 @@ export async function generateMetadata(): Promise<Metadata> {
     title: metadata.title,
     description: metadata.description,
     icons: {
-      icon: "/briar-mark.svg",
-      shortcut: "/briar-mark.svg",
+      icon: "/briar-icon.png",
+      shortcut: "/briar-icon.png",
     },
     openGraph: {
       title: metadata.title,

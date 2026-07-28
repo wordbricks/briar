@@ -44,6 +44,14 @@ write checksummed lifecycle evidence:
 bun run release:macos:candidate
 ```
 
+The command compares `HEAD` with `v$BRIAR_PREVIOUS_VERSION`. It skips the
+expensive ad-hoc Tauri bundle when only ordinary application code and the
+release version fields changed. Release scripts, packaging, updater, signing,
+dependencies, public release configuration, icons, capabilities, or other
+bundle configuration force the full candidate. A missing base tag or a dirty
+worktree also fails closed to the full build. Use
+`bun run release:macos:candidate -- --force` when a manual full run is desired.
+
 The command writes the `.dmg`, zipped `.app`, `release-manifest.json`,
 `lifecycle-evidence.json`, and `SHA256SUMS` to `release-artifacts/`. The manifest
 binds the channel, previous version, target, commit, source commit timestamp,

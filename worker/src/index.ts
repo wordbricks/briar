@@ -1,6 +1,5 @@
 import { z } from "zod";
-import briarMarkSvg from "../../src/assets/briar-mark.svg";
-import briarIconSvg from "../../src-tauri/app-icon.svg";
+import briarIconPng from "../../src/assets/app-icons/purple.png";
 import {
   autoHuntEvidenceTypeMaxLength,
   autoHuntEvidenceTypePattern,
@@ -847,11 +846,11 @@ const sha256 = async (value: string) => {
     .join("");
 };
 
-const svgResponse = (svg: string) =>
-  new Response(svg, {
+const pngResponse = (png: ArrayBuffer) =>
+  new Response(png, {
     headers: {
       "Cache-Control": "public, max-age=86400",
-      "Content-Type": "image/svg+xml; charset=utf-8",
+      "Content-Type": "image/png",
       "X-Content-Type-Options": "nosniff",
     },
   });
@@ -897,9 +896,9 @@ const devicePage = (apiOrigin: string, mobileCompanion: boolean) => {
   return new Response(
     `<!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="icon" type="image/svg+xml" href="/brand/briar-icon.svg"><title>Briar 로그인</title><style>
-*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#08090b;color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.card{width:min(390px,calc(100vw - 32px));padding:30px;border:1px solid #282a30;border-radius:14px;background:#111318;box-shadow:0 30px 100px #0008}.brand{display:flex;align-items:center;gap:10px;font-weight:750;font-size:20px}.brand img{width:26px;height:26px;display:block}.eyebrow{margin-top:32px;color:#8979cf;font:500 10px monospace;letter-spacing:1px}.code{margin:18px 0;padding:15px;border:1px solid #332e49;border-radius:8px;background:#171420;text-align:center;font:600 26px monospace;letter-spacing:4px}.copy{color:#838792;font-size:12px;line-height:1.6}.actions{display:grid;gap:8px;margin-top:22px}button{height:42px;border:1px solid #34363d;border-radius:8px;background:#f4f4f5;color:#18191d;font-weight:650;cursor:pointer}button.secondary{background:#191b20;color:#aaaeb8}.status{min-height:18px;margin-top:12px;color:#777b86;font-size:11px;text-align:center}</style></head>
-<body><main class="card"><div class="brand"><img src="/brand/briar-mark.svg" alt="">briar</div><p class="eyebrow">${copy.eyebrow}</p><h1>${copy.title}</h1><p class="copy">${copy.description}</p><div class="code" id="code">--------</div><div class="actions"><button id="google">Google로 로그인</button><button id="approve" hidden>${copy.approve}</button><button id="deny" class="secondary" hidden>거절</button></div><div class="status" id="status"></div></main>
+<link rel="icon" type="image/png" href="/brand/briar-icon.png"><title>Briar 로그인</title><style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#08090b;color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.card{width:min(390px,calc(100vw - 32px));padding:30px;border:1px solid #282a30;border-radius:14px;background:#111318;box-shadow:0 30px 100px #0008}.brand{display:flex;align-items:center;gap:10px;font-weight:750;font-size:20px}.brand img{width:26px;height:26px;display:block;border-radius:6px}.eyebrow{margin-top:32px;color:#8979cf;font:500 10px monospace;letter-spacing:1px}.code{margin:18px 0;padding:15px;border:1px solid #332e49;border-radius:8px;background:#171420;text-align:center;font:600 26px monospace;letter-spacing:4px}.copy{color:#838792;font-size:12px;line-height:1.6}.actions{display:grid;gap:8px;margin-top:22px}button{height:42px;border:1px solid #34363d;border-radius:8px;background:#f4f4f5;color:#18191d;font-weight:650;cursor:pointer}button.secondary{background:#191b20;color:#aaaeb8}.status{min-height:18px;margin-top:12px;color:#777b86;font-size:11px;text-align:center}</style></head>
+<body><main class="card"><div class="brand"><img src="/brand/briar-icon.png" alt="">briar</div><p class="eyebrow">${copy.eyebrow}</p><h1>${copy.title}</h1><p class="copy">${copy.description}</p><div class="code" id="code">--------</div><div class="actions"><button id="google">Google로 로그인</button><button id="approve" hidden>${copy.approve}</button><button id="deny" class="secondary" hidden>거절</button></div><div class="status" id="status"></div></main>
 <script>
 const base=${JSON.stringify(apiOrigin)};const mobileCompanion=${JSON.stringify(mobileCompanion)};const returnUrl='briar-companion://auth-complete';const params=new URLSearchParams(location.search);const code=(params.get('user_code')||'').replace(/-/g,'').toUpperCase();const callbackParams=new URLSearchParams({user_code:code});if(mobileCompanion)callbackParams.set('client','mobile');const callbackUrl=base+'/device?'+callbackParams.toString();document.querySelector('#code').textContent=code||'코드 없음';const status=document.querySelector('#status');const google=document.querySelector('#google');const approve=document.querySelector('#approve');const deny=document.querySelector('#deny');
 async function api(path,options={}){const response=await fetch(base+'/api/auth'+path,{credentials:'include',headers:{'content-type':'application/json'},...options});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.message||data.error_description||'요청에 실패했습니다.');return data}
@@ -2801,11 +2800,8 @@ export default {
     }
     const releaseResponse = await serveRelease(request, env.RELEASES);
     if (releaseResponse) return releaseResponse;
-    if (url.pathname === "/brand/briar-icon.svg" && request.method === "GET") {
-      return svgResponse(briarIconSvg);
-    }
-    if (url.pathname === "/brand/briar-mark.svg" && request.method === "GET") {
-      return svgResponse(briarMarkSvg);
+    if (url.pathname === "/brand/briar-icon.png" && request.method === "GET") {
+      return pngResponse(briarIconPng);
     }
     if (url.pathname === "/device" && request.method === "GET") {
       return devicePage(

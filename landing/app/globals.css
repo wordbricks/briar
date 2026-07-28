@@ -95,15 +95,14 @@ button {
   display: grid;
   width: 26px;
   height: 26px;
-  border: 1px solid #2b2b32;
   border-radius: 7px;
-  background: #121216;
+  overflow: hidden;
   place-items: center;
 }
 
 .brand-mark img {
-  width: 23px;
-  height: 23px;
+  width: 26px;
+  height: 26px;
 }
 
 .nav-shell nav {
@@ -497,6 +496,7 @@ button {
 .sidebar-brand img {
   width: 20px;
   height: 20px;
+  border-radius: 5px;
 }
 
 .stage-sidebar > p {
@@ -1928,15 +1928,14 @@ button {
   width: 52px;
   height: 52px;
   margin: 0 auto 30px;
-  border: 1px solid #34313f;
   border-radius: 14px;
-  background: #17151d;
+  overflow: hidden;
   place-items: center;
 }
 
 .cta-mark img {
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
 }
 
 .final-cta .section-index {

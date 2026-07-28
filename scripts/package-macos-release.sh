@@ -2,7 +2,7 @@
 set -euo pipefail
 
 workspace_root="$(cd "$(dirname "$0")/.." && pwd -P)"
-bundle_root="$workspace_root/src-tauri/target/release/bundle"
+bundle_root="${BRIAR_RELEASE_CARGO_TARGET_DIR:-${CARGO_TARGET_DIR:-$workspace_root/src-tauri/target}}/release/bundle"
 artifact_root="$workspace_root/release-artifacts"
 app_path="$bundle_root/macos/Briar.app"
 version="$(bun -e "import config from './src-tauri/tauri.conf.json'; console.log(config.version)" --cwd "$workspace_root")"

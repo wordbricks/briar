@@ -238,6 +238,8 @@ describe("Worker HTTP contract", () => {
     expect(page).not.toContain("<h1>데스크톱 연결 승인</h1>");
     expect(page).toContain("briar-companion://auth-complete");
     expect(page).toContain("callbackParams.set('client','mobile')");
+    expect(page).toContain("/brand/briar-icon.png");
+    expect(page).not.toContain("briar-mark.svg");
   });
 
   it("keeps the desktop authorization copy for desktop clients", async () => {
