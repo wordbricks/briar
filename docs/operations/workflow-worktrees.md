@@ -36,13 +36,16 @@ control-plane access.
 
 | | Value |
 | --- | --- |
-| Worktree root | `$BRIAR_WORKTREE_ROOT` → `autoHunt.worktrees.root` → `~/briar/worktrees`, always suffixed with the project id |
+| Worktree root | `$BRIAR_WORKTREE_ROOT` → `autoHunt.worktrees.root` → `~/briar/workspaces`, always suffixed with the project id |
 | Directory name | `<title-slug>-<first 8 of runId>`, e.g. `fix-login-redirect-3f6b9c21` |
 | Branch | `<autoHunt.worktrees.branchPrefix or "briar">/<directory name>` |
 | Base | `refs/remotes/origin/HEAD`, else `origin/main`, `origin/master`, `main`, `master` |
 
 The name is derived from the run id, so re-claiming a run after a retry
 re-enters the same worktree instead of piling up near-duplicates.
+The desktop runtime passes the real host home separately to its isolated CLI,
+so the default root remains under `~/briar/workspaces` even though credentials
+and config run with a temporary `HOME`.
 
 ## Why the base is always the remote branch
 
@@ -183,7 +186,7 @@ briar worktree remove [--path <dir>] [--force]
 
 ```sh
 briar project configure \
-  --worktree-root ~/briar/worktrees --branch-prefix briar
+  --worktree-root ~/briar/workspaces --branch-prefix briar
 ```
 
 `--disable-worktrees` returns a project to working directly in its checkout;

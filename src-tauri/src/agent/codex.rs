@@ -213,6 +213,7 @@ impl AutoHuntCliEnvironment {
         let execution_path_string = execution_path.to_string_lossy().into_owned();
         let briar_binary = briar_binary.to_string_lossy().into_owned();
         let briar_config_directory = sandbox_config.join("briar").to_string_lossy().into_owned();
+        let worktree_home = home.to_string_lossy().into_owned();
         Ok(Self {
             _directory: Some(directory),
             remote_directory: None,
@@ -225,6 +226,7 @@ impl AutoHuntCliEnvironment {
                 ("BRIAR_API_URL".to_string(), api_url.to_string()),
                 ("BRIAR_CLI".to_string(), briar_binary),
                 ("BRIAR_CONFIG_HOME".to_string(), briar_config_directory),
+                ("BRIAR_WORKTREE_HOME".to_string(), worktree_home),
             ],
         })
     }
@@ -386,6 +388,7 @@ printf '%s\n' "$directory"
         let environment_path = format!("{directory}/bin:{}", path_output.stdout);
         let briar_binary = format!("{directory}/bin/briar");
         let briar_config_directory = format!("{directory}/home/.config/briar");
+        let worktree_home = home_output.stdout_trimmed();
         Ok(Self {
             _directory: None,
             remote_directory: Some((runner, directory)),
@@ -398,6 +401,7 @@ printf '%s\n' "$directory"
                 ("BRIAR_API_URL".to_string(), api_url.to_string()),
                 ("BRIAR_CLI".to_string(), briar_binary),
                 ("BRIAR_CONFIG_HOME".to_string(), briar_config_directory),
+                ("BRIAR_WORKTREE_HOME".to_string(), worktree_home),
             ],
         })
     }
@@ -1702,7 +1706,7 @@ mod tests {
         for name in ["bun", "velen"] {
             let binary = binary_directory.join(name);
             let body = if name == "bun" {
-                "#!/bin/sh\nshift\nprintf changed > \"$HOME/.config/briar/config.json\"\nprintf '%s' \"$BRIAR_PROJECT_ID\" > \"$HOME/project-id\"\nprintf '%s' \"$BRIAR_API_URL\" > \"$HOME/api-url\"\n"
+                "#!/bin/sh\nshift\nprintf changed > \"$HOME/.config/briar/config.json\"\nprintf '%s' \"$BRIAR_PROJECT_ID\" > \"$HOME/project-id\"\nprintf '%s' \"$BRIAR_API_URL\" > \"$HOME/api-url\"\nprintf '%s' \"$BRIAR_WORKTREE_HOME\" > \"$HOME/worktree-home\"\n"
             } else {
                 "#!/bin/sh\nexit 0\n"
             };
@@ -1748,7 +1752,12 @@ mod tests {
             environment.get("BRIAR_CONFIG_HOME"),
             Some(&expected_config_home)
         );
+        assert_eq!(
+            environment.get("BRIAR_WORKTREE_HOME"),
+            Some(&home.to_string_lossy().into_owned())
+        );
         let output = Command::new(wrapper)
+            .envs(&environment)
             .output()
             .expect("Briar wrapper should execute");
         assert!(output.status.success());
@@ -1781,6 +1790,11 @@ mod tests {
             fs::read_to_string(snapshot_home.join("api-url"))
                 .expect("selected API should reach the Briar CLI"),
             "http://127.0.0.1:8788"
+        );
+        assert_eq!(
+            fs::read_to_string(snapshot_home.join("worktree-home"))
+                .expect("persistent worktree home should reach the Briar CLI"),
+            home.to_string_lossy()
         );
         assert_eq!(
             fs::metadata(snapshot_home.join(".config/velen/auth.json"))

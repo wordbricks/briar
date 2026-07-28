@@ -43,13 +43,14 @@ async function writeCliConfig(configDirectory: string, velenOrg?: string) {
   );
 }
 
-function runDoctor(home: string, configDirectory?: string) {
+function runDoctor(home: string, configDirectory?: string, worktreeHome?: string) {
   const environment = { ...process.env };
   for (const name of [
     "BRIAR_AGENT_TOKEN",
     "BRIAR_API_URL",
     "BRIAR_CONFIG_HOME",
     "BRIAR_PROJECT_ID",
+    "BRIAR_WORKTREE_HOME",
     "BRIAR_WORKTREE_ROOT",
   ]) {
     delete environment[name];
@@ -64,6 +65,7 @@ function runDoctor(home: string, configDirectory?: string) {
         HOME: home,
         PATH: "/usr/bin:/bin",
         ...(configDirectory ? { BRIAR_CONFIG_HOME: configDirectory } : {}),
+        ...(worktreeHome ? { BRIAR_WORKTREE_HOME: worktreeHome } : {}),
       },
       encoding: "utf8",
     },
@@ -93,7 +95,7 @@ describe("optional Velen CLI preflight", () => {
     const result = runDoctor(await cliHome("wordbricks"));
 
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain("@wordbricks/velen");
+    expect(result.stderr).toContain("Velen CLI");
   });
 
   it("uses an explicit Briar config home even when HOME points elsewhere", async () => {
@@ -109,5 +111,23 @@ describe("optional Velen CLI preflight", () => {
       ok: true,
       projectId: "11111111-1111-4111-8111-111111111111",
     });
+  });
+
+  it("keeps the default worktree root under the persistent host home", async () => {
+    const sandboxHome = await cliHome();
+    const worktreeHome = await mkdtemp(join(tmpdir(), "briar-persistent-home-"));
+    temporaryHomes.push(worktreeHome);
+
+    const result = runDoctor(sandboxHome, undefined, worktreeHome);
+
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout).worktrees.root).toBe(
+      join(
+        worktreeHome,
+        "briar",
+        "workspaces",
+        "11111111-1111-4111-8111-111111111111",
+      ),
+    );
   });
 });

@@ -6,6 +6,7 @@ import {
   allocateIssueWorktree,
   assertPathWithinRoot,
   copyWorktreeIncludes,
+  defaultWorktreeRoot,
   isPathWithinRoot,
   listIssueWorktrees,
   parseRemoteTrackingBase,
@@ -51,6 +52,10 @@ function fakeGit(handler: (gitArgs: string[]) => GitResult) {
 }
 
 describe("worktree naming", () => {
+  it("keeps the default root in the persistent Briar workspace directory", () => {
+    expect(defaultWorktreeRoot("/home/dev")).toBe(join("/home/dev", "briar", "workspaces"));
+  });
+
   it("keeps unicode titles readable and strips unsafe characters", () => {
     expect(sanitizeWorktreeSlug("Fix: 로그인 실패 (urgent!)")).toBe("fix-로그인-실패-urgent");
     expect(sanitizeWorktreeSlug("../../etc/passwd")).toBe("etc-passwd");

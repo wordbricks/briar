@@ -91,7 +91,7 @@ export type AllocateWorktreeOptions = {
 };
 
 export function defaultWorktreeRoot(home: string): string {
-  return join(home, "briar", "worktrees");
+  return join(home, "briar", "workspaces");
 }
 
 export function projectWorktreeRoot(root: string, projectId: string): string {
