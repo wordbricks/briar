@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   buildPromptParts,
   createGrokEventState,
+  extractJsonObject,
   finalizeGrokMessage,
   mapEffortToGrok,
   normalizeGrokSessionUpdate,
   permissionDecisionResult,
   resolveGrokAuthMethodId,
+  resolveGrokFinalMessage,
   resolveGrokModelId,
   shouldAutoApprovePermission,
   shouldDenyWritePermission,
@@ -89,7 +91,7 @@ describe("Grok runner", () => {
       },
       {
         type: "text",
-        text: 'Respond with JSON that matches this schema:\n{"type":"string"}',
+        text: 'Return only the JSON value that matches this schema, without Markdown fences or commentary:\n{"type":"string"}',
       },
       { type: "text", text: "Inspect the repository" },
     ]);
@@ -120,24 +122,125 @@ describe("Grok runner", () => {
 
     expect(started.event).toEqual({
       type: "messageStarted",
-      id: "session-1:assistant",
+      id: "session-1:assistant:1",
       phase: "commentary",
       text: "Hel",
     });
     expect(delta.event).toEqual({
       type: "messageDelta",
-      id: "session-1:assistant",
+      id: "session-1:assistant:1",
       delta: "lo",
     });
     expect(finalizeGrokMessage(state, "end_turn")).toEqual([
       {
         type: "messageCompleted",
-        id: "session-1:assistant",
+        id: "session-1:assistant:1",
         phase: "final",
         text: "Hello",
       },
       { type: "turnCompleted", status: "completed" },
     ]);
+  });
+
+  it("segments assistant messages around tool calls", () => {
+    const state = createGrokEventState();
+    normalizeGrokSessionUpdate(
+      {
+        sessionId: "session-1",
+        update: {
+          sessionUpdate: "agent_message_chunk",
+          content: { type: "text", text: "Checking the repository." },
+        },
+      },
+      state,
+    );
+    const toolCall = normalizeGrokSessionUpdate(
+      {
+        sessionId: "session-1",
+        update: { sessionUpdate: "tool_call", toolCallId: "tool-1" },
+      },
+      state,
+    );
+    const finalStarted = normalizeGrokSessionUpdate(
+      {
+        sessionId: "session-1",
+        update: {
+          sessionUpdate: "agent_message_chunk",
+          content: { type: "text", text: '{"action":"respond"}' },
+        },
+      },
+      state,
+    );
+
+    expect(toolCall.event).toEqual({
+      type: "messageCompleted",
+      id: "session-1:assistant:1",
+      phase: "commentary",
+      text: "Checking the repository.",
+    });
+    expect(finalStarted.event).toEqual({
+      type: "messageStarted",
+      id: "session-1:assistant:2",
+      phase: "commentary",
+      text: '{"action":"respond"}',
+    });
+    expect(finalizeGrokMessage(state, "end_turn")[0]).toEqual({
+      type: "messageCompleted",
+      id: "session-1:assistant:2",
+      phase: "final",
+      text: '{"action":"respond"}',
+    });
+    expect(state.lastAssistantText).toBe('{"action":"respond"}');
+  });
+
+  it("extracts balanced JSON from fenced conversational output", () => {
+    expect(
+      extractJsonObject(
+        'Done.\\n```json\\n{"message":"literal } brace","nested":{"ok":true}}\\n```',
+      ),
+    ).toBe('{"message":"literal } brace","nested":{"ok":true}}');
+  });
+
+  it("uses the final assistant segment for structured output", () => {
+    const state = createGrokEventState();
+    normalizeGrokSessionUpdate(
+      {
+        sessionId: "session-1",
+        update: {
+          sessionUpdate: "agent_message_chunk",
+          content: { type: "text", text: "Checking the repository." },
+        },
+      },
+      state,
+    );
+    normalizeGrokSessionUpdate(
+      {
+        sessionId: "session-1",
+        update: { sessionUpdate: "tool_call", toolCallId: "tool-1" },
+      },
+      state,
+    );
+    normalizeGrokSessionUpdate(
+      {
+        sessionId: "session-1",
+        update: {
+          sessionUpdate: "agent_message_chunk",
+          content: {
+            type: "text",
+            text: '```json\\n{"action":"respond"}\\n```',
+          },
+        },
+      },
+      state,
+    );
+    finalizeGrokMessage(state, "end_turn");
+
+    expect(
+      resolveGrokFinalMessage(state, undefined, { type: "object" }),
+    ).toBe('{"action":"respond"}');
+    expect(resolveGrokFinalMessage(state, undefined, null)).toBe(
+      '```json\\n{"action":"respond"}\\n```',
+    );
   });
 
   it("maps models and efforts for Grok", () => {
