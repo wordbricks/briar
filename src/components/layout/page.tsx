@@ -62,7 +62,7 @@ export function PageHeader({
   return (
     <header
       className={cn(
-        "page-header flex flex-wrap items-start justify-between gap-6 border-b border-border bg-gradient-to-br from-card to-[#faf9fd] px-8 py-7",
+        "page-header flex flex-wrap items-center justify-between gap-6 border-b border-border bg-card px-8 py-2.5",
         className,
       )}
     >
@@ -81,7 +81,7 @@ export function PageHeader({
           {title}
         </Typography>
         {description ? (
-          <Typography className="mt-2.5" tone="muted" variant="bodySm">
+          <Typography className="mt-1.5" tone="muted" variant="bodySm">
             {description}
           </Typography>
         ) : null}

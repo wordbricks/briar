@@ -486,14 +486,8 @@ export function ProjectSchedule({
             </Button>
           </div>
         }
-        className="project-schedule-heading"
+        className="app-page-header project-schedule-heading"
         description={t("schedule.description")}
-        eyebrow={
-          <>
-            <CalendarClock size={13} />
-            {t("schedule.eyebrow")}
-          </>
-        }
         title={t("schedule.title")}
       />
 
