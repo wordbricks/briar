@@ -158,12 +158,32 @@ describe("Worker HTTP contract", () => {
         claimToken,
         status: "completed",
         resultSummary: "Repository audit completed.",
+        structuredResult: {
+          summary: "Repository audit completed.",
+          outcome: "completed",
+          importance: "routine",
+          urgency: "normal",
+          impact: "issue",
+          humanActionRequired: false,
+          nextAction: null,
+          dueAt: null,
+        },
         error: null,
       }),
     ).toEqual({
       claimToken,
       status: "completed",
       resultSummary: "Repository audit completed.",
+      structuredResult: {
+        summary: "Repository audit completed.",
+        outcome: "completed",
+        importance: "routine",
+        urgency: "normal",
+        impact: "issue",
+        humanActionRequired: false,
+        nextAction: null,
+        dueAt: null,
+      },
       error: null,
     });
     expect(() =>
@@ -171,9 +191,37 @@ describe("Worker HTTP contract", () => {
         claimToken,
         status: "failed",
         resultSummary: null,
+        structuredResult: {
+          summary: "Runner stopped.",
+          outcome: "failed",
+          importance: "important",
+          urgency: "time_sensitive",
+          impact: "issue",
+          humanActionRequired: true,
+          nextAction: "Inspect the runner.",
+          dueAt: null,
+        },
         error: null,
       }),
     ).toThrow(/failed runs require an error/u);
+    expect(() =>
+      projectAgentScheduleRunCompletionSchema.parse({
+        claimToken,
+        status: "completed",
+        resultSummary: "A legacy summary.",
+        structuredResult: {
+          summary: "A structured summary.",
+          outcome: "completed",
+          importance: "routine",
+          urgency: "normal",
+          impact: "issue",
+          humanActionRequired: false,
+          nextAction: null,
+          dueAt: null,
+        },
+        error: null,
+      }),
+    ).toThrow(/resultSummary must match structuredResult.summary/u);
   });
 
   it("renders mobile Companion authorization and returns to the app", async () => {

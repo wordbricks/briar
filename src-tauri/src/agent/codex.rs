@@ -83,6 +83,53 @@ struct ProjectAgentRunDecision {
     action: ProjectAgentRunAction,
     message: String,
     max_issues: Option<usize>,
+    structured_result: Option<StructuredAgentResult>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum AgentResultOutcome {
+    Completed,
+    Partial,
+    Blocked,
+    Failed,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum AgentResultImportance {
+    Routine,
+    Important,
+    Critical,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum AgentResultUrgency {
+    Normal,
+    TimeSensitive,
+    Immediate,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum AgentResultImpact {
+    Issue,
+    Project,
+    Organization,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StructuredAgentResult {
+    pub(crate) summary: String,
+    pub(crate) outcome: AgentResultOutcome,
+    pub(crate) importance: AgentResultImportance,
+    pub(crate) urgency: AgentResultUrgency,
+    pub(crate) impact: AgentResultImpact,
+    pub(crate) human_action_required: bool,
+    pub(crate) next_action: Option<String>,
+    pub(crate) due_at: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -93,6 +140,7 @@ pub(crate) struct ProjectAgentRunResponse {
     pub(crate) action: ProjectAgentRunAction,
     pub(crate) message: String,
     pub(crate) max_issues: Option<usize>,
+    pub(crate) structured_result: Option<StructuredAgentResult>,
 }
 
 pub(crate) struct AutoHuntCliEnvironment {
@@ -724,7 +772,7 @@ pub(crate) fn run_project_agent_with(
             message: request.message,
             conversation_id: request.conversation_id,
             instructions: Some(format!(
-                "Run as the saved project agent `{}`.\n\n## Responsibility\n\n{}\n\n## Agent skill\n\n{}\n\n## Project workflow\n\n{}\n\nHandle the user's request in this single agent conversation. Do not claim queue work or create an issue worktree yourself. If and only if the user explicitly asks to start Auto Hunt or process queued issues through Auto Hunt, return `dispatch_auto_hunt` without running queue, Git, or repository commands; the trusted Briar host runtime will perform the dispatch. A request merely mentioning or discussing an issue is not an Auto Hunt request. For every other request, choose `respond`, complete the work in this session, and report the observed result. Return only the required JSON.",
+                "Run as the saved project agent `{}`.\n\n## Responsibility\n\n{}\n\n## Agent skill\n\n{}\n\n## Project workflow\n\n{}\n\nHandle the user's request in this single agent conversation. Do not claim queue work or create an issue worktree yourself. If and only if the user explicitly asks to start Auto Hunt or process queued issues through Auto Hunt, return `dispatch_auto_hunt` without running queue, Git, or repository commands; the trusted Briar host runtime will perform the dispatch. A request merely mentioning or discussing an issue is not an Auto Hunt request. For every other request, choose `respond`, complete the work in this session, and report both the user-facing message and a structured result. Set humanActionRequired only when a person must decide or act, and provide the exact nextAction. Use immediate urgency only when delay increases material risk. Return only the required JSON.",
                 request.agent_name,
                 request.responsibility,
                 request.skill,
@@ -750,12 +798,28 @@ pub(crate) fn run_project_agent_with(
     if decision.action == ProjectAgentRunAction::Respond && decision.max_issues.is_some() {
         return Err("일반 응답에는 자동사냥 처리 건수를 지정할 수 없습니다.".to_string());
     }
+    if decision.action == ProjectAgentRunAction::Respond && decision.structured_result.is_none() {
+        return Err("일반 응답에는 구조화된 실행 결과가 필요합니다.".to_string());
+    }
+    if decision.action == ProjectAgentRunAction::DispatchAutoHunt
+        && decision.structured_result.is_some()
+    {
+        return Err("자동사냥 요청은 실행 전 결과를 제출할 수 없습니다.".to_string());
+    }
+    if decision
+        .structured_result
+        .as_ref()
+        .is_some_and(|result| result.human_action_required && result.next_action.is_none())
+    {
+        return Err("사람의 행동이 필요한 결과에는 다음 행동이 필요합니다.".to_string());
+    }
     Ok(ProjectAgentRunResponse {
         conversation_id: response.conversation_id,
         workspace_root: response.workspace_root,
         action: decision.action,
         message: decision.message,
         max_issues: decision.max_issues,
+        structured_result: decision.structured_result,
     })
 }
 
@@ -937,7 +1001,7 @@ fn project_agent_run_output_schema() -> Value {
     json!({
         "type": "object",
         "additionalProperties": false,
-        "required": ["action", "message", "maxIssues"],
+        "required": ["action", "message", "maxIssues", "structuredResult"],
         "properties": {
             "action": {
                 "type": "string",
@@ -950,6 +1014,57 @@ fn project_agent_run_output_schema() -> Value {
                         "type": "integer",
                         "minimum": 1,
                         "maximum": MAX_AUTO_HUNT_ISSUES
+                    },
+                    { "type": "null" }
+                ]
+            },
+            "structuredResult": {
+                "anyOf": [
+                    {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                            "summary",
+                            "outcome",
+                            "importance",
+                            "urgency",
+                            "impact",
+                            "humanActionRequired",
+                            "nextAction",
+                            "dueAt"
+                        ],
+                        "properties": {
+                            "summary": { "type": "string", "minLength": 1 },
+                            "outcome": {
+                                "type": "string",
+                                "enum": ["completed", "partial", "blocked", "failed"]
+                            },
+                            "importance": {
+                                "type": "string",
+                                "enum": ["routine", "important", "critical"]
+                            },
+                            "urgency": {
+                                "type": "string",
+                                "enum": ["normal", "time_sensitive", "immediate"]
+                            },
+                            "impact": {
+                                "type": "string",
+                                "enum": ["issue", "project", "organization"]
+                            },
+                            "humanActionRequired": { "type": "boolean" },
+                            "nextAction": {
+                                "anyOf": [
+                                    { "type": "string", "minLength": 1 },
+                                    { "type": "null" }
+                                ]
+                            },
+                            "dueAt": {
+                                "anyOf": [
+                                    { "type": "string", "format": "date-time" },
+                                    { "type": "null" }
+                                ]
+                            }
+                        }
                     },
                     { "type": "null" }
                 ]
@@ -1531,11 +1646,21 @@ mod tests {
                     .output_schema
                     .as_ref()
                     .map(|schema| &schema["required"]),
-                Some(&json!(["action", "message", "maxIssues"]))
+                Some(&json!([
+                    "action",
+                    "message",
+                    "maxIssues",
+                    "structuredResult"
+                ]))
             );
+            let message = if request.message.contains("Auto Hunt") {
+                r#"{"action":"dispatch_auto_hunt","message":"Auto Hunt를 요청했습니다.","maxIssues":2,"structuredResult":null}"#
+            } else {
+                r#"{"action":"respond","message":"저장소 점검을 완료했습니다.","maxIssues":null,"structuredResult":{"summary":"저장소 점검을 완료했습니다.","outcome":"completed","importance":"routine","urgency":"normal","impact":"issue","humanActionRequired":false,"nextAction":null,"dueAt":null}}"#
+            };
             Ok(ProjectLlmResponse {
                 conversation_id: "briar:project-1:initial-coordinator".to_string(),
-                message: r#"{"action":"dispatch_auto_hunt","message":"Auto Hunt를 요청했습니다.","maxIssues":2}"#.to_string(),
+                message: message.to_string(),
                 workspace_root: workspace_root.to_string_lossy().into_owned(),
             })
         }
@@ -1954,6 +2079,48 @@ mod tests {
             response.conversation_id,
             "briar:project-1:initial-coordinator"
         );
+    }
+
+    #[test]
+    fn saved_agent_returns_a_structured_result_after_work() {
+        let response = run_project_agent_with(
+            &ProjectAgentBackend,
+            "project-1",
+            Path::new("/repo"),
+            ChatExecution {
+                approval_policy: ApprovalPolicy::OnRequest,
+                sandbox_mode: SandboxMode::WorkspaceWrite,
+                network_access: true,
+                model: Some("gpt-5.6-sol".to_string()),
+                effort: Some(ModelEffort::High),
+                event_sink: None,
+                environment: Vec::new(),
+                workspace_write_roots: Vec::new(),
+            },
+            r#"{"stages":[]}"#,
+            ProjectAgentRunRequest {
+                session_id: "session-1".to_string(),
+                agent_id: "agent-1".to_string(),
+                agent_name: "Auditor".to_string(),
+                agent_provider: AgentProviderKind::Codex,
+                agent_model: Some("gpt-5.6-sol".to_string()),
+                responsibility: "Audit the repository".to_string(),
+                skill: "# Auditor".to_string(),
+                message: "저장소를 점검해 줘".to_string(),
+                conversation_id: None,
+            },
+            &|_, _| false,
+        )
+        .expect("structured agent result");
+
+        let result = response
+            .structured_result
+            .expect("respond action should include a result");
+        assert_eq!(response.action, ProjectAgentRunAction::Respond);
+        assert_eq!(result.outcome, AgentResultOutcome::Completed);
+        assert_eq!(result.importance, AgentResultImportance::Routine);
+        assert!(!result.human_action_required);
+        assert_eq!(result.next_action, None);
     }
 
     #[test]

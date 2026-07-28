@@ -108,6 +108,16 @@ const projectId = "11111111-1111-4111-8111-111111111111";
 const baseTime = Date.parse("2026-07-21T00:00:00Z");
 const atMinute = (minute: number) =>
   new Date(baseTime + minute * 60_000).toISOString();
+const completedStructuredResult = {
+  summary: "Repository audit completed.",
+  outcome: "completed",
+  importance: "routine",
+  urgency: "normal",
+  impact: "issue",
+  humanActionRequired: false,
+  nextAction: null,
+  dueAt: null,
+} as const;
 const executeSql = async (db: D1Database, sql: string) => {
   for (const statement of sql.split(/;\s*(?:\n|$)/u)) {
     if (statement.trim()) await db.prepare(statement).run();
@@ -134,6 +144,7 @@ const event = (
   tracker: null,
   issueDescription: null,
   resultSummary: null,
+  structuredResult: null,
   pullRequestUrls: [],
   targetSha: null,
   sourceCreatedAt: null,
@@ -315,6 +326,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await executeSql(
       db,
       await readFile(resolve("migrations/0027_run_revisions.sql"), "utf8"),
+    );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0029_structured_agent_results.sql"),
+        "utf8",
+      ),
     );
   });
 
@@ -597,6 +615,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         claimTokenHash: "a".repeat(64),
         status: "completed",
         resultSummary: "Daily audit completed.",
+        structuredResult: {
+          ...completedStructuredResult,
+          summary: "Daily audit completed.",
+        },
         error: null,
         observedAt: "2026-07-27T09:01:00.000Z",
       }),
@@ -609,6 +631,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         schedule_name: "Daily project audit",
         status: "completed",
         result_summary: "Daily audit completed.",
+        structured_result_json: JSON.stringify({
+          ...completedStructuredResult,
+          summary: "Daily audit completed.",
+        }),
       }),
     ]);
     await expect(
@@ -648,6 +674,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         claimTokenHash: "d".repeat(64),
         status: "completed",
         resultSummary: "must not persist",
+        structuredResult: {
+          ...completedStructuredResult,
+          summary: "must not persist",
+        },
         error: null,
         observedAt: "2026-07-27T10:01:00.000Z",
       }),
@@ -657,6 +687,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         claimTokenHash: tokenHash,
         status: "completed",
         resultSummary: "Repository audit completed.",
+        structuredResult: completedStructuredResult,
         error: null,
         observedAt: "2026-07-27T10:01:00.000Z",
       }),
@@ -902,6 +933,12 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ).rejects.toThrow("result summary");
     const completion = event("completed", 12, {
       resultSummary: "Production verified",
+      structuredResult: {
+        ...completedStructuredResult,
+        summary: "Production verified",
+        importance: "important",
+        impact: "project",
+      },
     });
     await recordHuntEvent(db, projectId, completion);
     await expect(recordHuntEvent(db, projectId, completion)).resolves.toBe(
@@ -910,7 +947,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
 
     const run = await db
       .prepare(
-        `select stage, staging_qa_status, production_qa_status, result_summary
+        `select stage, staging_qa_status, production_qa_status, result_summary,
+                structured_result_json
          from briar_hunt_runs where id = ?`,
       )
       .bind(runId)
@@ -919,12 +957,19 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         staging_qa_status: string;
         production_qa_status: string;
         result_summary: string;
+        structured_result_json: string;
       }>();
     expect(run).toEqual({
       stage: "completed",
       staging_qa_status: "passed",
       production_qa_status: "passed",
       result_summary: "Production verified",
+      structured_result_json: JSON.stringify({
+        ...completedStructuredResult,
+        summary: "Production verified",
+        importance: "important",
+        impact: "project",
+      }),
     });
   });
 

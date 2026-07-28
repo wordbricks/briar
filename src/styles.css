@@ -1676,15 +1676,38 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .inbox-heading > div > p:last-child { margin:9px 0 0; color:var(--muted-foreground); font-size:var(--text-xs); line-height:var(--leading-md); }
 .inbox-heading > button { height:34px; margin-top:23px; padding:0 11px; display:flex; align-items:center; gap:6px; border:1px solid #dcd7ed; border-radius:9px; color:#624da8; background:#f7f4ff; cursor:pointer; font-size:var(--text-2xs); font-weight:600; }
 .inbox-heading > button:hover { border-color:#c8bde8; background:#f0ebff; }
-.inbox-heading > button:focus-visible,.inbox-message:focus-visible { outline:2px solid #8b70dd; outline-offset:2px; }
+.inbox-heading > button:focus-visible,.inbox-message:focus-visible,.inbox-activity-toggle:focus-visible { outline:2px solid #8b70dd; outline-offset:2px; }
 .inbox-panel { min-height:0; flex:1; overflow:hidden; display:flex; flex-direction:column; border:0; border-radius:0; background:var(--card); box-shadow:none; }
-.inbox-panel > header { min-height:58px; padding:0 18px 0 21px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #e9eae4; }
-.inbox-panel > header strong { color:#43443f; font-size:var(--text-xs); }
-.inbox-panel > header span { height:24px; padding:0 8px; display:flex; align-items:center; border-radius:999px; color:#6a55b0; background:#eee9ff; font:600 var(--text-2xs) "DM Mono",monospace; }
-.inbox-list { min-height:0; flex:1; display:grid; align-content:start; overflow-y:auto; }
+.inbox-summary { min-height:58px; padding:0 18px 0 21px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #e9eae4; }
+.inbox-summary strong { color:#43443f; font-size:var(--text-xs); }
+.inbox-summary > span { height:24px; padding:0 8px; display:flex; align-items:center; border-radius:999px; color:#6a55b0; background:#eee9ff; font:600 var(--text-2xs) "DM Mono",monospace; }
+.inbox-sections { min-height:0; flex:1; overflow-y:auto; background:#f8f8f6; }
+.inbox-section { border-bottom:1px solid #e7e8e3; background:var(--card); }
+.inbox-section-heading { min-height:46px; padding:0 18px 0 21px; display:flex; align-items:center; justify-content:space-between; color:#555750; background:#f8f8f6; }
+.inbox-section-title { min-width:0; display:flex; align-items:center; gap:8px; }
+.inbox-section-title > svg { color:#777a72; }
+.inbox-section-title strong { font-size:var(--text-xs); font-weight:var(--font-weight-semibold); }
+.inbox-section-count { min-width:22px; height:22px; padding:0 7px; display:inline-flex; align-items:center; justify-content:center; border-radius:999px; color:#6f716b; background:#ecece8; font:600 var(--text-2xs) "DM Mono",monospace; }
+.inbox-section.urgent .inbox-section-heading { color:#8d293c; background:#fff6f7; }
+.inbox-section.urgent .inbox-section-title > svg { color:#b1354d; }
+.inbox-section.urgent .inbox-section-count { color:#a12d44; background:#ffe1e7; }
+.inbox-section.action_required .inbox-section-heading { color:#83520f; background:#fff9ee; }
+.inbox-section.action_required .inbox-section-title > svg { color:#a96b16; }
+.inbox-section.action_required .inbox-section-count { color:#8b590f; background:#f9e8c5; }
+.inbox-section.important .inbox-section-heading { color:#594696; background:#faf8ff; }
+.inbox-section.important .inbox-section-title > svg { color:#7059bb; }
+.inbox-section.important .inbox-section-count { color:#624ba8; background:#ebe5ff; }
+.inbox-section-activity { border-bottom:0; }
+.inbox-activity-toggle { width:100%; border:0; cursor:pointer; text-align:left; }
+.inbox-activity-toggle:disabled { cursor:default; }
+.inbox-activity-action { display:flex; align-items:center; gap:5px; color:#777a72; font-size:var(--text-2xs); font-weight:var(--font-weight-medium); }
+.inbox-activity-chevron { transition:transform 180ms ease; }
+.inbox-activity-chevron.open { transform:rotate(180deg); }
+.inbox-list { display:grid; align-content:start; }
 .inbox-message { width:100%; min-height:90px; padding:15px 18px; display:grid; grid-template-columns:40px minmax(0,1fr) 18px; align-items:center; gap:13px; border:0; border-bottom:1px solid #edede8; color:inherit; background:var(--card); text-align:left; cursor:pointer; }
 .inbox-message:last-child { border-bottom:0; }
 .inbox-message:hover { background:var(--muted); }
+.inbox-message:active { transform:scale(.997); }
 .inbox-message.unread { background:#fbfaff; }
 .inbox-message.unread:hover { background:#f7f4ff; }
 .inbox-message > svg { color:#a4a69f; }
@@ -1693,11 +1716,15 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .inbox-message-icon.issue.failed,.inbox-message-icon.issue.blocked,.inbox-message-icon.session.failed { color:#aa4153; background:#ffeaee; }
 .inbox-message-icon.issue.cancelled { color:var(--muted-foreground); background:#ecece8; }
 .inbox-message-icon.session.completed { color:#5e49a7; background:#eee9ff; }
+.inbox-message-icon.urgent { color:#aa3249; background:#ffe4e9; }
+.inbox-message-icon.action_required { color:#946016; background:#faebca; }
+.inbox-message-icon.important { color:#654eae; background:#ece7ff; }
 .inbox-message-copy { min-width:0; display:grid; gap:6px; }
 .inbox-message-copy > span:first-child { min-width:0; display:flex; align-items:center; gap:8px; }
 .inbox-message-copy strong { overflow:hidden; color:var(--foreground); font-size:var(--text-xs); text-overflow:ellipsis; white-space:nowrap; }
 .inbox-unread-dot { width:7px; height:7px; flex:0 0 7px; border-radius:50%; background:#765bd0; box-shadow:0 0 0 3px rgba(118,91,208,.11); }
 .inbox-message-copy > small { overflow:hidden; color:var(--muted-foreground); font-size:var(--text-2xs); line-height:1.45; text-overflow:ellipsis; white-space:nowrap; }
+.inbox-message-copy > .inbox-next-action { color:#815615; font-weight:var(--font-weight-medium); }
 .inbox-message-copy > em { display:flex; align-items:center; gap:5px; color:#9a9c95; font-size:var(--text-2xs); font-style:normal; }
 .inbox-message-copy > em > span::after { content:""; width:2px; height:2px; margin:0 2px 2px 7px; display:inline-block; border-radius:50%; background:#b8b9b4; }
 .inbox-message-copy time { font:500 var(--text-2xs) "DM Mono",monospace; }
@@ -2078,6 +2105,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 @media (max-width:760px) {
   .inbox-heading { min-height:134px; padding:24px 18px; gap:16px; }
   .inbox-heading > button { width:34px; padding:0; justify-content:center; font-size:0; }
+  .inbox-summary,.inbox-section-heading { padding-right:12px; padding-left:12px; }
   .inbox-message { grid-template-columns:36px minmax(0,1fr) 16px; padding:13px 12px; gap:10px; }
   .inbox-message-icon { width:36px; height:36px; }
   .project-schedule-heading { min-height:142px; padding:20px 18px; align-items:flex-start; flex-direction:column; gap:14px; }
@@ -2603,7 +2631,8 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .companion-shell .inbox-heading > div > p:last-child { max-width:270px; font-size:var(--text-2xs); }
 .companion-shell .inbox-heading > button { width:34px; flex:0 0 34px; padding:0; justify-content:center; font-size:0; }
 .companion-shell .inbox-panel { border:0; border-radius:0; box-shadow:none; }
-.companion-shell .inbox-panel > header { min-height:46px; padding:0; }
+.companion-shell .inbox-summary { min-height:46px; padding:0; }
+.companion-shell .inbox-section-heading { padding:0; }
 .companion-shell .inbox-message { min-height:78px; padding:12px 0; grid-template-columns:36px minmax(0,1fr) 16px; gap:10px; }
 .companion-shell .inbox-message.unread,.companion-shell .inbox-message.unread:hover { background:transparent; }
 .companion-shell .inbox-message:active { background:#f5f3fa; }
@@ -2611,6 +2640,11 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .companion-shell .inbox-message-copy strong { font-size:var(--text-xs); }
 .companion-shell .inbox-message-copy > small { font-size:var(--text-2xs); }
 .companion-shell .inbox-empty { min-height:260px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .inbox-activity-chevron { transition:none; }
+  .inbox-message:active { transform:none; }
+}
 .companion-shell .dialog-backdrop { padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); align-items: flex-end; }
 .companion-shell .issue-dialog,
 .companion-shell .run-dialog,

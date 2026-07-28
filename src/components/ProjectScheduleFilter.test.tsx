@@ -69,6 +69,7 @@ function calendarRun(
     startedAt,
     completedAt,
     resultSummary: status === "completed" ? "Completed." : null,
+    structuredResult: null,
     error: status === "failed" ? "Execution failed." : null,
   };
 }

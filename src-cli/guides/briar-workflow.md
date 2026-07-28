@@ -11,7 +11,7 @@ This is the version-matched workflow guide embedded in the Briar CLI. Use the sa
 - Treat the workflow as repository-derived; never replace it with generic stage templates.
 - Record stages in order. Never invent PR, CI, deployment, or production work absent from the workflow.
 - Event and evidence keys are idempotency keys. Reuse a key only for an identical retry.
-- Record `completed` only after required stages, required evidence, and the result summary exist.
+- Record `completed` only after required stages, required evidence, and a structured result exist.
 
 ## Saved agent context
 
@@ -109,7 +109,7 @@ briar run event add \
 Later events should use the returned run ID. Useful optional event fields include:
 
 - Git: `--repository`, `--branch`, `--commit-sha`, repeated `--pull-request-url`, `--target-sha`
-- content: `--issue-description-file`, `--result-summary-file`, `--context-json`
+- content: `--issue-description-file`, `--structured-result-file`, `--context-json`
 - tracker: `--tracker-provider`, `--issue-id`, `--issue-identifier`, `--issue-url`, `--issue-state`
 - timing and detail: `--observed-at`, `--status-detail`, `--actor`
 
@@ -229,20 +229,39 @@ the target actually used, observed behavior, rollback posture when relevant, and
 
 ## Complete, recover, and clean up
 
-Write a summary covering the requested outcome, implementation, evidence for every required
-stage, applicable PR/release references, and remaining risks. Then complete:
+Write a structured JSON result covering the observed outcome, importance, urgency, impact,
+whether a person must act, the exact next action, and any due time. Use this contract:
+
+```json
+{
+  "summary": "What changed and what was verified.",
+  "outcome": "completed",
+  "importance": "routine",
+  "urgency": "normal",
+  "impact": "issue",
+  "humanActionRequired": false,
+  "nextAction": null,
+  "dueAt": null
+}
+```
+
+Allowed values are `completed|partial|blocked|failed` for `outcome`,
+`routine|important|critical` for `importance`, `normal|time_sensitive|immediate`
+for `urgency`, and `issue|project|organization` for `impact`. When
+`humanActionRequired` is true, `nextAction` must state the exact human action.
+Then complete:
 
 ```sh
 briar run complete --run '<run-id>' \
   --event-key '<source-key>:completed:criteria-met' \
-  --result-summary-file '<summary-file>'
+  --structured-result-file '<result-json-file>'
 ```
 
 Completion requires:
 
 - an event for every required stage;
 - passed or skipped evidence for every configured evidence type;
-- a non-empty result summary;
+- a valid structured result;
 - a terminal Linear state when Linear is configured for the run.
 
 On failure:

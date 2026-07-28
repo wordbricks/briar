@@ -15,6 +15,10 @@ import {
   type AutoHuntWorkflowStageId,
 } from "../../src/lib/auto-hunt-contract";
 import {
+  structuredAgentResultSchema,
+  type StructuredAgentResult,
+} from "../../src/lib/agent-result";
+import {
   defaultProjectAgentCalendarColor,
 } from "../../src/lib/project-agent";
 import {
@@ -259,6 +263,7 @@ const eventSchema = z
     tracker: trackerSchema.nullable().optional(),
     issueDescription: z.string().max(100_000).nullable().optional(),
     resultSummary: z.string().max(100_000).nullable().optional(),
+    structuredResult: structuredAgentResultSchema.nullable().optional(),
     pullRequestUrls: z
       .array(httpsUrl)
       .max(20)
@@ -297,6 +302,35 @@ const eventSchema = z
         code: "custom",
         message: "blocked progress requires an exact blocker reason",
         path: ["detail"],
+      });
+    }
+    if (input.status === "completed" && !input.structuredResult) {
+      context.addIssue({
+        code: "custom",
+        message: "completed runs require a structured result",
+        path: ["structuredResult"],
+      });
+    }
+    if (
+      input.status === "completed" &&
+      input.structuredResult &&
+      !["completed", "partial"].includes(input.structuredResult.outcome)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "completed runs require a completed or partial outcome",
+        path: ["structuredResult", "outcome"],
+      });
+    }
+    if (
+      input.resultSummary &&
+      input.structuredResult &&
+      input.resultSummary !== input.structuredResult.summary
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "resultSummary must match structuredResult.summary",
+        path: ["resultSummary"],
       });
     }
     if (input.tracker?.provider === "linear" && input.tracker.url) {
@@ -613,6 +647,7 @@ export const projectAgentScheduleRunCompletionSchema = z
     claimToken: projectAgentScheduleClaimTokenSchema,
     status: z.enum(["completed", "failed"]),
     resultSummary: z.string().trim().min(1).max(100_000).nullable().optional(),
+    structuredResult: structuredAgentResultSchema,
     error: z.string().trim().min(1).max(4_000).nullable().optional(),
   })
   .strict()
@@ -622,6 +657,30 @@ export const projectAgentScheduleRunCompletionSchema = z
         code: "custom",
         message: "completed runs require a result summary",
         path: ["resultSummary"],
+      });
+    }
+    if (
+      input.resultSummary &&
+      input.resultSummary !== input.structuredResult.summary
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "resultSummary must match structuredResult.summary",
+        path: ["resultSummary"],
+      });
+    }
+    if (input.status === "completed" && input.structuredResult.outcome === "failed") {
+      context.addIssue({
+        code: "custom",
+        message: "completed schedule runs cannot report a failed outcome",
+        path: ["structuredResult", "outcome"],
+      });
+    }
+    if (input.status === "failed" && input.structuredResult.outcome !== "failed") {
+      context.addIssue({
+        code: "custom",
+        message: "failed schedule runs require a failed structured outcome",
+        path: ["structuredResult", "outcome"],
       });
     }
     if (input.status === "failed" && !input.error) {
@@ -1002,6 +1061,7 @@ const projectAgentScheduleRunJson = (
   startedAt: row.started_at,
   completedAt: row.completed_at,
   resultSummary: row.result_summary,
+  structuredResult: parseStructuredResult(row.structured_result_json),
   error: row.error,
   ...(claimToken ? { claimToken } : {}),
 });
@@ -1050,6 +1110,14 @@ const parseJsonObject = (value: string | null) => {
   return parsed && typeof parsed === "object" && !Array.isArray(parsed)
     ? parsed
     : null;
+};
+
+const parseStructuredResult = (
+  value: string | null,
+): StructuredAgentResult | null => {
+  const parsed = parseJsonObject(value);
+  const result = structuredAgentResultSchema.safeParse(parsed);
+  return result.success ? result.data : null;
 };
 
 const dashboardEventJson = (event: HuntEventRow) => ({
@@ -1138,6 +1206,7 @@ function dashboardRunJson(
     issueDescription: run.issue_description,
     attachments: attachments.map(attachmentJson),
     resultSummary: run.result_summary,
+    structuredResult: parseStructuredResult(run.structured_result_json),
     pullRequestUrls: parseJsonArray(run.pull_request_urls),
     targetSha: run.target_sha,
     sourceCreatedAt: run.source_created_at,
@@ -1591,6 +1660,7 @@ async function route(
         claimTokenHash: await sha256(input.claimToken),
         status: input.status,
         resultSummary: input.resultSummary ?? null,
+        structuredResult: input.structuredResult,
         error: input.error ?? null,
         observedAt: new Date().toISOString(),
       },
@@ -2114,6 +2184,7 @@ async function route(
         tracker: null,
         issueDescription: input.description || null,
         resultSummary: null,
+        structuredResult: null,
         pullRequestUrls: [],
         targetSha: null,
         sourceCreatedAt: occurredAt,
@@ -2631,6 +2702,7 @@ async function route(
         : null,
       issueDescription: parsed.issueDescription ?? null,
       resultSummary: parsed.resultSummary ?? null,
+      structuredResult: parsed.structuredResult ?? null,
       targetSha: parsed.targetSha ?? null,
       sourceCreatedAt: parsed.sourceCreatedAt
         ? new Date(parsed.sourceCreatedAt).toISOString()
