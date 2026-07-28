@@ -5,6 +5,7 @@ import worker, {
   organizationUpdateInputSchema,
   projectAgentScheduleInputSchema,
   projectAgentScheduleRunCompletionSchema,
+  readRunEvidenceRequest,
   runEvidenceInputSchema,
   runReworkInputSchema,
 } from "./index";
@@ -21,6 +22,38 @@ describe("Worker HTTP contract", () => {
         actor: "briar-workflow",
       }).type,
     ).toBe("signoff/app worker");
+  });
+
+  it("parses evidence images from multipart CLI requests", async () => {
+    const evidence = {
+      evidenceKey: "LOCAL-1:local_qa:screenshot",
+      stage: "local_qa",
+      type: "ui_screenshot",
+      status: "passed",
+      observedAt: "2026-07-28T00:00:00.000Z",
+      actor: "briar-workflow",
+    };
+    const form = new FormData();
+    form.append("evidence", JSON.stringify(evidence));
+    form.append(
+      "images",
+      new File([new Uint8Array([137, 80, 78, 71])], "dashboard.png", {
+        type: "image/png",
+      }),
+    );
+
+    const parsed = await readRunEvidenceRequest(
+      new Request("https://briar-api.example/runs/run/evidence", {
+        method: "POST",
+        headers: { "Content-Length": "1024" },
+        body: form,
+      }),
+    );
+
+    expect(parsed.input).toEqual(evidence);
+    expect(parsed.images).toHaveLength(1);
+    expect(parsed.images[0]?.name).toBe("dashboard.png");
+    expect(parsed.images[0]?.type).toBe("image/png");
   });
 
   it("requires an explicit earlier stage and reason for run rework", () => {

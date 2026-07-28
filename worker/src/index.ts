@@ -31,6 +31,10 @@ import {
   projectAgentScheduleRecurrences,
 } from "../../src/lib/project-agent-schedule";
 import {
+  maxEvidenceMultipartBytes,
+  validateEvidenceImages,
+} from "../../src/lib/evidence-images";
+import {
   maxIssueMultipartBytes,
   validateIssueAttachments,
 } from "../../src/lib/issue-attachments";
@@ -43,6 +47,7 @@ import {
   completeProjectAgentScheduleRun,
   createIssueMessage,
   createIssueAttachments,
+  createRunEvidenceImages,
   createOrganization,
   createProjectAgent,
   createProjectAgentSchedule,
@@ -54,6 +59,7 @@ import {
   findProjectIdByAgentTokenHash,
   getProjectAgent,
   getIssueAttachment,
+  getRunEvidenceImage,
   getOrganizationRole,
   isOrganizationHandleAvailable,
   getProject,
@@ -64,8 +70,11 @@ import {
   importLinearHuntRuns,
   listIssueAttachments,
   listIssueMessages,
+  listAllRunEvidenceImages,
+  listEvidenceImagesForEvidence,
   listDashboardRuns,
   listRunEvidence,
+  listRunEvidenceImages,
   listRunStageRevisions,
   listOrganizationMembers,
   listOrganizations,
@@ -102,6 +111,8 @@ import {
   type OrganizationRole,
   type OrganizationRow,
   type RunEvidenceRow,
+  type RunEvidenceImageInput,
+  type RunEvidenceImageRow,
 } from "./db";
 import {
   codexPetSpriteSheetObjectKey,
@@ -359,6 +370,49 @@ export const runEvidenceInputSchema = z
     metadata: z.record(z.string(), z.unknown()).nullable().optional(),
   })
   .strict();
+
+export async function readRunEvidenceRequest(request: Request) {
+  const contentType = request.headers.get("content-type") ?? "";
+  if (!contentType.toLowerCase().startsWith("multipart/form-data;")) {
+    return {
+      input: runEvidenceInputSchema.parse(await readJson(request)),
+      images: [] as File[],
+    };
+  }
+
+  const declaredLength = Number(request.headers.get("content-length") ?? "0");
+  if (!Number.isSafeInteger(declaredLength) || declaredLength <= 0) {
+    throw new HttpError(411, "Multipart Content-Length is required");
+  }
+  if (declaredLength > maxEvidenceMultipartBytes) {
+    throw new HttpError(413, "Evidence images exceed the 25MB total limit");
+  }
+
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    throw new HttpError(400, "Invalid multipart form data");
+  }
+  const payload = form.get("evidence");
+  if (typeof payload !== "string") {
+    throw new HttpError(400, "Multipart evidence JSON is required");
+  }
+  let input: unknown;
+  try {
+    input = JSON.parse(payload);
+  } catch {
+    throw new HttpError(400, "Invalid multipart evidence JSON");
+  }
+  const rawImages = form.getAll("images");
+  if (rawImages.some((image) => !(image instanceof File))) {
+    throw new HttpError(400, "Evidence images must be files");
+  }
+  const images = rawImages as File[];
+  const imageError = validateEvidenceImages(images);
+  if (imageError) throw new HttpError(400, imageError);
+  return { input: runEvidenceInputSchema.parse(input), images };
+}
 
 const projectInputSchema = z.object({
   name: z.string().trim().min(1).max(100),
@@ -856,6 +910,13 @@ const sha256 = async (value: string) => {
     .join("");
 };
 
+const sha256Bytes = async (value: ArrayBuffer) => {
+  const digest = await crypto.subtle.digest("SHA-256", value);
+  return [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+};
+
 const pngResponse = (png: ArrayBuffer) =>
   new Response(png, {
     headers: {
@@ -872,7 +933,10 @@ const contentDisposition = (filename: string) =>
   )}`;
 
 const attachmentResponse = (
-  attachment: IssueAttachmentRow,
+  attachment: Pick<
+    IssueAttachmentRow,
+    "filename" | "content_type" | "byte_size"
+  >,
   object: R2Object,
   body: BodyInit | null,
 ) => {
@@ -1156,6 +1220,16 @@ const attachmentJson = (attachment: IssueAttachmentRow) => ({
   url: `/projects/${attachment.project_id}/runs/${attachment.run_id}/attachments/${attachment.id}`,
 });
 
+const evidenceImageJson = (image: RunEvidenceImageRow) => ({
+  id: image.id,
+  filename: image.filename,
+  contentType: image.content_type,
+  byteSize: image.byte_size,
+  sha256: image.sha256,
+  position: image.position,
+  url: `/projects/${image.project_id}/runs/${image.run_id}/evidence/images/${image.id}`,
+});
+
 const issueMessageJson = (message: IssueMessageRow) => ({
   id: message.id,
   runId: message.run_id,
@@ -1183,6 +1257,7 @@ const issueMessageJson = (message: IssueMessageRow) => ({
 const runEvidenceJson = (
   evidence: RunEvidenceRow,
   requiredRevision: number,
+  images: RunEvidenceImageRow[] = [],
 ) => ({
   key: evidence.evidence_key,
   attempt: evidence.attempt,
@@ -1197,6 +1272,7 @@ const runEvidenceJson = (
   actor: evidence.actor,
   observedAt: evidence.observed_at,
   recordedAt: evidence.recorded_at,
+  images: images.map(evidenceImageJson),
   requiredRevision,
   canonical: evidence.revision >= requiredRevision,
 });
@@ -1482,8 +1558,11 @@ async function route(
     if (project.member_role !== "owner") {
       throw new HttpError(403, "Organization owner access required");
     }
-    const attachments = await listIssueAttachments(db, project.id);
-    const attachmentKeys = attachments.map(
+    const [attachments, evidenceImages] = await Promise.all([
+      listIssueAttachments(db, project.id),
+      listRunEvidenceImages(db, project.id),
+    ]);
+    const attachmentKeys = [...attachments, ...(evidenceImages ?? [])].map(
       (attachment) => attachment.object_key,
     );
     for (let offset = 0; offset < attachmentKeys.length; offset += 1_000) {
@@ -2186,11 +2265,20 @@ async function route(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
-    const [evidence, revisions] = await Promise.all([
+    const [evidence, revisions, images] = await Promise.all([
       listRunEvidence(db, project.id, projectRunEvidenceMatch[2]),
       listRunStageRevisions(db, project.id, projectRunEvidenceMatch[2]),
+      listRunEvidenceImages(db, project.id, projectRunEvidenceMatch[2]),
     ]);
-    if (!evidence || !revisions) throw new HttpError(404, "Run not found");
+    if (!evidence || !revisions || !images) {
+      throw new HttpError(404, "Run not found");
+    }
+    const imagesByEvidence = new Map<string, RunEvidenceImageRow[]>();
+    for (const image of images) {
+      const evidenceImages = imagesByEvidence.get(image.evidence_id) ?? [];
+      evidenceImages.push(image);
+      imagesByEvidence.set(image.evidence_id, evidenceImages);
+    }
     return json({
       runId: projectRunEvidenceMatch[2],
       attempt: revisions.attempt,
@@ -2199,9 +2287,35 @@ async function route(
         runEvidenceJson(
           item,
           revisions.requirements.get(item.workflow_stage) ?? 1,
+          imagesByEvidence.get(item.id) ?? [],
         ),
       ),
     });
+  }
+
+  const projectEvidenceImageMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/evidence\/images\/([0-9a-f-]+)$/u,
+  );
+  if (
+    projectEvidenceImageMatch &&
+    (request.method === "GET" || request.method === "HEAD")
+  ) {
+    await requireProjectAccess(auth, db, request, projectEvidenceImageMatch[1]);
+    const image = await getRunEvidenceImage(
+      db,
+      projectEvidenceImageMatch[1],
+      projectEvidenceImageMatch[2],
+      projectEvidenceImageMatch[3],
+    );
+    if (!image) throw new HttpError(404, "Evidence image not found");
+    if (request.method === "HEAD") {
+      const object = await attachmentsBucket.head(image.object_key);
+      if (!object) throw new HttpError(404, "Evidence image not found");
+      return attachmentResponse(image, object, null);
+    }
+    const object = await attachmentsBucket.get(image.object_key);
+    if (!object) throw new HttpError(404, "Evidence image not found");
+    return attachmentResponse(image, object, object.body);
   }
 
   const issuesMatch = pathname.match(/^\/projects\/([0-9a-f-]+)\/issues$/u);
@@ -2367,11 +2481,10 @@ async function route(
     const session = await requireSession(auth, request);
     const project = await getProject(db, issueUpdateMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
-    const attachments = await listIssueAttachments(
-      db,
-      project.id,
-      issueUpdateMatch[2],
-    );
+    const [attachments, evidenceImages] = await Promise.all([
+      listIssueAttachments(db, project.id, issueUpdateMatch[2]),
+      listAllRunEvidenceImages(db, project.id, issueUpdateMatch[2]),
+    ]);
     const outcome = await deleteIssue(
       db,
       project.id,
@@ -2382,7 +2495,7 @@ async function route(
     if (outcome === "active") {
       throw new HttpError(409, "An active Auto Hunt issue cannot be deleted");
     }
-    const attachmentKeys = attachments.map(
+    const attachmentKeys = [...attachments, ...(evidenceImages ?? [])].map(
       (attachment) => attachment.object_key,
     );
     if (attachmentKeys.length > 0) {
@@ -2684,13 +2797,20 @@ async function route(
   const evidenceMatch = pathname.match(/^\/runs\/([0-9a-f-]+)\/evidence$/u);
   if (evidenceMatch && request.method === "GET") {
     const projectId = await requireAgentProject(db, request);
-    const evidence = await listRunEvidence(db, projectId, evidenceMatch[1]);
-    const revisions = await listRunStageRevisions(
-      db,
-      projectId,
-      evidenceMatch[1],
-    );
-    if (!evidence || !revisions) throw new HttpError(404, "Run not found");
+    const [evidence, revisions, images] = await Promise.all([
+      listRunEvidence(db, projectId, evidenceMatch[1]),
+      listRunStageRevisions(db, projectId, evidenceMatch[1]),
+      listRunEvidenceImages(db, projectId, evidenceMatch[1]),
+    ]);
+    if (!evidence || !revisions || !images) {
+      throw new HttpError(404, "Run not found");
+    }
+    const imagesByEvidence = new Map<string, RunEvidenceImageRow[]>();
+    for (const image of images) {
+      const evidenceImages = imagesByEvidence.get(image.evidence_id) ?? [];
+      evidenceImages.push(image);
+      imagesByEvidence.set(image.evidence_id, evidenceImages);
+    }
     return json({
       runId: evidenceMatch[1],
       attempt: revisions.attempt,
@@ -2699,13 +2819,14 @@ async function route(
         runEvidenceJson(
           item,
           revisions.requirements.get(item.workflow_stage) ?? 1,
+          imagesByEvidence.get(item.id) ?? [],
         ),
       ),
     });
   }
   if (evidenceMatch && request.method === "POST") {
     const projectId = await requireAgentProject(db, request);
-    const parsed = runEvidenceInputSchema.parse(await readJson(request));
+    const { input: parsed, images } = await readRunEvidenceRequest(request);
     try {
       const evidence = await recordRunEvidence(db, projectId, {
         runId: evidenceMatch[1],
@@ -2717,6 +2838,106 @@ async function route(
         observedAt: new Date(parsed.observedAt).toISOString(),
       });
       if (!evidence) throw new HttpError(404, "Run not found");
+      let storedImages = await listEvidenceImagesForEvidence(
+        db,
+        projectId,
+        evidence.run_id,
+        evidence.id,
+      );
+      if (images.length > 0) {
+        const prepared = await Promise.all(
+          images.map(async (image, position) => {
+            const bytes = await image.arrayBuffer();
+            return {
+              bytes,
+              filename: image.name.normalize("NFC").trim(),
+              contentType: image.type,
+              byteSize: image.size,
+              sha256: await sha256Bytes(bytes),
+              position,
+            };
+          }),
+        );
+        if (storedImages.length > 0) {
+          const sameImages =
+            storedImages.length === prepared.length &&
+            storedImages.every((stored, position) => {
+              const incoming = prepared[position];
+              return (
+                incoming &&
+                stored.filename === incoming.filename &&
+                stored.content_type === incoming.contentType &&
+                stored.byte_size === incoming.byteSize &&
+                stored.sha256 === incoming.sha256 &&
+                stored.position === incoming.position
+              );
+            });
+          if (!sameImages) throw new EventKeyConflictError();
+        } else {
+          const imageInputs: RunEvidenceImageInput[] = prepared.map(
+            (image) => {
+              const id = crypto.randomUUID();
+              return {
+                id,
+                object_key: `run-evidence/${projectId}/${evidence.run_id}/${evidence.id}/${id}`,
+                filename: image.filename,
+                content_type: image.contentType,
+                byte_size: image.byteSize,
+                sha256: image.sha256,
+                position: image.position,
+              };
+            },
+          );
+          const uploadedKeys: string[] = [];
+          try {
+            for (const [position, image] of imageInputs.entries()) {
+              const preparedImage = prepared[position];
+              if (!preparedImage) throw new Error("Evidence image is missing");
+              await attachmentsBucket.put(image.object_key, preparedImage.bytes, {
+                httpMetadata: {
+                  contentType: image.content_type,
+                  contentDisposition: contentDisposition(image.filename),
+                },
+                customMetadata: {
+                  evidenceId: evidence.id,
+                  imageId: image.id,
+                  projectId,
+                  runId: evidence.run_id,
+                  sha256: image.sha256,
+                },
+              });
+              uploadedKeys.push(image.object_key);
+            }
+            const created = await createRunEvidenceImages(
+              db,
+              projectId,
+              evidence.run_id,
+              evidence.id,
+              imageInputs,
+            );
+            if (!created) throw new HttpError(404, "Run evidence not found");
+            storedImages = created;
+          } catch (error) {
+            if (uploadedKeys.length > 0) {
+              try {
+                await attachmentsBucket.delete(uploadedKeys);
+              } catch (cleanupError) {
+                console.error(
+                  JSON.stringify({
+                    message: "evidence image cleanup failed",
+                    error:
+                      cleanupError instanceof Error
+                        ? cleanupError.message
+                        : String(cleanupError),
+                    evidenceId: evidence.id,
+                  }),
+                );
+              }
+            }
+            throw error;
+          }
+        }
+      }
       return json({
         runId: evidence.run_id,
         attempt: evidence.attempt,
@@ -2724,6 +2945,7 @@ async function route(
         stage: evidence.workflow_stage,
         type: evidence.evidence_type,
         status: evidence.status,
+        images: storedImages.map(evidenceImageJson),
       });
     } catch (error) {
       if (
