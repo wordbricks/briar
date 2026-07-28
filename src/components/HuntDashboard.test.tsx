@@ -4,8 +4,14 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import { demoDashboard } from "../lib/demo-data";
-import type { IssueMessage, RunEvidence } from "../types";
+import type {
+  HuntRun,
+  IssueMessage,
+  ProjectAgent,
+  RunEvidence,
+} from "../types";
 import {
   CreateIssueDialog,
   EditIssueDialog,
@@ -34,6 +40,53 @@ const dashboardProps = {
     throw new Error("not implemented in this test");
   },
 };
+
+const dashboardAgent: ProjectAgent = {
+  id: "agent-1",
+  projectId: demoDashboard.project.id,
+  name: "Briar Agent",
+  avatar: "data:image/png;base64,avatar",
+  codexPet: null,
+  provider: "codex",
+  model: null,
+  responsibility: "Process issues",
+  skill: "# Agent",
+  calendarColor: "#3275d5",
+  createdAt: "2026-07-29T00:00:00.000Z",
+  updatedAt: "2026-07-29T00:00:00.000Z",
+};
+
+function dashboardAgentSession(
+  run: HuntRun,
+  status: AutoHuntSession["status"] = "running",
+): AutoHuntSession {
+  return {
+    id: "session-1",
+    dispatchGroupId: "dispatch-1",
+    projectId: demoDashboard.project.id,
+    agentId: dashboardAgent.id,
+    sessionType: "dispatch",
+    status,
+    issues: [{
+      runId: run.id,
+      runNumber: run.runNumber,
+      sourceKey: run.sourceKey,
+      title: run.title,
+      outcome: status === "running" ? "pending" : "completed",
+      summary: null,
+    }],
+    startedAt: "2026-07-29T00:00:00.000Z",
+    completedAt:
+      status === "running" ? null : "2026-07-29T00:10:00.000Z",
+    conversationId: null,
+    workspaceRoot: null,
+    summary: null,
+    error: null,
+    events: [],
+    dispatchEvents: [],
+    workers: [],
+  };
+}
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true;
@@ -144,6 +197,68 @@ describe("HuntDashboard", () => {
       '<span class="kanban-card-description">사용자가 작성한 실제 이슈 설명</span>',
     );
     expect(markup).not.toContain("진행 상태 설명");
+  });
+
+  it("attaches the active agent avatar badge to the issue being processed", () => {
+    const run = demoDashboard.runs[0];
+    const markup = renderToStaticMarkup(
+      <HuntDashboard
+        {...dashboardProps}
+        agents={[dashboardAgent]}
+        dashboard={{ ...demoDashboard, runs: [run] }}
+        sessions={[dashboardAgentSession(run)]}
+      />,
+    );
+
+    expect(markup).toContain("kanban-card violet has-agent");
+    expect(markup).toContain('class="kanban-card-agent-badge"');
+    expect(markup).toContain('aria-label="Briar Agent 할당"');
+    expect(markup).toContain(`src="${dashboardAgent.avatar}"`);
+  });
+
+  it("keeps the performed agent name in issue properties after completion", async () => {
+    const run = demoDashboard.runs[0];
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        agents={[dashboardAgent]}
+        dashboard={{ ...demoDashboard, runs: [run] }}
+        sessions={[dashboardAgentSession(run, "completed")]}
+      />,
+    ));
+
+    expect(container.querySelector(".kanban-card-agent-badge")).toBeNull();
+    await act(async () => {
+      container.querySelector<HTMLElement>(".kanban-card")?.click();
+    });
+    const agentProperty = Array.from(
+      container.querySelectorAll<HTMLElement>(".run-property-copy"),
+    ).find((property) =>
+      property.querySelector("small")?.textContent === "에이전트"
+    );
+    expect(agentProperty?.querySelector("strong")?.textContent).toBe(
+      dashboardAgent.name,
+    );
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("does not show an agent badge without a processing session", () => {
+    const markup = renderToStaticMarkup(
+      <HuntDashboard
+        {...dashboardProps}
+        agents={[]}
+        dashboard={{ ...demoDashboard, runs: [demoDashboard.runs[0]] }}
+        sessions={[]}
+      />,
+    );
+
+    expect(markup).not.toContain("kanban-card-agent-badge");
+    expect(markup).not.toContain("has-agent");
   });
 
   it("opens a linked pull request from the issue card icon", async () => {
