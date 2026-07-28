@@ -2429,6 +2429,22 @@ export async function recordRunEvidence(
     )
     .bind(run.id, run.current_attempt, storedEvidenceKey)
     .first<RunEvidenceRow>();
+  const linkPullRequest = async (url: string | null, recordedAt: string) => {
+    if (input.type !== "pull_request" || !url) return;
+    await db
+      .prepare(
+        `update briar_hunt_runs
+         set pull_request_urls = json_insert(pull_request_urls, '$[#]', ?),
+             updated_at = max(updated_at, ?)
+         where id = ? and project_id = ?
+           and not exists (
+             select 1 from json_each(pull_request_urls)
+             where value = ?
+           )`,
+      )
+      .bind(url, recordedAt, run.id, projectId, url)
+      .run();
+  };
   if (existing) {
     const same =
       existing.workflow_stage === input.stage &&
@@ -2441,6 +2457,7 @@ export async function recordRunEvidence(
       existing.actor === input.actor &&
       existing.observed_at === input.observedAt;
     if (!same) throw new EventKeyConflictError();
+    await linkPullRequest(existing.url, existing.recorded_at);
     return existing;
   }
   const evidence: RunEvidenceRow = {
@@ -2487,6 +2504,7 @@ export async function recordRunEvidence(
       evidence.recorded_at,
     )
     .run();
+  await linkPullRequest(evidence.url, evidence.recorded_at);
   return evidence;
 }
 

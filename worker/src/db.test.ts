@@ -973,6 +973,44 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     });
   });
 
+  it("links pull request evidence to its issue run", async () => {
+    await updateProjectSettings(db, projectId, {
+      velenOrg: "example",
+      dataSource: null,
+      linear: { enabled: false, source: null, teamKey: null },
+      githubRepository: "example/repository",
+      workflow: releaseWorkflow,
+    });
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 12.1, {
+        sourceKey: "pull-request-evidence-run",
+        eventKey: "pull-request-evidence-run:queued",
+      }),
+    );
+    const pullRequestUrl = "https://github.com/example/repository/pull/42";
+    const evidenceInput = {
+      runId,
+      evidenceKey: "pr_open:pull_request",
+      stage: "pr_open",
+      type: "pull_request",
+      status: "passed" as const,
+      detail: "Pull request created",
+      command: "gh pr create",
+      url: pullRequestUrl,
+      metadata: null,
+      actor: "vitest",
+      observedAt: atMinute(12.2),
+    };
+
+    await recordRunEvidence(db, projectId, evidenceInput);
+    await recordRunEvidence(db, projectId, evidenceInput);
+
+    const linkedRun = await getHuntRunForProject(db, projectId, runId);
+    expect(JSON.parse(linkedRun!.pull_request_urls)).toEqual([pullRequestUrl]);
+  });
+
   it("reworks QA findings in the same attempt and requires fresh downstream evidence", async () => {
     await db
       .prepare(
