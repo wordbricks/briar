@@ -830,9 +830,15 @@ export function CreateIssueDialog({
       <form
         className="issue-dialog"
         onKeyDown={(event) => {
+          const isTitleEnter =
+            event.target instanceof HTMLInputElement &&
+            event.target.classList.contains("issue-title-input") &&
+            !event.metaKey &&
+            !event.ctrlKey;
           if (
             event.key === "Enter" &&
-            (event.metaKey || event.ctrlKey) &&
+            !event.nativeEvent.isComposing &&
+            (isTitleEnter || event.metaKey || event.ctrlKey) &&
             !isSubmitting
           ) {
             event.preventDefault();

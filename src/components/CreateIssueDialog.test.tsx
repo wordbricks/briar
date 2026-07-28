@@ -138,6 +138,110 @@ describe("CreateIssueDialog clipboard attachments", () => {
     await act(async () => root.unmount());
   });
 
+  it("submits with Enter from the title input", async () => {
+    const onCreate = vi.fn(async () => undefined);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <CreateIssueDialog
+          isSubmitting={false}
+          onClose={() => undefined}
+          onCreate={onCreate}
+        />,
+      );
+    });
+
+    const titleInput =
+      container.querySelector<HTMLInputElement>(".issue-title-input");
+    await act(async () => {
+      const valueSetter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set;
+      valueSetter?.call(titleInput, "Enter-created issue");
+      titleInput?.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    const enterEvent = new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      key: "Enter",
+    });
+    await act(async () => {
+      titleInput?.dispatchEvent(enterEvent);
+    });
+
+    expect(enterEvent.defaultPrevented).toBe(true);
+    expect(onCreate).toHaveBeenCalledWith({
+      attachments: [],
+      description: null,
+      priority: 2,
+      status: "queued",
+      title: "Enter-created issue",
+    });
+
+    await act(async () => root.unmount());
+  });
+
+  it("keeps plain Enter available for the description", async () => {
+    const onCreate = vi.fn(async () => undefined);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <CreateIssueDialog
+          isSubmitting={false}
+          onClose={() => undefined}
+          onCreate={onCreate}
+        />,
+      );
+    });
+
+    const enterEvent = new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      key: "Enter",
+    });
+    await act(async () => {
+      container.querySelector("textarea")?.dispatchEvent(enterEvent);
+    });
+
+    expect(enterEvent.defaultPrevented).toBe(false);
+    expect(onCreate).not.toHaveBeenCalled();
+
+    await act(async () => root.unmount());
+  });
+
+  it("does not submit Enter while the title is being composed", async () => {
+    const onCreate = vi.fn(async () => undefined);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <CreateIssueDialog
+          isSubmitting={false}
+          onClose={() => undefined}
+          onCreate={onCreate}
+        />,
+      );
+    });
+
+    const enterEvent = new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      isComposing: true,
+      key: "Enter",
+    });
+    await act(async () => {
+      container
+        .querySelector<HTMLInputElement>(".issue-title-input")
+        ?.dispatchEvent(enterEvent);
+    });
+
+    expect(enterEvent.defaultPrevented).toBe(false);
+    expect(onCreate).not.toHaveBeenCalled();
+
+    await act(async () => root.unmount());
+  });
+
   it("creates an issue in backlog when that status is selected", async () => {
     const onCreate = vi.fn(async () => undefined);
     const root = createRoot(container);
