@@ -622,6 +622,7 @@ body { overflow: hidden; font-synthesis: none; }
 .issue-context-item > small { max-width:112px; overflow:hidden; color:#898a85; font-size:var(--text-xs); text-overflow:ellipsis; white-space:nowrap; }
 .issue-context-item[data-highlighted],.issue-context-item[data-state="open"] { color:#4f3b91; background:#f1edfb; }
 .issue-context-item[data-highlighted] > svg,.issue-context-item[data-state="open"] > svg { color:#7058bd; }
+.issue-context-item[data-disabled] { opacity:.48; cursor:not-allowed; }
 .issue-context-choice { grid-template-columns:18px minmax(0,1fr); }
 .issue-context-check { width:18px; height:18px; display:grid; place-items:center; color:#7058bd; }
 .issue-context-item.danger { color:#b44155; }

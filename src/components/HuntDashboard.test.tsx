@@ -122,15 +122,63 @@ describe("HuntDashboard", () => {
     );
     expect(menu?.textContent).toContain("상태");
     expect(menu?.textContent).toContain("우선순위");
+    expect(menu?.textContent).toContain("바로 처리하기");
     expect(menu?.textContent).toContain("열기");
     expect(menu?.textContent).toContain("수정");
     expect(menu?.textContent).toContain("삭제");
+    const processNowItem = Array.from(
+      menu?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [],
+    ).find((item) => item.textContent?.includes("바로 처리하기"));
+    expect(processNowItem?.hasAttribute("data-disabled")).toBe(true);
 
     const editItem = Array.from(
       menu?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [],
     ).find((item) => item.textContent?.trim() === "수정");
     await act(async () => editItem?.click());
     expect(container.querySelector(".edit-issue-dialog")).not.toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("starts the selected queued issue directly from its context menu", async () => {
+    const onProcessIssueNow = vi.fn();
+    const queuedRun = {
+      ...demoDashboard.runs[0],
+      status: "queued" as const,
+      workflowStage: null,
+      progress: 0,
+      claimedBy: null,
+      claimedAt: null,
+      leaseExpiresAt: null,
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={{ ...demoDashboard, runs: [queuedRun] }}
+        onProcessIssueNow={onProcessIssueNow}
+      />,
+    ));
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".kanban-card")?.dispatchEvent(
+        new MouseEvent("contextmenu", {
+          bubbles: true,
+          button: 2,
+          cancelable: true,
+        }),
+      );
+    });
+    const processItem = Array.from(
+      document.body.querySelectorAll<HTMLElement>('[role="menuitem"]'),
+    ).find((item) => item.textContent?.includes("바로 처리하기"));
+
+    expect(processItem?.hasAttribute("data-disabled")).toBe(false);
+    await act(async () => processItem?.click());
+    expect(onProcessIssueNow).toHaveBeenCalledWith(queuedRun);
 
     await act(async () => root.unmount());
     container.remove();

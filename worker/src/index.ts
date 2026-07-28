@@ -610,6 +610,7 @@ const claimInputSchema = z
   .object({
     claimedBy: z.string().trim().min(1).max(128),
     workerId: z.string().trim().min(1).max(128).optional(),
+    runId: z.string().uuid().optional(),
   })
   .strict();
 
@@ -2557,6 +2558,7 @@ async function route(
       claimedBy: input.claimedBy,
       claimedAt,
       leaseExpiresAt,
+      runId: input.runId,
     });
     if (run && input.workerId) {
       await attributeRunToWorker(db, projectId, {

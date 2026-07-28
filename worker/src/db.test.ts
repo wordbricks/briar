@@ -1655,6 +1655,35 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ).resolves.toBeUndefined();
   });
 
+  it("claims a specifically requested queued run without taking the queue head", async () => {
+    const requestedId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 21.5, {
+        sourceKey: "requested-queued-issue",
+        eventKey: "requested-queued-issue:queued:intake",
+        title: "Requested queued issue",
+        priority: 4,
+        branch: null,
+        commitSha: null,
+      }),
+    );
+
+    const claimed = await claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: "d".repeat(64),
+      claimedBy: "direct-dispatch",
+      claimedAt: atMinute(22),
+      leaseExpiresAt: atMinute(32),
+      runId: requestedId,
+    });
+
+    expect(claimed?.id).toBe(requestedId);
+    expect(claimed?.title).toBe("Requested queued issue");
+    expect((await getNextQueuedHuntRun(db, projectId))?.title).toBe(
+      "Urgent queued issue",
+    );
+  });
+
   it("retries failed runs as a new attempt while preserving prior evidence", async () => {
     const sourceKey = "recovery-run";
     const sharedAnalyzingKey = "recovery:analyzing:stable";

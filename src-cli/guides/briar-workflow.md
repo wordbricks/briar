@@ -62,6 +62,12 @@ briar queue claim
 ```
 
 The result contains `work` or `null`. Stop when it is `null`; never invent queue work.
+To claim one specific queued run, pass its ID:
+
+```sh
+briar queue claim --run '<run-id>'
+```
+
 The default workspace mode follows project settings. Override it only when the task requires:
 
 ```sh

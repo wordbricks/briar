@@ -51,6 +51,10 @@ import {
 } from "./lib/platform";
 import { issueAgentConversation } from "./lib/issue-agent-reply";
 import { isRepositoryConnectedForImport } from "./lib/linear-import";
+import { loadProjectAgents } from "./lib/api";
+import { demoProjectAgents } from "./lib/demo-project-agents";
+import { useI18n } from "./i18n";
+import type { HuntRun } from "./types";
 
 type ActivePage =
   | "issues"
@@ -63,6 +67,7 @@ type ActivePage =
   | "settings";
 
 export function App() {
+  const { locale, t } = useI18n();
   const autoHunt = useAutoHuntSessions();
   const scheduleSessionOptions = useMemo<UseBriarOptions>(() => ({
     startScheduledAgentSession: (run) =>
@@ -117,6 +122,12 @@ export function App() {
     null,
   );
   const [isIssueDialogOpen, setIsIssueDialogOpen] = useState(false);
+  const [quickStartingRunId, setQuickStartingRunId] = useState<string | null>(
+    null,
+  );
+  const [quickProcessError, setQuickProcessError] = useState<string | null>(
+    null,
+  );
   const [companionPage, setCompanionPage] = useState<
     "issues" | "search" | "inbox" | "settings"
   >("issues");
@@ -132,6 +143,15 @@ export function App() {
   const activeProject = briar.projects.find(
     (project) => project.id === briar.activeProjectId,
   );
+  const processingIssueIds = useMemo(() => {
+    const runIds = new Set<string>();
+    if (quickStartingRunId) runIds.add(quickStartingRunId);
+    for (const session of autoHunt.sessions) {
+      if (session.status !== "running") continue;
+      for (const issue of session.issues) runIds.add(issue.runId);
+    }
+    return runIds;
+  }, [autoHunt.sessions, quickStartingRunId]);
   const hasDeferredFirstProject =
     briar.user !== null &&
     (deferredProjectOnboardingUserId === briar.user.id ||
@@ -158,6 +178,37 @@ export function App() {
         : null;
     return briar.addIssueMessage(runId, input, agentConversation);
   };
+  const processIssueNow = async (run: HuntRun) => {
+    if (!activeProject) return;
+    setQuickStartingRunId(run.id);
+    setQuickProcessError(null);
+    try {
+      const agents = briar.token
+        ? await loadProjectAgents(briar.token, activeProject.id, locale)
+        : demoProjectAgents(activeProject.id, locale);
+      const agent = agents[0];
+      if (!agent) {
+        throw new Error(t("issue.processNowNoAgent"));
+      }
+      autoHunt.startSession(
+        activeProject.id,
+        [run],
+        () => void briar.refresh(),
+        { agent, maxIssues: 1 },
+      );
+    } catch (caught) {
+      setQuickProcessError(
+        caught instanceof Error ? caught.message : String(caught),
+      );
+    } finally {
+      setQuickStartingRunId(null);
+    }
+  };
+
+  useEffect(() => {
+    setQuickProcessError(null);
+    setQuickStartingRunId(null);
+  }, [briar.activeProjectId]);
 
   useEffect(() => {
     if (!briar.user || hasCompletedOnboarding) return;
@@ -518,7 +569,7 @@ export function App() {
         ) : (
           <HuntDashboard
             dashboard={briar.dashboard}
-            error={briar.error}
+            error={quickProcessError ?? briar.error}
             isCreatingIssue={briar.isCreatingIssue}
             isIssueDialogOpen={isIssueDialogOpen}
             deletingIssueId={briar.deletingIssueId}
@@ -539,10 +590,12 @@ export function App() {
             onLoadIssueMessages={briar.readIssueMessages}
             onLoadRunEvidence={briar.readRunEvidence}
             onMoveRun={briar.moveRun}
+            onProcessIssueNow={(run) => void processIssueNow(run)}
             onRetryRun={briar.retryRun}
             onCancelRun={briar.cancelRun}
             onRequestedRunOpen={() => setRequestedRunId(null)}
             onSendIssueMessage={sendIssueMessage}
+            processingIssueIds={processingIssueIds}
           />
           )}
         </div>

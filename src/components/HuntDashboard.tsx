@@ -139,6 +139,7 @@ export function HuntDashboard({
   onLoadIssueMessages,
   onLoadRunEvidence,
   onMoveRun,
+  onProcessIssueNow,
   onRetryRun,
   onCancelRun,
   onCompanionInboxOpen,
@@ -147,6 +148,7 @@ export function HuntDashboard({
   onRequestedRunOpen,
   onSendIssueMessage,
   requestedRunId = null,
+  processingIssueIds = new Set<string>(),
 }: {
   companionMode?: boolean;
   companionSearchMode?: boolean;
@@ -173,6 +175,7 @@ export function HuntDashboard({
   onLoadIssueMessages: (runId: string) => Promise<IssueMessage[]>;
   onLoadRunEvidence: (runId: string) => Promise<RunEvidence[]>;
   onMoveRun: (runId: string, placement: HuntRunPlacement) => Promise<unknown>;
+  onProcessIssueNow?: (run: HuntRun) => void;
   onRetryRun: (runId: string) => Promise<unknown>;
   onCancelRun: (runId: string) => Promise<unknown>;
   onCompanionInboxOpen?: () => void;
@@ -184,6 +187,7 @@ export function HuntDashboard({
     input: { body: string; parentMessageId: string | null },
   ) => Promise<IssueMessageSendResult>;
   requestedRunId?: string | null;
+  processingIssueIds?: ReadonlySet<string>;
 }) {
   const { t } = useI18n();
   const [query, setQuery] = useState("");
@@ -589,6 +593,7 @@ export function HuntDashboard({
               onMoveRun(run.id, placement).catch(() => undefined)
             }
             onOpen={(runId) => setSelectedRunId(runId)}
+            onProcessIssueNow={onProcessIssueNow}
             onPriorityChange={(run, priority) =>
               onUpdateIssue(run.id, {
                 title: run.title,
@@ -597,6 +602,7 @@ export function HuntDashboard({
               }).catch(() => undefined)
             }
             runs={filtered}
+            processingIssueIds={processingIssueIds}
             updatingIssueId={updatingIssueId}
           />
         ) : <div aria-label={t("dashboard.kanbanBoard")} className="kanban-board">
@@ -669,6 +675,11 @@ export function HuntDashboard({
                       onMoveRun(run.id, placement).catch(() => undefined)
                     }
                     onOpen={() => setSelectedRunId(run.id)}
+                    onProcessNow={
+                      onProcessIssueNow
+                        ? () => onProcessIssueNow(run)
+                        : undefined
+                    }
                     onPriorityChange={(priority) =>
                       onUpdateIssue(run.id, {
                         title: run.title,
@@ -677,6 +688,7 @@ export function HuntDashboard({
                       }).catch(() => undefined)
                     }
                     run={run}
+                    isProcessing={processingIssueIds.has(run.id)}
                     updatingIssueId={updatingIssueId}
                   />
                 )) : (
@@ -1264,6 +1276,7 @@ function KanbanCard({
   contextMenuDisabled,
   deletingIssueId,
   isMoving,
+  isProcessing,
   onDelete,
   onDragEnd,
   onDragStart,
@@ -1271,12 +1284,14 @@ function KanbanCard({
   onMove,
   run,
   onOpen,
+  onProcessNow,
   onPriorityChange,
   updatingIssueId,
 }: {
   contextMenuDisabled: boolean;
   deletingIssueId: string | null;
   isMoving: boolean;
+  isProcessing: boolean;
   onDelete: () => void;
   onDragEnd: () => void;
   onDragStart: (event: DragEvent<HTMLButtonElement>) => void;
@@ -1284,6 +1299,7 @@ function KanbanCard({
   onMove: (placement: HuntRunPlacement) => void;
   run: HuntRun;
   onOpen: () => void;
+  onProcessNow?: () => void;
   onPriorityChange: (priority: number | null) => void;
   updatingIssueId: string | null;
 }) {
@@ -1306,8 +1322,10 @@ function KanbanCard({
       onEdit={onEdit}
       onMove={onMove}
       onOpen={onOpen}
+      onProcessNow={onProcessNow}
       onPriorityChange={onPriorityChange}
       run={run}
+      isProcessing={isProcessing}
     >
       <button
         aria-label={t("run.details", { title: run.title })}
@@ -1351,8 +1369,10 @@ function IssueContextMenu({
   onEdit,
   onMove,
   onOpen,
+  onProcessNow,
   onPriorityChange,
   run,
+  isProcessing,
 }: {
   children: ReactElement;
   disabled: boolean;
@@ -1360,8 +1380,10 @@ function IssueContextMenu({
   onEdit: () => void;
   onMove: (placement: HuntRunPlacement) => void;
   onOpen: () => void;
+  onProcessNow?: () => void;
   onPriorityChange: (priority: number | null) => void;
   run: HuntRun;
+  isProcessing: boolean;
 }) {
   const { t } = useI18n();
   const statusOptions = [
@@ -1392,6 +1414,12 @@ function IssueContextMenu({
   const currentPriorityLabel =
     priorityOptions.find((option) => option.value === currentPriority)?.label ??
     t("run.notSet");
+  const isClaimed =
+    run.status === "queued" &&
+    Boolean(run.leaseExpiresAt) &&
+    Date.parse(run.leaseExpiresAt!) > Date.now();
+  const processNowDisabled =
+    !onProcessNow || run.status !== "queued" || isClaimed || isProcessing;
 
   return (
     <ContextMenu.Root>
@@ -1404,6 +1432,28 @@ function IssueContextMenu({
           className="issue-context-menu"
           collisionPadding={10}
         >
+          <ContextMenu.Item
+            className="issue-context-item"
+            disabled={processNowDisabled}
+            onSelect={() => onProcessNow?.()}
+          >
+            {isProcessing ? (
+              <LoaderCircle aria-hidden="true" className="spin" size={17} />
+            ) : (
+              <Bot aria-hidden="true" size={17} />
+            )}
+            <span>{t("issue.processNow")}</span>
+            {isProcessing ? (
+              <small>{t("issue.processNowRunning")}</small>
+            ) : run.status !== "queued" ? (
+              <small>{t("issue.processNowQueuedOnly")}</small>
+            ) : isClaimed ? (
+              <small>{t("issue.processNowClaimed")}</small>
+            ) : null}
+          </ContextMenu.Item>
+
+          <ContextMenu.Separator className="issue-context-separator" />
+
           <ContextMenu.Sub>
             <ContextMenu.SubTrigger className="issue-context-item">
               <Activity aria-hidden="true" size={17} />
@@ -1529,8 +1579,10 @@ function IssueList({
   onEdit,
   onMove,
   onOpen,
+  onProcessIssueNow,
   onPriorityChange,
   runs,
+  processingIssueIds,
   updatingIssueId,
 }: {
   deletingIssueId: string | null;
@@ -1538,8 +1590,10 @@ function IssueList({
   onEdit: (runId: string) => void;
   onMove: (run: HuntRun, placement: HuntRunPlacement) => void;
   onOpen: (runId: string) => void;
+  onProcessIssueNow?: (run: HuntRun) => void;
   onPriorityChange: (run: HuntRun, priority: number | null) => void;
   runs: HuntRun[];
+  processingIssueIds: ReadonlySet<string>;
   updatingIssueId: string | null;
 }) {
   const { t } = useI18n();
@@ -1593,10 +1647,16 @@ function IssueList({
               onEdit={() => onEdit(run.id)}
               onMove={(placement) => onMove(run, placement)}
               onOpen={() => onOpen(run.id)}
+              onProcessNow={
+                onProcessIssueNow
+                  ? () => onProcessIssueNow(run)
+                  : undefined
+              }
               onPriorityChange={(priority) =>
                 onPriorityChange(run, priority)
               }
               run={run}
+              isProcessing={processingIssueIds.has(run.id)}
             >
               <div
                 aria-label={t("run.details", { title: run.title })}
