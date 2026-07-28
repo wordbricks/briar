@@ -995,11 +995,20 @@ export function CreateIssueDialog({
             !event.metaKey &&
             !event.ctrlKey;
           if (
-            event.key === "Enter" &&
-            !event.nativeEvent.isComposing &&
-            (isTitleEnter || event.metaKey || event.ctrlKey) &&
-            !isSubmitting
+            event.key !== "Enter" ||
+            event.nativeEvent.isComposing ||
+            isSubmitting
           ) {
+            return;
+          }
+          if (isTitleEnter) {
+            event.preventDefault();
+            event.currentTarget
+              .querySelector<HTMLTextAreaElement>(".issue-description-input")
+              ?.focus();
+            return;
+          }
+          if (event.metaKey || event.ctrlKey) {
             event.preventDefault();
             event.currentTarget.requestSubmit();
           }
