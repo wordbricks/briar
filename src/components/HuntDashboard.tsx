@@ -2689,22 +2689,24 @@ function IssueConversation({
   const messageListRef = useRef<HTMLDivElement | null>(null);
   const threadContentRef = useRef<HTMLDivElement | null>(null);
   const threadTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const onLoadRef = useRef(onLoad);
+  onLoadRef.current = onLoad;
 
   const loadMessages = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
     try {
-      setMessages(await onLoad());
+      setMessages(await onLoadRef.current());
     } catch {
       setLoadError(t("run.messagesLoadFailed"));
     } finally {
       setLoading(false);
     }
-  }, [onLoad, t]);
+  }, [t]);
 
   useEffect(() => {
     void loadMessages();
-  }, [loadMessages]);
+  }, [loadMessages, run.id]);
 
   useEffect(() => {
     if (!activeThreadId) return;

@@ -839,6 +839,69 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
+  it("keeps loaded messages visible when the run snapshot refreshes", async () => {
+    const createdAt = new Date().toISOString();
+    const loadedMessage: IssueMessage = {
+      id: "message-loaded",
+      runId: demoDashboard.runs[0].id,
+      parentMessageId: null,
+      body: "계속 보여야 하는 메시지",
+      author: { id: "jay", name: "Jay", image: null, provider: null },
+      replyCount: 0,
+      createdAt,
+      updatedAt: createdAt,
+    };
+    const onLoadIssueMessages = vi
+      .fn<() => Promise<IssueMessage[]>>()
+      .mockResolvedValueOnce([loadedMessage])
+      .mockImplementation(() => new Promise(() => undefined));
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    const renderPage = (run = demoDashboard.runs[0]) => (
+      <RunPage
+        isSidebarOpen
+        error={null}
+        isRecovering={false}
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={() => onLoadIssueMessages()}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }}
+        run={run}
+      />
+    );
+
+    await act(async () => root.render(renderPage()));
+    expect(onLoadIssueMessages).toHaveBeenCalledOnce();
+    expect(container.querySelector(".issue-message-list")?.textContent).toContain(
+      loadedMessage.body,
+    );
+
+    await act(async () => {
+      root.render(
+        renderPage({
+          ...demoDashboard.runs[0],
+          updatedAt: new Date(Date.now() + 15_000).toISOString(),
+        }),
+      );
+    });
+
+    expect(onLoadIssueMessages).toHaveBeenCalledOnce();
+    expect(container.querySelector(".issue-message-state")).toBeNull();
+    expect(container.querySelector(".issue-message-list")?.textContent).toContain(
+      loadedMessage.body,
+    );
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("scrolls the conversation to the bottom after loading and sending", async () => {
     const createdAt = new Date().toISOString();
     const loadedMessage: IssueMessage = {
