@@ -1,14 +1,12 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   BellRing,
   Bot,
   Check,
   CheckCircle2,
-  ChevronDown,
   ChevronRight,
   CircleAlert,
   Clock3,
-  History,
   Inbox as InboxIcon,
   Siren,
 } from "lucide-react";
@@ -20,11 +18,24 @@ import { cn } from "@/lib/utils";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
 import {
-  groupInboxMessages,
+  classifyInboxMessage,
   type InboxCategory,
   type InboxIssueMessage,
   type InboxMessageWithReadState,
 } from "../hooks/useInbox";
+
+const inboxFilters = [
+  "urgent",
+  "action_required",
+  "important",
+  "activity",
+] as const satisfies readonly InboxCategory[];
+
+const defaultInboxFilters = new Set<InboxCategory>([
+  "urgent",
+  "action_required",
+  "important",
+]);
 
 export function Inbox({
   companionMode = false,
@@ -42,12 +53,36 @@ export function Inbox({
   unreadCount: number;
 }) {
   const { localeTag, t } = useI18n();
-  const [showsActivity, setShowsActivity] = useState(false);
-  const grouped = groupInboxMessages(messages);
-  const priorityCount =
-    grouped.urgent.length +
-    grouped.action_required.length +
-    grouped.important.length;
+  const [activeFilters, setActiveFilters] = useState<Set<InboxCategory>>(
+    () => new Set(defaultInboxFilters),
+  );
+  const categoryCounts = useMemo(
+    () =>
+      messages.reduce<Record<InboxCategory, number>>(
+        (counts, message) => {
+          counts[classifyInboxMessage(message)] += 1;
+          return counts;
+        },
+        { urgent: 0, action_required: 0, important: 0, activity: 0 },
+      ),
+    [messages],
+  );
+  const filteredMessages = useMemo(
+    () =>
+      messages.filter((message) =>
+        activeFilters.has(classifyInboxMessage(message)),
+      ),
+    [activeFilters, messages],
+  );
+
+  const toggleFilter = (category: InboxCategory) => {
+    setActiveFilters((current) => {
+      const next = new Set(current);
+      if (next.has(category)) next.delete(category);
+      else next.add(category);
+      return next;
+    });
+  };
 
   const inboxContent = (
     <div className="inbox-scroll min-h-0 flex-1 overflow-auto">
@@ -77,12 +112,32 @@ export function Inbox({
           aria-label={t("inbox.messages")}
           className="inbox-panel rounded-none border-0 bg-card"
         >
-          <header className="inbox-summary">
-            <Typography as="strong" variant="body">
-              {t("inbox.needsAttention")}
-            </Typography>
+          <header className="inbox-filter-bar">
+            <div
+              aria-label={t("inbox.filters")}
+              className="inbox-filters"
+              role="group"
+            >
+              {inboxFilters.map((category) => (
+                <button
+                  aria-pressed={activeFilters.has(category)}
+                  className={cn("inbox-filter", category)}
+                  key={category}
+                  onClick={() => toggleFilter(category)}
+                  type="button"
+                >
+                  <FilterIcon category={category} />
+                  <span>
+                    {t(`inbox.category.${category}` as MessageKey)}
+                  </span>
+                  <span className="inbox-filter-count">
+                    {categoryCounts[category]}
+                  </span>
+                </button>
+              ))}
+            </div>
             <Typography as="span" tone="muted" variant="caption">
-              {t("inbox.priorityCount", { count: priorityCount })}
+              {t("inbox.filteredCount", { count: filteredMessages.length })}
             </Typography>
           </header>
 
@@ -93,84 +148,25 @@ export function Inbox({
               icon={<InboxIcon size={23} />}
               title={t("inbox.emptyTitle")}
             />
+          ) : filteredMessages.length === 0 ? (
+            <EmptyState
+              className="inbox-empty"
+              description={t("inbox.filterEmptyDescription")}
+              icon={<InboxIcon size={23} />}
+              title={t("inbox.filterEmptyTitle")}
+            />
           ) : (
-            <div className="inbox-sections">
-              <InboxSection
-                category="urgent"
-                localeTag={localeTag}
-                messages={grouped.urgent}
-                onOpen={onOpen}
-                t={t}
-              />
-              <InboxSection
-                category="action_required"
-                localeTag={localeTag}
-                messages={grouped.action_required}
-                onOpen={onOpen}
-                t={t}
-              />
-              <InboxSection
-                category="important"
-                localeTag={localeTag}
-                messages={grouped.important}
-                onOpen={onOpen}
-                t={t}
-              />
-
-              <section
-                aria-labelledby="inbox-activity-heading"
-                className="inbox-section inbox-section-activity"
-              >
-                <button
-                  aria-expanded={showsActivity}
-                  className="inbox-section-heading inbox-activity-toggle"
-                  disabled={grouped.activity.length === 0}
-                  onClick={() => setShowsActivity((current) => !current)}
-                  type="button"
-                >
-                  <span className="inbox-section-title">
-                    <History aria-hidden="true" size={15} />
-                    <Typography
-                      as="strong"
-                      id="inbox-activity-heading"
-                      variant="bodySm"
-                    >
-                      {t("inbox.category.activity")}
-                    </Typography>
-                    <span className="inbox-section-count">
-                      {grouped.activity.length}
-                    </span>
-                  </span>
-                  {grouped.activity.length > 0 ? (
-                    <span className="inbox-activity-action">
-                      {showsActivity
-                        ? t("inbox.collapseActivity")
-                        : t("inbox.expandActivity")}
-                      <ChevronDown
-                        className={cn(
-                          "inbox-activity-chevron",
-                          showsActivity && "open",
-                        )}
-                        size={15}
-                      />
-                    </span>
-                  ) : null}
-                </button>
-                {showsActivity ? (
-                  <div className="inbox-list">
-                    {grouped.activity.map((message) => (
-                      <InboxMessageRow
-                        category="activity"
-                        key={message.id}
-                        localeTag={localeTag}
-                        message={message}
-                        onOpen={onOpen}
-                        t={t}
-                      />
-                    ))}
-                  </div>
-                ) : null}
-              </section>
+            <div className="inbox-list">
+              {filteredMessages.map((message) => (
+                <InboxMessageRow
+                  category={classifyInboxMessage(message)}
+                  key={message.id}
+                  localeTag={localeTag}
+                  message={message}
+                  onOpen={onOpen}
+                  t={t}
+                />
+              ))}
             </div>
           )}
         </section>
@@ -197,56 +193,15 @@ export function Inbox({
   );
 }
 
-function InboxSection({
-  category,
-  localeTag,
-  messages,
-  onOpen,
-  t,
-}: {
-  category: Exclude<InboxCategory, "activity">;
-  localeTag: string;
-  messages: InboxMessageWithReadState[];
-  onOpen: (message: InboxMessageWithReadState) => void;
-  t: (key: MessageKey, values?: Record<string, string | number>) => string;
-}) {
-  const id = `inbox-${category}-heading`;
-  return (
-    <section
-      aria-labelledby={id}
-      className={cn("inbox-section", category)}
-    >
-      <header className="inbox-section-heading">
-        <span className="inbox-section-title">
-          {category === "urgent" ? (
-            <Siren aria-hidden="true" size={15} />
-          ) : category === "action_required" ? (
-            <CircleAlert aria-hidden="true" size={15} />
-          ) : (
-            <BellRing aria-hidden="true" size={15} />
-          )}
-          <Typography as="strong" id={id} variant="bodySm">
-            {t(`inbox.category.${category}` as MessageKey)}
-          </Typography>
-          <span className="inbox-section-count">{messages.length}</span>
-        </span>
-      </header>
-      {messages.length > 0 ? (
-        <div className="inbox-list">
-          {messages.map((message) => (
-            <InboxMessageRow
-              category={category}
-              key={message.id}
-              localeTag={localeTag}
-              message={message}
-              onOpen={onOpen}
-              t={t}
-            />
-          ))}
-        </div>
-      ) : null}
-    </section>
-  );
+function FilterIcon({ category }: { category: InboxCategory }) {
+  if (category === "urgent") return <Siren aria-hidden="true" size={14} />;
+  if (category === "action_required") {
+    return <CircleAlert aria-hidden="true" size={14} />;
+  }
+  if (category === "important") {
+    return <BellRing aria-hidden="true" size={14} />;
+  }
+  return <Clock3 aria-hidden="true" size={14} />;
 }
 
 function InboxMessageRow({
@@ -265,7 +220,7 @@ function InboxMessageRow({
   return (
     <button
       className={cn(
-        "inbox-message flex w-full items-center gap-3 border-b border-border/80 px-8 py-4 text-left transition-colors hover:bg-secondary/60",
+        "inbox-message",
         category,
         message.isUnread && category !== "activity" && "unread",
       )}
@@ -280,53 +235,48 @@ function InboxMessageRow({
           message.status,
         )}
       >
-        {category === "urgent" ? (
+        {message.kind === "session" ? (
+          <Bot size={17} />
+        ) : category === "urgent" ? (
           <Siren size={17} />
         ) : category === "action_required" ? (
           <CircleAlert size={17} />
         ) : category === "important" ? (
           <BellRing size={17} />
-        ) : message.kind === "session" ? (
-          <Bot size={17} />
         ) : message.status === "completed" ? (
           <CheckCircle2 size={17} />
         ) : (
           <Clock3 size={17} />
         )}
       </span>
-      <span className="inbox-message-copy min-w-0 flex-1 grid gap-1">
-        <span className="flex min-w-0 items-center gap-2">
-          <Typography as="strong" className="truncate" variant="bodySm">
-            {messageTitle(t, message)}
-          </Typography>
-          {message.isUnread && category !== "activity" ? (
-            <i
-              aria-label={t("inbox.unread")}
-              className="inbox-unread-dot size-1.5 shrink-0 rounded-full bg-primary"
-            />
-          ) : null}
-        </span>
-        <Typography as="small" className="truncate" tone="muted" variant="caption">
-          {messageDescription(t, message)}
+      <span className="inbox-message-copy">
+        <Typography as="strong" className="truncate" variant="bodySm">
+          {messageTitle(t, message)}
         </Typography>
-        {message.kind === "issue" &&
-        message.structuredResult?.humanActionRequired &&
-        message.structuredResult.nextAction ? (
-          <small className="inbox-next-action">
-            {t("inbox.nextAction", {
-              action: message.structuredResult.nextAction,
-            })}
-          </small>
+        {message.isUnread && category !== "activity" ? (
+          <i
+            aria-label={t("inbox.unread")}
+            className="inbox-unread-dot"
+          />
         ) : null}
-        <em className="flex items-center gap-1.5 text-2xs font-normal text-muted-foreground not-italic">
-          <span>{message.projectName}</span>
-          <Clock3 size={11} />
-          <time dateTime={message.occurredAt}>
-            {formatDate(message.occurredAt, localeTag)}
-          </time>
-        </em>
+        <small className="inbox-message-detail">
+          <span className="inbox-message-project">{message.projectName}</span>
+          <span aria-hidden="true" className="inbox-message-separator">
+            ·
+          </span>
+          <span className="inbox-message-description">
+            {messageSecondaryText(t, message)}
+          </span>
+        </small>
       </span>
-      <ChevronRight className="shrink-0 text-muted-foreground" size={16} />
+      <ChevronRight className="inbox-message-chevron" size={15} />
+      <time
+        className="inbox-message-time"
+        dateTime={message.occurredAt}
+        title={formatDate(message.occurredAt, localeTag)}
+      >
+        {formatRelativeDate(message.occurredAt, localeTag)}
+      </time>
     </button>
   );
 }
@@ -368,6 +318,22 @@ function messageDescription(
   );
 }
 
+function messageSecondaryText(
+  t: (key: MessageKey, values?: Record<string, string | number>) => string,
+  message: InboxMessageWithReadState,
+) {
+  if (
+    message.kind === "issue" &&
+    message.structuredResult?.humanActionRequired &&
+    message.structuredResult.nextAction
+  ) {
+    return t("inbox.nextAction", {
+      action: message.structuredResult.nextAction,
+    });
+  }
+  return messageDescription(t, message);
+}
+
 function issueStatusLabel(
   t: (key: MessageKey, values?: Record<string, string | number>) => string,
   message: InboxIssueMessage,
@@ -384,5 +350,31 @@ function formatDate(value: string, localeTag: string) {
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function formatRelativeDate(value: string, localeTag: string) {
+  const elapsed = new Date(value).getTime() - Date.now();
+  const absoluteElapsed = Math.abs(elapsed);
+  const minute = 60_000;
+  const hour = minute * 60;
+  const day = hour * 24;
+  const relative = new Intl.RelativeTimeFormat(localeTag, {
+    numeric: "always",
+    style: "narrow",
+  });
+
+  if (absoluteElapsed < hour) {
+    return relative.format(Math.round(elapsed / minute), "minute");
+  }
+  if (absoluteElapsed < day) {
+    return relative.format(Math.round(elapsed / hour), "hour");
+  }
+  if (absoluteElapsed < day * 7) {
+    return relative.format(Math.round(elapsed / day), "day");
+  }
+  return new Intl.DateTimeFormat(localeTag, {
+    month: "short",
+    day: "numeric",
   }).format(new Date(value));
 }
