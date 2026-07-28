@@ -916,6 +916,21 @@ describe("HuntDashboard", () => {
       id: "message-new-reply",
       body: "새 스레드 답장",
     };
+    const agentReply: IssueMessage = {
+      ...sentReply,
+      id: "message-agent-reply",
+      body: "스레드에서 답변합니다.",
+      author: {
+        id: null,
+        name: "Briar · Codex",
+        image: null,
+        provider: "codex",
+      },
+    };
+    let resolveAgentReply: (message: IssueMessage) => void = () => undefined;
+    const pendingAgentReply = new Promise<IssueMessage>((resolve) => {
+      resolveAgentReply = resolve;
+    });
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
@@ -934,7 +949,7 @@ describe("HuntDashboard", () => {
           onRetry={async () => undefined}
           onSendIssueMessage={async () => ({
             message: sentReply,
-            agentReply: null,
+            agentReply: pendingAgentReply,
           })}
           run={demoDashboard.runs[0]}
         />,
@@ -991,6 +1006,22 @@ describe("HuntDashboard", () => {
       await Promise.resolve();
     });
     expect(threadContent?.scrollTop).toBe(480);
+    expect(
+      threadContent.querySelector(":scope > .issue-agent-reply-state")
+        ?.textContent,
+    ).toContain("Briar가 답변을 작성하고 있습니다");
+    expect(
+      container.querySelector(".issue-message-list > .issue-agent-reply-state"),
+    ).toBeNull();
+
+    await act(async () => {
+      resolveAgentReply(agentReply);
+      await pendingAgentReply;
+    });
+    expect(threadContent.textContent).toContain(agentReply.body);
+    expect(
+      threadContent.querySelector(":scope > .issue-agent-reply-state"),
+    ).toBeNull();
 
     await act(async () => {
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
@@ -1103,6 +1134,15 @@ describe("HuntDashboard", () => {
     expect(textarea?.value).toBe("");
     expect(container.textContent).toContain(userMessage.body);
     expect(container.textContent).toContain("Briar가 답변을 작성하고 있습니다");
+    const userMessageItem = Array.from(
+      container.querySelectorAll<HTMLElement>(".issue-message"),
+    ).find((item) => item.textContent?.includes(userMessage.body));
+    expect(
+      userMessageItem?.querySelector(".issue-agent-reply-state"),
+    ).not.toBeNull();
+    expect(
+      container.querySelector(".issue-message-list > .issue-agent-reply-state"),
+    ).toBeNull();
     await act(async () => {
       resolveAgentReply(agentMessage);
       await pendingAgentReply;

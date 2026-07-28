@@ -2609,8 +2609,9 @@ function IssueConversation({
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [agentReplyError, setAgentReplyError] = useState<string | null>(null);
-  const [agentReplying, setAgentReplying] = useState(false);
+  const [agentReplyStates, setAgentReplyStates] = useState<
+    Record<string, { pending: number; error: string | null }>
+  >({});
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const messageListRef = useRef<HTMLDivElement | null>(null);
   const threadContentRef = useRef<HTMLDivElement | null>(null);
@@ -2660,18 +2661,22 @@ function IssueConversation({
   const replies = activeThread
     ? repliesByRootId.get(activeThread.id) ?? []
     : [];
+  const pendingAgentReplyCount = Object.values(agentReplyStates).reduce(
+    (total, state) => total + state.pending,
+    0,
+  );
 
   useLayoutEffect(() => {
     const messageList = messageListRef.current;
     if (messageList) messageList.scrollTop = messageList.scrollHeight;
-  }, [agentReplying, loading, messages.length]);
+  }, [loading, messages.length, pendingAgentReplyCount]);
 
   useLayoutEffect(() => {
     const threadContent = threadContentRef.current;
     if (activeThread && threadContent) {
       threadContent.scrollTop = threadContent.scrollHeight;
     }
-  }, [activeThreadId, replies.length]);
+  }, [activeThreadId, pendingAgentReplyCount, replies.length]);
 
   const openThread = (messageId: string, trigger: HTMLButtonElement) => {
     threadTriggerRef.current = trigger;
@@ -2694,19 +2699,50 @@ function IssueConversation({
         ),
         message,
       ]);
-    setAgentReplyError(null);
     const result = await onSend({ body, parentMessageId });
     appendMessage(result.message);
     if (!result.agentReply) return;
-    setAgentReplying(true);
+    const replyThreadId =
+      result.message.parentMessageId ?? result.message.id;
+    setAgentReplyStates((current) => ({
+      ...current,
+      [replyThreadId]: {
+        pending: (current[replyThreadId]?.pending ?? 0) + 1,
+        error: null,
+      },
+    }));
     void result.agentReply
-      .then(appendMessage)
-      .catch((caught: unknown) => {
-        setAgentReplyError(
-          caught instanceof Error ? caught.message : String(caught),
-        );
+      .then((message) => {
+        appendMessage(message);
+        setAgentReplyStates((current) => {
+          const state = current[replyThreadId];
+          if (!state) return current;
+          const pending = Math.max(state.pending - 1, 0);
+          if (pending === 0) {
+            const next = { ...current };
+            delete next[replyThreadId];
+            return next;
+          }
+          return {
+            ...current,
+            [replyThreadId]: { ...state, pending },
+          };
+        });
       })
-      .finally(() => setAgentReplying(false));
+      .catch((caught: unknown) => {
+        const error =
+          caught instanceof Error ? caught.message : String(caught);
+        setAgentReplyStates((current) => ({
+          ...current,
+          [replyThreadId]: {
+            pending: Math.max(
+              (current[replyThreadId]?.pending ?? 1) - 1,
+              0,
+            ),
+            error,
+          },
+        }));
+      });
   };
 
   return (
@@ -2742,21 +2778,14 @@ function IssueConversation({
               localeTag={localeTag}
               message={message}
               onOpenThread={openThread}
+              replyState={
+                message.id === activeThreadId
+                  ? undefined
+                  : agentReplyStates[message.id]
+              }
               threadReplies={repliesByRootId.get(message.id) ?? []}
             />
           ))
-        )}
-        {agentReplying && (
-          <div className="issue-agent-reply-state">
-            <LoaderCircle className="spin" size={14} />
-            {t("run.briarReplying")}
-          </div>
-        )}
-        {agentReplyError && (
-          <div className="issue-agent-reply-state error">
-            <CircleAlert size={14} />
-            {t("run.briarReplyFailed", { error: agentReplyError })}
-          </div>
         )}
       </div>
       <MessageComposer
@@ -2805,6 +2834,9 @@ function IssueConversation({
                     message={message}
                   />
                 ))}
+                <AgentReplyState
+                  state={agentReplyStates[activeThread.id]}
+                />
               </>
             )}
           </div>
@@ -2825,11 +2857,13 @@ function IssueMessageItem({
   localeTag,
   message,
   onOpenThread,
+  replyState,
   threadReplies = [],
 }: {
   localeTag: string;
   message: IssueMessage;
   onOpenThread?: (messageId: string, trigger: HTMLButtonElement) => void;
+  replyState?: { pending: number; error: string | null };
   threadReplies?: IssueMessage[];
 }) {
   const { t } = useI18n();
@@ -2867,6 +2901,7 @@ function IssueMessageItem({
             <ChevronRight aria-hidden="true" size={16} />
           </button>
         )}
+        <AgentReplyState state={replyState} />
       </div>
       {onOpenThread && message.replyCount === 0 && (
         <div
@@ -2888,6 +2923,30 @@ function IssueMessageItem({
         </div>
       )}
     </article>
+  );
+}
+
+function AgentReplyState({
+  state,
+}: {
+  state?: { pending: number; error: string | null };
+}) {
+  const { t } = useI18n();
+  if (!state) return null;
+  if (state.pending > 0) {
+    return (
+      <div className="issue-agent-reply-state">
+        <LoaderCircle className="spin" size={14} />
+        {t("run.briarReplying")}
+      </div>
+    );
+  }
+  if (!state.error) return null;
+  return (
+    <div className="issue-agent-reply-state error">
+      <CircleAlert size={14} />
+      {t("run.briarReplyFailed", { error: state.error })}
+    </div>
   );
 }
 

@@ -833,6 +833,7 @@ body { overflow: hidden; font-synthesis: none; }
 button.issue-message-state { width:100%; cursor:pointer; }
 .issue-message-state.error { color:#a54253; border-color:#efc7ce; background:#fff6f7; }
 .issue-agent-reply-state { margin:4px 10px; padding:9px 11px; display:flex; align-items:center; gap:7px; border-radius:9px; color:#6a57ad; background:#f5f2fc; font-size:var(--text-2xs); }
+.issue-message > div > .issue-agent-reply-state { margin:7px 0 1px; }
 .issue-agent-reply-state.error { color:#a54253; background:#fff1f3; }
 .issue-message-composer { position:relative; flex:0 0 auto; overflow:hidden; display:grid; border:1px solid #d7d8d2; border-radius:13px; background:var(--card); box-shadow:0 4px 16px rgba(43,42,37,.04); transition:border-color .14s ease-out,box-shadow .14s ease-out; }
 .issue-message-composer:focus-within { border-color:#9b88d7; box-shadow:0 0 0 3px rgba(128,104,206,.10),0 6px 20px rgba(43,42,37,.05); }
