@@ -208,10 +208,13 @@ export function HuntDashboard({
     useState(false);
   const isIssueDialogOpen =
     controlledIsIssueDialogOpen ?? internalIsIssueDialogOpen;
-  const setIsIssueDialogOpen = (isOpen: boolean) => {
-    setInternalIsIssueDialogOpen(isOpen);
-    onIssueDialogOpenChange?.(isOpen);
-  };
+  const setIsIssueDialogOpen = useCallback(
+    (isOpen: boolean) => {
+      setInternalIsIssueDialogOpen(isOpen);
+      onIssueDialogOpenChange?.(isOpen);
+    },
+    [onIssueDialogOpenChange],
+  );
   const [editingRunId, setEditingRunId] = useState<string | null>(null);
   const [deletingRunFromMenuId, setDeletingRunFromMenuId] =
     useState<string | null>(null);
@@ -220,6 +223,29 @@ export function HuntDashboard({
   );
   const [draggedRunId, setDraggedRunId] = useState<string | null>(null);
   const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (noProject) return;
+
+    const openIssueCreation = (event: KeyboardEvent) => {
+      if (
+        event.isComposing ||
+        !event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        event.shiftKey ||
+        (event.code !== "KeyN" && event.key.toLowerCase() !== "n")
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      setIsIssueDialogOpen(true);
+    };
+
+    window.addEventListener("keydown", openIssueCreation);
+    return () => window.removeEventListener("keydown", openIssueCreation);
+  }, [noProject, setIsIssueDialogOpen]);
 
   useEffect(() => {
     if (!isSourceFilterOpen) return;
@@ -515,6 +541,7 @@ export function HuntDashboard({
           <div className="queue-tools">
             {!companionMode && (
               <Button
+                aria-keyshortcuts="Meta+N"
                 aria-label={t("dashboard.createIssue")}
                 className="create-issue-button"
                 onClick={() => setIsIssueDialogOpen(true)}

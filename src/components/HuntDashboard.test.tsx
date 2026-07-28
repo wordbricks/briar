@@ -62,6 +62,40 @@ describe("HuntDashboard", () => {
     expect(markup).toContain('aria-label="새 Auto Hunt 이슈"');
   });
 
+  it("opens issue creation with Command-N", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={demoDashboard}
+      />,
+    ));
+
+    expect(
+      container.querySelector('[aria-keyshortcuts="Meta+N"]'),
+    ).not.toBeNull();
+    const shortcut = new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      code: "KeyN",
+      key: "n",
+      metaKey: true,
+    });
+    await act(async () => {
+      window.dispatchEvent(shortcut);
+    });
+
+    expect(shortcut.defaultPrevented).toBe(true);
+    expect(
+      container.querySelector('[aria-label="새 Auto Hunt 이슈"]'),
+    ).not.toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("shows a safe projectless state after onboarding is deferred", () => {
     const markup = renderToStaticMarkup(
       <HuntDashboard
