@@ -2023,6 +2023,7 @@ enum ProjectWorkspaceMode {
     Connected,
     LatestRemoteBase,
     IssueWorktree,
+    IssueContext,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -3596,13 +3597,7 @@ async fn project_llm_chat(
             );
         }
         let workspace_mode = workspace_mode.unwrap_or_default();
-        let latest_workspace = match workspace_mode {
-            ProjectWorkspaceMode::Connected => None,
-            ProjectWorkspaceMode::LatestRemoteBase => {
-                prepare_latest_remote_workspace(runner.as_ref(), &connected_workspace)?
-            }
-            ProjectWorkspaceMode::IssueWorktree => None,
-        };
+        let mut issue_workspace_error = None;
         let issue_workspace = match workspace_mode {
             ProjectWorkspaceMode::IssueWorktree => Some(resolve_issue_worktree(
                 runner.as_ref(),
@@ -3612,7 +3607,44 @@ async fn project_llm_chat(
                     .ok_or_else(|| "이슈 워크트리 실행에는 run ID가 필요합니다.".to_string())?,
                 workspace_branch.as_deref(),
             )?),
+            ProjectWorkspaceMode::IssueContext => {
+                let run_id = workspace_run_id
+                    .as_deref()
+                    .ok_or_else(|| "이슈 컨텍스트 실행에는 run ID가 필요합니다.".to_string())?;
+                match resolve_issue_worktree(
+                    runner.as_ref(),
+                    &connected_workspace,
+                    run_id,
+                    workspace_branch.as_deref(),
+                ) {
+                    Ok(workspace) => Some(workspace),
+                    Err(error) => {
+                        issue_workspace_error = Some(error);
+                        None
+                    }
+                }
+            }
             ProjectWorkspaceMode::Connected | ProjectWorkspaceMode::LatestRemoteBase => None,
+        };
+        let latest_workspace = match workspace_mode {
+            ProjectWorkspaceMode::LatestRemoteBase => {
+                prepare_latest_remote_workspace(runner.as_ref(), &connected_workspace)?
+            }
+            ProjectWorkspaceMode::IssueContext if issue_workspace.is_none() => {
+                prepare_latest_remote_workspace(runner.as_ref(), &connected_workspace).map_err(
+                    |fallback_error| {
+                        format!(
+                            "{} 최신 저장소 컨텍스트도 준비하지 못했습니다: {fallback_error}",
+                            issue_workspace_error
+                                .as_deref()
+                                .unwrap_or("이슈 워크트리를 사용할 수 없습니다.")
+                        )
+                    },
+                )?
+            }
+            ProjectWorkspaceMode::Connected
+            | ProjectWorkspaceMode::IssueWorktree
+            | ProjectWorkspaceMode::IssueContext => None,
         };
         let workspace = issue_workspace
             .as_deref()
@@ -5623,6 +5655,15 @@ branch refs/heads/briar/second-11111111
             select_issue_worktree(ambiguous, "11111111-2222-3333-4444-555555555555", None,)
                 .is_err()
         );
+    }
+
+    #[test]
+    fn deserializes_the_issue_context_workspace_mode() {
+        assert!(matches!(
+            serde_json::from_str::<ProjectWorkspaceMode>("\"issueContext\"")
+                .expect("issue context mode should deserialize"),
+            ProjectWorkspaceMode::IssueContext
+        ));
     }
 
     #[test]

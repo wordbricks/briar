@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
+import type { HuntRun } from "../types";
 import {
   agentReplyParentMessageId,
   briarMentionAtCaret,
   issueAgentConversation,
+  issueConversationSnapshot,
   mentionsBriar,
   providerForConversation,
   shouldBriarReply,
@@ -140,5 +142,89 @@ describe("issue agent replies", () => {
       conversationId: null,
       provider: null,
     });
+  });
+
+  it("preserves durable issue details needed after worktree cleanup", () => {
+    const run = {
+      id: "run-1",
+      runNumber: 17,
+      currentAttempt: 1,
+      currentRevision: 1,
+      source: "issue",
+      sourceKey: "issue:17",
+      title: "Clarify result urgency",
+      issueDescription: "Explain the urgency recorded by the agent.",
+      priority: 2,
+      status: "completed",
+      workflowStage: "local_qa",
+      workflow: {
+        version: 1,
+        stages: [],
+        completion: { requiredStages: [] },
+        release: { enabled: false },
+      },
+      progress: 100,
+      detail: "All checks passed.",
+      repository: "owner/repository",
+      branch: "briar/clarify-urgency-11111111",
+      commitSha: "abc123",
+      tracker: null,
+      attachments: [
+        {
+          id: "attachment-1",
+          filename: "result.png",
+          contentType: "image/png",
+          byteSize: 2048,
+          url: "https://example.invalid/private-result.png",
+        },
+      ],
+      resultSummary: "The issue was completed.",
+      structuredResult: {
+        summary: "The issue was completed.",
+        outcome: "completed",
+        importance: "important",
+        urgency: "time_sensitive",
+        impact: "issue",
+        humanActionRequired: false,
+        nextAction: null,
+        dueAt: null,
+      },
+      pullRequestUrls: ["https://example.invalid/pull/17"],
+      targetSha: null,
+      stagingQaStatus: null,
+      productionQaStatus: null,
+      stagingQaDetail: null,
+      productionQaDetail: null,
+      context: { customerTier: "enterprise" },
+      claimedBy: "agent-1",
+      claimedAt: "2026-07-29T01:00:00.000Z",
+      leaseExpiresAt: null,
+      claimAttempts: 1,
+      sourceCreatedAt: "2026-07-28T23:00:00.000Z",
+      startedAt: "2026-07-29T00:00:00.000Z",
+      updatedAt: "2026-07-29T02:00:00.000Z",
+      completedAt: "2026-07-29T02:00:00.000Z",
+      events: [],
+    } as HuntRun;
+
+    const snapshot = issueConversationSnapshot(run, []);
+
+    expect(snapshot.run).toMatchObject({
+      runId: "run-1",
+      issueDescription: "Explain the urgency recorded by the agent.",
+      structuredResult: {
+        importance: "important",
+        urgency: "time_sensitive",
+      },
+      context: { customerTier: "enterprise" },
+      attachments: [
+        {
+          filename: "result.png",
+          contentType: "image/png",
+          byteSize: 2048,
+        },
+      ],
+    });
+    expect(JSON.stringify(snapshot)).not.toContain("private-result.png");
   });
 });

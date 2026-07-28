@@ -89,7 +89,11 @@ export type ProjectLlmChatInput = {
   instructions?: string | null;
   outputSchema?: JsonSchema | null;
   fullAccess?: boolean;
-  workspaceMode?: "connected" | "latestRemoteBase" | "issueWorktree";
+  workspaceMode?:
+    | "connected"
+    | "latestRemoteBase"
+    | "issueWorktree"
+    | "issueContext";
   workspaceRunId?: string | null;
   workspaceBranch?: string | null;
 };

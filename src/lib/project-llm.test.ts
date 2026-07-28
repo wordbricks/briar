@@ -151,6 +151,31 @@ describe("project LLM gateway", () => {
     );
   });
 
+  it("routes durable issue context without requiring a surviving worktree", async () => {
+    invoke.mockResolvedValue({
+      conversationId: "briar:project-1:thread-1",
+      message: "Urgency is normal.",
+      workspaceRoot: "/latest-remote-base",
+    });
+
+    await chatWithProjectLlm({
+      projectId: "project-1",
+      message: "What is the urgency?",
+      workspaceMode: "issueContext",
+      workspaceRunId: "11111111-2222-3333-4444-555555555555",
+      workspaceBranch: null,
+    });
+
+    expect(invoke).toHaveBeenCalledWith(
+      "project_llm_chat",
+      expect.objectContaining({
+        workspaceMode: "issueContext",
+        workspaceRunId: "11111111-2222-3333-4444-555555555555",
+        workspaceBranch: null,
+      }),
+    );
+  });
+
   it("continues and serializes a project conversation", async () => {
     invoke
       .mockResolvedValueOnce({
