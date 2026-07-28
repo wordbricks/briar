@@ -15,9 +15,9 @@ bun run release:macos:candidate
 ```
 
 The wrapper may skip this build when the diff from the configured previous
-version does not touch release or bundle mechanics. Use
-`bun run release:macos:candidate -- --force` for an unconditional acceptance
-run.
+version does not touch release or bundle mechanics. Routine releases should
+use that automatic gate. Use `bun run release:macos:candidate -- --force` only
+for an unconditional acceptance run while changing the release pipeline.
 
 For a real cross-version acceptance run, use an accepted previous artifact:
 

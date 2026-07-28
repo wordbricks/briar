@@ -11,6 +11,9 @@ readonly all_contexts=("app-worker" "d1-migrations" "rust" "security")
 
 selected_contexts=()
 should_signoff=false
+ci_temp=""
+ci_temp_base="${TMPDIR:-/tmp}"
+ci_temp_base="${ci_temp_base%/}"
 
 usage() {
   cat <<'EOF'
@@ -25,6 +28,16 @@ fail() {
   echo "[local-ci] $*" >&2
   exit 1
 }
+
+cleanup() {
+  if [[ -n "$ci_temp" ]]; then
+    case "$ci_temp" in
+      "$ci_temp_base"/briar-local-ci.*) rm -rf -- "$ci_temp" ;;
+      *) echo "[local-ci] Refusing to clean unexpected path: $ci_temp" >&2 ;;
+    esac
+  fi
+}
+trap cleanup EXIT
 
 require_command() {
   local command_name="$1"
@@ -91,9 +104,6 @@ run_rust() {
   rustup toolchain install "$rust_toolchain" \
     --profile minimal \
     --component rustfmt,clippy
-  bun run runtime:prepare
-  bun run cli:build
-  bun run agent:build
   cargo +"$rust_toolchain" fmt --manifest-path src-tauri/Cargo.toml --all --check
   cargo +"$rust_toolchain" clippy \
     --manifest-path src-tauri/Cargo.toml \
@@ -124,6 +134,65 @@ run_security() {
     --no-banner \
     --log-opts="--all" \
     .
+}
+
+context_runner() {
+  case "$1" in
+    app-worker) echo run_app_worker ;;
+    d1-migrations) echo run_d1_migrations ;;
+    rust) echo run_rust ;;
+    security) echo run_security ;;
+    *) fail "Unknown CI context: $1" ;;
+  esac
+}
+
+prepare_parallel_inputs() {
+  if includes_context rust; then
+    echo
+    echo "[local-ci] === shared build inputs ==="
+    bun run runtime:prepare
+    bun run cli:build
+    bun run agent:build
+    echo "[local-ci] ✓ shared build inputs"
+  fi
+}
+
+run_selected_contexts() {
+  local context
+  local runner
+  local log_path
+  local index
+  local pid
+  local failed=false
+  local pids=()
+  local logs=()
+
+  ci_temp="$(mktemp -d "$ci_temp_base/briar-local-ci.XXXXXX")"
+  echo
+  echo "[local-ci] Running ${#selected_contexts[@]} context(s) in parallel."
+
+  for context in "${selected_contexts[@]}"; do
+    runner="$(context_runner "$context")"
+    log_path="$ci_temp/${context}.log"
+    logs+=("$log_path")
+    (
+      run_context "$context" "$runner"
+    ) >"$log_path" 2>&1 &
+    pid="$!"
+    pids+=("$pid")
+    echo "[local-ci] Started ${context} (pid ${pid})."
+  done
+
+  for index in "${!selected_contexts[@]}"; do
+    if ! wait "${pids[$index]}"; then
+      failed=true
+    fi
+    cat "${logs[$index]}"
+  done
+
+  if [[ "$failed" == true ]]; then
+    fail "One or more CI contexts failed."
+  fi
 }
 
 while [[ $# -gt 0 ]]; do
@@ -171,10 +240,8 @@ fi
 
 bun install --frozen-lockfile
 
-includes_context app-worker && run_context app-worker run_app_worker
-includes_context d1-migrations && run_context d1-migrations run_d1_migrations
-includes_context rust && run_context rust run_rust
-includes_context security && run_context security run_security
+prepare_parallel_inputs
+run_selected_contexts
 
 if $should_signoff; then
   gh signoff "${selected_contexts[@]}"

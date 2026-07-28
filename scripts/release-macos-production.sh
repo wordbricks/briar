@@ -10,6 +10,8 @@ release_temp=""
 release_environment_file=""
 original_keychains=()
 original_args=("$@")
+upload_pids=()
+upload_logs=()
 
 usage() {
   cat <<'EOF'
@@ -45,6 +47,37 @@ read_keychains() {
     path="${path%\"*}"
     [[ -n "$path" ]] && original_keychains+=("$path")
   done < <(security list-keychains -d user)
+}
+
+upload_release_artifact() {
+  local artifact="$1"
+  local name
+  name="$(basename "$artifact")"
+
+  gh release upload "$tag" "$artifact" --repo "$repository"
+  bunx wrangler r2 object put \
+    "briar-releases/releases/$tag/$name" \
+    --file "$artifact" \
+    --remote
+}
+
+wait_for_upload_batch() {
+  local index
+  local failed=false
+
+  for index in "${!upload_pids[@]}"; do
+    if ! wait "${upload_pids[$index]}"; then
+      failed=true
+    fi
+    cat "${upload_logs[$index]}"
+  done
+
+  if [[ "$failed" == true ]]; then
+    fail "Failed to upload one or more release artifacts. Inspect the draft release before retrying."
+  fi
+
+  upload_pids=()
+  upload_logs=()
 }
 
 cleanup() {
@@ -180,20 +213,36 @@ if [[ "$publish" == true ]]; then
       --commit-sha "$commit_sha" \
       --base-url "$BRIAR_RELEASE_BASE_URL"
 
-  gh release create "$tag" "$artifact_root"/* \
+  upload_concurrency="${BRIAR_RELEASE_UPLOAD_CONCURRENCY:-4}"
+  [[ "$upload_concurrency" =~ ^[1-8]$ ]] ||
+    fail "BRIAR_RELEASE_UPLOAD_CONCURRENCY must be an integer from 1 to 8."
+
+  gh release create "$tag" \
     --repo "$repository" \
     --draft \
     --verify-tag \
     --generate-notes \
     --title "Briar $tag"
 
+  release_temp="$(mktemp -d /tmp/briar-production-release.XXXXXX)"
+  upload_log_root="$release_temp/uploads"
+  mkdir -p "$upload_log_root"
+
   for artifact in "$artifact_root"/*; do
     name="$(basename "$artifact")"
-    bunx wrangler r2 object put \
-      "briar-releases/releases/$tag/$name" \
-      --file "$artifact" \
-      --remote
+    log_path="$upload_log_root/$name.log"
+    upload_release_artifact "$artifact" >"$log_path" 2>&1 &
+    upload_pids+=("$!")
+    upload_logs+=("$log_path")
+    echo "Started GitHub and R2 upload for $name."
+
+    if [[ ${#upload_pids[@]} -ge "$upload_concurrency" ]]; then
+      wait_for_upload_batch
+    fi
   done
+  if [[ ${#upload_pids[@]} -gt 0 ]]; then
+    wait_for_upload_batch
+  fi
 
   curl --fail --silent --show-error --head \
     "${BRIAR_RELEASE_BASE_URL}/${tag}/Briar.app.tar.gz" >/dev/null

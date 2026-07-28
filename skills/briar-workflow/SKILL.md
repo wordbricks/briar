@@ -1,6 +1,6 @@
 ---
 name: briar-workflow
-description: Execute or track repository work through a Briar project's configured workflow. Use when claiming queued work, recording run events and evidence, completing a run, or recovering a blocked or failed run.
+description: Execute or track repository work through a Briar project's configured workflow. Use only when the agent is running inside the Briar app and is claiming queued work, recording run events and evidence, completing a run, or recovering a blocked or failed run.
 ---
 
 # Briar Workflow

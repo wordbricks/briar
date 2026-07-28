@@ -26,6 +26,11 @@ statuses with `gh-signoff`:
 bun run ci:signoff
 ```
 
+The signoff command is self-contained: it installs the locked dependencies,
+prepares shared build inputs once, and runs the four independent contexts in
+parallel before publishing any status. Do not precede it with a separate
+`bun run check`; that check is already part of `signoff/app-worker`.
+
 The security phase uses `bun audit`, `cargo-audit`, and Gitleaks. Rust
 vulnerabilities and any warning not in the dated advisory allowlist fail the
 gate. The first Rust audit prints all known warnings before the strict allowlist
@@ -49,8 +54,9 @@ expensive ad-hoc Tauri bundle when only ordinary application code and the
 release version fields changed. Release scripts, packaging, updater, signing,
 dependencies, public release configuration, icons, capabilities, or other
 bundle configuration force the full candidate. A missing base tag or a dirty
-worktree also fails closed to the full build. Use
-`bun run release:macos:candidate -- --force` when a manual full run is desired.
+worktree also fails closed to the full build. Routine releases must use the
+automatic gate. Use `bun run release:macos:candidate -- --force` only when
+validating changes to the release pipeline itself.
 
 The command writes the `.dmg`, zipped `.app`, `release-manifest.json`,
 `lifecycle-evidence.json`, and `SHA256SUMS` to `release-artifacts/`. The manifest
