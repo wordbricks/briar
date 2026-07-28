@@ -97,6 +97,41 @@ describe("ProjectAgents", () => {
     }
   });
 
+  it("shows only the agent with an active session as running", async () => {
+    const runningSession: AutoHuntSession = {
+      id: "running-session",
+      dispatchGroupId: "running-session",
+      workers: [],
+      dispatchEvents: [],
+      projectId: project.id,
+      agentId: "demo-agent-auto-hunt",
+      status: "running",
+      issues: [],
+      startedAt: "2026-07-28T00:00:00.000Z",
+      completedAt: null,
+      conversationId: null,
+      workspaceRoot: null,
+      summary: null,
+      error: null,
+      events: [],
+    };
+    const container = await mount(
+      <ProjectAgents {...projectAgentsProps} sessions={[runningSession]} />,
+    );
+    await act(async () => Promise.resolve());
+
+    expect(
+      container.querySelector<HTMLButtonElement>(
+        'button[aria-label="자동 사냥 에이전트 세부 정보 열기"]',
+      )?.textContent,
+    ).toContain("실행 중");
+    expect(
+      container.querySelector<HTMLButtonElement>(
+        'button[aria-label="Sentry 오류 탐지 에이전트 세부 정보 열기"]',
+      )?.textContent,
+    ).toContain("준비됨");
+  });
+
   it("submits provider, default model, and a concrete responsibility", async () => {
     const onCreate = vi.fn(async () => undefined);
     const container = await mount(

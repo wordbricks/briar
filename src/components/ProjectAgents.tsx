@@ -8,7 +8,7 @@ import {
   Settings,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   EmptyState,
@@ -43,6 +43,7 @@ import type {
 } from "../types";
 import { AgentProviderIcon } from "./AgentIcons";
 import { NativeSelect } from "./NativeSelect";
+import { ProjectAgentAvatar } from "./ProjectAgentAvatar";
 import {
   ProjectAgentDetail,
   type ProjectAgentTaskSessionSettlement,
@@ -102,6 +103,20 @@ export function ProjectAgents({
   const [settingsAgent, setSettingsAgent] = useState<ProjectAgent | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<ProjectAgent | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const runningAgentIds = useMemo(
+    () =>
+      new Set(
+        sessions
+          .filter(
+            (session) =>
+              session.projectId === project.id &&
+              session.status === "running" &&
+              session.agentId,
+          )
+          .map((session) => session.agentId as string),
+      ),
+    [project.id, sessions],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -329,78 +344,81 @@ export function ProjectAgents({
                 aria-label={t("agents.list")}
                 className="project-agent-grid"
               >
-                {agents.map((agent) => (
-                  <article className="project-agent-card" key={agent.id}>
-                    <button
-                      aria-label={t("agents.openAgent", { name: agent.name })}
-                      className="project-agent-card-open"
-                      onClick={() => setSelectedAgent(agent)}
-                      type="button"
-                    >
-                      <header>
-                        <span className={`project-agent-avatar ${agent.provider}`}>
-                          {agent.avatar ? (
-                            <img alt="" src={agent.avatar} />
-                          ) : (
-                            <Bot size={19} />
-                          )}
-                        </span>
-                        <div>
-                          <h2>{agent.name}</h2>
-                          <span>{t("agents.ready")}</span>
-                        </div>
-                      </header>
-                      <div className="project-agent-runtime">
-                        <span
-                          aria-label={providerLabels[agent.provider]}
-                          className={`project-agent-provider-icon ${agent.provider}`}
-                          role="img"
-                          title={providerLabels[agent.provider]}
-                        >
-                          <AgentProviderIcon
-                            provider={agent.provider}
-                            size={14}
-                          />
-                        </span>
-                        <span>
-                          {modelLabel(agent, t("agents.providerDefaultModel"))}
-                        </span>
-                        <span>
-                          <i
-                            aria-hidden="true"
-                            className="project-agent-calendar-color"
-                            style={{ backgroundColor: agent.calendarColor }}
-                          />
-                          {agent.calendarColor.toUpperCase()}
-                        </span>
-                      </div>
-                      <section>
-                        <small>{t("agents.responsibility")}</small>
-                        <p>{agent.responsibility}</p>
-                      </section>
-                    </button>
-                    <footer>
-                      <time dateTime={agent.createdAt}>
-                        {t("agents.created", {
-                          date: new Intl.DateTimeFormat(localeTag, {
-                            dateStyle: "medium",
-                          }).format(new Date(agent.createdAt)),
-                        })}
-                      </time>
+                {agents.map((agent) => {
+                  const isRunning = runningAgentIds.has(agent.id);
+                  return (
+                    <article className="project-agent-card" key={agent.id}>
                       <button
-                        aria-label={t("agents.settingsAgent", {
-                          name: agent.name,
-                        })}
-                        className="project-agent-settings-button"
-                        onClick={() => setSettingsAgent(agent)}
+                        aria-label={t("agents.openAgent", { name: agent.name })}
+                        className="project-agent-card-open"
+                        onClick={() => setSelectedAgent(agent)}
                         type="button"
                       >
-                        <Settings size={14} />
+                        <header>
+                          <ProjectAgentAvatar
+                            agent={agent}
+                            isRunning={isRunning}
+                            token={token}
+                          />
+                          <div>
+                            <h2>{agent.name}</h2>
+                            <span>
+                              {t(isRunning ? "agents.running" : "agents.ready")}
+                            </span>
+                          </div>
+                        </header>
+                        <div className="project-agent-runtime">
+                          <span
+                            aria-label={providerLabels[agent.provider]}
+                            className={`project-agent-provider-icon ${agent.provider}`}
+                            role="img"
+                            title={providerLabels[agent.provider]}
+                          >
+                            <AgentProviderIcon
+                              provider={agent.provider}
+                              size={14}
+                            />
+                          </span>
+                          <span>
+                            {modelLabel(agent, t("agents.providerDefaultModel"))}
+                          </span>
+                          <span>
+                            <i
+                              aria-hidden="true"
+                              className="project-agent-calendar-color"
+                              style={{ backgroundColor: agent.calendarColor }}
+                            />
+                            {agent.calendarColor.toUpperCase()}
+                          </span>
+                        </div>
+                        <section>
+                          <small>{t("agents.responsibility")}</small>
+                          <p>{agent.responsibility}</p>
+                        </section>
                       </button>
-                      <ChevronRight aria-hidden="true" size={14} />
-                    </footer>
-                  </article>
-                ))}
+                      <footer>
+                        <time dateTime={agent.createdAt}>
+                          {t("agents.created", {
+                            date: new Intl.DateTimeFormat(localeTag, {
+                              dateStyle: "medium",
+                            }).format(new Date(agent.createdAt)),
+                          })}
+                        </time>
+                        <button
+                          aria-label={t("agents.settingsAgent", {
+                            name: agent.name,
+                          })}
+                          className="project-agent-settings-button"
+                          onClick={() => setSettingsAgent(agent)}
+                          type="button"
+                        >
+                          <Settings size={14} />
+                        </button>
+                        <ChevronRight aria-hidden="true" size={14} />
+                      </footer>
+                    </article>
+                  );
+                })}
                 <button
                   className="project-agent-create-card"
                   onClick={openCreateDialog}
