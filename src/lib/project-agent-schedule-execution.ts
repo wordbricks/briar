@@ -70,6 +70,7 @@ export async function executeScheduledProjectAgent(
     },
     {
       projectId: run.projectId,
+      sessionId: crypto.randomUUID(),
       agent: run.agent,
       message: [
         `Run the scheduled automation "${run.scheduleName}".`,

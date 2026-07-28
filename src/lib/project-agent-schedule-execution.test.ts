@@ -95,6 +95,7 @@ describe("scheduled project agent execution", () => {
 
     expect(current.runAgent).toHaveBeenCalledWith({
       projectId: scheduledRun().projectId,
+      sessionId: expect.any(String),
       agent: scheduledRun().agent,
       message: [
         'Run the scheduled automation "Weekly Auto Hunt".',
