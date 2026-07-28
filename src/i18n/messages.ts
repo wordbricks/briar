@@ -13,6 +13,7 @@ export const ko = {
   "common.healthy": "정상",
   "common.notInstalled": "설치 안 됨",
   "common.notConnected": "연결 안 됨",
+  "session.restoring": "로그인 정보를 확인하는 중입니다",
   "sidebar.close": "왼쪽 패널 닫기",
   "sidebar.open": "왼쪽 패널 열기",
   "sidebar.mainMenu": "주요 메뉴",
@@ -913,6 +914,7 @@ export type Messages = Record<MessageKey, string>;
 
 export const en: Messages = {
   ...ko,
+  "session.restoring": "Checking your sign-in…",
   "sidebar.addOrganization": "Add organization",
   "sidebar.agents": "Agents",
   "sidebar.schedule": "Schedule",
@@ -1336,6 +1338,7 @@ export const en: Messages = {
 };
 export const zh: Messages = {
   ...en,
+  "session.restoring": "正在检查登录信息…",
   "run.pullRequest": "拉取请求",
   "run.openPullRequest": "打开 {label}",
   "sidebar.addOrganization": "添加组织",

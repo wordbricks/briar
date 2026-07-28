@@ -24,6 +24,7 @@ import { ProjectAgents } from "./components/ProjectAgents";
 import { ProjectSchedule } from "./components/ProjectSchedule";
 import { ProjectRepositorySetupDialog } from "./components/ProjectRepositorySetupDialog";
 import { ProjectSettings } from "./components/ProjectSettings";
+import { SessionLoadingScreen } from "./components/SessionLoadingScreen";
 import { Sidebar } from "./components/Sidebar";
 import { WindowNavigationControls } from "./components/WindowNavigationControls";
 import { useBriar, type UseBriarOptions } from "./hooks/useBriar";
@@ -274,7 +275,9 @@ export function App() {
 
   let content: React.ReactNode;
 
-  if (shouldShowInitialOnboarding) {
+  if (briar.restoringSession) {
+    content = <SessionLoadingScreen />;
+  } else if (shouldShowInitialOnboarding) {
     content = (
       <InitialOnboarding onComplete={() => setHasCompletedOnboarding(true)} />
     );
