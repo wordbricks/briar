@@ -18,10 +18,12 @@ import {
   Image as ImageIcon,
   Italic,
   Link2,
+  ListChecks,
   List,
   ListFilter,
   LoaderCircle,
   MessageCircle,
+  MoreHorizontal,
   Paperclip,
   Pencil,
   Plus,
@@ -37,12 +39,21 @@ import {
   Video,
   X,
 } from "lucide-react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
   EmptyState,
   ErrorBanner,
   MainContent,
 } from "@/components/layout";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Typography } from "@/components/ui/typography";
 import {
@@ -83,6 +94,7 @@ import type {
   IssueAttachment,
   IssueMessage,
   IssueMessageSendResult,
+  RunEvidence,
   UpdateIssueInput,
 } from "../types";
 import { useI18n } from "../i18n";
@@ -108,6 +120,7 @@ export function HuntDashboard({
   error,
   isCreatingIssue,
   isIssueDialogOpen: controlledIsIssueDialogOpen,
+  deletingIssueId,
   updatingIssueId,
   needsLocalConnection = false,
   noProject = false,
@@ -118,9 +131,11 @@ export function HuntDashboard({
   onAddProject,
   onCreateIssue,
   onIssueDialogOpenChange,
+  onDeleteIssue,
   onUpdateIssue,
   onLoadAttachment,
   onLoadIssueMessages,
+  onLoadRunEvidence,
   onMoveRun,
   onRetryRun,
   onCancelRun,
@@ -139,6 +154,7 @@ export function HuntDashboard({
   error: string | null;
   isCreatingIssue: boolean;
   isIssueDialogOpen?: boolean;
+  deletingIssueId: string | null;
   updatingIssueId: string | null;
   needsLocalConnection?: boolean;
   noProject?: boolean;
@@ -149,9 +165,11 @@ export function HuntDashboard({
   onAddProject?: () => void;
   onCreateIssue: (input: CreateIssueInput) => Promise<unknown>;
   onIssueDialogOpenChange?: (isOpen: boolean) => void;
+  onDeleteIssue: (runId: string) => Promise<unknown>;
   onUpdateIssue: (runId: string, input: UpdateIssueInput) => Promise<unknown>;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onLoadIssueMessages: (runId: string) => Promise<IssueMessage[]>;
+  onLoadRunEvidence: (runId: string) => Promise<RunEvidence[]>;
   onMoveRun: (runId: string, placement: HuntRunPlacement) => Promise<unknown>;
   onRetryRun: (runId: string) => Promise<unknown>;
   onCancelRun: (runId: string) => Promise<unknown>;
@@ -364,13 +382,19 @@ export function HuntDashboard({
         <RunPage
           companionMode={companionMode}
           error={recoveryError}
+          isDeletingIssue={deletingIssueId === selected.id}
           isRecovering={recoveringRunId === selected.id}
           isUpdatingIssue={updatingIssueId === selected.id}
           isSidebarOpen={isSidebarOpen}
           onBack={() => setSelectedRunId(null)}
           onCancel={() => onCancelRun(selected.id)}
+          onDelete={async () => {
+            await onDeleteIssue(selected.id);
+            setSelectedRunId(null);
+          }}
           onLoadAttachment={onLoadAttachment}
           onLoadIssueMessages={() => onLoadIssueMessages(selected.id)}
+          onLoadRunEvidence={() => onLoadRunEvidence(selected.id)}
           onMove={(placement) => onMoveRun(selected.id, placement)}
           onRetry={() => onRetryRun(selected.id)}
           onSendIssueMessage={(input) => onSendIssueMessage(selected.id, input)}
@@ -1265,13 +1289,16 @@ function IssueList({
 export function RunPage({
   companionMode = false,
   error,
+  isDeletingIssue = false,
   isRecovering,
   isUpdatingIssue = false,
   isSidebarOpen,
   onBack,
   onCancel,
+  onDelete,
   onLoadAttachment,
   onLoadIssueMessages,
+  onLoadRunEvidence,
   onMove,
   onRetry,
   onSendIssueMessage,
@@ -1280,13 +1307,16 @@ export function RunPage({
 }: {
   companionMode?: boolean;
   error: string | null;
+  isDeletingIssue?: boolean;
   isRecovering: boolean;
   isUpdatingIssue?: boolean;
   isSidebarOpen: boolean;
   onBack: () => void;
   onCancel: () => Promise<unknown>;
+  onDelete?: () => Promise<unknown>;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onLoadIssueMessages: () => Promise<IssueMessage[]>;
+  onLoadRunEvidence: () => Promise<RunEvidence[]>;
   onMove: (placement: HuntRunPlacement) => Promise<unknown>;
   onRetry: () => Promise<unknown>;
   onSendIssueMessage: (input: {
@@ -1305,8 +1335,14 @@ export function RunPage({
     : t(`issue.priority${run.priority}` as MessageKey);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [contentSplit, setContentSplit] = useState(50);
   const [isResizingContent, setIsResizingContent] = useState(false);
+  const [activeDetailTab, setActiveDetailTab] = useState<
+    "description" | "evidence"
+  >("description");
+  const detailTabsId = useId();
   const contentRef = useRef<HTMLDivElement | null>(null);
   const activeResizePointerRef = useRef<number | null>(null);
   const resizeGrabOffsetRef = useRef(0);
@@ -1411,6 +1447,13 @@ export function RunPage({
           >
             {run.title}
           </strong>
+          {(onUpdateIssue || onDelete) && (
+            <IssueActionsMenu
+              disabled={isUpdatingIssue || isDeletingIssue}
+              onDelete={onDelete ? () => setIsDeleteDialogOpen(true) : undefined}
+              onEdit={onUpdateIssue ? () => setIsEditDialogOpen(true) : undefined}
+            />
+          )}
         </header>
       )}
       <div className="run-page-scroll">
@@ -1434,21 +1477,22 @@ export function RunPage({
                     <div className="run-page-title-row">
                       <small>AH-{run.runNumber}</small>
                       <h1 id="run-page-title">{run.title}</h1>
+                      {(onUpdateIssue || onDelete) && (
+                        <IssueActionsMenu
+                          disabled={isUpdatingIssue || isDeletingIssue}
+                          onDelete={
+                            onDelete ? () => setIsDeleteDialogOpen(true) : undefined
+                          }
+                          onEdit={
+                            onUpdateIssue
+                              ? () => setIsEditDialogOpen(true)
+                              : undefined
+                          }
+                        />
+                      )}
                     </div>
                   </div>
                   <div className="run-page-meta">
-                    {onUpdateIssue && (
-                      <button
-                        aria-label={t("issue.edit")}
-                        className="run-page-edit"
-                        disabled={isUpdatingIssue}
-                        onClick={() => setIsEditDialogOpen(true)}
-                        type="button"
-                      >
-                        <Pencil size={13} />
-                        {t("issue.edit")}
-                      </button>
-                    )}
                     <span className={`status-pill ${meta.tone}`}>{label}</span>
                     <small>
                       {t("run.attempt", { count: run.currentAttempt })} ·{" "}
@@ -1464,18 +1508,6 @@ export function RunPage({
               <div className="run-page-summary">
                 <IssueActivity run={run} />
                 <div className="run-page-meta">
-                  {onUpdateIssue && (
-                    <button
-                      aria-label={t("issue.edit")}
-                      className="run-page-edit"
-                      disabled={isUpdatingIssue}
-                      onClick={() => setIsEditDialogOpen(true)}
-                      type="button"
-                    >
-                      <Pencil size={13} />
-                      {t("issue.edit")}
-                    </button>
-                  )}
                   <span className={`status-pill ${meta.tone}`}>{label}</span>
                   <small>
                     {t("run.attempt", { count: run.currentAttempt })} ·{" "}
@@ -1495,42 +1527,87 @@ export function RunPage({
                 }}
               >
                 <section
-                  aria-label={t("issue.description")}
+                  aria-label={t(
+                    activeDetailTab === "description"
+                      ? "issue.description"
+                      : "run.evidence",
+                  )}
                   className="issue-description-pane"
                 >
-                  <div className="issue-description-scroll">
-                    {issueContent ? (
-                      <div className="issue-description-markdown">
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          skipHtml
-                        >
-                          {issueContent}
-                        </ReactMarkdown>
-                      </div>
-                    ) : (
-                      <p className="issue-description-empty">{t("run.notSet")}</p>
-                    )}
-                    {(run.attachments ?? []).length > 0 && (
-                      <IssueAttachmentGallery
-                        attachments={run.attachments ?? []}
-                        onLoadAttachment={onLoadAttachment}
-                      />
-                    )}
-                    {needsAttention && (
-                      <div className="recovery-panel">
-                        <div><CircleAlert size={16} /><span><strong>{run.status === "failed" ? t("run.failed") : t("run.blocked")}</strong><small>{t("run.retryDescription", { count: run.currentAttempt + 1 })}</small></span></div>
-                        <div className="recovery-actions">
-                          <button disabled={isRecovering} onClick={() => void runAction(onRetry)} type="button"><RotateCcw className={isRecovering ? "spin" : ""} size={14} />{t("run.retry")}</button>
-                          {confirmCancel ? (
-                            <><button className="danger" disabled={isRecovering} onClick={() => void runAction(onCancel)} type="button">{t("run.confirmCancel")}</button><button disabled={isRecovering} onClick={() => setConfirmCancel(false)} type="button">{t("run.back")}</button></>
-                          ) : (
-                            <button className="danger-secondary" disabled={isRecovering} onClick={() => setConfirmCancel(true)} type="button">{t("run.cancel")}</button>
-                          )}
-                        </div>
-                      </div>
-                    )}
+                  <div
+                    aria-label={t("run.detailTabs")}
+                    className="issue-detail-tabs"
+                    role="tablist"
+                  >
+                    <button
+                      aria-controls={`${detailTabsId}-description-panel`}
+                      aria-selected={activeDetailTab === "description"}
+                      id={`${detailTabsId}-description-tab`}
+                      onClick={() => setActiveDetailTab("description")}
+                      role="tab"
+                      type="button"
+                    >
+                      {t("issue.description")}
+                    </button>
+                    <button
+                      aria-controls={`${detailTabsId}-evidence-panel`}
+                      aria-selected={activeDetailTab === "evidence"}
+                      id={`${detailTabsId}-evidence-tab`}
+                      onClick={() => setActiveDetailTab("evidence")}
+                      role="tab"
+                      type="button"
+                    >
+                      <ListChecks aria-hidden="true" size={14} />
+                      {t("run.evidence")}
+                    </button>
                   </div>
+                  {activeDetailTab === "description" ? (
+                    <div
+                      aria-labelledby={`${detailTabsId}-description-tab`}
+                      className="issue-description-scroll"
+                      id={`${detailTabsId}-description-panel`}
+                      role="tabpanel"
+                    >
+                      {issueContent ? (
+                        <div className="issue-description-markdown">
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            skipHtml
+                          >
+                            {issueContent}
+                          </ReactMarkdown>
+                        </div>
+                      ) : (
+                        <p className="issue-description-empty">{t("run.notSet")}</p>
+                      )}
+                      {(run.attachments ?? []).length > 0 && (
+                        <IssueAttachmentGallery
+                          attachments={run.attachments ?? []}
+                          onLoadAttachment={onLoadAttachment}
+                        />
+                      )}
+                      {needsAttention && (
+                        <div className="recovery-panel">
+                          <div><CircleAlert size={16} /><span><strong>{run.status === "failed" ? t("run.failed") : t("run.blocked")}</strong><small>{t("run.retryDescription", { count: run.currentAttempt + 1 })}</small></span></div>
+                          <div className="recovery-actions">
+                            <button disabled={isRecovering} onClick={() => void runAction(onRetry)} type="button"><RotateCcw className={isRecovering ? "spin" : ""} size={14} />{t("run.retry")}</button>
+                            {confirmCancel ? (
+                              <><button className="danger" disabled={isRecovering} onClick={() => void runAction(onCancel)} type="button">{t("run.confirmCancel")}</button><button disabled={isRecovering} onClick={() => setConfirmCancel(false)} type="button">{t("run.back")}</button></>
+                            ) : (
+                              <button className="danger-secondary" disabled={isRecovering} onClick={() => setConfirmCancel(true)} type="button">{t("run.cancel")}</button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <RunEvidencePanel
+                      id={`${detailTabsId}-evidence-panel`}
+                      labelledBy={`${detailTabsId}-evidence-tab`}
+                      onLoad={onLoadRunEvidence}
+                      run={run}
+                    />
+                  )}
                 </section>
                 <div
                   aria-label={t("run.resizeContentPanels")}
@@ -1634,7 +1711,119 @@ export function RunPage({
           run={run}
         />
       )}
+      <Dialog
+        onOpenChange={(open) => {
+          if (isDeletingIssue) return;
+          setIsDeleteDialogOpen(open);
+          if (!open) setDeleteError(null);
+        }}
+        open={isDeleteDialogOpen}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="mb-2 grid size-10 place-items-center rounded-xl bg-destructive/10 text-destructive">
+              <Trash2 size={20} strokeWidth={1.8} />
+            </div>
+            <DialogTitle>{t("issue.deleteTitle", { title: run.title })}</DialogTitle>
+            <DialogDescription>
+              {t("issue.deleteDescription")}
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError ? (
+            <p className="text-xs text-destructive" role="alert">
+              {deleteError}
+            </p>
+          ) : null}
+          <DialogFooter>
+            <Button
+              disabled={isDeletingIssue}
+              onClick={() => setIsDeleteDialogOpen(false)}
+              type="button"
+              variant="outline"
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              disabled={isDeletingIssue || !onDelete}
+              onClick={() => {
+                if (!onDelete) return;
+                setDeleteError(null);
+                void onDelete().catch((caught) => {
+                  setDeleteError(
+                    caught instanceof Error ? caught.message : String(caught),
+                  );
+                });
+              }}
+              type="button"
+              variant="destructive"
+            >
+              {isDeletingIssue ? (
+                <LoaderCircle className="spin" size={15} />
+              ) : (
+                <Trash2 size={15} />
+              )}
+              {isDeletingIssue ? t("issue.deleting") : t("issue.delete")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MainContent>
+  );
+}
+
+function IssueActionsMenu({
+  disabled,
+  onDelete,
+  onEdit,
+}: {
+  disabled: boolean;
+  onDelete?: () => void;
+  onEdit?: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild>
+        <button
+          aria-label={t("issue.actions")}
+          className="run-page-actions-trigger"
+          disabled={disabled}
+          type="button"
+        >
+          {disabled ? (
+            <LoaderCircle className="spin" size={15} />
+          ) : (
+            <MoreHorizontal size={17} />
+          )}
+        </button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          align="end"
+          className="run-page-actions-menu"
+          sideOffset={6}
+        >
+          {onEdit ? (
+            <DropdownMenu.Item
+              className="run-page-actions-item"
+              onSelect={onEdit}
+            >
+              <Pencil size={14} />
+              {t("issue.edit")}
+            </DropdownMenu.Item>
+          ) : null}
+          {onDelete ? (
+            <DropdownMenu.Item
+              className="run-page-actions-item danger"
+              onSelect={onDelete}
+            >
+              <Trash2 size={14} />
+              {t("issue.delete")}
+            </DropdownMenu.Item>
+          ) : null}
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
   );
 }
 
@@ -1771,6 +1960,205 @@ function IssueActivity({ run }: { run: HuntRun }) {
               )}
             </div>
           </section>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RunEvidencePanel({
+  id,
+  labelledBy,
+  onLoad,
+  run,
+}: {
+  id: string;
+  labelledBy: string;
+  onLoad: () => Promise<RunEvidence[]>;
+  run: HuntRun;
+}) {
+  const { localeTag, t } = useI18n();
+  const [evidence, setEvidence] = useState<RunEvidence[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const onLoadRef = useRef(onLoad);
+  onLoadRef.current = onLoad;
+
+  const loadEvidence = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      setEvidence(await onLoadRef.current());
+    } catch (caught) {
+      setLoadError(
+        caught instanceof Error ? caught.message : t("run.evidenceLoadFailed"),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [t]);
+
+  useEffect(() => {
+    void loadEvidence();
+  }, [loadEvidence]);
+
+  const stageGroups = useMemo(() => {
+    const knownStageIds = new Set(run.workflow.stages.map((stage) => stage.id));
+    const configured = run.workflow.stages
+      .map((stage) => ({
+        id: stage.id,
+        label: localizeWorkflowStage(t, stage.id, stage.label),
+        requirements: stage.evidence ?? [],
+        evidence: evidence.filter((item) => item.stage === stage.id),
+      }))
+      .filter(
+        (stage) => stage.requirements.length > 0 || stage.evidence.length > 0,
+      );
+    const unknownStageIds = Array.from(
+      new Set(
+        evidence
+          .filter((item) => !knownStageIds.has(item.stage))
+          .map((item) => item.stage),
+      ),
+    );
+    return [
+      ...configured,
+      ...unknownStageIds.map((stageId) => ({
+        id: stageId,
+        label: stageId,
+        requirements: [] as string[],
+        evidence: evidence.filter((item) => item.stage === stageId),
+      })),
+    ];
+  }, [evidence, run.workflow.stages, t]);
+
+  return (
+    <div
+      aria-labelledby={labelledBy}
+      className="run-evidence-panel"
+      id={id}
+      role="tabpanel"
+    >
+      {loading ? (
+        <div className="run-evidence-state">
+          <LoaderCircle className="spin" size={16} />
+          {t("run.evidenceLoading")}
+        </div>
+      ) : loadError ? (
+        <button
+          className="run-evidence-state error"
+          onClick={() => void loadEvidence()}
+          type="button"
+        >
+          <CircleAlert size={15} />
+          <span>{loadError}</span>
+          <RefreshCw size={13} />
+        </button>
+      ) : stageGroups.length === 0 ? (
+        <div className="run-evidence-empty">
+          <ListChecks aria-hidden="true" size={22} />
+          <strong>{t("run.evidenceEmpty")}</strong>
+        </div>
+      ) : (
+        <div className="run-evidence-groups">
+          {stageGroups.map((stage) => {
+            const satisfiedTypes = new Set(
+              stage.evidence
+                .filter(
+                  (item) =>
+                    item.canonical &&
+                    (item.status === "passed" || item.status === "skipped"),
+                )
+                .map((item) => item.type),
+            );
+            const unrecorded = stage.requirements.filter(
+              (type) => !stage.evidence.some((item) => item.type === type),
+            );
+            return (
+              <section className="run-evidence-stage" key={stage.id}>
+                <header>
+                  <span>
+                    <strong>{stage.label}</strong>
+                    <code>{stage.id}</code>
+                  </span>
+                  <small>
+                    {stage.requirements.length > 0
+                      ? `${satisfiedTypes.size}/${stage.requirements.length}`
+                      : stage.evidence.length}
+                  </small>
+                </header>
+                <div>
+                  {stage.evidence.map((item) => (
+                    <article
+                      className={`run-evidence-item ${item.status}${
+                        item.canonical ? "" : " stale"
+                      }`}
+                      key={`${item.attempt}:${item.key}`}
+                    >
+                      <header>
+                        <strong>{item.type}</strong>
+                        <span>
+                          {!item.canonical && (
+                            <em>{t("run.evidenceStale")}</em>
+                          )}
+                          <i className={item.status}>
+                            {t(
+                              `run.evidenceStatus.${item.status}` as MessageKey,
+                            )}
+                          </i>
+                        </span>
+                      </header>
+                      {item.detail && <p>{item.detail}</p>}
+                      {item.command && (
+                        <div className="run-evidence-command">
+                          <small>{t("run.evidenceCommand")}</small>
+                          <code>{item.command}</code>
+                        </div>
+                      )}
+                      {item.url && (
+                        <a
+                          href={item.url}
+                          rel="noreferrer"
+                          target="_blank"
+                        >
+                          <Link2 aria-hidden="true" size={13} />
+                          {t("common.open")}
+                        </a>
+                      )}
+                      {item.metadata && (
+                        <details className="run-evidence-metadata">
+                          <summary>{t("run.evidenceMetadata")}</summary>
+                          <pre>{JSON.stringify(item.metadata, null, 2)}</pre>
+                        </details>
+                      )}
+                      <footer>
+                        <span>
+                          {t("run.attempt", { count: item.attempt })} ·{" "}
+                          {t("run.revision", { count: item.revision })}
+                        </span>
+                        <span>
+                          {item.actor} · {formatDate(item.observedAt, localeTag)}
+                        </span>
+                      </footer>
+                    </article>
+                  ))}
+                  {unrecorded.map((type) => (
+                    <article
+                      className="run-evidence-item unrecorded"
+                      key={`unrecorded:${type}`}
+                    >
+                      <header>
+                        <strong>{type}</strong>
+                        <span>
+                          <i>{t("run.evidenceNotRecorded")}</i>
+                        </span>
+                      </header>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            );
+          })}
         </div>
       )}
     </div>

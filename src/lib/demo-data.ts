@@ -1,6 +1,5 @@
 import type { DashboardPayload, HuntEvent, HuntRun } from "../types";
 import { normalizeAutoHuntWorkflow } from "./auto-hunt-contract";
-import { defaultAutoHuntAutomation } from "./auto-hunt-automation";
 import type { RepositoryReadiness } from "./project-connection";
 
 const now = Date.now();
@@ -27,6 +26,7 @@ const runDefaults = {
   issueDescription: null,
   attachments: [],
   resultSummary: null,
+  structuredResult: null,
   pullRequestUrls: [],
   targetSha: null,
   sourceCreatedAt: null,
@@ -49,6 +49,7 @@ const runDefaults = {
   | "issueDescription"
   | "attachments"
   | "resultSummary"
+  | "structuredResult"
   | "pullRequestUrls"
   | "targetSha"
   | "sourceCreatedAt"
@@ -238,7 +239,6 @@ export const demoDashboard: DashboardPayload = {
     },
     githubRepository: "wordbricks/briar",
     workflow: structuredClone(demoWorkflow),
-    automation: structuredClone(defaultAutoHuntAutomation),
   },
   runs,
   generatedAt: new Date().toISOString(),

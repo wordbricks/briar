@@ -12,9 +12,9 @@ use std::{
     fs::{self, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
-    process::Command,
+    process::{Child, Command},
     sync::{
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, Mutex,
     },
 };
@@ -27,6 +27,7 @@ const SESSION_FILE_NAME: &str = "session.json";
 const AUTO_HUNT_EVENT_DIRECTORY: &str = "auto-hunt-sessions";
 const AUTO_HUNT_APP_SERVER_EVENT: &str = "auto-hunt-app-server-event";
 const AUTO_HUNT_DISPATCH_EVENT: &str = "auto-hunt-dispatch-event";
+const PROJECT_AGENT_SCHEDULE_POLL_EVENT: &str = "project-agent-schedule-poll";
 const DEFAULT_MAIN_WINDOW_SIZE: (f64, f64) = (1280.0, 820.0);
 const ONBOARDING_MAIN_WINDOW_SIZE: (f64, f64) = (980.0, 680.0);
 const DISCOVERED_SSH_HOST_ID_PREFIX: &str = "ssh-config-";
@@ -353,6 +354,8 @@ struct CliConfig {
     #[serde(default)]
     agent_providers: AppProviderSettings,
     #[serde(default)]
+    app_settings: StoredAppRuntimeSettings,
+    #[serde(default)]
     projects: Vec<CliProject>,
     /// Saved SSH execution hosts. Local to this machine: never sent to the
     /// Worker, and holding no secrets — OpenSSH owns key and agent resolution.
@@ -360,6 +363,101 @@ struct CliConfig {
     ssh_hosts: Vec<host::SshHost>,
     #[serde(flatten)]
     extra: BTreeMap<String, serde_json::Value>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StoredAppRuntimeSettings {
+    #[serde(default)]
+    prevent_sleep_while_running: bool,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AppRuntimeSettings {
+    prevent_sleep_while_running: bool,
+    prevent_sleep_supported: bool,
+}
+
+impl From<StoredAppRuntimeSettings> for AppRuntimeSettings {
+    fn from(settings: StoredAppRuntimeSettings) -> Self {
+        Self {
+            prevent_sleep_while_running: settings.prevent_sleep_while_running,
+            prevent_sleep_supported: cfg!(target_os = "macos"),
+        }
+    }
+}
+
+struct SleepPreventionState {
+    enabled: AtomicBool,
+    #[cfg(target_os = "macos")]
+    process: Mutex<Option<Child>>,
+}
+
+impl Default for SleepPreventionState {
+    fn default() -> Self {
+        Self {
+            enabled: AtomicBool::new(false),
+            #[cfg(target_os = "macos")]
+            process: Mutex::new(None),
+        }
+    }
+}
+
+impl SleepPreventionState {
+    fn set_enabled(&self, enabled: bool) -> Result<(), String> {
+        self.enabled.store(enabled, Ordering::SeqCst);
+        self.refresh()
+    }
+
+    fn refresh(&self) -> Result<(), String> {
+        #[cfg(target_os = "macos")]
+        {
+            let mut process = self
+                .process
+                .lock()
+                .map_err(|_| "절전 방지 상태 잠금이 손상되었습니다.".to_string())?;
+            if self.enabled.load(Ordering::SeqCst) {
+                if process
+                    .as_mut()
+                    .is_some_and(|child| child.try_wait().is_ok_and(|status| status.is_none()))
+                {
+                    return Ok(());
+                }
+                if let Some(mut child) = process.take() {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                }
+                let app_process_id = std::process::id().to_string();
+                *process = Some(
+                    Command::new("/usr/bin/caffeinate")
+                        .args(["-i", "-w", &app_process_id])
+                        .spawn()
+                        .map_err(|error| {
+                            format!("macOS 절전 방지를 시작하지 못했습니다: {error}")
+                        })?,
+                );
+            } else if let Some(mut child) = process.take() {
+                child
+                    .kill()
+                    .map_err(|error| format!("macOS 절전 방지를 중지하지 못했습니다: {error}"))?;
+                let _ = child.wait();
+            }
+        }
+        Ok(())
+    }
+}
+
+impl Drop for SleepPreventionState {
+    fn drop(&mut self) {
+        #[cfg(target_os = "macos")]
+        if let Ok(process) = self.process.get_mut() {
+            if let Some(mut child) = process.take() {
+                let _ = child.kill();
+                let _ = child.wait();
+            }
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
@@ -1607,6 +1705,7 @@ fn write_cli_connection(
             api_url: api_url.clone(),
             user_token: None,
             agent_providers: AppProviderSettings::default(),
+            app_settings: StoredAppRuntimeSettings::default(),
             projects: Vec::new(),
             ssh_hosts: Vec::new(),
             extra: BTreeMap::new(),
@@ -1725,6 +1824,7 @@ fn read_cli_config(config_path: &Path) -> Result<CliConfig, String> {
             api_url: String::new(),
             user_token: None,
             agent_providers: AppProviderSettings::default(),
+            app_settings: StoredAppRuntimeSettings::default(),
             projects: Vec::new(),
             ssh_hosts: Vec::new(),
             extra: BTreeMap::new(),
@@ -2670,6 +2770,20 @@ fn app_provider_settings_from(config_path: &Path) -> Result<AppProviderSettings,
     Ok(config.agent_providers)
 }
 
+fn app_runtime_settings_from(config_path: &Path) -> Result<StoredAppRuntimeSettings, String> {
+    Ok(read_cli_config(config_path)?.app_settings)
+}
+
+fn update_app_runtime_settings_at(
+    config_path: &Path,
+    settings: StoredAppRuntimeSettings,
+) -> Result<StoredAppRuntimeSettings, String> {
+    let mut config = read_cli_config(config_path)?;
+    config.app_settings = settings;
+    write_cli_config(config_path, &config)?;
+    Ok(settings)
+}
+
 fn update_app_provider_settings_at(
     config_path: &Path,
     settings: AppProviderSettings,
@@ -3498,6 +3612,7 @@ async fn run_project_agent(
     project_id: String,
     request: agent::ProjectAgentRunRequest,
 ) -> Result<agent::ProjectAgentRunResponse, String> {
+    validate_auto_hunt_session_id(&request.session_id)?;
     if request.agent_id.trim().is_empty()
         || request.agent_id.len() > 128
         || request.agent_name.trim().is_empty()
@@ -3541,6 +3656,7 @@ async fn run_project_agent(
         "agent/grok-runner.js",
         "dist-agent/grok-runner.js",
     );
+    let event_sink = create_auto_hunt_event_sink(&app, &request.session_id)?;
     let approval_app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let (runner, workspace) =
@@ -3590,75 +3706,13 @@ async fn run_project_agent(
                 network_access: true,
                 model,
                 effort,
-                event_sink: None,
+                event_sink: Some(event_sink),
                 environment: Vec::new(),
                 workspace_write_roots: Vec::new(),
             },
             &workflow_json,
             request,
             &approve,
-        )
-    })
-    .await
-    .map_err(|error| error.to_string())?
-}
-
-#[tauri::command]
-async fn run_project_agent_schedule(
-    app: tauri::AppHandle,
-    project_id: String,
-    provider: agent::AgentProviderKind,
-    model: Option<String>,
-    request: agent::ProjectLlmRequest,
-) -> Result<agent::ProjectLlmResponse, String> {
-    let config_path = cli_config_path(&app)?;
-    let home = app.path().home_dir().map_err(|error| error.to_string())?;
-    let resource_directory = app
-        .path()
-        .resource_dir()
-        .map_err(|error| error.to_string())?;
-    let claude_runner = bundled_path(
-        &resource_directory,
-        "agent/claude-runner.js",
-        "dist-agent/claude-runner.js",
-    );
-    let grok_runner = bundled_path(
-        &resource_directory,
-        "agent/grok-runner.js",
-        "dist-agent/grok-runner.js",
-    );
-    tauri::async_runtime::spawn_blocking(move || {
-        let (runner, workspace) =
-            connected_project_workspace_on_host(&config_path, &project_id, &home)?;
-        if !app_provider_settings_from(&config_path)?.is_enabled(provider) {
-            return Err(
-                "예약된 에이전트의 프로바이더가 앱 설정에서 비활성화되어 있습니다.".to_string(),
-            );
-        }
-        let backend = agent::discover_backend(
-            provider,
-            runner,
-            agent::AgentRunnerBundles {
-                claude: &claude_runner,
-                grok: &grok_runner,
-            },
-        )?;
-        agent::AgentBackend::run(
-            &backend,
-            &project_id,
-            &workspace,
-            agent::ChatExecution {
-                approval_policy: agent::ApprovalPolicy::Never,
-                sandbox_mode: agent::SandboxMode::WorkspaceWrite,
-                network_access: true,
-                model: model.filter(|value| !value.trim().is_empty()),
-                effort: None,
-                event_sink: None,
-                environment: Vec::new(),
-                workspace_write_roots: Vec::new(),
-            },
-            request,
-            &|_, _| false,
         )
     })
     .await
@@ -4677,6 +4731,16 @@ async fn load_app_provider_settings(app: tauri::AppHandle) -> Result<AppProvider
 }
 
 #[tauri::command]
+async fn load_app_runtime_settings(app: tauri::AppHandle) -> Result<AppRuntimeSettings, String> {
+    let config_path = cli_config_path(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        app_runtime_settings_from(&config_path).map(AppRuntimeSettings::from)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
 async fn load_agent_usage(
     app: tauri::AppHandle,
 ) -> Result<agent_usage::AgentUsageSnapshot, String> {
@@ -4695,6 +4759,22 @@ async fn update_app_provider_settings(
     })
     .await
     .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn update_app_runtime_settings(
+    app: tauri::AppHandle,
+    sleep_prevention: tauri::State<'_, SleepPreventionState>,
+    settings: StoredAppRuntimeSettings,
+) -> Result<AppRuntimeSettings, String> {
+    let config_path = cli_config_path(&app)?;
+    let saved = tauri::async_runtime::spawn_blocking(move || {
+        update_app_runtime_settings_at(&config_path, settings)
+    })
+    .await
+    .map_err(|error| error.to_string())??;
+    sleep_prevention.set_enabled(saved.prevent_sleep_while_running)?;
+    Ok(saved.into())
 }
 
 #[tauri::command]
@@ -5070,6 +5150,7 @@ fn prepare_launch_intro(app: tauri::AppHandle) -> Result<(), String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default()
+        .manage(SleepPreventionState::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init());
     #[cfg(any(target_os = "macos", target_os = "ios"))]
@@ -5082,6 +5163,26 @@ pub fn run() {
         .setup(|_app| {
             #[cfg(desktop)]
             {
+                if let Ok(config_path) = cli_config_path(_app.handle()) {
+                    match app_runtime_settings_from(&config_path) {
+                        Ok(settings) => {
+                            if let Err(error) = _app
+                                .state::<SleepPreventionState>()
+                                .set_enabled(settings.prevent_sleep_while_running)
+                            {
+                                eprintln!("Sleep prevention startup failed: {error}");
+                            }
+                        }
+                        Err(error) => {
+                            eprintln!("App runtime settings startup failed: {error}");
+                        }
+                    }
+                }
+                let schedule_poll_app = _app.handle().clone();
+                std::thread::spawn(move || loop {
+                    std::thread::sleep(std::time::Duration::from_secs(15));
+                    let _ = schedule_poll_app.emit(PROJECT_AGENT_SCHEDULE_POLL_EVENT, ());
+                });
                 let resource_directory = _app.path().resource_dir()?;
                 let home = _app.path().home_dir()?;
                 let app_data_directory = _app.path().app_data_dir()?;
@@ -5123,13 +5224,14 @@ pub fn run() {
             connected_project_ids,
             project_llm_chat,
             run_project_agent,
-            run_project_agent_schedule,
             start_project_auto_hunt,
             load_auto_hunt_app_server_events,
             load_auto_hunt_dispatch,
             load_app_provider_settings,
+            load_app_runtime_settings,
             load_agent_usage,
             update_app_provider_settings,
+            update_app_runtime_settings,
             load_project_llm_settings,
             update_project_llm_settings,
             load_project_sandbox_settings,
@@ -5775,6 +5877,11 @@ branch refs/heads/briar/second-11111111
                 .expect("legacy provider settings should load")
                 .codex
         );
+        assert!(
+            !app_runtime_settings_from(&config_path)
+                .expect("legacy runtime settings should load")
+                .prevent_sleep_while_running
+        );
         update_app_provider_settings_at(
             &config_path,
             AppProviderSettings {
@@ -5784,6 +5891,13 @@ branch refs/heads/briar/second-11111111
             },
         )
         .expect("provider settings should save");
+        update_app_runtime_settings_at(
+            &config_path,
+            StoredAppRuntimeSettings {
+                prevent_sleep_while_running: true,
+            },
+        )
+        .expect("runtime settings should save");
         update_project_llm_settings_at(
             &config_path,
             "project-1",
@@ -5803,6 +5917,7 @@ branch refs/heads/briar/second-11111111
         assert_eq!(saved["customSetting"], true);
         assert_eq!(saved["agentProviders"]["codex"], false);
         assert_eq!(saved["agentProviders"]["claude"], true);
+        assert_eq!(saved["appSettings"]["preventSleepWhileRunning"], true);
         assert_eq!(saved["projects"][0]["llm"]["provider"], "claude");
         assert_eq!(saved["projects"][0]["llm"]["model"], "sonnet");
         assert_eq!(saved["projects"][0]["llm"]["effort"], "high");
@@ -6468,6 +6583,7 @@ branch refs/heads/briar/second-11111111
             api_url: "http://127.0.0.1:8787".to_string(),
             user_token: None,
             agent_providers: AppProviderSettings::default(),
+            app_settings: StoredAppRuntimeSettings::default(),
             projects: vec![CliProject {
                 id: "project-1".to_string(),
                 repository_path: "/repo".to_string(),

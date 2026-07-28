@@ -11,11 +11,7 @@ import {
   type AutoHuntWorkflow,
   type AutoHuntWorkflowStageId,
 } from "../../src/lib/auto-hunt-contract";
-import {
-  defaultAutoHuntAutomation,
-  normalizeAutoHuntAutomation,
-  type AutoHuntAutomation,
-} from "../../src/lib/auto-hunt-automation";
+import type { StructuredAgentResult } from "../../src/lib/agent-result";
 import {
   defaultProjectAgentCalendarColor,
   defaultProjectAgentCopy,
@@ -31,7 +27,6 @@ import {
 } from "../../src/lib/project-agent-schedule";
 
 type ProjectAgentProvider = "codex" | "claude" | "grok";
-type ProjectAgentKind = "auto_hunt" | "custom";
 
 export type ProjectRow = {
   id: string;
@@ -68,7 +63,6 @@ export type ProjectSettingsRow = {
   linear_team_key: string | null;
   github_repository: string | null;
   workflow_json: string;
-  auto_hunt_automation_json: string;
   created_at: string;
   updated_at: string;
 };
@@ -85,7 +79,6 @@ export type ProjectAgentRow = {
   responsibility: string;
   skill_markdown: string;
   calendar_color: string;
-  kind: ProjectAgentKind;
   created_at: string;
   updated_at: string;
 };
@@ -132,6 +125,7 @@ export type ProjectAgentScheduleRunRow = {
   started_at: string;
   completed_at: string | null;
   result_summary: string | null;
+  structured_result_json: string | null;
   error: string | null;
   created_at: string;
   updated_at: string;
@@ -159,6 +153,7 @@ export type HuntRunRow = {
   tracker_issue_state: string | null;
   issue_description: string | null;
   result_summary: string | null;
+  structured_result_json: string | null;
   pull_request_urls: string;
   target_sha: string | null;
   source_created_at: string | null;
@@ -276,6 +271,7 @@ export type HuntEventInput = {
   tracker: TrackerInput;
   issueDescription: string | null;
   resultSummary: string | null;
+  structuredResult: StructuredAgentResult | null;
   pullRequestUrls: string[];
   targetSha: string | null;
   sourceCreatedAt: string | null;
@@ -295,7 +291,6 @@ export type ProjectSettingsInput = {
   };
   githubRepository: string | null;
   workflow: AutoHuntWorkflow;
-  automation?: AutoHuntAutomation;
 };
 
 export class EventKeyConflictError extends Error {
@@ -536,10 +531,8 @@ export async function createProject(
     responsibility: defaultAgentCopy.responsibility,
     skill_markdown: projectAgentSkill({
       ...defaultAgentCopy,
-      kind: "auto_hunt",
     }),
     calendar_color: defaultProjectAgentCalendarColor,
-    kind: "auto_hunt",
     created_at: createdAt,
     updated_at: createdAt,
   };
@@ -576,8 +569,8 @@ export async function createProject(
       .prepare(
         `insert into briar_project_agents (
            id, project_id, name, provider, model, responsibility,
-           skill_markdown, calendar_color, created_at, updated_at, kind
-         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           skill_markdown, calendar_color, created_at, updated_at
+         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         defaultAgent.id,
@@ -590,7 +583,6 @@ export async function createProject(
         defaultAgent.calendar_color,
         defaultAgent.created_at,
         defaultAgent.updated_at,
-        defaultAgent.kind,
       ),
   ]);
   return project;
@@ -640,7 +632,7 @@ export async function listProjectAgents(db: D1Database, projectId: string) {
     .prepare(
       `select id, project_id, name, avatar, avatar_pet_json,
               avatar_spritesheet_object_key, provider, model, responsibility, skill_markdown, calendar_color,
-              kind, created_at, updated_at
+              created_at, updated_at
        from briar_project_agents
        where project_id = ?
        order by created_at, id`,
@@ -659,7 +651,7 @@ export async function getProjectAgent(
     .prepare(
       `select id, project_id, name, avatar, avatar_pet_json,
               avatar_spritesheet_object_key, provider, model, responsibility,
-              skill_markdown, calendar_color, kind, created_at, updated_at
+              skill_markdown, calendar_color, created_at, updated_at
        from briar_project_agents
        where id = ? and project_id = ?`,
     )
@@ -695,10 +687,8 @@ export async function createProjectAgent(
     skill_markdown: projectAgentSkill({
       name: input.name,
       responsibility: input.responsibility,
-      kind: "custom",
     }),
     calendar_color: input.calendarColor,
-    kind: "custom",
     created_at: createdAt,
     updated_at: createdAt,
   };
@@ -707,8 +697,8 @@ export async function createProjectAgent(
       `insert into briar_project_agents (
          id, project_id, name, avatar, avatar_pet_json,
          avatar_spritesheet_object_key, provider, model, responsibility,
-         skill_markdown, calendar_color, created_at, updated_at, kind
-       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         skill_markdown, calendar_color, created_at, updated_at
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       agent.id,
@@ -724,7 +714,6 @@ export async function createProjectAgent(
       agent.calendar_color,
       agent.created_at,
       agent.updated_at,
-      agent.kind,
     )
     .run();
   return agent;
@@ -984,7 +973,8 @@ const scheduleRunSelect = `
          agent.skill_markdown as agent_skill_markdown,
          settings.workflow_json,
          run.status, run.scheduled_for, run.lease_expires_at,
-         run.started_at, run.completed_at, run.result_summary, run.error,
+         run.started_at, run.completed_at, run.result_summary,
+         run.structured_result_json, run.error,
          run.created_at, run.updated_at
   from briar_project_agent_schedule_runs run
   join briar_project_agent_schedules schedule on schedule.id = run.schedule_id
@@ -1247,6 +1237,7 @@ export async function completeProjectAgentScheduleRun(
     claimTokenHash: string;
     status: Exclude<ProjectAgentScheduleRunStatus, "running">;
     resultSummary: string | null;
+    structuredResult: StructuredAgentResult;
     error: string | null;
     observedAt: string;
   },
@@ -1255,7 +1246,8 @@ export async function completeProjectAgentScheduleRun(
     .prepare(
       `update briar_project_agent_schedule_runs
        set status = ?, claim_token_hash = null, lease_expires_at = null,
-           completed_at = ?, result_summary = ?, error = ?, updated_at = ?
+           completed_at = ?, result_summary = ?, structured_result_json = ?,
+           error = ?, updated_at = ?
        where id = ? and project_id = ? and status = 'running'
          and claim_token_hash = ?
        returning id`,
@@ -1264,6 +1256,7 @@ export async function completeProjectAgentScheduleRun(
       input.status,
       input.observedAt,
       input.resultSummary,
+      stableJson(input.structuredResult),
       input.error,
       input.observedAt,
       runId,
@@ -1323,18 +1316,11 @@ export async function updateProjectAgent(
   },
 ) {
   const updatedAt = new Date().toISOString();
-  const existing = await db
-    .prepare(
-      `select kind from briar_project_agents
-       where id = ? and project_id = ?`,
-    )
-    .bind(agentId, projectId)
-    .first<Pick<ProjectAgentRow, "kind">>();
+  const existing = await getProjectAgent(db, projectId, agentId);
   if (!existing) return null;
   const skill = projectAgentSkill({
     name: input.name,
     responsibility: input.responsibility,
-    kind: existing.kind,
   });
   const result = await db
     .prepare(
@@ -1370,7 +1356,7 @@ export async function updateProjectAgent(
     .prepare(
       `select id, project_id, name, avatar, avatar_pet_json,
               avatar_spritesheet_object_key, provider, model, responsibility, skill_markdown, calendar_color,
-              kind, created_at, updated_at
+              created_at, updated_at
        from briar_project_agents
        where id = ? and project_id = ?`,
     )
@@ -1383,7 +1369,7 @@ export async function getProjectSettings(db: D1Database, projectId: string) {
     .prepare(
       `select project_id, velen_org, data_source, linear_enabled,
               linear_source, linear_team_key, github_repository, workflow_json,
-              auto_hunt_automation_json, created_at, updated_at
+              created_at, updated_at
        from briar_project_settings
        where project_id = ?`,
     )
@@ -1397,16 +1383,12 @@ export async function updateProjectSettings(
   input: ProjectSettingsInput,
 ) {
   const updatedAt = new Date().toISOString();
-  const automation = stableJson(
-    normalizeAutoHuntAutomation(input.automation ?? defaultAutoHuntAutomation),
-  );
   await db
     .prepare(
       `insert into briar_project_settings (
          project_id, velen_org, data_source, linear_enabled, linear_source,
-         linear_team_key, github_repository, workflow_json,
-         auto_hunt_automation_json, created_at, updated_at
-       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         linear_team_key, github_repository, workflow_json, created_at, updated_at
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        on conflict(project_id) do update set
          velen_org = excluded.velen_org,
          data_source = excluded.data_source,
@@ -1415,10 +1397,6 @@ export async function updateProjectSettings(
          linear_team_key = excluded.linear_team_key,
          github_repository = excluded.github_repository,
          workflow_json = excluded.workflow_json,
-         auto_hunt_automation_json = case
-           when ? = 1 then excluded.auto_hunt_automation_json
-           else briar_project_settings.auto_hunt_automation_json
-         end,
          updated_at = excluded.updated_at`,
     )
     .bind(
@@ -1430,10 +1408,8 @@ export async function updateProjectSettings(
       input.linear.enabled ? input.linear.teamKey : null,
       input.githubRepository,
       stableJson(normalizeAutoHuntWorkflow(input.workflow)),
-      automation,
       updatedAt,
       updatedAt,
-      input.automation ? 1 : 0,
     )
     .run();
   return await getProjectSettings(db, projectId);
@@ -1449,7 +1425,8 @@ export async function listDashboardRuns(db: D1Database, projectId: string) {
               run.commit_sha, run.tracker_provider, run.tracker_issue_id,
               run.tracker_issue_identifier, run.tracker_issue_url,
               run.tracker_issue_state, run.issue_description,
-              run.result_summary, run.pull_request_urls, run.target_sha,
+              run.result_summary, run.structured_result_json,
+              run.pull_request_urls, run.target_sha,
               run.source_created_at, run.staging_qa_status,
               run.production_qa_status, run.staging_qa_detail,
               run.production_qa_detail, run.context_json,
@@ -2192,11 +2169,12 @@ export async function recordHuntEvent(
            repository, branch, commit_sha, tracker_provider,
            tracker_issue_id, tracker_issue_identifier, tracker_issue_url,
            tracker_issue_state, issue_description, result_summary,
+           structured_result_json,
            pull_request_urls, target_sha, source_created_at,
            staging_qa_status, production_qa_status, staging_qa_detail,
            production_qa_detail, context_json, started_at, completed_at,
            last_event_at, created_at, updated_at
-         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          on conflict(project_id, source, source_key) do nothing`,
       )
       .bind(
@@ -2221,6 +2199,9 @@ export async function recordHuntEvent(
         normalizedInput.tracker?.state ?? null,
         normalizedInput.issueDescription,
         normalizedInput.resultSummary,
+        normalizedInput.structuredResult
+          ? stableJson(normalizedInput.structuredResult)
+          : null,
         stableJson(mergedPullRequestUrls),
         normalizedInput.targetSha,
         normalizedInput.sourceCreatedAt,
@@ -2295,6 +2276,7 @@ export async function recordHuntEvent(
              tracker_issue_state = case when ? >= last_event_at then coalesce(?, tracker_issue_state) else tracker_issue_state end,
              issue_description = case when ? >= last_event_at then coalesce(?, issue_description) else issue_description end,
              result_summary = case when ? >= last_event_at then coalesce(?, result_summary) else result_summary end,
+             structured_result_json = case when ? >= last_event_at then coalesce(?, structured_result_json) else structured_result_json end,
              pull_request_urls = ?,
              target_sha = case when ? >= last_event_at then coalesce(?, target_sha) else target_sha end,
              source_created_at = coalesce(source_created_at, ?),
@@ -2355,6 +2337,10 @@ export async function recordHuntEvent(
         normalizedInput.issueDescription,
         normalizedInput.occurredAt,
         normalizedInput.resultSummary,
+        normalizedInput.occurredAt,
+        normalizedInput.structuredResult
+          ? stableJson(normalizedInput.structuredResult)
+          : null,
         stableJson(mergedPullRequestUrls),
         normalizedInput.occurredAt,
         normalizedInput.targetSha,
@@ -2620,6 +2606,7 @@ export async function reworkHuntRun(
          set stage = ?, status = 'running', workflow_stage = ?,
              detail = ?, current_revision = ?, commit_sha = null,
              target_sha = null, result_summary = null,
+             structured_result_json = null,
              staging_qa_status = null, production_qa_status = null,
              staging_qa_detail = null, production_qa_detail = null,
              completed_at = null, last_event_at = ?, updated_at = ?
@@ -2799,6 +2786,7 @@ export async function recoverHuntRun(
              set stage = 'queued', status = 'queued', workflow_stage = null,
                  detail = ?, current_attempt = ?, current_revision = 1,
                  branch = null, commit_sha = null, result_summary = null,
+                 structured_result_json = null,
                  pull_request_urls = '[]',
                  target_sha = null, staging_qa_status = null,
                  production_qa_status = null, staging_qa_detail = null,
@@ -3058,6 +3046,7 @@ export async function moveHuntRun(
              commit_sha = case when ? then null else commit_sha end,
              target_sha = case when ? then null else target_sha end,
              result_summary = case when ? then null else result_summary end,
+             structured_result_json = case when ? then null else structured_result_json end,
              staging_qa_status = case when ? then null else staging_qa_status end,
              production_qa_status = case when ? then null else production_qa_status end,
              staging_qa_detail = case when ? then null else staging_qa_detail end,
@@ -3079,6 +3068,7 @@ export async function moveHuntRun(
         detail,
         targetAttempt,
         targetRevision,
+        isRegression ? 1 : 0,
         isRegression ? 1 : 0,
         isRegression ? 1 : 0,
         isRegression ? 1 : 0,
@@ -3268,11 +3258,12 @@ export async function importLinearHuntRuns(
                repository, branch, commit_sha, tracker_provider,
                tracker_issue_id, tracker_issue_identifier, tracker_issue_url,
                tracker_issue_state, issue_description, result_summary,
+               structured_result_json,
                pull_request_urls, target_sha, source_created_at,
                staging_qa_status, production_qa_status, staging_qa_detail,
                production_qa_detail, context_json, started_at, completed_at,
                last_event_at, created_at, updated_at
-             ) values (?, ?, 'issue', ?, ?, ?, ?, ?, ?, ?, ?, ?, null, null, ?, ?, ?, ?, ?, ?, ?, '[]', null, ?, null, null, null, null, ?, ?, ?, ?, ?, ?)
+             ) values (?, ?, 'issue', ?, ?, ?, ?, ?, ?, ?, ?, ?, null, null, ?, ?, ?, ?, ?, ?, ?, null, '[]', null, ?, null, null, null, null, ?, ?, ?, ?, ?, ?)
              on conflict(project_id, source, source_key) do nothing`,
           )
           .bind(
@@ -3497,4 +3488,35 @@ export async function updateIssue(
       projectId,
     )
     .first<HuntRunRow>();
+}
+
+export async function deleteIssue(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  observedAt: string,
+): Promise<"deleted" | "active" | "not_found"> {
+  const deleted = await db
+    .prepare(
+      `delete from briar_hunt_runs
+       where id = ? and project_id = ?
+         and status <> 'running'
+         and not (
+           status = 'queued'
+           and lease_expires_at is not null
+           and lease_expires_at > ?
+         )
+       returning id`,
+    )
+    .bind(runId, projectId, observedAt)
+    .first<{ id: string }>();
+  if (deleted) return "deleted";
+  const run = await db
+    .prepare(
+      `select id from briar_hunt_runs
+       where id = ? and project_id = ?`,
+    )
+    .bind(runId, projectId)
+    .first<{ id: string }>();
+  return run ? "active" : "not_found";
 }

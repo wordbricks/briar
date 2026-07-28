@@ -1,3 +1,5 @@
+import type { StructuredAgentResult } from "./agent-result";
+
 export type JsonSchema = Record<string, unknown> | boolean;
 
 export const approvalPolicies = ["untrusted", "on-request", "never"] as const;
@@ -98,16 +100,9 @@ export type ProjectLlmChatResponse = {
   workspaceRoot: string;
 };
 
-export type ProjectAgentScheduleExecutionInput = {
-  projectId: string;
-  provider: AgentProvider;
-  model: string | null;
-  message: string;
-  instructions: string;
-};
-
 export type ProjectAgentRunInput = {
   projectId: string;
+  sessionId: string;
   agent: {
     id: string;
     name: string;
@@ -126,6 +121,7 @@ export type ProjectAgentRunResponse = {
   action: "respond" | "dispatch_auto_hunt";
   message: string;
   maxIssues: number | null;
+  structuredResult: StructuredAgentResult | null;
 };
 
 export type ProjectChatMessage = {
@@ -172,35 +168,10 @@ export async function chatWithProjectLlm(
 }
 
 /**
- * Run one claimed schedule in the locally registered project root.
- *
- * Callers choose a saved agent identity, never a filesystem path. The native
- * layer resolves the connected root and confines writes to that workspace.
- */
-export async function runProjectAgentSchedule(
-  input: ProjectAgentScheduleExecutionInput,
-): Promise<ProjectLlmChatResponse> {
-  if (!isTauri()) {
-    throw new Error("예약 에이전트는 Briar 데스크톱 앱에서 실행할 수 있습니다.");
-  }
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<ProjectLlmChatResponse>("run_project_agent_schedule", {
-    projectId: input.projectId,
-    provider: input.provider,
-    model: input.model,
-    request: {
-      message: input.message,
-      conversationId: null,
-      instructions: input.instructions,
-      outputSchema: null,
-    },
-  });
-}
-
-/**
- * Run one user-requested turn for a saved agent. The agent either completes the
- * request in this conversation or explicitly asks the Briar host to dispatch
- * Auto Hunt; it never claims queue work itself.
+ * Run one turn for a saved Agent. Direct and scheduled callers provide the
+ * invocation message through this same gateway. The Agent either responds in
+ * this conversation or explicitly asks the Briar host to dispatch Auto Hunt;
+ * it never claims queue work itself.
  */
 export async function runProjectAgent(
   input: ProjectAgentRunInput,
@@ -212,6 +183,7 @@ export async function runProjectAgent(
   return invoke<ProjectAgentRunResponse>("run_project_agent", {
     projectId: input.projectId,
     request: {
+      sessionId: input.sessionId,
       agentId: input.agent.id,
       agentName: input.agent.name,
       agentProvider: input.agent.provider,

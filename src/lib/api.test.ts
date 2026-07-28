@@ -4,9 +4,11 @@ import {
   completeProjectAgentScheduleRun,
   createProjectAgent,
   createProjectAgentSchedule,
+  deleteIssue,
   deleteProjectAgentSchedule,
   loadProjectAgentScheduleRuns,
   loadProjectAgents,
+  loadRunEvidence,
   loadSession,
   updateProjectAgent,
   updateProjectAgentSchedule,
@@ -77,6 +79,63 @@ describe("API errors", () => {
     );
   });
 
+  it("deletes an issue through its project-scoped run endpoint", async () => {
+    const projectId = "22222222-2222-4222-8222-222222222222";
+    const runId = "11111111-1111-4111-8111-111111111111";
+    const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(deleteIssue("token", projectId, runId)).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(`/projects/${projectId}/runs/${runId}`),
+      expect.objectContaining({ method: "DELETE" }),
+    );
+  });
+
+  it("loads run evidence through the user-authenticated project endpoint", async () => {
+    const projectId = "22222222-2222-4222-8222-222222222222";
+    const runId = "11111111-1111-4111-8111-111111111111";
+    const evidence = [{
+      key: "LOCAL-1:local_qa:local_ci_result",
+      attempt: 1,
+      revision: 2,
+      stage: "local_qa",
+      type: "local_ci_result",
+      status: "passed",
+      detail: "Focused checks passed.",
+      command: "bun run test",
+      url: null,
+      metadata: null,
+      actor: "briar-workflow",
+      observedAt: "2026-07-28T00:00:00.000Z",
+      recordedAt: "2026-07-28T00:00:01.000Z",
+      requiredRevision: 2,
+      canonical: true,
+    }];
+    let capturedInit: RequestInit | undefined;
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        capturedInit = init;
+        return new Response(
+          JSON.stringify({ runId, attempt: 1, revision: 2, evidence }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(loadRunEvidence("token", projectId, runId)).resolves.toEqual(
+      evidence,
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(`/projects/${projectId}/runs/${runId}/evidence`),
+      expect.any(Object),
+    );
+    expect(
+      new Headers(capturedInit?.headers).get("Authorization"),
+    ).toBe("Bearer token");
+  });
+
   it("creates a project agent with its provider, model, and responsibility", async () => {
     const fetchMock = vi.fn(
       async (_input: RequestInfo | URL, init?: RequestInit) => {
@@ -117,7 +176,6 @@ describe("API errors", () => {
       provider: "grok",
       model: "grok-4.5",
       responsibility: "피드백을 분석해 액션 아이템 이슈를 만듭니다.",
-      kind: "custom",
     });
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining(
@@ -149,7 +207,7 @@ describe("API errors", () => {
     );
   });
 
-  it("normalizes legacy project agents that omit kind", async () => {
+  it("loads project agents without a special kind", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => {
@@ -195,13 +253,10 @@ describe("API errors", () => {
         "22222222-2222-4222-8222-222222222222",
         "ko",
       ),
-    ).resolves.toMatchObject([
-      { kind: "auto_hunt" },
-      { kind: "custom" },
-    ]);
+    ).resolves.toHaveLength(2);
   });
 
-  it("rejects explicit unsupported project agent kinds", async () => {
+  it("ignores legacy project agent kind fields", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => {
@@ -236,7 +291,9 @@ describe("API errors", () => {
         "22222222-2222-4222-8222-222222222222",
         "en",
       ),
-    ).rejects.toMatchObject({ name: "ZodError" });
+    ).resolves.toEqual([
+      expect.not.objectContaining({ kind: expect.anything() }),
+    ]);
   });
 
   it("creates an agent schedule with its recurrence and time zone", async () => {
@@ -356,6 +413,16 @@ describe("API errors", () => {
 
   it("claims and completes a due agent schedule run", async () => {
     const claimToken = `briar_schedule_claim_${"a".repeat(64)}`;
+    const structuredResult = {
+      summary: "Audit completed.",
+      outcome: "completed",
+      importance: "routine",
+      urgency: "normal",
+      impact: "issue",
+      humanActionRequired: false,
+      nextAction: null,
+      dueAt: null,
+    } as const;
     const run = {
       id: "11111111-1111-4111-8111-111111111111",
       projectId: "22222222-2222-4222-8222-222222222222",
@@ -376,6 +443,7 @@ describe("API errors", () => {
       startedAt: "2026-07-27T09:00:01.000Z",
       completedAt: null,
       resultSummary: null,
+      structuredResult: null,
       error: null,
     } as const;
     const fetchMock = vi
@@ -395,6 +463,7 @@ describe("API errors", () => {
               leaseExpiresAt: null,
               completedAt: "2026-07-27T09:01:00.000Z",
               resultSummary: "Audit completed.",
+              structuredResult,
             },
           }),
           {
@@ -416,11 +485,17 @@ describe("API errors", () => {
         "token",
         "22222222-2222-4222-8222-222222222222",
         run.id,
-        { claimToken, status: "completed", resultSummary: "Audit completed." },
+        {
+          claimToken,
+          status: "completed",
+          resultSummary: "Audit completed.",
+          structuredResult,
+        },
       ),
     ).resolves.toMatchObject({
       status: "completed",
       resultSummary: "Audit completed.",
+      structuredResult,
     });
   });
 
@@ -445,6 +520,16 @@ describe("API errors", () => {
       startedAt: "2026-07-27T09:00:01.000Z",
       completedAt: "2026-07-27T09:01:00.000Z",
       resultSummary: "Audit completed.",
+      structuredResult: {
+        summary: "Audit completed.",
+        outcome: "completed",
+        importance: "routine",
+        urgency: "normal",
+        impact: "issue",
+        humanActionRequired: false,
+        nextAction: null,
+        dueAt: null,
+      },
       error: null,
     } as const;
     const fetchMock = vi.fn(async () =>
@@ -532,7 +617,6 @@ describe("API errors", () => {
       provider: "claude",
       model: "sonnet",
       responsibility: "릴리스 상태를 점검합니다.",
-      kind: "custom",
     });
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining(

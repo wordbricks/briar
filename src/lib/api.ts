@@ -1,9 +1,9 @@
 import { z } from "zod";
+import { structuredAgentResultSchema } from "./agent-result";
 import { validateIssueAttachments } from "./issue-attachments";
 import type { AutoHuntWorkflow } from "./auto-hunt-contract";
 import {
   defaultProjectAgentCalendarColor,
-  defaultProjectAgentCopy,
   type ProjectAgentLocale,
 } from "./project-agent";
 import type {
@@ -27,6 +27,7 @@ import type {
   Organization,
   OrganizationMember,
   ProjectSettings,
+  RunEvidence,
   SessionUser,
   UpdateProjectAgentInput,
   UpdateProjectAgentScheduleInput,
@@ -81,32 +82,9 @@ const projectAgentSchema = z.object({
     .string()
     .regex(/^#[0-9a-f]{6}$/iu)
     .default(defaultProjectAgentCalendarColor),
-  kind: z.enum(["auto_hunt", "custom"]).optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
-type ParsedProjectAgent = z.infer<typeof projectAgentSchema>;
-
-function normalizeProjectAgent(
-  agent: ParsedProjectAgent,
-  fallbackKind: ProjectAgent["kind"],
-): ProjectAgent {
-  return {
-    ...agent,
-    kind: agent.kind ?? fallbackKind,
-  };
-}
-
-function inferLegacyProjectAgentKind(
-  agent: ParsedProjectAgent,
-  locale: ProjectAgentLocale,
-): ProjectAgent["kind"] {
-  const defaultCopy = defaultProjectAgentCopy(locale);
-  return agent.name === defaultCopy.name &&
-    agent.responsibility === defaultCopy.responsibility
-    ? "auto_hunt"
-    : "custom";
-}
 const projectAgentScheduleSchema = z.object({
   id: z.string().uuid(),
   projectId: z.string().uuid(),
@@ -166,6 +144,7 @@ const projectAgentScheduleRunSchema = z.object({
   startedAt: z.string(),
   completedAt: z.string().nullable(),
   resultSummary: z.string().nullable(),
+  structuredResult: structuredAgentResultSchema.nullable(),
   error: z.string().nullable(),
 });
 const claimedProjectAgentScheduleRunSchema =
@@ -421,12 +400,7 @@ export async function loadProjectAgents(
     `/projects/${projectId}/agents?locale=${encodeURIComponent(locale)}`,
     token,
   );
-  return z
-    .array(projectAgentSchema)
-    .parse(result.agents)
-    .map((agent) =>
-      normalizeProjectAgent(agent, inferLegacyProjectAgentKind(agent, locale)),
-    );
+  return z.array(projectAgentSchema).parse(result.agents);
 }
 
 export async function createProjectAgent(
@@ -442,10 +416,7 @@ export async function createProjectAgent(
       body: JSON.stringify(projectAgentInputJson(input)),
     },
   );
-  return normalizeProjectAgent(
-    projectAgentSchema.parse(result.agent),
-    "custom",
-  );
+  return projectAgentSchema.parse(result.agent);
 }
 
 export async function loadProjectAgentSchedules(
@@ -534,8 +505,18 @@ export async function completeProjectAgentScheduleRun(
   projectId: string,
   runId: string,
   input:
-    | { claimToken: string; status: "completed"; resultSummary: string }
-    | { claimToken: string; status: "failed"; error: string },
+    | {
+        claimToken: string;
+        status: "completed";
+        resultSummary: string;
+        structuredResult: z.infer<typeof structuredAgentResultSchema>;
+      }
+    | {
+        claimToken: string;
+        status: "failed";
+        error: string;
+        structuredResult: z.infer<typeof structuredAgentResultSchema>;
+      },
 ): Promise<ProjectAgentScheduleRun> {
   const result = await request<{ run: unknown }>(
     `/projects/${projectId}/agent-schedule-runs/${runId}/complete`,
@@ -547,6 +528,7 @@ export async function completeProjectAgentScheduleRun(
         status: input.status,
         resultSummary:
           input.status === "completed" ? input.resultSummary : null,
+        structuredResult: input.structuredResult,
         error: input.status === "failed" ? input.error : null,
       }),
     },
@@ -585,10 +567,7 @@ export async function updateProjectAgent(
       body: JSON.stringify(projectAgentInputJson(input)),
     },
   );
-  return normalizeProjectAgent(
-    projectAgentSchema.parse(result.agent),
-    "custom",
-  );
+  return projectAgentSchema.parse(result.agent);
 }
 
 export async function loadProjectAgentSpriteSheet(
@@ -682,6 +661,16 @@ export async function updateIssue(
   });
 }
 
+export async function deleteIssue(
+  token: string,
+  projectId: string,
+  runId: string,
+) {
+  await request<void>(`/projects/${projectId}/runs/${runId}`, token, {
+    method: "DELETE",
+  });
+}
+
 export async function loadIssueAttachment(
   token: string,
   attachment: IssueAttachment,
@@ -713,6 +702,20 @@ export async function loadIssueMessages(
     token,
   );
   return result.messages;
+}
+
+export async function loadRunEvidence(
+  token: string,
+  projectId: string,
+  runId: string,
+) {
+  const result = await request<{
+    runId: string;
+    attempt: number;
+    revision: number;
+    evidence: RunEvidence[];
+  }>(`/projects/${projectId}/runs/${runId}/evidence`, token);
+  return result.evidence;
 }
 
 export async function createIssueMessage(
