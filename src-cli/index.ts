@@ -13,6 +13,7 @@ import {
   repositoryWorkflowPendingStageId,
 } from "../src/lib/auto-hunt-contract";
 import { structuredAgentResultSchema } from "../src/lib/agent-result";
+import { validateEvidenceImages } from "../src/lib/evidence-images";
 import {
   defaultWorkerLabel,
   hostFingerprint,
@@ -200,14 +201,17 @@ async function request<T>(
   token: string | null,
   init?: RequestInit,
 ): Promise<T> {
+  const headers = new Headers(init?.headers);
+  if (!headers.has("Accept")) headers.set("Accept", "application/json");
+  if (!(init?.body instanceof FormData) && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+  if (token && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
   const response = await fetch(`${apiUrl.replace(/\/$/u, "")}${path}`, {
     ...init,
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...init?.headers,
-    },
+    headers,
   });
   const body: unknown = await response.json().catch(() => null);
   if (!response.ok) {
@@ -1168,11 +1172,39 @@ async function addRunEvidence() {
     url: z.string().url().nullable(),
     metadata: z.record(z.string(), z.unknown()).nullable(),
   }).parse(input);
+  const imagePaths = values("--image").map((path) => resolve(path));
+  const images = await Promise.all(
+    imagePaths.map(async (path) => {
+      const image = Bun.file(path);
+      if (!(await image.exists())) {
+        throw new Error(`Evidence image does not exist: ${path}`);
+      }
+      return { image, name: basename(path) };
+    }),
+  );
+  const imageError = validateEvidenceImages(
+    images.map(({ image, name }) => ({
+      name,
+      size: image.size,
+      type: image.type,
+    })),
+  );
+  if (imageError) throw new Error(imageError);
+  const body = images.length
+    ? (() => {
+        const form = new FormData();
+        form.append("evidence", JSON.stringify(parsed));
+        for (const { image, name } of images) {
+          form.append("images", image, name);
+        }
+        return form;
+      })()
+    : JSON.stringify(parsed);
   const result = await request(
     config.apiUrl,
     `/runs/${runId}/evidence`,
     process.env.BRIAR_AGENT_TOKEN ?? project.agentToken,
-    { method: "POST", body: JSON.stringify(parsed) },
+    { method: "POST", body },
   );
   console.log(JSON.stringify(result));
 }
@@ -1528,7 +1560,7 @@ const usage = `Briar CLI
     --stage <configured-stage> --type <type>
     --status <pending|passed|failed|skipped>
     [--detail <text>|--detail-file <path>] [--command <command>]
-    [--url <url>] [--metadata-json <json>]
+    [--url <url>] [--metadata-json <json>] [--image <path>]...
   briar run evidence list [--run <uuid>]
   briar run rework [--run <uuid>] --to <earlier-stage> --reason <text>
     [--request-id <uuid>]

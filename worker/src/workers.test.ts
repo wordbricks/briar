@@ -105,6 +105,7 @@ describe("detached execution workers", () => {
       "migrations/0026_flexible_project_agent_schedules.sql",
       "migrations/0027_run_revisions.sql",
       "migrations/0029_structured_agent_results.sql",
+      "migrations/0030_run_evidence_images.sql",
     ]) {
       await executeSql(db, await readFile(resolve(migration), "utf8"));
     }
@@ -133,7 +134,7 @@ describe("detached execution workers", () => {
       );
     `,
     );
-  });
+  }, 30_000);
 
   afterAll(async () => {
     await miniflare.dispose();

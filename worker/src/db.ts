@@ -215,6 +215,25 @@ export type RunEvidenceRow = {
   recorded_at: string;
 };
 
+export type RunEvidenceImageRow = {
+  id: string;
+  project_id: string;
+  run_id: string;
+  evidence_id: string;
+  object_key: string;
+  filename: string;
+  content_type: string;
+  byte_size: number;
+  sha256: string;
+  position: number;
+  created_at: string;
+};
+
+export type RunEvidenceImageInput = Omit<
+  RunEvidenceImageRow,
+  "project_id" | "run_id" | "evidence_id" | "created_at"
+>;
+
 export type IssueMessageRow = {
   id: string;
   run_id: string;
@@ -2524,6 +2543,133 @@ export async function listRunEvidence(
     .bind(projectId, runId, run.current_attempt)
     .all<RunEvidenceRow>();
   return result.results ?? [];
+}
+
+export async function listRunEvidenceImages(
+  db: D1Database,
+  projectId: string,
+  runId?: string,
+) {
+  if (!runId) {
+    const result = await db
+      .prepare(
+        `select * from briar_run_evidence_images
+         where project_id = ?
+         order by run_id, evidence_id, position, id`,
+      )
+      .bind(projectId)
+      .all<RunEvidenceImageRow>();
+    return result.results ?? [];
+  }
+  const run = await getHuntRunForProject(db, projectId, runId);
+  if (!run) return null;
+  const result = await db
+    .prepare(
+      `select image.*
+       from briar_run_evidence_images image
+       join briar_run_evidence evidence on evidence.id = image.evidence_id
+       where image.project_id = ? and image.run_id = ?
+         and evidence.attempt = ?
+       order by evidence.observed_at, evidence.recorded_at, evidence.id,
+                image.position, image.id`,
+    )
+    .bind(projectId, runId, run.current_attempt)
+    .all<RunEvidenceImageRow>();
+  return result.results ?? [];
+}
+
+export async function listAllRunEvidenceImages(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+) {
+  const run = await getHuntRunForProject(db, projectId, runId);
+  if (!run) return null;
+  const result = await db
+    .prepare(
+      `select * from briar_run_evidence_images
+       where project_id = ? and run_id = ?
+       order by evidence_id, position, id`,
+    )
+    .bind(projectId, runId)
+    .all<RunEvidenceImageRow>();
+  return result.results ?? [];
+}
+
+export async function listEvidenceImagesForEvidence(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  evidenceId: string,
+) {
+  const result = await db
+    .prepare(
+      `select * from briar_run_evidence_images
+       where project_id = ? and run_id = ? and evidence_id = ?
+       order by position, id`,
+    )
+    .bind(projectId, runId, evidenceId)
+    .all<RunEvidenceImageRow>();
+  return result.results ?? [];
+}
+
+export async function createRunEvidenceImages(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  evidenceId: string,
+  images: RunEvidenceImageInput[],
+) {
+  const evidence = await db
+    .prepare(
+      `select id from briar_run_evidence
+       where id = ? and project_id = ? and run_id = ?`,
+    )
+    .bind(evidenceId, projectId, runId)
+    .first<{ id: string }>();
+  if (!evidence) return null;
+  if (images.length === 0) return [];
+  const createdAt = new Date().toISOString();
+  await db.batch(
+    images.map((image) =>
+      db
+        .prepare(
+          `insert into briar_run_evidence_images (
+             id, project_id, run_id, evidence_id, object_key, filename,
+             content_type, byte_size, sha256, position, created_at
+           ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          image.id,
+          projectId,
+          runId,
+          evidenceId,
+          image.object_key,
+          image.filename,
+          image.content_type,
+          image.byte_size,
+          image.sha256,
+          image.position,
+          createdAt,
+        ),
+    ),
+  );
+  return listEvidenceImagesForEvidence(db, projectId, runId, evidenceId);
+}
+
+export async function getRunEvidenceImage(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  imageId: string,
+) {
+  return db
+    .prepare(
+      `select * from briar_run_evidence_images
+       where id = ? and project_id = ? and run_id = ?`,
+    )
+    .bind(imageId, projectId, runId)
+    .first<RunEvidenceImageRow>();
 }
 
 export async function listRunStageRevisions(
