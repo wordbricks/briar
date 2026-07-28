@@ -102,6 +102,15 @@ export type RunEvidence = {
   actor: string;
   observedAt: string;
   recordedAt: string;
+  images?: Array<{
+    id: string;
+    filename: string;
+    contentType: string;
+    byteSize: number;
+    sha256: string;
+    position: number;
+    url: string;
+  }>;
   requiredRevision: number;
   canonical: boolean;
 };

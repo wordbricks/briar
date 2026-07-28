@@ -19,6 +19,7 @@ import {
   createProjectAgentSchedule,
   createProject,
   createIssueAttachments,
+  createRunEvidenceImages,
   deleteIssue,
   deleteProjectAgentSchedule,
   deleteProject,
@@ -26,6 +27,7 @@ import {
   getProjectSettings,
   getHuntRunForProject,
   getIssueAttachment,
+  getRunEvidenceImage,
   getNextQueuedHuntRun,
   HuntClaimError,
   HuntTransitionError,
@@ -38,6 +40,7 @@ import {
   listProjectAgentScheduleRuns,
   listProjectAgentSchedules,
   listRunEvidence,
+  listRunEvidenceImages,
   moveHuntRun,
   recoverHuntRun,
   reworkHuntRun,
@@ -334,7 +337,11 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         "utf8",
       ),
     );
-  });
+    await executeSql(
+      db,
+      await readFile(resolve("migrations/0030_run_evidence_images.sql"), "utf8"),
+    );
+  }, 30_000);
 
   afterAll(async () => {
     await miniflare.dispose();
@@ -1009,6 +1016,64 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
 
     const linkedRun = await getHuntRunForProject(db, projectId, runId);
     expect(JSON.parse(linkedRun!.pull_request_urls)).toEqual([pullRequestUrl]);
+  });
+
+  it("stores images against a run evidence record", async () => {
+    await updateProjectSettings(db, projectId, {
+      velenOrg: "example",
+      dataSource: null,
+      linear: { enabled: false, source: null, teamKey: null },
+      githubRepository: "example/repository",
+      workflow: releaseWorkflow,
+    });
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 12.3, {
+        sourceKey: "evidence-image-run",
+        eventKey: "evidence-image-run:queued",
+      }),
+    );
+    const evidence = await recordRunEvidence(db, projectId, {
+      runId,
+      evidenceKey: "analyzing:screenshot",
+      stage: "analyzing",
+      type: "repository",
+      status: "passed",
+      detail: "Screenshot captured",
+      command: null,
+      url: null,
+      metadata: null,
+      actor: "vitest",
+      observedAt: atMinute(12.4),
+    });
+    expect(evidence).not.toBeNull();
+    const imageId = "11111111-3333-4444-8555-666666666666";
+    const stored = await createRunEvidenceImages(
+      db,
+      projectId,
+      runId,
+      evidence!.id,
+      [
+        {
+          id: imageId,
+          object_key: `run-evidence/${projectId}/${runId}/${evidence!.id}/${imageId}`,
+          filename: "dashboard.png",
+          content_type: "image/png",
+          byte_size: 8,
+          sha256: "a".repeat(64),
+          position: 0,
+        },
+      ],
+    );
+
+    expect(stored).toHaveLength(1);
+    await expect(listRunEvidenceImages(db, projectId, runId)).resolves.toEqual(
+      stored,
+    );
+    await expect(
+      getRunEvidenceImage(db, projectId, runId, imageId),
+    ).resolves.toEqual(stored?.[0]);
   });
 
   it("reworks QA findings in the same attempt and requires fresh downstream evidence", async () => {

@@ -146,9 +146,14 @@ briar run evidence add --run '<run-id>' \
   --stage '<stage-id>' \
   --type '<evidence-type>' \
   --status passed \
+  --image '<screenshot.png>' \
   --command '<command>' \
   --detail '<observed result>'
 ```
+
+Repeat `--image <path>` to upload up to five JPEG, PNG, GIF, WebP, or AVIF
+images with the evidence record. Each image may be up to 20MB and their combined
+size may not exceed 25MB.
 
 Evidence statuses:
 
