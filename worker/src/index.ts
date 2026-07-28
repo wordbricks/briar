@@ -15,15 +15,7 @@ import {
   type AutoHuntWorkflowStageId,
 } from "../../src/lib/auto-hunt-contract";
 import {
-  defaultAutoHuntAutomation,
-  normalizeAutoHuntAutomation,
-} from "../../src/lib/auto-hunt-automation";
-import {
   defaultProjectAgentCalendarColor,
-  defaultProjectAgentCopy,
-  normalizeProjectAgentLocale,
-  projectAgentSkill,
-  type ProjectAgentLocale,
 } from "../../src/lib/project-agent";
 import {
   isValidProjectAgentScheduleTimeZone,
@@ -729,27 +721,6 @@ const projectSettingsSchema = z
       .strict(),
     githubRepository: nullableTrimmed(300),
     workflow: workflowSchema.default(repositoryWorkflowBootstrap),
-    automation: z
-      .object({
-        enabled: z.boolean(),
-        maxIssuesPerSession: z.number().int().min(1).max(10),
-        schedule: z
-          .object({
-            enabled: z.boolean(),
-            intervalHours: z.number().int().min(1).max(168),
-          })
-          .strict(),
-        queueThreshold: z
-          .object({
-            enabled: z.boolean(),
-            minimumIssues: z.number().int().min(1).max(100),
-          })
-          .strict(),
-        urgentIssue: z.object({ enabled: z.boolean() }).strict(),
-      })
-      .strict()
-      .transform(normalizeAutoHuntAutomation)
-      .optional(),
   })
   .strict()
   .superRefine((input, context) => {
@@ -964,18 +935,11 @@ function projectJson(row: ProjectRow) {
   };
 }
 
-const projectAgentJson = (
-  row: ProjectAgentRow,
-  locale: ProjectAgentLocale = "en",
-) => {
-  const copy =
-    row.kind === "auto_hunt" && row.updated_at === row.created_at
-      ? defaultProjectAgentCopy(locale)
-      : { name: row.name, responsibility: row.responsibility };
+const projectAgentJson = (row: ProjectAgentRow) => {
   return {
     id: row.id,
     projectId: row.project_id,
-    name: copy.name,
+    name: row.name,
     avatar: row.avatar,
     codexPet: row.avatar_pet_json
       ? {
@@ -987,17 +951,9 @@ const projectAgentJson = (
       : null,
     provider: row.provider,
     model: row.model,
-    responsibility: copy.responsibility,
-    skill:
-      row.kind === "auto_hunt"
-        ? projectAgentSkill({
-            name: copy.name,
-            responsibility: copy.responsibility,
-            kind: row.kind,
-          })
-        : row.skill_markdown,
+    responsibility: row.responsibility,
+    skill: row.skill_markdown,
     calendarColor: row.calendar_color,
-    kind: row.kind,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -1037,14 +993,7 @@ const projectAgentScheduleRunJson = (
     provider: row.agent_provider,
     model: row.agent_model,
     responsibility: row.agent_responsibility,
-    skill:
-      row.agent_kind === "auto_hunt"
-        ? projectAgentSkill({
-            name: row.agent_name,
-            responsibility: row.agent_responsibility,
-            kind: row.agent_kind,
-          })
-        : row.agent_skill_markdown,
+    skill: row.agent_skill_markdown,
   },
   workflow: normalizeAutoHuntWorkflow(JSON.parse(row.workflow_json)),
   status: row.status,
@@ -1088,9 +1037,6 @@ const settingsJson = (row: ProjectSettingsRow | null) => ({
   workflow: row?.workflow_json
     ? normalizeAutoHuntWorkflow(JSON.parse(row.workflow_json))
     : structuredClone(repositoryWorkflowBootstrap),
-  automation: row?.auto_hunt_automation_json
-    ? normalizeAutoHuntAutomation(JSON.parse(row.auto_hunt_automation_json))
-    : structuredClone(defaultAutoHuntAutomation),
 });
 
 const parseJsonArray = (value: string) => {
@@ -1448,7 +1394,6 @@ async function route(
       linear: input.linear,
       githubRepository: input.githubRepository ?? null,
       workflow: input.workflow,
-      automation: input.automation,
     });
     return json({ settings: settingsJson(settings) });
   }
@@ -1465,12 +1410,8 @@ async function route(
     );
     if (!project) throw new HttpError(404, "Project not found");
     const agents = await listProjectAgents(db, project.id);
-    const locale = normalizeProjectAgentLocale(
-      new URL(request.url).searchParams.get("locale") ??
-        request.headers.get("accept-language"),
-    );
     return json({
-      agents: agents.map((agent) => projectAgentJson(agent, locale)),
+      agents: agents.map((agent) => projectAgentJson(agent)),
     });
   }
   if (projectAgentsMatch && request.method === "POST") {

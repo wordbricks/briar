@@ -3,7 +3,6 @@ import { validateIssueAttachments } from "./issue-attachments";
 import type { AutoHuntWorkflow } from "./auto-hunt-contract";
 import {
   defaultProjectAgentCalendarColor,
-  defaultProjectAgentCopy,
   type ProjectAgentLocale,
 } from "./project-agent";
 import type {
@@ -81,32 +80,9 @@ const projectAgentSchema = z.object({
     .string()
     .regex(/^#[0-9a-f]{6}$/iu)
     .default(defaultProjectAgentCalendarColor),
-  kind: z.enum(["auto_hunt", "custom"]).optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
-type ParsedProjectAgent = z.infer<typeof projectAgentSchema>;
-
-function normalizeProjectAgent(
-  agent: ParsedProjectAgent,
-  fallbackKind: ProjectAgent["kind"],
-): ProjectAgent {
-  return {
-    ...agent,
-    kind: agent.kind ?? fallbackKind,
-  };
-}
-
-function inferLegacyProjectAgentKind(
-  agent: ParsedProjectAgent,
-  locale: ProjectAgentLocale,
-): ProjectAgent["kind"] {
-  const defaultCopy = defaultProjectAgentCopy(locale);
-  return agent.name === defaultCopy.name &&
-    agent.responsibility === defaultCopy.responsibility
-    ? "auto_hunt"
-    : "custom";
-}
 const projectAgentScheduleSchema = z.object({
   id: z.string().uuid(),
   projectId: z.string().uuid(),
@@ -421,12 +397,7 @@ export async function loadProjectAgents(
     `/projects/${projectId}/agents?locale=${encodeURIComponent(locale)}`,
     token,
   );
-  return z
-    .array(projectAgentSchema)
-    .parse(result.agents)
-    .map((agent) =>
-      normalizeProjectAgent(agent, inferLegacyProjectAgentKind(agent, locale)),
-    );
+  return z.array(projectAgentSchema).parse(result.agents);
 }
 
 export async function createProjectAgent(
@@ -442,10 +413,7 @@ export async function createProjectAgent(
       body: JSON.stringify(projectAgentInputJson(input)),
     },
   );
-  return normalizeProjectAgent(
-    projectAgentSchema.parse(result.agent),
-    "custom",
-  );
+  return projectAgentSchema.parse(result.agent);
 }
 
 export async function loadProjectAgentSchedules(
@@ -585,10 +553,7 @@ export async function updateProjectAgent(
       body: JSON.stringify(projectAgentInputJson(input)),
     },
   );
-  return normalizeProjectAgent(
-    projectAgentSchema.parse(result.agent),
-    "custom",
-  );
+  return projectAgentSchema.parse(result.agent);
 }
 
 export async function loadProjectAgentSpriteSheet(

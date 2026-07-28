@@ -117,7 +117,6 @@ describe("ProjectSchedule", () => {
       responsibility: "Run calendar work.",
       skill: "# Calendar agent\n\nRun calendar work.",
       calendarColor: "#8b5cf6",
-      kind: "custom",
       createdAt: "2026-07-26T00:00:00.000Z",
       updatedAt: "2026-07-26T00:00:00.000Z",
     };

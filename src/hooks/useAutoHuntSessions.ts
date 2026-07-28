@@ -11,7 +11,6 @@ import {
 import {
   defaultAutoHuntMaxIssues,
   selectAutoHuntCandidates,
-  type AutoHuntAutomaticTrigger,
 } from "../lib/auto-hunt-automation";
 import type { HuntRun, ProjectAgent } from "../types";
 
@@ -54,6 +53,8 @@ export type AutoHuntSession = {
   dispatchGroupId: string;
   projectId: string;
   agentId?: string;
+  sessionType?: "task" | "dispatch";
+  request?: string;
   status: AutoHuntSessionStatus;
   issues: AutoHuntSessionIssue[];
   startedAt: string;
@@ -65,10 +66,6 @@ export type AutoHuntSession = {
   events: AutoHuntSessionEvent[];
   dispatchEvents: AutoHuntDispatchEvent[];
   workers: AutoHuntWorkerResult[];
-  trigger?: {
-    type: "manual" | "automatic";
-    reasons: AutoHuntAutomaticTrigger[];
-  };
 };
 
 type AutoHuntRunner = typeof startProjectAutoHunt;
@@ -90,9 +87,9 @@ function readSessions(): AutoHuntSession[] {
       const session = {
         ...storedSession,
         dispatchGroupId: storedSession.dispatchGroupId ?? storedSession.id,
+        sessionType: storedSession.sessionType ?? "dispatch",
         workers: storedSession.workers ?? [],
         dispatchEvents: storedSession.dispatchEvents ?? [],
-        trigger: storedSession.trigger ?? { type: "manual" as const, reasons: [] },
       };
       return session.status === "running"
         ? {
@@ -209,7 +206,8 @@ export function useAutoHuntSessions(
   useEffect(() => {
     const recoverable = sessionsRef.current.filter(
       (session) =>
-        session.status === "running" || session.status === "interrupted",
+        session.sessionType !== "task" &&
+        (session.status === "running" || session.status === "interrupted"),
     );
     if (recoverable.length === 0) return;
     let active = true;
@@ -276,6 +274,47 @@ export function useAutoHuntSessions(
     setSessions(remaining);
   }, []);
 
+  const recordTaskSession = useCallback((
+    projectId: string,
+    agentId: string,
+    input: {
+      request: string;
+      startedAt: string;
+      status: "completed" | "failed";
+      conversationId: string | null;
+      workspaceRoot: string | null;
+      summary: string | null;
+      error: string | null;
+    },
+  ) => {
+    const completedAt = new Date().toISOString();
+    const session: AutoHuntSession = {
+      id: crypto.randomUUID(),
+      dispatchGroupId: "",
+      projectId,
+      agentId,
+      sessionType: "task",
+      request: input.request,
+      status: input.status,
+      issues: [],
+      startedAt: input.startedAt,
+      completedAt,
+      conversationId: input.conversationId,
+      workspaceRoot: input.workspaceRoot,
+      summary: input.summary,
+      error: input.error,
+      events: [
+        event("started", input.startedAt),
+        event(input.status, completedAt),
+      ],
+      workers: [],
+      dispatchEvents: [],
+    };
+    sessionsRef.current = [session, ...sessionsRef.current];
+    setSessions(sessionsRef.current);
+    return session.id;
+  }, []);
+
   const startSession = useCallback((
     projectId: string,
     runs: HuntRun[],
@@ -284,7 +323,6 @@ export function useAutoHuntSessions(
       agent: ProjectAgent;
       maxIssues?: number;
       coordinatorConversationId?: string | null;
-      trigger?: AutoHuntSession["trigger"];
     },
   ) => {
     if (sessionsRef.current.some(
@@ -305,6 +343,7 @@ export function useAutoHuntSessions(
       dispatchGroupId: "",
       projectId,
       agentId: options.agent.id,
+      sessionType: "dispatch",
       status: "running",
       issues: candidates.map((run) => ({
         runId: run.id,
@@ -323,7 +362,6 @@ export function useAutoHuntSessions(
       events: [event("started", startedAt)],
       workers: [],
       dispatchEvents: [],
-      trigger: options.trigger ?? { type: "manual", reasons: [] },
     };
     session.dispatchGroupId = session.id;
     sessionsRef.current = [session, ...sessionsRef.current];
@@ -356,5 +394,10 @@ export function useAutoHuntSessions(
     return session.id;
   }, [runner]);
 
-  return { sessions, startSession, removeProjectSessions };
+  return {
+    sessions,
+    startSession,
+    recordTaskSession,
+    removeProjectSessions,
+  };
 }

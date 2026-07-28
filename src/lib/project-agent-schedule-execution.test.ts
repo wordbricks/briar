@@ -36,10 +36,17 @@ const scheduledRun = (
 });
 
 const dashboard = {
+  project: {
+    id: "33333333-3333-4333-8333-333333333333",
+    name: "Briar",
+    createdAt: "2026-07-28T00:00:00.000Z",
+  },
   settings: {
-    automation: {
-      maxIssuesPerSession: 5,
-    },
+    velenOrg: null,
+    dataSource: null,
+    linear: { enabled: false, source: null, teamKey: null },
+    githubRepository: null,
+    workflow: repositoryWorkflowBootstrap,
   },
   runs: [
     {
@@ -50,6 +57,7 @@ const dashboard = {
       status: "queued",
     },
   ],
+  generatedAt: "2026-07-28T00:00:00.000Z",
 } as DashboardPayload;
 
 const dependencies = (): ProjectAgentScheduleExecutionDependencies => ({

@@ -64,7 +64,6 @@ const agent: ProjectAgent = {
   responsibility: "릴리스 작업을 처리합니다.",
   skill: "# 릴리스 에이전트",
   calendarColor: "#3275d5",
-  kind: "custom",
   createdAt: "2026-07-28T00:00:00.000Z",
   updatedAt: "2026-07-28T00:00:00.000Z",
 };
@@ -88,6 +87,7 @@ describe("ProjectAgentDetail", () => {
       maxIssues: null,
     });
     const onStartAutoHunt = vi.fn(() => "dispatch-1");
+    const onRecordTaskSession = vi.fn();
     const container = await mount(
       <ProjectAgentDetail
         agent={agent}
@@ -95,13 +95,20 @@ describe("ProjectAgentDetail", () => {
         error={null}
         isSidebarOpen={true}
         onBack={() => undefined}
+        onRecordTaskSession={onRecordTaskSession}
         onStartAutoHunt={onStartAutoHunt}
         requestedSessionId={null}
         sessions={[]}
       />,
     );
 
-    const textarea = container.querySelector<HTMLTextAreaElement>("textarea");
+    await act(async () => {
+      Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
+        .find((button) => button.textContent?.trim() === "작업 실행")
+        ?.click();
+    });
+    const textarea = document.querySelector<HTMLTextAreaElement>("textarea");
+    expect(textarea?.value).toBe(agent.responsibility);
     await act(async () => {
       Object.getOwnPropertyDescriptor(
         HTMLTextAreaElement.prototype,
@@ -110,15 +117,23 @@ describe("ProjectAgentDetail", () => {
       textarea?.dispatchEvent(new Event("input", { bubbles: true }));
     });
     await act(async () => {
-      container.querySelector<HTMLFormElement>("form")?.dispatchEvent(
+      document.querySelector<HTMLFormElement>("form")?.dispatchEvent(
         new Event("submit", { bubbles: true, cancelable: true }),
       );
       await Promise.resolve();
     });
 
     expect(onStartAutoHunt).not.toHaveBeenCalled();
-    expect(container.textContent).toContain("릴리스 상태를 확인했습니다.");
-    expect(container.querySelector("form")).not.toBeNull();
+    expect(onRecordTaskSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        request: "현재 릴리스 상태를 확인해 줘",
+        status: "completed",
+        conversationId: "briar:project-1:ordinary-1",
+        summary: "릴리스 상태를 확인했습니다.",
+      }),
+    );
+    expect(document.body.textContent).toContain("릴리스 상태를 확인했습니다.");
+    expect(document.querySelector("form")).not.toBeNull();
   });
 
   it("hands an explicit Auto Hunt decision to the host with its conversation", async () => {
@@ -130,6 +145,7 @@ describe("ProjectAgentDetail", () => {
       maxIssues: 3,
     });
     const onStartAutoHunt = vi.fn(() => "dispatch-1");
+    const onRecordTaskSession = vi.fn();
     const container = await mount(
       <ProjectAgentDetail
         agent={agent}
@@ -137,13 +153,19 @@ describe("ProjectAgentDetail", () => {
         error={null}
         isSidebarOpen={true}
         onBack={() => undefined}
+        onRecordTaskSession={onRecordTaskSession}
         onStartAutoHunt={onStartAutoHunt}
         requestedSessionId={null}
         sessions={[]}
       />,
     );
 
-    const textarea = container.querySelector<HTMLTextAreaElement>("textarea");
+    await act(async () => {
+      Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
+        .find((button) => button.textContent?.trim() === "작업 실행")
+        ?.click();
+    });
+    const textarea = document.querySelector<HTMLTextAreaElement>("textarea");
     await act(async () => {
       Object.getOwnPropertyDescriptor(
         HTMLTextAreaElement.prototype,
@@ -152,7 +174,7 @@ describe("ProjectAgentDetail", () => {
       textarea?.dispatchEvent(new Event("input", { bubbles: true }));
     });
     await act(async () => {
-      container.querySelector<HTMLFormElement>("form")?.dispatchEvent(
+      document.querySelector<HTMLFormElement>("form")?.dispatchEvent(
         new Event("submit", { bubbles: true, cancelable: true }),
       );
       await Promise.resolve();
@@ -168,7 +190,11 @@ describe("ProjectAgentDetail", () => {
       coordinatorConversationId: "briar:project-1:coordinator-1",
       maxIssues: 3,
     });
+    expect(onRecordTaskSession).not.toHaveBeenCalled();
     expect(container.textContent).toContain("수행 세션");
-    expect(container.textContent).toContain("대기 이슈 0개");
+    expect(container.textContent).not.toContain("Auto Hunt");
+    expect(document.body.textContent).toContain(
+      "대기 이슈 세 건을 Auto Hunt로 요청했습니다.",
+    );
   });
 });

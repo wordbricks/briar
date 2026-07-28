@@ -369,7 +369,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     });
   });
 
-  it("backfills one default Auto Hunt agent for an existing project", async () => {
+  it("keeps the default project agent as a regular agent", async () => {
     await expect(listProjectAgents(db, projectId)).resolves.toEqual([
       expect.objectContaining({
         project_id: projectId,
@@ -378,11 +378,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         provider: "codex",
         model: null,
         responsibility: "Perform Auto Hunt for every queued issue.",
-        skill_markdown: expect.stringContaining(
-          "briar skills get briar-workflow",
-        ),
+        skill_markdown: expect.stringContaining("attached project workflow"),
         calendar_color: "#3275d5",
-        kind: "auto_hunt",
       }),
     ]);
   });
@@ -409,7 +406,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     });
     await expect(listProjectAgents(db, projectId)).resolves.toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ kind: "auto_hunt" }),
+        expect.objectContaining({ name: "Auto Hunt agent" }),
         agent,
       ]),
     );
@@ -759,7 +756,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         "Coordinates release checks and reports the result.",
       ),
       calendar_color: "#0f9f76",
-      kind: "auto_hunt",
     });
     await expect(
       updateProjectAgent(
@@ -775,36 +771,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         },
       ),
     ).resolves.toBeNull();
-  });
-
-  it("stores automation settings and preserves them for older settings clients", async () => {
-    const baseSettings = {
-      velenOrg: "example",
-      dataSource: null,
-      linear: { enabled: false, source: null, teamKey: null },
-      githubRepository: "example/repository",
-      workflow: releaseWorkflow,
-    };
-    await updateProjectSettings(db, projectId, {
-      ...baseSettings,
-      automation: {
-        enabled: true,
-        maxIssuesPerSession: 7,
-        schedule: { enabled: true, intervalHours: 3 },
-        queueThreshold: { enabled: true, minimumIssues: 5 },
-        urgentIssue: { enabled: true },
-      },
-    });
-    await updateProjectSettings(db, projectId, baseSettings);
-
-    const settings = await getProjectSettings(db, projectId);
-    expect(JSON.parse(settings?.auto_hunt_automation_json ?? "{}")).toEqual({
-      enabled: true,
-      maxIssuesPerSession: 7,
-      schedule: { enabled: true, intervalHours: 3 },
-      queueThreshold: { enabled: true, minimumIssues: 5 },
-      urgentIssue: { enabled: true },
-    });
   });
 
   it("allows duplicate organization names but enforces unique handles", async () => {
@@ -832,6 +798,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
   });
 
   it("enforces forward stages, QA gates, and a completion summary", async () => {
+    await updateProjectSettings(db, projectId, {
+      velenOrg: "example",
+      dataSource: null,
+      linear: { enabled: false, source: null, teamKey: null },
+      githubRepository: "example/repository",
+      workflow: releaseWorkflow,
+    });
     const runId = await recordHuntEvent(db, projectId, event("queued", 1));
     expect(runId).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
@@ -1138,7 +1111,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       expect.objectContaining({
         project_id: project.id,
         provider: "codex",
-        kind: "auto_hunt",
       }),
     ]);
     const settings = await getProjectSettings(db, project.id);

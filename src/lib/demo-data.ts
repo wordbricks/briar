@@ -1,6 +1,5 @@
 import type { DashboardPayload, HuntEvent, HuntRun } from "../types";
 import { normalizeAutoHuntWorkflow } from "./auto-hunt-contract";
-import { defaultAutoHuntAutomation } from "./auto-hunt-automation";
 import type { RepositoryReadiness } from "./project-connection";
 
 const now = Date.now();
@@ -238,7 +237,6 @@ export const demoDashboard: DashboardPayload = {
     },
     githubRepository: "wordbricks/briar",
     workflow: structuredClone(demoWorkflow),
-    automation: structuredClone(defaultAutoHuntAutomation),
   },
   runs,
   generatedAt: new Date().toISOString(),

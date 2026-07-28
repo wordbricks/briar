@@ -18,7 +18,6 @@ const agent: ProjectAgent = {
   responsibility: "Run the queued issue workflow.",
   skill: "# Auto Hunt agent\n\nRun the queued issue workflow.",
   calendarColor: "#3275d5",
-  kind: "auto_hunt",
   createdAt: "2026-07-27T00:00:00.000Z",
   updatedAt: "2026-07-27T00:00:00.000Z",
 };

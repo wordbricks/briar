@@ -1,5 +1,8 @@
 import type { AutoHuntAgentResponse } from "./auto-hunt-agent";
-import { selectAutoHuntCandidates } from "./auto-hunt-automation";
+import {
+  defaultAutoHuntMaxIssues,
+  selectAutoHuntCandidates,
+} from "./auto-hunt-automation";
 import { executeProjectAgentTurn } from "./project-agent-execution";
 import type {
   ProjectAgentRunInput,
@@ -51,8 +54,7 @@ export async function executeScheduledProjectAgent(
         );
         const candidates = selectAutoHuntCandidates(
           dashboard.runs,
-          decision.maxIssues ??
-            dashboard.settings.automation.maxIssuesPerSession,
+          decision.maxIssues ?? defaultAutoHuntMaxIssues,
         );
         if (candidates.length === 0) {
           throw new Error("대기 상태인 이슈가 없습니다.");

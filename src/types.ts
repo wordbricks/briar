@@ -6,7 +6,6 @@ import {
   type AutoHuntWorkflow,
   type AutoHuntWorkflowStageId,
 } from "./lib/auto-hunt-contract";
-import type { AutoHuntAutomation } from "./lib/auto-hunt-automation";
 import type { ProjectAgentCodexPet } from "./lib/codex-pets";
 import type { AgentProvider } from "./lib/project-llm";
 import type {
@@ -152,7 +151,6 @@ export type ProjectAgent = {
   responsibility: string;
   skill: string;
   calendarColor: string;
-  kind: "auto_hunt" | "custom";
   createdAt: string;
   updatedAt: string;
 };
@@ -255,7 +253,6 @@ export type ProjectSettings = {
   };
   githubRepository: string | null;
   workflow: AutoHuntWorkflow;
-  automation: AutoHuntAutomation;
 };
 
 export type DashboardPayload = {
