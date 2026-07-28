@@ -39,6 +39,7 @@ import {
   Video,
   X,
 } from "lucide-react";
+import * as ContextMenu from "@radix-ui/react-context-menu";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
   EmptyState,
@@ -65,6 +66,7 @@ import {
   useRef,
   useState,
   type DragEvent,
+  type ReactElement,
   type FormEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
@@ -205,6 +207,12 @@ export function HuntDashboard({
     setInternalIsIssueDialogOpen(isOpen);
     onIssueDialogOpenChange?.(isOpen);
   };
+  const [editingRunId, setEditingRunId] = useState<string | null>(null);
+  const [deletingRunFromMenuId, setDeletingRunFromMenuId] =
+    useState<string | null>(null);
+  const [contextDeleteError, setContextDeleteError] = useState<string | null>(
+    null,
+  );
   const [draggedRunId, setDraggedRunId] = useState<string | null>(null);
   const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null);
 
@@ -229,6 +237,9 @@ export function HuntDashboard({
 
   const runs = dashboard?.runs ?? [];
   const selected = runs.find((run) => run.id === selectedRunId) ?? null;
+  const editingRun = runs.find((run) => run.id === editingRunId) ?? null;
+  const deletingRunFromMenu =
+    runs.find((run) => run.id === deletingRunFromMenuId) ?? null;
   const activeCount = runs.filter((run) => !["completed", "cancelled"].includes(run.status)).length;
   const attentionCount = runs.filter((run) => ["blocked", "failed"].includes(run.status)).length;
   const completedCount = runs.filter((run) =>
@@ -568,8 +579,25 @@ export function HuntDashboard({
         </div>}
         {view === "list" && !companionMode ? (
           <IssueList
+            deletingIssueId={deletingIssueId}
+            onDelete={(runId) => {
+              setContextDeleteError(null);
+              setDeletingRunFromMenuId(runId);
+            }}
+            onEdit={setEditingRunId}
+            onMove={(run, placement) =>
+              onMoveRun(run.id, placement).catch(() => undefined)
+            }
             onOpen={(runId) => setSelectedRunId(runId)}
+            onPriorityChange={(run, priority) =>
+              onUpdateIssue(run.id, {
+                title: run.title,
+                description: run.issueDescription,
+                priority,
+              }).catch(() => undefined)
+            }
             runs={filtered}
+            updatingIssueId={updatingIssueId}
           />
         ) : <div aria-label={t("dashboard.kanbanBoard")} className="kanban-board">
           {kanbanColumns.length === 0 ? (
@@ -619,8 +647,14 @@ export function HuntDashboard({
               <div>
                 {column.runs.length ? column.runs.map((run) => (
                   <KanbanCard
+                    contextMenuDisabled={companionMode}
+                    deletingIssueId={deletingIssueId}
                     isMoving={recoveringRunId === run.id}
                     key={run.id}
+                    onDelete={() => {
+                      setContextDeleteError(null);
+                      setDeletingRunFromMenuId(run.id);
+                    }}
                     onDragEnd={() => {
                       setDraggedRunId(null);
                       setDragOverColumnId(null);
@@ -630,8 +664,20 @@ export function HuntDashboard({
                       event.dataTransfer.setData("text/plain", run.id);
                       setDraggedRunId(run.id);
                     }}
+                    onEdit={() => setEditingRunId(run.id)}
+                    onMove={(placement) =>
+                      onMoveRun(run.id, placement).catch(() => undefined)
+                    }
                     onOpen={() => setSelectedRunId(run.id)}
+                    onPriorityChange={(priority) =>
+                      onUpdateIssue(run.id, {
+                        title: run.title,
+                        description: run.issueDescription,
+                        priority,
+                      }).catch(() => undefined)
+                    }
                     run={run}
+                    updatingIssueId={updatingIssueId}
                   />
                 )) : (
                   <div className="kanban-column-empty">
@@ -655,6 +701,86 @@ export function HuntDashboard({
         />
       )}
       {createIssueDialog}
+      {editingRun && (
+        <EditIssueDialog
+          isSubmitting={updatingIssueId === editingRun.id}
+          onClose={() => setEditingRunId(null)}
+          onUpdate={async (input) => {
+            await onUpdateIssue(editingRun.id, input);
+            setEditingRunId(null);
+          }}
+          run={editingRun}
+        />
+      )}
+      <Dialog
+        onOpenChange={(open) => {
+          if (deletingIssueId) return;
+          if (!open) {
+            setDeletingRunFromMenuId(null);
+            setContextDeleteError(null);
+          }
+        }}
+        open={Boolean(deletingRunFromMenu)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="mb-2 grid size-10 place-items-center rounded-xl bg-destructive/10 text-destructive">
+              <Trash2 size={20} strokeWidth={1.8} />
+            </div>
+            <DialogTitle>
+              {t("issue.deleteTitle", {
+                title: deletingRunFromMenu?.title ?? "",
+              })}
+            </DialogTitle>
+            <DialogDescription>
+              {t("issue.deleteDescription")}
+            </DialogDescription>
+          </DialogHeader>
+          {contextDeleteError ? (
+            <p className="text-xs text-destructive" role="alert">
+              {contextDeleteError}
+            </p>
+          ) : null}
+          <DialogFooter>
+            <Button
+              disabled={Boolean(deletingIssueId)}
+              onClick={() => {
+                setDeletingRunFromMenuId(null);
+                setContextDeleteError(null);
+              }}
+              type="button"
+              variant="outline"
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              disabled={Boolean(deletingIssueId)}
+              onClick={() => {
+                if (!deletingRunFromMenu) return;
+                setContextDeleteError(null);
+                void onDeleteIssue(deletingRunFromMenu.id)
+                  .then(() => setDeletingRunFromMenuId(null))
+                  .catch((caught) => {
+                    setContextDeleteError(
+                      caught instanceof Error
+                        ? caught.message
+                        : String(caught),
+                    );
+                  });
+              }}
+              type="button"
+              variant="destructive"
+            >
+              {deletingIssueId ? (
+                <LoaderCircle className="spin" size={15} />
+              ) : (
+                <Trash2 size={15} />
+              )}
+              {deletingIssueId ? t("issue.deleting") : t("issue.delete")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MainContent>
   );
 }
@@ -1135,17 +1261,31 @@ function SelectedAttachment({
 }
 
 function KanbanCard({
+  contextMenuDisabled,
+  deletingIssueId,
   isMoving,
+  onDelete,
   onDragEnd,
   onDragStart,
+  onEdit,
+  onMove,
   run,
   onOpen,
+  onPriorityChange,
+  updatingIssueId,
 }: {
+  contextMenuDisabled: boolean;
+  deletingIssueId: string | null;
   isMoving: boolean;
+  onDelete: () => void;
   onDragEnd: () => void;
   onDragStart: (event: DragEvent<HTMLButtonElement>) => void;
+  onEdit: () => void;
+  onMove: (placement: HuntRunPlacement) => void;
   run: HuntRun;
   onOpen: () => void;
+  onPriorityChange: (priority: number | null) => void;
+  updatingIssueId: string | null;
 }) {
   const { t } = useI18n();
   const meta = runMeta(run.status, run.workflowStage, run.workflow);
@@ -1155,46 +1295,252 @@ function KanbanCard({
     Boolean(run.leaseExpiresAt) &&
     Date.parse(run.leaseExpiresAt!) > Date.now();
   return (
-    <button
-      aria-label={t("run.details", { title: run.title })}
-      aria-disabled={isMoving}
-      className={`kanban-card ${meta.tone}${isMoving ? " moving" : ""}`}
-      draggable={!isMoving}
-      onDragEnd={onDragEnd}
-      onDragStart={onDragStart}
-      onClick={onOpen}
-      type="button"
+    <IssueContextMenu
+      disabled={
+        contextMenuDisabled ||
+        isMoving ||
+        deletingIssueId === run.id ||
+        updatingIssueId === run.id
+      }
+      onDelete={onDelete}
+      onEdit={onEdit}
+      onMove={onMove}
+      onOpen={onOpen}
+      onPriorityChange={onPriorityChange}
+      run={run}
     >
-      <span className="kanban-card-kicker">
-        <small>AH-{run.runNumber}</small>
-        <i><span className={`source-dot ${run.source}`} />{t(`source.${run.source}` as MessageKey)}</i>
-      </span>
-      <span className="kanban-card-copy">
-        <strong>{run.title}</strong>
-        {(run.detail || run.issueDescription) && (
-          <span>{run.detail || run.issueDescription}</span>
-        )}
-      </span>
-      <span className="kanban-card-badges">
-        <i className={`status-pill ${meta.tone}`}>{run.status === "running" && <LoaderCircle className="spin" size={11} />}{label}</i>
-        <i className="kanban-progress">{run.progress}%</i>
-        {run.priority !== null && <i className="kanban-priority">P{run.priority}</i>}
-        {(run.attachments ?? []).length > 0 && <i><Paperclip size={11} />{run.attachments.length}</i>}
-      </span>
-      <span className="kanban-card-footer">
-        <small>{isClaimed ? t("run.assigned", { agent: run.claimedBy ?? "agent" }) : relativeTime(run.updatedAt, t)}</small>
-        <ChevronRight size={14} />
-      </span>
-    </button>
+      <button
+        aria-label={t("run.details", { title: run.title })}
+        aria-disabled={isMoving}
+        className={`kanban-card ${meta.tone}${isMoving ? " moving" : ""}`}
+        draggable={!isMoving}
+        onDragEnd={onDragEnd}
+        onDragStart={onDragStart}
+        onClick={onOpen}
+        type="button"
+      >
+        <span className="kanban-card-kicker">
+          <small>AH-{run.runNumber}</small>
+          <i><span className={`source-dot ${run.source}`} />{t(`source.${run.source}` as MessageKey)}</i>
+        </span>
+        <span className="kanban-card-copy">
+          <strong>{run.title}</strong>
+          {(run.detail || run.issueDescription) && (
+            <span>{run.detail || run.issueDescription}</span>
+          )}
+        </span>
+        <span className="kanban-card-badges">
+          <i className={`status-pill ${meta.tone}`}>{run.status === "running" && <LoaderCircle className="spin" size={11} />}{label}</i>
+          <i className="kanban-progress">{run.progress}%</i>
+          {run.priority !== null && <i className="kanban-priority">P{run.priority}</i>}
+          {(run.attachments ?? []).length > 0 && <i><Paperclip size={11} />{run.attachments.length}</i>}
+        </span>
+        <span className="kanban-card-footer">
+          <small>{isClaimed ? t("run.assigned", { agent: run.claimedBy ?? "agent" }) : relativeTime(run.updatedAt, t)}</small>
+          <ChevronRight size={14} />
+        </span>
+      </button>
+    </IssueContextMenu>
+  );
+}
+
+function IssueContextMenu({
+  children,
+  disabled,
+  onDelete,
+  onEdit,
+  onMove,
+  onOpen,
+  onPriorityChange,
+  run,
+}: {
+  children: ReactElement;
+  disabled: boolean;
+  onDelete: () => void;
+  onEdit: () => void;
+  onMove: (placement: HuntRunPlacement) => void;
+  onOpen: () => void;
+  onPriorityChange: (priority: number | null) => void;
+  run: HuntRun;
+}) {
+  const { t } = useI18n();
+  const statusOptions = [
+    { label: t("status.backlog"), value: "status:backlog" },
+    { label: t("status.queued"), value: "status:queued" },
+    ...run.workflow.stages.map((stage) => ({
+      label: localizeWorkflowStage(t, stage.id, stage.label),
+      value: `stage:${stage.id}`,
+    })),
+    { label: t("status.blocked"), value: "status:blocked" },
+    { label: t("status.failed"), value: "status:failed" },
+    { label: t("status.completed"), value: "status:completed" },
+    { label: t("status.cancelled"), value: "status:cancelled" },
+  ];
+  const currentStatus = placementIdForRun(run);
+  const currentStatusLabel =
+    statusOptions.find((option) => option.value === currentStatus)?.label ??
+    t(`status.${run.status}` as MessageKey);
+  const currentPriority =
+    run.priority === null ? "none" : String(run.priority);
+  const priorityOptions = [
+    { label: t("run.notSet"), value: "none" },
+    { label: t("issue.priority1"), value: "1" },
+    { label: t("issue.priority2"), value: "2" },
+    { label: t("issue.priority3"), value: "3" },
+    { label: t("issue.priority4"), value: "4" },
+  ];
+  const currentPriorityLabel =
+    priorityOptions.find((option) => option.value === currentPriority)?.label ??
+    t("run.notSet");
+
+  return (
+    <ContextMenu.Root>
+      <ContextMenu.Trigger asChild disabled={disabled}>
+        {children}
+      </ContextMenu.Trigger>
+      <ContextMenu.Portal>
+        <ContextMenu.Content
+          aria-label={t("issue.actions")}
+          className="issue-context-menu"
+          collisionPadding={10}
+        >
+          <ContextMenu.Sub>
+            <ContextMenu.SubTrigger className="issue-context-item">
+              <Activity aria-hidden="true" size={17} />
+              <span>{t("dashboard.status")}</span>
+              <small>{currentStatusLabel}</small>
+              <ChevronRight aria-hidden="true" size={14} />
+            </ContextMenu.SubTrigger>
+            <ContextMenu.Portal>
+              <ContextMenu.SubContent
+                className="issue-context-menu issue-context-submenu"
+                collisionPadding={10}
+                sideOffset={7}
+              >
+                <ContextMenu.RadioGroup value={currentStatus}>
+                  {statusOptions.map((option) => (
+                    <ContextMenu.RadioItem
+                      className="issue-context-item issue-context-choice"
+                      key={option.value}
+                      onSelect={() => {
+                        const placement = placementForId(option.value);
+                        if (!placement || placementMatchesRun(run, placement)) {
+                          return;
+                        }
+                        onMove(placement);
+                      }}
+                      value={option.value}
+                    >
+                      <ContextMenu.ItemIndicator
+                        className="issue-context-check"
+                        forceMount
+                      >
+                        {option.value === currentStatus ? (
+                          <Check aria-hidden="true" size={14} />
+                        ) : null}
+                      </ContextMenu.ItemIndicator>
+                      <span>{option.label}</span>
+                    </ContextMenu.RadioItem>
+                  ))}
+                </ContextMenu.RadioGroup>
+              </ContextMenu.SubContent>
+            </ContextMenu.Portal>
+          </ContextMenu.Sub>
+
+          <ContextMenu.Sub>
+            <ContextMenu.SubTrigger className="issue-context-item">
+              <Signal aria-hidden="true" size={17} />
+              <span>{t("issue.priority")}</span>
+              <small>{currentPriorityLabel}</small>
+              <ChevronRight aria-hidden="true" size={14} />
+            </ContextMenu.SubTrigger>
+            <ContextMenu.Portal>
+              <ContextMenu.SubContent
+                className="issue-context-menu issue-context-submenu"
+                collisionPadding={10}
+                sideOffset={7}
+              >
+                <ContextMenu.RadioGroup value={currentPriority}>
+                  {priorityOptions.map((option) => (
+                    <ContextMenu.RadioItem
+                      className="issue-context-item issue-context-choice"
+                      key={option.value}
+                      onSelect={() => {
+                        if (option.value === currentPriority) return;
+                        onPriorityChange(
+                          option.value === "none"
+                            ? null
+                            : Number(option.value),
+                        );
+                      }}
+                      value={option.value}
+                    >
+                      <ContextMenu.ItemIndicator
+                        className="issue-context-check"
+                        forceMount
+                      >
+                        {option.value === currentPriority ? (
+                          <Check aria-hidden="true" size={14} />
+                        ) : null}
+                      </ContextMenu.ItemIndicator>
+                      <span>{option.label}</span>
+                    </ContextMenu.RadioItem>
+                  ))}
+                </ContextMenu.RadioGroup>
+              </ContextMenu.SubContent>
+            </ContextMenu.Portal>
+          </ContextMenu.Sub>
+
+          <ContextMenu.Separator className="issue-context-separator" />
+
+          <ContextMenu.Item
+            className="issue-context-item"
+            onSelect={onOpen}
+          >
+            <ChevronRight aria-hidden="true" size={17} />
+            <span>{t("common.open")}</span>
+          </ContextMenu.Item>
+          <ContextMenu.Item
+            className="issue-context-item"
+            onSelect={onEdit}
+          >
+            <Pencil aria-hidden="true" size={17} />
+            <span>{t("issue.edit")}</span>
+          </ContextMenu.Item>
+
+          <ContextMenu.Separator className="issue-context-separator" />
+
+          <ContextMenu.Item
+            className="issue-context-item danger"
+            onSelect={onDelete}
+          >
+            <Trash2 aria-hidden="true" size={17} />
+            <span>{t("issue.delete")}</span>
+          </ContextMenu.Item>
+        </ContextMenu.Content>
+      </ContextMenu.Portal>
+    </ContextMenu.Root>
   );
 }
 
 function IssueList({
+  deletingIssueId,
+  onDelete,
+  onEdit,
+  onMove,
   onOpen,
+  onPriorityChange,
   runs,
+  updatingIssueId,
 }: {
+  deletingIssueId: string | null;
+  onDelete: (runId: string) => void;
+  onEdit: (runId: string) => void;
+  onMove: (run: HuntRun, placement: HuntRunPlacement) => void;
   onOpen: (runId: string) => void;
+  onPriorityChange: (run: HuntRun, priority: number | null) => void;
   runs: HuntRun[];
+  updatingIssueId: string | null;
 }) {
   const { t } = useI18n();
 
@@ -1237,54 +1583,69 @@ function IssueList({
             Date.parse(run.leaseExpiresAt!) > Date.now();
 
           return (
-            <div
-              aria-label={t("run.details", { title: run.title })}
-              className="issue-list-grid issue-list-row"
+            <IssueContextMenu
+              disabled={
+                deletingIssueId === run.id ||
+                updatingIssueId === run.id
+              }
               key={run.id}
-              onClick={() => onOpen(run.id)}
-              onKeyDown={(event) => {
-                if (event.key !== "Enter" && event.key !== " ") return;
-                event.preventDefault();
-                onOpen(run.id);
-              }}
-              role="row"
-              tabIndex={0}
+              onDelete={() => onDelete(run.id)}
+              onEdit={() => onEdit(run.id)}
+              onMove={(placement) => onMove(run, placement)}
+              onOpen={() => onOpen(run.id)}
+              onPriorityChange={(priority) =>
+                onPriorityChange(run, priority)
+              }
+              run={run}
             >
-              <span className="issue-list-task" role="cell">
-                <small>AH-{run.runNumber} · {run.sourceKey}</small>
-                <strong>{run.title}</strong>
-                {(run.detail || run.issueDescription) && (
-                  <span>{run.detail || run.issueDescription}</span>
-                )}
-              </span>
-              <span className="issue-list-status" role="cell">
-                <i className={`status-pill ${meta.tone}`}>
-                  {run.status === "running" && (
-                    <LoaderCircle className="spin" size={11} />
+              <div
+                aria-label={t("run.details", { title: run.title })}
+                className="issue-list-grid issue-list-row"
+                onClick={() => onOpen(run.id)}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter" && event.key !== " ") return;
+                  event.preventDefault();
+                  onOpen(run.id);
+                }}
+                role="row"
+                tabIndex={0}
+              >
+                <span className="issue-list-task" role="cell">
+                  <small>AH-{run.runNumber} · {run.sourceKey}</small>
+                  <strong>{run.title}</strong>
+                  {(run.detail || run.issueDescription) && (
+                    <span>{run.detail || run.issueDescription}</span>
                   )}
-                  {label}
-                </i>
-                <small>
-                  <i className={`source-dot ${run.source}`} />
-                  {t(`source.${run.source}` as MessageKey)}
-                </small>
-              </span>
-              <span className="issue-list-priority" role="cell">
-                {run.priority === null ? "—" : `P${run.priority}`}
-              </span>
-              <span className="issue-list-progress" role="cell">
-                <span aria-hidden="true">
-                  <i style={{ width: `${run.progress}%` }} />
                 </span>
-                <strong>{run.progress}%</strong>
-              </span>
-              <span className="issue-list-updated" role="cell">
-                {isClaimed
-                  ? t("run.assigned", { agent: run.claimedBy ?? "agent" })
-                  : relativeTime(run.updatedAt, t)}
-              </span>
-              <ChevronRight aria-hidden="true" size={15} />
-            </div>
+                <span className="issue-list-status" role="cell">
+                  <i className={`status-pill ${meta.tone}`}>
+                    {run.status === "running" && (
+                      <LoaderCircle className="spin" size={11} />
+                    )}
+                    {label}
+                  </i>
+                  <small>
+                    <i className={`source-dot ${run.source}`} />
+                    {t(`source.${run.source}` as MessageKey)}
+                  </small>
+                </span>
+                <span className="issue-list-priority" role="cell">
+                  {run.priority === null ? "—" : `P${run.priority}`}
+                </span>
+                <span className="issue-list-progress" role="cell">
+                  <span aria-hidden="true">
+                    <i style={{ width: `${run.progress}%` }} />
+                  </span>
+                  <strong>{run.progress}%</strong>
+                </span>
+                <span className="issue-list-updated" role="cell">
+                  {isClaimed
+                    ? t("run.assigned", { agent: run.claimedBy ?? "agent" })
+                    : relativeTime(run.updatedAt, t)}
+                </span>
+                <ChevronRight aria-hidden="true" size={15} />
+              </div>
+            </IssueContextMenu>
           );
         })}
       </div>
