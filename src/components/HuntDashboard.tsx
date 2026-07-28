@@ -1350,8 +1350,10 @@ function KanbanCard({
         </span>
         <span className="kanban-card-copy">
           <strong>{run.title}</strong>
-          {(run.detail || run.issueDescription) && (
-            <span>{run.detail || run.issueDescription}</span>
+          {run.issueDescription && (
+            <span className="kanban-card-description">
+              {run.issueDescription}
+            </span>
           )}
         </span>
         <span className="kanban-card-badges">

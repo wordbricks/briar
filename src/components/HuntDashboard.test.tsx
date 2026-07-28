@@ -93,6 +93,25 @@ describe("HuntDashboard", () => {
     expect(markup).not.toContain('class="metric-grid"');
   });
 
+  it("shows the issue description instead of the run status detail on cards", () => {
+    const run = {
+      ...demoDashboard.runs[0],
+      detail: "진행 상태 설명",
+      issueDescription: "사용자가 작성한 실제 이슈 설명",
+    };
+    const markup = renderToStaticMarkup(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={{ ...demoDashboard, runs: [run] }}
+      />,
+    );
+
+    expect(markup).toContain(
+      '<span class="kanban-card-description">사용자가 작성한 실제 이슈 설명</span>',
+    );
+    expect(markup).not.toContain("진행 상태 설명");
+  });
+
   it("opens a linked pull request from the issue card icon", async () => {
     const pullRequestUrl =
       "https://github.com/example/repository/pull/42";

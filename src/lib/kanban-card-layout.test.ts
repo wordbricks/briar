@@ -15,7 +15,7 @@ function firstRule(selector: string) {
 }
 
 describe("kanban card layout", () => {
-  it("lets desktop cards grow to fit all title and description content", () => {
+  it("keeps full titles and clamps descriptions to three lines", () => {
     const columnBodyRule = firstRule(".kanban-column > div");
     const cardRule = firstRule(".kanban-card");
     const titleRule = firstRule(".kanban-card-copy > strong");
@@ -27,8 +27,10 @@ describe("kanban card layout", () => {
     expect(titleRule).not.toContain("line-clamp");
     expect(titleRule).not.toContain("overflow:hidden");
     expect(titleRule).toContain("overflow-wrap:anywhere");
-    expect(descriptionRule).not.toContain("line-clamp");
-    expect(descriptionRule).not.toContain("overflow:hidden");
+    expect(descriptionRule).toContain("display:-webkit-box");
+    expect(descriptionRule).toContain("overflow:hidden");
     expect(descriptionRule).toContain("overflow-wrap:anywhere");
+    expect(descriptionRule).toContain("-webkit-box-orient:vertical");
+    expect(descriptionRule).toContain("-webkit-line-clamp:3");
   });
 });
