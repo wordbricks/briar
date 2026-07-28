@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
+import { verifyReleaseManifest } from "./release-manifest";
 
 const semverPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/u;
 const updaterPublicKeyPattern = /^untrusted comment: minisign public key[^\n]*\n[A-Za-z0-9+/=]{40,}\s*$/u;
@@ -37,19 +38,17 @@ function requireHttpsUrl(value: string, name: string) {
 export function validateProductionEnvironment(
   env: NodeJS.ProcessEnv,
   version: string,
-  publish = false,
+  mode: "build" | "publish" = "build",
 ) {
   requireSemver(version);
-  const required = publish
-    ? [...requiredProductionSecrets, ...requiredPublishingSecrets]
-    : requiredProductionSecrets;
+  const required =
+    mode === "publish" ? requiredPublishingSecrets : requiredProductionSecrets;
   const missing = required.filter((name) => !env[name]?.trim());
   if (missing.length > 0) {
     throw new Error(`Missing Production secrets: ${missing.join(", ")}`);
   }
-  const requiredConfig = publish
-    ? [...requiredProductionConfig, ...requiredPublishingConfig]
-    : requiredProductionConfig;
+  const requiredConfig =
+    mode === "publish" ? requiredPublishingConfig : requiredProductionConfig;
   const missingConfig = requiredConfig.filter((name) => !env[name]?.trim());
   if (missingConfig.length > 0) {
     throw new Error(`Missing Production config: ${missingConfig.join(", ")}`);
@@ -95,6 +94,170 @@ export function productionUpdaterConfig(env: NodeJS.ProcessEnv) {
 
 async function sha256(path: string) {
   return createHash("sha256").update(await readFile(path)).digest("hex");
+}
+
+const productionArtifactNames = (version: string) =>
+  new Set([
+    "Briar.app.tar.gz",
+    "Briar.app.tar.gz.sig",
+    `Briar_${version}_aarch64.dmg`,
+    `Briar_${version}_macos.app.zip`,
+    "SHA256SUMS",
+    "briar.spdx.json",
+    "briar.spdx.json.sig",
+    "latest.json",
+    "lifecycle-evidence.json",
+    "lifecycle-evidence.json.sig",
+    "provenance.intoto.jsonl",
+    "provenance.intoto.jsonl.sig",
+    "release-manifest.json",
+  ]);
+
+function objectValue(value: unknown, name: string): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${name} must be an object.`);
+  }
+  return value as Record<string, unknown>;
+}
+
+async function jsonFile(path: string, name: string) {
+  try {
+    return JSON.parse(await readFile(path, "utf8")) as unknown;
+  } catch {
+    throw new Error(`${name} must contain valid JSON.`);
+  }
+}
+
+export async function verifyProductionArtifacts(input: {
+  root: string;
+  version: string;
+  commitSha: string;
+  baseUrl: string;
+}) {
+  requireSemver(input.version);
+  if (!/^[0-9a-f]{40}$/u.test(input.commitSha)) {
+    throw new Error("commitSha must be a full Git SHA.");
+  }
+  const expectedNames = productionArtifactNames(input.version);
+  const entries = await readdir(input.root, { withFileTypes: true });
+  const actualNames = new Set(
+    entries.filter((entry) => entry.isFile()).map((entry) => entry.name),
+  );
+  const missing = [...expectedNames].filter((name) => !actualNames.has(name));
+  const unexpected = [...actualNames].filter((name) => !expectedNames.has(name));
+  if (missing.length > 0 || unexpected.length > 0) {
+    throw new Error(
+      `Production artifact set mismatch; missing: ${missing.join(", ") || "none"}; unexpected: ${unexpected.join(", ") || "none"}.`,
+    );
+  }
+
+  const checksumLines = (await readFile(join(input.root, "SHA256SUMS"), "utf8"))
+    .trim()
+    .split(/\r?\n/u);
+  const checksums = new Map<string, string>();
+  for (const line of checksumLines) {
+    const match = /^([0-9a-f]{64})  \.\/([^/]+)$/u.exec(line);
+    if (!match || checksums.has(match[2])) {
+      throw new Error("SHA256SUMS contains an invalid or duplicate entry.");
+    }
+    checksums.set(match[2], match[1]);
+  }
+  const checksumNames = new Set([...expectedNames].filter((name) => name !== "SHA256SUMS"));
+  if (
+    checksums.size !== checksumNames.size ||
+    [...checksumNames].some((name) => !checksums.has(name))
+  ) {
+    throw new Error("SHA256SUMS must cover every Production artifact exactly once.");
+  }
+  for (const [name, digest] of checksums) {
+    if ((await sha256(join(input.root, name))) !== digest) {
+      throw new Error(`Production artifact checksum mismatch: ${name}`);
+    }
+  }
+
+  const manifest = await verifyReleaseManifest(input.root);
+  if (
+    manifest.version !== input.version ||
+    manifest.channel !== "stable" ||
+    manifest.commitSha !== input.commitSha
+  ) {
+    throw new Error("Release manifest does not match the Production tag and commit.");
+  }
+
+  const baseUrl = requireHttpsUrl(input.baseUrl, "baseUrl").toString().replace(/\/$/u, "");
+  const latest = objectValue(
+    await jsonFile(join(input.root, "latest.json"), "latest.json"),
+    "latest.json",
+  );
+  const platforms = objectValue(latest.platforms, "latest.json platforms");
+  const darwin = objectValue(platforms["darwin-aarch64"], "darwin-aarch64 updater");
+  if (
+    latest.version !== input.version ||
+    darwin.url !== `${baseUrl}/v${input.version}/Briar.app.tar.gz` ||
+    typeof darwin.signature !== "string" ||
+    darwin.signature.trim() !==
+      (await readFile(join(input.root, "Briar.app.tar.gz.sig"), "utf8")).trim()
+  ) {
+    throw new Error("Updater metadata does not match the verified Production artifacts.");
+  }
+
+  const provenance = objectValue(
+    await jsonFile(join(input.root, "provenance.intoto.jsonl"), "provenance"),
+    "provenance",
+  );
+  const predicate = objectValue(provenance.predicate, "provenance predicate");
+  const buildDefinition = objectValue(
+    predicate.buildDefinition,
+    "provenance build definition",
+  );
+  const externalParameters = objectValue(
+    buildDefinition.externalParameters,
+    "provenance external parameters",
+  );
+  if (
+    externalParameters.version !== input.version ||
+    externalParameters.commitSha !== input.commitSha
+  ) {
+    throw new Error("Provenance does not match the Production tag and commit.");
+  }
+  const subjects = Array.isArray(provenance.subject) ? provenance.subject : [];
+  const subjectDigests = new Map<string, string>();
+  for (const subjectValue of subjects) {
+    const subject = objectValue(subjectValue, "provenance subject");
+    const digest = objectValue(subject.digest, "provenance subject digest");
+    if (typeof subject.name === "string" && typeof digest.sha256 === "string") {
+      subjectDigests.set(subject.name, digest.sha256);
+    }
+  }
+  for (const name of [
+    "Briar.app.tar.gz",
+    "Briar.app.tar.gz.sig",
+    `Briar_${input.version}_aarch64.dmg`,
+    `Briar_${input.version}_macos.app.zip`,
+    "briar.spdx.json",
+    "latest.json",
+    "release-manifest.json",
+  ]) {
+    if (subjectDigests.get(name) !== checksums.get(name)) {
+      throw new Error(`Provenance digest mismatch: ${name}`);
+    }
+  }
+
+  const lifecycle = objectValue(
+    await jsonFile(join(input.root, "lifecycle-evidence.json"), "lifecycle evidence"),
+    "lifecycle evidence",
+  );
+  if (
+    lifecycle.result !== "passed" ||
+    lifecycle.candidateVersion !== input.version ||
+    lifecycle.candidateSignature !== "developer-id-notarized-gatekeeper" ||
+    lifecycle.checksumsVerified !== true ||
+    lifecycle.candidateManifestVerified !== true ||
+    lifecycle.statePreserved !== true
+  ) {
+    throw new Error("Lifecycle evidence does not contain the Production acceptance gate.");
+  }
+  return { manifest, latest, provenance, lifecycle };
 }
 
 async function singleFile(root: string, suffix: string) {
@@ -193,7 +356,11 @@ if (import.meta.main) {
   const command = process.argv[2];
   const version = requiredArgument("--version");
   if (command === "preflight") {
-    validateProductionEnvironment(process.env, version, process.argv.includes("--publish"));
+    validateProductionEnvironment(
+      process.env,
+      version,
+      process.argv.includes("--publish") ? "publish" : "build",
+    );
     console.log(`Production preflight passed for Briar v${version}.`);
   } else if (command === "config") {
     const output = requiredArgument("--output");
@@ -223,7 +390,15 @@ if (import.meta.main) {
         `local:v${version}:${commitSha}`,
     });
     console.log(`Generated updater and provenance metadata for Briar v${version}.`);
+  } else if (command === "verify-artifacts") {
+    await verifyProductionArtifacts({
+      root: requiredArgument("--root"),
+      version,
+      commitSha: requiredArgument("--commit-sha"),
+      baseUrl: requiredArgument("--base-url"),
+    });
+    console.log(`Verified reusable Production artifacts for Briar v${version}.`);
   } else {
-    throw new Error("Expected preflight, config, or metadata command.");
+    throw new Error("Expected preflight, config, metadata, or verify-artifacts command.");
   }
 }

@@ -14,6 +14,11 @@ Build, package, and self-test a same-version candidate locally:
 bun run release:macos:candidate
 ```
 
+The wrapper may skip this build when the diff from the configured previous
+version does not touch release or bundle mechanics. Use
+`bun run release:macos:candidate -- --force` for an unconditional acceptance
+run.
+
 For a real cross-version acceptance run, use an accepted previous artifact:
 
 ```sh

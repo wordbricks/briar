@@ -1,4 +1,5 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -6,7 +7,9 @@ import {
   generateProductionMetadata,
   productionUpdaterConfig,
   validateProductionEnvironment,
+  verifyProductionArtifacts,
 } from "./production-release";
+import { generateReleaseManifest } from "./release-manifest";
 
 const directories: string[] = [];
 const publicKey = Buffer.from(
@@ -47,7 +50,7 @@ describe("Production release contract", () => {
     const environment = completeEnvironment();
     delete environment.CLOUDFLARE_API_TOKEN;
     expect(() => validateProductionEnvironment(environment, "1.0.0")).not.toThrow();
-    expect(() => validateProductionEnvironment(environment, "1.0.0", true)).toThrow(
+    expect(() => validateProductionEnvironment(environment, "1.0.0", "publish")).toThrow(
       "Missing Production secrets: CLOUDFLARE_API_TOKEN",
     );
   });
@@ -62,10 +65,19 @@ describe("Production release contract", () => {
     const publishingEnvironment = completeEnvironment();
     delete publishingEnvironment.CLOUDFLARE_ACCOUNT_ID;
     expect(() =>
-      validateProductionEnvironment(publishingEnvironment, "1.0.0", true),
+      validateProductionEnvironment(publishingEnvironment, "1.0.0", "publish"),
     ).toThrow(
       "Missing Production config: CLOUDFLARE_ACCOUNT_ID",
     );
+  });
+
+  it("does not require Apple build credentials when publishing verified artifacts", () => {
+    const environment = completeEnvironment();
+    delete environment.APPLE_CERTIFICATE;
+    delete environment.APPLE_API_ISSUER;
+    expect(() =>
+      validateProductionEnvironment(environment, "1.0.0", "publish"),
+    ).not.toThrow();
   });
 
   it("builds a secret-free updater config", () => {
@@ -126,5 +138,97 @@ describe("Production release contract", () => {
     expect(result.provenance.predicate.runDetails.builder.id).toContain(
       "scripts/release-macos-production.sh",
     );
+  });
+
+  it("verifies the complete reusable Production artifact set", async () => {
+    const root = await mkdtemp(join(tmpdir(), "briar-production-artifacts-"));
+    directories.push(root);
+    const version = "1.0.0";
+    const commitSha = "d".repeat(40);
+    const baseUrl = "https://briar-api.example/releases";
+    const artifacts = new Map([
+      ["Briar.app.tar.gz", "archive"],
+      ["Briar.app.tar.gz.sig", "updater signature"],
+      [`Briar_${version}_aarch64.dmg`, "dmg"],
+      [`Briar_${version}_macos.app.zip`, "app"],
+      ["briar.spdx.json", "{}"],
+      ["briar.spdx.json.sig", "sbom signature"],
+      ["lifecycle-evidence.json.sig", "lifecycle signature"],
+      ["provenance.intoto.jsonl.sig", "provenance signature"],
+    ]);
+    for (const [name, contents] of artifacts) {
+      await writeFile(join(root, name), contents);
+    }
+    await generateReleaseManifest(root, {
+      version,
+      channel: "stable",
+      previousVersion: "0.9.0",
+      commitSha,
+      releasedAt: "2026-07-22T00:00:00Z",
+    });
+    await writeFile(
+      join(root, "latest.json"),
+      `${JSON.stringify({
+        version,
+        platforms: {
+          "darwin-aarch64": {
+            signature: "updater signature",
+            url: `${baseUrl}/v${version}/Briar.app.tar.gz`,
+          },
+        },
+      })}\n`,
+    );
+    await writeFile(
+      join(root, "lifecycle-evidence.json"),
+      `${JSON.stringify({
+        result: "passed",
+        candidateVersion: version,
+        candidateSignature: "developer-id-notarized-gatekeeper",
+        checksumsVerified: true,
+        candidateManifestVerified: true,
+        statePreserved: true,
+      })}\n`,
+    );
+    const provenanceSubjects = await Promise.all(
+      [
+        "Briar.app.tar.gz",
+        "Briar.app.tar.gz.sig",
+        `Briar_${version}_aarch64.dmg`,
+        `Briar_${version}_macos.app.zip`,
+        "briar.spdx.json",
+        "latest.json",
+        "release-manifest.json",
+      ].map(async (name) => ({
+        name,
+        digest: {
+          sha256: createHash("sha256")
+            .update(await readFile(join(root, name)))
+            .digest("hex"),
+        },
+      })),
+    );
+    await writeFile(
+      join(root, "provenance.intoto.jsonl"),
+      `${JSON.stringify({
+        subject: provenanceSubjects,
+        predicate: {
+          buildDefinition: { externalParameters: { version, commitSha } },
+        },
+      })}\n`,
+    );
+    const names = (await readdir(root)).sort();
+    const checksumLines = await Promise.all(
+      names.map(async (name) => {
+        const digest = createHash("sha256")
+          .update(await readFile(join(root, name)))
+          .digest("hex");
+        return `${digest}  ./${name}`;
+      }),
+    );
+    await writeFile(join(root, "SHA256SUMS"), `${checksumLines.join("\n")}\n`);
+
+    await expect(
+      verifyProductionArtifacts({ root, version, commitSha, baseUrl }),
+    ).resolves.toMatchObject({ manifest: { version, commitSha } });
   });
 });
