@@ -13,6 +13,7 @@ import {
   permissionOptions,
   permissionToolName,
   resolveGrokAuthMethodId,
+  resolveGrokFinalMessage,
   resolveGrokModelId,
   shouldAutoApprovePermission,
   shouldDenyWritePermission,
@@ -370,9 +371,11 @@ async function main() {
       });
     }
 
-    const finalMessage =
-      state.assistantText.trim() ||
-      (typeof promptResult?.text === "string" ? promptResult.text.trim() : "");
+    const finalMessage = resolveGrokFinalMessage(
+      state,
+      typeof promptResult?.text === "string" ? promptResult.text : undefined,
+      request.outputSchema,
+    );
     emit({
       type: "result",
       sessionId,

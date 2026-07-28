@@ -52,8 +52,9 @@ export type NormalizedAgentEvent =
 
 export type GrokEventState = {
   activeMessageId: string | null;
-  assistantText: string;
-  messageStarted: boolean;
+  activeAssistantText: string;
+  lastAssistantText: string;
+  messageSequence: number;
 };
 
 export type GrokRunnerOutput =
@@ -180,7 +181,7 @@ export function buildPromptParts(request: GrokRunnerRequest): Array<{
   ) {
     parts.push({
       type: "text",
-      text: `Respond with JSON that matches this schema:\n${JSON.stringify(request.outputSchema)}`,
+      text: `Return only the JSON value that matches this schema, without Markdown fences or commentary:\n${JSON.stringify(request.outputSchema)}`,
     });
   }
   parts.push({ type: "text", text: request.message });
@@ -204,9 +205,28 @@ export function mapEffortToGrok(
 export function createGrokEventState(): GrokEventState {
   return {
     activeMessageId: null,
-    assistantText: "",
-    messageStarted: false,
+    activeAssistantText: "",
+    lastAssistantText: "",
+    messageSequence: 0,
   };
+}
+
+function completeActiveGrokMessage(
+  state: GrokEventState,
+  phase: string,
+): NormalizedAgentEvent | undefined {
+  if (!state.activeMessageId) return;
+  const text = state.activeAssistantText;
+  state.lastAssistantText = text;
+  const event: NormalizedAgentEvent = {
+    type: "messageCompleted",
+    id: state.activeMessageId,
+    phase,
+    text,
+  };
+  state.activeMessageId = null;
+  state.activeAssistantText = "";
+  return event;
 }
 
 export function normalizeGrokSessionUpdate(
@@ -235,13 +255,13 @@ export function normalizeGrokSessionUpdate(
         : "";
     if (!text) return { raw: params };
 
-    if (!state.messageStarted) {
+    if (!state.activeMessageId) {
+      state.messageSequence += 1;
       state.activeMessageId =
         typeof record?.sessionId === "string"
-          ? `${record.sessionId}:assistant`
-          : "assistant";
-      state.messageStarted = true;
-      state.assistantText = text;
+          ? `${record.sessionId}:assistant:${state.messageSequence}`
+          : `assistant:${state.messageSequence}`;
+      state.activeAssistantText = text;
       return {
         raw: params,
         event: {
@@ -253,19 +273,22 @@ export function normalizeGrokSessionUpdate(
       };
     }
 
-    state.assistantText += text;
+    state.activeAssistantText += text;
     return {
       raw: params,
       event: {
         type: "messageDelta",
-        id: state.activeMessageId ?? "assistant",
+        id: state.activeMessageId,
         delta: text,
       },
     };
   }
 
   if (kind === "tool_call" || kind === "tool_call_update") {
-    return { raw: params };
+    return {
+      raw: params,
+      event: completeActiveGrokMessage(state, "commentary"),
+    };
   }
 
   return { raw: params };
@@ -276,14 +299,8 @@ export function finalizeGrokMessage(
   stopReason: string | undefined,
 ): NormalizedAgentEvent[] {
   const events: NormalizedAgentEvent[] = [];
-  if (state.messageStarted && state.activeMessageId) {
-    events.push({
-      type: "messageCompleted",
-      id: state.activeMessageId,
-      phase: "final",
-      text: state.assistantText,
-    });
-  }
+  const completed = completeActiveGrokMessage(state, "final");
+  if (completed) events.push(completed);
   events.push({
     type: "turnCompleted",
     status:
@@ -292,6 +309,50 @@ export function finalizeGrokMessage(
         : stopReason,
   });
   return events;
+}
+
+export function extractJsonObject(raw: string): string {
+  const trimmed = raw.trim();
+  const start = trimmed.indexOf("{");
+  if (start < 0) return trimmed;
+
+  let depth = 0;
+  let inString = false;
+  let escaping = false;
+  for (let index = start; index < trimmed.length; index += 1) {
+    const char = trimmed[index];
+    if (inString) {
+      if (escaping) {
+        escaping = false;
+      } else if (char === "\\") {
+        escaping = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (char === '"') {
+      inString = true;
+    } else if (char === "{") {
+      depth += 1;
+    } else if (char === "}") {
+      depth -= 1;
+      if (depth === 0) return trimmed.slice(start, index + 1);
+    }
+  }
+  return trimmed.slice(start);
+}
+
+export function resolveGrokFinalMessage(
+  state: GrokEventState,
+  promptResultText: string | undefined,
+  outputSchema: GrokRunnerRequest["outputSchema"],
+): string {
+  const message =
+    state.lastAssistantText.trim() || promptResultText?.trim() || "";
+  return outputSchema === null || outputSchema === undefined
+    ? message
+    : extractJsonObject(message);
 }
 
 export function permissionToolName(params: unknown): string {
