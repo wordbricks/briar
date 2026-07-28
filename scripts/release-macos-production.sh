@@ -16,9 +16,9 @@ usage() {
 Usage: scripts/release-macos-production.sh [--publish]
 
 Builds, signs, notarizes, staples, packages, and verifies a Production macOS
-release from the exact signed vX.Y.Z tag at HEAD. By default it stops after
-creating local artifacts. Pass --publish to create and publish the GitHub
-Release, upload immutable versioned objects to R2, and promote latest.json.
+release from the exact signed vX.Y.Z tag at HEAD. By default it creates the
+local artifacts once. Pass --publish in a second invocation to verify and
+publish those exact artifacts without rebuilding, resigning, or renotarizing.
 
 Credentials are decrypted from .env.release with dotenvx using the ignored
 .env.keys file. See docs/operations/production-release.md for setup and
@@ -48,6 +48,7 @@ read_keychains() {
 }
 
 cleanup() {
+  release_cargo_cache_cleanup
   if [[ ${#original_keychains[@]} -gt 0 ]]; then
     security list-keychains -d user -s "${original_keychains[@]}" >/dev/null 2>&1 || true
   fi
@@ -61,6 +62,8 @@ cleanup() {
     esac
   fi
 }
+# shellcheck disable=SC1091 -- fixed repository path.
+source "$workspace_root/scripts/release-cargo-cache.sh"
 trap cleanup EXIT
 
 while [[ $# -gt 0 ]]; do
@@ -107,11 +110,15 @@ fi
 
 [[ "$(uname -s)" == "Darwin" ]] || fail "Production macOS releases require macOS."
 
-for command_name in bun cargo codesign curl git jq rustc security shasum spctl syft xcrun; do
+for command_name in bun curl git jq shasum; do
   require_command "$command_name"
 done
 if [[ "$publish" == true ]]; then
   require_command gh
+else
+  for command_name in cargo codesign rustc security spctl syft xcrun; do
+    require_command "$command_name"
+  done
 fi
 
 cd "$workspace_root"
@@ -119,8 +126,10 @@ cd "$workspace_root"
 expected_bun_version="$(bun -e "console.log((await Bun.file('package.json').json()).packageManager.split('@')[1])")"
 [[ "$(bun --version)" == "$expected_bun_version" ]] ||
   fail "Expected Bun $expected_bun_version; found $(bun --version)."
-rustc --version | grep -F "rustc 1.96.0 " >/dev/null ||
-  fail "Expected the Rust 1.96.0 toolchain."
+if [[ "$publish" != true ]]; then
+  rustc --version | grep -F "rustc 1.96.0 " >/dev/null ||
+    fail "Expected the Rust 1.96.0 toolchain."
+fi
 [[ -z "$(git status --porcelain --untracked-files=all)" ]] ||
   fail "The Production release worktree must be clean."
 
@@ -159,8 +168,51 @@ if [[ "$publish" == true ]]; then
   if gh release view "$tag" --repo "$repository" >/dev/null 2>&1; then
     fail "GitHub Release $tag already exists; refusing to overwrite it."
   fi
+
+  scripts/with-release-env.sh \
+    bun run src-cli/production-release.ts preflight \
+      --version "$version" \
+      --publish
+  scripts/with-release-env.sh \
+    bun run src-cli/production-release.ts verify-artifacts \
+      --root "$artifact_root" \
+      --version "$version" \
+      --commit-sha "$commit_sha" \
+      --base-url "$BRIAR_RELEASE_BASE_URL"
+
+  gh release create "$tag" "$artifact_root"/* \
+    --repo "$repository" \
+    --draft \
+    --verify-tag \
+    --generate-notes \
+    --title "Briar $tag"
+
+  for artifact in "$artifact_root"/*; do
+    name="$(basename "$artifact")"
+    bunx wrangler r2 object put \
+      "briar-releases/releases/$tag/$name" \
+      --file "$artifact" \
+      --remote
+  done
+
+  curl --fail --silent --show-error --head \
+    "${BRIAR_RELEASE_BASE_URL}/${tag}/Briar.app.tar.gz" >/dev/null
+  gh release edit "$tag" --repo "$repository" --draft=false --latest
+  bunx wrangler r2 object put \
+    "briar-releases/releases/latest.json" \
+    --file "$artifact_root/latest.json" \
+    --remote
+  curl --fail --silent --show-error \
+    "${BRIAR_UPDATE_ENDPOINT}?promoted=${version}" |
+    jq -e --arg version "$version" '.version == $version' >/dev/null
+
+  release_url="$(gh release view "$tag" --repo "$repository" --json url --jq .url)"
+  echo "Published Briar $tag from verified local artifacts: $release_url"
+  exit 0
 fi
 
+configure_release_cargo_cache
+reset_release_bundle_output
 release_temp="$(mktemp -d /tmp/briar-production-release.XXXXXX)"
 release_environment_file="$release_temp/release.env"
 touch "$release_environment_file"
@@ -170,12 +222,8 @@ export BRIAR_RELEASE_ENV_FILE="$release_environment_file"
 export BRIAR_RELEASE_COMMIT="$commit_sha"
 export BRIAR_RELEASE_INVOCATION_ID="local:$tag:$commit_sha"
 
-preflight_args=(preflight --version "$version")
-if [[ "$publish" == true ]]; then
-  preflight_args+=(--publish)
-fi
 scripts/with-release-env.sh \
-  bun run src-cli/production-release.ts "${preflight_args[@]}"
+  bun run src-cli/production-release.ts preflight --version "$version"
 
 read_keychains
 scripts/import-apple-signing-assets.sh
@@ -191,7 +239,7 @@ scripts/with-release-env.sh \
     --output "$production_config"
 scripts/with-release-env.sh bun run tauri build --config "$production_config"
 
-dmg_directory="$workspace_root/src-tauri/target/release/bundle/dmg"
+dmg_directory="$BRIAR_RELEASE_CARGO_TARGET_DIR/release/bundle/dmg"
 dmg_path="$(
   find "$dmg_directory" -maxdepth 1 -type f -name 'Briar_*_aarch64.dmg' -print -quit
 )"
@@ -220,37 +268,5 @@ bun run tauri signer sign "$artifact_root/lifecycle-evidence.json"
   shasum -a 256 --check SHA256SUMS
 )
 
-if [[ "$publish" != true ]]; then
-  echo "Verified Production artifacts in $artifact_root"
-  echo "Re-run from the same clean signed tag with --publish to publish them."
-  exit 0
-fi
-
-gh release create "$tag" "$artifact_root"/* \
-  --repo "$repository" \
-  --draft \
-  --verify-tag \
-  --generate-notes \
-  --title "Briar $tag"
-
-for artifact in "$artifact_root"/*; do
-  name="$(basename "$artifact")"
-  bunx wrangler r2 object put \
-    "briar-releases/releases/$tag/$name" \
-    --file "$artifact" \
-    --remote
-done
-
-curl --fail --silent --show-error --head \
-  "${BRIAR_RELEASE_BASE_URL}/${tag}/Briar.app.tar.gz" >/dev/null
-gh release edit "$tag" --repo "$repository" --draft=false --latest
-bunx wrangler r2 object put \
-  "briar-releases/releases/latest.json" \
-  --file "$artifact_root/latest.json" \
-  --remote
-curl --fail --silent --show-error \
-  "${BRIAR_UPDATE_ENDPOINT}?promoted=${version}" |
-  jq -e --arg version "$version" '.version == $version' >/dev/null
-
-release_url="$(gh release view "$tag" --repo "$repository" --json url --jq .url)"
-echo "Published Briar $tag from the local release host: $release_url"
+echo "Verified Production artifacts in $artifact_root"
+echo "Re-run from the same clean signed tag with --publish to publish these exact files."

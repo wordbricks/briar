@@ -66,7 +66,8 @@ run_app_worker() {
     scripts/release-macos-production.sh \
     scripts/verify-bundled-runtime.sh \
     scripts/qa-production-updater-build.sh \
-    scripts/qa-macos-lifecycle.sh
+    scripts/qa-macos-lifecycle.sh \
+    scripts/release-cargo-cache.sh
   bun run build
   bun run build:release
   bun run worker:check

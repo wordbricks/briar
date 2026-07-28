@@ -311,6 +311,15 @@ present on the release host; without it the Production release command exits.
 Run `bun run secrets:verify-encrypted` before committing secret-file changes.
 Public signing and publishing identifiers live in `config/release.env`.
 
-The Production command only mutates GitHub and R2 when `--publish` is explicit.
+The candidate command skips its expensive ad-hoc bundle build when the diff
+from `BRIAR_PREVIOUS_VERSION` contains no release, signing, packaging, updater,
+dependency, or bundle-configuration changes; pass `-- --force` to override the
+gate. Candidate and Production builds share a locked Cargo target cache across
+worktrees.
+
+The first Production command builds, signs, notarizes, and verifies the local
+artifacts once. The second command only revalidates and publishes those exact
+files. It does not rebuild, resign, or renotarize them, and only mutates GitHub
+and R2 when `--publish` is explicit.
 See [the local Production release runbook](docs/operations/production-release.md)
 for host, credential, signed-tag, and rollback requirements.

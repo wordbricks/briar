@@ -80,18 +80,26 @@ user-installed Bun.
    bun run release:macos:production
    ```
 
-7. Review `release-artifacts/`, then rebuild and publish from the same clean tag:
+7. Review `release-artifacts/`, then publish those exact files from the same
+   clean tag:
 
    ```sh
    bun run release:macos:production -- --publish
    ```
 
-The command verifies the pinned toolchain, clean worktree, signed tag, remote
-tag, and membership in `origin/main`. It then imports an ephemeral keychain,
-signs with Developer ID, notarizes and staples, generates updater artifacts,
-SPDX, provenance, checksums, and lifecycle evidence. The keychain and temporary
-Apple API key are removed on every exit, and the user's original keychain search
-list is restored.
+The build command verifies the pinned toolchain, clean worktree, signed tag,
+remote tag, and membership in `origin/main`. It then imports an ephemeral
+keychain, signs with Developer ID, notarizes and staples, generates updater
+artifacts, SPDX, provenance, checksums, and lifecycle evidence. The keychain and
+temporary Apple API key are removed on every exit, and the user's original
+keychain search list is restored.
+
+The publish command does not invoke Tauri, Apple signing, notarization, or
+packaging. Before upload it requires the exact expected artifact set and checks
+every file against `SHA256SUMS`; it also binds the stable release manifest,
+updater metadata, provenance subjects, and Production lifecycle evidence to the
+version and commit at the signed tag. Any missing, extra, modified, or
+wrong-commit artifact fails closed.
 
 `--publish` is required for every GitHub and R2 publication. Publication
 creates a draft GitHub Release, uploads immutable versioned files to the private
@@ -117,6 +125,18 @@ authority. The Production command replaces both values with the offline-backed
 public key and stable endpoint; preflight rejects a missing or malformed
 override.
 
+## Shared Cargo build cache
+
+Candidate and Production builds set `CARGO_TARGET_DIR` to a per-user release
+cache outside the worktree. This preserves compiled Rust dependencies between
+Auto Hunt worktrees while the bundle output is cleared before each build. A
+lock prevents two release commands from writing to the shared target at the
+same time.
+
+The command prints the resolved cache path. Set
+`BRIAR_RELEASE_CARGO_TARGET_DIR` to an absolute path ending in `/cargo-target`
+to relocate it. Do not point ordinary development builds at this release cache.
+
 ## Verification
 
 ```sh
@@ -124,11 +144,11 @@ curl --fail https://briar-api.wbai.workers.dev/releases/latest.json | jq .
 curl --fail --head \
   https://briar-api.wbai.workers.dev/releases/v1.1.1/Briar.app.tar.gz
 (cd release-artifacts && shasum -a 256 --check SHA256SUMS)
-spctl --assess --type execute --verbose=2 \
-  src-tauri/target/release/bundle/macos/Briar.app
-xcrun stapler validate src-tauri/target/release/bundle/macos/Briar.app
-scripts/verify-bundled-runtime.sh \
-  src-tauri/target/release/bundle/macos/Briar.app
+bun run src-cli/production-release.ts verify-artifacts \
+  --root release-artifacts \
+  --version 1.1.1 \
+  --commit-sha "$(git rev-parse HEAD)" \
+  --base-url https://briar-api.wbai.workers.dev/releases
 ```
 
 Tauri requires every updater archive to carry a signature; signature checks
