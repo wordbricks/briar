@@ -501,6 +501,14 @@ body { overflow: hidden; font-synthesis: none; }
 .project-settings-automation-actions > button:disabled { color:#9a96a3; background:#f4f3f6; cursor:not-allowed; }
 .project-settings-automation-icon { width:32px; height:32px; flex:0 0 32px; display:grid; place-items:center; border-radius:9px; color:#6650b4; background:#eeeafd; }
 .project-settings-workflow-ai-note { margin:14px 0 0 43px; color:#85828b; font-size:var(--text-2xs); line-height:1.6; }
+.project-settings-workflow-revision { margin:14px 0 0 43px; padding:13px; display:grid; gap:8px; border:1px solid #e0d9f2; border-radius:11px; background:#faf8ff; }
+.project-settings-workflow-revision > label { color:#514762; font-size:var(--text-2xs); font-weight:700; }
+.project-settings-workflow-revision textarea { min-height:72px; resize:vertical; border-color:#ddd6ef; background:#fff; font-size:var(--text-2xs); line-height:1.55; }
+.project-settings-workflow-revision > footer { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.project-settings-workflow-revision > footer > small { color:#8a8394; font-size:var(--text-2xs); line-height:1.45; }
+.project-settings-workflow-revision > footer > button { height:30px; padding:0 11px; flex:0 0 auto; display:flex; align-items:center; gap:6px; border:1px solid #cfc3eb; border-radius:8px; color:#fff; background:#7157bd; cursor:pointer; font-size:var(--text-2xs); font-weight:700; white-space:nowrap; }
+.project-settings-workflow-revision > footer > button:hover:not(:disabled) { background:#6349ad; }
+.project-settings-workflow-revision > footer > button:disabled { border-color:#ddd9e5; color:#9d99a4; background:#efedf2; cursor:not-allowed; }
 .project-settings-workflow-success,.project-settings-workflow-error { margin:10px 0 0 43px; font-size:var(--text-2xs); line-height:1.5; }
 .project-settings-workflow-success { display:flex; align-items:center; gap:5px; color:#33775f; }
 .project-settings-workflow-error { color:#b04455; }
@@ -3508,4 +3516,17 @@ button.issue-message-state { width:100%; cursor:pointer; }
   font-weight:var(--font-weight-semibold);
   letter-spacing:var(--tracking-wide);
   text-transform:uppercase;
+}
+
+@media (max-width:480px) {
+  .project-settings-workflow-revision {
+    margin-left:0;
+  }
+  .project-settings-workflow-revision > footer {
+    align-items:stretch;
+    flex-direction:column;
+  }
+  .project-settings-workflow-revision > footer > button {
+    justify-content:center;
+  }
 }
