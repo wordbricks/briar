@@ -6,6 +6,7 @@ import {
   createProjectAgentSchedule,
   deleteIssue,
   deleteProjectAgentSchedule,
+  loadDashboard,
   loadProjectAgentScheduleRuns,
   loadProjectAgents,
   loadRunEvidence,
@@ -15,6 +16,7 @@ import {
   updateIssue,
 } from "./api";
 import { repositoryWorkflowBootstrap } from "./auto-hunt-contract";
+import { demoDashboard } from "./demo-data";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -90,6 +92,43 @@ describe("API errors", () => {
       expect.stringContaining(`/projects/${projectId}/runs/${runId}`),
       expect.objectContaining({ method: "DELETE" }),
     );
+  });
+
+  it("defaults missing dashboard revision numbers for older API payloads", async () => {
+    const legacyDashboard = {
+      ...demoDashboard,
+      runs: demoDashboard.runs.map((run) => {
+        const {
+          currentRevision: _currentRevision,
+          events: currentEvents,
+          ...legacyRun
+        } = run;
+        return {
+          ...legacyRun,
+          events: currentEvents.map((event) => {
+            const { revision: _revision, ...legacyEvent } = event;
+            return legacyEvent;
+          }),
+        };
+      }),
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(JSON.stringify(legacyDashboard), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+
+    const dashboard = await loadDashboard(
+      "token",
+      demoDashboard.project.id,
+    );
+
+    expect(dashboard.runs[0].currentRevision).toBe(1);
+    expect(dashboard.runs[0].events[0].revision).toBe(1);
   });
 
   it("loads run evidence through the user-authenticated project endpoint", async () => {
