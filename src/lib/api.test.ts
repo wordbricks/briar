@@ -131,7 +131,6 @@ describe("API errors", () => {
       provider: "grok",
       model: "grok-4.5",
       responsibility: "피드백을 분석해 액션 아이템 이슈를 만듭니다.",
-      kind: "custom",
     });
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining(
@@ -163,7 +162,7 @@ describe("API errors", () => {
     );
   });
 
-  it("normalizes legacy project agents that omit kind", async () => {
+  it("loads project agents without a special kind", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => {
@@ -209,13 +208,10 @@ describe("API errors", () => {
         "22222222-2222-4222-8222-222222222222",
         "ko",
       ),
-    ).resolves.toMatchObject([
-      { kind: "auto_hunt" },
-      { kind: "custom" },
-    ]);
+    ).resolves.toHaveLength(2);
   });
 
-  it("rejects explicit unsupported project agent kinds", async () => {
+  it("ignores legacy project agent kind fields", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => {
@@ -250,7 +246,9 @@ describe("API errors", () => {
         "22222222-2222-4222-8222-222222222222",
         "en",
       ),
-    ).rejects.toMatchObject({ name: "ZodError" });
+    ).resolves.toEqual([
+      expect.not.objectContaining({ kind: expect.anything() }),
+    ]);
   });
 
   it("creates an agent schedule with its recurrence and time zone", async () => {
@@ -546,7 +544,6 @@ describe("API errors", () => {
       provider: "claude",
       model: "sonnet",
       responsibility: "릴리스 상태를 점검합니다.",
-      kind: "custom",
     });
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining(

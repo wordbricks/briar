@@ -103,7 +103,9 @@ export function buildCurrentInboxMessages(
       projectId: session.projectId,
       projectName: projectNames.get(session.projectId) ?? "",
       targetId: session.id,
-      title: session.issues.map((issue) => issue.title).join(" · "),
+      title:
+        session.request ??
+        session.issues.map((issue) => issue.title).join(" · "),
       occurredAt:
         finalEvent?.occurredAt ??
         session.completedAt ??

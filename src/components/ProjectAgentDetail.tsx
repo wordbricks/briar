@@ -3,17 +3,23 @@ import {
   Bot,
   LoaderCircle,
   Play,
-  Sparkles,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import {
   ErrorBanner,
   MainContent,
   PageHero,
-  StatusPill,
 } from "@/components/layout";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Typography } from "@/components/ui/typography";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
@@ -25,7 +31,7 @@ import type {
   HuntRun,
   ProjectAgent,
 } from "../types";
-import { AutoHuntSessions } from "./AutoHuntSessions";
+import { ProjectAgentSessions } from "./ProjectAgentSessions";
 
 type ProjectAgentMessage = {
   id: string;
@@ -34,12 +40,23 @@ type ProjectAgentMessage = {
   dispatched: boolean;
 };
 
+export type ProjectAgentTaskSessionRecord = {
+  request: string;
+  startedAt: string;
+  status: "completed" | "failed";
+  conversationId: string | null;
+  workspaceRoot: string | null;
+  summary: string | null;
+  error: string | null;
+};
+
 export function ProjectAgentDetail({
   agent,
   dashboard,
   error: appError,
   isSidebarOpen,
   onBack,
+  onRecordTaskSession,
   onRequestedSessionOpen,
   onStartAutoHunt,
   requestedSessionId,
@@ -50,6 +67,7 @@ export function ProjectAgentDetail({
   error: string | null;
   isSidebarOpen: boolean;
   onBack: () => void;
+  onRecordTaskSession?: (record: ProjectAgentTaskSessionRecord) => void;
   onRequestedSessionOpen?: () => void;
   onStartAutoHunt: (
     runs: HuntRun[],
@@ -62,23 +80,20 @@ export function ProjectAgentDetail({
   sessions: AutoHuntSession[];
 }) {
   const { t } = useI18n();
-  const [mode, setMode] = useState<"task" | "auto_hunt">(
-    requestedSessionId ? "auto_hunt" : "task",
-  );
-  const [request, setRequest] = useState("");
+  const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
+  const [request, setRequest] = useState(agent.responsibility);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ProjectAgentMessage[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [openedSessionId, setOpenedSessionId] = useState<string | null>(
-    requestedSessionId,
-  );
 
-  useEffect(() => {
-    if (!requestedSessionId) return;
-    setOpenedSessionId(requestedSessionId);
-    setMode("auto_hunt");
-  }, [requestedSessionId]);
+  const openTaskDialog = () => {
+    setRequest(agent.responsibility);
+    setConversationId(null);
+    setMessages([]);
+    setError(null);
+    setIsTaskDialogOpen(true);
+  };
 
   const submit = async () => {
     const message = request.trim();
@@ -94,9 +109,10 @@ export function ProjectAgentDetail({
         dispatched: false,
       },
     ]);
+    const startedAt = new Date().toISOString();
     setIsRunning(true);
     try {
-      const { response, dispatchResult } = await executeProjectAgentTurn(
+      const { response } = await executeProjectAgentTurn(
         {
           runAgent: runProjectAgent,
           dispatchAutoHunt: (decision) =>
@@ -113,6 +129,17 @@ export function ProjectAgentDetail({
         },
       );
       setConversationId(response.conversationId);
+      if (response.action === "respond") {
+        onRecordTaskSession?.({
+          request: message,
+          startedAt,
+          status: "completed",
+          conversationId: response.conversationId,
+          workspaceRoot: response.workspaceRoot,
+          summary: response.message,
+          error: null,
+        });
+      }
       setMessages((current) => [
         ...current,
         {
@@ -122,32 +149,23 @@ export function ProjectAgentDetail({
           dispatched: response.action === "dispatch_auto_hunt",
         },
       ]);
-      if (dispatchResult !== null) {
-        setOpenedSessionId(dispatchResult);
-        setMode("auto_hunt");
-      }
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught));
+      const messageText =
+        caught instanceof Error ? caught.message : String(caught);
+      setError(messageText);
+      onRecordTaskSession?.({
+        request: message,
+        startedAt,
+        status: "failed",
+        conversationId,
+        workspaceRoot: null,
+        summary: null,
+        error: messageText,
+      });
     } finally {
       setIsRunning(false);
     }
   };
-
-  if (mode === "auto_hunt") {
-    return (
-      <AutoHuntSessions
-        agent={agent}
-        dashboard={dashboard}
-        error={appError}
-        isSidebarOpen={isSidebarOpen}
-        onAgentBack={() => setMode("task")}
-        onRequestedSessionOpen={onRequestedSessionOpen}
-        onStart={(runs) => onStartAutoHunt(runs)}
-        requestedSessionId={openedSessionId}
-        sessions={sessions}
-      />
-    );
-  }
 
   return (
     <MainContent id="project-agent-detail">
@@ -159,12 +177,12 @@ export function ProjectAgentDetail({
         <PageHero
           action={
             <Button
-              onClick={() => setMode("auto_hunt")}
+              className="h-12 min-w-[150px] rounded-xl"
+              onClick={openTaskDialog}
               type="button"
-              variant="outline"
             >
-              <Sparkles size={16} />
-              {t("agents.autoHunt")}
+              <Play fill="currentColor" size={17} />
+              {t("agents.runTask")}
             </Button>
           }
           className="project-agent-run-hero"
@@ -174,11 +192,6 @@ export function ProjectAgentDetail({
               <Bot size={13} />
               {t("agents.detailEyebrow")}
             </>
-          }
-          meta={
-            <StatusPill tone="primary">
-              {t("agents.singleSession")}
-            </StatusPill>
           }
           title={
             <span className="grid gap-3">
@@ -196,17 +209,32 @@ export function ProjectAgentDetail({
           }
         />
 
-        <section className="project-agent-run-panel">
-          <header>
-            <div>
-              <Typography as="h2" variant="bodyLg">
-                {t("agents.taskTitle")}
-              </Typography>
-              <Typography className="mt-1" tone="muted" variant="caption">
-                {t("agents.taskDescription")}
-              </Typography>
-            </div>
-          </header>
+        {appError ? (
+          <ErrorBanner className="m-4">{appError}</ErrorBanner>
+        ) : null}
+
+        <ProjectAgentSessions
+          agent={agent}
+          onRequestedSessionOpen={onRequestedSessionOpen}
+          projectId={dashboard?.project.id ?? agent.projectId}
+          requestedSessionId={requestedSessionId}
+          sessions={sessions}
+        />
+      </div>
+
+      <Dialog
+        onOpenChange={(open) => {
+          if (!isRunning) setIsTaskDialogOpen(open);
+        }}
+        open={isTaskDialogOpen}
+      >
+        <DialogContent className="project-agent-task-dialog">
+          <DialogHeader>
+            <DialogTitle>{t("agents.taskTitle")}</DialogTitle>
+            <DialogDescription>
+              {t("agents.taskDescription")}
+            </DialogDescription>
+          </DialogHeader>
 
           {messages.length > 0 ? (
             <div className="project-agent-run-messages">
@@ -216,27 +244,24 @@ export function ProjectAgentDetail({
                   key={message.id}
                 >
                   <small>
-                    {message.role === "user"
-                      ? t("agents.you")
-                      : agent.name}
+                    {message.role === "user" ? t("agents.you") : agent.name}
                   </small>
                   <p>{message.text}</p>
                   {message.dispatched ? (
-                    <StatusPill tone="primary">
+                    <Typography tone="muted" variant="caption">
                       {t("agents.autoHuntRequested")}
-                    </StatusPill>
+                    </Typography>
                   ) : null}
                 </article>
               ))}
             </div>
           ) : null}
 
-          {(error || appError) ? (
-            <ErrorBanner>{error ?? appError}</ErrorBanner>
-          ) : null}
+          {error ? <ErrorBanner>{error}</ErrorBanner> : null}
 
           <form
             className="project-agent-run-composer"
+            id="project-agent-task-form"
             onSubmit={(event) => {
               event.preventDefault();
               void submit();
@@ -249,23 +274,24 @@ export function ProjectAgentDetail({
               placeholder={t("agents.taskPlaceholder")}
               value={request}
             />
-            <div>
-              <Typography tone="muted" variant="caption">
-                {t("agents.autoHuntHint")}
-              </Typography>
-              <Button
-                disabled={isRunning || request.trim().length === 0 || !dashboard}
-                type="submit"
-              >
-                {isRunning
-                  ? <LoaderCircle className="spin" size={16} />
-                  : <Play size={16} />}
-                {isRunning ? t("agents.running") : t("agents.runTask")}
-              </Button>
-            </div>
           </form>
-        </section>
-      </div>
+
+          <DialogFooter>
+            <Button
+              disabled={isRunning || request.trim().length === 0 || !dashboard}
+              form="project-agent-task-form"
+              type="submit"
+            >
+              {isRunning ? (
+                <LoaderCircle className="spin" size={16} />
+              ) : (
+                <Play size={16} />
+              )}
+              {isRunning ? t("agents.running") : t("agents.runTask")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MainContent>
   );
 }

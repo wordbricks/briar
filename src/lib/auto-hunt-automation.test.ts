@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  automaticTriggersFor,
-  defaultAutoHuntAutomation,
-  normalizeAutoHuntAutomation,
-  selectAutoHuntCandidates,
-} from "./auto-hunt-automation";
+import { selectAutoHuntCandidates } from "./auto-hunt-automation";
 
 const queued = (
   runNumber: number,
@@ -19,66 +14,15 @@ const queued = (
   startedAt,
 });
 
-describe("Auto Hunt automation", () => {
-  it("normalizes defaults and enforces the configurable safety bounds", () => {
-    expect(normalizeAutoHuntAutomation(null)).toEqual(defaultAutoHuntAutomation);
-    expect(normalizeAutoHuntAutomation({
-      enabled: true,
-      maxIssuesPerSession: 99,
-      schedule: { enabled: true, intervalHours: 0 },
-      queueThreshold: { enabled: true, minimumIssues: 101 },
-      urgentIssue: { enabled: true },
-    })).toMatchObject({
-      enabled: true,
-      maxIssuesPerSession: 10,
-      schedule: { enabled: true, intervalHours: 1 },
-      queueThreshold: { enabled: true, minimumIssues: 100 },
-      urgentIssue: { enabled: true },
-    });
-  });
-
-  it("treats enabled conditions as OR rules", () => {
-    const automation = normalizeAutoHuntAutomation({
-      enabled: true,
-      maxIssuesPerSession: 3,
-      schedule: { enabled: true, intervalHours: 3 },
-      queueThreshold: { enabled: true, minimumIssues: 2 },
-      urgentIssue: { enabled: true },
-    });
-    expect(automaticTriggersFor(
-      automation,
-      [queued(1, 1), queued(2, 3)],
-      Date.parse("2026-07-24T12:00:00.000Z"),
-      "2026-07-24T08:00:00.000Z",
-    )).toEqual(["schedule", "queue_threshold", "urgent_issue"]);
-  });
-
-  it("honors the cooldown and prioritizes urgent queued issues", () => {
-    const automation = normalizeAutoHuntAutomation({
-      ...defaultAutoHuntAutomation,
-      enabled: true,
-      urgentIssue: { enabled: true },
-    });
-    expect(automaticTriggersFor(
-      automation,
-      [queued(1, 1)],
-      Date.parse("2026-07-24T12:03:00.000Z"),
-      "2026-07-24T12:00:00.000Z",
-    )).toEqual([]);
+describe("Auto Hunt queue selection", () => {
+  it("prioritizes urgent queued issues", () => {
     expect(selectAutoHuntCandidates(
       [queued(1, 3), queued(2, 1), queued(3, 2), queued(4, null)],
       2,
     ).map((run) => run.id)).toEqual(["run-2", "run-3"]);
   });
 
-  it("never treats backlog work as an Auto Hunt candidate or trigger", () => {
-    const automation = normalizeAutoHuntAutomation({
-      ...defaultAutoHuntAutomation,
-      enabled: true,
-      schedule: { enabled: true, intervalHours: 1 },
-      queueThreshold: { enabled: true, minimumIssues: 1 },
-      urgentIssue: { enabled: true },
-    });
+  it("never treats backlog work as a candidate", () => {
     const backlog = {
       ...queued(0, 1),
       id: "run-backlog",
@@ -86,13 +30,5 @@ describe("Auto Hunt automation", () => {
     };
 
     expect(selectAutoHuntCandidates([backlog], 3)).toEqual([]);
-    expect(
-      automaticTriggersFor(
-        automation,
-        [backlog],
-        Date.parse("2026-07-24T12:00:00.000Z"),
-        null,
-      ),
-    ).toEqual([]);
   });
 });

@@ -34,24 +34,18 @@ describe("default project agent copy", () => {
 });
 
 describe("project agent skills", () => {
-  it("creates an Auto Hunt skill that delegates to the versioned workflow guide", () => {
-    const skill = projectAgentSkill({
-      ...defaultProjectAgentCopy("en"),
-      kind: "auto_hunt",
-    });
+  it("creates the same repository workflow contract for every agent", () => {
+    const skill = projectAgentSkill(defaultProjectAgentCopy("en"));
 
     expect(skill).toContain("Perform Auto Hunt for every queued issue.");
-    expect(skill).toContain("briar skills get briar-workflow");
-    expect(skill).toContain("workflow snapshot");
-    expect(skill).toContain("allocated by the Briar host runtime");
-    expect(skill).not.toContain("Claim queued issues");
+    expect(skill).toContain("attached project workflow");
+    expect(skill).not.toContain("briar queue claim");
   });
 
-  it("creates a repository workflow skill for custom agents", () => {
+  it("creates a repository workflow skill", () => {
     const skill = projectAgentSkill({
       name: "Auditor",
       responsibility: "Audit the repository.",
-      kind: "custom",
     });
 
     expect(skill).toContain("# Auditor");

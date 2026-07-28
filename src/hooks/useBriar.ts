@@ -79,11 +79,6 @@ import {
   progressForAutoHuntRun,
   repositoryWorkflowBootstrap,
 } from "../lib/auto-hunt-contract";
-import {
-  defaultAutoHuntAutomation,
-  normalizeAutoHuntAutomation,
-  type AutoHuntAutomation,
-} from "../lib/auto-hunt-automation";
 import { isMobileCompanion } from "../lib/platform";
 import { chatWithProjectLlm, runProjectAgent } from "../lib/project-llm";
 import { executeScheduledProjectAgent } from "../lib/project-agent-schedule-execution";
@@ -178,7 +173,6 @@ const emptyDashboard = (project: Project): DashboardPayload => ({
     linear: { enabled: false, source: null, teamKey: null },
     githubRepository: null,
     workflow: structuredClone(repositoryWorkflowBootstrap),
-    automation: structuredClone(defaultAutoHuntAutomation),
   },
   runs: [],
   generatedAt: new Date().toISOString(),
@@ -973,7 +967,6 @@ export function useBriar() {
         },
         githubRepository: autoHunt.githubRepository ?? null,
         workflow: generatedWorkflow,
-        automation: structuredClone(defaultAutoHuntAutomation),
       };
       let savedSettings = initialSettings;
       if (token) {
@@ -1154,38 +1147,6 @@ export function useBriar() {
       setError(`저장소 기반 워크플로우 생성에 실패했습니다: ${message}`);
     });
   }, [connectedProjectIds, dashboard, regenerateWorkflow, token]);
-
-  const saveAutoHuntAutomation = useCallback(
-    async (projectId: string, automation: AutoHuntAutomation) => {
-      if (!dashboard || dashboard.project.id !== projectId) {
-        throw new Error("자동 실행을 저장할 프로젝트 설정이 없습니다.");
-      }
-      const normalized = normalizeAutoHuntAutomation(automation);
-      if (demoMode) {
-        setDashboard((current) =>
-          current?.project.id === projectId
-            ? {
-                ...current,
-                settings: { ...current.settings, automation: normalized },
-              }
-            : current,
-        );
-        return normalized;
-      }
-      if (!token) throw new Error("로그인이 필요합니다.");
-      const result = await updateProjectSettings(token, projectId, {
-        ...dashboard.settings,
-        automation: normalized,
-      });
-      setDashboard((current) =>
-        current?.project.id === projectId
-          ? { ...current, settings: result.settings }
-          : current,
-      );
-      return result.settings.automation;
-    },
-    [dashboard, token],
-  );
 
   const assertRepositoryReadyForLinearImport = useCallback(
     (projectId: string) => {
@@ -2029,7 +1990,6 @@ export function useBriar() {
     reconnectProject,
     renameOrganization,
     regenerateWorkflow,
-    saveAutoHuntAutomation,
     saveVelenIntegration,
     saveLinearIntegration,
     connectLinearForImport,

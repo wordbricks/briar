@@ -20,7 +20,6 @@ const agentA: ProjectAgent = {
   name: "Agent A",
   avatar: null,
   codexPet: null,
-  kind: "custom",
   provider: "codex",
   model: null,
   responsibility: "Review changes.",
