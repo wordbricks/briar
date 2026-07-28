@@ -13,7 +13,7 @@ beforeAll(() => {
   ).IS_REACT_ACT_ENVIRONMENT = true;
 });
 describe("ProjectAgentSettings", () => {
-  it("shows agent profile fields and the shared project runtime settings", async () => {
+  it("keeps agent settings focused on the agent profile", async () => {
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
@@ -62,48 +62,13 @@ describe("ProjectAgentSettings", () => {
     expect(
       container.querySelector(".project-agent-settings-fields .native-select"),
     ).toBeNull();
-    expect(container.textContent).toContain("프로젝트 실행 기본값");
-    expect(
-      container.querySelector("#project-agent-runtime-provider"),
-    ).not.toBeNull();
-    expect(container.querySelector("#project-agent-runtime-model")).not.toBeNull();
-    expect(container.querySelector("#project-agent-runtime-effort")).not.toBeNull();
-    expect(
-      container.querySelector("#project-agent-runtime-approval"),
-    ).not.toBeNull();
+    expect(container.textContent).not.toContain("프로젝트 실행 기본값");
+    expect(container.querySelector("#project-runtime-provider")).toBeNull();
     expect(
       container.querySelector<HTMLInputElement>(
         'input[aria-label="캘린더 색상"]',
       )?.value,
     ).toBe("#3275d5");
-
-    const providerTrigger = container.querySelector<HTMLButtonElement>(
-      "#project-agent-runtime-provider",
-    );
-    await act(async () => providerTrigger?.click());
-    expect(
-      Array.from(
-        document.querySelectorAll<HTMLButtonElement>(
-          "#project-agent-runtime-provider-listbox .select-menu-option",
-        ),
-      ).map((option) => option.dataset.value),
-    ).toEqual(["codex", "claude", "grok"]);
-
-    await act(async () => {
-      document
-        .querySelector<HTMLButtonElement>(
-          '#project-agent-runtime-provider-listbox .select-menu-option[data-value="claude"]',
-        )
-        ?.click();
-    });
-    const runtimeSave = Array.from(
-      container.querySelectorAll<HTMLButtonElement>(
-        ".project-agent-settings-save",
-      ),
-    ).at(-1);
-    expect(runtimeSave?.textContent).toContain("실행 기본값 저장");
-    await act(async () => runtimeSave?.click());
-    expect(runtimeSave?.textContent).toContain("저장됨");
 
     await act(async () => root.unmount());
     container.remove();

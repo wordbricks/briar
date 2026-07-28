@@ -190,6 +190,39 @@ describe("ProjectSettings", () => {
         ".project-settings-agent-configuration",
       )?.hidden,
     ).toBe(false);
+    expect(
+      container.querySelector(".project-settings-runtime")?.textContent,
+    ).toContain("프로젝트 실행 기본값");
+    expect(container.querySelector("#project-runtime-provider")).not.toBeNull();
+    expect(container.querySelector("#project-runtime-model")).not.toBeNull();
+    expect(container.querySelector("#project-runtime-effort")).not.toBeNull();
+    expect(container.querySelector("#project-runtime-approval")).not.toBeNull();
+
+    const providerTrigger = container.querySelector<HTMLButtonElement>(
+      "#project-runtime-provider",
+    );
+    await act(async () => providerTrigger?.click());
+    expect(
+      Array.from(
+        document.querySelectorAll<HTMLButtonElement>(
+          "#project-runtime-provider-listbox .select-menu-option",
+        ),
+      ).map((option) => option.dataset.value),
+    ).toEqual(["codex", "claude", "grok"]);
+    await act(async () => {
+      document
+        .querySelector<HTMLButtonElement>(
+          '#project-runtime-provider-listbox .select-menu-option[data-value="claude"]',
+        )
+        ?.click();
+    });
+    const runtimeSave = container.querySelector<HTMLButtonElement>(
+      ".project-settings-runtime > footer button",
+    );
+    expect(runtimeSave?.textContent).toContain("실행 기본값 저장");
+    await act(async () => runtimeSave?.click());
+    expect(runtimeSave?.textContent).toContain("저장됨");
+
     const sandboxControl = container.querySelector<HTMLElement>(
       ".project-settings-sandbox",
     );
