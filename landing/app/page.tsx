@@ -12,7 +12,7 @@ function Brand({ c }: { c: LandingCopy }) {
   return (
     <a className="brand" href="#top" aria-label={c.aria.brandHome}>
       <span className="brand-mark">
-        <img src="/briar-mark.svg" alt="" />
+        <img src="/briar-icon.png" alt="" />
       </span>
       <span>briar</span>
     </a>
@@ -46,7 +46,7 @@ function ProductStage({ c }: { c: LandingCopy }) {
         <div className="window-body">
           <aside className="stage-sidebar">
             <div className="sidebar-brand">
-              <img src="/briar-mark.svg" alt="" />
+              <img src="/briar-icon.png" alt="" />
               <strong>briar</strong>
             </div>
             <p>Workspace</p>
@@ -603,7 +603,7 @@ export default async function Home() {
 
       <section className="final-cta shell">
         <div className="cta-mark">
-          <img src="/briar-mark.svg" alt="" />
+          <img src="/briar-icon.png" alt="" />
         </div>
         <span className="section-index">{c.final.eyebrow}</span>
         <h2>
