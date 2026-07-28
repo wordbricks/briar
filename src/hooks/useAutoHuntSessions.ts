@@ -408,7 +408,10 @@ export function useAutoHuntSessions(
     },
   ) => {
     if (sessionsRef.current.some(
-      (session) => session.projectId === projectId && session.status === "running",
+      (session) =>
+        session.projectId === projectId &&
+        session.sessionType === "dispatch" &&
+        session.status === "running",
     )) {
       throw new Error("이 프로젝트에서 이미 자동사냥 세션이 진행 중입니다.");
     }
