@@ -9,6 +9,11 @@
       "type": "Text",
       "globs": ["**/*.svg"],
       "fallthrough": true
+    },
+    {
+      "type": "Data",
+      "globs": ["**/*.png"],
+      "fallthrough": true
     }
   ],
   "placement": {

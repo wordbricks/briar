@@ -1,4 +1,4 @@
-<img src="./src-tauri/app-icon.svg" alt="Briar logo" width="72" />
+<img src="./src/assets/app-icons/purple.png" alt="Briar logo" width="72" />
 
 # Briar
 
