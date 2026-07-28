@@ -32,6 +32,19 @@ export type ProjectAgentScheduleExecutionDependencies = {
       coordinatorConversationId: string;
     },
   ) => Promise<AutoHuntAgentResponse>;
+  startSession?: (
+    run: ClaimedProjectAgentScheduleRun,
+  ) => string | null;
+  settleSession?: (
+    sessionId: string,
+    input: {
+      status: "completed" | "failed";
+      conversationId: string | null;
+      workspaceRoot: string | null;
+      summary: string | null;
+      error: string | null;
+    },
+  ) => void;
 };
 
 /**
@@ -44,46 +57,71 @@ export async function executeScheduledProjectAgent(
   token: string,
   run: ClaimedProjectAgentScheduleRun,
 ): Promise<ProjectLlmChatResponse> {
-  const { response, dispatchResult } = await executeProjectAgentTurn(
-    {
-      runAgent: dependencies.runAgent,
-      dispatchAutoHunt: async (decision) => {
-        const dashboard = await dependencies.loadDashboard(
-          token,
-          run.projectId,
-        );
-        const candidates = selectAutoHuntCandidates(
-          dashboard.runs,
-          decision.maxIssues ?? defaultAutoHuntMaxIssues,
-        );
-        if (candidates.length === 0) {
-          throw new Error("대기 상태인 이슈가 없습니다.");
-        }
-        return dependencies.startAutoHunt(
-          run.projectId,
-          candidates,
-          crypto.randomUUID(),
-          run.agent,
-          { coordinatorConversationId: decision.conversationId },
-        );
+  const sessionId = dependencies.startSession?.(run) ?? null;
+  try {
+    const { response, dispatchResult } = await executeProjectAgentTurn(
+      {
+        runAgent: dependencies.runAgent,
+        dispatchAutoHunt: async (decision) => {
+          const dashboard = await dependencies.loadDashboard(
+            token,
+            run.projectId,
+          );
+          const candidates = selectAutoHuntCandidates(
+            dashboard.runs,
+            decision.maxIssues ?? defaultAutoHuntMaxIssues,
+          );
+          if (candidates.length === 0) {
+            throw new Error("대기 상태인 이슈가 없습니다.");
+          }
+          return dependencies.startAutoHunt(
+            run.projectId,
+            candidates,
+            crypto.randomUUID(),
+            run.agent,
+            { coordinatorConversationId: decision.conversationId },
+          );
+        },
       },
-    },
-    {
-      projectId: run.projectId,
-      agent: run.agent,
-      message: [
-        `Run the scheduled automation "${run.scheduleName}".`,
-        `It was scheduled for ${run.scheduledFor}.`,
-        "Fulfill your saved responsibility for this scheduled run:",
-        run.agent.responsibility,
-      ].join("\n"),
-      conversationId: null,
-    },
-  );
-  if (dispatchResult === null) return response;
-  return {
-    conversationId: dispatchResult.conversationId,
-    message: dispatchResult.result.summary,
-    workspaceRoot: dispatchResult.workspaceRoot,
-  };
+      {
+        projectId: run.projectId,
+        agent: run.agent,
+        message: [
+          `Run the scheduled automation "${run.scheduleName}".`,
+          `It was scheduled for ${run.scheduledFor}.`,
+          "Fulfill your saved responsibility for this scheduled run:",
+          run.agent.responsibility,
+        ].join("\n"),
+        conversationId: null,
+      },
+    );
+    const result = dispatchResult === null
+      ? response
+      : {
+          conversationId: dispatchResult.conversationId,
+          message: dispatchResult.result.summary,
+          workspaceRoot: dispatchResult.workspaceRoot,
+        };
+    if (sessionId) {
+      dependencies.settleSession?.(sessionId, {
+        status: "completed",
+        conversationId: result.conversationId,
+        workspaceRoot: result.workspaceRoot,
+        summary: result.message,
+        error: null,
+      });
+    }
+    return result;
+  } catch (caught) {
+    if (sessionId) {
+      dependencies.settleSession?.(sessionId, {
+        status: "failed",
+        conversationId: null,
+        workspaceRoot: null,
+        summary: null,
+        error: caught instanceof Error ? caught.message : String(caught),
+      });
+    }
+    throw caught;
+  }
 }

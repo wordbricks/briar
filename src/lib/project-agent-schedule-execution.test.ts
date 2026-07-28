@@ -108,6 +108,44 @@ describe("scheduled project agent execution", () => {
     expect(current.startAutoHunt).not.toHaveBeenCalled();
   });
 
+  it("records a scheduled Agent session from start through completion", async () => {
+    const current = dependencies();
+    current.startSession = vi.fn(() => "scheduled-session");
+    current.settleSession = vi.fn();
+
+    await executeScheduledProjectAgent(current, "token", scheduledRun());
+
+    expect(current.startSession).toHaveBeenCalledWith(scheduledRun());
+    expect(current.settleSession).toHaveBeenCalledWith("scheduled-session", {
+      status: "completed",
+      conversationId: "agent-conversation",
+      workspaceRoot: "/repo",
+      summary: "Responsibility complete.",
+      error: null,
+    });
+  });
+
+  it("records a failed scheduled Agent session before propagating the error", async () => {
+    const current = dependencies();
+    current.startSession = vi.fn(() => "scheduled-session");
+    current.settleSession = vi.fn();
+    vi.mocked(current.runAgent).mockRejectedValue(
+      new Error("provider unavailable"),
+    );
+
+    await expect(
+      executeScheduledProjectAgent(current, "token", scheduledRun()),
+    ).rejects.toThrow("provider unavailable");
+
+    expect(current.settleSession).toHaveBeenCalledWith("scheduled-session", {
+      status: "failed",
+      conversationId: null,
+      workspaceRoot: null,
+      summary: null,
+      error: "provider unavailable",
+    });
+  });
+
   it("honors a dispatch decision from any scheduled Agent", async () => {
     const current = dependencies();
     vi.mocked(current.runAgent).mockResolvedValue({

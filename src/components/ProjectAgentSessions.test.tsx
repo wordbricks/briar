@@ -57,6 +57,12 @@ describe("ProjectAgentSessions", () => {
             taskSession,
             {
               ...taskSession,
+              id: "scheduled-session",
+              trigger: "scheduled",
+              request: "Daily repository audit",
+            },
+            {
+              ...taskSession,
               id: "other-agent-session",
               agentId: "agent-2",
               request: "Do not show this task.",
@@ -69,6 +75,8 @@ describe("ProjectAgentSessions", () => {
     expect(container.textContent).toContain(
       "Review the current release status.",
     );
+    expect(container.textContent).toContain("스케줄 실행");
+    expect(container.textContent).toContain("Daily repository audit");
     expect(container.textContent).not.toContain("Do not show this task.");
 
     await act(async () => {

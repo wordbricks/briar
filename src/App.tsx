@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AgentUsageStatusBar } from "./components/AgentUsageStatusBar";
 import { AppVersionStatus } from "./components/AppVersionStatus";
 import {
@@ -26,7 +26,7 @@ import { ProjectRepositorySetupDialog } from "./components/ProjectRepositorySetu
 import { ProjectSettings } from "./components/ProjectSettings";
 import { Sidebar } from "./components/Sidebar";
 import { WindowNavigationControls } from "./components/WindowNavigationControls";
-import { useBriar } from "./hooks/useBriar";
+import { useBriar, type UseBriarOptions } from "./hooks/useBriar";
 import { useAutoHuntSessions } from "./hooks/useAutoHuntSessions";
 import { useInbox } from "./hooks/useInbox";
 import { useNavigationHistory } from "./hooks/useNavigationHistory";
@@ -63,8 +63,19 @@ type ActivePage =
   | "settings";
 
 export function App() {
-  const briar = useBriar();
   const autoHunt = useAutoHuntSessions();
+  const scheduleSessionOptions = useMemo<UseBriarOptions>(() => ({
+    startScheduledAgentSession: (run) =>
+      autoHunt.startTaskSession(run.projectId, run.agent.id, {
+        request: run.scheduleName,
+        startedAt: run.startedAt,
+        trigger: "scheduled",
+        scheduleId: run.scheduleId,
+        scheduleRunId: run.id,
+      }),
+    settleScheduledAgentSession: autoHunt.settleTaskSession,
+  }), [autoHunt.settleTaskSession, autoHunt.startTaskSession]);
+  const briar = useBriar(scheduleSessionOptions);
   const inbox = useInbox(
     briar.user?.id ?? null,
     briar.dashboard,
