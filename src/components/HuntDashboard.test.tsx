@@ -255,6 +255,10 @@ describe("HuntDashboard", () => {
       'button[aria-label="리스트 보기"]',
     );
     expect(listButton?.getAttribute("aria-pressed")).toBe("false");
+    expect(container.querySelector(".kanban-progress")).toBeNull();
+    expect(container.querySelector(".kanban-card")?.textContent).not.toContain(
+      `${demoDashboard.runs[0].progress}%`,
+    );
 
     await act(async () => listButton?.click());
 
@@ -267,6 +271,19 @@ describe("HuntDashboard", () => {
     expect(container.querySelector(".issue-list")?.textContent).toContain(
       demoDashboard.runs[0].title,
     );
+    expect(container.querySelector(".issue-list")?.textContent).not.toContain(
+      "진행률",
+    );
+    expect(container.querySelector(".issue-list-progress")).toBeNull();
+    expect(container.querySelector(".issue-list")?.textContent).not.toContain(
+      `${demoDashboard.runs[0].progress}%`,
+    );
+    expect(
+      container.querySelectorAll(".issue-list-header [role='columnheader']"),
+    ).toHaveLength(4);
+    expect(
+      container.querySelectorAll(".issue-list-row:first-child [role='cell']"),
+    ).toHaveLength(4);
 
     await act(async () => {
       container.querySelector<HTMLElement>(".issue-list-row")?.click();
