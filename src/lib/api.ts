@@ -20,6 +20,8 @@ import type {
   CreateProjectAgentScheduleInput,
   DashboardPayload,
   ExecutionWorker,
+  OrganizationExecutionWorker,
+  ProjectExecutionWorkerPolicy,
   HuntRunPlacement,
   IssueAttachment,
   IssueMessage,
@@ -373,6 +375,45 @@ export async function loadOrganizationMembers(
     token,
   );
   return result.members;
+}
+
+export async function loadOrganizationExecutionWorkers(
+  token: string,
+  organizationId: string,
+) {
+  return request<{
+    workers: OrganizationExecutionWorker[];
+    canManage: boolean;
+    generatedAt: string;
+  }>(`/organizations/${organizationId}/workers`, token);
+}
+
+export async function disableOrganizationExecutionWorker(
+  token: string,
+  organizationId: string,
+  deviceId: string,
+) {
+  return request<void>(
+    `/organizations/${organizationId}/workers/${encodeURIComponent(deviceId)}`,
+    token,
+    { method: "DELETE" },
+  );
+}
+
+export async function updateOrganizationExecutionWorkerConcurrency(
+  token: string,
+  organizationId: string,
+  deviceId: string,
+  maxConcurrentSessions: number,
+) {
+  return request<{ deviceId: string; maxConcurrentSessions: number }>(
+    `/organizations/${organizationId}/workers/${encodeURIComponent(deviceId)}`,
+    token,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ maxConcurrentSessions }),
+    },
+  );
 }
 
 export async function addOrganizationMember(
@@ -953,6 +994,31 @@ export async function updateExecutionWorkerConcurrency(
       method: "PATCH",
       body: JSON.stringify({ maxConcurrentSessions }),
     },
+  );
+}
+
+export async function loadProjectExecutionWorkerPolicy(
+  token: string,
+  projectId: string,
+) {
+  return request<{ policy: ProjectExecutionWorkerPolicy }>(
+    `/projects/${projectId}/execution-policy`,
+    token,
+  );
+}
+
+export async function updateProjectExecutionWorkerPolicy(
+  token: string,
+  projectId: string,
+  policy: Pick<
+    ProjectExecutionWorkerPolicy,
+    "selectionMode" | "defaultWorkerId" | "allowedWorkerIds"
+  >,
+) {
+  return request<{ policy: ProjectExecutionWorkerPolicy }>(
+    `/projects/${projectId}/execution-policy`,
+    token,
+    { method: "PUT", body: JSON.stringify(policy) },
   );
 }
 

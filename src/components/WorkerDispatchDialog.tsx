@@ -15,6 +15,7 @@ import type {
   ExecutionWorker,
   HuntRun,
   ProjectAgent,
+  ProjectExecutionWorkerPolicy,
 } from "../types";
 import { NativeSelect } from "./NativeSelect";
 
@@ -25,6 +26,7 @@ export function WorkerDispatchDialog({
   onOpenChange,
   onSubmit,
   open,
+  policy,
   run,
   workers,
 }: {
@@ -34,6 +36,7 @@ export function WorkerDispatchDialog({
   onOpenChange: (open: boolean) => void;
   onSubmit: (input: { agentId: string; workerId: string | null }) => void;
   open: boolean;
+  policy?: ProjectExecutionWorkerPolicy;
   run: HuntRun | null;
   workers: ExecutionWorker[];
 }) {
@@ -45,11 +48,13 @@ export function WorkerDispatchDialog({
     () =>
       workers.filter(
         (worker) =>
+          (policy?.selectionMode !== "allowlist" ||
+            policy.allowedWorkerIds.includes(worker.id)) &&
           worker.agentProvider === selectedAgent?.provider &&
           worker.acceptingWork &&
           worker.readiness !== "disabled",
       ),
-    [selectedAgent?.provider, workers],
+    [policy, selectedAgent?.provider, workers],
   );
 
   useEffect(() => {
@@ -57,8 +62,14 @@ export function WorkerDispatchDialog({
     const preferredAgent =
       agents.find((agent) => agent.id === run?.agentId) ?? agents[0] ?? null;
     setAgentId(preferredAgent?.id ?? "");
-    setWorkerId(run?.requestedWorkerId ?? "any");
-  }, [agents, open, run?.agentId, run?.requestedWorkerId]);
+    setWorkerId(run?.requestedWorkerId ?? policy?.defaultWorkerId ?? "any");
+  }, [
+    agents,
+    open,
+    policy?.defaultWorkerId,
+    run?.agentId,
+    run?.requestedWorkerId,
+  ]);
 
   useEffect(() => {
     if (workerId === "any") return;

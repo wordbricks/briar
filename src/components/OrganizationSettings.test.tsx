@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   addOrganizationMember,
+  loadOrganizationExecutionWorkers,
   loadOrganizationMembers,
   removeOrganizationMember,
 } from "../lib/api";
@@ -14,8 +15,11 @@ import { OrganizationSettings } from "./OrganizationSettings";
 
 vi.mock("../lib/api", () => ({
   addOrganizationMember: vi.fn(),
+  disableOrganizationExecutionWorker: vi.fn(),
+  loadOrganizationExecutionWorkers: vi.fn(),
   loadOrganizationMembers: vi.fn(),
   removeOrganizationMember: vi.fn(),
+  updateOrganizationExecutionWorkerConcurrency: vi.fn(),
 }));
 vi.mock("../lib/organization-logo", () => ({
   organizationLogoAccept: "image/jpeg,image/png,image/webp",
@@ -56,6 +60,11 @@ describe("OrganizationSettings", () => {
     vi.mocked(loadOrganizationMembers).mockResolvedValue(members);
     vi.mocked(addOrganizationMember).mockResolvedValue({ members });
     vi.mocked(removeOrganizationMember).mockResolvedValue(undefined);
+    vi.mocked(loadOrganizationExecutionWorkers).mockResolvedValue({
+      workers: [],
+      canManage: true,
+      generatedAt: "2026-07-29T00:00:00Z",
+    });
     vi.mocked(organizationLogoFromFile).mockResolvedValue(
       "data:image/webp;base64,bG9nbw==",
     );
@@ -175,6 +184,9 @@ describe("OrganizationSettings", () => {
     expect(
       container.querySelector('[aria-label="조직 설정 메뉴"]')?.textContent,
     ).toContain("멤버 및 초대");
+    expect(
+      container.querySelector('[aria-label="조직 설정 메뉴"]')?.textContent,
+    ).toContain("Workers");
 
     const nameInput = container.querySelector<HTMLInputElement>(
       "#organization-name",
@@ -190,6 +202,82 @@ describe("OrganizationSettings", () => {
 
     expect(onRename).toHaveBeenCalledWith("organization-1", "Briar Labs");
     expect(container.textContent).toContain("조직 이름을 저장했습니다.");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("shows organization-scoped Worker devices and project bindings", async () => {
+    vi.mocked(loadOrganizationExecutionWorkers).mockResolvedValue({
+      workers: [
+        {
+          deviceId: "device-1",
+          ownerUserId: "user-1",
+          ownerName: "Jay Nam",
+          label: "Jay MacBook",
+          state: "online",
+          maxConcurrentSessions: 2,
+          activeSessions: 1,
+          lastHeartbeatAt: "2026-07-29T00:00:00Z",
+          createdAt: "2026-07-29T00:00:00Z",
+          bindings: [
+            {
+              id: "worker-1",
+              projectId: "project-1",
+              projectName: "Briar",
+              agentProvider: "codex",
+              state: "online",
+              acceptingWork: true,
+              readiness: "available",
+              readinessDetail: null,
+            },
+          ],
+        },
+      ],
+      canManage: true,
+      generatedAt: "2026-07-29T00:00:00Z",
+    });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <OrganizationSettings
+          connectedProjectIds={["project-1"]}
+          initialSection="workers"
+          organization={{
+            id: "organization-1",
+            name: "Wordbricks",
+            handle: "wordbricks",
+            logo: null,
+            role: "owner",
+            createdAt: "2023-12-01T00:00:00Z",
+          }}
+          onBack={() => undefined}
+          onLogoChange={vi.fn()}
+          onRename={vi.fn()}
+          projects={[
+            {
+              id: "project-1",
+              name: "Briar",
+              organizationId: "organization-1",
+              createdAt: "2026-07-29T00:00:00Z",
+            },
+          ]}
+          token="token"
+          userId="user-1"
+        />,
+      );
+    });
+
+    expect(container.textContent).toContain("Jay MacBook");
+    expect(container.textContent).toContain("Briar · codex · 사용 가능");
+    expect(container.textContent).toContain("실행 슬롯 1/2 사용 중");
+    expect(loadOrganizationExecutionWorkers).toHaveBeenCalledWith(
+      "token",
+      "organization-1",
+    );
 
     await act(async () => root.unmount());
     container.remove();

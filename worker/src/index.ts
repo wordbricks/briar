@@ -148,8 +148,10 @@ import {
   appendAgentTranscript,
   auditExecutionEvent,
   authenticateExecutionWorker,
+  bindExecutionWorkerProject,
   countExecutionWorkerDeviceSessions,
   countLeasedRuns,
+  disableExecutionWorker,
   dispatchHuntRun,
   executionWorkerBindingById,
   executionWorkerBindingForProject,
@@ -157,6 +159,8 @@ import {
   leaseExpiryFrom,
   listExecutionAuditEvents,
   listExecutionWorkers,
+  listOrganizationExecutionWorkers,
+  getProjectExecutionWorkerPolicy,
   MAX_WORKER_CONCURRENT_SESSIONS,
   MAX_TRANSCRIPT_EVENTS_PER_REQUEST,
   reapStalledHuntRuns,
@@ -169,6 +173,7 @@ import {
   workerStateAt,
   unbindExecutionWorker,
   updateExecutionWorkerConcurrency,
+  updateProjectExecutionWorkerPolicy,
 } from "./workers";
 import { serveRelease } from "./releases";
 import {
@@ -741,6 +746,12 @@ const workerRegisterSchema = z
   })
   .strict();
 
+const workerBindSchema = workerRegisterSchema.pick({
+  deviceIdentity: true,
+  agentProvider: true,
+  versions: true,
+});
+
 const workerConcurrencySchema = z
   .object({
     maxConcurrentSessions: z
@@ -748,6 +759,17 @@ const workerConcurrencySchema = z
       .int()
       .min(1)
       .max(MAX_WORKER_CONCURRENT_SESSIONS),
+  })
+  .strict();
+
+const executionWorkerPolicySchema = z
+  .object({
+    selectionMode: z.enum(["any", "allowlist"]),
+    defaultWorkerId: z.string().trim().min(1).max(128).nullable(),
+    allowedWorkerIds: z
+      .array(z.string().trim().min(1).max(128))
+      .max(100)
+      .default([]),
   })
   .strict();
 
@@ -2093,6 +2115,100 @@ async function route(
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
+  const organizationWorkersMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/workers$/u,
+  );
+  if (organizationWorkersMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const organizationId = organizationWorkersMatch[1];
+    const role = await getOrganizationRole(db, organizationId, session.user.id);
+    if (!role) throw new HttpError(404, "Organization not found");
+    const observedAt = new Date().toISOString();
+    return json({
+      workers: await listOrganizationExecutionWorkers(
+        db,
+        organizationId,
+        observedAt,
+      ),
+      canManage: canManageOrganization(role),
+      generatedAt: observedAt,
+    });
+  }
+
+  const organizationWorkerMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/workers\/([0-9a-zA-Z-]+)$/u,
+  );
+  if (organizationWorkerMatch && request.method === "PATCH") {
+    const session = await requireSession(auth, request);
+    const organizationId = organizationWorkerMatch[1];
+    const role = await getOrganizationRole(db, organizationId, session.user.id);
+    if (!role) throw new HttpError(404, "Organization not found");
+    const device = await db
+      .prepare(
+        `select id, owner_user_id
+         from briar_execution_worker_devices
+         where id = ? and organization_id = ?`,
+      )
+      .bind(organizationWorkerMatch[2], organizationId)
+      .first<{ id: string; owner_user_id: string }>();
+    if (!device) throw new HttpError(404, "Worker not found");
+    if (
+      device.owner_user_id !== session.user.id &&
+      !canManageOrganization(role)
+    ) {
+      throw new HttpError(
+        403,
+        "Worker owner or organization admin access required",
+      );
+    }
+    const input = workerConcurrencySchema.parse(await readJson(request));
+    const updated = await updateExecutionWorkerConcurrency(
+      db,
+      device.id,
+      input.maxConcurrentSessions,
+      new Date().toISOString(),
+    );
+    if (!updated) throw new HttpError(409, "Worker is disabled");
+    return json({
+      deviceId: updated.id,
+      maxConcurrentSessions: updated.max_concurrent_sessions,
+    });
+  }
+  if (organizationWorkerMatch && request.method === "DELETE") {
+    const session = await requireSession(auth, request);
+    const organizationId = organizationWorkerMatch[1];
+    const role = await getOrganizationRole(db, organizationId, session.user.id);
+    if (!role) throw new HttpError(404, "Organization not found");
+    const device = await db
+      .prepare(
+        `select id, owner_user_id
+         from briar_execution_worker_devices
+         where id = ? and organization_id = ?`,
+      )
+      .bind(organizationWorkerMatch[2], organizationId)
+      .first<{ id: string; owner_user_id: string }>();
+    if (!device) throw new HttpError(404, "Worker not found");
+    if (
+      device.owner_user_id !== session.user.id &&
+      !canManageOrganization(role)
+    ) {
+      throw new HttpError(
+        403,
+        "Worker owner or organization admin access required",
+      );
+    }
+    if (
+      !(await disableExecutionWorker(
+        db,
+        device.id,
+        new Date().toISOString(),
+      ))
+    ) {
+      throw new HttpError(404, "Worker not found");
+    }
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
   const organizationSlackMatch = pathname.match(
     /^\/organizations\/([0-9a-f-]+)\/slack$/u,
   );
@@ -2326,6 +2442,41 @@ async function route(
       workflow: input.workflow,
     });
     return json({ settings: settingsJson(settings) });
+  }
+
+  const executionPolicyMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/execution-policy$/u,
+  );
+  if (executionPolicyMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      executionPolicyMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    return json({
+      policy: await getProjectExecutionWorkerPolicy(db, project.id),
+    });
+  }
+  if (executionPolicyMatch && request.method === "PUT") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      executionPolicyMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    if (!canManageOrganization(project.member_role)) {
+      throw new HttpError(403, "Organization admin access required");
+    }
+    const input = executionWorkerPolicySchema.parse(await readJson(request));
+    const policy = await updateProjectExecutionWorkerPolicy(db, project.id, {
+      ...input,
+      updatedByUserId: session.user.id,
+      observedAt: new Date().toISOString(),
+    });
+    return json({ policy });
   }
 
   const projectAgentsMatch = pathname.match(
@@ -2879,12 +3030,14 @@ async function route(
     const project = await getProject(db, dashboardMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
     const observedAt = new Date().toISOString();
-    const [{ runs, events }, settings, attachments, workers] = await Promise.all([
-      listDashboardRuns(db, project.id),
-      getProjectSettings(db, project.id),
-      listIssueAttachments(db, project.id),
-      listExecutionWorkers(db, project.id, observedAt),
-    ]);
+    const [{ runs, events }, settings, attachments, workers, executionPolicy] =
+      await Promise.all([
+        listDashboardRuns(db, project.id),
+        getProjectSettings(db, project.id),
+        listIssueAttachments(db, project.id),
+        listExecutionWorkers(db, project.id, observedAt),
+        getProjectExecutionWorkerPolicy(db, project.id),
+      ]);
     const eventsByRun = new Map<string, HuntEventRow[]>();
     for (const event of events) {
       const runEvents = eventsByRun.get(event.run_id) ?? [];
@@ -2908,6 +3061,7 @@ async function route(
         ),
       ),
       workers: workers.map((worker) => workerJson(worker, observedAt)),
+      executionPolicy,
       generatedAt: observedAt,
     });
   }
@@ -3449,6 +3603,35 @@ async function route(
     );
     response.headers.set("Cache-Control", "no-store");
     return response;
+  }
+
+  const workerBindingMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/workers\/bind$/u,
+  );
+  if (workerBindingMatch && request.method === "POST") {
+    const projectId = workerBindingMatch[1];
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, projectId, session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    const input = workerBindSchema.parse(await readJson(request));
+    const observedAt = new Date().toISOString();
+    const binding = await bindExecutionWorkerProject(db, projectId, {
+      id: crypto.randomUUID(),
+      organizationId: project.organization_id,
+      ownerUserId: session.user.id,
+      deviceIdentityHash: await sha256(input.deviceIdentity),
+      agentProvider: input.agentProvider,
+      versions: input.versions,
+      observedAt,
+    });
+    return json(
+      {
+        organizationId: project.organization_id,
+        deviceId: binding.device.id,
+        worker: workerJson(binding.worker, observedAt),
+      },
+      201,
+    );
   }
 
   const workerDisableMatch = pathname.match(

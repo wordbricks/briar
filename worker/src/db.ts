@@ -2063,6 +2063,20 @@ export async function claimNextQueuedHuntRun(
            and (? = 0 or dispatched_at is not null)
            and (? is null or requested_worker_id is null or requested_worker_id = ?)
            and (
+             ? is null
+             or not exists (
+               select 1 from briar_project_execution_worker_policies policy
+               where policy.project_id = briar_hunt_runs.project_id
+                 and policy.selection_mode = 'allowlist'
+             )
+             or exists (
+               select 1
+               from briar_project_execution_worker_allowlist allowed
+               where allowed.project_id = briar_hunt_runs.project_id
+                 and allowed.worker_id = ?
+             )
+           )
+           and (
              ? is null or agent_id is null or exists (
                select 1 from briar_project_agents agent
                where agent.id = briar_hunt_runs.agent_id
@@ -2110,6 +2124,8 @@ export async function claimNextQueuedHuntRun(
       input.runId ?? null,
       input.runId ?? null,
       input.detachedOnly ? 1 : 0,
+      input.workerId ?? null,
+      input.workerId ?? null,
       input.workerId ?? null,
       input.workerId ?? null,
       input.agentProvider ?? null,

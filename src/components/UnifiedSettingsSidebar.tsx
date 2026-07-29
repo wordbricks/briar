@@ -2,6 +2,7 @@ import {
   Bell,
   Bot,
   Building2,
+  Cpu,
   ChevronDown,
   Download,
   GitBranch,
@@ -138,6 +139,11 @@ export function UnifiedSettingsSidebar({
         label: t("organization.membersAndInvites"),
       },
       {
+        id: "workers",
+        icon: <Cpu size={16} strokeWidth={1.75} />,
+        label: t("organization.workers"),
+      },
+      {
         id: "integrations",
         icon: <MessageSquare size={16} strokeWidth={1.75} />,
         label: t("organization.integrations"),
@@ -166,6 +172,11 @@ export function UnifiedSettingsSidebar({
         id: "agent-configuration",
         icon: <ShieldCheck size={16} strokeWidth={1.75} />,
         label: t("settings.navAgent"),
+      },
+      {
+        id: "execution",
+        icon: <Cpu size={16} strokeWidth={1.75} />,
+        label: t("settings.navExecution"),
       },
       {
         id: "workflow",

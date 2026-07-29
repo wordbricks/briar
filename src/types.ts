@@ -185,6 +185,36 @@ export type ExecutionWorker = {
   createdAt: string;
 };
 
+export type ProjectExecutionWorkerPolicy = {
+  selectionMode: "any" | "allowlist";
+  defaultWorkerId: string | null;
+  allowedWorkerIds: string[];
+  updatedAt: string | null;
+};
+
+export type OrganizationExecutionWorker = {
+  deviceId: string;
+  ownerUserId: string;
+  ownerName: string;
+  label: string;
+  state: "online" | "stale" | "disabled";
+  maxConcurrentSessions: number;
+  activeSessions: number;
+  lastHeartbeatAt: string;
+  createdAt: string;
+  bindings: Array<{
+    id: string;
+    projectId: string;
+    projectName: string;
+    agentProvider: AgentProvider;
+    state: "online" | "stale" | "disabled";
+    acceptingWork: boolean;
+    readiness:
+      "available" | "busy" | "offline" | "needs_attention" | "disabled";
+    readinessDetail: string | null;
+  }>;
+};
+
 export type HuntRunPlacement = {
   status: HuntStatus;
   workflowStage: AutoHuntWorkflowStageId | null;
@@ -321,6 +351,7 @@ export type DashboardPayload = {
   settings: ProjectSettings;
   runs: HuntRun[];
   workers?: ExecutionWorker[];
+  executionPolicy?: ProjectExecutionWorkerPolicy;
   generatedAt: string;
 };
 
