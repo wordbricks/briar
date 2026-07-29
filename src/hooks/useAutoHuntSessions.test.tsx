@@ -150,31 +150,52 @@ describe("useAutoHuntSessions", () => {
     await act(async () => root.unmount());
   });
 
-  it("still rejects a second running Auto Hunt dispatch", async () => {
+  it("runs multiple Auto Hunt dispatches with disjoint issue claims", async () => {
     runner = () =>
       new Promise<Awaited<ReturnType<AutoHuntRunner>>>(() => undefined);
     const container = document.createElement("div");
     const root = createRoot(container);
     await act(async () => root.render(<Harness />));
-    const runs = [{
-      id: "run-1",
-      runNumber: 1,
-      sourceKey: "issue-1",
-      title: "Queued issue",
-      status: "queued",
-      priority: null,
-      sourceCreatedAt: null,
-      startedAt: "2026-07-28T00:00:00.000Z",
-    } as HuntRun];
+    const runs = [
+      {
+        id: "run-1",
+        runNumber: 1,
+        sourceKey: "issue-1",
+        title: "Queued issue 1",
+        status: "queued",
+        priority: null,
+        sourceCreatedAt: null,
+        startedAt: "2026-07-28T00:00:00.000Z",
+      },
+      {
+        id: "run-2",
+        runNumber: 2,
+        sourceKey: "issue-2",
+        title: "Queued issue 2",
+        status: "queued",
+        priority: null,
+        sourceCreatedAt: null,
+        startedAt: "2026-07-28T00:01:00.000Z",
+      },
+    ] as HuntRun[];
     const options = { agent: { id: "agent-1" } as ProjectAgent };
+
+    act(() => {
+      sessionsHook.startSession("project-1", [runs[0]], undefined, options);
+    });
 
     act(() => {
       sessionsHook.startSession("project-1", runs, undefined, options);
     });
 
-    expect(() => {
-      sessionsHook.startSession("project-1", runs, undefined, options);
-    }).toThrow("이 프로젝트에서 이미 자동사냥 세션이 진행 중입니다.");
+    const dispatches = sessionsHook.sessions.filter(
+      (session) => session.sessionType === "dispatch",
+    );
+    expect(dispatches).toHaveLength(2);
+    expect(dispatches.map((session) => session.issues[0].runId).sort()).toEqual([
+      "run-1",
+      "run-2",
+    ]);
 
     await act(async () => root.unmount());
   });

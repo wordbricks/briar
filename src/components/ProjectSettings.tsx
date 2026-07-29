@@ -49,6 +49,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Typography } from "@/components/ui/typography";
 import type { DashboardPayload, Project, ProjectSettings as ProjectSettingsData } from "../types";
 import { useI18n } from "../i18n";
+import { updateExecutionWorkerConcurrency } from "../lib/api";
 import {
   agentEfforts,
   agentModels,
@@ -180,9 +181,17 @@ export function ProjectSettings({
   const ownedWorker = dashboard?.workers?.find(
     (worker) => worker.ownerUserId === userId,
   );
+  const [workerMaxSessions, setWorkerMaxSessions] = useState(1);
+  const [workerSavedMaxSessions, setWorkerSavedMaxSessions] = useState(1);
+  const [workerConcurrencySaving, setWorkerConcurrencySaving] = useState(false);
   const workerSharingEnabled =
     workerSharingOverride ??
     Boolean(ownedWorker && ownedWorker.readiness !== "disabled");
+  useEffect(() => {
+    const maximum = ownedWorker?.maxConcurrentSessions ?? 1;
+    setWorkerMaxSessions(maximum);
+    setWorkerSavedMaxSessions(maximum);
+  }, [ownedWorker?.maxConcurrentSessions]);
   const [linear, setLinear] = useState<ProjectSettingsData["linear"]>(
     () => dashboard?.settings.linear ?? {
       enabled: false,
@@ -500,6 +509,27 @@ export function ProjectSettings({
       );
     } finally {
       setWorkerSharingSaving(false);
+    }
+  };
+  const saveWorkerConcurrency = async () => {
+    if (!sessionToken || !ownedWorker) return;
+    setWorkerConcurrencySaving(true);
+    setWorkerSharingError(null);
+    try {
+      const updated = await updateExecutionWorkerConcurrency(
+        sessionToken,
+        project.id,
+        ownedWorker.id,
+        workerMaxSessions,
+      );
+      setWorkerMaxSessions(updated.maxConcurrentSessions);
+      setWorkerSavedMaxSessions(updated.maxConcurrentSessions);
+    } catch (caught) {
+      setWorkerSharingError(
+        caught instanceof Error ? caught.message : String(caught),
+      );
+    } finally {
+      setWorkerConcurrencySaving(false);
     }
   };
   const navigationItems = [
@@ -1050,6 +1080,46 @@ export function ProjectSettings({
               <p className="project-settings-sandbox-error" role="alert">
                 {workerSharingError}
               </p>
+            ) : null}
+            {workerSharingEnabled && ownedWorker ? (
+              <div className="project-settings-worker-concurrency">
+                <span>
+                  <strong>{t("worker.maxConcurrentSessions")}</strong>
+                  <small>
+                    {t("worker.concurrentSessionsUsage", {
+                      active: ownedWorker.activeSessions,
+                      maximum: workerMaxSessions,
+                    })}
+                  </small>
+                </span>
+                <Input
+                  aria-label={t("worker.maxConcurrentSessions")}
+                  max={16}
+                  min={1}
+                  onChange={(event) =>
+                    setWorkerMaxSessions(
+                      Math.min(
+                        16,
+                        Math.max(1, Number.parseInt(event.target.value, 10) || 1),
+                      ),
+                    )}
+                  type="number"
+                  value={workerMaxSessions}
+                />
+                <Button
+                  disabled={
+                    workerConcurrencySaving ||
+                    workerMaxSessions === workerSavedMaxSessions
+                  }
+                  onClick={() => void saveWorkerConcurrency()}
+                  type="button"
+                  variant="outline"
+                >
+                  {workerConcurrencySaving
+                    ? t("common.saving")
+                    : t("worker.saveConcurrency")}
+                </Button>
+              </div>
             ) : null}
 
             <div

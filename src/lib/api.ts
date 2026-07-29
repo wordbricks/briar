@@ -16,6 +16,7 @@ import type {
   CreateProjectAgentInput,
   CreateProjectAgentScheduleInput,
   DashboardPayload,
+  ExecutionWorker,
   HuntRunPlacement,
   IssueAttachment,
   IssueMessage,
@@ -929,6 +930,22 @@ export async function dispatchHuntRun(
         workerId: input.workerId,
         requestId: crypto.randomUUID(),
       }),
+    },
+  );
+}
+
+export async function updateExecutionWorkerConcurrency(
+  token: string,
+  projectId: string,
+  workerId: string,
+  maxConcurrentSessions: number,
+) {
+  return request<ExecutionWorker>(
+    `/projects/${projectId}/workers/${workerId}`,
+    token,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ maxConcurrentSessions }),
     },
   );
 }

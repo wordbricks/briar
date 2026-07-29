@@ -28,6 +28,8 @@ export type ExecutionWorkerRow = {
   last_heartbeat_at: string;
   created_at: string;
   updated_at: string;
+  max_concurrent_sessions?: number;
+  active_sessions?: number;
 };
 
 export type ExecutionWorkerDeviceRow = {
@@ -37,6 +39,7 @@ export type ExecutionWorkerDeviceRow = {
   label: string;
   device_identity_hash: string;
   state: ExecutionWorkerState;
+  max_concurrent_sessions: number;
   last_heartbeat_at: string;
   created_at: string;
   updated_at: string;
@@ -74,6 +77,8 @@ export const LEASE_DURATION_MS = 15 * 60_000;
 export const STALLED_RUN_GRACE_MS = 5 * 60_000;
 /** Reaping past this many attempts blocks the run instead of looping forever. */
 export const MAX_CLAIM_ATTEMPTS = 5;
+export const MIN_WORKER_CONCURRENT_SESSIONS = 1;
+export const MAX_WORKER_CONCURRENT_SESSIONS = 16;
 
 export const MAX_TRANSCRIPT_PAYLOAD_BYTES = 32 * 1024;
 export const MAX_TRANSCRIPT_EVENTS_PER_REQUEST = 200;
@@ -131,6 +136,7 @@ export async function registerExecutionWorker(
     label: string;
     agentProvider: AgentProvider;
     versions: Record<string, string>;
+    maxConcurrentSessions?: number;
     observedAt: string;
     id: string;
   },
@@ -145,6 +151,16 @@ export async function registerExecutionWorker(
   if (!/^[0-9a-f]{64}$/u.test(input.credentialTokenHash)) {
     throw new WorkerConflictError("Worker credential must be a SHA-256 hex digest");
   }
+  if (
+    input.maxConcurrentSessions !== undefined &&
+    (!Number.isInteger(input.maxConcurrentSessions) ||
+      input.maxConcurrentSessions < MIN_WORKER_CONCURRENT_SESSIONS ||
+      input.maxConcurrentSessions > MAX_WORKER_CONCURRENT_SESSIONS)
+  ) {
+    throw new WorkerConflictError(
+      `Worker concurrency must be ${MIN_WORKER_CONCURRENT_SESSIONS}-${MAX_WORKER_CONCURRENT_SESSIONS}`,
+    );
+  }
   const project = await db
     .prepare(`select organization_id from briar_projects where id = ?`)
     .bind(projectId)
@@ -158,11 +174,14 @@ export async function registerExecutionWorker(
     .prepare(
       `insert into briar_execution_worker_devices (
          id, organization_id, owner_user_id, label, device_identity_hash,
-         state, last_heartbeat_at, created_at, updated_at
-       ) values (?, ?, ?, ?, ?, 'online', ?, ?, ?)
+         state, max_concurrent_sessions, last_heartbeat_at, created_at, updated_at
+       ) values (?, ?, ?, ?, ?, 'online', ?, ?, ?, ?)
        on conflict (organization_id, device_identity_hash) do update set
          label = excluded.label,
          state = 'online',
+         max_concurrent_sessions = coalesce(
+           ?, briar_execution_worker_devices.max_concurrent_sessions
+         ),
          last_heartbeat_at = excluded.last_heartbeat_at,
          updated_at = excluded.updated_at
        where briar_execution_worker_devices.owner_user_id = excluded.owner_user_id`,
@@ -173,9 +192,11 @@ export async function registerExecutionWorker(
       input.ownerUserId,
       label,
       input.deviceIdentityHash,
+      input.maxConcurrentSessions ?? 1,
       input.observedAt,
       input.observedAt,
       input.observedAt,
+      input.maxConcurrentSessions ?? null,
     )
     .run();
 
@@ -312,8 +333,26 @@ export async function recordWorkerHeartbeat(
       ),
   ]);
   const updated = await db
-    .prepare(`select * from briar_execution_workers where id = ?`)
-    .bind(input.workerId)
+    .prepare(
+      `select worker.*, device.max_concurrent_sessions,
+              (
+                select count(*)
+                from briar_hunt_runs active
+                join briar_execution_workers holder
+                  on holder.id = active.worker_id
+                where holder.device_id = device.id
+                  and active.claim_token_hash is not null
+                  and active.lease_expires_at is not null
+                  and active.lease_expires_at > ?
+                  and active.status not in (
+                    'backlog', 'completed', 'cancelled', 'blocked', 'failed'
+                  )
+              ) as active_sessions
+       from briar_execution_workers worker
+       join briar_execution_worker_devices device on device.id = worker.device_id
+       where worker.id = ?`,
+    )
+    .bind(input.observedAt, input.workerId)
     .first<ExecutionWorkerRow>();
   if (!updated) {
     throw new WorkerConflictError("Worker heartbeat update was not persisted");
@@ -328,7 +367,7 @@ export async function executionWorkerBindingForProject(
 ) {
   return await db
     .prepare(
-      `select worker.*
+      `select worker.*, device.max_concurrent_sessions
        from briar_execution_workers worker
        join briar_projects project on project.id = worker.project_id
        join briar_execution_worker_devices device on device.id = worker.device_id
@@ -346,8 +385,10 @@ export async function executionWorkerBindingById(
 ) {
   return await db
     .prepare(
-      `select * from briar_execution_workers
-       where id = ? and device_id = ?`,
+      `select worker.*, device.max_concurrent_sessions
+       from briar_execution_workers worker
+       join briar_execution_worker_devices device on device.id = worker.device_id
+       where worker.id = ? and worker.device_id = ?`,
     )
     .bind(workerId, deviceId)
     .first<ExecutionWorkerRow>();
@@ -483,13 +524,27 @@ export async function listExecutionWorkers(
 ) {
   const result = await db
     .prepare(
-      `select worker.*, device.owner_user_id, device.organization_id
+      `select worker.*, device.owner_user_id, device.organization_id,
+              device.max_concurrent_sessions,
+              (
+                select count(*)
+                from briar_hunt_runs active
+                join briar_execution_workers holder
+                  on holder.id = active.worker_id
+                where holder.device_id = device.id
+                  and active.claim_token_hash is not null
+                  and active.lease_expires_at is not null
+                  and active.lease_expires_at > ?
+                  and active.status not in (
+                    'backlog', 'completed', 'cancelled', 'blocked', 'failed'
+                  )
+              ) as active_sessions
        from briar_execution_workers worker
        join briar_execution_worker_devices device on device.id = worker.device_id
        where worker.project_id = ?
        order by worker.last_heartbeat_at desc, worker.id asc`,
     )
-    .bind(projectId)
+    .bind(observedAt, projectId)
     .all<
       ExecutionWorkerRow & {
         owner_user_id: string;
@@ -500,6 +555,32 @@ export async function listExecutionWorkers(
     ...row,
     state: workerStateAt(row.last_heartbeat_at, observedAt, row.state),
   }));
+}
+
+export async function updateExecutionWorkerConcurrency(
+  db: D1Database,
+  deviceId: string,
+  maxConcurrentSessions: number,
+  observedAt: string,
+) {
+  if (
+    !Number.isInteger(maxConcurrentSessions) ||
+    maxConcurrentSessions < MIN_WORKER_CONCURRENT_SESSIONS ||
+    maxConcurrentSessions > MAX_WORKER_CONCURRENT_SESSIONS
+  ) {
+    throw new WorkerConflictError(
+      `Worker concurrency must be ${MIN_WORKER_CONCURRENT_SESSIONS}-${MAX_WORKER_CONCURRENT_SESSIONS}`,
+    );
+  }
+  return await db
+    .prepare(
+      `update briar_execution_worker_devices
+       set max_concurrent_sessions = ?, updated_at = ?
+       where id = ? and state != 'disabled'
+       returning *`,
+    )
+    .bind(maxConcurrentSessions, observedAt, deviceId)
+    .first<ExecutionWorkerDeviceRow>();
 }
 
 export async function auditExecutionEvent(
@@ -785,29 +866,28 @@ export async function listExecutionAuditEvents(
   return result.results ?? [];
 }
 
-/**
- * A worker may hold one run at a time. Enforced server-side so a worker that
- * restarts mid-run cannot double-book itself against a second issue.
- */
-export async function assertWorkerHasNoRunInFlight(
+/** Return the number of live run leases held across every project binding. */
+export async function countExecutionWorkerDeviceSessions(
   db: D1Database,
-  projectId: string,
-  workerId: string,
+  deviceId: string,
+  observedAt: string,
 ) {
   const row = await db
     .prepare(
-      `select id from briar_hunt_runs
-       where project_id = ? and worker_id = ?
-         and status not in ('backlog', 'completed', 'cancelled', 'blocked', 'failed')
-       limit 1`,
+      `select count(*) as active_sessions
+       from briar_hunt_runs run
+       join briar_execution_workers worker on worker.id = run.worker_id
+       where worker.device_id = ?
+         and run.claim_token_hash is not null
+         and run.lease_expires_at is not null
+         and run.lease_expires_at > ?
+         and run.status not in (
+           'backlog', 'completed', 'cancelled', 'blocked', 'failed'
+         )`,
     )
-    .bind(projectId, workerId)
-    .first<{ id: string }>();
-  if (row) {
-    throw new WorkerConflictError(
-      `Worker already holds run ${row.id}; finish or release it before claiming another`,
-    );
-  }
+    .bind(deviceId, observedAt)
+    .first<{ active_sessions: number }>();
+  return row?.active_sessions ?? 0;
 }
 
 export async function attributeRunToWorker(

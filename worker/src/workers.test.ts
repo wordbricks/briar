@@ -6,8 +6,8 @@ import { claimNextQueuedHuntRun, recordHuntEvent, type HuntEventInput } from "./
 import {
   appendAgentTranscript,
   authenticateExecutionWorker,
-  assertWorkerHasNoRunInFlight,
   attributeRunToWorker,
+  countExecutionWorkerDeviceSessions,
   countLeasedRuns,
   disableExecutionWorker,
   dispatchHuntRun,
@@ -24,6 +24,7 @@ import {
   renewHuntRunLease,
   TranscriptLimitError,
   unbindExecutionWorker,
+  updateExecutionWorkerConcurrency,
   WorkerConflictError,
   workerStateAt,
 } from "./workers";
@@ -117,6 +118,7 @@ describe("detached execution workers", () => {
       "migrations/0033_organization_logo_browser_formats.sql",
       "migrations/0034_execution_worker_credentials.sql",
       "migrations/0035_detached_worker_dispatch.sql",
+      "migrations/0036_execution_worker_concurrency.sql",
     ]) {
       await executeSql(db, await readFile(resolve(migration), "utf8"));
     }
@@ -151,6 +153,13 @@ describe("detached execution workers", () => {
         project_id, velen_org, linear_enabled, workflow_json, created_at, updated_at
       ) values (
         '${projectId}', 'example', 0,
+        '{"version":1,"stages":[{"id":"analyzing","label":"분석","required":true},{"id":"implementing","label":"구현","required":true}],"completion":{"requiredStages":["analyzing","implementing"]},"release":{"enabled":false}}',
+        '${atMinute(0)}', '${atMinute(0)}'
+      );
+      insert into briar_project_settings (
+        project_id, velen_org, linear_enabled, workflow_json, created_at, updated_at
+      ) values (
+        '${secondProjectId}', 'example', 0,
         '{"version":1,"stages":[{"id":"analyzing","label":"분석","required":true},{"id":"implementing","label":"구현","required":true}],"completion":{"requiredStages":["analyzing","implementing"]},"release":{"enabled":false}}',
         '${atMinute(0)}', '${atMinute(0)}'
       );
@@ -267,6 +276,66 @@ describe("detached execution workers", () => {
         secondProjectId,
       ),
     ).not.toBeNull();
+  });
+
+  it("shares device session slots across every project binding", async () => {
+    const first = await register("capacity-shared");
+    const second = await registerExecutionWorker(db, secondProjectId, {
+      id: "worker-capacity-shared-second",
+      deviceId: "ignored",
+      organizationId: projectId,
+      ownerUserId: "owner",
+      label: "capacity shared",
+      deviceIdentityHash: fingerprint("capacity-shared"),
+      credentialTokenHash: fingerprint("capacity-shared-token"),
+      agentProvider: "codex",
+      versions: {},
+      maxConcurrentSessions: 2,
+      observedAt: atMinute(2),
+    });
+    await recordHuntEvent(db, projectId, queuedEvent("first-project-1", 3));
+    await recordHuntEvent(db, projectId, queuedEvent("first-project-2", 4));
+    await recordHuntEvent(
+      db,
+      secondProjectId,
+      queuedEvent("second-project-1", 5),
+    );
+
+    const claim = (
+      targetProjectId: string,
+      workerId: string,
+      token: string,
+    ) =>
+      claimNextQueuedHuntRun(db, targetProjectId, {
+        claimTokenHash: token.repeat(64),
+        claimedBy: "capacity shared",
+        claimedAt: atMinute(6),
+        leaseExpiresAt: leaseExpiryFrom(atMinute(6)),
+        workerId,
+        workerDeviceId: first.device.id,
+      });
+    const claims = await Promise.all([
+      claim(projectId, first.worker.id, "a"),
+      claim(projectId, first.worker.id, "b"),
+      claim(secondProjectId, second.worker.id, "c"),
+    ]);
+
+    expect(claims.filter(Boolean)).toHaveLength(2);
+    expect(
+      await countExecutionWorkerDeviceSessions(
+        db,
+        first.device.id,
+        atMinute(7),
+      ),
+    ).toBe(2);
+    await expect(
+      listExecutionWorkers(db, projectId, atMinute(7)),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        max_concurrent_sessions: 2,
+        active_sessions: 2,
+      }),
+    ]);
   });
 
   it("unshares one project without revoking the device's other bindings", async () => {
@@ -635,26 +704,38 @@ describe("detached execution workers", () => {
     expect(new Set(runIds).size).toBe(3);
   });
 
-  it("refuses a second claim from a worker that already holds a run", async () => {
-    await register("e");
-    for (const key of ["issue-1", "issue-2"]) {
+  it("enforces a shared device session limit inside the atomic claim", async () => {
+    const registration = await register("e");
+    await updateExecutionWorkerConcurrency(
+      db,
+      registration.device.id,
+      2,
+      atMinute(1),
+    );
+    for (const key of ["issue-1", "issue-2", "issue-3"]) {
       await recordHuntEvent(db, projectId, queuedEvent(key, 1));
     }
-    const claimed = await claimNextQueuedHuntRun(db, projectId, {
-      claimTokenHash: "a".repeat(64),
-      claimedBy: "worker-e",
-      claimedAt: atMinute(2),
-      leaseExpiresAt: leaseExpiryFrom(atMinute(2)),
-    });
-    await attributeRunToWorker(db, projectId, {
-      runId: claimed!.id,
-      workerId: "worker-e",
-      observedAt: atMinute(2),
-    });
-
+    const claim = (token: string) =>
+      claimNextQueuedHuntRun(db, projectId, {
+        claimTokenHash: token.repeat(64),
+        claimedBy: "worker-e",
+        claimedAt: atMinute(2),
+        leaseExpiresAt: leaseExpiryFrom(atMinute(2)),
+        workerId: registration.worker.id,
+        workerDeviceId: registration.device.id,
+      });
+    const first = await claim("a");
+    const second = await claim("b");
+    expect(first).not.toBeNull();
+    expect(second).not.toBeNull();
+    await expect(claim("c")).resolves.toBeNull();
     await expect(
-      assertWorkerHasNoRunInFlight(db, projectId, "worker-e"),
-    ).rejects.toBeInstanceOf(WorkerConflictError);
+      countExecutionWorkerDeviceSessions(
+        db,
+        registration.device.id,
+        atMinute(3),
+      ),
+    ).resolves.toBe(2);
 
     await recordHuntEvent(db, projectId, {
       ...queuedEvent("issue-1", 3),
@@ -662,9 +743,7 @@ describe("detached execution workers", () => {
       eventKey: "issue-1:cancelled",
       claimToken: null,
     } as HuntEventInput);
-    await expect(
-      assertWorkerHasNoRunInFlight(db, projectId, "worker-e"),
-    ).resolves.toBeUndefined();
+    await expect(claim("c")).resolves.not.toBeNull();
   });
 
   it("does not treat backlog work as held or leased Auto Hunt work", async () => {
@@ -691,9 +770,6 @@ describe("detached execution workers", () => {
       .bind(claimed!.id)
       .run();
 
-    await expect(
-      assertWorkerHasNoRunInFlight(db, projectId, "worker-backlog"),
-    ).resolves.toBeUndefined();
     expect(await countLeasedRuns(db, projectId, atMinute(3))).toBe(0);
     expect(await reapStalledHuntRuns(db, projectId, atMinute(60))).toEqual([]);
   });
