@@ -13,6 +13,7 @@ import { CompanionEmptyState, CompanionHeader } from "./components/CompanionHead
 import { CompanionSettings } from "./components/CompanionSettings";
 import { ConnectionHealth } from "./components/ConnectionHealth";
 import { HuntDashboard } from "./components/HuntDashboard";
+import { WorkerDispatchDialog } from "./components/WorkerDispatchDialog";
 import { Inbox } from "./components/Inbox";
 import { InitialOnboarding } from "./components/InitialOnboarding";
 import { LaunchIntro } from "./components/LaunchIntro";
@@ -58,7 +59,7 @@ import {
 } from "./lib/platform";
 import { issueAgentConversation } from "./lib/issue-agent-reply";
 import { isRepositoryConnectedForImport } from "./lib/linear-import";
-import { loadProjectAgents } from "./lib/api";
+import { dispatchHuntRun, loadProjectAgents } from "./lib/api";
 import { demoProjectAgents } from "./lib/demo-project-agents";
 import { useI18n } from "./i18n";
 import type { HuntRun, ProjectAgent } from "./types";
@@ -141,6 +142,7 @@ export function App() {
   const [quickProcessError, setQuickProcessError] = useState<string | null>(
     null,
   );
+  const [dispatchRun, setDispatchRun] = useState<HuntRun | null>(null);
   const [companionPage, setCompanionPage] = useState<
     "issues" | "search" | "inbox" | "settings"
   >("issues");
@@ -234,24 +236,33 @@ export function App() {
         : null;
     return briar.addIssueMessage(runId, input, agentConversation);
   };
-  const processIssueNow = async (run: HuntRun) => {
-    if (!activeProject) return;
-    setQuickStartingRunId(run.id);
+  const processIssueNow = (run: HuntRun) => {
+    if (!activeProject || issueAgents.length === 0) {
+      setQuickProcessError(t("issue.processNowNoAgent"));
+      return;
+    }
+    setQuickProcessError(null);
+    setDispatchRun(run);
+  };
+  const submitWorkerDispatch = async (input: {
+    agentId: string;
+    workerId: string | null;
+  }) => {
+    if (!activeProject || !briar.token || !dispatchRun) return;
+    setQuickStartingRunId(dispatchRun.id);
     setQuickProcessError(null);
     try {
-      const agents = briar.token
-        ? await loadProjectAgents(briar.token, activeProject.id, locale)
-        : demoProjectAgents(activeProject.id, locale);
-      const agent = agents[0];
-      if (!agent) {
-        throw new Error(t("issue.processNowNoAgent"));
-      }
-      autoHunt.startSession(
+      await dispatchHuntRun(
+        briar.token,
         activeProject.id,
-        [run],
-        () => void briar.refresh(),
-        { agent, maxIssues: 1 },
+        dispatchRun.id,
+        {
+          ...input,
+          reassign: Boolean(dispatchRun.dispatchedAt || dispatchRun.workerId),
+        },
       );
+      setDispatchRun(null);
+      await briar.refresh();
     } catch (caught) {
       setQuickProcessError(
         caught instanceof Error ? caught.message : String(caught),
@@ -264,6 +275,7 @@ export function App() {
   useEffect(() => {
     setQuickProcessError(null);
     setQuickStartingRunId(null);
+    setDispatchRun(null);
   }, [briar.activeProjectId]);
 
   useEffect(() => {
@@ -593,6 +605,8 @@ export function App() {
               githubRepository: briar.dashboard?.settings.githubRepository,
               repositoryPath: briar.health?.repositoryPath,
             })}
+            sessionToken={briar.token}
+            userId={briar.user?.id ?? null}
             velen={briar.velen}
           />
         ) : activePage === "agents" && activeProject ? (
@@ -659,7 +673,7 @@ export function App() {
             onLoadIssueMessages={briar.readIssueMessages}
             onLoadRunEvidence={briar.readRunEvidence}
             onMoveRun={briar.moveRun}
-            onProcessIssueNow={(run) => void processIssueNow(run)}
+            onProcessIssueNow={processIssueNow}
             onRetryRun={briar.retryRun}
             onCancelRun={briar.cancelRun}
             onRequestedRunOpen={() => setRequestedRunId(null)}
@@ -794,10 +808,12 @@ export function App() {
             onLoadIssueMessages={briar.readIssueMessages}
             onLoadRunEvidence={briar.readRunEvidence}
             onMoveRun={briar.moveRun}
+            onProcessIssueNow={processIssueNow}
             onRequestedRunOpen={() => setRequestedRunId(null)}
             onRetryRun={briar.retryRun}
             onCancelRun={briar.cancelRun}
             onSendIssueMessage={sendIssueMessage}
+            processingIssueIds={processingIssueIds}
             sessions={autoHunt.sessions}
             token={briar.token}
           />
@@ -809,6 +825,18 @@ export function App() {
   return (
     <>
       {content}
+      <WorkerDispatchDialog
+        agents={issueAgents}
+        error={quickProcessError}
+        isDispatching={Boolean(quickStartingRunId)}
+        onOpenChange={(open) => {
+          if (!open && !quickStartingRunId) setDispatchRun(null);
+        }}
+        onSubmit={(input) => void submitWorkerDispatch(input)}
+        open={Boolean(dispatchRun)}
+        run={dispatchRun}
+        workers={briar.dashboard?.workers ?? []}
+      />
       {isLaunchIntroVisible ? (
         <LaunchIntro
           onComplete={completeLaunchIntro}

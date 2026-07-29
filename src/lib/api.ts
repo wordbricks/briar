@@ -899,6 +899,40 @@ export const cancelHuntRun = (
   reason: string | null = null,
 ) => recoverHuntRun(token, projectId, runId, "cancel", reason);
 
+export type HuntDispatchResult = {
+  runId: string;
+  agentId: string;
+  requestedWorkerId: string | null;
+  requestedByUserId: string;
+  dispatchMode: "any" | "specific";
+  dispatchedAt: string;
+  outcome: "dispatched" | "already_dispatched";
+};
+
+export async function dispatchHuntRun(
+  token: string,
+  projectId: string,
+  runId: string,
+  input: {
+    agentId: string;
+    workerId: string | null;
+    reassign?: boolean;
+  },
+) {
+  return request<HuntDispatchResult>(
+    `/projects/${projectId}/runs/${runId}/${input.reassign ? "reassign" : "dispatch"}`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        agentId: input.agentId,
+        workerId: input.workerId,
+        requestId: crypto.randomUUID(),
+      }),
+    },
+  );
+}
+
 export type HuntMoveResult = {
   runId: string;
   outcome: "moved" | "unchanged" | "already_moved";

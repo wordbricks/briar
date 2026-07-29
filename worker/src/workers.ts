@@ -8,6 +8,7 @@
  */
 
 export type ExecutionWorkerState = "online" | "stale" | "disabled";
+export type ExecutionWorkerReadiness = "ready" | "busy" | "needs_attention";
 export type AgentProvider = "codex" | "claude" | "grok";
 export type TranscriptDirection = "client" | "server";
 
@@ -20,6 +21,10 @@ export type ExecutionWorkerRow = {
   agent_provider: AgentProvider;
   versions_json: string;
   state: ExecutionWorkerState;
+  accepting_work: number;
+  readiness_state: ExecutionWorkerReadiness;
+  readiness_detail: string | null;
+  capabilities_json: string;
   last_heartbeat_at: string;
   created_at: string;
   updated_at: string;
@@ -79,6 +84,16 @@ export const MAX_TRANSCRIPT_SESSIONS_PER_PROJECT = 50;
 
 export class WorkerConflictError extends Error {}
 export class TranscriptLimitError extends Error {}
+
+export type ExecutionDispatchRow = {
+  runId: string;
+  agentId: string;
+  requestedWorkerId: string | null;
+  requestedByUserId: string;
+  dispatchMode: "any" | "specific";
+  dispatchedAt: string;
+  outcome: "dispatched" | "already_dispatched";
+};
 
 const utf8Length = (value: string) => new TextEncoder().encode(value).length;
 
@@ -242,6 +257,10 @@ export async function recordWorkerHeartbeat(
   input: {
     workerId: string;
     versions?: Record<string, string>;
+    acceptingWork?: boolean;
+    readinessState?: ExecutionWorkerReadiness;
+    readinessDetail?: string | null;
+    capabilities?: Record<string, unknown>;
     observedAt: string;
   },
 ) {
@@ -271,6 +290,11 @@ export async function recordWorkerHeartbeat(
          set last_heartbeat_at = ?,
              updated_at = ?,
              versions_json = coalesce(?, versions_json),
+             accepting_work = coalesce(?, accepting_work),
+             readiness_state = coalesce(?, readiness_state),
+             readiness_detail = case when ? is null
+               then readiness_detail else ? end,
+             capabilities_json = coalesce(?, capabilities_json),
              state = case when state = 'disabled' then 'disabled' else 'online' end
          where id = ? and project_id = ?`,
       )
@@ -278,6 +302,11 @@ export async function recordWorkerHeartbeat(
         input.observedAt,
         input.observedAt,
         input.versions ? JSON.stringify(input.versions) : null,
+        input.acceptingWork === undefined ? null : input.acceptingWork ? 1 : 0,
+        input.readinessState ?? null,
+        input.readinessDetail === undefined ? null : 1,
+        input.readinessDetail ?? null,
+        input.capabilities ? JSON.stringify(input.capabilities) : null,
         input.workerId,
         projectId,
       ),
@@ -411,6 +440,42 @@ export async function disableExecutionWorker(
   return results[0]?.meta.changes === 1;
 }
 
+/** Remove one project binding; revoke the device only after its last binding. */
+export async function unbindExecutionWorker(
+  db: D1Database,
+  deviceId: string,
+  projectId: string,
+  observedAt: string,
+) {
+  const deleted = await db
+    .prepare(
+      `delete from briar_execution_workers
+       where device_id = ? and project_id = ?`,
+    )
+    .bind(deviceId, projectId)
+    .run();
+  if (deleted.meta.changes !== 1) return false;
+  const remaining = await db
+    .prepare(
+      `select count(*) as bindings from briar_execution_workers
+       where device_id = ?`,
+    )
+    .bind(deviceId)
+    .first<{ bindings: number }>();
+  if ((remaining?.bindings ?? 0) === 0) {
+    await disableExecutionWorker(db, deviceId, observedAt);
+  } else {
+    await db
+      .prepare(
+        `update briar_execution_worker_devices
+         set updated_at = ? where id = ?`,
+      )
+      .bind(observedAt, deviceId)
+      .run();
+  }
+  return true;
+}
+
 export async function listExecutionWorkers(
   db: D1Database,
   projectId: string,
@@ -435,6 +500,289 @@ export async function listExecutionWorkers(
     ...row,
     state: workerStateAt(row.last_heartbeat_at, observedAt, row.state),
   }));
+}
+
+export async function auditExecutionEvent(
+  db: D1Database,
+  input: {
+    organizationId: string;
+    projectId: string;
+    runId?: string | null;
+    workerId?: string | null;
+    agentId?: string | null;
+    actorUserId?: string | null;
+    actorDeviceId?: string | null;
+    action:
+      | "dispatched"
+      | "reassigned"
+      | "claimed"
+      | "lease_lost"
+      | "cancelled"
+      | "requeued"
+      | "blocked"
+      | "completed"
+      | "worker_readiness_changed";
+    requestId?: string | null;
+    detail?: Record<string, unknown>;
+    occurredAt: string;
+  },
+) {
+  await db
+    .prepare(
+      `insert into briar_execution_audit_events (
+         id, organization_id, project_id, run_id, worker_id, agent_id,
+         actor_user_id, actor_device_id, action, request_id, detail_json,
+         occurred_at
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       on conflict do nothing`,
+    )
+    .bind(
+      crypto.randomUUID(),
+      input.organizationId,
+      input.projectId,
+      input.runId ?? null,
+      input.workerId ?? null,
+      input.agentId ?? null,
+      input.actorUserId ?? null,
+      input.actorDeviceId ?? null,
+      input.action,
+      input.requestId ?? null,
+      JSON.stringify(input.detail ?? {}),
+      input.occurredAt,
+    )
+    .run();
+}
+
+/**
+ * Assign a logical Agent and an execution-time Worker policy to one run.
+ * This deliberately creates no ownership edge between Agent and Worker.
+ */
+export async function dispatchHuntRun(
+  db: D1Database,
+  organizationId: string,
+  projectId: string,
+  input: {
+    runId: string;
+    agentId: string;
+    workerId?: string | null;
+    requestedByUserId: string;
+    requestId: string;
+    occurredAt: string;
+    reassign?: boolean;
+  },
+): Promise<ExecutionDispatchRow | null> {
+  const agent = await db
+    .prepare(
+      `select id, provider from briar_project_agents
+       where id = ? and project_id = ?`,
+    )
+    .bind(input.agentId, projectId)
+    .first<{ id: string; provider: AgentProvider }>();
+  if (!agent) throw new WorkerConflictError("Agent not found for this project");
+
+  if (input.workerId) {
+    const worker = await db
+      .prepare(
+        `select worker.agent_provider, worker.state, worker.accepting_work,
+                worker.readiness_state, worker.last_heartbeat_at
+         from briar_execution_workers worker
+         join briar_execution_worker_devices device on device.id = worker.device_id
+         where worker.id = ? and worker.project_id = ?
+           and device.organization_id = ?`,
+      )
+      .bind(input.workerId, projectId, organizationId)
+      .first<{
+        agent_provider: AgentProvider;
+        state: ExecutionWorkerState;
+        accepting_work: number;
+        readiness_state: ExecutionWorkerReadiness;
+        last_heartbeat_at: string;
+      }>();
+    if (!worker) throw new WorkerConflictError("Worker not found for this project");
+    if (
+      workerStateAt(worker.last_heartbeat_at, input.occurredAt, worker.state) !==
+        "online" ||
+      worker.accepting_work !== 1 ||
+      worker.readiness_state === "needs_attention"
+    ) {
+      throw new WorkerConflictError("Worker is not ready to accept work");
+    }
+    if (worker.agent_provider !== agent.provider) {
+      throw new WorkerConflictError(
+        `Worker does not support the ${agent.provider} Agent provider`,
+      );
+    }
+  } else {
+    const eligible = await db
+      .prepare(
+        `select worker.id
+         from briar_execution_workers worker
+         join briar_execution_worker_devices device on device.id = worker.device_id
+         where worker.project_id = ? and device.organization_id = ?
+           and worker.agent_provider = ? and worker.state != 'disabled'
+           and worker.accepting_work = 1
+           and worker.readiness_state != 'needs_attention'
+         limit 1`,
+      )
+      .bind(projectId, organizationId, agent.provider)
+      .first<{ id: string }>();
+    if (!eligible) {
+      throw new WorkerConflictError(
+        `No worker is configured for the ${agent.provider} Agent provider`,
+      );
+    }
+  }
+
+  const existing = await db
+    .prepare(
+      `select id, agent_id, requested_worker_id, requested_by_user_id,
+              dispatch_mode, dispatched_at
+       from briar_hunt_runs
+       where project_id = ? and dispatch_request_id = ?`,
+    )
+    .bind(projectId, input.requestId)
+    .first<{
+      id: string;
+      agent_id: string;
+      requested_worker_id: string | null;
+      requested_by_user_id: string;
+      dispatch_mode: "any" | "specific";
+      dispatched_at: string;
+    }>();
+  if (existing) {
+    return {
+      runId: existing.id,
+      agentId: existing.agent_id,
+      requestedWorkerId: existing.requested_worker_id,
+      requestedByUserId: existing.requested_by_user_id,
+      dispatchMode: existing.dispatch_mode,
+      dispatchedAt: existing.dispatched_at,
+      outcome: "already_dispatched",
+    };
+  }
+
+  const run = await db
+    .prepare(
+      `select id, status, current_attempt, claim_token_hash, worker_id
+       from briar_hunt_runs where id = ? and project_id = ?`,
+    )
+    .bind(input.runId, projectId)
+    .first<{
+      id: string;
+      status: string;
+      current_attempt: number;
+      claim_token_hash: string | null;
+      worker_id: string | null;
+    }>();
+  if (!run) return null;
+  const active = ![
+    "backlog",
+    "queued",
+    "blocked",
+    "failed",
+    "cancelled",
+    "completed",
+  ].includes(run.status);
+  if (active && !input.reassign) {
+    throw new WorkerConflictError("Run is already executing");
+  }
+  if (["completed", "cancelled"].includes(run.status)) {
+    throw new WorkerConflictError("Completed or cancelled runs cannot be dispatched");
+  }
+
+  const nextAttempt =
+    input.reassign && (active || run.claim_token_hash)
+      ? run.current_attempt + 1
+      : run.current_attempt;
+  const action = input.reassign ? "reassigned" : "dispatched";
+  const detail = input.workerId
+    ? "사용자가 특정 Worker에 작업을 배정했습니다."
+    : "사용자가 적합한 Worker에 작업을 배정했습니다.";
+  const result = await db
+    .prepare(
+      `update briar_hunt_runs
+       set agent_id = ?, requested_worker_id = ?, requested_by_user_id = ?,
+           dispatch_mode = ?, dispatch_request_id = ?, dispatched_at = ?,
+           status = 'queued', stage = 'queued', workflow_stage = null,
+           current_attempt = ?, current_revision = 1,
+           worker_id = null, claim_token_hash = null, claimed_by = null,
+           claimed_at = null, lease_expires_at = null, completed_at = null,
+           detail = ?, last_event_at = ?, updated_at = ?
+       where id = ? and project_id = ?
+         and status not in ('completed', 'cancelled')`,
+    )
+    .bind(
+      agent.id,
+      input.workerId ?? null,
+      input.requestedByUserId,
+      input.workerId ? "specific" : "any",
+      input.requestId,
+      input.occurredAt,
+      nextAttempt,
+      detail,
+      input.occurredAt,
+      input.occurredAt,
+      input.runId,
+      projectId,
+    )
+    .run();
+  if (result.meta.changes !== 1) {
+    throw new WorkerConflictError("Run dispatch raced with another update");
+  }
+  await auditExecutionEvent(db, {
+    organizationId,
+    projectId,
+    runId: input.runId,
+    workerId: input.workerId ?? null,
+    agentId: agent.id,
+    actorUserId: input.requestedByUserId,
+    action,
+    requestId: input.requestId,
+    detail: {
+      previousWorkerId: run.worker_id,
+      dispatchMode: input.workerId ? "specific" : "any",
+    },
+    occurredAt: input.occurredAt,
+  });
+  return {
+    runId: input.runId,
+    agentId: agent.id,
+    requestedWorkerId: input.workerId ?? null,
+    requestedByUserId: input.requestedByUserId,
+    dispatchMode: input.workerId ? "specific" : "any",
+    dispatchedAt: input.occurredAt,
+    outcome: "dispatched",
+  };
+}
+
+export async function listExecutionAuditEvents(
+  db: D1Database,
+  projectId: string,
+  runId?: string,
+) {
+  const result = await db
+    .prepare(
+      `select id, run_id, worker_id, agent_id, actor_user_id, actor_device_id,
+              action, request_id, detail_json, occurred_at
+       from briar_execution_audit_events
+       where project_id = ? and (? is null or run_id = ?)
+       order by occurred_at desc, id desc
+       limit 200`,
+    )
+    .bind(projectId, runId ?? null, runId ?? null)
+    .all<{
+      id: string;
+      run_id: string | null;
+      worker_id: string | null;
+      agent_id: string | null;
+      actor_user_id: string | null;
+      actor_device_id: string | null;
+      action: string;
+      request_id: string | null;
+      detail_json: string;
+      occurred_at: string;
+    }>();
+  return result.results ?? [];
 }
 
 /**
@@ -542,8 +890,11 @@ export async function reapStalledHuntRuns(
   const cutoff = new Date(Date.parse(observedAt) - STALLED_RUN_GRACE_MS).toISOString();
   const stalled = await db
     .prepare(
-      `select id, worker_id, claim_attempts from briar_hunt_runs
-       where project_id = ?
+      `select run.id, run.worker_id, run.claim_attempts, run.agent_id,
+              project.organization_id
+       from briar_hunt_runs run
+       join briar_projects project on project.id = run.project_id
+       where run.project_id = ?
          and status not in (
            'backlog', 'queued', 'completed', 'cancelled', 'blocked', 'failed'
          )
@@ -553,7 +904,13 @@ export async function reapStalledHuntRuns(
        order by run_number asc`,
     )
     .bind(projectId, cutoff)
-    .all<{ id: string; worker_id: string | null; claim_attempts: number }>();
+    .all<{
+      id: string;
+      worker_id: string | null;
+      claim_attempts: number;
+      agent_id: string | null;
+      organization_id: string;
+    }>();
 
   const reaped: ReapedRun[] = [];
   for (const run of stalled.results ?? []) {
@@ -584,6 +941,16 @@ export async function reapStalledHuntRuns(
         projectId,
       )
       .run();
+    await auditExecutionEvent(db, {
+      organizationId: run.organization_id,
+      projectId,
+      runId: run.id,
+      workerId: run.worker_id,
+      agentId: run.agent_id,
+      action: blocked ? "blocked" : "requeued",
+      detail: { reason: "lease_expired", claimAttempts: run.claim_attempts },
+      occurredAt: observedAt,
+    });
     reaped.push({
       runId: run.id,
       outcome: blocked ? "blocked" : "requeued",
