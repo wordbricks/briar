@@ -1356,6 +1356,10 @@ const workerRegistrationSchema = z.object({
   workerToken: z.string().startsWith("briar_worker_"),
 });
 
+const workerBindingSchema = workerRegistrationSchema.omit({
+  workerToken: true,
+});
+
 const claimedRunSchema = z.object({
   runId: z.string().uuid(),
   runNumber: z.number().int().positive(),
@@ -1655,7 +1659,39 @@ async function workerRegisterCommand() {
     value("--max-sessions") ?? "",
     10,
   );
-  const registration = workerRegistrationSchema.parse(
+  let registration: z.infer<typeof workerRegistrationSchema> | null = null;
+  if (config.projects.some((candidate) => candidate.executionWorker)) {
+    try {
+      const binding = workerBindingSchema.parse(
+        await request(
+          config.apiUrl,
+          `/projects/${project.id}/workers/bind`,
+          userToken,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              deviceIdentity,
+              agentProvider: provider,
+              versions: { briar: cliVersion },
+            }),
+          },
+        ),
+      );
+      const existing = config.projects.find(
+        (candidate) => candidate.executionWorker?.deviceId === binding.deviceId,
+      )?.executionWorker;
+      if (existing) {
+        registration = {
+          ...binding,
+          workerToken: existing.token,
+        };
+      }
+    } catch {
+      // The device is not enrolled in this organization yet. Registration
+      // below creates it and issues the first organization credential.
+    }
+  }
+  registration ??= workerRegistrationSchema.parse(
     await request(
       config.apiUrl,
       `/projects/${project.id}/workers/register`,

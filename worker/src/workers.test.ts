@@ -7,13 +7,16 @@ import {
   appendAgentTranscript,
   authenticateExecutionWorker,
   attributeRunToWorker,
+  bindExecutionWorkerProject,
   countExecutionWorkerDeviceSessions,
   countLeasedRuns,
   disableExecutionWorker,
   dispatchHuntRun,
   executionWorkerBindingForProject,
+  getProjectExecutionWorkerPolicy,
   leaseExpiryFrom,
   listExecutionWorkers,
+  listOrganizationExecutionWorkers,
   MAX_CLAIM_ATTEMPTS,
   MAX_TRANSCRIPT_PAYLOAD_BYTES,
   MAX_TRANSCRIPT_SESSIONS_PER_PROJECT,
@@ -25,6 +28,7 @@ import {
   TranscriptLimitError,
   unbindExecutionWorker,
   updateExecutionWorkerConcurrency,
+  updateProjectExecutionWorkerPolicy,
   WorkerConflictError,
   workerStateAt,
 } from "./workers";
@@ -119,6 +123,7 @@ describe("detached execution workers", () => {
       "migrations/0034_execution_worker_credentials.sql",
       "migrations/0035_detached_worker_dispatch.sql",
       "migrations/0036_execution_worker_concurrency.sql",
+      "migrations/0038_project_execution_worker_policies.sql",
     ]) {
       await executeSql(db, await readFile(resolve(migration), "utf8"));
     }
@@ -186,6 +191,8 @@ describe("detached execution workers", () => {
        delete from briar_agent_transcript_sessions;
        delete from briar_hunt_events;
        delete from briar_hunt_runs;
+       delete from briar_project_execution_worker_allowlist;
+       delete from briar_project_execution_worker_policies;
        delete from briar_execution_worker_credentials;
        delete from briar_execution_workers;
        delete from briar_execution_worker_devices;
@@ -243,6 +250,46 @@ describe("detached execution workers", () => {
     await expect(
       authenticateExecutionWorker(db, fingerprint("token-a"), atMinute(6)),
     ).resolves.toBeNull();
+  });
+
+  it("binds an enrolled device to another project without rotating its credential", async () => {
+    const first = await register("shared");
+    const credentialBefore = await db
+      .prepare(
+        `select token_hash from briar_execution_worker_credentials
+         where device_id = ?`,
+      )
+      .bind(first.device.id)
+      .first<{ token_hash: string }>();
+
+    const second = await bindExecutionWorkerProject(db, secondProjectId, {
+      id: "worker-shared-second",
+      organizationId: projectId,
+      ownerUserId: "owner",
+      deviceIdentityHash: fingerprint("shared"),
+      agentProvider: "codex",
+      versions: { briar: "1.1.2" },
+      observedAt: atMinute(2),
+    });
+    const credentialAfter = await db
+      .prepare(
+        `select token_hash from briar_execution_worker_credentials
+         where device_id = ?`,
+      )
+      .bind(first.device.id)
+      .first<{ token_hash: string }>();
+
+    expect(second.device.id).toBe(first.device.id);
+    expect(credentialAfter).toEqual(credentialBefore);
+    const organizationWorkers = await listOrganizationExecutionWorkers(
+      db,
+      projectId,
+      atMinute(2),
+    );
+    expect(organizationWorkers).toHaveLength(1);
+    expect(
+      organizationWorkers[0].bindings.map((binding) => binding.projectId),
+    ).toEqual([projectId, secondProjectId]);
   });
 
   it("binds one organization device to several projects", async () => {
@@ -596,6 +643,91 @@ describe("detached execution workers", () => {
       requested_worker_id: first.worker.id,
       worker_id: first.worker.id,
     });
+  });
+
+  it("enforces the project Worker allowlist for dispatch and claim", async () => {
+    const allowed = await register("policy-allowed");
+    const denied = await register("policy-denied");
+    const agent = await db
+      .prepare(
+        `select id from briar_project_agents where project_id = ? limit 1`,
+      )
+      .bind(projectId)
+      .first<{ id: string }>();
+    const policy = await updateProjectExecutionWorkerPolicy(db, projectId, {
+      selectionMode: "allowlist",
+      defaultWorkerId: allowed.worker.id,
+      allowedWorkerIds: [allowed.worker.id],
+      updatedByUserId: "owner",
+      observedAt: atMinute(2),
+    });
+    expect(policy).toMatchObject({
+      selectionMode: "allowlist",
+      defaultWorkerId: allowed.worker.id,
+      allowedWorkerIds: [allowed.worker.id],
+    });
+    await expect(
+      updateProjectExecutionWorkerPolicy(db, projectId, {
+        selectionMode: "allowlist",
+        defaultWorkerId: denied.worker.id,
+        allowedWorkerIds: [allowed.worker.id],
+        updatedByUserId: "owner",
+        observedAt: atMinute(2),
+      }),
+    ).rejects.toBeInstanceOf(WorkerConflictError);
+
+    const specificallyDeniedRun = await recordHuntEvent(
+      db,
+      projectId,
+      queuedEvent("policy-specific-denied", 3),
+    );
+    await expect(
+      dispatchHuntRun(db, projectId, projectId, {
+        runId: specificallyDeniedRun,
+        agentId: agent!.id,
+        workerId: denied.worker.id,
+        requestedByUserId: "member",
+        requestId: "44444444-aaaa-4444-8444-444444444444",
+        occurredAt: atMinute(3),
+      }),
+    ).rejects.toThrow("execution policy");
+
+    const anyRun = await recordHuntEvent(
+      db,
+      projectId,
+      queuedEvent("policy-any", 4),
+    );
+    await dispatchHuntRun(db, projectId, projectId, {
+      runId: anyRun,
+      agentId: agent!.id,
+      workerId: null,
+      requestedByUserId: "member",
+      requestId: "55555555-aaaa-4555-8555-555555555555",
+      occurredAt: atMinute(4),
+    });
+    const deniedClaim = await claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: fingerprint("policy-denied-claim"),
+      claimedBy: denied.worker.label,
+      claimedAt: atMinute(5),
+      leaseExpiresAt: leaseExpiryFrom(atMinute(5)),
+      workerId: denied.worker.id,
+      agentProvider: "codex",
+      detachedOnly: true,
+    });
+    expect(deniedClaim).toBeNull();
+    const allowedClaim = await claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: fingerprint("policy-allowed-claim"),
+      claimedBy: allowed.worker.label,
+      claimedAt: atMinute(5),
+      leaseExpiresAt: leaseExpiryFrom(atMinute(5)),
+      workerId: allowed.worker.id,
+      agentProvider: "codex",
+      detachedOnly: true,
+    });
+    expect(allowedClaim?.id).toBe(anyRun);
+    await expect(
+      getProjectExecutionWorkerPolicy(db, projectId),
+    ).resolves.toEqual(policy);
   });
 
   it("reassigns an active run by invalidating the old claim", async () => {

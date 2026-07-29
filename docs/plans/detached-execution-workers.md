@@ -1,6 +1,6 @@
 # Detached execution workers
 
-Status: in progress. Updated 2026-07-29.
+Status: implemented. Updated 2026-07-29.
 
 ## Goal
 
@@ -48,22 +48,29 @@ Repository paths and third-party credentials never enter D1.
 | Org device, project binding, credential schema, and run attribution | done | `migrations/0013_execution_workers.sql`, `migrations/0034_execution_worker_credentials.sql` |
 | Worker register, heartbeat, lease, transcript, and read APIs | done | `worker/src/workers.ts`, `worker/src/index.ts` |
 | Stalled-run reaper and claim concurrency guards | done | `worker/src/workers.ts` |
-| Worker loop and service installer | done | `src-cli/worker.ts`, Tauri project settings |
+| Worker loop and service installer | done | `src-cli/worker.ts`, Tauri organization Worker settings |
 | Detached coding-agent launch | done | `src-cli/agent-runner.ts`, `runClaimedIssue` in `src-cli/index.ts` |
 | Worker discovery and observation UI | done | dashboard readiness strip and dispatch dialog |
 | Worker enrollment, credential rotation/revocation, and scoped runtime auth | done | API, schema, CLI |
 | Targeted dispatch and reassignment | done | migration 0035, API, CLI claim filter, renderer |
+| Organization Worker management and project execution policy | done | migration 0038, organization/project settings, API claim enforcement |
 
 ## Worker registration
 
 The desktop on the execution machine provides the primary setup flow:
 
-1. The signed-in user enables **Share this computer as a worker**.
-2. They select an organization and one or more projects.
+1. The signed-in user opens **Organization settings → Workers**.
+2. They enable one or more locally connected projects for this computer.
 3. Briar verifies the local repository, agent, Git, and required integrations.
 4. The API issues a revocable worker credential scoped to that worker and its
    project bindings.
 5. Briar installs and starts the background service.
+
+The Worker is an organization-scoped physical device. Each enabled project
+creates a project binding containing repository-specific readiness and
+provider information. Adding a second project reuses the device credential
+instead of rotating it, so services already running for other projects remain
+connected.
 
 Enrollment uses the signed-in user's session and returns a `briar_worker_`
 credential. Only its SHA-256 hash is stored in D1. The opaque device identity
@@ -79,6 +86,13 @@ renew a held lease, and append events or transcripts. They may not change
 organization membership, project settings, or another worker.
 
 The worker owner and organization administrators can pause or revoke a worker.
+
+Project settings do not register computers. **Project settings → Execution
+environments** stores only the project policy: allow every connected Worker or
+an explicit allowlist, plus an optional default selection for the dispatch
+dialog. The API enforces the allowlist during both dispatch and atomic claim.
+The default is presentation state and never creates an Agent-to-Worker
+ownership relationship.
 
 ## Dispatch
 
@@ -96,6 +110,7 @@ run:
 ```text
 POST /projects/:projectId/runs/:runId/dispatch
 {
+  "agentId": "logical-project-agent-id",
   "workerId": "optional-worker-id",
   "requestId": "idempotency-key"
 }

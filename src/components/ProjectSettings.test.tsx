@@ -88,6 +88,7 @@ describe("ProjectSettings", () => {
         | "integrations"
         | "issue-import"
         | "agent-configuration"
+        | "execution"
         | "workflow",
     ) => {
       const button = container.querySelector<HTMLButtonElement>(
@@ -109,6 +110,7 @@ describe("ProjectSettings", () => {
       "Integrations",
       "이슈 임포트",
       "에이전트 구성",
+      "실행 환경",
       "워크플로우",
     ]);
     expect(
@@ -242,6 +244,14 @@ describe("ProjectSettings", () => {
     await act(async () => sandboxToggle?.click());
     expect(sandboxControl?.textContent).toContain("워크트리만");
     expect(container.querySelector(".project-settings-auto-run")).toBeNull();
+    expect(container.textContent).not.toContain("이 컴퓨터를 Worker로 공유");
+
+    await openSection("execution");
+    expect(container.textContent).toContain("프로젝트 실행 정책");
+    expect(container.textContent).toContain("모든 연결된 Worker 허용");
+    expect(container.textContent).toContain(
+      "조직 설정 → Workers에서 관리합니다.",
+    );
 
     await openSection("integrations");
     expect(container.querySelector(".project-settings-card")).toBeNull();

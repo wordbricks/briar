@@ -2765,6 +2765,42 @@ fn configure_execution_worker(
     serde_json::from_str(&status).map_err(|error| format!("Worker 상태를 읽지 못했습니다: {error}"))
 }
 
+#[tauri::command]
+fn inspect_execution_workers(
+    app: AppHandle,
+    project_ids: Vec<String>,
+) -> Result<Vec<serde_json::Value>, String> {
+    let resource_directory = app
+        .path()
+        .resource_dir()
+        .map_err(|error| error.to_string())?;
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    sync_auto_hunt_assets(&resource_directory, &home)?;
+    let bun = bundled_bun_binary()
+        .ok_or_else(|| "Briar에 포함된 Bun runtime을 찾지 못했습니다.".to_string())?;
+    let cli = home.join(".local/share/briar/briar.js");
+    let path = cli_execution_path(&home)?;
+    let mut statuses = Vec::new();
+    for project_id in project_ids
+        .into_iter()
+        .filter(|value| !value.trim().is_empty())
+    {
+        let output = Command::new(&bun)
+            .arg(&cli)
+            .args(["worker", "status", "--project", &project_id])
+            .env("PATH", &path)
+            .output()
+            .map_err(|error| format!("Worker 상태 명령을 시작하지 못했습니다: {error}"))?;
+        if !output.status.success() {
+            continue;
+        }
+        let status: serde_json::Value = serde_json::from_slice(&output.stdout)
+            .map_err(|error| format!("Worker 상태를 읽지 못했습니다: {error}"))?;
+        statuses.push(status);
+    }
+    Ok(statuses)
+}
+
 fn sync_auto_hunt_assets(resource_directory: &Path, home: &Path) -> Result<bool, String> {
     if auto_hunt_assets_are_current(resource_directory, home) {
         return Ok(false);
@@ -4899,7 +4935,8 @@ pub fn run() {
             inspect_velen,
             auto_hunt_health,
             repair_auto_hunt,
-            configure_execution_worker
+            configure_execution_worker,
+            inspect_execution_workers
         ])
         .run(tauri::generate_context!())
         .expect("error while running Briar");

@@ -572,7 +572,10 @@ export function App() {
             organization={settingsOrganization}
             onLogoChange={briar.changeOrganizationLogo}
             onRename={briar.renameOrganization}
+            connectedProjectIds={briar.connectedProjectIds}
+            projects={briar.projects}
             token={briar.token ?? ""}
+            userId={briar.user.id}
           />
         ) : activePage === "inbox" ? (
           <Inbox
@@ -653,7 +656,6 @@ export function App() {
               repositoryPath: briar.health?.repositoryPath,
             })}
             sessionToken={briar.token}
-            userId={briar.user?.id ?? null}
             velen={briar.velen}
           />
         ) : activePage === "agents" && activeProject ? (
@@ -884,6 +886,7 @@ export function App() {
         }}
         onSubmit={(input) => void submitWorkerDispatch(input)}
         open={Boolean(dispatchRun)}
+        policy={briar.dashboard?.executionPolicy}
         run={dispatchRun}
         workers={briar.dashboard?.workers ?? []}
       />

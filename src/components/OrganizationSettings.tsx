@@ -1,5 +1,6 @@
 import {
   Building2,
+  Cpu,
   Download,
   ImagePlus,
   MessageSquare,
@@ -47,7 +48,8 @@ import {
   organizationLogoAccept,
   organizationLogoFromFile,
 } from "../lib/organization-logo";
-import type { Organization, OrganizationMember } from "../types";
+import type { Organization, OrganizationMember, Project } from "../types";
+import { OrganizationWorkersSettings } from "./OrganizationWorkersSettings";
 import { SelectMenu } from "./SelectMenu";
 import { SlackIntegrationSettings } from "./SlackIntegrationSettings";
 
@@ -55,6 +57,7 @@ type RoleFilter = "all" | OrganizationMember["role"];
 export type OrganizationSettingsSection =
   | "general"
   | "members"
+  | "workers"
   | "integrations";
 
 const csvCell = (value: string) => `"${value.replaceAll('"', '""')}"`;
@@ -68,6 +71,9 @@ export function OrganizationSettings({
   isSidebarOpen = true,
   initialSection,
   navigationSidebar,
+  connectedProjectIds = null,
+  projects = [],
+  userId = "",
 }: {
   organization: Organization;
   token: string;
@@ -80,6 +86,9 @@ export function OrganizationSettings({
   isSidebarOpen?: boolean;
   initialSection?: OrganizationSettingsSection;
   navigationSidebar?: ReactNode;
+  connectedProjectIds?: string[] | null;
+  projects?: Project[];
+  userId?: string;
 }) {
   const { locale, t } = useI18n();
   const [activeSection, setActiveSection] =
@@ -241,6 +250,13 @@ export function OrganizationSettings({
               onClick={() => setActiveSection("members")}
             >
               {t("organization.membersAndInvites")}
+            </SettingsNavItem>
+            <SettingsNavItem
+              active={activeSection === "workers"}
+              icon={<Cpu aria-hidden="true" size={16} strokeWidth={1.8} />}
+              onClick={() => setActiveSection("workers")}
+            >
+              {t("organization.workers")}
             </SettingsNavItem>
             <SettingsNavItem
               active={activeSection === "integrations"}
@@ -656,6 +672,14 @@ export function OrganizationSettings({
                   )}
                 </section>
               </>
+            ) : activeSection === "workers" ? (
+              <OrganizationWorkersSettings
+                connectedProjectIds={connectedProjectIds}
+                organization={organization}
+                projects={projects}
+                token={token}
+                userId={userId}
+              />
             ) : (
               <SlackIntegrationSettings
                 organizationId={organizationId}

@@ -49,7 +49,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Typography } from "@/components/ui/typography";
 import type { DashboardPayload, Project, ProjectSettings as ProjectSettingsData } from "../types";
 import { useI18n } from "../i18n";
-import { updateExecutionWorkerConcurrency } from "../lib/api";
 import {
   agentEfforts,
   agentModels,
@@ -75,6 +74,7 @@ import type {
 } from "../lib/linear-import";
 import { requiredExecutableWorkflowStages } from "../lib/auto-hunt-contract";
 import { LinearIssueImport } from "./LinearIssueImport";
+import { ProjectExecutionSettings } from "./ProjectExecutionSettings";
 import { SelectMenu } from "./SelectMenu";
 
 const providerLabels: Record<AgentProvider, string> = {
@@ -88,6 +88,7 @@ export type ProjectSettingsSection =
   | "integrations"
   | "issue-import"
   | "agent-configuration"
+  | "execution"
   | "workflow";
 
 export function ProjectSettings({
@@ -111,7 +112,6 @@ export function ProjectSettings({
   project,
   repositoryConnected,
   sessionToken = null,
-  userId = null,
   velen,
 }: {
   dashboard: DashboardPayload | null;
@@ -143,7 +143,6 @@ export function ProjectSettings({
   project: Project;
   repositoryConnected: boolean;
   sessionToken?: string | null;
-  userId?: string | null;
   velen: VelenInspection | null;
 }) {
   const { localeTag, t } = useI18n();
@@ -182,28 +181,9 @@ export function ProjectSettings({
   const [sandboxLoading, setSandboxLoading] = useState(true);
   const [sandboxSaving, setSandboxSaving] = useState(false);
   const [sandboxError, setSandboxError] = useState<string | null>(null);
-  const [workerSharingSaving, setWorkerSharingSaving] = useState(false);
-  const [workerSharingError, setWorkerSharingError] = useState<string | null>(null);
-  const [workerSharingOverride, setWorkerSharingOverride] = useState<boolean | null>(
-    null,
-  );
-  const ownedWorker = dashboard?.workers?.find(
-    (worker) => worker.ownerUserId === userId,
-  );
-  const [workerMaxSessions, setWorkerMaxSessions] = useState(1);
-  const [workerSavedMaxSessions, setWorkerSavedMaxSessions] = useState(1);
-  const [workerConcurrencySaving, setWorkerConcurrencySaving] = useState(false);
-  const workerSharingEnabled =
-    workerSharingOverride ??
-    Boolean(ownedWorker && ownedWorker.readiness !== "disabled");
   useEffect(() => {
     if (initialSection) setActiveSection(initialSection);
   }, [initialSection]);
-  useEffect(() => {
-    const maximum = ownedWorker?.maxConcurrentSessions ?? 1;
-    setWorkerMaxSessions(maximum);
-    setWorkerSavedMaxSessions(maximum);
-  }, [ownedWorker?.maxConcurrentSessions]);
   const [linear, setLinear] = useState<ProjectSettingsData["linear"]>(
     () => dashboard?.settings.linear ?? {
       enabled: false,
@@ -516,54 +496,6 @@ export function ProjectSettings({
       setLinearSaving(false);
     }
   };
-  const updateWorkerSharing = async (enabled: boolean) => {
-    if (!sessionToken) {
-      setWorkerSharingError(t("worker.loginRequired"));
-      return;
-    }
-    if (enabled && !repositoryConnected) {
-      setWorkerSharingError(t("worker.repositoryRequired"));
-      return;
-    }
-    setWorkerSharingSaving(true);
-    setWorkerSharingError(null);
-    try {
-      const { invoke } = await import("@tauri-apps/api/core");
-      await invoke("configure_execution_worker", {
-        projectId: project.id,
-        userToken: sessionToken,
-        enabled,
-      });
-      setWorkerSharingOverride(enabled);
-    } catch (caught) {
-      setWorkerSharingError(
-        caught instanceof Error ? caught.message : String(caught),
-      );
-    } finally {
-      setWorkerSharingSaving(false);
-    }
-  };
-  const saveWorkerConcurrency = async () => {
-    if (!sessionToken || !ownedWorker) return;
-    setWorkerConcurrencySaving(true);
-    setWorkerSharingError(null);
-    try {
-      const updated = await updateExecutionWorkerConcurrency(
-        sessionToken,
-        project.id,
-        ownedWorker.id,
-        workerMaxSessions,
-      );
-      setWorkerMaxSessions(updated.maxConcurrentSessions);
-      setWorkerSavedMaxSessions(updated.maxConcurrentSessions);
-    } catch (caught) {
-      setWorkerSharingError(
-        caught instanceof Error ? caught.message : String(caught),
-      );
-    } finally {
-      setWorkerConcurrencySaving(false);
-    }
-  };
   const navigationItems = [
     {
       id: "general" as const,
@@ -588,6 +520,12 @@ export function ProjectSettings({
       icon: <ShieldCheck size={16} strokeWidth={1.75} />,
       label: t("settings.navAgent"),
       description: t("settings.navAgentDescription"),
+    },
+    {
+      id: "execution" as const,
+      icon: <Cpu size={16} strokeWidth={1.75} />,
+      label: t("settings.navExecution"),
+      description: t("settings.navExecutionDescription"),
     },
     {
       id: "workflow" as const,
@@ -1075,85 +1013,6 @@ export function ProjectSettings({
               </footer>
             </section>
 
-            <div className="project-settings-worker-sharing">
-              <span className="project-settings-sandbox-icon">
-                <Cpu size={17} strokeWidth={1.8} />
-              </span>
-              <span>
-                <strong>{t("worker.shareThisComputer")}</strong>
-                <small>
-                  {ownedWorker?.readinessDetail ??
-                    t(
-                      workerSharingEnabled
-                        ? "worker.sharingDescriptionOn"
-                        : "worker.sharingDescriptionOff",
-                    )}
-                </small>
-              </span>
-              <label className="project-settings-toggle flex items-center gap-2">
-                <Switch
-                  aria-label={t("worker.shareThisComputer")}
-                  checked={workerSharingEnabled}
-                  disabled={workerSharingSaving}
-                  onCheckedChange={(enabled) => {
-                    void updateWorkerSharing(enabled);
-                  }}
-                />
-                <span className="text-xs font-medium text-muted-foreground">
-                  {workerSharingSaving
-                    ? t("common.saving")
-                    : workerSharingEnabled
-                      ? t("worker.sharingOn")
-                      : t("worker.sharingOff")}
-                </span>
-              </label>
-            </div>
-            {workerSharingError ? (
-              <p className="project-settings-sandbox-error" role="alert">
-                {workerSharingError}
-              </p>
-            ) : null}
-            {workerSharingEnabled && ownedWorker ? (
-              <div className="project-settings-worker-concurrency">
-                <span>
-                  <strong>{t("worker.maxConcurrentSessions")}</strong>
-                  <small>
-                    {t("worker.concurrentSessionsUsage", {
-                      active: ownedWorker.activeSessions,
-                      maximum: workerMaxSessions,
-                    })}
-                  </small>
-                </span>
-                <Input
-                  aria-label={t("worker.maxConcurrentSessions")}
-                  max={16}
-                  min={1}
-                  onChange={(event) =>
-                    setWorkerMaxSessions(
-                      Math.min(
-                        16,
-                        Math.max(1, Number.parseInt(event.target.value, 10) || 1),
-                      ),
-                    )}
-                  type="number"
-                  value={workerMaxSessions}
-                />
-                <Button
-                  disabled={
-                    workerConcurrencySaving ||
-                    workerMaxSessions === workerSavedMaxSessions
-                  }
-                  onClick={() => void saveWorkerConcurrency()}
-                  type="button"
-                  variant="outline"
-                >
-                  {workerConcurrencySaving
-                    ? t("common.saving")
-                    : t("worker.saveConcurrency")}
-                </Button>
-              </div>
-            ) : null}
-
             <div
               className={`project-settings-sandbox${
                 sandbox.fullAccess ? " unrestricted" : ""
@@ -1200,6 +1059,16 @@ export function ProjectSettings({
               </p>
             ) : null}
           </section>
+
+          <div hidden={activeSection !== "execution"}>
+            <ProjectExecutionSettings
+              canManage={project.role === "owner" || project.role === "admin"}
+              initialPolicy={dashboard?.executionPolicy}
+              project={project}
+              token={sessionToken}
+              workers={dashboard?.workers ?? []}
+            />
+          </div>
 
           <section
             className="project-settings-automation"

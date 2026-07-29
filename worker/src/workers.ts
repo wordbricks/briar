@@ -45,6 +45,36 @@ export type ExecutionWorkerDeviceRow = {
   updated_at: string;
 };
 
+export type ProjectExecutionWorkerPolicy = {
+  selectionMode: "any" | "allowlist";
+  defaultWorkerId: string | null;
+  allowedWorkerIds: string[];
+  updatedAt: string | null;
+};
+
+export type OrganizationExecutionWorker = {
+  deviceId: string;
+  ownerUserId: string;
+  ownerName: string;
+  label: string;
+  state: ExecutionWorkerState;
+  maxConcurrentSessions: number;
+  activeSessions: number;
+  lastHeartbeatAt: string;
+  createdAt: string;
+  bindings: Array<{
+    id: string;
+    projectId: string;
+    projectName: string;
+    agentProvider: AgentProvider;
+    state: ExecutionWorkerState;
+    acceptingWork: boolean;
+    readiness:
+      "available" | "busy" | "offline" | "needs_attention" | "disabled";
+    readinessDetail: string | null;
+  }>;
+};
+
 export type ExecutionWorkerCredentialPrincipal = {
   deviceId: string;
   organizationId: string;
@@ -269,6 +299,89 @@ export async function registerExecutionWorker(
     projectId,
   );
   if (!worker) throw new WorkerConflictError("Worker project binding was not created");
+  return { device, worker };
+}
+
+/**
+ * Add a project binding for an already enrolled device without rotating its
+ * organization-scoped credential. This keeps other project services alive.
+ */
+export async function bindExecutionWorkerProject(
+  db: D1Database,
+  projectId: string,
+  input: {
+    id: string;
+    organizationId: string;
+    ownerUserId: string;
+    deviceIdentityHash: string;
+    agentProvider: AgentProvider;
+    versions: Record<string, string>;
+    observedAt: string;
+  },
+) {
+  const device = await db
+    .prepare(
+      `select device.*
+       from briar_execution_worker_devices device
+       join briar_execution_worker_credentials credential
+         on credential.device_id = device.id
+       where device.organization_id = ?
+         and device.owner_user_id = ?
+         and device.device_identity_hash = ?
+         and device.state != 'disabled'
+         and credential.revoked_at is null`,
+    )
+    .bind(input.organizationId, input.ownerUserId, input.deviceIdentityHash)
+    .first<ExecutionWorkerDeviceRow>();
+  if (!device) {
+    throw new WorkerConflictError(
+      "This computer must be enrolled in the organization before another project can be enabled",
+    );
+  }
+  const project = await db
+    .prepare(`select organization_id from briar_projects where id = ?`)
+    .bind(projectId)
+    .first<{ organization_id: string }>();
+  if (!project || project.organization_id !== device.organization_id) {
+    throw new WorkerConflictError(
+      "Worker project must belong to its organization",
+    );
+  }
+  await db
+    .prepare(
+      `insert into briar_execution_workers (
+         id, project_id, device_id, label, host_fingerprint, agent_provider,
+         versions_json, state, last_heartbeat_at, created_at, updated_at
+       ) values (?, ?, ?, ?, ?, ?, ?, 'online', ?, ?, ?)
+       on conflict (project_id, device_id) do update set
+         label = excluded.label,
+         host_fingerprint = excluded.host_fingerprint,
+         agent_provider = excluded.agent_provider,
+         versions_json = excluded.versions_json,
+         state = 'online',
+         last_heartbeat_at = excluded.last_heartbeat_at,
+         updated_at = excluded.updated_at`,
+    )
+    .bind(
+      input.id,
+      projectId,
+      device.id,
+      device.label,
+      input.deviceIdentityHash,
+      input.agentProvider,
+      JSON.stringify(input.versions ?? {}),
+      input.observedAt,
+      input.observedAt,
+      input.observedAt,
+    )
+    .run();
+  const worker = await executionWorkerBindingForProject(
+    db,
+    device.id,
+    projectId,
+  );
+  if (!worker)
+    throw new WorkerConflictError("Worker project binding was not created");
   return { device, worker };
 }
 
@@ -557,6 +670,268 @@ export async function listExecutionWorkers(
   }));
 }
 
+export async function listOrganizationExecutionWorkers(
+  db: D1Database,
+  organizationId: string,
+  observedAt: string,
+): Promise<OrganizationExecutionWorker[]> {
+  const result = await db
+    .prepare(
+      `select device.id as device_id, device.owner_user_id, owner.name as owner_name,
+              device.label as device_label, device.state as device_state,
+              device.max_concurrent_sessions, device.last_heartbeat_at,
+              device.created_at, worker.id as worker_id,
+              worker.project_id, project.name as project_name,
+              worker.agent_provider, worker.state as worker_state,
+              worker.accepting_work, worker.readiness_state,
+              worker.readiness_detail, worker.last_heartbeat_at as worker_heartbeat_at,
+              (
+                select count(*)
+                from briar_hunt_runs active
+                join briar_execution_workers holder
+                  on holder.id = active.worker_id
+                where holder.device_id = device.id
+                  and active.claim_token_hash is not null
+                  and active.lease_expires_at is not null
+                  and active.lease_expires_at > ?
+                  and active.status not in (
+                    'backlog', 'completed', 'cancelled', 'blocked', 'failed'
+                  )
+              ) as active_sessions
+       from briar_execution_worker_devices device
+       join "user" owner on owner.id = device.owner_user_id
+       left join briar_execution_workers worker
+         on worker.device_id = device.id
+       left join briar_projects project on project.id = worker.project_id
+       where device.organization_id = ?
+       order by device.last_heartbeat_at desc, device.id, project.created_at`,
+    )
+    .bind(observedAt, organizationId)
+    .all<{
+      device_id: string;
+      owner_user_id: string;
+      owner_name: string;
+      device_label: string;
+      device_state: ExecutionWorkerState;
+      max_concurrent_sessions: number;
+      last_heartbeat_at: string;
+      created_at: string;
+      worker_id: string | null;
+      project_id: string | null;
+      project_name: string | null;
+      agent_provider: AgentProvider | null;
+      worker_state: ExecutionWorkerState | null;
+      accepting_work: number | null;
+      readiness_state: ExecutionWorkerReadiness | null;
+      readiness_detail: string | null;
+      worker_heartbeat_at: string | null;
+      active_sessions: number;
+    }>();
+  const workers = new Map<string, OrganizationExecutionWorker>();
+  for (const row of result.results ?? []) {
+    const activeSessions = row.active_sessions ?? 0;
+    const device =
+      workers.get(row.device_id) ??
+      ({
+        deviceId: row.device_id,
+        ownerUserId: row.owner_user_id,
+        ownerName: row.owner_name,
+        label: row.device_label,
+        state: workerStateAt(
+          row.last_heartbeat_at,
+          observedAt,
+          row.device_state,
+        ),
+        maxConcurrentSessions: row.max_concurrent_sessions,
+        activeSessions,
+        lastHeartbeatAt: row.last_heartbeat_at,
+        createdAt: row.created_at,
+        bindings: [],
+      } satisfies OrganizationExecutionWorker);
+    workers.set(row.device_id, device);
+    if (
+      !row.worker_id ||
+      !row.project_id ||
+      !row.project_name ||
+      !row.agent_provider ||
+      !row.worker_state ||
+      !row.readiness_state ||
+      !row.worker_heartbeat_at
+    ) {
+      continue;
+    }
+    const state = workerStateAt(
+      row.worker_heartbeat_at,
+      observedAt,
+      row.worker_state,
+    );
+    device.bindings.push({
+      id: row.worker_id,
+      projectId: row.project_id,
+      projectName: row.project_name,
+      agentProvider: row.agent_provider,
+      state,
+      acceptingWork: row.accepting_work !== 0,
+      readiness:
+        state === "disabled"
+          ? "disabled"
+          : state === "stale"
+            ? "offline"
+            : row.readiness_state === "needs_attention"
+              ? "needs_attention"
+              : activeSessions >= row.max_concurrent_sessions
+                ? "busy"
+                : "available",
+      readinessDetail: row.readiness_detail,
+    });
+  }
+  return [...workers.values()];
+}
+
+export async function getProjectExecutionWorkerPolicy(
+  db: D1Database,
+  projectId: string,
+): Promise<ProjectExecutionWorkerPolicy> {
+  const [policy, allowed] = await Promise.all([
+    db
+      .prepare(
+        `select selection_mode, default_worker_id, updated_at
+         from briar_project_execution_worker_policies
+         where project_id = ?`,
+      )
+      .bind(projectId)
+      .first<{
+        selection_mode: "any" | "allowlist";
+        default_worker_id: string | null;
+        updated_at: string;
+      }>(),
+    db
+      .prepare(
+        `select worker_id
+         from briar_project_execution_worker_allowlist
+         where project_id = ?
+         order by created_at, worker_id`,
+      )
+      .bind(projectId)
+      .all<{ worker_id: string }>(),
+  ]);
+  return {
+    selectionMode: policy?.selection_mode ?? "any",
+    defaultWorkerId: policy?.default_worker_id ?? null,
+    allowedWorkerIds: (allowed.results ?? []).map((row) => row.worker_id),
+    updatedAt: policy?.updated_at ?? null,
+  };
+}
+
+export async function updateProjectExecutionWorkerPolicy(
+  db: D1Database,
+  projectId: string,
+  input: {
+    selectionMode: "any" | "allowlist";
+    defaultWorkerId: string | null;
+    allowedWorkerIds: string[];
+    updatedByUserId: string;
+    observedAt: string;
+  },
+) {
+  const allowedWorkerIds = [...new Set(input.allowedWorkerIds)];
+  const referencedIds = [
+    ...new Set([
+      ...allowedWorkerIds,
+      ...(input.defaultWorkerId ? [input.defaultWorkerId] : []),
+    ]),
+  ];
+  if (referencedIds.length > 0) {
+    const placeholders = referencedIds.map(() => "?").join(", ");
+    const result = await db
+      .prepare(
+        `select id from briar_execution_workers
+         where project_id = ? and id in (${placeholders})`,
+      )
+      .bind(projectId, ...referencedIds)
+      .all<{ id: string }>();
+    if (
+      new Set(result.results?.map((row) => row.id)).size !==
+      referencedIds.length
+    ) {
+      throw new WorkerConflictError(
+        "Execution policy references an unknown Worker",
+      );
+    }
+  }
+  if (
+    input.selectionMode === "allowlist" &&
+    input.defaultWorkerId &&
+    !allowedWorkerIds.includes(input.defaultWorkerId)
+  ) {
+    throw new WorkerConflictError(
+      "The default Worker must be in the allowlist",
+    );
+  }
+  await db.batch([
+    db
+      .prepare(
+        `insert into briar_project_execution_worker_policies (
+           project_id, selection_mode, default_worker_id, updated_by_user_id,
+           created_at, updated_at
+         ) values (?, ?, ?, ?, ?, ?)
+         on conflict(project_id) do update set
+           selection_mode = excluded.selection_mode,
+           default_worker_id = excluded.default_worker_id,
+           updated_by_user_id = excluded.updated_by_user_id,
+           updated_at = excluded.updated_at`,
+      )
+      .bind(
+        projectId,
+        input.selectionMode,
+        input.defaultWorkerId,
+        input.updatedByUserId,
+        input.observedAt,
+        input.observedAt,
+      ),
+    db
+      .prepare(
+        `delete from briar_project_execution_worker_allowlist
+         where project_id = ?`,
+      )
+      .bind(projectId),
+    ...allowedWorkerIds.map((workerId) =>
+      db
+        .prepare(
+          `insert into briar_project_execution_worker_allowlist (
+             project_id, worker_id, created_at
+           ) values (?, ?, ?)`,
+        )
+        .bind(projectId, workerId, input.observedAt),
+    ),
+  ]);
+  return getProjectExecutionWorkerPolicy(db, projectId);
+}
+
+export async function isExecutionWorkerAllowedForProject(
+  db: D1Database,
+  projectId: string,
+  workerId: string,
+) {
+  const row = await db
+    .prepare(
+      `select case
+         when policy.selection_mode is null or policy.selection_mode = 'any'
+           then 1
+         when allowed.worker_id is not null then 1
+         else 0
+       end as allowed
+       from (select 1) seed
+       left join briar_project_execution_worker_policies policy
+         on policy.project_id = ?
+       left join briar_project_execution_worker_allowlist allowed
+         on allowed.project_id = ? and allowed.worker_id = ?`,
+    )
+    .bind(projectId, projectId, workerId)
+    .first<{ allowed: number }>();
+  return row?.allowed === 1;
+}
+
 export async function updateExecutionWorkerConcurrency(
   db: D1Database,
   deviceId: string,
@@ -693,6 +1068,13 @@ export async function dispatchHuntRun(
         `Worker does not support the ${agent.provider} Agent provider`,
       );
     }
+    if (
+      !(await isExecutionWorkerAllowedForProject(db, projectId, input.workerId))
+    ) {
+      throw new WorkerConflictError(
+        "Worker is not allowed by this project's execution policy",
+      );
+    }
   } else {
     const eligible = await db
       .prepare(
@@ -703,6 +1085,19 @@ export async function dispatchHuntRun(
            and worker.agent_provider = ? and worker.state != 'disabled'
            and worker.accepting_work = 1
            and worker.readiness_state != 'needs_attention'
+           and (
+             not exists (
+               select 1 from briar_project_execution_worker_policies policy
+               where policy.project_id = worker.project_id
+                 and policy.selection_mode = 'allowlist'
+             )
+             or exists (
+               select 1
+               from briar_project_execution_worker_allowlist allowed
+               where allowed.project_id = worker.project_id
+                 and allowed.worker_id = worker.id
+             )
+           )
          limit 1`,
       )
       .bind(projectId, organizationId, agent.provider)
