@@ -11,7 +11,6 @@ import {
   Clock3,
   Code2,
   Columns3,
-  Cpu,
   FolderKanban,
   FolderGit2,
   GitCommitHorizontal,
@@ -704,18 +703,6 @@ export function HuntDashboard({
               </span>
             }
           />
-        )}
-        {!companionMode && (dashboard?.workers?.length ?? 0) > 0 && (
-          <div className="worker-readiness-strip" aria-label={t("worker.executionEnvironment")}>
-            <Cpu size={15} />
-            {dashboard!.workers!.map((worker) => (
-              <span className={`worker-readiness-chip ${worker.readiness}`} key={worker.id}>
-                <i />
-                <strong>{worker.label}</strong>
-                <small>{t(`worker.readiness.${worker.readiness}` as MessageKey)}</small>
-              </span>
-            ))}
-          </div>
         )}
         {!companionMode && <div className="status-tabs">
           <button className={status === "all" ? "active" : ""} onClick={() => setStatus("all")}>{t("dashboard.all")} <span>{runs.length}</span></button>
