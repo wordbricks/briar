@@ -276,7 +276,10 @@ pub(crate) fn ssh_script_args(
     args.push("--".to_string());
     args.push("sh".to_string());
     args.push("-c".to_string());
-    args.push(script.to_string());
+    // OpenSSH joins the remote argv with spaces before handing it to the
+    // account's login shell. Quote the complete script so `sh -c` receives it
+    // as one argument instead of letting the login shell execute its lines.
+    args.push(shell_quote(script));
     Ok(args)
 }
 
@@ -638,8 +641,9 @@ Host !blocked build-?
     }
 
     #[test]
-    fn script_args_end_with_the_remote_shell_program() {
-        let args = ssh_script_args(&host(), &SshAuth::default(), "exec git status\n").unwrap();
+    fn script_args_shell_quote_the_complete_remote_program() {
+        let script = "exec sh -c 'printf \"%s\" \"$HOME\"'\n";
+        let args = ssh_script_args(&host(), &SshAuth::default(), script).unwrap();
         assert_eq!(
             &args[args.len() - 5..],
             &[
@@ -647,8 +651,12 @@ Host !blocked build-?
                 "--".to_string(),
                 "sh".to_string(),
                 "-c".to_string(),
-                "exec git status\n".to_string(),
+                shell_quote(script),
             ]
+        );
+        assert_eq!(
+            args[args.len() - 3..].join(" "),
+            format!("sh -c {}", shell_quote(script)),
         );
     }
 
