@@ -341,4 +341,29 @@ describe("Worker HTTP contract", () => {
         .map((method) => method.trim()),
     ).toContain("DELETE");
   });
+
+  it("allows worker concurrency updates through CORS preflight", async () => {
+    const response = await worker.fetch(
+      new Request(
+        "https://briar-api.example/organizations/00000000-0000-0000-0000-000000000000/workers/device-id",
+        {
+          method: "OPTIONS",
+          headers: {
+            "Access-Control-Request-Headers": "authorization, content-type",
+            "Access-Control-Request-Method": "PATCH",
+            Origin: "tauri://localhost",
+          },
+        },
+      ),
+      {} as never,
+    );
+
+    expect(response.status).toBe(200);
+    expect(
+      response.headers
+        .get("Access-Control-Allow-Methods")
+        ?.split(",")
+        .map((method) => method.trim()),
+    ).toContain("PATCH");
+  });
 });

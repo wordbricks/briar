@@ -194,7 +194,7 @@ import {
 const corsHeaders = {
   "Access-Control-Allow-Headers":
     "authorization, content-type, x-briar-claim-token",
-  "Access-Control-Allow-Methods": "DELETE, GET, HEAD, POST, PUT, OPTIONS",
+  "Access-Control-Allow-Methods": "DELETE, GET, HEAD, PATCH, POST, PUT, OPTIONS",
   "Access-Control-Allow-Origin": "*",
 };
 
