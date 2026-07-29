@@ -17,6 +17,7 @@ import type {
   ProjectExecutionWorkerPolicy,
 } from "../types";
 import { SelectMenu } from "./SelectMenu";
+import { WorkerProviderIcons } from "./WorkerProviderIcons";
 
 const defaultPolicy: ProjectExecutionWorkerPolicy = {
   selectionMode: "any",
@@ -228,7 +229,11 @@ export function ProjectExecutionSettings({
                             {worker.label}
                           </Typography>
                           <Badge variant="outline">
-                            {worker.agentProvider}
+                            <WorkerProviderIcons
+                              providers={
+                                worker.providers ?? [worker.agentProvider]
+                              }
+                            />
                           </Badge>
                           <Badge
                             variant={
@@ -284,7 +289,9 @@ export function ProjectExecutionSettings({
                     value: "",
                   },
                   ...eligibleWorkers.map((worker) => ({
-                    description: `${worker.agentProvider} · ${t(
+                    description: `${(
+                      worker.providers ?? [worker.agentProvider]
+                    ).join(", ")} · ${t(
                       `worker.readiness.${worker.readiness}`,
                     )}`,
                     label: worker.label,

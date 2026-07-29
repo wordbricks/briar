@@ -19,6 +19,7 @@ import type {
   Project,
 } from "../types";
 import { SelectMenu } from "./SelectMenu";
+import { WorkerProviderIcons } from "./WorkerProviderIcons";
 
 type LocalWorkerStatus = {
   projectId: string;
@@ -385,7 +386,14 @@ export function OrganizationWorkersSettings({
                           key={binding.id}
                           variant={readinessTone(binding.readiness)}
                         >
-                          {binding.projectName} · {binding.agentProvider} ·{" "}
+                          {binding.projectName}
+                          <span aria-hidden>·</span>
+                          <WorkerProviderIcons
+                            providers={
+                              binding.providers ?? [binding.agentProvider]
+                            }
+                          />
+                          <span aria-hidden>·</span>
                           {t(`worker.readiness.${binding.readiness}`)}
                         </Badge>
                       ))

@@ -156,6 +156,7 @@ import {
   executionWorkerBindingById,
   executionWorkerBindingForProject,
   executionWorkerDeviceForBinding,
+  executionWorkerProviders,
   leaseExpiryFrom,
   listExecutionAuditEvents,
   listExecutionWorkers,
@@ -736,6 +737,10 @@ const workerRegisterSchema = z
     label: z.string().trim().min(1).max(100),
     deviceIdentity: z.string().regex(/^briar_device_[0-9a-f]{64}$/u),
     agentProvider: z.enum(["codex", "claude", "grok"]),
+    providers: z
+      .array(z.enum(["codex", "claude", "grok"]))
+      .max(3)
+      .optional(),
     maxConcurrentSessions: z
       .number()
       .int()
@@ -749,6 +754,7 @@ const workerRegisterSchema = z
 const workerBindSchema = workerRegisterSchema.pick({
   deviceIdentity: true,
   agentProvider: true,
+  providers: true,
   versions: true,
 });
 
@@ -1099,7 +1105,7 @@ const workerJson = (
     device_id?: string;
     owner_user_id?: string;
     label: string;
-    agent_provider: string;
+    agent_provider: "codex" | "claude" | "grok";
     versions_json: string;
     state: string;
     accepting_work?: number;
@@ -1127,6 +1133,10 @@ const workerJson = (
   ...(worker.owner_user_id ? { ownerUserId: worker.owner_user_id } : {}),
   label: worker.label,
   agentProvider: worker.agent_provider,
+  providers: executionWorkerProviders({
+    agent_provider: worker.agent_provider,
+    capabilities_json: worker.capabilities_json ?? "{}",
+  }),
   versions: parseJsonObject(worker.versions_json) ?? {},
   state: workerStateAt(
     worker.last_heartbeat_at,
@@ -3591,6 +3601,7 @@ async function route(
       deviceIdentityHash: await sha256(input.deviceIdentity),
       credentialTokenHash: await sha256(workerToken),
       agentProvider: input.agentProvider,
+      providers: input.providers,
       maxConcurrentSessions: input.maxConcurrentSessions,
       versions: input.versions,
       observedAt,
@@ -3624,6 +3635,7 @@ async function route(
       ownerUserId: session.user.id,
       deviceIdentityHash: await sha256(input.deviceIdentity),
       agentProvider: input.agentProvider,
+      providers: input.providers,
       versions: input.versions,
       observedAt,
     });
@@ -3953,7 +3965,9 @@ async function route(
       runId: input.runId,
       workerId: authenticatedWorkerId,
       workerDeviceId: authenticatedWorker?.principal.deviceId,
-      agentProvider: authenticatedWorker?.binding.agent_provider,
+      agentProviders: authenticatedWorker
+        ? executionWorkerProviders(authenticatedWorker.binding)
+        : undefined,
       detachedOnly: Boolean(authenticatedWorkerId),
     });
     if (run && authenticatedWorker) {
