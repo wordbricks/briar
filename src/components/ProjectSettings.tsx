@@ -15,7 +15,6 @@ import {
   RefreshCw,
   Rocket,
   Save,
-  Server,
   ShieldCheck,
   Sparkles,
   SlidersHorizontal,
@@ -73,7 +72,6 @@ import type {
   LinearImportStatesResult,
 } from "../lib/linear-import";
 import { LinearIssueImport } from "./LinearIssueImport";
-import { ProjectRemoteConnection } from "./ProjectRemoteConnection";
 import { SelectMenu } from "./SelectMenu";
 
 const providerLabels: Record<AgentProvider, string> = {
@@ -85,7 +83,6 @@ const providerLabels: Record<AgentProvider, string> = {
 type ProjectSettingsSection =
   | "general"
   | "integrations"
-  | "remote-connection"
   | "issue-import"
   | "agent-configuration"
   | "workflow";
@@ -476,12 +473,6 @@ export function ProjectSettings({
       description: t("settings.navIntegrationsDescription"),
     },
     {
-      id: "remote-connection" as const,
-      icon: <Server size={16} strokeWidth={1.75} />,
-      label: t("settings.navRemoteConnection"),
-      description: t("settings.navRemoteConnectionDescription"),
-    },
-    {
       id: "issue-import" as const,
       icon: <Download size={16} strokeWidth={1.75} />,
       label: t("settings.navIssueImport"),
@@ -561,9 +552,6 @@ export function ProjectSettings({
             </section>
           ) : null}
 
-          {activeSection === "remote-connection" ? (
-            <ProjectRemoteConnection projectId={project.id} />
-          ) : null}
 
           <section
             className="project-settings-linear"

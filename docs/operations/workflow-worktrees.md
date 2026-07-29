@@ -101,10 +101,10 @@ commands inside the worktree.
 
 ## Agent write access
 
-Auto Hunt worktree creation is a host control-plane operation. The desktop
+Auto Hunt worktree creation is a local runtime control-plane operation. The desktop
 runtime invokes the isolated Briar CLI before starting a worker, so
 `git worktree add` writes the connected repository's shared `.git/refs` and
-`.git/worktrees` with host authority rather than from inside an agent sandbox.
+`.git/worktrees` with application authority rather than from inside an agent sandbox.
 Only after allocation succeeds does the app start a worker with that exact
 worktree as its `cwd`.
 
@@ -218,10 +218,3 @@ Removal is conservative by design:
 | Removal refuses | uncommitted or untracked files | commit, discard, or pass `--force` |
 | `preservedBranch` in the removal result | the branch holds commits the base ref does not | merge, push, or delete it deliberately |
 | Worktree missing from `worktree list` | directory deleted outside git | rerun removal; bookkeeping is pruned automatically |
-
-## Remote execution hosts
-
-On an SSH-backed project the worktree is created on that host, next to its
-checkout. The CLI runs there against a throwaway copy of `~/.config/briar`, so
-allocation never relies on config written by an earlier command: reuse is
-detected from `git worktree list` and branch existence.

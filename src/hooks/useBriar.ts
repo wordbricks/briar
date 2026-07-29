@@ -416,10 +416,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     };
   }, []);
 
-  const refreshVelen = useCallback(async (
-    org?: string | null,
-    executionHostId = "local",
-  ) => {
+  const refreshVelen = useCallback(async (org?: string | null) => {
     if (demoMode) {
       const inspection: VelenInspection = {
         authenticated: true,
@@ -437,7 +434,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       return inspection;
     }
     try {
-      const inspection = await inspectVelen(org, executionHostId);
+      const inspection = await inspectVelen(org);
       setVelen(inspection);
       setError(null);
       return inspection;
@@ -1026,7 +1023,6 @@ export function useBriar(options: UseBriarOptions = {}) {
   const connectProject = useCallback(async (
     autoHunt: LocalAutoHuntConfig,
     repositoryPath: string,
-    executionHostId = "local",
   ) => {
     if (!projectConnection) throw new Error("연결할 프로젝트가 없습니다.");
     if (!repositoryPath) throw new Error("연결할 Git 저장소를 선택하세요.");
@@ -1050,7 +1046,6 @@ export function useBriar(options: UseBriarOptions = {}) {
         projectId: connection.project.id,
         agentToken,
         repositoryPath,
-        executionHostId,
         autoHunt,
       });
       connectedLocally = true;

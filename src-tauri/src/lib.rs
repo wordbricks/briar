@@ -3,8 +3,8 @@ mod agent_usage;
 mod auto_hunt_dispatch;
 mod host;
 
+use crate::host::CommandRunner;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
     env,
@@ -31,7 +31,6 @@ const PROJECT_AGENT_SCHEDULE_POLL_EVENT: &str = "project-agent-schedule-poll";
 const AGENT_SESSION_STOPPED_ERROR: &str = "사용자가 에이전트 세션을 중지했습니다.";
 const DEFAULT_MAIN_WINDOW_SIZE: (f64, f64) = (1280.0, 820.0);
 const ONBOARDING_MAIN_WINDOW_SIZE: (f64, f64) = (980.0, 680.0);
-const DISCOVERED_SSH_HOST_ID_PREFIX: &str = "ssh-config-";
 
 #[derive(Deserialize, Serialize)]
 struct StoredSession {
@@ -47,10 +46,6 @@ struct CliProject {
     /// omit it and remain readable until the next connection save.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     api_url: Option<String>,
-    /// Which machine this project executes on. Absent means the local machine,
-    /// so configs written before remote hosts existed keep working unchanged.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    execution_host_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     repository_remote: Option<String>,
     agent_token: String,
@@ -126,24 +121,6 @@ struct WorkflowReleaseConfig {
 struct ConnectedLocalProject {
     repository_path: String,
     workflow: WorkflowConfig,
-}
-
-/// Origin remote URL, read on whichever host owns the repository.
-fn repository_remote_on(runner: &dyn host::CommandRunner, path: &Path) -> Option<String> {
-    if !runner.is_remote() {
-        return repository_remote(path);
-    }
-    let git = runner.resolve_binary("git").ok()?;
-    let output = runner
-        .run(
-            &host::CommandSpec::new(git)
-                .args(["remote", "get-url", "origin"])
-                .env("GIT_TERMINAL_PROMPT", "0")
-                .working_directory(path),
-        )
-        .ok()?;
-    let remote = output.stdout_trimmed();
-    (output.success() && !remote.is_empty()).then_some(remote)
 }
 
 fn repository_workflow_bootstrap() -> WorkflowConfig {
@@ -358,10 +335,6 @@ struct CliConfig {
     app_settings: StoredAppRuntimeSettings,
     #[serde(default)]
     projects: Vec<CliProject>,
-    /// Saved SSH execution hosts. Local to this machine: never sent to the
-    /// Worker, and holding no secrets — OpenSSH owns key and agent resolution.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    ssh_hosts: Vec<host::SshHost>,
     #[serde(flatten)]
     extra: BTreeMap<String, serde_json::Value>,
 }
@@ -1086,7 +1059,7 @@ fn inspect_repository_readiness_on(
     }
     let resolved_path = root.as_deref().unwrap_or(repository_path);
     let remote = repository_healthy
-        .then(|| repository_remote_on(runner, resolved_path))
+        .then(|| repository_remote(resolved_path))
         .flatten();
     if remote.is_none() {
         issues.push("origin 원격 저장소가 설정되지 않았습니다.".to_string());
@@ -1302,22 +1275,12 @@ async fn inspect_repository_readiness(
     app: tauri::AppHandle,
     repository_path: String,
     workflow: WorkflowConfig,
-    execution_host_id: Option<String>,
 ) -> Result<RepositoryReadiness, String> {
-    let config_path = cli_config_path(&app)?;
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
-        let config = read_cli_config(&config_path)?;
-        let execution_host = host::ExecutionHostId::parse(execution_host_id.as_deref());
-        let runner = host::runner_for(
-            &execution_host,
-            &config.ssh_hosts,
-            cli_execution_path(&home)?,
-            &home,
-            host::SshAuth::default(),
-        )?;
+        let runner = host::LocalRunner::new(cli_execution_path(&home)?, home);
         Ok(inspect_repository_readiness_on(
-            runner.as_ref(),
+            &runner,
             Path::new(&repository_path),
             &workflow,
         ))
@@ -1552,21 +1515,11 @@ fn inspect_velen_on(
 async fn inspect_velen(
     app: tauri::AppHandle,
     org: Option<String>,
-    execution_host_id: Option<String>,
 ) -> Result<VelenInspection, String> {
-    let config_path = cli_config_path(&app)?;
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
-        let config = read_cli_config(&config_path)?;
-        let execution_host = host::ExecutionHostId::parse(execution_host_id.as_deref());
-        let runner = host::runner_for(
-            &execution_host,
-            &config.ssh_hosts,
-            cli_execution_path(&home)?,
-            &home,
-            host::SshAuth::default(),
-        )?;
-        inspect_velen_on(runner.as_ref(), org)
+        let runner = host::LocalRunner::new(cli_execution_path(&home)?, home);
+        inspect_velen_on(&runner, org)
     })
     .await
     .map_err(|error| error.to_string())?
@@ -1743,14 +1696,13 @@ struct LocalProjectAgentConfig {
     auto_hunt: AutoHuntConfig,
 }
 
-/// Everything a project connection records about where and how it runs.
+/// Everything a local project connection records.
 struct CliConnectionInput {
     api_url: String,
     project_id: String,
     agent_token: String,
     repository_path: String,
     repository_remote: Option<String>,
-    execution_host: Option<host::ExecutionHostId>,
 }
 
 fn write_cli_connection(
@@ -1764,7 +1716,6 @@ fn write_cli_connection(
         agent_token,
         repository_path,
         repository_remote,
-        execution_host,
     } = connection;
     if api_url.trim().is_empty() || project_id.trim().is_empty() {
         return Err("Briar 프로젝트 연결 정보가 올바르지 않습니다.".to_string());
@@ -1784,7 +1735,6 @@ fn write_cli_connection(
             agent_providers: AppProviderSettings::default(),
             app_settings: StoredAppRuntimeSettings::default(),
             projects: Vec::new(),
-            ssh_hosts: Vec::new(),
             extra: BTreeMap::new(),
         }
     };
@@ -1814,9 +1764,6 @@ fn write_cli_connection(
         id: project_id,
         repository_path,
         api_url: Some(api_url),
-        execution_host_id: execution_host
-            .filter(|host| !host.is_local())
-            .map(|host| host.as_stored()),
         repository_remote,
         agent_token,
         llm: Some(agent_config.llm),
@@ -1903,7 +1850,6 @@ fn read_cli_config(config_path: &Path) -> Result<CliConfig, String> {
             agent_providers: AppProviderSettings::default(),
             app_settings: StoredAppRuntimeSettings::default(),
             projects: Vec::new(),
-            ssh_hosts: Vec::new(),
             extra: BTreeMap::new(),
         });
     }
@@ -1911,22 +1857,6 @@ fn read_cli_config(config_path: &Path) -> Result<CliConfig, String> {
         .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
     serde_json::from_str::<CliConfig>(&contents)
         .map_err(|error| format!("Briar 로컬 설정이 손상되었습니다: {error}"))
-}
-
-/// Execution host a project is bound to. Unknown or missing values resolve to
-/// the local machine, so a config from another build never blocks startup.
-fn project_execution_host(
-    config: &CliConfig,
-    project_id: &str,
-) -> Result<host::ExecutionHostId, String> {
-    let project = config
-        .projects
-        .iter()
-        .find(|project| project.id == project_id)
-        .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
-    Ok(host::ExecutionHostId::parse(
-        project.execution_host_id.as_deref(),
-    ))
 }
 
 fn project_repository_path(config: &CliConfig, project_id: &str) -> Result<PathBuf, String> {
@@ -1938,21 +1868,16 @@ fn project_repository_path(config: &CliConfig, project_id: &str) -> Result<PathB
         .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())
 }
 
-/// Build the runner for a project's host. Local projects keep the exact
-/// binary-resolution behaviour they had before hosts existed.
 fn project_runner(
     config: &CliConfig,
     project_id: &str,
     home: &Path,
 ) -> Result<Arc<dyn host::CommandRunner>, String> {
-    let execution_host = project_execution_host(config, project_id)?;
-    host::runner_for(
-        &execution_host,
-        &config.ssh_hosts,
+    project_repository_path(config, project_id)?;
+    Ok(Arc::new(host::LocalRunner::new(
         cli_execution_path(home)?,
-        home,
-        host::SshAuth::default(),
-    )
+        home.to_path_buf(),
+    )))
 }
 
 /// Resolve a repository root through a runner: the configured path must be the
@@ -2004,23 +1929,17 @@ fn connected_project_workspace(config_path: &Path, project_id: &str) -> Result<P
     Ok(root)
 }
 
-/// Workspace root for a project on whichever host owns it.
-fn connected_project_workspace_on_host(
+fn connected_project_runtime(
     config_path: &Path,
     project_id: &str,
     home: &Path,
 ) -> Result<(Arc<dyn host::CommandRunner>, PathBuf), String> {
     let config = read_cli_config(config_path)?;
     let runner = project_runner(&config, project_id, home)?;
-    if !runner.is_remote() {
-        return Ok((
-            runner,
-            connected_project_workspace(config_path, project_id)?,
-        ));
-    }
-    let repository_path = project_repository_path(&config, project_id)?;
-    let workspace = resolve_workspace_with(runner.as_ref(), &repository_path)?;
-    Ok((runner, workspace))
+    Ok((
+        runner,
+        connected_project_workspace(config_path, project_id)?,
+    ))
 }
 
 #[derive(Clone, Copy, Default, Deserialize)]
@@ -2176,46 +2095,17 @@ fn remote_head_branch(output: &str) -> Option<&str> {
     })
 }
 
-fn create_analysis_temp_root(runner: &dyn host::CommandRunner) -> Result<PathBuf, String> {
-    if !runner.is_remote() {
-        return tempfile::Builder::new()
-            .prefix("briar-workflow-analysis-")
-            .tempdir()
-            .map(|directory| directory.keep())
-            .map_err(|error| format!("워크플로우 분석 임시 폴더를 만들지 못했습니다: {error}"));
-    }
-
-    let mktemp = runner.resolve_binary("mktemp")?;
-    let output = runner.run(&host::CommandSpec::new(mktemp).args(["-d"]))?;
-    if !output.success() {
-        return Err(format!(
-            "원격 워크플로우 분석 임시 폴더를 만들지 못했습니다: {}",
-            output.failure_message()
-        ));
-    }
-    let root = PathBuf::from(output.stdout_trimmed());
-    if !root.is_absolute() {
-        return Err("원격 호스트가 절대 임시 경로를 반환하지 않았습니다.".to_string());
-    }
-    Ok(root)
+fn create_analysis_temp_root(_runner: &dyn host::CommandRunner) -> Result<PathBuf, String> {
+    tempfile::Builder::new()
+        .prefix("briar-workflow-analysis-")
+        .tempdir()
+        .map(|directory| directory.keep())
+        .map_err(|error| format!("워크플로우 분석 임시 폴더를 만들지 못했습니다: {error}"))
 }
 
-fn remove_analysis_temp_root(runner: &dyn host::CommandRunner, root: &Path) -> Result<(), String> {
-    if !runner.is_remote() {
-        return fs::remove_dir(root)
-            .map_err(|error| format!("워크플로우 분석 임시 폴더를 정리하지 못했습니다: {error}"));
-    }
-    let rmdir = runner.resolve_binary("rmdir")?;
-    let output =
-        runner.run(&host::CommandSpec::new(rmdir).args([root.to_string_lossy().into_owned()]))?;
-    if output.success() {
-        Ok(())
-    } else {
-        Err(format!(
-            "원격 워크플로우 분석 임시 폴더를 정리하지 못했습니다: {}",
-            output.failure_message()
-        ))
-    }
+fn remove_analysis_temp_root(_runner: &dyn host::CommandRunner, root: &Path) -> Result<(), String> {
+    fs::remove_dir(root)
+        .map_err(|error| format!("워크플로우 분석 임시 폴더를 정리하지 못했습니다: {error}"))
 }
 
 fn prepare_latest_remote_workspace(
@@ -2336,492 +2226,6 @@ fn remove_latest_remote_workspace(
         ));
     }
     remove_analysis_temp_root(runner, &workspace.root)
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ExecutionHostSummary {
-    id: String,
-    label: String,
-    kind: host::ExecutionHostKind,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    alias: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    hostname: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    username: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    port: Option<u16>,
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ProjectExecutionConnection {
-    execution_host_id: String,
-    repository_path: String,
-    repository_remote: Option<String>,
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct RemoteDirectoryEntry {
-    name: String,
-    path: String,
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct RemoteDirectoryListing {
-    path: String,
-    parent_path: Option<String>,
-    entries: Vec<RemoteDirectoryEntry>,
-    git_repository: bool,
-    repository_remote: Option<String>,
-}
-
-fn execution_host_summaries(config: &CliConfig) -> Vec<ExecutionHostSummary> {
-    let mut hosts = vec![ExecutionHostSummary {
-        id: host::LOCAL_EXECUTION_HOST_ID.to_string(),
-        label: "이 컴퓨터".to_string(),
-        kind: host::ExecutionHostKind::Local,
-        alias: None,
-        hostname: None,
-        username: None,
-        port: None,
-    }];
-    hosts.extend(config.ssh_hosts.iter().map(|ssh| ExecutionHostSummary {
-        id: host::ssh_execution_host_id(&ssh.id),
-        label: ssh.label.clone(),
-        kind: host::ExecutionHostKind::Ssh,
-        alias: Some(ssh.alias.clone()),
-        hostname: ssh.hostname.clone(),
-        username: ssh.username.clone(),
-        port: ssh.port,
-    }));
-    hosts
-}
-
-fn discovered_ssh_host_id(alias: &str) -> String {
-    let digest = Sha256::digest(alias.to_ascii_lowercase().as_bytes());
-    let suffix = digest[..12]
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<String>();
-    format!("{DISCOVERED_SSH_HOST_ID_PREFIX}{suffix}")
-}
-
-fn sync_discovered_ssh_hosts_with<F>(
-    config_path: &Path,
-    aliases: Vec<String>,
-    mut resolve: F,
-) -> Result<CliConfig, String>
-where
-    F: FnMut(&str) -> Option<host::SshResolvedTarget>,
-{
-    let mut config = read_cli_config(config_path)?;
-    let discovered_aliases = aliases
-        .iter()
-        .map(|alias| alias.to_ascii_lowercase())
-        .collect::<BTreeSet<_>>();
-    let stale_host_ids = config
-        .ssh_hosts
-        .iter()
-        .filter(|saved| {
-            saved.id.starts_with(DISCOVERED_SSH_HOST_ID_PREFIX)
-                && !discovered_aliases.contains(&saved.alias.to_ascii_lowercase())
-        })
-        .map(|saved| host::ssh_execution_host_id(&saved.id))
-        .collect::<BTreeSet<_>>();
-    let previous_host_count = config.ssh_hosts.len();
-    config.ssh_hosts.retain(|saved| {
-        !saved.id.starts_with(DISCOVERED_SSH_HOST_ID_PREFIX)
-            || discovered_aliases.contains(&saved.alias.to_ascii_lowercase())
-    });
-    let mut changed = config.ssh_hosts.len() != previous_host_count;
-    if !stale_host_ids.is_empty() {
-        for project in &mut config.projects {
-            if project
-                .execution_host_id
-                .as_ref()
-                .is_some_and(|host_id| stale_host_ids.contains(host_id))
-            {
-                project.execution_host_id = None;
-                changed = true;
-            }
-        }
-    }
-
-    for alias in aliases {
-        let resolved = resolve(&alias);
-        if let Some(saved) = config
-            .ssh_hosts
-            .iter_mut()
-            .find(|saved| saved.alias.eq_ignore_ascii_case(&alias))
-        {
-            if let Some(target) = resolved {
-                let next = host::SshHost {
-                    id: saved.id.clone(),
-                    label: if saved.id.starts_with(DISCOVERED_SSH_HOST_ID_PREFIX) {
-                        alias.clone()
-                    } else {
-                        saved.label.clone()
-                    },
-                    alias,
-                    hostname: Some(target.hostname),
-                    username: target.username,
-                    port: target.port,
-                    last_required_passphrase: saved.last_required_passphrase,
-                };
-                if *saved != next {
-                    *saved = next;
-                    changed = true;
-                }
-            }
-            continue;
-        }
-        let (hostname, username, port) = resolved
-            .map(|target| (Some(target.hostname), target.username, target.port))
-            .unwrap_or((None, None, None));
-        config.ssh_hosts.push(host::SshHost {
-            id: discovered_ssh_host_id(&alias),
-            label: alias.clone(),
-            alias,
-            hostname,
-            username,
-            port,
-            last_required_passphrase: None,
-        });
-        changed = true;
-    }
-
-    if changed {
-        write_cli_config(config_path, &config)?;
-    }
-    Ok(config)
-}
-
-fn sync_discovered_ssh_hosts(config_path: &Path, home: &Path) -> Result<CliConfig, String> {
-    let aliases = host::discover_ssh_config_aliases(home)?;
-    sync_discovered_ssh_hosts_with(config_path, aliases, |alias| resolve_ssh_alias(alias).ok())
-}
-
-/// Ask OpenSSH what an alias actually resolves to, instead of parsing
-/// `~/.ssh/config` ourselves: ProxyJump, Match blocks, and Include all apply.
-fn resolve_ssh_alias(alias: &str) -> Result<host::SshResolvedTarget, String> {
-    let trimmed = alias.trim();
-    if trimmed.is_empty() {
-        return Err("SSH 호스트 별칭을 입력하세요.".to_string());
-    }
-    if trimmed.starts_with('-') {
-        return Err("SSH 호스트 별칭이 올바르지 않습니다.".to_string());
-    }
-    let output = Command::new(host::ssh_command())
-        .args(["-G", trimmed])
-        .output()
-        .map_err(|error| format!("ssh 명령을 실행하지 못했습니다: {error}"))?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        return Err(if stderr.is_empty() {
-            "SSH 설정에서 호스트를 확인하지 못했습니다.".to_string()
-        } else {
-            stderr
-        });
-    }
-    Ok(host::parse_ssh_resolve_output(
-        trimmed,
-        &String::from_utf8_lossy(&output.stdout),
-    ))
-}
-
-fn add_ssh_host_to(
-    config_path: &Path,
-    label: String,
-    resolved: host::SshResolvedTarget,
-) -> Result<host::SshHost, String> {
-    let label = label.trim().to_string();
-    if label.is_empty() || label.chars().count() > 100 {
-        return Err("SSH 호스트 이름은 1자 이상 100자 이하여야 합니다.".to_string());
-    }
-    let mut config = read_cli_config(config_path)?;
-    let existing_id = config
-        .ssh_hosts
-        .iter()
-        .find(|existing| existing.alias.eq_ignore_ascii_case(&resolved.alias))
-        .map(|existing| existing.id.clone());
-    let entry = host::SshHost {
-        id: existing_id.unwrap_or_else(|| {
-            format!(
-                "ssh-{}-{}",
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map(|elapsed| elapsed.as_millis())
-                    .unwrap_or_default(),
-                config.ssh_hosts.len()
-            )
-        }),
-        label,
-        alias: resolved.alias,
-        hostname: Some(resolved.hostname),
-        username: resolved.username,
-        port: resolved.port,
-        last_required_passphrase: None,
-    };
-    // Re-adding the same alias replaces the stale record rather than stacking
-    // duplicates that all point at one machine.
-    config
-        .ssh_hosts
-        .retain(|existing| existing.alias != entry.alias);
-    config.ssh_hosts.push(entry.clone());
-    write_cli_config(config_path, &config)?;
-    Ok(entry)
-}
-
-/// Removing a host unbinds the projects pinned to it so they fall back to the
-/// local machine instead of stranding on an id that no longer resolves.
-fn remove_ssh_host_from(config_path: &Path, host_id: &str) -> Result<Vec<String>, String> {
-    let mut config = read_cli_config(config_path)?;
-    let before = config.ssh_hosts.len();
-    config.ssh_hosts.retain(|existing| existing.id != host_id);
-    if config.ssh_hosts.len() == before {
-        return Err("삭제할 SSH 호스트를 찾지 못했습니다.".to_string());
-    }
-    let stored = host::ssh_execution_host_id(host_id);
-    let mut unbound = Vec::new();
-    for project in &mut config.projects {
-        if project.execution_host_id.as_deref() == Some(stored.as_str()) {
-            project.execution_host_id = None;
-            unbound.push(project.id.clone());
-        }
-    }
-    write_cli_config(config_path, &config)?;
-    Ok(unbound)
-}
-
-#[tauri::command]
-async fn list_execution_hosts(app: tauri::AppHandle) -> Result<Vec<ExecutionHostSummary>, String> {
-    let config_path = cli_config_path(&app)?;
-    let home = app.path().home_dir().map_err(|error| error.to_string())?;
-    tauri::async_runtime::spawn_blocking(move || {
-        Ok(execution_host_summaries(&sync_discovered_ssh_hosts(
-            &config_path,
-            &home,
-        )?))
-    })
-    .await
-    .map_err(|error| error.to_string())?
-}
-
-#[tauri::command]
-async fn load_project_execution_connection(
-    app: tauri::AppHandle,
-    project_id: String,
-) -> Result<ProjectExecutionConnection, String> {
-    let config_path = cli_config_path(&app)?;
-    tauri::async_runtime::spawn_blocking(move || {
-        let config = read_cli_config(&config_path)?;
-        let project = config
-            .projects
-            .iter()
-            .find(|project| project.id == project_id)
-            .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
-        Ok(ProjectExecutionConnection {
-            execution_host_id: host::ExecutionHostId::parse(project.execution_host_id.as_deref())
-                .as_stored(),
-            repository_path: project.repository_path.clone(),
-            repository_remote: project.repository_remote.clone(),
-        })
-    })
-    .await
-    .map_err(|error| error.to_string())?
-}
-
-fn remote_directory_listing(
-    runner: &dyn host::CommandRunner,
-    local_home: &Path,
-    requested_path: Option<&str>,
-) -> Result<RemoteDirectoryListing, String> {
-    if !runner.is_remote() {
-        return Err("원격 폴더 탐색에는 SSH 실행 호스트를 선택해야 합니다.".to_string());
-    }
-    let requested = requested_path
-        .map(str::trim)
-        .filter(|path| !path.is_empty())
-        .map(PathBuf::from)
-        .unwrap_or(host_home_directory(runner, local_home)?);
-    let path = runner.canonicalize(&requested)?;
-    let find = runner
-        .resolve_binary("find")
-        .map_err(|_| "원격 호스트에서 find 명령을 찾지 못했습니다.".to_string())?;
-    let output = runner.run(&host::CommandSpec::new(find).args([
-        path.to_string_lossy().into_owned(),
-        "-mindepth".to_string(),
-        "1".to_string(),
-        "-maxdepth".to_string(),
-        "1".to_string(),
-        "-type".to_string(),
-        "d".to_string(),
-        "-print0".to_string(),
-    ]))?;
-    if !output.success() {
-        return Err(format!(
-            "원격 폴더 목록을 불러오지 못했습니다: {}",
-            output.failure_message()
-        ));
-    }
-    let mut entries = output
-        .stdout
-        .split('\0')
-        .filter(|entry| !entry.is_empty())
-        .filter_map(|entry| {
-            let entry_path = PathBuf::from(entry);
-            let name = entry_path.file_name()?.to_string_lossy().into_owned();
-            (name != ".git").then(|| RemoteDirectoryEntry {
-                name,
-                path: entry_path.to_string_lossy().into_owned(),
-            })
-        })
-        .collect::<Vec<_>>();
-    entries.sort_by(|left, right| {
-        left.name
-            .to_lowercase()
-            .cmp(&right.name.to_lowercase())
-            .then_with(|| left.name.cmp(&right.name))
-    });
-    entries.truncate(500);
-
-    let repository_root = resolve_workspace_with(runner, &path).ok();
-    let git_repository = repository_root.as_ref() == Some(&path);
-    let repository_remote = git_repository
-        .then(|| repository_remote_on(runner, &path))
-        .flatten();
-    let parent_path = path
-        .parent()
-        .map(|parent| parent.to_string_lossy().into_owned());
-    Ok(RemoteDirectoryListing {
-        path: path.to_string_lossy().into_owned(),
-        parent_path,
-        entries,
-        git_repository,
-        repository_remote,
-    })
-}
-
-#[tauri::command]
-async fn list_remote_directory(
-    app: tauri::AppHandle,
-    execution_host_id: String,
-    path: Option<String>,
-) -> Result<RemoteDirectoryListing, String> {
-    let config_path = cli_config_path(&app)?;
-    let home = app.path().home_dir().map_err(|error| error.to_string())?;
-    tauri::async_runtime::spawn_blocking(move || {
-        let config = read_cli_config(&config_path)?;
-        let execution_host = host::ExecutionHostId::parse(Some(&execution_host_id));
-        let runner = host::runner_for(
-            &execution_host,
-            &config.ssh_hosts,
-            cli_execution_path(&home)?,
-            &home,
-            host::SshAuth::default(),
-        )?;
-        remote_directory_listing(runner.as_ref(), &home, path.as_deref())
-    })
-    .await
-    .map_err(|error| error.to_string())?
-}
-
-#[tauri::command]
-async fn update_project_execution_connection(
-    app: tauri::AppHandle,
-    project_id: String,
-    execution_host_id: String,
-    repository_path: String,
-) -> Result<ProjectExecutionConnection, String> {
-    let config_path = cli_config_path(&app)?;
-    let home = app.path().home_dir().map_err(|error| error.to_string())?;
-    tauri::async_runtime::spawn_blocking(move || {
-        let mut config = read_cli_config(&config_path)?;
-        let execution_host = host::ExecutionHostId::parse(Some(&execution_host_id));
-        if execution_host.is_local() {
-            return Err("Remote connection에는 SSH 실행 호스트를 선택해야 합니다.".to_string());
-        }
-        let runner = host::runner_for(
-            &execution_host,
-            &config.ssh_hosts,
-            cli_execution_path(&home)?,
-            &home,
-            host::SshAuth::default(),
-        )?;
-        let root = resolve_workspace_with(runner.as_ref(), Path::new(&repository_path))?;
-        let remote = repository_remote_on(runner.as_ref(), &root);
-        let root = root
-            .into_os_string()
-            .into_string()
-            .map_err(|_| "원격 Git 저장소 경로를 표시할 수 없습니다.".to_string())?;
-        let project = config
-            .projects
-            .iter_mut()
-            .find(|project| project.id == project_id)
-            .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
-        project.execution_host_id = Some(execution_host.as_stored());
-        project.repository_path = root.clone();
-        project.repository_remote = remote.clone();
-        write_cli_config(&config_path, &config)?;
-        Ok(ProjectExecutionConnection {
-            execution_host_id: execution_host.as_stored(),
-            repository_path: root,
-            repository_remote: remote,
-        })
-    })
-    .await
-    .map_err(|error| error.to_string())?
-}
-
-#[tauri::command]
-async fn resolve_ssh_host(alias: String) -> Result<host::SshResolvedTarget, String> {
-    tauri::async_runtime::spawn_blocking(move || resolve_ssh_alias(&alias))
-        .await
-        .map_err(|error| error.to_string())?
-}
-
-#[tauri::command]
-async fn add_ssh_host(
-    app: tauri::AppHandle,
-    alias: String,
-    label: Option<String>,
-) -> Result<ExecutionHostSummary, String> {
-    let config_path = cli_config_path(&app)?;
-    tauri::async_runtime::spawn_blocking(move || {
-        let resolved = resolve_ssh_alias(&alias)?;
-        let label = label
-            .map(|label| label.trim().to_string())
-            .filter(|label| !label.is_empty())
-            .unwrap_or_else(|| resolved.alias.clone());
-        let saved = add_ssh_host_to(&config_path, label, resolved)?;
-        Ok(ExecutionHostSummary {
-            id: host::ssh_execution_host_id(&saved.id),
-            label: saved.label,
-            kind: host::ExecutionHostKind::Ssh,
-            alias: Some(saved.alias),
-            hostname: saved.hostname,
-            username: saved.username,
-            port: saved.port,
-        })
-    })
-    .await
-    .map_err(|error| error.to_string())?
-}
-
-#[tauri::command]
-async fn remove_ssh_host(app: tauri::AppHandle, host_id: String) -> Result<Vec<String>, String> {
-    let config_path = cli_config_path(&app)?;
-    let host_id = host::ExecutionHostId::parse(Some(&host_id))
-        .ssh_host_id()
-        .map(str::to_string)
-        .unwrap_or(host_id);
-    tauri::async_runtime::spawn_blocking(move || remove_ssh_host_from(&config_path, &host_id))
-        .await
-        .map_err(|error| error.to_string())?
 }
 
 fn project_llm_settings_from(
@@ -3266,25 +2670,6 @@ fn read_trimmed_file_on(runner: &dyn host::CommandRunner, path: &Path) -> Option
         .filter(|value| !value.is_empty())
 }
 
-fn host_home_directory(
-    runner: &dyn host::CommandRunner,
-    local_home: &Path,
-) -> Result<PathBuf, String> {
-    if !runner.is_remote() {
-        return Ok(local_home.to_path_buf());
-    }
-    let shell = runner.resolve_binary("sh")?;
-    let output =
-        runner.run(&host::CommandSpec::new(shell).args(["-c", "printf '%s' \"$HOME\""]))?;
-    if !output.success() || output.stdout.is_empty() {
-        return Err(format!(
-            "원격 홈 폴더를 확인하지 못했습니다: {}",
-            output.failure_message()
-        ));
-    }
-    Ok(PathBuf::from(output.stdout_trimmed()))
-}
-
 fn auto_hunt_health_sync(
     config_path: &Path,
     resource_directory: &Path,
@@ -3317,7 +2702,7 @@ fn auto_hunt_health_sync_with(
         .find(|project| project.id == project_id)
         .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
     let runner = project_runner(&config, project_id, home)?;
-    let execution_home = host_home_directory(runner.as_ref(), home)?;
+    let execution_home = home.to_path_buf();
     let mut issues = Vec::new();
 
     let repository_path = Path::new(&project.repository_path);
@@ -3335,18 +2720,7 @@ fn auto_hunt_health_sync_with(
             .join("share")
             .join("briar")
             .join("VERSION"),
-    )
-    .filter(|_| !runner.is_remote())
-    .or_else(|| {
-        read_trimmed_file_on(
-            runner.as_ref(),
-            &execution_home
-                .join(".local")
-                .join("share")
-                .join("briar")
-                .join("VERSION"),
-        )
-    });
+    );
     let cli_current = cli_version.as_deref() == Some(expected_version.as_str());
     if !cli_installed {
         issues.push("Briar CLI가 설치되지 않았습니다.".to_string());
@@ -3386,11 +2760,7 @@ fn auto_hunt_health_sync_with(
         .and_then(|auto_hunt| auto_hunt.velen_org.clone());
     let (velen_authenticated, velen_email, velen_healthy) = if let Some(org) = velen_org.as_deref()
     {
-        let inspection = if runner.is_remote() {
-            inspect_velen_on(runner.as_ref(), Some(org.to_string()))
-        } else {
-            inspect_velen(Some(org.to_string()))
-        };
+        let inspection = inspect_velen(Some(org.to_string()));
         match inspection {
             Ok(inspection) => (inspection.authenticated, inspection.email, true),
             Err(error) => {
@@ -3401,67 +2771,6 @@ fn auto_hunt_health_sync_with(
     } else {
         (false, None, true)
     };
-
-    if runner.is_remote() {
-        if runner.resolve_binary("bun").is_err() {
-            issues.push("원격 호스트에 Bun이 설치되지 않았습니다.".to_string());
-        }
-        if cli_installed && repository_healthy {
-            let cli_connected = runner
-                .resolve_binary("briar")
-                .and_then(|binary| {
-                    runner.run(
-                        &host::CommandSpec::new(binary)
-                            .args(["project", "doctor"])
-                            .env("BRIAR_PROJECT_ID", project_id)
-                            .env("BRIAR_API_URL", &config.api_url)
-                            .working_directory(repository_path),
-                    )
-                })
-                .is_ok_and(|output| output.success());
-            if !cli_connected {
-                issues.push(
-                    "원격 Briar CLI가 이 프로젝트에 연결되지 않았습니다. 원격 저장소에서 `briar connect`와 `briar project configure`를 실행해 주세요."
-                        .to_string(),
-                );
-            }
-        }
-        let (agent_name, auth_args): (&str, &[&str]) =
-            match project.llm.clone().unwrap_or_default().provider {
-                agent::AgentProviderKind::Codex => ("codex", &["login", "status"]),
-                agent::AgentProviderKind::Claude => ("claude", &["auth", "status"]),
-                agent::AgentProviderKind::Grok => ("grok", &["--version"]),
-            };
-        match runner.resolve_binary(agent_name) {
-            Ok(binary) => {
-                let authenticated = runner
-                    .run(&host::CommandSpec::new(binary).args(auth_args.iter().copied()))
-                    .is_ok_and(|output| output.success());
-                if !authenticated {
-                    issues.push(format!(
-                        "원격 {} 에이전트가 인증되지 않았습니다. 호스트에서 직접 로그인해 주세요.",
-                        match agent_name {
-                            "codex" => "Codex",
-                            "claude" => "Claude",
-                            "grok" => "Grok",
-                            other => other,
-                        }
-                    ));
-                }
-            }
-            Err(_) => {
-                issues.push(format!(
-                    "원격 호스트에서 {} CLI를 찾지 못했습니다.",
-                    match agent_name {
-                        "codex" => "Codex",
-                        "claude" => "Claude",
-                        "grok" => "Grok",
-                        other => other,
-                    }
-                ));
-            }
-        }
-    }
 
     Ok(AutoHuntHealth {
         project_id: project.id.clone(),
@@ -3517,14 +2826,6 @@ async fn repair_auto_hunt(
         .map_err(|error| error.to_string())?;
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
-        let config = read_cli_config(&config_path)?;
-        let runner = project_runner(&config, &project_id, &home)?;
-        if runner.is_remote() {
-            return Err(format!(
-                "{}에서 `briar` CLI와 Briar Workflow 스킬을 설치하거나 업데이트한 뒤 다시 검사해 주세요.",
-                runner.label()
-            ));
-        }
         install_auto_hunt_assets(&resource_directory, &home)?;
         auto_hunt_health_sync(&config_path, &resource_directory, &home, &project_id)
     })
@@ -3582,7 +2883,7 @@ async fn project_llm_chat(
     let approval_app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let (runner, connected_workspace) =
-            connected_project_workspace_on_host(&config_path, &project_id, &home)?;
+            connected_project_runtime(&config_path, &project_id, &home)?;
         let readiness = project_repository_readiness_at(&config_path, &project_id, &home)?;
         if readiness.requires_github && !readiness.pr_ready {
             return Err(format!(
@@ -3774,8 +3075,7 @@ async fn run_project_agent(
     tauri::async_runtime::spawn_blocking(move || {
         let _cancellation = cancellation;
         ensure_agent_session_running(&cancellation_signal)?;
-        let (runner, workspace) =
-            connected_project_workspace_on_host(&config_path, &project_id, &home)?;
+        let (runner, workspace) = connected_project_runtime(&config_path, &project_id, &home)?;
         let provider = request.agent_provider;
         if !app_provider_settings_from(&config_path)?.is_enabled(provider) {
             return Err(
@@ -4003,27 +3303,27 @@ fn project_agent_sandbox_mode(full_access: bool) -> agent::SandboxMode {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct HostClaimResponse {
-    work: Option<HostClaimedRun>,
+struct CliClaimResponse {
+    work: Option<CliClaimedRun>,
     #[serde(default)]
     workspace_error: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct HostClaimedRun {
+struct CliClaimedRun {
     run_id: String,
     run_number: u64,
     source_key: String,
     title: String,
     workflow: serde_json::Value,
     #[serde(default)]
-    workspace: Option<HostClaimedWorkspace>,
+    workspace: Option<CliClaimedWorkspace>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct HostClaimedWorkspace {
+struct CliClaimedWorkspace {
     #[serde(rename = "type")]
     workspace_type: String,
     path: String,
@@ -4031,26 +3331,26 @@ struct HostClaimedWorkspace {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct HostRunEvidenceResponse {
+struct CliRunEvidenceResponse {
     evidence: Vec<serde_json::Value>,
 }
 
-fn claim_auto_hunt_run_on_host(
+fn claim_auto_hunt_run(
     runner: &dyn host::CommandRunner,
     cli_environment: &agent::AutoHuntCliEnvironment,
     connected_workspace: &Path,
     run_id: &str,
-) -> Result<HostClaimResponse, String> {
+) -> Result<CliClaimResponse, String> {
     let arguments = auto_hunt_claim_arguments(run_id);
     let output = cli_environment.run_briar(runner, connected_workspace, arguments)?;
     if !output.success() {
         return Err(format!(
-            "호스트가 자동사냥 작업을 claim하지 못했습니다: {}",
+            "로컬 런타임이 자동사냥 작업을 claim하지 못했습니다: {}",
             output.failure_message()
         ));
     }
     serde_json::from_str(output.stdout.trim())
-        .map_err(|error| format!("호스트 claim 결과를 읽지 못했습니다: {error}"))
+        .map_err(|error| format!("로컬 claim 결과를 읽지 못했습니다: {error}"))
 }
 
 fn auto_hunt_claim_arguments(run_id: &str) -> Vec<String> {
@@ -4071,7 +3371,7 @@ fn record_auto_hunt_terminal_event(
     runner: &dyn host::CommandRunner,
     cli_environment: &agent::AutoHuntCliEnvironment,
     workspace: &Path,
-    run: &HostClaimedRun,
+    run: &CliClaimedRun,
     status: &str,
     cause: &str,
     detail: &str,
@@ -4132,7 +3432,7 @@ impl AutoHuntEvidenceCapture<'_> {
                 if !output.success() {
                     return Err(output.failure_message());
                 }
-                serde_json::from_str::<HostRunEvidenceResponse>(output.stdout.trim())
+                serde_json::from_str::<CliRunEvidenceResponse>(output.stdout.trim())
                     .map(|response| response.evidence)
                     .map_err(|error| format!("run evidence 결과를 읽지 못했습니다: {error}"))
             });
@@ -4320,7 +3620,7 @@ async fn start_project_auto_hunt(
         let _cancellation = cancellation;
         ensure_agent_session_running(&cancellation_signal)?;
         let (runner, workspace) =
-            connected_project_workspace_on_host(&config_path, &project_id, &home)?;
+            connected_project_runtime(&config_path, &project_id, &home)?;
         let settings = project_llm_settings_from(&config_path, &project_id)?;
         let provider = request.agent_provider;
         if !app_provider_settings_from(&config_path)?.is_enabled(provider) {
@@ -4357,7 +3657,7 @@ async fn start_project_auto_hunt(
             ensure_agent_session_running(&cancellation_signal)?;
             // One isolated config snapshot per worker allows several runs to be
             // claimed without sharing the CLI's activeClaim state.
-            let cli_environment = agent::AutoHuntCliEnvironment::prepare_on_host(
+            let cli_environment = agent::AutoHuntCliEnvironment::prepare_local(
                 runner.clone(),
                 &home,
                 &execution_path,
@@ -4367,7 +3667,7 @@ async fn start_project_auto_hunt(
                 include_velen,
             )?;
             let requested_issue = &request.issues[index];
-            let claim = claim_auto_hunt_run_on_host(
+            let claim = claim_auto_hunt_run(
                 runner.as_ref(),
                 &cli_environment,
                 &workspace,
@@ -4381,7 +3681,7 @@ async fn start_project_auto_hunt(
             };
             if claimed.run_id != requested_issue.run_id {
                 return Err(format!(
-                    "호스트가 요청한 run {} 대신 {}을 claim했습니다.",
+                    "로컬 런타임이 요청한 run {} 대신 {}을 claim했습니다.",
                     requested_issue.run_id, claimed.run_id
                 ));
             }
@@ -4441,7 +3741,7 @@ async fn start_project_auto_hunt(
                 let detail = claim
                     .workspace_error
                     .as_deref()
-                    .unwrap_or("호스트가 claim한 run의 전용 worktree를 반환하지 않았습니다.");
+                    .unwrap_or("claim한 run의 전용 worktree를 반환하지 않았습니다.");
                 let record_error = record_auto_hunt_terminal_event(
                     runner.as_ref(),
                     &cli_environment,
@@ -4484,7 +3784,9 @@ async fn start_project_auto_hunt(
                 continue;
             };
             if claimed_workspace.workspace_type != "worktree" {
-                return Err("호스트가 전용 worktree가 아닌 workspace를 할당했습니다.".to_string());
+                return Err(
+                    "로컬 런타임이 전용 worktree가 아닌 workspace를 할당했습니다.".to_string(),
+                );
             }
             let worker_workspace = PathBuf::from(&claimed_workspace.path);
             let dispatch = dispatch_store.transition_worker(
@@ -5131,7 +4433,6 @@ async fn connect_local_project(
     project_id: String,
     agent_token: String,
     repository_path: String,
-    execution_host_id: Option<String>,
     mut auto_hunt: AutoHuntConfig,
 ) -> Result<ConnectedLocalProject, String> {
     let config_path = cli_config_path(&app)?;
@@ -5141,21 +4442,9 @@ async fn connect_local_project(
         .map_err(|error| error.to_string())?;
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
-        let execution_host = host::ExecutionHostId::parse(execution_host_id.as_deref());
-        let config = read_cli_config(&config_path)?;
-        let runner = host::runner_for(
-            &execution_host,
-            &config.ssh_hosts,
-            cli_execution_path(&home)?,
-            &home,
-            host::SshAuth::default(),
-        )?;
-        let root = if runner.is_remote() {
-            resolve_workspace_with(runner.as_ref(), Path::new(&repository_path))?
-        } else {
-            git_repository_root(Path::new(&repository_path))?
-        };
-        let remote = repository_remote_on(runner.as_ref(), &root);
+        let runner = host::LocalRunner::new(cli_execution_path(&home)?, home.clone());
+        let root = git_repository_root(Path::new(&repository_path))?;
+        let remote = repository_remote(&root);
         let workflow = auto_hunt.workflow.clone();
         let root_string = root
             .into_os_string()
@@ -5172,7 +4461,7 @@ async fn connect_local_project(
         let inspection = auto_hunt
             .velen_org
             .as_ref()
-            .map(|org| inspect_velen_on(runner.as_ref(), Some(org.clone())))
+            .map(|org| inspect_velen_on(&runner, Some(org.clone())))
             .transpose()?;
         if auto_hunt.linear_enabled {
             let inspection = inspection
@@ -5190,9 +4479,7 @@ async fn connect_local_project(
                 return Err("선택한 Linear 소스를 Velen에서 사용할 수 없습니다.".to_string());
             }
         }
-        if !runner.is_remote() {
-            install_auto_hunt_assets(&resource_directory, &home)?;
-        }
+        install_auto_hunt_assets(&resource_directory, &home)?;
         let provider = if runner.resolve_binary("codex").is_ok() {
             agent::AgentProviderKind::Codex
         } else if runner.resolve_binary("claude").is_ok() {
@@ -5210,7 +4497,6 @@ async fn connect_local_project(
                 agent_token,
                 repository_path: root_string.clone(),
                 repository_remote: remote,
-                execution_host: Some(execution_host),
             },
             LocalProjectAgentConfig {
                 llm: agent::ProjectLlmSettings {
@@ -5491,13 +4777,6 @@ pub fn run() {
             login_project_github,
             disconnect_local_project,
             connect_local_project,
-            list_execution_hosts,
-            load_project_execution_connection,
-            list_remote_directory,
-            update_project_execution_connection,
-            resolve_ssh_host,
-            add_ssh_host,
-            remove_ssh_host,
             inspect_velen,
             auto_hunt_health,
             repair_auto_hunt
@@ -6099,7 +5378,6 @@ branch refs/heads/briar/second-11111111
                 agent_token: "briar_agent_new".to_string(),
                 repository_path: "/new/repository".to_string(),
                 repository_remote: Some("git@github.com:example/repository.git".to_string()),
-                execution_host: None,
             },
             LocalProjectAgentConfig {
                 llm: agent::ProjectLlmSettings::default(),
@@ -6588,7 +5866,6 @@ branch refs/heads/briar/second-11111111
                 agent_token: "briar_agent_test".to_string(),
                 repository_path: repository,
                 repository_remote: Some("https://github.com/wordbricks/briar.git".to_string()),
-                execution_host: None,
             },
             LocalProjectAgentConfig {
                 llm: agent::ProjectLlmSettings::default(),
@@ -6678,7 +5955,7 @@ branch refs/heads/briar/second-11111111
         fs::remove_dir_all(home).expect("test home should be removed");
     }
 
-    fn host_test_config_path(name: &str) -> PathBuf {
+    fn test_config_path(name: &str) -> PathBuf {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("clock should be after the epoch")
@@ -6686,234 +5963,6 @@ branch refs/heads/briar/second-11111111
         let directory = std::env::temp_dir().join(format!("briar-host-test-{name}-{unique}"));
         fs::create_dir_all(&directory).expect("test directory should be created");
         directory.join("config.json")
-    }
-
-    #[test]
-    fn a_config_without_host_fields_stays_local() {
-        let config_path = host_test_config_path("legacy");
-        fs::write(
-            &config_path,
-            r#"{
-  "apiUrl": "https://briar.example.com",
-  "projects": [
-    { "id": "project-1", "repositoryPath": "/repo", "agentToken": "briar_agent_x" }
-  ]
-}"#,
-        )
-        .expect("legacy config should be written");
-
-        let config = read_cli_config(&config_path).expect("legacy config should load");
-        assert!(config.ssh_hosts.is_empty());
-        assert_eq!(
-            project_execution_host(&config, "project-1").expect("host should resolve"),
-            host::ExecutionHostId::Local
-        );
-        assert_eq!(
-            execution_host_summaries(&config)
-                .iter()
-                .map(|host| host.id.clone())
-                .collect::<Vec<_>>(),
-            vec!["local".to_string()]
-        );
-    }
-
-    #[test]
-    fn saving_a_host_keeps_the_project_binding_readable() {
-        let config_path = host_test_config_path("bind");
-        write_cli_connection(
-            &config_path,
-            CliConnectionInput {
-                api_url: "https://briar.example.com".to_string(),
-                project_id: "project-1".to_string(),
-                agent_token: "briar_agent_x".to_string(),
-                repository_path: "/repo".to_string(),
-                repository_remote: None,
-                execution_host: None,
-            },
-            LocalProjectAgentConfig {
-                llm: agent::ProjectLlmSettings::default(),
-                auto_hunt: AutoHuntConfig {
-                    velen_org: Some("example".to_string()),
-                    data_source: None,
-                    linear_enabled: false,
-                    linear_source: None,
-                    linear_team: None,
-                    github_repository: None,
-                    workflow: repository_workflow_bootstrap(),
-                },
-            },
-        )
-        .expect("connection should be written");
-
-        let saved = add_ssh_host_to(
-            &config_path,
-            "build box".to_string(),
-            host::SshResolvedTarget {
-                alias: "build-box".to_string(),
-                hostname: "10.0.0.5".to_string(),
-                username: Some("dev".to_string()),
-                port: Some(2222),
-            },
-        )
-        .expect("host should be saved");
-
-        let mut config = read_cli_config(&config_path).expect("config should load");
-        assert_eq!(config.ssh_hosts.len(), 1);
-        assert_eq!(config.ssh_hosts[0].label, "build box");
-        assert_eq!(config.ssh_hosts[0].port, Some(2222));
-
-        // A local project stays local until it is explicitly rebound.
-        assert!(project_execution_host(&config, "project-1")
-            .expect("host should resolve")
-            .is_local());
-
-        config.projects[0].execution_host_id = Some(host::ssh_execution_host_id(&saved.id));
-        write_cli_config(&config_path, &config).expect("config should be written");
-        let rebound = read_cli_config(&config_path).expect("config should reload");
-        assert_eq!(
-            project_execution_host(&rebound, "project-1")
-                .expect("host should resolve")
-                .ssh_host_id(),
-            Some(saved.id.as_str())
-        );
-        assert_eq!(
-            project_repository_path(&rebound, "project-1").expect("path should resolve"),
-            PathBuf::from("/repo")
-        );
-    }
-
-    #[test]
-    fn re_adding_the_same_alias_replaces_the_stale_record() {
-        let config_path = host_test_config_path("realias");
-        let target = |hostname: &str| host::SshResolvedTarget {
-            alias: "build-box".to_string(),
-            hostname: hostname.to_string(),
-            username: None,
-            port: None,
-        };
-        add_ssh_host_to(&config_path, "first".to_string(), target("10.0.0.5"))
-            .expect("first host should be saved");
-        add_ssh_host_to(&config_path, "second".to_string(), target("10.0.0.9"))
-            .expect("second host should be saved");
-
-        let config = read_cli_config(&config_path).expect("config should load");
-        assert_eq!(config.ssh_hosts.len(), 1);
-        assert_eq!(config.ssh_hosts[0].label, "second");
-        assert_eq!(config.ssh_hosts[0].hostname.as_deref(), Some("10.0.0.9"));
-    }
-
-    #[test]
-    fn syncs_literal_ssh_config_hosts_with_stable_ids() {
-        let config_path = host_test_config_path("discover");
-        add_ssh_host_to(
-            &config_path,
-            "Manual build box".to_string(),
-            host::SshResolvedTarget {
-                alias: "build-box".to_string(),
-                hostname: "10.0.0.5".to_string(),
-                username: Some("builder".to_string()),
-                port: None,
-            },
-        )
-        .expect("manual host should be saved");
-
-        let first = sync_discovered_ssh_hosts_with(
-            &config_path,
-            vec!["kiwi".to_string(), "build-box".to_string()],
-            |alias| {
-                Some(host::SshResolvedTarget {
-                    alias: alias.to_string(),
-                    hostname: format!("{alias}.example.com"),
-                    username: Some("dev".to_string()),
-                    port: Some(22),
-                })
-            },
-        )
-        .expect("discovered hosts should sync");
-        assert_eq!(first.ssh_hosts.len(), 2);
-        let kiwi = first
-            .ssh_hosts
-            .iter()
-            .find(|saved| saved.alias == "kiwi")
-            .expect("kiwi should be discovered");
-        assert!(kiwi.id.starts_with(DISCOVERED_SSH_HOST_ID_PREFIX));
-        assert_eq!(kiwi.label, "kiwi");
-        let kiwi_id = kiwi.id.clone();
-        let manual = first
-            .ssh_hosts
-            .iter()
-            .find(|saved| saved.alias == "build-box")
-            .expect("manual host should remain");
-        assert_eq!(manual.label, "Manual build box");
-        assert_eq!(manual.hostname.as_deref(), Some("build-box.example.com"));
-
-        let second =
-            sync_discovered_ssh_hosts_with(&config_path, vec!["kiwi".to_string()], |alias| {
-                Some(host::SshResolvedTarget {
-                    alias: alias.to_string(),
-                    hostname: "10.0.0.9".to_string(),
-                    username: Some("dev".to_string()),
-                    port: Some(2222),
-                })
-            })
-            .expect("repeated discovery should update in place");
-        let kiwi = second
-            .ssh_hosts
-            .iter()
-            .find(|saved| saved.alias == "kiwi")
-            .expect("kiwi should remain");
-        assert_eq!(kiwi.id, kiwi_id);
-        assert_eq!(kiwi.hostname.as_deref(), Some("10.0.0.9"));
-        assert_eq!(kiwi.port, Some(2222));
-        assert!(second
-            .ssh_hosts
-            .iter()
-            .any(|saved| saved.alias == "build-box"));
-
-        let final_config = sync_discovered_ssh_hosts_with(&config_path, Vec::new(), |_| None)
-            .expect("stale discovered hosts should be removed");
-        assert_eq!(final_config.ssh_hosts.len(), 1);
-        assert_eq!(final_config.ssh_hosts[0].alias, "build-box");
-    }
-
-    #[test]
-    fn removing_a_host_unbinds_the_projects_pinned_to_it() {
-        let config_path = host_test_config_path("unbind");
-        let saved = add_ssh_host_to(
-            &config_path,
-            "build box".to_string(),
-            host::SshResolvedTarget {
-                alias: "build-box".to_string(),
-                hostname: "10.0.0.5".to_string(),
-                username: None,
-                port: None,
-            },
-        )
-        .expect("host should be saved");
-        let mut config = read_cli_config(&config_path).expect("config should load");
-        config.projects.push(CliProject {
-            id: "project-1".to_string(),
-            repository_path: "/repo".to_string(),
-            api_url: None,
-            execution_host_id: Some(host::ssh_execution_host_id(&saved.id)),
-            repository_remote: None,
-            agent_token: "briar_agent_x".to_string(),
-            llm: None,
-            auto_hunt: None,
-            extra: BTreeMap::new(),
-        });
-        write_cli_config(&config_path, &config).expect("config should be written");
-
-        let unbound =
-            remove_ssh_host_from(&config_path, &saved.id).expect("host should be removed");
-        assert_eq!(unbound, vec!["project-1".to_string()]);
-
-        let after = read_cli_config(&config_path).expect("config should reload");
-        assert!(after.ssh_hosts.is_empty());
-        assert!(project_execution_host(&after, "project-1")
-            .expect("host should resolve")
-            .is_local());
-        assert!(remove_ssh_host_from(&config_path, &saved.id).is_err());
     }
 
     /// Write a project whose auto-hunt block carries CLI-owned worktree settings.
@@ -6935,7 +5984,6 @@ branch refs/heads/briar/second-11111111
                 id: "project-1".to_string(),
                 repository_path: "/repo".to_string(),
                 api_url: Some("http://127.0.0.1:8787".to_string()),
-                execution_host_id: None,
                 repository_remote: None,
                 agent_token: "briar_agent_x".to_string(),
                 llm: None,
@@ -6951,7 +5999,6 @@ branch refs/heads/briar/second-11111111
                 }),
                 extra: BTreeMap::new(),
             }],
-            ssh_hosts: Vec::new(),
             extra: BTreeMap::new(),
         };
         write_cli_config(config_path, &config).expect("config should be written");
@@ -6959,7 +6006,7 @@ branch refs/heads/briar/second-11111111
 
     #[test]
     fn resolves_the_configured_auto_hunt_worktree_root_per_project() {
-        let config_path = host_test_config_path("worktree-root");
+        let config_path = test_config_path("worktree-root");
         config_with_worktree_settings(
             &config_path,
             StoredWorktreeConfig {
@@ -6978,7 +6025,7 @@ branch refs/heads/briar/second-11111111
 
     #[test]
     fn falls_back_to_the_default_worktree_root_and_honors_opt_out() {
-        let config_path = host_test_config_path("worktree-default");
+        let config_path = test_config_path("worktree-default");
         config_with_worktree_settings(
             &config_path,
             StoredWorktreeConfig {
@@ -6994,7 +6041,7 @@ branch refs/heads/briar/second-11111111
             Some(PathBuf::from("/Users/dev/briar/workspaces/project-1"))
         );
 
-        let disabled_path = host_test_config_path("worktree-disabled");
+        let disabled_path = test_config_path("worktree-disabled");
         config_with_worktree_settings(
             &disabled_path,
             StoredWorktreeConfig {
@@ -7014,7 +6061,7 @@ branch refs/heads/briar/second-11111111
 
     #[test]
     fn saving_project_settings_keeps_cli_owned_worktree_settings() {
-        let config_path = host_test_config_path("worktree-preserve");
+        let config_path = test_config_path("worktree-preserve");
         config_with_worktree_settings(
             &config_path,
             StoredWorktreeConfig {
@@ -7033,7 +6080,6 @@ branch refs/heads/briar/second-11111111
                 agent_token: "briar_agent_x".to_string(),
                 repository_path: "/repo".to_string(),
                 repository_remote: None,
-                execution_host: None,
             },
             LocalProjectAgentConfig {
                 llm: agent::ProjectLlmSettings::default(),
@@ -7064,7 +6110,7 @@ branch refs/heads/briar/second-11111111
 
     #[test]
     fn project_filesystem_access_controls_saved_agent_sandbox() {
-        let config_path = host_test_config_path("sandbox-default");
+        let config_path = test_config_path("sandbox-default");
         config_with_cli_owned_settings(&config_path, None, None);
         let full_access = project_auto_hunt_full_access(&config_path, "project-1")
             .expect("sandbox setting should resolve");
@@ -7074,7 +6120,7 @@ branch refs/heads/briar/second-11111111
             agent::SandboxMode::DangerFullAccess
         );
 
-        let sandboxed = host_test_config_path("sandbox-workspace-only");
+        let sandboxed = test_config_path("sandbox-workspace-only");
         config_with_cli_owned_settings(
             &sandboxed,
             None,
@@ -7094,7 +6140,7 @@ branch refs/heads/briar/second-11111111
 
     #[test]
     fn app_settings_can_change_and_preserve_the_workspace_sandbox() {
-        let config_path = host_test_config_path("sandbox-preserve");
+        let config_path = test_config_path("sandbox-preserve");
         config_with_cli_owned_settings(
             &config_path,
             None,
@@ -7132,7 +6178,6 @@ branch refs/heads/briar/second-11111111
                 agent_token: "briar_agent_x".to_string(),
                 repository_path: "/repo".to_string(),
                 repository_remote: None,
-                execution_host: None,
             },
             LocalProjectAgentConfig {
                 llm: agent::ProjectLlmSettings::default(),
@@ -7151,22 +6196,6 @@ branch refs/heads/briar/second-11111111
 
         assert!(!project_auto_hunt_full_access(&config_path, "project-1")
             .expect("sandbox setting should survive an app-side save"));
-    }
-
-    #[test]
-    fn rejects_unusable_host_labels_and_aliases() {
-        let config_path = host_test_config_path("labels");
-        let target = host::SshResolvedTarget {
-            alias: "build-box".to_string(),
-            hostname: "10.0.0.5".to_string(),
-            username: None,
-            port: None,
-        };
-        assert!(add_ssh_host_to(&config_path, "   ".to_string(), target.clone()).is_err());
-        assert!(add_ssh_host_to(&config_path, "x".repeat(101), target).is_err());
-        assert!(resolve_ssh_alias("  ").is_err());
-        // A leading dash would otherwise be read by ssh as an option.
-        assert!(resolve_ssh_alias("-oProxyCommand=touch /tmp/briar-pwned").is_err());
     }
 
     #[test]

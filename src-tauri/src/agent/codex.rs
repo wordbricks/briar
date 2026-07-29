@@ -145,7 +145,6 @@ pub(crate) struct ProjectAgentRunResponse {
 
 pub(crate) struct AutoHuntCliEnvironment {
     _directory: Option<tempfile::TempDir>,
-    remote_directory: Option<(Arc<dyn CommandRunner>, String)>,
     briar_binary: String,
     #[cfg(test)]
     execution_path: OsString,
@@ -216,7 +215,6 @@ impl AutoHuntCliEnvironment {
         let worktree_home = home.to_string_lossy().into_owned();
         Ok(Self {
             _directory: Some(directory),
-            remote_directory: None,
             briar_binary: briar_binary.clone(),
             #[cfg(test)]
             execution_path,
@@ -260,150 +258,31 @@ impl AutoHuntCliEnvironment {
         )
     }
 
-    pub(crate) fn prepare_on_host(
+    pub(crate) fn prepare_local(
         runner: Arc<dyn CommandRunner>,
         home: &Path,
         execution_path: &OsStr,
-        workspace: &Path,
+        _workspace: &Path,
         project_id: &str,
         api_url: &str,
         include_velen: bool,
     ) -> Result<Self, String> {
-        if !runner.is_remote() {
-            let bun = PathBuf::from(runner.resolve_binary("bun").map_err(|_| {
-                "Briar CLI 실행에 필요한 번들 Bun 런타임을 찾지 못했습니다.".to_string()
-            })?);
-            let velen = if include_velen {
-                Some(PathBuf::from(runner.resolve_binary("velen")?))
-            } else {
-                None
-            };
-            let environment = Self::prepare_with_binaries(
-                home,
-                execution_path,
-                project_id,
-                api_url,
-                &bun,
-                velen.as_deref(),
-            )?;
-            return Ok(environment);
-        }
-
-        let shell = runner.resolve_binary("sh")?;
-        let bun = runner.resolve_binary("bun")?;
+        let bun = PathBuf::from(runner.resolve_binary("bun").map_err(|_| {
+            "Briar CLI 실행에 필요한 번들 Bun 런타임을 찾지 못했습니다.".to_string()
+        })?);
         let velen = if include_velen {
-            runner.resolve_binary("velen")?
+            Some(PathBuf::from(runner.resolve_binary("velen")?))
         } else {
-            String::new()
+            None
         };
-        // Resolve after PATH bootstrap so the returned value is the same PATH
-        // the agent would receive from a normal SSH invocation.
-        let path_output =
-            runner.run(&CommandSpec::new(shell.clone()).args(["-c", "printf '%s' \"$PATH\""]))?;
-        if !path_output.success() || path_output.stdout.is_empty() {
-            return Err(format!(
-                "원격 실행 PATH를 확인하지 못했습니다: {}",
-                path_output.failure_message()
-            ));
-        }
-        let setup = r#"set -eu
-umask 077
-bundle=$3
-if [ ! -f "$bundle" ]; then
-  printf 'Briar CLI bundle is missing: %s\n' "$bundle" >&2
-  exit 2
-fi
-directory=$(mktemp -d "${TMPDIR:-/tmp}/briar-workflow.XXXXXX")
-cleanup() { rm -rf -- "$directory"; }
-trap cleanup EXIT HUP INT TERM
-mkdir -p "$directory/home/.config" "$directory/bin" "$directory/lib"
-if [ -d "$HOME/.config/briar" ]; then
-  mkdir -p "$directory/home/.config/briar"
-  cp -R "$HOME/.config/briar/." "$directory/home/.config/briar/"
-fi
-if [ -n "$2" ] && [ -d "$HOME/.config/velen" ]; then
-  mkdir -p "$directory/home/.config/velen"
-  cp -R "$HOME/.config/velen/." "$directory/home/.config/velen/"
-fi
-cp "$bundle" "$directory/lib/briar.js"
-ln -s "$1" "$directory/bin/.briar-bun"
-cat > "$directory/bin/briar" <<'BRIAR_WRAPPER'
-#!/bin/sh
-root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-export HOME="$root/home"
-export XDG_CONFIG_HOME="$HOME/.config"
-export BRIAR_CONFIG_HOME="$XDG_CONFIG_HOME/briar"
-exec "$root/bin/.briar-bun" "$root/lib/briar.js" "$@"
-BRIAR_WRAPPER
-if [ -n "$2" ]; then
-ln -s "$2" "$directory/bin/.velen"
-cat > "$directory/bin/velen" <<'VELEN_WRAPPER'
-#!/bin/sh
-root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-export HOME="$root/home"
-export XDG_CONFIG_HOME="$HOME/.config"
-exec "$root/bin/.velen" "$@"
-VELEN_WRAPPER
-chmod 700 "$directory/bin/velen"
-fi
-chmod 700 "$directory" "$directory/home" "$directory/home/.config" "$directory/bin" "$directory/lib"
-chmod 700 "$directory/bin/briar"
-chmod 600 "$directory/lib/briar.js"
-chmod -R go-rwx "$directory/home/.config"
-trap - EXIT HUP INT TERM
-printf '%s\n' "$directory"
-"#;
-        let home_output =
-            runner.run(&CommandSpec::new(shell.clone()).args(["-c", "printf '%s' \"$HOME\""]))?;
-        if !home_output.success() || home_output.stdout.is_empty() {
-            return Err(format!(
-                "원격 홈 폴더를 확인하지 못했습니다: {}",
-                home_output.failure_message()
-            ));
-        }
-        let briar_bundle = format!(
-            "{}/.local/share/briar/briar.js",
-            home_output.stdout_trimmed()
-        );
-        let setup_output = runner.run(
-            &CommandSpec::new(shell)
-                .args([
-                    "-c".to_string(),
-                    setup.to_string(),
-                    "briar-workflow-setup".to_string(),
-                    bun,
-                    velen,
-                    briar_bundle,
-                ])
-                .working_directory(workspace),
-        )?;
-        if !setup_output.success() {
-            return Err(format!(
-                "원격 자동사냥 CLI 환경을 만들지 못했습니다: {}",
-                setup_output.failure_message()
-            ));
-        }
-        let directory = setup_output.stdout_trimmed();
-        validate_remote_temp_directory(&directory, "briar-workflow.")?;
-        let environment_path = format!("{directory}/bin:{}", path_output.stdout);
-        let briar_binary = format!("{directory}/bin/briar");
-        let briar_config_directory = format!("{directory}/home/.config/briar");
-        let worktree_home = home_output.stdout_trimmed();
-        Ok(Self {
-            _directory: None,
-            remote_directory: Some((runner, directory)),
-            briar_binary: briar_binary.clone(),
-            #[cfg(test)]
-            execution_path: OsString::from(&environment_path),
-            environment: vec![
-                ("PATH".to_string(), environment_path),
-                ("BRIAR_PROJECT_ID".to_string(), project_id.to_string()),
-                ("BRIAR_API_URL".to_string(), api_url.to_string()),
-                ("BRIAR_CLI".to_string(), briar_binary),
-                ("BRIAR_CONFIG_HOME".to_string(), briar_config_directory),
-                ("BRIAR_WORKTREE_HOME".to_string(), worktree_home),
-            ],
-        })
+        Self::prepare_with_binaries(
+            home,
+            execution_path,
+            project_id,
+            api_url,
+            &bun,
+            velen.as_deref(),
+        )
     }
 
     #[cfg(test)]
@@ -415,9 +294,9 @@ printf '%s\n' "$directory"
         &self.environment
     }
 
-    /// Invoke the isolated Briar CLI from the host control plane. The absolute
+    /// Invoke the isolated Briar CLI from the local runtime. The absolute
     /// wrapper path deliberately avoids login-shell PATH rewriting inside an
-    /// agent turn; Git and config mutations therefore happen with host
+    /// agent turn; Git and config mutations therefore happen with application
     /// authority before the worker is started.
     pub(crate) fn run_briar(
         &self,
@@ -433,27 +312,6 @@ printf '%s\n' "$directory"
         }
         runner.run(&command)
     }
-}
-
-impl Drop for AutoHuntCliEnvironment {
-    fn drop(&mut self) {
-        if let Some((runner, directory)) = self.remote_directory.take() {
-            let _ = runner.run(&CommandSpec::new("rm").args(["-rf".to_string(), directory]));
-        }
-    }
-}
-
-fn validate_remote_temp_directory(directory: &str, prefix: &str) -> Result<(), String> {
-    let path = Path::new(directory);
-    let name = path.file_name().and_then(OsStr::to_str).unwrap_or_default();
-    if !path.is_absolute()
-        || directory.lines().count() != 1
-        || !name.starts_with(prefix)
-        || name.len() <= prefix.len()
-    {
-        return Err("원격 임시 폴더 경로가 안전하지 않습니다.".to_string());
-    }
-    Ok(())
 }
 
 fn copy_secure_tree(source: &Path, destination: &Path) -> Result<(), String> {
@@ -825,7 +683,7 @@ pub(crate) fn run_project_agent_with(
     })
 }
 
-/// Run exactly one already-claimed issue in its host-allocated worktree.
+/// Run exactly one already-claimed issue in its runtime-allocated worktree.
 ///
 /// Queue selection and `git worktree add` are control-plane responsibilities;
 /// this worker only executes the repository workflow and reports run events.
@@ -1890,7 +1748,7 @@ mod tests {
             .resolve_binary("bun")
             .expect("bundled Bun should resolve");
 
-        let cli_environment = AutoHuntCliEnvironment::prepare_on_host(
+        let cli_environment = AutoHuntCliEnvironment::prepare_local(
             runner,
             &home,
             OsStr::new(""),
@@ -1971,7 +1829,7 @@ mod tests {
     }
 
     #[test]
-    fn configures_a_host_allocated_auto_hunt_worker() {
+    fn configures_a_runtime_allocated_auto_hunt_worker() {
         let request = thread_request(
             "/repo",
             None,
@@ -2074,7 +1932,7 @@ mod tests {
     }
 
     #[test]
-    fn saved_agent_explicitly_requests_host_auto_hunt_dispatch() {
+    fn saved_agent_explicitly_requests_auto_hunt_dispatch() {
         let response = run_project_agent_with(
             &ProjectAgentBackend,
             "project-1",

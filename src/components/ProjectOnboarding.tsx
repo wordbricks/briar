@@ -44,7 +44,6 @@ type Props = {
   onConnect: (
     settings: LocalAutoHuntConfig,
     repositoryPath: string,
-    executionHostId: string,
   ) => Promise<unknown>;
   onCreate: (input: { name: string }) => Promise<unknown>;
   onLogout: () => void;
@@ -53,7 +52,6 @@ type Props = {
   onRepositoryInspect: (
     repositoryPath: string,
     workflow: LocalAutoHuntConfig["workflow"],
-    executionHostId: string,
   ) => Promise<RepositoryReadiness>;
   onWorkspaceCreate: (name: string) => Promise<CreatedProjectWorkspace>;
   user: SessionUser;
@@ -128,7 +126,6 @@ export function ProjectOnboarding({
       const readiness = await onRepositoryInspect(
         workspace.repositoryPath,
         initialWorkflow,
-        "local",
       );
       setRepositoryPath(readiness.repositoryPath);
       setRepositoryReadiness(readiness);
@@ -151,7 +148,7 @@ export function ProjectOnboarding({
       linearTeam: null,
       githubRepository: repositoryReadiness?.githubRepository ?? null,
       workflow: initialWorkflow,
-    }, repositoryPath, "local").catch(() => undefined);
+    }, repositoryPath).catch(() => undefined);
   };
 
   const selectRepository = async () => {
@@ -165,7 +162,6 @@ export function ProjectOnboarding({
       const readiness = await onRepositoryInspect(
         selected,
         initialWorkflow,
-        "local",
       );
       setRepositoryPath(readiness.repositoryPath);
       setRepositoryReadiness(readiness);

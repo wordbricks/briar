@@ -1,5 +1,5 @@
-//! Local execution host. Behaviour must stay identical to Briar's original
-//! direct `Command::new` calls, because every existing project keeps using it.
+//! Local command runner. Behaviour must stay identical to Briar's original
+//! direct `Command::new` calls.
 
 use std::{
     ffi::OsString,
@@ -7,7 +7,7 @@ use std::{
     process::{Child, Command, Stdio},
 };
 
-use super::{CommandOutput, CommandRunner, CommandSpec, ExecutionHostKind};
+use super::{CommandOutput, CommandRunner, CommandSpec};
 
 pub(crate) struct LocalRunner {
     execution_path: OsString,
@@ -37,14 +37,6 @@ impl LocalRunner {
 }
 
 impl CommandRunner for LocalRunner {
-    fn kind(&self) -> ExecutionHostKind {
-        ExecutionHostKind::Local
-    }
-
-    fn label(&self) -> String {
-        "이 컴퓨터".to_string()
-    }
-
     fn resolve_binary(&self, tool: &str) -> Result<String, String> {
         if tool == "bun" {
             if let Some(binary) = crate::bundled_bun_binary() {
