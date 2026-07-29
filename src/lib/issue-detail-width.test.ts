@@ -33,7 +33,7 @@ describe("issue detail width", () => {
     expect(titleRule).toContain("line-height:1.25");
   });
 
-  it("fills the parent and gives the properties rail room to align labels", () => {
+  it("fills the parent and keeps the value-only properties rail compact", () => {
     const bodyRule = firstRule(".run-page-body");
     const layoutRule = firstRule(".run-page-layout");
     const propertiesRule = firstRule(".run-properties");
@@ -48,24 +48,24 @@ describe("issue detail width", () => {
     expect(bodyRule).not.toContain("1180px");
     expect(bodyRule).toContain("margin:0");
     expect(layoutRule).toContain(
-      "grid-template-columns:minmax(0,1fr) minmax(280px,320px)",
+      "grid-template-columns:minmax(0,1fr) minmax(240px,280px)",
     );
-    expect(layoutRule).toContain("gap:28px");
+    expect(layoutRule).toContain("gap:24px");
     expect(styles).toContain(
-      "grid-template-columns:minmax(0,1fr) minmax(260px,300px)",
+      "grid-template-columns:minmax(0,1fr) minmax(220px,250px)",
     );
     expect(styles).toContain(
-      "grid-template-columns:minmax(0,1fr) minmax(220px,240px)",
+      "grid-template-columns:minmax(0,1fr) minmax(200px,220px)",
     );
-    expect(propertiesRule).toContain("padding:4px 8px 18px 26px");
-    expect(propertyRule).toContain("min-height:53px");
-    expect(propertyRule).toContain("grid-template-columns:36px minmax(0,1fr)");
-    expect(propertyIconRule).toContain("width:36px");
-    expect(propertyIconRule).toContain("height:36px");
+    expect(propertiesRule).toContain("padding:4px 4px 18px 22px");
+    expect(propertyRule).toContain("min-height:40px");
+    expect(propertyRule).toContain("grid-template-columns:24px minmax(0,1fr)");
+    expect(propertyIconRule).toContain("width:24px");
+    expect(propertyIconRule).toContain("height:24px");
     expect(statusControlRule).toContain(
-      "grid-template-columns:36px minmax(0,1fr) 16px",
+      "grid-template-columns:24px minmax(0,1fr) 14px",
     );
-    expect(statusErrorRule).toContain("margin:0 0 4px 50px");
+    expect(statusErrorRule).toContain("margin:0 0 4px 34px");
   });
 
   it("uses the full content width without a description card", () => {

@@ -2361,7 +2361,6 @@ export function RunPage({
                   <label className="run-property run-status-control">
                     <span className={`run-property-icon ${meta.tone}`}><Activity size={15} /></span>
                     <span className="run-property-copy">
-                      <small>{t("dashboard.status")}</small>
                       <SelectMenu
                         align="end"
                         className="run-status-select"
@@ -2380,40 +2379,72 @@ export function RunPage({
                     {isRecovering && <LoaderCircle className="spin" size={14} />}
                   </label>
                   {error && <p className="run-status-error"><CircleAlert size={13} />{error}</p>}
-                  <div className="run-property">
+                  <div
+                    aria-label={`${t("issue.priority")}: ${priorityLabel}`}
+                    className="run-property"
+                    title={t("issue.priority")}
+                  >
                     <span className="run-property-icon priority"><Signal size={15} /></span>
-                    <span className="run-property-copy"><small>{t("issue.priority")}</small><strong>{priorityLabel}</strong></span>
+                    <span className="run-property-copy"><strong>{priorityLabel}</strong></span>
                   </div>
-                  <div className="run-property">
+                  <div
+                    aria-label={`${t("run.assignee")}: ${run.claimedBy ?? t("run.unassigned")}`}
+                    className="run-property"
+                    title={t("run.assignee")}
+                  >
                     <span className="run-property-icon assignee"><UserRound size={15} /></span>
-                    <span className="run-property-copy"><small>{t("run.assignee")}</small><strong>{run.claimedBy ?? t("run.unassigned")}</strong></span>
+                    <span className="run-property-copy"><strong>{run.claimedBy ?? t("run.unassigned")}</strong></span>
                   </div>
-                  <div className="run-property">
+                  <div
+                    aria-label={`${t("run.agent")}: ${performedAgentName ?? t("run.unassigned")}`}
+                    className="run-property"
+                    title={t("run.agent")}
+                  >
                     <span className="run-property-icon agent"><Bot size={15} /></span>
-                    <span className="run-property-copy"><small>{t("run.agent")}</small><strong>{performedAgentName ?? t("run.unassigned")}</strong></span>
+                    <span className="run-property-copy"><strong>{performedAgentName ?? t("run.unassigned")}</strong></span>
                   </div>
-                  <div className="run-property">
+                  <div
+                    aria-label={`${t("run.currentAttempt")} · ${t("run.currentRevision")}: ${t("run.attempt", { count: run.currentAttempt })} · ${t("run.revision", { count: run.currentRevision })}`}
+                    className="run-property"
+                    title={`${t("run.currentAttempt")} · ${t("run.currentRevision")}`}
+                  >
                     <span className="run-property-icon attempt"><RotateCcw size={15} /></span>
-                    <span className="run-property-copy"><small>{t("run.currentAttempt")} · {t("run.currentRevision")}</small><strong>{t("run.attempt", { count: run.currentAttempt })} · {t("run.revision", { count: run.currentRevision })}</strong></span>
+                    <span className="run-property-copy"><strong>{t("run.attempt", { count: run.currentAttempt })} · {t("run.revision", { count: run.currentRevision })}</strong></span>
                   </div>
                 </section>
                 <section>
                   <h2>{t("run.repository")}</h2>
-                  <div className="run-property">
+                  <div
+                    aria-label={`${t("run.repository")}: ${run.repository}`}
+                    className="run-property"
+                    title={t("run.repository")}
+                  >
                     <span className="run-property-icon repository"><FolderGit2 size={15} /></span>
-                    <span className="run-property-copy"><small>{t("run.repository")}</small><strong title={run.repository}>{run.repository}</strong></span>
+                    <span className="run-property-copy"><strong title={run.repository}>{run.repository}</strong></span>
                   </div>
-                  <div className="run-property">
+                  <div
+                    aria-label={`${t("run.source")}: ${t(`source.${run.source}` as MessageKey)}`}
+                    className="run-property"
+                    title={t("run.source")}
+                  >
                     <span className="run-property-icon source"><span className={`source-dot ${run.source}`} /></span>
-                    <span className="run-property-copy"><small>{t("run.source")}</small><strong>{t(`source.${run.source}` as MessageKey)}</strong></span>
+                    <span className="run-property-copy"><strong>{t(`source.${run.source}` as MessageKey)}</strong></span>
                   </div>
-                  <div className="run-property">
+                  <div
+                    aria-label={`${t("run.branch")}: ${run.branch ?? "—"}`}
+                    className="run-property"
+                    title={t("run.branch")}
+                  >
                     <span className="run-property-icon"><GitFork size={15} /></span>
-                    <span className="run-property-copy"><small>{t("run.branch")}</small><strong title={run.branch ?? undefined}>{run.branch ?? "—"}</strong></span>
+                    <span className="run-property-copy"><strong title={run.branch ?? undefined}>{run.branch ?? "—"}</strong></span>
                   </div>
-                  <div className="run-property">
+                  <div
+                    aria-label={`${t("run.commit")}: ${run.commitSha ?? "—"}`}
+                    className="run-property"
+                    title={t("run.commit")}
+                  >
                     <span className="run-property-icon"><GitCommitHorizontal size={15} /></span>
-                    <span className="run-property-copy"><small>{t("run.commit")}</small><strong title={run.commitSha ?? undefined}>{run.commitSha ?? "—"}</strong></span>
+                    <span className="run-property-copy"><strong title={run.commitSha ?? undefined}>{run.commitSha ?? "—"}</strong></span>
                   </div>
                   {run.pullRequestUrls.map((url, index) => {
                     const label = pullRequestDisplayName(url, index);
@@ -2431,15 +2462,18 @@ export function RunPage({
                           <GitPullRequest size={15} />
                         </span>
                         <span className="run-property-copy">
-                          <small>{t("run.pullRequest")}</small>
                           <strong>{label}</strong>
                         </span>
                       </a>
                     );
                   })}
-                  <div className="run-property">
+                  <div
+                    aria-label={`${t("run.started")}: ${formatDate(run.startedAt, localeTag)}`}
+                    className="run-property"
+                    title={t("run.started")}
+                  >
                     <span className="run-property-icon"><Clock3 size={15} /></span>
-                    <span className="run-property-copy"><small>{t("run.started")}</small><strong>{formatDate(run.startedAt, localeTag)}</strong></span>
+                    <span className="run-property-copy"><strong>{formatDate(run.startedAt, localeTag)}</strong></span>
                   </div>
                 </section>
               </aside>
