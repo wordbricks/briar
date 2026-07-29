@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.browser.auth.AuthTabIntent
 import androidx.browser.customtabs.CustomTabsIntent
@@ -16,6 +17,23 @@ import me.leolin.shortcutbadger.ShortcutBadger
 class MainActivity : TauriActivity() {
   private var appWebView: WebView? = null
   private var pendingAuthReturn = false
+  private val navigationBackCallback =
+    object : OnBackPressedCallback(true) {
+      override fun handleOnBackPressed() {
+        val webView = appWebView
+        if (webView == null) {
+          performDefaultBack()
+          return
+        }
+        webView.post {
+          webView.evaluateJavascript(
+            "window.dispatchEvent(new CustomEvent('briar-navigation-back',{cancelable:true}));",
+          ) { result ->
+            if (result != "false") performDefaultBack()
+          }
+        }
+      }
+    }
 
   private val authTabLauncher =
     AuthTabIntent.registerActivityResultLauncher(this) { result ->
@@ -25,6 +43,7 @@ class MainActivity : TauriActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
+    onBackPressedDispatcher.addCallback(this, navigationBackCallback)
   }
 
   override fun onWebViewCreate(webView: WebView) {
@@ -80,6 +99,14 @@ class MainActivity : TauriActivity() {
 
   private fun isAuthReturn(uri: Uri?): Boolean =
     uri?.scheme == AUTH_RETURN_SCHEME && uri.host == AUTH_RETURN_HOST
+
+  private fun performDefaultBack() {
+    runOnUiThread {
+      navigationBackCallback.isEnabled = false
+      onBackPressedDispatcher.onBackPressed()
+      navigationBackCallback.isEnabled = true
+    }
+  }
 
   inner class BriarAndroidAuthBridge {
     @JavascriptInterface
