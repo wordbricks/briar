@@ -78,6 +78,11 @@ export function InitialOnboarding({
     prerequisiteIds.some(
       (id) => prerequisites[id].installed && prerequisites[id].authenticated,
     );
+  const allReady =
+    prerequisites !== null &&
+    prerequisiteIds.every(
+      (id) => prerequisites[id].installed && prerequisites[id].authenticated,
+    );
   const busy = checking || installing !== null;
 
   const continueToLogin = () => {
@@ -121,19 +126,22 @@ export function InitialOnboarding({
           </section>
         ) : step === "prerequisites" ? (
           <section className="initial-prerequisites-card">
-            <div
-              aria-label={t("initialOnboarding.progress")}
-              aria-valuemax={3}
-              aria-valuemin={1}
-              aria-valuenow={2}
-              className="initial-onboarding-progress"
-              role="progressbar"
-            >
-              <span />
-            </div>
-
             <div className="initial-prerequisites-layout">
               <div className="initial-prerequisites-content">
+                <div className="initial-prerequisites-progress">
+                  <div
+                    aria-label={t("initialOnboarding.progress")}
+                    aria-valuemax={3}
+                    aria-valuemin={1}
+                    aria-valuenow={2}
+                    className="initial-onboarding-progress"
+                    role="progressbar"
+                  >
+                    <span />
+                  </div>
+                  <span aria-hidden="true">2 / 3</span>
+                </div>
+
                 <div className="initial-prerequisites-heading">
                   <h1>{t("initialOnboarding.prerequisitesTitle")}</h1>
                   <p>{t("initialOnboarding.requirementsDescription")}</p>
@@ -169,30 +177,26 @@ export function InitialOnboarding({
                               : t(`initialOnboarding.${id}Name`)}
                             <em>{t("common.optional")}</em>
                           </strong>
+                          <span>
+                            {t(`initialOnboarding.${id}Summary`)}
+                          </span>
                         </div>
-                        <span
-                          aria-label={
-                            isReady
-                              ? t("initialOnboarding.installed")
-                              : undefined
-                          }
-                          className={`initial-prerequisite-check${isReady ? " checked" : ""}${checking && !prerequisites ? " checking" : ""}`}
-                          role={isReady ? "status" : undefined}
-                        >
-                          {checking && !prerequisites ? (
+                        {checking && !prerequisites ? (
+                          <span
+                            className="initial-prerequisite-check checking"
+                            role="status"
+                          >
                             <LoaderCircle className="spin" size={16} />
-                          ) : isReady ? (
-                            <Check size={17} strokeWidth={2.5} />
-                          ) : null}
-                        </span>
-                        {isReady ? (
-                          <small className="initial-prerequisite-state">
-                            {t("initialOnboarding.installed")}
-                          </small>
-                        ) : checking && !prerequisites ? (
-                          <small className="initial-prerequisite-state">
                             {t("initialOnboarding.checking")}
-                          </small>
+                          </span>
+                        ) : isReady ? (
+                          <span
+                            className="initial-prerequisite-check checked"
+                            role="status"
+                          >
+                            <Check size={17} strokeWidth={2.5} />
+                            {t("initialOnboarding.installed")}
+                          </span>
                         ) : (
                           <button
                             className="initial-prerequisite-install"
@@ -216,6 +220,14 @@ export function InitialOnboarding({
                     );
                   })}
                 </div>
+
+                <p className="initial-prerequisites-summary">
+                  {t(
+                    allReady
+                      ? "initialOnboarding.allToolsReady"
+                      : "initialOnboarding.toolsSetupLater",
+                  )}
+                </p>
 
                 {error ? (
                   <div className="initial-prerequisites-error" role="alert">

@@ -91,6 +91,21 @@ describe("InitialOnboarding", () => {
     );
     expect(container.textContent?.match(/선택/g)).toHaveLength(4);
     expect(container.textContent).not.toContain("Velen");
+    expect(
+      container.querySelectorAll(
+        ".initial-prerequisites-list .initial-prerequisite-row",
+      ),
+    ).toHaveLength(4);
+    expect(
+      container.querySelector(
+        ".initial-prerequisites-content .initial-prerequisites-progress",
+      ),
+    ).not.toBeNull();
+    expect(
+      container.querySelector(
+        ".initial-prerequisites-layout > .initial-prerequisites-visual img",
+      ),
+    ).not.toBeNull();
   });
 
   it("shows next when at least one tool is installed", async () => {
