@@ -55,6 +55,29 @@ export type OrganizationMemberRow = {
   created_at: string;
 };
 
+export type SlackInstallationRow = {
+  team_id: string;
+  team_name: string;
+  organization_id: string;
+  default_project_id: string | null;
+  default_project_name: string | null;
+  bot_user_id: string;
+  encrypted_bot_token: string;
+  token_iv: string;
+  installed_by_user_id: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SlackOAuthStateRow = {
+  state_hash: string;
+  organization_id: string;
+  default_project_id: string;
+  user_id: string;
+  expires_at: string;
+  created_at: string;
+};
+
 export type ProjectSettingsRow = {
   project_id: string;
   velen_org: string | null;
@@ -531,6 +554,249 @@ export async function removeOrganizationMember(
   return result.meta.changes > 0;
 }
 
+export async function createSlackOAuthState(
+  db: D1Database,
+  input: {
+    stateHash: string;
+    organizationId: string;
+    defaultProjectId: string;
+    userId: string;
+    expiresAt: string;
+    createdAt: string;
+  },
+) {
+  await db.batch([
+    db
+      .prepare(`delete from briar_slack_oauth_states where expires_at <= ?`)
+      .bind(input.createdAt),
+    db
+      .prepare(
+        `insert into briar_slack_oauth_states (
+           state_hash, organization_id, default_project_id, user_id,
+           expires_at, created_at
+         ) values (?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        input.stateHash,
+        input.organizationId,
+        input.defaultProjectId,
+        input.userId,
+        input.expiresAt,
+        input.createdAt,
+      ),
+  ]);
+}
+
+export async function consumeSlackOAuthState(
+  db: D1Database,
+  stateHash: string,
+  now: string,
+) {
+  const state = await db
+    .prepare(
+      `select state_hash, organization_id, default_project_id, user_id,
+              expires_at, created_at
+       from briar_slack_oauth_states
+       where state_hash = ? and expires_at > ?`,
+    )
+    .bind(stateHash, now)
+    .first<SlackOAuthStateRow>();
+  if (!state) return null;
+  const deleted = await db
+    .prepare(`delete from briar_slack_oauth_states where state_hash = ?`)
+    .bind(stateHash)
+    .run();
+  return deleted.meta.changes > 0 ? state : null;
+}
+
+export async function upsertSlackInstallation(
+  db: D1Database,
+  input: {
+    teamId: string;
+    teamName: string;
+    organizationId: string;
+    defaultProjectId: string;
+    botUserId: string;
+    encryptedBotToken: string;
+    tokenIv: string;
+    installedByUserId: string;
+    observedAt: string;
+  },
+) {
+  await db
+    .prepare(
+      `insert into briar_slack_installations (
+         team_id, team_name, organization_id, default_project_id, bot_user_id,
+         encrypted_bot_token, token_iv, installed_by_user_id,
+         created_at, updated_at
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       on conflict(team_id) do update set
+         team_name = excluded.team_name,
+         organization_id = excluded.organization_id,
+         default_project_id = excluded.default_project_id,
+         bot_user_id = excluded.bot_user_id,
+         encrypted_bot_token = excluded.encrypted_bot_token,
+         token_iv = excluded.token_iv,
+         installed_by_user_id = excluded.installed_by_user_id,
+         updated_at = excluded.updated_at`,
+    )
+    .bind(
+      input.teamId,
+      input.teamName,
+      input.organizationId,
+      input.defaultProjectId,
+      input.botUserId,
+      input.encryptedBotToken,
+      input.tokenIv,
+      input.installedByUserId,
+      input.observedAt,
+      input.observedAt,
+    )
+    .run();
+}
+
+const slackInstallationSelect = `
+  select installation.team_id, installation.team_name,
+         installation.organization_id, installation.default_project_id,
+         project.name as default_project_name, installation.bot_user_id,
+         installation.encrypted_bot_token, installation.token_iv,
+         installation.installed_by_user_id, installation.created_at,
+         installation.updated_at
+  from briar_slack_installations installation
+  left join briar_projects project on project.id = installation.default_project_id
+`;
+
+export async function getSlackInstallation(
+  db: D1Database,
+  teamId: string,
+) {
+  return db
+    .prepare(`${slackInstallationSelect} where installation.team_id = ?`)
+    .bind(teamId)
+    .first<SlackInstallationRow>();
+}
+
+export async function listSlackInstallations(
+  db: D1Database,
+  organizationId: string,
+) {
+  const result = await db
+    .prepare(
+      `${slackInstallationSelect}
+       where installation.organization_id = ?
+       order by installation.created_at`,
+    )
+    .bind(organizationId)
+    .all<SlackInstallationRow>();
+  return result.results;
+}
+
+export async function updateSlackInstallationProject(
+  db: D1Database,
+  organizationId: string,
+  teamId: string,
+  projectId: string,
+) {
+  const result = await db
+    .prepare(
+      `update briar_slack_installations
+       set default_project_id = ?, updated_at = ?
+       where organization_id = ? and team_id = ?
+         and exists (
+           select 1 from briar_projects
+           where id = ? and organization_id = ?
+         )`,
+    )
+    .bind(
+      projectId,
+      new Date().toISOString(),
+      organizationId,
+      teamId,
+      projectId,
+      organizationId,
+    )
+    .run();
+  return result.meta.changes > 0;
+}
+
+export async function deleteSlackInstallation(
+  db: D1Database,
+  organizationId: string,
+  teamId: string,
+) {
+  const result = await db
+    .prepare(
+      `delete from briar_slack_installations
+       where organization_id = ? and team_id = ?`,
+    )
+    .bind(organizationId, teamId)
+    .run();
+  return result.meta.changes > 0;
+}
+
+export async function claimSlackEvent(
+  db: D1Database,
+  teamId: string,
+  eventId: string,
+  claimedAt: string,
+  staleBefore: string,
+) {
+  const retentionBefore = new Date(
+    Date.parse(claimedAt) - 30 * 24 * 60 * 60_000,
+  ).toISOString();
+  await db
+    .prepare(
+      `delete from briar_slack_events
+       where coalesce(completed_at, claimed_at) < ?`,
+    )
+    .bind(retentionBefore)
+    .run();
+  const result = await db
+    .prepare(
+      `insert into briar_slack_events (
+         team_id, event_id, status, claimed_at, completed_at
+       ) values (?, ?, 'processing', ?, null)
+       on conflict(team_id, event_id) do update set
+         status = 'processing', claimed_at = excluded.claimed_at,
+         completed_at = null
+       where briar_slack_events.status = 'processing'
+         and briar_slack_events.claimed_at < ?`,
+    )
+    .bind(teamId, eventId, claimedAt, staleBefore)
+    .run();
+  return result.meta.changes > 0;
+}
+
+export async function completeSlackEvent(
+  db: D1Database,
+  teamId: string,
+  eventId: string,
+  completedAt: string,
+) {
+  await db
+    .prepare(
+      `update briar_slack_events
+       set status = 'completed', completed_at = ?
+       where team_id = ? and event_id = ?`,
+    )
+    .bind(completedAt, teamId, eventId)
+    .run();
+}
+
+export async function releaseSlackEvent(
+  db: D1Database,
+  teamId: string,
+  eventId: string,
+) {
+  await db
+    .prepare(
+      `delete from briar_slack_events
+       where team_id = ? and event_id = ? and status = 'processing'`,
+    )
+    .bind(teamId, eventId)
+    .run();
+}
+
 export async function listProjects(db: D1Database, userId: string) {
   const result = await db
     .prepare(
@@ -545,6 +811,26 @@ export async function listProjects(db: D1Database, userId: string) {
        order by organization.created_at, project.created_at`,
     )
     .bind(userId)
+    .all<ProjectRow>();
+  return result.results;
+}
+
+export async function listOrganizationProjects(
+  db: D1Database,
+  organizationId: string,
+) {
+  const result = await db
+    .prepare(
+      `select project.id, project.name, project.organization_id,
+              organization.name as organization_name,
+              'member' as member_role, project.created_at
+       from briar_projects project
+       join briar_organizations organization
+         on organization.id = project.organization_id
+       where project.organization_id = ?
+       order by project.created_at`,
+    )
+    .bind(organizationId)
     .all<ProjectRow>();
   return result.results;
 }

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { verifyEncryptedEnv } from "./verify-encrypted-env";
+import {
+  encryptedEnvPolicies,
+  verifyEncryptedEnv,
+} from "./verify-encrypted-env";
 
 const policy = {
   publicKey: "DOTENV_PUBLIC_KEY_TEST",
@@ -20,6 +23,17 @@ function fixture(overrides: Partial<Record<string, string>> = {}) {
 }
 
 describe("encrypted environment verification", () => {
+  it("requires every Slack production secret to remain encrypted", () => {
+    expect(encryptedEnvPolicies[".env.production"]?.secrets).toEqual(
+      expect.arrayContaining([
+        "SLACK_CLIENT_ID",
+        "SLACK_CLIENT_SECRET",
+        "SLACK_SIGNING_SECRET",
+        "SLACK_TOKEN_ENCRYPTION_KEY",
+      ]),
+    );
+  });
+
   it("accepts a public key and encrypted secret values", () => {
     expect(() => verifyEncryptedEnv(".env.test", fixture(), policy)).not.toThrow();
   });

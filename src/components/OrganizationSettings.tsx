@@ -2,6 +2,7 @@ import {
   Building2,
   Download,
   ImagePlus,
+  MessageSquare,
   Search,
   Trash2,
   UserPlus,
@@ -48,6 +49,7 @@ import {
 } from "../lib/organization-logo";
 import type { Organization, OrganizationMember } from "../types";
 import { SelectMenu } from "./SelectMenu";
+import { SlackIntegrationSettings } from "./SlackIntegrationSettings";
 
 type RoleFilter = "all" | OrganizationMember["role"];
 
@@ -71,12 +73,12 @@ export function OrganizationSettings({
   ) => Promise<Organization>;
   onRename: (organizationId: string, name: string) => Promise<Organization>;
   isSidebarOpen?: boolean;
-  initialSection?: "general" | "members";
+  initialSection?: "general" | "members" | "integrations";
 }) {
   const { locale, t } = useI18n();
-  const [activeSection, setActiveSection] = useState<"general" | "members">(
-    initialSection ?? "general",
-  );
+  const [activeSection, setActiveSection] = useState<
+    "general" | "members" | "integrations"
+  >(initialSection ?? "general");
   const [organizationName, setOrganizationName] = useState(organization.name);
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameError, setRenameError] = useState<string | null>(null);
@@ -230,6 +232,15 @@ export function OrganizationSettings({
               onClick={() => setActiveSection("members")}
             >
               {t("organization.membersAndInvites")}
+            </SettingsNavItem>
+            <SettingsNavItem
+              active={activeSection === "integrations"}
+              icon={
+                <MessageSquare aria-hidden="true" size={16} strokeWidth={1.8} />
+              }
+              onClick={() => setActiveSection("integrations")}
+            >
+              {t("organization.integrations")}
             </SettingsNavItem>
           </SettingsNavGroup>
         </SettingsNav>
@@ -451,7 +462,7 @@ export function OrganizationSettings({
                   </form>
                 </section>
               </>
-            ) : (
+            ) : activeSection === "members" ? (
               <>
                 <SettingsPageHeader
                   className="mb-7 max-w-none"
@@ -636,6 +647,11 @@ export function OrganizationSettings({
                   )}
                 </section>
               </>
+            ) : (
+              <SlackIntegrationSettings
+                organizationId={organizationId}
+                token={token}
+              />
             )}
           </div>
         </SettingsScroll>

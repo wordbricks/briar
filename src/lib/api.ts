@@ -392,6 +392,76 @@ export async function removeOrganizationMember(
   );
 }
 
+export type SlackInstallation = {
+  teamId: string;
+  teamName: string;
+  botUserId: string;
+  defaultProjectId: string | null;
+  defaultProjectName: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SlackIntegration = {
+  configured: boolean;
+  canManage: boolean;
+  projects: Array<{ id: string; name: string }>;
+  installations: SlackInstallation[];
+};
+
+export async function loadSlackIntegration(
+  token: string,
+  organizationId: string,
+) {
+  return request<SlackIntegration>(
+    `/organizations/${organizationId}/slack`,
+    token,
+  );
+}
+
+export async function createSlackInstallUrl(
+  token: string,
+  organizationId: string,
+  defaultProjectId: string,
+) {
+  return request<{ installUrl: string }>(
+    `/organizations/${organizationId}/slack`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify({ defaultProjectId }),
+    },
+  );
+}
+
+export async function updateSlackInstallation(
+  token: string,
+  organizationId: string,
+  teamId: string,
+  defaultProjectId: string,
+) {
+  return request<{ installation: SlackInstallation }>(
+    `/organizations/${organizationId}/slack/installations/${encodeURIComponent(teamId)}`,
+    token,
+    {
+      method: "PUT",
+      body: JSON.stringify({ defaultProjectId }),
+    },
+  );
+}
+
+export async function disconnectSlackInstallation(
+  token: string,
+  organizationId: string,
+  teamId: string,
+) {
+  return request<void>(
+    `/organizations/${organizationId}/slack/installations/${encodeURIComponent(teamId)}`,
+    token,
+    { method: "DELETE" },
+  );
+}
+
 export async function loadDashboard(
   token: string,
   projectId: string,

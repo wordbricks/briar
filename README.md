@@ -21,6 +21,7 @@ Repository source code stays local. Agents send only task state and Git metadata
 - Project-scoped LLM conversations through Codex App Server or Claude Agent SDK
 - Optional Velen CLI context with repository-specific organization/source settings
 - Optional Linear integration through a configured Velen source
+- Slack OAuth integration for creating issues with `@Briar` mentions
 - Native React controls in a light desktop theme
 - Universal run status plus repository-specific workflow stages selected at connection time
 - Exceptional states: `blocked`, `failed`, `cancelled`
@@ -42,6 +43,9 @@ flowchart LR
 ```
 
 The Worker owns Better Auth, dashboard APIs, Agent ingest APIs, authorization checks, and all database access. D1 is not exposed directly to the desktop app or CLI.
+
+Slack App provisioning and deployment are covered in
+[docs/operations/slack-integration.md](docs/operations/slack-integration.md).
 
 ## Install
 
@@ -188,6 +192,10 @@ Worker secrets are managed with [dotenvx](https://dotenvx.com/). The encrypted `
 bunx dotenvx set BETTER_AUTH_SECRET 'new-value' -f .env.production --no-native --no-armor
 bunx dotenvx set GOOGLE_CLIENT_ID 'new-value' -f .env.production --no-native --no-armor
 bunx dotenvx set GOOGLE_CLIENT_SECRET 'new-value' -f .env.production --no-native --no-armor
+bunx dotenvx set SLACK_CLIENT_ID 'new-value' -f .env.production --no-native --no-armor
+bunx dotenvx set SLACK_CLIENT_SECRET 'new-value' -f .env.production --no-native --no-armor
+bunx dotenvx set SLACK_SIGNING_SECRET 'new-value' -f .env.production --no-native --no-armor
+bunx dotenvx set SLACK_TOKEN_ENCRYPTION_KEY "$(openssl rand -base64 32)" -f .env.production --no-native --no-armor
 
 bun run secrets:check
 bun run worker:build

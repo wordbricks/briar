@@ -45,6 +45,8 @@ import {
   claimDueProjectAgentScheduleRun,
   claimNextQueuedHuntRun,
   completeProjectAgentScheduleRun,
+  completeSlackEvent,
+  consumeSlackOAuthState,
   createIssueMessage,
   createIssueAttachments,
   createRunEvidenceImages,
@@ -52,6 +54,9 @@ import {
   createProjectAgent,
   createProjectAgentSchedule,
   createProject,
+  createSlackOAuthState,
+  claimSlackEvent,
+  deleteSlackInstallation,
   deleteProjectAgent,
   deleteProjectAgentSchedule,
   deleteIssue,
@@ -62,6 +67,7 @@ import {
   getIssueAttachment,
   getRunEvidenceImage,
   getOrganizationRole,
+  getSlackInstallation,
   isOrganizationHandleAvailable,
   getProject,
   getProjectSettings,
@@ -78,11 +84,13 @@ import {
   listRunEvidenceImages,
   listRunStageRevisions,
   listOrganizationMembers,
+  listOrganizationProjects,
   listOrganizations,
   listProjects,
   listProjectAgents,
   listProjectAgentScheduleRuns,
   listProjectAgentSchedules,
+  listSlackInstallations,
   moveHuntRun,
   recoverHuntRun,
   reworkHuntRun,
@@ -92,12 +100,15 @@ import {
   removeOrganizationMember,
   renewProjectAgentScheduleRunLease,
   rollbackNewAppIssue,
+  releaseSlackEvent,
   updateProjectAgent,
   updateProjectAgentSchedule,
   updateProjectSettings,
   updateOrganization,
   updateOrganizationLogo,
   updateIssue,
+  updateSlackInstallationProject,
+  upsertSlackInstallation,
   type HuntEventRow,
   type HuntRunRow,
   type IssueAttachmentInput,
@@ -151,6 +162,20 @@ import {
   workerStateAt,
 } from "./workers";
 import { serveRelease } from "./releases";
+import {
+  callSlackApi,
+  decryptSlackToken,
+  encryptSlackToken,
+  exchangeSlackOAuthCode,
+  parseSlackIssueInstruction,
+  randomUrlSafeToken,
+  sha256Hex,
+  slackBotScopes,
+  slackEventClaimTtlMs,
+  slackHelpMessage,
+  slackOAuthStateTtlMs,
+  verifySlackRequest,
+} from "./slack";
 
 const corsHeaders = {
   "Access-Control-Allow-Headers":
@@ -556,6 +581,12 @@ const organizationMemberInputSchema = z.object({
   email: z.string().trim().email().max(320),
   role: z.enum(["admin", "member"]).default("member"),
 });
+const slackOAuthInputSchema = z
+  .object({
+    defaultProjectId: z.string().uuid(),
+  })
+  .strict();
+const slackInstallationUpdateSchema = slackOAuthInputSchema;
 
 const issueInputSchema = z
   .object({
@@ -1150,6 +1181,382 @@ const organizationJson = (row: OrganizationRow) => ({
   role: row.role,
   createdAt: row.created_at,
 });
+
+const slackInstallationJson = (
+  row: Awaited<ReturnType<typeof listSlackInstallations>>[number],
+) => ({
+  teamId: row.team_id,
+  teamName: row.team_name,
+  botUserId: row.bot_user_id,
+  defaultProjectId: row.default_project_id,
+  defaultProjectName: row.default_project_name,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+
+const slackConfigAvailable = (env: Env) =>
+  Boolean(
+    env.SLACK_CLIENT_ID?.trim() &&
+      env.SLACK_CLIENT_SECRET?.trim() &&
+      env.SLACK_SIGNING_SECRET?.trim() &&
+      env.SLACK_TOKEN_ENCRYPTION_KEY?.trim(),
+  );
+
+const slackOAuthRedirectUri = (origin: string) =>
+  `${origin}/slack/oauth/callback`;
+
+const escapeHtml = (value: string) =>
+  value.replace(
+    /[&<>"']/gu,
+    (character) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[character]!,
+  );
+
+const html = (title: string, message: string, status = 200) =>
+  new Response(
+    `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f7f7fb;color:#29272f;font:16px/1.55 system-ui,sans-serif}.card{width:min(520px,calc(100vw - 48px));padding:36px;border:1px solid #e7e3ee;border-radius:18px;background:white;box-shadow:0 18px 50px #33264d14}h1{margin:0 0 12px;font-size:25px}p{margin:0;color:#69636f}</style></head><body><main class="card"><h1>${escapeHtml(title)}</h1><p>${escapeHtml(message)}</p></main></body></html>`,
+    {
+      status,
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+        "content-security-policy":
+          "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
+      },
+    },
+  );
+
+type SlackAppMentionEvent = {
+  type: "app_mention";
+  user: string;
+  text: string;
+  channel: string;
+  ts: string;
+  thread_ts?: string;
+};
+
+type SlackEventCallback = {
+  type: "event_callback";
+  team_id: string;
+  event_id: string;
+  event: SlackAppMentionEvent;
+};
+
+const isSlackEventCallback = (
+  payload: unknown,
+): payload is SlackEventCallback => {
+  if (!payload || typeof payload !== "object") return false;
+  const callback = payload as Partial<SlackEventCallback>;
+  const event = callback.event as Partial<SlackAppMentionEvent> | undefined;
+  return (
+    callback.type === "event_callback" &&
+    typeof callback.team_id === "string" &&
+    typeof callback.event_id === "string" &&
+    event?.type === "app_mention" &&
+    typeof event.user === "string" &&
+    typeof event.text === "string" &&
+    typeof event.channel === "string" &&
+    typeof event.ts === "string" &&
+    (event.thread_ts === undefined || typeof event.thread_ts === "string")
+  );
+};
+
+async function postSlackReply(
+  token: string,
+  event: SlackAppMentionEvent,
+  text: string,
+) {
+  await callSlackApi("chat.postMessage", token, {
+    channel: event.channel,
+    thread_ts: event.thread_ts ?? event.ts,
+    text,
+    unfurl_links: false,
+    unfurl_media: false,
+  });
+}
+
+async function processSlackAppMention(env: Env, payload: SlackEventCallback) {
+  const now = new Date();
+  const observedAt = now.toISOString();
+  const claimed = await claimSlackEvent(
+    env.DB,
+    payload.team_id,
+    payload.event_id,
+    observedAt,
+    new Date(now.getTime() - slackEventClaimTtlMs).toISOString(),
+  );
+  if (!claimed) return;
+
+  const installation = await getSlackInstallation(env.DB, payload.team_id);
+  if (!installation) {
+    await completeSlackEvent(
+      env.DB,
+      payload.team_id,
+      payload.event_id,
+      observedAt,
+    );
+    return;
+  }
+  let token: string;
+  try {
+    token = await decryptSlackToken(
+      installation.encrypted_bot_token,
+      installation.token_iv,
+      env.SLACK_TOKEN_ENCRYPTION_KEY,
+    );
+  } catch (error) {
+    await releaseSlackEvent(env.DB, payload.team_id, payload.event_id);
+    console.error(
+      JSON.stringify({
+        message: "Slack bot token decrypt failed",
+        error: error instanceof Error ? error.message : String(error),
+        teamId: payload.team_id,
+      }),
+    );
+    return;
+  }
+
+  try {
+    const instruction = parseSlackIssueInstruction(payload.event.text);
+    if (!instruction) {
+      await postSlackReply(token, payload.event, slackHelpMessage());
+      await completeSlackEvent(
+        env.DB,
+        payload.team_id,
+        payload.event_id,
+        new Date().toISOString(),
+      );
+      return;
+    }
+    if (!installation.default_project_id) {
+      await postSlackReply(
+        token,
+        payload.event,
+        "기본 프로젝트가 설정되지 않았습니다. Briar 조직 설정 → Slack에서 프로젝트를 선택해 주세요.",
+      );
+      await completeSlackEvent(
+        env.DB,
+        payload.team_id,
+        payload.event_id,
+        new Date().toISOString(),
+      );
+      return;
+    }
+
+    const settings = await getProjectSettings(
+      env.DB,
+      installation.default_project_id,
+    );
+    const project = (
+      await listOrganizationProjects(env.DB, installation.organization_id)
+    ).find((candidate) => candidate.id === installation.default_project_id);
+    if (!project) {
+      throw new Error("Slack default project is unavailable");
+    }
+
+    const sourceKey = `slack:${payload.team_id}:${payload.event_id}`;
+    const runId = await recordHuntEvent(
+      env.DB,
+      installation.default_project_id,
+      {
+        source: "issue",
+        sourceKey,
+        title: instruction.title,
+        stage: "queued",
+        status: instruction.status,
+        workflowStage: null,
+        eventKey: `${sourceKey}:intake`,
+        occurredAt: observedAt,
+        actor: `slack:${payload.event.user}`,
+        repository: settings?.github_repository ?? project.name,
+        detail:
+          instruction.status === "backlog"
+            ? "Slack 멘션으로 생성된 이슈가 백로그에 추가되었습니다."
+            : "Slack 멘션으로 생성된 이슈가 Auto Hunt 처리를 기다리고 있습니다.",
+        priority: instruction.priority,
+        branch: null,
+        commitSha: null,
+        tracker: null,
+        issueDescription: instruction.description,
+        resultSummary: null,
+        structuredResult: null,
+        pullRequestUrls: [],
+        targetSha: null,
+        sourceCreatedAt: observedAt,
+        qaStatus: null,
+        stagingQaDetail: null,
+        productionQaDetail: null,
+        context: {
+          origin: "slack",
+          slackTeamId: payload.team_id,
+          slackEventId: payload.event_id,
+          slackChannelId: payload.event.channel,
+          slackMessageTs: payload.event.ts,
+          slackThreadTs: payload.event.thread_ts ?? payload.event.ts,
+          slackUserId: payload.event.user,
+        },
+      },
+    );
+    const statusLabel =
+      instruction.status === "backlog" ? "백로그" : "작업 대기열";
+    const priorityLabel = instruction.priority
+      ? ` · P${instruction.priority}`
+      : "";
+    await postSlackReply(
+      token,
+      payload.event,
+      `:white_check_mark: *${instruction.title}* 이슈를 만들었습니다.\n프로젝트: ${project.name} · ${statusLabel}${priorityLabel}\n이슈 ID: \`${runId}\``,
+    );
+    await completeSlackEvent(
+      env.DB,
+      payload.team_id,
+      payload.event_id,
+      new Date().toISOString(),
+    );
+  } catch (error) {
+    await releaseSlackEvent(env.DB, payload.team_id, payload.event_id);
+    console.error(
+      JSON.stringify({
+        message: "Slack app mention failed",
+        error: error instanceof Error ? error.message : String(error),
+        teamId: payload.team_id,
+        eventId: payload.event_id,
+      }),
+    );
+    try {
+      await postSlackReply(
+        token,
+        payload.event,
+        ":warning: 이슈를 만들지 못했습니다. 프로젝트 워크플로와 Slack 연결 설정을 확인한 뒤 다시 시도해 주세요.",
+      );
+    } catch {
+      // Slack will retry the signed event, so keep the original failure retryable.
+    }
+  }
+}
+
+async function handleSlackEventRequest(
+  request: Request,
+  env: Env,
+  ctx?: ExecutionContext,
+) {
+  if (!env.SLACK_SIGNING_SECRET?.trim()) {
+    return json({ message: "Slack integration is not configured" }, 503);
+  }
+  const rawBody = await request.text();
+  if (
+    !(await verifySlackRequest(
+      rawBody,
+      request.headers,
+      env.SLACK_SIGNING_SECRET,
+    ))
+  ) {
+    return json({ message: "Invalid Slack signature" }, 401);
+  }
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(rawBody);
+  } catch {
+    throw new HttpError(400, "Invalid Slack event payload");
+  }
+  if (
+    typeof payload === "object" &&
+    payload !== null &&
+    "type" in payload &&
+    payload.type === "url_verification" &&
+    "challenge" in payload &&
+    typeof payload.challenge === "string"
+  ) {
+    return json({ challenge: payload.challenge });
+  }
+  if (isSlackEventCallback(payload)) {
+    const processing = processSlackAppMention(env, payload);
+    if (ctx) ctx.waitUntil(processing);
+    else await processing;
+  }
+  return json({ ok: true });
+}
+
+async function handleSlackOAuthCallback(request: Request, env: Env) {
+  if (!slackConfigAvailable(env)) {
+    return html(
+      "Slack 연결 실패",
+      "Briar 서버의 Slack 환경 변수가 설정되지 않았습니다.",
+      503,
+    );
+  }
+  const url = new URL(request.url);
+  const state = url.searchParams.get("state");
+  const code = url.searchParams.get("code");
+  const oauthError = url.searchParams.get("error");
+  if (!state || oauthError || !code) {
+    return html(
+      "Slack 연결 취소됨",
+      oauthError
+        ? `Slack이 연결을 완료하지 않았습니다 (${oauthError}).`
+        : "유효하지 않은 OAuth 응답입니다.",
+      400,
+    );
+  }
+  const oauthState = await consumeSlackOAuthState(
+    env.DB,
+    await sha256Hex(state),
+    new Date().toISOString(),
+  );
+  if (!oauthState) {
+    return html(
+      "Slack 연결 만료됨",
+      "설치 링크가 만료되었거나 이미 사용되었습니다. Briar에서 다시 연결해 주세요.",
+      400,
+    );
+  }
+
+  try {
+    const authorization = await exchangeSlackOAuthCode({
+      clientId: env.SLACK_CLIENT_ID,
+      clientSecret: env.SLACK_CLIENT_SECRET,
+      code,
+      redirectUri: slackOAuthRedirectUri(url.origin),
+    });
+    const encrypted = await encryptSlackToken(
+      authorization.token,
+      env.SLACK_TOKEN_ENCRYPTION_KEY,
+    );
+    await upsertSlackInstallation(env.DB, {
+      teamId: authorization.teamId,
+      teamName: authorization.teamName,
+      organizationId: oauthState.organization_id,
+      defaultProjectId: oauthState.default_project_id,
+      botUserId: authorization.botUserId,
+      encryptedBotToken: encrypted.encryptedToken,
+      tokenIv: encrypted.iv,
+      installedByUserId: oauthState.user_id,
+      observedAt: new Date().toISOString(),
+    });
+    return html(
+      "Slack 연결 완료",
+      `${authorization.teamName} 워크스페이스가 Briar에 연결되었습니다. 이 창을 닫고 Slack에서 @Briar를 멘션해 보세요.`,
+    );
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        message: "Slack OAuth callback failed",
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    );
+    return html(
+      "Slack 연결 실패",
+      "Slack 인증을 저장하지 못했습니다. Briar에서 다시 연결해 주세요.",
+      502,
+    );
+  }
+}
 const organizationMemberJson = (row: OrganizationMemberRow) => ({
   userId: row.user_id,
   name: row.name,
@@ -1342,6 +1749,7 @@ async function route(
   auth: BriarAuth,
   db: D1Database,
   attachmentsBucket: R2Bucket,
+  env: Env,
 ): Promise<Response> {
   const { pathname } = new URL(request.url);
 
@@ -1511,6 +1919,150 @@ async function route(
     );
     if (!removed) throw new HttpError(404, "Member not found");
     return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  const organizationSlackMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/slack$/u,
+  );
+  if (organizationSlackMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const role = await getOrganizationRole(
+      db,
+      organizationSlackMatch[1],
+      session.user.id,
+    );
+    if (!role) throw new HttpError(404, "Organization not found");
+    const [projects, installations] = await Promise.all([
+      listOrganizationProjects(db, organizationSlackMatch[1]),
+      listSlackInstallations(db, organizationSlackMatch[1]),
+    ]);
+    return json({
+      configured: slackConfigAvailable(env),
+      canManage: canManageOrganization(role),
+      projects: projects.map((project) => ({
+        id: project.id,
+        name: project.name,
+      })),
+      installations: installations.map(slackInstallationJson),
+    });
+  }
+  if (organizationSlackMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const role = await getOrganizationRole(
+      db,
+      organizationSlackMatch[1],
+      session.user.id,
+    );
+    if (!canManageOrganization(role)) {
+      throw new HttpError(403, "Organization admin access required");
+    }
+    if (!slackConfigAvailable(env)) {
+      throw new HttpError(503, "Slack integration is not configured");
+    }
+    const input = slackOAuthInputSchema.parse(await readJson(request));
+    const project = await getProject(db, input.defaultProjectId, session.user.id);
+    if (
+      !project ||
+      project.organization_id !== organizationSlackMatch[1]
+    ) {
+      throw new HttpError(404, "Project not found");
+    }
+    const state = randomUrlSafeToken();
+    const createdAt = new Date();
+    await createSlackOAuthState(db, {
+      stateHash: await sha256Hex(state),
+      organizationId: organizationSlackMatch[1],
+      defaultProjectId: project.id,
+      userId: session.user.id,
+      expiresAt: new Date(
+        createdAt.getTime() + slackOAuthStateTtlMs,
+      ).toISOString(),
+      createdAt: createdAt.toISOString(),
+    });
+    const installUrl = new URL("https://slack.com/oauth/v2/authorize");
+    installUrl.searchParams.set("client_id", env.SLACK_CLIENT_ID);
+    installUrl.searchParams.set("scope", slackBotScopes.join(","));
+    installUrl.searchParams.set(
+      "redirect_uri",
+      slackOAuthRedirectUri(new URL(request.url).origin),
+    );
+    installUrl.searchParams.set("state", state);
+    return json({ installUrl: installUrl.toString() }, 201);
+  }
+
+  const organizationSlackInstallationMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/slack\/installations\/([^/]+)$/u,
+  );
+  if (
+    organizationSlackInstallationMatch &&
+    (request.method === "PUT" || request.method === "DELETE")
+  ) {
+    const session = await requireSession(auth, request);
+    const role = await getOrganizationRole(
+      db,
+      organizationSlackInstallationMatch[1],
+      session.user.id,
+    );
+    if (!canManageOrganization(role)) {
+      throw new HttpError(403, "Organization admin access required");
+    }
+    const teamId = decodeURIComponent(
+      organizationSlackInstallationMatch[2],
+    );
+    if (request.method === "DELETE") {
+      const installation = await getSlackInstallation(db, teamId);
+      if (
+        !installation ||
+        installation.organization_id !==
+          organizationSlackInstallationMatch[1]
+      ) {
+        throw new HttpError(404, "Slack workspace not found");
+      }
+      if (slackConfigAvailable(env)) {
+        try {
+          const token = await decryptSlackToken(
+            installation.encrypted_bot_token,
+            installation.token_iv,
+            env.SLACK_TOKEN_ENCRYPTION_KEY,
+          );
+          await callSlackApi("auth.revoke", token, { test: false });
+        } catch (error) {
+          console.error(
+            JSON.stringify({
+              message: "Slack token revoke failed",
+              error: error instanceof Error ? error.message : String(error),
+              teamId,
+            }),
+          );
+        }
+      }
+      const removed = await deleteSlackInstallation(
+        db,
+        organizationSlackInstallationMatch[1],
+        teamId,
+      );
+      if (!removed) throw new HttpError(404, "Slack workspace not found");
+      return new Response(null, { status: 204, headers: corsHeaders });
+    }
+    const input = slackInstallationUpdateSchema.parse(await readJson(request));
+    const updated = await updateSlackInstallationProject(
+      db,
+      organizationSlackInstallationMatch[1],
+      teamId,
+      input.defaultProjectId,
+    );
+    if (!updated) {
+      throw new HttpError(404, "Slack workspace or project not found");
+    }
+    const installations = await listSlackInstallations(
+      db,
+      organizationSlackInstallationMatch[1],
+    );
+    const installation = installations.find(
+      (candidate) => candidate.team_id === teamId,
+    );
+    if (!installation) throw new HttpError(404, "Slack workspace not found");
+    return json({ installation: slackInstallationJson(installation) });
   }
 
   if (pathname === "/projects" && request.method === "GET") {
@@ -3063,7 +3615,11 @@ async function route(
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(
+    request: Request,
+    env: Env,
+    ctx?: ExecutionContext,
+  ): Promise<Response> {
     const url = new URL(request.url);
     if (request.method === "OPTIONS") {
       return new Response(null, { headers: corsHeaders });
@@ -3075,6 +3631,25 @@ export default {
         database: "cloudflare-d1",
         updates: "cloudflare-r2",
       });
+    }
+    if (url.pathname === "/slack/events" && request.method === "POST") {
+      try {
+        return await handleSlackEventRequest(request, env, ctx);
+      } catch (error) {
+        if (error instanceof HttpError) {
+          return json({ message: error.message }, error.status);
+        }
+        console.error(
+          JSON.stringify({
+            message: "Slack event request failed",
+            error: error instanceof Error ? error.message : String(error),
+          }),
+        );
+        return json({ message: "Internal server error" }, 500);
+      }
+    }
+    if (url.pathname === "/slack/oauth/callback" && request.method === "GET") {
+      return handleSlackOAuthCallback(request, env);
     }
     const releaseResponse = await serveRelease(request, env.RELEASES);
     if (releaseResponse) return releaseResponse;
@@ -3091,7 +3666,7 @@ export default {
 
     try {
       const auth = createAuth(env, url.origin);
-      return await route(request, auth, env.DB, env.ATTACHMENTS);
+      return await route(request, auth, env.DB, env.ATTACHMENTS, env);
     } catch (error) {
       if (error instanceof HttpError) {
         return json({ message: error.message }, error.status);
