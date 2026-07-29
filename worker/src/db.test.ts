@@ -34,6 +34,7 @@ import {
   HuntTransitionError,
   listIssueAttachments,
   listIssueMessages,
+  listOrganizations,
   listOrganizationMembers,
   isOrganizationHandleAvailable,
   listProjects,
@@ -346,6 +347,19 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await executeSql(
       db,
       await readFile(resolve("migrations/0031_organization_logos.sql"), "utf8"),
+    );
+    await executeSql(
+      db,
+      `update briar_organizations
+       set logo = 'data:image/webp;base64,bGVnYWN5'
+       where id = '${projectId}'`,
+    );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0033_organization_logo_browser_formats.sql"),
+        "utf8",
+      ),
     );
   }, 30_000);
 
@@ -1379,15 +1393,31 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     );
   });
 
+  it("preserves logos stored before browser fallback formats were added", async () => {
+    await expect(listOrganizations(db, "owner")).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: projectId,
+          logo: "data:image/webp;base64,bGVnYWN5",
+        }),
+      ]),
+    );
+  });
+
   it("stores and removes an organization logo while preserving its role", async () => {
-    const logo = "data:image/webp;base64,bG9nbw==";
-    await expect(
-      updateOrganizationLogo(db, projectId, logo, "owner"),
-    ).resolves.toMatchObject({
-      id: projectId,
-      logo,
-      role: "owner",
-    });
+    for (const logo of [
+      "data:image/webp;base64,bG9nbw==",
+      "data:image/png;base64,bG9nbw==",
+      "data:image/jpeg;base64,bG9nbw==",
+    ]) {
+      await expect(
+        updateOrganizationLogo(db, projectId, logo, "owner"),
+      ).resolves.toMatchObject({
+        id: projectId,
+        logo,
+        role: "owner",
+      });
+    }
     await expect(
       updateOrganizationLogo(db, projectId, null, "owner"),
     ).resolves.toMatchObject({

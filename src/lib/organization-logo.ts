@@ -7,7 +7,7 @@ const supportedLogoTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 export function isOrganizationLogoDataUrl(value: string): boolean {
   return (
-    /^data:image\/webp;base64,/u.test(value) &&
+    /^data:image\/(?:jpeg|png|webp);base64,/u.test(value) &&
     value.length <= maxOrganizationLogoDataUrlLength
   );
 }

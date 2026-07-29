@@ -164,18 +164,28 @@ describe("Worker HTTP contract", () => {
     });
   });
 
-  it("accepts a bounded WebP organization logo or removal", () => {
+  it("accepts bounded browser-supported organization logos or removal", () => {
     expect(
       organizationLogoInputSchema.parse({
         logo: "data:image/webp;base64,bG9nbw==",
       }),
     ).toEqual({ logo: "data:image/webp;base64,bG9nbw==" });
+    expect(
+      organizationLogoInputSchema.parse({
+        logo: "data:image/png;base64,bG9nbw==",
+      }),
+    ).toEqual({ logo: "data:image/png;base64,bG9nbw==" });
+    expect(
+      organizationLogoInputSchema.parse({
+        logo: "data:image/jpeg;base64,bG9nbw==",
+      }),
+    ).toEqual({ logo: "data:image/jpeg;base64,bG9nbw==" });
     expect(organizationLogoInputSchema.parse({ logo: null })).toEqual({
       logo: null,
     });
     expect(() =>
       organizationLogoInputSchema.parse({
-        logo: "data:image/png;base64,bG9nbw==",
+        logo: "data:image/gif;base64,bG9nbw==",
       }),
     ).toThrow();
   });

@@ -107,6 +107,8 @@ describe("detached execution workers", () => {
       "migrations/0029_structured_agent_results.sql",
       "migrations/0030_run_evidence_images.sql",
       "migrations/0031_organization_logos.sql",
+      "migrations/0032_slack_integration.sql",
+      "migrations/0033_organization_logo_browser_formats.sql",
     ]) {
       await executeSql(db, await readFile(resolve(migration), "utf8"));
     }
