@@ -363,7 +363,7 @@ describe("ProjectAgents", () => {
 
     expect(container.querySelector("#project-agent-session")).not.toBeNull();
     expect(container.querySelector('[role="dialog"]')).toBeNull();
-    expect(container.textContent).toContain("수행 로그");
+    expect(container.textContent).not.toContain("수행 로그");
     expect(container.textContent).toContain("세션 타임라인");
 
     await act(async () => {
