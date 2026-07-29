@@ -67,6 +67,38 @@ describe("UpdateControl", () => {
     await act(async () => root.unmount());
   });
 
+  it("keeps the installing state compact without showing feedback text", async () => {
+    let finishDownload: (() => void) | undefined;
+    const downloadAndInstall = vi.fn(
+      () => new Promise<void>((resolve) => {
+        finishDownload = resolve;
+      }),
+    );
+    check.mockResolvedValue({ version: "1.0.1", downloadAndInstall });
+    const root = createRoot(container);
+    await act(async () => root.render(<UpdateControl />));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const button = container.querySelector("button");
+    await act(async () => {
+      button?.click();
+    });
+
+    expect(downloadAndInstall).toHaveBeenCalledOnce();
+    expect(button?.hasAttribute("disabled")).toBe(true);
+    expect(container.querySelector(".sidebar-update-feedback")).toBeNull();
+    expect(container.textContent).not.toContain("업데이트를 설치하고 있습니다");
+
+    await act(async () => {
+      finishDownload?.();
+      await Promise.resolve();
+    });
+    expect(relaunch).toHaveBeenCalledOnce();
+    await act(async () => root.unmount());
+  });
+
   it("rechecks the signed channel on a fixed interval", async () => {
     check.mockResolvedValue(null);
     const root = createRoot(container);
