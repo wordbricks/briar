@@ -11,6 +11,7 @@ import android.webkit.WebView
 import androidx.activity.enableEdgeToEdge
 import androidx.browser.auth.AuthTabIntent
 import androidx.browser.customtabs.CustomTabsIntent
+import me.leolin.shortcutbadger.ShortcutBadger
 
 class MainActivity : TauriActivity() {
   private var appWebView: WebView? = null
@@ -31,6 +32,7 @@ class MainActivity : TauriActivity() {
     appWebView = webView
     webView.addJavascriptInterface(BriarAndroidAuthBridge(), AUTH_BRIDGE)
     webView.addJavascriptInterface(BriarAndroidIconBridge(), ICON_BRIDGE)
+    webView.addJavascriptInterface(BriarAndroidBadgeBridge(), BADGE_BRIDGE)
     if (pendingAuthReturn) {
       notifyAuthReturn(true)
     }
@@ -102,6 +104,18 @@ class MainActivity : TauriActivity() {
     }
   }
 
+  inner class BriarAndroidBadgeBridge {
+    @JavascriptInterface
+    fun set(count: Int): Boolean {
+      if (count < 0) return false
+      return try {
+        ShortcutBadger.applyCount(this@MainActivity, count)
+      } catch (_: RuntimeException) {
+        false
+      }
+    }
+  }
+
   private fun currentAppIcon(): String {
     for (icon in listOf("gray", "pink", "green")) {
       val alias = ICON_ALIASES.getValue(icon)
@@ -147,6 +161,7 @@ class MainActivity : TauriActivity() {
 
   companion object {
     private const val AUTH_BRIDGE = "BriarAndroidAuth"
+    private const val BADGE_BRIDGE = "BriarAndroidBadge"
     private const val ICON_BRIDGE = "BriarAndroidIcon"
     private const val AUTH_RETURN_HOST = "auth-complete"
     private const val AUTH_RETURN_SCHEME = "briar-companion"

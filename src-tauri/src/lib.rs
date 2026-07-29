@@ -10,7 +10,7 @@ use std::{
     env,
     ffi::{OsStr, OsString},
     fs::{self, OpenOptions},
-    io::Write,
+    io::{Read, Write},
     path::{Path, PathBuf},
     process::{Child, Command},
     sync::{
@@ -709,6 +709,13 @@ fn set_app_icon(icon: String) -> Result<(), String> {
     }
     #[cfg(not(target_os = "ios"))]
     Err("Native app icon selection is only handled by this command on iOS.".to_string())
+}
+
+#[tauri::command]
+fn set_app_badge_count(window: tauri::Window, count: u32) -> Result<(), String> {
+    window
+        .set_badge_count((count > 0).then_some(i64::from(count)))
+        .map_err(|error| format!("App badge count update failed: {error}"))
 }
 
 fn git_repository_root(path: &Path) -> Result<PathBuf, String> {
@@ -4845,18 +4852,9 @@ fn create_auto_hunt_event_sink(
             format!("자동사냥 이벤트 저장 폴더 권한을 지정하지 못했습니다: {error}")
         })?;
     }
-    let mut options = OpenOptions::new();
-    options.create_new(true).write(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
-    }
-    let file = options
-        .open(path)
-        .map_err(|error| format!("자동사냥 이벤트 로그를 열지 못했습니다: {error}"))?;
+    let (file, last_sequence) = open_auto_hunt_event_log(&path)?;
     let file = Arc::new(Mutex::new(file));
-    let sequence = Arc::new(AtomicU64::new(0));
+    let sequence = Arc::new(AtomicU64::new(last_sequence));
     let session_id = session_id.to_string();
     let event_app = app.clone();
 
@@ -4883,6 +4881,46 @@ fn create_auto_hunt_event_sink(
     }))
 }
 
+fn open_auto_hunt_event_log(path: &Path) -> Result<(fs::File, u64), String> {
+    let mut options = OpenOptions::new();
+    options.create(true).read(true).append(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut file = options
+        .open(path)
+        .map_err(|error| format!("자동사냥 이벤트 로그를 열지 못했습니다: {error}"))?;
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)
+        .map_err(|error| format!("자동사냥 이벤트 로그를 읽지 못했습니다: {error}"))?;
+    let last_sequence = parse_auto_hunt_event_records(&contents)?
+        .into_iter()
+        .map(|record| record.sequence)
+        .max()
+        .unwrap_or(0);
+    Ok((file, last_sequence))
+}
+
+fn parse_auto_hunt_event_records(
+    contents: &str,
+) -> Result<Vec<agent::AppServerEventRecord>, String> {
+    contents
+        .lines()
+        .enumerate()
+        .filter(|(_, line)| !line.trim().is_empty())
+        .map(|(index, line)| {
+            serde_json::from_str(line).map_err(|error| {
+                format!(
+                    "자동사냥 이벤트 로그의 {}번째 줄이 손상되었습니다: {error}",
+                    index + 1
+                )
+            })
+        })
+        .collect()
+}
+
 #[tauri::command]
 async fn load_auto_hunt_app_server_events(
     app: tauri::AppHandle,
@@ -4897,19 +4935,7 @@ async fn load_auto_hunt_app_server_events(
                 return Err(format!("자동사냥 이벤트 로그를 읽지 못했습니다: {error}"));
             }
         };
-        contents
-            .lines()
-            .enumerate()
-            .filter(|(_, line)| !line.trim().is_empty())
-            .map(|(index, line)| {
-                serde_json::from_str(line).map_err(|error| {
-                    format!(
-                        "자동사냥 이벤트 로그의 {}번째 줄이 손상되었습니다: {error}",
-                        index + 1
-                    )
-                })
-            })
-            .collect()
+        parse_auto_hunt_event_records(&contents)
     })
     .await
     .map_err(|error| error.to_string())?
@@ -5436,6 +5462,7 @@ pub fn run() {
             clear_session_token,
             current_app_icon,
             set_app_icon,
+            set_app_badge_count,
             validate_repository_path,
             project_workspace_root,
             create_project_workspace,
@@ -5497,6 +5524,62 @@ mod tests {
         assert!(registration.cancelled.load(Ordering::SeqCst));
         drop(registration);
         assert!(!state.stop("session-1").expect("cleaned up"));
+    }
+
+    #[test]
+    fn resumes_an_existing_auto_hunt_event_log_without_overwriting_records() {
+        let directory = tempfile::tempdir().expect("event log directory should exist");
+        let path = directory.path().join("session-1.jsonl");
+        let (mut file, last_sequence) =
+            open_auto_hunt_event_log(&path).expect("new event log should open");
+        assert_eq!(last_sequence, 0);
+
+        let first = agent::AppServerEventRecord::new(
+            "session-1".to_string(),
+            1,
+            agent::AgentProviderEvent {
+                provider: agent::AgentProviderKind::Codex,
+                direction: agent::AgentEventDirection::Server,
+                raw: serde_json::json!({"message": "first attempt"}),
+                event: None,
+            },
+        );
+        serde_json::to_writer(&mut file, &first).expect("first event should serialize");
+        file.write_all(b"\n").expect("first event should finish");
+        file.flush().expect("first event should persist");
+        drop(file);
+
+        let (mut file, last_sequence) =
+            open_auto_hunt_event_log(&path).expect("existing event log should reopen");
+        assert_eq!(last_sequence, 1);
+
+        let second = agent::AppServerEventRecord::new(
+            "session-1".to_string(),
+            last_sequence + 1,
+            agent::AgentProviderEvent {
+                provider: agent::AgentProviderKind::Codex,
+                direction: agent::AgentEventDirection::Server,
+                raw: serde_json::json!({"message": "resumed attempt"}),
+                event: None,
+            },
+        );
+        serde_json::to_writer(&mut file, &second).expect("resumed event should serialize");
+        file.write_all(b"\n").expect("resumed event should finish");
+        file.flush().expect("resumed event should persist");
+        drop(file);
+
+        let contents = fs::read_to_string(path).expect("event log should be readable");
+        let records =
+            parse_auto_hunt_event_records(&contents).expect("event log should remain valid");
+        assert_eq!(
+            records
+                .iter()
+                .map(|record| record.sequence)
+                .collect::<Vec<_>>(),
+            vec![1, 2]
+        );
+        assert_eq!(records[0].message["message"], "first attempt");
+        assert_eq!(records[1].message["message"], "resumed attempt");
     }
 
     #[cfg(unix)]
