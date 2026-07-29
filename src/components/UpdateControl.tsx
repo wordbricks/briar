@@ -76,24 +76,16 @@ export function UpdateControl() {
 
   if (!isTauri() || !available) return null;
 
-  // Show status text only while installing or on error — not for the idle
-  // "update available" state (the download button alone is enough).
-  const feedback = error
-    ? t("update.failed", { error })
-    : isInstalling
-      ? t("update.installing")
-      : null;
-
   const buttonLabel = isInstalling
     ? t("update.installingLabel")
     : t("update.install", { version: available.version });
 
   return (
     <div className="sidebar-update-control">
-      {feedback && (
-        <div className={`sidebar-update-feedback${error ? " error" : ""}`} role="status">
-          {error && <CircleAlert size={13} />}
-          <span>{feedback}</span>
+      {error && (
+        <div className="sidebar-update-feedback error" role="status">
+          <CircleAlert size={13} />
+          <span>{t("update.failed", { error })}</span>
         </div>
       )}
       <button
