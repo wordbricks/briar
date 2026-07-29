@@ -75,6 +75,10 @@ import {
 } from "../lib/token-store";
 import { restoreStoredSession } from "../lib/session-restore";
 import {
+  resolveActiveAccountSelection,
+  writeActiveOrganizationId,
+} from "../lib/active-organization";
+import {
   isAuthorizationCancelled,
   openAuthorization,
 } from "../lib/auth-session";
@@ -342,6 +346,11 @@ export function useBriar(options: UseBriarOptions = {}) {
       window.removeEventListener("briar-auth-return", handleAuthReturn);
   }, [clearLoginTimer]);
 
+  useEffect(() => {
+    if (!user || !activeOrganizationId) return;
+    writeActiveOrganizationId(user.id, activeOrganizationId);
+  }, [activeOrganizationId, user]);
+
   const refresh = useCallback(async () => {
     if (demoMode || !token || !activeProjectId) return;
     try {
@@ -398,12 +407,13 @@ export function useBriar(options: UseBriarOptions = {}) {
       setProjects(result.projects);
       setOrganizations(result.organizations);
       setConnectedProjectIds(nextConnectedProjectIds);
-      setActiveOrganizationId(
-        result.projects[0]?.organizationId ??
-          result.organizations[0]?.id ??
-          null,
+      const selection = resolveActiveAccountSelection(
+        result.user.id,
+        result.organizations,
+        result.projects,
       );
-      setActiveProjectId(result.projects[0]?.id ?? null);
+      setActiveOrganizationId(selection.activeOrganizationId);
+      setActiveProjectId(selection.activeProjectId);
       setError(null);
       setRestoringSession(false);
       setLoading(false);
@@ -646,10 +656,13 @@ export function useBriar(options: UseBriarOptions = {}) {
             setProjects(nextProjects);
             setOrganizations(nextOrganizations);
             setConnectedProjectIds(nextConnectedProjectIds);
-            setActiveOrganizationId(
-              nextProjects[0]?.organizationId ?? nextOrganizations[0]?.id ?? null,
+            const selection = resolveActiveAccountSelection(
+              nextUser.id,
+              nextOrganizations,
+              nextProjects,
             );
-            setActiveProjectId(nextProjects[0]?.id ?? null);
+            setActiveOrganizationId(selection.activeOrganizationId);
+            setActiveProjectId(selection.activeProjectId);
             setProjectConnection(null);
             setLoginCode(null);
             setLoading(false);
