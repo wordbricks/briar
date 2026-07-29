@@ -14,6 +14,7 @@ export type TranscriptDirection = "client" | "server";
 export type ExecutionWorkerRow = {
   id: string;
   project_id: string;
+  device_id: string;
   label: string;
   host_fingerprint: string;
   agent_provider: AgentProvider;
@@ -22,6 +23,24 @@ export type ExecutionWorkerRow = {
   last_heartbeat_at: string;
   created_at: string;
   updated_at: string;
+};
+
+export type ExecutionWorkerDeviceRow = {
+  id: string;
+  organization_id: string;
+  owner_user_id: string;
+  label: string;
+  device_identity_hash: string;
+  state: ExecutionWorkerState;
+  last_heartbeat_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ExecutionWorkerCredentialPrincipal = {
+  deviceId: string;
+  organizationId: string;
+  ownerUserId: string;
 };
 
 export type TranscriptSessionRow = {
@@ -79,15 +98,22 @@ export const leaseExpiryFrom = (observedAt: string) =>
   new Date(Date.parse(observedAt) + LEASE_DURATION_MS).toISOString();
 
 /**
- * Register a worker, or adopt the existing registration for the same machine.
- * Idempotent so a restarted worker keeps its identity and its run attribution.
+ * Enroll an organization-scoped device and bind it to one project.
+ *
+ * Re-enrollment is explicit and rotates the device credential. A device may be
+ * bound to several projects in the same organization, while runs continue to
+ * reference the project-specific worker row.
  */
 export async function registerExecutionWorker(
   db: D1Database,
   projectId: string,
   input: {
+    deviceId: string;
+    organizationId: string;
+    ownerUserId: string;
+    deviceIdentityHash: string;
+    credentialTokenHash: string;
     label: string;
-    hostFingerprint: string;
     agentProvider: AgentProvider;
     versions: Record<string, string>;
     observedAt: string;
@@ -98,47 +124,116 @@ export async function registerExecutionWorker(
   if (label.length < 1 || label.length > 100) {
     throw new WorkerConflictError("Worker label must be 1-100 characters");
   }
-  if (!/^[0-9a-f]{64}$/u.test(input.hostFingerprint)) {
-    throw new WorkerConflictError("Worker host fingerprint must be a SHA-256 hex digest");
+  if (!/^[0-9a-f]{64}$/u.test(input.deviceIdentityHash)) {
+    throw new WorkerConflictError("Worker device identity must be a SHA-256 hex digest");
   }
+  if (!/^[0-9a-f]{64}$/u.test(input.credentialTokenHash)) {
+    throw new WorkerConflictError("Worker credential must be a SHA-256 hex digest");
+  }
+  const project = await db
+    .prepare(`select organization_id from briar_projects where id = ?`)
+    .bind(projectId)
+    .first<{ organization_id: string }>();
+  if (!project || project.organization_id !== input.organizationId) {
+    throw new WorkerConflictError("Worker project must belong to its organization");
+  }
+
   const versions = JSON.stringify(input.versions ?? {});
   await db
     .prepare(
-      `insert into briar_execution_workers (
-         id, project_id, label, host_fingerprint, agent_provider, versions_json,
+      `insert into briar_execution_worker_devices (
+         id, organization_id, owner_user_id, label, device_identity_hash,
          state, last_heartbeat_at, created_at, updated_at
-       ) values (?, ?, ?, ?, ?, ?, 'online', ?, ?, ?)
-       on conflict (project_id, host_fingerprint) do update set
+       ) values (?, ?, ?, ?, ?, 'online', ?, ?, ?)
+       on conflict (organization_id, device_identity_hash) do update set
          label = excluded.label,
-         agent_provider = excluded.agent_provider,
-         versions_json = excluded.versions_json,
-         state = case
-           when briar_execution_workers.state = 'disabled' then 'disabled'
-           else 'online'
-         end,
+         state = 'online',
          last_heartbeat_at = excluded.last_heartbeat_at,
-         updated_at = excluded.updated_at`,
+         updated_at = excluded.updated_at
+       where briar_execution_worker_devices.owner_user_id = excluded.owner_user_id`,
     )
     .bind(
-      input.id,
-      projectId,
+      input.deviceId,
+      input.organizationId,
+      input.ownerUserId,
       label,
-      input.hostFingerprint,
-      input.agentProvider,
-      versions,
+      input.deviceIdentityHash,
       input.observedAt,
       input.observedAt,
       input.observedAt,
     )
     .run();
 
-  return await db
+  const device = await db
     .prepare(
-      `select * from briar_execution_workers
-       where project_id = ? and host_fingerprint = ?`,
+      `select * from briar_execution_worker_devices
+       where organization_id = ? and device_identity_hash = ?`,
     )
-    .bind(projectId, input.hostFingerprint)
-    .first<ExecutionWorkerRow>();
+    .bind(input.organizationId, input.deviceIdentityHash)
+    .first<ExecutionWorkerDeviceRow>();
+  if (!device || device.owner_user_id !== input.ownerUserId) {
+    throw new WorkerConflictError(
+      "Worker device is already owned by another organization member",
+    );
+  }
+
+  await db.batch([
+    db
+      .prepare(
+        `insert into briar_execution_workers (
+           id, project_id, device_id, label, host_fingerprint, agent_provider,
+           versions_json, state, last_heartbeat_at, created_at, updated_at
+         ) values (?, ?, ?, ?, ?, ?, ?, 'online', ?, ?, ?)
+         on conflict (project_id, device_id) do update set
+           label = excluded.label,
+           host_fingerprint = excluded.host_fingerprint,
+           agent_provider = excluded.agent_provider,
+           versions_json = excluded.versions_json,
+           state = 'online',
+           last_heartbeat_at = excluded.last_heartbeat_at,
+           updated_at = excluded.updated_at`,
+      )
+      .bind(
+        input.id,
+        projectId,
+        device.id,
+        label,
+        input.deviceIdentityHash,
+        input.agentProvider,
+        versions,
+        input.observedAt,
+        input.observedAt,
+        input.observedAt,
+      ),
+    db
+      .prepare(
+        `update briar_execution_workers
+         set label = ?, updated_at = ?
+         where device_id = ?`,
+      )
+      .bind(label, input.observedAt, device.id),
+    db
+      .prepare(
+        `insert into briar_execution_worker_credentials (
+           device_id, token_hash, created_at, last_used_at, expires_at, revoked_at
+         ) values (?, ?, ?, null, null, null)
+         on conflict (device_id) do update set
+           token_hash = excluded.token_hash,
+           created_at = excluded.created_at,
+           last_used_at = null,
+           expires_at = null,
+           revoked_at = null`,
+      )
+      .bind(device.id, input.credentialTokenHash, input.observedAt),
+  ]);
+
+  const worker = await executionWorkerBindingForProject(
+    db,
+    device.id,
+    projectId,
+  );
+  if (!worker) throw new WorkerConflictError("Worker project binding was not created");
+  return { device, worker };
 }
 
 export async function recordWorkerHeartbeat(
@@ -150,26 +245,170 @@ export async function recordWorkerHeartbeat(
     observedAt: string;
   },
 ) {
+  const binding = await db
+    .prepare(
+      `select * from briar_execution_workers
+       where id = ? and project_id = ?`,
+    )
+    .bind(input.workerId, projectId)
+    .first<ExecutionWorkerRow>();
+  if (!binding) {
+    throw new WorkerConflictError("Worker is not registered for this project");
+  }
+  await db.batch([
+    db
+      .prepare(
+        `update briar_execution_worker_devices
+         set last_heartbeat_at = ?,
+             updated_at = ?,
+             state = case when state = 'disabled' then 'disabled' else 'online' end
+         where id = ?`,
+      )
+      .bind(input.observedAt, input.observedAt, binding.device_id),
+    db
+      .prepare(
+        `update briar_execution_workers
+         set last_heartbeat_at = ?,
+             updated_at = ?,
+             versions_json = coalesce(?, versions_json),
+             state = case when state = 'disabled' then 'disabled' else 'online' end
+         where id = ? and project_id = ?`,
+      )
+      .bind(
+        input.observedAt,
+        input.observedAt,
+        input.versions ? JSON.stringify(input.versions) : null,
+        input.workerId,
+        projectId,
+      ),
+  ]);
+  const updated = await db
+    .prepare(`select * from briar_execution_workers where id = ?`)
+    .bind(input.workerId)
+    .first<ExecutionWorkerRow>();
+  if (!updated) {
+    throw new WorkerConflictError("Worker heartbeat update was not persisted");
+  }
+  return updated;
+}
+
+export async function executionWorkerBindingForProject(
+  db: D1Database,
+  deviceId: string,
+  projectId: string,
+) {
+  return await db
+    .prepare(
+      `select worker.*
+       from briar_execution_workers worker
+       join briar_projects project on project.id = worker.project_id
+       join briar_execution_worker_devices device on device.id = worker.device_id
+       where worker.project_id = ? and worker.device_id = ?
+         and project.organization_id = device.organization_id`,
+    )
+    .bind(projectId, deviceId)
+    .first<ExecutionWorkerRow>();
+}
+
+export async function executionWorkerBindingById(
+  db: D1Database,
+  deviceId: string,
+  workerId: string,
+) {
+  return await db
+    .prepare(
+      `select * from briar_execution_workers
+       where id = ? and device_id = ?`,
+    )
+    .bind(workerId, deviceId)
+    .first<ExecutionWorkerRow>();
+}
+
+export async function executionWorkerDeviceForBinding(
+  db: D1Database,
+  workerId: string,
+) {
+  return await db
+    .prepare(
+      `select device.*
+       from briar_execution_worker_devices device
+       join briar_execution_workers worker on worker.device_id = device.id
+       where worker.id = ?`,
+    )
+    .bind(workerId)
+    .first<ExecutionWorkerDeviceRow>();
+}
+
+export async function authenticateExecutionWorker(
+  db: D1Database,
+  tokenHash: string,
+  observedAt: string,
+): Promise<ExecutionWorkerCredentialPrincipal | null> {
   const row = await db
     .prepare(
-      `update briar_execution_workers
-       set last_heartbeat_at = ?,
-           updated_at = ?,
-           versions_json = coalesce(?, versions_json),
-           state = case when state = 'disabled' then 'disabled' else 'online' end
-       where id = ? and project_id = ?
-       returning *`,
+      `select device.id, device.organization_id, device.owner_user_id
+       from briar_execution_worker_credentials credential
+       join briar_execution_worker_devices device
+         on device.id = credential.device_id
+       join briar_organization_members membership
+         on membership.organization_id = device.organization_id
+        and membership.user_id = device.owner_user_id
+       where credential.token_hash = ?
+         and credential.revoked_at is null
+         and (credential.expires_at is null or credential.expires_at > ?)
+         and device.state != 'disabled'`,
     )
-    .bind(
-      input.observedAt,
-      input.observedAt,
-      input.versions ? JSON.stringify(input.versions) : null,
-      input.workerId,
-      projectId,
+    .bind(tokenHash, observedAt)
+    .first<{
+      id: string;
+      organization_id: string;
+      owner_user_id: string;
+    }>();
+  if (!row) return null;
+  await db
+    .prepare(
+      `update briar_execution_worker_credentials
+       set last_used_at = ?
+       where device_id = ? and token_hash = ?`,
     )
-    .first<ExecutionWorkerRow>();
-  if (!row) throw new WorkerConflictError("Worker is not registered for this project");
-  return row;
+    .bind(observedAt, row.id, tokenHash)
+    .run();
+  return {
+    deviceId: row.id,
+    organizationId: row.organization_id,
+    ownerUserId: row.owner_user_id,
+  };
+}
+
+export async function disableExecutionWorker(
+  db: D1Database,
+  deviceId: string,
+  observedAt: string,
+) {
+  const results = await db.batch([
+    db
+      .prepare(
+        `update briar_execution_worker_devices
+         set state = 'disabled', updated_at = ?
+         where id = ?`,
+      )
+      .bind(observedAt, deviceId),
+    db
+      .prepare(
+        `update briar_execution_workers
+         set state = 'disabled', updated_at = ?
+         where device_id = ?`,
+      )
+      .bind(observedAt, deviceId),
+    db
+      .prepare(
+        `update briar_execution_worker_credentials
+         set revoked_at = ?
+         where device_id = ? and revoked_at is null`,
+      )
+      .bind(observedAt, deviceId),
+  ]);
+  return results[0]?.meta.changes === 1;
 }
 
 export async function listExecutionWorkers(
@@ -179,12 +418,19 @@ export async function listExecutionWorkers(
 ) {
   const result = await db
     .prepare(
-      `select * from briar_execution_workers
-       where project_id = ?
-       order by last_heartbeat_at desc, id asc`,
+      `select worker.*, device.owner_user_id, device.organization_id
+       from briar_execution_workers worker
+       join briar_execution_worker_devices device on device.id = worker.device_id
+       where worker.project_id = ?
+       order by worker.last_heartbeat_at desc, worker.id asc`,
     )
     .bind(projectId)
-    .all<ExecutionWorkerRow>();
+    .all<
+      ExecutionWorkerRow & {
+        owner_user_id: string;
+        organization_id: string;
+      }
+    >();
   return (result.results ?? []).map((row) => ({
     ...row,
     state: workerStateAt(row.last_heartbeat_at, observedAt, row.state),
@@ -239,7 +485,12 @@ export async function attributeRunToWorker(
 export async function renewHuntRunLease(
   db: D1Database,
   projectId: string,
-  input: { runId: string; claimTokenHash: string; observedAt: string },
+  input: {
+    runId: string;
+    claimTokenHash: string;
+    observedAt: string;
+    workerId?: string;
+  },
 ) {
   const leaseExpiresAt = leaseExpiryFrom(input.observedAt);
   const row = await db
@@ -247,10 +498,19 @@ export async function renewHuntRunLease(
       `update briar_hunt_runs
        set lease_expires_at = ?, updated_at = ?
        where id = ? and project_id = ? and claim_token_hash = ?
+         and (? is null or worker_id = ?)
          and status not in ('completed', 'cancelled')
        returning id, lease_expires_at`,
     )
-    .bind(leaseExpiresAt, input.observedAt, input.runId, projectId, input.claimTokenHash)
+    .bind(
+      leaseExpiresAt,
+      input.observedAt,
+      input.runId,
+      projectId,
+      input.claimTokenHash,
+      input.workerId ?? null,
+      input.workerId ?? null,
+    )
     .first<{ id: string; lease_expires_at: string }>();
   if (!row) {
     throw new WorkerConflictError("Auto Hunt claim token is no longer active");

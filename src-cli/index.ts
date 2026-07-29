@@ -15,8 +15,8 @@ import {
 import { structuredAgentResultSchema } from "../src/lib/agent-result";
 import { validateEvidenceImages } from "../src/lib/evidence-images";
 import {
+  createWorkerDeviceIdentity,
   defaultWorkerLabel,
-  hostFingerprint,
   interruptibleSleep,
   runWorkerLoop,
   serviceDefinition,
@@ -123,6 +123,15 @@ const projectConfigSchema = z
       .passthrough()
       .optional(),
     autoHunt: autoHuntConfigSchema.optional(),
+    executionWorker: z
+      .object({
+        deviceId: z.string().uuid(),
+        workerId: z.string().min(1),
+        organizationId: z.string().uuid(),
+        token: z.string().startsWith("briar_worker_"),
+        label: z.string().min(1).max(100),
+      })
+      .optional(),
     activeClaim: z
       .object({
         runId: z.string().uuid(),
@@ -140,6 +149,10 @@ const configSchema = z
   .object({
     apiUrl: z.string().url(),
     userToken: z.string().optional(),
+    workerDeviceIdentity: z
+      .string()
+      .regex(/^briar_device_[0-9a-f]{64}$/u)
+      .optional(),
     projects: z.array(projectConfigSchema).default([]),
   })
   .passthrough();
@@ -1295,12 +1308,15 @@ async function reworkRun() {
 }
 
 const workerRegistrationSchema = z.object({
+  organizationId: z.string().uuid(),
+  deviceId: z.string().uuid(),
   worker: z.object({
     id: z.string().min(1),
     label: z.string().min(1),
     state: z.enum(["online", "stale", "disabled"]),
     lastHeartbeatAt: z.string(),
   }),
+  workerToken: z.string().startsWith("briar_worker_"),
 });
 
 const claimedRunSchema = z.object({
@@ -1332,6 +1348,97 @@ async function runClaimedIssue(project: ProjectConfig, issue: ClaimedIssue) {
   );
 }
 
+async function workerRegisterCommand() {
+  const config = await loadConfig();
+  if (!config.userToken) throw new Error("먼저 `briar login`을 실행하세요.");
+  const requestedProjectId = value("--project");
+  const project = requestedProjectId
+    ? config.projects.find((candidate) => candidate.id === requestedProjectId)
+    : await currentProject(config);
+  if (!project) {
+    throw new Error("이 컴퓨터에 연결된 프로젝트를 찾지 못했습니다.");
+  }
+  const deviceIdentity =
+    config.workerDeviceIdentity ?? createWorkerDeviceIdentity();
+  const label = value("--label") ?? defaultWorkerLabel();
+  const provider = project.llm?.provider ?? "codex";
+  const registration = workerRegistrationSchema.parse(
+    await request(
+      config.apiUrl,
+      `/projects/${project.id}/workers/register`,
+      config.userToken,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          label,
+          deviceIdentity,
+          agentProvider: provider,
+          versions: { briar: cliVersion },
+        }),
+      },
+    ),
+  );
+  config.workerDeviceIdentity = deviceIdentity;
+  config.projects = config.projects.map((candidate) => {
+    if (
+      candidate.id !== project.id &&
+      candidate.executionWorker?.deviceId !== registration.deviceId
+    ) {
+      return candidate;
+    }
+    return {
+      ...candidate,
+      executionWorker: {
+        deviceId: registration.deviceId,
+        workerId:
+          candidate.id === project.id
+            ? registration.worker.id
+            : candidate.executionWorker!.workerId,
+        organizationId: registration.organizationId,
+        token: registration.workerToken,
+        label,
+      },
+    };
+  });
+  await saveConfig(config);
+  console.log(
+    JSON.stringify({
+      projectId: project.id,
+      organizationId: registration.organizationId,
+      deviceId: registration.deviceId,
+      workerId: registration.worker.id,
+      label,
+      state: registration.worker.state,
+    }),
+  );
+}
+
+async function workerUnregisterCommand() {
+  const config = await loadConfig();
+  if (!config.userToken) throw new Error("먼저 `briar login`을 실행하세요.");
+  const requestedProjectId = value("--project");
+  const project = requestedProjectId
+    ? config.projects.find((candidate) => candidate.id === requestedProjectId)
+    : await currentProject(config);
+  if (!project?.executionWorker) {
+    throw new Error("이 프로젝트에 등록된 worker가 없습니다.");
+  }
+  const deviceId = project.executionWorker.deviceId;
+  await request(
+    config.apiUrl,
+    `/projects/${project.id}/workers/${project.executionWorker.workerId}`,
+    config.userToken,
+    { method: "DELETE" },
+  );
+  config.projects = config.projects.map((candidate) =>
+    candidate.executionWorker?.deviceId === deviceId
+      ? { ...candidate, executionWorker: undefined }
+      : candidate,
+  );
+  await saveConfig(config);
+  console.log(JSON.stringify({ deviceId, state: "disabled" }));
+}
+
 async function workerCommand() {
   const config = await loadConfig();
   const projectId = value("--project");
@@ -1342,23 +1449,16 @@ async function workerCommand() {
     throw new Error("이 컴퓨터에 연결된 프로젝트를 찾지 못했습니다.");
   }
   ensureConfiguredVelen(project);
-  const agentToken = process.env.BRIAR_AGENT_TOKEN ?? project.agentToken;
-  const label = value("--label") ?? defaultWorkerLabel();
-  const provider = project.llm?.provider ?? "codex";
-
-  const registration = workerRegistrationSchema.parse(
-    await request(config.apiUrl, "/workers/register", agentToken, {
-      method: "POST",
-      body: JSON.stringify({
-        label,
-        hostFingerprint: hostFingerprint(),
-        agentProvider: provider,
-        versions: { briar: cliVersion },
-      }),
-    }),
-  );
-  const workerId = registration.worker.id;
-  console.log(`worker ${label} registered as ${workerId}`);
+  const registered = project.executionWorker;
+  if (!registered) {
+    throw new Error(
+      "이 프로젝트의 worker가 등록되지 않았습니다. `briar worker register`를 먼저 실행하세요.",
+    );
+  }
+  const workerToken = process.env.BRIAR_WORKER_TOKEN ?? registered.token;
+  const label = registered.label;
+  const workerId = registered.workerId;
+  console.log(`worker ${label} starting as ${workerId}`);
 
   const maxIssues = Number.parseInt(value("--max-issues") ?? "", 10);
   const result = await runWorkerLoop(
@@ -1367,10 +1467,14 @@ async function workerCommand() {
         const claimed = await request<{ work: unknown }>(
           config.apiUrl,
           "/queue/claims",
-          agentToken,
+          workerToken,
           {
             method: "POST",
-            body: JSON.stringify({ claimedBy: label, workerId }),
+            body: JSON.stringify({
+              claimedBy: label,
+              workerId,
+              projectId: project.id,
+            }),
           },
         );
         return claimed.work === null
@@ -1381,10 +1485,13 @@ async function workerCommand() {
         await request(
           config.apiUrl,
           `/runs/${issue.runId}/lease`,
-          agentToken,
+          workerToken,
           {
             method: "POST",
-            body: JSON.stringify({ claimToken: issue.claimToken }),
+            body: JSON.stringify({
+              claimToken: issue.claimToken,
+              projectId: project.id,
+            }),
           },
         );
       },
@@ -1392,7 +1499,7 @@ async function workerCommand() {
         await request(
           config.apiUrl,
           `/workers/${workerId}/heartbeat`,
-          agentToken,
+          workerToken,
           {
             method: "POST",
             body: JSON.stringify({ versions: { briar: cliVersion } }),
@@ -1432,7 +1539,10 @@ async function workerStatus() {
         service: definition.label,
         unitPath: definition.path,
         logPath: definition.logPath,
-        hostFingerprint: hostFingerprint(),
+        registered: Boolean(project.executionWorker),
+        workerId: project.executionWorker?.workerId ?? null,
+        deviceId: project.executionWorker?.deviceId ?? null,
+        label: project.executionWorker?.label ?? null,
       },
       null,
       2,
@@ -1447,6 +1557,11 @@ async function workerService(action: "install" | "uninstall") {
     : await currentProject(config);
   if (!project) {
     throw new Error("이 컴퓨터에 연결된 프로젝트를 찾지 못했습니다.");
+  }
+  if (action === "install" && !project.executionWorker) {
+    throw new Error(
+      "서비스를 설치하기 전에 `briar worker register`를 실행하세요.",
+    );
   }
   const briarBinary = value("--briar-binary") ?? process.execPath;
   const definition = serviceDefinition({
@@ -1566,7 +1681,9 @@ const usage = `Briar CLI
     [--request-id <uuid>]
   briar run retry [--run <uuid>] [--request-id <uuid>] [--reason <text>]
   briar run cancel [--run <uuid>] [--request-id <uuid>] [--reason <text>]
-  briar worker [--project <uuid>] [--label <text>] [--max-issues <n>] [--once]
+  briar worker register [--project <uuid>] [--label <text>]
+  briar worker unregister [--project <uuid>]
+  briar worker [--project <uuid>] [--max-issues <n>] [--once]
   briar worker status [--project <uuid>]
   briar worker install-service [--project <uuid>] [--briar-binary <path>]
   briar worker uninstall-service [--project <uuid>]
@@ -1574,6 +1691,7 @@ const usage = `Briar CLI
 Environment:
   BRIAR_API_URL       Cloudflare Worker URL
   BRIAR_AGENT_TOKEN   Project-scoped ingest token
+  BRIAR_WORKER_TOKEN  Worker credential override
   BRIAR_CLI           Absolute CLI path injected into Auto Hunt workers
   BRIAR_CONFIG_HOME   Absolute directory containing an isolated config.json
   BRIAR_WORKTREE_ROOT Parent directory for per-issue worktrees
@@ -1622,6 +1740,12 @@ async function main() {
   if (args[0] === "run" && args[1] === "rework") return reworkRun();
   if (args[0] === "run" && args[1] === "retry") return recoverRun("retry");
   if (args[0] === "run" && args[1] === "cancel") return recoverRun("cancel");
+  if (args[0] === "worker" && args[1] === "register") {
+    return workerRegisterCommand();
+  }
+  if (args[0] === "worker" && args[1] === "unregister") {
+    return workerUnregisterCommand();
+  }
   if (args[0] === "worker" && args[1] === "status") return workerStatus();
   if (args[0] === "worker" && args[1] === "install-service") {
     return workerService("install");

@@ -218,6 +218,15 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         '{"version":1,"preset":"release","stages":[{"id":"analyzing","label":"분석","required":true},{"id":"implementing","label":"구현","required":true},{"id":"pr_open","label":"PR 검증","required":true},{"id":"staging_qa","label":"Stage QA","required":true},{"id":"production_qa","label":"Production QA","required":true}]}',
         '${atMinute(0)}', '${atMinute(0)}'
       );
+      insert into briar_execution_workers (
+        id, project_id, label, host_fingerprint, agent_provider, versions_json,
+        state, last_heartbeat_at, created_at, updated_at
+      ) values (
+        'legacy-worker', '${projectId}', 'Legacy worker',
+        'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+        'codex', '{"briar":"1.1.0"}', 'stale', '${atMinute(0)}',
+        '${atMinute(0)}', '${atMinute(0)}'
+      );
     `,
     );
     const migrationRunId = "99999999-9999-4999-8999-999999999999";
@@ -361,6 +370,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         "utf8",
       ),
     );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0034_execution_worker_credentials.sql"),
+        "utf8",
+      ),
+    );
   }, 30_000);
 
   afterAll(async () => {
@@ -412,6 +428,44 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     expect(await db.prepare("pragma foreign_key_check").all()).toMatchObject({
       results: [],
     });
+  });
+
+  it("backfills legacy workers as organization devices without issuing credentials", async () => {
+    const binding = await db
+      .prepare(
+        `select project_id, device_id
+         from briar_execution_workers
+         where id = 'legacy-worker'`,
+      )
+      .first<{ project_id: string; device_id: string }>();
+    expect(binding).toEqual({
+      project_id: projectId,
+      device_id: "legacy-worker",
+    });
+    const device = await db
+      .prepare(
+        `select organization_id, owner_user_id, state
+         from briar_execution_worker_devices
+         where id = 'legacy-worker'`,
+      )
+      .first<{
+        organization_id: string;
+        owner_user_id: string;
+        state: string;
+      }>();
+    expect(device).toEqual({
+      organization_id: projectId,
+      owner_user_id: "owner",
+      state: "stale",
+    });
+    expect(
+      await db
+        .prepare(
+          `select token_hash from briar_execution_worker_credentials
+           where device_id = 'legacy-worker'`,
+        )
+        .first(),
+    ).toBeNull();
   });
 
   it("keeps the default project agent as a regular agent", async () => {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_MAX_ERROR_DELAY_MS,
+  createWorkerDeviceIdentity,
   defaultWorkerLabel,
   errorDelayMs,
   hostFingerprint,
@@ -228,6 +229,15 @@ describe("briar worker loop", () => {
 });
 
 describe("worker identity", () => {
+  it("creates an opaque random device identity for local persistence", () => {
+    expect(createWorkerDeviceIdentity(() => "a".repeat(64))).toBe(
+      `briar_device_${"a".repeat(64)}`,
+    );
+    expect(() => createWorkerDeviceIdentity(() => "not-random")).toThrow(
+      "32 random bytes",
+    );
+  });
+
   it("derives a stable fingerprint from machine facts only", () => {
     const first = hostFingerprint({
       host: "build-box",

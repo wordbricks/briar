@@ -5,9 +5,12 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { claimNextQueuedHuntRun, recordHuntEvent, type HuntEventInput } from "./db";
 import {
   appendAgentTranscript,
+  authenticateExecutionWorker,
   assertWorkerHasNoRunInFlight,
   attributeRunToWorker,
   countLeasedRuns,
+  disableExecutionWorker,
+  executionWorkerBindingForProject,
   leaseExpiryFrom,
   listExecutionWorkers,
   MAX_CLAIM_ATTEMPTS,
@@ -24,6 +27,7 @@ import {
 } from "./workers";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
+const secondProjectId = "22222222-2222-4222-8222-222222222222";
 const baseTime = Date.parse("2026-07-25T00:00:00Z");
 const atMinute = (minute: number) =>
   new Date(baseTime + minute * 60_000).toISOString();
@@ -109,6 +113,7 @@ describe("detached execution workers", () => {
       "migrations/0031_organization_logos.sql",
       "migrations/0032_slack_integration.sql",
       "migrations/0033_organization_logo_browser_formats.sql",
+      "migrations/0034_execution_worker_credentials.sql",
     ]) {
       await executeSql(db, await readFile(resolve(migration), "utf8"));
     }
@@ -117,15 +122,26 @@ describe("detached execution workers", () => {
       `
       insert into user (id, name, email, emailVerified, createdAt, updatedAt)
       values ('owner', 'Owner', 'owner@example.com', 1, '${atMinute(0)}', '${atMinute(0)}');
+      insert into user (id, name, email, emailVerified, createdAt, updatedAt)
+      values ('member', 'Member', 'member@example.com', 1, '${atMinute(0)}', '${atMinute(0)}');
       insert into briar_organizations (id, name, handle, created_at, updated_at)
       values ('${projectId}', 'Example Org', 'example-org', '${atMinute(0)}', '${atMinute(0)}');
       insert into briar_organization_members (organization_id, user_id, role, created_at, updated_at)
       values ('${projectId}', 'owner', 'owner', '${atMinute(0)}', '${atMinute(0)}');
+      insert into briar_organization_members (organization_id, user_id, role, created_at, updated_at)
+      values ('${projectId}', 'member', 'member', '${atMinute(0)}', '${atMinute(0)}');
       insert into briar_projects (
         id, owner_user_id, organization_id, name, agent_token_hash, created_at, updated_at
       ) values (
         '${projectId}', 'owner', '${projectId}', 'Example',
         'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        '${atMinute(0)}', '${atMinute(0)}'
+      );
+      insert into briar_projects (
+        id, owner_user_id, organization_id, name, agent_token_hash, created_at, updated_at
+      ) values (
+        '${secondProjectId}', 'owner', '${projectId}', 'Second',
+        'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
         '${atMinute(0)}', '${atMinute(0)}'
       );
       insert into briar_project_settings (
@@ -150,15 +166,26 @@ describe("detached execution workers", () => {
        delete from briar_agent_transcript_sessions;
        delete from briar_hunt_events;
        delete from briar_hunt_runs;
-       delete from briar_execution_workers;`,
+       delete from briar_execution_worker_credentials;
+       delete from briar_execution_workers;
+       delete from briar_execution_worker_devices;
+       insert into briar_organization_members (
+         organization_id, user_id, role, created_at, updated_at
+       ) values (
+         '${projectId}', 'member', 'member', '${atMinute(0)}', '${atMinute(0)}'
+       ) on conflict (organization_id, user_id) do update set role = 'member';`,
     );
   });
 
   const register = (seed: string, minute = 1) =>
     registerExecutionWorker(db, projectId, {
       id: `worker-${seed}`,
+      deviceId: `device-${seed}`,
+      organizationId: projectId,
+      ownerUserId: "owner",
       label: `worker ${seed}`,
-      hostFingerprint: fingerprint(seed),
+      deviceIdentityHash: fingerprint(seed),
+      credentialTokenHash: fingerprint(`token-${seed}`),
       agentProvider: "codex",
       versions: { briar: "1.1.1" },
       observedAt: atMinute(minute),
@@ -166,28 +193,136 @@ describe("detached execution workers", () => {
 
   it("registers a worker and adopts the same machine on restart", async () => {
     const first = await register("a");
-    expect(first?.state).toBe("online");
+    expect(first.worker.state).toBe("online");
     const second = await registerExecutionWorker(db, projectId, {
       id: "worker-different-id",
+      deviceId: "device-different-id",
+      organizationId: projectId,
+      ownerUserId: "owner",
       label: "renamed",
-      hostFingerprint: fingerprint("a"),
+      deviceIdentityHash: fingerprint("a"),
+      credentialTokenHash: fingerprint("rotated-token"),
       agentProvider: "claude",
       versions: { briar: "1.2.0" },
       observedAt: atMinute(5),
     });
-    expect(second?.id).toBe(first?.id);
-    expect(second?.label).toBe("renamed");
-    expect(second?.agent_provider).toBe("claude");
+    expect(second.device.id).toBe(first.device.id);
+    expect(second.worker.id).toBe(first.worker.id);
+    expect(second.worker.label).toBe("renamed");
+    expect(second.worker.agent_provider).toBe("claude");
     const workers = await listExecutionWorkers(db, projectId, atMinute(5));
     expect(workers).toHaveLength(1);
+    expect(workers[0].owner_user_id).toBe("owner");
+    expect(
+      await authenticateExecutionWorker(
+        db,
+        fingerprint("rotated-token"),
+        atMinute(6),
+      ),
+    ).toMatchObject({ deviceId: first.device.id, ownerUserId: "owner" });
+    await expect(
+      authenticateExecutionWorker(db, fingerprint("token-a"), atMinute(6)),
+    ).resolves.toBeNull();
   });
 
-  it("rejects unusable labels and fingerprints", async () => {
+  it("binds one organization device to several projects", async () => {
+    const first = await register("shared");
+    const second = await registerExecutionWorker(db, secondProjectId, {
+      id: "worker-shared-second-project",
+      deviceId: "unused-device-id",
+      organizationId: projectId,
+      ownerUserId: "owner",
+      label: "shared worker",
+      deviceIdentityHash: fingerprint("shared"),
+      credentialTokenHash: fingerprint("shared-rotated"),
+      agentProvider: "grok",
+      versions: { briar: "1.2.0" },
+      observedAt: atMinute(4),
+    });
+    expect(second.device.id).toBe(first.device.id);
+    expect(second.worker.id).not.toBe(first.worker.id);
+    expect(second.worker.project_id).toBe(secondProjectId);
+    expect(
+      await executionWorkerBindingForProject(
+        db,
+        first.device.id,
+        projectId,
+      ),
+    ).not.toBeNull();
+    expect(
+      await executionWorkerBindingForProject(
+        db,
+        first.device.id,
+        secondProjectId,
+      ),
+    ).not.toBeNull();
+  });
+
+  it("does not let another organization member adopt an enrolled device", async () => {
+    await register("owned");
+    await expect(
+      registerExecutionWorker(db, secondProjectId, {
+        id: "worker-owned-by-member",
+        deviceId: "device-owned-by-member",
+        organizationId: projectId,
+        ownerUserId: "member",
+        label: "member worker",
+        deviceIdentityHash: fingerprint("owned"),
+        credentialTokenHash: fingerprint("member-token"),
+        agentProvider: "codex",
+        versions: {},
+        observedAt: atMinute(3),
+      }),
+    ).rejects.toThrow("already owned by another organization member");
+  });
+
+  it("stops accepting a worker credential when its owner leaves the organization", async () => {
+    const registration = await registerExecutionWorker(db, projectId, {
+      id: "worker-departing-member",
+      deviceId: "device-departing-member",
+      organizationId: projectId,
+      ownerUserId: "member",
+      label: "member worker",
+      deviceIdentityHash: fingerprint("departing"),
+      credentialTokenHash: fingerprint("departing-token"),
+      agentProvider: "codex",
+      versions: {},
+      observedAt: atMinute(2),
+    });
+    expect(registration.device.owner_user_id).toBe("member");
+    expect(
+      await authenticateExecutionWorker(
+        db,
+        fingerprint("departing-token"),
+        atMinute(3),
+      ),
+    ).not.toBeNull();
+    await db
+      .prepare(
+        `delete from briar_organization_members
+         where organization_id = ? and user_id = ?`,
+      )
+      .bind(projectId, "member")
+      .run();
+    await expect(
+      authenticateExecutionWorker(
+        db,
+        fingerprint("departing-token"),
+        atMinute(4),
+      ),
+    ).resolves.toBeNull();
+  });
+
+  it("rejects unusable labels, identities, and credentials", async () => {
     await expect(
       registerExecutionWorker(db, projectId, {
         id: "worker-bad",
+        deviceId: "device-bad",
+        organizationId: projectId,
+        ownerUserId: "owner",
         label: "   ",
-        hostFingerprint: fingerprint("b"),
+        deviceIdentityHash: fingerprint("b"),
+        credentialTokenHash: fingerprint("token-b"),
         agentProvider: "codex",
         versions: {},
         observedAt: atMinute(1),
@@ -196,13 +331,55 @@ describe("detached execution workers", () => {
     await expect(
       registerExecutionWorker(db, projectId, {
         id: "worker-bad",
+        deviceId: "device-bad",
+        organizationId: projectId,
+        ownerUserId: "owner",
         label: "ok",
-        hostFingerprint: "not-a-digest",
+        deviceIdentityHash: "not-a-digest",
+        credentialTokenHash: fingerprint("token-b"),
         agentProvider: "codex",
         versions: {},
         observedAt: atMinute(1),
       }),
     ).rejects.toBeInstanceOf(WorkerConflictError);
+    await expect(
+      registerExecutionWorker(db, projectId, {
+        id: "worker-bad",
+        deviceId: "device-bad",
+        organizationId: projectId,
+        ownerUserId: "owner",
+        label: "ok",
+        deviceIdentityHash: fingerprint("b"),
+        credentialTokenHash: "not-a-digest",
+        agentProvider: "codex",
+        versions: {},
+        observedAt: atMinute(1),
+      }),
+    ).rejects.toBeInstanceOf(WorkerConflictError);
+  });
+
+  it("revokes the credential and every project binding when disabled", async () => {
+    const registered = await register("revoked");
+    expect(
+      await executionWorkerBindingForProject(
+        db,
+        registered.device.id,
+        projectId,
+      ),
+    ).not.toBeNull();
+    expect(
+      await disableExecutionWorker(db, registered.device.id, atMinute(5)),
+    ).toBe(true);
+    await expect(
+      authenticateExecutionWorker(
+        db,
+        fingerprint("token-revoked"),
+        atMinute(6),
+      ),
+    ).resolves.toBeNull();
+    expect((await listExecutionWorkers(db, projectId, atMinute(6)))[0].state).toBe(
+      "disabled",
+    );
   });
 
   it("reports a worker as stale once heartbeats stop", async () => {
@@ -345,6 +522,7 @@ describe("detached execution workers", () => {
   });
 
   it("renews a lease for the holder and rejects a superseded token", async () => {
+    await register("f");
     await recordHuntEvent(db, projectId, queuedEvent("issue-lease", 1));
     const claimTokenHash = "b".repeat(64);
     const claimed = await claimNextQueuedHuntRun(db, projectId, {
@@ -353,11 +531,17 @@ describe("detached execution workers", () => {
       claimedAt: atMinute(2),
       leaseExpiresAt: leaseExpiryFrom(atMinute(2)),
     });
+    await attributeRunToWorker(db, projectId, {
+      runId: claimed!.id,
+      workerId: "worker-f",
+      observedAt: atMinute(2),
+    });
 
     const renewed = await renewHuntRunLease(db, projectId, {
       runId: claimed!.id,
       claimTokenHash,
       observedAt: atMinute(10),
+      workerId: "worker-f",
     });
     expect(renewed.lease_expires_at).toBe(leaseExpiryFrom(atMinute(10)));
 
@@ -366,6 +550,15 @@ describe("detached execution workers", () => {
         runId: claimed!.id,
         claimTokenHash: "c".repeat(64),
         observedAt: atMinute(11),
+        workerId: "worker-f",
+      }),
+    ).rejects.toBeInstanceOf(WorkerConflictError);
+    await expect(
+      renewHuntRunLease(db, projectId, {
+        runId: claimed!.id,
+        claimTokenHash,
+        observedAt: atMinute(11),
+        workerId: "worker-other",
       }),
     ).rejects.toBeInstanceOf(WorkerConflictError);
   });
