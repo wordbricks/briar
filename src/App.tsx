@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AgentUsageStatusBar } from "./components/AgentUsageStatusBar";
 import { AppVersionStatus } from "./components/AppVersionStatus";
-import {
-  AppSettings,
-  type SettingsSection,
-} from "./components/AppSettings";
+import { AppSettings } from "./components/AppSettings";
 import {
   CompanionBottomNavigation,
   type CompanionStatusFilter,
@@ -27,6 +24,10 @@ import { ProjectRepositorySetupDialog } from "./components/ProjectRepositorySetu
 import { ProjectSettings } from "./components/ProjectSettings";
 import { SessionLoadingScreen } from "./components/SessionLoadingScreen";
 import { Sidebar } from "./components/Sidebar";
+import {
+  UnifiedSettingsSidebar,
+  type UnifiedSettingsTarget,
+} from "./components/UnifiedSettingsSidebar";
 import { WindowNavigationControls } from "./components/WindowNavigationControls";
 import { useBriar, type UseBriarOptions } from "./hooks/useBriar";
 import { useAutoHuntSessions } from "./hooks/useAutoHuntSessions";
@@ -69,9 +70,7 @@ type ActivePage =
   | "agents"
   | "schedule"
   | "inbox"
-  | "project-settings"
   | "organization-create"
-  | "organization-settings"
   | "settings";
 
 export function App() {
@@ -113,8 +112,11 @@ export function App() {
   );
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [appSettingsSection, setAppSettingsSection] =
-    useState<SettingsSection>("source-control");
+  const [settingsTarget, setSettingsTarget] =
+    useState<UnifiedSettingsTarget>({
+      scope: "application",
+      section: "source-control",
+    });
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(
     hasCompletedInitialOnboarding,
   );
@@ -159,10 +161,6 @@ export function App() {
     },
     { enabled: briar.companionMode },
   );
-  const [organizationSettingsTarget, setOrganizationSettingsTarget] = useState<{
-    id: string;
-    section?: "members";
-  } | null>(null);
   const [repositorySetupProjectId, setRepositorySetupProjectId] =
     useState<string | null>(null);
   const hasCompactedWindowForOnboarding = useRef(false);
@@ -214,9 +212,13 @@ export function App() {
     briar.user !== null &&
     (deferredProjectOnboardingUserId === briar.user.id ||
       hasDeferredProjectOnboarding(briar.user.id));
-  const settingsOrganization = briar.organizations.find(
-    (organization) => organization.id === organizationSettingsTarget?.id,
-  );
+  const settingsOrganization =
+    settingsTarget.scope === "organization"
+      ? briar.organizations.find(
+          (organization) =>
+            organization.id === settingsTarget.organizationId,
+        )
+      : null;
   const shouldShowInitialOnboarding =
     !briar.companionMode &&
     !briar.loading &&
@@ -336,9 +338,30 @@ export function App() {
   }, []);
 
   const openAppSettings = useCallback(() => {
-    setAppSettingsSection("source-control");
+    setSettingsTarget({
+      scope: "application",
+      section: "source-control",
+    });
     navigateToPage("settings");
   }, [navigateToPage]);
+
+  const unifiedSettingsSidebar = (
+    <UnifiedSettingsSidebar
+      activeTarget={settingsTarget}
+      isOpen={isSidebarOpen}
+      onBack={() => (canGoBack ? goBack() : navigateToPage("issues"))}
+      onNavigate={(target) => {
+        setSettingsTarget(target);
+        if (target.scope === "organization") {
+          briar.setActiveOrganizationId(target.organizationId);
+        } else if (target.scope === "project") {
+          briar.setActiveProjectId(target.projectId);
+        }
+      }}
+      organizations={briar.organizations}
+      projects={briar.projects}
+    />
+  );
 
   let content: React.ReactNode;
 
@@ -408,8 +431,7 @@ export function App() {
             onSettings={openAppSettings}
             onSidebarToggle={() => setIsSidebarOpen((open) => !open)}
           />
-        {activePage !== "settings" &&
-        activePage !== "organization-settings" ? (
+        {activePage !== "settings" ? (
           <Sidebar
             activePage={activePage}
             activeOrganizationId={briar.activeOrganizationId}
@@ -439,9 +461,13 @@ export function App() {
               resetNavigation("issues");
             }}
             onOrganizationSettings={(organizationId, section) => {
-              setOrganizationSettingsTarget({ id: organizationId, section });
+              setSettingsTarget({
+                scope: "organization",
+                organizationId,
+                section: section ?? "general",
+              });
               setIsSidebarOpen(true);
-              navigateToPage("organization-settings");
+              navigateToPage("settings");
             }}
             onProjectChange={(projectId) => {
               briar.setActiveProjectId(projectId);
@@ -452,7 +478,12 @@ export function App() {
             onProjectReadinessOpen={setRepositorySetupProjectId}
             onProjectSettings={(projectId) => {
               briar.setActiveProjectId(projectId);
-              navigateToPage("project-settings");
+              setSettingsTarget({
+                scope: "project",
+                projectId,
+                section: "general",
+              });
+              navigateToPage("settings");
             }}
             onSettings={openAppSettings}
             onLogout={() => void briar.logout()}
@@ -512,24 +543,29 @@ export function App() {
               resetNavigation("issues");
             }}
           />
-        ) : activePage === "settings" && activeProject ? (
+        ) : activePage === "settings" &&
+          settingsTarget.scope === "application" &&
+          activeProject ? (
           <AppSettings
             error={briar.projectReadinessError[activeProject.id] ?? null}
-            initialSection={appSettingsSection}
+            initialSection={settingsTarget.section}
             isSidebarOpen={isSidebarOpen}
             loading={briar.projectReadinessLoadingId === activeProject.id}
+            navigationSidebar={unifiedSettingsSidebar}
             onBack={() => (canGoBack ? goBack() : navigateToPage("issues"))}
             onRefresh={() => briar.refreshProjectReadiness(activeProject.id)}
             projectId={activeProject.id}
             projectName={activeProject.name}
             readiness={briar.projectReadiness[activeProject.id] ?? null}
           />
-        ) : activePage === "organization-settings" &&
+        ) : activePage === "settings" &&
+        settingsTarget.scope === "organization" &&
         settingsOrganization ? (
           <OrganizationSettings
-            initialSection={organizationSettingsTarget?.section}
+            initialSection={settingsTarget.section}
             isSidebarOpen={isSidebarOpen}
-            key={`${settingsOrganization.id}-${organizationSettingsTarget?.section ?? "settings"}`}
+            key={settingsOrganization.id}
+            navigationSidebar={unifiedSettingsSidebar}
             onBack={() =>
               canGoBack ? goBack() : navigateToPage("issues")
             }
@@ -560,7 +596,9 @@ export function App() {
             }}
             unreadCount={inbox.unreadCount}
           />
-        ) : activePage === "project-settings" && activeProject ? (
+        ) : activePage === "settings" &&
+          settingsTarget.scope === "project" &&
+          activeProject ? (
           <ProjectSettings
             dashboard={briar.dashboard}
             githubRepository={
@@ -570,6 +608,9 @@ export function App() {
             }
             isDeleting={briar.deletingProjectId === briar.activeProjectId}
             isSidebarOpen={isSidebarOpen}
+            initialSection={settingsTarget.section}
+            key={activeProject.id}
+            navigationSidebar={unifiedSettingsSidebar}
             onBack={() =>
               canGoBack ? goBack() : navigateToPage("issues")
             }
@@ -693,7 +734,10 @@ export function App() {
         <div className="app-status-bar">
           <AgentUsageStatusBar
             onManageAccounts={() => {
-              setAppSettingsSection("providers");
+              setSettingsTarget({
+                scope: "application",
+                section: "providers",
+              });
               navigateToPage("settings");
             }}
           />

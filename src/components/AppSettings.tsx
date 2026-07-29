@@ -116,6 +116,7 @@ export function AppSettings({
   initialSection = "source-control",
   isSidebarOpen,
   loading,
+  navigationSidebar,
   onBack,
   onRefresh,
   projectId,
@@ -126,6 +127,7 @@ export function AppSettings({
   initialSection?: SettingsSection;
   isSidebarOpen: boolean;
   loading: boolean;
+  navigationSidebar?: ReactNode;
   onBack: () => void;
   onRefresh: () => Promise<unknown>;
   projectId: string;
@@ -358,7 +360,7 @@ export function AppSettings({
 
   return (
     <SettingsShell>
-      <SettingsSidebar isOpen={isSidebarOpen} label={t("appSettings.navigation")}>
+      {navigationSidebar || <SettingsSidebar isOpen={isSidebarOpen} label={t("appSettings.navigation")}>
         <SettingsBackButton onClick={onBack}>
           {t("appSettings.back")}
         </SettingsBackButton>
@@ -385,7 +387,7 @@ export function AppSettings({
             </SettingsNavGroup>
           ))}
         </SettingsNav>
-      </SettingsSidebar>
+      </SettingsSidebar>}
 
       <SettingsMain isSidebarOpen={isSidebarOpen}>
         <SettingsScroll>
