@@ -91,9 +91,6 @@ describe("ProjectOnboarding", () => {
     expect(markup).toContain("워크플로우 자동 생성");
     expect(markup).toContain("Agent backend");
     expect(markup).toContain("저장소 선택");
-    expect(markup).not.toContain("실행 호스트");
-    expect(markup).not.toContain("SSH 별칭");
-    expect(markup).not.toContain("SSH 호스트 추가");
     expect(markup).toContain("완료되어야 연결");
     expect(markup).toContain(">확인 ");
     expect(markup).not.toContain('label="Auto Hunt 워크플로"');
@@ -173,7 +170,6 @@ describe("ProjectOnboarding", () => {
     expect(onRepositoryInspect).toHaveBeenCalledWith(
       "/Users/jay/git/briar",
       expect.objectContaining({ version: 1 }),
-      "local",
     );
     expect(nameInput?.value).toBe("briar");
     expect(create?.disabled).toBe(false);
@@ -218,7 +214,6 @@ describe("ProjectOnboarding", () => {
     expect(onRepositoryInspect).toHaveBeenCalledWith(
       "/Users/jay/Briar/atlas",
       expect.objectContaining({ version: 1 }),
-      "local",
     );
     expect(onCreate).toHaveBeenCalledWith({ name: "atlas" });
 
@@ -289,7 +284,6 @@ describe("ProjectOnboarding", () => {
     expect(onRepositoryInspect).toHaveBeenCalledWith(
       "/Users/jay/git/briar",
       expect.objectContaining({ version: 1 }),
-      "local",
     );
     expect(container.textContent).toContain("/Users/jay/git/briar");
     expect(container.textContent).toContain("push 권한 확인됨");
@@ -303,7 +297,6 @@ describe("ProjectOnboarding", () => {
         githubRepository: "wordbricks/briar",
       }),
       "/Users/jay/git/briar",
-      "local",
     );
 
     await act(async () => root.unmount());

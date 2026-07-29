@@ -6,9 +6,9 @@
  * inherits another run's uncommitted state. The main checkout is never
  * modified: it only lends its object database.
  *
- * Allocation is deliberately derived from git state (worktree list, branch
- * existence) rather than only from the CLI config, because a remote execution
- * host runs the CLI against a throwaway copy of `~/.config/briar`.
+ * Allocation is deliberately derived from git state (worktree list and branch
+ * existence) rather than only from CLI config, so interrupted or concurrent
+ * runs can recover without trusting stale bookkeeping.
  */
 
 import { copyFile, cp, lstat, mkdir, readFile, stat } from "node:fs/promises";

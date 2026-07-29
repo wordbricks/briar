@@ -15,14 +15,15 @@ use crate::host::{CommandRunner, CommandSpec};
 
 use super::{
     AgentEvent, AgentEventDirection, AgentProviderEvent, AgentProviderKind, ApprovalPolicy,
-    ChatExecution, HostRunnerFile, ModelEffort, ProjectLlmRequest, ProjectLlmResponse, SandboxMode,
+    BundledRunnerFile, ChatExecution, ModelEffort, ProjectLlmRequest, ProjectLlmResponse,
+    SandboxMode,
 };
 
 pub(crate) struct ClaudeRuntime {
     command_runner: Arc<dyn CommandRunner>,
     bun_binary: String,
     claude_binary: String,
-    runner: HostRunnerFile,
+    runner: BundledRunnerFile,
 }
 
 impl ClaudeRuntime {
@@ -31,11 +32,10 @@ impl ClaudeRuntime {
         runner_bundle: &Path,
     ) -> Result<Self, String> {
         let bun_binary = command_runner.resolve_binary("bun").map_err(|_| {
-            "Claude Agent SDK 실행에 필요한 Bun을 실행 호스트에서 찾지 못했습니다.".to_string()
+            "Claude Agent SDK 실행에 필요한 Bun을 로컬 환경에서 찾지 못했습니다.".to_string()
         })?;
         let claude_binary = command_runner.resolve_binary("claude")?;
-        let runner =
-            HostRunnerFile::prepare(command_runner.clone(), runner_bundle, "claude-runner.js")?;
+        let runner = BundledRunnerFile::prepare(runner_bundle)?;
         Ok(Self {
             command_runner,
             bun_binary,
@@ -50,8 +50,7 @@ impl ClaudeRuntime {
             std::env::var_os("PATH").unwrap_or_default(),
             std::env::temp_dir(),
         ));
-        let runner =
-            HostRunnerFile::prepare(command_runner.clone(), &runner, "claude-runner.js").unwrap();
+        let runner = BundledRunnerFile::prepare(&runner).unwrap();
         Self {
             command_runner,
             bun_binary: bun_binary.to_string_lossy().into_owned(),

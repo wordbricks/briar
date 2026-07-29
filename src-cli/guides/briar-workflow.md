@@ -19,7 +19,7 @@ When Briar invokes a saved project agent, the runtime instructions include three
 inputs: the agent responsibility, the agent-specific Skill generated with that agent, and
 the current repository-derived project workflow. Treat them as one execution contract.
 
-For a host-dispatched Auto Hunt worker, the Briar runtime has already claimed the run,
+For a runtime-dispatched Auto Hunt worker, Briar has already claimed the run,
 created its worktree, and started the agent there. Do not call `briar queue claim` or
 create another worktree in that worker. Use the bound run ID explicitly for every run
 and evidence command. Its workflow snapshot is authoritative if it differs from the

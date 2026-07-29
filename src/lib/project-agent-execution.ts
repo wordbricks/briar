@@ -17,7 +17,7 @@ export type ProjectAgentTurnDependencies<DispatchResult> = {
  *
  * Manual and scheduled invocations share this decision boundary: the caller
  * supplies the message, while the saved Agent decides whether to respond in
- * place or hand Auto Hunt to the trusted host dispatcher.
+ * place or hand Auto Hunt to the trusted local dispatcher.
  */
 export async function executeProjectAgentTurn<DispatchResult>(
   dependencies: ProjectAgentTurnDependencies<DispatchResult>,

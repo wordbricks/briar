@@ -1317,7 +1317,7 @@ const claimedRunSchema = z.object({
  * Claude and Grok have standalone runners (dist-agent/*-runner.js). The Codex
  * app-server client still lives in the desktop's Rust layer, so `briar worker`
  * cannot drive Codex until that client is ported to src-agent — see
- * docs/plans/remote-execution-hosts.md §2.4. Runner wiring for Claude/Grok in
+ * docs/plans/detached-execution-workers.md. Runner wiring for Claude/Grok in
  * the CLI worker loop is still pending; issue execution remains desktop-led.
  */
 async function runClaimedIssue(project: ProjectConfig, issue: ClaimedIssue) {

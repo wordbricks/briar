@@ -310,7 +310,6 @@ version = "1.2.0"
 dependencies = [
  "chrono",
  "dirs",
- "glob",
  "reqwest",
  "rustls",
  "serde",

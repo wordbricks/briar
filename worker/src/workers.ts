@@ -4,7 +4,7 @@
  * A worker is a machine running `briar worker`: it claims queued issues, runs
  * the agent locally, and reports progress here. Multiple workers per project
  * are supported, so every race in this module is closed rather than avoided by
- * limiting concurrency — see docs/plans/remote-execution-hosts.md §2.7.
+ * limiting concurrency — see docs/plans/detached-execution-workers.md.
  */
 
 export type ExecutionWorkerState = "online" | "stale" | "disabled";

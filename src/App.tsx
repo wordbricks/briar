@@ -360,12 +360,8 @@ export function App() {
         error={briar.error}
         loading={briar.loading}
         onCancel={briar.cancelProjectCreation}
-        onConnect={async (settings, repositoryPath, executionHostId) => {
-          const connected = await briar.connectProject(
-            settings,
-            repositoryPath,
-            executionHostId,
-          );
+        onConnect={async (settings, repositoryPath) => {
+          const connected = await briar.connectProject(settings, repositoryPath);
           if (connected) {
             setRequestedRunId(null);
             setRequestedSessionId(null);

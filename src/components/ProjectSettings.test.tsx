@@ -84,7 +84,6 @@ describe("ProjectSettings", () => {
       section:
         | "general"
         | "integrations"
-        | "remote-connection"
         | "issue-import"
         | "agent-configuration"
         | "workflow",
@@ -106,7 +105,6 @@ describe("ProjectSettings", () => {
     ).toEqual([
       "General",
       "Integrations",
-      "Remote connection",
       "이슈 임포트",
       "에이전트 구성",
       "워크플로우",
