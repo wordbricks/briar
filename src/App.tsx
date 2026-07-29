@@ -168,6 +168,16 @@ export function App() {
       cancelled = true;
     };
   }, [activePage, activeProject, briar.token, locale]);
+  const rememberIssueAgent = useCallback((agent: ProjectAgent) => {
+    setIssueAgents((current) => {
+      const index = current.findIndex((candidate) => candidate.id === agent.id);
+      if (index < 0) return [...current, agent];
+      if (current[index] === agent) return current;
+      return current.map((candidate) =>
+        candidate.id === agent.id ? agent : candidate
+      );
+    });
+  }, []);
   const processingIssueIds = useMemo(() => {
     const runIds = new Set<string>();
     if (quickStartingRunId) runIds.add(quickStartingRunId);
@@ -375,9 +385,15 @@ export function App() {
             activePage={activePage}
             activeOrganizationId={briar.activeOrganizationId}
             activeProjectId={briar.activeProjectId}
+            agents={issueAgents}
             connectedProjectIds={briar.connectedProjectIds}
             isOpen={isSidebarOpen}
             onAddProject={briar.startProjectCreation}
+            onAgentSessionOpen={(sessionId) => {
+              setRequestedRunId(null);
+              setRequestedSessionId(sessionId);
+              navigateToPage("agents");
+            }}
             onAgentsOpen={() => navigateToPage("agents")}
             onScheduleOpen={() => navigateToPage("schedule")}
             onInboxOpen={() => navigateToPage("inbox")}
@@ -414,6 +430,8 @@ export function App() {
             organizations={briar.organizations}
             projects={briar.projects}
             projectReadiness={briar.projectReadiness}
+            sessions={autoHunt.sessions}
+            token={briar.token}
             unreadInboxCount={inbox.unreadCount}
             user={briar.user}
           />
@@ -569,8 +587,9 @@ export function App() {
             onSettleTaskSession={(sessionId, settlement) =>
               autoHunt.settleTaskSession(sessionId, settlement)}
             onStopSession={(sessionId) => autoHunt.stopSession(sessionId)}
-            onStart={(agent, runs, options) =>
-              autoHunt.startSession(
+            onStart={(agent, runs, options) => {
+              rememberIssueAgent(agent);
+              return autoHunt.startSession(
                 activeProject.id,
                 runs,
                 () => void briar.refresh(),
@@ -581,10 +600,12 @@ export function App() {
                   parentSessionId: options?.parentSessionId,
                   maxIssues: options?.maxIssues,
                 },
-              )
-            }
-            onStartTaskSession={(agent, session) =>
-              autoHunt.startTaskSession(activeProject.id, agent.id, session)}
+              );
+            }}
+            onStartTaskSession={(agent, session) => {
+              rememberIssueAgent(agent);
+              autoHunt.startTaskSession(activeProject.id, agent.id, session);
+            }}
             project={activeProject}
             requestedSessionId={requestedSessionId}
             sessions={autoHunt.sessions}
