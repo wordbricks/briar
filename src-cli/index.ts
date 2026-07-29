@@ -1,8 +1,10 @@
 #!/usr/bin/env bun
 
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
+import { spawn } from "node:child_process";
 import { homedir, platform } from "node:os";
 import { basename, isAbsolute, join, resolve } from "node:path";
+import { createInterface } from "node:readline";
 import { z } from "zod";
 import packageJson from "../package.json";
 import {
@@ -14,6 +16,11 @@ import {
 } from "../src/lib/auto-hunt-contract";
 import { structuredAgentResultSchema } from "../src/lib/agent-result";
 import { validateEvidenceImages } from "../src/lib/evidence-images";
+import {
+  boundedTranscriptPayload,
+  detachedAgentPrompt,
+  detachedProviderRequest,
+} from "./agent-runner";
 import {
   createWorkerDeviceIdentity,
   defaultWorkerLabel,
@@ -159,6 +166,10 @@ const configSchema = z
 
 type Config = z.infer<typeof configSchema>;
 type ProjectConfig = z.infer<typeof projectConfigSchema>;
+const executionToken = (project: ProjectConfig) =>
+  process.env.BRIAR_WORKER_TOKEN ??
+  process.env.BRIAR_AGENT_TOKEN ??
+  project.agentToken;
 const configuredConfigDirectory = process.env.BRIAR_CONFIG_HOME?.trim();
 if (configuredConfigDirectory && !isAbsolute(configuredConfigDirectory)) {
   throw new Error("BRIAR_CONFIG_HOME must be an absolute path");
@@ -787,7 +798,7 @@ async function claimWork() {
   const result = await request<{ work: unknown }>(
     config.apiUrl,
     "/queue/claims",
-    process.env.BRIAR_AGENT_TOKEN ?? project.agentToken,
+    executionToken(project),
     {
       method: "POST",
       body: JSON.stringify({
@@ -801,7 +812,7 @@ async function claimWork() {
     return;
   }
   const issue = queuedIssueSchema.parse(result.work);
-  const agentToken = process.env.BRIAR_AGENT_TOKEN ?? project.agentToken;
+  const agentToken = executionToken(project);
   config.projects = config.projects.map((candidate) =>
     candidate.id === project.id
       ? {
@@ -995,8 +1006,8 @@ async function addRunEvent(forcedStatus?: string) {
   const config = await loadConfig();
   const project = await currentProject(config);
   const repositoryRoot = await currentRepositoryPath();
-  const agentToken = process.env.BRIAR_AGENT_TOKEN ?? project.agentToken;
-  if (!agentToken) throw new Error("Briar Agent 토큰이 없습니다.");
+  const agentToken = executionToken(project);
+  if (!agentToken) throw new Error("Briar 실행 토큰이 없습니다.");
   const branch = value("--branch") ?? gitValue(["branch", "--show-current"]);
   const commitSha = value("--commit-sha") ?? gitValue(["rev-parse", "HEAD"]);
   const remote = gitValue(["remote", "get-url", "origin"]);
@@ -1136,15 +1147,18 @@ async function addRunEvent(forcedStatus?: string) {
     },
   );
   if (project.activeClaim?.runId === result.runId) {
+    const terminal = ["completed", "cancelled", "blocked", "failed"].includes(
+      input.status ?? "",
+    );
     config.projects = config.projects.map((candidate) =>
       candidate.id === project.id
         ? {
             ...candidate,
-            activeClaim: candidate.activeClaim && input.status !== "queued"
+            activeClaim: candidate.activeClaim && terminal
               ? {
                   ...candidate.activeClaim,
                   token: undefined,
-                  finished: ["completed", "cancelled"].includes(input.status ?? ""),
+                  finished: true,
                 }
               : candidate.activeClaim,
           }
@@ -1216,8 +1230,15 @@ async function addRunEvidence() {
   const result = await request(
     config.apiUrl,
     `/runs/${runId}/evidence`,
-    process.env.BRIAR_AGENT_TOKEN ?? project.agentToken,
-    { method: "POST", body },
+    executionToken(project),
+    {
+      method: "POST",
+      body,
+      headers:
+        project.activeClaim?.runId === runId && project.activeClaim.token
+          ? { "X-Briar-Claim-Token": project.activeClaim.token }
+          : undefined,
+    },
   );
   console.log(JSON.stringify(result));
 }
@@ -1231,7 +1252,7 @@ async function listCurrentRunEvidence() {
   const result = await request(
     config.apiUrl,
     `/runs/${runId}/evidence`,
-    process.env.BRIAR_AGENT_TOKEN ?? project.agentToken,
+    executionToken(project),
   );
   console.log(JSON.stringify(result));
 }
@@ -1260,7 +1281,7 @@ async function recoverRun(action: "retry" | "cancel") {
   }>(
     config.apiUrl,
     `/runs/${runId}/${action}`,
-    process.env.BRIAR_AGENT_TOKEN ?? project.agentToken,
+    executionToken(project),
     { method: "POST", body: JSON.stringify(input) },
   );
   if (project.activeClaim?.runId === runId) {
@@ -1301,7 +1322,7 @@ async function reworkRun() {
   }>(
     config.apiUrl,
     `/runs/${runId}/rework`,
-    process.env.BRIAR_AGENT_TOKEN ?? project.agentToken,
+    executionToken(project),
     { method: "POST", body: JSON.stringify(input) },
   );
   console.log(JSON.stringify(result));
@@ -1321,36 +1342,272 @@ const workerRegistrationSchema = z.object({
 
 const claimedRunSchema = z.object({
   runId: z.string().uuid(),
+  runNumber: z.number().int().positive(),
+  currentAttempt: z.number().int().positive(),
+  source: z.enum(autoHuntSources),
   sourceKey: z.string().min(1),
   title: z.string().min(1),
+  description: z.string().nullable(),
+  repository: z.string().min(1),
+  workflow: workflowConfigSchema,
   claimToken: z.string().startsWith("briar_claim_"),
   leaseExpiresAt: z.string(),
+  agent: z
+    .object({
+      id: z.string().uuid(),
+      name: z.string().min(1),
+      provider: z.enum(["codex", "claude", "grok"]),
+      model: z.string().nullable(),
+      responsibility: z.string(),
+      skill: z.string(),
+    })
+    .nullable(),
 });
 
-/**
- * Agent launcher for a claimed issue.
- *
- * Claude and Grok have standalone runners (dist-agent/*-runner.js). The Codex
- * app-server client still lives in the desktop's Rust layer, so `briar worker`
- * cannot drive Codex until that client is ported to src-agent — see
- * docs/plans/detached-execution-workers.md. Runner wiring for Claude/Grok in
- * the CLI worker loop is still pending; issue execution remains desktop-led.
- */
-async function runClaimedIssue(project: ProjectConfig, issue: ClaimedIssue) {
-  const provider = project.llm?.provider ?? "codex";
-  if (provider !== "claude" && provider !== "grok") {
+async function runClaimedIssue(
+  config: Config,
+  project: ProjectConfig,
+  issue: z.infer<typeof claimedRunSchema>,
+  workerToken: string,
+  signal: AbortSignal,
+) {
+  if (!issue.agent) {
+    throw new Error("이 실행에 배정된 Briar Agent가 없습니다.");
+  }
+  config.projects = config.projects.map((candidate) =>
+    candidate.id === project.id
+      ? {
+          ...candidate,
+          activeClaim: {
+            runId: issue.runId,
+            sourceKey: issue.sourceKey,
+            token: issue.claimToken,
+            leaseExpiresAt: issue.leaseExpiresAt,
+          },
+        }
+      : candidate,
+  );
+  await saveConfig(config);
+  const activeProject =
+    config.projects.find((candidate) => candidate.id === project.id) ?? project;
+  const { workspace, workspaceError } = await allocateClaimWorkspace(
+    config,
+    activeProject,
+    issue,
+  );
+  if (!workspace?.path) {
     throw new Error(
-      `이 프로젝트는 ${provider} 에이전트를 사용하도록 설정되어 있어 워커에서 실행할 수 없습니다. Codex 러너 이식이 끝나면 사용할 수 있습니다.`,
+      `Worker workspace allocation failed: ${workspaceError ?? "no workspace"}`,
     );
   }
-  throw new Error(
-    `${provider === "grok" ? "Grok" : "Claude"} 러너 연결이 아직 준비되지 않았습니다: ${issue.sourceKey}는 데스크톱 앱에서 실행하세요.`,
-  );
+
+  const provider = issue.agent.provider;
+  const binaryName = provider === "claude" ? "claude" : provider;
+  const agentBinary = Bun.which(binaryName);
+  if (!agentBinary) {
+    throw new Error(`${binaryName} coding agent is not installed on this Worker`);
+  }
+  const prompt = detachedAgentPrompt({
+    agent: issue.agent,
+    sourceKey: issue.sourceKey,
+    title: issue.title,
+    description: issue.description,
+    workspacePath: workspace.path,
+  });
+  const fullAccess = activeProject.autoHunt?.sandbox?.fullAccess ?? true;
+  const sessionId = `detached-${issue.runId}`;
+  const environment = {
+    ...process.env,
+    BRIAR_WORKER_TOKEN: workerToken,
+    BRIAR_PROJECT_ID: project.id,
+    BRIAR_CONFIG_HOME: configDirectory,
+  };
+
+  const launch = detachedProviderRequest({
+    agent: issue.agent,
+    prompt,
+    workspacePath: workspace.path,
+    fullAccess,
+    agentBinary,
+  });
+  let command = agentBinary;
+  let commandArgs = launch.arguments;
+  const runnerRequest = launch.request;
+  if (launch.kind === "runner") {
+    const runnerPath = (
+      await Promise.all(
+        [
+          resolve(import.meta.dir, `agent/${provider}-runner.js`),
+          resolve(import.meta.dir, `../dist-agent/${provider}-runner.js`),
+        ].map(async (path) => ((await Bun.file(path).exists()) ? path : null)),
+      )
+    ).find((path): path is string => Boolean(path));
+    if (!runnerPath) {
+      throw new Error(
+        `${provider} runner bundle is missing; run \`bun run agent:build\``,
+      );
+    }
+    command = process.execPath;
+    commandArgs = [runnerPath];
+  }
+
+  const child = spawn(command, commandArgs, {
+    cwd: workspace.path,
+    env: environment,
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  const exitPromise = new Promise<number | null>((resolveExit, rejectExit) => {
+    child.once("error", rejectExit);
+    child.once("close", resolveExit);
+  });
+  let sequence = 0;
+  let stderr = "";
+  let runnerError: string | null = null;
+  let completed = false;
+  const terminate = () => {
+    if (child.exitCode !== null || child.killed) return;
+    child.kill("SIGTERM");
+    setTimeout(() => {
+      if (child.exitCode === null) child.kill("SIGKILL");
+    }, 5_000).unref();
+  };
+  signal.addEventListener("abort", terminate, { once: true });
+  child.stderr.setEncoding("utf8");
+  child.stderr.on("data", (chunk: string) => {
+    stderr = `${stderr}${chunk}`.slice(-8_000);
+  });
+  if (runnerRequest) {
+    child.stdin.write(`${JSON.stringify(runnerRequest)}\n`);
+  } else {
+    child.stdin.end();
+  }
+
+  const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
+  try {
+    for await (const line of lines) {
+      if (!line.trim()) continue;
+      sequence += 1;
+      let payload: unknown = line;
+      try {
+        payload = JSON.parse(line);
+      } catch {
+        // Plain output is still useful in the remote transcript.
+      }
+      payload = boundedTranscriptPayload(payload, line);
+      if (
+        runnerRequest &&
+        payload &&
+        typeof payload === "object" &&
+        "type" in payload &&
+        (payload as { type?: string }).type === "approval" &&
+        "id" in payload &&
+        typeof payload.id === "string"
+      ) {
+        child.stdin.write(
+          `${JSON.stringify({
+            type: "approvalResponse",
+            id: payload.id,
+            approved: true,
+          })}\n`,
+        );
+      }
+      if (
+        payload &&
+        typeof payload === "object" &&
+        "type" in payload &&
+        (payload as { type?: string }).type === "error"
+      ) {
+        runnerError = String((payload as { message?: unknown }).message ?? "Agent failed");
+      }
+      if (
+        payload &&
+        typeof payload === "object" &&
+        "type" in payload &&
+        (payload as { type?: string }).type === "result"
+      ) {
+        completed = true;
+      }
+      try {
+        await request(config.apiUrl, "/transcripts", workerToken, {
+          method: "POST",
+          body: JSON.stringify({
+            projectId: project.id,
+            sessionId,
+            runId: issue.runId,
+            workerId: activeProject.executionWorker?.workerId,
+            agentProvider: provider,
+            events: [{ sequence, direction: "server", payload }],
+          }),
+        });
+      } catch (error) {
+        console.error(
+          `transcript upload failed for ${issue.sourceKey}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
+    const exitCode = await exitPromise;
+    if (signal.aborted) {
+      throw signal.reason instanceof Error
+        ? signal.reason
+        : new Error("Worker execution was cancelled");
+    }
+    if (exitCode !== 0 || runnerError) {
+      throw new Error(
+        runnerError ?? (stderr.trim() || `Agent exited with ${exitCode}`),
+      );
+    }
+    if (runnerRequest && !completed) {
+      throw new Error("Agent runner exited without a result");
+    }
+  } catch (error) {
+    if (!signal.aborted) {
+      try {
+        await request(config.apiUrl, "/run-events", workerToken, {
+          method: "POST",
+          headers: { "X-Briar-Claim-Token": issue.claimToken },
+          body: JSON.stringify({
+            runId: issue.runId,
+            status: "failed",
+            workflowStage: null,
+            eventKey: `detached:${issue.currentAttempt}:agent-failed`,
+            occurredAt: new Date().toISOString(),
+            actor: `briar-worker:${activeProject.executionWorker?.workerId ?? "unknown"}`,
+            repository: issue.repository,
+            detail: error instanceof Error ? error.message : String(error),
+            pullRequestUrls: [],
+          }),
+        });
+      } catch {
+        // A cancellation or reassignment invalidates the claim before the
+        // process exits. That expected late write must not hide the root error.
+      }
+    }
+    throw error;
+  } finally {
+    signal.removeEventListener("abort", terminate);
+    terminate();
+    config.projects = config.projects.map((candidate) =>
+      candidate.id === project.id && candidate.activeClaim?.runId === issue.runId
+        ? {
+            ...candidate,
+            activeClaim: {
+              ...candidate.activeClaim,
+              token: undefined,
+              finished: true,
+            },
+          }
+        : candidate,
+    );
+    await saveConfig(config);
+  }
 }
 
 async function workerRegisterCommand() {
   const config = await loadConfig();
-  if (!config.userToken) throw new Error("먼저 `briar login`을 실행하세요.");
+  const userToken = process.env.BRIAR_USER_TOKEN ?? config.userToken;
+  if (!userToken) throw new Error("먼저 `briar login`을 실행하세요.");
   const requestedProjectId = value("--project");
   const project = requestedProjectId
     ? config.projects.find((candidate) => candidate.id === requestedProjectId)
@@ -1366,7 +1623,7 @@ async function workerRegisterCommand() {
     await request(
       config.apiUrl,
       `/projects/${project.id}/workers/register`,
-      config.userToken,
+      userToken,
       {
         method: "POST",
         body: JSON.stringify({
@@ -1415,7 +1672,8 @@ async function workerRegisterCommand() {
 
 async function workerUnregisterCommand() {
   const config = await loadConfig();
-  if (!config.userToken) throw new Error("먼저 `briar login`을 실행하세요.");
+  const userToken = process.env.BRIAR_USER_TOKEN ?? config.userToken;
+  if (!userToken) throw new Error("먼저 `briar login`을 실행하세요.");
   const requestedProjectId = value("--project");
   const project = requestedProjectId
     ? config.projects.find((candidate) => candidate.id === requestedProjectId)
@@ -1423,20 +1681,25 @@ async function workerUnregisterCommand() {
   if (!project?.executionWorker) {
     throw new Error("이 프로젝트에 등록된 worker가 없습니다.");
   }
-  const deviceId = project.executionWorker.deviceId;
   await request(
     config.apiUrl,
     `/projects/${project.id}/workers/${project.executionWorker.workerId}`,
-    config.userToken,
+    userToken,
     { method: "DELETE" },
   );
   config.projects = config.projects.map((candidate) =>
-    candidate.executionWorker?.deviceId === deviceId
+    candidate.id === project.id
       ? { ...candidate, executionWorker: undefined }
       : candidate,
   );
   await saveConfig(config);
-  console.log(JSON.stringify({ deviceId, state: "disabled" }));
+  console.log(
+    JSON.stringify({
+      deviceId: project.executionWorker.deviceId,
+      projectId: project.id,
+      state: "unbound",
+    }),
+  );
 }
 
 async function workerCommand() {
@@ -1458,7 +1721,37 @@ async function workerCommand() {
   const workerToken = process.env.BRIAR_WORKER_TOKEN ?? registered.token;
   const label = registered.label;
   const workerId = registered.workerId;
+  const configuredProvider = project.llm?.provider ?? "codex";
+  const configuredBinary =
+    configuredProvider === "claude" ? "claude" : configuredProvider;
+  const readinessProblem = !gitValueAt(project.repositoryPath, [
+    "rev-parse",
+    "--show-toplevel",
+  ])
+    ? "연결된 저장소를 열 수 없습니다."
+    : !Bun.which(configuredBinary)
+      ? `${configuredBinary} coding agent가 설치되어 있지 않습니다.`
+      : null;
   console.log(`worker ${label} starting as ${workerId}`);
+
+  if (readinessProblem) {
+    await request(
+      config.apiUrl,
+      `/workers/${workerId}/heartbeat`,
+      workerToken,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          versions: { briar: cliVersion },
+          acceptingWork: false,
+          readinessState: "needs_attention",
+          readinessDetail: readinessProblem,
+          capabilities: { providers: [configuredProvider], worktrees: true },
+        }),
+      },
+    );
+    throw new Error(readinessProblem);
+  }
 
   const maxIssues = Number.parseInt(value("--max-issues") ?? "", 10);
   const result = await runWorkerLoop(
@@ -1495,18 +1788,34 @@ async function workerCommand() {
           },
         );
       },
-      heartbeat: async () => {
+      heartbeat: async (readinessState = "ready") => {
         await request(
           config.apiUrl,
           `/workers/${workerId}/heartbeat`,
           workerToken,
           {
             method: "POST",
-            body: JSON.stringify({ versions: { briar: cliVersion } }),
+            body: JSON.stringify({
+              versions: { briar: cliVersion },
+              acceptingWork: true,
+              readinessState,
+              readinessDetail: null,
+              capabilities: {
+                providers: [configuredProvider],
+                worktrees: worktreesEnabled(project),
+              },
+            }),
           },
         );
       },
-      runIssue: (issue) => runClaimedIssue(project, issue),
+      runIssue: (issue, signal) =>
+        runClaimedIssue(
+          config,
+          project,
+          claimedRunSchema.parse(issue),
+          workerToken,
+          signal,
+        ),
       sleep: interruptibleSleep,
       now: () => Date.now(),
       log: (line) => console.log(line),

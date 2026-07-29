@@ -154,7 +154,7 @@ describe("briar worker loop", () => {
   it("renews the lease while an issue is in flight", async () => {
     const test = harness([issue("issue-1")], {}, { renewalTicks: 1 });
     const result = await runWorkerLoop(test.dependencies, {
-      maxIssues: 1,
+      once: true,
       leaseRenewIntervalMs: 5 * 60_000,
     });
 
@@ -162,22 +162,38 @@ describe("briar worker loop", () => {
     expect(test.renewals).toEqual(["issue-1"]);
   });
 
-  it("keeps working when a lease renewal fails and logs the reason", async () => {
+  it("aborts the execution when a lease renewal fails", async () => {
+    let aborted = false;
     const test = harness(
       [issue("issue-1")],
       {
         renewLease: async () => {
           throw new Error("claim token is no longer active");
         },
+        runIssue: async (_issue, signal) => {
+          await new Promise<void>((resolve) => {
+            if (signal.aborted) {
+              aborted = true;
+              resolve();
+              return;
+            }
+            signal.addEventListener("abort", () => {
+              aborted = true;
+              resolve();
+            }, { once: true });
+          });
+        },
       },
       { renewalTicks: 1 },
     );
     const result = await runWorkerLoop(test.dependencies, {
-      maxIssues: 1,
+      once: true,
       leaseRenewIntervalMs: 5 * 60_000,
     });
 
-    expect(result.processed).toBe(1);
+    expect(result.processed).toBe(0);
+    expect(result.failures).toBe(1);
+    expect(aborted).toBe(true);
     expect(test.logs.some((line) => line.includes("lease renewal failed"))).toBe(true);
   });
 
@@ -223,8 +239,8 @@ describe("briar worker loop", () => {
       heartbeatIntervalMs: 60_000,
     });
 
-    // Second iteration happens at the same simulated instant, so one beat.
-    expect(test.heartbeats).toBe(1);
+    // Initial readiness plus busy/ready transitions for each issue.
+    expect(test.heartbeats).toBe(5);
   });
 });
 

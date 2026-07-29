@@ -10,6 +10,7 @@ import {
   attributeRunToWorker,
   countLeasedRuns,
   disableExecutionWorker,
+  dispatchHuntRun,
   executionWorkerBindingForProject,
   leaseExpiryFrom,
   listExecutionWorkers,
@@ -22,6 +23,7 @@ import {
   registerExecutionWorker,
   renewHuntRunLease,
   TranscriptLimitError,
+  unbindExecutionWorker,
   WorkerConflictError,
   workerStateAt,
 } from "./workers";
@@ -114,6 +116,7 @@ describe("detached execution workers", () => {
       "migrations/0032_slack_integration.sql",
       "migrations/0033_organization_logo_browser_formats.sql",
       "migrations/0034_execution_worker_credentials.sql",
+      "migrations/0035_detached_worker_dispatch.sql",
     ]) {
       await executeSql(db, await readFile(resolve(migration), "utf8"));
     }
@@ -150,6 +153,14 @@ describe("detached execution workers", () => {
         '${projectId}', 'example', 0,
         '{"version":1,"stages":[{"id":"analyzing","label":"분석","required":true},{"id":"implementing","label":"구현","required":true}],"completion":{"requiredStages":["analyzing","implementing"]},"release":{"enabled":false}}',
         '${atMinute(0)}', '${atMinute(0)}'
+      );
+      insert into briar_project_agents (
+        id, project_id, name, provider, model, responsibility,
+        skill_markdown, created_at, updated_at
+      ) values (
+        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '${projectId}',
+        'Codex Agent', 'codex', null, 'Perform the assigned issue.',
+        '# Codex Agent', '${atMinute(0)}', '${atMinute(0)}'
       );
     `,
     );
@@ -254,6 +265,47 @@ describe("detached execution workers", () => {
         db,
         first.device.id,
         secondProjectId,
+      ),
+    ).not.toBeNull();
+  });
+
+  it("unshares one project without revoking the device's other bindings", async () => {
+    const first = await register("partially-shared");
+    await registerExecutionWorker(db, secondProjectId, {
+      id: "worker-partially-shared-second",
+      deviceId: "ignored",
+      organizationId: projectId,
+      ownerUserId: "owner",
+      label: "partially shared",
+      deviceIdentityHash: fingerprint("partially-shared"),
+      credentialTokenHash: fingerprint("partially-shared-token"),
+      agentProvider: "codex",
+      versions: {},
+      observedAt: atMinute(2),
+    });
+    expect(
+      await unbindExecutionWorker(
+        db,
+        first.device.id,
+        projectId,
+        atMinute(3),
+      ),
+    ).toBe(true);
+    expect(
+      await executionWorkerBindingForProject(db, first.device.id, projectId),
+    ).toBeNull();
+    expect(
+      await executionWorkerBindingForProject(
+        db,
+        first.device.id,
+        secondProjectId,
+      ),
+    ).not.toBeNull();
+    expect(
+      await authenticateExecutionWorker(
+        db,
+        fingerprint("partially-shared-token"),
+        atMinute(4),
       ),
     ).not.toBeNull();
   });
@@ -417,6 +469,131 @@ describe("detached execution workers", () => {
     });
     expect(row.state).toBe("disabled");
     expect(workerStateAt(atMinute(3), atMinute(3), "disabled")).toBe("disabled");
+  });
+
+  it("keeps the Agent logical and assigns a specific Worker only for the run", async () => {
+    const first = await register("target-a");
+    const second = await register("target-b");
+    const agent = await db
+      .prepare(
+        `select id from briar_project_agents
+         where project_id = ? and provider = 'codex' limit 1`,
+      )
+      .bind(projectId)
+      .first<{ id: string }>();
+    expect(agent).not.toBeNull();
+    const run = await recordHuntEvent(
+      db,
+      projectId,
+      queuedEvent("targeted-issue", 2),
+    );
+
+    const dispatched = await dispatchHuntRun(db, projectId, projectId, {
+      runId: run,
+      agentId: agent!.id,
+      workerId: first.worker.id,
+      requestedByUserId: "member",
+      requestId: "11111111-aaaa-4111-8111-111111111111",
+      occurredAt: atMinute(2),
+    });
+    expect(dispatched).toMatchObject({
+      agentId: agent!.id,
+      requestedWorkerId: first.worker.id,
+      dispatchMode: "specific",
+    });
+
+    const wrongWorkerClaim = await claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: fingerprint("wrong-worker-claim"),
+      claimedBy: second.worker.label,
+      claimedAt: atMinute(3),
+      leaseExpiresAt: leaseExpiryFrom(atMinute(3)),
+      workerId: second.worker.id,
+      agentProvider: "codex",
+      detachedOnly: true,
+    });
+    expect(wrongWorkerClaim).toBeNull();
+
+    const assignedClaim = await claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: fingerprint("assigned-worker-claim"),
+      claimedBy: first.worker.label,
+      claimedAt: atMinute(3),
+      leaseExpiresAt: leaseExpiryFrom(atMinute(3)),
+      workerId: first.worker.id,
+      agentProvider: "codex",
+      detachedOnly: true,
+    });
+    expect(assignedClaim).toMatchObject({
+      agent_id: agent!.id,
+      requested_worker_id: first.worker.id,
+      worker_id: first.worker.id,
+    });
+  });
+
+  it("reassigns an active run by invalidating the old claim", async () => {
+    const first = await register("reassign-a");
+    const second = await register("reassign-b");
+    const agent = await db
+      .prepare(`select id from briar_project_agents where project_id = ? limit 1`)
+      .bind(projectId)
+      .first<{ id: string }>();
+    const run = await recordHuntEvent(
+      db,
+      projectId,
+      queuedEvent("reassigned-issue", 2),
+    );
+    await dispatchHuntRun(db, projectId, projectId, {
+      runId: run,
+      agentId: agent!.id,
+      workerId: first.worker.id,
+      requestedByUserId: "member",
+      requestId: "22222222-aaaa-4222-8222-222222222222",
+      occurredAt: atMinute(2),
+    });
+    await claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: fingerprint("old-claim"),
+      claimedBy: first.worker.label,
+      claimedAt: atMinute(3),
+      leaseExpiresAt: leaseExpiryFrom(atMinute(3)),
+      workerId: first.worker.id,
+      agentProvider: "codex",
+      detachedOnly: true,
+    });
+
+    await dispatchHuntRun(db, projectId, projectId, {
+      runId: run,
+      agentId: agent!.id,
+      workerId: second.worker.id,
+      requestedByUserId: "member",
+      requestId: "33333333-aaaa-4333-8333-333333333333",
+      occurredAt: atMinute(4),
+      reassign: true,
+    });
+    await expect(
+      renewHuntRunLease(db, projectId, {
+        runId: run,
+        claimTokenHash: fingerprint("old-claim"),
+        workerId: first.worker.id,
+        observedAt: atMinute(5),
+      }),
+    ).rejects.toBeInstanceOf(WorkerConflictError);
+    const reassigned = await db
+      .prepare(
+        `select agent_id, requested_worker_id, worker_id, claim_token_hash
+         from briar_hunt_runs where id = ?`,
+      )
+      .bind(run)
+      .first<{
+        agent_id: string;
+        requested_worker_id: string;
+        worker_id: string | null;
+        claim_token_hash: string | null;
+      }>();
+    expect(reassigned).toEqual({
+      agent_id: agent!.id,
+      requested_worker_id: second.worker.id,
+      worker_id: null,
+      claim_token_hash: null,
+    });
   });
 
   it("hands one queued run to exactly one of many concurrent claimers", async () => {

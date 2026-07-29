@@ -149,10 +149,37 @@ export type HuntRun = {
   claimedAt: string | null;
   leaseExpiresAt: string | null;
   claimAttempts: number;
+  agentId?: string | null;
+  requestedWorkerId?: string | null;
+  requestedByUserId?: string | null;
+  dispatchMode?: "any" | "specific" | null;
+  dispatchedAt?: string | null;
+  workerId?: string | null;
   startedAt: string;
   updatedAt: string;
   completedAt: string | null;
   events: HuntEvent[];
+};
+
+export type ExecutionWorker = {
+  id: string;
+  deviceId: string;
+  ownerUserId: string;
+  label: string;
+  agentProvider: AgentProvider;
+  versions: Record<string, string>;
+  state: "online" | "stale" | "disabled";
+  readiness:
+    | "available"
+    | "busy"
+    | "offline"
+    | "needs_attention"
+    | "disabled";
+  acceptingWork: boolean;
+  readinessDetail: string | null;
+  capabilities: Record<string, unknown>;
+  lastHeartbeatAt: string;
+  createdAt: string;
 };
 
 export type HuntRunPlacement = {
@@ -290,6 +317,7 @@ export type DashboardPayload = {
   project: Project;
   settings: ProjectSettings;
   runs: HuntRun[];
+  workers?: ExecutionWorker[];
   generatedAt: string;
 };
 

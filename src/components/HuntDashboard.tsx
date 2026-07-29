@@ -11,6 +11,7 @@ import {
   Clock3,
   Code2,
   Columns3,
+  Cpu,
   FolderKanban,
   FolderGit2,
   GitCommitHorizontal,
@@ -330,6 +331,14 @@ export function HuntDashboard({
     const agentById = new Map(agents.map((agent) => [agent.id, agent]));
     const activeAgents = new Map<string, ProjectAgent>();
     const performedAgents = new Map<string, ProjectAgent>();
+    for (const run of runs) {
+      const agent = run.agentId ? agentById.get(run.agentId) : null;
+      if (!agent) continue;
+      performedAgents.set(run.id, agent);
+      if (!["backlog", "queued", "completed", "cancelled", "blocked", "failed"].includes(run.status)) {
+        activeAgents.set(run.id, agent);
+      }
+    }
     const recentSessions = [...sessions].sort(
       (left, right) =>
         Date.parse(right.startedAt) - Date.parse(left.startedAt),
@@ -355,7 +364,7 @@ export function HuntDashboard({
       }
     }
     return { activeAgents, performedAgents };
-  }, [agents, dashboard?.project.id, sessions]);
+  }, [agents, dashboard?.project.id, runs, sessions]);
 
   useEffect(() => {
     if (!requestedRunId) return;
@@ -695,6 +704,18 @@ export function HuntDashboard({
               </span>
             }
           />
+        )}
+        {!companionMode && (dashboard?.workers?.length ?? 0) > 0 && (
+          <div className="worker-readiness-strip" aria-label={t("worker.executionEnvironment")}>
+            <Cpu size={15} />
+            {dashboard!.workers!.map((worker) => (
+              <span className={`worker-readiness-chip ${worker.readiness}`} key={worker.id}>
+                <i />
+                <strong>{worker.label}</strong>
+                <small>{t(`worker.readiness.${worker.readiness}` as MessageKey)}</small>
+              </span>
+            ))}
+          </div>
         )}
         {!companionMode && <div className="status-tabs">
           <button className={status === "all" ? "active" : ""} onClick={() => setStatus("all")}>{t("dashboard.all")} <span>{runs.length}</span></button>
@@ -1668,8 +1689,14 @@ function IssueContextMenu({
     run.status === "queued" &&
     Boolean(run.leaseExpiresAt) &&
     Date.parse(run.leaseExpiresAt!) > Date.now();
+  const canReassign =
+    Boolean(run.workerId || run.requestedWorkerId) &&
+    !["completed", "cancelled"].includes(run.status);
   const processNowDisabled =
-    !onProcessNow || run.status !== "queued" || isClaimed || isProcessing;
+    !onProcessNow ||
+    (run.status !== "queued" && !canReassign) ||
+    (isClaimed && !canReassign) ||
+    isProcessing;
 
   return (
     <ContextMenu.Root>
@@ -1692,7 +1719,7 @@ function IssueContextMenu({
             ) : (
               <Bot aria-hidden="true" size={17} />
             )}
-            <span>{t("issue.processNow")}</span>
+            <span>{t(canReassign ? "worker.reassign" : "issue.processNow")}</span>
             {isProcessing ? (
               <small>{t("issue.processNowRunning")}</small>
             ) : run.status !== "queued" ? (
@@ -2005,6 +2032,9 @@ export function RunPage({
   const meta = runMeta(run.status, run.workflowStage, run.workflow);
   const label = localizeStatus(t, run.status, run.workflowStage, meta.label);
   const needsAttention = ["blocked", "failed"].includes(run.status);
+  const canCancelRemoteExecution =
+    Boolean(run.workerId) &&
+    !["completed", "cancelled", "blocked", "failed"].includes(run.status);
   const priorityLabel = run.priority === null
     ? t("run.notSet")
     : t(`issue.priority${run.priority}` as MessageKey);
@@ -2281,11 +2311,11 @@ export function RunPage({
                           onLoadAttachment={onLoadAttachment}
                         />
                       )}
-                      {needsAttention && (
+                      {(needsAttention || canCancelRemoteExecution) && (
                         <div className="recovery-panel">
-                          <div><CircleAlert size={16} /><span><strong>{run.status === "failed" ? t("run.failed") : t("run.blocked")}</strong><small>{t("run.retryDescription", { count: run.currentAttempt + 1 })}</small></span></div>
+                          <div><CircleAlert size={16} /><span><strong>{needsAttention ? (run.status === "failed" ? t("run.failed") : t("run.blocked")) : label}</strong><small>{needsAttention ? t("run.retryDescription", { count: run.currentAttempt + 1 }) : (run.detail ?? t("worker.sharingDescriptionOn"))}</small></span></div>
                           <div className="recovery-actions">
-                            <button disabled={isRecovering} onClick={() => void runAction(onRetry)} type="button"><RotateCcw className={isRecovering ? "spin" : ""} size={14} />{t("run.retry")}</button>
+                            {needsAttention && <button disabled={isRecovering} onClick={() => void runAction(onRetry)} type="button"><RotateCcw className={isRecovering ? "spin" : ""} size={14} />{t("run.retry")}</button>}
                             {confirmCancel ? (
                               <><button className="danger" disabled={isRecovering} onClick={() => void runAction(onCancel)} type="button">{t("run.confirmCancel")}</button><button disabled={isRecovering} onClick={() => setConfirmCancel(false)} type="button">{t("run.back")}</button></>
                             ) : (
