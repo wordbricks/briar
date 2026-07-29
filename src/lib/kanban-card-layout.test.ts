@@ -33,4 +33,18 @@ describe("kanban card layout", () => {
     expect(descriptionRule).toContain("-webkit-box-orient:vertical");
     expect(descriptionRule).toContain("-webkit-line-clamp:3");
   });
+
+  it("keeps the active agent badge clear of the scroll edge and issue label", () => {
+    const columnBodyRule = firstRule(".kanban-column > div");
+    const badgeRule = firstRule(".kanban-card-agent-badge");
+    const activeCardKickerRule = firstRule(
+      ".kanban-card.has-agent .kanban-card-kicker",
+    );
+
+    expect(columnBodyRule).toContain("padding:10px");
+    expect(columnBodyRule).toContain("gap:10px");
+    expect(badgeRule).toContain("top:-9px");
+    expect(badgeRule).toContain("right:-7px");
+    expect(activeCardKickerRule).toContain("padding-right:34px");
+  });
 });
