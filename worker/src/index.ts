@@ -146,9 +146,14 @@ import {
 } from "../../src/lib/linear-import";
 import {
   appendAgentTranscript,
+  authenticateExecutionWorker,
   assertWorkerHasNoRunInFlight,
   attributeRunToWorker,
   countLeasedRuns,
+  disableExecutionWorker,
+  executionWorkerBindingById,
+  executionWorkerBindingForProject,
+  executionWorkerDeviceForBinding,
   leaseExpiryFrom,
   listExecutionWorkers,
   MAX_TRANSCRIPT_EVENTS_PER_REQUEST,
@@ -705,6 +710,7 @@ const claimInputSchema = z
   .object({
     claimedBy: z.string().trim().min(1).max(128),
     workerId: z.string().trim().min(1).max(128).optional(),
+    projectId: z.string().uuid().optional(),
     runId: z.string().uuid().optional(),
   })
   .strict();
@@ -712,7 +718,7 @@ const claimInputSchema = z
 const workerRegisterSchema = z
   .object({
     label: z.string().trim().min(1).max(100),
-    hostFingerprint: z.string().regex(/^[0-9a-f]{64}$/u),
+    deviceIdentity: z.string().regex(/^briar_device_[0-9a-f]{64}$/u),
     agentProvider: z.enum(["codex", "claude", "grok"]),
     versions: z.record(z.string().max(64), z.string().max(64)).default({}),
   })
@@ -727,6 +733,7 @@ const workerHeartbeatSchema = z
 const leaseRenewSchema = z
   .object({
     claimToken: z.string().trim().min(1).max(200),
+    projectId: z.string().uuid().optional(),
   })
   .strict();
 
@@ -798,6 +805,7 @@ const transcriptSchema = z
       .max(128)
       .regex(/^[A-Za-z0-9_-]+$/u),
     runId: z.string().uuid().nullable().optional(),
+    projectId: z.string().uuid().optional(),
     workerId: z.string().trim().min(1).max(128).nullable().optional(),
     agentProvider: z.enum(["codex", "claude", "grok"]),
     events: z
@@ -1027,6 +1035,8 @@ deny.onclick=async()=>{try{await api('/device/deny',{method:'POST',body:JSON.str
 const workerJson = (
   worker: {
     id: string;
+    device_id?: string;
+    owner_user_id?: string;
     label: string;
     agent_provider: string;
     versions_json: string;
@@ -1037,6 +1047,8 @@ const workerJson = (
   observedAt: string,
 ) => ({
   id: worker.id,
+  ...(worker.device_id ? { deviceId: worker.device_id } : {}),
+  ...(worker.owner_user_id ? { ownerUserId: worker.owner_user_id } : {}),
   label: worker.label,
   agentProvider: worker.agent_provider,
   versions: parseJsonObject(worker.versions_json) ?? {},
@@ -1056,10 +1068,7 @@ async function requireSession(auth: BriarAuth, request: Request) {
 }
 
 async function requireAgentProject(db: D1Database, request: Request) {
-  const authorization = request.headers.get("authorization") ?? "";
-  const token = authorization.startsWith("Bearer ")
-    ? authorization.slice(7)
-    : "";
+  const token = bearerToken(request);
   if (!token.startsWith("briar_agent_")) {
     throw new HttpError(401, "Invalid agent token");
   }
@@ -1069,6 +1078,65 @@ async function requireAgentProject(db: D1Database, request: Request) {
   );
   if (!projectId) throw new HttpError(401, "Invalid agent token");
   return projectId;
+}
+
+const bearerToken = (request: Request) => {
+  const authorization = request.headers.get("authorization") ?? "";
+  return authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+};
+
+async function requireWorkerCredential(db: D1Database, request: Request) {
+  const token = bearerToken(request);
+  if (!token.startsWith("briar_worker_")) {
+    throw new HttpError(401, "Invalid worker token");
+  }
+  const principal = await authenticateExecutionWorker(
+    db,
+    await sha256(token),
+    new Date().toISOString(),
+  );
+  if (!principal) throw new HttpError(401, "Invalid worker token");
+  return principal;
+}
+
+async function requireWorkerProjectBinding(
+  db: D1Database,
+  request: Request,
+  projectId: string,
+  workerId?: string,
+) {
+  const principal = await requireWorkerCredential(db, request);
+  const binding = workerId
+    ? await executionWorkerBindingById(db, principal.deviceId, workerId)
+    : await executionWorkerBindingForProject(db, principal.deviceId, projectId);
+  if (!binding || binding.project_id !== projectId || binding.state === "disabled") {
+    throw new HttpError(403, "Worker is not enabled for this project");
+  }
+  return { principal, binding };
+}
+
+async function requireRunExecutionProject(
+  db: D1Database,
+  request: Request,
+  runId: string,
+) {
+  if (!bearerToken(request).startsWith("briar_worker_")) {
+    return await requireAgentProject(db, request);
+  }
+  const run = await db
+    .prepare(`select project_id, worker_id from briar_hunt_runs where id = ?`)
+    .bind(runId)
+    .first<{ project_id: string; worker_id: string | null }>();
+  if (!run) throw new HttpError(404, "Run not found");
+  const { binding } = await requireWorkerProjectBinding(
+    db,
+    request,
+    run.project_id,
+  );
+  if (run.worker_id !== binding.id) {
+    throw new HttpError(403, "Run is not assigned to this worker");
+  }
+  return run.project_id;
 }
 
 async function requireProjectAccess(
@@ -2744,7 +2812,16 @@ async function route(
     attachmentMatch &&
     (request.method === "GET" || request.method === "HEAD")
   ) {
-    await requireProjectAccess(auth, db, request, attachmentMatch[1]);
+    if (bearerToken(request).startsWith("briar_worker_")) {
+      if (
+        (await requireRunExecutionProject(db, request, attachmentMatch[2])) !==
+        attachmentMatch[1]
+      ) {
+        throw new HttpError(404, "Attachment not found");
+      }
+    } else {
+      await requireProjectAccess(auth, db, request, attachmentMatch[1]);
+    }
     const attachment = await getIssueAttachment(
       db,
       attachmentMatch[1],
@@ -2873,7 +2950,24 @@ async function route(
     projectEvidenceImageMatch &&
     (request.method === "GET" || request.method === "HEAD")
   ) {
-    await requireProjectAccess(auth, db, request, projectEvidenceImageMatch[1]);
+    if (bearerToken(request).startsWith("briar_worker_")) {
+      if (
+        (await requireRunExecutionProject(
+          db,
+          request,
+          projectEvidenceImageMatch[2],
+        )) !== projectEvidenceImageMatch[1]
+      ) {
+        throw new HttpError(404, "Evidence image not found");
+      }
+    } else {
+      await requireProjectAccess(
+        auth,
+        db,
+        request,
+        projectEvidenceImageMatch[1],
+      );
+    }
     const image = await getRunEvidenceImage(
       db,
       projectEvidenceImageMatch[1],
@@ -3138,49 +3232,118 @@ async function route(
     }
   }
 
-  if (pathname === "/workers/register" && request.method === "POST") {
-    const projectId = await requireAgentProject(db, request);
+  const workerRegistrationMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/workers\/register$/u,
+  );
+  if (workerRegistrationMatch && request.method === "POST") {
+    const projectId = workerRegistrationMatch[1];
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, projectId, session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
     const input = workerRegisterSchema.parse(await readJson(request));
     const observedAt = new Date().toISOString();
-    const worker = await registerExecutionWorker(db, projectId, {
+    const workerToken = `briar_worker_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
+    const registration = await registerExecutionWorker(db, projectId, {
       id: crypto.randomUUID(),
+      deviceId: crypto.randomUUID(),
+      organizationId: project.organization_id,
+      ownerUserId: session.user.id,
       label: input.label,
-      hostFingerprint: input.hostFingerprint,
+      deviceIdentityHash: await sha256(input.deviceIdentity),
+      credentialTokenHash: await sha256(workerToken),
       agentProvider: input.agentProvider,
       versions: input.versions,
       observedAt,
     });
-    if (!worker) throw new HttpError(500, "Worker registration failed");
-    return json({ worker: workerJson(worker, observedAt) }, 201);
+    const response = json(
+      {
+        organizationId: project.organization_id,
+        deviceId: registration.device.id,
+        worker: workerJson(registration.worker, observedAt),
+        workerToken,
+      },
+      201,
+    );
+    response.headers.set("Cache-Control", "no-store");
+    return response;
+  }
+
+  const workerDisableMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/workers\/([0-9a-zA-Z-]+)$/u,
+  );
+  if (workerDisableMatch && request.method === "DELETE") {
+    const projectId = workerDisableMatch[1];
+    const workerId = workerDisableMatch[2];
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, projectId, session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    const device = await executionWorkerDeviceForBinding(db, workerId);
+    if (!device || device.organization_id !== project.organization_id) {
+      throw new HttpError(404, "Worker not found");
+    }
+    if (
+      device.owner_user_id !== session.user.id &&
+      project.member_role !== "owner" &&
+      project.member_role !== "admin"
+    ) {
+      throw new HttpError(403, "Worker owner or organization admin access required");
+    }
+    await disableExecutionWorker(db, device.id, new Date().toISOString());
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   const workerHeartbeatMatch = pathname.match(
     /^\/workers\/([0-9a-zA-Z-]+)\/heartbeat$/u,
   );
   if (workerHeartbeatMatch && request.method === "POST") {
-    const projectId = await requireAgentProject(db, request);
+    const principal = await requireWorkerCredential(db, request);
+    const binding = await executionWorkerBindingById(
+      db,
+      principal.deviceId,
+      workerHeartbeatMatch[1],
+    );
+    if (!binding || binding.state === "disabled") {
+      throw new HttpError(403, "Worker is not enabled for this project");
+    }
     const input = workerHeartbeatSchema.parse(await readJson(request));
     const observedAt = new Date().toISOString();
-    const worker = await recordWorkerHeartbeat(db, projectId, {
+    const worker = await recordWorkerHeartbeat(db, binding.project_id, {
       workerId: workerHeartbeatMatch[1],
       versions: input.versions,
       observedAt,
     });
     // A heartbeat is the cheapest regular touchpoint, so let it also recover
     // runs whose holder stopped reporting.
-    const reaped = await reapStalledHuntRuns(db, projectId, observedAt);
+    const reaped = await reapStalledHuntRuns(db, binding.project_id, observedAt);
     return json({ worker: workerJson(worker, observedAt), reaped });
   }
 
   const leaseMatch = pathname.match(/^\/runs\/([0-9a-f-]+)\/lease$/u);
   if (leaseMatch && request.method === "POST") {
-    const projectId = await requireAgentProject(db, request);
     const input = leaseRenewSchema.parse(await readJson(request));
+    let workerId: string | undefined;
+    const projectId = bearerToken(request).startsWith("briar_worker_")
+      ? (() => {
+          if (!input.projectId) {
+            throw new HttpError(400, "projectId is required for worker lease renewal");
+          }
+          return input.projectId;
+        })()
+      : await requireAgentProject(db, request);
+    if (bearerToken(request).startsWith("briar_worker_")) {
+      const worker = await requireWorkerProjectBinding(
+        db,
+        request,
+        projectId,
+      );
+      workerId = worker.binding.id;
+    }
     const observedAt = new Date().toISOString();
     const renewed = await renewHuntRunLease(db, projectId, {
       runId: leaseMatch[1],
       claimTokenHash: await sha256(input.claimToken),
       observedAt,
+      workerId,
     });
     return json({
       runId: renewed.id,
@@ -3189,12 +3352,35 @@ async function route(
   }
 
   if (pathname === "/transcripts" && request.method === "POST") {
-    const projectId = await requireAgentProject(db, request);
     const input = transcriptSchema.parse(await readJson(request));
+    let authenticatedWorkerId: string | null = null;
+    const projectId = bearerToken(request).startsWith("briar_worker_")
+      ? (() => {
+          if (!input.projectId) {
+            throw new HttpError(400, "projectId is required for worker transcripts");
+          }
+          return input.projectId;
+        })()
+      : await requireAgentProject(db, request);
+    if (bearerToken(request).startsWith("briar_worker_")) {
+      const worker = await requireWorkerProjectBinding(
+        db,
+        request,
+        projectId,
+        input.workerId ?? undefined,
+      );
+      authenticatedWorkerId = worker.binding.id;
+      if (
+        input.runId &&
+        (await requireRunExecutionProject(db, request, input.runId)) !== projectId
+      ) {
+        throw new HttpError(403, "Run is not assigned to this worker");
+      }
+    }
     const result = await appendAgentTranscript(db, projectId, {
       sessionId: input.sessionId,
       runId: input.runId ?? null,
-      workerId: input.workerId ?? null,
+      workerId: authenticatedWorkerId ?? input.workerId ?? null,
       agentProvider: input.agentProvider,
       events: input.events,
       observedAt: new Date().toISOString(),
@@ -3262,14 +3448,35 @@ async function route(
   }
 
   if (pathname === "/queue/claims" && request.method === "POST") {
-    const projectId = await requireAgentProject(db, request);
     const input = claimInputSchema.parse(await readJson(request));
+    let authenticatedWorkerId: string | undefined;
+    const projectId = input.workerId
+      ? (() => {
+          if (!input.projectId) {
+            throw new HttpError(400, "projectId is required for worker claims");
+          }
+          return input.projectId;
+        })()
+      : await requireAgentProject(db, request);
+    if (input.workerId) {
+      const worker = await requireWorkerProjectBinding(
+        db,
+        request,
+        projectId,
+        input.workerId,
+      );
+      authenticatedWorkerId = worker.binding.id;
+    }
     const claimedAt = new Date().toISOString();
     // Recover runs abandoned by a dead worker before looking at the queue, so
     // they are claimable again in this same request.
     await reapStalledHuntRuns(db, projectId, claimedAt);
-    if (input.workerId) {
-      await assertWorkerHasNoRunInFlight(db, projectId, input.workerId);
+    if (authenticatedWorkerId) {
+      await assertWorkerHasNoRunInFlight(
+        db,
+        projectId,
+        authenticatedWorkerId,
+      );
     }
     const leaseExpiresAt = leaseExpiryFrom(claimedAt);
     const claimToken = `briar_claim_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
@@ -3280,10 +3487,10 @@ async function route(
       leaseExpiresAt,
       runId: input.runId,
     });
-    if (run && input.workerId) {
+    if (run && authenticatedWorkerId) {
       await attributeRunToWorker(db, projectId, {
         runId: run.id,
-        workerId: input.workerId,
+        workerId: authenticatedWorkerId,
         observedAt: claimedAt,
       });
     }
@@ -3323,7 +3530,11 @@ async function route(
     /^\/runs\/([0-9a-f-]+)\/(retry|cancel)$/u,
   );
   if (agentRecoveryMatch && request.method === "POST") {
-    const projectId = await requireAgentProject(db, request);
+    const projectId = await requireRunExecutionProject(
+      db,
+      request,
+      agentRecoveryMatch[1],
+    );
     const input = recoveryAgentInputSchema.parse(await readJson(request));
     const result = await recoverHuntRun(db, projectId, {
       runId: agentRecoveryMatch[1],
@@ -3344,7 +3555,11 @@ async function route(
 
   const reworkMatch = pathname.match(/^\/runs\/([0-9a-f-]+)\/rework$/u);
   if (reworkMatch && request.method === "POST") {
-    const projectId = await requireAgentProject(db, request);
+    const projectId = await requireRunExecutionProject(
+      db,
+      request,
+      reworkMatch[1],
+    );
     const input = runReworkInputSchema.parse(await readJson(request));
     try {
       const result = await reworkHuntRun(db, projectId, {
@@ -3369,7 +3584,11 @@ async function route(
 
   const evidenceMatch = pathname.match(/^\/runs\/([0-9a-f-]+)\/evidence$/u);
   if (evidenceMatch && request.method === "GET") {
-    const projectId = await requireAgentProject(db, request);
+    const projectId = await requireRunExecutionProject(
+      db,
+      request,
+      evidenceMatch[1],
+    );
     const [evidence, revisions, images] = await Promise.all([
       listRunEvidence(db, projectId, evidenceMatch[1]),
       listRunStageRevisions(db, projectId, evidenceMatch[1]),
@@ -3398,7 +3617,11 @@ async function route(
     });
   }
   if (evidenceMatch && request.method === "POST") {
-    const projectId = await requireAgentProject(db, request);
+    const projectId = await requireRunExecutionProject(
+      db,
+      request,
+      evidenceMatch[1],
+    );
     const { input: parsed, images } = await readRunEvidenceRequest(request);
     try {
       const evidence = await recordRunEvidence(db, projectId, {
@@ -3532,8 +3755,10 @@ async function route(
   }
 
   if (pathname === "/run-events" && request.method === "POST") {
-    const projectId = await requireAgentProject(db, request);
     const parsed = eventSchema.parse(await readJson(request));
+    const projectId = parsed.runId
+      ? await requireRunExecutionProject(db, request, parsed.runId)
+      : await requireAgentProject(db, request);
     const run = parsed.runId
       ? await getHuntRunForProject(db, projectId, parsed.runId)
       : null;

@@ -45,13 +45,14 @@ Repository paths and third-party credentials never enter D1.
 
 | Area | State | Location |
 | --- | --- | --- |
-| Worker schema and run attribution | done | `migrations/0013_execution_workers.sql` |
+| Org device, project binding, credential schema, and run attribution | done | `migrations/0013_execution_workers.sql`, `migrations/0034_execution_worker_credentials.sql` |
 | Worker register, heartbeat, lease, transcript, and read APIs | done | `worker/src/workers.ts`, `worker/src/index.ts` |
 | Stalled-run reaper and claim concurrency guards | done | `worker/src/workers.ts` |
 | Worker loop and service installer | done except agent launch | `src-cli/worker.ts` |
 | Detached coding-agent launch | not started | `runClaimedIssue` in `src-cli/index.ts` |
 | Worker discovery and observation UI | not started | renderer |
-| Targeted dispatch and worker credentials | not started | API, schema, renderer |
+| Worker enrollment, credential rotation/revocation, and scoped runtime auth | done | API, schema, CLI |
+| Targeted dispatch | not started | API, schema, renderer |
 
 ## Worker registration
 
@@ -64,9 +65,14 @@ The desktop on the execution machine provides the primary setup flow:
    project bindings.
 5. Briar installs and starts the background service.
 
-The current project-wide `briar_agent_` token is transitional. Shared workers
-need independent hashed credentials so revoking one machine does not rotate the
-project token or affect other workers.
+Enrollment uses the signed-in user's session and returns a `briar_worker_`
+credential. Only its SHA-256 hash is stored in D1. The opaque device identity
+is generated randomly, kept in Briar's mode-0600 local config, and hashed by
+the API. Re-enrollment rotates the credential for that device; disabling the
+device revokes it and all of its project bindings.
+
+The project-wide `briar_agent_` token remains available for local workflow
+sessions, but detached workers do not use it.
 
 Worker credentials may register readiness, heartbeat, claim eligible work,
 renew a held lease, and append events or transcripts. They may not change
@@ -107,7 +113,9 @@ of truth.
 ## `briar worker`
 
 ```text
-briar worker --project <id> [--label <text>] [--max-issues <n>] [--once]
+briar worker register --project <id> [--label <text>]
+briar worker unregister --project <id>
+briar worker --project <id> [--max-issues <n>] [--once]
 briar worker status
 briar worker install-service [--project <id>] [--label <text>]
 briar worker uninstall-service
