@@ -21,7 +21,7 @@ import {
   SlidersHorizontal,
   Trash2,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import {
   SettingsBackButton,
@@ -83,7 +83,7 @@ const providerLabels: Record<AgentProvider, string> = {
   grok: "Grok",
 };
 
-type ProjectSettingsSection =
+export type ProjectSettingsSection =
   | "general"
   | "integrations"
   | "issue-import"
@@ -95,6 +95,8 @@ export function ProjectSettings({
   githubRepository,
   isDeleting,
   isSidebarOpen,
+  initialSection,
+  navigationSidebar,
   onBack,
   onDelete,
   onRegenerateWorkflow,
@@ -116,6 +118,8 @@ export function ProjectSettings({
   githubRepository: string | null;
   isDeleting: boolean;
   isSidebarOpen: boolean;
+  initialSection?: ProjectSettingsSection;
+  navigationSidebar?: ReactNode;
   onBack: () => void;
   onDelete: () => Promise<unknown>;
   onRegenerateWorkflow: () => Promise<unknown>;
@@ -144,7 +148,7 @@ export function ProjectSettings({
 }) {
   const { localeTag, t } = useI18n();
   const [activeSection, setActiveSection] =
-    useState<ProjectSettingsSection>("general");
+    useState<ProjectSettingsSection>(initialSection ?? "general");
   const [isConfirming, setIsConfirming] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [workflowCopied, setWorkflowCopied] = useState(false);
@@ -192,6 +196,9 @@ export function ProjectSettings({
   const workerSharingEnabled =
     workerSharingOverride ??
     Boolean(ownedWorker && ownedWorker.readiness !== "disabled");
+  useEffect(() => {
+    if (initialSection) setActiveSection(initialSection);
+  }, [initialSection]);
   useEffect(() => {
     const maximum = ownedWorker?.maxConcurrentSessions ?? 1;
     setWorkerMaxSessions(maximum);
@@ -593,7 +600,7 @@ export function ProjectSettings({
 
   return (
     <SettingsShell className="project-settings-page">
-      <SettingsSidebar
+      {navigationSidebar || <SettingsSidebar
         className="project-settings-sidebar"
         isOpen={isSidebarOpen}
         label={t("settings.navigation")}
@@ -617,7 +624,7 @@ export function ProjectSettings({
             ))}
           </SettingsNavGroup>
         </SettingsNav>
-      </SettingsSidebar>
+      </SettingsSidebar>}
 
       <SettingsMain
         className="project-settings-main"

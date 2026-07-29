@@ -321,15 +321,20 @@ export function naturalLanguageFromAgentMessage(text: string): string {
   const trimmed = text.trim();
   if (!trimmed) return text;
 
-  const jsonText = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i)?.[1]
-    ?? trimmed;
+  const withoutPhase = trimmed.replace(
+    /^\[(?:commentary|final_answer|final|analysis)\]\s*/i,
+    "",
+  );
+  const jsonText = withoutPhase.match(
+    /^```(?:json)?\s*([\s\S]*?)\s*```$/i,
+  )?.[1] ?? withoutPhase;
 
   try {
     const payload = JSON.parse(jsonText) as unknown;
     const summary = record(payload) && string(record(payload)?.summary);
-    return summary?.trim() || text;
+    return summary?.trim() || withoutPhase;
   } catch {
-    return text;
+    return withoutPhase;
   }
 }
 

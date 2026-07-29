@@ -6,7 +6,7 @@ import {
   LoaderCircle,
   OctagonX,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { MainContent } from "@/components/layout";
 import { Button } from "@/components/ui/button";
@@ -15,13 +15,9 @@ import type {
   AutoHuntSessionIssueOutcome,
   AutoHuntSessionStatus,
 } from "../hooks/useAutoHuntSessions";
-import { useAutoHuntAppServerEvents } from "../hooks/useAutoHuntAppServerEvents";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
-import {
-  agentMessagesFromAppServerEvents,
-  naturalLanguageFromAgentMessage,
-} from "../lib/auto-hunt-agent";
+import { naturalLanguageFromAgentMessage } from "../lib/auto-hunt-agent";
 
 export function ProjectAgentSessionDetail({
   isSidebarOpen,
@@ -35,21 +31,20 @@ export function ProjectAgentSessionDetail({
   session: AutoHuntSession;
 }) {
   const { localeTag, t } = useI18n();
-  const appServerEvents = useAutoHuntAppServerEvents(session.id);
-  const agentMessages = useMemo(
-    () => agentMessagesFromAppServerEvents(appServerEvents.events),
-    [appServerEvents.events],
-  );
-  const eventListRef = useRef<HTMLDivElement>(null);
-  const latestAgentMessage = agentMessages[agentMessages.length - 1];
+  const workerProgressRef = useRef<HTMLDivElement>(null);
+  const latestDispatchEvent =
+    session.dispatchEvents[session.dispatchEvents.length - 1];
   const [isStopping, setIsStopping] = useState(false);
   const [stopError, setStopError] = useState<string | null>(null);
 
   useEffect(() => {
-    const eventList = eventListRef.current;
-    if (!eventList || agentMessages.length === 0) return;
-    eventList.scrollTop = eventList.scrollHeight;
-  }, [agentMessages.length, latestAgentMessage?.text.length]);
+    const workerProgress = workerProgressRef.current;
+    if (!workerProgress || session.dispatchEvents.length === 0) return;
+    workerProgress.scrollTop = workerProgress.scrollHeight;
+  }, [
+    session.dispatchEvents.length,
+    latestDispatchEvent?.message.length,
+  ]);
 
   const stop = async () => {
     if (isStopping || session.status !== "running") return;
@@ -161,9 +156,20 @@ export function ProjectAgentSessionDetail({
             )}
 
             {session.dispatchEvents.length > 0 ? (
-              <section className="auto-hunt-dialog-section">
-                <h3>{t("autoHunt.workerTimeline")}</h3>
-                <div className="auto-hunt-timeline">
+              <section
+                aria-labelledby="auto-hunt-worker-progress-title"
+                className="auto-hunt-dialog-section"
+              >
+                <h3 id="auto-hunt-worker-progress-title">
+                  {t("autoHunt.workerTimeline")}
+                </h3>
+                <div
+                  aria-labelledby="auto-hunt-worker-progress-title"
+                  className="auto-hunt-timeline auto-hunt-worker-progress"
+                  ref={workerProgressRef}
+                  role="region"
+                  tabIndex={0}
+                >
                   {session.dispatchEvents.map((dispatchEvent) => (
                     <div
                       className={`auto-hunt-session-event ${dispatchEvent.status}`}
@@ -171,7 +177,11 @@ export function ProjectAgentSessionDetail({
                     >
                       <i />
                       <span>
-                        <strong>{dispatchEvent.message}</strong>
+                        <strong>
+                          {naturalLanguageFromAgentMessage(
+                            dispatchEvent.message,
+                          )}
+                        </strong>
                         <small>
                           <Clock3 size={12} />
                           {formatDate(dispatchEvent.occurredAt, localeTag)}
@@ -194,75 +204,6 @@ export function ProjectAgentSessionDetail({
                 <p>{session.error ?? session.summary}</p>
               </section>
             ) : null}
-
-            <section className="auto-hunt-dialog-section auto-hunt-app-server-section">
-              <header>
-                <div>
-                  <h3>{t("agents.executionLog")}</h3>
-                  <p>{t("agents.executionLogDescription")}</p>
-                </div>
-                <span className="auto-hunt-event-count">
-                  {session.status === "running" ? (
-                    <i>
-                      <span />
-                      {t("autoHunt.live")}
-                    </i>
-                  ) : null}
-                  {t("autoHunt.eventCount", { count: agentMessages.length })}
-                </span>
-              </header>
-              {appServerEvents.error ? (
-                <div className="auto-hunt-event-state error">
-                  <CircleAlert size={14} />
-                  {appServerEvents.error}
-                </div>
-              ) : appServerEvents.isLoading ? (
-                <div className="auto-hunt-event-state">
-                  <LoaderCircle className="spin" size={14} />
-                  {t("autoHunt.eventsLoading")}
-                </div>
-              ) : agentMessages.length === 0 ? (
-                <div className="auto-hunt-event-state">
-                  {t("autoHunt.eventsEmpty")}
-                </div>
-              ) : (
-                <div className="auto-hunt-agent-messages" ref={eventListRef}>
-                  {agentMessages.map((message) => (
-                    <article
-                      className="auto-hunt-agent-message"
-                      key={message.id}
-                    >
-                      <header>
-                        <span>
-                          <Bot size={13} />
-                        </span>
-                        <strong>
-                          {agentMessagePhase(t, message.phase)}
-                        </strong>
-                        {!message.isComplete ? (
-                          <small className="auto-hunt-message-streaming">
-                            <LoaderCircle className="spin" size={11} />
-                            {t("autoHunt.agentMessage.streaming")}
-                          </small>
-                        ) : null}
-                        <time
-                          dateTime={new Date(
-                            message.updatedAtMs,
-                          ).toISOString()}
-                        >
-                          {formatEventTime(message.updatedAtMs, localeTag)}
-                        </time>
-                      </header>
-                      <p>
-                        {message.text
-                          ? naturalLanguageFromAgentMessage(message.text)
-                          : t("autoHunt.agentMessage.writing")}
-                      </p>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </section>
 
             <section className="auto-hunt-dialog-section">
               <h3>{t("autoHunt.timeline")}</h3>
@@ -328,21 +269,4 @@ function formatDate(value: string, locale: string) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
-}
-
-function formatEventTime(value: number, locale: string) {
-  return new Intl.DateTimeFormat(locale, {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).format(new Date(value));
-}
-
-function agentMessagePhase(
-  t: (key: MessageKey) => string,
-  phase: string | null,
-) {
-  return phase === "final_answer"
-    ? t("autoHunt.agentMessage.final")
-    : t("autoHunt.agentMessage.commentary");
 }
