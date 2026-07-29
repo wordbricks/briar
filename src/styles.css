@@ -944,6 +944,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
   width: min(760px, calc(100vw - 48px));
   height: min(460px, calc(100dvh - 48px));
   min-height: 380px;
+  position: relative;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -952,6 +953,29 @@ button.issue-message-state { width:100%; cursor:pointer; }
   background:var(--card);
   box-shadow: 0 24px 72px rgba(29, 30, 27, .26);
   animation: issue-dialog-in .16s cubic-bezier(.2, .8, .2, 1);
+}
+.issue-dialog.is-dragging-attachments {
+  border-color: #8d78d3;
+  box-shadow: 0 24px 72px rgba(29, 30, 27, .26), 0 0 0 3px rgba(113, 88, 198, .14);
+}
+.issue-attachment-drop-overlay {
+  position: absolute;
+  z-index: 5;
+  inset: 8px;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  border: 2px dashed #8d78d3;
+  border-radius: 11px;
+  color: #654daf;
+  background: rgba(247, 244, 255, .94);
+  box-shadow: inset 0 0 32px rgba(113, 88, 198, .08);
+  pointer-events: none;
+}
+.issue-attachment-drop-overlay strong {
+  font-size: var(--text-sm);
+  font-weight: 650;
 }
 @keyframes issue-dialog-in {
   from { opacity: 0; transform: translateY(5px) scale(.99); }
