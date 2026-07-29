@@ -31,7 +31,8 @@ body { overflow: hidden; font-synthesis: none; }
 .worker-status-dot.busy { background:#7657d8; }
 .worker-status-dot.needs_attention { background:#e09f3e; }
 .worker-status-providers { display:flex; align-items:center; gap:3px; }
-.worker-status-providers > span { width:16px; height:16px; display:grid; place-items:center; border:1px solid #dedfd9; border-radius:5px; color:#3e4643; background:var(--card); }
+.worker-status-providers > span { display:flex; align-items:center; gap:3px; }
+.worker-status-providers > span > span { width:16px; height:16px; display:grid; place-items:center; border:1px solid #dedfd9; border-radius:5px; color:#3e4643; background:var(--card); }
 .worker-status-providers img,.worker-status-providers svg { display:block; }
 .app-version-status { flex:0 0 auto; height:100%; padding:0 10px; display:flex; align-items:center; border-left:1px solid #dedfd9; }
 .app-version-status > small { color:#777972; font:500 var(--text-2xs) "DM Mono",ui-monospace,monospace; letter-spacing:.01em; white-space:nowrap; }

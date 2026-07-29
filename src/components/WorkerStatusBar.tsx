@@ -1,26 +1,13 @@
 import { useI18n } from "../i18n";
 import type { AgentProvider } from "../lib/project-llm";
 import type { ExecutionWorker } from "../types";
-import { AgentProviderIcon } from "./AgentIcons";
-
-const agentProviders = new Set<AgentProvider>(["claude", "codex", "grok"]);
-
-function providerName(provider: AgentProvider) {
-  if (provider === "claude") return "Claude";
-  if (provider === "grok") return "Grok";
-  return "Codex";
-}
+import { WorkerProviderIcons } from "./WorkerProviderIcons";
 
 export function workerProviders(worker: ExecutionWorker): AgentProvider[] {
-  const configured = worker.capabilities.providers;
-  if (!Array.isArray(configured)) return [worker.agentProvider];
-
-  const providers = configured.filter(
-    (provider): provider is AgentProvider =>
-      typeof provider === "string" &&
-      agentProviders.has(provider as AgentProvider),
-  );
-  return providers.length > 0 ? [...new Set(providers)] : [worker.agentProvider];
+  const providers = worker.providers ?? [];
+  return providers.length > 0
+    ? [...new Set(providers)]
+    : [worker.agentProvider];
 }
 
 export function WorkerStatusBar({
@@ -51,15 +38,8 @@ export function WorkerStatusBar({
               role="img"
             />
             <strong>{worker.label}</strong>
-            <span
-              aria-label={providers.map(providerName).join(", ")}
-              className="worker-status-providers"
-            >
-              {providers.map((provider) => (
-                <span key={provider} title={providerName(provider)}>
-                  <AgentProviderIcon provider={provider} size={12} />
-                </span>
-              ))}
+            <span className="worker-status-providers">
+              <WorkerProviderIcons providers={providers} size={12} />
             </span>
           </div>
         );
