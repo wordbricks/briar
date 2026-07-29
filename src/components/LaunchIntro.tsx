@@ -1,5 +1,5 @@
 import { useEffect, type CSSProperties } from "react";
-import briarIconUrl from "../assets/app-icons/purple.png";
+import briarIconUrl from "../assets/app-icons/aubergine-riso.png";
 import { useI18n } from "../i18n";
 
 const INTRO_HOLD_MS = 5_000;

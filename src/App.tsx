@@ -221,7 +221,6 @@ export function App() {
       : null;
   const shouldShowInitialOnboarding =
     !briar.companionMode &&
-    !briar.loading &&
     !briar.user &&
     !hasCompletedOnboarding;
   const sendIssueMessage = (
@@ -369,7 +368,13 @@ export function App() {
     content = <SessionLoadingScreen />;
   } else if (shouldShowInitialOnboarding) {
     content = (
-      <InitialOnboarding onComplete={() => setHasCompletedOnboarding(true)} />
+      <InitialOnboarding
+        error={briar.error}
+        loading={briar.loading}
+        loginCode={briar.loginCode}
+        onCancelLogin={briar.cancelLogin}
+        onLogin={() => void briar.login()}
+      />
     );
   } else if (!briar.user) {
     content = (

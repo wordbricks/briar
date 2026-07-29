@@ -2,7 +2,7 @@
   Briar design tokens
   -------------------
   Single source of truth for color, type, radius, and elevation.
-  Semantic names follow shadcn conventions; values preserve Briar's warm paper + violet brand.
+  Semantic names follow shadcn conventions; values preserve Briar's warm paper + aubergine brand.
 */
 
 :root {
@@ -69,8 +69,11 @@
   --popover: #ffffff;
   --popover-foreground: #22231f;
 
-  --primary: #6046b8;
-  --primary-foreground: #faf9ff;
+  --primary: #2b2020;
+  --primary-foreground: #fff9fa;
+  --primary-hover: #1f1717;
+  --primary-shadow: rgba(43, 32, 32, 0.22);
+  --primary-ring: rgba(43, 32, 32, 0.26);
 
   --secondary: #f0f0ec;
   --secondary-foreground: #30312d;
@@ -94,7 +97,7 @@
 
   --border: #e3e4dd;
   --input: #dcded8;
-  --ring: #8b70dd;
+  --ring: #73585d;
 
   --sidebar: rgba(244, 244, 242, 0.94);
   --sidebar-foreground: #5f605b;
@@ -146,6 +149,9 @@
 
   --primary: #8c72ff;
   --primary-foreground: #120f22;
+  --primary-hover: #9b84ff;
+  --primary-shadow: rgba(140, 114, 255, 0.22);
+  --primary-ring: rgba(168, 148, 255, 0.3);
 
   --secondary: #242428;
   --secondary-foreground: #e8e8e3;

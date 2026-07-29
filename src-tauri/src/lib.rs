@@ -30,7 +30,8 @@ const AUTO_HUNT_DISPATCH_EVENT: &str = "auto-hunt-dispatch-event";
 const PROJECT_AGENT_SCHEDULE_POLL_EVENT: &str = "project-agent-schedule-poll";
 const AGENT_SESSION_STOPPED_ERROR: &str = "사용자가 에이전트 세션을 중지했습니다.";
 const DEFAULT_MAIN_WINDOW_SIZE: (f64, f64) = (1280.0, 820.0);
-const ONBOARDING_MAIN_WINDOW_SIZE: (f64, f64) = (980.0, 680.0);
+const DEFAULT_MAIN_WINDOW_MIN_SIZE: (f64, f64) = (980.0, 680.0);
+const ONBOARDING_MAIN_WINDOW_SIZE: (f64, f64) = (780.0, 580.0);
 
 #[derive(Deserialize, Serialize)]
 struct StoredSession {
@@ -4699,10 +4700,31 @@ fn main_window_size(compact: bool) -> (f64, f64) {
     }
 }
 
+fn main_window_min_size(compact: bool) -> (f64, f64) {
+    if compact {
+        ONBOARDING_MAIN_WINDOW_SIZE
+    } else {
+        DEFAULT_MAIN_WINDOW_MIN_SIZE
+    }
+}
+
+fn main_window_decorated(compact: bool) -> bool {
+    !compact
+}
+
 #[tauri::command]
 fn set_main_window_onboarding_mode(app: tauri::AppHandle, compact: bool) -> Result<(), String> {
     let main = main_window(&app)?;
     let (width, height) = main_window_size(compact);
+    let (min_width, min_height) = main_window_min_size(compact);
+    #[cfg(target_os = "macos")]
+    {
+        main.set_decorations(main_window_decorated(compact))
+            .map_err(|error| error.to_string())?;
+        main.set_shadow(true).map_err(|error| error.to_string())?;
+    }
+    main.set_min_size(Some(tauri::LogicalSize::new(min_width, min_height)))
+        .map_err(|error| error.to_string())?;
     main.set_size(tauri::LogicalSize::new(width, height))
         .map_err(|error| error.to_string())?;
     #[cfg(desktop)]
@@ -5404,6 +5426,10 @@ branch refs/heads/briar/second-11111111
     fn uses_compact_window_dimensions_only_during_onboarding() {
         assert_eq!(main_window_size(true), ONBOARDING_MAIN_WINDOW_SIZE);
         assert_eq!(main_window_size(false), DEFAULT_MAIN_WINDOW_SIZE);
+        assert_eq!(main_window_min_size(true), ONBOARDING_MAIN_WINDOW_SIZE);
+        assert_eq!(main_window_min_size(false), DEFAULT_MAIN_WINDOW_MIN_SIZE);
+        assert!(!main_window_decorated(true));
+        assert!(main_window_decorated(false));
     }
 
     #[test]

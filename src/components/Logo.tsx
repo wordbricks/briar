@@ -1,4 +1,4 @@
-import briarIconUrl from "../assets/app-icons/purple.png";
+import briarIconUrl from "../assets/app-icons/aubergine-riso.png";
 
 export function Logo({ compact = false }: { compact?: boolean }) {
   return (

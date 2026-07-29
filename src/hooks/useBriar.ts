@@ -78,6 +78,7 @@ import {
   resolveActiveAccountSelection,
   writeActiveOrganizationId,
 } from "../lib/active-organization";
+import { ensureDefaultOrganization } from "../lib/default-organization";
 import {
   isAuthorizationCancelled,
   openAuthorization,
@@ -398,6 +399,21 @@ export function useBriar(options: UseBriarOptions = {}) {
         return;
       }
 
+      let nextOrganizations: Organization[];
+      try {
+        nextOrganizations = await ensureDefaultOrganization(
+          result.token,
+          result.user,
+          result.organizations,
+          {
+            createOrganization: createRemoteOrganization,
+            loadOrganizations,
+          },
+        );
+      } catch (caught) {
+        if (!cancelled) scheduleRetry(caught);
+        return;
+      }
       const nextConnectedProjectIds = companionMode
         ? null
         : await readConnectedProjectIds();
@@ -405,11 +421,11 @@ export function useBriar(options: UseBriarOptions = {}) {
       setToken(result.token);
       setUser(result.user);
       setProjects(result.projects);
-      setOrganizations(result.organizations);
+      setOrganizations(nextOrganizations);
       setConnectedProjectIds(nextConnectedProjectIds);
       const selection = resolveActiveAccountSelection(
         result.user.id,
-        result.organizations,
+        nextOrganizations,
         result.projects,
       );
       setActiveOrganizationId(selection.activeOrganizationId);
@@ -637,11 +653,21 @@ export function useBriar(options: UseBriarOptions = {}) {
           if (attempt !== loginAttempt.current) return;
           if (result.access_token) {
             const nextToken = result.access_token;
-            const [nextUser, nextProjects, nextOrganizations] = await Promise.all([
-              loadSession(nextToken),
-              loadProjects(nextToken),
-              loadOrganizations(nextToken),
-            ]);
+            const [nextUser, nextProjects, loadedOrganizations] =
+              await Promise.all([
+                loadSession(nextToken),
+                loadProjects(nextToken),
+                loadOrganizations(nextToken),
+              ]);
+            const nextOrganizations = await ensureDefaultOrganization(
+              nextToken,
+              nextUser,
+              loadedOrganizations,
+              {
+                createOrganization: createRemoteOrganization,
+                loadOrganizations,
+              },
+            );
             const nextConnectedProjectIds = companionMode
               ? null
               : await readConnectedProjectIds();
