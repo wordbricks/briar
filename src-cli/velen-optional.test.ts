@@ -8,8 +8,8 @@ const temporaryHomes: string[] = [];
 const repositoryWorkflow = {
   version: 1,
   stages: [{ id: "analyzing", label: "Analyze", required: true }],
+  execution: { stopAfterStage: "analyzing" },
   completion: { requiredStages: ["analyzing"] },
-  release: { enabled: false },
 } as const;
 const bunExecutable = spawnSync("/usr/bin/env", ["which", "bun"], {
   encoding: "utf8",

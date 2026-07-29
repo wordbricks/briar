@@ -15,7 +15,12 @@ const evidenceTypeSchema = z
   .regex(autoHuntEvidenceTypePattern);
 
 const workflowStageSchema = z.object({
-  id: z.string().trim().min(1).max(64).regex(/^[a-z][a-z0-9_]*$/u),
+  id: z
+    .string()
+    .trim()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z][a-z0-9_]*$/u),
   label: z.string().trim().min(1).max(80),
   required: z.boolean(),
   evidence: z.array(evidenceTypeSchema).max(20),
@@ -26,10 +31,17 @@ const generatedWorkflowSchema = z
   .object({
     version: z.literal(1),
     stages: z.array(workflowStageSchema).min(1).max(30),
+    execution: z.object({
+      stopAfterStage: z
+        .string()
+        .trim()
+        .min(1)
+        .max(64)
+        .regex(/^[a-z][a-z0-9_]*$/u),
+    }),
     completion: z.object({
       requiredStages: z.array(z.string().trim().min(1).max(64)).max(30),
     }),
-    release: z.object({ enabled: z.boolean() }),
   })
   .superRefine((workflow, context) => {
     const stageIds = workflow.stages.map((stage) => stage.id);
@@ -46,7 +58,9 @@ const generatedWorkflowSchema = z
       .map((stage) => stage.id);
     if (
       workflow.completion.requiredStages.length !== expectedRequired.length ||
-      workflow.completion.requiredStages.some((id) => !expectedRequired.includes(id))
+      workflow.completion.requiredStages.some(
+        (id) => !expectedRequired.includes(id),
+      )
     ) {
       context.addIssue({
         code: "custom",
@@ -54,12 +68,20 @@ const generatedWorkflowSchema = z
         path: ["completion", "requiredStages"],
       });
     }
+    if (!uniqueIds.has(workflow.execution.stopAfterStage)) {
+      context.addIssue({
+        code: "custom",
+        message:
+          "Execution stop stage must reference a configured workflow stage.",
+        path: ["execution", "stopAfterStage"],
+      });
+    }
   });
 
 const workflowOutputSchema: JsonSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["version", "stages", "completion", "release"],
+  required: ["version", "stages", "execution", "completion"],
   properties: {
     version: { type: "integer", enum: [1] },
     stages: {
@@ -92,6 +114,19 @@ const workflowOutputSchema: JsonSchema = {
         },
       },
     },
+    execution: {
+      type: "object",
+      additionalProperties: false,
+      required: ["stopAfterStage"],
+      properties: {
+        stopAfterStage: {
+          type: "string",
+          pattern: "^[a-z][a-z0-9_]*$",
+          minLength: 1,
+          maxLength: 64,
+        },
+      },
+    },
     completion: {
       type: "object",
       additionalProperties: false,
@@ -103,12 +138,6 @@ const workflowOutputSchema: JsonSchema = {
           items: { type: "string", minLength: 1, maxLength: 64 },
         },
       },
-    },
-    release: {
-      type: "object",
-      additionalProperties: false,
-      required: ["enabled"],
-      properties: { enabled: { type: "boolean" } },
     },
   },
 };
@@ -128,8 +157,9 @@ Rules:
 - Return empty evidence or checks arrays when a stage has none; never omit those fields.
 - Mark a stage required only when every successful Auto Hunt task must complete it.
 - completion.requiredStages must contain exactly the ids marked required, in stage order.
+- execution.stopAfterStage must reference the last stage Auto Hunt is authorized to execute for this project.
+- Stages after execution.stopAfterStage describe repository capabilities only. Auto Hunt must not execute them.
 - Do not invent pull requests, CI, staging, production, deployment, or monitoring. Include them only when repository evidence proves they exist and are usable.
-- release.enabled must be false unless the repository has an actual release or deployment path that Auto Hunt can run.
 - Do not modify files and do not run commands that can change the repository.`;
 
 const workflowRequest = `Analyze this repository and generate the most appropriate Briar Auto Hunt workflow for future autonomous issue, feedback, and error work. Keep it minimal, executable, and grounded in the repository's actual tooling.`;
@@ -143,7 +173,9 @@ const parseGeneratedWorkflow = (message: string): AutoHuntWorkflow => {
   }
   const generated = generatedWorkflowSchema.safeParse(parsed);
   if (!generated.success) {
-    throw new Error("Codex가 생성한 워크플로우가 실행 계약을 충족하지 않습니다.");
+    throw new Error(
+      "Codex가 생성한 워크플로우가 실행 계약을 충족하지 않습니다.",
+    );
   }
   return normalizeAutoHuntWorkflow(generated.data);
 };

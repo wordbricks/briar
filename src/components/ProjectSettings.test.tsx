@@ -11,6 +11,7 @@ describe("ProjectSettings", () => {
   it("keeps project settings focused on project-wide configuration", async () => {
     const onRegenerateWorkflow = vi.fn(async () => undefined);
     const onReviseWorkflow = vi.fn(async () => undefined);
+    const onUpdateWorkflowStopAfterStage = vi.fn(async () => undefined);
     const onUpdateLinear = vi.fn(
       async (linear: ProjectSettingsData["linear"]) => linear,
     );
@@ -62,6 +63,7 @@ describe("ProjectSettings", () => {
           onDelete={async () => undefined}
           onRegenerateWorkflow={onRegenerateWorkflow}
           onReviseWorkflow={onReviseWorkflow}
+          onUpdateWorkflowStopAfterStage={onUpdateWorkflowStopAfterStage}
           onUpdateVelenOrg={async (org) => org}
           onUpdateLinear={onUpdateLinear}
           onConnectLinearImport={onConnectLinearImport}
@@ -134,10 +136,19 @@ describe("ProjectSettings", () => {
       "bun run test",
     );
     expect(container.querySelector(".project-workflow-contract")?.textContent).toContain(
-      "릴리스비활성",
+      "실행 종료 단계Local validation",
     );
     expect(container.querySelector(".project-workflow-contract pre")).toBeNull();
     expect(container.querySelectorAll(".project-workflow-stage")).toHaveLength(3);
+    const boundaryTrigger = container.querySelector<HTMLButtonElement>(
+      ".project-settings-workflow-boundary .select-menu-trigger",
+    );
+    await act(async () => boundaryTrigger?.click());
+    const implementingBoundary = Array.from(
+      document.body.querySelectorAll<HTMLButtonElement>(".select-menu-option"),
+    ).find((option) => option.textContent?.includes("Implement"));
+    await act(async () => implementingBoundary?.click());
+    expect(onUpdateWorkflowStopAfterStage).toHaveBeenCalledWith("implementing");
     expect(
       container.querySelector(".project-workflow-contract")?.getAttribute("aria-label"),
     ).toBe("Auto Hunt 워크플로 다이어그램");

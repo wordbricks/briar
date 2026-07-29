@@ -12,6 +12,7 @@ import {
   autoHuntEvidenceTypePattern,
   autoHuntRunStatuses,
   autoHuntSources,
+  normalizeAutoHuntWorkflow,
   repositoryWorkflowPendingStageId,
 } from "../src/lib/auto-hunt-contract";
 import { structuredAgentResultSchema } from "../src/lib/agent-result";
@@ -68,12 +69,19 @@ const workflowConfigSchema = z
         checks: z.array(z.string().min(1)).optional(),
       }),
     ).min(1),
+    execution: z
+      .object({
+        stopAfterStage: workflowStageIdSchema,
+      })
+      .optional(),
     completion: z.object({
       requiredStages: z.array(workflowStageIdSchema),
     }).optional(),
+    /** Read compatibility for local configurations created before stopAfterStage. */
     release: z.object({ enabled: z.boolean() }).optional(),
   })
-  .strict();
+  .strict()
+  .transform(normalizeAutoHuntWorkflow);
 
 const worktreeConfigSchema = z
   .object({

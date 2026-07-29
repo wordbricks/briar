@@ -62,8 +62,8 @@ describe("project agent skills", () => {
           { id: "analyzing", label: "Analyze", required: true },
           { id: "local_qa", label: "Local QA", required: true },
         ],
+        execution: { stopAfterStage: "local_qa" },
         completion: { requiredStages: ["analyzing", "local_qa"] },
-        release: { enabled: false },
       },
       invocation: "Run the scheduled automation.",
     });

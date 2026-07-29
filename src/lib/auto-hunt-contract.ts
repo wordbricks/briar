@@ -45,17 +45,19 @@ export type AutoHuntWorkflowStage = {
 export type AutoHuntWorkflow = {
   version: 1;
   stages: AutoHuntWorkflowStage[];
+  execution: {
+    stopAfterStage: AutoHuntWorkflowStageId;
+  };
   completion: {
     requiredStages: AutoHuntWorkflowStageId[];
   };
-  release: {
-    enabled: boolean;
-  };
 };
 
-type AutoHuntWorkflowInput = Omit<AutoHuntWorkflow, "completion" | "release"> & {
+type AutoHuntWorkflowInput = Omit<AutoHuntWorkflow, "completion" | "execution"> & {
   completion?: AutoHuntWorkflow["completion"];
-  release?: AutoHuntWorkflow["release"];
+  execution?: AutoHuntWorkflow["execution"];
+  /** Read compatibility for workflows stored before execution.stopAfterStage. */
+  release?: { enabled: boolean };
 };
 
 const catalogById: Map<string, (typeof autoHuntWorkflowStageCatalog)[number]> = new Map(
@@ -76,8 +78,8 @@ export const repositoryWorkflowBootstrap: AutoHuntWorkflow = {
       required: true,
     },
   ],
+  execution: { stopAfterStage: repositoryWorkflowPendingStageId },
   completion: { requiredStages: [repositoryWorkflowPendingStageId] },
-  release: { enabled: false },
 };
 
 export const isRepositoryWorkflowPending = (workflow: AutoHuntWorkflow) =>
@@ -117,16 +119,42 @@ export function normalizeAutoHuntWorkflow(
   const requiredStages = workflow.completion
     ? (configuredRequiredStages ?? [])
     : stages.filter((stage) => stage.required).map((stage) => stage.id);
+  const configuredStopAfterStage = workflow.execution?.stopAfterStage.trim();
+  const stopAfterStage =
+    configuredStopAfterStage && stageIds.has(configuredStopAfterStage)
+      ? configuredStopAfterStage
+      : requiredStages.at(-1) ?? stages.at(-1)!.id;
   return {
     version: 1,
     stages,
+    execution: { stopAfterStage },
     completion: { requiredStages },
-    release: {
-      enabled: workflow.release?.enabled ?? stages.some((stage) =>
-        ["staging_qa", "production_qa"].includes(stage.id),
-      ),
-    },
   };
+}
+
+export function workflowStopIndex(workflow: AutoHuntWorkflow) {
+  const index = workflow.stages.findIndex(
+    (stage) => stage.id === workflow.execution.stopAfterStage,
+  );
+  return index < 0 ? workflow.stages.length - 1 : index;
+}
+
+export function executableWorkflowStages(workflow: AutoHuntWorkflow) {
+  return workflow.stages.slice(0, workflowStopIndex(workflow) + 1);
+}
+
+export function requiredExecutableWorkflowStages(workflow: AutoHuntWorkflow) {
+  const executableStageIds = new Set(
+    executableWorkflowStages(workflow).map((stage) => stage.id),
+  );
+  return [
+    ...new Set([
+      ...workflow.completion.requiredStages.filter((stage) =>
+        executableStageIds.has(stage)
+      ),
+      workflow.execution.stopAfterStage,
+    ]),
+  ];
 }
 
 export function progressForAutoHuntRun(

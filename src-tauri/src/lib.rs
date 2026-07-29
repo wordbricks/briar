@@ -85,9 +85,9 @@ struct WorkflowConfig {
     version: u8,
     stages: Vec<WorkflowStageConfig>,
     #[serde(default)]
-    completion: WorkflowCompletionConfig,
+    execution: WorkflowExecutionConfig,
     #[serde(default)]
-    release: WorkflowReleaseConfig,
+    completion: WorkflowCompletionConfig,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -111,9 +111,9 @@ struct WorkflowCompletionConfig {
 
 #[derive(Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct WorkflowReleaseConfig {
+struct WorkflowExecutionConfig {
     #[serde(default)]
-    enabled: bool,
+    stop_after_stage: String,
 }
 
 #[derive(Serialize)]
@@ -133,10 +133,12 @@ fn repository_workflow_bootstrap() -> WorkflowConfig {
             evidence: Vec::new(),
             checks: Vec::new(),
         }],
+        execution: WorkflowExecutionConfig {
+            stop_after_stage: "repository_workflow_pending".to_string(),
+        },
         completion: WorkflowCompletionConfig {
             required_stages: vec!["repository_workflow_pending".to_string()],
         },
-        release: WorkflowReleaseConfig { enabled: false },
     }
 }
 
@@ -970,8 +972,37 @@ fn cli_execution_path(home: &Path) -> Result<OsString, String> {
     cli_execution_path_with_runtime(home, runtime_directories)
 }
 
+fn workflow_stop_index(workflow: &WorkflowConfig) -> Option<usize> {
+    workflow
+        .stages
+        .iter()
+        .position(|stage| stage.id == workflow.execution.stop_after_stage)
+        .or_else(|| {
+            workflow
+                .completion
+                .required_stages
+                .iter()
+                .rev()
+                .find_map(|required| {
+                    workflow
+                        .stages
+                        .iter()
+                        .position(|stage| &stage.id == required)
+                })
+        })
+        .or_else(|| workflow.stages.len().checked_sub(1))
+}
+
+fn normalize_workflow_execution(mut workflow: WorkflowConfig) -> WorkflowConfig {
+    if let Some(stop_index) = workflow_stop_index(&workflow) {
+        workflow.execution.stop_after_stage = workflow.stages[stop_index].id.clone();
+    }
+    workflow
+}
+
 fn workflow_requires_github(workflow: &WorkflowConfig) -> bool {
-    workflow.stages.iter().any(|stage| {
+    let stop_index = workflow_stop_index(workflow).unwrap_or_default();
+    workflow.stages.iter().take(stop_index + 1).any(|stage| {
         stage.id == "pr_open"
             || stage
                 .evidence
@@ -2524,6 +2555,9 @@ fn validate_generated_workflow(workflow: &WorkflowConfig) -> Result<(), String> 
     if completion != required {
         return Err("생성된 워크플로우의 필수 단계와 완료 조건이 일치하지 않습니다.".to_string());
     }
+    if !ids.contains(workflow.execution.stop_after_stage.as_str()) {
+        return Err("생성된 워크플로우의 실행 종료 단계가 올바르지 않습니다.".to_string());
+    }
     Ok(())
 }
 
@@ -3347,7 +3381,7 @@ fn project_auto_hunt_workflow_json(config_path: &Path, project_id: &str) -> Resu
     {
         return Err("저장소 기반 워크플로우가 생성되지 않았습니다.".to_string());
     }
-    serde_json::to_string_pretty(workflow)
+    serde_json::to_string_pretty(&normalize_workflow_execution(workflow.clone()))
         .map_err(|error| format!("프로젝트 워크플로우를 직렬화하지 못했습니다: {error}"))
 }
 
@@ -5677,6 +5711,7 @@ branch refs/heads/briar/second-11111111
             checks: vec!["cargo test".to_string()],
         }];
         workflow.completion.required_stages = vec!["repository_qa".to_string()];
+        workflow.execution.stop_after_stage = "repository_qa".to_string();
 
         update_project_workflow_at(&config_path, "project-1", workflow)
             .expect("workflow should save");
@@ -5693,6 +5728,8 @@ branch refs/heads/briar/second-11111111
             .expect("runtime workflow should load");
         assert!(runtime_workflow.contains("repository_qa"));
         assert!(runtime_workflow.contains("cargo test"));
+        assert!(runtime_workflow.contains("stopAfterStage"));
+        assert!(!runtime_workflow.contains("\"release\""));
 
         fs::remove_dir_all(directory).expect("test config directory should be removed");
     }
@@ -5822,6 +5859,8 @@ branch refs/heads/briar/second-11111111
             evidence: vec!["pull_request".to_string()],
             checks: Vec::new(),
         });
+        assert!(!workflow_requires_github(&workflow));
+        workflow.execution.stop_after_stage = "pr_open".to_string();
         assert!(workflow_requires_github(&workflow));
         assert_eq!(
             github_repository_from_remote("git@github.com:wordbricks/briar.git"),

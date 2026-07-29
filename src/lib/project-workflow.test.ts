@@ -21,8 +21,20 @@ describe("project workflow generator", () => {
       message: JSON.stringify({
         version: 1,
         stages: [
-          { id: "analyzing", label: "Analyze", required: true, evidence: ["repository"], checks: [] },
-          { id: "implementing", label: "Implement", required: true, evidence: ["diff"], checks: [] },
+          {
+            id: "analyzing",
+            label: "Analyze",
+            required: true,
+            evidence: ["repository"],
+            checks: [],
+          },
+          {
+            id: "implementing",
+            label: "Implement",
+            required: true,
+            evidence: ["diff"],
+            checks: [],
+          },
           {
             id: "local_qa",
             label: "Local validation",
@@ -31,15 +43,15 @@ describe("project workflow generator", () => {
             checks: ["bun run test"],
           },
         ],
+        execution: { stopAfterStage: "local_qa" },
         completion: {
           requiredStages: ["analyzing", "implementing", "local_qa"],
         },
-        release: { enabled: false },
       }),
     });
 
     await expect(generateProjectWorkflow("project-1")).resolves.toMatchObject({
-      release: { enabled: false },
+      execution: { stopAfterStage: "local_qa" },
       stages: [
         { id: "analyzing" },
         { id: "implementing" },
@@ -64,9 +76,42 @@ describe("project workflow generator", () => {
       workspaceRoot: "/repo",
       message: JSON.stringify({
         version: 1,
-        stages: [{ id: "analyzing", label: "Analyze", required: true, evidence: [], checks: [] }],
+        stages: [
+          {
+            id: "analyzing",
+            label: "Analyze",
+            required: true,
+            evidence: [],
+            checks: [],
+          },
+        ],
+        execution: { stopAfterStage: "analyzing" },
         completion: { requiredStages: [] },
-        release: { enabled: false },
+      }),
+    });
+
+    await expect(generateProjectWorkflow("project-1")).rejects.toThrow(
+      "실행 계약",
+    );
+  });
+
+  it("rejects an execution boundary that is not a configured stage", async () => {
+    chatWithProjectLlm.mockResolvedValue({
+      conversationId: "briar:project-1:thread-1",
+      workspaceRoot: "/repo",
+      message: JSON.stringify({
+        version: 1,
+        stages: [
+          {
+            id: "implementing",
+            label: "Implement",
+            required: true,
+            evidence: ["diff"],
+            checks: [],
+          },
+        ],
+        execution: { stopAfterStage: "production_qa" },
+        completion: { requiredStages: ["implementing"] },
       }),
     });
 
@@ -94,8 +139,8 @@ describe("project workflow generator", () => {
           checks: [],
         },
       ],
+      execution: { stopAfterStage: "pr_open" },
       completion: { requiredStages: ["implementing", "pr_open"] },
-      release: { enabled: false },
     };
     const revisedWorkflow = {
       ...currentWorkflow,
@@ -112,6 +157,7 @@ describe("project workflow generator", () => {
       completion: {
         requiredStages: ["implementing", "pr_open", "merged"],
       },
+      execution: { stopAfterStage: "merged" },
     };
     chatWithProjectLlm.mockResolvedValue({
       conversationId: "briar:project-1:thread-2",
@@ -161,8 +207,8 @@ describe("project workflow generator", () => {
               checks: [],
             },
           ],
+          execution: { stopAfterStage: "implementing" },
           completion: { requiredStages: ["implementing"] },
-          release: { enabled: false },
         },
         "   ",
       ),
