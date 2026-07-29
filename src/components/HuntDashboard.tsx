@@ -83,6 +83,7 @@ import {
 } from "./CompanionBottomNavigation";
 import { ProjectAgentAvatar } from "./ProjectAgentAvatar";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
+import { useMobileBackHandler } from "../hooks/useMobileNavigation";
 import { eventMeta, runMeta } from "../lib/stages";
 import {
   formatAttachmentBytes,
@@ -230,6 +231,29 @@ export function HuntDashboard({
     useState<string | null>(null);
   const [contextDeleteError, setContextDeleteError] = useState<string | null>(
     null,
+  );
+  useMobileBackHandler(
+    () => {
+      if (!companionMode) return false;
+      if (deletingRunFromMenuId) {
+        setDeletingRunFromMenuId(null);
+        return true;
+      }
+      if (editingRunId) {
+        setEditingRunId(null);
+        return true;
+      }
+      if (isIssueDialogOpen) {
+        setIsIssueDialogOpen(false);
+        return true;
+      }
+      if (selectedRunId) {
+        setSelectedRunId(null);
+        return true;
+      }
+      return false;
+    },
+    { enabled: companionMode, priority: 100 },
   );
   const [draggedRunId, setDraggedRunId] = useState<string | null>(null);
   const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null);
@@ -1942,6 +1966,26 @@ export function RunPage({
   const [activeDetailTab, setActiveDetailTab] = useState<
     "description" | "evidence"
   >("description");
+  useMobileBackHandler(
+    () => {
+      if (!companionMode) return false;
+      if (isDeleteDialogOpen) {
+        setIsDeleteDialogOpen(false);
+        return true;
+      }
+      if (isEditDialogOpen) {
+        setIsEditDialogOpen(false);
+        return true;
+      }
+      if (confirmCancel) {
+        setConfirmCancel(false);
+        return true;
+      }
+      onBack();
+      return true;
+    },
+    { enabled: companionMode, priority: 200 },
+  );
   const detailTabsId = useId();
   const contentRef = useRef<HTMLDivElement | null>(null);
   const activeResizePointerRef = useRef<number | null>(null);

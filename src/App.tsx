@@ -31,6 +31,10 @@ import { useBriar, type UseBriarOptions } from "./hooks/useBriar";
 import { useAutoHuntSessions } from "./hooks/useAutoHuntSessions";
 import { useInbox } from "./hooks/useInbox";
 import { useInboxNotifications } from "./hooks/useInboxNotifications";
+import {
+  useMobileBackHandler,
+  useMobileNavigationGestures,
+} from "./hooks/useMobileNavigation";
 import { useNavigationHistory } from "./hooks/useNavigationHistory";
 import {
   clearLaunchIntroPreview,
@@ -142,6 +146,17 @@ export function App() {
   >("issues");
   const [companionStatus, setCompanionStatus] =
     useState<CompanionStatusFilter>("all");
+  useMobileNavigationGestures(briar.companionMode);
+  useMobileBackHandler(
+    () => {
+      if (!briar.companionMode || companionPage === "issues") return false;
+      setCompanionPage("issues");
+      setRequestedRunId(null);
+      setRequestedSessionId(null);
+      return true;
+    },
+    { enabled: briar.companionMode },
+  );
   const [organizationSettingsTarget, setOrganizationSettingsTarget] = useState<{
     id: string;
     section?: "members";
