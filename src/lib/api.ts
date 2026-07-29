@@ -159,7 +159,7 @@ const organizationSchema = z.object({
   logo: z
     .string()
     .max(400_000)
-    .regex(/^data:image\/webp;base64,/u)
+    .regex(/^data:image\/(?:jpeg|png|webp);base64,/u)
     .nullable()
     .default(null),
   role: z.enum(["owner", "admin", "member"]),

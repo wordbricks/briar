@@ -572,7 +572,7 @@ export const organizationLogoInputSchema = z
     logo: z
       .string()
       .max(400_000)
-      .regex(/^data:image\/webp;base64,[a-z0-9+/]+={0,2}$/iu)
+      .regex(/^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/]+={0,2}$/iu)
       .nullable(),
   })
   .strict();

@@ -362,7 +362,7 @@ export async function listOrganizations(db: D1Database, userId: string) {
   const result = await db
     .prepare(
       `select organization.id, organization.name, organization.handle,
-              organization.logo,
+              coalesce(organization.logo_data_url, organization.logo) as logo,
               membership.role,
               organization.created_at
        from briar_organizations organization
@@ -432,7 +432,7 @@ export async function updateOrganization(
   if (result.meta.changes === 0) return null;
   return db
     .prepare(
-      `select id, name, handle, logo, created_at
+      `select id, name, handle, coalesce(logo_data_url, logo) as logo, created_at
        from briar_organizations
        where id = ?`,
     )
@@ -451,7 +451,7 @@ export async function updateOrganizationLogo(
   const result = await db
     .prepare(
       `update briar_organizations
-       set logo = ?, updated_at = ?
+       set logo_data_url = ?, logo = null, updated_at = ?
        where id = ?`,
     )
     .bind(logo, updatedAt, organizationId)
@@ -459,7 +459,7 @@ export async function updateOrganizationLogo(
   if (result.meta.changes === 0) return null;
   return db
     .prepare(
-      `select id, name, handle, logo, created_at
+      `select id, name, handle, coalesce(logo_data_url, logo) as logo, created_at
        from briar_organizations
        where id = ?`,
     )
