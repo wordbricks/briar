@@ -189,6 +189,15 @@ describe("naturalLanguageFromAgentMessage", () => {
     expect(naturalLanguageFromAgentMessage('{"issues":[],"summary":"작성 중'))
       .toBe('{"issues":[],"summary":"작성 중');
   });
+
+  it("removes agent phase metadata and renders its structured summary", () => {
+    expect(naturalLanguageFromAgentMessage(
+      '[commentary] {"issues":[],"summary":"사람이 읽을 진행 상황입니다."}',
+    )).toBe("사람이 읽을 진행 상황입니다.");
+    expect(naturalLanguageFromAgentMessage(
+      "[commentary] 저장소를 확인하고 있습니다.",
+    )).toBe("저장소를 확인하고 있습니다.");
+  });
 });
 
 describe("startProjectAutoHunt", () => {
