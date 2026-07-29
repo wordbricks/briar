@@ -193,6 +193,13 @@ export type HuntRunRow = {
   claimed_at: string | null;
   lease_expires_at: string | null;
   claim_attempts: number;
+  agent_id: string | null;
+  requested_worker_id: string | null;
+  requested_by_user_id: string | null;
+  dispatch_mode: "any" | "specific" | null;
+  dispatch_request_id: string | null;
+  dispatched_at: string | null;
+  worker_id: string | null;
   started_at: string;
   updated_at: string;
   completed_at: string | null;
@@ -1790,7 +1797,11 @@ export async function listDashboardRuns(db: D1Database, projectId: string) {
               run.production_qa_status, run.staging_qa_detail,
               run.production_qa_detail, run.context_json,
               run.current_attempt, run.claimed_by, run.claimed_at,
-              run.lease_expires_at, run.claim_attempts, run.started_at,
+              run.current_revision, run.lease_expires_at, run.claim_attempts,
+              run.agent_id, run.requested_worker_id,
+              run.requested_by_user_id, run.dispatch_mode,
+              run.dispatch_request_id, run.dispatched_at, run.worker_id,
+              run.started_at,
               run.updated_at, run.completed_at, run.last_event_at,
               (select count(*) from briar_hunt_events event
                where event.run_id = run.id) as event_count
@@ -2030,6 +2041,9 @@ export async function claimNextQueuedHuntRun(
     claimedAt: string;
     leaseExpiresAt: string;
     runId?: string;
+    workerId?: string;
+    agentProvider?: "codex" | "claude" | "grok";
+    detachedOnly?: boolean;
   },
 ) {
   return await db
@@ -2037,12 +2051,22 @@ export async function claimNextQueuedHuntRun(
       `update briar_hunt_runs
        set claim_token_hash = ?, claimed_by = ?, claimed_at = ?,
            lease_expires_at = ?, claim_attempts = claim_attempts + 1,
-           updated_at = ?
+           worker_id = coalesce(?, worker_id), updated_at = ?
        where id = (
          select id from briar_hunt_runs
          where project_id = ? and status = 'queued'
            and (lease_expires_at is null or lease_expires_at <= ?)
            and (? is null or id = ?)
+           and (? = 0 or dispatched_at is not null)
+           and (? is null or requested_worker_id is null or requested_worker_id = ?)
+           and (
+             ? is null or agent_id is null or exists (
+               select 1 from briar_project_agents agent
+               where agent.id = briar_hunt_runs.agent_id
+                 and agent.project_id = briar_hunt_runs.project_id
+                 and agent.provider = ?
+             )
+           )
          order by
            case when priority is null then 1 else 0 end,
            priority asc,
@@ -2057,11 +2081,17 @@ export async function claimNextQueuedHuntRun(
       input.claimedBy,
       input.claimedAt,
       input.leaseExpiresAt,
+      input.workerId ?? null,
       input.claimedAt,
       projectId,
       input.claimedAt,
       input.runId ?? null,
       input.runId ?? null,
+      input.detachedOnly ? 1 : 0,
+      input.workerId ?? null,
+      input.workerId ?? null,
+      input.agentProvider ?? null,
+      input.agentProvider ?? null,
     )
     .first<HuntRunRow>();
 }
@@ -3266,7 +3296,11 @@ export async function recoverHuntRun(
     };
   }
 
-  if (!(["blocked", "failed"] as AutoHuntRunStatus[]).includes(run.status)) {
+  const eligible =
+    input.action === "retry"
+      ? (["blocked", "failed"] as AutoHuntRunStatus[]).includes(run.status)
+      : !(["completed", "cancelled"] as AutoHuntRunStatus[]).includes(run.status);
+  if (!eligible) {
     return {
       outcome: "ineligible",
       attempt: run.current_attempt,
@@ -3321,7 +3355,8 @@ export async function recoverHuntRun(
                  claim_token_hash = null,
                  claimed_by = null, claimed_at = null, lease_expires_at = null,
                  completed_at = ?, last_event_at = ?, updated_at = ?
-             where id = ? and project_id = ? and status in ('blocked', 'failed')
+             where id = ? and project_id = ?
+               and status not in ('completed', 'cancelled')
                and current_attempt = ? and last_event_at = ?`,
           )
           .bind(

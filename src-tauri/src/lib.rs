@@ -2581,8 +2581,21 @@ fn install_auto_hunt_assets(resource_directory: &Path, home: &Path) -> Result<()
 
     let cli_source = bundled_path(resource_directory, "cli/briar.js", "dist-cli/briar.js");
     let launcher_source = bundled_path(resource_directory, "cli/briar", "scripts/briar-launcher");
+    let claude_runner_source = bundled_path(
+        resource_directory,
+        "agent/claude-runner.js",
+        "dist-agent/claude-runner.js",
+    );
+    let grok_runner_source = bundled_path(
+        resource_directory,
+        "agent/grok-runner.js",
+        "dist-agent/grok-runner.js",
+    );
     if !cli_source.is_file() || !launcher_source.is_file() {
         return Err("Briar CLI 번들을 찾지 못했습니다.".to_string());
+    }
+    if !claude_runner_source.is_file() || !grok_runner_source.is_file() {
+        return Err("Briar Agent runner 번들을 찾지 못했습니다.".to_string());
     }
     let library_directory = home.join(".local").join("share").join("briar");
     let binary_directory = home.join(".local").join("bin");
@@ -2590,6 +2603,15 @@ fn install_auto_hunt_assets(resource_directory: &Path, home: &Path) -> Result<()
     fs::create_dir_all(&binary_directory).map_err(|error| error.to_string())?;
     fs::copy(cli_source, library_directory.join("briar.js"))
         .map_err(|error| format!("Briar CLI를 설치하지 못했습니다: {error}"))?;
+    let agent_directory = library_directory.join("agent");
+    fs::create_dir_all(&agent_directory).map_err(|error| error.to_string())?;
+    fs::copy(
+        claude_runner_source,
+        agent_directory.join("claude-runner.js"),
+    )
+    .map_err(|error| format!("Claude runner를 설치하지 못했습니다: {error}"))?;
+    fs::copy(grok_runner_source, agent_directory.join("grok-runner.js"))
+        .map_err(|error| format!("Grok runner를 설치하지 못했습니다: {error}"))?;
     fs::write(
         library_directory.join("VERSION"),
         format!("{}\n", env!("CARGO_PKG_VERSION")),
@@ -2625,6 +2647,8 @@ fn auto_hunt_assets_are_current(resource_directory: &Path, home: &Path) -> bool 
     let cli_directory = home.join(".local").join("share").join("briar");
     let cli_current = home.join(".local").join("bin").join("briar").is_file()
         && cli_directory.join("briar.js").is_file()
+        && cli_directory.join("agent/claude-runner.js").is_file()
+        && cli_directory.join("agent/grok-runner.js").is_file()
         && read_trimmed_file(&cli_directory.join("VERSION")).as_deref()
             == Some(env!("CARGO_PKG_VERSION"));
     if !cli_current {
@@ -2644,6 +2668,67 @@ fn auto_hunt_assets_are_current(resource_directory: &Path, home: &Path) -> bool 
             && read_trimmed_file(&skill.join("VERSION")).as_deref()
                 == Some(expected_version.as_str())
     })
+}
+
+#[tauri::command]
+fn configure_execution_worker(
+    app: AppHandle,
+    project_id: String,
+    user_token: String,
+    enabled: bool,
+) -> Result<serde_json::Value, String> {
+    if project_id.trim().is_empty() || user_token.trim().is_empty() {
+        return Err("프로젝트와 로그인 정보가 필요합니다.".to_string());
+    }
+    let resource_directory = app
+        .path()
+        .resource_dir()
+        .map_err(|error| error.to_string())?;
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    sync_auto_hunt_assets(&resource_directory, &home)?;
+    let bun = bundled_bun_binary()
+        .ok_or_else(|| "Briar에 포함된 Bun runtime을 찾지 못했습니다.".to_string())?;
+    let cli = home.join(".local/share/briar/briar.js");
+    let launcher = home.join(".local/bin/briar");
+
+    let run = |arguments: &[&str]| -> Result<String, String> {
+        let output = Command::new(&bun)
+            .arg(&cli)
+            .args(arguments)
+            .env("BRIAR_USER_TOKEN", &user_token)
+            .env("PATH", cli_execution_path(&home)?)
+            .output()
+            .map_err(|error| format!("Worker 설정 명령을 시작하지 못했습니다: {error}"))?;
+        if !output.status.success() {
+            let detail = String::from_utf8_lossy(&output.stderr).trim().to_string();
+            return Err(if detail.is_empty() {
+                String::from_utf8_lossy(&output.stdout).trim().to_string()
+            } else {
+                detail
+            });
+        }
+        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    };
+
+    if enabled {
+        run(&["worker", "register", "--project", &project_id])?;
+        run(&[
+            "worker",
+            "install-service",
+            "--project",
+            &project_id,
+            "--briar-binary",
+            launcher
+                .to_str()
+                .ok_or_else(|| "Briar CLI 경로가 올바르지 않습니다.".to_string())?,
+        ])?;
+    } else {
+        run(&["worker", "uninstall-service", "--project", &project_id])?;
+        run(&["worker", "unregister", "--project", &project_id])?;
+    }
+
+    let status = run(&["worker", "status", "--project", &project_id])?;
+    serde_json::from_str(&status).map_err(|error| format!("Worker 상태를 읽지 못했습니다: {error}"))
 }
 
 fn sync_auto_hunt_assets(resource_directory: &Path, home: &Path) -> Result<bool, String> {
@@ -4779,7 +4864,8 @@ pub fn run() {
             connect_local_project,
             inspect_velen,
             auto_hunt_health,
-            repair_auto_hunt
+            repair_auto_hunt,
+            configure_execution_worker
         ])
         .run(tauri::generate_context!())
         .expect("error while running Briar");

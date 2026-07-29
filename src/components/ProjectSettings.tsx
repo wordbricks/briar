@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   CircleAlert,
   Copy,
+  Cpu,
   Database,
   Download,
   GitBranch,
@@ -104,6 +105,8 @@ export function ProjectSettings({
   onRefreshVelen,
   project,
   repositoryConnected,
+  sessionToken = null,
+  userId = null,
   velen,
 }: {
   dashboard: DashboardPayload | null;
@@ -131,6 +134,8 @@ export function ProjectSettings({
   onRefreshVelen: (org?: string | null) => Promise<VelenInspection | null>;
   project: Project;
   repositoryConnected: boolean;
+  sessionToken?: string | null;
+  userId?: string | null;
   velen: VelenInspection | null;
 }) {
   const { localeTag, t } = useI18n();
@@ -167,6 +172,17 @@ export function ProjectSettings({
   const [sandboxLoading, setSandboxLoading] = useState(true);
   const [sandboxSaving, setSandboxSaving] = useState(false);
   const [sandboxError, setSandboxError] = useState<string | null>(null);
+  const [workerSharingSaving, setWorkerSharingSaving] = useState(false);
+  const [workerSharingError, setWorkerSharingError] = useState<string | null>(null);
+  const [workerSharingOverride, setWorkerSharingOverride] = useState<boolean | null>(
+    null,
+  );
+  const ownedWorker = dashboard?.workers?.find(
+    (worker) => worker.ownerUserId === userId,
+  );
+  const workerSharingEnabled =
+    workerSharingOverride ??
+    Boolean(ownedWorker && ownedWorker.readiness !== "disabled");
   const [linear, setLinear] = useState<ProjectSettingsData["linear"]>(
     () => dashboard?.settings.linear ?? {
       enabled: false,
@@ -457,6 +473,33 @@ export function ProjectSettings({
       setLinearError(caught instanceof Error ? caught.message : String(caught));
     } finally {
       setLinearSaving(false);
+    }
+  };
+  const updateWorkerSharing = async (enabled: boolean) => {
+    if (!sessionToken) {
+      setWorkerSharingError(t("worker.loginRequired"));
+      return;
+    }
+    if (enabled && !repositoryConnected) {
+      setWorkerSharingError(t("worker.repositoryRequired"));
+      return;
+    }
+    setWorkerSharingSaving(true);
+    setWorkerSharingError(null);
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("configure_execution_worker", {
+        projectId: project.id,
+        userToken: sessionToken,
+        enabled,
+      });
+      setWorkerSharingOverride(enabled);
+    } catch (caught) {
+      setWorkerSharingError(
+        caught instanceof Error ? caught.message : String(caught),
+      );
+    } finally {
+      setWorkerSharingSaving(false);
     }
   };
   const navigationItems = [
@@ -969,6 +1012,45 @@ export function ProjectSettings({
                 </button>
               </footer>
             </section>
+
+            <div className="project-settings-worker-sharing">
+              <span className="project-settings-sandbox-icon">
+                <Cpu size={17} strokeWidth={1.8} />
+              </span>
+              <span>
+                <strong>{t("worker.shareThisComputer")}</strong>
+                <small>
+                  {ownedWorker?.readinessDetail ??
+                    t(
+                      workerSharingEnabled
+                        ? "worker.sharingDescriptionOn"
+                        : "worker.sharingDescriptionOff",
+                    )}
+                </small>
+              </span>
+              <label className="project-settings-toggle flex items-center gap-2">
+                <Switch
+                  aria-label={t("worker.shareThisComputer")}
+                  checked={workerSharingEnabled}
+                  disabled={workerSharingSaving}
+                  onCheckedChange={(enabled) => {
+                    void updateWorkerSharing(enabled);
+                  }}
+                />
+                <span className="text-xs font-medium text-muted-foreground">
+                  {workerSharingSaving
+                    ? t("common.saving")
+                    : workerSharingEnabled
+                      ? t("worker.sharingOn")
+                      : t("worker.sharingOff")}
+                </span>
+              </label>
+            </div>
+            {workerSharingError ? (
+              <p className="project-settings-sandbox-error" role="alert">
+                {workerSharingError}
+              </p>
+            ) : null}
 
             <div
               className={`project-settings-sandbox${

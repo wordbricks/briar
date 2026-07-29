@@ -48,11 +48,11 @@ Repository paths and third-party credentials never enter D1.
 | Org device, project binding, credential schema, and run attribution | done | `migrations/0013_execution_workers.sql`, `migrations/0034_execution_worker_credentials.sql` |
 | Worker register, heartbeat, lease, transcript, and read APIs | done | `worker/src/workers.ts`, `worker/src/index.ts` |
 | Stalled-run reaper and claim concurrency guards | done | `worker/src/workers.ts` |
-| Worker loop and service installer | done except agent launch | `src-cli/worker.ts` |
-| Detached coding-agent launch | not started | `runClaimedIssue` in `src-cli/index.ts` |
-| Worker discovery and observation UI | not started | renderer |
+| Worker loop and service installer | done | `src-cli/worker.ts`, Tauri project settings |
+| Detached coding-agent launch | done | `src-cli/agent-runner.ts`, `runClaimedIssue` in `src-cli/index.ts` |
+| Worker discovery and observation UI | done | dashboard readiness strip and dispatch dialog |
 | Worker enrollment, credential rotation/revocation, and scoped runtime auth | done | API, schema, CLI |
-| Targeted dispatch | not started | API, schema, renderer |
+| Targeted dispatch and reassignment | done | migration 0035, API, CLI claim filter, renderer |
 
 ## Worker registration
 
@@ -82,7 +82,7 @@ The worker owner and organization administrators can pause or revoke a worker.
 
 ## Dispatch
 
-Run state gains:
+Run state includes:
 
 - `requested_worker_id` — nullable for automatic routing;
 - `requested_by_user_id`;
@@ -90,7 +90,8 @@ Run state gains:
 - `dispatched_at`;
 - optional fallback policy for a worker that stays unavailable.
 
-An idempotent user-authenticated endpoint dispatches an existing queued run:
+An idempotent user-authenticated endpoint dispatches or reassigns an existing
+run:
 
 ```text
 POST /projects/:projectId/runs/:runId/dispatch
@@ -178,7 +179,8 @@ local execution that cannot succeed.
 
 - Claims are atomic and exclusive.
 - One worker cannot hold a second nonterminal run.
-- Workers renew a 15-minute lease every 5 minutes.
+- Workers keep a 15-minute lease and poll it every 30 seconds so cancellation
+  or reassignment terminates the child process promptly.
 - Lease loss or cancellation aborts the child agent immediately.
 - Late writes from a superseded claim are rejected.
 - Expired runs are requeued up to an attempt ceiling, then blocked.
