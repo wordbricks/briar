@@ -1086,6 +1086,8 @@ export function CreateIssueDialog({
   const [attachments, setAttachments] = useState<File[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isDraggingAttachments, setIsDraggingAttachments] = useState(false);
+  const attachmentDragDepthRef = useRef(0);
 
   const addAttachments = (selected: File[]) => {
     if (selected.length === 0) return;
@@ -1103,6 +1105,12 @@ export function CreateIssueDialog({
     return () => document.removeEventListener("keydown", closeOnEscape);
   }, [isSubmitting, onClose]);
 
+  useEffect(() => {
+    if (!isSubmitting) return;
+    attachmentDragDepthRef.current = 0;
+    setIsDraggingAttachments(false);
+  }, [isSubmitting]);
+
   return (
     <div
       className="dialog-backdrop issue-dialog-backdrop"
@@ -1111,7 +1119,40 @@ export function CreateIssueDialog({
       }
     >
       <form
-        className="issue-dialog"
+        className={`issue-dialog${
+          isDraggingAttachments ? " is-dragging-attachments" : ""
+        }`}
+        onDragEnter={(event) => {
+          if (!Array.from(event.dataTransfer.types).includes("Files")) return;
+          event.preventDefault();
+          attachmentDragDepthRef.current += 1;
+          if (!isSubmitting) setIsDraggingAttachments(true);
+        }}
+        onDragLeave={(event) => {
+          if (!Array.from(event.dataTransfer.types).includes("Files")) return;
+          event.preventDefault();
+          attachmentDragDepthRef.current = Math.max(
+            0,
+            attachmentDragDepthRef.current - 1,
+          );
+          if (attachmentDragDepthRef.current === 0) {
+            setIsDraggingAttachments(false);
+          }
+        }}
+        onDragOver={(event) => {
+          if (!Array.from(event.dataTransfer.types).includes("Files")) return;
+          event.preventDefault();
+          if (!isSubmitting) event.dataTransfer.dropEffect = "copy";
+        }}
+        onDrop={(event) => {
+          if (!Array.from(event.dataTransfer.types).includes("Files")) return;
+          event.preventDefault();
+          attachmentDragDepthRef.current = 0;
+          setIsDraggingAttachments(false);
+          if (!isSubmitting) {
+            addAttachments(Array.from(event.dataTransfer.files));
+          }
+        }}
         onKeyDown={(event) => {
           const isTitleEnter =
             event.target instanceof HTMLInputElement &&
@@ -1358,6 +1399,16 @@ export function CreateIssueDialog({
             </button>
           </div>
         </footer>
+        {isDraggingAttachments && (
+          <div
+            aria-live="polite"
+            className="issue-attachment-drop-overlay"
+            role="status"
+          >
+            <ImageIcon aria-hidden="true" size={28} />
+            <strong>{t("issue.dropHint")}</strong>
+          </div>
+        )}
       </form>
     </div>
   );

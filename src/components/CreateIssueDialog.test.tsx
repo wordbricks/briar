@@ -5,7 +5,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CreateIssueDialog } from "./HuntDashboard";
 
-describe("CreateIssueDialog clipboard attachments", () => {
+describe("CreateIssueDialog attachments", () => {
   let container: HTMLDivElement;
 
   beforeEach(() => {
@@ -86,6 +86,64 @@ describe("CreateIssueDialog clipboard attachments", () => {
 
     expect(pasteEvent.defaultPrevented).toBe(false);
     expect(container.querySelector(".issue-attachment-item")).toBeNull();
+
+    await act(async () => root.unmount());
+  });
+
+  it("adds a dropped image and shows drag feedback", async () => {
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <CreateIssueDialog
+          isSubmitting={false}
+          onClose={() => undefined}
+          onCreate={async () => undefined}
+        />,
+      );
+    });
+
+    const image = new File(["dropped image"], "dropped.png", {
+      type: "image/png",
+    });
+    const dataTransfer = {
+      dropEffect: "none",
+      files: [image],
+      types: ["Files"],
+    };
+    const dragEnterEvent = new Event("dragenter", {
+      bubbles: true,
+      cancelable: true,
+    });
+    Object.defineProperty(dragEnterEvent, "dataTransfer", {
+      value: dataTransfer,
+    });
+
+    await act(async () => {
+      container.querySelector("form")?.dispatchEvent(dragEnterEvent);
+    });
+
+    expect(dragEnterEvent.defaultPrevented).toBe(true);
+    expect(container.querySelector(".issue-attachment-drop-overlay")).not.toBeNull();
+
+    const dropEvent = new Event("drop", {
+      bubbles: true,
+      cancelable: true,
+    });
+    Object.defineProperty(dropEvent, "dataTransfer", {
+      value: dataTransfer,
+    });
+    await act(async () => {
+      container.querySelector("form")?.dispatchEvent(dropEvent);
+    });
+
+    expect(dropEvent.defaultPrevented).toBe(true);
+    expect(container.querySelector(".issue-attachment-drop-overlay")).toBeNull();
+    expect(container.textContent).toContain("dropped.png");
+    expect(
+      container.querySelector<HTMLImageElement>(
+        ".issue-attachment-preview img",
+      )?.src,
+    ).toBe("blob:clipboard-preview");
 
     await act(async () => root.unmount());
   });
