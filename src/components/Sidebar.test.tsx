@@ -4,6 +4,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import { Sidebar } from "./Sidebar";
 import { I18nProvider } from "../i18n";
 
@@ -11,9 +12,11 @@ const sidebarProps = {
   activePage: "issues" as const,
   activeOrganizationId: "organization-1",
   activeProjectId: "project-1",
+  agents: [],
   connectedProjectIds: ["project-1"],
   isOpen: true,
   onAddProject: () => undefined,
+  onAgentSessionOpen: () => undefined,
   onAgentsOpen: () => undefined,
   onScheduleOpen: () => undefined,
   onInboxOpen: () => undefined,
@@ -48,6 +51,8 @@ const sidebarProps = {
     },
   ],
   projectReadiness: {},
+  sessions: [],
+  token: null,
   unreadInboxCount: 0,
   user: { id: "user-1", name: "Jay", email: "jay@example.com" },
 };
@@ -289,6 +294,85 @@ describe("Sidebar", () => {
 
     expect(markup).toContain("sidebar-unread-dot");
     expect(markup).toContain('aria-label="읽지 않은 메시지 2개"');
+  });
+
+  it("shows running sessions beneath Agents and opens their details", async () => {
+    const onAgentSessionOpen = vi.fn();
+    const runningSession: AutoHuntSession = {
+      id: "session-running",
+      dispatchGroupId: "session-running",
+      projectId: "project-1",
+      agentId: "agent-1",
+      sessionType: "task",
+      request: "Inspect briar design system",
+      status: "running",
+      issues: [],
+      startedAt: "2026-07-29T00:00:00.000Z",
+      completedAt: null,
+      conversationId: null,
+      workspaceRoot: null,
+      summary: null,
+      error: null,
+      events: [],
+      dispatchEvents: [],
+      workers: [],
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <Sidebar
+          {...sidebarProps}
+          agents={[
+            {
+              id: "agent-1",
+              projectId: "project-1",
+              name: "Design agent",
+              avatar: "data:image/png;base64,avatar",
+              codexPet: null,
+              provider: "codex",
+              model: null,
+              responsibility: "Inspect the design system",
+              skill: "# Agent",
+              calendarColor: "#3275d5",
+              createdAt: "2026-07-28T00:00:00.000Z",
+              updatedAt: "2026-07-28T00:00:00.000Z",
+            },
+          ]}
+          onAgentSessionOpen={onAgentSessionOpen}
+          sessions={[
+            runningSession,
+            {
+              ...runningSession,
+              id: "session-completed",
+              dispatchGroupId: "session-completed",
+              request: "Already finished",
+              status: "completed",
+              completedAt: "2026-07-29T00:10:00.000Z",
+            },
+          ]}
+        />,
+      );
+    });
+
+    const sessionButton = container.querySelector<HTMLButtonElement>(
+      ".sidebar-agent-session",
+    );
+    expect(sessionButton?.textContent).toContain(
+      "Inspect briar design system",
+    );
+    expect(sessionButton?.textContent).toContain("Design agent");
+    expect(
+      sessionButton?.querySelector(".project-agent-avatar img"),
+    ).not.toBeNull();
+    expect(container.textContent).not.toContain("Already finished");
+
+    await act(async () => sessionButton?.click());
+    expect(onAgentSessionOpen).toHaveBeenCalledWith("session-running");
+
+    await act(async () => root.unmount());
+    container.remove();
   });
 
   it("opens project settings from the project menu", async () => {

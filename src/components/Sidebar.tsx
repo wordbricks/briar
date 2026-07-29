@@ -17,20 +17,32 @@ import {
   Settings,
   Languages,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  collapseLinkedAutoHuntSessions,
+  type AutoHuntSession,
+} from "../hooks/useAutoHuntSessions";
 import { useI18n, type Locale } from "../i18n";
 import { isProjectConnectedLocally } from "../lib/local-project-connection";
 import type { RepositoryReadiness } from "../lib/project-connection";
-import type { Organization, Project, SessionUser } from "../types";
+import type {
+  Organization,
+  Project,
+  ProjectAgent,
+  SessionUser,
+} from "../types";
+import { ProjectAgentAvatar } from "./ProjectAgentAvatar";
 import { UpdateControl } from "./UpdateControl";
 
 export function Sidebar({
   activePage,
   activeOrganizationId,
   activeProjectId,
+  agents,
   connectedProjectIds,
   isOpen,
   onAddProject,
+  onAgentSessionOpen,
   onAgentsOpen,
   onScheduleOpen,
   onInboxOpen,
@@ -47,6 +59,8 @@ export function Sidebar({
   organizations,
   projects,
   projectReadiness,
+  sessions,
+  token,
   unreadInboxCount,
   user,
 }: {
@@ -61,9 +75,11 @@ export function Sidebar({
     | "settings";
   activeOrganizationId: string | null;
   activeProjectId: string | null;
+  agents: ProjectAgent[];
   connectedProjectIds: string[] | null;
   isOpen: boolean;
   onAddProject: () => void;
+  onAgentSessionOpen: (sessionId: string) => void;
   onAgentsOpen: () => void;
   onScheduleOpen: () => void;
   onInboxOpen: () => void;
@@ -83,6 +99,8 @@ export function Sidebar({
   organizations: Organization[];
   projects: Project[];
   projectReadiness: Record<string, RepositoryReadiness>;
+  sessions: AutoHuntSession[];
+  token: string | null;
   unreadInboxCount: number;
   user: SessionUser;
 }) {
@@ -218,6 +236,31 @@ export function Sidebar({
         (project) => project.organizationId === activeOrganization.id,
       )
     : projects;
+  const runningAgentSessions = useMemo(() => {
+    const agentById = new Map(
+      agents
+        .filter((agent) => agent.projectId === activeProjectId)
+        .map((agent) => [agent.id, agent]),
+    );
+    return collapseLinkedAutoHuntSessions(
+      sessions.filter(
+        (session) =>
+          session.projectId === activeProjectId &&
+          session.status === "running" &&
+          session.agentId &&
+          agentById.has(session.agentId),
+      ),
+    )
+      .map((session) => ({
+        agent: agentById.get(session.agentId as string)!,
+        session,
+      }))
+      .sort(
+        (left, right) =>
+          new Date(right.session.startedAt).getTime() -
+          new Date(left.session.startedAt).getTime(),
+      );
+  }, [activeProjectId, agents, sessions]);
 
   return (
     <aside
@@ -562,18 +605,63 @@ export function Sidebar({
                         <Plus aria-hidden="true" size={16} strokeWidth={1.7} />
                       </button>
                     </div>
-                    <a
-                      aria-current={activePage === "agents" ? "page" : undefined}
-                      className={`sidebar-project-view${activePage === "agents" ? " active" : ""}`}
-                      href="#agents"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        onAgentsOpen();
-                      }}
-                    >
-                      <Bot size={14} strokeWidth={1.7} />
-                      <span>{t("sidebar.agents")}</span>
-                    </a>
+                    <div className="sidebar-agent-navigation">
+                      <a
+                        aria-current={activePage === "agents" ? "page" : undefined}
+                        className={`sidebar-project-view${activePage === "agents" ? " active" : ""}`}
+                        href="#agents"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          onAgentsOpen();
+                        }}
+                      >
+                        <Bot size={14} strokeWidth={1.7} />
+                        <span>{t("sidebar.agents")}</span>
+                      </a>
+                      {runningAgentSessions.length > 0 ? (
+                        <div
+                          aria-label={t("sidebar.runningAgentSessions")}
+                          className="sidebar-agent-sessions"
+                        >
+                          {runningAgentSessions.map(({ agent, session }) => {
+                            const title = agentSessionTitle(
+                              session,
+                              t("sidebar.untitledAgentSession"),
+                            );
+                            return (
+                              <button
+                                aria-label={t("sidebar.openAgentSession", {
+                                  title,
+                                })}
+                                className="sidebar-agent-session"
+                                key={session.id}
+                                onClick={() => onAgentSessionOpen(session.id)}
+                                title={title}
+                                type="button"
+                              >
+                                <ProjectAgentAvatar
+                                  agent={agent}
+                                  isRunning
+                                  token={token}
+                                />
+                                <span>
+                                  <strong>{title}</strong>
+                                  <small>
+                                    <i aria-hidden="true" />
+                                    {agent.name}
+                                  </small>
+                                </span>
+                                <ChevronRight
+                                  aria-hidden="true"
+                                  size={13}
+                                  strokeWidth={1.8}
+                                />
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+                    </div>
                     <a
                       aria-current={activePage === "schedule" ? "page" : undefined}
                       className={`sidebar-project-view${activePage === "schedule" ? " active" : ""}`}
@@ -698,4 +786,13 @@ export function Sidebar({
       </div>
     </aside>
   );
+}
+
+function agentSessionTitle(session: AutoHuntSession, fallback: string) {
+  const request = session.request?.trim();
+  if (request) return request;
+  const issueTitles = session.issues
+    .map((issue) => issue.title.trim())
+    .filter(Boolean);
+  return issueTitles.length > 0 ? issueTitles.join(" · ") : fallback;
 }
