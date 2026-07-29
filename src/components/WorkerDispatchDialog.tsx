@@ -50,7 +50,12 @@ export function WorkerDispatchDialog({
         (worker) =>
           (policy?.selectionMode !== "allowlist" ||
             policy.allowedWorkerIds.includes(worker.id)) &&
-          worker.agentProvider === selectedAgent?.provider &&
+          Boolean(
+            selectedAgent &&
+              (worker.providers ?? [worker.agentProvider]).includes(
+                selectedAgent.provider,
+              ),
+          ) &&
           worker.acceptingWork &&
           worker.readiness !== "disabled",
       ),

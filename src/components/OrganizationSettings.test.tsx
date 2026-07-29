@@ -226,6 +226,7 @@ describe("OrganizationSettings", () => {
               projectId: "project-1",
               projectName: "Briar",
               agentProvider: "codex",
+              providers: ["codex", "claude", "grok"],
               state: "online",
               acceptingWork: true,
               readiness: "available",
@@ -272,7 +273,11 @@ describe("OrganizationSettings", () => {
     });
 
     expect(container.textContent).toContain("Jay MacBook");
-    expect(container.textContent).toContain("Briar · codex · 사용 가능");
+    expect(container.textContent).toContain("Briar");
+    expect(container.querySelector('[aria-label="Codex"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Claude"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Grok"]')).not.toBeNull();
+    expect(container.textContent).toContain("사용 가능");
     expect(container.textContent).toContain("실행 슬롯 1/2 사용 중");
     expect(loadOrganizationExecutionWorkers).toHaveBeenCalledWith(
       "token",
