@@ -8,10 +8,19 @@ const REQUIRED_SECRETS = [
   "GOOGLE_CLIENT_SECRET",
 ] as const;
 
+const OPTIONAL_SECRET_GROUPS = [
+  [
+    "SLACK_CLIENT_ID",
+    "SLACK_CLIENT_SECRET",
+    "SLACK_SIGNING_SECRET",
+    "SLACK_TOKEN_ENCRYPTION_KEY",
+  ],
+] as const;
+
 type Mode = "check" | "deploy" | "dev";
 
-function readSecrets(): Record<(typeof REQUIRED_SECRETS)[number], string> {
-  return Object.fromEntries(
+function readSecrets(): Record<string, string> {
+  const secrets = Object.fromEntries(
     REQUIRED_SECRETS.map((name) => {
       const value = process.env[name]?.trim();
       if (!value) {
@@ -19,7 +28,20 @@ function readSecrets(): Record<(typeof REQUIRED_SECRETS)[number], string> {
       }
       return [name, value];
     }),
-  ) as Record<(typeof REQUIRED_SECRETS)[number], string>;
+  );
+  for (const group of OPTIONAL_SECRET_GROUPS) {
+    const configured = group.filter((name) => process.env[name]?.trim());
+    if (configured.length > 0 && configured.length !== group.length) {
+      const missing = group.filter((name) => !process.env[name]?.trim());
+      throw new Error(
+        `Optional secret group is incomplete. Missing: ${missing.join(", ")}`,
+      );
+    }
+    for (const name of configured) {
+      secrets[name] = process.env[name]!.trim();
+    }
+  }
+  return secrets;
 }
 
 function serializeDotenv(secrets: Record<string, string>): string {
@@ -48,7 +70,9 @@ async function main(): Promise<void> {
 
   const secrets = readSecrets();
   if (mode === "check") {
-    console.log(`Validated ${REQUIRED_SECRETS.length} encrypted Worker secrets.`);
+    console.log(
+      `Validated ${Object.keys(secrets).length} encrypted Worker secrets.`,
+    );
     return;
   }
 

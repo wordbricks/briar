@@ -1,0 +1,23 @@
+display_information:
+  name: Briar
+  description: Create Briar issues from Slack mentions
+  background_color: "#4a154b"
+features:
+  bot_user:
+    display_name: Briar
+    always_online: false
+oauth_config:
+  redirect_urls:
+    - https://YOUR_BRIAR_API_HOST/slack/oauth/callback
+  scopes:
+    bot:
+      - app_mentions:read
+      - chat:write
+settings:
+  event_subscriptions:
+    request_url: https://YOUR_BRIAR_API_HOST/slack/events
+    bot_events:
+      - app_mention
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false

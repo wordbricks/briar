@@ -41,7 +41,11 @@
     "required": [
       "BETTER_AUTH_SECRET",
       "GOOGLE_CLIENT_ID",
-      "GOOGLE_CLIENT_SECRET"
+      "GOOGLE_CLIENT_SECRET",
+      "SLACK_CLIENT_ID",
+      "SLACK_CLIENT_SECRET",
+      "SLACK_SIGNING_SECRET",
+      "SLACK_TOKEN_ENCRYPTION_KEY"
     ]
   },
   "observability": {

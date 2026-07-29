@@ -9,7 +9,15 @@ export type EncryptedEnvPolicy = {
 export const encryptedEnvPolicies: Readonly<Record<string, EncryptedEnvPolicy>> = {
   ".env.production": {
     publicKey: "DOTENV_PUBLIC_KEY_PRODUCTION",
-    secrets: ["BETTER_AUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],
+    secrets: [
+      "BETTER_AUTH_SECRET",
+      "GOOGLE_CLIENT_ID",
+      "GOOGLE_CLIENT_SECRET",
+      "SLACK_CLIENT_ID",
+      "SLACK_CLIENT_SECRET",
+      "SLACK_SIGNING_SECRET",
+      "SLACK_TOKEN_ENCRYPTION_KEY",
+    ],
   },
   ".env.release": {
     publicKey: "DOTENV_PUBLIC_KEY_RELEASE",
