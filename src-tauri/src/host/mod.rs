@@ -148,6 +148,7 @@ impl CommandOutput {
             return stdout.to_string();
         }
         match self.status {
+            Some(0) => "명령은 성공했지만 출력이 비어 있습니다.".to_string(),
             Some(code) => format!("종료 코드 {code}"),
             None => "신호로 종료되었습니다.".to_string(),
         }
@@ -333,6 +334,15 @@ mod tests {
             stderr: String::new(),
         };
         assert_eq!(silent.failure_message(), "종료 코드 9");
+        let empty_success = CommandOutput {
+            status: Some(0),
+            stdout: String::new(),
+            stderr: String::new(),
+        };
+        assert_eq!(
+            empty_success.failure_message(),
+            "명령은 성공했지만 출력이 비어 있습니다."
+        );
         let signalled = CommandOutput {
             status: None,
             stdout: String::new(),
