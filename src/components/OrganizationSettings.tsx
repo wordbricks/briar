@@ -8,7 +8,7 @@ import {
   UserPlus,
   Users,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import {
   SettingsAlert,
@@ -52,6 +52,10 @@ import { SelectMenu } from "./SelectMenu";
 import { SlackIntegrationSettings } from "./SlackIntegrationSettings";
 
 type RoleFilter = "all" | OrganizationMember["role"];
+export type OrganizationSettingsSection =
+  | "general"
+  | "members"
+  | "integrations";
 
 const csvCell = (value: string) => `"${value.replaceAll('"', '""')}"`;
 
@@ -63,6 +67,7 @@ export function OrganizationSettings({
   onRename,
   isSidebarOpen = true,
   initialSection,
+  navigationSidebar,
 }: {
   organization: Organization;
   token: string;
@@ -73,12 +78,12 @@ export function OrganizationSettings({
   ) => Promise<Organization>;
   onRename: (organizationId: string, name: string) => Promise<Organization>;
   isSidebarOpen?: boolean;
-  initialSection?: "general" | "members" | "integrations";
+  initialSection?: OrganizationSettingsSection;
+  navigationSidebar?: ReactNode;
 }) {
   const { locale, t } = useI18n();
-  const [activeSection, setActiveSection] = useState<
-    "general" | "members" | "integrations"
-  >(initialSection ?? "general");
+  const [activeSection, setActiveSection] =
+    useState<OrganizationSettingsSection>(initialSection ?? "general");
   const [organizationName, setOrganizationName] = useState(organization.name);
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameError, setRenameError] = useState<string | null>(null);
@@ -133,6 +138,10 @@ export function OrganizationSettings({
   useEffect(() => {
     if (activeSection === "members") searchRef.current?.focus();
   }, [activeSection]);
+
+  useEffect(() => {
+    if (initialSection) setActiveSection(initialSection);
+  }, [initialSection]);
 
   useEffect(() => {
     setOrganizationName(organization.name);
@@ -192,7 +201,7 @@ export function OrganizationSettings({
 
   return (
     <SettingsShell className="bg-background">
-      <SettingsSidebar
+      {navigationSidebar || <SettingsSidebar
         className="bg-[#f1f1f0]"
         isOpen={isSidebarOpen}
         label={t("organization.navigation")}
@@ -244,7 +253,7 @@ export function OrganizationSettings({
             </SettingsNavItem>
           </SettingsNavGroup>
         </SettingsNav>
-      </SettingsSidebar>
+      </SettingsSidebar>}
 
       <SettingsMain className="bg-[#fbfbfd]" isSidebarOpen={isSidebarOpen}>
         <SettingsScroll className="pt-[clamp(40px,8vw,76px)]">
