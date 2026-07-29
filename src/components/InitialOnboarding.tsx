@@ -3,37 +3,36 @@ import {
   Check,
   Download,
   LoaderCircle,
-  RefreshCw,
-  Sparkles,
-  SquareTerminal,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import onboardingEveIssueUrl from "../assets/onboarding-eve-issue.png";
+import onboardingPrerequisitesUrl from "../assets/onboarding-prerequisites.png";
 import { useI18n } from "../i18n";
 import {
   inspectOnboardingPrerequisites,
   installOnboardingPrerequisite,
-  markInitialOnboardingComplete,
   type OnboardingPrerequisites,
   type PrerequisiteId,
 } from "../lib/initial-onboarding";
-import { Button } from "@/components/ui/button";
-import { Typography } from "@/components/ui/typography";
 import { ClaudeIcon, CodexIcon, GrokIcon } from "./AgentIcons";
+import { LoginScreen } from "./LoginScreen";
 
-type Step = "welcome" | "prerequisites";
+type Step = "welcome" | "prerequisites" | "login";
 
-const prerequisiteIds: PrerequisiteId[] = [
-  "git",
-  "codex",
-  "claude",
-  "grok",
-];
-const agentPrerequisiteIds: PrerequisiteId[] = ["codex", "claude", "grok"];
+const prerequisiteIds: PrerequisiteId[] = ["git", "codex", "claude", "grok"];
 
 export function InitialOnboarding({
-  onComplete,
+  error: loginError,
+  loading: loginLoading,
+  loginCode,
+  onCancelLogin,
+  onLogin,
 }: {
-  onComplete: () => void;
+  error: string | null;
+  loading: boolean;
+  loginCode: string | null;
+  onCancelLogin: () => void;
+  onLogin: () => void;
 }) {
   const { t } = useI18n();
   const [step, setStep] = useState<Step>("welcome");
@@ -74,22 +73,25 @@ export function InitialOnboarding({
     }
   };
 
-  const ready =
+  const hasAnyReady =
     prerequisites !== null &&
-    prerequisites.git.installed &&
-    prerequisites.git.authenticated &&
-    agentPrerequisiteIds.some(
+    prerequisiteIds.some(
       (id) => prerequisites[id].installed && prerequisites[id].authenticated,
     );
   const busy = checking || installing !== null;
 
   const continueToLogin = () => {
-    markInitialOnboardingComplete();
-    onComplete();
+    setStep("login");
+  };
+
+  const returnToPrerequisites = () => {
+    onCancelLogin();
+    setStep("prerequisites");
   };
 
   return (
     <div className="initial-onboarding-shell">
+      <div className="initial-onboarding-drag-region" data-tauri-drag-region />
       <main
         aria-label={t("initialOnboarding.label")}
         className="initial-onboarding"
@@ -97,15 +99,11 @@ export function InitialOnboarding({
         {step === "welcome" ? (
           <section className="initial-welcome-card">
             <div className="initial-welcome-visual" aria-hidden="true">
-              <div className="initial-welcome-orbit initial-welcome-orbit-large" />
-              <div className="initial-welcome-orbit initial-welcome-orbit-small" />
-              <span className="initial-welcome-spark">
-                <Sparkles size={28} />
-              </span>
-              <div className="initial-welcome-wordmark">
-                <small>Agent development environment</small>
-                <strong>briar</strong>
-              </div>
+              <img
+                alt=""
+                className="initial-welcome-image"
+                src={onboardingEveIssueUrl}
+              />
             </div>
             <div className="initial-welcome-copy">
               <p className="eyebrow">{t("initialOnboarding.eyebrow")}</p>
@@ -121,138 +119,179 @@ export function InitialOnboarding({
               </button>
             </div>
           </section>
-        ) : (
+        ) : step === "prerequisites" ? (
           <section className="initial-prerequisites-card">
-            <div className="initial-prerequisites-heading">
-              <span>
-                <SquareTerminal size={20} />
-              </span>
-              <div>
-                <p className="eyebrow">
-                  {t("initialOnboarding.prerequisitesEyebrow")}
-                </p>
-                <h1>{t("initialOnboarding.prerequisitesTitle")}</h1>
-                <p>{t("initialOnboarding.requirementsDescription")}</p>
-              </div>
-              <button
-                aria-label={t("initialOnboarding.checkAgain")}
-                className="initial-prerequisites-refresh"
-                disabled={busy}
-                onClick={() => void checkPrerequisites()}
-                type="button"
-              >
-                <RefreshCw className={checking ? "spin" : ""} size={17} />
-              </button>
+            <div
+              aria-label={t("initialOnboarding.progress")}
+              aria-valuemax={3}
+              aria-valuemin={1}
+              aria-valuenow={2}
+              className="initial-onboarding-progress"
+              role="progressbar"
+            >
+              <span />
             </div>
 
-            <div className="initial-prerequisites-list">
-              {prerequisiteIds.map((id) => {
-                const status = prerequisites?.[id];
-                const isInstalling = installing === id;
-                return (
-                  <article className="initial-prerequisite-row" key={id}>
-                    <span className={`initial-prerequisite-icon ${id}`}>
-                      {id === "git" ? (
-                        "G"
-                      ) : id === "codex" ? (
-                        <CodexIcon size={20} />
-                      ) : id === "claude" ? (
-                        <ClaudeIcon size={20} />
-                      ) : id === "grok" ? (
-                        <GrokIcon size={20} />
-                      ) : (
-                        null
-                      )}
-                    </span>
-                    <div>
-                      <strong>
-                        {id === "claude"
-                          ? "Claude Code"
-                          : t(`initialOnboarding.${id}Name`)}
-                        <em>
-                          {t(
-                            agentPrerequisiteIds.includes(id)
-                              ? "common.optional"
-                              : "common.required",
-                          )}
-                        </em>
-                      </strong>
-                      <p>
-                        {t(
-                          `initialOnboarding.${
-                            id === "claude" || id === "grok" ? "codex" : id
-                          }Description`,
-                        )}
-                      </p>
-                    </div>
-                    {checking && !prerequisites ? (
-                      <span className="initial-prerequisite-status checking">
-                        <LoaderCircle className="spin" size={15} />
-                        {t("initialOnboarding.checking")}
-                      </span>
-                    ) : status?.installed && status.authenticated ? (
-                      <span className="initial-prerequisite-status installed">
-                        <Check size={15} />
-                        {status.version ?? t("initialOnboarding.installed")}
-                      </span>
-                    ) : (
-                      <button
-                        className="initial-prerequisite-install"
-                        disabled={busy}
-                        onClick={() => void install(id)}
-                        type="button"
+            <div className="initial-prerequisites-layout">
+              <div className="initial-prerequisites-content">
+                <div className="initial-prerequisites-heading">
+                  <h1>{t("initialOnboarding.prerequisitesTitle")}</h1>
+                  <p>{t("initialOnboarding.requirementsDescription")}</p>
+                </div>
+
+                <div className="initial-prerequisites-list">
+                  {prerequisiteIds.map((id) => {
+                    const status = prerequisites?.[id];
+                    const isInstalling = installing === id;
+                    const isReady =
+                      status?.installed === true &&
+                      status.authenticated === true;
+                    return (
+                      <article
+                        className={`initial-prerequisite-row${isReady ? " ready" : ""}`}
+                        key={id}
                       >
-                        {isInstalling ? (
-                          <LoaderCircle className="spin" size={15} />
+                        <span className={`initial-prerequisite-icon ${id}`}>
+                          {id === "git" ? (
+                            "G"
+                          ) : id === "codex" ? (
+                            <CodexIcon size={20} />
+                          ) : id === "claude" ? (
+                            <ClaudeIcon size={20} />
+                          ) : id === "grok" ? (
+                            <GrokIcon size={20} />
+                          ) : null}
+                        </span>
+                        <div className="initial-prerequisite-copy">
+                          <strong>
+                            {id === "claude"
+                              ? "Claude Code"
+                              : t(`initialOnboarding.${id}Name`)}
+                            <em>{t("common.optional")}</em>
+                          </strong>
+                        </div>
+                        <span
+                          aria-label={
+                            isReady
+                              ? t("initialOnboarding.installed")
+                              : undefined
+                          }
+                          className={`initial-prerequisite-check${isReady ? " checked" : ""}${checking && !prerequisites ? " checking" : ""}`}
+                          role={isReady ? "status" : undefined}
+                        >
+                          {checking && !prerequisites ? (
+                            <LoaderCircle className="spin" size={16} />
+                          ) : isReady ? (
+                            <Check size={17} strokeWidth={2.5} />
+                          ) : null}
+                        </span>
+                        {isReady ? (
+                          <small className="initial-prerequisite-state">
+                            {t("initialOnboarding.installed")}
+                          </small>
+                        ) : checking && !prerequisites ? (
+                          <small className="initial-prerequisite-state">
+                            {t("initialOnboarding.checking")}
+                          </small>
                         ) : (
-                          <Download size={15} />
+                          <button
+                            className="initial-prerequisite-install"
+                            disabled={busy}
+                            onClick={() => void install(id)}
+                            type="button"
+                          >
+                            {isInstalling ? (
+                              <LoaderCircle className="spin" size={14} />
+                            ) : (
+                              <Download size={14} />
+                            )}
+                            {t(
+                              isInstalling
+                                ? "initialOnboarding.installing"
+                                : "initialOnboarding.install",
+                            )}
+                          </button>
                         )}
-                        {t(
-                          isInstalling
-                            ? "initialOnboarding.installing"
-                            : "initialOnboarding.install",
-                        )}
-                      </button>
+                      </article>
+                    );
+                  })}
+                </div>
+
+                {error ? (
+                  <div className="initial-prerequisites-error" role="alert">
+                    <span>{error}</span>
+                    <button
+                      onClick={() => void checkPrerequisites()}
+                      type="button"
+                    >
+                      {t("initialOnboarding.retry")}
+                    </button>
+                  </div>
+                ) : null}
+
+                <footer>
+                  <button
+                    className="initial-onboarding-back"
+                    onClick={() => setStep("welcome")}
+                    type="button"
+                  >
+                    {t("initialOnboarding.back")}
+                  </button>
+                  <button
+                    className="initial-onboarding-primary"
+                    disabled={busy}
+                    onClick={continueToLogin}
+                    type="button"
+                  >
+                    {t(
+                      hasAnyReady
+                        ? "initialOnboarding.next"
+                        : "initialOnboarding.installLater",
                     )}
-                  </article>
-                );
-              })}
-            </div>
-
-            {error ? (
-              <div className="initial-prerequisites-error" role="alert">
-                <span>{error}</span>
-                <button onClick={() => void checkPrerequisites()} type="button">
-                  {t("initialOnboarding.retry")}
-                </button>
+                    <ArrowRight size={17} />
+                  </button>
+                </footer>
               </div>
-            ) : null}
 
-            <footer>
-              <button
-                className="initial-onboarding-back"
-                onClick={() => setStep("welcome")}
-                type="button"
+              <aside
+                aria-hidden="true"
+                className="initial-prerequisites-visual"
               >
-                {t("initialOnboarding.back")}
-              </button>
-              <div>
-                <small>
-                  {ready
-                    ? t("initialOnboarding.ready")
-                    : t("initialOnboarding.requirementsMissing")}
-                </small>
-                <button
-                  className="initial-onboarding-primary"
-                  disabled={!ready || busy}
-                  onClick={continueToLogin}
-                  type="button"
-                >
-                  {t("initialOnboarding.continueLogin")}
-                  <ArrowRight size={17} />
-                </button>
-              </div>
-            </footer>
+                <img
+                  alt=""
+                  className="initial-prerequisites-image"
+                  src={onboardingPrerequisitesUrl}
+                />
+              </aside>
+            </div>
+          </section>
+        ) : (
+          <section className="initial-login-step">
+            <div
+              aria-label={t("initialOnboarding.progress")}
+              aria-valuemax={3}
+              aria-valuemin={1}
+              aria-valuenow={3}
+              className="initial-onboarding-progress complete"
+              role="progressbar"
+            >
+              <span />
+            </div>
+            <LoginScreen
+              embedded
+              error={loginError}
+              loading={loginLoading}
+              loginCode={loginCode}
+              onCancel={onCancelLogin}
+              onLogin={onLogin}
+            />
+            <button
+              className="initial-onboarding-back initial-login-back"
+              onClick={returnToPrerequisites}
+              type="button"
+            >
+              {t("initialOnboarding.back")}
+            </button>
           </section>
         )}
       </main>

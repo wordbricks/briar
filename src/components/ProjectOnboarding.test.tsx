@@ -97,11 +97,13 @@ describe("ProjectOnboarding", () => {
     expect(markup).not.toContain('aria-pressed="true"');
   });
 
-  it("keeps first-project onboarding non-cancellable", () => {
+  it("asks first-time users how they want to use Briar", () => {
     const markup = renderToStaticMarkup(<ProjectOnboarding {...baseProps} />);
 
-    expect(markup).toContain("프로젝트 만들기");
-    expect(markup).toContain("나중에 만들기");
+    expect(markup).toContain("Briar를 어떻게 사용하고 싶으세요?");
+    expect(markup).toContain("개발 프로젝트 진행하기");
+    expect(markup).toContain("작업 흐름 둘러보기");
+    expect(markup).not.toContain("기존 저장소 연결");
     expect(markup).not.toContain("대시보드로 돌아가기");
   });
 
@@ -120,10 +122,42 @@ describe("ProjectOnboarding", () => {
       ),
     );
 
-    await act(async () => buttonWithText(container, "나중에 만들기")?.click());
+    const skip = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="프로젝트 없이 시작"]',
+    );
+    await act(async () => skip?.click());
 
     expect(onSkip).toHaveBeenCalledOnce();
     expect(onCreate).not.toHaveBeenCalled();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("opens project setup from the purpose choice and lets users go back", async () => {
+    const { container, root } = mountOnboarding();
+
+    await act(async () =>
+      root.render(<ProjectOnboarding {...baseProps} />),
+    );
+
+    const setUpProject = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="프로젝트 설정하기"]',
+    );
+    await act(async () => setUpProject?.click());
+
+    expect(container.textContent).toContain("프로젝트 만들기");
+    expect(container.textContent).toContain("기존 저장소 연결");
+    expect(buttonWithText(container, "목적 다시 선택")).toBeTruthy();
+
+    await act(async () =>
+      buttonWithText(container, "목적 다시 선택")?.click(),
+    );
+
+    expect(container.textContent).toContain(
+      "Briar를 어떻게 사용하고 싶으세요?",
+    );
+    expect(container.textContent).not.toContain("기존 저장소 연결");
 
     await act(async () => root.unmount());
     container.remove();

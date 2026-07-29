@@ -37,11 +37,7 @@ describe("LoginScreen", () => {
 
   it("describes Android sign-in as an in-app flow", () => {
     const markup = renderToStaticMarkup(
-      <LoginScreen
-        {...baseProps}
-        companionMode
-        loginCode="F65P9NQN"
-      />,
+      <LoginScreen {...baseProps} companionMode loginCode="F65P9NQN" />,
     );
 
     expect(markup).toContain("인앱 로그인에서 Google 계정으로 계속하세요");
@@ -55,8 +51,15 @@ describe("LoginScreen", () => {
       <LoginScreen {...baseProps} companionMode loginCode={null} />,
     );
 
-    expect(markup).toContain(
-      'class="login-shell companion-login-shell"',
+    expect(markup).toContain('class="login-shell companion-login-shell"');
+  });
+
+  it("uses an embeddable shell inside onboarding", () => {
+    const markup = renderToStaticMarkup(
+      <LoginScreen {...baseProps} embedded loginCode={null} />,
     );
+
+    expect(markup).toContain('<div class="login-shell embedded-login-shell">');
+    expect(markup).not.toContain("<main");
   });
 });

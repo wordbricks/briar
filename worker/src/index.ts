@@ -1,5 +1,5 @@
 import { z } from "zod";
-import briarIconPng from "../../src/assets/app-icons/purple.png";
+import briarIconPng from "../../src/assets/app-icons/aubergine-riso.png";
 import {
   autoHuntEvidenceTypeMaxLength,
   autoHuntEvidenceTypePattern,
@@ -2365,7 +2365,10 @@ async function route(
     let organizations = await listOrganizations(db, session.user.id);
     if (organizations.length === 0) {
       const organization = await createOrganization(db, {
-        name: `${session.user.name || session.user.email}의 조직`,
+        name:
+          session.user.name?.trim() ||
+          session.user.email.split("@")[0]?.trim() ||
+          "Briar",
         handle: `organization-${crypto.randomUUID().replaceAll("-", "")}`,
         ownerUserId: session.user.id,
       });

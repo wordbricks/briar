@@ -1,4 +1,4 @@
-<img src="./src/assets/app-icons/purple.png" alt="Briar logo" width="72" />
+<img src="./src/assets/app-icons/aubergine-riso.png" alt="Briar logo" width="72" />
 
 # Briar
 

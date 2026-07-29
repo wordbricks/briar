@@ -8,6 +8,7 @@ import { Logo } from "./Logo";
 
 export function LoginScreen({
   companionMode = false,
+  embedded = false,
   error,
   loading,
   loginCode,
@@ -15,6 +16,7 @@ export function LoginScreen({
   onLogin,
 }: {
   companionMode?: boolean;
+  embedded?: boolean;
   error: string | null;
   loading: boolean;
   loginCode: string | null;
@@ -22,11 +24,13 @@ export function LoginScreen({
   onLogin: () => void;
 }) {
   const { t } = useI18n();
+  const Shell = embedded ? "div" : "main";
   return (
-    <main
+    <Shell
       className={cn(
         "login-shell",
         companionMode && "companion-login-shell",
+        embedded && "embedded-login-shell",
       )}
     >
       <div className="login-glow" />
@@ -120,7 +124,7 @@ export function LoginScreen({
           </Typography>
         ) : null}
       </section>
-    </main>
+    </Shell>
   );
 }
 
