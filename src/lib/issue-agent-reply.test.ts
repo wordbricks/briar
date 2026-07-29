@@ -160,8 +160,8 @@ describe("issue agent replies", () => {
       workflow: {
         version: 1,
         stages: [],
+        execution: { stopAfterStage: "repository_workflow_pending" },
         completion: { requiredStages: [] },
-        release: { enabled: false },
       },
       progress: 100,
       detail: "All checks passed.",

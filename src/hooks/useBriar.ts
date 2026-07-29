@@ -1287,6 +1287,32 @@ export function useBriar(options: UseBriarOptions = {}) {
     [dashboard, persistProjectWorkflow, token],
   );
 
+  const updateWorkflowStopAfterStage = useCallback(
+    async (projectId: string, stopAfterStage: string) => {
+      if (demoMode) {
+        throw new Error("워크플로우 수정은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
+      }
+      if (!token) throw new Error("로그인이 필요합니다.");
+      if (!dashboard || dashboard.project.id !== projectId) {
+        throw new Error("워크플로우를 갱신할 프로젝트 설정이 없습니다.");
+      }
+      const previousWorkflow = dashboard.settings.workflow;
+      if (!previousWorkflow.stages.some((stage) => stage.id === stopAfterStage)) {
+        throw new Error("실행 종료 단계가 현재 워크플로우에 없습니다.");
+      }
+      const nextWorkflow = {
+        ...previousWorkflow,
+        execution: { stopAfterStage },
+      };
+      return persistProjectWorkflow(
+        projectId,
+        previousWorkflow,
+        nextWorkflow,
+      );
+    },
+    [dashboard, persistProjectWorkflow, token],
+  );
+
   useEffect(() => {
     const projectId = dashboard?.project.id;
     if (
@@ -2165,6 +2191,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     renameOrganization,
     regenerateWorkflow,
     reviseWorkflow,
+    updateWorkflowStopAfterStage,
     saveVelenIntegration,
     saveLinearIntegration,
     connectLinearForImport,

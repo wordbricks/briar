@@ -9,12 +9,12 @@ import {
   Cpu,
   Database,
   Download,
+  Flag,
   GitBranch,
   Link2,
   LoaderCircle,
   Plug,
   RefreshCw,
-  Rocket,
   Save,
   ShieldCheck,
   Sparkles,
@@ -73,6 +73,7 @@ import type {
   LinearImportResult,
   LinearImportStatesResult,
 } from "../lib/linear-import";
+import { requiredExecutableWorkflowStages } from "../lib/auto-hunt-contract";
 import { LinearIssueImport } from "./LinearIssueImport";
 import { SelectMenu } from "./SelectMenu";
 
@@ -98,6 +99,7 @@ export function ProjectSettings({
   onDelete,
   onRegenerateWorkflow,
   onReviseWorkflow,
+  onUpdateWorkflowStopAfterStage,
   onUpdateVelenOrg,
   onUpdateLinear,
   onConnectLinearImport,
@@ -118,6 +120,7 @@ export function ProjectSettings({
   onDelete: () => Promise<unknown>;
   onRegenerateWorkflow: () => Promise<unknown>;
   onReviseWorkflow: (requestedChange: string) => Promise<unknown>;
+  onUpdateWorkflowStopAfterStage?: (stopAfterStage: string) => Promise<unknown>;
   onUpdateVelenOrg: (org: string | null) => Promise<string | null>;
   onUpdateLinear: (
     linear: ProjectSettingsData["linear"],
@@ -147,6 +150,8 @@ export function ProjectSettings({
   const [workflowCopied, setWorkflowCopied] = useState(false);
   const [isRegeneratingWorkflow, setIsRegeneratingWorkflow] = useState(false);
   const [isRevisingWorkflow, setIsRevisingWorkflow] = useState(false);
+  const [isUpdatingWorkflowBoundary, setIsUpdatingWorkflowBoundary] =
+    useState(false);
   const [workflowRevisionRequest, setWorkflowRevisionRequest] = useState("");
   const [workflowError, setWorkflowError] = useState<string | null>(null);
   const [workflowRegenerated, setWorkflowRegenerated] = useState(false);
@@ -221,8 +226,8 @@ export function ProjectSettings({
     ? {
         version: workflow.version,
         stages: workflow.stages,
+        execution: workflow.execution,
         completion: workflow.completion,
-        release: workflow.release,
       }
     : null;
   const workflowJson = workflowContract
@@ -427,6 +432,26 @@ export function ProjectSettings({
       setWorkflowError(caught instanceof Error ? caught.message : String(caught));
     } finally {
       setIsRevisingWorkflow(false);
+    }
+  };
+
+  const updateWorkflowBoundary = async (stopAfterStage: string) => {
+    if (
+      !onUpdateWorkflowStopAfterStage ||
+      stopAfterStage === workflowContract?.execution.stopAfterStage
+    ) {
+      return;
+    }
+    setIsUpdatingWorkflowBoundary(true);
+    setWorkflowError(null);
+    setWorkflowRegenerated(false);
+    setWorkflowRevised(false);
+    try {
+      await onUpdateWorkflowStopAfterStage(stopAfterStage);
+    } catch (caught) {
+      setWorkflowError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setIsUpdatingWorkflowBoundary(false);
     }
   };
 
@@ -1284,11 +1309,38 @@ export function ProjectSettings({
               ) : null}
             </div>
             {workflowContract ? (
-              <div
-                aria-label={t("settings.workflowDiagram")}
-                className="project-workflow-contract"
-                role="group"
-              >
+              <>
+                <div className="project-settings-workflow-boundary">
+                  <span>
+                    <Flag size={16} strokeWidth={1.8} />
+                    <span>
+                      <strong>{t("settings.workflowStopAfterStage")}</strong>
+                      <small>{t("settings.workflowStopAfterStageDescription")}</small>
+                    </span>
+                  </span>
+                  <SelectMenu
+                    disabled={
+                      isRegeneratingWorkflow ||
+                      isRevisingWorkflow ||
+                      isUpdatingWorkflowBoundary ||
+                      !onUpdateWorkflowStopAfterStage
+                    }
+                    label={t("settings.workflowStopAfterStage")}
+                    onValueChange={(value) => void updateWorkflowBoundary(value)}
+                    options={workflowContract.stages.map((stage) => ({
+                      description: stage.id,
+                      label: stage.label,
+                      value: stage.id,
+                    }))}
+                    size="small"
+                    value={workflowContract.execution.stopAfterStage}
+                  />
+                </div>
+                <div
+                  aria-label={t("settings.workflowDiagram")}
+                  className="project-workflow-contract"
+                  role="group"
+                >
                 <div className="project-workflow-repository">
                   <span>{t("settings.repository")}</span>
                   <strong>{githubRepository ?? t("settings.noRepository")}</strong>
@@ -1303,6 +1355,15 @@ export function ProjectSettings({
                         <article
                           className={`project-workflow-stage ${
                             stage.required ? "required" : "optional"
+                          }${
+                            index >
+                            workflowContract.stages.findIndex(
+                              (candidate) =>
+                                candidate.id ===
+                                workflowContract.execution.stopAfterStage,
+                            )
+                              ? " outside-boundary"
+                              : ""
                           }`}
                         >
                           <header>
@@ -1317,6 +1378,12 @@ export function ProjectSettings({
                           </header>
                           <strong>{stage.label}</strong>
                           <code>{stage.id}</code>
+                          {stage.id ===
+                          workflowContract.execution.stopAfterStage ? (
+                            <span className="project-workflow-stop-badge">
+                              {t("settings.workflowStopsHere")}
+                            </span>
+                          ) : null}
                           {stage.evidence?.length ? (
                             <div className="project-workflow-stage-detail">
                               <span>{t("settings.workflowEvidence")}</span>
@@ -1356,33 +1423,32 @@ export function ProjectSettings({
                         <small>{t("settings.workflowCompletion")}</small>
                         <strong>
                           {t("settings.workflowRequiredStageCount", {
-                            count: workflowContract.completion.requiredStages.length,
+                            count:
+                              requiredExecutableWorkflowStages(
+                                workflowContract,
+                              ).length,
                           })}
                         </strong>
                       </span>
                     </div>
-                    <div
-                      className={
-                        workflowContract.release.enabled
-                          ? "project-workflow-release enabled"
-                          : "project-workflow-release"
-                      }
-                    >
-                      <Rocket size={18} strokeWidth={1.8} />
+                    <div className="project-workflow-boundary-summary">
+                      <Flag size={18} strokeWidth={1.8} />
                       <span>
-                        <small>{t("settings.workflowRelease")}</small>
+                        <small>{t("settings.workflowStopAfterStage")}</small>
                         <strong>
-                          {t(
-                            workflowContract.release.enabled
-                              ? "settings.workflowReleaseEnabled"
-                              : "settings.workflowReleaseDisabled",
-                          )}
+                          {workflowContract.stages.find(
+                            (stage) =>
+                              stage.id ===
+                              workflowContract.execution.stopAfterStage,
+                          )?.label ??
+                            workflowContract.execution.stopAfterStage}
                         </strong>
                       </span>
                     </div>
                   </footer>
                 </div>
-              </div>
+                </div>
+              </>
             ) : (
               <p className="project-settings-empty">{t("settings.loadingWorkflow")}</p>
             )}

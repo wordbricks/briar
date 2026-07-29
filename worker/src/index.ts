@@ -245,6 +245,13 @@ const workflowSchema = z
       })
       .strict()
       .optional(),
+    execution: z
+      .object({
+        stopAfterStage: workflowStageIdSchema,
+      })
+      .strict()
+      .optional(),
+    /** Read compatibility for workflows stored before stopAfterStage. */
     release: z.object({ enabled: z.boolean() }).strict().optional(),
   })
   .strict()

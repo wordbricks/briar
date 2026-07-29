@@ -9,16 +9,18 @@ import { eventMeta, runMeta } from "./stages";
 
 describe("Auto Hunt workflows", () => {
   it("marks the pre-analysis contract as pending instead of inventing stages", () => {
-    expect(repositoryWorkflowBootstrap.stages.map((stage) => stage.id)).toEqual([
-      "repository_workflow_pending",
-    ]);
-    expect(repositoryWorkflowBootstrap.stages.map((stage) => stage.id)).not.toContain(
-      "production_qa",
+    expect(repositoryWorkflowBootstrap.stages.map((stage) => stage.id)).toEqual(
+      ["repository_workflow_pending"],
     );
+    expect(
+      repositoryWorkflowBootstrap.stages.map((stage) => stage.id),
+    ).not.toContain("production_qa");
     expect(repositoryWorkflowBootstrap.completion.requiredStages).toEqual([
       "repository_workflow_pending",
     ]);
-    expect(repositoryWorkflowBootstrap.release.enabled).toBe(false);
+    expect(repositoryWorkflowBootstrap.execution.stopAfterStage).toBe(
+      "repository_workflow_pending",
+    );
   });
 
   it("calculates progress from repository-defined stages", () => {
@@ -30,9 +32,7 @@ describe("Auto Hunt workflows", () => {
         { id: "local_qa", label: "Validate", required: true },
       ],
     });
-    expect(
-      progressForAutoHuntRun("running", "local_qa", workflow),
-    ).toBe(75);
+    expect(progressForAutoHuntRun("running", "local_qa", workflow)).toBe(75);
   });
 
   it("normalizes a repository workflow to the execution contract", () => {
@@ -51,19 +51,29 @@ describe("Auto Hunt workflows", () => {
       "implementing",
       "local_qa",
     ]);
-    expect(workflow.release).toEqual({ enabled: false });
+    expect(workflow.execution).toEqual({ stopAfterStage: "local_qa" });
   });
 
   it("keeps repository-defined stage ids and execution requirements", () => {
     const workflow = normalizeAutoHuntWorkflow({
       version: 1,
       stages: [
-        { id: "analyze", label: "분석", required: true, evidence: ["repository"] },
+        {
+          id: "analyze",
+          label: "분석",
+          required: true,
+          evidence: ["repository"],
+        },
         { id: "implement", label: "구현", required: true, evidence: ["diff"] },
-        { id: "validate", label: "로컬 검증", required: true, checks: ["bun run test", "bun run build"] },
+        {
+          id: "validate",
+          label: "로컬 검증",
+          required: true,
+          checks: ["bun run test", "bun run build"],
+        },
       ],
+      execution: { stopAfterStage: "validate" },
       completion: { requiredStages: ["analyze", "implement", "validate"] },
-      release: { enabled: false },
     });
 
     expect(workflow.stages.map((stage) => stage.id)).toEqual([
@@ -78,10 +88,30 @@ describe("Auto Hunt workflows", () => {
     ]);
   });
 
+  it("upgrades a legacy release workflow to an explicit execution boundary", () => {
+    const workflow = normalizeAutoHuntWorkflow({
+      version: 1,
+      stages: [
+        { id: "implementing", label: "Implement", required: true },
+        { id: "pr_open", label: "Open PR", required: true },
+        { id: "production_qa", label: "Production QA", required: false },
+      ],
+      completion: { requiredStages: ["implementing", "pr_open"] },
+      release: { enabled: false },
+    });
+
+    expect(workflow.execution.stopAfterStage).toBe("pr_open");
+    expect(workflow).not.toHaveProperty("release");
+  });
+
   it("ships a representative read-only demo", () => {
     expect(demoDashboard.runs).toHaveLength(4);
-    expect(demoDashboard.runs.some((run) => run.status === "completed")).toBe(true);
-    expect(demoDashboard.runs.some((run) => run.status === "blocked")).toBe(true);
+    expect(demoDashboard.runs.some((run) => run.status === "completed")).toBe(
+      true,
+    );
+    expect(demoDashboard.runs.some((run) => run.status === "blocked")).toBe(
+      true,
+    );
   });
 
   it("renders legacy stage values returned in the status field", () => {

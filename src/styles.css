@@ -485,6 +485,12 @@ body { overflow: hidden; font-synthesis: none; }
 .project-settings-workflow-success,.project-settings-workflow-error { margin:10px 0 0 43px; font-size:var(--text-2xs); line-height:1.5; }
 .project-settings-workflow-success { display:flex; align-items:center; gap:5px; color:#33775f; }
 .project-settings-workflow-error { color:#b04455; }
+.project-settings-workflow-boundary { margin-top:14px; padding:12px 13px; display:flex; align-items:center; justify-content:space-between; gap:14px; border:1px solid #dcd5ef; border-radius:10px; background:#f7f4ff; }
+.project-settings-workflow-boundary > span { min-width:0; display:flex; align-items:center; gap:9px; color:#6b4fc1; }
+.project-settings-workflow-boundary > span > span { min-width:0; display:grid; gap:3px; }
+.project-settings-workflow-boundary strong { color:#534565; font-size:var(--text-2xs); }
+.project-settings-workflow-boundary small { color:#877d9b; font-size:var(--text-2xs); line-height:1.4; }
+.project-settings-workflow-boundary > .select-menu { min-width:210px; }
 .project-workflow-contract { margin-top:17px; overflow:hidden; border:1px solid #ddd9e9; border-radius:12px; background:#fbfaff; }
 .project-workflow-repository { min-width:0; min-height:38px; padding:0 13px; display:flex; align-items:center; gap:9px; border-bottom:1px solid #e4e0ed; background:#f4f1fa; }
 .project-workflow-repository > span:first-child { color:#827b8d; font-size:var(--text-2xs); }
@@ -495,12 +501,14 @@ body { overflow: hidden; font-synthesis: none; }
 .project-workflow-stages > li { min-width:0; flex:0 0 auto; display:flex; align-items:center; }
 .project-workflow-stage { width:190px; min-height:184px; flex:0 0 190px; padding:13px; display:flex; flex-direction:column; border:1px solid #ded9eb; border-radius:11px; background:var(--card); box-shadow:0 4px 14px rgba(74,57,119,.055); }
 .project-workflow-stage.optional { border-style:dashed; background:#fcfbfe; }
+.project-workflow-stage.outside-boundary { opacity:.48; filter:saturate(.45); }
 .project-workflow-stage > header { display:flex; align-items:center; justify-content:space-between; gap:8px; }
 .project-workflow-stage > header > span { width:24px; height:24px; display:grid; place-items:center; border-radius:8px; color:#fff; background:linear-gradient(145deg,#7458c6,#9378df); font:600 var(--text-2xs) "DM Mono",monospace; box-shadow:0 4px 10px rgba(107,78,185,.2); }
 .project-workflow-stage > header > em { padding:3px 6px; border-radius:999px; color:#6b4fc1; background:#eee8ff; font-size:var(--text-2xs); font-style:normal; font-weight:700; letter-spacing:.25px; }
 .project-workflow-stage.optional > header > em { color:#77747e; background:#efeff1; }
 .project-workflow-stage > strong { margin-top:11px; color:#3f3a48; font-size:var(--text-2xs); line-height:1.45; }
 .project-workflow-stage > code { margin-top:3px; color:#918a9c; font:500 var(--text-2xs) "DM Mono",monospace; }
+.project-workflow-stop-badge { margin-top:8px; align-self:flex-start; padding:3px 6px; border-radius:999px; color:#fff; background:#6b4fc1; font-size:var(--text-2xs); font-weight:700; }
 .project-workflow-stage-detail { margin-top:11px; display:grid; gap:5px; }
 .project-workflow-stage-detail > span { color:#8b8493; font-size:var(--text-2xs); font-weight:700; letter-spacing:.35px; text-transform:uppercase; }
 .project-workflow-stage-detail > ul { margin:0; padding:0; display:flex; flex-wrap:wrap; gap:4px; list-style:none; }
@@ -513,8 +521,7 @@ body { overflow: hidden; font-synthesis: none; }
 .project-workflow-summary > div > span { min-width:0; display:grid; gap:3px; }
 .project-workflow-summary small { color:#877d9b; font-size:var(--text-2xs); font-weight:700; letter-spacing:.35px; text-transform:uppercase; }
 .project-workflow-summary strong { overflow:hidden; color:#534565; font-size:var(--text-2xs); text-overflow:ellipsis; white-space:nowrap; }
-.project-workflow-summary > .project-workflow-release { color:#8a8790; border-color:#e1dfe5; background:#f7f6f8; }
-.project-workflow-summary > .project-workflow-release.enabled { color:#2f886a; border-color:#cde7dc; background:#edf8f4; }
+.project-workflow-summary > .project-workflow-boundary-summary { color:#6b4fc1; border-color:#dcd5ef; background:#f4f0ff; }
 .project-settings-empty { margin:15px 0 0; padding:18px; border:1px dashed #dddeda; border-radius:10px; color:var(--muted-foreground); background:#fafaf8; font-size:var(--text-2xs); text-align:center; }
 .project-settings-danger { min-height:104px; margin-top:18px; padding:18px 20px; display:flex; align-items:center; justify-content:space-between; gap:20px; border:1px solid #edc8ce; border-radius:15px; background:#fff8f9; }
 .project-settings-danger > div { min-width:0; display:flex; align-items:flex-start; gap:11px; }

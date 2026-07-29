@@ -2,7 +2,9 @@ import {
   isTerminalTrackerState,
   isRepositoryWorkflowPending,
   normalizeAutoHuntWorkflow,
+  requiredExecutableWorkflowStages,
   repositoryWorkflowBootstrap,
+  workflowStopIndex,
   type AutoHuntQaEnvironment,
   type AutoHuntQaStatus,
   type AutoHuntRunStatus,
@@ -2323,7 +2325,7 @@ const assertCompletionEligible = async (
   if (input.status !== "completed") return;
   if (!run) throw new HuntTransitionError("Run does not exist");
   const workflow = parseWorkflow(run.workflow_snapshot_json);
-  const requiredStages = workflow.completion.requiredStages;
+  const requiredStages = requiredExecutableWorkflowStages(workflow);
   const revisionRequirements = await loadStageRevisionRequirements(db, run);
   const completedStages = await db
     .prepare(
@@ -2430,6 +2432,11 @@ const assertStageTransition = async (
       `Workflow stage is not configured for this run: ${input.workflowStage}`,
     );
   }
+  if (nextRank > workflowStopIndex(workflow)) {
+    throw new HuntTransitionError(
+      `Workflow stops after stage: ${workflow.execution.stopAfterStage}`,
+    );
+  }
   const floorRank = run.workflow_stage
     ? workflow.stages.findIndex((stage) => stage.id === run.workflow_stage)
     : -1;
@@ -2520,6 +2527,16 @@ export async function recordHuntEvent(
     throw new HuntTransitionError(
       `Workflow stage is not configured for this run: ${normalizedInput.workflowStage ?? "none"}`,
     );
+  }
+  if (normalizedInput.status === "running" && normalizedInput.workflowStage) {
+    const requestedRank = workflowSnapshot.stages.findIndex(
+      (stage) => stage.id === normalizedInput.workflowStage,
+    );
+    if (requestedRank > workflowStopIndex(workflowSnapshot)) {
+      throw new HuntTransitionError(
+        `Workflow stops after stage: ${workflowSnapshot.execution.stopAfterStage}`,
+      );
+    }
   }
   const eventAttempt = existingRun?.current_attempt ?? 1;
   const eventRevision = existingRun?.current_revision ?? 1;
@@ -2825,9 +2842,17 @@ export async function recordRunEvidence(
   const run = await getHuntRunForProject(db, projectId, input.runId);
   if (!run) return null;
   const workflow = parseWorkflow(run.workflow_snapshot_json);
-  if (!workflow.stages.some((stage) => stage.id === input.stage)) {
+  const evidenceStageRank = workflow.stages.findIndex(
+    (stage) => stage.id === input.stage,
+  );
+  if (evidenceStageRank < 0) {
     throw new HuntTransitionError(
       `Workflow stage is not configured for this run: ${input.stage}`,
+    );
+  }
+  if (evidenceStageRank > workflowStopIndex(workflow)) {
+    throw new HuntTransitionError(
+      `Workflow stops after stage: ${workflow.execution.stopAfterStage}`,
     );
   }
   const metadataJson = input.metadata ? stableJson(input.metadata) : null;
@@ -3145,6 +3170,11 @@ export async function reworkHuntRun(
   if (targetRank < 0) {
     throw new HuntTransitionError(
       `Workflow stage is not configured for this run: ${input.workflowStage}`,
+    );
+  }
+  if (targetRank > workflowStopIndex(workflow)) {
+    throw new HuntTransitionError(
+      `Workflow stops after stage: ${workflow.execution.stopAfterStage}`,
     );
   }
   if (currentRank < 0 || targetRank >= currentRank) {
@@ -3486,12 +3516,20 @@ export async function moveHuntRun(
 
   const workflow = parseWorkflow(run.workflow_snapshot_json);
   if (input.status === "running") {
+    const targetRank = workflow.stages.findIndex(
+      (stage) => stage.id === input.workflowStage,
+    );
     if (
       !input.workflowStage ||
-      !workflow.stages.some((stage) => stage.id === input.workflowStage)
+      targetRank < 0
     ) {
       throw new HuntTransitionError(
         `Workflow stage is not configured for this run: ${input.workflowStage ?? "none"}`,
+      );
+    }
+    if (targetRank > workflowStopIndex(workflow)) {
+      throw new HuntTransitionError(
+        `Workflow stops after stage: ${workflow.execution.stopAfterStage}`,
       );
     }
   } else if (input.workflowStage !== null) {

@@ -68,6 +68,12 @@ const releaseWorkflow = normalizeAutoHuntWorkflow({
     { id: "production_qa", label: "Production QA", required: true },
   ],
 });
+const pullRequestBoundaryWorkflow = normalizeAutoHuntWorkflow({
+  version: 1,
+  stages: releaseWorkflow.stages,
+  execution: { stopAfterStage: "pr_open" },
+  completion: releaseWorkflow.completion,
+});
 const localWorkflow = normalizeAutoHuntWorkflow({
   version: 1,
   stages: [
@@ -314,15 +320,24 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0022_remove_workflow_presets.sql"), "utf8"),
+      await readFile(
+        resolve("migrations/0022_remove_workflow_presets.sql"),
+        "utf8",
+      ),
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0023_project_agent_skills.sql"), "utf8"),
+      await readFile(
+        resolve("migrations/0023_project_agent_skills.sql"),
+        "utf8",
+      ),
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0024_project_agent_avatars.sql"), "utf8"),
+      await readFile(
+        resolve("migrations/0024_project_agent_avatars.sql"),
+        "utf8",
+      ),
     );
     await executeSql(
       db,
@@ -351,7 +366,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0030_run_evidence_images.sql"), "utf8"),
+      await readFile(
+        resolve("migrations/0030_run_evidence_images.sql"),
+        "utf8",
+      ),
     );
     await executeSql(
       db,
@@ -388,6 +406,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db,
       await readFile(
         resolve("migrations/0036_execution_worker_concurrency.sql"),
+        "utf8",
+      ),
+    );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0037_workflow_stop_after_stage.sql"),
         "utf8",
       ),
     );
@@ -564,13 +589,11 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       .run();
 
     await expect(
-      deleteProjectAgent(
-        db,
-        "22222222-2222-4222-8222-222222222222",
-        agent.id,
-      ),
+      deleteProjectAgent(db, "22222222-2222-4222-8222-222222222222", agent.id),
     ).resolves.toBeNull();
-    await expect(deleteProjectAgent(db, projectId, agent.id)).resolves.toMatchObject({
+    await expect(
+      deleteProjectAgent(db, projectId, agent.id),
+    ).resolves.toMatchObject({
       id: agent.id,
       project_id: projectId,
     });
@@ -738,10 +761,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       agent_skill_markdown: expect.stringContaining(
         "briar skills get briar-workflow",
       ),
-      workflow_json: JSON.stringify(repositoryWorkflowBootstrap),
+      workflow_json: expect.any(String),
       status: "running",
       scheduled_for: "2026-07-27T09:00:00.000Z",
     });
+    expect(JSON.parse(claimed!.workflow_json)).toEqual(
+      repositoryWorkflowBootstrap,
+    );
     await expect(
       claimDueProjectAgentScheduleRun(db, projectId, {
         claimTokenHash: "b".repeat(64),
@@ -787,10 +813,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       }),
     ]);
     await expect(
-      listProjectAgentScheduleRuns(
-        db,
-        "22222222-2222-4222-8222-222222222222",
-      ),
+      listProjectAgentScheduleRuns(db, "22222222-2222-4222-8222-222222222222"),
     ).resolves.toEqual([]);
   });
 
@@ -909,8 +932,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         license: "CC BY-NC 4.0",
         spriteVersion: 1,
       }),
-      objectKey:
-        "project-agent-spritesheets/project/agent/firefly.webp",
+      objectKey: "project-agent-spritesheets/project/agent/firefly.webp",
     };
     const updated = await updateProjectAgent(db, projectId, current.id, {
       name: "Release coordinator",
@@ -1120,6 +1142,84 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         impact: "project",
       }),
     });
+  });
+
+  it("enforces the execution stop stage for events, evidence, and completion", async () => {
+    await updateProjectSettings(db, projectId, {
+      velenOrg: null,
+      dataSource: null,
+      linear: { enabled: false, source: null, teamKey: null },
+      githubRepository: "example/repository",
+      workflow: pullRequestBoundaryWorkflow,
+    });
+    const common = { sourceKey: "pull-request-boundary" };
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 13, common),
+    );
+    await expect(
+      moveHuntRun(db, projectId, {
+        runId,
+        status: "running",
+        workflowStage: "staging_qa",
+        requestId: "99999999-9999-4999-8999-999999999996",
+        actor: "vitest",
+        occurredAt: atMinute(13.5),
+      }),
+    ).rejects.toThrow("Workflow stops after stage: pr_open");
+    await recordHuntEvent(db, projectId, event("analyzing", 14, common));
+    await recordHuntEvent(db, projectId, event("implementing", 15, common));
+    await recordHuntEvent(db, projectId, event("pr_open", 16, common));
+
+    await expect(
+      recordHuntEvent(db, projectId, event("staging_qa", 17, common)),
+    ).rejects.toThrow("Workflow stops after stage: pr_open");
+    await expect(
+      recordRunEvidence(db, projectId, {
+        runId,
+        evidenceKey: "staging-after-boundary",
+        stage: "staging_qa",
+        type: "staging",
+        status: "passed",
+        detail: "must not be accepted",
+        command: null,
+        url: null,
+        metadata: null,
+        actor: "vitest",
+        observedAt: atMinute(17.1),
+      }),
+    ).rejects.toThrow("Workflow stops after stage: pr_open");
+
+    for (const [stage, type, minute] of [
+      ["analyzing", "repository", 17.2],
+      ["implementing", "diff", 17.3],
+      ["pr_open", "pull_request", 17.4],
+    ] as const) {
+      await recordRunEvidence(db, projectId, {
+        runId,
+        evidenceKey: `${stage}:${type}`,
+        stage,
+        type,
+        status: "passed",
+        detail: `${type} verified`,
+        command: null,
+        url: null,
+        metadata: null,
+        actor: "vitest",
+        observedAt: atMinute(minute),
+      });
+    }
+    await expect(
+      recordHuntEvent(
+        db,
+        projectId,
+        event("completed", 18, {
+          ...common,
+          resultSummary: "Pull request opened",
+        }),
+      ),
+    ).resolves.toBe(runId);
   });
 
   it("links pull request evidence to its issue run", async () => {
@@ -1379,9 +1479,9 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ).resolves.toBe(runId);
 
     const evidence = await listRunEvidence(db, projectId, runId);
-    expect(evidence?.filter((item) => item.workflow_stage === "analyzing")).toEqual([
-      expect.objectContaining({ revision: 1 }),
-    ]);
+    expect(
+      evidence?.filter((item) => item.workflow_stage === "analyzing"),
+    ).toEqual([expect.objectContaining({ revision: 1 })]);
     expect(
       evidence
         ?.filter((item) => item.workflow_stage === "local_qa")
@@ -1500,10 +1600,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       .prepare(
         `update briar_project_settings set workflow_json = ? where project_id = ?`,
       )
-      .bind(
-        JSON.stringify(localWorkflow),
-        projectId,
-      )
+      .bind(JSON.stringify(localWorkflow), projectId)
       .run();
     const runId = await recordHuntEvent(
       db,
@@ -1808,7 +1905,9 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     expect(await listIssueAttachments(db, projectId, runId)).toEqual([]);
     expect(
       await db
-        .prepare("select count(*) as count from briar_hunt_events where run_id = ?")
+        .prepare(
+          "select count(*) as count from briar_hunt_events where run_id = ?",
+        )
         .bind(runId)
         .first<number>("count"),
     ).toBe(0);

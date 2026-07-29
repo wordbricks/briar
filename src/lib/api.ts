@@ -1,7 +1,10 @@
 import { z } from "zod";
 import { structuredAgentResultSchema } from "./agent-result";
 import { validateIssueAttachments } from "./issue-attachments";
-import type { AutoHuntWorkflow } from "./auto-hunt-contract";
+import {
+  normalizeAutoHuntWorkflow,
+  type AutoHuntWorkflow,
+} from "./auto-hunt-contract";
 import {
   defaultProjectAgentCalendarColor,
   type ProjectAgentLocale,
@@ -111,20 +114,23 @@ const projectAgentScheduleSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
 });
-const autoHuntWorkflowSchema: z.ZodType<AutoHuntWorkflow> = z.object({
-  version: z.literal(1),
-  stages: z.array(
-    z.object({
-      id: z.string(),
-      label: z.string(),
-      required: z.boolean(),
-      evidence: z.array(z.string()).optional(),
-      checks: z.array(z.string()).optional(),
-    }),
-  ),
-  completion: z.object({ requiredStages: z.array(z.string()) }),
-  release: z.object({ enabled: z.boolean() }),
-});
+const autoHuntWorkflowSchema: z.ZodType<AutoHuntWorkflow> = z
+  .object({
+    version: z.literal(1),
+    stages: z.array(
+      z.object({
+        id: z.string(),
+        label: z.string(),
+        required: z.boolean(),
+        evidence: z.array(z.string()).optional(),
+        checks: z.array(z.string()).optional(),
+      }),
+    ),
+    execution: z.object({ stopAfterStage: z.string() }).optional(),
+    completion: z.object({ requiredStages: z.array(z.string()) }).optional(),
+    release: z.object({ enabled: z.boolean() }).optional(),
+  })
+  .transform(normalizeAutoHuntWorkflow);
 const projectAgentScheduleRunSchema = z.object({
   id: z.string().uuid(),
   projectId: z.string().uuid(),

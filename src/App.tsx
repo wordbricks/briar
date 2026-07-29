@@ -582,6 +582,12 @@ export function App() {
             onReviseWorkflow={(requestedChange) =>
               briar.reviseWorkflow(activeProject.id, requestedChange)
             }
+            onUpdateWorkflowStopAfterStage={(stopAfterStage) =>
+              briar.updateWorkflowStopAfterStage(
+                activeProject.id,
+                stopAfterStage,
+              )
+            }
             onUpdateVelenOrg={(org) =>
               briar.saveVelenIntegration(activeProject.id, org)
             }
