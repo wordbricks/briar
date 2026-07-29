@@ -237,10 +237,8 @@ describe("HuntDashboard", () => {
       container.querySelector<HTMLElement>(".kanban-card")?.click();
     });
     const agentProperty = Array.from(
-      container.querySelectorAll<HTMLElement>(".run-property-copy"),
-    ).find((property) =>
-      property.querySelector("small")?.textContent === "에이전트"
-    );
+      container.querySelectorAll<HTMLElement>(".run-property"),
+    ).find((property) => property.getAttribute("aria-label")?.startsWith("에이전트:"));
     expect(agentProperty?.querySelector("strong")?.textContent).toBe(
       dashboardAgent.name,
     );
@@ -795,8 +793,11 @@ describe("HuntDashboard", () => {
     const properties = container.querySelector(".run-properties");
     expect(properties).not.toBeNull();
     expect(properties?.textContent).toContain("속성");
-    expect(properties?.textContent).toContain("우선순위");
     expect(properties?.textContent).toContain("저장소");
+    expect(
+      properties?.querySelector('[aria-label^="우선순위:"]'),
+    ).not.toBeNull();
+    expect(properties?.querySelectorAll(".run-property-copy small")).toHaveLength(0);
     expect(properties?.querySelector(".run-status-control")).not.toBeNull();
     expect(properties?.textContent).not.toContain("전체 진행률");
     expect(properties?.querySelector(".run-property.progress")).toBeNull();

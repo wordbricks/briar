@@ -148,7 +148,7 @@ import {
   appendAgentTranscript,
   auditExecutionEvent,
   authenticateExecutionWorker,
-  assertWorkerHasNoRunInFlight,
+  countExecutionWorkerDeviceSessions,
   countLeasedRuns,
   dispatchHuntRun,
   executionWorkerBindingById,
@@ -157,6 +157,7 @@ import {
   leaseExpiryFrom,
   listExecutionAuditEvents,
   listExecutionWorkers,
+  MAX_WORKER_CONCURRENT_SESSIONS,
   MAX_TRANSCRIPT_EVENTS_PER_REQUEST,
   reapStalledHuntRuns,
   readAgentTranscript,
@@ -167,6 +168,7 @@ import {
   WorkerConflictError,
   workerStateAt,
   unbindExecutionWorker,
+  updateExecutionWorkerConcurrency,
 } from "./workers";
 import { serveRelease } from "./releases";
 import {
@@ -729,7 +731,23 @@ const workerRegisterSchema = z
     label: z.string().trim().min(1).max(100),
     deviceIdentity: z.string().regex(/^briar_device_[0-9a-f]{64}$/u),
     agentProvider: z.enum(["codex", "claude", "grok"]),
+    maxConcurrentSessions: z
+      .number()
+      .int()
+      .min(1)
+      .max(MAX_WORKER_CONCURRENT_SESSIONS)
+      .optional(),
     versions: z.record(z.string().max(64), z.string().max(64)).default({}),
+  })
+  .strict();
+
+const workerConcurrencySchema = z
+  .object({
+    maxConcurrentSessions: z
+      .number()
+      .int()
+      .min(1)
+      .max(MAX_WORKER_CONCURRENT_SESSIONS),
   })
   .strict();
 
@@ -1066,11 +1084,22 @@ const workerJson = (
     readiness_state?: string;
     readiness_detail?: string | null;
     capabilities_json?: string;
+    max_concurrent_sessions?: number;
+    active_sessions?: number;
     last_heartbeat_at: string;
     created_at: string;
   },
   observedAt: string,
 ) => ({
+  ...(() => {
+    const maximum = worker.max_concurrent_sessions ?? 1;
+    const active = worker.active_sessions ?? 0;
+    return {
+      maxConcurrentSessions: maximum,
+      activeSessions: active,
+      availableSessions: Math.max(0, maximum - active),
+    };
+  })(),
   id: worker.id,
   ...(worker.device_id ? { deviceId: worker.device_id } : {}),
   ...(worker.owner_user_id ? { ownerUserId: worker.owner_user_id } : {}),
@@ -1094,7 +1123,8 @@ const workerJson = (
         ? "offline"
         : worker.readiness_state === "needs_attention"
           ? "needs_attention"
-          : worker.readiness_state === "busy"
+          : (worker.active_sessions ?? 0) >=
+              (worker.max_concurrent_sessions ?? 1)
             ? "busy"
             : "available",
   readinessDetail: worker.readiness_detail ?? null,
@@ -3404,6 +3434,7 @@ async function route(
       deviceIdentityHash: await sha256(input.deviceIdentity),
       credentialTokenHash: await sha256(workerToken),
       agentProvider: input.agentProvider,
+      maxConcurrentSessions: input.maxConcurrentSessions,
       versions: input.versions,
       observedAt,
     });
@@ -3423,6 +3454,45 @@ async function route(
   const workerDisableMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/workers\/([0-9a-zA-Z-]+)$/u,
   );
+  if (workerDisableMatch && request.method === "PATCH") {
+    const projectId = workerDisableMatch[1];
+    const workerId = workerDisableMatch[2];
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, projectId, session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    const device = await executionWorkerDeviceForBinding(db, workerId);
+    if (!device || device.organization_id !== project.organization_id) {
+      throw new HttpError(404, "Worker not found");
+    }
+    if (
+      device.owner_user_id !== session.user.id &&
+      project.member_role !== "owner" &&
+      project.member_role !== "admin"
+    ) {
+      throw new HttpError(403, "Worker owner or organization admin access required");
+    }
+    const input = workerConcurrencySchema.parse(await readJson(request));
+    const observedAt = new Date().toISOString();
+    const updated = await updateExecutionWorkerConcurrency(
+      db,
+      device.id,
+      input.maxConcurrentSessions,
+      observedAt,
+    );
+    if (!updated) throw new HttpError(409, "Worker is disabled");
+    const binding = await executionWorkerBindingById(
+      db,
+      device.id,
+      workerId,
+    );
+    if (!binding) throw new HttpError(404, "Worker not found");
+    binding.active_sessions = await countExecutionWorkerDeviceSessions(
+      db,
+      device.id,
+      observedAt,
+    );
+    return json(workerJson(binding, observedAt));
+  }
   if (workerDisableMatch && request.method === "DELETE") {
     const projectId = workerDisableMatch[1];
     const workerId = workerDisableMatch[2];
@@ -3687,13 +3757,6 @@ async function route(
     // Recover runs abandoned by a dead worker before looking at the queue, so
     // they are claimable again in this same request.
     await reapStalledHuntRuns(db, projectId, claimedAt);
-    if (authenticatedWorkerId) {
-      await assertWorkerHasNoRunInFlight(
-        db,
-        projectId,
-        authenticatedWorkerId,
-      );
-    }
     const leaseExpiresAt = leaseExpiryFrom(claimedAt);
     const claimToken = `briar_claim_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
     const run = await claimNextQueuedHuntRun(db, projectId, {
@@ -3703,6 +3766,7 @@ async function route(
       leaseExpiresAt,
       runId: input.runId,
       workerId: authenticatedWorkerId,
+      workerDeviceId: authenticatedWorker?.principal.deviceId,
       agentProvider: authenticatedWorker?.binding.agent_provider,
       detachedOnly: Boolean(authenticatedWorkerId),
     });

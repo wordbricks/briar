@@ -2044,6 +2044,7 @@ export async function claimNextQueuedHuntRun(
     leaseExpiresAt: string;
     runId?: string;
     workerId?: string;
+    workerDeviceId?: string;
     agentProvider?: "codex" | "claude" | "grok";
     detachedOnly?: boolean;
   },
@@ -2068,6 +2069,25 @@ export async function claimNextQueuedHuntRun(
                  and agent.project_id = briar_hunt_runs.project_id
                  and agent.provider = ?
              )
+           )
+           and (
+             ? is null or (
+               select count(*)
+               from briar_hunt_runs active
+               join briar_execution_workers holder
+                 on holder.id = active.worker_id
+               where holder.device_id = ?
+                 and active.claim_token_hash is not null
+                 and active.lease_expires_at is not null
+                 and active.lease_expires_at > ?
+                 and active.status not in (
+                   'backlog', 'completed', 'cancelled', 'blocked', 'failed'
+                 )
+             ) < coalesce((
+               select device.max_concurrent_sessions
+               from briar_execution_worker_devices device
+               where device.id = ?
+             ), 0)
            )
          order by
            case when priority is null then 1 else 0 end,
@@ -2094,6 +2114,10 @@ export async function claimNextQueuedHuntRun(
       input.workerId ?? null,
       input.agentProvider ?? null,
       input.agentProvider ?? null,
+      input.workerDeviceId ?? null,
+      input.workerDeviceId ?? null,
+      input.claimedAt,
+      input.workerDeviceId ?? null,
     )
     .first<HuntRunRow>();
 }
