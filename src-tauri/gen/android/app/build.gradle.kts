@@ -59,6 +59,7 @@ rust {
 }
 
 dependencies {
+    implementation("me.leolin:ShortcutBadger:1.1.22@aar")
     implementation("androidx.browser:browser:1.9.0")
     implementation("androidx.webkit:webkit:1.14.0")
     implementation("androidx.appcompat:appcompat:1.7.1")
