@@ -42,6 +42,7 @@ import {
   hasCompletedInitialOnboarding,
   markInitialOnboardingComplete,
 } from "./lib/initial-onboarding";
+import { syncAppBadgeCount } from "./lib/app-badge";
 import {
   hasDeferredProjectOnboarding,
   markProjectOnboardingDeferred,
@@ -90,6 +91,11 @@ export function App() {
     briar.projects,
   );
   useInboxNotifications(briar.user?.id ?? null, inbox.messages);
+  useEffect(() => {
+    void syncAppBadgeCount(inbox.unreadCount).catch(() => {
+      // An unsupported desktop environment or Android launcher must not block the app.
+    });
+  }, [inbox.unreadCount]);
   const mobilePlatform = getMobilePlatform() ?? "android";
   const previewsLaunchIntro = isLaunchIntroPreview();
   const runsOnDesktopTauri = isDesktopTauri();

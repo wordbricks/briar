@@ -711,6 +711,13 @@ fn set_app_icon(icon: String) -> Result<(), String> {
     Err("Native app icon selection is only handled by this command on iOS.".to_string())
 }
 
+#[tauri::command]
+fn set_app_badge_count(window: tauri::Window, count: u32) -> Result<(), String> {
+    window
+        .set_badge_count((count > 0).then_some(i64::from(count)))
+        .map_err(|error| format!("App badge count update failed: {error}"))
+}
+
 fn git_repository_root(path: &Path) -> Result<PathBuf, String> {
     if !path.is_dir() {
         return Err("선택한 폴더를 찾을 수 없습니다.".to_string());
@@ -5436,6 +5443,7 @@ pub fn run() {
             clear_session_token,
             current_app_icon,
             set_app_icon,
+            set_app_badge_count,
             validate_repository_path,
             project_workspace_root,
             create_project_workspace,
