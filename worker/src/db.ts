@@ -2046,9 +2046,13 @@ export async function claimNextQueuedHuntRun(
     workerId?: string;
     workerDeviceId?: string;
     agentProvider?: "codex" | "claude" | "grok";
+    agentProviders?: Array<"codex" | "claude" | "grok">;
     detachedOnly?: boolean;
   },
 ) {
+  const allowedProviders =
+    input.agentProviders ??
+    (input.agentProvider ? [input.agentProvider] : undefined);
   return await db
     .prepare(
       `update briar_hunt_runs
@@ -2077,11 +2081,15 @@ export async function claimNextQueuedHuntRun(
              )
            )
            and (
-             ? is null or agent_id is null or exists (
+             ? = 0 or agent_id is null or exists (
                select 1 from briar_project_agents agent
                where agent.id = briar_hunt_runs.agent_id
                  and agent.project_id = briar_hunt_runs.project_id
-                 and agent.provider = ?
+                 and (
+                   (? = 1 and agent.provider = 'codex')
+                   or (? = 1 and agent.provider = 'claude')
+                   or (? = 1 and agent.provider = 'grok')
+                 )
              )
            )
            and (
@@ -2128,8 +2136,10 @@ export async function claimNextQueuedHuntRun(
       input.workerId ?? null,
       input.workerId ?? null,
       input.workerId ?? null,
-      input.agentProvider ?? null,
-      input.agentProvider ?? null,
+      allowedProviders ? 1 : 0,
+      allowedProviders?.includes("codex") ? 1 : 0,
+      allowedProviders?.includes("claude") ? 1 : 0,
+      allowedProviders?.includes("grok") ? 1 : 0,
       input.workerDeviceId ?? null,
       input.workerDeviceId ?? null,
       input.claimedAt,

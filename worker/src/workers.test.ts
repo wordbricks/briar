@@ -645,6 +645,74 @@ describe("detached execution workers", () => {
     });
   });
 
+  it("dispatches and claims Agents through every provider advertised by a Worker", async () => {
+    const registered = await register("multi-provider");
+    await recordWorkerHeartbeat(db, projectId, {
+      workerId: registered.worker.id,
+      capabilities: {
+        providers: ["codex", "claude", "grok"],
+        worktrees: true,
+      },
+      observedAt: atMinute(2),
+    });
+    const claudeAgentId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    await db
+      .prepare(
+        `insert into briar_project_agents (
+           id, project_id, name, provider, model, responsibility,
+           skill_markdown, created_at, updated_at
+         ) values (?, ?, 'Claude Agent', 'claude', null, 'Review the issue.',
+                   '# Claude Agent', ?, ?)`,
+      )
+      .bind(claudeAgentId, projectId, atMinute(2), atMinute(2))
+      .run();
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      queuedEvent("multi-provider-issue", 3),
+    );
+
+    await expect(
+      dispatchHuntRun(db, projectId, projectId, {
+        runId,
+        agentId: claudeAgentId,
+        workerId: null,
+        requestedByUserId: "member",
+        requestId: "66666666-aaaa-4666-8666-666666666666",
+        occurredAt: atMinute(3),
+      }),
+    ).resolves.toMatchObject({
+      agentId: claudeAgentId,
+      dispatchMode: "any",
+    });
+
+    const claimed = await claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: fingerprint("multi-provider-claim"),
+      claimedBy: registered.worker.label,
+      claimedAt: atMinute(4),
+      leaseExpiresAt: leaseExpiryFrom(atMinute(4)),
+      workerId: registered.worker.id,
+      agentProviders: ["codex", "claude", "grok"],
+      detachedOnly: true,
+    });
+    expect(claimed).toMatchObject({
+      id: runId,
+      agent_id: claudeAgentId,
+      worker_id: registered.worker.id,
+    });
+
+    const devices = await listOrganizationExecutionWorkers(
+      db,
+      projectId,
+      atMinute(4),
+    );
+    expect(devices[0].bindings[0].providers).toEqual([
+      "codex",
+      "claude",
+      "grok",
+    ]);
+  });
+
   it("enforces the project Worker allowlist for dispatch and claim", async () => {
     const allowed = await register("policy-allowed");
     const denied = await register("policy-denied");

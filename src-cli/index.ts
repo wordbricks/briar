@@ -165,6 +165,13 @@ const configSchema = z
   .object({
     apiUrl: z.string().url(),
     userToken: z.string().optional(),
+    agentProviders: z
+      .object({
+        codex: z.boolean().default(true),
+        claude: z.boolean().default(true),
+        grok: z.boolean().default(true),
+      })
+      .default({ codex: true, claude: true, grok: true }),
     workerDeviceIdentity: z
       .string()
       .regex(/^briar_device_[0-9a-f]{64}$/u)
@@ -175,6 +182,13 @@ const configSchema = z
 
 type Config = z.infer<typeof configSchema>;
 type ProjectConfig = z.infer<typeof projectConfigSchema>;
+const workerProviderIds = ["codex", "claude", "grok"] as const;
+type WorkerProvider = (typeof workerProviderIds)[number];
+const availableWorkerProviders = (config: Config): WorkerProvider[] =>
+  workerProviderIds.filter(
+    (provider) =>
+      config.agentProviders[provider] && Boolean(Bun.which(provider)),
+  );
 const executionToken = (project: ProjectConfig) =>
   process.env.BRIAR_WORKER_TOKEN ??
   process.env.BRIAR_AGENT_TOKEN ??
@@ -216,7 +230,11 @@ async function loadConfig(): Promise<Config> {
         : undefined,
     };
   } catch {
-    return { apiUrl: defaultApiUrl, projects: [] };
+    return {
+      apiUrl: defaultApiUrl,
+      agentProviders: { codex: true, claude: true, grok: true },
+      projects: [],
+    };
   }
 }
 
@@ -1654,7 +1672,11 @@ async function workerRegisterCommand() {
   const deviceIdentity =
     config.workerDeviceIdentity ?? createWorkerDeviceIdentity();
   const label = value("--label") ?? defaultWorkerLabel();
-  const provider = project.llm?.provider ?? "codex";
+  const configuredProvider = project.llm?.provider ?? "codex";
+  const providers = availableWorkerProviders(config);
+  const provider = providers.includes(configuredProvider)
+    ? configuredProvider
+    : (providers[0] ?? configuredProvider);
   const requestedMaxSessions = Number.parseInt(
     value("--max-sessions") ?? "",
     10,
@@ -1672,6 +1694,7 @@ async function workerRegisterCommand() {
             body: JSON.stringify({
               deviceIdentity,
               agentProvider: provider,
+              providers,
               versions: { briar: cliVersion },
             }),
           },
@@ -1702,6 +1725,7 @@ async function workerRegisterCommand() {
           label,
           deviceIdentity,
           agentProvider: provider,
+          providers,
           ...(Number.isInteger(requestedMaxSessions) &&
           requestedMaxSessions > 0
             ? { maxConcurrentSessions: requestedMaxSessions }
@@ -1799,16 +1823,14 @@ async function workerCommand() {
   const workerToken = process.env.BRIAR_WORKER_TOKEN ?? registered.token;
   const label = registered.label;
   const workerId = registered.workerId;
-  const configuredProvider = project.llm?.provider ?? "codex";
-  const configuredBinary =
-    configuredProvider === "claude" ? "claude" : configuredProvider;
+  const providers = availableWorkerProviders(config);
   const readinessProblem = !gitValueAt(project.repositoryPath, [
     "rev-parse",
     "--show-toplevel",
   ])
     ? "연결된 저장소를 열 수 없습니다."
-    : !Bun.which(configuredBinary)
-      ? `${configuredBinary} coding agent가 설치되어 있지 않습니다.`
+    : providers.length === 0
+      ? "활성화되고 설치된 coding agent가 없습니다."
       : null;
   console.log(`worker ${label} starting as ${workerId}`);
 
@@ -1824,7 +1846,7 @@ async function workerCommand() {
           acceptingWork: false,
           readinessState: "needs_attention",
           readinessDetail: readinessProblem,
-          capabilities: { providers: [configuredProvider], worktrees: true },
+          capabilities: { providers, worktrees: true },
         }),
       },
     );
@@ -1881,7 +1903,7 @@ async function workerCommand() {
               readinessState,
               readinessDetail: null,
               capabilities: {
-                providers: [configuredProvider],
+                providers,
                 worktrees: worktreesEnabled(project),
               },
             }),
