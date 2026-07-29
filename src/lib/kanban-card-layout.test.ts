@@ -14,6 +14,16 @@ function firstRule(selector: string) {
   return bodyEnd === -1 ? "" : styles.slice(bodyStart, bodyEnd);
 }
 
+function ruleAfter(marker: string, selector: string) {
+  const markerStart = styles.indexOf(marker);
+  if (markerStart === -1) return "";
+  const declarationStart = styles.indexOf(`${selector} {`, markerStart);
+  if (declarationStart === -1) return "";
+  const bodyStart = declarationStart + selector.length + 2;
+  const bodyEnd = styles.indexOf("}", bodyStart);
+  return bodyEnd === -1 ? "" : styles.slice(bodyStart, bodyEnd);
+}
+
 describe("kanban card layout", () => {
   it("keeps full titles and clamps descriptions to three lines", () => {
     const columnBodyRule = firstRule(".kanban-column > div");
@@ -46,5 +56,25 @@ describe("kanban card layout", () => {
     expect(badgeRule).toContain("top:-9px");
     expect(badgeRule).toContain("right:-7px");
     expect(activeCardKickerRule).toContain("padding-right:34px");
+  });
+
+  it("stacks columns without horizontal scrolling on narrow screens", () => {
+    const narrowScreenMarker = "@media (max-width:760px) { .sidebar";
+    const boardRule = ruleAfter(narrowScreenMarker, ".kanban-board");
+    const columnRule = ruleAfter(narrowScreenMarker, ".kanban-column");
+    const columnBodyRule = ruleAfter(
+      narrowScreenMarker,
+      ".kanban-column > div",
+    );
+
+    expect(boardRule).toContain("grid-auto-flow:row");
+    expect(boardRule).toContain("grid-auto-columns:auto");
+    expect(boardRule).toContain("grid-auto-rows:max-content");
+    expect(boardRule).toContain("grid-template-columns:minmax(0,1fr)");
+    expect(boardRule).toContain("align-items:start");
+    expect(boardRule).toContain("overflow-x:hidden");
+    expect(boardRule).toContain("overflow-y:auto");
+    expect(columnRule).toContain("height:auto");
+    expect(columnBodyRule).toContain("overflow-y:visible");
   });
 });
