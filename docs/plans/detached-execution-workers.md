@@ -132,10 +132,14 @@ Loop:
 6. stream bounded progress and transcript batches;
 7. renew the lease while the process is alive;
 8. complete, block, fail, or release the run;
-9. clean up according to the workflow worktree policy.
+9. immediately reuse the released device slot;
+10. clean up according to the workflow worktree policy.
 
-Exactly one issue is in flight per project worker. Concurrency comes from
-multiple workers.
+Each physical worker device has a configurable `max_concurrent_sessions`
+capacity shared by all of its project bindings. Every claimed run consumes one
+slot. Project worker services keep filling free slots, while the API enforces
+the device-wide limit inside the atomic claim statement so simultaneous claims
+from different project bindings cannot oversubscribe the machine.
 
 macOS uses a user LaunchAgent and Linux uses a user systemd service. Unit files
 contain no agent token and use restrictive permissions.
@@ -178,7 +182,9 @@ local execution that cannot succeed.
 ## Failure and concurrency rules
 
 - Claims are atomic and exclusive.
-- One worker cannot hold a second nonterminal run.
+- A worker device cannot hold more live run leases than its configured
+  `max_concurrent_sessions`; lowering the limit drains naturally without
+  cancelling work already in flight.
 - Workers keep a 15-minute lease and poll it every 30 seconds so cancellation
   or reassignment terminates the child process promptly.
 - Lease loss or cancellation aborts the child agent immediately.

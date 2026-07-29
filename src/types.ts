@@ -178,6 +178,9 @@ export type ExecutionWorker = {
   acceptingWork: boolean;
   readinessDetail: string | null;
   capabilities: Record<string, unknown>;
+  maxConcurrentSessions: number;
+  activeSessions: number;
+  availableSessions: number;
   lastHeartbeatAt: string;
   createdAt: string;
 };

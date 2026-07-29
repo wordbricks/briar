@@ -448,16 +448,19 @@ export function useAutoHuntSessions(
       parentSessionId?: string;
     },
   ) => {
-    if (sessionsRef.current.some(
-      (session) =>
+    const activeRunIds = new Set(
+      sessionsRef.current.flatMap((session) =>
         session.projectId === projectId &&
         session.sessionType === "dispatch" &&
-        session.status === "running",
-    )) {
-      throw new Error("이 프로젝트에서 이미 자동사냥 세션이 진행 중입니다.");
-    }
+        session.status === "running"
+          ? session.issues
+              .filter((issue) => issue.outcome === "pending")
+              .map((issue) => issue.runId)
+          : [],
+      ),
+    );
     const candidates = selectAutoHuntCandidates(
-      runs,
+      runs.filter((run) => !activeRunIds.has(run.id)),
       options.maxIssues ?? defaultAutoHuntMaxIssues,
     );
     if (candidates.length === 0) {

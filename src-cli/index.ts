@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { homedir, platform } from "node:os";
 import { basename, isAbsolute, join, resolve } from "node:path";
@@ -137,6 +137,7 @@ const projectConfigSchema = z
         organizationId: z.string().uuid(),
         token: z.string().startsWith("briar_worker_"),
         label: z.string().min(1).max(100),
+        maxConcurrentSessions: z.number().int().min(1).max(16).default(1),
       })
       .optional(),
     activeClaim: z
@@ -212,11 +213,16 @@ async function loadConfig(): Promise<Config> {
 }
 
 async function saveConfig(config: Config) {
-  await mkdir(configDirectory, { recursive: true, mode: 0o700 });
-  await writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, {
+  await saveConfigAt(configDirectory, config);
+}
+
+async function saveConfigAt(directory: string, config: Config) {
+  const path = join(directory, "config.json");
+  await mkdir(directory, { recursive: true, mode: 0o700 });
+  await writeFile(path, `${JSON.stringify(config, null, 2)}\n`, {
     mode: 0o600,
   });
-  await chmod(configPath, 0o600);
+  await chmod(path, 0o600);
 }
 
 async function request<T>(
@@ -874,6 +880,7 @@ async function allocateClaimWorkspace(
   config: Config,
   project: ProjectConfig,
   issue: { runId: string; sourceKey: string; title: string },
+  storageDirectory = configDirectory,
 ): Promise<{
   workspace:
     | ({ type: "worktree" } & IssueWorktree & { warning?: string })
@@ -922,7 +929,7 @@ async function allocateClaimWorkspace(
           }
         : candidate,
     );
-    await saveConfig(config);
+    await saveConfigAt(storageDirectory, config);
     return {
       workspace: { type: "worktree", ...worktree },
       workspaceError: null,
@@ -1335,6 +1342,7 @@ const workerRegistrationSchema = z.object({
     id: z.string().min(1),
     label: z.string().min(1),
     state: z.enum(["online", "stale", "disabled"]),
+    maxConcurrentSessions: z.number().int().min(1).max(16),
     lastHeartbeatAt: z.string(),
   }),
   workerToken: z.string().startsWith("briar_worker_"),
@@ -1371,10 +1379,13 @@ async function runClaimedIssue(
   workerToken: string,
   signal: AbortSignal,
 ) {
-  if (!issue.agent) {
-    throw new Error("이 실행에 배정된 Briar Agent가 없습니다.");
-  }
-  config.projects = config.projects.map((candidate) =>
+  const runtimeDirectory = join(
+    configDirectory,
+    "worker-sessions",
+    issue.runId,
+  );
+  const runtimeConfig = structuredClone(config);
+  runtimeConfig.projects = runtimeConfig.projects.map((candidate) =>
     candidate.id === project.id
       ? {
           ...candidate,
@@ -1387,13 +1398,39 @@ async function runClaimedIssue(
         }
       : candidate,
   );
-  await saveConfig(config);
+  await saveConfigAt(runtimeDirectory, runtimeConfig);
+  try {
+    await runClaimedIssueInRuntime(
+      runtimeConfig,
+      project,
+      issue,
+      workerToken,
+      signal,
+      runtimeDirectory,
+    );
+  } finally {
+    await rm(runtimeDirectory, { recursive: true, force: true });
+  }
+}
+
+async function runClaimedIssueInRuntime(
+  config: Config,
+  project: ProjectConfig,
+  issue: z.infer<typeof claimedRunSchema>,
+  workerToken: string,
+  signal: AbortSignal,
+  runtimeDirectory: string,
+) {
+  if (!issue.agent) {
+    throw new Error("이 실행에 배정된 Briar Agent가 없습니다.");
+  }
   const activeProject =
     config.projects.find((candidate) => candidate.id === project.id) ?? project;
   const { workspace, workspaceError } = await allocateClaimWorkspace(
     config,
     activeProject,
     issue,
+    runtimeDirectory,
   );
   if (!workspace?.path) {
     throw new Error(
@@ -1420,7 +1457,7 @@ async function runClaimedIssue(
     ...process.env,
     BRIAR_WORKER_TOKEN: workerToken,
     BRIAR_PROJECT_ID: project.id,
-    BRIAR_CONFIG_HOME: configDirectory,
+    BRIAR_CONFIG_HOME: runtimeDirectory,
   };
 
   const launch = detachedProviderRequest({
@@ -1588,19 +1625,6 @@ async function runClaimedIssue(
   } finally {
     signal.removeEventListener("abort", terminate);
     terminate();
-    config.projects = config.projects.map((candidate) =>
-      candidate.id === project.id && candidate.activeClaim?.runId === issue.runId
-        ? {
-            ...candidate,
-            activeClaim: {
-              ...candidate.activeClaim,
-              token: undefined,
-              finished: true,
-            },
-          }
-        : candidate,
-    );
-    await saveConfig(config);
   }
 }
 
@@ -1619,6 +1643,10 @@ async function workerRegisterCommand() {
     config.workerDeviceIdentity ?? createWorkerDeviceIdentity();
   const label = value("--label") ?? defaultWorkerLabel();
   const provider = project.llm?.provider ?? "codex";
+  const requestedMaxSessions = Number.parseInt(
+    value("--max-sessions") ?? "",
+    10,
+  );
   const registration = workerRegistrationSchema.parse(
     await request(
       config.apiUrl,
@@ -1630,6 +1658,10 @@ async function workerRegisterCommand() {
           label,
           deviceIdentity,
           agentProvider: provider,
+          ...(Number.isInteger(requestedMaxSessions) &&
+          requestedMaxSessions > 0
+            ? { maxConcurrentSessions: requestedMaxSessions }
+            : {}),
           versions: { briar: cliVersion },
         }),
       },
@@ -1654,6 +1686,7 @@ async function workerRegisterCommand() {
         organizationId: registration.organizationId,
         token: registration.workerToken,
         label,
+        maxConcurrentSessions: registration.worker.maxConcurrentSessions,
       },
     };
   });
@@ -1665,6 +1698,7 @@ async function workerRegisterCommand() {
       deviceId: registration.deviceId,
       workerId: registration.worker.id,
       label,
+      maxConcurrentSessions: registration.worker.maxConcurrentSessions,
       state: registration.worker.state,
     }),
   );
@@ -1789,7 +1823,9 @@ async function workerCommand() {
         );
       },
       heartbeat: async (readinessState = "ready") => {
-        await request(
+        const heartbeat = await request<{
+          worker: { maxConcurrentSessions?: number };
+        }>(
           config.apiUrl,
           `/workers/${workerId}/heartbeat`,
           workerToken,
@@ -1807,6 +1843,11 @@ async function workerCommand() {
             }),
           },
         );
+        return {
+          maxConcurrentSessions:
+            heartbeat.worker.maxConcurrentSessions ??
+            registered.maxConcurrentSessions,
+        };
       },
       runIssue: (issue, signal) =>
         runClaimedIssue(
@@ -1822,6 +1863,7 @@ async function workerCommand() {
     },
     {
       once: has("--once"),
+      maxConcurrentSessions: registered.maxConcurrentSessions,
       ...(Number.isInteger(maxIssues) && maxIssues > 0 ? { maxIssues } : {}),
     },
   );
@@ -1852,6 +1894,8 @@ async function workerStatus() {
         workerId: project.executionWorker?.workerId ?? null,
         deviceId: project.executionWorker?.deviceId ?? null,
         label: project.executionWorker?.label ?? null,
+        maxConcurrentSessions:
+          project.executionWorker?.maxConcurrentSessions ?? null,
       },
       null,
       2,
@@ -1991,6 +2035,7 @@ const usage = `Briar CLI
   briar run retry [--run <uuid>] [--request-id <uuid>] [--reason <text>]
   briar run cancel [--run <uuid>] [--request-id <uuid>] [--reason <text>]
   briar worker register [--project <uuid>] [--label <text>]
+    [--max-sessions <1-16>]
   briar worker unregister [--project <uuid>]
   briar worker [--project <uuid>] [--max-issues <n>] [--once]
   briar worker status [--project <uuid>]

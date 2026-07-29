@@ -151,6 +151,65 @@ describe("briar worker loop", () => {
     expect(observedMaximum).toBe(1);
   });
 
+  it("fills every configured session slot and reuses it after completion", async () => {
+    let inFlight = 0;
+    let observedMaximum = 0;
+    let started = 0;
+    const waiting: Array<() => void> = [];
+    const test = harness(
+      [issue("issue-1"), issue("issue-2"), issue("issue-3")],
+      {
+        runIssue: async () => {
+          started += 1;
+          inFlight += 1;
+          observedMaximum = Math.max(observedMaximum, inFlight);
+          if (started <= 2) {
+            await new Promise<void>((resolve) => {
+              waiting.push(resolve);
+              if (waiting.length === 2) {
+                for (const release of waiting.splice(0)) release();
+              }
+            });
+          }
+          inFlight -= 1;
+        },
+      },
+    );
+    const result = await runWorkerLoop(test.dependencies, {
+      maxIssues: 3,
+      maxConcurrentSessions: 2,
+    });
+
+    expect(result.processed).toBe(3);
+    expect(observedMaximum).toBe(2);
+  });
+
+  it("adopts a device concurrency change from heartbeat", async () => {
+    let inFlight = 0;
+    let observedMaximum = 0;
+    const waiting: Array<() => void> = [];
+    const test = harness(
+      [issue("issue-1"), issue("issue-2")],
+      {
+        heartbeat: async () => ({ maxConcurrentSessions: 2 }),
+        runIssue: async () => {
+          inFlight += 1;
+          observedMaximum = Math.max(observedMaximum, inFlight);
+          await new Promise<void>((resolve) => {
+            waiting.push(resolve);
+            if (waiting.length === 2) {
+              for (const release of waiting.splice(0)) release();
+            }
+          });
+          inFlight -= 1;
+        },
+      },
+    );
+    await runWorkerLoop(test.dependencies, { maxIssues: 2 });
+
+    expect(observedMaximum).toBe(2);
+  });
+
   it("renews the lease while an issue is in flight", async () => {
     const test = harness([issue("issue-1")], {}, { renewalTicks: 1 });
     const result = await runWorkerLoop(test.dependencies, {
