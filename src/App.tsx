@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AgentUsageStatusBar } from "./components/AgentUsageStatusBar";
+import { WorkerStatusBar } from "./components/WorkerStatusBar";
 import { AppVersionStatus } from "./components/AppVersionStatus";
 import { AppSettings } from "./components/AppSettings";
 import {
@@ -748,6 +749,7 @@ export function App() {
               navigateToPage("settings");
             }}
           />
+          <WorkerStatusBar workers={briar.dashboard?.workers ?? []} />
           <AppVersionStatus />
           <ConnectionHealth
             error={briar.healthError}
