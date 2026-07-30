@@ -18,9 +18,24 @@ describe("detached Agent runner", () => {
   it("uses the logical Agent configuration independently of a Worker", () => {
     const prompt = detachedAgentPrompt({
       agent,
-      sourceKey: "BRIAR-42",
-      title: "Detached execution",
-      description: null,
+      snapshot: {
+        runId: "run-42",
+        sourceKey: "BRIAR-42",
+        title: "Detached execution",
+        issueDescription: "Use the attached design.",
+        attachments: [
+          {
+            filename: "design.png",
+            localPath: "/runtime/attachments/run-42/design.png",
+          },
+        ],
+        conversation: [
+          {
+            author: { name: "Jay", provider: null },
+            body: "The mobile layout is the acceptance criterion.",
+          },
+        ],
+      },
       workspacePath: "/worktree",
     });
     const launch = detachedProviderRequest({
@@ -33,6 +48,10 @@ describe("detached Agent runner", () => {
 
     expect(prompt).toContain("Release Agent");
     expect(prompt).toContain("BRIAR-42");
+    expect(prompt).toContain("Use the attached design.");
+    expect(prompt).toContain("/runtime/attachments/run-42/design.png");
+    expect(prompt).toContain("The mobile layout is the acceptance criterion.");
+    expect(prompt).not.toContain("claimToken");
     expect(launch.arguments).toContain("workspace-write");
     expect(launch.arguments).toContain("gpt-5");
   });
