@@ -34,6 +34,7 @@ import { Input } from "@/components/ui/input";
 import { Typography } from "@/components/ui/typography";
 import { Logo } from "./Logo";
 import {
+  isRepositoryWorkflowPending,
   normalizeAutoHuntWorkflow,
 } from "../lib/auto-hunt-contract";
 import { useI18n } from "../i18n";
@@ -90,6 +91,9 @@ export function ProjectOnboarding({
   const [firstProjectStep, setFirstProjectStep] =
     useState<FirstProjectStep>("purpose");
   const initialWorkflow = normalizeAutoHuntWorkflow(connection?.workflow);
+  const reusesExistingWorkflow =
+    Boolean(connection?.workflow) &&
+    !isRepositoryWorkflowPending(initialWorkflow);
   const showPurposeStep =
     !canCancel && !connection && firstProjectStep === "purpose";
 
@@ -270,7 +274,9 @@ export function ProjectOnboarding({
                 <p className="eyebrow">AUTO HUNT CONNECTION</p>
                 <h1>{t("onboarding.connectTitle", { name: connection.project.name })}</h1>
                 <p className="onboarding-copy">
-                  {t("onboarding.repositoryConnectDescription")}
+                  {reusesExistingWorkflow
+                    ? t("dashboard.connectRepositoryDescription")
+                    : t("onboarding.repositoryConnectDescription")}
                 </p>
 
                 <div className="setup-grid">
@@ -278,12 +284,18 @@ export function ProjectOnboarding({
                     <div className="setup-section-heading">
                       <ListChecks size={18} />
                       <div>
-                        <strong>{t("onboarding.workflow")}</strong>
+                        <strong>
+                          {reusesExistingWorkflow
+                            ? t("settings.workflowTitle")
+                            : t("onboarding.workflow")}
+                        </strong>
                         <span>
-                          {t("onboarding.workflowDescription").replace(
-                            "Codex App Server",
-                            "Agent backend",
-                          )}
+                          {reusesExistingWorkflow
+                            ? t("settings.workflowDescription")
+                            : t("onboarding.workflowDescription").replace(
+                                "Codex App Server",
+                                "Agent backend",
+                              )}
                         </span>
                       </div>
                     </div>
@@ -352,11 +364,17 @@ export function ProjectOnboarding({
                   onClick={() => void connect()}
                   type="button"
                 >
-                  {loading ? t("onboarding.connecting") : t("onboarding.connect")} <ArrowRight size={17} />
+                  {loading
+                    ? reusesExistingWorkflow
+                      ? t("common.saving")
+                      : t("onboarding.connecting")
+                    : t("onboarding.connect")} <ArrowRight size={17} />
                 </button>
-                <p className="token-warning">
-                  {t("onboarding.localStorageNotice")}
-                </p>
+                {!reusesExistingWorkflow ? (
+                  <p className="token-warning">
+                    {t("onboarding.localStorageNotice")}
+                  </p>
+                ) : null}
               </>
             ) : (
               <>
