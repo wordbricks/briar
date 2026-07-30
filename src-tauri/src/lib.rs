@@ -342,6 +342,26 @@ struct CliConfig {
     extra: BTreeMap<String, serde_json::Value>,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StoredExecutionWorker {
+    worker_id: String,
+    device_id: String,
+    label: String,
+    max_concurrent_sessions: u32,
+}
+
+#[derive(Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LocalExecutionWorkerStatus {
+    project_id: String,
+    registered: bool,
+    worker_id: Option<String>,
+    device_id: Option<String>,
+    label: Option<String>,
+    max_concurrent_sessions: Option<u32>,
+}
+
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct StoredAppRuntimeSettings {
@@ -2770,36 +2790,52 @@ fn configure_execution_worker(
 fn inspect_execution_workers(
     app: AppHandle,
     project_ids: Vec<String>,
-) -> Result<Vec<serde_json::Value>, String> {
-    let resource_directory = app
-        .path()
-        .resource_dir()
-        .map_err(|error| error.to_string())?;
-    let home = app.path().home_dir().map_err(|error| error.to_string())?;
-    sync_auto_hunt_assets(&resource_directory, &home)?;
-    let bun = bundled_bun_binary()
-        .ok_or_else(|| "Briar에 포함된 Bun runtime을 찾지 못했습니다.".to_string())?;
-    let cli = home.join(".local/share/briar/briar.js");
-    let path = cli_execution_path(&home)?;
-    let mut statuses = Vec::new();
-    for project_id in project_ids
+) -> Result<Vec<LocalExecutionWorkerStatus>, String> {
+    inspect_execution_workers_at(&cli_config_path(&app)?, project_ids)
+}
+
+fn inspect_execution_workers_at(
+    config_path: &Path,
+    project_ids: Vec<String>,
+) -> Result<Vec<LocalExecutionWorkerStatus>, String> {
+    // Settings-page inspection must stay read-only: synchronizing CLI assets
+    // here can disturb a running background Worker and change its readiness.
+    let config = read_cli_config(config_path)?;
+    let projects = config
+        .projects
         .into_iter()
-        .filter(|value| !value.trim().is_empty())
-    {
-        let output = Command::new(&bun)
-            .arg(&cli)
-            .args(["worker", "status", "--project", &project_id])
-            .env("PATH", &path)
-            .output()
-            .map_err(|error| format!("Worker 상태 명령을 시작하지 못했습니다: {error}"))?;
-        if !output.status.success() {
-            continue;
-        }
-        let status: serde_json::Value = serde_json::from_slice(&output.stdout)
-            .map_err(|error| format!("Worker 상태를 읽지 못했습니다: {error}"))?;
-        statuses.push(status);
-    }
-    Ok(statuses)
+        .map(|project| (project.id.clone(), project))
+        .collect::<BTreeMap<_, _>>();
+    project_ids
+        .into_iter()
+        .filter(|project_id| !project_id.trim().is_empty())
+        .filter_map(|project_id| {
+            projects
+                .get(&project_id)
+                .map(|project| (project_id, project))
+        })
+        .map(|(project_id, project)| {
+            let worker = project
+                .extra
+                .get("executionWorker")
+                .filter(|value| !value.is_null())
+                .map(|value| {
+                    serde_json::from_value::<StoredExecutionWorker>(value.clone())
+                        .map_err(|error| format!("Worker 로컬 설정이 손상되었습니다: {error}"))
+                })
+                .transpose()?;
+            Ok(LocalExecutionWorkerStatus {
+                project_id,
+                registered: worker.is_some(),
+                worker_id: worker.as_ref().map(|worker| worker.worker_id.clone()),
+                device_id: worker.as_ref().map(|worker| worker.device_id.clone()),
+                label: worker.as_ref().map(|worker| worker.label.clone()),
+                max_concurrent_sessions: worker
+                    .as_ref()
+                    .map(|worker| worker.max_concurrent_sessions),
+            })
+        })
+        .collect()
 }
 
 fn sync_auto_hunt_assets(resource_directory: &Path, home: &Path) -> Result<bool, String> {
@@ -6151,6 +6187,71 @@ branch refs/heads/briar/second-11111111
         let directory = std::env::temp_dir().join(format!("briar-host-test-{name}-{unique}"));
         fs::create_dir_all(&directory).expect("test directory should be created");
         directory.join("config.json")
+    }
+
+    #[test]
+    fn inspects_local_workers_without_mutating_their_configuration() {
+        let config_path = test_config_path("inspect-workers");
+        let contents = serde_json::json!({
+            "apiUrl": "https://briar.example.com",
+            "projects": [
+                {
+                    "id": "project-1",
+                    "repositoryPath": "/repo/one",
+                    "agentToken": "briar_agent_one",
+                    "executionWorker": {
+                        "workerId": "worker-1",
+                        "deviceId": "device-1",
+                        "label": "Dev Mac",
+                        "maxConcurrentSessions": 3,
+                        "token": "briar_worker_secret"
+                    }
+                },
+                {
+                    "id": "project-2",
+                    "repositoryPath": "/repo/two",
+                    "agentToken": "briar_agent_two"
+                }
+            ]
+        })
+        .to_string();
+        fs::write(&config_path, &contents).expect("config should be written");
+
+        let statuses = inspect_execution_workers_at(
+            &config_path,
+            vec![
+                "project-2".to_string(),
+                "missing-project".to_string(),
+                "project-1".to_string(),
+            ],
+        )
+        .expect("worker status should be readable");
+
+        assert_eq!(
+            statuses,
+            vec![
+                LocalExecutionWorkerStatus {
+                    project_id: "project-2".to_string(),
+                    registered: false,
+                    worker_id: None,
+                    device_id: None,
+                    label: None,
+                    max_concurrent_sessions: None,
+                },
+                LocalExecutionWorkerStatus {
+                    project_id: "project-1".to_string(),
+                    registered: true,
+                    worker_id: Some("worker-1".to_string()),
+                    device_id: Some("device-1".to_string()),
+                    label: Some("Dev Mac".to_string()),
+                    max_concurrent_sessions: Some(3),
+                },
+            ]
+        );
+        assert_eq!(
+            fs::read_to_string(&config_path).expect("config should remain readable"),
+            contents
+        );
     }
 
     /// Write a project whose auto-hunt block carries CLI-owned worktree settings.
