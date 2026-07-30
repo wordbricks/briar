@@ -242,6 +242,20 @@ export function groupInboxMessages(
   };
 }
 
+export function filterInboxMessagesByOrganization<T extends InboxMessage>(
+  messages: T[],
+  projects: Project[],
+  organizationId: string | null,
+): T[] {
+  if (!organizationId) return [];
+  const projectIds = new Set(
+    projects
+      .filter((project) => project.organizationId === organizationId)
+      .map((project) => project.id),
+  );
+  return messages.filter((message) => projectIds.has(message.projectId));
+}
+
 function readInboxStorage(storageKey: string): InboxStorage {
   if (typeof window === "undefined") return emptyStorage();
   try {
@@ -277,6 +291,7 @@ function writeInboxStorage(storageKey: string, storage: InboxStorage) {
 
 export function useInbox(
   userId: string | null,
+  organizationId: string | null,
   dashboard: DashboardPayload | null,
   sessions: AutoHuntSession[],
   projects: Project[],
@@ -320,12 +335,16 @@ export function useInbox(
   const messages = useMemo<InboxMessageWithReadState[]>(
     () =>
       state.storageKey === storageKey
-        ? state.messages.map((message) => ({
-            ...message,
-            isUnread: isInboxMessageUnread(message, state.readVersions),
-          }))
+        ? filterInboxMessagesByOrganization(
+            state.messages,
+            projects,
+            organizationId,
+          ).map((message) => ({
+              ...message,
+              isUnread: isInboxMessageUnread(message, state.readVersions),
+            }))
         : [],
-    [state, storageKey],
+    [organizationId, projects, state, storageKey],
   );
 
   const markRead = useCallback(
@@ -355,16 +374,27 @@ export function useInbox(
   const markAllRead = useCallback(() => {
     setState((current) => {
       if (current.storageKey !== storageKey) return current;
+      const organizationMessages = filterInboxMessagesByOrganization(
+        current.messages,
+        projects,
+        organizationId,
+      );
       const next = {
         messages: current.messages,
-        readVersions: Object.fromEntries(
-          current.messages.map((message) => [message.id, message.version]),
-        ),
+        readVersions: {
+          ...current.readVersions,
+          ...Object.fromEntries(
+            organizationMessages.map((message) => [
+              message.id,
+              message.version,
+            ]),
+          ),
+        },
       };
       writeInboxStorage(storageKey, next);
       return { storageKey, ...next };
     });
-  }, [storageKey]);
+  }, [organizationId, projects, storageKey]);
 
   return {
     messages,

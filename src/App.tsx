@@ -91,11 +91,16 @@ export function App() {
   const briar = useBriar(scheduleSessionOptions);
   const inbox = useInbox(
     briar.user?.id ?? null,
+    briar.activeOrganizationId,
     briar.dashboard,
     autoHunt.sessions,
     briar.projects,
   );
-  useInboxNotifications(briar.user?.id ?? null, inbox.messages);
+  useInboxNotifications(
+    briar.user?.id ?? null,
+    briar.activeOrganizationId,
+    inbox.messages,
+  );
   useEffect(() => {
     void syncAppBadgeCount(inbox.unreadCount).catch(() => {
       // An unsupported desktop environment or Android launcher must not block the app.
