@@ -237,13 +237,23 @@ export async function runWorkerLoop(
     }
 
     const executionFinished = Promise.race(active.values());
-    const outcome =
+    const heartbeatDelayMs = Math.max(
+      0,
+      heartbeatIntervalMs - (dependencies.now() - lastHeartbeatAt),
+    );
+    const waitDelayMs =
       queueWasEmpty && active.size < maxConcurrentSessions
-        ? await Promise.race([
-            executionFinished,
-            dependencies.sleep(idleDelayMs).then(() => null),
-          ])
-        : await executionFinished;
+        ? Math.min(idleDelayMs, heartbeatDelayMs)
+        : heartbeatDelayMs;
+    // Wake for the next heartbeat even when every execution slot is occupied.
+    // Otherwise a long-running issue makes the server report the live worker
+    // as stale until that issue finishes.
+    const wake = new AbortController();
+    const outcome = await Promise.race([
+      executionFinished,
+      dependencies.sleep(waitDelayMs, wake.signal).then(() => null),
+    ]);
+    wake.abort();
     if (!outcome) continue;
 
     active.delete(outcome.issue.runId);
