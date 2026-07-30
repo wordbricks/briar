@@ -46,6 +46,8 @@ test("server-renders Korean for a Korean browser", async () => {
   assert.match(html, /에이전트 작업을 운영하세요/);
   assert.match(html, /코드는 로컬에/);
   assert.match(html, /에이전트 이벤트 스트림 연결/);
+  assert.match(html, /briar-dashboard\.jpeg/);
+  assert.match(html, /briar-evidence\.jpeg/);
   assert.match(html, /Mac용 Briar 다운로드/);
   assert.match(html, /macOS Apple Silicon/);
   assert.match(html, /Android용 다운로드/);
@@ -79,6 +81,8 @@ test("server-renders English for an English browser", async () => {
   assert.match(html, /From issue to PR\./);
   assert.match(html, /Operate your agent work\./);
   assert.match(html, /Turn agent development/);
+  assert.match(html, /briar-dashboard\.jpeg/);
+  assert.match(html, /briar-evidence\.jpeg/);
   assert.match(html, /Download Briar for Mac/);
   assert.match(html, /aria-label="Language"/);
   assert.match(html, /aria-pressed="true"[^>]*aria-label="English"/);
