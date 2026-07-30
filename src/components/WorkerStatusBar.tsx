@@ -90,11 +90,20 @@ export function WorkerStatusBar({
             {workers.map((worker) => {
               const providers = workerProviders(worker);
               const status = t(`worker.readiness.${worker.readiness}`);
+              const maximumSlots = Math.max(1, worker.maxConcurrentSessions);
+              const activeSlots = Math.min(
+                maximumSlots,
+                Math.max(0, worker.activeSessions),
+              );
+              const slotUsage = t("worker.slotUsage", {
+                active: activeSlots,
+                maximum: maximumSlots,
+              });
               return (
                 <div
                   className="worker-status-item"
                   key={worker.id}
-                  title={`${worker.label} · ${status}`}
+                  title={`${worker.label} · ${status} · ${slotUsage}`}
                 >
                   <i
                     aria-label={status}
@@ -103,7 +112,28 @@ export function WorkerStatusBar({
                   />
                   <span className="worker-status-copy">
                     <strong>{worker.label}</strong>
-                    <small>{status}</small>
+                    <span className="worker-status-meta">
+                      <small>{status}</small>
+                      <span
+                        aria-label={slotUsage}
+                        aria-valuemax={maximumSlots}
+                        aria-valuemin={0}
+                        aria-valuenow={activeSlots}
+                        className="worker-slot-usage"
+                        role="progressbar"
+                      >
+                        <i aria-hidden>
+                          <b
+                            style={{
+                              width: `${(activeSlots / maximumSlots) * 100}%`,
+                            }}
+                          />
+                        </i>
+                        <small aria-hidden>
+                          {activeSlots}/{maximumSlots}
+                        </small>
+                      </span>
+                    </span>
                   </span>
                   <span className="worker-status-providers">
                     <WorkerProviderIcons providers={providers} size={13} />

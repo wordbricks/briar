@@ -97,6 +97,42 @@ describe("WorkerStatusBar", () => {
     await act(async () => root.unmount());
   });
 
+  it("shows each worker's used and total slots with an accessible meter", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <I18nProvider>
+          <WorkerStatusBar
+            workers={[
+              worker({
+                activeSessions: 2,
+                availableSessions: 2,
+                maxConcurrentSessions: 4,
+              }),
+            ]}
+          />
+        </I18nProvider>,
+      );
+    });
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".worker-status-trigger")
+        ?.click();
+    });
+
+    const meter = container.querySelector<HTMLElement>('[role="progressbar"]');
+    expect(meter?.getAttribute("aria-label")).toBe("슬롯 2/4개 사용 중");
+    expect(meter?.getAttribute("aria-valuenow")).toBe("2");
+    expect(meter?.getAttribute("aria-valuemax")).toBe("4");
+    expect(meter?.querySelector("b")?.style.width).toBe("50%");
+    expect(meter?.textContent).toBe("2/4");
+
+    await act(async () => root.unmount());
+  });
+
   it("falls back to the worker binding provider for older responses", () => {
     expect(
       workerProviders(worker({ agentProvider: "grok", providers: undefined })),
