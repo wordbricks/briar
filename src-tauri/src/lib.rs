@@ -22,6 +22,7 @@ use std::{
 use tauri::{webview::Color, WebviewUrl, WebviewWindowBuilder};
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
+use tauri_plugin_opener::OpenerExt;
 
 const SESSION_FILE_NAME: &str = "session.json";
 const AUTO_HUNT_EVENT_DIRECTORY: &str = "auto-hunt-sessions";
@@ -29,6 +30,11 @@ const AUTO_HUNT_APP_SERVER_EVENT: &str = "auto-hunt-app-server-event";
 const AUTO_HUNT_DISPATCH_EVENT: &str = "auto-hunt-dispatch-event";
 const PROJECT_AGENT_SCHEDULE_POLL_EVENT: &str = "project-agent-schedule-poll";
 const AGENT_SESSION_STOPPED_ERROR: &str = "사용자가 에이전트 세션을 중지했습니다.";
+const GITHUB_DEVICE_LOGIN_URL: &str = "https://github.com/login/device";
+#[cfg(not(target_os = "windows"))]
+const GITHUB_CLI_NOOP_BROWSER: &str = "/usr/bin/true";
+#[cfg(target_os = "windows")]
+const GITHUB_CLI_NOOP_BROWSER: &str = "cmd.exe /D /C rem";
 const DEFAULT_MAIN_WINDOW_SIZE: (f64, f64) = (1280.0, 820.0);
 const DEFAULT_MAIN_WINDOW_MIN_SIZE: (f64, f64) = (980.0, 680.0);
 const ONBOARDING_MAIN_WINDOW_SIZE: (f64, f64) = (780.0, 580.0);
@@ -1370,6 +1376,7 @@ async fn login_project_github(
 ) -> Result<RepositoryReadiness, String> {
     let config_path = cli_config_path(&app)?;
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    let app_handle = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let binary = gh_binary(&home)?;
         let execution_path = cli_execution_path(&home)?;
@@ -1387,16 +1394,25 @@ async fn login_project_github(
             let supports_clipboard = help.as_ref().is_some_and(|output| {
                 String::from_utf8_lossy(&output.stdout).contains("--clipboard")
             });
+            app_handle
+                .opener()
+                .open_url(GITHUB_DEVICE_LOGIN_URL, None::<&str>)
+                .map_err(|error| format!("GitHub 로그인 페이지를 열지 못했습니다: {error}"))?;
             let mut command = Command::new(&binary);
-            command.env("PATH", &execution_path).args([
-                "auth",
-                "login",
-                "--hostname",
-                "github.com",
-                "--git-protocol",
-                "https",
-                "--web",
-            ]);
+            command
+                .env("PATH", &execution_path)
+                // Briar opens the device page itself so a GUI launch never
+                // depends on the CLI process inheriting a usable browser.
+                .env("GH_BROWSER", GITHUB_CLI_NOOP_BROWSER)
+                .args([
+                    "auth",
+                    "login",
+                    "--hostname",
+                    "github.com",
+                    "--git-protocol",
+                    "https",
+                    "--web",
+                ]);
             if supports_clipboard {
                 command.arg("--clipboard");
             }
