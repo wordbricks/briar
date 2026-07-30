@@ -150,6 +150,7 @@ export type HuntRun = {
   leaseExpiresAt: string | null;
   claimAttempts: number;
   agentId?: string | null;
+  requestedProvider?: AgentProvider | null;
   requestedWorkerId?: string | null;
   requestedByUserId?: string | null;
   dispatchMode?: "any" | "specific" | null;

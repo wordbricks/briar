@@ -92,4 +92,100 @@ describe("WorkerDispatchDialog", () => {
 
     await act(async () => root.unmount());
   });
+
+  it("selects an execution provider independently from the logical Agent", async () => {
+    const codexWorker = {
+      ...worker("worker-codex", "Codex Mac"),
+      providers: ["codex"] as ExecutionWorker["providers"],
+    };
+    const claudeWorker = {
+      ...worker("worker-claude", "Claude Mac"),
+      providers: ["claude"] as ExecutionWorker["providers"],
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <WorkerDispatchDialog
+          agents={[agent]}
+          error={null}
+          isDispatching={false}
+          onOpenChange={vi.fn()}
+          onSubmit={vi.fn()}
+          open
+          run={null}
+          workers={[codexWorker, claudeWorker]}
+        />,
+      );
+    });
+
+    expect(document.body.textContent).toContain("Claude Mac");
+    expect(document.body.textContent).not.toContain("Codex Mac");
+
+    await act(async () => {
+      document.body
+        .querySelector<HTMLButtonElement>('[aria-label="실행 프로바이더"]')
+        ?.click();
+    });
+    await act(async () => {
+      document.body
+        .querySelector<HTMLButtonElement>(
+          '.select-menu-option[data-value="codex"]',
+        )
+        ?.click();
+    });
+
+    expect(document.body.textContent).toContain("Codex Mac");
+    expect(document.body.textContent).not.toContain("Claude Mac");
+
+    await act(async () => root.unmount());
+  });
+
+  it("selects a Worker card and submits the Worker and provider", async () => {
+    const first = worker("worker-first", "First Mac");
+    const second = worker("worker-second", "Second Mac");
+    const onSubmit = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <WorkerDispatchDialog
+          agents={[agent]}
+          error={null}
+          isDispatching={false}
+          onOpenChange={vi.fn()}
+          onSubmit={onSubmit}
+          open
+          run={null}
+          workers={[first, second]}
+        />,
+      );
+    });
+
+    const secondCard = Array.from(
+      document.body.querySelectorAll<HTMLButtonElement>(
+        ".worker-readiness-row",
+      ),
+    ).find((button) => button.textContent?.includes("Second Mac"));
+    await act(async () => secondCard?.click());
+
+    expect(secondCard?.getAttribute("aria-pressed")).toBe("true");
+
+    const dispatchButton = Array.from(
+      document.body.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent?.includes("실행 배정"));
+    await act(async () => dispatchButton?.click());
+
+    expect(onSubmit).toHaveBeenCalledWith({
+      agentId: agent.id,
+      provider: "claude",
+      workerId: second.id,
+    });
+
+    await act(async () => root.unmount());
+  });
 });

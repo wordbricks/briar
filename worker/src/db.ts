@@ -196,6 +196,7 @@ export type HuntRunRow = {
   lease_expires_at: string | null;
   claim_attempts: number;
   agent_id: string | null;
+  requested_agent_provider: ProjectAgentProvider | null;
   requested_worker_id: string | null;
   requested_by_user_id: string | null;
   dispatch_mode: "any" | "specific" | null;
@@ -2103,9 +2104,27 @@ export async function claimNextQueuedHuntRun(
                where agent.id = briar_hunt_runs.agent_id
                  and agent.project_id = briar_hunt_runs.project_id
                  and (
-                   (? = 1 and agent.provider = 'codex')
-                   or (? = 1 and agent.provider = 'claude')
-                   or (? = 1 and agent.provider = 'grok')
+                   (
+                     ? = 1
+                     and coalesce(
+                       briar_hunt_runs.requested_agent_provider,
+                       agent.provider
+                     ) = 'codex'
+                   )
+                   or (
+                     ? = 1
+                     and coalesce(
+                       briar_hunt_runs.requested_agent_provider,
+                       agent.provider
+                     ) = 'claude'
+                   )
+                   or (
+                     ? = 1
+                     and coalesce(
+                       briar_hunt_runs.requested_agent_provider,
+                       agent.provider
+                     ) = 'grok'
+                   )
                  )
              )
            )

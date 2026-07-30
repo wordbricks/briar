@@ -126,6 +126,7 @@ describe("detached execution workers", () => {
       "migrations/0036_execution_worker_concurrency.sql",
       "migrations/0038_project_execution_worker_policies.sql",
       "migrations/0039_project_agent_tokens.sql",
+      "migrations/0040_run_execution_provider.sql",
     ]) {
       await executeSql(db, await readFile(resolve(migration), "utf8"));
     }
@@ -744,6 +745,73 @@ describe("detached execution workers", () => {
       "claude",
       "grok",
     ]);
+  });
+
+  it("routes a logical Agent through the explicitly selected provider", async () => {
+    const registered = await register("provider-override");
+    await recordWorkerHeartbeat(db, projectId, {
+      workerId: registered.worker.id,
+      capabilities: {
+        providers: ["codex", "claude"],
+        worktrees: true,
+      },
+      observedAt: atMinute(2),
+    });
+    const agent = await db
+      .prepare(
+        `select id from briar_project_agents
+         where project_id = ? and provider = 'codex' limit 1`,
+      )
+      .bind(projectId)
+      .first<{ id: string }>();
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      queuedEvent("provider-override-issue", 3),
+    );
+
+    await expect(
+      dispatchHuntRun(db, projectId, projectId, {
+        runId,
+        agentId: agent!.id,
+        provider: "claude",
+        workerId: registered.worker.id,
+        requestedByUserId: "member",
+        requestId: "77777777-aaaa-4777-8777-777777777777",
+        occurredAt: atMinute(3),
+      }),
+    ).resolves.toMatchObject({
+      agentId: agent!.id,
+      provider: "claude",
+      requestedWorkerId: registered.worker.id,
+    });
+
+    const wrongProviderClaim = await claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: fingerprint("wrong-provider-claim"),
+      claimedBy: registered.worker.label,
+      claimedAt: atMinute(4),
+      leaseExpiresAt: leaseExpiryFrom(atMinute(4)),
+      workerId: registered.worker.id,
+      agentProvider: "codex",
+      detachedOnly: true,
+    });
+    expect(wrongProviderClaim).toBeNull();
+
+    const selectedProviderClaim = await claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: fingerprint("selected-provider-claim"),
+      claimedBy: registered.worker.label,
+      claimedAt: atMinute(4),
+      leaseExpiresAt: leaseExpiryFrom(atMinute(4)),
+      workerId: registered.worker.id,
+      agentProvider: "claude",
+      detachedOnly: true,
+    });
+    expect(selectedProviderClaim).toMatchObject({
+      id: runId,
+      agent_id: agent!.id,
+      requested_agent_provider: "claude",
+      worker_id: registered.worker.id,
+    });
   });
 
   it("enforces the project Worker allowlist for dispatch and claim", async () => {

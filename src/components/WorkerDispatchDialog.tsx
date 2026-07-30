@@ -1,4 +1,11 @@
-import { Bot, CircleAlert, Cpu, LoaderCircle } from "lucide-react";
+import {
+  Bot,
+  Check,
+  CircleAlert,
+  Cpu,
+  LoaderCircle,
+  Waypoints,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   Dialog,
@@ -11,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
+import { agentProviders, type AgentProvider } from "../lib/project-llm";
 import type {
   ExecutionWorker,
   HuntRun,
@@ -34,7 +42,11 @@ export function WorkerDispatchDialog({
   error: string | null;
   isDispatching: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (input: { agentId: string; workerId: string | null }) => void;
+  onSubmit: (input: {
+    agentId: string;
+    provider: AgentProvider;
+    workerId: string | null;
+  }) => void;
   open: boolean;
   policy?: ProjectExecutionWorkerPolicy;
   run: HuntRun | null;
@@ -42,6 +54,7 @@ export function WorkerDispatchDialog({
 }) {
   const { t } = useI18n();
   const [agentId, setAgentId] = useState("");
+  const [provider, setProvider] = useState<AgentProvider>("codex");
   const [workerId, setWorkerId] = useState("any");
   const selectedAgent = agents.find((agent) => agent.id === agentId) ?? null;
   const eligibleWorkers = useMemo(
@@ -50,16 +63,11 @@ export function WorkerDispatchDialog({
         (worker) =>
           (policy?.selectionMode !== "allowlist" ||
             policy.allowedWorkerIds.includes(worker.id)) &&
-          Boolean(
-            selectedAgent &&
-              (worker.providers ?? [worker.agentProvider]).includes(
-                selectedAgent.provider,
-              ),
-          ) &&
+          (worker.providers ?? [worker.agentProvider]).includes(provider) &&
           worker.acceptingWork &&
           worker.readiness !== "disabled",
       ),
-    [policy, selectedAgent?.provider, workers],
+    [policy, provider, workers],
   );
 
   useEffect(() => {
@@ -67,12 +75,14 @@ export function WorkerDispatchDialog({
     const preferredAgent =
       agents.find((agent) => agent.id === run?.agentId) ?? agents[0] ?? null;
     setAgentId(preferredAgent?.id ?? "");
+    setProvider(run?.requestedProvider ?? preferredAgent?.provider ?? "codex");
     setWorkerId(run?.requestedWorkerId ?? policy?.defaultWorkerId ?? "any");
   }, [
     agents,
     open,
     policy?.defaultWorkerId,
     run?.agentId,
+    run?.requestedProvider,
     run?.requestedWorkerId,
   ]);
 
@@ -110,10 +120,27 @@ export function WorkerDispatchDialog({
               label={t("worker.agent")}
               onValueChange={setAgentId}
               options={agents.map((agent) => ({
-                label: `${agent.name} · ${agent.provider}`,
+                label: agent.name,
                 value: agent.id,
               }))}
               value={agentId}
+            />
+          </label>
+          <label>
+            <span><Waypoints size={15} />{t("worker.provider")}</span>
+            <NativeSelect
+              label={t("worker.provider")}
+              onValueChange={(value) => setProvider(value as AgentProvider)}
+              options={agentProviders.map((candidate) => ({
+                label:
+                  candidate === "codex"
+                    ? "Codex"
+                    : candidate === "claude"
+                      ? "Claude"
+                      : "Grok",
+                value: candidate,
+              }))}
+              value={provider}
             />
           </label>
           <label>
@@ -127,6 +154,7 @@ export function WorkerDispatchDialog({
                   value: "any",
                 },
                 ...eligibleWorkers.map((worker) => ({
+                  disabled: worker.readiness !== "available",
                   label: `${worker.label} · ${t(`worker.readiness.${worker.readiness}` as MessageKey)}`,
                   value: worker.id,
                 })),
@@ -140,7 +168,14 @@ export function WorkerDispatchDialog({
               <p><CircleAlert size={15} />{t("worker.noneForProvider")}</p>
             ) : (
               eligibleWorkers.map((worker) => (
-                <div className="worker-readiness-row" key={worker.id}>
+                <button
+                  aria-pressed={workerId === worker.id}
+                  className="worker-readiness-row"
+                  disabled={worker.readiness !== "available"}
+                  key={worker.id}
+                  onClick={() => setWorkerId(worker.id)}
+                  type="button"
+                >
                   <span className={`worker-readiness-dot ${worker.readiness}`} />
                   <span>
                     <strong>{worker.label}</strong>
@@ -151,7 +186,12 @@ export function WorkerDispatchDialog({
                         : ""}
                     </small>
                   </span>
-                </div>
+                  <Check
+                    aria-hidden="true"
+                    className="worker-readiness-check"
+                    size={16}
+                  />
+                </button>
               ))
             )}
           </div>
@@ -171,6 +211,7 @@ export function WorkerDispatchDialog({
             onClick={() =>
               onSubmit({
                 agentId,
+                provider,
                 workerId: workerId === "any" ? null : workerId,
               })
             }

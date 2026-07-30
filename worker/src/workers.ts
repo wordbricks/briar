@@ -145,6 +145,7 @@ export function executionWorkerProviders(
 export type ExecutionDispatchRow = {
   runId: string;
   agentId: string;
+  provider: AgentProvider;
   requestedWorkerId: string | null;
   requestedByUserId: string;
   dispatchMode: "any" | "specific";
@@ -1093,6 +1094,7 @@ export async function dispatchHuntRun(
   input: {
     runId: string;
     agentId: string;
+    provider?: AgentProvider;
     workerId?: string | null;
     requestedByUserId: string;
     requestId: string;
@@ -1108,6 +1110,7 @@ export async function dispatchHuntRun(
     .bind(input.agentId, projectId)
     .first<{ id: string; provider: AgentProvider }>();
   if (!agent) throw new WorkerConflictError("Agent not found for this project");
+  const provider = input.provider ?? agent.provider;
 
   if (input.workerId) {
     const worker = await db
@@ -1138,9 +1141,9 @@ export async function dispatchHuntRun(
     ) {
       throw new WorkerConflictError("Worker is not ready to accept work");
     }
-    if (!executionWorkerProviders(worker).includes(agent.provider)) {
+    if (!executionWorkerProviders(worker).includes(provider)) {
       throw new WorkerConflictError(
-        `Worker does not support the ${agent.provider} Agent provider`,
+        `Worker does not support the ${provider} provider`,
       );
     }
     if (
@@ -1192,19 +1195,19 @@ export async function dispatchHuntRun(
            )
          limit 1`,
       )
-      .bind(projectId, organizationId, agent.provider, agent.provider)
+      .bind(projectId, organizationId, provider, provider)
       .first<{ id: string }>();
     if (!eligible) {
       throw new WorkerConflictError(
-        `No worker is configured for the ${agent.provider} Agent provider`,
+        `No worker is configured for the ${provider} provider`,
       );
     }
   }
 
   const existing = await db
     .prepare(
-      `select id, agent_id, requested_worker_id, requested_by_user_id,
-              dispatch_mode, dispatched_at
+      `select id, agent_id, requested_agent_provider, requested_worker_id,
+              requested_by_user_id, dispatch_mode, dispatched_at
        from briar_hunt_runs
        where project_id = ? and dispatch_request_id = ?`,
     )
@@ -1212,6 +1215,7 @@ export async function dispatchHuntRun(
     .first<{
       id: string;
       agent_id: string;
+      requested_agent_provider: AgentProvider | null;
       requested_worker_id: string | null;
       requested_by_user_id: string;
       dispatch_mode: "any" | "specific";
@@ -1221,6 +1225,7 @@ export async function dispatchHuntRun(
     return {
       runId: existing.id,
       agentId: existing.agent_id,
+      provider: existing.requested_agent_provider ?? agent.provider,
       requestedWorkerId: existing.requested_worker_id,
       requestedByUserId: existing.requested_by_user_id,
       dispatchMode: existing.dispatch_mode,
@@ -1269,7 +1274,8 @@ export async function dispatchHuntRun(
   const result = await db
     .prepare(
       `update briar_hunt_runs
-       set agent_id = ?, requested_worker_id = ?, requested_by_user_id = ?,
+       set agent_id = ?, requested_agent_provider = ?, requested_worker_id = ?,
+           requested_by_user_id = ?,
            dispatch_mode = ?, dispatch_request_id = ?, dispatched_at = ?,
            status = 'queued', stage = 'queued', workflow_stage = null,
            current_attempt = ?, current_revision = 1,
@@ -1281,6 +1287,7 @@ export async function dispatchHuntRun(
     )
     .bind(
       agent.id,
+      provider,
       input.workerId ?? null,
       input.requestedByUserId,
       input.workerId ? "specific" : "any",
@@ -1308,6 +1315,7 @@ export async function dispatchHuntRun(
     requestId: input.requestId,
     detail: {
       previousWorkerId: run.worker_id,
+      provider,
       dispatchMode: input.workerId ? "specific" : "any",
     },
     occurredAt: input.occurredAt,
@@ -1315,6 +1323,7 @@ export async function dispatchHuntRun(
   return {
     runId: input.runId,
     agentId: agent.id,
+    provider,
     requestedWorkerId: input.workerId ?? null,
     requestedByUserId: input.requestedByUserId,
     dispatchMode: input.workerId ? "specific" : "any",

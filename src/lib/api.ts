@@ -9,6 +9,7 @@ import {
   defaultProjectAgentCalendarColor,
   type ProjectAgentLocale,
 } from "./project-agent";
+import type { AgentProvider } from "./project-llm";
 import type {
   LinearImportConnectResult,
   LinearImportResult,
@@ -966,6 +967,7 @@ export const cancelHuntRun = (
 export type HuntDispatchResult = {
   runId: string;
   agentId: string;
+  provider: AgentProvider;
   requestedWorkerId: string | null;
   requestedByUserId: string;
   dispatchMode: "any" | "specific";
@@ -979,6 +981,7 @@ export async function dispatchHuntRun(
   runId: string,
   input: {
     agentId: string;
+    provider: AgentProvider;
     workerId: string | null;
     reassign?: boolean;
   },
@@ -990,6 +993,7 @@ export async function dispatchHuntRun(
       method: "POST",
       body: JSON.stringify({
         agentId: input.agentId,
+        provider: input.provider,
         workerId: input.workerId,
         requestId: crypto.randomUUID(),
       }),
