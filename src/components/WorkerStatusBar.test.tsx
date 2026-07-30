@@ -1,8 +1,16 @@
+/** @vitest-environment jsdom */
+
+import { act } from "react";
+import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { I18nProvider } from "../i18n";
 import type { ExecutionWorker } from "../types";
-import { WorkerStatusBar, workerProviders } from "./WorkerStatusBar";
+import {
+  activeWorkerCount,
+  WorkerStatusBar,
+  workerProviders,
+} from "./WorkerStatusBar";
 
 const worker = (overrides: Partial<ExecutionWorker> = {}): ExecutionWorker => ({
   id: "worker-1",
@@ -26,24 +34,82 @@ const worker = (overrides: Partial<ExecutionWorker> = {}): ExecutionWorker => ({
 });
 
 describe("WorkerStatusBar", () => {
-  it("shows readiness, name, and every supported provider icon", () => {
+  beforeEach(() => {
+    (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
+      .IS_REACT_ACT_ENVIRONMENT = true;
+    localStorage.setItem("briar.locale.v1", "ko");
+  });
+
+  afterEach(() => {
+    document.body.innerHTML = "";
+    localStorage.clear();
+  });
+
+  it("shows a compact computer trigger with the active worker count", () => {
     const markup = renderToStaticMarkup(
       <I18nProvider>
-        <WorkerStatusBar workers={[worker()]} />
+        <WorkerStatusBar
+          workers={[
+            worker(),
+            worker({
+              id: "worker-2",
+              state: "stale",
+              readiness: "offline",
+            }),
+          ]}
+        />
       </I18nProvider>,
     );
 
-    expect(markup).toContain("worker-status-dot available");
-    expect(markup).toContain("Janet&#x27;s Mac");
-    expect(markup).toContain('aria-label="Codex"');
-    expect(markup).toContain('aria-label="Claude"');
-    expect(markup.match(/title="Codex"/g)).toHaveLength(1);
-    expect(markup.match(/title="Claude"/g)).toHaveLength(1);
+    expect(markup).toContain("worker-status-trigger");
+    expect(markup).toContain('aria-label="활성 Worker 1대"');
+    expect(markup).toContain("<strong>1</strong>");
+    expect(markup).not.toContain("worker-status-popover");
+  });
+
+  it("opens a list with readiness, name, and every supported provider icon", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <I18nProvider>
+          <WorkerStatusBar workers={[worker()]} />
+        </I18nProvider>,
+      );
+    });
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".worker-status-trigger")
+        ?.click();
+    });
+
+    expect(container.innerHTML).toContain("worker-status-dot available");
+    expect(container.innerHTML).toContain("Janet's Mac");
+    expect(container.innerHTML).toContain("사용 가능");
+    expect(container.innerHTML).toContain('aria-label="Codex"');
+    expect(container.innerHTML).toContain('aria-label="Claude"');
+    expect(container.innerHTML.match(/title="Codex"/g)).toHaveLength(1);
+    expect(container.innerHTML.match(/title="Claude"/g)).toHaveLength(1);
+    expect(container.querySelector('[role="dialog"]')).not.toBeNull();
+
+    await act(async () => root.unmount());
   });
 
   it("falls back to the worker binding provider for older responses", () => {
     expect(
       workerProviders(worker({ agentProvider: "grok", providers: undefined })),
     ).toEqual(["grok"]);
+  });
+
+  it("only counts online workers as active", () => {
+    expect(
+      activeWorkerCount([
+        worker(),
+        worker({ id: "worker-2", state: "stale", readiness: "offline" }),
+        worker({ id: "worker-3", state: "disabled", readiness: "disabled" }),
+      ]),
+    ).toBe(1);
   });
 });
