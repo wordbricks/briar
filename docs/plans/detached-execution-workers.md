@@ -98,6 +98,9 @@ ownership relationship.
 
 Run state includes:
 
+- `requested_agent_provider` — the execution provider selected independently
+  from the logical Agent, with the Agent's configured provider as the legacy
+  fallback;
 - `requested_worker_id` — nullable for automatic routing;
 - `requested_by_user_id`;
 - `dispatch_mode` — `specific` or `any`;
@@ -111,6 +114,7 @@ run:
 POST /projects/:projectId/runs/:runId/dispatch
 {
   "agentId": "logical-project-agent-id",
+  "provider": "codex | claude | grok",
   "workerId": "optional-worker-id",
   "requestId": "idempotency-key"
 }

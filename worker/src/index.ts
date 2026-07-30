@@ -805,6 +805,7 @@ const workerLabelSchema = z
 const dispatchRunSchema = z
   .object({
     agentId: z.string().uuid(),
+    provider: z.enum(["codex", "claude", "grok"]).optional(),
     workerId: z.string().trim().min(1).max(128).nullable().optional(),
     requestId: z.string().uuid(),
   })
@@ -1951,6 +1952,7 @@ function dashboardRunJson(
     leaseExpiresAt: run.lease_expires_at,
     claimAttempts: run.claim_attempts,
     agentId: run.agent_id,
+    requestedProvider: run.requested_agent_provider,
     requestedWorkerId: run.requested_worker_id,
     requestedByUserId: run.requested_by_user_id,
     dispatchMode: run.dispatch_mode,
@@ -3595,6 +3597,7 @@ async function route(
       {
         runId: dispatchRunMatch[2],
         agentId: input.agentId,
+        provider: input.provider,
         workerId: input.workerId ?? null,
         requestedByUserId: session.user.id,
         requestId: input.requestId,
@@ -4097,8 +4100,12 @@ async function route(
               ? {
                   id: agent.id,
                   name: agent.name,
-                  provider: agent.provider,
-                  model: agent.model,
+                  provider: run.requested_agent_provider ?? agent.provider,
+                  model:
+                    run.requested_agent_provider &&
+                    run.requested_agent_provider !== agent.provider
+                      ? null
+                      : agent.model,
                   responsibility: agent.responsibility,
                   skill: agent.skill_markdown,
                 }

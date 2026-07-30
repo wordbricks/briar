@@ -64,6 +64,7 @@ import { isRepositoryConnectedForImport } from "./lib/linear-import";
 import { settingsAccountSelection } from "./lib/settings-account-selection";
 import { dispatchHuntRun, loadProjectAgents } from "./lib/api";
 import { demoProjectAgents } from "./lib/demo-project-agents";
+import type { AgentProvider } from "./lib/project-llm";
 import { useI18n } from "./i18n";
 import type { HuntRun, ProjectAgent } from "./types";
 
@@ -262,6 +263,7 @@ export function App() {
   };
   const submitWorkerDispatch = async (input: {
     agentId: string;
+    provider: AgentProvider;
     workerId: string | null;
   }) => {
     if (!activeProject || !briar.token || !dispatchRun) return;
