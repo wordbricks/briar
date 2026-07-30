@@ -5234,7 +5234,8 @@ mod tests {
         fs::create_dir_all(&shims).expect("mise shims directory should exist");
         for binary in ["bun", "codex"] {
             let path = shims.join(binary);
-            fs::write(&path, "#!/bin/sh\nexit 0\n").expect("fixture CLI should be written");
+            fs::write(&path, format!("#!/bin/sh\nprintf '{binary} 1.2.3\\n'\n"))
+                .expect("fixture CLI should be written");
             fs::set_permissions(&path, fs::Permissions::from_mode(0o700))
                 .expect("fixture CLI should be executable");
         }
@@ -5249,6 +5250,38 @@ mod tests {
             agent::codex_binary(home.path(), &execution_path)
                 .expect("Codex should resolve through the mise shim directory"),
             shims.join("codex")
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn skips_a_broken_codex_before_a_working_path_candidate() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let home = tempfile::tempdir().expect("fixture home should exist");
+        let broken_directory = home.path().join(".bun/bin");
+        let working_directory = home.path().join("homebrew/bin");
+        fs::create_dir_all(&broken_directory).expect("broken fixture directory should exist");
+        fs::create_dir_all(&working_directory).expect("working fixture directory should exist");
+
+        let broken = broken_directory.join("codex");
+        fs::write(&broken, "#!/usr/bin/env missing-codex-runtime\n")
+            .expect("broken Codex fixture should be written");
+        let working = working_directory.join("codex");
+        fs::write(&working, "#!/bin/sh\nprintf 'codex-cli 1.2.3\\n'\n")
+            .expect("working Codex fixture should be written");
+        for binary in [&broken, &working] {
+            fs::set_permissions(binary, fs::Permissions::from_mode(0o700))
+                .expect("fixture CLI should be executable");
+        }
+
+        let execution_path = env::join_paths([&broken_directory, &working_directory])
+            .expect("fixture PATH should resolve");
+
+        assert_eq!(
+            agent::codex_binary(home.path(), &execution_path)
+                .expect("the working Codex should be selected"),
+            working
         );
     }
 

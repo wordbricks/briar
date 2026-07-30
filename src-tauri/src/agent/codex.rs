@@ -6,22 +6,19 @@ use std::{
     fs,
     io::{BufRead, BufReader, Read, Write},
     path::{Path, PathBuf},
-    process::{Child, ChildStdin},
+    process::{Child, ChildStdin, Command},
     sync::{Arc, Mutex},
     thread,
 };
-
-use crate::host::{CommandRunner, CommandSpec};
-#[cfg(test)]
-use std::ffi::OsString;
-#[cfg(test)]
-use std::process::Command;
 
 use super::{
     AgentBackend, AgentEvent, AgentEventDirection, AgentEventSink, AgentProviderEvent,
     AgentProviderKind, ApprovalPolicy, AutoHuntExecution, ChatExecution, ModelEffort,
     ProjectLlmRequest, ProjectLlmResponse, SandboxMode,
 };
+use crate::host::{CommandRunner, CommandSpec};
+#[cfg(test)]
+use std::ffi::OsString;
 
 const INITIALIZE_REQUEST_ID: u64 = 1;
 const THREAD_REQUEST_ID: u64 = 2;
@@ -569,9 +566,9 @@ pub(crate) struct AutoHuntCoordinatorResponse {
 }
 
 pub(crate) fn codex_binary(home: &Path, execution_path: &OsStr) -> Result<PathBuf, String> {
-    if let Ok(path) = which::which_in("codex", Some(execution_path), home) {
-        return Ok(path);
-    }
+    let mut candidates = which::which_in_all("codex", Some(execution_path), home)
+        .map(|paths| paths.collect::<Vec<_>>())
+        .unwrap_or_default();
     for candidate in [
         home.join(".local/bin/codex"),
         home.join(".bun/bin/codex"),
@@ -579,11 +576,28 @@ pub(crate) fn codex_binary(home: &Path, execution_path: &OsStr) -> Result<PathBu
         PathBuf::from("/opt/homebrew/bin/codex"),
         PathBuf::from("/usr/local/bin/codex"),
     ] {
-        if candidate.is_file() {
-            return Ok(candidate);
+        if candidate.is_file() && !candidates.contains(&candidate) {
+            candidates.push(candidate);
         }
     }
+
+    if let Some(candidate) = candidates
+        .into_iter()
+        .find(|candidate| codex_binary_is_usable(candidate, execution_path))
+    {
+        return Ok(candidate);
+    }
     Err("Codex CLI가 필요합니다. Codex를 설치하고 로그인한 뒤 Briar를 다시 여세요.".to_string())
+}
+
+fn codex_binary_is_usable(candidate: &Path, execution_path: &OsStr) -> bool {
+    Command::new(candidate)
+        .env("PATH", execution_path)
+        .arg("--version")
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .is_some_and(|output| !output.stdout.is_empty() || !output.stderr.is_empty())
 }
 
 pub(crate) fn chat(
