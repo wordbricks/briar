@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import worker, {
+  claimConversationJson,
   issueUpdateInputSchema,
   organizationLogoInputSchema,
   organizationMemberRoleInputSchema,
@@ -19,6 +20,54 @@ describe("Worker HTTP contract", () => {
     expect(() =>
       organizationMemberRoleInputSchema.parse({ role: "owner" }),
     ).toThrow();
+  });
+
+  it("serializes the complete issue conversation into claim snapshots", () => {
+    expect(
+      claimConversationJson([
+        {
+          id: "message-1",
+          run_id: "run-1",
+          parent_message_id: null,
+          author_user_id: "user-1",
+          author_agent_provider: null,
+          author_name: "Jay",
+          author_image: null,
+          body: "Use all three requested articles.",
+          reply_count: 1,
+          created_at: "2026-07-30T00:00:00.000Z",
+          updated_at: "2026-07-30T00:00:00.000Z",
+        },
+        {
+          id: "message-2",
+          run_id: "run-1",
+          parent_message_id: "message-1",
+          author_user_id: null,
+          author_agent_provider: "codex",
+          author_name: null,
+          author_image: null,
+          body: "I will preserve that acceptance criterion.",
+          reply_count: 0,
+          created_at: "2026-07-30T00:01:00.000Z",
+          updated_at: "2026-07-30T00:01:00.000Z",
+        },
+      ]),
+    ).toEqual([
+      expect.objectContaining({
+        id: "message-1",
+        body: "Use all three requested articles.",
+        author: expect.objectContaining({ name: "Jay", provider: null }),
+      }),
+      expect.objectContaining({
+        id: "message-2",
+        parentMessageId: "message-1",
+        body: "I will preserve that acceptance criterion.",
+        author: expect.objectContaining({
+          name: "Briar · Codex",
+          provider: "codex",
+        }),
+      }),
+    ]);
   });
 
   it("accepts exact workflow evidence names containing spaces and slashes", () => {

@@ -1866,6 +1866,9 @@ const issueMessageJson = (message: IssueMessageRow) => ({
   updatedAt: message.updated_at,
 });
 
+export const claimConversationJson = (messages: IssueMessageRow[]) =>
+  messages.map(issueMessageJson);
+
 const runEvidenceJson = (
   evidence: RunEvidenceRow,
   requiredRevision: number,
@@ -4028,9 +4031,12 @@ async function route(
     }
     const agent =
       run?.agent_id ? await getProjectAgent(db, projectId, run.agent_id) : null;
-    const attachments = run
-      ? await listIssueAttachments(db, projectId, run.id)
-      : [];
+    const [attachments, messages] = run
+      ? await Promise.all([
+          listIssueAttachments(db, projectId, run.id),
+          listIssueMessages(db, projectId, run.id),
+        ])
+      : [[], []];
     return json({
       work: run
         ? {
@@ -4050,6 +4056,7 @@ async function route(
               JSON.parse(run.workflow_snapshot_json),
             ),
             attachments: attachments.map(attachmentJson),
+            messages: claimConversationJson(messages),
             claimToken,
             claimedBy: run.claimed_by,
             claimedAt: run.claimed_at,
