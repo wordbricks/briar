@@ -168,9 +168,11 @@ export function ProjectRepositorySetupDialog({
             >
               {loading ? <LoaderCircle className="spin" size={15} /> : <LogIn size={15} />}
               {t(
-                readiness.ghAuthenticated
-                  ? "repositorySetup.configureGit"
-                  : "repositorySetup.loginGithub",
+                loading && !readiness.ghAuthenticated
+                  ? "repositorySetup.completeLoginGithub"
+                  : readiness.ghAuthenticated
+                    ? "repositorySetup.configureGit"
+                    : "repositorySetup.loginGithub",
               )}
             </button>
           ) : (

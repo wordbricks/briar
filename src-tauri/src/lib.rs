@@ -22,6 +22,7 @@ use std::{
 use tauri::{webview::Color, WebviewUrl, WebviewWindowBuilder};
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
+use tauri_plugin_opener::OpenerExt;
 
 const SESSION_FILE_NAME: &str = "session.json";
 const AUTO_HUNT_EVENT_DIRECTORY: &str = "auto-hunt-sessions";
@@ -29,6 +30,11 @@ const AUTO_HUNT_APP_SERVER_EVENT: &str = "auto-hunt-app-server-event";
 const AUTO_HUNT_DISPATCH_EVENT: &str = "auto-hunt-dispatch-event";
 const PROJECT_AGENT_SCHEDULE_POLL_EVENT: &str = "project-agent-schedule-poll";
 const AGENT_SESSION_STOPPED_ERROR: &str = "사용자가 에이전트 세션을 중지했습니다.";
+const GITHUB_DEVICE_LOGIN_URL: &str = "https://github.com/login/device";
+#[cfg(not(target_os = "windows"))]
+const GITHUB_CLI_NOOP_BROWSER: &str = "/usr/bin/true";
+#[cfg(target_os = "windows")]
+const GITHUB_CLI_NOOP_BROWSER: &str = "cmd.exe /D /C rem";
 const DEFAULT_MAIN_WINDOW_SIZE: (f64, f64) = (1280.0, 820.0);
 const DEFAULT_MAIN_WINDOW_MIN_SIZE: (f64, f64) = (980.0, 680.0);
 const ONBOARDING_MAIN_WINDOW_SIZE: (f64, f64) = (780.0, 580.0);
@@ -1386,6 +1392,7 @@ async fn login_project_github(
 ) -> Result<RepositoryReadiness, String> {
     let config_path = cli_config_path(&app)?;
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    let app_handle = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let binary = gh_binary(&home)?;
         let execution_path = cli_execution_path(&home)?;
@@ -1403,16 +1410,25 @@ async fn login_project_github(
             let supports_clipboard = help.as_ref().is_some_and(|output| {
                 String::from_utf8_lossy(&output.stdout).contains("--clipboard")
             });
+            app_handle
+                .opener()
+                .open_url(GITHUB_DEVICE_LOGIN_URL, None::<&str>)
+                .map_err(|error| format!("GitHub 로그인 페이지를 열지 못했습니다: {error}"))?;
             let mut command = Command::new(&binary);
-            command.env("PATH", &execution_path).args([
-                "auth",
-                "login",
-                "--hostname",
-                "github.com",
-                "--git-protocol",
-                "https",
-                "--web",
-            ]);
+            command
+                .env("PATH", &execution_path)
+                // Briar opens the device page itself so a GUI launch never
+                // depends on the CLI process inheriting a usable browser.
+                .env("GH_BROWSER", GITHUB_CLI_NOOP_BROWSER)
+                .args([
+                    "auth",
+                    "login",
+                    "--hostname",
+                    "github.com",
+                    "--git-protocol",
+                    "https",
+                    "--web",
+                ]);
             if supports_clipboard {
                 command.arg("--clipboard");
             }
@@ -3508,6 +3524,16 @@ struct CliClaimedRun {
     run_number: u64,
     source_key: String,
     title: String,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    priority: Option<u8>,
+    #[serde(default)]
+    context: Option<serde_json::Value>,
+    #[serde(default)]
+    attachments: Vec<agent::ProjectAutoHuntIssueAttachment>,
+    #[serde(default)]
+    messages: Vec<agent::ProjectAutoHuntIssueMessage>,
     workflow: serde_json::Value,
     #[serde(default)]
     workspace: Option<CliClaimedWorkspace>,
@@ -3883,6 +3909,11 @@ async fn start_project_auto_hunt(
                 run_number: claimed.run_number,
                 source_key: claimed.source_key.clone(),
                 title: claimed.title.clone(),
+                issue_description: claimed.description.clone(),
+                priority: claimed.priority,
+                context: claimed.context.clone(),
+                attachments: claimed.attachments.clone(),
+                conversation: claimed.messages.clone(),
             };
             let dispatch = dispatch_store.add_worker(
                 &request.session_id,
@@ -5509,6 +5540,55 @@ branch refs/heads/briar/second-11111111
                 "--runtime-dispatch",
             ],
         );
+    }
+
+    #[test]
+    fn parses_the_claimed_runs_durable_issue_snapshot() {
+        let response = serde_json::from_value::<CliClaimResponse>(serde_json::json!({
+            "work": {
+                "runId": "515b7a2c-8918-5a8f-a292-f0b95090281c",
+                "runNumber": 13,
+                "sourceKey": "BRIAR-13",
+                "title": "Render the attached layout",
+                "description": "Match the mobile reference.",
+                "priority": 1,
+                "context": { "customer": "enterprise" },
+                "workflow": { "version": 1 },
+                "attachments": [{
+                    "id": "attachment-1",
+                    "filename": "layout.png",
+                    "contentType": "image/png",
+                    "byteSize": 2048,
+                    "url": "/projects/project-1/runs/run-1/attachments/attachment-1",
+                    "localPath": "/tmp/attachments/layout.png",
+                    "downloadError": null
+                }],
+                "messages": [{
+                    "id": "message-1",
+                    "parentMessageId": null,
+                    "body": "The compact breakpoint is required.",
+                    "author": {
+                        "id": "user-1",
+                        "name": "Jay",
+                        "provider": null
+                    },
+                    "createdAt": "2026-07-30T00:00:00Z",
+                    "updatedAt": "2026-07-30T00:00:00Z"
+                }]
+            }
+        }))
+        .expect("claim response should parse");
+        let work = response.work.expect("claim should contain work");
+
+        assert_eq!(
+            work.description.as_deref(),
+            Some("Match the mobile reference.")
+        );
+        assert_eq!(
+            work.attachments[0].local_path.as_deref(),
+            Some("/tmp/attachments/layout.png")
+        );
+        assert_eq!(work.messages[0].body, "The compact breakpoint is required.");
     }
 
     #[test]

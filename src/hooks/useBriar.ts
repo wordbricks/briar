@@ -51,6 +51,7 @@ import {
   loginProjectGithub,
   pickGitRepository,
   repairAutoHunt,
+  resolveProjectConnectionWorkflow,
   updateLocalProjectLinear,
   updateLocalProjectVelenOrg,
   updateLocalProjectWorkflow,
@@ -1091,8 +1092,13 @@ export function useBriar(options: UseBriarOptions = {}) {
       setConnectedProjectIds((current) =>
         withConnectedProject(current, connection.project.id),
       );
-      const generatedWorkflow = await generateProjectWorkflow(
-        connection.project.id,
+      const {
+        workflow: generatedWorkflow,
+        shouldPersistProjectSettings,
+      } = await resolveProjectConnectionWorkflow(
+        connection.project.role,
+        connection.workflow,
+        () => generateProjectWorkflow(connection.project.id),
       );
       await updateLocalProjectWorkflow(
         connection.project.id,
@@ -1111,7 +1117,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         workflow: generatedWorkflow,
       };
       let savedSettings = initialSettings;
-      if (token) {
+      if (token && shouldPersistProjectSettings) {
         const saved = await updateProjectSettings(
           token,
           connection.project.id,
@@ -1120,14 +1126,16 @@ export function useBriar(options: UseBriarOptions = {}) {
         savedSettings = saved.settings;
       }
 
-      setDashboard((current) =>
-        current?.project.id === connection.project.id
-          ? { ...current, settings: savedSettings }
-          : {
-              ...emptyDashboard(connection.project),
-              settings: savedSettings,
-            },
-      );
+      if (shouldPersistProjectSettings) {
+        setDashboard((current) =>
+          current?.project.id === connection.project.id
+            ? { ...current, settings: savedSettings }
+            : {
+                ...emptyDashboard(connection.project),
+                settings: savedSettings,
+              },
+        );
+      }
       setProjectConnection(null);
       setIsCreatingProject(false);
       setError(null);

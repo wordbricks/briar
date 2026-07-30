@@ -80,6 +80,28 @@ export type ConnectedLocalProject = {
   workflow: AutoHuntWorkflow;
 };
 
+export async function resolveProjectConnectionWorkflow(
+  role: "owner" | "admin" | "member" | undefined,
+  existingWorkflow: AutoHuntWorkflow | undefined,
+  generateWorkflow: () => Promise<AutoHuntWorkflow>,
+) {
+  if (role === "member") {
+    if (!existingWorkflow) {
+      throw new Error(
+        "An organization owner or admin must generate the project workflow before members can connect a repository.",
+      );
+    }
+    return {
+      workflow: existingWorkflow,
+      shouldPersistProjectSettings: false,
+    };
+  }
+  return {
+    workflow: await generateWorkflow(),
+    shouldPersistProjectSettings: true,
+  };
+}
+
 const isTauri = () => "__TAURI_INTERNALS__" in window;
 
 export async function loadConnectedProjectIds(): Promise<string[] | null> {

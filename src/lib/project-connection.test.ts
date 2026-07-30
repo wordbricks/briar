@@ -3,6 +3,7 @@ import {
   connectLocalProject,
   inspectRepositoryReadiness,
   inspectVelen,
+  resolveProjectConnectionWorkflow,
 } from "./project-connection";
 import { repositoryWorkflowBootstrap } from "./auto-hunt-contract";
 import { briarApiUrl } from "./api";
@@ -53,5 +54,35 @@ describe("local project connection", () => {
     expect(invoke).toHaveBeenCalledWith("inspect_velen", {
       org: "wordbricks",
     });
+  });
+
+  it("reuses shared workflow settings when a member connects locally", async () => {
+    const generateWorkflow = vi.fn();
+
+    await expect(
+      resolveProjectConnectionWorkflow(
+        "member",
+        repositoryWorkflowBootstrap,
+        generateWorkflow,
+      ),
+    ).resolves.toEqual({
+      workflow: repositoryWorkflowBootstrap,
+      shouldPersistProjectSettings: false,
+    });
+    expect(generateWorkflow).not.toHaveBeenCalled();
+  });
+
+  it("generates and persists workflow settings for organization admins", async () => {
+    const generateWorkflow = vi.fn().mockResolvedValue(
+      repositoryWorkflowBootstrap,
+    );
+
+    await expect(
+      resolveProjectConnectionWorkflow("admin", undefined, generateWorkflow),
+    ).resolves.toEqual({
+      workflow: repositoryWorkflowBootstrap,
+      shouldPersistProjectSettings: true,
+    });
+    expect(generateWorkflow).toHaveBeenCalledOnce();
   });
 });
