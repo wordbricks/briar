@@ -797,11 +797,14 @@ fn inspect_cli(binary: Result<PathBuf, String>) -> OnboardingPrerequisiteStatus 
         .output()
         .ok()
         .filter(|output| output.status.success())
-        .and_then(|output| parse_cli_version(&output.stdout));
+        .and_then(|output| {
+            parse_cli_version(&output.stdout).or_else(|| parse_cli_version(&output.stderr))
+        });
+    let installed = version.is_some();
     OnboardingPrerequisiteStatus {
-        installed: true,
+        installed,
         version,
-        authenticated: true,
+        authenticated: installed,
     }
 }
 
@@ -809,7 +812,7 @@ fn inspect_onboarding_prerequisites_sync(home: &Path) -> OnboardingPrerequisites
     let execution_path = cli_execution_path(home).unwrap_or_default();
     OnboardingPrerequisites {
         git: inspect_cli(git_binary(home)),
-        codex: inspect_cli(agent::codex_binary(home)),
+        codex: inspect_cli(agent::codex_binary(home, &execution_path)),
         claude: inspect_cli(agent::claude_binary(home, &execution_path)),
         grok: inspect_cli(agent::grok_binary(home, &execution_path)),
     }
@@ -837,6 +840,7 @@ fn install_cli_package(home: &Path, package: &str) -> Result<(), String> {
         };
         match Command::new(binary)
             .env("PATH", &execution_path)
+            .env("HOME", home)
             .args(args)
             .output()
         {
@@ -5115,22 +5119,51 @@ mod tests {
         let home = tempfile::tempdir().expect("fixture home should exist");
         let shims = home.path().join(".local/share/mise/shims");
         fs::create_dir_all(&shims).expect("mise shims directory should exist");
-        let bun = shims.join("bun");
-        fs::write(&bun, "#!/bin/sh\nexit 0\n").expect("fixture Bun should be written");
-        fs::set_permissions(&bun, fs::Permissions::from_mode(0o700))
-            .expect("fixture Bun should be executable");
+        for binary in ["bun", "codex"] {
+            let path = shims.join(binary);
+            fs::write(&path, "#!/bin/sh\nexit 0\n").expect("fixture CLI should be written");
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o700))
+                .expect("fixture CLI should be executable");
+        }
+        let execution_path = cli_execution_path_with_runtime(home.path(), Vec::new())
+            .expect("CLI PATH should resolve");
 
-        let resolved = which::which_in(
-            "bun",
-            Some(
-                cli_execution_path_with_runtime(home.path(), Vec::new())
-                    .expect("CLI PATH should resolve"),
-            ),
-            home.path(),
-        )
-        .expect("Bun should resolve through the mise shim directory");
+        let resolved = which::which_in("bun", Some(&execution_path), home.path())
+            .expect("Bun should resolve through the mise shim directory");
 
-        assert_eq!(resolved, bun);
+        assert_eq!(resolved, shims.join("bun"));
+        assert_eq!(
+            agent::codex_binary(home.path(), &execution_path)
+                .expect("Codex should resolve through the mise shim directory"),
+            shims.join("codex")
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn only_marks_a_cli_installed_when_its_version_probe_succeeds() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let directory = tempfile::tempdir().expect("fixture directory should exist");
+        let working = directory.path().join("working-cli");
+        let broken = directory.path().join("broken-cli");
+        fs::write(&working, "#!/bin/sh\nprintf 'codex-cli 1.2.3\\n' >&2\n")
+            .expect("working fixture should be written");
+        fs::write(&broken, "#!/bin/sh\nexit 1\n").expect("broken fixture should be written");
+        for binary in [&working, &broken] {
+            fs::set_permissions(binary, fs::Permissions::from_mode(0o700))
+                .expect("fixture CLI should be executable");
+        }
+
+        let working_status = inspect_cli(Ok(working));
+        assert!(working_status.installed);
+        assert!(working_status.authenticated);
+        assert_eq!(working_status.version.as_deref(), Some("codex-cli 1.2.3"));
+
+        let broken_status = inspect_cli(Ok(broken));
+        assert!(!broken_status.installed);
+        assert!(!broken_status.authenticated);
+        assert_eq!(broken_status.version, None);
     }
 
     #[cfg(unix)]

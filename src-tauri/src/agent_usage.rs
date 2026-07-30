@@ -163,7 +163,8 @@ fn load_codex(home: &Path) -> ProviderUsage {
 }
 
 fn fetch_codex(home: &Path) -> Result<ProviderUsage, String> {
-    let binary = crate::agent::codex_binary(home)?;
+    let execution_path = crate::cli_execution_path(home)?;
+    let binary = crate::agent::codex_binary(home, &execution_path)?;
     let mut child = Command::new(binary)
         .args(["app-server", "--listen", "stdio://"])
         .stdin(Stdio::piped())

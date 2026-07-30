@@ -568,8 +568,8 @@ pub(crate) struct AutoHuntCoordinatorResponse {
     pub(crate) summary: String,
 }
 
-pub(crate) fn codex_binary(home: &Path) -> Result<PathBuf, String> {
-    if let Ok(path) = which::which("codex") {
+pub(crate) fn codex_binary(home: &Path, execution_path: &OsStr) -> Result<PathBuf, String> {
+    if let Ok(path) = which::which_in("codex", Some(execution_path), home) {
         return Ok(path);
     }
     for candidate in [

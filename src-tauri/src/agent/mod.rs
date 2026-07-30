@@ -480,8 +480,8 @@ impl BundledRunnerFile {
     }
 }
 
-pub(crate) fn codex_binary(home: &Path) -> Result<PathBuf, String> {
-    codex::codex_binary(home)
+pub(crate) fn codex_binary(home: &Path, execution_path: &OsStr) -> Result<PathBuf, String> {
+    codex::codex_binary(home, execution_path)
 }
 
 pub(crate) fn claude_binary(home: &Path, execution_path: &OsStr) -> Result<PathBuf, String> {
