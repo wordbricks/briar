@@ -1,3 +1,4 @@
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, USER_AGENT};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -38,6 +39,8 @@ pub(crate) struct ProviderUsage {
     weekly: Option<AgentUsageWindow>,
     monthly: Option<AgentUsageWindow>,
     plan_type: Option<String>,
+    account_label: Option<String>,
+    authenticated: bool,
     updated_at: u64,
     error: Option<String>,
 }
@@ -70,6 +73,17 @@ struct ClaudeCredentials {
 #[serde(rename_all = "camelCase")]
 struct ClaudeOauthCredentials {
     access_token: Option<String>,
+    email: Option<String>,
+    #[serde(alias = "emailAddress")]
+    email_address: Option<String>,
+    #[serde(alias = "subscriptionType")]
+    subscription_type: Option<String>,
+}
+
+struct ClaudeAccountCredentials {
+    access_token: String,
+    account_label: Option<String>,
+    plan_type: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -90,6 +104,7 @@ struct GrokAuthSession {
     access_token: String,
     user_id: Option<String>,
     expires_at: Option<u64>,
+    account_label: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -97,6 +112,9 @@ struct GrokAuthEntry {
     key: Option<String>,
     user_id: Option<String>,
     expires_at: Option<String>,
+    email: Option<String>,
+    #[serde(alias = "teamId")]
+    team_id: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -148,18 +166,83 @@ pub(crate) async fn load(home: PathBuf) -> AgentUsageSnapshot {
     }
 }
 
+pub(crate) fn locally_authenticated(home: &Path, provider: &str) -> bool {
+    match provider {
+        "codex" => read_codex_account_identity(home).0,
+        "claude" => read_claude_credentials(home).is_ok(),
+        "grok" => read_grok_auth_session(home).is_ok_and(|session| {
+            session
+                .expires_at
+                .is_none_or(|expires_at| expires_at > now_millis() + GROK_TOKEN_SKEW_MILLIS)
+        }),
+        _ => false,
+    }
+}
+
 fn load_codex(home: &Path) -> ProviderUsage {
+    let (authenticated, account_label) = read_codex_account_identity(home);
     match fetch_codex(home) {
-        Ok(usage) => usage,
+        Ok(mut usage) => {
+            usage.account_label = account_label;
+            usage.authenticated = true;
+            usage
+        }
         Err(error) => {
             let status = if error.contains("CLI") || error.contains("로그인") {
                 "unavailable"
             } else {
                 "error"
             };
-            provider_without_usage("codex", status, error)
+            provider_without_usage_with_account(
+                "codex",
+                status,
+                error,
+                account_label,
+                authenticated,
+            )
         }
     }
+}
+
+fn read_codex_account_identity(home: &Path) -> (bool, Option<String>) {
+    let codex_home = env::var_os("CODEX_HOME")
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+        .unwrap_or_else(|| home.join(".codex"));
+    let Ok(contents) = fs::read_to_string(codex_home.join("auth.json")) else {
+        return (false, None);
+    };
+    let Ok(auth) = serde_json::from_str::<Value>(&contents) else {
+        return (false, None);
+    };
+    let has_api_key = auth
+        .get("OPENAI_API_KEY")
+        .and_then(Value::as_str)
+        .is_some_and(|value| !value.trim().is_empty());
+    let tokens = auth.get("tokens");
+    let id_token = tokens
+        .and_then(|value| value.get("id_token").or_else(|| value.get("idToken")))
+        .and_then(Value::as_str);
+    let has_tokens = tokens.is_some_and(Value::is_object);
+    let account_label = id_token.and_then(jwt_email);
+    (has_api_key || has_tokens, account_label)
+}
+
+fn jwt_email(token: &str) -> Option<String> {
+    let payload = token.split('.').nth(1)?;
+    let decoded = URL_SAFE_NO_PAD.decode(payload).ok()?;
+    let value = serde_json::from_slice::<Value>(&decoded).ok()?;
+    value
+        .get("email")
+        .and_then(Value::as_str)
+        .or_else(|| {
+            value
+                .pointer("/https:~1~1api.openai.com~1profile/email")
+                .and_then(Value::as_str)
+        })
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
 }
 
 fn fetch_codex(home: &Path) -> Result<ProviderUsage, String> {
@@ -285,6 +368,8 @@ fn parse_codex_response(message: &Value) -> Result<ProviderUsage, String> {
             .get("planType")
             .and_then(Value::as_str)
             .map(str::to_string),
+        account_label: None,
+        authenticated: true,
         updated_at: now_millis(),
         error: None,
     })
@@ -320,16 +405,27 @@ async fn load_claude(home: &Path) -> ProviderUsage {
         Ok(credentials) => credentials,
         Err(error) => return provider_without_usage("claude", "unavailable", error),
     };
-    match fetch_claude_usage(&credentials).await {
-        Ok(usage) => usage,
-        Err(error) => failed_provider("claude", error),
+    match fetch_claude_usage(&credentials.access_token).await {
+        Ok(mut usage) => {
+            usage.account_label = credentials.account_label;
+            usage.plan_type = credentials.plan_type;
+            usage.authenticated = true;
+            usage
+        }
+        Err(error) => provider_without_usage_with_account(
+            "claude",
+            "error",
+            error,
+            credentials.account_label,
+            true,
+        ),
     }
 }
 
-fn read_claude_credentials(home: &Path) -> Result<String, String> {
+fn read_claude_credentials(home: &Path) -> Result<ClaudeAccountCredentials, String> {
     #[cfg(target_os = "macos")]
     if let Some(credentials) = read_claude_keychain(home) {
-        return extract_claude_access_token(&credentials);
+        return parse_claude_account_credentials(&credentials);
     }
     let config_directory = env::var_os("CLAUDE_CONFIG_DIR")
         .map(PathBuf::from)
@@ -337,7 +433,7 @@ fn read_claude_credentials(home: &Path) -> Result<String, String> {
     let path = config_directory.join(".credentials.json");
     let credentials =
         fs::read_to_string(path).map_err(|_| "Claude 로그인이 필요합니다.".to_string())?;
-    extract_claude_access_token(&credentials)
+    parse_claude_account_credentials(&credentials)
 }
 
 #[cfg(target_os = "macos")]
@@ -378,13 +474,32 @@ fn read_claude_keychain(home: &Path) -> Option<String> {
     None
 }
 
+#[cfg(test)]
 fn extract_claude_access_token(credentials: &str) -> Result<String, String> {
-    serde_json::from_str::<ClaudeCredentials>(credentials)
+    parse_claude_account_credentials(credentials).map(|value| value.access_token)
+}
+
+fn parse_claude_account_credentials(credentials: &str) -> Result<ClaudeAccountCredentials, String> {
+    let oauth = serde_json::from_str::<ClaudeCredentials>(credentials)
         .ok()
         .and_then(|value| value.oauth)
-        .and_then(|value| value.access_token)
+        .ok_or_else(|| "Claude 로그인이 필요합니다.".to_string())?;
+    let access_token = oauth
+        .access_token
         .filter(|value| !value.trim().is_empty())
-        .ok_or_else(|| "Claude 로그인이 필요합니다.".to_string())
+        .ok_or_else(|| "Claude 로그인이 필요합니다.".to_string())?;
+    Ok(ClaudeAccountCredentials {
+        access_token,
+        account_label: oauth
+            .email_address
+            .or(oauth.email)
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty()),
+        plan_type: oauth
+            .subscription_type
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty()),
+    })
 }
 
 async fn fetch_claude_usage(access_token: &str) -> Result<ProviderUsage, String> {
@@ -436,6 +551,8 @@ async fn fetch_claude_usage(access_token: &str) -> Result<ProviderUsage, String>
         weekly,
         monthly: None,
         plan_type: None,
+        account_label: None,
+        authenticated: true,
         updated_at: now_millis(),
         error: None,
     })
@@ -466,14 +583,23 @@ async fn load_grok(home: &Path) -> ProviderUsage {
         .expires_at
         .is_some_and(|expires_at| expires_at <= now_millis() + GROK_TOKEN_SKEW_MILLIS)
     {
-        return failed_provider(
+        return provider_without_usage_with_account(
             "grok",
+            "error",
             "Grok 로그인이 만료되었습니다. Grok CLI를 실행해 인증을 갱신하세요.".to_string(),
+            session.account_label,
+            true,
         );
     }
     match fetch_grok_usage(&session).await {
-        Ok(usage) => usage,
-        Err(error) => failed_provider("grok", error),
+        Ok(mut usage) => {
+            usage.account_label = session.account_label;
+            usage.authenticated = true;
+            usage
+        }
+        Err(error) => {
+            provider_without_usage_with_account("grok", "error", error, session.account_label, true)
+        }
     }
 }
 
@@ -508,6 +634,12 @@ fn parse_grok_auth_session(contents: &str) -> Result<GrokAuthSession, String> {
             continue;
         };
         let session = GrokAuthSession {
+            account_label: entry
+                .email
+                .or_else(|| jwt_email(&access_token))
+                .or(entry.team_id)
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty()),
             access_token,
             user_id: entry.user_id.filter(|value| !value.is_empty()),
             expires_at: entry.expires_at.as_deref().and_then(parse_iso_millis),
@@ -566,6 +698,8 @@ async fn fetch_grok_usage(session: &GrokAuthSession) -> Result<ProviderUsage, St
         plan_type: credits
             .subscription_tier
             .filter(|value| !value.trim().is_empty()),
+        account_label: None,
+        authenticated: true,
         updated_at: now_millis(),
         error: None,
     })
@@ -697,6 +831,16 @@ fn provider_without_usage(
     status: &'static str,
     error: String,
 ) -> ProviderUsage {
+    provider_without_usage_with_account(provider, status, error, None, false)
+}
+
+fn provider_without_usage_with_account(
+    provider: &'static str,
+    status: &'static str,
+    error: String,
+    account_label: Option<String>,
+    authenticated: bool,
+) -> ProviderUsage {
     ProviderUsage {
         provider,
         status,
@@ -704,6 +848,8 @@ fn provider_without_usage(
         weekly: None,
         monthly: None,
         plan_type: None,
+        account_label,
+        authenticated,
         updated_at: now_millis(),
         error: Some(error),
     }
@@ -769,6 +915,25 @@ mod tests {
     }
 
     #[test]
+    fn reads_provider_account_labels_from_auth_metadata() {
+        let credentials = parse_claude_account_credentials(
+            r#"{"claudeAiOauth":{"accessToken":"secret","emailAddress":"dev@example.com","subscriptionType":"max"}}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            credentials.account_label.as_deref(),
+            Some("dev@example.com")
+        );
+        assert_eq!(credentials.plan_type.as_deref(), Some("max"));
+
+        let payload = URL_SAFE_NO_PAD.encode(r#"{"email":"codex@example.com"}"#);
+        assert_eq!(
+            jwt_email(&format!("header.{payload}.signature")).as_deref(),
+            Some("codex@example.com")
+        );
+    }
+
+    #[test]
     fn prefers_fresh_xai_grok_auth_session() {
         let session = parse_grok_auth_session(
             r#"{
@@ -786,6 +951,7 @@ mod tests {
         .unwrap();
         assert_eq!(session.access_token, "live-token");
         assert_eq!(session.user_id.as_deref(), Some("live-user"));
+        assert_eq!(session.account_label, None);
     }
 
     #[test]

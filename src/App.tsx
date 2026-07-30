@@ -746,6 +746,13 @@ export function App() {
               });
               navigateToPage("settings");
             }}
+            onOpenUsageDetails={() => {
+              setSettingsTarget({
+                scope: "application",
+                section: "usage",
+              });
+              navigateToPage("settings");
+            }}
           />
           <WorkerStatusBar workers={briar.dashboard?.workers ?? []} />
           <AppVersionStatus />

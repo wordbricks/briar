@@ -69,6 +69,7 @@ describe("AgentUsageStatusBar", () => {
     const root = createRoot(container);
     const loadUsage = vi.fn().mockResolvedValue(snapshot);
     const onManageAccounts = vi.fn();
+    const onOpenUsageDetails = vi.fn();
 
     await act(async () => {
       root.render(
@@ -76,6 +77,7 @@ describe("AgentUsageStatusBar", () => {
           <AgentUsageStatusBar
             loadUsage={loadUsage}
             onManageAccounts={onManageAccounts}
+            onOpenUsageDetails={onOpenUsageDetails}
           />
         </I18nProvider>,
       );
@@ -97,6 +99,14 @@ describe("AgentUsageStatusBar", () => {
     expect(container.textContent).toContain("Usage details & history");
     expect(container.textContent).toContain("Grok");
 
+    const details = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("Usage details & history"),
+    );
+    await act(async () => details?.click());
+    expect(onOpenUsageDetails).toHaveBeenCalledOnce();
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+
+    await act(async () => trigger?.click());
     const manage = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent?.includes("Manage Accounts"),
     );
@@ -107,5 +117,6 @@ describe("AgentUsageStatusBar", () => {
     await act(async () => root.unmount());
     container.remove();
     localStorage.removeItem("briar.locale.v1");
+    localStorage.removeItem("briar.agent-usage.history.v1");
   });
 });

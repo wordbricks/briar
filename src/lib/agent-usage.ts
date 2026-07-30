@@ -13,6 +13,8 @@ export type AgentUsageProvider = {
   weekly: AgentUsageWindow | null;
   monthly: AgentUsageWindow | null;
   planType: string | null;
+  accountLabel?: string | null;
+  authenticated?: boolean;
   updatedAt: number;
   error: string | null;
 };
@@ -24,6 +26,9 @@ export type AgentUsageSnapshot = {
   updatedAt: number;
 };
 
+const historyStorageKey = "briar.agent-usage.history.v1";
+const historyLimit = 96;
+
 const isTauri = () =>
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
@@ -33,6 +38,83 @@ export async function loadAgentUsage(): Promise<AgentUsageSnapshot> {
   }
   const { invoke } = await import("@tauri-apps/api/core");
   return invoke<AgentUsageSnapshot>("load_agent_usage");
+}
+
+export async function openAgentProviderLogin(
+  provider: AgentUsageProvider["provider"],
+) {
+  if (!isTauri()) {
+    throw new Error("Provider sign-in is available in the Briar desktop app.");
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<void>("open_agent_provider_login", { provider });
+}
+
+function isUsageProvider(value: unknown): value is AgentUsageProvider {
+  if (!value || typeof value !== "object") return false;
+  const provider = value as Partial<AgentUsageProvider>;
+  return (
+    (provider.provider === "claude" ||
+      provider.provider === "codex" ||
+      provider.provider === "grok") &&
+    (provider.status === "ok" ||
+      provider.status === "error" ||
+      provider.status === "unavailable") &&
+    typeof provider.updatedAt === "number"
+  );
+}
+
+function isUsageSnapshot(value: unknown): value is AgentUsageSnapshot {
+  if (!value || typeof value !== "object") return false;
+  const snapshot = value as Partial<AgentUsageSnapshot>;
+  return (
+    typeof snapshot.updatedAt === "number" &&
+    isUsageProvider(snapshot.claude) &&
+    isUsageProvider(snapshot.codex) &&
+    isUsageProvider(snapshot.grok)
+  );
+}
+
+export function readAgentUsageHistory(): AgentUsageSnapshot[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const parsed: unknown = JSON.parse(
+      window.localStorage.getItem(historyStorageKey) ?? "[]",
+    );
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(isUsageSnapshot)
+      .sort((left, right) => right.updatedAt - left.updatedAt)
+      .slice(0, historyLimit);
+  } catch {
+    return [];
+  }
+}
+
+export function recordAgentUsageSnapshot(
+  snapshot: AgentUsageSnapshot,
+): AgentUsageSnapshot[] {
+  const minute = Math.floor(snapshot.updatedAt / 60_000);
+  const history = [
+    snapshot,
+    ...readAgentUsageHistory().filter(
+      (item) => Math.floor(item.updatedAt / 60_000) !== minute,
+    ),
+  ].slice(0, historyLimit);
+  try {
+    window.localStorage.setItem(historyStorageKey, JSON.stringify(history));
+  } catch {
+    // The current session can still show the newly collected snapshot.
+  }
+  return history;
+}
+
+export function clearAgentUsageHistory() {
+  try {
+    window.localStorage.removeItem(historyStorageKey);
+  } catch {
+    // Ignore storage failures; callers still clear their in-memory history.
+  }
 }
 
 export function tightestUsageWindow(provider: AgentUsageProvider) {

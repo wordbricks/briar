@@ -1,4 +1,5 @@
 import {
+  Activity,
   Archive,
   Bell,
   Bot,
@@ -57,7 +58,14 @@ import {
   updateAppRuntimeSettings,
   type AppRuntimeSettings,
 } from "../lib/app-runtime-settings";
+import {
+  loadAgentUsage,
+  openAgentProviderLogin,
+  type AgentUsageProvider,
+  type AgentUsageSnapshot,
+} from "../lib/agent-usage";
 import { ClaudeIcon, CodexIcon, GrokIcon } from "./AgentIcons";
+import { AgentUsageSettings } from "./AgentUsageSettings";
 import { InboxNotificationSettings } from "./InboxNotificationSettings";
 import type { RepositoryReadiness } from "../lib/project-connection";
 
@@ -65,6 +73,7 @@ export type SettingsSection =
   | "general"
   | "notifications"
   | "keybindings"
+  | "usage"
   | "providers"
   | "source-control"
   | "connections"
@@ -154,6 +163,10 @@ export function AppSettings({
     useState<AgentProvider | null>(null);
   const [providerError, setProviderError] = useState<string | null>(null);
   const [providersChecked, setProvidersChecked] = useState(false);
+  const [providerUsage, setProviderUsage] =
+    useState<AgentUsageSnapshot | null>(null);
+  const [providerLoginOpening, setProviderLoginOpening] =
+    useState<AgentProvider | null>(null);
   const [runtimeSettings, setRuntimeSettings] =
     useState<AppRuntimeSettings | null>(null);
   const [runtimeSettingsLoading, setRuntimeSettingsLoading] = useState(false);
@@ -174,12 +187,14 @@ export function AppSettings({
     setProvidersLoading(true);
     setProviderError(null);
     try {
-      const [statuses, settings] = await Promise.all([
+      const [statuses, settings, usage] = await Promise.all([
         inspectOnboardingPrerequisites(),
         loadAppProviderSettings(),
+        loadAgentUsage().catch(() => null),
       ]);
       setProviderStatuses(statuses);
       setProviderSettings(settings);
+      setProviderUsage(usage);
       setProvidersChecked(true);
     } catch (caught) {
       setProviderError(
@@ -238,6 +253,21 @@ export function AppSettings({
     }
   };
 
+  const openProviderLogin = async (provider: AgentProvider) => {
+    if (providerLoginOpening) return;
+    setProviderLoginOpening(provider);
+    setProviderError(null);
+    try {
+      await openAgentProviderLogin(provider);
+    } catch (caught) {
+      setProviderError(
+        caught instanceof Error ? caught.message : String(caught),
+      );
+    } finally {
+      setProviderLoginOpening(null);
+    }
+  };
+
   const togglePreventSleep = async (enabled: boolean) => {
     if (!runtimeSettings || runtimeSettingsSaving) return;
     const previous = runtimeSettings;
@@ -290,6 +320,11 @@ export function AppSettings({
         id: "ai",
         label: t("appSettings.groupAi"),
         items: [
+          {
+            id: "usage",
+            icon: <Activity size={16} strokeWidth={1.75} />,
+            label: t("usage.title"),
+          },
           {
             id: "providers",
             icon: <Bot size={16} strokeWidth={1.75} />,
@@ -351,6 +386,7 @@ export function AppSettings({
     general: t("appSettings.generalDescription"),
     notifications: t("notifications.description"),
     keybindings: t("appSettings.keybindingsDescription"),
+    usage: t("usage.settingsDescription"),
     providers: t("appSettings.providersDescription"),
     "source-control": t("appSettings.sourceControlDescription"),
     connections: t("appSettings.connectionsDescription"),
@@ -396,7 +432,11 @@ export function AppSettings({
             title={activeItem?.label ?? t("appSettings.title")}
           />
 
-          {activeSection === "notifications" ? (
+          {activeSection === "usage" ? (
+            <AgentUsageSettings
+              onManageAccounts={() => setActiveSection("providers")}
+            />
+          ) : activeSection === "notifications" ? (
             <SettingsContent>
               <SettingsGroupHeading title={t("notifications.inboxImportance")} />
               <InboxNotificationSettings />
@@ -581,6 +621,68 @@ export function AppSettings({
                   }
                 />
               </SettingsCard>
+
+              <SettingsGroupHeading title={t("usage.accounts")} />
+              <SettingsCard>
+                {(
+                  [
+                    ["codex", <CodexIcon size={18} />],
+                    ["claude", <ClaudeIcon size={18} />],
+                    ["grok", <GrokIcon size={18} />],
+                  ] as const
+                ).map(([provider, icon]) => {
+                  const usage = providerUsage?.[provider] as
+                    | AgentUsageProvider
+                    | undefined;
+                  const installed = providerStatuses?.[provider].installed;
+                  return (
+                    <div className="provider-account-row" key={provider}>
+                      <ProviderIcon tone={provider}>{icon}</ProviderIcon>
+                      <div>
+                        <strong>
+                          {provider === "codex"
+                            ? "Codex"
+                            : provider === "claude"
+                              ? "Claude"
+                              : "Grok"}
+                        </strong>
+                        <span>
+                          {usage?.accountLabel ??
+                            (usage?.authenticated
+                              ? t("usage.systemAccount")
+                              : t("usage.signInRequired"))}
+                        </span>
+                        {usage?.error ? <small>{usage.error}</small> : null}
+                      </div>
+                      <span
+                        className={`provider-account-health ${usage?.status ?? "unavailable"}`}
+                      >
+                        {t(
+                          `usage.status.${usage?.status ?? "unavailable"}` as
+                            | "usage.status.ok"
+                            | "usage.status.error"
+                            | "usage.status.unavailable",
+                        )}
+                      </span>
+                      <button
+                        disabled={
+                          !installed || providerLoginOpening !== null
+                        }
+                        onClick={() => void openProviderLogin(provider)}
+                        type="button"
+                      >
+                        {providerLoginOpening === provider ? (
+                          <LoaderCircle className="spin" size={14} />
+                        ) : null}
+                        {usage?.authenticated
+                          ? t("usage.reauthenticate")
+                          : t("usage.signInAction")}
+                      </button>
+                    </div>
+                  );
+                })}
+              </SettingsCard>
+              <SettingsNote>{t("usage.accountsNote")}</SettingsNote>
 
               {providerError ? <SettingsAlert>{providerError}</SettingsAlert> : null}
               <SettingsNote>
