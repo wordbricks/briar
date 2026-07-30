@@ -3,7 +3,6 @@ import {
   Bot,
   Building2,
   CalendarDays,
-  CircleAlert,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -503,9 +502,7 @@ export function Sidebar({
             return (
               <section className="sidebar-project-group" key={project.id}>
                 <div
-                  className={`sidebar-project-row${
-                    needsConnection || needsAttention ? " has-warning" : ""
-                  }`}
+                  className={`sidebar-project-row${needsAttention ? " has-warning" : ""}`}
                 >
                   <button
                     aria-expanded={isActive}
@@ -517,20 +514,7 @@ export function Sidebar({
                     <span>{project.name}</span>
                     {isActive && <i aria-label={t("sidebar.currentProject")} />}
                   </button>
-                  {needsConnection ? (
-                    <span
-                      aria-label={t("sidebar.projectNotConnected", {
-                        name: project.name,
-                      })}
-                      className="sidebar-project-disconnected"
-                      role="img"
-                      title={t("sidebar.projectNotConnected", {
-                        name: project.name,
-                      })}
-                    >
-                      <CircleAlert size={18} strokeWidth={2.1} />
-                    </span>
-                  ) : needsAttention ? (
+                  {needsAttention ? (
                     <button
                       aria-label={t("repositorySetup.open", { name: project.name })}
                       className="sidebar-project-warning"

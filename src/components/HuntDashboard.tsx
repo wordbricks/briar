@@ -131,12 +131,10 @@ export function HuntDashboard({
   isIssueDialogOpen: controlledIsIssueDialogOpen,
   deletingIssueId,
   updatingIssueId,
-  needsLocalConnection = false,
   noProject = false,
   recoveringRunId,
   recoveryError,
   isSidebarOpen,
-  onConnectRepository,
   onAddProject,
   onCreateIssue,
   onIssueDialogOpenChange,
@@ -170,12 +168,10 @@ export function HuntDashboard({
   isIssueDialogOpen?: boolean;
   deletingIssueId: string | null;
   updatingIssueId: string | null;
-  needsLocalConnection?: boolean;
   noProject?: boolean;
   recoveringRunId: string | null;
   recoveryError: string | null;
   isSidebarOpen: boolean;
-  onConnectRepository?: () => void;
   onAddProject?: () => void;
   onCreateIssue: (input: CreateIssueInput) => Promise<unknown>;
   onIssueDialogOpenChange?: (isOpen: boolean) => void;
@@ -538,23 +534,6 @@ export function HuntDashboard({
             {error}
           </ErrorBanner>
         ) : null}
-        {needsLocalConnection && (
-          <div className="connect-banner">
-            <span aria-hidden="true"><FolderGit2 size={16} /></span>
-            <div>
-              <Typography as="strong" variant="bodySm">
-                {t("dashboard.connectRepositoryTitle")}
-              </Typography>
-              <Typography as="small" tone="muted" variant="caption">
-                {t("dashboard.connectRepositoryDescription")}
-              </Typography>
-            </div>
-            <Button onClick={onConnectRepository} type="button" variant="soft">
-              <FolderGit2 size={13} />{t("dashboard.connectRepository")}
-            </Button>
-          </div>
-        )}
-
         {companionMode ? (
           <div className="queue-header">
             <div className="queue-heading">
