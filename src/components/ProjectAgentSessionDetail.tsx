@@ -256,8 +256,10 @@ export function ProjectAgentSessionDetail({
                   </div>
                 ) : (
                   <div
+                    aria-live="polite"
                     className="auto-hunt-agent-messages"
                     ref={agentMessagesRef}
+                    role="log"
                   >
                     {agentMessages.map((message) => (
                       <article

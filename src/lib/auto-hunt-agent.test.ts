@@ -174,6 +174,18 @@ describe("agentMessagesFromAppServerEvents", () => {
 });
 
 describe("naturalLanguageFromAgentMessage", () => {
+  it("extracts the user-facing message from a saved-agent response envelope", () => {
+    expect(naturalLanguageFromAgentMessage(JSON.stringify({
+      action: "call_host_tool",
+      message: "현재 blocked/failed 실행을 조회합니다.",
+      structuredResult: null,
+      toolCall: {
+        name: "list_briar_runs",
+        arguments: { statuses: ["blocked", "failed"] },
+      },
+    }))).toBe("현재 blocked/failed 실행을 조회합니다.");
+  });
+
   it("extracts the natural-language summary from a structured response", () => {
     expect(naturalLanguageFromAgentMessage(JSON.stringify({
       issues: [],

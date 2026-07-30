@@ -120,7 +120,7 @@ describe("ProjectAgentSessionDetail", () => {
           id: "message-1",
           phase: "commentary",
           text:
-            '[commentary] {"summary":"블록된 이슈의 상태를 확인하고 있습니다."}',
+            '[commentary] {"action":"call_host_tool","message":"블록된 이슈의 상태를 확인하고 있습니다.","structuredResult":null,"toolCall":{"name":"list_briar_runs","arguments":{"statuses":["blocked","failed"]}}}',
         },
       }],
       isLoading: false,
@@ -141,5 +141,10 @@ describe("ProjectAgentSessionDetail", () => {
       "블록된 이슈의 상태를 확인하고 있습니다.",
     );
     expect(container.textContent).not.toContain("[commentary]");
+    expect(container.textContent).not.toContain("call_host_tool");
+    expect(
+      container.querySelector(".auto-hunt-agent-messages")
+        ?.getAttribute("role"),
+    ).toBe("log");
   });
 });
