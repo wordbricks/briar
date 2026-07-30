@@ -1,0 +1,166 @@
+/*
+  Dark-mode compatibility for legacy screens.
+  New components use semantic tokens directly; these selectors cover older
+  product surfaces that still contain fixed light colors in styles.css.
+*/
+
+.dark .sidebar,
+.dark .sidebar-bottom,
+.dark .app-settings-sidebar,
+.dark .organization-settings-sidebar {
+  border-color: var(--sidebar-border);
+  color: var(--sidebar-foreground);
+  background: var(--sidebar);
+}
+
+.dark .sidebar-brand,
+.dark .sidebar-primary-nav a,
+.dark .sidebar-project-heading,
+.dark .sidebar-project-view,
+.dark .sidebar-agent-session {
+  color: var(--sidebar-foreground);
+}
+
+.dark .sidebar-brand:hover,
+.dark .sidebar-brand[aria-expanded="true"],
+.dark .sidebar-primary-nav a:hover,
+.dark .sidebar-primary-nav a.active,
+.dark .sidebar-project-heading:hover,
+.dark .sidebar-project-view:hover,
+.dark .sidebar-project-view.active,
+.dark .sidebar-agent-session:hover {
+  color: var(--sidebar-accent-foreground);
+  background: var(--sidebar-accent);
+}
+
+.dark .sidebar-organization-menu,
+.dark .sidebar-project-menu,
+.dark .account-popover,
+.dark .agent-usage-popover,
+.dark .worker-status-popover,
+.dark .app-version-popover,
+.dark .health-popover,
+.dark .companion-account-popover,
+.dark .project-schedule-context-menu {
+  border-color: var(--border);
+  color: var(--popover-foreground);
+  background: var(--popover);
+}
+
+.dark .desktop-app-frame,
+.dark .app-shell,
+.dark .main-content,
+.dark .organization-settings-layout,
+.dark .organization-settings,
+.dark .organization-create,
+.dark .project-settings-page,
+.dark .settings-main,
+.dark .app-settings-main,
+.dark .kanban-board,
+.dark .issue-list {
+  color: var(--foreground);
+  background: var(--background) !important;
+}
+
+.dark .topbar,
+.dark .app-status-bar,
+.dark .page-header,
+.dark .queue-header,
+.dark .inbox-heading,
+.dark .project-agents-heading,
+.dark .project-schedule-heading {
+  border-color: var(--border);
+  color: var(--foreground);
+  background: var(--card);
+}
+
+.dark .kanban-column,
+.dark .issue-list-header {
+  border-color: var(--border);
+  color: var(--foreground);
+  background: var(--muted);
+}
+
+.dark .kanban-card,
+.dark .issue-list-body,
+.dark .issue-list-row,
+.dark .inbox-panel,
+.dark .inbox-message,
+.dark .project-schedule-calendar,
+.dark .project-schedule-toolbar {
+  border-color: var(--border);
+  color: var(--foreground);
+  background: var(--card);
+}
+
+.dark .issue-list-row:hover,
+.dark .issue-list-row:focus-visible,
+.dark .inbox-message.unread,
+.dark .inbox-message.unread:hover,
+.dark .status-tabs button:hover,
+.dark .health-trigger:hover,
+.dark .health-trigger[aria-expanded="true"] {
+  color: var(--foreground);
+  background: var(--secondary);
+}
+
+.dark .search-box input,
+.dark input,
+.dark textarea,
+.dark select {
+  color: var(--foreground);
+}
+
+.dark .platform-ios.companion-shell,
+.dark .companion-header,
+.dark .platform-ios .companion-header,
+.dark .companion-settings,
+.dark .platform-android .companion-settings {
+  color: var(--foreground);
+  background: var(--background);
+}
+
+.dark .companion-project-picker select,
+.dark .companion-header-actions > button,
+.dark .companion-account-menu > .companion-account-button,
+.dark .companion-settings > header button,
+.dark .companion-account-identity strong,
+.dark .companion-account-popover > button,
+.dark .companion-organization-options button {
+  color: var(--foreground);
+}
+
+.dark .companion-header-actions,
+.dark .companion-settings > section {
+  border-color: var(--border);
+  color: var(--card-foreground);
+  background: var(--card);
+}
+
+.dark .companion-shell .search-box {
+  color: var(--foreground);
+  background: var(--secondary);
+}
+
+.dark .companion-shell .kanban-column > header,
+.dark .companion-shell .kanban-card,
+.dark .companion-shell .run-properties {
+  border-color: var(--border);
+}
+
+.dark .companion-shell .kanban-card:active,
+.dark .companion-shell .inbox-message:active {
+  background: var(--secondary);
+}
+
+.dark .dialog,
+.dark .issue-dialog,
+.dark .run-dialog,
+.dark .issue-activity-dialog,
+.dark .delete-project-dialog,
+.dark .project-schedule-dialog,
+.dark .project-schedule-detail {
+  border-color: var(--border);
+  color: var(--foreground);
+  background: var(--card);
+}
