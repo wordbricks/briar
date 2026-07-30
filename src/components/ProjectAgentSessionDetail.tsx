@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { MainContent } from "@/components/layout";
+import { MainContent, PageHeader } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import type {
   AutoHuntSession,
@@ -84,9 +84,52 @@ export function ProjectAgentSessionDetail({
 
   return (
     <MainContent id="project-agent-session">
-      <header
-        className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`}
+      <PageHeader
+        action={
+          <div className="auto-hunt-session-page-actions">
+            {session.status === "running" ? (
+              <Button
+                aria-label={t("agents.stopSession")}
+                disabled={isStopping}
+                onClick={() => void stop()}
+                size="sm"
+                type="button"
+                variant="destructive"
+              >
+                {isStopping ? (
+                  <LoaderCircle className="spin" />
+                ) : (
+                  <OctagonX />
+                )}
+                {isStopping
+                  ? t("agents.stoppingSession")
+                  : t("agents.stopSession")}
+              </Button>
+            ) : null}
+            <span className={`auto-hunt-status ${session.status}`}>
+              {statusLabel(t, session.status)}
+            </span>
+          </div>
+        }
+        className={`app-page-header auto-hunt-session-page-heading${isSidebarOpen ? "" : " sidebar-closed"}`}
         data-tauri-drag-region
+        title={
+          <span className="project-agent-detail-title">
+            <Button
+              aria-label={t("run.back")}
+              className="project-agent-detail-back auto-hunt-session-back"
+              onClick={onBack}
+              size="icon"
+              type="button"
+              variant="ghost"
+            >
+              <ArrowLeft aria-hidden="true" size={16} />
+            </Button>
+            <SessionStatusIcon status={session.status} />
+            <span>{formatDate(session.startedAt, localeTag)}</span>
+          </span>
+        }
+        titleId="project-agent-session-title"
       />
 
       <div className="auto-hunt-scroll auto-hunt-session-detail-scroll">
@@ -94,52 +137,6 @@ export function ProjectAgentSessionDetail({
           aria-labelledby="project-agent-session-title"
           className="auto-hunt-session-page"
         >
-          <header>
-            <div className="auto-hunt-session-page-heading">
-              <button
-                className="auto-hunt-session-back"
-                onClick={onBack}
-                type="button"
-              >
-                <ArrowLeft size={16} />
-                {t("run.back")}
-              </button>
-              <div>
-                <SessionStatusIcon status={session.status} />
-                <span>
-                  <small>{t("autoHunt.session")}</small>
-                  <h1 id="project-agent-session-title">
-                    {formatDate(session.startedAt, localeTag)}
-                  </h1>
-                </span>
-              </div>
-            </div>
-            <div className="auto-hunt-session-page-actions">
-              {session.status === "running" ? (
-                <Button
-                  aria-label={t("agents.stopSession")}
-                  disabled={isStopping}
-                  onClick={() => void stop()}
-                  size="sm"
-                  type="button"
-                  variant="destructive"
-                >
-                  {isStopping ? (
-                    <LoaderCircle className="spin" />
-                  ) : (
-                    <OctagonX />
-                  )}
-                  {isStopping
-                    ? t("agents.stoppingSession")
-                    : t("agents.stopSession")}
-                </Button>
-              ) : null}
-              <span className={`auto-hunt-status ${session.status}`}>
-                {statusLabel(t, session.status)}
-              </span>
-            </div>
-          </header>
-
           <div className="auto-hunt-session-detail-body">
             {stopError ? (
               <div className="auto-hunt-stop-error" role="alert">

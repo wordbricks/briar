@@ -51,6 +51,7 @@ export function PageHeader({
   eyebrow,
   title,
   titleId,
+  ...props
 }: {
   action?: ReactNode;
   className?: string;
@@ -58,35 +59,40 @@ export function PageHeader({
   eyebrow?: ReactNode;
   title: ReactNode;
   titleId?: string;
-}) {
+} & Omit<HTMLAttributes<HTMLElement>, "title">) {
   return (
     <header
       className={cn(
-        "page-header flex flex-wrap items-center justify-between gap-6 border-b border-border bg-card px-8 py-2.5",
+        "page-header flex items-center justify-between gap-3 border-b border-border bg-card",
         className,
       )}
+      {...props}
     >
-      <div className="min-w-0 max-w-[720px]">
+      <div className="page-header-copy min-w-0 flex-1">
         {eyebrow ? (
           <Typography
             as="p"
-            className="eyebrow mb-2.5 flex items-center gap-1.5 tracking-wide uppercase"
+            className="eyebrow mb-0 flex items-center gap-1.5 tracking-wide uppercase"
             tone="primary"
             variant="micro"
           >
             {eyebrow}
           </Typography>
         ) : null}
-        <Typography as="h1" id={titleId} variant="title">
+        <Typography as="h1" className="page-header-title" id={titleId} variant="subheading">
           {title}
         </Typography>
         {description ? (
-          <Typography className="mt-1.5" tone="muted" variant="bodySm">
+          <Typography className="page-header-description" tone="muted" variant="caption">
             {description}
           </Typography>
         ) : null}
       </div>
-      {action ? <div className="flex shrink-0 items-center gap-2">{action}</div> : null}
+      {action ? (
+        <div className="page-header-actions flex shrink-0 items-center gap-2">
+          {action}
+        </div>
+      ) : null}
     </header>
   );
 }

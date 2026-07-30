@@ -193,7 +193,7 @@ describe("ProjectAgentDetail", () => {
     expect(
       header?.querySelector("#project-agent-detail-title")?.textContent,
     ).toContain(agent.name);
-    expect(header?.textContent).toContain(agent.responsibility);
+    expect(header?.textContent).not.toContain(agent.responsibility);
     expect(
       header?.querySelector(".project-agent-run-task")?.textContent,
     ).toContain("작업 실행");
