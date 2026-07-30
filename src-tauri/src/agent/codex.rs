@@ -740,9 +740,10 @@ pub(crate) fn run_project_agent_with(
         if decision.message.trim().is_empty() {
             return Err("에이전트가 빈 결과를 반환했습니다.".to_string());
         }
-        if decision
-            .max_issues
-            .is_some_and(|count| count == 0 || count > MAX_AUTO_HUNT_ISSUES)
+        if decision.action != ProjectAgentRunAction::CallHostTool
+            && decision
+                .max_issues
+                .is_some_and(|count| count == 0 || count > MAX_AUTO_HUNT_ISSUES)
         {
             return Err(format!(
                 "에이전트가 요청한 자동사냥 건수는 1~{MAX_AUTO_HUNT_ISSUES} 범위여야 합니다."
@@ -750,11 +751,10 @@ pub(crate) fn run_project_agent_with(
         }
 
         if decision.action == ProjectAgentRunAction::CallHostTool {
-            if decision.max_issues.is_some() || decision.structured_result.is_some() {
-                return Err(
-                    "호스트 도구 호출에는 자동사냥 건수나 실행 결과를 함께 지정할 수 없습니다."
-                        .to_string(),
-                );
+            // maxIssues only controls queued Auto Hunt dispatches. Models may echo a user's
+            // requested issue limit while gathering host context, so ignore it for tool calls.
+            if decision.structured_result.is_some() {
+                return Err("호스트 도구 호출에는 실행 결과를 함께 지정할 수 없습니다.".to_string());
             }
             let tool_call = decision
                 .tool_call
@@ -1885,7 +1885,7 @@ mod tests {
             let message = match call {
                 0 => {
                     assert!(request.message.contains("블록된 이슈"));
-                    r#"{"action":"call_host_tool","message":"블록된 run을 조회합니다.","maxIssues":null,"structuredResult":null,"toolCall":{"name":"list_briar_runs","arguments":{"statuses":["blocked"]}}}"#
+                    r#"{"action":"call_host_tool","message":"블록된 run을 조회합니다.","maxIssues":1,"structuredResult":null,"toolCall":{"name":"list_briar_runs","arguments":{"statuses":["blocked"]}}}"#
                 }
                 1 => {
                     assert!(request.message.contains("blocked-run"));
@@ -1893,7 +1893,7 @@ mod tests {
                         request.conversation_id.as_deref(),
                         Some("briar:project-1:resume-coordinator")
                     );
-                    r#"{"action":"call_host_tool","message":"블로킹이 해소되어 재시도합니다.","maxIssues":null,"structuredResult":null,"toolCall":{"name":"resume_auto_hunt","arguments":{"runId":"blocked-run","reason":"필요한 인증이 복구되었습니다."}}}"#
+                    r#"{"action":"call_host_tool","message":"블로킹이 해소되어 재시도합니다.","maxIssues":1,"structuredResult":null,"toolCall":{"name":"resume_auto_hunt","arguments":{"runId":"blocked-run","reason":"필요한 인증이 복구되었습니다."}}}"#
                 }
                 _ => panic!("unexpected saved-agent host tool turn"),
             };
@@ -2413,7 +2413,7 @@ mod tests {
     }
 
     #[test]
-    fn saved_agent_uses_host_tools_to_resume_one_blocked_run() {
+    fn saved_agent_ignores_max_issues_while_using_host_tools_to_resume_one_blocked_run() {
         let backend = ResumeBlockedRunBackend {
             calls: AtomicUsize::new(0),
         };
