@@ -44,6 +44,25 @@ struct StoredSession {
     token: String,
 }
 
+#[cfg(desktop)]
+#[derive(Default)]
+struct ExitConfirmationState {
+    prompt_open: AtomicBool,
+}
+
+#[cfg(desktop)]
+impl ExitConfirmationState {
+    fn try_open_prompt(&self) -> bool {
+        self.prompt_open
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok()
+    }
+
+    fn close_prompt(&self) {
+        self.prompt_open.store(false, Ordering::Release);
+    }
+}
+
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct CliProject {
@@ -5062,6 +5081,36 @@ fn prepare_launch_intro(app: tauri::AppHandle) -> Result<(), String> {
     }
 }
 
+#[cfg(desktop)]
+fn request_exit_confirmation(app: &AppHandle) {
+    let state = app.state::<ExitConfirmationState>();
+    if !state.try_open_prompt() {
+        return;
+    }
+
+    let confirmation_app = app.clone();
+    let dialog = app
+        .dialog()
+        .message("Briar를 종료하시겠습니까?")
+        .title("Briar 종료")
+        .buttons(MessageDialogButtons::OkCancelCustom(
+            "종료".to_string(),
+            "취소".to_string(),
+        ));
+    let dialog = match app.get_webview_window("main") {
+        Some(main) => dialog.parent(&main),
+        None => dialog,
+    };
+    dialog.show(move |confirmed| {
+        confirmation_app
+            .state::<ExitConfirmationState>()
+            .close_prompt();
+        if confirmed {
+            confirmation_app.exit(0);
+        }
+    });
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default()
@@ -5074,9 +5123,18 @@ pub fn run() {
     let builder = builder.plugin(tauri_plugin_auth_session::init());
     #[cfg(desktop)]
     let builder = builder
+        .manage(ExitConfirmationState::default())
+        .on_window_event(|window, event| {
+            if window.label() == "main" {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                    request_exit_confirmation(window.app_handle());
+                }
+            }
+        })
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build());
-    builder
+    let app = builder
         .setup(|_app| {
             #[cfg(desktop)]
             {
@@ -5171,14 +5229,36 @@ pub fn run() {
             sync_execution_worker_labels,
             inspect_execution_workers
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running Briar");
+        .build(tauri::generate_context!())
+        .expect("error while building Briar");
+    app.run(|app, event| {
+        #[cfg(desktop)]
+        if let tauri::RunEvent::ExitRequested {
+            code: None, api, ..
+        } = event
+        {
+            api.prevent_exit();
+            request_exit_confirmation(app);
+        }
+    });
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[cfg(desktop)]
+    #[test]
+    fn exit_confirmation_allows_only_one_prompt_at_a_time() {
+        let state = ExitConfirmationState::default();
+
+        assert!(state.try_open_prompt());
+        assert!(!state.try_open_prompt());
+
+        state.close_prompt();
+        assert!(state.try_open_prompt());
+    }
 
     #[test]
     fn stops_only_the_registered_agent_session_and_cleans_it_up() {
