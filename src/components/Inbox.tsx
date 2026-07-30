@@ -44,6 +44,7 @@ export function Inbox({
   isSidebarOpen,
   messages,
   onMarkAllRead,
+  onMarkRead,
   onOpen,
   unreadCount,
 }: {
@@ -51,6 +52,7 @@ export function Inbox({
   isSidebarOpen: boolean;
   messages: InboxMessageWithReadState[];
   onMarkAllRead: () => void;
+  onMarkRead: (messageId: string) => void;
   onOpen: (message: InboxMessageWithReadState) => void;
   unreadCount: number;
 }) {
@@ -167,6 +169,7 @@ export function Inbox({
                   key={message.id}
                   localeTag={localeTag}
                   message={message}
+                  onMarkRead={onMarkRead}
                   onOpen={onOpen}
                   t={t}
                 />
@@ -209,82 +212,102 @@ function InboxMessageRow({
   category,
   localeTag,
   message,
+  onMarkRead,
   onOpen,
   t,
 }: {
   category: InboxCategory;
   localeTag: string;
   message: InboxMessageWithReadState;
+  onMarkRead: (messageId: string) => void;
   onOpen: (message: InboxMessageWithReadState) => void;
   t: (key: MessageKey, values?: Record<string, string | number>) => string;
 }) {
+  const showUnreadAction = message.isUnread && category !== "activity";
+
   return (
-    <button
+    <div
       className={cn(
         "inbox-message",
         category,
-        message.isUnread && category !== "activity" && "unread",
+        showUnreadAction && "unread",
       )}
-      onClick={() => onOpen(message)}
-      type="button"
     >
-      <span
-        className={cn(
-          "inbox-message-icon grid size-9 shrink-0 place-items-center rounded-lg",
-          category,
-          message.kind,
-          message.kind === "conversation" ? message.reason : message.status,
-        )}
+      <button
+        className="inbox-message-open"
+        onClick={() => onOpen(message)}
+        type="button"
       >
-        {message.kind === "session" ? (
-          <Bot size={17} />
-        ) : message.kind === "conversation" ? (
-          message.reason === "mention" ? (
-            <AtSign size={17} />
+        <span
+          className={cn(
+            "inbox-message-icon grid size-9 shrink-0 place-items-center rounded-lg",
+            category,
+            message.kind,
+            message.kind === "conversation" ? message.reason : message.status,
+          )}
+        >
+          {message.kind === "session" ? (
+            <Bot size={17} />
+          ) : message.kind === "conversation" ? (
+            message.reason === "mention" ? (
+              <AtSign size={17} />
+            ) : (
+              <MessageCircle size={17} />
+            )
+          ) : category === "urgent" ? (
+            <Siren size={17} />
+          ) : category === "action_required" ? (
+            <CircleAlert size={17} />
+          ) : category === "important" ? (
+            <BellRing size={17} />
+          ) : message.status === "completed" ? (
+            <CheckCircle2 size={17} />
           ) : (
-            <MessageCircle size={17} />
-          )
-        ) : category === "urgent" ? (
-          <Siren size={17} />
-        ) : category === "action_required" ? (
-          <CircleAlert size={17} />
-        ) : category === "important" ? (
-          <BellRing size={17} />
-        ) : message.status === "completed" ? (
-          <CheckCircle2 size={17} />
-        ) : (
-          <Clock3 size={17} />
-        )}
-      </span>
-      <span className="inbox-message-copy">
-        <Typography as="strong" className="truncate" variant="bodySm">
-          {messageTitle(t, message)}
-        </Typography>
-        {message.isUnread && category !== "activity" ? (
-          <i
-            aria-label={t("inbox.unread")}
-            className="inbox-unread-dot"
-          />
+            <Clock3 size={17} />
+          )}
+        </span>
+        <span className="inbox-message-copy">
+          <Typography as="strong" className="truncate" variant="bodySm">
+            {messageTitle(t, message)}
+          </Typography>
+          <small className="inbox-message-detail">
+            <span className="inbox-message-project">{message.projectName}</span>
+            <span aria-hidden="true" className="inbox-message-separator">
+              ·
+            </span>
+            <span className="inbox-message-description">
+              {messageSecondaryText(t, message)}
+            </span>
+          </small>
+        </span>
+        {!showUnreadAction ? (
+          <ChevronRight className="inbox-message-chevron" size={15} />
         ) : null}
-        <small className="inbox-message-detail">
-          <span className="inbox-message-project">{message.projectName}</span>
-          <span aria-hidden="true" className="inbox-message-separator">
-            ·
-          </span>
-          <span className="inbox-message-description">
-            {messageSecondaryText(t, message)}
-          </span>
-        </small>
-      </span>
-      <ChevronRight className="inbox-message-chevron" size={15} />
-      <time
-        className="inbox-message-time"
-        dateTime={message.occurredAt}
-        title={formatDate(message.occurredAt, localeTag)}
-      >
-        {formatRelativeDate(message.occurredAt, localeTag)}
-      </time>
-    </button>
+        <time
+          className="inbox-message-time"
+          dateTime={message.occurredAt}
+          title={formatDate(message.occurredAt, localeTag)}
+        >
+          {formatRelativeDate(message.occurredAt, localeTag)}
+        </time>
+      </button>
+      {showUnreadAction ? (
+        <button
+          aria-label={t("inbox.markRead")}
+          className="inbox-mark-read"
+          onClick={() => onMarkRead(message.id)}
+          title={t("inbox.markRead")}
+          type="button"
+        >
+          <i aria-hidden="true" className="inbox-mark-read-dot" />
+          <Check
+            aria-hidden="true"
+            className="inbox-mark-read-check"
+            size={15}
+          />
+        </button>
+      ) : null}
+    </div>
   );
 }
 

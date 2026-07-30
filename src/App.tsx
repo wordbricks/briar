@@ -616,6 +616,7 @@ export function App() {
             isSidebarOpen={isSidebarOpen}
             messages={inbox.messages}
             onMarkAllRead={inbox.markAllRead}
+            onMarkRead={inbox.markRead}
             onOpen={(message) => {
               inbox.markRead(message.id);
               if (message.projectId !== briar.activeProjectId) {
@@ -878,6 +879,7 @@ export function App() {
               isSidebarOpen
               messages={inbox.messages}
               onMarkAllRead={inbox.markAllRead}
+              onMarkRead={inbox.markRead}
               onOpen={(message) => {
                 inbox.markRead(message.id);
                 if (message.projectId !== briar.activeProjectId) {

@@ -104,6 +104,15 @@
   background: var(--secondary);
 }
 
+.dark .inbox-mark-read {
+  color: var(--primary-foreground);
+}
+
+.dark .inbox-mark-read:hover,
+.dark .inbox-mark-read:focus-visible {
+  background: var(--accent);
+}
+
 .dark .search-box input,
 .dark input,
 .dark textarea,
@@ -149,7 +158,7 @@
 }
 
 .dark .companion-shell .kanban-card:active,
-.dark .companion-shell .inbox-message:active {
+.dark .companion-shell .inbox-message-open:active {
   background: var(--secondary);
 }
 

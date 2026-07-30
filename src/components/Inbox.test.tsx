@@ -100,6 +100,7 @@ describe("Inbox", () => {
             isSidebarOpen
             messages={messages}
             onMarkAllRead={vi.fn()}
+            onMarkRead={vi.fn()}
             onOpen={vi.fn()}
             unreadCount={3}
           />
@@ -152,6 +153,7 @@ describe("Inbox", () => {
             isSidebarOpen
             messages={[message]}
             onMarkAllRead={vi.fn()}
+            onMarkRead={vi.fn()}
             onOpen={vi.fn()}
             unreadCount={1}
           />
@@ -168,6 +170,41 @@ describe("Inbox", () => {
     );
     expect(row?.querySelector(".inbox-message-time")).not.toBeNull();
     expect(row?.querySelector(".inbox-next-action")).toBeNull();
+  });
+
+  it("marks one message as read without opening its destination", async () => {
+    const message = issue("unread", "Review this update", {
+      priority: 1,
+      status: "failed",
+    });
+    const onMarkRead = vi.fn();
+    const onOpen = vi.fn();
+
+    await act(async () =>
+      root.render(
+        <I18nProvider>
+          <Inbox
+            isSidebarOpen
+            messages={[message]}
+            onMarkAllRead={vi.fn()}
+            onMarkRead={onMarkRead}
+            onOpen={onOpen}
+            unreadCount={1}
+          />
+        </I18nProvider>,
+      ),
+    );
+
+    const markRead = container.querySelector<HTMLButtonElement>(
+      ".inbox-mark-read",
+    );
+    expect(markRead?.getAttribute("aria-label")).toBe("읽음으로 표시");
+
+    await act(async () => markRead?.click());
+
+    expect(onMarkRead).toHaveBeenCalledOnce();
+    expect(onMarkRead).toHaveBeenCalledWith(message.id);
+    expect(onOpen).not.toHaveBeenCalled();
   });
 
   it("shows mention and thread-reply context in conversation rows", async () => {
@@ -211,6 +248,7 @@ describe("Inbox", () => {
             isSidebarOpen
             messages={messages}
             onMarkAllRead={vi.fn()}
+            onMarkRead={vi.fn()}
             onOpen={vi.fn()}
             unreadCount={2}
           />
