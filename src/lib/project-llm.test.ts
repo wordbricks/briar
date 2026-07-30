@@ -10,6 +10,7 @@ import {
   loadAppProviderSettings,
   loadProjectLlmSettings,
   loadProjectSandboxSettings,
+  projectAgentRunSnapshots,
   runProjectAgent,
   stopProjectAgentSession,
   updateAppProviderSettings,
@@ -24,6 +25,30 @@ describe("project LLM gateway", () => {
   });
 
   afterEach(() => vi.unstubAllGlobals());
+
+  it("bounds the saved-Agent host snapshot to blocked and failed runs", () => {
+    const run = (index: number, status: string) => ({
+      id: `run-${index}`,
+      sourceKey: `BRIAR-${index}`,
+      title: `Run ${index}`,
+      status,
+      currentAttempt: 1,
+      detail: null,
+      resultSummary: null,
+      updatedAt: "2026-07-30T09:00:00.000Z",
+    });
+    const snapshots = projectAgentRunSnapshots([
+      run(0, "queued"),
+      ...Array.from({ length: 501 }, (_, index) => run(index + 1, "blocked")),
+    ]);
+
+    expect(snapshots).toHaveLength(500);
+    expect(snapshots[0]).toMatchObject({
+      runId: "run-1",
+      status: "blocked",
+    });
+    expect(snapshots.at(-1)?.runId).toBe("run-500");
+  });
 
   it("sends only a project id and model request to the native gateway", async () => {
     invoke.mockResolvedValue({
@@ -111,6 +136,7 @@ describe("project LLM gateway", () => {
         skill: "# Release agent",
         message: "Auto Hunt로 대기 이슈 3개를 처리해 줘",
         conversationId: null,
+        runs: [],
       },
     });
     expect(invoke.mock.calls[0]?.[1]).not.toHaveProperty("workspaceRoot");

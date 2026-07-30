@@ -56,6 +56,10 @@ const dashboard = {
       sourceKey: "issue:1",
       title: "Queued issue",
       status: "queued",
+      currentAttempt: 1,
+      detail: null,
+      resultSummary: null,
+      updatedAt: "2026-07-28T00:00:00.000Z",
     },
   ],
   generatedAt: "2026-07-28T00:00:00.000Z",
@@ -63,6 +67,9 @@ const dashboard = {
 
 const dependencies = (): ProjectAgentScheduleExecutionDependencies => ({
   loadDashboard: vi.fn(async () => dashboard),
+  retryRun: vi.fn(async () => ({
+    outcome: "retried",
+  })),
   runAgent: vi.fn(async () => ({
     conversationId: "agent-conversation",
     action: "respond" as const,
@@ -115,8 +122,9 @@ describe("scheduled project agent execution", () => {
         "Fulfill the saved responsibility.",
       ].join("\n"),
       conversationId: null,
+      runs: [],
     });
-    expect(current.loadDashboard).not.toHaveBeenCalled();
+    expect(current.loadDashboard).toHaveBeenCalledOnce();
     expect(current.startAutoHunt).not.toHaveBeenCalled();
   });
 
@@ -190,6 +198,50 @@ describe("scheduled project agent execution", () => {
     );
   });
 
+  it("retries and dispatches the exact blocked run selected by the host tool", async () => {
+    const blockedRun = {
+      ...dashboard.runs[0],
+      status: "blocked" as const,
+      detail: "GitHub authentication is missing.",
+    };
+    const queuedRun = {
+      ...blockedRun,
+      status: "queued" as const,
+      currentAttempt: 2,
+      detail: "GitHub authentication was restored.",
+    };
+    const current = dependencies();
+    vi.mocked(current.loadDashboard)
+      .mockResolvedValueOnce({ ...dashboard, runs: [blockedRun] })
+      .mockResolvedValueOnce({ ...dashboard, runs: [queuedRun] });
+    vi.mocked(current.runAgent).mockResolvedValue({
+      conversationId: "agent-conversation",
+      action: "dispatch_auto_hunt",
+      message: "Resume the recovered run.",
+      maxIssues: 1,
+      workspaceRoot: "/repo",
+      structuredResult: null,
+      targetRunIds: [blockedRun.id],
+      retryReason: "GitHub authentication was restored.",
+    });
+
+    await executeScheduledProjectAgent(current, "token", scheduledRun());
+
+    expect(current.retryRun).toHaveBeenCalledWith(
+      "token",
+      scheduledRun().projectId,
+      blockedRun.id,
+      "GitHub authentication was restored.",
+    );
+    expect(current.startAutoHunt).toHaveBeenCalledWith(
+      scheduledRun().projectId,
+      [queuedRun],
+      expect.any(String),
+      scheduledRun().agent,
+      { coordinatorConversationId: "agent-conversation" },
+    );
+  });
+
   it("does not infer dispatch from an Agent name or kind", async () => {
     const current = dependencies();
 
@@ -201,7 +253,7 @@ describe("scheduled project agent execution", () => {
       ),
     ).resolves.toMatchObject({ message: "Responsibility complete." });
 
-    expect(current.loadDashboard).not.toHaveBeenCalled();
+    expect(current.loadDashboard).toHaveBeenCalledOnce();
     expect(current.startAutoHunt).not.toHaveBeenCalled();
   });
 

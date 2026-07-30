@@ -176,6 +176,28 @@ export async function startProjectAutoHunt(
   });
 }
 
+export async function retryProjectAutoHuntRun(
+  projectId: string,
+  runId: string,
+  reason: string,
+) {
+  if (!isTauri()) {
+    throw new Error("Auto Hunt 재시도는 Briar 데스크톱 앱에서 사용할 수 있습니다.");
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<{
+    runId: string;
+    outcome: string;
+    attempt: number;
+    stage: string;
+  }>("retry_project_auto_hunt_run", {
+    projectId,
+    runId,
+    requestId: crypto.randomUUID(),
+    reason,
+  });
+}
+
 export async function loadAutoHuntAppServerEvents(
   sessionId: string,
 ): Promise<AutoHuntAppServerEvent[]> {

@@ -10,7 +10,10 @@ const { runProjectAgent } = vi.hoisted(() => ({
   runProjectAgent: vi.fn(),
 }));
 
-vi.mock("../lib/project-llm", () => ({ runProjectAgent }));
+vi.mock("../lib/project-llm", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../lib/project-llm")>()),
+  runProjectAgent,
+}));
 
 import {
   ProjectAgentDetail,
@@ -81,11 +84,13 @@ const dashboard = {
 } as unknown as DashboardPayload;
 
 function ProjectAgentDetailHarness({
+  dashboardValue = dashboard,
   onSettleTaskSession,
   onStopSession = async () => true,
   onStartAutoHunt,
   onStartTaskSession,
 }: {
+  dashboardValue?: DashboardPayload;
   onSettleTaskSession: (
     sessionId: string,
     settlement: ProjectAgentTaskSessionSettlement,
@@ -97,8 +102,10 @@ function ProjectAgentDetailHarness({
       coordinatorConversationId?: string | null;
       parentSessionId?: string;
       maxIssues?: number;
+      targetRunIds?: string[];
+      retryReason?: string | null;
     },
-  ) => string;
+  ) => string | Promise<string>;
   onStartTaskSession: (session: ProjectAgentTaskSessionStart) => void;
 }) {
   const [sessions, setSessions] = useState<AutoHuntSession[]>([]);
@@ -106,7 +113,7 @@ function ProjectAgentDetailHarness({
   return (
     <ProjectAgentDetail
       agent={agent}
-      dashboard={dashboard}
+      dashboard={dashboardValue}
       error={null}
       isSidebarOpen={true}
       onBack={() => undefined}
@@ -380,6 +387,7 @@ describe("ProjectAgentDetail", () => {
       agent,
       message: "Auto Hunt로 대기 이슈 세 건을 처리해 줘",
       conversationId: null,
+      runs: [],
     });
     expect(onStartAutoHunt).toHaveBeenCalledWith([], {
       coordinatorConversationId: "briar:project-1:coordinator-1",
@@ -406,6 +414,63 @@ describe("ProjectAgentDetail", () => {
     expect(document.body.textContent).toContain(
       "대기 이슈 세 건을 Auto Hunt로 요청했습니다.",
     );
+  });
+
+  it("forwards an exact blocked-run retry selected by the host tool", async () => {
+    const blockedRun = {
+      id: "blocked-run",
+      runNumber: 42,
+      sourceKey: "BRIAR-42",
+      title: "막힌 배포 재개",
+      status: "blocked",
+      currentAttempt: 1,
+      detail: "GitHub 인증이 필요합니다.",
+      resultSummary: null,
+      updatedAt: "2026-07-30T09:00:00.000Z",
+    } as DashboardPayload["runs"][number];
+    const dashboardWithBlockedRun = {
+      ...dashboard,
+      runs: [blockedRun],
+    };
+    runProjectAgent.mockResolvedValue({
+      conversationId: "briar:project-1:recovery-coordinator",
+      workspaceRoot: "/repo",
+      action: "dispatch_auto_hunt",
+      message: "블로킹이 해소된 이슈를 다시 시작합니다.",
+      maxIssues: 1,
+      structuredResult: null,
+      targetRunIds: [blockedRun.id],
+      retryReason: "GitHub 인증이 복구되었습니다.",
+    });
+    const onStartAutoHunt = vi.fn(() => "dispatch-1");
+    const container = await mount(
+      <ProjectAgentDetailHarness
+        dashboardValue={dashboardWithBlockedRun}
+        onSettleTaskSession={() => undefined}
+        onStartAutoHunt={onStartAutoHunt}
+        onStartTaskSession={() => undefined}
+      />,
+    );
+
+    await act(async () => {
+      Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
+        .find((button) => button.textContent?.trim() === "작업 실행")
+        ?.click();
+    });
+    await act(async () => {
+      document.querySelector<HTMLFormElement>("form")?.dispatchEvent(
+        new Event("submit", { bubbles: true, cancelable: true }),
+      );
+      await Promise.resolve();
+    });
+
+    expect(onStartAutoHunt).toHaveBeenCalledWith([blockedRun], {
+      coordinatorConversationId: "briar:project-1:recovery-coordinator",
+      parentSessionId: "task-session",
+      maxIssues: 1,
+      targetRunIds: [blockedRun.id],
+      retryReason: "GitHub 인증이 복구되었습니다.",
+    });
   });
 
   it("stops a running session from its detail page", async () => {

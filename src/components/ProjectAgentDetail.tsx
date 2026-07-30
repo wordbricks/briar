@@ -23,7 +23,10 @@ import { Textarea } from "@/components/ui/textarea";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import { useI18n } from "../i18n";
 import { executeProjectAgentTurn } from "../lib/project-agent-execution";
-import { runProjectAgent } from "../lib/project-llm";
+import {
+  projectAgentRunSnapshots,
+  runProjectAgent,
+} from "../lib/project-llm";
 import type {
   DashboardPayload,
   HuntRun,
@@ -77,8 +80,10 @@ export function ProjectAgentDetail({
       coordinatorConversationId?: string | null;
       parentSessionId?: string;
       maxIssues?: number;
+      targetRunIds?: string[];
+      retryReason?: string | null;
     },
-  ) => string;
+  ) => string | Promise<string>;
   onStartTaskSession: (session: ProjectAgentTaskSessionStart) => void;
   requestedSessionId: string | null;
   sessions: AutoHuntSession[];
@@ -171,6 +176,12 @@ export function ProjectAgentDetail({
               coordinatorConversationId: decision.conversationId,
               parentSessionId: sessionId,
               maxIssues: decision.maxIssues ?? undefined,
+              ...(decision.targetRunIds?.length
+                ? {
+                    targetRunIds: decision.targetRunIds,
+                    retryReason: decision.retryReason,
+                  }
+                : {}),
             }),
         },
         {
@@ -179,6 +190,7 @@ export function ProjectAgentDetail({
           message,
           conversationId: null,
           sessionId,
+          runs: projectAgentRunSnapshots(dashboard.runs),
         },
       );
       onSettleTaskSession(sessionId, {
