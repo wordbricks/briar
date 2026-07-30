@@ -55,6 +55,18 @@ extern "C" int briar_ios_set_app_icon(const char *iconName) {
 	return accepted ? 1 : 0;
 }
 
+extern "C" void briar_ios_set_app_badge_count(uint32_t count) {
+	void (^updateBadge)(void) = ^{
+		UIApplication.sharedApplication.applicationIconBadgeNumber =
+			static_cast<NSInteger>(count);
+	};
+	if (NSThread.isMainThread) {
+		updateBadge();
+	} else {
+		dispatch_async(dispatch_get_main_queue(), updateBadge);
+	}
+}
+
 int main(int argc, char * argv[]) {
 	ffi::start_app();
 	return 0;

@@ -684,8 +684,49 @@ fn valid_app_icon(icon: &str) -> bool {
 
 #[cfg(target_os = "ios")]
 unsafe extern "C" {
-    fn briar_ios_current_app_icon(buffer: *mut std::ffi::c_char, length: usize) -> i32;
-    fn briar_ios_set_app_icon(icon: *const std::ffi::c_char) -> i32;
+    fn dlsym(
+        handle: *mut std::ffi::c_void,
+        symbol: *const std::ffi::c_char,
+    ) -> *mut std::ffi::c_void;
+}
+
+#[cfg(target_os = "ios")]
+unsafe fn briar_ios_symbol(name: &'static [u8]) -> *mut std::ffi::c_void {
+    const RTLD_DEFAULT: *mut std::ffi::c_void = (-2_isize) as *mut std::ffi::c_void;
+    dlsym(RTLD_DEFAULT, name.as_ptr().cast())
+}
+
+#[cfg(target_os = "ios")]
+unsafe fn briar_ios_current_app_icon(buffer: *mut std::ffi::c_char, length: usize) -> i32 {
+    let symbol = briar_ios_symbol(b"briar_ios_current_app_icon\0");
+    if symbol.is_null() {
+        return 0;
+    }
+    let function: unsafe extern "C" fn(*mut std::ffi::c_char, usize) -> i32 =
+        std::mem::transmute(symbol);
+    function(buffer, length)
+}
+
+#[cfg(target_os = "ios")]
+unsafe fn briar_ios_set_app_icon(icon: *const std::ffi::c_char) -> i32 {
+    let symbol = briar_ios_symbol(b"briar_ios_set_app_icon\0");
+    if symbol.is_null() {
+        return 0;
+    }
+    let function: unsafe extern "C" fn(*const std::ffi::c_char) -> i32 =
+        std::mem::transmute(symbol);
+    function(icon)
+}
+
+#[cfg(target_os = "ios")]
+unsafe fn briar_ios_set_app_badge_count(count: u32) -> bool {
+    let symbol = briar_ios_symbol(b"briar_ios_set_app_badge_count\0");
+    if symbol.is_null() {
+        return false;
+    }
+    let function: unsafe extern "C" fn(u32) = std::mem::transmute(symbol);
+    function(count);
+    true
 }
 
 #[tauri::command]
@@ -734,6 +775,19 @@ fn set_app_icon(icon: String) -> Result<(), String> {
 
 #[tauri::command]
 fn set_app_badge_count(window: tauri::Window, count: u32) -> Result<(), String> {
+    #[cfg(target_os = "android")]
+    {
+        let _ = (window, count);
+        return Ok(());
+    }
+    #[cfg(target_os = "ios")]
+    {
+        let _ = window;
+        return unsafe { briar_ios_set_app_badge_count(count) }
+            .then_some(())
+            .ok_or_else(|| "The iOS app badge bridge is unavailable.".to_string());
+    }
+    #[cfg(desktop)]
     window
         .set_badge_count((count > 0).then_some(i64::from(count)))
         .map_err(|error| format!("App badge count update failed: {error}"))
