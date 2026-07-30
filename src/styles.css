@@ -2158,7 +2158,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .inbox-heading > div > p:last-child { display:none; }
 .inbox-heading > button { height:34px; margin-top:0; padding:0 11px; display:flex; align-items:center; gap:6px; border:1px solid #dcd7ed; border-radius:9px; color:#624da8; background:#f7f4ff; cursor:pointer; font-size:var(--text-2xs); font-weight:600; }
 .inbox-heading > button:hover { border-color:#c8bde8; background:#f0ebff; }
-.inbox-heading > button:focus-visible,.inbox-message:focus-visible,.inbox-filter:focus-visible { outline:2px solid #8b70dd; outline-offset:2px; }
+.inbox-heading > button:focus-visible,.inbox-message-open:focus-visible,.inbox-mark-read:focus-visible,.inbox-filter:focus-visible { outline:2px solid #8b70dd; outline-offset:2px; }
 .inbox-panel { min-height:0; flex:1; overflow:hidden; display:flex; flex-direction:column; border:0; border-radius:0; background:var(--card); box-shadow:none; }
 .inbox-filter-bar { min-height:58px; padding:10px 18px 10px 21px; display:flex; align-items:center; justify-content:space-between; gap:16px; border-bottom:1px solid #e9eae4; background:rgba(255,255,255,.92); }
 .inbox-filter-bar > span { flex:0 0 auto; color:#888a83; font:500 var(--text-2xs) "DM Mono",monospace; }
@@ -2177,10 +2177,11 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .inbox-filter[aria-pressed="true"].activity { border-color:#d6d8d1; color:#555750; background:#f1f2ee; }
 .inbox-filter[aria-pressed="true"].activity .inbox-filter-count { color:#555750; background:#dfe1da; }
 .inbox-list { min-height:0; flex:1; display:grid; align-content:start; overflow-y:auto; background:var(--card); }
-.inbox-message { width:100%; min-height:68px; padding:10px 18px; display:grid; grid-template-columns:36px minmax(0,1fr) auto; grid-template-rows:1fr 1fr; align-items:center; column-gap:12px; border:0; border-bottom:1px solid #edede8; color:inherit; background:var(--card); text-align:left; cursor:pointer; transition:transform 100ms ease-out,background-color 140ms ease; }
+.inbox-message { width:100%; min-height:68px; position:relative; border-bottom:1px solid #edede8; color:inherit; background:var(--card); transition:background-color 140ms ease; }
+.inbox-message-open { width:100%; min-height:68px; padding:10px 18px; display:grid; grid-template-columns:36px minmax(0,1fr) auto; grid-template-rows:1fr 1fr; align-items:center; column-gap:12px; border:0; color:inherit; background:transparent; text-align:left; cursor:pointer; transition:transform 100ms ease-out; }
 .inbox-message:last-child { border-bottom:0; }
 .inbox-message:hover { background:var(--muted); }
-.inbox-message:active { transform:scale(.997); }
+.inbox-message-open:active { transform:scale(.997); }
 .inbox-message.unread { background:#fbfaff; }
 .inbox-message.unread:hover { background:#f7f4ff; }
 .inbox-message-icon { width:36px; height:36px; grid-column:1; grid-row:1 / 3; display:grid; place-items:center; border-radius:10px; color:#5e49a7; background:#eee9ff; }
@@ -2191,15 +2192,21 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .inbox-message-icon.urgent { color:#aa3249; background:#ffe4e9; }
 .inbox-message-icon.action_required { color:#946016; background:#faebca; }
 .inbox-message-icon.important { color:#654eae; background:#ece7ff; }
-.inbox-message-copy { min-width:0; grid-column:2; grid-row:1 / 3; display:grid; grid-template-columns:minmax(0,1fr) auto; grid-template-rows:1fr 1fr; align-items:center; column-gap:7px; }
-.inbox-message-copy strong { min-width:0; grid-column:1 / 2; grid-row:1; overflow:hidden; color:var(--foreground); font-size:var(--text-xs); line-height:1.25; text-overflow:ellipsis; white-space:nowrap; }
-.inbox-unread-dot { width:6px; height:6px; grid-column:2; grid-row:1; border-radius:50%; background:#765bd0; box-shadow:0 0 0 3px rgba(118, 91, 208, 0.1); }
-.inbox-message-detail { min-width:0; grid-column:1 / 3; grid-row:2; display:flex; align-items:center; gap:5px; overflow:hidden; color:var(--muted-foreground); font-size:var(--text-2xs); line-height:1.3; white-space:nowrap; }
+.inbox-message-copy { min-width:0; grid-column:2; grid-row:1 / 3; display:grid; grid-template-rows:1fr 1fr; align-items:center; }
+.inbox-message-copy strong { min-width:0; grid-row:1; overflow:hidden; color:var(--foreground); font-size:var(--text-xs); line-height:1.25; text-overflow:ellipsis; white-space:nowrap; }
+.inbox-message-detail { min-width:0; grid-row:2; display:flex; align-items:center; gap:5px; overflow:hidden; color:var(--muted-foreground); font-size:var(--text-2xs); line-height:1.3; white-space:nowrap; }
 .inbox-message-project { flex:0 0 auto; color:#767871; font-weight:var(--font-weight-medium); }
 .inbox-message-separator { flex:0 0 auto; color:#b1b3ad; }
 .inbox-message-description { min-width:0; overflow:hidden; text-overflow:ellipsis; }
 .inbox-message-chevron { grid-column:3; grid-row:1; justify-self:end; color:#a4a69f; }
 .inbox-message-time { grid-column:3; grid-row:2; justify-self:end; padding-left:12px; color:#92948d; font:500 var(--text-2xs) "DM Mono",monospace; white-space:nowrap; }
+.inbox-mark-read { width:32px; height:32px; position:absolute; z-index:1; top:5px; right:9px; display:grid; place-items:center; border:0; border-radius:9px; color:#654eae; background:transparent; cursor:pointer; transition:background-color 140ms ease,color 140ms ease; }
+.inbox-mark-read:hover,.inbox-mark-read:focus-visible { background:#ece7ff; }
+.inbox-mark-read-dot,.inbox-mark-read-check { grid-column:1; grid-row:1; transition:opacity 120ms ease,transform 120ms ease; }
+.inbox-mark-read-dot { width:6px; height:6px; border-radius:50%; background:#765bd0; box-shadow:0 0 0 3px rgba(118,91,208,.1); }
+.inbox-mark-read-check { opacity:0; transform:scale(.8); }
+.inbox-message:hover .inbox-mark-read-dot,.inbox-mark-read:hover .inbox-mark-read-dot,.inbox-mark-read:focus-visible .inbox-mark-read-dot { opacity:0; transform:scale(.8); }
+.inbox-message:hover .inbox-mark-read-check,.inbox-mark-read:hover .inbox-mark-read-check,.inbox-mark-read:focus-visible .inbox-mark-read-check { opacity:1; transform:scale(1); }
 .inbox-empty { min-height:0; flex:1; padding:34px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; }
 .inbox-empty > span { width:48px; height:48px; margin-bottom:14px; display:grid; place-items:center; border-radius:15px; color:#6a53b6; background:#eeeafd; }
 .inbox-empty strong { color:var(--foreground); font-size:var(--text-xs); }
@@ -2595,7 +2602,8 @@ button.issue-message-state { width:100%; cursor:pointer; }
   .inbox-heading > button { width:34px; padding:0; justify-content:center; font-size:0; }
   .inbox-filter-bar { padding-right:12px; padding-left:12px; }
   .inbox-filter-bar > span { display:none; }
-  .inbox-message { grid-template-columns:36px minmax(0,1fr) auto; padding-right:12px; padding-left:12px; column-gap:10px; }
+  .inbox-message-open { grid-template-columns:36px minmax(0,1fr) auto; padding-right:12px; padding-left:12px; column-gap:10px; }
+  .inbox-mark-read { right:3px; }
   .inbox-message-icon { width:36px; height:36px; }
   .project-schedule-heading { min-height:48px; padding:0 18px; align-items:center; flex-direction:row; gap:12px; }
   .project-schedule-heading h1 { font-size:var(--text-lg); }
@@ -3132,9 +3140,13 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .companion-shell .inbox-panel { border:0; border-radius:0; box-shadow:none; }
 .companion-shell .inbox-filter-bar { min-height:52px; padding:8px 0; }
 .companion-shell .inbox-filter-bar > span { display:none; }
-.companion-shell .inbox-message { min-height:66px; padding:9px 0; grid-template-columns:36px minmax(0,1fr) auto; column-gap:10px; }
+.companion-shell .inbox-message,.companion-shell .inbox-message-open { min-height:66px; }
+.companion-shell .inbox-message-open { padding:9px 0; grid-template-columns:36px minmax(0,1fr) auto; column-gap:10px; }
 .companion-shell .inbox-message.unread,.companion-shell .inbox-message.unread:hover { background:transparent; }
-.companion-shell .inbox-message:active { background:#f5f3fa; }
+.companion-shell .inbox-message-open:active { background:#f5f3fa; }
+.companion-shell .inbox-mark-read { top:4px; right:-8px; }
+.companion-shell .inbox-mark-read-dot { opacity:0; transform:scale(.8); }
+.companion-shell .inbox-mark-read-check { opacity:1; transform:scale(1); }
 .companion-shell .inbox-message-icon { width:36px; height:36px; border-radius:11px; }
 .companion-shell .inbox-message-copy strong { font-size:var(--text-xs); }
 .companion-shell .inbox-message-detail { font-size:var(--text-2xs); }
@@ -3142,7 +3154,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 
 @media (prefers-reduced-motion: reduce) {
   .inbox-filter { transition:none; }
-  .inbox-message:active { transform:none; }
+  .inbox-message-open:active { transform:none; }
 }
 .companion-shell .dialog-backdrop { padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); align-items: flex-end; }
 .companion-shell .issue-dialog,
