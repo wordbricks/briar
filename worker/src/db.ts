@@ -548,6 +548,23 @@ export async function addOrganizationMember(
   return user.id;
 }
 
+export async function updateOrganizationMemberRole(
+  db: D1Database,
+  organizationId: string,
+  userId: string,
+  role: Exclude<OrganizationRole, "owner">,
+) {
+  const result = await db
+    .prepare(
+      `update briar_organization_members
+       set role = ?, updated_at = ?
+       where organization_id = ? and user_id = ? and role != 'owner'`,
+    )
+    .bind(role, new Date().toISOString(), organizationId, userId)
+    .run();
+  return result.meta.changes > 0;
+}
+
 export async function removeOrganizationMember(
   db: D1Database,
   organizationId: string,
@@ -2209,12 +2226,25 @@ export async function findProjectIdByAgentTokenHash(
   agentTokenHash: string,
 ) {
   return await db
-    .prepare("select id from briar_projects where agent_token_hash = ?")
-    .bind(agentTokenHash)
-    .first<string>("id");
+    .prepare(
+      `select token.project_id
+       from briar_project_agent_tokens token
+       join briar_projects project on project.id = token.project_id
+       join briar_organization_members membership
+         on membership.organization_id = project.organization_id
+        and membership.user_id = token.issued_to_user_id
+       where token.token_hash = ?
+       union all
+       select id as project_id
+       from briar_projects
+       where agent_token_hash = ?
+       limit 1`,
+    )
+    .bind(agentTokenHash, agentTokenHash)
+    .first<string>("project_id");
 }
 
-export async function replaceProjectAgentToken(
+export async function issueProjectAgentToken(
   db: D1Database,
   projectId: string,
   userId: string,
@@ -2222,14 +2252,23 @@ export async function replaceProjectAgentToken(
 ) {
   const result = await db
     .prepare(
-      `update briar_projects
-       set agent_token_hash = ?, updated_at = ?
-       where id = ? and organization_id in (
-         select organization_id from briar_organization_members
-         where user_id = ? and role in ('owner', 'admin')
-       )`,
+      `insert into briar_project_agent_tokens (
+         token_hash, project_id, issued_to_user_id, created_at
+       )
+       select ?, project.id, ?, ?
+       from briar_projects project
+       join briar_organization_members membership
+         on membership.organization_id = project.organization_id
+        and membership.user_id = ?
+       where project.id = ?`,
     )
-    .bind(agentTokenHash, new Date().toISOString(), projectId, userId)
+    .bind(
+      agentTokenHash,
+      userId,
+      new Date().toISOString(),
+      userId,
+      projectId,
+    )
     .run();
   return result.meta.changes > 0;
 }

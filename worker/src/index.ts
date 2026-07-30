@@ -92,11 +92,11 @@ import {
   listProjectAgentSchedules,
   listSlackInstallations,
   moveHuntRun,
+  issueProjectAgentToken,
   recoverHuntRun,
   reworkHuntRun,
   recordHuntEvent,
   recordRunEvidence,
-  replaceProjectAgentToken,
   removeOrganizationMember,
   renewProjectAgentScheduleRunLease,
   rollbackNewAppIssue,
@@ -106,6 +106,7 @@ import {
   updateProjectSettings,
   updateOrganization,
   updateOrganizationLogo,
+  updateOrganizationMemberRole,
   updateIssue,
   updateSlackInstallationProject,
   upsertSlackInstallation,
@@ -603,6 +604,11 @@ const organizationMemberInputSchema = z.object({
   email: z.string().trim().email().max(320),
   role: z.enum(["admin", "member"]).default("member"),
 });
+export const organizationMemberRoleInputSchema = z
+  .object({
+    role: z.enum(["admin", "member"]),
+  })
+  .strict();
 const slackOAuthInputSchema = z
   .object({
     defaultProjectId: z.string().uuid(),
@@ -1860,6 +1866,9 @@ const issueMessageJson = (message: IssueMessageRow) => ({
   updatedAt: message.updated_at,
 });
 
+export const claimConversationJson = (messages: IssueMessageRow[]) =>
+  messages.map(issueMessageJson);
+
 const runEvidenceJson = (
   evidence: RunEvidenceRow,
   requiredRevision: number,
@@ -2106,6 +2115,39 @@ async function route(
   const organizationMemberMatch = pathname.match(
     /^\/organizations\/([0-9a-f-]+)\/members\/([^/]+)$/u,
   );
+  if (organizationMemberMatch && request.method === "PATCH") {
+    const session = await requireSession(auth, request);
+    const organizationId = organizationMemberMatch[1];
+    const memberId = decodeURIComponent(organizationMemberMatch[2]);
+    const role = await getOrganizationRole(
+      db,
+      organizationId,
+      session.user.id,
+    );
+    if (!canManageOrganization(role)) {
+      throw new HttpError(403, "Organization admin access required");
+    }
+    if (memberId === session.user.id) {
+      throw new HttpError(400, "You cannot change your own organization role");
+    }
+    const memberRole = await getOrganizationRole(db, organizationId, memberId);
+    if (!memberRole) throw new HttpError(404, "Member not found");
+    if (memberRole === "owner") {
+      throw new HttpError(403, "Organization owner role cannot be changed");
+    }
+    const input = organizationMemberRoleInputSchema.parse(
+      await readJson(request),
+    );
+    const updated = await updateOrganizationMemberRole(
+      db,
+      organizationId,
+      memberId,
+      input.role,
+    );
+    if (!updated) throw new HttpError(404, "Member not found");
+    const members = await listOrganizationMembers(db, organizationId);
+    return json({ members: members.map(organizationMemberJson) });
+  }
   if (organizationMemberMatch && request.method === "DELETE") {
     const session = await requireSession(auth, request);
     const role = await getOrganizationRole(
@@ -3024,14 +3066,18 @@ async function route(
   );
   if (agentTokenMatch && request.method === "POST") {
     const session = await requireSession(auth, request);
+    const project = await getProject(db, agentTokenMatch[1], session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
     const agentToken = `briar_agent_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
-    const replaced = await replaceProjectAgentToken(
+    const issued = await issueProjectAgentToken(
       db,
-      agentTokenMatch[1],
+      project.id,
       session.user.id,
       await sha256(agentToken),
     );
-    if (!replaced) throw new HttpError(404, "Project not found");
+    if (!issued) {
+      throw new HttpError(403, "Repository connection permission denied");
+    }
     return json({ agentToken });
   }
 
@@ -3985,9 +4031,12 @@ async function route(
     }
     const agent =
       run?.agent_id ? await getProjectAgent(db, projectId, run.agent_id) : null;
-    const attachments = run
-      ? await listIssueAttachments(db, projectId, run.id)
-      : [];
+    const [attachments, messages] = run
+      ? await Promise.all([
+          listIssueAttachments(db, projectId, run.id),
+          listIssueMessages(db, projectId, run.id),
+        ])
+      : [[], []];
     return json({
       work: run
         ? {
@@ -4007,6 +4056,7 @@ async function route(
               JSON.parse(run.workflow_snapshot_json),
             ),
             attachments: attachments.map(attachmentJson),
+            messages: claimConversationJson(messages),
             claimToken,
             claimedBy: run.claimed_by,
             claimedAt: run.claimed_at,

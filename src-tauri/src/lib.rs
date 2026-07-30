@@ -3488,6 +3488,16 @@ struct CliClaimedRun {
     run_number: u64,
     source_key: String,
     title: String,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    priority: Option<u8>,
+    #[serde(default)]
+    context: Option<serde_json::Value>,
+    #[serde(default)]
+    attachments: Vec<agent::ProjectAutoHuntIssueAttachment>,
+    #[serde(default)]
+    messages: Vec<agent::ProjectAutoHuntIssueMessage>,
     workflow: serde_json::Value,
     #[serde(default)]
     workspace: Option<CliClaimedWorkspace>,
@@ -3863,6 +3873,11 @@ async fn start_project_auto_hunt(
                 run_number: claimed.run_number,
                 source_key: claimed.source_key.clone(),
                 title: claimed.title.clone(),
+                issue_description: claimed.description.clone(),
+                priority: claimed.priority,
+                context: claimed.context.clone(),
+                attachments: claimed.attachments.clone(),
+                conversation: claimed.messages.clone(),
             };
             let dispatch = dispatch_store.add_worker(
                 &request.session_id,
@@ -5489,6 +5504,55 @@ branch refs/heads/briar/second-11111111
                 "--runtime-dispatch",
             ],
         );
+    }
+
+    #[test]
+    fn parses_the_claimed_runs_durable_issue_snapshot() {
+        let response = serde_json::from_value::<CliClaimResponse>(serde_json::json!({
+            "work": {
+                "runId": "515b7a2c-8918-5a8f-a292-f0b95090281c",
+                "runNumber": 13,
+                "sourceKey": "BRIAR-13",
+                "title": "Render the attached layout",
+                "description": "Match the mobile reference.",
+                "priority": 1,
+                "context": { "customer": "enterprise" },
+                "workflow": { "version": 1 },
+                "attachments": [{
+                    "id": "attachment-1",
+                    "filename": "layout.png",
+                    "contentType": "image/png",
+                    "byteSize": 2048,
+                    "url": "/projects/project-1/runs/run-1/attachments/attachment-1",
+                    "localPath": "/tmp/attachments/layout.png",
+                    "downloadError": null
+                }],
+                "messages": [{
+                    "id": "message-1",
+                    "parentMessageId": null,
+                    "body": "The compact breakpoint is required.",
+                    "author": {
+                        "id": "user-1",
+                        "name": "Jay",
+                        "provider": null
+                    },
+                    "createdAt": "2026-07-30T00:00:00Z",
+                    "updatedAt": "2026-07-30T00:00:00Z"
+                }]
+            }
+        }))
+        .expect("claim response should parse");
+        let work = response.work.expect("claim should contain work");
+
+        assert_eq!(
+            work.description.as_deref(),
+            Some("Match the mobile reference.")
+        );
+        assert_eq!(
+            work.attachments[0].local_path.as_deref(),
+            Some("/tmp/attachments/layout.png")
+        );
+        assert_eq!(work.messages[0].body, "The compact breakpoint is required.");
     }
 
     #[test]
