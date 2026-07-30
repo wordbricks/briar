@@ -842,33 +842,29 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .issue-agent-reply-state { margin:4px 10px; padding:9px 11px; display:flex; align-items:center; gap:7px; border-radius:9px; color:#6a57ad; background:#f5f2fc; font-size:var(--text-2xs); }
 .issue-message > div > .issue-agent-reply-state { margin:7px 0 1px; }
 .issue-agent-reply-state.error { color:#a54253; background:#fff1f3; }
-.issue-message-composer { position:relative; flex:0 0 auto; overflow:hidden; display:grid; border:1px solid #d7d8d2; border-radius:13px; background:var(--card); box-shadow:0 4px 16px rgba(43,42,37,.04); transition:border-color .14s ease-out,box-shadow .14s ease-out; }
-.issue-message-composer:focus-within { border-color:#9b88d7; box-shadow:0 0 0 3px rgba(128, 104, 206, 0.1),
-    0 6px 20px rgba(43, 42, 37, 0.05); }
-.issue-composer-formatting { min-height:34px; padding:4px 8px; display:flex; align-items:center; gap:2px; border-bottom:1px solid #eeeeea; background:#fafaf8; }
-.issue-composer-formatting button,.issue-message-composer footer button { width:28px; height:26px; padding:0; display:grid; place-items:center; border:0; border-radius:6px; color:var(--muted-foreground); background:transparent; cursor:pointer; }
-.issue-composer-formatting button:hover,.issue-message-composer footer button:hover { color:#554491; background:#efebfa; }
-.issue-composer-formatting button:active,.issue-message-composer footer button:active { transform:scale(.94); }
-.issue-composer-formatting button:focus-visible,.issue-message-composer footer button:focus-visible { outline:2px solid #8b70dd; outline-offset:1px; }
-.issue-composer-mention-menu { margin:7px 9px 0; padding:3px; border:1px solid #dedfd9; border-radius:9px; background:var(--card); box-shadow:0 7px 20px rgba(43, 42, 37, 0.1); }
+.issue-message-composer { position:relative; flex:0 0 auto; overflow:hidden; display:grid; grid-template-rows:minmax(0,1fr) auto; border:1px solid #dedfda; border-radius:16px; background:var(--card); box-shadow:0 5px 18px rgba(43,42,37,.055); transition:border-color .14s ease-out,box-shadow .14s ease-out; }
+.issue-message-composer:focus-within { border-color:#c4c5bf; box-shadow:0 0 0 3px rgba(80,82,76,.055),0 7px 22px rgba(43,42,37,.07); }
+.issue-composer-mention-menu { position:absolute; z-index:3; right:12px; bottom:51px; left:12px; padding:3px; border:1px solid #dedfd9; border-radius:9px; background:var(--card); box-shadow:0 7px 20px rgba(43,42,37,.1); }
 .issue-composer-mention-menu button { width:100%; min-height:32px; padding:4px 8px; display:flex; align-items:center; gap:8px; border:0; border-radius:6px; color:#4f5050; background:#f5f2fc; cursor:pointer; text-align:left; }
 .issue-composer-mention-menu button > span { width:22px; height:22px; display:grid; place-items:center; border-radius:6px; color:#604bad; background:#e9e2fa; }
 .issue-composer-mention-menu button strong { font-size:var(--text-xs); }
 .issue-composer-mention-menu button:hover { color:#554491; background:#efebfa; }
 .issue-composer-mention-menu button:focus-visible { outline:2px solid #8b70dd; outline-offset:1px; }
-.issue-message-composer textarea { width:100%; min-height:72px; padding:11px 13px 4px; resize:vertical; border:0; outline:0; color:#41423e; background:transparent; font:400 var(--text-xs)/1.6 inherit; }
-.issue-message-composer textarea::placeholder { color:#a2a49d; }
-.issue-message-composer footer { min-height:38px; padding:4px 7px 6px 8px; display:flex; align-items:center; justify-content:space-between; gap:8px; }
-.issue-message-composer footer > div { display:flex; align-items:center; gap:2px; }
-.issue-message-composer footer .issue-message-send { width:30px; height:30px; color:#fff; background:#7058bf; }
-.issue-message-composer footer .issue-message-send:hover { color:#fff; background:#5e47ac; }
-.issue-message-composer footer .issue-message-send:disabled { color:#b7b8b3; background:#ecece8; cursor:default; transform:none; }
+.issue-message-composer textarea { width:100%; min-height:92px; padding:18px 18px 6px; resize:none; border:0; outline:0; color:#41423e; background:transparent; font:400 var(--text-sm)/1.55 inherit; }
+.issue-message-composer textarea::placeholder { color:#a5a7a1; }
+.issue-message-composer footer { min-height:48px; padding:4px 12px 11px; display:flex; align-items:center; justify-content:flex-end; gap:5px; }
+.issue-message-composer footer button { width:32px; height:32px; padding:0; display:grid; place-items:center; border:0; border-radius:9px; color:#797b75; background:transparent; cursor:pointer; transition:color .12s ease-out,background-color .12s ease-out,transform .1s ease-out; }
+.issue-message-composer footer button:hover { color:#4f514c; background:#f0f0ed; }
+.issue-message-composer footer button:active { transform:scale(.94); }
+.issue-message-composer footer button:focus-visible { outline:2px solid #8b70dd; outline-offset:1px; }
+.issue-message-composer footer .issue-message-send { color:#555751; }
+.issue-message-composer footer .issue-message-send:disabled { color:#c2c3be; background:transparent; cursor:default; transform:none; }
 .issue-composer-error { margin:0; padding:0 10px 8px; display:flex; align-items:center; gap:5px; color:#b13f54; font-size:var(--text-2xs); }
-.issue-message-composer.compact { margin:12px max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left)); box-shadow:0 8px 30px rgba(43,42,37,.08); }
-.issue-message-composer.compact textarea { min-height:52px; resize:none; }
-.issue-thread-layer { position:fixed; inset:0; z-index:40; visibility:hidden; pointer-events:none; }
+.issue-message-composer.compact { margin:12px max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left)); box-shadow:0 8px 26px rgba(43,42,37,.07); }
+.issue-message-composer.compact textarea { min-height:68px; }
+.issue-thread-layer { position:absolute; inset:0; z-index:40; visibility:hidden; pointer-events:none; }
 .issue-thread-layer.open { visibility:visible; }
-.issue-thread-drawer { width:min(430px,calc(100vw - 56px)); height:100%; margin-left:auto; display:grid; grid-template-rows:auto minmax(0,1fr) auto; overflow:hidden; border-left:1px solid rgba(77,72,89,.13); background:rgba(255,255,255,.94); box-shadow:-24px 0 70px rgba(37,34,46,.16); backdrop-filter:blur(24px) saturate(150%); -webkit-backdrop-filter:blur(24px) saturate(150%); transform:translateX(102%); transition:transform .3s cubic-bezier(.2,.8,.2,1); }
+.issue-thread-drawer { width:min(max(430px,50vw),calc(100vw - 56px)); height:100%; margin-left:auto; display:grid; grid-template-rows:auto minmax(0,1fr) auto; overflow:hidden; border-left:1px solid rgba(77,72,89,.13); background:rgba(255,255,255,.94); box-shadow:-24px 0 70px rgba(37,34,46,.16); backdrop-filter:blur(24px) saturate(150%); -webkit-backdrop-filter:blur(24px) saturate(150%); transform:translateX(102%); transition:transform .3s cubic-bezier(.2,.8,.2,1); }
 .issue-thread-layer.open .issue-thread-drawer { pointer-events:auto; transform:translateX(0); }
 .issue-thread-drawer > header { min-height:calc(66px + env(safe-area-inset-top,0px)); padding:calc(8px + env(safe-area-inset-top,0px)) max(13px,env(safe-area-inset-right)) 8px max(18px,env(safe-area-inset-left)); display:flex; align-items:center; justify-content:space-between; gap:12px; border-bottom:1px solid rgba(77, 72, 89, 0.1); }
 .issue-thread-drawer > header > div { display:flex; align-items:baseline; gap:8px; }

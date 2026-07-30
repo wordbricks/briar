@@ -1,15 +1,13 @@
 import {
   Activity,
   ArrowLeft,
-  AtSign,
-  Bold,
+  ArrowUp,
   Bot,
   Check,
   ChevronDown,
   ChevronRight,
   CircleAlert,
   Clock3,
-  Code2,
   Columns3,
   FolderKanban,
   FolderGit2,
@@ -17,7 +15,6 @@ import {
   GitFork,
   GitPullRequest,
   Image as ImageIcon,
-  Italic,
   Link2,
   ListChecks,
   List,
@@ -31,9 +28,7 @@ import {
   RefreshCw,
   RotateCcw,
   Search,
-  Send,
   Signal,
-  Smile,
   Tag,
   Trash2,
   UserRound,
@@ -3411,36 +3406,6 @@ function MessageComposer({
       onFocus={() => setComposerFocused(true)}
       onSubmit={(event) => void submit(event)}
     >
-      <div className="issue-composer-formatting">
-        <button
-          aria-label={t("run.formatBold")}
-          onClick={() => wrapSelection("**")}
-          type="button"
-        >
-          <Bold size={15} />
-        </button>
-        <button
-          aria-label={t("run.formatItalic")}
-          onClick={() => wrapSelection("_")}
-          type="button"
-        >
-          <Italic size={15} />
-        </button>
-        <button
-          aria-label={t("run.formatLink")}
-          onClick={() => wrapSelection("[", "](https://)")}
-          type="button"
-        >
-          <Link2 size={15} />
-        </button>
-        <button
-          aria-label={t("run.formatCode")}
-          onClick={() => wrapSelection("`")}
-          type="button"
-        >
-          <Code2 size={15} />
-        </button>
-      </div>
       {showsMentionSuggestion && (
         <div
           aria-label={t("run.mention")}
@@ -3505,22 +3470,14 @@ function MessageComposer({
         value={body}
       />
       <footer>
-        <div>
-          <button
-            aria-label={t("run.emoji")}
-            onClick={() => wrapSelection("🙂", "")}
-            type="button"
-          >
-            <Smile size={16} />
-          </button>
-          <button
-            aria-label={t("run.mention")}
-            onClick={() => wrapSelection("@briar ", "")}
-            type="button"
-          >
-            <AtSign size={16} />
-          </button>
-        </div>
+        <button
+          aria-label={t("run.formatLink")}
+          className="issue-composer-link"
+          onClick={() => wrapSelection("[", "](https://)")}
+          type="button"
+        >
+          <Paperclip size={18} />
+        </button>
         <button
           aria-label={sending ? t("run.sendingMessage") : t("run.sendMessage")}
           className="issue-message-send"
@@ -3530,7 +3487,7 @@ function MessageComposer({
           {sending ? (
             <LoaderCircle className="spin" size={16} />
           ) : (
-            <Send size={16} />
+            <ArrowUp size={19} strokeWidth={2.2} />
           )}
         </button>
       </footer>
