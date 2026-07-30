@@ -10,6 +10,7 @@ import {
   type ProjectAgentLocale,
 } from "./project-agent";
 import type { AgentProvider } from "./project-llm";
+import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import type {
   LinearImportConnectResult,
   LinearImportResult,
@@ -90,6 +91,53 @@ const projectAgentSchema = z.object({
     .regex(/^#[0-9a-f]{6}$/iu)
     .default(defaultProjectAgentCalendarColor),
   createdAt: z.string(),
+  updatedAt: z.string(),
+});
+const projectAgentSessionSchema = z.object({
+  id: z.string(),
+  projectId: z.string().uuid(),
+  dispatchGroupId: z.string(),
+  agentId: z.string().uuid().nullable(),
+  sessionType: z.enum(["task", "dispatch"]),
+  trigger: z.enum(["manual", "scheduled"]).nullable(),
+  scheduleId: z.string().nullable(),
+  scheduleRunId: z.string().nullable(),
+  parentSessionId: z.string().nullable(),
+  request: z.string().nullable(),
+  status: z.enum(["running", "completed", "failed", "interrupted"]),
+  issues: z.array(z.object({
+    runId: z.string(),
+    runNumber: z.number().int(),
+    sourceKey: z.string(),
+    title: z.string(),
+    outcome: z.enum([
+      "pending",
+      "completed",
+      "blocked",
+      "failed",
+      "skipped",
+    ]),
+    summary: z.string().nullable(),
+  })),
+  startedAt: z.string(),
+  completedAt: z.string().nullable(),
+  conversationId: z.string().nullable(),
+  workspaceRoot: z.null(),
+  summary: z.string().nullable(),
+  error: z.string().nullable(),
+  events: z.array(z.object({
+    id: z.string(),
+    type: z.enum([
+      "started",
+      "completed",
+      "failed",
+      "interrupted",
+      "stopped",
+    ]),
+    occurredAt: z.string(),
+  })),
+  dispatchEvents: z.array(z.never()),
+  workers: z.array(z.never()),
   updatedAt: z.string(),
 });
 const projectAgentScheduleSchema = z.object({
@@ -581,6 +629,62 @@ export async function loadProjectAgents(
     token,
   );
   return z.array(projectAgentSchema).parse(result.agents);
+}
+
+export async function loadProjectAgentSessions(
+  token: string,
+  projectId: string,
+): Promise<AutoHuntSession[]> {
+  const result = await request<{ sessions: unknown[] }>(
+    `/projects/${projectId}/agent-sessions`,
+    token,
+  );
+  return z.array(projectAgentSessionSchema).parse(result.sessions).map(
+    (session) => ({
+      ...session,
+      localOwner: false,
+    } as AutoHuntSession),
+  );
+}
+
+export async function upsertProjectAgentSession(
+  token: string,
+  session: AutoHuntSession,
+): Promise<AutoHuntSession> {
+  const result = await request<{ session: unknown }>(
+    `/projects/${session.projectId}/agent-sessions/${encodeURIComponent(session.id)}`,
+    token,
+    {
+      method: "PUT",
+      body: JSON.stringify({
+        dispatchGroupId: session.dispatchGroupId,
+        agentId: session.agentId ?? null,
+        sessionType: session.sessionType ?? "dispatch",
+        trigger: session.trigger ?? null,
+        scheduleId: session.scheduleId ?? null,
+        scheduleRunId: session.scheduleRunId ?? null,
+        parentSessionId: session.parentSessionId ?? null,
+        request: session.request ?? null,
+        status: session.status,
+        issues: session.issues,
+        startedAt: session.startedAt,
+        completedAt: session.completedAt,
+        conversationId: session.conversationId,
+        summary: session.summary,
+        error: session.error,
+        events: session.events,
+        updatedAt:
+          session.updatedAt ?? session.completedAt ?? session.startedAt,
+      }),
+    },
+  );
+  return {
+    ...projectAgentSessionSchema.parse(result.session),
+    localOwner: session.localOwner,
+    workspaceRoot: session.workspaceRoot,
+    dispatchEvents: session.dispatchEvents,
+    workers: session.workers,
+  } as AutoHuntSession;
 }
 
 export async function createProjectAgent(

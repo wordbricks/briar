@@ -4,7 +4,11 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { HuntRun, ProjectAgent } from "../types";
-import { useAutoHuntSessions } from "./useAutoHuntSessions";
+import {
+  mergeSynchronizedSessions,
+  useAutoHuntSessions,
+  type AutoHuntSession,
+} from "./useAutoHuntSessions";
 
 type SessionsHook = ReturnType<typeof useAutoHuntSessions>;
 type AutoHuntRunner = NonNullable<
@@ -27,6 +31,83 @@ beforeEach(() => {
 });
 
 describe("useAutoHuntSessions", () => {
+  it("keeps a remotely owned running session active after app restart", async () => {
+    window.localStorage.setItem(
+      "briar.auto-hunt-sessions.v1",
+      JSON.stringify([{
+        id: "remote-session-1",
+        dispatchGroupId: "",
+        projectId: "project-1",
+        agentId: "agent-1",
+        sessionType: "task",
+        trigger: "manual",
+        request: "Remote repository audit",
+        status: "running",
+        issues: [],
+        startedAt: "2026-07-28T01:00:00.000Z",
+        completedAt: null,
+        conversationId: null,
+        workspaceRoot: null,
+        summary: null,
+        error: null,
+        events: [],
+        dispatchEvents: [],
+        workers: [],
+        updatedAt: "2026-07-28T01:00:00.000Z",
+        localOwner: false,
+      }]),
+    );
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    await act(async () => root.render(<Harness />));
+
+    expect(sessionsHook.sessions[0]).toMatchObject({
+      id: "remote-session-1",
+      status: "running",
+      localOwner: false,
+    });
+
+    await act(async () => root.unmount());
+  });
+
+  it("merges a newer remote status without losing local-only details", () => {
+    const local = {
+      id: "session-1",
+      dispatchGroupId: "",
+      projectId: "project-1",
+      agentId: "agent-1",
+      sessionType: "task",
+      status: "running",
+      issues: [],
+      startedAt: "2026-07-28T01:00:00.000Z",
+      completedAt: null,
+      conversationId: null,
+      workspaceRoot: "/repo",
+      summary: null,
+      error: null,
+      events: [],
+      dispatchEvents: [],
+      workers: [],
+      updatedAt: "2026-07-28T01:00:00.000Z",
+      localOwner: true,
+    } as AutoHuntSession;
+    const remote = {
+      ...local,
+      status: "completed",
+      completedAt: "2026-07-28T01:10:00.000Z",
+      workspaceRoot: null,
+      updatedAt: "2026-07-28T01:10:00.000Z",
+      localOwner: false,
+    } as AutoHuntSession;
+
+    expect(mergeSynchronizedSessions([local], [remote])[0])
+      .toMatchObject({
+        status: "completed",
+        workspaceRoot: "/repo",
+        localOwner: true,
+      });
+  });
+
   it("starts and settles a scheduled task session with schedule identity", async () => {
     const container = document.createElement("div");
     const root = createRoot(container);
