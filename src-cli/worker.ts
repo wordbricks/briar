@@ -339,11 +339,20 @@ export function launchdPlist(input: {
   cliScript?: string;
   workingDirectory: string;
   logPath: string;
+  environmentPath?: string;
 }): string {
   const label = serviceLabel(input.projectId);
   const programArguments = workerServiceCommand(input)
     .map((argument) => `    <string>${plistText(argument)}</string>`)
     .join("\n");
+  const environmentVariables = input.environmentPath
+    ? `  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>${plistText(input.environmentPath)}</string>
+  </dict>
+`
+    : "";
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -356,7 +365,7 @@ ${programArguments}
   </array>
   <key>WorkingDirectory</key>
   <string>${plistText(input.workingDirectory)}</string>
-  <key>RunAtLoad</key>
+${environmentVariables}  <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>
   <true/>
@@ -405,6 +414,7 @@ export function serviceDefinition(input: {
   workingDirectory: string;
   home?: string;
   platform?: string;
+  environmentPath?: string;
 }): ServiceDefinition {
   const home = input.home ?? homedir();
   const currentPlatform = input.platform ?? platform();
@@ -422,6 +432,10 @@ export function serviceDefinition(input: {
         cliScript: input.cliScript,
         workingDirectory: input.workingDirectory,
         logPath,
+        // launchd does not inherit the PATH used to bootstrap the service.
+        // Persist it so user-installed CLIs and their shebang runtimes remain
+        // available after the desktop configuration command exits.
+        environmentPath: input.environmentPath ?? process.env.PATH,
       }),
       enableCommand: ["launchctl", "bootstrap", `gui/${process.getuid?.() ?? 501}`],
       disableCommand: ["launchctl", "bootout", `gui/${process.getuid?.() ?? 501}`],
