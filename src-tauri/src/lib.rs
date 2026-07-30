@@ -233,7 +233,7 @@ impl From<AutoHuntConfig> for StoredAutoHuntConfig {
                 extra: BTreeMap::new(),
             }),
             github_repository: config.github_repository,
-            workflow: Some(config.workflow),
+            workflow: Some(normalize_workflow_execution(config.workflow)),
             // Worktree and sandbox settings belong to the CLI; callers carry the
             // stored values over instead of letting an app-side save erase them.
             worktrees: None,
@@ -4783,6 +4783,7 @@ async fn connect_local_project(
         let runner = host::LocalRunner::new(cli_execution_path(&home)?, home.clone());
         let root = git_repository_root(Path::new(&repository_path))?;
         let remote = repository_remote(&root);
+        auto_hunt.workflow = normalize_workflow_execution(auto_hunt.workflow);
         let workflow = auto_hunt.workflow.clone();
         let root_string = root
             .into_os_string()
@@ -5874,6 +5875,74 @@ branch refs/heads/briar/second-11111111
         assert!(saved["projects"][1]["autoHunt"]["linearEnabled"].is_null());
 
         fs::remove_dir_all(directory).expect("test config directory should be removed");
+    }
+
+    #[test]
+    fn repairs_an_empty_workflow_execution_boundary_when_connecting() {
+        let config_path = test_config_path("empty-workflow-boundary");
+        let workflow = WorkflowConfig {
+            version: 1,
+            stages: vec![
+                WorkflowStageConfig {
+                    id: "analyzing".to_string(),
+                    label: "Analyze".to_string(),
+                    required: true,
+                    evidence: Vec::new(),
+                    checks: Vec::new(),
+                },
+                WorkflowStageConfig {
+                    id: "implementing".to_string(),
+                    label: "Implement".to_string(),
+                    required: true,
+                    evidence: Vec::new(),
+                    checks: Vec::new(),
+                },
+            ],
+            execution: WorkflowExecutionConfig::default(),
+            completion: WorkflowCompletionConfig {
+                required_stages: vec!["analyzing".to_string(), "implementing".to_string()],
+            },
+        };
+
+        write_cli_connection(
+            &config_path,
+            CliConnectionInput {
+                api_url: "https://briar.example.com".to_string(),
+                project_id: "project-1".to_string(),
+                agent_token: "briar_agent_test".to_string(),
+                repository_path: "/repo".to_string(),
+                repository_remote: None,
+            },
+            LocalProjectAgentConfig {
+                llm: agent::ProjectLlmSettings::default(),
+                auto_hunt: AutoHuntConfig {
+                    velen_org: None,
+                    data_source: None,
+                    linear_enabled: false,
+                    linear_source: None,
+                    linear_team: None,
+                    github_repository: None,
+                    workflow,
+                },
+            },
+        )
+        .expect("connection should save");
+
+        let saved: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&config_path).expect("saved config should be readable"),
+        )
+        .expect("saved config should be valid json");
+        assert_eq!(
+            saved["projects"][0]["autoHunt"]["workflow"]["execution"]["stopAfterStage"],
+            "implementing"
+        );
+
+        fs::remove_dir_all(
+            config_path
+                .parent()
+                .expect("config should have a parent directory"),
+        )
+        .expect("test directory should be removed");
     }
 
     #[test]
