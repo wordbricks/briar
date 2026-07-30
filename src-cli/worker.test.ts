@@ -365,6 +365,49 @@ describe("worker service definitions", () => {
     expect(definition.enableCommand[0]).toBe("launchctl");
   });
 
+  it("runs a packaged CLI with the bundled runtime on macOS", () => {
+    const definition = serviceDefinition({
+      ...input,
+      platform: "darwin",
+      runtimeBinary: "/Applications/Briar.app/Contents/MacOS/bun",
+      cliScript: "/Users/dev/.local/share/briar/briar.js",
+    });
+    expect(definition.contents).toContain(
+      "<string>/Applications/Briar.app/Contents/MacOS/bun</string>",
+    );
+    expect(definition.contents).toContain(
+      "<string>/Users/dev/.local/share/briar/briar.js</string>",
+    );
+    expect(definition.contents).not.toContain(
+      "<string>/Users/dev/.local/bin/briar</string>",
+    );
+  });
+
+  it("requires the packaged runtime and CLI script together", () => {
+    expect(() =>
+      serviceDefinition({
+        ...input,
+        platform: "darwin",
+        runtimeBinary: "/Applications/Briar.app/Contents/MacOS/bun",
+      }),
+    ).toThrow(/configured together/u);
+  });
+
+  it("escapes packaged runtime paths in launchd plists", () => {
+    const definition = serviceDefinition({
+      ...input,
+      platform: "darwin",
+      runtimeBinary: "/Applications/Briar & Test.app/Contents/MacOS/bun",
+      cliScript: "/Users/dev/<briar>/briar.js",
+    });
+    expect(definition.contents).toContain(
+      "<string>/Applications/Briar &amp; Test.app/Contents/MacOS/bun</string>",
+    );
+    expect(definition.contents).toContain(
+      "<string>/Users/dev/&lt;briar&gt;/briar.js</string>",
+    );
+  });
+
   it("builds a systemd user unit that always restarts", () => {
     const definition = serviceDefinition({ ...input, platform: "linux" });
     expect(definition.path).toBe(
