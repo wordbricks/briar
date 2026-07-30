@@ -482,29 +482,15 @@ describe("Sidebar", () => {
     container.remove();
   });
 
-  it("flags projects that are not connected on this computer", () => {
+  it("does not show a repository connection warning beside projects", () => {
     const markup = renderToStaticMarkup(
       <Sidebar {...sidebarProps} connectedProjectIds={[]} />,
     );
 
-    expect(markup).toContain("sidebar-project-disconnected");
-    expect(markup).toContain(
+    expect(markup).not.toContain("sidebar-project-disconnected");
+    expect(markup).not.toContain(
       "Briar: 이 컴퓨터에 저장소가 연결되지 않았습니다",
     );
-  });
-
-  it("keeps connected projects unflagged", () => {
-    const markup = renderToStaticMarkup(<Sidebar {...sidebarProps} />);
-
-    expect(markup).not.toContain("sidebar-project-disconnected");
-  });
-
-  it("leaves projects unflagged when the local state is unknown", () => {
-    const markup = renderToStaticMarkup(
-      <Sidebar {...sidebarProps} connectedProjectIds={null} />,
-    );
-
-    expect(markup).not.toContain("sidebar-project-disconnected");
   });
 
   it("switches and persists the language from the account submenu", async () => {

@@ -182,6 +182,22 @@ describe("HuntDashboard", () => {
     expect(markup).not.toContain('class="metric-grid"');
   });
 
+  it("does not show a repository connection banner", () => {
+    const disconnectedState = { needsLocalConnection: true };
+    const markup = renderToStaticMarkup(
+      <HuntDashboard
+        {...dashboardProps}
+        {...disconnectedState}
+        dashboard={demoDashboard}
+      />,
+    );
+
+    expect(markup).not.toContain("connect-banner");
+    expect(markup).not.toContain(
+      "이 컴퓨터에 저장소가 연결되지 않았습니다.",
+    );
+  });
+
   it("shows the issue description instead of the run status detail on cards", () => {
     const run = {
       ...demoDashboard.runs[0],

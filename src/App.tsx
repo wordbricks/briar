@@ -712,13 +712,11 @@ export function App() {
             isIssueDialogOpen={isIssueDialogOpen}
             deletingIssueId={briar.deletingIssueId}
             updatingIssueId={briar.updatingIssueId}
-            needsLocalConnection={!briar.isActiveProjectConnectedLocally}
             noProject={!activeProject}
             recoveringRunId={briar.recoveringRunId}
             recoveryError={briar.recoveryError}
             requestedRunId={requestedRunId}
             isSidebarOpen={isSidebarOpen}
-            onConnectRepository={briar.reconnectProject}
             onAddProject={briar.startProjectCreation}
             onCreateIssue={briar.addIssue}
             onIssueDialogOpenChange={setIsIssueDialogOpen}
