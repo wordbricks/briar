@@ -97,6 +97,34 @@ describe("ProjectOnboarding", () => {
     expect(markup).not.toContain('aria-pressed="true"');
   });
 
+  it("does not show repository analysis or workflow generation when reconnecting", () => {
+    const markup = renderToStaticMarkup(
+      <ProjectOnboarding
+        {...baseProps}
+        connection={{
+          project: { id: "project-1", name: "Briar", createdAt: "2026-07-22T00:00:00Z" },
+          agentToken: "token",
+          workflow: {
+            version: 1,
+            stages: [
+              { id: "implementing", label: "구현", required: true },
+              { id: "local_qa", label: "로컬 검증", required: true },
+            ],
+            execution: { stopAfterStage: "local_qa" },
+            completion: { requiredStages: ["implementing", "local_qa"] },
+          },
+        }}
+        loading
+      />,
+    );
+
+    expect(markup).toContain("Auto Hunt 실행 워크플로");
+    expect(markup).toContain("저장 중");
+    expect(markup).not.toContain("워크플로우 자동 생성");
+    expect(markup).not.toContain("저장소를 분석");
+    expect(markup).not.toContain("완료되어야 연결");
+  });
+
   it("asks first-time users how they want to use Briar", () => {
     const markup = renderToStaticMarkup(<ProjectOnboarding {...baseProps} />);
 

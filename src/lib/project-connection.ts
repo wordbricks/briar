@@ -1,5 +1,8 @@
 import { briarApiUrl } from "./api";
-import type { AutoHuntWorkflow } from "./auto-hunt-contract";
+import {
+  isRepositoryWorkflowPending,
+  type AutoHuntWorkflow,
+} from "./auto-hunt-contract";
 import type { ProjectSettings } from "../types";
 
 export type VelenOrganization = { name: string; slug: string };
@@ -85,16 +88,19 @@ export async function resolveProjectConnectionWorkflow(
   existingWorkflow: AutoHuntWorkflow | undefined,
   generateWorkflow: () => Promise<AutoHuntWorkflow>,
 ) {
-  if (role === "member") {
-    if (!existingWorkflow) {
-      throw new Error(
-        "An organization owner or admin must generate the project workflow before members can connect a repository.",
-      );
-    }
+  if (
+    existingWorkflow &&
+    !isRepositoryWorkflowPending(existingWorkflow)
+  ) {
     return {
       workflow: existingWorkflow,
-      shouldPersistProjectSettings: false,
+      shouldPersistProjectSettings: role !== "member",
     };
+  }
+  if (role === "member") {
+    throw new Error(
+      "An organization owner or admin must generate the project workflow before members can connect a repository.",
+    );
   }
   return {
     workflow: await generateWorkflow(),

@@ -58,6 +58,55 @@ describe("local project connection", () => {
 
   it("reuses shared workflow settings when a member connects locally", async () => {
     const generateWorkflow = vi.fn();
+    const existingWorkflow = {
+      version: 1 as const,
+      stages: [
+        { id: "implementing", label: "Implement", required: true },
+      ],
+      execution: { stopAfterStage: "implementing" },
+      completion: { requiredStages: ["implementing"] },
+    };
+
+    await expect(
+      resolveProjectConnectionWorkflow(
+        "member",
+        existingWorkflow,
+        generateWorkflow,
+      ),
+    ).resolves.toEqual({
+      workflow: existingWorkflow,
+      shouldPersistProjectSettings: false,
+    });
+    expect(generateWorkflow).not.toHaveBeenCalled();
+  });
+
+  it("reuses an existing project workflow without analyzing the repository again", async () => {
+    const existingWorkflow = {
+      version: 1 as const,
+      stages: [
+        { id: "implementing", label: "Implement", required: true },
+        { id: "local_qa", label: "Local QA", required: true },
+      ],
+      execution: { stopAfterStage: "local_qa" },
+      completion: { requiredStages: ["implementing", "local_qa"] },
+    };
+    const generateWorkflow = vi.fn();
+
+    await expect(
+      resolveProjectConnectionWorkflow(
+        "admin",
+        existingWorkflow,
+        generateWorkflow,
+      ),
+    ).resolves.toEqual({
+      workflow: existingWorkflow,
+      shouldPersistProjectSettings: true,
+    });
+    expect(generateWorkflow).not.toHaveBeenCalled();
+  });
+
+  it("does not let members connect while the project workflow is pending", async () => {
+    const generateWorkflow = vi.fn();
 
     await expect(
       resolveProjectConnectionWorkflow(
@@ -65,10 +114,7 @@ describe("local project connection", () => {
         repositoryWorkflowBootstrap,
         generateWorkflow,
       ),
-    ).resolves.toEqual({
-      workflow: repositoryWorkflowBootstrap,
-      shouldPersistProjectSettings: false,
-    });
+    ).rejects.toThrow("owner or admin");
     expect(generateWorkflow).not.toHaveBeenCalled();
   });
 
