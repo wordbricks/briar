@@ -6,7 +6,7 @@ import {
   LoaderCircle,
   OctagonX,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { MainContent } from "@/components/layout";
 import { Button } from "@/components/ui/button";
@@ -15,9 +15,13 @@ import type {
   AutoHuntSessionIssueOutcome,
   AutoHuntSessionStatus,
 } from "../hooks/useAutoHuntSessions";
+import { useAutoHuntAppServerEvents } from "../hooks/useAutoHuntAppServerEvents";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
-import { naturalLanguageFromAgentMessage } from "../lib/auto-hunt-agent";
+import {
+  agentMessagesFromAppServerEvents,
+  naturalLanguageFromAgentMessage,
+} from "../lib/auto-hunt-agent";
 
 export function ProjectAgentSessionDetail({
   isSidebarOpen,
@@ -31,7 +35,16 @@ export function ProjectAgentSessionDetail({
   session: AutoHuntSession;
 }) {
   const { localeTag, t } = useI18n();
+  const appServerEvents = useAutoHuntAppServerEvents(
+    session.sessionType === "task" ? session.id : null,
+  );
+  const agentMessages = useMemo(
+    () => agentMessagesFromAppServerEvents(appServerEvents.events),
+    [appServerEvents.events],
+  );
+  const agentMessagesRef = useRef<HTMLDivElement>(null);
   const workerProgressRef = useRef<HTMLDivElement>(null);
+  const latestAgentMessage = agentMessages[agentMessages.length - 1];
   const latestDispatchEvent =
     session.dispatchEvents[session.dispatchEvents.length - 1];
   const [isStopping, setIsStopping] = useState(false);
@@ -45,6 +58,12 @@ export function ProjectAgentSessionDetail({
     session.dispatchEvents.length,
     latestDispatchEvent?.message.length,
   ]);
+
+  useEffect(() => {
+    const messageList = agentMessagesRef.current;
+    if (!messageList || agentMessages.length === 0) return;
+    messageList.scrollTop = messageList.scrollHeight;
+  }, [agentMessages.length, latestAgentMessage?.text.length]);
 
   const stop = async () => {
     if (isStopping || session.status !== "running") return;
@@ -205,6 +224,85 @@ export function ProjectAgentSessionDetail({
               </section>
             ) : null}
 
+            {session.sessionType === "task" ? (
+              <section className="auto-hunt-dialog-section auto-hunt-app-server-section">
+                <header>
+                  <div>
+                    <h3>{t("agents.executionLog")}</h3>
+                    <p>{t("agents.executionLogDescription")}</p>
+                  </div>
+                  <span className="auto-hunt-event-count">
+                    {session.status === "running" ? (
+                      <i>
+                        <span />
+                        {t("autoHunt.live")}
+                      </i>
+                    ) : null}
+                    {t("autoHunt.eventCount", {
+                      count: agentMessages.length,
+                    })}
+                  </span>
+                </header>
+                {appServerEvents.error ? (
+                  <div className="auto-hunt-event-state error">
+                    <CircleAlert size={14} />
+                    {appServerEvents.error}
+                  </div>
+                ) : appServerEvents.isLoading ? (
+                  <div className="auto-hunt-event-state">
+                    <LoaderCircle className="spin" size={14} />
+                    {t("autoHunt.eventsLoading")}
+                  </div>
+                ) : agentMessages.length === 0 ? (
+                  <div className="auto-hunt-event-state">
+                    {t("autoHunt.eventsEmpty")}
+                  </div>
+                ) : (
+                  <div
+                    className="auto-hunt-agent-messages"
+                    ref={agentMessagesRef}
+                  >
+                    {agentMessages.map((message) => (
+                      <article
+                        className="auto-hunt-agent-message"
+                        key={message.id}
+                      >
+                        <header>
+                          <span>
+                            <Bot size={13} />
+                          </span>
+                          <strong>
+                            {agentMessagePhase(t, message.phase)}
+                          </strong>
+                          {!message.isComplete ? (
+                            <small className="auto-hunt-message-streaming">
+                              <LoaderCircle className="spin" size={11} />
+                              {t("autoHunt.agentMessage.streaming")}
+                            </small>
+                          ) : null}
+                          <time
+                            dateTime={new Date(
+                              message.updatedAtMs,
+                            ).toISOString()}
+                          >
+                            {formatEventTime(
+                              message.updatedAtMs,
+                              localeTag,
+                            )}
+                          </time>
+                        </header>
+                        <p>
+                          {message.text
+                            ? naturalLanguageFromAgentMessage(message.text)
+                            : t("autoHunt.agentMessage.writing")}
+                        </p>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </section>
+            ) : null}
+
             <section className="auto-hunt-dialog-section">
               <h3>{t("autoHunt.timeline")}</h3>
               <div className="auto-hunt-timeline">
@@ -269,4 +367,21 @@ function formatDate(value: string, locale: string) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
+}
+
+function formatEventTime(value: number, locale: string) {
+  return new Intl.DateTimeFormat(locale, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(new Date(value));
+}
+
+function agentMessagePhase(
+  t: (key: MessageKey) => string,
+  phase: string | null,
+) {
+  return phase === "final_answer"
+    ? t("autoHunt.agentMessage.final")
+    : t("autoHunt.agentMessage.commentary");
 }

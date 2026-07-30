@@ -4,7 +4,18 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
+import { useAutoHuntAppServerEvents } from "../hooks/useAutoHuntAppServerEvents";
 import { ProjectAgentSessionDetail } from "./ProjectAgentSessionDetail";
+
+vi.mock("../hooks/useAutoHuntAppServerEvents", () => ({
+  useAutoHuntAppServerEvents: vi.fn(() => ({
+    events: [],
+    isLoading: false,
+    error: null,
+  })),
+}));
+
+const mockedAppServerEvents = vi.mocked(useAutoHuntAppServerEvents);
 
 const mounted: Array<{
   container: HTMLDivElement;
@@ -25,6 +36,11 @@ afterEach(async () => {
     await act(async () => item.root.unmount());
     item.container.remove();
   }
+  mockedAppServerEvents.mockReturnValue({
+    events: [],
+    isLoading: false,
+    error: null,
+  });
 });
 
 async function mount(session: AutoHuntSession) {
@@ -89,5 +105,41 @@ describe("ProjectAgentSessionDetail", () => {
     expect(progress?.textContent).not.toContain("[commentary]");
     expect(container.querySelector(".auto-hunt-app-server-section")).toBeNull();
     expect(container.textContent).not.toContain("수행 로그");
+  });
+
+  it("shows live execution messages for a task session", async () => {
+    mockedAppServerEvents.mockReturnValue({
+      events: [{
+        sessionId: "task-session-1",
+        sequence: 1,
+        occurredAtMs: Date.parse("2026-07-29T11:01:00.000Z"),
+        direction: "server",
+        message: {},
+        event: {
+          type: "messageCompleted",
+          id: "message-1",
+          phase: "commentary",
+          text:
+            '[commentary] {"summary":"블록된 이슈의 상태를 확인하고 있습니다."}',
+        },
+      }],
+      isLoading: false,
+      error: null,
+    });
+
+    const container = await mount({
+      ...session,
+      id: "task-session-1",
+      dispatchGroupId: "",
+      sessionType: "task",
+      dispatchEvents: [],
+    });
+
+    expect(mockedAppServerEvents).toHaveBeenCalledWith("task-session-1");
+    expect(container.textContent).toContain("수행 로그");
+    expect(container.textContent).toContain(
+      "블록된 이슈의 상태를 확인하고 있습니다.",
+    );
+    expect(container.textContent).not.toContain("[commentary]");
   });
 });
