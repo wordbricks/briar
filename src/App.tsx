@@ -61,6 +61,7 @@ import {
 } from "./lib/platform";
 import { issueAgentConversation } from "./lib/issue-agent-reply";
 import { isRepositoryConnectedForImport } from "./lib/linear-import";
+import { settingsAccountSelection } from "./lib/settings-account-selection";
 import { dispatchHuntRun, loadProjectAgents } from "./lib/api";
 import { demoProjectAgents } from "./lib/demo-project-agents";
 import { useI18n } from "./i18n";
@@ -365,10 +366,15 @@ export function App() {
       onBack={() => (canGoBack ? goBack() : navigateToPage("issues"))}
       onNavigate={(target) => {
         setSettingsTarget(target);
-        if (target.scope === "organization") {
-          briar.setActiveOrganizationId(target.organizationId);
-        } else if (target.scope === "project") {
-          briar.setActiveProjectId(target.projectId);
+        const selection = settingsAccountSelection(
+          target,
+          briar.activeOrganizationId,
+          briar.activeProjectId,
+        );
+        if (selection?.scope === "organization") {
+          briar.setActiveOrganizationId(selection.organizationId);
+        } else if (selection?.scope === "project") {
+          briar.setActiveProjectId(selection.projectId);
         }
       }}
       organizations={briar.organizations}
