@@ -308,6 +308,7 @@ dependencies = [
 name = "briar"
 version = "1.2.10"
 dependencies = [
+ "base64 0.22.1",
  "chrono",
  "dirs",
  "reqwest",

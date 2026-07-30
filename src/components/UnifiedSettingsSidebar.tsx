@@ -1,4 +1,5 @@
 import {
+  Activity,
   Bell,
   Bot,
   Building2,
@@ -100,6 +101,11 @@ export function UnifiedSettingsSidebar({
         id: "keybindings",
         icon: <Keyboard size={16} strokeWidth={1.75} />,
         label: t("appSettings.keybindings"),
+      },
+      {
+        id: "usage",
+        icon: <Activity size={16} strokeWidth={1.75} />,
+        label: t("usage.title"),
       },
       {
         id: "providers",

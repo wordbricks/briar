@@ -1,6 +1,8 @@
 import {
   ArrowLeft,
   ChevronRight,
+  CircleCheck,
+  CircleX,
   RefreshCw,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -9,6 +11,7 @@ import {
   formatUsageDuration,
   formatUsageWindowLabel,
   loadAgentUsage,
+  recordAgentUsageSnapshot,
   tightestUsageWindow,
   type AgentUsageProvider,
   type AgentUsageSnapshot,
@@ -17,8 +20,6 @@ import {
 import { AgentProviderIcon } from "./AgentIcons";
 
 const refreshIntervalMs = 5 * 60_000;
-const historyLimit = 12;
-
 type UsageMode = "detailed" | "compact";
 
 const emptyProvider = (
@@ -150,6 +151,94 @@ function ProviderRow({
   );
 }
 
+function ProviderDetails({
+  onBack,
+  onManageAccount,
+  provider,
+}: {
+  onBack: () => void;
+  onManageAccount: () => void;
+  provider: AgentUsageProvider;
+}) {
+  const { localeTag, t } = useI18n();
+  const windows = [provider.session, provider.weekly, provider.monthly].filter(
+    (window): window is AgentUsageWindow => window !== null,
+  );
+  return (
+    <div className="agent-usage-provider-details">
+      <header>
+        <button aria-label={t("usage.back")} onClick={onBack} type="button">
+          <ArrowLeft aria-hidden size={14} />
+        </button>
+        <ProviderIcon provider={provider.provider} />
+        <div>
+          <strong>{providerName(provider.provider)}</strong>
+          <small>
+            {provider.accountLabel ??
+              provider.planType ??
+              t("usage.systemAccount")}
+          </small>
+        </div>
+        {provider.status === "ok" ? (
+          <CircleCheck aria-label={t("usage.connected")} size={16} />
+        ) : (
+          <CircleX aria-label={t("usage.needsAttention")} size={16} />
+        )}
+      </header>
+      <div className="agent-usage-provider-detail-body">
+        <div className={`agent-usage-health ${provider.status}`}>
+          <strong>
+            {provider.status === "ok"
+              ? t("usage.connected")
+              : provider.status === "unavailable"
+                ? t("usage.signInRequired")
+                : t("usage.refreshFailed")}
+          </strong>
+          <small>
+            {t("usage.lastChecked", {
+              time: new Intl.DateTimeFormat(localeTag, {
+                hour: "numeric",
+                minute: "2-digit",
+              }).format(provider.updatedAt),
+            })}
+          </small>
+          {provider.error ? <p>{provider.error}</p> : null}
+        </div>
+        {windows.length > 0 ? (
+          <div className="agent-usage-detail-windows">
+            {windows.map((window) => (
+              <div key={window.windowMinutes}>
+                <UsageMeter window={window} />
+                <small>
+                  {window.resetsAt && window.resetsAt > Date.now()
+                    ? t("usage.resetsIn", {
+                        duration: formatUsageDuration(
+                          window.resetsAt - Date.now(),
+                        ),
+                      })
+                    : t("usage.resetUnknown")}
+                </small>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="agent-usage-detail-empty">
+            {t("usage.noProviderUsage")}
+          </p>
+        )}
+      </div>
+      <footer>
+        <button onClick={onManageAccount} type="button">
+          {t("usage.manageProviderAccount", {
+            provider: providerName(provider.provider),
+          })}
+          <ChevronRight aria-hidden size={14} />
+        </button>
+      </footer>
+    </div>
+  );
+}
+
 function StatusProvider({
   loading,
   provider,
@@ -196,69 +285,24 @@ function StatusProvider({
   );
 }
 
-function UsageHistory({
-  history,
-  onBack,
-}: {
-  history: AgentUsageSnapshot[];
-  onBack: () => void;
-}) {
-  const { localeTag, t } = useI18n();
-  return (
-    <div className="agent-usage-history">
-      <header>
-        <button aria-label={t("usage.back")} onClick={onBack} type="button">
-          <ArrowLeft aria-hidden size={14} />
-        </button>
-        <strong>{t("usage.detailsHistory")}</strong>
-      </header>
-      <div>
-        {history.length === 0 ? (
-          <p>{t("usage.noHistory")}</p>
-        ) : (
-          history.map((snapshot) => (
-            <div className="agent-usage-history-row" key={snapshot.updatedAt}>
-              <time>
-                {new Intl.DateTimeFormat(localeTag, {
-                  hour: "numeric",
-                  minute: "2-digit",
-                }).format(snapshot.updatedAt)}
-              </time>
-              {(["claude", "codex", "grok"] as const).map((provider) => {
-                const window = tightestUsageWindow(snapshot[provider]);
-                return (
-                  <span key={provider}>
-                    {providerName(provider)}
-                    <strong>
-                      {window ? `${Math.round(window.usedPercent)}%` : "—"}
-                    </strong>
-                  </span>
-                );
-              })}
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  );
-}
-
 export function AgentUsageStatusBar({
   loadUsage = loadAgentUsage,
   onManageAccounts,
+  onOpenUsageDetails,
 }: {
   loadUsage?: () => Promise<AgentUsageSnapshot>;
   onManageAccounts: () => void;
+  onOpenUsageDetails: () => void;
 }) {
   const { t } = useI18n();
   const rootRef = useRef<HTMLDivElement>(null);
   const requestRef = useRef<Promise<void> | null>(null);
   const [snapshot, setSnapshot] = useState<AgentUsageSnapshot | null>(null);
-  const [history, setHistory] = useState<AgentUsageSnapshot[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [mode, setMode] = useState<UsageMode>("detailed");
-  const [showsHistory, setShowsHistory] = useState(false);
+  const [selectedProvider, setSelectedProvider] =
+    useState<AgentUsageProvider["provider"] | null>(null);
 
   const refresh = useCallback(() => {
     if (requestRef.current) return requestRef.current;
@@ -266,12 +310,7 @@ export function AgentUsageStatusBar({
     const request = loadUsage()
       .then((next) => {
         setSnapshot(next);
-        setHistory((current) =>
-          [
-            next,
-            ...current.filter((item) => item.updatedAt !== next.updatedAt),
-          ].slice(0, historyLimit),
-        );
+        recordAgentUsageSnapshot(next);
       })
       .catch(() => undefined)
       .finally(() => {
@@ -324,10 +363,18 @@ export function AgentUsageStatusBar({
           className="agent-usage-popover"
           role="dialog"
         >
-          {showsHistory ? (
-            <UsageHistory
-              history={history}
-              onBack={() => setShowsHistory(false)}
+          {selectedProvider ? (
+            <ProviderDetails
+              onBack={() => setSelectedProvider(null)}
+              onManageAccount={() => {
+                setIsOpen(false);
+                onManageAccounts();
+              }}
+              provider={
+                providers.find(
+                  (provider) => provider.provider === selectedProvider,
+                ) ?? emptyProvider(selectedProvider)
+              }
             />
           ) : (
             <>
@@ -371,16 +418,19 @@ export function AgentUsageStatusBar({
                   <ProviderRow
                     key={provider.provider}
                     mode={mode}
-                    onOpen={() => {
-                      setIsOpen(false);
-                      onManageAccounts();
-                    }}
+                    onOpen={() => setSelectedProvider(provider.provider)}
                     provider={provider}
                   />
                 ))}
               </div>
               <footer className="agent-usage-popover-footer">
-                <button onClick={() => setShowsHistory(true)} type="button">
+                <button
+                  onClick={() => {
+                    setIsOpen(false);
+                    onOpenUsageDetails();
+                  }}
+                  type="button"
+                >
                   {t("usage.detailsHistory")}
                   <ChevronRight aria-hidden size={14} />
                 </button>
@@ -404,7 +454,7 @@ export function AgentUsageStatusBar({
         aria-haspopup="dialog"
         className="agent-usage-status-trigger"
         onClick={() => {
-          setShowsHistory(false);
+          setSelectedProvider(null);
           setIsOpen((open) => !open);
         }}
         type="button"

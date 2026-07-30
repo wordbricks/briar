@@ -1,7 +1,12 @@
+/** @vitest-environment jsdom */
+
 import { describe, expect, it } from "vitest";
 import {
+  clearAgentUsageHistory,
   formatUsageDuration,
   formatUsageWindowLabel,
+  readAgentUsageHistory,
+  recordAgentUsageSnapshot,
   tightestUsageWindow,
   type AgentUsageProvider,
 } from "./agent-usage";
@@ -45,5 +50,21 @@ describe("agent usage presentation", () => {
         resetsAt: null,
       }),
     ).toBe("30d");
+  });
+
+  it("persists one usage snapshot per minute", () => {
+    clearAgentUsageHistory();
+    const snapshot = {
+      updatedAt: 61_000,
+      claude: { ...provider, provider: "claude" as const },
+      codex: provider,
+      grok: { ...provider, provider: "grok" as const },
+    };
+    recordAgentUsageSnapshot(snapshot);
+    recordAgentUsageSnapshot({ ...snapshot, updatedAt: 62_000 });
+
+    expect(readAgentUsageHistory()).toHaveLength(1);
+    expect(readAgentUsageHistory()[0]?.updatedAt).toBe(62_000);
+    clearAgentUsageHistory();
   });
 });

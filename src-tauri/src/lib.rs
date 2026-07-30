@@ -810,12 +810,118 @@ fn inspect_cli(binary: Result<PathBuf, String>) -> OnboardingPrerequisiteStatus 
 
 fn inspect_onboarding_prerequisites_sync(home: &Path) -> OnboardingPrerequisites {
     let execution_path = cli_execution_path(home).unwrap_or_default();
+    let mut codex = inspect_cli(agent::codex_binary(home, &execution_path));
+    let mut claude = inspect_cli(agent::claude_binary(home, &execution_path));
+    let mut grok = inspect_cli(agent::grok_binary(home, &execution_path));
+    codex.authenticated = codex.installed && agent_usage::locally_authenticated(home, "codex");
+    claude.authenticated = claude.installed && agent_usage::locally_authenticated(home, "claude");
+    grok.authenticated = grok.installed && agent_usage::locally_authenticated(home, "grok");
     OnboardingPrerequisites {
         git: inspect_cli(git_binary(home)),
-        codex: inspect_cli(agent::codex_binary(home, &execution_path)),
-        claude: inspect_cli(agent::claude_binary(home, &execution_path)),
-        grok: inspect_cli(agent::grok_binary(home, &execution_path)),
+        codex,
+        claude,
+        grok,
     }
+}
+
+fn provider_login_binary_and_args(
+    home: &Path,
+    provider: &str,
+) -> Result<(PathBuf, Vec<&'static str>), String> {
+    let execution_path = cli_execution_path(home)?;
+    match provider {
+        "codex" => Ok((agent::codex_binary(home, &execution_path)?, vec!["login"])),
+        "claude" => Ok((
+            agent::claude_binary(home, &execution_path)?,
+            vec!["auth", "login", "--claudeai"],
+        )),
+        "grok" => Ok((agent::grok_binary(home, &execution_path)?, vec!["login"])),
+        _ => Err("지원하지 않는 Agent 프로바이더입니다.".to_string()),
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn shell_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\"'\"'"))
+}
+
+#[cfg(target_os = "macos")]
+fn open_provider_login_terminal(binary: &Path, args: &[&str]) -> Result<(), String> {
+    let command = std::iter::once(binary.to_string_lossy().to_string())
+        .chain(args.iter().map(|value| value.to_string()))
+        .map(|value| shell_quote(&value))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let escaped = command.replace('\\', "\\\\").replace('"', "\\\"");
+    let script =
+        format!("tell application \"Terminal\"\nactivate\ndo script \"{escaped}\"\nend tell");
+    Command::new("/usr/bin/osascript")
+        .args(["-e", &script])
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("Terminal을 열지 못했습니다: {error}"))
+}
+
+#[cfg(target_os = "windows")]
+fn open_provider_login_terminal(binary: &Path, args: &[&str]) -> Result<(), String> {
+    let command = format!(
+        "\"{}\" {}",
+        binary.display(),
+        args.iter()
+            .map(|value| format!("\"{}\"", value.replace('"', "\\\"")))
+            .collect::<Vec<_>>()
+            .join(" ")
+    );
+    Command::new("cmd")
+        .args(["/C", "start", "", "cmd", "/K", &command])
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("명령 프롬프트를 열지 못했습니다: {error}"))
+}
+
+#[cfg(target_os = "linux")]
+fn open_provider_login_terminal(binary: &Path, args: &[&str]) -> Result<(), String> {
+    let command = std::iter::once(binary.to_string_lossy().to_string())
+        .chain(args.iter().map(|value| value.to_string()))
+        .map(|value| shell_quote(&value))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let interactive_command = format!("{command}; exec \"${{SHELL:-/bin/sh}}\"");
+    for (terminal, terminal_args) in [
+        (
+            "x-terminal-emulator",
+            vec!["-e", "sh", "-lc", interactive_command.as_str()],
+        ),
+        (
+            "gnome-terminal",
+            vec!["--", "sh", "-lc", interactive_command.as_str()],
+        ),
+        (
+            "konsole",
+            vec!["-e", "sh", "-lc", interactive_command.as_str()],
+        ),
+    ] {
+        if Command::new(terminal).args(terminal_args).spawn().is_ok() {
+            return Ok(());
+        }
+    }
+    Err("사용 가능한 터미널 앱을 찾지 못했습니다.".to_string())
+}
+
+#[cfg(any(target_os = "android", target_os = "ios"))]
+fn open_provider_login_terminal(_binary: &Path, _args: &[&str]) -> Result<(), String> {
+    Err("모바일에서는 Agent CLI 로그인을 열 수 없습니다.".to_string())
+}
+
+#[tauri::command]
+async fn open_agent_provider_login(app: tauri::AppHandle, provider: String) -> Result<(), String> {
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let (binary, args) = provider_login_binary_and_args(&home, &provider)?;
+        open_provider_login_terminal(&binary, &args)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -4995,6 +5101,7 @@ pub fn run() {
             finish_launch_intro,
             set_main_window_onboarding_mode,
             inspect_onboarding_prerequisites,
+            open_agent_provider_login,
             install_onboarding_prerequisite,
             read_session_token,
             write_session_token,
