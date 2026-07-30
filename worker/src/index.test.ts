@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import worker, {
   issueUpdateInputSchema,
   organizationLogoInputSchema,
+  organizationMemberRoleInputSchema,
   organizationUpdateInputSchema,
   projectAgentScheduleInputSchema,
   projectAgentScheduleRunCompletionSchema,
@@ -11,6 +12,15 @@ import worker, {
 } from "./index";
 
 describe("Worker HTTP contract", () => {
+  it("accepts only assignable organization member roles", () => {
+    expect(organizationMemberRoleInputSchema.parse({ role: "admin" })).toEqual({
+      role: "admin",
+    });
+    expect(() =>
+      organizationMemberRoleInputSchema.parse({ role: "owner" }),
+    ).toThrow();
+  });
+
   it("accepts exact workflow evidence names containing spaces and slashes", () => {
     expect(
       runEvidenceInputSchema.parse({

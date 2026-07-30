@@ -124,6 +124,7 @@ describe("detached execution workers", () => {
       "migrations/0035_detached_worker_dispatch.sql",
       "migrations/0036_execution_worker_concurrency.sql",
       "migrations/0038_project_execution_worker_policies.sql",
+      "migrations/0039_project_agent_tokens.sql",
     ]) {
       await executeSql(db, await readFile(resolve(migration), "utf8"));
     }

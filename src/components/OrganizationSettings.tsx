@@ -43,6 +43,7 @@ import {
   addOrganizationMember,
   loadOrganizationMembers,
   removeOrganizationMember,
+  updateOrganizationMemberRole,
 } from "../lib/api";
 import {
   organizationLogoAccept,
@@ -109,6 +110,7 @@ export function OrganizationSettings({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
+  const [updatingMemberId, setUpdatingMemberId] = useState<string | null>(null);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement | null>(null);
   const inviteEmailRef = useRef<HTMLInputElement | null>(null);
@@ -556,7 +558,7 @@ export function OrganizationSettings({
                   aria-label={t("organization.memberList")}
                   className="overflow-hidden rounded-xl border border-border bg-card"
                 >
-                  <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1.4fr)_100px_100px_40px] gap-3 border-b border-border px-4 py-2.5 text-micro font-medium tracking-wide text-muted-foreground uppercase">
+                  <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1.4fr)_120px_100px_40px] gap-3 border-b border-border px-4 py-2.5 text-micro font-medium tracking-wide text-muted-foreground uppercase">
                     <span>{t("organization.name")}</span>
                     <span>{t("organization.email")}</span>
                     <span>{t("organization.role")}</span>
@@ -582,7 +584,7 @@ export function OrganizationSettings({
                   ) : (
                     filteredMembers.map((member) => (
                       <div
-                        className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1.4fr)_100px_100px_40px] items-center gap-3 border-b border-border/80 px-4 py-3 last:border-b-0"
+                        className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1.4fr)_120px_100px_40px] items-center gap-3 border-b border-border/80 px-4 py-3 last:border-b-0"
                         key={member.userId}
                       >
                         <div className="flex min-w-0 items-center gap-2.5">
@@ -605,16 +607,60 @@ export function OrganizationSettings({
                         <Typography as="span" className="truncate" tone="muted" variant="bodySm">
                           {member.email}
                         </Typography>
-                        <Badge
-                          className={cn(
-                            "justify-center capitalize",
-                            member.role === "owner" && "bg-accent text-accent-foreground",
-                            member.role === "admin" && "bg-secondary",
-                          )}
-                          variant="secondary"
-                        >
-                          {roleLabel(member.role)}
-                        </Badge>
+                        {canManage &&
+                        member.role !== "owner" &&
+                        member.userId !== userId ? (
+                          <SelectMenu
+                            className="w-full"
+                            disabled={updatingMemberId === member.userId}
+                            label={t("organization.changeRole", {
+                              name: member.name,
+                            })}
+                            onValueChange={(value) => {
+                              setUpdatingMemberId(member.userId);
+                              setError(null);
+                              void updateOrganizationMemberRole(
+                                token,
+                                organizationId,
+                                member.userId,
+                                value as "admin" | "member",
+                              )
+                                .then((result) => setMembers(result.members))
+                                .catch((caught) =>
+                                  setError(
+                                    caught instanceof Error
+                                      ? caught.message
+                                      : String(caught),
+                                  ),
+                                )
+                                .finally(() => setUpdatingMemberId(null));
+                            }}
+                            options={[
+                              {
+                                label: t("organization.role.member"),
+                                value: "member",
+                              },
+                              {
+                                label: t("organization.role.admin"),
+                                value: "admin",
+                              },
+                            ]}
+                            size="small"
+                            value={member.role}
+                          />
+                        ) : (
+                          <Badge
+                            className={cn(
+                              "justify-center capitalize",
+                              member.role === "owner" &&
+                                "bg-accent text-accent-foreground",
+                              member.role === "admin" && "bg-secondary",
+                            )}
+                            variant="secondary"
+                          >
+                            {roleLabel(member.role)}
+                          </Badge>
+                        )}
                         <time
                           className="text-xs text-muted-foreground"
                           dateTime={member.createdAt}
