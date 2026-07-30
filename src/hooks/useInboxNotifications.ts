@@ -12,6 +12,7 @@ import {
 
 type NotificationBaseline = {
   userId: string;
+  organizationId: string;
   versions: Record<string, string>;
 };
 
@@ -26,13 +27,14 @@ export function findChangedInboxMessages(
 
 export function useInboxNotifications(
   userId: string | null,
+  organizationId: string | null,
   messages: InboxMessageWithReadState[],
 ) {
   const { t } = useI18n();
   const baselineRef = useRef<NotificationBaseline | null>(null);
 
   useEffect(() => {
-    if (!userId) {
+    if (!userId || !organizationId) {
       baselineRef.current = null;
       return;
     }
@@ -41,8 +43,12 @@ export function useInboxNotifications(
       messages.map((message) => [message.id, message.version]),
     );
     const baseline = baselineRef.current;
-    if (!baseline || baseline.userId !== userId) {
-      baselineRef.current = { userId, versions };
+    if (
+      !baseline ||
+      baseline.userId !== userId ||
+      baseline.organizationId !== organizationId
+    ) {
+      baselineRef.current = { userId, organizationId, versions };
       return;
     }
 
@@ -50,7 +56,7 @@ export function useInboxNotifications(
       baseline.versions,
       messages,
     );
-    baselineRef.current = { userId, versions };
+    baselineRef.current = { userId, organizationId, versions };
     if (changedMessages.length === 0) return;
 
     const preferences = readInboxNotificationPreferences();
@@ -64,5 +70,5 @@ export function useInboxNotifications(
         console.error("Failed to send inbox notification", error);
       });
     }
-  }, [messages, t, userId]);
+  }, [messages, organizationId, t, userId]);
 }
