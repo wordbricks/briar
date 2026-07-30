@@ -79,6 +79,10 @@ export function OrganizationWorkersSettings({
     setLoading(true);
     setError(null);
     try {
+      if (desktop) {
+        const { invoke } = await import("@tauri-apps/api/core");
+        await invoke("sync_execution_worker_labels");
+      }
       const [remote, local] = await Promise.all([
         loadOrganizationExecutionWorkers(token, organization.id),
         desktop

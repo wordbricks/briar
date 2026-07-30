@@ -1882,6 +1882,71 @@ async function workerUnregisterCommand() {
   );
 }
 
+async function workerSyncLabelCommand() {
+  const config = await loadConfig();
+  const label = defaultWorkerLabel();
+  const registrationsByDevice = new Map<
+    string,
+    Array<{ workerId: string; token: string }>
+  >();
+  for (const project of config.projects) {
+    const registered = project.executionWorker;
+    if (!registered) continue;
+    const registrations = registrationsByDevice.get(registered.deviceId) ?? [];
+    registrations.push({
+      workerId: registered.workerId,
+      token: registered.token,
+    });
+    registrationsByDevice.set(registered.deviceId, registrations);
+  }
+
+  const syncedDeviceIds = new Set<string>();
+  let failedDevices = 0;
+  for (const [deviceId, registrations] of registrationsByDevice) {
+    let lastError: unknown = null;
+    for (const registration of registrations) {
+      try {
+        await request(
+          config.apiUrl,
+          `/workers/${registration.workerId}/label`,
+          registration.token,
+          {
+            method: "PATCH",
+            body: JSON.stringify({ label }),
+          },
+        );
+        syncedDeviceIds.add(deviceId);
+        lastError = null;
+        break;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    if (lastError) failedDevices += 1;
+  }
+
+  if (syncedDeviceIds.size > 0) {
+    config.projects = config.projects.map((project) => {
+      const registered = project.executionWorker;
+      if (!registered || !syncedDeviceIds.has(registered.deviceId)) {
+        return project;
+      }
+      return {
+        ...project,
+        executionWorker: { ...registered, label },
+      };
+    });
+    await saveConfig(config);
+  }
+  console.log(
+    JSON.stringify({
+      label,
+      syncedDevices: syncedDeviceIds.size,
+      failedDevices,
+    }),
+  );
+}
+
 async function workerCommand() {
   const config = await loadConfig();
   const projectId = value("--project");
@@ -2247,6 +2312,9 @@ async function main() {
   }
   if (args[0] === "worker" && args[1] === "unregister") {
     return workerUnregisterCommand();
+  }
+  if (args[0] === "worker" && args[1] === "sync-label") {
+    return workerSyncLabelCommand();
   }
   if (args[0] === "worker" && args[1] === "status") return workerStatus();
   if (args[0] === "worker" && args[1] === "install-service") {

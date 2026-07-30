@@ -1000,6 +1000,37 @@ export async function updateExecutionWorkerConcurrency(
     .first<ExecutionWorkerDeviceRow>();
 }
 
+/** Keep the organization device and every project binding on the same name. */
+export async function updateExecutionWorkerLabel(
+  db: D1Database,
+  deviceId: string,
+  labelInput: string,
+  observedAt: string,
+) {
+  const label = labelInput.trim();
+  if (label.length < 1 || label.length > 100) {
+    throw new WorkerConflictError("Worker label must be 1-100 characters");
+  }
+  const [deviceUpdate] = await db.batch([
+    db
+      .prepare(
+        `update briar_execution_worker_devices
+         set label = ?, updated_at = ?
+         where id = ? and state != 'disabled'
+         returning *`,
+      )
+      .bind(label, observedAt, deviceId),
+    db
+      .prepare(
+        `update briar_execution_workers
+         set label = ?, updated_at = ?
+         where device_id = ? and state != 'disabled'`,
+      )
+      .bind(label, observedAt, deviceId),
+  ]);
+  return (deviceUpdate.results[0] as ExecutionWorkerDeviceRow | undefined) ?? null;
+}
+
 export async function auditExecutionEvent(
   db: D1Database,
   input: {

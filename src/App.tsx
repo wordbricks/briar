@@ -109,6 +109,14 @@ export function App() {
   const mobilePlatform = getMobilePlatform() ?? "android";
   const previewsLaunchIntro = isLaunchIntroPreview();
   const runsOnDesktopTauri = isDesktopTauri();
+  useEffect(() => {
+    if (!runsOnDesktopTauri) return;
+    void import("@tauri-apps/api/core")
+      .then(({ invoke }) => invoke("sync_execution_worker_labels"))
+      .catch(() => {
+        // Offline startup must not block the rest of the desktop app.
+      });
+  }, [runsOnDesktopTauri]);
   // Preview changes the timing, not the macOS presentation surface.
   const usesNativeLaunchIntro = isMacDesktopTauri();
   const [isLaunchIntroVisible, setIsLaunchIntroVisible] = useState(
