@@ -58,6 +58,23 @@ describe("kanban card layout", () => {
     expect(activeCardKickerRule).toContain("padding-right:34px");
   });
 
+  it("truncates long assignee labels without widening the card", () => {
+    const cardRule = firstRule(".kanban-card");
+    const footerRule = ruleAfter(
+      ".kanban-card-badges .kanban-priority {",
+      ".kanban-card-footer",
+    );
+    const assigneeRule = firstRule(".kanban-card-footer small");
+
+    expect(cardRule).toContain("min-width:0");
+    expect(footerRule).toContain("min-width:0");
+    expect(assigneeRule).toContain("min-width:0");
+    expect(assigneeRule).toContain("overflow:hidden");
+    expect(assigneeRule).toContain("flex:1 1 auto");
+    expect(assigneeRule).toContain("text-overflow:ellipsis");
+    expect(assigneeRule).toContain("white-space:nowrap");
+  });
+
   it("stacks columns without horizontal scrolling on narrow screens", () => {
     const narrowScreenMarker = "@media (max-width:760px) { .sidebar";
     const boardRule = ruleAfter(narrowScreenMarker, ".kanban-board");
