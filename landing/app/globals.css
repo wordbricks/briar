@@ -268,7 +268,7 @@ button {
   line-height: 1.05;
 }
 
-.hero > p {
+.hero-content > p {
   max-width: 630px;
   margin: 30px auto 0;
   color: #96969f;
@@ -2045,7 +2045,7 @@ footer {
     font-size: clamp(42px, 11vw, 64px);
   }
 
-  .hero > p {
+  .hero-content > p {
     max-width: 540px;
     font-size: 15px;
   }
@@ -2208,7 +2208,7 @@ footer {
     line-height: 1.12;
   }
 
-  .hero > p {
+  .hero-content > p {
     margin-top: 23px;
     font-size: 14px;
     line-height: 1.7;
@@ -2413,56 +2413,127 @@ footer {
   background: #fff9fa;
 }
 
+.hero {
+  display: grid;
+  min-height: 880px;
+  isolation: isolate;
+  padding: 0;
+  place-items: start center;
+}
+
 .hero::before {
-  background: radial-gradient(
-    circle,
-    rgb(205 175 173 / 0.16) 0,
-    rgb(43 32 32 / 0.08) 42%,
-    transparent 70%
-  );
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  background:
+    radial-gradient(
+      ellipse at 50% 34%,
+      rgb(31 23 23 / 0.14) 0,
+      rgb(43 32 32 / 0.48) 58%,
+      rgb(43 32 32 / 0.82) 82%,
+      var(--paper) 100%
+    ),
+    linear-gradient(
+      180deg,
+      rgb(43 32 32 / 0.08) 0,
+      rgb(43 32 32 / 0.12) 48%,
+      var(--paper) 100%
+    );
+  transform: none;
+  pointer-events: none;
+  content: "";
+}
+
+.hero-content {
+  position: relative;
+  z-index: 2;
+  padding: 132px 0 260px;
+}
+
+.hero-content h1 {
+  text-shadow:
+    0 2px 24px rgb(15 8 10 / 0.48),
+    0 18px 70px rgb(15 8 10 / 0.35);
+}
+
+.hero-content > p {
+  color: #b3a9ab;
+  text-shadow: 0 2px 20px rgb(15 8 10 / 0.65);
 }
 
 .hero-art {
-  position: relative;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
   width: 100%;
-  aspect-ratio: 2.3 / 1;
-  margin-top: 72px;
+  height: 100%;
   overflow: hidden;
-  border: 1px solid rgb(205 175 173 / 0.2);
-  border-radius: 20px;
-  background: #1f1717;
-  box-shadow:
-    0 40px 90px rgb(15 8 10 / 0.34),
-    inset 0 1px 0 rgb(255 249 250 / 0.05);
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--paper);
+  box-shadow: none;
+  mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    #000 58%,
+    rgb(0 0 0 / 0.88) 68%,
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    #000 58%,
+    rgb(0 0 0 / 0.88) 68%,
+    transparent 100%
+  );
+}
+
+.hero-art::before {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  opacity: 0.18;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='hero-noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.72' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23hero-noise)' opacity='.68'/%3E%3C/svg%3E");
+  background-size: 210px 210px;
+  mix-blend-mode: soft-light;
+  pointer-events: none;
+  content: "";
 }
 
 .hero-art::after {
   position: absolute;
   inset: 0;
+  z-index: 1;
   background:
-    linear-gradient(90deg, rgb(43 32 32 / 0.08), transparent 22% 78%, rgb(43 32 32 / 0.2)),
-    linear-gradient(0deg, rgb(43 32 32 / 0.24), transparent 28%);
+    radial-gradient(
+      ellipse at 50% 35%,
+      rgb(31 23 23 / 0.05),
+      rgb(43 32 32 / 0.28) 74%
+    ),
+    linear-gradient(
+      90deg,
+      rgb(43 32 32 / 0.28),
+      transparent 26% 72%,
+      rgb(43 32 32 / 0.34)
+    );
   pointer-events: none;
   content: "";
 }
 
 .hero-art img {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
+  opacity: 0.84;
   object-fit: cover;
-}
-
-.hero-art > span {
-  position: absolute;
-  right: 22px;
-  bottom: 18px;
-  z-index: 2;
-  color: rgb(255 249 250 / 0.48);
-  font-family: var(--font-geist-mono), monospace;
-  font-size: 8px;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
+  object-position: center;
+  filter: saturate(0.82) contrast(1.04);
 }
 
 .product-stage {
@@ -3321,9 +3392,12 @@ footer {
 }
 
 @media (max-width: 800px) {
-  .hero-art {
-    margin-top: 54px;
-    border-radius: 15px;
+  .hero {
+    min-height: 820px;
+  }
+
+  .hero-content {
+    padding: 106px 0 230px;
   }
 
   .product-stage {
@@ -3363,20 +3437,17 @@ footer {
 }
 
 @media (max-width: 560px) {
-  .hero-art {
-    aspect-ratio: 1.45 / 1;
-    margin-top: 42px;
-    border-radius: 12px;
+  .hero {
+    min-height: 780px;
+  }
+
+  .hero-content {
+    padding: 86px 0 194px;
   }
 
   .hero-art img {
-    object-position: 54% center;
-  }
-
-  .hero-art > span {
-    right: 12px;
-    bottom: 10px;
-    font-size: 6px;
+    opacity: 0.78;
+    object-position: 50% center;
   }
 
   .product-stage {

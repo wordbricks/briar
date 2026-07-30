@@ -388,62 +388,63 @@ export default async function Home() {
         </div>
       </header>
 
-      <section className="hero shell">
-        <div className="hero-kicker">
-          <span />
-          Agent Development Environment
-        </div>
-        <h1>
-          {c.hero.line1}
-          <br />
-          {c.hero.line2}
-        </h1>
-        <p>{c.hero.description}</p>
-        <div className="hero-actions">
-          <a
-            className="button button-primary"
-            href={MAC_DOWNLOAD_URL}
-            aria-label={c.aria.macDownload}
-          >
-            {c.hero.macDownload} <span aria-hidden="true">↓</span>
-          </a>
-          <a
-            className="button button-secondary"
-            href={ANDROID_DOWNLOAD_URL}
-            aria-label={c.aria.androidDownload}
-          >
-            {c.hero.androidDownload} <span aria-hidden="true">↓</span>
-          </a>
-          <a className="button button-secondary" href="#workflow">
-            {c.hero.howItWorks} <span aria-hidden="true">↓</span>
-          </a>
-        </div>
-        <div className="hero-meta">
-          <span>
-            <i>⌘</i> macOS Apple Silicon
-          </span>
-          <span>
-            <i>●</i> Android companion
-          </span>
-          <span>
-            <i>✓</i> Repository-agnostic
-          </span>
-          <span>
-            <i>✓</i> Codex + Claude
-          </span>
-          <span>
-            <i>✓</i> Local-first
-          </span>
-        </div>
-        <div className="hero-art">
+      <section className="hero">
+        <div className="hero-art" aria-hidden="true">
           <img
             src="/briar-hero-orchestration.webp"
-            alt={c.aria.heroArtwork}
+            alt=""
             width="1899"
             height="828"
             fetchPriority="high"
           />
-          <span aria-hidden="true">Human intent · Agent execution</span>
+        </div>
+        <div className="hero-content shell">
+          <div className="hero-kicker">
+            <span />
+            Agent Development Environment
+          </div>
+          <h1>
+            {c.hero.line1}
+            <br />
+            {c.hero.line2}
+          </h1>
+          <p>{c.hero.description}</p>
+          <div className="hero-actions">
+            <a
+              className="button button-primary"
+              href={MAC_DOWNLOAD_URL}
+              aria-label={c.aria.macDownload}
+            >
+              {c.hero.macDownload} <span aria-hidden="true">↓</span>
+            </a>
+            <a
+              className="button button-secondary"
+              href={ANDROID_DOWNLOAD_URL}
+              aria-label={c.aria.androidDownload}
+            >
+              {c.hero.androidDownload} <span aria-hidden="true">↓</span>
+            </a>
+            <a className="button button-secondary" href="#workflow">
+              {c.hero.howItWorks} <span aria-hidden="true">↓</span>
+            </a>
+          </div>
+          <div className="hero-meta">
+            <span>
+              <i>⌘</i> macOS Apple Silicon
+            </span>
+            <span>
+              <i>●</i> Android companion
+            </span>
+            <span>
+              <i>✓</i> Repository-agnostic
+            </span>
+            <span>
+              <i>✓</i> Codex + Claude
+            </span>
+            <span>
+              <i>✓</i> Local-first
+            </span>
+          </div>
         </div>
       </section>
 
