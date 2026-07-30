@@ -8,6 +8,7 @@ import {
   deleteIssue,
   deleteProjectAgentSchedule,
   loadDashboard,
+  loadProjectAgentSessions,
   loadProjectAgentScheduleRuns,
   loadProjectAgents,
   loadRunEvidence,
@@ -16,6 +17,7 @@ import {
   updateProjectAgentSchedule,
   updateOrganizationMemberRole,
   updateIssue,
+  upsertProjectAgentSession,
 } from "./api";
 import { repositoryWorkflowBootstrap } from "./auto-hunt-contract";
 import { demoDashboard } from "./demo-data";
@@ -94,6 +96,105 @@ describe("API errors", () => {
       expect.stringContaining(`/projects/${projectId}/runs/${runId}`),
       expect.objectContaining({ method: "DELETE" }),
     );
+  });
+
+  it("loads synchronized agent sessions as remote-owned snapshots", async () => {
+    const projectId = "22222222-2222-4222-8222-222222222222";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(JSON.stringify({
+          sessions: [{
+            id: "session-1",
+            projectId,
+            dispatchGroupId: "",
+            agentId: null,
+            sessionType: "task",
+            trigger: "manual",
+            scheduleId: null,
+            scheduleRunId: null,
+            parentSessionId: null,
+            request: "Review the repository",
+            status: "running",
+            issues: [],
+            startedAt: "2026-07-30T00:00:00.000Z",
+            completedAt: null,
+            conversationId: null,
+            workspaceRoot: null,
+            summary: null,
+            error: null,
+            events: [],
+            dispatchEvents: [],
+            workers: [],
+            updatedAt: "2026-07-30T00:00:00.000Z",
+          }],
+        }), {
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+
+    await expect(loadProjectAgentSessions("token", projectId)).resolves.toEqual([
+      expect.objectContaining({
+        id: "session-1",
+        status: "running",
+        localOwner: false,
+      }),
+    ]);
+  });
+
+  it("uploads only the shareable agent session snapshot", async () => {
+    const projectId = "22222222-2222-4222-8222-222222222222";
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body));
+        return new Response(JSON.stringify({
+          session: {
+            id: "session-1",
+            projectId,
+            ...body,
+            workspaceRoot: null,
+            dispatchEvents: [],
+            workers: [],
+          },
+        }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await upsertProjectAgentSession("token", {
+      id: "session-1",
+      projectId,
+      dispatchGroupId: "",
+      agentId: undefined,
+      sessionType: "task",
+      trigger: "manual",
+      request: "Review the repository",
+      status: "running",
+      issues: [],
+      startedAt: "2026-07-30T00:00:00.000Z",
+      completedAt: null,
+      conversationId: null,
+      workspaceRoot: "/Users/dev/private-repository",
+      summary: null,
+      error: null,
+      events: [],
+      dispatchEvents: [],
+      workers: [],
+      updatedAt: "2026-07-30T00:00:00.000Z",
+      localOwner: true,
+    });
+
+    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    expect(body).not.toHaveProperty("workspaceRoot");
+    expect(body).not.toHaveProperty("localOwner");
+    expect(body).toMatchObject({
+      agentId: null,
+      status: "running",
+      updatedAt: "2026-07-30T00:00:00.000Z",
+    });
   });
 
   it("updates an organization member role through the member endpoint", async () => {

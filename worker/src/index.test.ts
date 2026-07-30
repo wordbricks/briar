@@ -5,6 +5,7 @@ import worker, {
   organizationLogoInputSchema,
   organizationMemberRoleInputSchema,
   organizationUpdateInputSchema,
+  projectAgentSessionInputSchema,
   projectAgentScheduleInputSchema,
   projectAgentScheduleRunCompletionSchema,
   readRunEvidenceRequest,
@@ -13,6 +14,41 @@ import worker, {
 } from "./index";
 
 describe("Worker HTTP contract", () => {
+  it("validates synchronized agent session snapshots", () => {
+    expect(
+      projectAgentSessionInputSchema.parse({
+        dispatchGroupId: "dispatch-1",
+        agentId: "11111111-1111-4111-8111-111111111111",
+        sessionType: "dispatch",
+        trigger: "manual",
+        scheduleId: null,
+        scheduleRunId: null,
+        parentSessionId: null,
+        request: "Process queued issues",
+        status: "running",
+        issues: [{
+          runId: "run-1",
+          runNumber: 1,
+          sourceKey: "AH-1",
+          title: "Synchronize agent state",
+          outcome: "pending",
+          summary: null,
+        }],
+        startedAt: "2026-07-30T00:00:00.000Z",
+        completedAt: null,
+        conversationId: null,
+        summary: null,
+        error: null,
+        events: [{
+          id: "event-1",
+          type: "started",
+          occurredAt: "2026-07-30T00:00:00.000Z",
+        }],
+        updatedAt: "2026-07-30T00:00:00.000Z",
+      }).status,
+    ).toBe("running");
+  });
+
   it("accepts only assignable organization member roles", () => {
     expect(organizationMemberRoleInputSchema.parse({ role: "admin" })).toEqual({
       role: "admin",

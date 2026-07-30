@@ -89,6 +89,7 @@ import {
   listOrganizations,
   listProjects,
   listProjectAgents,
+  listProjectAgentSessions,
   listProjectAgentScheduleRuns,
   listProjectAgentSchedules,
   listSlackInstallations,
@@ -110,6 +111,7 @@ import {
   updateOrganizationMemberRole,
   updateIssue,
   updateSlackInstallationProject,
+  upsertProjectAgentSession,
   upsertSlackInstallation,
   type HuntEventRow,
   type HuntRunRow,
@@ -496,6 +498,56 @@ const projectAgentInputSchema = z
       .trim()
       .regex(/^#[0-9a-f]{6}$/iu)
       .default(defaultProjectAgentCalendarColor),
+  })
+  .strict();
+const projectAgentSessionEventSchema = z
+  .object({
+    id: z.string().min(1).max(128),
+    type: z.enum([
+      "started",
+      "completed",
+      "failed",
+      "interrupted",
+      "stopped",
+    ]),
+    occurredAt: z.string().datetime({ offset: true }),
+  })
+  .strict();
+const projectAgentSessionIssueSchema = z
+  .object({
+    runId: z.string().min(1).max(128),
+    runNumber: z.number().int().nonnegative(),
+    sourceKey: z.string().min(1).max(500),
+    title: z.string().min(1).max(500),
+    outcome: z.enum([
+      "pending",
+      "completed",
+      "blocked",
+      "failed",
+      "skipped",
+    ]),
+    summary: z.string().max(50_000).nullable(),
+  })
+  .strict();
+export const projectAgentSessionInputSchema = z
+  .object({
+    dispatchGroupId: z.string().max(128),
+    agentId: z.string().uuid().nullable(),
+    sessionType: z.enum(["task", "dispatch"]),
+    trigger: z.enum(["manual", "scheduled"]).nullable(),
+    scheduleId: z.string().max(128).nullable(),
+    scheduleRunId: z.string().max(128).nullable(),
+    parentSessionId: z.string().max(128).nullable(),
+    request: z.string().max(50_000).nullable(),
+    status: z.enum(["running", "completed", "failed", "interrupted"]),
+    issues: z.array(projectAgentSessionIssueSchema).max(100),
+    startedAt: z.string().datetime({ offset: true }),
+    completedAt: z.string().datetime({ offset: true }).nullable(),
+    conversationId: z.string().max(128).nullable(),
+    summary: z.string().max(50_000).nullable(),
+    error: z.string().max(20_000).nullable(),
+    events: z.array(projectAgentSessionEventSchema).max(200),
+    updatedAt: z.string().datetime({ offset: true }),
   })
   .strict();
 export const projectAgentScheduleInputSchema = z
@@ -1339,6 +1391,19 @@ const projectAgentJson = (row: ProjectAgentRow) => {
     updatedAt: row.updated_at,
   };
 };
+
+const projectAgentSessionJson = (row: {
+  project_id: string;
+  id: string;
+  payload_json: string;
+}) => ({
+  id: row.id,
+  projectId: row.project_id,
+  ...(JSON.parse(row.payload_json) as Record<string, unknown>),
+  workspaceRoot: null,
+  dispatchEvents: [],
+  workers: [],
+});
 
 const projectAgentScheduleJson = (row: ProjectAgentScheduleRow) => ({
   id: row.id,
@@ -2562,6 +2627,46 @@ async function route(
   const projectAgentsMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/agents$/u,
   );
+  const projectAgentSessionsMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/agent-sessions$/u,
+  );
+  if (projectAgentSessionsMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      projectAgentSessionsMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const sessions = await listProjectAgentSessions(db, project.id);
+    return json({ sessions: sessions.map(projectAgentSessionJson) });
+  }
+  const projectAgentSessionMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/agent-sessions\/([A-Za-z0-9_-]{1,128})$/u,
+  );
+  if (projectAgentSessionMatch && request.method === "PUT") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      projectAgentSessionMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const input = projectAgentSessionInputSchema.parse(await readJson(request));
+    const row = await upsertProjectAgentSession(db, {
+      project_id: project.id,
+      id: projectAgentSessionMatch[2],
+      agent_id: input.agentId,
+      status: input.status,
+      session_type: input.sessionType,
+      payload_json: JSON.stringify(input),
+      started_at: input.startedAt,
+      completed_at: input.completedAt,
+      updated_at: input.updatedAt,
+    });
+    if (!row) throw new HttpError(409, "Agent session could not be synchronized");
+    return json({ session: projectAgentSessionJson(row) });
+  }
   if (projectAgentsMatch && request.method === "GET") {
     const session = await requireSession(auth, request);
     const project = await getProject(

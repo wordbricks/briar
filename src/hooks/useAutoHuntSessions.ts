@@ -13,6 +13,11 @@ import {
   defaultAutoHuntMaxIssues,
   selectAutoHuntCandidates,
 } from "../lib/auto-hunt-automation";
+import {
+  loadProjectAgentSessions,
+  upsertProjectAgentSession,
+} from "../lib/api";
+import { DASHBOARD_POLL_INTERVAL_MS } from "../lib/dashboard-polling";
 import type { HuntRun, ProjectAgent } from "../types";
 
 const storageKey = "briar.auto-hunt-sessions.v1";
@@ -72,6 +77,8 @@ export type AutoHuntSession = {
   events: AutoHuntSessionEvent[];
   dispatchEvents: AutoHuntDispatchEvent[];
   workers: AutoHuntWorkerResult[];
+  updatedAt?: string;
+  localOwner?: boolean;
 };
 
 export function collapseLinkedAutoHuntSessions(
@@ -108,12 +115,18 @@ function readSessions(): AutoHuntSession[] {
         sessionType: storedSession.sessionType ?? "dispatch",
         workers: storedSession.workers ?? [],
         dispatchEvents: storedSession.dispatchEvents ?? [],
+        updatedAt:
+          storedSession.updatedAt ??
+          storedSession.completedAt ??
+          storedSession.startedAt,
+        localOwner: storedSession.localOwner ?? true,
       };
-      return session.status === "running"
+      return session.status === "running" && session.localOwner
         ? {
             ...session,
             status: "interrupted",
             completedAt: interruptedAt,
+            updatedAt: interruptedAt,
             error: null,
             events: [...session.events, event("interrupted", interruptedAt)],
           }
@@ -139,6 +152,7 @@ function completedSession(
     summary: response.result.summary,
     error: null,
     workers: response.workers,
+    updatedAt: completedAt,
     issues: session.issues.map((issue) => {
       const result = response.result.issues.find(
         (candidate) => candidate.sourceKey === issue.sourceKey,
@@ -191,6 +205,7 @@ function reconcileDispatch(
     error: dispatch.error,
     workers,
     dispatchEvents: dispatch.events,
+    updatedAt: new Date().toISOString(),
     issues: session.issues.map((issue) => {
       const worker = dispatch.workers.find(
         (candidate) => candidate.runId === issue.runId,
@@ -206,12 +221,56 @@ function reconcileDispatch(
   };
 }
 
+function sessionSyncKey(session: Pick<AutoHuntSession, "projectId" | "id">) {
+  return `${session.projectId}:${session.id}`;
+}
+
+function sessionVersion(
+  session: Pick<AutoHuntSession, "updatedAt" | "completedAt" | "startedAt">,
+) {
+  return session.updatedAt ?? session.completedAt ?? session.startedAt;
+}
+
+export function mergeSynchronizedSessions(
+  localSessions: readonly AutoHuntSession[],
+  remoteSessions: readonly AutoHuntSession[],
+) {
+  const merged = new Map(
+    localSessions.map((session) => [sessionSyncKey(session), session]),
+  );
+  for (const remote of remoteSessions) {
+    const key = sessionSyncKey(remote);
+    const local = merged.get(key);
+    if (local && sessionVersion(local) >= sessionVersion(remote)) continue;
+    merged.set(key, {
+      ...remote,
+      localOwner: local?.localOwner ?? false,
+      workspaceRoot: local?.workspaceRoot ?? null,
+      dispatchEvents: local?.dispatchEvents ?? [],
+      workers: local?.workers ?? [],
+    });
+  }
+  return [...merged.values()].sort(
+      (left, right) =>
+        new Date(right.startedAt).getTime() -
+        new Date(left.startedAt).getTime(),
+  );
+}
+
 export function useAutoHuntSessions(
   runner: AutoHuntRunner = startProjectAutoHunt,
   stopper: AutoHuntStopper = stopProjectAgentSession,
 ) {
   const [sessions, setSessions] = useState<AutoHuntSession[]>(readSessions);
   const sessionsRef = useRef(sessions);
+  const [syncContext, setSyncContext] = useState<{
+    token: string;
+    projectIds: string[];
+  } | null>(null);
+  const [synchronizedProjects, setSynchronizedProjects] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const uploadedVersionsRef = useRef(new Map<string, string>());
 
   useEffect(() => {
     sessionsRef.current = sessions;
@@ -221,6 +280,99 @@ export function useAutoHuntSessions(
       // Session tracking remains available in memory when storage is unavailable.
     }
   }, [sessions]);
+
+  const configureSync = useCallback((
+    token: string | null,
+    projectIds: readonly string[],
+  ) => {
+    const normalizedProjectIds = [...new Set(projectIds)].sort();
+    setSyncContext((current) => {
+      if (!token) return current === null ? current : null;
+      if (
+        current?.token === token &&
+        current.projectIds.length === normalizedProjectIds.length &&
+        current.projectIds.every(
+          (projectId, index) => projectId === normalizedProjectIds[index],
+        )
+      ) {
+        return current;
+      }
+      return { token, projectIds: normalizedProjectIds };
+    });
+  }, []);
+
+  useEffect(() => {
+    uploadedVersionsRef.current.clear();
+    setSynchronizedProjects(new Set());
+    if (!syncContext || syncContext.projectIds.length === 0) return;
+    let active = true;
+
+    const refreshRemoteSessions = async () => {
+      const loaded = await Promise.allSettled(
+        syncContext.projectIds.map(async (projectId) => ({
+          projectId,
+          sessions: await loadProjectAgentSessions(syncContext.token, projectId),
+        })),
+      );
+      if (!active) return;
+      const successfulProjectIds = new Set<string>();
+      setSessions((current) => {
+        let next = current;
+        for (const result of loaded) {
+          if (result.status !== "fulfilled") continue;
+          successfulProjectIds.add(result.value.projectId);
+          for (const session of result.value.sessions) {
+            uploadedVersionsRef.current.set(
+              sessionSyncKey(session),
+              sessionVersion(session),
+            );
+          }
+          next = mergeSynchronizedSessions(
+            next,
+            result.value.sessions,
+          );
+        }
+        return next;
+      });
+      setSynchronizedProjects(successfulProjectIds);
+    };
+
+    void refreshRemoteSessions();
+    const timer = window.setInterval(
+      () => void refreshRemoteSessions(),
+      DASHBOARD_POLL_INTERVAL_MS,
+    );
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [syncContext]);
+
+  useEffect(() => {
+    if (!syncContext || synchronizedProjects.size === 0) return;
+    for (const session of sessions) {
+      if (!synchronizedProjects.has(session.projectId)) continue;
+      const key = sessionSyncKey(session);
+      const version = sessionVersion(session);
+      if (uploadedVersionsRef.current.get(key) === version) continue;
+      uploadedVersionsRef.current.set(key, version);
+      void upsertProjectAgentSession(syncContext.token, session)
+        .then((remote) => {
+          uploadedVersionsRef.current.set(
+            sessionSyncKey(remote),
+            sessionVersion(remote),
+          );
+          setSessions((current) =>
+            mergeSynchronizedSessions(current, [remote])
+          );
+        })
+        .catch(() => {
+          if (uploadedVersionsRef.current.get(key) === version) {
+            uploadedVersionsRef.current.delete(key);
+          }
+        });
+    }
+  }, [sessions, syncContext, synchronizedProjects]);
 
   useEffect(() => {
     const recoverable = sessionsRef.current.filter(
@@ -325,6 +477,8 @@ export function useAutoHuntSessions(
                 workspaceRoot: null,
                 summary: null,
                 error: null,
+                updatedAt: input.startedAt,
+                localOwner: true,
                 events: [...session.events, event("started", input.startedAt)],
               }
             : session
@@ -355,6 +509,8 @@ export function useAutoHuntSessions(
       events: [event("started", input.startedAt)],
       workers: [],
       dispatchEvents: [],
+      updatedAt: input.startedAt,
+      localOwner: true,
     };
     sessionsRef.current = [session, ...sessionsRef.current];
     setSessions(sessionsRef.current);
@@ -382,6 +538,7 @@ export function useAutoHuntSessions(
             workspaceRoot: input.workspaceRoot,
             summary: input.summary,
             error: input.error,
+            updatedAt: completedAt,
             events: [...session.events, event(input.status, completedAt)],
           }
         : session
@@ -405,6 +562,7 @@ export function useAutoHuntSessions(
             status: "interrupted" as const,
             completedAt,
             error: null,
+            updatedAt: completedAt,
             events: [...candidate.events, event("stopped", completedAt)],
           }
         : candidate
@@ -499,6 +657,8 @@ export function useAutoHuntSessions(
       events: [event("started", startedAt)],
       workers: [],
       dispatchEvents: [],
+      updatedAt: startedAt,
+      localOwner: true,
     };
     session.dispatchGroupId = session.id;
     sessionsRef.current = [session, ...sessionsRef.current];
@@ -524,6 +684,7 @@ export function useAutoHuntSessions(
               status: "failed",
               completedAt,
               error,
+              updatedAt: completedAt,
               events: [...candidate.events, event("failed", completedAt)],
             }
           : candidate));
@@ -540,5 +701,6 @@ export function useAutoHuntSessions(
     stopSession,
     recordTaskSession,
     removeProjectSessions,
+    configureSync,
   };
 }

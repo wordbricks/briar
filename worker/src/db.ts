@@ -109,6 +109,18 @@ export type ProjectAgentRow = {
   updated_at: string;
 };
 
+export type ProjectAgentSessionRow = {
+  project_id: string;
+  id: string;
+  agent_id: string | null;
+  status: "running" | "completed" | "failed" | "interrupted";
+  session_type: "task" | "dispatch";
+  payload_json: string;
+  started_at: string;
+  completed_at: string | null;
+  updated_at: string;
+};
+
 export type ProjectAgentScheduleRow = {
   id: string;
   project_id: string;
@@ -1025,6 +1037,67 @@ export async function getProjectAgent(
     )
     .bind(agentId, projectId)
     .first<ProjectAgentRow>();
+}
+
+export async function listProjectAgentSessions(
+  db: D1Database,
+  projectId: string,
+) {
+  const result = await db
+    .prepare(
+      `select project_id, id, agent_id, status, session_type, payload_json,
+              started_at, completed_at, updated_at
+       from briar_project_agent_sessions
+       where project_id = ?
+       order by updated_at desc, id
+       limit 200`,
+    )
+    .bind(projectId)
+    .all<ProjectAgentSessionRow>();
+  return result.results;
+}
+
+export async function upsertProjectAgentSession(
+  db: D1Database,
+  input: ProjectAgentSessionRow,
+) {
+  await db
+    .prepare(
+      `insert into briar_project_agent_sessions (
+         project_id, id, agent_id, status, session_type, payload_json,
+         started_at, completed_at, updated_at
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       on conflict (project_id, id) do update set
+         agent_id = excluded.agent_id,
+         status = excluded.status,
+         session_type = excluded.session_type,
+         payload_json = excluded.payload_json,
+         started_at = excluded.started_at,
+         completed_at = excluded.completed_at,
+         updated_at = excluded.updated_at
+       where excluded.updated_at > briar_project_agent_sessions.updated_at`,
+    )
+    .bind(
+      input.project_id,
+      input.id,
+      input.agent_id,
+      input.status,
+      input.session_type,
+      input.payload_json,
+      input.started_at,
+      input.completed_at,
+      input.updated_at,
+    )
+    .run();
+  return db
+    .prepare(
+      `select project_id, id, agent_id, status, session_type, payload_json,
+              started_at, completed_at, updated_at
+       from briar_project_agent_sessions
+       where project_id = ? and id = ?`,
+    )
+    .bind(input.project_id, input.id)
+    .first<ProjectAgentSessionRow>();
 }
 
 export async function createProjectAgent(

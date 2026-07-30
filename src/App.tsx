@@ -92,6 +92,12 @@ export function App() {
     settleScheduledAgentSession: autoHunt.settleTaskSession,
   }), [autoHunt.settleTaskSession, autoHunt.startTaskSession]);
   const briar = useBriar(scheduleSessionOptions);
+  useEffect(() => {
+    autoHunt.configureSync(
+      briar.token,
+      briar.projects.map((project) => project.id),
+    );
+  }, [autoHunt.configureSync, briar.projects, briar.token]);
   const inbox = useInbox(
     briar.user?.id ?? null,
     briar.activeOrganizationId,

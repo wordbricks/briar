@@ -42,6 +42,7 @@ import {
   issueProjectAgentToken,
   listProjects,
   listProjectAgents,
+  listProjectAgentSessions,
   listProjectAgentScheduleRuns,
   listProjectAgentSchedules,
   listRunEvidence,
@@ -61,6 +62,7 @@ import {
   updateOrganizationLogo,
   updateOrganizationMemberRole,
   updateIssue,
+  upsertProjectAgentSession,
 } from "./db";
 
 const releaseWorkflow = normalizeAutoHuntWorkflow({
@@ -449,6 +451,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         "utf8",
       ),
     );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0042_project_agent_sessions.sql"),
+        "utf8",
+      ),
+    );
   }, 30_000);
 
   afterAll(async () => {
@@ -500,6 +509,60 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     expect(await db.prepare("pragma foreign_key_check").all()).toMatchObject({
       results: [],
     });
+  });
+
+  it("synchronizes the newest project agent session snapshot", async () => {
+    const sessionId = "77777777-7777-4777-8777-777777777777";
+    const payload = {
+      dispatchGroupId: "",
+      agentId: null,
+      sessionType: "task",
+      trigger: "manual",
+      scheduleId: null,
+      scheduleRunId: null,
+      parentSessionId: null,
+      request: "Review the repository",
+      status: "running",
+      issues: [],
+      startedAt: atMinute(2),
+      completedAt: null,
+      conversationId: null,
+      summary: null,
+      error: null,
+      events: [],
+      updatedAt: atMinute(2),
+    };
+    await upsertProjectAgentSession(db, {
+      project_id: projectId,
+      id: sessionId,
+      agent_id: null,
+      status: "running",
+      session_type: "task",
+      payload_json: JSON.stringify(payload),
+      started_at: atMinute(2),
+      completed_at: null,
+      updated_at: atMinute(2),
+    });
+    await upsertProjectAgentSession(db, {
+      project_id: projectId,
+      id: sessionId,
+      agent_id: null,
+      status: "failed",
+      session_type: "task",
+      payload_json: JSON.stringify({ ...payload, status: "failed" }),
+      started_at: atMinute(2),
+      completed_at: atMinute(1),
+      updated_at: atMinute(1),
+    });
+
+    const sessions = await listProjectAgentSessions(db, projectId);
+    expect(sessions).toEqual([
+      expect.objectContaining({
+        id: sessionId,
+        status: "running",
+        updated_at: atMinute(2),
+      }),
+    ]);
   });
 
   it("backfills legacy workers as organization devices without issuing credentials", async () => {
