@@ -4,6 +4,7 @@ import type { AutoHuntSession } from "./useAutoHuntSessions";
 import {
   buildCurrentInboxMessages,
   classifyInboxMessage,
+  filterInboxMessagesByOrganization,
   groupInboxMessages,
   isInboxMessageUnread,
   mergeInboxMessages,
@@ -140,6 +141,41 @@ describe("Inbox messages", () => {
       title: "Process queued issues with Auto Hunt.",
       issueCount: 1,
     });
+  });
+
+  it("keeps only messages from the selected organization", () => {
+    const otherProject = {
+      ...project,
+      id: "project-other",
+      name: "Other project",
+      organizationId: "organization-other",
+    };
+    const messages = buildCurrentInboxMessages(
+      null,
+      [
+        session("completed", "selected-session"),
+        {
+          ...session("failed", "other-session"),
+          projectId: otherProject.id,
+        },
+      ],
+      [project, otherProject],
+    );
+
+    expect(
+      filterInboxMessagesByOrganization(
+        messages,
+        [project, otherProject],
+        project.organizationId ?? null,
+      ).map((message) => message.id),
+    ).toEqual(["session:selected-session"]);
+    expect(
+      filterInboxMessagesByOrganization(
+        messages,
+        [project, otherProject],
+        otherProject.organizationId,
+      ).map((message) => message.id),
+    ).toEqual(["session:other-session"]);
   });
 
   it("marks a new message version unread after an earlier version was read", () => {
