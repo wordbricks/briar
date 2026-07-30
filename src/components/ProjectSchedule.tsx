@@ -442,14 +442,10 @@ export function ProjectSchedule({
 
   return (
     <MainContent className="project-schedule-page" id="project-schedule">
-      <header
-        className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`}
-        data-tauri-drag-region
-      />
       <PageHeader
         action={
-          <div className="project-schedule-heading-actions flex flex-wrap items-center gap-3">
-            <div className="project-schedule-summary flex flex-wrap items-center gap-3 text-caption text-muted-foreground">
+          <div className="project-schedule-heading-actions flex flex-nowrap items-center gap-3">
+            <div className="project-schedule-summary flex flex-nowrap items-center gap-3 text-caption text-muted-foreground">
               <span>
                 <Typography as="strong" className="mr-1" variant="bodySm">
                   {visibleRuns}
@@ -486,8 +482,8 @@ export function ProjectSchedule({
             </Button>
           </div>
         }
-        className="app-page-header project-schedule-heading"
-        description={t("schedule.description")}
+        className={`app-page-header project-schedule-heading${isSidebarOpen ? "" : " sidebar-closed"}`}
+        data-tauri-drag-region
         title={t("schedule.title")}
       />
 

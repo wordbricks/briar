@@ -296,32 +296,27 @@ export function ProjectAgents({
 
   return (
     <MainContent className="project-agents-page" id="project-agents">
-      <header
-        className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`}
+      <PageHeader
+        action={
+          <Button
+            className="project-agent-create"
+            onClick={openCreateDialog}
+            type="button"
+          >
+            <Plus size={15} />
+            {t("agents.create")}
+          </Button>
+        }
+        className={`app-page-header project-agents-heading${isSidebarOpen ? "" : " sidebar-closed"}`}
         data-tauri-drag-region
+        title={t("agents.title")}
+        titleId="project-agents-title"
       />
       <div className="project-agents-scroll">
         <section
           aria-labelledby="project-agents-title"
           className="project-agents-content"
         >
-          <PageHeader
-            action={
-              <Button
-                className="project-agent-create"
-                onClick={openCreateDialog}
-                type="button"
-              >
-                <Plus size={15} />
-                {t("agents.create")}
-              </Button>
-            }
-            className="app-page-header project-agents-heading"
-            description={t("agents.description", { project: project.name })}
-            title={t("agents.title")}
-            titleId="project-agents-title"
-          />
-
           <div className="project-agents-body">
             <header>
               <div>

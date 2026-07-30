@@ -20,10 +20,16 @@ describe("project agents layout", () => {
       ".project-agents-content { min-height:100%; padding:0 0 54px; }",
     );
     expect(styles).toContain(
-      ".page-header.app-page-header {\n  min-height:unset;\n  padding:10px 32px;",
+      ".page-header.app-page-header {\n  height:48px;\n  min-height:48px;\n  flex:0 0 48px;\n  padding:0 22px;",
     );
     expect(styles).toContain(
-      ".page-header.app-page-header > div:first-child > p:last-child {\n  max-width:720px;\n  margin:6px 0 0;",
+      ".page-header.app-page-header .page-header-description {\n  display:none;",
+    );
+    expect(styles).toContain(
+      ".page-header.app-page-header h1,\n.page-header.app-page-header .page-header-title {",
+    );
+    expect(styles).toContain(
+      ".run-page-window-title { min-width:0; flex:1; overflow:hidden; color:var(--foreground); font-size:var(--text-lg); font-weight:650;",
     );
   });
 
@@ -50,7 +56,10 @@ describe("project agents layout", () => {
       "color:var(--foreground)",
     );
     expect(firstRule(".auto-hunt-session-page > header")).toContain(
-      "background:var(--card)",
+      "display:none",
+    );
+    expect(styles).toContain(
+      ".page-header.app-page-header {\n  height:48px;\n  min-height:48px;",
     );
     expect(
       firstRule(".auto-hunt-dialog-section h3,.auto-hunt-summary h3"),
