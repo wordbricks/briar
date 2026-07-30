@@ -9,9 +9,12 @@ import { TooltipProvider } from "./components/ui/tooltip";
 import { I18nProvider } from "./i18n";
 import { installAppZoomShortcuts } from "./lib/app-zoom";
 import { isNativeLaunchIntroWindow } from "./lib/launch-intro";
+import { initializeTheme, ThemeProvider } from "./theme";
 import "./styles/globals.css";
 import "./styles.css";
+import "./styles/dark.css";
 
+initializeTheme();
 const nativeLaunchIntro = isNativeLaunchIntroWindow();
 if (nativeLaunchIntro) {
   document.documentElement.classList.add("launch-intro-document");
@@ -21,19 +24,23 @@ if (nativeLaunchIntro) {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <I18nProvider>
-      <TooltipProvider delayDuration={200}>
-        <AppErrorBoundary>
-          {nativeLaunchIntro ? (
-            <NativeLaunchIntro />
-          ) : (
-            <AppUpdateProvider>
-              <App />
-            </AppUpdateProvider>
-          )}
-        </AppErrorBoundary>
-        {import.meta.env.DEV && !nativeLaunchIntro ? <DevelopmentBadge /> : null}
-      </TooltipProvider>
-    </I18nProvider>
+    <ThemeProvider>
+      <I18nProvider>
+        <TooltipProvider delayDuration={200}>
+          <AppErrorBoundary>
+            {nativeLaunchIntro ? (
+              <NativeLaunchIntro />
+            ) : (
+              <AppUpdateProvider>
+                <App />
+              </AppUpdateProvider>
+            )}
+          </AppErrorBoundary>
+          {import.meta.env.DEV && !nativeLaunchIntro ? (
+            <DevelopmentBadge />
+          ) : null}
+        </TooltipProvider>
+      </I18nProvider>
+    </ThemeProvider>
   </StrictMode>,
 );

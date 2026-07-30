@@ -10,6 +10,7 @@ import {
   Keyboard,
   Link2,
   MessageSquare,
+  Palette,
   Plug,
   Settings2,
   ShieldCheck,
@@ -91,6 +92,11 @@ export function UnifiedSettingsSidebar({
         id: "general",
         icon: <SlidersHorizontal size={16} strokeWidth={1.75} />,
         label: t("appSettings.general"),
+      },
+      {
+        id: "appearance",
+        icon: <Palette size={16} strokeWidth={1.75} />,
+        label: t("appSettings.appearance"),
       },
       {
         id: "notifications",

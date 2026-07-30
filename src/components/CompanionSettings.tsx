@@ -23,6 +23,7 @@ import {
   type AppIconName,
 } from "../lib/app-icon";
 import type { SessionUser } from "../types";
+import { AppearanceSettings } from "./AppearanceSettings";
 import { InboxNotificationSettings } from "./InboxNotificationSettings";
 
 export function CompanionSettings({
@@ -113,6 +114,19 @@ export function CompanionSettings({
             </Typography>
           </CardContent>
         </Card>
+      </section>
+
+      <section className="mb-7 grid gap-3">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Palette aria-hidden="true" size={19} />
+          <Typography as="h2" variant="bodyLg">
+            {t("appSettings.appearance")}
+          </Typography>
+        </div>
+        <Typography tone="muted" variant="bodySm">
+          {t("appSettings.themeDescription")}
+        </Typography>
+        <AppearanceSettings compact />
       </section>
 
       <section className="mb-7 grid gap-3">

@@ -136,7 +136,6 @@
   --window-navigation-content-inset: 188px;
 }
 
-/* Optional dark surface for future chrome / companion themes */
 .dark {
   --background: #121214;
   --foreground: #f2f2ef;
@@ -189,4 +188,6 @@
   --mint: var(--success);
   --rose: var(--destructive);
   --brand: var(--primary);
+
+  color-scheme: dark;
 }

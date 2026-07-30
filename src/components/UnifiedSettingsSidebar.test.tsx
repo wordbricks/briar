@@ -56,6 +56,7 @@ describe("UnifiedSettingsSidebar", () => {
     });
 
     expect(container.textContent).toContain("Application settings");
+    expect(container.textContent).toContain("Appearance");
     expect(container.textContent).toContain("Organization settings");
     expect(container.textContent).toContain("Project settings");
     expect(
@@ -88,6 +89,18 @@ describe("UnifiedSettingsSidebar", () => {
       scope: "project",
       projectId: "project-1",
       section: "workflow",
+    });
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(
+          '[data-settings-section="appearance"]',
+        )
+        ?.click();
+    });
+    expect(onNavigate).toHaveBeenLastCalledWith({
+      scope: "application",
+      section: "appearance",
     });
 
     await act(async () => {

@@ -13,6 +13,7 @@ import {
   Link2,
   LoaderCircle,
   Moon,
+  Palette,
   RefreshCw,
   Settings2,
   SlidersHorizontal,
@@ -66,11 +67,13 @@ import {
 } from "../lib/agent-usage";
 import { ClaudeIcon, CodexIcon, GrokIcon } from "./AgentIcons";
 import { AgentUsageSettings } from "./AgentUsageSettings";
+import { AppearanceSettings } from "./AppearanceSettings";
 import { InboxNotificationSettings } from "./InboxNotificationSettings";
 import type { RepositoryReadiness } from "../lib/project-connection";
 
 export type SettingsSection =
   | "general"
+  | "appearance"
   | "notifications"
   | "keybindings"
   | "usage"
@@ -305,6 +308,11 @@ export function AppSettings({
             label: t("appSettings.general"),
           },
           {
+            id: "appearance",
+            icon: <Palette size={16} strokeWidth={1.75} />,
+            label: t("appSettings.appearance"),
+          },
+          {
             id: "notifications",
             icon: <Bell size={16} strokeWidth={1.75} />,
             label: t("notifications.title"),
@@ -384,6 +392,7 @@ export function AppSettings({
   const activeItem = flatNavigation.find((item) => item.id === activeSection);
   const sectionDescriptions: Record<SettingsSection, string> = {
     general: t("appSettings.generalDescription"),
+    appearance: t("appSettings.appearanceDescription"),
     notifications: t("notifications.description"),
     keybindings: t("appSettings.keybindingsDescription"),
     usage: t("usage.settingsDescription"),
@@ -472,6 +481,8 @@ export function AppSettings({
               ) : null}
               <SettingsNote>{t("appSettings.preventSleepNote")}</SettingsNote>
             </SettingsContent>
+          ) : activeSection === "appearance" ? (
+            <AppearanceSettings />
           ) : activeSection === "providers" ? (
             <SettingsContent>
               <SettingsGroupHeading
