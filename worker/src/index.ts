@@ -76,6 +76,7 @@ import {
   HuntTransitionError,
   importLinearHuntRuns,
   listIssueAttachments,
+  listIssueConversationNotifications,
   listIssueMessages,
   listAllRunEvidenceImages,
   listEvidenceImagesForEvidence,
@@ -114,6 +115,7 @@ import {
   type HuntRunRow,
   type IssueAttachmentInput,
   type IssueAttachmentRow,
+  type IssueConversationNotificationRow,
   type IssueMessageRow,
   type ProjectRow,
   type ProjectAgentRow,
@@ -671,6 +673,7 @@ const issueMessageInputSchema = z
   .object({
     body: z.string().trim().min(1).max(10_000),
     parentMessageId: z.string().uuid().nullable().optional(),
+    mentionedUserIds: z.array(z.string().min(1).max(200)).max(50).optional(),
     agentConversationId: z
       .string()
       .trim()
@@ -1872,6 +1875,19 @@ const issueMessageJson = (message: IssueMessageRow) => ({
   replyCount: message.reply_count,
   createdAt: message.created_at,
   updatedAt: message.updated_at,
+});
+
+const issueConversationNotificationJson = (
+  notification: IssueConversationNotificationRow,
+) => ({
+  id: notification.id,
+  runId: notification.run_id,
+  runTitle: notification.run_title,
+  rootMessageId: notification.root_message_id,
+  body: notification.body,
+  author: issueMessageJson(notification).author,
+  reason: notification.notification_reason,
+  createdAt: notification.created_at,
 });
 
 export const claimConversationJson = (messages: IssueMessageRow[]) =>
@@ -3098,13 +3114,27 @@ async function route(
     const project = await getProject(db, dashboardMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
     const observedAt = new Date().toISOString();
-    const [{ runs, events }, settings, attachments, workers, executionPolicy] =
+    const [
+      { runs, events },
+      settings,
+      attachments,
+      workers,
+      executionPolicy,
+      members,
+      conversationNotifications,
+    ] =
       await Promise.all([
         listDashboardRuns(db, project.id),
         getProjectSettings(db, project.id),
         listIssueAttachments(db, project.id),
         listExecutionWorkers(db, project.id, observedAt),
         getProjectExecutionWorkerPolicy(db, project.id),
+        listOrganizationMembers(db, project.organization_id),
+        listIssueConversationNotifications(
+          db,
+          project.id,
+          session.user.id,
+        ),
       ]);
     const eventsByRun = new Map<string, HuntEventRow[]>();
     for (const event of events) {
@@ -3130,6 +3160,10 @@ async function route(
       ),
       workers: workers.map((worker) => workerJson(worker, observedAt)),
       executionPolicy,
+      members: members.map(organizationMemberJson),
+      conversationNotifications: conversationNotifications.map(
+        issueConversationNotificationJson,
+      ),
       generatedAt: observedAt,
     });
   }
@@ -3222,6 +3256,7 @@ async function route(
       authorUserId: agentProvider ? null : session.user.id,
       authorAgentProvider: agentProvider,
       body: input.body,
+      mentionedUserIds: agentProvider ? [] : input.mentionedUserIds,
       createdAt: new Date().toISOString(),
     });
     if (!message) {

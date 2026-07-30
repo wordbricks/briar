@@ -282,6 +282,12 @@ export type IssueMessageRow = {
   updated_at: string;
 };
 
+export type IssueConversationNotificationRow = IssueMessageRow & {
+  run_title: string;
+  root_message_id: string;
+  notification_reason: "mention" | "thread_reply";
+};
+
 export type IssueAttachmentRow = {
   id: string;
   run_id: string;
@@ -1897,6 +1903,7 @@ export async function createIssueMessage(
     authorUserId: string | null;
     authorAgentProvider: "codex" | "claude" | "grok" | null;
     body: string;
+    mentionedUserIds?: string[];
     createdAt: string;
   },
 ) {
@@ -1930,8 +1937,74 @@ export async function createIssueMessage(
     )
     .run();
   if (result.meta.changes !== 1) return null;
+  const mentionedUserIds = [...new Set(input.mentionedUserIds ?? [])];
+  if (mentionedUserIds.length > 0) {
+    await db.batch(
+      mentionedUserIds.map((userId) =>
+        db
+          .prepare(
+            `insert into briar_issue_message_mentions (
+               message_id, user_id, created_at
+             )
+             select message.id, membership.user_id, ?
+             from briar_issue_messages message
+             join briar_projects project on project.id = message.project_id
+             join briar_organization_members membership
+               on membership.organization_id = project.organization_id
+              and membership.user_id = ?
+             where message.id = ?
+               and (message.author_user_id is null
+                 or message.author_user_id != membership.user_id)
+             on conflict (message_id, user_id) do nothing`,
+          )
+          .bind(input.createdAt, userId, input.id),
+      ),
+    );
+  }
   const messages = await listIssueMessages(db, input.projectId, input.runId);
   return messages.find((message) => message.id === input.id) ?? null;
+}
+
+export async function listIssueConversationNotifications(
+  db: D1Database,
+  projectId: string,
+  userId: string,
+) {
+  const result = await db
+    .prepare(
+      `select message.id, message.run_id, message.parent_message_id,
+              message.author_user_id, message.author_agent_provider,
+              author.name as author_name, author.image as author_image,
+              message.body, 0 as reply_count, message.created_at,
+              message.updated_at, run.title as run_title,
+              coalesce(message.parent_message_id, message.id) as root_message_id,
+              case when mention.user_id is not null
+                then 'mention' else 'thread_reply' end as notification_reason
+       from briar_issue_messages message
+       join briar_hunt_runs run
+         on run.id = message.run_id and run.project_id = message.project_id
+       left join "user" author on author.id = message.author_user_id
+       left join briar_issue_messages root
+         on root.id = message.parent_message_id
+        and root.project_id = message.project_id
+        and root.run_id = message.run_id
+       left join briar_issue_message_mentions mention
+         on mention.message_id = message.id and mention.user_id = ?
+       where message.project_id = ?
+         and (message.author_user_id is null or message.author_user_id != ?)
+         and (
+           mention.user_id is not null
+           or (
+             message.parent_message_id is not null
+             and root.author_user_id = ?
+           )
+         )
+       order by message.created_at desc, message.id desc
+       limit 500`,
+    )
+    .bind(userId, projectId, userId, userId)
+    .all<IssueConversationNotificationRow>();
+  return result.results;
 }
 
 export async function createIssueAttachments(

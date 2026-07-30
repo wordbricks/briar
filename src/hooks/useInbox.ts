@@ -46,7 +46,25 @@ export type InboxSessionMessage = {
   requiresAttention: boolean;
 };
 
-export type InboxMessage = InboxIssueMessage | InboxSessionMessage;
+export type InboxConversationMessage = {
+  id: string;
+  kind: "conversation";
+  projectId: string;
+  projectName: string;
+  targetId: string;
+  rootMessageId: string;
+  title: string;
+  occurredAt: string;
+  version: string;
+  body: string;
+  authorName: string;
+  reason: "mention" | "thread_reply";
+};
+
+export type InboxMessage =
+  | InboxIssueMessage
+  | InboxSessionMessage
+  | InboxConversationMessage;
 export type InboxMessageWithReadState = InboxMessage & { isUnread: boolean };
 export type InboxCategory =
   | "urgent"
@@ -103,6 +121,23 @@ export function buildCurrentInboxMessages(
         workflowStage: run.workflowStage,
         priority: run.priority,
         structuredResult: run.structuredResult,
+      });
+    }
+
+    for (const notification of dashboard.conversationNotifications ?? []) {
+      messages.push({
+        id: `conversation:${notification.id}`,
+        kind: "conversation",
+        projectId: dashboard.project.id,
+        projectName: dashboard.project.name,
+        targetId: notification.runId,
+        rootMessageId: notification.rootMessageId,
+        title: notification.runTitle,
+        occurredAt: notification.createdAt,
+        version: notification.id,
+        body: notification.body,
+        authorName: notification.author.name,
+        reason: notification.reason,
       });
     }
   }
@@ -188,6 +223,7 @@ export function isInboxMessageUnread(
 export function classifyInboxMessage(
   message: InboxMessage,
 ): InboxCategory {
+  if (message.kind === "conversation") return "action_required";
   if (message.kind === "session") {
     return message.requiresAttention || message.status === "failed"
       ? "action_required"
