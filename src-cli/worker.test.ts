@@ -301,6 +301,52 @@ describe("briar worker loop", () => {
     // Initial readiness plus busy/ready transitions for each issue.
     expect(test.heartbeats).toBe(5);
   });
+
+  it("keeps heartbeating while every session slot is occupied", async () => {
+    const readinessStates: Array<"ready" | "busy" | undefined> = [];
+    const wakeDelays: number[] = [];
+    let finishIssue: (() => void) | undefined;
+    let clock = 0;
+    const test = harness([issue("issue-long")], {
+      heartbeat: async (readinessState) => {
+        readinessStates.push(readinessState);
+        if (
+          readinessStates.filter((state) => state === "busy").length === 2
+        ) {
+          finishIssue?.();
+        }
+      },
+      runIssue: async () => {
+        await new Promise<void>((resolve) => {
+          finishIssue = resolve;
+        });
+      },
+      sleep: async (milliseconds, signal) => {
+        if (milliseconds === 60_000) {
+          wakeDelays.push(milliseconds);
+          clock += milliseconds;
+          return;
+        }
+        if (signal?.aborted) return;
+        await new Promise<void>((resolve) =>
+          signal?.addEventListener("abort", () => resolve(), { once: true }),
+        );
+      },
+      now: () => clock,
+    });
+
+    const result = await runWorkerLoop(test.dependencies, {
+      maxIssues: 1,
+      maxConcurrentSessions: 1,
+      heartbeatIntervalMs: 60_000,
+    });
+
+    expect(result.processed).toBe(1);
+    expect(
+      readinessStates.filter((state) => state === "busy").length,
+    ).toBeGreaterThanOrEqual(2);
+    expect(wakeDelays).toContain(60_000);
+  });
 });
 
 describe("worker identity", () => {
