@@ -353,8 +353,11 @@ export function naturalLanguageFromAgentMessage(text: string): string {
 
   try {
     const payload = JSON.parse(jsonText) as unknown;
-    const summary = record(payload) && string(record(payload)?.summary);
-    return summary?.trim() || withoutPhase;
+    const payloadRecord = record(payload);
+    const naturalLanguage =
+      string(payloadRecord?.message)?.trim() ||
+      string(payloadRecord?.summary)?.trim();
+    return naturalLanguage || withoutPhase;
   } catch {
     return withoutPhase;
   }
