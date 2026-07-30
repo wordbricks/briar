@@ -27,7 +27,7 @@ describe("full-width application pages", () => {
       /\.project-agent-run-scroll \{[^}]*display:flex;[^}]*flex-direction:column;[^}]*overflow:hidden;/,
     );
     expect(styles).toMatch(
-      /\.project-agent-detail-heading \{[^}]*flex:0 0 auto;/,
+      /\.project-agent-detail-heading \{[^}]*flex:0 0 48px;/,
     );
     expect(styles).toMatch(
       /\.project-agent-session-panel \{[^}]*width:100%;[^}]*min-height:0;[^}]*flex:1;[^}]*margin:0;[^}]*border:0;[^}]*border-radius:0;[^}]*box-shadow:none;/,

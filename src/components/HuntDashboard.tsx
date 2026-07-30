@@ -527,12 +527,89 @@ export function HuntDashboard({
 
   return (
     <MainContent id="issues">
-      {!companionMode && (
-        <header
-          className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`}
+      {!companionMode ? (
+        <PageHeader
+          action={
+            <div className="queue-tools">
+              <Button
+                aria-keyshortcuts="Meta+N"
+                aria-label={t("dashboard.createIssue")}
+                className="create-issue-button"
+                onClick={() => setIsIssueDialogOpen(true)}
+                type="button"
+              >
+                <Plus size={14} />
+                {t("dashboard.createIssue")}
+              </Button>
+              <label className="search-box">
+                <Search size={15} />
+                <Input
+                  className="h-full border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={t("dashboard.search")}
+                  value={query}
+                />
+              </label>
+              <div className="source-filter">
+                {(["all", "issue", "feedback", "error"] as const).map((value) => (
+                  <button
+                    key={value}
+                    className={source === value ? "active" : ""}
+                    onClick={() => setSource(value)}
+                  >
+                    {value === "all"
+                      ? t("dashboard.all")
+                      : t(`source.${value}` as MessageKey)}
+                  </button>
+                ))}
+              </div>
+              <div
+                aria-label={t("dashboard.viewMode")}
+                className="view-switch"
+                role="group"
+              >
+                <button
+                  aria-label={t("dashboard.kanbanView")}
+                  aria-pressed={view === "kanban"}
+                  className={view === "kanban" ? "active" : ""}
+                  onClick={() => setView("kanban")}
+                  title={t("dashboard.kanbanView")}
+                  type="button"
+                >
+                  <Columns3 size={14} />
+                  <span>{t("dashboard.kanban")}</span>
+                </button>
+                <button
+                  aria-label={t("dashboard.listView")}
+                  aria-pressed={view === "list"}
+                  className={view === "list" ? "active" : ""}
+                  onClick={() => setView("list")}
+                  title={t("dashboard.listView")}
+                  type="button"
+                >
+                  <List size={14} />
+                  <span>{t("dashboard.list")}</span>
+                </button>
+              </div>
+            </div>
+          }
+          className={`app-page-header queue-header${isSidebarOpen ? "" : " sidebar-closed"}`}
           data-tauri-drag-region="deep"
+          title={
+            <span className="queue-heading-copy">
+              <span>{t("dashboard.queue")}</span>
+              <Typography
+                as="span"
+                className="queue-task-count"
+                tone="muted"
+                variant="caption"
+              >
+                {t("dashboard.taskCount", { count: filtered.length })}
+              </Typography>
+            </span>
+          }
         />
-      )}
+      ) : null}
       <div className="dashboard-scroll">
         {error ? (
           <ErrorBanner className="error-banner" icon={<CircleAlert size={16} />}>
@@ -612,82 +689,7 @@ export function HuntDashboard({
               </div>
             )}
           </div>
-        ) : (
-          <PageHeader
-            action={
-              <div className="queue-tools">
-              <Button
-                aria-keyshortcuts="Meta+N"
-                aria-label={t("dashboard.createIssue")}
-                className="create-issue-button"
-                onClick={() => setIsIssueDialogOpen(true)}
-                type="button"
-              >
-                <Plus size={14} />{t("dashboard.createIssue")}
-              </Button>
-              <label className="search-box">
-                <Search size={15} />
-                <Input
-                  className="h-full border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder={t("dashboard.search")}
-                  value={query}
-                />
-              </label>
-              <div className="source-filter">
-                {(["all", "issue", "feedback", "error"] as const).map((value) => (
-                  <button key={value} className={source === value ? "active" : ""} onClick={() => setSource(value)}>
-                    {value === "all" ? t("dashboard.all") : t(`source.${value}` as MessageKey)}
-                  </button>
-                ))}
-              </div>
-              <div
-                aria-label={t("dashboard.viewMode")}
-                className="view-switch"
-                role="group"
-              >
-                <button
-                  aria-label={t("dashboard.kanbanView")}
-                  aria-pressed={view === "kanban"}
-                  className={view === "kanban" ? "active" : ""}
-                  onClick={() => setView("kanban")}
-                  title={t("dashboard.kanbanView")}
-                  type="button"
-                >
-                  <Columns3 size={14} />
-                  <span>{t("dashboard.kanban")}</span>
-                </button>
-                <button
-                  aria-label={t("dashboard.listView")}
-                  aria-pressed={view === "list"}
-                  className={view === "list" ? "active" : ""}
-                  onClick={() => setView("list")}
-                  title={t("dashboard.listView")}
-                  type="button"
-                >
-                  <List size={14} />
-                  <span>{t("dashboard.list")}</span>
-                </button>
-              </div>
-              </div>
-            }
-            className="app-page-header queue-header"
-            description={t("dashboard.description")}
-            title={
-              <span className="queue-heading-copy">
-                <span>{t("dashboard.queue")}</span>
-                <Typography
-                  as="span"
-                  className="queue-task-count"
-                  tone="muted"
-                  variant="caption"
-                >
-                  {t("dashboard.taskCount", { count: filtered.length })}
-                </Typography>
-              </span>
-            }
-          />
-        )}
+        ) : null}
         {!companionMode && <div className="status-tabs">
           <button className={status === "all" ? "active" : ""} onClick={() => setStatus("all")}>{t("dashboard.all")} <span>{runs.length}</span></button>
           <button className={status === "active" ? "active" : ""} onClick={() => setStatus("active")}>{t("dashboard.active")} <span>{activeCount}</span></button>

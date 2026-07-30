@@ -176,7 +176,8 @@ describe("HuntDashboard", () => {
     expect(markup).not.toContain("queue-panel");
     expect(markup).toContain('class="page-header');
     expect(markup).toContain("queue-header");
-    expect(markup).toContain("에이전트가 처리하는 작업의 흐름과 병목");
+    expect(markup).toContain("app-page-header");
+    expect(markup).not.toContain("에이전트가 처리하는 작업의 흐름과 병목");
     expect(markup).toContain('class="kanban-board"');
     expect(markup).not.toContain('class="page-heading"');
     expect(markup).not.toContain('class="metric-grid"');
@@ -1655,7 +1656,7 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
-  it("keeps a drag topbar without embedding Auto Hunt health", () => {
+  it("keeps a drag title header without embedding Auto Hunt health", () => {
     const markup = renderToStaticMarkup(
       <HuntDashboard
         {...dashboardProps}
@@ -1663,7 +1664,8 @@ describe("HuntDashboard", () => {
       />,
     );
 
-    expect(markup).toContain("topbar");
+    expect(markup).toContain("app-page-header");
+    expect(markup).toContain('data-tauri-drag-region="deep"');
     expect(markup).not.toContain("health-trigger");
     expect(markup).not.toContain("Auto Hunt 연결 상태");
     expect(markup).not.toContain("Briar CLI");

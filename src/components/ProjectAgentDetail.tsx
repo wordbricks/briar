@@ -232,42 +232,37 @@ export function ProjectAgentDetail({
 
   return (
     <MainContent id="project-agent-detail">
-      <header
-        className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`}
+      <PageHeader
+        action={
+          <Button
+            className="project-agent-create project-agent-run-task"
+            onClick={openTaskDialog}
+            type="button"
+          >
+            <Play fill="currentColor" size={17} />
+            {t("agents.runTask")}
+          </Button>
+        }
+        className={`app-page-header project-agents-heading project-agent-detail-heading${isSidebarOpen ? "" : " sidebar-closed"}`}
         data-tauri-drag-region
+        title={
+          <span className="project-agent-detail-title">
+            <Button
+              aria-label={t("agents.back")}
+              className="project-agent-detail-back"
+              onClick={onBack}
+              size="icon"
+              type="button"
+              variant="ghost"
+            >
+              <ArrowLeft aria-hidden="true" size={16} />
+            </Button>
+            <span>{agent.name}</span>
+          </span>
+        }
+        titleId="project-agent-detail-title"
       />
       <div className="project-agent-run-scroll">
-        <PageHeader
-          action={
-            <Button
-              className="project-agent-create project-agent-run-task"
-              onClick={openTaskDialog}
-              type="button"
-            >
-              <Play fill="currentColor" size={17} />
-              {t("agents.runTask")}
-            </Button>
-          }
-          className="app-page-header project-agents-heading project-agent-detail-heading"
-          description={agent.responsibility}
-          title={
-            <span className="project-agent-detail-title">
-              <Button
-                aria-label={t("agents.back")}
-                className="project-agent-detail-back"
-                onClick={onBack}
-                size="icon"
-                type="button"
-                variant="ghost"
-              >
-                <ArrowLeft aria-hidden="true" size={16} />
-              </Button>
-              <span>{agent.name}</span>
-            </span>
-          }
-          titleId="project-agent-detail-title"
-        />
-
         {appError ? (
           <ErrorBanner className="m-4">{appError}</ErrorBanner>
         ) : null}

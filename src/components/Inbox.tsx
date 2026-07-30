@@ -86,34 +86,31 @@ export function Inbox({
     });
   };
 
+  const pageHeader = (
+    <PageHeader
+      action={
+        unreadCount > 0 ? (
+          <Button onClick={onMarkAllRead} type="button" variant="soft">
+            <Check size={14} />
+            {t("inbox.markAllRead")}
+          </Button>
+        ) : null
+      }
+      className={cn(
+        "inbox-heading",
+        companionMode ? null : "app-page-header",
+        !companionMode && !isSidebarOpen && "sidebar-closed",
+      )}
+      data-tauri-drag-region={companionMode ? undefined : true}
+      title={t("inbox.title")}
+      titleId="inbox-title"
+    />
+  );
+
   const inboxContent = (
     <div className="inbox-scroll min-h-0 flex-1 overflow-auto">
       <section className="inbox-content" aria-labelledby="inbox-title">
-        <PageHeader
-          action={
-            unreadCount > 0 ? (
-              <Button onClick={onMarkAllRead} type="button" variant="soft">
-                <Check size={14} />
-                {t("inbox.markAllRead")}
-              </Button>
-            ) : null
-          }
-          className={cn(
-            "inbox-heading",
-            !companionMode && "app-page-header",
-          )}
-          description={t("inbox.description")}
-          eyebrow={
-            companionMode ? (
-              <>
-                <InboxIcon size={13} />
-                {t("inbox.eyebrow")}
-              </>
-            ) : null
-          }
-          title={t("inbox.title")}
-          titleId="inbox-title"
-        />
+        {companionMode ? pageHeader : null}
 
         <section
           aria-label={t("inbox.messages")}
@@ -191,10 +188,7 @@ export function Inbox({
 
   return (
     <MainContent id="inbox">
-      <header
-        className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`}
-        data-tauri-drag-region
-      />
+      {pageHeader}
       {inboxContent}
     </MainContent>
   );
