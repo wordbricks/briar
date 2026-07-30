@@ -352,6 +352,8 @@ describe("worker service definitions", () => {
     briarBinary: "/Users/dev/.local/bin/briar",
     workingDirectory: "/Users/dev/git/example",
     home: "/Users/dev",
+    environmentPath:
+      "/Users/dev/.local/bin:/opt/homebrew/bin:/usr/bin:/bin",
   };
 
   it("builds a launchd agent that restarts and logs", () => {
@@ -361,6 +363,11 @@ describe("worker service definitions", () => {
     );
     expect(definition.contents).toContain("<key>KeepAlive</key>");
     expect(definition.contents).toContain("<key>RunAtLoad</key>");
+    expect(definition.contents).toContain("<key>EnvironmentVariables</key>");
+    expect(definition.contents).toContain("<key>PATH</key>");
+    expect(definition.contents).toContain(
+      "<string>/Users/dev/.local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>",
+    );
     expect(definition.contents).toContain(workerLogPath(projectId, "/Users/dev"));
     expect(definition.enableCommand[0]).toBe("launchctl");
   });
@@ -383,6 +390,28 @@ describe("worker service definitions", () => {
     );
   });
 
+  it("inherits the installer PATH when no service PATH is provided", () => {
+    const previousPath = process.env.PATH;
+    process.env.PATH = "/Users/dev/.local/bin:/opt/homebrew/bin:/usr/bin:/bin";
+    try {
+      const definition = serviceDefinition({
+        ...input,
+        platform: "darwin",
+        environmentPath: undefined,
+      });
+      expect(definition.contents).toContain(
+        `<key>PATH</key>
+    <string>${process.env.PATH}</string>`,
+      );
+    } finally {
+      if (previousPath === undefined) {
+        delete process.env.PATH;
+      } else {
+        process.env.PATH = previousPath;
+      }
+    }
+  });
+
   it("requires the packaged runtime and CLI script together", () => {
     expect(() =>
       serviceDefinition({
@@ -399,12 +428,16 @@ describe("worker service definitions", () => {
       platform: "darwin",
       runtimeBinary: "/Applications/Briar & Test.app/Contents/MacOS/bun",
       cliScript: "/Users/dev/<briar>/briar.js",
+      environmentPath: "/Users/dev/bin&tools:/usr/bin",
     });
     expect(definition.contents).toContain(
       "<string>/Applications/Briar &amp; Test.app/Contents/MacOS/bun</string>",
     );
     expect(definition.contents).toContain(
       "<string>/Users/dev/&lt;briar&gt;/briar.js</string>",
+    );
+    expect(definition.contents).toContain(
+      "<string>/Users/dev/bin&amp;tools:/usr/bin</string>",
     );
   });
 
