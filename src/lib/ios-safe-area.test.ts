@@ -26,4 +26,13 @@ describe("iOS safe area layout", () => {
       /\.platform-ios \.companion-bottom-chrome \{[\s\S]*?background: transparent;/u,
     );
   });
+
+  it("keeps thread controls inside the mobile safe areas", () => {
+    expect(styles).toContain(
+      ".issue-thread-drawer > header { min-height:calc(66px + env(safe-area-inset-top,0px)); padding:calc(8px + env(safe-area-inset-top,0px)) max(13px,env(safe-area-inset-right)) 8px max(18px,env(safe-area-inset-left));",
+    );
+    expect(styles).toContain(
+      ".issue-message-composer.compact { margin:12px max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));",
+    );
+  });
 });
