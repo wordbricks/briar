@@ -71,7 +71,11 @@ const workflowConfigSchema = z
     ).min(1),
     execution: z
       .object({
-        stopAfterStage: workflowStageIdSchema,
+        // Older desktop builds serialized a missing execution boundary as an
+        // empty string. normalizeAutoHuntWorkflow already repairs a missing or
+        // unknown boundary from the required stages, so keep that read
+        // compatibility here instead of rejecting the whole CLI config.
+        stopAfterStage: z.string().trim().max(64),
       })
       .optional(),
     completion: z.object({
@@ -217,25 +221,58 @@ const required = (name: string) => {
 };
 
 async function loadConfig(): Promise<Config> {
+  let contents: string;
   try {
-    const config = configSchema.parse(
-      JSON.parse(await readFile(configPath, "utf8")),
+    contents = await readFile(configPath, "utf8");
+  } catch (error) {
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === "ENOENT"
+    ) {
+      return {
+        apiUrl: defaultApiUrl,
+        agentProviders: { codex: true, claude: true, grok: true },
+        projects: [],
+      };
+    }
+    throw new Error(
+      `Briar 로컬 설정을 읽지 못했습니다: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
     );
-    const apiUrl = process.env.BRIAR_API_URL ?? config.apiUrl;
-    return {
-      ...config,
-      apiUrl,
-      userToken: sameApiEnvironment(apiUrl, config.apiUrl)
-        ? config.userToken
-        : undefined,
-    };
-  } catch {
-    return {
-      apiUrl: defaultApiUrl,
-      agentProviders: { codex: true, claude: true, grok: true },
-      projects: [],
-    };
   }
+
+  let storedConfig: unknown;
+  try {
+    storedConfig = JSON.parse(contents);
+  } catch {
+    throw new Error("Briar 로컬 설정이 올바른 JSON이 아닙니다.");
+  }
+  const parsed = configSchema.safeParse(storedConfig);
+  if (!parsed.success) {
+    const locations = [
+      ...new Set(
+        parsed.error.issues.map((issue) =>
+          issue.path.length > 0 ? issue.path.join(".") : "config",
+        ),
+      ),
+    ].slice(0, 3);
+    throw new Error(
+      `Briar 로컬 설정이 손상되었습니다: ${locations.join(", ")} 항목을 확인하세요.`,
+    );
+  }
+
+  const config = parsed.data;
+  const apiUrl = process.env.BRIAR_API_URL ?? config.apiUrl;
+  return {
+    ...config,
+    apiUrl,
+    userToken: sameApiEnvironment(apiUrl, config.apiUrl)
+      ? config.userToken
+      : undefined,
+  };
 }
 
 async function saveConfig(config: Config) {
