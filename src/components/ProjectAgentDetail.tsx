@@ -1,6 +1,5 @@
 import {
   ArrowLeft,
-  Bot,
   LoaderCircle,
   Play,
 } from "lucide-react";
@@ -9,7 +8,7 @@ import { useEffect, useState } from "react";
 import {
   ErrorBanner,
   MainContent,
-  PageHero,
+  PageHeader,
 } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import {
@@ -226,10 +225,10 @@ export function ProjectAgentDetail({
         data-tauri-drag-region
       />
       <div className="project-agent-run-scroll">
-        <PageHero
+        <PageHeader
           action={
             <Button
-              className="h-12 min-w-[150px] rounded-xl"
+              className="project-agent-create project-agent-run-task"
               onClick={openTaskDialog}
               type="button"
             >
@@ -237,28 +236,24 @@ export function ProjectAgentDetail({
               {t("agents.runTask")}
             </Button>
           }
-          className="project-agent-run-hero"
+          className="app-page-header project-agents-heading project-agent-detail-heading"
           description={agent.responsibility}
-          eyebrow={
-            <>
-              <Bot size={13} />
-              {t("agents.detailEyebrow")}
-            </>
-          }
           title={
-            <span className="grid gap-3">
+            <span className="project-agent-detail-title">
               <Button
-                className="project-agent-detail-back w-max"
+                aria-label={t("agents.back")}
+                className="project-agent-detail-back"
                 onClick={onBack}
+                size="icon"
                 type="button"
                 variant="ghost"
               >
-                <ArrowLeft size={16} />
-                {t("agents.back")}
+                <ArrowLeft aria-hidden="true" size={16} />
               </Button>
               <span>{agent.name}</span>
             </span>
           }
+          titleId="project-agent-detail-title"
         />
 
         {appError ? (
