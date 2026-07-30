@@ -614,7 +614,10 @@ export function App() {
               if (message.projectId !== briar.activeProjectId) {
                 briar.setActiveProjectId(message.projectId);
               }
-              if (message.kind === "issue") {
+              if (
+                message.kind === "issue" ||
+                message.kind === "conversation"
+              ) {
                 setRequestedSessionId(null);
                 setRequestedRunId(message.targetId);
                 navigateToPage("issues");
@@ -841,7 +844,10 @@ export function App() {
                 if (message.projectId !== briar.activeProjectId) {
                   briar.setActiveProjectId(message.projectId);
                 }
-                if (message.kind === "issue") {
+                if (
+                  message.kind === "issue" ||
+                  message.kind === "conversation"
+                ) {
                   setRequestedRunId(message.targetId);
                   setCompanionStatus("all");
                   setCompanionPage("issues");

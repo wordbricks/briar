@@ -3,8 +3,11 @@ import type { HuntRun } from "../types";
 import {
   agentReplyParentMessageId,
   briarMentionAtCaret,
+  issueMentionAtCaret,
+  issueMentionHandle,
   issueAgentConversation,
   issueConversationSnapshot,
+  mentionsIssueHandle,
   mentionsBriar,
   providerForConversation,
   shouldBriarReply,
@@ -90,6 +93,24 @@ describe("issue agent replies", () => {
     expect(briarMentionAtCaret("owner@", 6)).toBeNull();
     expect(briarMentionAtCaret("@other", 6)).toBeNull();
     expect(briarMentionAtCaret("@briar ", 7)).toBeNull();
+  });
+
+  it("builds member mention handles and recognizes selected mentions", () => {
+    expect(
+      issueMentionHandle({
+        userId: "user-1",
+        email: "Jay.Kim+dev@example.com",
+      }),
+    ).toBe("jay.kim-dev");
+    expect(issueMentionAtCaret("ask @jay.k", 10)).toEqual({
+      start: 4,
+      end: 10,
+      query: "jay.k",
+    });
+    expect(mentionsIssueHandle("@jay.kim-dev 확인해 주세요", "jay.kim-dev"))
+      .toBe(true);
+    expect(mentionsIssueHandle("owner@jay.kim-dev.example", "jay.kim-dev"))
+      .toBe(false);
   });
 
   it("resolves the provider encoded in a project-scoped conversation id", () => {

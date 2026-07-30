@@ -1549,6 +1549,112 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
+  it("sends the selected member id with an issue conversation mention", async () => {
+    const createdAt = new Date().toISOString();
+    let sentInput:
+      | {
+          body: string;
+          parentMessageId: string | null;
+          mentionedUserIds?: string[];
+        }
+      | undefined;
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          mentionMembers={[
+            {
+              userId: "member-1",
+              name: "Member One",
+              email: "member@example.com",
+              image: null,
+              role: "member",
+              createdAt,
+            },
+          ]}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async (input) => {
+            sentInput = input;
+            return {
+              message: {
+                id: "member-mention",
+                runId: demoDashboard.runs[0].id,
+                parentMessageId: null,
+                body: input.body,
+                author: {
+                  id: "owner",
+                  name: "Owner",
+                  image: null,
+                  provider: null,
+                },
+                replyCount: 0,
+                createdAt,
+                updatedAt: createdAt,
+              },
+              agentReply: null,
+            };
+          }}
+          run={demoDashboard.runs[0]}
+        />,
+      );
+    });
+
+    const textarea = container.querySelector<HTMLTextAreaElement>(
+      ".issue-message-composer textarea",
+    );
+    await act(async () => {
+      textarea?.focus();
+      if (!textarea) return;
+      Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )?.set?.call(textarea, "@mem");
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const suggestion = container.querySelector<HTMLButtonElement>(
+      '[role="option"]',
+    );
+    expect(suggestion?.textContent).toContain("@member");
+    await act(async () => suggestion?.click());
+    expect(textarea?.value).toBe("@member ");
+
+    await act(async () => {
+      if (!textarea) return;
+      Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )?.set?.call(textarea, "@member 확인해 주세요");
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+      textarea.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          bubbles: true,
+          cancelable: true,
+          key: "Enter",
+        }),
+      );
+      await Promise.resolve();
+    });
+
+    expect(sentInput).toEqual({
+      body: "@member 확인해 주세요",
+      parentMessageId: null,
+      mentionedUserIds: ["member-1"],
+    });
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("keeps a drag topbar without embedding Auto Hunt health", () => {
     const markup = renderToStaticMarkup(
       <HuntDashboard

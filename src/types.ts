@@ -88,6 +88,17 @@ export type IssueMessageSendResult = {
   agentReply: Promise<IssueMessage> | null;
 };
 
+export type IssueConversationNotification = {
+  id: string;
+  runId: string;
+  runTitle: string;
+  rootMessageId: string;
+  body: string;
+  author: IssueMessageAuthor;
+  reason: "mention" | "thread_reply";
+  createdAt: string;
+};
+
 export type RunEvidence = {
   key: string;
   attempt: number;
@@ -355,6 +366,8 @@ export type DashboardPayload = {
   runs: HuntRun[];
   workers?: ExecutionWorker[];
   executionPolicy?: ProjectExecutionWorkerPolicy;
+  members?: OrganizationMember[];
+  conversationNotifications?: IssueConversationNotification[];
   generatedAt: string;
 };
 

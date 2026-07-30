@@ -115,6 +115,70 @@ describe("Inbox messages", () => {
     ]);
   });
 
+  it("creates actionable inbox messages for mentions and thread replies", () => {
+    const messages = buildCurrentInboxMessages(
+      {
+        ...demoDashboard,
+        runs: [],
+        conversationNotifications: [
+          {
+            id: "message-mention",
+            runId: "run-mention",
+            runTitle: "Review login behavior",
+            rootMessageId: "message-mention",
+            body: "@owner could you confirm this?",
+            author: {
+              id: "member",
+              name: "Member",
+              image: null,
+              provider: null,
+            },
+            reason: "mention",
+            createdAt: "2026-07-30T01:00:00.000Z",
+          },
+          {
+            id: "message-reply",
+            runId: "run-thread",
+            runTitle: "Fix checkout",
+            rootMessageId: "message-root",
+            body: "I added the reproduction steps.",
+            author: {
+              id: "member",
+              name: "Member",
+              image: null,
+              provider: null,
+            },
+            reason: "thread_reply",
+            createdAt: "2026-07-30T01:01:00.000Z",
+          },
+        ],
+      },
+      [],
+      [project],
+    );
+    const conversationMessages = messages.filter(
+      (message) => message.kind === "conversation",
+    );
+
+    expect(conversationMessages).toEqual([
+      expect.objectContaining({
+        id: "conversation:message-mention",
+        targetId: "run-mention",
+        reason: "mention",
+      }),
+      expect.objectContaining({
+        id: "conversation:message-reply",
+        targetId: "run-thread",
+        rootMessageId: "message-root",
+        reason: "thread_reply",
+      }),
+    ]);
+    expect(conversationMessages.map(classifyInboxMessage)).toEqual([
+      "action_required",
+      "action_required",
+    ]);
+  });
+
   it("creates one message for a task and its linked Auto Hunt dispatch", () => {
     const taskSession = {
       ...session("completed", "task-session"),

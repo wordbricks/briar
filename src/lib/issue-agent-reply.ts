@@ -1,4 +1,4 @@
-import type { HuntRun, IssueMessage } from "../types";
+import type { HuntRun, IssueMessage, OrganizationMember } from "../types";
 import type { AgentProvider } from "./project-llm";
 
 type IssueSession = {
@@ -41,15 +41,46 @@ export function agentReplyParentMessageId(
 }
 
 export function briarMentionAtCaret(body: string, caret: number) {
+  const mention = issueMentionAtCaret(body, caret);
+  if (!mention || !"briar".startsWith(mention.query.toLowerCase())) {
+    return null;
+  }
+  return { start: mention.start, end: mention.end };
+}
+
+export function issueMentionAtCaret(body: string, caret: number) {
   if (!Number.isInteger(caret) || caret < 0 || caret > body.length) return null;
   const match = body
     .slice(0, caret)
-    .match(/(^|[^\p{L}\p{N}_])@([\p{L}\p{N}_-]*)$/u);
-  if (!match || !"briar".startsWith(match[2].toLowerCase())) return null;
+    .match(/(^|[^\p{L}\p{N}_.-])@([\p{L}\p{N}_.-]*)$/u);
+  if (!match) return null;
   return {
     start: caret - match[2].length - 1,
     end: caret,
+    query: match[2],
   };
+}
+
+export function issueMentionHandle(
+  member: Pick<OrganizationMember, "email" | "userId">,
+) {
+  const localPart = member.email.split("@")[0]?.toLowerCase() ?? "";
+  const normalized = localPart
+    .normalize("NFKC")
+    .replace(/[^\p{L}\p{N}_.-]+/gu, "-")
+    .replace(/^[._-]+|[._-]+$/gu, "");
+  return (
+    normalized ||
+    member.userId.toLowerCase().replace(/[^a-z0-9_-]+/gu, "-")
+  );
+}
+
+export function mentionsIssueHandle(body: string, handle: string) {
+  const escaped = handle.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  return new RegExp(
+    `(^|[^\\p{L}\\p{N}_.-])@${escaped}(?=$|[^\\p{L}\\p{N}_.-])`,
+    "iu",
+  ).test(body);
 }
 
 export function providerForConversation(

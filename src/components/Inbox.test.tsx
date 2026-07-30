@@ -169,4 +169,60 @@ describe("Inbox", () => {
     expect(row?.querySelector(".inbox-message-time")).not.toBeNull();
     expect(row?.querySelector(".inbox-next-action")).toBeNull();
   });
+
+  it("shows mention and thread-reply context in conversation rows", async () => {
+    const messages: InboxMessageWithReadState[] = [
+      {
+        id: "conversation:mention",
+        kind: "conversation",
+        projectId: "project-1",
+        projectName: "Briar",
+        targetId: "run-1",
+        rootMessageId: "message-1",
+        title: "Review login behavior",
+        occurredAt: "2026-07-28T07:47:00.000Z",
+        version: "mention",
+        body: "@owner 확인해 주세요.",
+        authorName: "Member",
+        reason: "mention",
+        isUnread: true,
+      },
+      {
+        id: "conversation:reply",
+        kind: "conversation",
+        projectId: "project-1",
+        projectName: "Briar",
+        targetId: "run-1",
+        rootMessageId: "message-root",
+        title: "Review login behavior",
+        occurredAt: "2026-07-28T07:48:00.000Z",
+        version: "reply",
+        body: "재현 절차를 추가했습니다.",
+        authorName: "Member",
+        reason: "thread_reply",
+        isUnread: true,
+      },
+    ];
+
+    await act(async () =>
+      root.render(
+        <I18nProvider>
+          <Inbox
+            isSidebarOpen
+            messages={messages}
+            onMarkAllRead={vi.fn()}
+            onOpen={vi.fn()}
+            unreadCount={2}
+          />
+        </I18nProvider>,
+      ),
+    );
+
+    expect(container.textContent).toContain("Member님이 회원님을 멘션했습니다.");
+    expect(container.textContent).toContain(
+      "Member님이 회원님의 스레드에 답글을 남겼습니다.",
+    );
+    expect(container.textContent).toContain("@owner 확인해 주세요.");
+    expect(container.textContent).toContain("재현 절차를 추가했습니다.");
+  });
 });

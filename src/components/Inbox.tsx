@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import {
+  AtSign,
   BellRing,
   Bot,
   Check,
@@ -8,6 +9,7 @@ import {
   CircleAlert,
   Clock3,
   Inbox as InboxIcon,
+  MessageCircle,
   Siren,
 } from "lucide-react";
 
@@ -237,11 +239,17 @@ function InboxMessageRow({
           "inbox-message-icon grid size-9 shrink-0 place-items-center rounded-lg",
           category,
           message.kind,
-          message.status,
+          message.kind === "conversation" ? message.reason : message.status,
         )}
       >
         {message.kind === "session" ? (
           <Bot size={17} />
+        ) : message.kind === "conversation" ? (
+          message.reason === "mention" ? (
+            <AtSign size={17} />
+          ) : (
+            <MessageCircle size={17} />
+          )
         ) : category === "urgent" ? (
           <Siren size={17} />
         ) : category === "action_required" ? (
@@ -290,17 +298,22 @@ function messageTitle(
   t: (key: MessageKey, values?: Record<string, string | number>) => string,
   message: InboxMessageWithReadState,
 ) {
-  return message.kind === "issue"
-    ? message.title
-    : message.status === "completed"
-      ? t("inbox.sessionCompleted")
-      : t("inbox.sessionFailed");
+  if (message.kind === "issue") return message.title;
+  if (message.kind === "conversation") {
+    return message.reason === "mention"
+      ? t("inbox.conversationMention", { author: message.authorName })
+      : t("inbox.conversationThreadReply", { author: message.authorName });
+  }
+  return message.status === "completed"
+    ? t("inbox.sessionCompleted")
+    : t("inbox.sessionFailed");
 }
 
 function messageDescription(
   t: (key: MessageKey, values?: Record<string, string | number>) => string,
   message: InboxMessageWithReadState,
 ) {
+  if (message.kind === "conversation") return message.body;
   if (message.kind === "session") {
     if (message.status === "failed") {
       return message.error

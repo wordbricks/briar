@@ -1846,7 +1846,11 @@ export function useBriar(options: UseBriarOptions = {}) {
   const addIssueMessage = useCallback(
     async (
       runId: string,
-      input: { body: string; parentMessageId: string | null },
+      input: {
+        body: string;
+        parentMessageId: string | null;
+        mentionedUserIds?: string[];
+      },
       agentConversation: IssueAgentConversation | null = null,
     ): Promise<IssueMessageSendResult> => {
       const body = input.body.trim();
@@ -1914,6 +1918,8 @@ export function useBriar(options: UseBriarOptions = {}) {
           message = await createIssueMessage(token, activeProjectId, runId, {
             body: messageBody,
             parentMessageId,
+            mentionedUserIds:
+              conversation === null ? input.mentionedUserIds : [],
             agentConversationId: conversation?.conversationId ?? null,
           });
         }

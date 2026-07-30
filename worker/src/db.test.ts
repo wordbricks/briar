@@ -34,6 +34,7 @@ import {
   HuntClaimError,
   HuntTransitionError,
   listIssueAttachments,
+  listIssueConversationNotifications,
   listIssueMessages,
   listOrganizations,
   listOrganizationMembers,
@@ -438,6 +439,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db,
       await readFile(
         resolve("migrations/0040_run_execution_provider.sql"),
+        "utf8",
+      ),
+    );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0041_issue_message_mentions.sql"),
         "utf8",
       ),
     );
@@ -1792,6 +1800,103 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         createdAt: atMinute(29),
       }),
     ).resolves.toBeNull();
+  });
+
+  it("lists mentions and replies to a user's root messages for inbox delivery", async () => {
+    await executeSql(
+      db,
+      `
+      insert into user (id, name, email, emailVerified, createdAt, updatedAt)
+      values (
+        'conversation-member', 'Conversation Member',
+        'conversation@example.com', 1, '${atMinute(0)}', '${atMinute(0)}'
+      );
+      insert into briar_organization_members (
+        organization_id, user_id, role, created_at, updated_at
+      ) values (
+        '${projectId}', 'conversation-member', 'member',
+        '${atMinute(0)}', '${atMinute(0)}'
+      );`,
+    );
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 29, {
+        sourceKey: "inbox-conversation-run",
+        eventKey: "inbox-conversation-run:queued",
+      }),
+    );
+    const ownerRootId = "11111111-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    await createIssueMessage(db, {
+      id: ownerRootId,
+      projectId,
+      runId,
+      parentMessageId: null,
+      authorUserId: "owner",
+      authorAgentProvider: null,
+      body: "This is my thread.",
+      createdAt: atMinute(29.1),
+    });
+    await createIssueMessage(db, {
+      id: "22222222-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      projectId,
+      runId,
+      parentMessageId: ownerRootId,
+      authorUserId: "conversation-member",
+      authorAgentProvider: null,
+      body: "Replying to your thread.",
+      createdAt: atMinute(29.2),
+    });
+    await createIssueMessage(db, {
+      id: "33333333-cccc-4ccc-8ccc-cccccccccccc",
+      projectId,
+      runId,
+      parentMessageId: null,
+      authorUserId: "conversation-member",
+      authorAgentProvider: null,
+      body: "@owner please review this.",
+      mentionedUserIds: ["owner"],
+      createdAt: atMinute(29.3),
+    });
+    await createIssueMessage(db, {
+      id: "44444444-dddd-4ddd-8ddd-dddddddddddd",
+      projectId,
+      runId,
+      parentMessageId: ownerRootId,
+      authorUserId: "owner",
+      authorAgentProvider: null,
+      body: "My own reply should not notify me.",
+      mentionedUserIds: ["owner"],
+      createdAt: atMinute(29.4),
+    });
+
+    const notifications = await listIssueConversationNotifications(
+      db,
+      projectId,
+      "owner",
+    );
+    expect(notifications).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "33333333-cccc-4ccc-8ccc-cccccccccccc",
+          notification_reason: "mention",
+          root_message_id: "33333333-cccc-4ccc-8ccc-cccccccccccc",
+        }),
+        expect.objectContaining({
+          id: "22222222-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          notification_reason: "thread_reply",
+          root_message_id: ownerRootId,
+        }),
+      ]),
+    );
+    expect(
+      notifications.some(
+        (notification) =>
+          notification.id === "44444444-dddd-4ddd-8ddd-dddddddddddd",
+      ),
+    ).toBe(false);
+
+    await removeOrganizationMember(db, projectId, "conversation-member");
   });
 
   it("completes a local workflow without staging or production", async () => {

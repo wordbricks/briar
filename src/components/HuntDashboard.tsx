@@ -86,7 +86,11 @@ import {
   maxIssueAttachmentCount,
   validateIssueAttachments,
 } from "../lib/issue-attachments";
-import { briarMentionAtCaret } from "../lib/issue-agent-reply";
+import {
+  issueMentionAtCaret,
+  issueMentionHandle,
+  mentionsIssueHandle,
+} from "../lib/issue-agent-reply";
 import type {
   CreateIssueInput,
   DashboardPayload,
@@ -96,6 +100,7 @@ import type {
   IssueAttachment,
   IssueMessage,
   IssueMessageSendResult,
+  OrganizationMember,
   ProjectAgent,
   RunEvidence,
   UpdateIssueInput,
@@ -185,7 +190,11 @@ export function HuntDashboard({
   onRequestedRunOpen?: () => void;
   onSendIssueMessage: (
     runId: string,
-    input: { body: string; parentMessageId: string | null },
+    input: {
+      body: string;
+      parentMessageId: string | null;
+      mentionedUserIds?: string[];
+    },
   ) => Promise<IssueMessageSendResult>;
   requestedRunId?: string | null;
   processingIssueIds?: ReadonlySet<string>;
@@ -500,6 +509,7 @@ export function HuntDashboard({
           onLoadAttachment={onLoadAttachment}
           onLoadIssueMessages={() => onLoadIssueMessages(selected.id)}
           onLoadRunEvidence={() => onLoadRunEvidence(selected.id)}
+          mentionMembers={dashboard?.members ?? []}
           onMove={(placement) => onMoveRun(selected.id, placement)}
           onRetry={() => onRetryRun(selected.id)}
           onSendIssueMessage={(input) => onSendIssueMessage(selected.id, input)}
@@ -1960,6 +1970,7 @@ export function RunPage({
   onLoadAttachment,
   onLoadIssueMessages,
   onLoadRunEvidence,
+  mentionMembers = [],
   onMove,
   onRetry,
   onSendIssueMessage,
@@ -1979,11 +1990,13 @@ export function RunPage({
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onLoadIssueMessages: () => Promise<IssueMessage[]>;
   onLoadRunEvidence: () => Promise<RunEvidence[]>;
+  mentionMembers?: OrganizationMember[];
   onMove: (placement: HuntRunPlacement) => Promise<unknown>;
   onRetry: () => Promise<unknown>;
   onSendIssueMessage: (input: {
     body: string;
     parentMessageId: string | null;
+    mentionedUserIds?: string[];
   }) => Promise<IssueMessageSendResult>;
   onUpdateIssue?: (input: UpdateIssueInput) => Promise<unknown>;
   performedAgentName?: string | null;
@@ -2311,6 +2324,7 @@ export function RunPage({
                   tabIndex={0}
                 />
                 <IssueConversation
+                  mentionMembers={mentionMembers}
                   onLoad={onLoadIssueMessages}
                   onSend={onSendIssueMessage}
                   run={run}
@@ -2908,14 +2922,17 @@ function RunEvidencePanel({
 }
 
 function IssueConversation({
+  mentionMembers,
   onLoad,
   onSend,
   run,
 }: {
+  mentionMembers: OrganizationMember[];
   onLoad: () => Promise<IssueMessage[]>;
   onSend: (input: {
     body: string;
     parentMessageId: string | null;
+    mentionedUserIds?: string[];
   }) => Promise<IssueMessageSendResult>;
   run: HuntRun;
 }) {
@@ -3006,6 +3023,7 @@ function IssueConversation({
   const sendMessage = async (
     body: string,
     parentMessageId: string | null,
+    mentionedUserIds: string[],
   ) => {
     const appendMessage = (message: IssueMessage) =>
       setMessages((current) => [
@@ -3016,7 +3034,11 @@ function IssueConversation({
         ),
         message,
       ]);
-    const result = await onSend({ body, parentMessageId });
+    const result = await onSend({
+      body,
+      parentMessageId,
+      mentionedUserIds,
+    });
     appendMessage(result.message);
     if (!result.agentReply) return;
     const replyThreadId =
@@ -3099,7 +3121,10 @@ function IssueConversation({
         )}
       </div>
       <MessageComposer
-        onSubmit={(body) => sendMessage(body, null)}
+        mentionMembers={mentionMembers}
+        onSubmit={(body, mentionedUserIds) =>
+          sendMessage(body, null, mentionedUserIds)
+        }
         placeholder={t("run.messagePlaceholder", { title: run.title })}
       />
       <div
@@ -3153,7 +3178,10 @@ function IssueConversation({
           {activeThread && (
             <MessageComposer
               compact
-              onSubmit={(body) => sendMessage(body, activeThread.id)}
+              mentionMembers={mentionMembers}
+              onSubmit={(body, mentionedUserIds) =>
+                sendMessage(body, activeThread.id, mentionedUserIds)
+              }
               placeholder={t("run.threadPlaceholder")}
             />
           )}
@@ -3324,11 +3352,13 @@ function MessageAvatar({ message }: { message: IssueMessage }) {
 
 function MessageComposer({
   compact = false,
+  mentionMembers,
   onSubmit,
   placeholder,
 }: {
   compact?: boolean;
-  onSubmit: (body: string) => Promise<void>;
+  mentionMembers: OrganizationMember[];
+  onSubmit: (body: string, mentionedUserIds: string[]) => Promise<void>;
   placeholder: string;
 }) {
   const { t } = useI18n();
@@ -3338,25 +3368,61 @@ function MessageComposer({
   const [caret, setCaret] = useState(0);
   const [composerFocused, setComposerFocused] = useState(false);
   const [mentionDismissed, setMentionDismissed] = useState(false);
+  const [selectedMentions, setSelectedMentions] = useState<
+    Record<string, string>
+  >({});
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const mentionListId = useId();
-  const activeMention = briarMentionAtCaret(body, caret);
+  const activeMention = issueMentionAtCaret(body, caret);
+  const mentionSuggestions = activeMention
+    ? [
+        ...("briar".startsWith(activeMention.query.toLowerCase())
+          ? [
+              {
+                handle: "briar",
+                image: null,
+                name: "Briar",
+                userId: null,
+              },
+            ]
+          : []),
+        ...mentionMembers
+          .map((member) => ({
+            handle: issueMentionHandle(member),
+            image: member.image,
+            name: member.name,
+            userId: member.userId,
+          }))
+          .filter((member) =>
+            member.handle.startsWith(activeMention.query.toLowerCase()),
+          ),
+      ]
+    : [];
   const showsMentionSuggestion =
-    composerFocused && !mentionDismissed && activeMention !== null;
+    composerFocused &&
+    !mentionDismissed &&
+    activeMention !== null &&
+    mentionSuggestions.length > 0;
   const submit = async (event?: FormEvent) => {
     event?.preventDefault();
     const nextBody = body.trim();
     if (!nextBody || sending) return;
+    const nextMentionedUserIds = Object.entries(selectedMentions)
+      .filter(([, handle]) => mentionsIssueHandle(nextBody, handle))
+      .map(([userId]) => userId);
+    const previousMentions = selectedMentions;
     setSending(true);
     setError(null);
     setBody("");
     setCaret(0);
     setMentionDismissed(false);
+    setSelectedMentions({});
     try {
-      await onSubmit(nextBody);
+      await onSubmit(nextBody, nextMentionedUserIds);
     } catch (caught) {
       setBody(nextBody);
       setCaret(nextBody.length);
+      setSelectedMentions(previousMentions);
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
       setSending(false);
@@ -3380,16 +3446,25 @@ function MessageComposer({
       setCaret(cursor);
     });
   };
-  const completeBriarMention = () => {
+  const completeMention = (suggestion: (typeof mentionSuggestions)[number]) => {
     const textarea = textareaRef.current;
     if (!textarea || !activeMention) return;
-    const nextBody = `${body.slice(0, activeMention.start)}@briar ${body.slice(
-      activeMention.end,
-    )}`;
-    const nextCaret = activeMention.start + "@briar ".length;
+    const insertedMention = `@${suggestion.handle} `;
+    const nextBody = `${body.slice(
+      0,
+      activeMention.start,
+    )}${insertedMention}${body.slice(activeMention.end)}`;
+    const nextCaret = activeMention.start + insertedMention.length;
     setBody(nextBody);
     setCaret(nextCaret);
     setMentionDismissed(false);
+    if (suggestion.userId) {
+      const userId = suggestion.userId;
+      setSelectedMentions((current) => ({
+        ...current,
+        [userId]: suggestion.handle,
+      }));
+    }
     requestAnimationFrame(() => {
       textarea.focus();
       textarea.setSelectionRange(nextCaret, nextCaret);
@@ -3413,18 +3488,30 @@ function MessageComposer({
           id={mentionListId}
           role="listbox"
         >
-          <button
-            aria-selected="true"
-            onClick={completeBriarMention}
-            onMouseDown={(event) => event.preventDefault()}
-            role="option"
-            type="button"
-          >
-            <span aria-hidden="true">
-              <Bot size={14} />
-            </span>
-            <strong>@briar</strong>
-          </button>
+          {mentionSuggestions.map((suggestion, index) => (
+            <button
+              aria-selected={index === 0}
+              key={suggestion.userId ?? "briar"}
+              onClick={() => completeMention(suggestion)}
+              onMouseDown={(event) => event.preventDefault()}
+              role="option"
+              type="button"
+            >
+              <span aria-hidden="true">
+                {suggestion.userId ? (
+                  suggestion.image ? (
+                    <img alt="" src={suggestion.image} />
+                  ) : (
+                    suggestion.name.trim().charAt(0).toUpperCase() || "?"
+                  )
+                ) : (
+                  <Bot size={14} />
+                )}
+              </span>
+              <strong>@{suggestion.handle}</strong>
+              {suggestion.userId ? <small>{suggestion.name}</small> : null}
+            </button>
+          ))}
         </div>
       )}
       <textarea
@@ -3446,7 +3533,7 @@ function MessageComposer({
               (event.key === "Enter" && !event.metaKey && !event.ctrlKey))
           ) {
             event.preventDefault();
-            completeBriarMention();
+            completeMention(mentionSuggestions[0]);
             return;
           }
           if (showsMentionSuggestion && event.key === "Escape") {

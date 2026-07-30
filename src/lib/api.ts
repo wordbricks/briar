@@ -915,6 +915,7 @@ export async function createIssueMessage(
   input: {
     body: string;
     parentMessageId: string | null;
+    mentionedUserIds?: string[];
     agentConversationId?: string | null;
   },
 ) {
