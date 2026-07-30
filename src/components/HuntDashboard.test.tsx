@@ -1290,9 +1290,20 @@ describe("HuntDashboard", () => {
     );
     expect(threadContent?.scrollTop).toBe(480);
 
+    const threadComposer = container.querySelector<HTMLElement>(
+      ".issue-thread-drawer .issue-message-composer",
+    );
     const threadTextarea = container.querySelector<HTMLTextAreaElement>(
       ".issue-thread-drawer .issue-message-composer textarea",
     );
+    expect(
+      threadComposer?.querySelector(".issue-composer-formatting"),
+    ).toBeNull();
+    expect(
+      threadComposer?.querySelector(".issue-composer-link"),
+    ).not.toBeNull();
+    expect(threadComposer?.querySelectorAll("footer button")).toHaveLength(2);
+    expect(threadTextarea?.placeholder).toBe("답장 남기기…");
     await act(async () => {
       if (!threadTextarea) return;
       Object.getOwnPropertyDescriptor(
@@ -1396,13 +1407,18 @@ describe("HuntDashboard", () => {
       );
     });
 
-    const mentionButton = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="멘션"]',
-    );
     const textarea = container.querySelector<HTMLTextAreaElement>(
       ".issue-message-composer textarea",
     );
-    await act(async () => mentionButton?.click());
+    await act(async () => {
+      textarea?.focus();
+      if (!textarea) return;
+      Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )?.set?.call(textarea, "@briar ");
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
     expect(textarea?.value).toBe("@briar ");
 
     await act(async () => {
