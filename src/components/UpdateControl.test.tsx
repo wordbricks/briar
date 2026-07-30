@@ -3,7 +3,11 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { UPDATE_CHECK_INTERVAL_MS, UpdateControl } from "./UpdateControl";
+import {
+  AppUpdateProvider,
+  UPDATE_CHECK_INTERVAL_MS,
+} from "./AppUpdateProvider";
+import { UpdateControl } from "./UpdateControl";
 
 const { check, relaunch } = vi.hoisted(() => ({
   check: vi.fn(),
@@ -31,10 +35,16 @@ describe("UpdateControl", () => {
     vi.useRealTimers();
   });
 
+  const control = (
+    <AppUpdateProvider>
+      <UpdateControl />
+    </AppUpdateProvider>
+  );
+
   it("stays hidden when the signed channel is current", async () => {
     check.mockResolvedValue(null);
     const root = createRoot(container);
-    await act(async () => root.render(<UpdateControl />));
+    await act(async () => root.render(control));
     await act(async () => {
       await Promise.resolve();
     });
@@ -47,7 +57,7 @@ describe("UpdateControl", () => {
     const downloadAndInstall = vi.fn().mockResolvedValue(undefined);
     check.mockResolvedValue({ version: "1.0.1", downloadAndInstall });
     const root = createRoot(container);
-    await act(async () => root.render(<UpdateControl />));
+    await act(async () => root.render(control));
     await act(async () => {
       await Promise.resolve();
     });
@@ -76,7 +86,7 @@ describe("UpdateControl", () => {
     );
     check.mockResolvedValue({ version: "1.0.1", downloadAndInstall });
     const root = createRoot(container);
-    await act(async () => root.render(<UpdateControl />));
+    await act(async () => root.render(control));
     await act(async () => {
       await Promise.resolve();
     });
@@ -102,7 +112,7 @@ describe("UpdateControl", () => {
   it("rechecks the signed channel on a fixed interval", async () => {
     check.mockResolvedValue(null);
     const root = createRoot(container);
-    await act(async () => root.render(<UpdateControl />));
+    await act(async () => root.render(control));
     await act(async () => {
       await Promise.resolve();
     });
@@ -141,7 +151,7 @@ describe("UpdateControl", () => {
   it("stops rechecking after unmount", async () => {
     check.mockResolvedValue(null);
     const root = createRoot(container);
-    await act(async () => root.render(<UpdateControl />));
+    await act(async () => root.render(control));
     await act(async () => {
       await Promise.resolve();
     });
