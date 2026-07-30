@@ -28,6 +28,7 @@ import {
   TranscriptLimitError,
   unbindExecutionWorker,
   updateExecutionWorkerConcurrency,
+  updateExecutionWorkerLabel,
   updateProjectExecutionWorkerPolicy,
   WorkerConflictError,
   workerStateAt,
@@ -291,6 +292,37 @@ describe("detached execution workers", () => {
     expect(
       organizationWorkers[0].bindings.map((binding) => binding.projectId),
     ).toEqual([projectId, secondProjectId]);
+  });
+
+  it("renames a device and all of its project bindings together", async () => {
+    const first = await register("rename");
+    const second = await bindExecutionWorkerProject(db, secondProjectId, {
+      id: "worker-rename-second",
+      organizationId: projectId,
+      ownerUserId: "owner",
+      deviceIdentityHash: fingerprint("rename"),
+      agentProvider: "codex",
+      versions: {},
+      observedAt: atMinute(2),
+    });
+
+    const renamed = await updateExecutionWorkerLabel(
+      db,
+      first.device.id,
+      "new-hostname",
+      atMinute(3),
+    );
+
+    expect(renamed?.label).toBe("new-hostname");
+    await expect(
+      executionWorkerBindingForProject(db, first.device.id, projectId),
+    ).resolves.toMatchObject({ label: "new-hostname" });
+    await expect(
+      executionWorkerBindingForProject(db, first.device.id, secondProjectId),
+    ).resolves.toMatchObject({
+      id: second.worker.id,
+      label: "new-hostname",
+    });
   });
 
   it("binds one organization device to several projects", async () => {

@@ -2925,6 +2925,32 @@ fn inspect_execution_workers(
     inspect_execution_workers_at(&cli_config_path(&app)?, project_ids)
 }
 
+#[tauri::command]
+fn sync_execution_worker_labels(app: AppHandle) -> Result<serde_json::Value, String> {
+    let resource_directory = app
+        .path()
+        .resource_dir()
+        .map_err(|error| error.to_string())?;
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    sync_auto_hunt_assets(&resource_directory, &home)?;
+    let bun = bundled_bun_binary()
+        .ok_or_else(|| "Briar에 포함된 Bun runtime을 찾지 못했습니다.".to_string())?;
+    let cli = home.join(".local/share/briar/briar.js");
+    let output = Command::new(&bun)
+        .arg(&cli)
+        .args(["worker", "sync-label"])
+        .env("PATH", cli_execution_path(&home)?)
+        .output()
+        .map_err(|error| format!("Worker 이름 동기화를 시작하지 못했습니다: {error}"))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        return Err(if stderr.is_empty() { stdout } else { stderr });
+    }
+    serde_json::from_slice(&output.stdout)
+        .map_err(|error| format!("Worker 이름 동기화 결과를 읽지 못했습니다: {error}"))
+}
+
 fn inspect_execution_workers_at(
     config_path: &Path,
     project_ids: Vec<String>,
@@ -5142,6 +5168,7 @@ pub fn run() {
             auto_hunt_health,
             repair_auto_hunt,
             configure_execution_worker,
+            sync_execution_worker_labels,
             inspect_execution_workers
         ])
         .run(tauri::generate_context!())

@@ -175,6 +175,7 @@ import {
   workerStateAt,
   unbindExecutionWorker,
   updateExecutionWorkerConcurrency,
+  updateExecutionWorkerLabel,
   updateProjectExecutionWorkerPolicy,
 } from "./workers";
 import { serveRelease } from "./releases";
@@ -792,6 +793,12 @@ const workerHeartbeatSchema = z
     readinessState: z.enum(["ready", "busy", "needs_attention"]).optional(),
     readinessDetail: z.string().trim().max(500).nullable().optional(),
     capabilities: z.record(z.string().max(64), z.unknown()).optional(),
+  })
+  .strict();
+
+const workerLabelSchema = z
+  .object({
+    label: z.string().trim().min(1).max(100),
   })
   .strict();
 
@@ -3810,6 +3817,30 @@ async function route(
     // runs whose holder stopped reporting.
     const reaped = await reapStalledHuntRuns(db, binding.project_id, observedAt);
     return json({ worker: workerJson(worker, observedAt), reaped });
+  }
+
+  const workerLabelMatch = pathname.match(
+    /^\/workers\/([0-9a-zA-Z-]+)\/label$/u,
+  );
+  if (workerLabelMatch && request.method === "PATCH") {
+    const principal = await requireWorkerCredential(db, request);
+    const binding = await executionWorkerBindingById(
+      db,
+      principal.deviceId,
+      workerLabelMatch[1],
+    );
+    if (!binding || binding.state === "disabled") {
+      throw new HttpError(403, "Worker is not enabled for this project");
+    }
+    const input = workerLabelSchema.parse(await readJson(request));
+    const device = await updateExecutionWorkerLabel(
+      db,
+      principal.deviceId,
+      input.label,
+      new Date().toISOString(),
+    );
+    if (!device) throw new HttpError(409, "Worker is disabled");
+    return json({ deviceId: device.id, label: device.label });
   }
 
   const leaseMatch = pathname.match(/^\/runs\/([0-9a-f-]+)\/lease$/u);
