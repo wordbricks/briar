@@ -164,3 +164,53 @@
   color: var(--foreground);
   background: var(--card);
 }
+
+.dark .agent-usage-status-trigger,
+.dark .worker-status-trigger,
+.dark .app-version-trigger,
+.dark .health-trigger {
+  color: var(--muted-foreground);
+}
+
+.dark .agent-usage-status-trigger:hover,
+.dark .agent-usage-status-trigger[aria-expanded="true"],
+.dark .worker-status-trigger:hover,
+.dark .worker-status-trigger[aria-expanded="true"],
+.dark .app-version-trigger:hover,
+.dark .app-version-trigger[aria-expanded="true"] {
+  color: var(--foreground);
+  background: var(--secondary);
+}
+
+.dark .agent-usage-status-provider > small,
+.dark .agent-usage-meter > strong,
+.dark .worker-slot-usage,
+.dark .worker-slot-usage > small {
+  color: var(--muted-foreground);
+}
+
+.dark .health-item {
+  border-color: var(--border);
+}
+
+.dark .health-item strong {
+  color: var(--foreground);
+}
+
+.dark .health-item em,
+.dark .health-actions button {
+  color: var(--muted-foreground);
+}
+
+.dark .health-actions button:hover:not(:disabled) {
+  color: var(--accent-foreground);
+  border-color: var(--input);
+  background: var(--accent);
+}
+
+.dark .health-error,
+.dark .health-issues {
+  color: var(--foreground);
+  border-color: color-mix(in srgb, var(--destructive) 36%, var(--border));
+  background: color-mix(in srgb, var(--destructive) 10%, var(--card));
+}
