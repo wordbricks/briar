@@ -34,6 +34,7 @@ export const copy = {
       brandHome: "Briar 홈",
       mainMenu: "주요 메뉴",
       productPreview: "Briar 작업 대시보드 미리보기",
+      heroArtwork: "사람이 Briar 작업 흐름을 이끄는 리소그래프 일러스트",
       securityVisual: "Briar 보안 구조",
       sendCommand: "에이전트에게 전송",
       macDownload: "Mac용 Briar 최신 버전 다운로드",
@@ -223,6 +224,8 @@ export const copy = {
       brandHome: "Briar home",
       mainMenu: "Main navigation",
       productPreview: "Preview of the Briar task dashboard",
+      heroArtwork:
+        "Risograph illustration of a person guiding a Briar workflow",
       securityVisual: "Briar security architecture",
       sendCommand: "Send to agent",
       macDownload: "Download the latest Briar for Mac",
