@@ -2024,9 +2024,13 @@ async function workerService(action: "install" | "uninstall") {
     );
   }
   const briarBinary = value("--briar-binary") ?? process.execPath;
+  const runtimeBinary = value("--runtime-binary");
+  const cliScript = value("--cli-script");
   const definition = serviceDefinition({
     projectId: project.id,
     briarBinary,
+    runtimeBinary,
+    cliScript,
     workingDirectory: project.repositoryPath,
   });
   const command =
@@ -2146,7 +2150,7 @@ const usage = `Briar CLI
   briar worker unregister [--project <uuid>]
   briar worker [--project <uuid>] [--max-issues <n>] [--once]
   briar worker status [--project <uuid>]
-  briar worker install-service [--project <uuid>] [--briar-binary <path>]
+  briar worker install-service [--project <uuid>] [--briar-binary <path>] [--runtime-binary <path> --cli-script <path>]
   briar worker uninstall-service [--project <uuid>]
 
 Environment:

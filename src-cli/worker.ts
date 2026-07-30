@@ -317,6 +317,13 @@ export type ServiceDefinition = {
   logPath: string;
 };
 
+type WorkerServiceCommand = {
+  projectId: string;
+  briarBinary: string;
+  runtimeBinary?: string;
+  cliScript?: string;
+};
+
 export function serviceLabel(projectId: string): string {
   return `dev.briar.worker.${projectId}`;
 }
@@ -328,33 +335,35 @@ export function workerLogPath(projectId: string, home = homedir()): string {
 export function launchdPlist(input: {
   projectId: string;
   briarBinary: string;
+  runtimeBinary?: string;
+  cliScript?: string;
   workingDirectory: string;
   logPath: string;
 }): string {
   const label = serviceLabel(input.projectId);
+  const programArguments = workerServiceCommand(input)
+    .map((argument) => `    <string>${plistText(argument)}</string>`)
+    .join("\n");
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>${label}</string>
+  <string>${plistText(label)}</string>
   <key>ProgramArguments</key>
   <array>
-    <string>${input.briarBinary}</string>
-    <string>worker</string>
-    <string>--project</string>
-    <string>${input.projectId}</string>
+${programArguments}
   </array>
   <key>WorkingDirectory</key>
-  <string>${input.workingDirectory}</string>
+  <string>${plistText(input.workingDirectory)}</string>
   <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>
   <true/>
   <key>StandardOutPath</key>
-  <string>${input.logPath}</string>
+  <string>${plistText(input.logPath)}</string>
   <key>StandardErrorPath</key>
-  <string>${input.logPath}</string>
+  <string>${plistText(input.logPath)}</string>
 </dict>
 </plist>
 `;
@@ -363,15 +372,18 @@ export function launchdPlist(input: {
 export function systemdUnit(input: {
   projectId: string;
   briarBinary: string;
+  runtimeBinary?: string;
+  cliScript?: string;
   workingDirectory: string;
 }): string {
+  const command = workerServiceCommand(input).join(" ");
   return `[Unit]
 Description=Briar execution worker (${input.projectId})
 After=network-online.target
 
 [Service]
 Type=simple
-ExecStart=${input.briarBinary} worker --project ${input.projectId}
+ExecStart=${command}
 WorkingDirectory=${input.workingDirectory}
 Restart=always
 RestartSec=10
@@ -388,6 +400,8 @@ WantedBy=default.target
 export function serviceDefinition(input: {
   projectId: string;
   briarBinary: string;
+  runtimeBinary?: string;
+  cliScript?: string;
   workingDirectory: string;
   home?: string;
   platform?: string;
@@ -404,6 +418,8 @@ export function serviceDefinition(input: {
       contents: launchdPlist({
         projectId: input.projectId,
         briarBinary: input.briarBinary,
+        runtimeBinary: input.runtimeBinary,
+        cliScript: input.cliScript,
         workingDirectory: input.workingDirectory,
         logPath,
       }),
@@ -420,6 +436,8 @@ export function serviceDefinition(input: {
       contents: systemdUnit({
         projectId: input.projectId,
         briarBinary: input.briarBinary,
+        runtimeBinary: input.runtimeBinary,
+        cliScript: input.cliScript,
         workingDirectory: input.workingDirectory,
       }),
       enableCommand: ["systemctl", "--user", "enable", "--now", unitName],
@@ -431,6 +449,33 @@ export function serviceDefinition(input: {
     "이 운영체제에서는 워커 서비스 설치를 지원하지 않습니다. `briar worker --project <id>`를 직접 실행하세요.",
   );
 }
+
+const workerServiceCommand = (input: WorkerServiceCommand): string[] => {
+  const hasRuntimeBinary = Boolean(input.runtimeBinary);
+  const hasCliScript = Boolean(input.cliScript);
+  if (hasRuntimeBinary !== hasCliScript) {
+    throw new Error(
+      "Worker runtime binary and CLI script must be configured together",
+    );
+  }
+  return hasRuntimeBinary
+    ? [
+        input.runtimeBinary!,
+        input.cliScript!,
+        "worker",
+        "--project",
+        input.projectId,
+      ]
+    : [input.briarBinary, "worker", "--project", input.projectId];
+};
+
+const plistText = (value: string) =>
+  value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
 
 /** Write the unit file with restrictive permissions. Idempotent. */
 export async function writeServiceDefinition(definition: ServiceDefinition) {

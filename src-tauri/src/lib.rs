@@ -2764,7 +2764,12 @@ fn configure_execution_worker(
     let bun = bundled_bun_binary()
         .ok_or_else(|| "Briar에 포함된 Bun runtime을 찾지 못했습니다.".to_string())?;
     let cli = home.join(".local/share/briar/briar.js");
-    let launcher = home.join(".local/bin/briar");
+    let bun_path = bun
+        .to_str()
+        .ok_or_else(|| "Briar Bun runtime 경로가 올바르지 않습니다.".to_string())?;
+    let cli_path = cli
+        .to_str()
+        .ok_or_else(|| "Briar CLI 경로가 올바르지 않습니다.".to_string())?;
 
     let run = |arguments: &[&str]| -> Result<String, String> {
         let output = Command::new(&bun)
@@ -2792,10 +2797,10 @@ fn configure_execution_worker(
             "install-service",
             "--project",
             &project_id,
-            "--briar-binary",
-            launcher
-                .to_str()
-                .ok_or_else(|| "Briar CLI 경로가 올바르지 않습니다.".to_string())?,
+            "--runtime-binary",
+            bun_path,
+            "--cli-script",
+            cli_path,
         ])?;
     } else {
         run(&["worker", "uninstall-service", "--project", &project_id])?;
