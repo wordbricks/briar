@@ -748,6 +748,22 @@ const queuedAttachmentSchema = z.object({
   url: z.string().startsWith("/"),
 });
 
+const queuedIssueMessageSchema = z.object({
+  id: z.string().uuid(),
+  runId: z.string().uuid(),
+  parentMessageId: z.string().uuid().nullable(),
+  body: z.string().min(1),
+  author: z.object({
+    id: z.string().nullable(),
+    name: z.string().min(1),
+    image: z.string().nullable(),
+    provider: z.enum(["codex", "claude", "grok"]).nullable(),
+  }),
+  replyCount: z.number().int().nonnegative(),
+  createdAt: z.string().datetime({ offset: true }),
+  updatedAt: z.string().datetime({ offset: true }),
+});
+
 const queuedIssueSchema = z.object({
   runId: z.string().uuid(),
   runNumber: z.number().int().positive(),
@@ -762,6 +778,7 @@ const queuedIssueSchema = z.object({
   context: z.record(z.string(), z.unknown()).nullable(),
   workflow: workflowConfigSchema,
   attachments: z.array(queuedAttachmentSchema).max(5).default([]),
+  messages: z.array(queuedIssueMessageSchema).default([]),
   claimToken: z.string().startsWith("briar_claim_"),
   claimedBy: z.string().min(1),
   claimedAt: z.string().datetime({ offset: true }),
@@ -784,6 +801,7 @@ async function downloadClaimAttachment(
   projectId: string,
   runId: string,
   attachment: z.infer<typeof queuedAttachmentSchema>,
+  storageDirectory = configDirectory,
 ) {
   const expectedPrefix = `/projects/${projectId}/runs/${runId}/attachments/`;
   if (!attachment.url.startsWith(expectedPrefix)) {
@@ -800,7 +818,7 @@ async function downloadClaimAttachment(
   if (bytes.byteLength !== attachment.byteSize) {
     throw new Error("Attachment size did not match its metadata");
   }
-  const directory = join(configDirectory, "attachments", runId);
+  const directory = join(storageDirectory, "attachments", runId);
   await mkdir(directory, { recursive: true, mode: 0o700 });
   const path = join(
     directory,
@@ -1378,18 +1396,7 @@ const workerBindingSchema = workerRegistrationSchema.omit({
   workerToken: true,
 });
 
-const claimedRunSchema = z.object({
-  runId: z.string().uuid(),
-  runNumber: z.number().int().positive(),
-  currentAttempt: z.number().int().positive(),
-  source: z.enum(autoHuntSources),
-  sourceKey: z.string().min(1),
-  title: z.string().min(1),
-  description: z.string().nullable(),
-  repository: z.string().min(1),
-  workflow: workflowConfigSchema,
-  claimToken: z.string().startsWith("briar_claim_"),
-  leaseExpiresAt: z.string(),
+const claimedRunSchema = queuedIssueSchema.extend({
   agent: z
     .object({
       id: z.string().uuid(),
@@ -1474,11 +1481,45 @@ async function runClaimedIssueInRuntime(
   if (!agentBinary) {
     throw new Error(`${binaryName} coding agent is not installed on this Worker`);
   }
+  const attachments = await Promise.all(
+    issue.attachments.map(async (attachment) => {
+      try {
+        return {
+          ...attachment,
+          localPath: await downloadClaimAttachment(
+            config.apiUrl,
+            workerToken,
+            project.id,
+            issue.runId,
+            attachment,
+            runtimeDirectory,
+          ),
+          downloadError: null,
+        };
+      } catch (error) {
+        return {
+          ...attachment,
+          localPath: null,
+          downloadError: error instanceof Error ? error.message : String(error),
+        };
+      }
+    }),
+  );
   const prompt = detachedAgentPrompt({
     agent: issue.agent,
-    sourceKey: issue.sourceKey,
-    title: issue.title,
-    description: issue.description,
+    snapshot: {
+      runId: issue.runId,
+      runNumber: issue.runNumber,
+      source: issue.source,
+      sourceKey: issue.sourceKey,
+      title: issue.title,
+      issueDescription: issue.description,
+      priority: issue.priority,
+      sourceCreatedAt: issue.sourceCreatedAt,
+      context: issue.context,
+      attachments,
+      conversation: issue.messages,
+    },
     workspacePath: workspace.path,
   });
   const fullAccess = activeProject.autoHunt?.sandbox?.fullAccess ?? true;

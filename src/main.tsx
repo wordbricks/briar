@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
+import { AppUpdateProvider } from "./components/AppUpdateProvider";
 import { DevelopmentBadge } from "./components/DevelopmentBadge";
 import { NativeLaunchIntro } from "./components/NativeLaunchIntro";
 import { TooltipProvider } from "./components/ui/tooltip";
@@ -23,7 +24,13 @@ createRoot(document.getElementById("root")!).render(
     <I18nProvider>
       <TooltipProvider delayDuration={200}>
         <AppErrorBoundary>
-          {nativeLaunchIntro ? <NativeLaunchIntro /> : <App />}
+          {nativeLaunchIntro ? (
+            <NativeLaunchIntro />
+          ) : (
+            <AppUpdateProvider>
+              <App />
+            </AppUpdateProvider>
+          )}
         </AppErrorBoundary>
         {import.meta.env.DEV && !nativeLaunchIntro ? <DevelopmentBadge /> : null}
       </TooltipProvider>

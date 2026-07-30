@@ -77,4 +77,30 @@ describe("ProjectRepositorySetupDialog", () => {
 
     await act(async () => root.unmount());
   });
+
+  it("directs an in-progress GitHub login to the browser", async () => {
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <ProjectRepositorySetupDialog
+          error={null}
+          loading
+          onClose={vi.fn()}
+          onInstallGithub={vi.fn()}
+          onLoginGithub={vi.fn()}
+          onRefresh={vi.fn()}
+          projectName="Briar"
+          readiness={{
+            ...readiness,
+            ghInstalled: true,
+            ghVersion: "gh version 2.96.0",
+          }}
+        />,
+      );
+    });
+
+    expect(container.textContent).toContain("브라우저에서 로그인 완료");
+
+    await act(async () => root.unmount());
+  });
 });

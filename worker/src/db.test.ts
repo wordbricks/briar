@@ -24,6 +24,7 @@ import {
   deleteIssue,
   deleteProjectAgentSchedule,
   deleteProject,
+  findProjectIdByAgentTokenHash,
   getProject,
   getProjectSettings,
   getHuntRunForProject,
@@ -37,6 +38,7 @@ import {
   listOrganizations,
   listOrganizationMembers,
   isOrganizationHandleAvailable,
+  issueProjectAgentToken,
   listProjects,
   listProjectAgents,
   listProjectAgentScheduleRuns,
@@ -49,12 +51,14 @@ import {
   recordHuntEvent,
   recordRunEvidence,
   recordQaResult,
+  removeOrganizationMember,
   renewProjectAgentScheduleRunLease,
   updateProjectSettings,
   updateProjectAgent,
   updateProjectAgentSchedule,
   updateOrganization,
   updateOrganizationLogo,
+  updateOrganizationMemberRole,
   updateIssue,
 } from "./db";
 
@@ -420,6 +424,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db,
       await readFile(
         resolve("migrations/0038_project_execution_worker_policies.sql"),
+        "utf8",
+      ),
+    );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0039_project_agent_tokens.sql"),
         "utf8",
       ),
     );
@@ -1547,12 +1558,37 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     expect(projects[0]?.member_role).toBe("member");
     expect(await getProject(db, projectId, "member")).not.toBeNull();
     await expect(deleteProject(db, projectId, "member")).resolves.toBe(false);
+    const memberTokenHash = "e".repeat(64);
+    await expect(
+      issueProjectAgentToken(db, projectId, "member", memberTokenHash),
+    ).resolves.toBe(true);
+    await expect(
+      findProjectIdByAgentTokenHash(db, memberTokenHash),
+    ).resolves.toBe(projectId);
+    await expect(
+      issueProjectAgentToken(db, projectId, "not-a-member", "f".repeat(64)),
+    ).resolves.toBe(false);
 
+    await expect(
+      updateOrganizationMemberRole(db, projectId, "member", "admin"),
+    ).resolves.toBe(true);
     const members = await listOrganizationMembers(db, projectId);
     expect(members.map((member) => member.email)).toEqual([
       "owner@example.com",
       "member@example.com",
     ]);
+    expect(members.find((member) => member.user_id === "member")?.role).toBe(
+      "admin",
+    );
+    await expect(
+      updateOrganizationMemberRole(db, projectId, "owner", "member"),
+    ).resolves.toBe(false);
+    await expect(
+      removeOrganizationMember(db, projectId, "member"),
+    ).resolves.toBe(true);
+    await expect(
+      findProjectIdByAgentTokenHash(db, memberTokenHash),
+    ).resolves.toBeNull();
   });
 
   it("updates an organization name while preserving its membership role", async () => {

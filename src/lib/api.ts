@@ -428,6 +428,22 @@ export async function addOrganizationMember(
   );
 }
 
+export async function updateOrganizationMemberRole(
+  token: string,
+  organizationId: string,
+  userId: string,
+  role: "admin" | "member",
+) {
+  return request<{ members: OrganizationMember[] }>(
+    `/organizations/${organizationId}/members/${encodeURIComponent(userId)}`,
+    token,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ role }),
+    },
+  );
+}
+
 export async function removeOrganizationMember(
   token: string,
   organizationId: string,

@@ -14,6 +14,7 @@ import {
   loadSession,
   updateProjectAgent,
   updateProjectAgentSchedule,
+  updateOrganizationMemberRole,
   updateIssue,
 } from "./api";
 import { repositoryWorkflowBootstrap } from "./auto-hunt-contract";
@@ -92,6 +93,36 @@ describe("API errors", () => {
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining(`/projects/${projectId}/runs/${runId}`),
       expect.objectContaining({ method: "DELETE" }),
+    );
+  });
+
+  it("updates an organization member role through the member endpoint", async () => {
+    const organizationId = "22222222-2222-4222-8222-222222222222";
+    const userId = "user/member";
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ members: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      updateOrganizationMemberRole(
+        "token",
+        organizationId,
+        userId,
+        "admin",
+      ),
+    ).resolves.toEqual({ members: [] });
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(
+        `/organizations/${organizationId}/members/user%2Fmember`,
+      ),
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({ role: "admin" }),
+      }),
     );
   });
 

@@ -8,6 +8,7 @@ import {
   loadOrganizationExecutionWorkers,
   loadOrganizationMembers,
   removeOrganizationMember,
+  updateOrganizationMemberRole,
 } from "../lib/api";
 import { organizationLogoFromFile } from "../lib/organization-logo";
 import type { OrganizationMember } from "../types";
@@ -19,6 +20,7 @@ vi.mock("../lib/api", () => ({
   loadOrganizationExecutionWorkers: vi.fn(),
   loadOrganizationMembers: vi.fn(),
   removeOrganizationMember: vi.fn(),
+  updateOrganizationMemberRole: vi.fn(),
   updateOrganizationExecutionWorkerConcurrency: vi.fn(),
 }));
 vi.mock("../lib/organization-logo", () => ({
@@ -43,6 +45,14 @@ const members: OrganizationMember[] = [
     role: "admin",
     createdAt: "2024-12-01T00:00:00Z",
   },
+  {
+    userId: "user-3",
+    name: "Mina Park",
+    email: "mina@wordbricks.ai",
+    image: null,
+    role: "member",
+    createdAt: "2025-01-01T00:00:00Z",
+  },
 ];
 
 const setInputValue = (input: HTMLInputElement, value: string) => {
@@ -60,6 +70,11 @@ describe("OrganizationSettings", () => {
     vi.mocked(loadOrganizationMembers).mockResolvedValue(members);
     vi.mocked(addOrganizationMember).mockResolvedValue({ members });
     vi.mocked(removeOrganizationMember).mockResolvedValue(undefined);
+    vi.mocked(updateOrganizationMemberRole).mockResolvedValue({
+      members: members.map((member) =>
+        member.userId === "user-3" ? { ...member, role: "admin" } : member,
+      ),
+    });
     vi.mocked(loadOrganizationExecutionWorkers).mockResolvedValue({
       workers: [],
       canManage: true,
@@ -202,6 +217,61 @@ describe("OrganizationSettings", () => {
 
     expect(onRename).toHaveBeenCalledWith("organization-1", "Briar Labs");
     expect(container.textContent).toContain("조직 이름을 저장했습니다.");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("lets an admin change another member's role", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <OrganizationSettings
+          initialSection="members"
+          organization={{
+            id: "organization-1",
+            name: "Wordbricks",
+            handle: "wordbricks",
+            logo: null,
+            role: "admin",
+            createdAt: "2023-12-01T00:00:00Z",
+          }}
+          onBack={() => undefined}
+          onLogoChange={vi.fn()}
+          onRename={vi.fn()}
+          token="token"
+          userId="user-2"
+        />,
+      );
+    });
+
+    const roleControl = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Mina Park 권한 변경"]',
+    );
+    expect(roleControl?.textContent).toContain("멤버");
+    expect(
+      container.querySelector('[aria-label="Ian Jeon 권한 변경"]'),
+    ).toBeNull();
+
+    await act(async () => roleControl?.click());
+    const adminOption = document.querySelector<HTMLButtonElement>(
+      '[role="option"][data-value="admin"]',
+    );
+    await act(async () => adminOption?.click());
+
+    expect(updateOrganizationMemberRole).toHaveBeenCalledWith(
+      "token",
+      "organization-1",
+      "user-3",
+      "admin",
+    );
+    expect(
+      container.querySelector('[aria-label="Mina Park 권한 변경"]')
+        ?.textContent,
+    ).toContain("관리자");
 
     await act(async () => root.unmount());
     container.remove();

@@ -22,6 +22,7 @@ use std::{
 use tauri::{webview::Color, WebviewUrl, WebviewWindowBuilder};
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
+use tauri_plugin_opener::OpenerExt;
 
 const SESSION_FILE_NAME: &str = "session.json";
 const AUTO_HUNT_EVENT_DIRECTORY: &str = "auto-hunt-sessions";
@@ -29,6 +30,11 @@ const AUTO_HUNT_APP_SERVER_EVENT: &str = "auto-hunt-app-server-event";
 const AUTO_HUNT_DISPATCH_EVENT: &str = "auto-hunt-dispatch-event";
 const PROJECT_AGENT_SCHEDULE_POLL_EVENT: &str = "project-agent-schedule-poll";
 const AGENT_SESSION_STOPPED_ERROR: &str = "사용자가 에이전트 세션을 중지했습니다.";
+const GITHUB_DEVICE_LOGIN_URL: &str = "https://github.com/login/device";
+#[cfg(not(target_os = "windows"))]
+const GITHUB_CLI_NOOP_BROWSER: &str = "/usr/bin/true";
+#[cfg(target_os = "windows")]
+const GITHUB_CLI_NOOP_BROWSER: &str = "cmd.exe /D /C rem";
 const DEFAULT_MAIN_WINDOW_SIZE: (f64, f64) = (1280.0, 820.0);
 const DEFAULT_MAIN_WINDOW_MIN_SIZE: (f64, f64) = (980.0, 680.0);
 const ONBOARDING_MAIN_WINDOW_SIZE: (f64, f64) = (780.0, 580.0);
@@ -340,6 +346,26 @@ struct CliConfig {
     projects: Vec<CliProject>,
     #[serde(flatten)]
     extra: BTreeMap<String, serde_json::Value>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StoredExecutionWorker {
+    worker_id: String,
+    device_id: String,
+    label: String,
+    max_concurrent_sessions: u32,
+}
+
+#[derive(Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LocalExecutionWorkerStatus {
+    project_id: String,
+    registered: bool,
+    worker_id: Option<String>,
+    device_id: Option<String>,
+    label: Option<String>,
+    max_concurrent_sessions: Option<u32>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
@@ -771,11 +797,14 @@ fn inspect_cli(binary: Result<PathBuf, String>) -> OnboardingPrerequisiteStatus 
         .output()
         .ok()
         .filter(|output| output.status.success())
-        .and_then(|output| parse_cli_version(&output.stdout));
+        .and_then(|output| {
+            parse_cli_version(&output.stdout).or_else(|| parse_cli_version(&output.stderr))
+        });
+    let installed = version.is_some();
     OnboardingPrerequisiteStatus {
-        installed: true,
+        installed,
         version,
-        authenticated: true,
+        authenticated: installed,
     }
 }
 
@@ -783,7 +812,7 @@ fn inspect_onboarding_prerequisites_sync(home: &Path) -> OnboardingPrerequisites
     let execution_path = cli_execution_path(home).unwrap_or_default();
     OnboardingPrerequisites {
         git: inspect_cli(git_binary(home)),
-        codex: inspect_cli(agent::codex_binary(home)),
+        codex: inspect_cli(agent::codex_binary(home, &execution_path)),
         claude: inspect_cli(agent::claude_binary(home, &execution_path)),
         grok: inspect_cli(agent::grok_binary(home, &execution_path)),
     }
@@ -811,6 +840,7 @@ fn install_cli_package(home: &Path, package: &str) -> Result<(), String> {
         };
         match Command::new(binary)
             .env("PATH", &execution_path)
+            .env("HOME", home)
             .args(args)
             .output()
         {
@@ -1366,6 +1396,7 @@ async fn login_project_github(
 ) -> Result<RepositoryReadiness, String> {
     let config_path = cli_config_path(&app)?;
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    let app_handle = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let binary = gh_binary(&home)?;
         let execution_path = cli_execution_path(&home)?;
@@ -1383,16 +1414,25 @@ async fn login_project_github(
             let supports_clipboard = help.as_ref().is_some_and(|output| {
                 String::from_utf8_lossy(&output.stdout).contains("--clipboard")
             });
+            app_handle
+                .opener()
+                .open_url(GITHUB_DEVICE_LOGIN_URL, None::<&str>)
+                .map_err(|error| format!("GitHub 로그인 페이지를 열지 못했습니다: {error}"))?;
             let mut command = Command::new(&binary);
-            command.env("PATH", &execution_path).args([
-                "auth",
-                "login",
-                "--hostname",
-                "github.com",
-                "--git-protocol",
-                "https",
-                "--web",
-            ]);
+            command
+                .env("PATH", &execution_path)
+                // Briar opens the device page itself so a GUI launch never
+                // depends on the CLI process inheriting a usable browser.
+                .env("GH_BROWSER", GITHUB_CLI_NOOP_BROWSER)
+                .args([
+                    "auth",
+                    "login",
+                    "--hostname",
+                    "github.com",
+                    "--git-protocol",
+                    "https",
+                    "--web",
+                ]);
             if supports_clipboard {
                 command.arg("--clipboard");
             }
@@ -2775,36 +2815,52 @@ fn configure_execution_worker(
 fn inspect_execution_workers(
     app: AppHandle,
     project_ids: Vec<String>,
-) -> Result<Vec<serde_json::Value>, String> {
-    let resource_directory = app
-        .path()
-        .resource_dir()
-        .map_err(|error| error.to_string())?;
-    let home = app.path().home_dir().map_err(|error| error.to_string())?;
-    sync_auto_hunt_assets(&resource_directory, &home)?;
-    let bun = bundled_bun_binary()
-        .ok_or_else(|| "Briar에 포함된 Bun runtime을 찾지 못했습니다.".to_string())?;
-    let cli = home.join(".local/share/briar/briar.js");
-    let path = cli_execution_path(&home)?;
-    let mut statuses = Vec::new();
-    for project_id in project_ids
+) -> Result<Vec<LocalExecutionWorkerStatus>, String> {
+    inspect_execution_workers_at(&cli_config_path(&app)?, project_ids)
+}
+
+fn inspect_execution_workers_at(
+    config_path: &Path,
+    project_ids: Vec<String>,
+) -> Result<Vec<LocalExecutionWorkerStatus>, String> {
+    // Settings-page inspection must stay read-only: synchronizing CLI assets
+    // here can disturb a running background Worker and change its readiness.
+    let config = read_cli_config(config_path)?;
+    let projects = config
+        .projects
         .into_iter()
-        .filter(|value| !value.trim().is_empty())
-    {
-        let output = Command::new(&bun)
-            .arg(&cli)
-            .args(["worker", "status", "--project", &project_id])
-            .env("PATH", &path)
-            .output()
-            .map_err(|error| format!("Worker 상태 명령을 시작하지 못했습니다: {error}"))?;
-        if !output.status.success() {
-            continue;
-        }
-        let status: serde_json::Value = serde_json::from_slice(&output.stdout)
-            .map_err(|error| format!("Worker 상태를 읽지 못했습니다: {error}"))?;
-        statuses.push(status);
-    }
-    Ok(statuses)
+        .map(|project| (project.id.clone(), project))
+        .collect::<BTreeMap<_, _>>();
+    project_ids
+        .into_iter()
+        .filter(|project_id| !project_id.trim().is_empty())
+        .filter_map(|project_id| {
+            projects
+                .get(&project_id)
+                .map(|project| (project_id, project))
+        })
+        .map(|(project_id, project)| {
+            let worker = project
+                .extra
+                .get("executionWorker")
+                .filter(|value| !value.is_null())
+                .map(|value| {
+                    serde_json::from_value::<StoredExecutionWorker>(value.clone())
+                        .map_err(|error| format!("Worker 로컬 설정이 손상되었습니다: {error}"))
+                })
+                .transpose()?;
+            Ok(LocalExecutionWorkerStatus {
+                project_id,
+                registered: worker.is_some(),
+                worker_id: worker.as_ref().map(|worker| worker.worker_id.clone()),
+                device_id: worker.as_ref().map(|worker| worker.device_id.clone()),
+                label: worker.as_ref().map(|worker| worker.label.clone()),
+                max_concurrent_sessions: worker
+                    .as_ref()
+                    .map(|worker| worker.max_concurrent_sessions),
+            })
+        })
+        .collect()
 }
 
 fn sync_auto_hunt_assets(resource_directory: &Path, home: &Path) -> Result<bool, String> {
@@ -3477,6 +3533,16 @@ struct CliClaimedRun {
     run_number: u64,
     source_key: String,
     title: String,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    priority: Option<u8>,
+    #[serde(default)]
+    context: Option<serde_json::Value>,
+    #[serde(default)]
+    attachments: Vec<agent::ProjectAutoHuntIssueAttachment>,
+    #[serde(default)]
+    messages: Vec<agent::ProjectAutoHuntIssueMessage>,
     workflow: serde_json::Value,
     #[serde(default)]
     workspace: Option<CliClaimedWorkspace>,
@@ -3852,6 +3918,11 @@ async fn start_project_auto_hunt(
                 run_number: claimed.run_number,
                 source_key: claimed.source_key.clone(),
                 title: claimed.title.clone(),
+                issue_description: claimed.description.clone(),
+                priority: claimed.priority,
+                context: claimed.context.clone(),
+                attachments: claimed.attachments.clone(),
+                conversation: claimed.messages.clone(),
             };
             let dispatch = dispatch_store.add_worker(
                 &request.session_id,
@@ -5053,22 +5124,51 @@ mod tests {
         let home = tempfile::tempdir().expect("fixture home should exist");
         let shims = home.path().join(".local/share/mise/shims");
         fs::create_dir_all(&shims).expect("mise shims directory should exist");
-        let bun = shims.join("bun");
-        fs::write(&bun, "#!/bin/sh\nexit 0\n").expect("fixture Bun should be written");
-        fs::set_permissions(&bun, fs::Permissions::from_mode(0o700))
-            .expect("fixture Bun should be executable");
+        for binary in ["bun", "codex"] {
+            let path = shims.join(binary);
+            fs::write(&path, "#!/bin/sh\nexit 0\n").expect("fixture CLI should be written");
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o700))
+                .expect("fixture CLI should be executable");
+        }
+        let execution_path = cli_execution_path_with_runtime(home.path(), Vec::new())
+            .expect("CLI PATH should resolve");
 
-        let resolved = which::which_in(
-            "bun",
-            Some(
-                cli_execution_path_with_runtime(home.path(), Vec::new())
-                    .expect("CLI PATH should resolve"),
-            ),
-            home.path(),
-        )
-        .expect("Bun should resolve through the mise shim directory");
+        let resolved = which::which_in("bun", Some(&execution_path), home.path())
+            .expect("Bun should resolve through the mise shim directory");
 
-        assert_eq!(resolved, bun);
+        assert_eq!(resolved, shims.join("bun"));
+        assert_eq!(
+            agent::codex_binary(home.path(), &execution_path)
+                .expect("Codex should resolve through the mise shim directory"),
+            shims.join("codex")
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn only_marks_a_cli_installed_when_its_version_probe_succeeds() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let directory = tempfile::tempdir().expect("fixture directory should exist");
+        let working = directory.path().join("working-cli");
+        let broken = directory.path().join("broken-cli");
+        fs::write(&working, "#!/bin/sh\nprintf 'codex-cli 1.2.3\\n' >&2\n")
+            .expect("working fixture should be written");
+        fs::write(&broken, "#!/bin/sh\nexit 1\n").expect("broken fixture should be written");
+        for binary in [&working, &broken] {
+            fs::set_permissions(binary, fs::Permissions::from_mode(0o700))
+                .expect("fixture CLI should be executable");
+        }
+
+        let working_status = inspect_cli(Ok(working));
+        assert!(working_status.installed);
+        assert!(working_status.authenticated);
+        assert_eq!(working_status.version.as_deref(), Some("codex-cli 1.2.3"));
+
+        let broken_status = inspect_cli(Ok(broken));
+        assert!(!broken_status.installed);
+        assert!(!broken_status.authenticated);
+        assert_eq!(broken_status.version, None);
     }
 
     #[cfg(unix)]
@@ -5478,6 +5578,55 @@ branch refs/heads/briar/second-11111111
                 "--runtime-dispatch",
             ],
         );
+    }
+
+    #[test]
+    fn parses_the_claimed_runs_durable_issue_snapshot() {
+        let response = serde_json::from_value::<CliClaimResponse>(serde_json::json!({
+            "work": {
+                "runId": "515b7a2c-8918-5a8f-a292-f0b95090281c",
+                "runNumber": 13,
+                "sourceKey": "BRIAR-13",
+                "title": "Render the attached layout",
+                "description": "Match the mobile reference.",
+                "priority": 1,
+                "context": { "customer": "enterprise" },
+                "workflow": { "version": 1 },
+                "attachments": [{
+                    "id": "attachment-1",
+                    "filename": "layout.png",
+                    "contentType": "image/png",
+                    "byteSize": 2048,
+                    "url": "/projects/project-1/runs/run-1/attachments/attachment-1",
+                    "localPath": "/tmp/attachments/layout.png",
+                    "downloadError": null
+                }],
+                "messages": [{
+                    "id": "message-1",
+                    "parentMessageId": null,
+                    "body": "The compact breakpoint is required.",
+                    "author": {
+                        "id": "user-1",
+                        "name": "Jay",
+                        "provider": null
+                    },
+                    "createdAt": "2026-07-30T00:00:00Z",
+                    "updatedAt": "2026-07-30T00:00:00Z"
+                }]
+            }
+        }))
+        .expect("claim response should parse");
+        let work = response.work.expect("claim should contain work");
+
+        assert_eq!(
+            work.description.as_deref(),
+            Some("Match the mobile reference.")
+        );
+        assert_eq!(
+            work.attachments[0].local_path.as_deref(),
+            Some("/tmp/attachments/layout.png")
+        );
+        assert_eq!(work.messages[0].body, "The compact breakpoint is required.");
     }
 
     #[test]
@@ -6156,6 +6305,71 @@ branch refs/heads/briar/second-11111111
         let directory = std::env::temp_dir().join(format!("briar-host-test-{name}-{unique}"));
         fs::create_dir_all(&directory).expect("test directory should be created");
         directory.join("config.json")
+    }
+
+    #[test]
+    fn inspects_local_workers_without_mutating_their_configuration() {
+        let config_path = test_config_path("inspect-workers");
+        let contents = serde_json::json!({
+            "apiUrl": "https://briar.example.com",
+            "projects": [
+                {
+                    "id": "project-1",
+                    "repositoryPath": "/repo/one",
+                    "agentToken": "briar_agent_one",
+                    "executionWorker": {
+                        "workerId": "worker-1",
+                        "deviceId": "device-1",
+                        "label": "Dev Mac",
+                        "maxConcurrentSessions": 3,
+                        "token": "briar_worker_secret"
+                    }
+                },
+                {
+                    "id": "project-2",
+                    "repositoryPath": "/repo/two",
+                    "agentToken": "briar_agent_two"
+                }
+            ]
+        })
+        .to_string();
+        fs::write(&config_path, &contents).expect("config should be written");
+
+        let statuses = inspect_execution_workers_at(
+            &config_path,
+            vec![
+                "project-2".to_string(),
+                "missing-project".to_string(),
+                "project-1".to_string(),
+            ],
+        )
+        .expect("worker status should be readable");
+
+        assert_eq!(
+            statuses,
+            vec![
+                LocalExecutionWorkerStatus {
+                    project_id: "project-2".to_string(),
+                    registered: false,
+                    worker_id: None,
+                    device_id: None,
+                    label: None,
+                    max_concurrent_sessions: None,
+                },
+                LocalExecutionWorkerStatus {
+                    project_id: "project-1".to_string(),
+                    registered: true,
+                    worker_id: Some("worker-1".to_string()),
+                    device_id: Some("device-1".to_string()),
+                    label: Some("Dev Mac".to_string()),
+                    max_concurrent_sessions: Some(3),
+                },
+            ]
+        );
+        assert_eq!(
+            fs::read_to_string(&config_path).expect("config should remain readable"),
+            contents
+        );
     }
 
     /// Write a project whose auto-hunt block carries CLI-owned worktree settings.
