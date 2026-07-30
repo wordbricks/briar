@@ -2381,3 +2381,55 @@ footer {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Product imagery is captured from the real Briar app in demo mode. */
+.product-stage {
+  min-height: 0;
+  padding: 48px;
+}
+
+.product-stage::before {
+  pointer-events: none;
+}
+
+.real-product-screen {
+  position: relative;
+  z-index: 2;
+  aspect-ratio: 1231 / 730;
+  overflow: hidden;
+  border: 1px solid #303039;
+  border-radius: 12px;
+  background: #f7f7f3;
+  box-shadow:
+    0 55px 100px rgb(0 0 0 / 0.65),
+    0 10px 30px rgb(0 0 0 / 0.38),
+    inset 0 1px 0 rgb(255 255 255 / 0.04);
+}
+
+.real-product-screen img {
+  display: block;
+  width: 100%;
+  height: auto;
+  transform: translateY(-4.948%);
+}
+
+.workflow-visual.real-product-screen {
+  min-height: 0;
+  padding: 0;
+  border-color: #2a2a31;
+  background: #f7f7f3;
+  box-shadow:
+    0 26px 70px rgb(0 0 0 / 0.38),
+    0 6px 20px rgb(0 0 0 / 0.25);
+}
+
+@media (max-width: 760px) {
+  .product-stage {
+    min-height: 0;
+    padding: 10px;
+  }
+
+  .real-product-screen {
+    border-radius: 8px;
+  }
+}
