@@ -117,7 +117,7 @@ export function ProjectAgentSessionDetail({
           <span className="project-agent-detail-title">
             <Button
               aria-label={t("run.back")}
-              className="project-agent-detail-back"
+              className="project-agent-detail-back auto-hunt-session-back"
               onClick={onBack}
               size="icon"
               type="button"

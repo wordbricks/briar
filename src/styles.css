@@ -671,7 +671,12 @@ body { overflow: hidden; font-synthesis: none; }
 .topbar { height: 30px; flex: 0 0 30px; display: flex; align-items: center; gap: 12px; padding: 0 22px; border-bottom:1px solid var(--border); background: rgba(255,255,255,.7); }
 .topbar.sidebar-closed { padding-left: var(--window-navigation-content-inset); }
 /* Product title chrome shares the issue-detail titlebar height (48px). */
-.run-page-shell > .topbar,
+.run-page-shell > .topbar {
+  height:48px;
+  min-height:48px;
+  flex:0 0 48px;
+  gap:10px;
+}
 .page-header.app-page-header {
   height:48px;
   min-height:48px;
