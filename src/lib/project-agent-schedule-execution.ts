@@ -4,6 +4,7 @@ import {
   selectAutoHuntCandidates,
 } from "./auto-hunt-automation";
 import { executeProjectAgentTurn } from "./project-agent-execution";
+import { projectAgentRunSnapshots } from "./project-llm";
 import type {
   ProjectAgentRunInput,
   ProjectAgentRunResponse,
@@ -24,6 +25,12 @@ export type ProjectAgentScheduleExecutionDependencies = {
   runAgent: (
     input: ProjectAgentRunInput,
   ) => Promise<ProjectAgentRunResponse>;
+  retryRun: (
+    token: string,
+    projectId: string,
+    runId: string,
+    reason: string | null,
+  ) => Promise<unknown>;
   startAutoHunt: (
     projectId: string,
     issues: HuntRun[],
@@ -62,17 +69,38 @@ export async function executeScheduledProjectAgent(
 > {
   const sessionId = dependencies.startSession?.(run) ?? null;
   try {
+    const initialDashboard = await dependencies.loadDashboard(
+      token,
+      run.projectId,
+    );
     const { response, dispatchResult } = await executeProjectAgentTurn(
       {
         runAgent: dependencies.runAgent,
         dispatchAutoHunt: async (decision) => {
+          const targetRunIds = decision.targetRunIds ?? [];
+          for (const runId of targetRunIds) {
+            await dependencies.retryRun(
+              token,
+              run.projectId,
+              runId,
+              decision.retryReason ?? null,
+            );
+          }
           const dashboard = await dependencies.loadDashboard(
             token,
             run.projectId,
           );
+          const availableRuns =
+            targetRunIds.length === 0
+              ? dashboard.runs
+              : dashboard.runs.filter((candidate) =>
+                  targetRunIds.includes(candidate.id)
+                );
           const candidates = selectAutoHuntCandidates(
-            dashboard.runs,
-            decision.maxIssues ?? defaultAutoHuntMaxIssues,
+            availableRuns,
+            targetRunIds.length > 0
+              ? targetRunIds.length
+              : decision.maxIssues ?? defaultAutoHuntMaxIssues,
           );
           if (candidates.length === 0) {
             throw new Error("대기 상태인 이슈가 없습니다.");
@@ -97,6 +125,7 @@ export async function executeScheduledProjectAgent(
           run.agent.responsibility,
         ].join("\n"),
         conversationId: null,
+        runs: projectAgentRunSnapshots(initialDashboard.runs),
       },
     );
     let result: ProjectLlmChatResponse & {

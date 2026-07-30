@@ -63,6 +63,7 @@ import { issueAgentConversation } from "./lib/issue-agent-reply";
 import { isRepositoryConnectedForImport } from "./lib/linear-import";
 import { settingsAccountSelection } from "./lib/settings-account-selection";
 import { dispatchHuntRun, loadProjectAgents } from "./lib/api";
+import { retryProjectAutoHuntRun } from "./lib/auto-hunt-agent";
 import { demoProjectAgents } from "./lib/demo-project-agents";
 import type { AgentProvider } from "./lib/project-llm";
 import { useI18n } from "./i18n";
@@ -697,18 +698,50 @@ export function App() {
             onSettleTaskSession={(sessionId, settlement) =>
               autoHunt.settleTaskSession(sessionId, settlement)}
             onStopSession={(sessionId) => autoHunt.stopSession(sessionId)}
-            onStart={(agent, runs, options) => {
+            onStart={async (agent, runs, options) => {
               rememberIssueAgent(agent);
+              const targetRunIds = options?.targetRunIds ?? [];
+              let dispatchRuns = runs;
+              if (targetRunIds.length > 0) {
+                const targets = new Set(targetRunIds);
+                const selected = runs.filter((run) => targets.has(run.id));
+                if (selected.length !== targets.size) {
+                  throw new Error(
+                    "재시도할 Auto Hunt 이슈를 현재 프로젝트에서 찾지 못했습니다.",
+                  );
+                }
+                for (const run of selected) {
+                  await retryProjectAutoHuntRun(
+                    activeProject.id,
+                    run.id,
+                    options?.retryReason ??
+                      "저장된 Agent가 블로킹 해소를 확인하여 재시도를 요청했습니다.",
+                  );
+                }
+                dispatchRuns = selected.map((run) => ({
+                  ...run,
+                  status: "queued" as const,
+                  currentAttempt: run.currentAttempt + 1,
+                  currentRevision: 1,
+                  workflowStage: null,
+                  claimedBy: null,
+                  claimedAt: null,
+                  leaseExpiresAt: null,
+                }));
+              }
               return autoHunt.startSession(
                 activeProject.id,
-                runs,
+                dispatchRuns,
                 () => void briar.refresh(),
                 {
                   agent,
                   coordinatorConversationId:
                     options?.coordinatorConversationId,
                   parentSessionId: options?.parentSessionId,
-                  maxIssues: options?.maxIssues,
+                  maxIssues:
+                    targetRunIds.length > 0
+                      ? targetRunIds.length
+                      : options?.maxIssues,
                 },
               );
             }}

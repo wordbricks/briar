@@ -3,6 +3,7 @@ import {
   agentMessagesFromAppServerEvents,
   mergeAutoHuntAppServerEvents,
   naturalLanguageFromAgentMessage,
+  retryProjectAutoHuntRun,
   startProjectAutoHunt,
   type AutoHuntAppServerEvent,
 } from "./auto-hunt-agent";
@@ -197,6 +198,34 @@ describe("naturalLanguageFromAgentMessage", () => {
     expect(naturalLanguageFromAgentMessage(
       "[commentary] 저장소를 확인하고 있습니다.",
     )).toBe("저장소를 확인하고 있습니다.");
+  });
+});
+
+describe("retryProjectAutoHuntRun", () => {
+  it("routes a saved-Agent retry through the native Briar CLI host", async () => {
+    vi.stubGlobal("window", { __TAURI_INTERNALS__: {} });
+    vi.stubGlobal("crypto", {
+      randomUUID: vi.fn(() => "11111111-1111-4111-8111-111111111111"),
+    });
+    invoke.mockResolvedValue({
+      runId: "22222222-2222-4222-8222-222222222222",
+      outcome: "retried",
+      attempt: 2,
+      stage: "queued",
+    });
+
+    await retryProjectAutoHuntRun(
+      "33333333-3333-4333-8333-333333333333",
+      "22222222-2222-4222-8222-222222222222",
+      "GitHub authentication was restored.",
+    );
+
+    expect(invoke).toHaveBeenCalledWith("retry_project_auto_hunt_run", {
+      projectId: "33333333-3333-4333-8333-333333333333",
+      runId: "22222222-2222-4222-8222-222222222222",
+      requestId: "11111111-1111-4111-8111-111111111111",
+      reason: "GitHub authentication was restored.",
+    });
   });
 });
 

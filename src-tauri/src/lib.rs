@@ -3406,6 +3406,31 @@ async fn run_project_agent(
         || request.skill.len() > 10_000
         || request.message.trim().is_empty()
         || request.message.len() > 20_000
+        || request.runs.len() > 500
+        || request.runs.iter().any(|run| {
+            run.run_id.trim().is_empty()
+                || run.run_id.len() > 128
+                || run.source_key.trim().is_empty()
+                || run.source_key.len() > 300
+                || run.title.trim().is_empty()
+                || run.title.len() > 500
+                || !matches!(
+                    run.status.as_str(),
+                    "backlog"
+                        | "queued"
+                        | "running"
+                        | "blocked"
+                        | "failed"
+                        | "completed"
+                        | "cancelled"
+                )
+                || run.detail.as_ref().is_some_and(|value| value.len() > 4_000)
+                || run
+                    .result_summary
+                    .as_ref()
+                    .is_some_and(|value| value.len() > 4_000)
+                || run.updated_at.len() > 100
+        })
     {
         return Err("에이전트 실행 요청이 올바르지 않습니다.".to_string());
     }
@@ -3729,6 +3754,84 @@ fn claim_auto_hunt_run(
     }
     serde_json::from_str(output.stdout.trim())
         .map_err(|error| format!("로컬 claim 결과를 읽지 못했습니다: {error}"))
+}
+
+#[tauri::command]
+async fn retry_project_auto_hunt_run(
+    app: tauri::AppHandle,
+    project_id: String,
+    run_id: String,
+    request_id: String,
+    reason: String,
+) -> Result<serde_json::Value, String> {
+    if project_id.trim().is_empty()
+        || project_id.len() > 128
+        || run_id.trim().is_empty()
+        || run_id.len() > 128
+        || request_id.trim().is_empty()
+        || request_id.len() > 128
+        || reason.trim().is_empty()
+        || reason.len() > 2_000
+    {
+        return Err("Auto Hunt 재시도 요청이 올바르지 않습니다.".to_string());
+    }
+    let config_path = cli_config_path(&app)?;
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let config = read_cli_config(&config_path)?;
+        let project = config
+            .projects
+            .iter()
+            .find(|project| project.id == project_id)
+            .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
+        let api_url = project
+            .api_url
+            .as_deref()
+            .unwrap_or(config.api_url.as_str())
+            .to_string();
+        let (runner, workspace) = connected_project_runtime(&config_path, &project_id, &home)?;
+        let execution_path = cli_execution_path(&home)?;
+        let include_velen = project_auto_hunt_uses_velen(&config_path, &project_id)?;
+        let cli_environment = agent::AutoHuntCliEnvironment::prepare_local(
+            runner.clone(),
+            &home,
+            &execution_path,
+            &workspace,
+            &project_id,
+            &api_url,
+            include_velen,
+        )?;
+        let output = cli_environment.run_briar(
+            runner.as_ref(),
+            &workspace,
+            auto_hunt_retry_arguments(&run_id, &request_id, &reason),
+        )?;
+        if !output.success() {
+            return Err(format!(
+                "Briar CLI가 Auto Hunt 재시도를 시작하지 못했습니다: {}",
+                output.failure_message()
+            ));
+        }
+        serde_json::from_str(output.stdout.trim())
+            .map_err(|error| format!("Briar CLI 재시도 결과를 읽지 못했습니다: {error}"))
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+fn auto_hunt_retry_arguments(run_id: &str, request_id: &str, reason: &str) -> Vec<String> {
+    vec![
+        "run".to_string(),
+        "retry".to_string(),
+        "--run".to_string(),
+        run_id.to_string(),
+        "--request-id".to_string(),
+        request_id.to_string(),
+        "--reason".to_string(),
+        reason.to_string(),
+        "--actor".to_string(),
+        "briar-agent-host-tool".to_string(),
+    ]
 }
 
 fn auto_hunt_claim_arguments(run_id: &str) -> Vec<String> {
@@ -5202,6 +5305,7 @@ pub fn run() {
             project_llm_chat,
             run_project_agent,
             stop_project_agent_session,
+            retry_project_auto_hunt_run,
             start_project_auto_hunt,
             load_auto_hunt_app_server_events,
             load_auto_hunt_dispatch,
@@ -5806,6 +5910,31 @@ branch refs/heads/briar/second-11111111
         assert!(validate_auto_hunt_session_id("../session").is_err());
         assert!(validate_auto_hunt_session_id("session.jsonl").is_err());
         assert!(validate_auto_hunt_session_id("").is_err());
+    }
+
+    #[test]
+    fn retries_the_requested_run_through_the_briar_cli() {
+        let arguments = auto_hunt_retry_arguments(
+            "515b7a2c-8918-5a8f-a292-f0b95090281c",
+            "616b7a2c-8918-5a8f-a292-f0b95090281d",
+            "GitHub authentication was restored.",
+        );
+
+        assert_eq!(
+            arguments,
+            vec![
+                "run",
+                "retry",
+                "--run",
+                "515b7a2c-8918-5a8f-a292-f0b95090281c",
+                "--request-id",
+                "616b7a2c-8918-5a8f-a292-f0b95090281d",
+                "--reason",
+                "GitHub authentication was restored.",
+                "--actor",
+                "briar-agent-host-tool",
+            ],
+        );
     }
 
     #[test]

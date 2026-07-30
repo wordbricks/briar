@@ -88,8 +88,10 @@ export function ProjectAgents({
       coordinatorConversationId?: string | null;
       parentSessionId?: string;
       maxIssues?: number;
+      targetRunIds?: string[];
+      retryReason?: string | null;
     },
-  ) => string;
+  ) => string | Promise<string>;
   onStartTaskSession: (
     agent: ProjectAgent,
     session: ProjectAgentTaskSessionStart,

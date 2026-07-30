@@ -117,7 +117,48 @@ export type ProjectAgentRunInput = {
   };
   message: string;
   conversationId?: string | null;
+  runs?: ProjectAgentRunSnapshot[];
 };
+
+export type ProjectAgentRunSnapshot = {
+  runId: string;
+  sourceKey: string;
+  title: string;
+  status: string;
+  currentAttempt: number;
+  detail: string | null;
+  resultSummary: string | null;
+  updatedAt: string;
+};
+
+type ProjectAgentRunSnapshotSource = {
+  id: string;
+  sourceKey: string;
+  title: string;
+  status: string;
+  currentAttempt: number;
+  detail: string | null;
+  resultSummary: string | null;
+  updatedAt: string;
+};
+
+export function projectAgentRunSnapshots(
+  runs: readonly ProjectAgentRunSnapshotSource[],
+): ProjectAgentRunSnapshot[] {
+  return runs
+    .filter((run) => run.status === "blocked" || run.status === "failed")
+    .slice(0, 500)
+    .map((run) => ({
+      runId: run.id,
+      sourceKey: run.sourceKey,
+      title: run.title,
+      status: run.status,
+      currentAttempt: run.currentAttempt,
+      detail: run.detail,
+      resultSummary: run.resultSummary,
+      updatedAt: run.updatedAt,
+    }));
+}
 
 export type ProjectAgentRunResponse = {
   conversationId: string;
@@ -126,6 +167,8 @@ export type ProjectAgentRunResponse = {
   message: string;
   maxIssues: number | null;
   structuredResult: StructuredAgentResult | null;
+  targetRunIds?: string[];
+  retryReason?: string | null;
 };
 
 export type ProjectChatMessage = {
@@ -196,6 +239,7 @@ export async function runProjectAgent(
       skill: input.agent.skill,
       message: input.message,
       conversationId: input.conversationId ?? null,
+      runs: input.runs ?? [],
     },
   });
 }
