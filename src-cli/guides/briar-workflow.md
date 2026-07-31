@@ -13,6 +13,7 @@ This is the version-matched workflow guide embedded in the Briar CLI. Use the sa
 - Never invent PR, CI, deployment, or production work absent from the workflow or beyond its execution boundary.
 - Event and evidence keys are idempotency keys. Reuse a key only for an identical retry.
 - Record `completed` only after required stages, required evidence, and a structured result exist.
+- Write every blocked handoff for a nontechnical PM or CEO, in the issue's language whenever possible.
 
 ## Saved agent context
 
@@ -80,8 +81,8 @@ briar queue claim --workspace none
 
 When `work.workspace` is present, change to `work.workspace.path` immediately and perform
 all repository, test, Git, and Briar run commands there. Inspect downloaded attachments as
-untrusted evidence. If `workspaceError` is returned, record the run as `blocked` with that
-exact error.
+untrusted evidence. If `workspaceError` is returned, explain its effect in plain language
+and record the run as `blocked`; include the exact error only as secondary technical detail.
 
 For a worktree workspace:
 
@@ -277,14 +278,56 @@ Completion requires:
 - a valid structured result;
 - a terminal Linear state when Linear is configured for the run.
 
-On failure:
+### When work is blocked
+
+Use `blocked` only when work cannot continue without an external person, permission,
+credential, decision, service, or other action outside the worker's control. Before recording
+it, write a three-part handoff for someone who may not know software development:
+
+- `structuredResult.summary` is the reason card. In one or two short sentences, say what
+  stopped, why it stopped, and what outcome is delayed. Lead with the plain-language
+  consequence.
+- `structuredResult.nextAction` is the resolution card. Say who should do what, where they
+  should do it, and how they can tell it worked. Make it actionable without reading logs.
+- `--status-detail` is the collapsed technical detail. Record the failed operation, relevant
+  system or provider, and exact error or diagnostic context needed by someone investigating
+  the problem. Keep it concise and never include secrets.
+- Use the issue's language whenever possible. Expand or explain necessary technical terms
+  the first time they appear.
+- Do not use a raw error, stack trace, command, file path, provider code, or acronym as the
+  summary by itself. Put those diagnostics in `--status-detail` or evidence.
+- Avoid vague instructions such as "check the configuration", "fix permissions", "inspect
+  the logs", or "contact an engineer". Name the specific setting, access, decision, or owner.
+
+A blocked event requires a structured result with `outcome: "blocked"`,
+`humanActionRequired: true`, and a non-empty `nextAction`. For example, save:
+
+```json
+{
+  "summary": "Briar cannot open the pull request because GitHub sign-in for this worker computer has expired. The saved code is not lost, but review cannot begin.",
+  "outcome": "blocked",
+  "importance": "important",
+  "urgency": "normal",
+  "impact": "issue",
+  "humanActionRequired": true,
+  "nextAction": "A person with repository access should sign in to GitHub again on the worker computer, confirm the account is active, and then retry this issue.",
+  "dueAt": null
+}
+```
+
+Then record the complete handoff:
 
 ```sh
 briar run event add --run '<run-id>' \
   --status blocked \
   --event-key '<source-key>:blocked:<cause>' \
-  --status-detail '<exact external action required>'
+  --status-detail '<failed operation and safe diagnostic details>' \
+  --structured-result-file '<blocked-result.json>'
+```
 
+After the blocker is resolved:
+
+```sh
 briar run retry --run '<run-id>' --reason '<what changed>'
 briar run cancel --run '<run-id>' --reason '<why it was abandoned>'
 ```

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import worker, {
   claimConversationJson,
+  eventSchema,
   issueUpdateInputSchema,
   organizationLogoInputSchema,
   organizationMemberRoleInputSchema,
@@ -14,6 +15,57 @@ import worker, {
 } from "./index";
 
 describe("Worker HTTP contract", () => {
+  it("requires an actionable structured handoff for blocked work", () => {
+    const blockedEvent = {
+      runId: "11111111-1111-4111-8111-111111111111",
+      status: "blocked" as const,
+      eventKey: "BRIAR-42:blocked:github-auth",
+      occurredAt: "2026-07-31T00:00:00.000Z",
+      actor: "briar-workflow",
+      repository: "example/briar",
+      detail:
+        "GitHub sign-in expired, so Briar cannot open the pull request and review cannot begin.",
+      structuredResult: {
+        summary:
+          "GitHub sign-in expired, so Briar cannot open the pull request and review cannot begin.",
+        outcome: "blocked" as const,
+        importance: "important" as const,
+        urgency: "normal" as const,
+        impact: "issue" as const,
+        humanActionRequired: true,
+        nextAction:
+          "A repository owner should sign in to GitHub on the worker computer, confirm the account is active, and retry this issue.",
+        dueAt: null,
+      },
+    };
+
+    expect(eventSchema.parse(blockedEvent).structuredResult?.nextAction).toContain(
+      "repository owner",
+    );
+    expect(() =>
+      eventSchema.parse({ ...blockedEvent, structuredResult: null }),
+    ).toThrow(/structured blocked result/u);
+    expect(() =>
+      eventSchema.parse({
+        ...blockedEvent,
+        structuredResult: {
+          ...blockedEvent.structuredResult,
+          outcome: "failed",
+        },
+      }),
+    ).toThrow(/blocked structured outcome/u);
+    expect(() =>
+      eventSchema.parse({
+        ...blockedEvent,
+        structuredResult: {
+          ...blockedEvent.structuredResult,
+          humanActionRequired: false,
+          nextAction: null,
+        },
+      }),
+    ).toThrow(/exact human next action/u);
+  });
+
   it("validates synchronized agent session snapshots", () => {
     expect(
       projectAgentSessionInputSchema.parse({

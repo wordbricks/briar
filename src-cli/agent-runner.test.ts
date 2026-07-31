@@ -51,6 +51,10 @@ describe("detached Agent runner", () => {
     expect(prompt).toContain("Use the attached design.");
     expect(prompt).toContain("/runtime/attachments/run-42/design.png");
     expect(prompt).toContain("The mobile layout is the acceptance criterion.");
+    expect(prompt).toContain("nontechnical PM or CEO");
+    expect(prompt).toContain("observable completion condition");
+    expect(prompt).toContain("available under View details");
+    expect(prompt).toContain("structured blocked result");
     expect(prompt).not.toContain("claimToken");
     expect(launch.arguments).toContain("workspace-write");
     expect(launch.arguments).toContain("gpt-5");

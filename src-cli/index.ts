@@ -1168,6 +1168,26 @@ async function addRunEvent(forcedStatus?: string) {
       "run complete structured outcome must be completed or partial",
     );
   }
+  if (input.status === "blocked" && !input.structuredResult) {
+    throw new Error(
+      "--status blocked requires --structured-result or --structured-result-file",
+    );
+  }
+  if (
+    input.status === "blocked" &&
+    input.structuredResult?.outcome !== "blocked"
+  ) {
+    throw new Error("--status blocked structured outcome must be blocked");
+  }
+  if (
+    input.status === "blocked" &&
+    (!input.structuredResult?.humanActionRequired ||
+      !input.structuredResult.nextAction)
+  ) {
+    throw new Error(
+      "--status blocked requires humanActionRequired and an exact nextAction",
+    );
+  }
   z.object({
     runId: z.string().uuid().nullable(),
     source: z.enum(autoHuntSources).nullable(),
