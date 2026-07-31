@@ -6,6 +6,7 @@ import {
   Cable,
   ChevronDown,
   Cloud,
+  Download,
   Github,
   GitBranch,
   Gitlab,
@@ -43,9 +44,11 @@ import {
   SettingsAlert,
 } from "@/components/settings";
 import { Typography } from "@/components/ui/typography";
+import { Button } from "@/components/ui/button";
 import { useI18n } from "../i18n";
 import {
   inspectOnboardingPrerequisites,
+  installOnboardingPrerequisite,
   type OnboardingPrerequisites,
 } from "../lib/initial-onboarding";
 import {
@@ -164,6 +167,8 @@ export function AppSettings({
   const [providersLoading, setProvidersLoading] = useState(false);
   const [providerSaving, setProviderSaving] =
     useState<AgentProvider | null>(null);
+  const [providerInstalling, setProviderInstalling] =
+    useState<AgentProvider | null>(null);
   const [providerError, setProviderError] = useState<string | null>(null);
   const [providersChecked, setProvidersChecked] = useState(false);
   const [providerUsage, setProviderUsage] =
@@ -268,6 +273,24 @@ export function AppSettings({
       );
     } finally {
       setProviderLoginOpening(null);
+    }
+  };
+
+  const installProvider = async (provider: AgentProvider) => {
+    if (providerInstalling || providerSaving) return;
+    setProviderInstalling(provider);
+    setProviderError(null);
+    try {
+      const statuses = await installOnboardingPrerequisite(provider);
+      setProviderStatuses(statuses);
+      setProviderUsage(await loadAgentUsage().catch(() => null));
+      setProvidersChecked(true);
+    } catch (caught) {
+      setProviderError(
+        caught instanceof Error ? caught.message : String(caught),
+      );
+    } finally {
+      setProviderInstalling(null);
     }
   };
 
@@ -495,7 +518,11 @@ export function AppSettings({
                     ) : null}
                     <SettingsIconButton
                       aria-label={t("appSettings.refreshProviders")}
-                      disabled={providersLoading || providerSaving !== null}
+                      disabled={
+                        providersLoading ||
+                        providerSaving !== null ||
+                        providerInstalling !== null
+                      }
                       onClick={() => void refreshProviders()}
                       title={t("appSettings.refreshProviders")}
                     >
@@ -510,7 +537,13 @@ export function AppSettings({
                 title={t("appSettings.providers")}
               />
 
-              <SettingsCard aria-busy={providersLoading || providerSaving !== null}>
+              <SettingsCard
+                aria-busy={
+                  providersLoading ||
+                  providerSaving !== null ||
+                  providerInstalling !== null
+                }
+              >
                 <ProviderRow
                   available={Boolean(
                     providerStatuses?.codex.installed &&
@@ -524,7 +557,9 @@ export function AppSettings({
                     providerName: "Codex CLI",
                     t,
                   })}
-                  disabled={providerSaving !== null}
+                  disabled={
+                    providerSaving !== null || providerInstalling !== null
+                  }
                   enabled={providerSettings?.codex ?? false}
                   icon={
                     <ProviderIcon tone="codex">
@@ -542,7 +577,33 @@ export function AppSettings({
                     </>
                   }
                   trailing={
-                    providerSaving === "codex" ? (
+                    providerInstalling === "codex" ? (
+                      <Button
+                        aria-label={t("appSettings.installingProvider", {
+                          provider: "Codex",
+                        })}
+                        disabled
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        <LoaderCircle className="spin" />
+                        {t("appSettings.installing")}
+                      </Button>
+                    ) : providerStatuses?.codex.installed === false ? (
+                      <Button
+                        aria-label={t("appSettings.installProvider", {
+                          provider: "Codex",
+                        })}
+                        onClick={() => void installProvider("codex")}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        <Download />
+                        {t("appSettings.install")}
+                      </Button>
+                    ) : providerSaving === "codex" ? (
                       <LoaderCircle
                         aria-label={t("common.saving")}
                         className="spin"
@@ -564,7 +625,9 @@ export function AppSettings({
                     providerName: "Claude Code",
                     t,
                   })}
-                  disabled={providerSaving !== null}
+                  disabled={
+                    providerSaving !== null || providerInstalling !== null
+                  }
                   enabled={providerSettings?.claude ?? false}
                   icon={
                     <ProviderIcon tone="claude">
@@ -582,7 +645,33 @@ export function AppSettings({
                     </>
                   }
                   trailing={
-                    providerSaving === "claude" ? (
+                    providerInstalling === "claude" ? (
+                      <Button
+                        aria-label={t("appSettings.installingProvider", {
+                          provider: "Claude",
+                        })}
+                        disabled
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        <LoaderCircle className="spin" />
+                        {t("appSettings.installing")}
+                      </Button>
+                    ) : providerStatuses?.claude.installed === false ? (
+                      <Button
+                        aria-label={t("appSettings.installProvider", {
+                          provider: "Claude",
+                        })}
+                        onClick={() => void installProvider("claude")}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        <Download />
+                        {t("appSettings.install")}
+                      </Button>
+                    ) : providerSaving === "claude" ? (
                       <LoaderCircle
                         aria-label={t("common.saving")}
                         className="spin"
@@ -604,7 +693,9 @@ export function AppSettings({
                     providerName: "Grok CLI",
                     t,
                   })}
-                  disabled={providerSaving !== null}
+                  disabled={
+                    providerSaving !== null || providerInstalling !== null
+                  }
                   enabled={providerSettings?.grok ?? false}
                   icon={
                     <ProviderIcon tone="grok">
@@ -622,7 +713,33 @@ export function AppSettings({
                     </>
                   }
                   trailing={
-                    providerSaving === "grok" ? (
+                    providerInstalling === "grok" ? (
+                      <Button
+                        aria-label={t("appSettings.installingProvider", {
+                          provider: "Grok",
+                        })}
+                        disabled
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        <LoaderCircle className="spin" />
+                        {t("appSettings.installing")}
+                      </Button>
+                    ) : providerStatuses?.grok.installed === false ? (
+                      <Button
+                        aria-label={t("appSettings.installProvider", {
+                          provider: "Grok",
+                        })}
+                        onClick={() => void installProvider("grok")}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        <Download />
+                        {t("appSettings.install")}
+                      </Button>
+                    ) : providerSaving === "grok" ? (
                       <LoaderCircle
                         aria-label={t("common.saving")}
                         className="spin"
@@ -677,7 +794,9 @@ export function AppSettings({
                       </span>
                       <button
                         disabled={
-                          !installed || providerLoginOpening !== null
+                          !installed ||
+                          providerLoginOpening !== null ||
+                          providerInstalling !== null
                         }
                         onClick={() => void openProviderLogin(provider)}
                         type="button"
