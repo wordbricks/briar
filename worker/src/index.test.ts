@@ -408,7 +408,7 @@ describe("Worker HTTP contract", () => {
     expect(page).not.toContain("<h1>Companion 로그인 승인</h1>");
   });
 
-  it("serves issue links that open the exact issue in Companion", async () => {
+  it("serves issue links that open the exact issue in the Briar app", async () => {
     const projectId = "11111111-1111-4111-8111-111111111111";
     const runId = "22222222-2222-4222-8222-222222222222";
     const response = await worker.fetch(
@@ -424,6 +424,7 @@ describe("Worker HTTP contract", () => {
     expect(page).toContain(
       `briar-companion://issues/${projectId}/${runId}`,
     );
+    expect(page).toContain("Briar 앱이 설치되어 있어야 합니다.");
     expect(page).not.toContain("authorization");
   });
 

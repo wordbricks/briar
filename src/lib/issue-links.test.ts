@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  copyIssueShareLink,
   issueDeepLinkUrl,
   issueShareUrl,
   parseIssueLink,
@@ -16,6 +17,21 @@ const mobileConfig = (platform: "android" | "ios") =>
       "utf8",
     ),
   );
+const desktopConfig = JSON.parse(
+  readFileSync(
+    new URL("../../src-tauri/tauri.conf.json", import.meta.url),
+    "utf8",
+  ),
+);
+const desktopCapabilities = JSON.parse(
+  readFileSync(
+    new URL(
+      "../../src-tauri/capabilities/default.json",
+      import.meta.url,
+    ),
+    "utf8",
+  ),
+);
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -65,6 +81,27 @@ describe("issue links", () => {
           appLink: true,
         },
       ]),
+    );
+  });
+
+  it("registers and grants issue deep links on desktop", () => {
+    expect(desktopConfig.plugins["deep-link"].desktop.schemes).toContain(
+      "briar-companion",
+    );
+    expect(desktopCapabilities.permissions).toContain("deep-link:default");
+  });
+
+  it("copies the deterministic issue URL directly", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    await copyIssueShareLink({ projectId, runId });
+
+    expect(writeText).toHaveBeenCalledWith(
+      `http://127.0.0.1:8787/open/issues/${projectId}/${runId}`,
     );
   });
 

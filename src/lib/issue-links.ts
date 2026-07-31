@@ -1,5 +1,3 @@
-import { isMobileCompanion } from "./platform";
-
 const issueLinkPathPattern =
   /^\/open\/issues\/([0-9a-f-]{36})\/([0-9a-f-]{36})\/?$/iu;
 const issueDeepLinkScheme = "briar-companion:";
@@ -73,6 +71,13 @@ async function copyIssueLink(url: string): Promise<void> {
   if (!copied) throw new Error("Unable to copy issue link");
 }
 
+export async function copyIssueShareLink(input: {
+  projectId: string;
+  runId: string;
+}): Promise<void> {
+  await copyIssueLink(issueShareUrl(input.projectId, input.runId));
+}
+
 export async function shareIssueLink(input: {
   projectId: string;
   runId: string;
@@ -100,8 +105,7 @@ export function listenForIssueLinks(
 ): () => void {
   if (
     typeof window === "undefined" ||
-    !("__TAURI_INTERNALS__" in window) ||
-    !isMobileCompanion()
+    !("__TAURI_INTERNALS__" in window)
   ) {
     return () => {};
   }

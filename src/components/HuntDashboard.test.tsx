@@ -466,7 +466,7 @@ describe("HuntDashboard", () => {
     await act(async () => root.unmount());
   });
 
-  it("shows share, edit, and delete in the title actions menu and confirms deletion", async () => {
+  it("shows copy link beside the title and edit/delete in the actions menu", async () => {
     const onDeleteIssue = vi.fn(async () => undefined);
     const container = document.createElement("div");
     document.body.append(container);
@@ -486,7 +486,16 @@ describe("HuntDashboard", () => {
     const trigger = container.querySelector<HTMLButtonElement>(
       ".run-page-actions-trigger",
     );
-    expect(title?.nextElementSibling).toBe(trigger);
+    const copyLink = container.querySelector<HTMLButtonElement>(
+      ".run-page-link-copy",
+    );
+    const titlebarActions = container.querySelector(
+      ".run-page-titlebar-actions",
+    );
+    expect(copyLink?.getAttribute("aria-label")).toBe("링크 복사");
+    expect(title?.nextElementSibling).toBe(titlebarActions);
+    expect(titlebarActions?.firstElementChild).toBe(copyLink);
+    expect(copyLink?.nextElementSibling).toBe(trigger);
     expect(container.querySelector(".run-page-edit")).toBeNull();
 
     await act(async () => {
@@ -495,7 +504,7 @@ describe("HuntDashboard", () => {
       );
     });
     const menu = document.body.querySelector('[role="menu"]');
-    expect(menu?.textContent).toContain("링크 공유");
+    expect(menu?.textContent).not.toContain("링크 공유");
     expect(menu?.textContent).toContain("수정");
     expect(menu?.textContent).toContain("삭제");
 
