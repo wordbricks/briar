@@ -311,6 +311,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "dirs",
+ "notify-rust",
  "reqwest",
  "rustls",
  "serde",
