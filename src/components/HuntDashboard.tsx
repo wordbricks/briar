@@ -181,6 +181,7 @@ export function HuntDashboard({
   onProcessIssueNow,
   onRetryRun,
   onCancelRun,
+  onCompanionAgentsOpen,
   onCompanionInboxOpen,
   onCompanionSearchOpen,
   onCompanionStatusChange,
@@ -232,6 +233,7 @@ export function HuntDashboard({
   onProcessIssueNow?: (run: HuntRun) => void;
   onRetryRun: (runId: string) => Promise<unknown>;
   onCancelRun: (runId: string) => Promise<unknown>;
+  onCompanionAgentsOpen?: () => void;
   onCompanionInboxOpen?: () => void;
   onCompanionSearchOpen?: () => void;
   onCompanionStatusChange?: (status: CompanionStatusFilter) => void;
@@ -587,6 +589,9 @@ export function HuntDashboard({
           onLoadRunEvidenceImage={onLoadRunEvidenceImage}
           mentionMembers={dashboard?.members ?? []}
           onMove={(placement) => onMoveRun(selected.id, placement)}
+          onProcessNow={
+            onProcessIssueNow ? () => onProcessIssueNow(selected) : undefined
+          }
           onRetry={() => onRetryRun(selected.id)}
           onSendIssueMessage={(input) => onSendIssueMessage(selected.id, input)}
           onUpdateIssue={(input) => onUpdateIssue(selected.id, input)}
@@ -599,6 +604,7 @@ export function HuntDashboard({
           }
           projectId={dashboard!.project.id}
           run={selected}
+          isProcessing={processingIssueIds.has(selected.id)}
           availableRuns={dashboard!.runs}
         />
         {createIssueDialog}
@@ -934,6 +940,7 @@ export function HuntDashboard({
         <CompanionBottomNavigation
           activeDestination={companionSearchMode ? "search" : status}
           onCreate={() => setIsIssueDialogOpen(true)}
+          onAgentsOpen={() => onCompanionAgentsOpen?.()}
           onInboxOpen={() => onCompanionInboxOpen?.()}
           onSearchOpen={() => onCompanionSearchOpen?.()}
           onStatusChange={setStatus}
@@ -2587,6 +2594,7 @@ export function RunPage({
   companionMode = false,
   error,
   isDeletingIssue = false,
+  isProcessing = false,
   isRecovering,
   isUpdatingIssue = false,
   isSidebarOpen,
@@ -2602,6 +2610,7 @@ export function RunPage({
   onLoadRunEvidenceImage,
   mentionMembers = [],
   onMove,
+  onProcessNow,
   onRetry,
   onRemoveDependency,
   onSendIssueMessage,
@@ -2616,6 +2625,7 @@ export function RunPage({
   companionMode?: boolean;
   error: string | null;
   isDeletingIssue?: boolean;
+  isProcessing?: boolean;
   isRecovering: boolean;
   isUpdatingIssue?: boolean;
   isSidebarOpen: boolean;
@@ -2631,6 +2641,7 @@ export function RunPage({
   onLoadRunEvidenceImage?: (image: RunEvidenceImage) => Promise<Blob>;
   mentionMembers?: OrganizationMember[];
   onMove: (placement: HuntRunPlacement) => Promise<unknown>;
+  onProcessNow?: () => void;
   onRetry: () => Promise<unknown>;
   onRemoveDependency?: (prerequisiteRunId: string) => Promise<unknown>;
   onSendIssueMessage: (input: {
@@ -2653,6 +2664,19 @@ export function RunPage({
   const canCancelRemoteExecution =
     Boolean(run.workerId) &&
     !["completed", "cancelled", "blocked", "failed"].includes(run.status);
+  const isClaimed =
+    run.status === "queued" &&
+    Boolean(run.leaseExpiresAt) &&
+    Date.parse(run.leaseExpiresAt!) > Date.now();
+  const canReassign =
+    Boolean(run.workerId || run.requestedWorkerId) &&
+    !["completed", "cancelled"].includes(run.status);
+  const processNowDisabled =
+    !onProcessNow ||
+    run.executionReadiness === "waiting" ||
+    (run.status !== "queued" && !canReassign) ||
+    (isClaimed && !canReassign) ||
+    isProcessing;
   const priorityLabel = run.priority === null
     ? t("run.notSet")
     : t(`issue.priority${run.priority}` as MessageKey);
@@ -2932,6 +2956,26 @@ export function RunPage({
                 </div>
                 <div className="run-page-companion-actions">
                   {compactProperties}
+                  <Button
+                    className="run-page-process-now"
+                    disabled={processNowDisabled}
+                    onClick={onProcessNow}
+                    size="sm"
+                    type="button"
+                  >
+                    {isProcessing ? (
+                      <LoaderCircle aria-hidden="true" className="spin" size={15} />
+                    ) : (
+                      <Bot aria-hidden="true" size={15} />
+                    )}
+                    {t(
+                      isProcessing
+                        ? "issue.processNowRunning"
+                        : canReassign
+                          ? "worker.reassign"
+                          : "issue.processNow",
+                    )}
+                  </Button>
                   <button
                     aria-controls="run-properties-panel"
                     aria-expanded={isPropertiesOpen}

@@ -3188,7 +3188,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
   min-height: 68px;
   padding: 5px;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0,1fr));
+  grid-template-columns: repeat(4, minmax(0,1fr));
   border: 1px solid rgba(61,59,67,.14);
   border-radius: 26px;
   background: rgba(247,247,249,.88);
@@ -3314,6 +3314,44 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .companion-shell .inbox-message-copy strong { font-size:var(--text-xs); }
 .companion-shell .inbox-message-detail { font-size:var(--text-2xs); }
 .companion-shell .inbox-empty { min-height:260px; }
+.companion-shell .project-agents-heading {
+  min-height:56px;
+  padding:6px max(16px,env(safe-area-inset-right)) 6px max(16px,env(safe-area-inset-left));
+}
+.companion-shell .project-agents-heading .project-agent-create {
+  height:40px;
+  padding:0 12px;
+  border-radius:11px;
+  font-size:var(--text-sm);
+}
+.companion-shell .project-agents-scroll {
+  padding-bottom:calc(106px + env(safe-area-inset-bottom));
+}
+.companion-shell .project-agents-content { padding-bottom:0; }
+.companion-shell .project-agents-body {
+  padding:20px max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left));
+}
+.companion-shell .project-agents-body > header { margin-bottom:16px; }
+.companion-shell .project-agent-grid {
+  grid-template-columns:minmax(0,1fr);
+  gap:14px;
+}
+.companion-shell .project-agent-card,
+.companion-shell .project-agent-create-card { min-height:0; }
+.companion-shell .project-agent-card-open > section { padding-bottom:18px; }
+.companion-shell .project-agent-run-scroll {
+  overflow-y:auto;
+  padding-bottom:calc(106px + env(safe-area-inset-bottom));
+}
+.companion-shell .run-page-companion-actions { flex-wrap:wrap; }
+.companion-shell .run-page-companion-actions .run-page-property-badges {
+  flex:1 1 100%;
+}
+.companion-shell .run-page-process-now {
+  min-height:36px;
+  flex:1 1 auto;
+  white-space:nowrap;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .inbox-filter { transition:none; }
