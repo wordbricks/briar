@@ -13,6 +13,8 @@ This is the version-matched workflow guide embedded in the Briar CLI. Use the sa
 - Never invent PR, CI, deployment, or production work absent from the workflow or beyond its execution boundary.
 - Event and evidence keys are idempotency keys. Reuse a key only for an identical retry.
 - Record `completed` only after required stages, required evidence, and a structured result exist.
+- Write every completion result for a nontechnical PM or CEO, in the issue's language whenever possible.
+- For user-visible interface changes, make a reasonable effort to capture and attach screenshots of the finished result.
 - Write every blocked handoff for a nontechnical PM or CEO, in the issue's language whenever possible.
 
 ## Saved agent context
@@ -263,6 +265,24 @@ whether a person must act, the exact next action, and any due time. Use this con
   "dueAt": null
 }
 ```
+
+The issue detail page presents `structuredResult.summary` as the main result card. Write it
+for a PM or CEO who may not know the codebase:
+
+- Lead with what is now different for users or the business, then say what was verified.
+- Use the issue's language and explain any necessary technical term on first use.
+- Keep commands, file paths, test internals, raw errors, and low-level implementation detail
+  in evidence or status detail rather than the summary.
+- Do not merely list files changed or say that work was completed.
+
+When the work changes a user-visible interface, make a reasonable effort to run the relevant
+screen and capture the finished state. Attach one or more useful screenshots to the most
+relevant passed evidence record with repeated `--image` arguments. Prefer screenshots that
+show the completed experience and the changed area clearly; avoid duplicate or incidental
+screens. These images appear with the result evidence on the issue detail page. If the
+available environment cannot render the interface or capture a screenshot, state the reason
+in the evidence detail. Do not fabricate a screenshot, and do not block otherwise completed
+work solely because screenshot capture is unavailable.
 
 Allowed values are `completed|partial|blocked|failed` for `outcome`,
 `routine|important|critical` for `importance`, `normal|time_sensitive|immediate`

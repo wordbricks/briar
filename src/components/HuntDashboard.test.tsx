@@ -1192,6 +1192,86 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
+  it("shows authenticated result screenshots with their evidence", async () => {
+    const observedAt = "2026-07-28T04:30:00.000Z";
+    const image = {
+      id: "image-1",
+      filename: "finished-dashboard.png",
+      contentType: "image/png",
+      byteSize: 1024,
+      sha256: "abc",
+      position: 0,
+      url: "/projects/project-1/runs/run-1/evidence/images/image-1",
+    };
+    const evidence: RunEvidence[] = [{
+      key: "BRIAR-12:local_qa:ui_result",
+      attempt: 1,
+      revision: 1,
+      stage: "local_qa",
+      type: "ui_result",
+      status: "passed",
+      detail: "완성된 대시보드 화면을 확인했습니다.",
+      command: null,
+      url: null,
+      metadata: null,
+      actor: "briar-workflow",
+      observedAt,
+      recordedAt: observedAt,
+      images: [image],
+      requiredRevision: 1,
+      canonical: true,
+    }];
+    const onLoadImage = vi.fn(async () => new Blob(["image"], { type: "image/png" }));
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: vi.fn(() => "blob:result-screenshot"),
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: vi.fn(),
+    });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => evidence}
+          onLoadRunEvidenceImage={onLoadImage}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          run={demoDashboard.runs[0]}
+        />,
+      );
+    });
+    const evidenceTab = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
+    ).find((button) => button.textContent?.includes("증빙"));
+    await act(async () => evidenceTab?.click());
+
+    expect(onLoadImage).toHaveBeenCalledWith(image);
+    expect(
+      container.querySelector(".run-evidence-image img")?.getAttribute("src"),
+    ).toBe("blob:result-screenshot");
+    expect(container.querySelector(".run-evidence-images")?.textContent).toContain(
+      "결과 화면",
+    );
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("keeps loaded messages visible when the run snapshot refreshes", async () => {
     const createdAt = new Date().toISOString();
     const loadedMessage: IssueMessage = {
@@ -1866,6 +1946,51 @@ describe("HuntDashboard", () => {
     expect(markup).toContain('<label class="run-property run-status-control">');
     expect(markup).toContain('aria-haspopup="listbox" aria-label="상태"');
     expect(markup).toContain('<span class="select-menu-value">실패</span>');
+  });
+
+  it("shows a plain-language result card for a completed issue", () => {
+    const completedRun = {
+      ...demoDashboard.runs[0],
+      status: "completed" as const,
+      issueDescription: "## 요청\n\n완료 결과를 쉽게 확인할 수 있게 해주세요.",
+      resultSummary: "고객이 완료된 작업 결과를 이슈에서 바로 확인할 수 있습니다.",
+      structuredResult: {
+        summary: "고객이 완료된 작업 결과와 화면을 이슈에서 바로 확인할 수 있습니다. 주요 흐름도 정상 동작하는지 확인했습니다.",
+        outcome: "completed" as const,
+        importance: "important" as const,
+        urgency: "normal" as const,
+        impact: "issue" as const,
+        humanActionRequired: false,
+        nextAction: null,
+        dueAt: null,
+      },
+    };
+    const markup = renderToStaticMarkup(
+      <RunPage
+        isSidebarOpen
+        error={null}
+        isRecovering={false}
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => []}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }}
+        run={completedRun}
+      />,
+    );
+
+    expect(markup).toContain('class="completed-issue-card"');
+    expect(markup).toContain("작업 결과");
+    expect(markup).toContain(completedRun.structuredResult.summary);
+    expect(markup).toContain("결과 화면과 증빙 보기");
+    expect(markup.indexOf("completed-issue-card")).toBeLessThan(
+      markup.indexOf("issue-description-markdown"),
+    );
   });
 
   it("shows blocker details at the top of the issue description", () => {

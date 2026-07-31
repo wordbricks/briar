@@ -19,6 +19,7 @@ import {
   loadIssueAttachment,
   loadIssueMessages,
   loadRunEvidence,
+  loadRunEvidenceImage,
   loadLinearImportStates,
   loadOrganizations,
   loadProjects,
@@ -112,6 +113,7 @@ import type {
   Project,
   ProjectSettings,
   RunEvidence,
+  RunEvidenceImage,
   SessionUser,
   UpdateIssueInput,
 } from "../types";
@@ -1893,6 +1895,14 @@ export function useBriar(options: UseBriarOptions = {}) {
     [activeProjectId, token],
   );
 
+  const readRunEvidenceImage = useCallback(
+    async (image: RunEvidenceImage) => {
+      if (!token) throw new Error("증빙 이미지를 불러오려면 로그인이 필요합니다.");
+      return loadRunEvidenceImage(token, image);
+    },
+    [token],
+  );
+
   const addIssueMessage = useCallback(
     async (
       runId: string,
@@ -2236,6 +2246,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     editIssueExecutionPreferences,
     readIssueMessages,
     readRunEvidence,
+    readRunEvidenceImage,
     addIssueMessage,
     setActiveOrganizationId: selectOrganization,
     setActiveProjectId: selectProject,

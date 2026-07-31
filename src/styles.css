@@ -880,6 +880,15 @@ body { overflow: hidden; font-synthesis: none; }
 .blocked-issue-card dl > div { display:grid; grid-template-columns:minmax(86px,auto) 1fr; align-items:start; gap:10px; }
 .blocked-issue-card dt { color:var(--destructive); font-size:var(--text-2xs); font-weight:700; }
 .blocked-issue-card dd { min-width:0; margin:0; color:var(--foreground); font-size:var(--text-xs); line-height:1.55; overflow-wrap:anywhere; }
+.completed-issue-card { margin:0 0 14px; padding:14px; border:1px solid color-mix(in srgb,#4baa86 42%,var(--border)); border-radius:12px; background:color-mix(in srgb,#4baa86 8%,var(--card)); box-shadow:0 1px 2px color-mix(in srgb,#4baa86 8%,transparent); }
+.completed-issue-card-heading { display:flex; align-items:center; gap:8px; color:#318064; }
+.completed-issue-card-heading strong { color:var(--foreground); font-size:var(--text-xs); }
+.completed-issue-card > p { margin:10px 0 0; color:var(--foreground); font-size:var(--text-xs); line-height:1.65; white-space:pre-wrap; overflow-wrap:anywhere; }
+.completed-issue-card > div:not(.completed-issue-card-heading) { margin-top:10px; display:grid; gap:3px; }
+.completed-issue-card > div:not(.completed-issue-card-heading) strong { color:#318064; font-size:var(--text-2xs); }
+.completed-issue-card > div:not(.completed-issue-card-heading) span { color:var(--foreground); font-size:var(--text-xs); line-height:1.55; }
+.completed-issue-card > button { margin-top:12px; padding:7px 9px; display:flex; align-items:center; gap:6px; border:1px solid color-mix(in srgb,#4baa86 45%,var(--border)); border-radius:8px; color:#2d725b; background:var(--card); cursor:pointer; font-size:var(--text-2xs); font-weight:700; }
+.completed-issue-card > button:hover { background:color-mix(in srgb,#4baa86 12%,var(--card)); }
 .blocked-issue-details { margin-top:12px; padding-top:10px; border-top:1px solid color-mix(in srgb,var(--destructive) 22%,var(--border)); }
 .blocked-issue-details summary { width:max-content; max-width:100%; display:flex; align-items:center; gap:5px; color:var(--muted-foreground); font-size:var(--text-2xs); font-weight:650; cursor:pointer; list-style:none; }
 .blocked-issue-details summary::-webkit-details-marker { display:none; }
@@ -919,6 +928,17 @@ body { overflow: hidden; font-synthesis: none; }
 .run-evidence-item > header i.skipped { color:#6f726b; background:#efefeb; }
 .run-evidence-item > header em { color:#7c6aaf; background:#f0ecfa; }
 .run-evidence-item > p { margin:8px 0 0; color:var(--muted-foreground); font-size:var(--text-2xs); line-height:1.55; white-space:pre-wrap; overflow-wrap:anywhere; }
+.run-evidence-images { margin-top:10px; display:grid; gap:7px; }
+.run-evidence-images > strong { display:flex; align-items:center; gap:6px; color:var(--foreground); font-size:var(--text-2xs); }
+.run-evidence-images > strong span { padding:1px 5px; border-radius:999px; color:var(--muted-foreground); background:var(--muted); font-size:var(--text-2xs); }
+.run-evidence-images > div { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:8px; }
+.run-evidence-image { min-width:0; margin:0; overflow:hidden; border:1px solid var(--border); border-radius:9px; background:var(--muted); }
+.run-evidence-image > div { min-height:120px; display:flex; align-items:center; justify-content:center; color:var(--muted-foreground); background:color-mix(in srgb,var(--muted) 65%,#000); }
+.run-evidence-image img { width:100%; height:auto; max-height:360px; display:block; object-fit:contain; }
+.run-evidence-image figcaption { min-width:0; padding:7px 8px; display:flex; align-items:center; justify-content:space-between; gap:8px; color:var(--muted-foreground); background:var(--card); font-size:var(--text-2xs); }
+.run-evidence-image figcaption span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.run-evidence-image figcaption a { flex:0 0 auto; color:var(--accent-foreground); font-weight:650; }
+.run-evidence-image figcaption small { color:var(--destructive); }
 .run-evidence-command { margin-top:8px; display:grid; gap:4px; }
 .run-evidence-command small { color:#999b94; font-size:var(--text-2xs); }
 .run-evidence-command code { overflow-x:auto; padding:7px 8px; border:1px solid var(--border); border-radius:7px; color:var(--foreground); background:var(--muted); font:500 var(--text-2xs)/1.45 "DM Mono",monospace; white-space:pre; }

@@ -14,6 +14,7 @@ import {
   loadProjectAgentScheduleRuns,
   loadProjectAgents,
   loadRunEvidence,
+  loadRunEvidenceImage,
   loadSession,
   updateProjectAgent,
   updateProjectAgentSchedule,
@@ -475,6 +476,33 @@ describe("API errors", () => {
       expect.stringContaining(`/projects/${projectId}/runs/${runId}/evidence`),
       expect.any(Object),
     );
+    expect(
+      new Headers(capturedInit?.headers).get("Authorization"),
+    ).toBe("Bearer token");
+  });
+
+  it("loads a protected run evidence image with the user token", async () => {
+    const imageBlob = new Blob(["image"], { type: "image/png" });
+    let capturedInit: RequestInit | undefined;
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        capturedInit = init;
+        return new Response(imageBlob, { status: 200 });
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      loadRunEvidenceImage("token", {
+        id: "image-1",
+        filename: "finished-ui.png",
+        contentType: "image/png",
+        byteSize: 5,
+        sha256: "abc",
+        position: 0,
+        url: "/projects/project-1/runs/run-1/evidence/images/image-1",
+      }),
+    ).resolves.toEqual(imageBlob);
     expect(
       new Headers(capturedInit?.headers).get("Authorization"),
     ).toBe("Bearer token");
