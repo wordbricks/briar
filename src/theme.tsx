@@ -10,6 +10,7 @@ import {
 export const themePreferences = ["system", "light", "dark"] as const;
 export type ThemePreference = (typeof themePreferences)[number];
 export type ResolvedTheme = Exclude<ThemePreference, "system">;
+export const defaultThemePreference: ThemePreference = "light";
 
 export const themeStorageKey = "briar.theme.v1";
 const darkMediaQuery = "(prefers-color-scheme: dark)";
@@ -22,12 +23,12 @@ function isThemePreference(value: unknown): value is ThemePreference {
 }
 
 export function loadThemePreference(): ThemePreference {
-  if (typeof window === "undefined") return "system";
+  if (typeof window === "undefined") return defaultThemePreference;
   try {
     const stored = window.localStorage.getItem(themeStorageKey);
-    return isThemePreference(stored) ? stored : "system";
+    return isThemePreference(stored) ? stored : defaultThemePreference;
   } catch {
-    return "system";
+    return defaultThemePreference;
   }
 }
 
@@ -85,7 +86,7 @@ type ThemeContextValue = {
 const ThemeContext = createContext<ThemeContextValue>({
   resolvedTheme: "light",
   setTheme: () => undefined,
-  theme: "system",
+  theme: defaultThemePreference,
 });
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
