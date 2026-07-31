@@ -2665,7 +2665,7 @@ export function RunPage({
   );
   const [isPropertiesOpen, setIsPropertiesOpen] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState<
-    "description" | "result" | "statusHistory" | "evidence"
+    "description" | "result" | "statusHistory" | "evidence" | "conversation"
   >(() => run.status === "completed" ? "result" : "description");
   const [runEvents, setRunEvents] = useState<HuntEvent[]>([]);
   const [runEventsLoading, setRunEventsLoading] = useState(true);
@@ -2995,6 +2995,18 @@ export function RunPage({
                   >
                     {t("run.status")}
                   </button>
+                  {companionMode ? (
+                    <button
+                      aria-controls={`${detailTabsId}-conversation-panel`}
+                      aria-selected={activeDetailTab === "conversation"}
+                      id={`${detailTabsId}-conversation-tab`}
+                      onClick={() => setActiveDetailTab("conversation")}
+                      role="tab"
+                      type="button"
+                    >
+                      {t("run.messages")}
+                    </button>
+                  ) : null}
                 </div>
                 <div className="run-page-content">
                 <section
@@ -3008,6 +3020,7 @@ export function RunPage({
                           : "run.evidence",
                   )}
                   className="issue-description-pane"
+                  hidden={activeDetailTab === "conversation"}
                 >
                   {activeDetailTab === "description" ? (
                     <div
@@ -3267,14 +3280,32 @@ export function RunPage({
                     />
                   )}
                 </section>
+                {companionMode ? (
+                  <div
+                    aria-labelledby={`${detailTabsId}-conversation-tab`}
+                    className="issue-conversation-tab-panel"
+                    hidden={activeDetailTab !== "conversation"}
+                    id={`${detailTabsId}-conversation-panel`}
+                    role="tabpanel"
+                  >
+                    <IssueConversation
+                      mentionMembers={mentionMembers}
+                      onLoad={onLoadIssueMessages}
+                      onSend={onSendIssueMessage}
+                      run={run}
+                    />
+                  </div>
+                ) : null}
                 </div>
               </div>
-              <IssueConversation
-                mentionMembers={mentionMembers}
-                onLoad={onLoadIssueMessages}
-                onSend={onSendIssueMessage}
-                run={run}
-              />
+              {!companionMode ? (
+                <IssueConversation
+                  mentionMembers={mentionMembers}
+                  onLoad={onLoadIssueMessages}
+                  onSend={onSendIssueMessage}
+                  run={run}
+                />
+              ) : null}
               {isPropertiesOpen ? (
               <aside
                 aria-label={t("run.properties")}
