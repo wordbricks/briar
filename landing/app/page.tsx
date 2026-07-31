@@ -1,6 +1,7 @@
 import { copy, type LandingCopy } from "./i18n";
 import { LanguageSwitcher } from "./language-switcher";
 import { getRequestLocale } from "./request-locale";
+import { ThemeToggle } from "./theme-toggle";
 
 // Stable redirect that always resolves to the current Production DMG.
 const MAC_DOWNLOAD_URL =
@@ -361,6 +362,11 @@ export default async function Home() {
             <a href="#agents">{c.nav.agents}</a>
           </nav>
           <div className="header-actions">
+            <ThemeToggle
+              label={c.theme.label}
+              darkLabel={c.theme.dark}
+              lightLabel={c.theme.light}
+            />
             <LanguageSwitcher
               locale={locale}
               label={c.language.label}
