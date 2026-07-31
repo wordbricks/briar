@@ -107,6 +107,10 @@ describe("OrganizationWorkersSettings", () => {
       "organization-1",
     );
     expect(container.textContent).toContain("renamed-host");
+    const capacity = container.querySelector('[role="progressbar"]');
+    expect(capacity?.getAttribute("aria-valuemin")).toBe("0");
+    expect(capacity?.getAttribute("aria-valuemax")).toBe("1");
+    expect(capacity?.getAttribute("aria-valuenow")).toBe("0");
 
     await act(async () => root.unmount());
     container.remove();
@@ -174,6 +178,82 @@ describe("OrganizationWorkersSettings", () => {
       "organization-1",
       "device-1",
       { type: "emoji", value: "🍋" },
+    );
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("separates project readiness and providers from Worker capacity", async () => {
+    vi.mocked(loadOrganizationExecutionWorkers).mockResolvedValue({
+      workers: [
+        {
+          deviceId: "device-1",
+          ownerUserId: "user-1",
+          ownerName: "Jay",
+          label: "renamed-host",
+          state: "online",
+          maxConcurrentSessions: 4,
+          activeSessions: 1,
+          lastHeartbeatAt: "2026-07-30T00:00:00Z",
+          createdAt: "2026-07-30T00:00:00Z",
+          bindings: [
+            {
+              id: "binding-1",
+              projectId: "project-1",
+              projectName: "Briar",
+              agentProvider: "codex",
+              providers: ["codex", "claude"],
+              state: "online",
+              acceptingWork: true,
+              readiness: "available",
+              readinessDetail: null,
+            },
+          ],
+        },
+      ],
+      canManage: true,
+      generatedAt: "2026-07-30T00:00:00Z",
+    });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <OrganizationWorkersSettings
+          connectedProjectIds={["project-1"]}
+          organization={{
+            id: "organization-1",
+            name: "Wordbricks",
+            handle: "wordbricks",
+            logo: null,
+            role: "owner",
+            createdAt: "2026-07-30T00:00:00Z",
+          }}
+          projects={[
+            {
+              id: "project-1",
+              organizationId: "organization-1",
+              name: "Briar",
+              createdAt: "2026-07-30T00:00:00Z",
+            },
+          ]}
+          token="token"
+          userId="user-1"
+        />,
+      );
+    });
+
+    expect(container.textContent).toContain("Briar");
+    expect(container.textContent).toContain("사용 가능");
+    expect(container.querySelector('[aria-label="Codex"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Claude"]')).not.toBeNull();
+    const capacity = container.querySelector('[role="progressbar"]');
+    expect(capacity?.getAttribute("aria-valuemax")).toBe("4");
+    expect(capacity?.getAttribute("aria-valuenow")).toBe("1");
+    expect(capacity?.getAttribute("aria-label")).toBe(
+      "실행 슬롯 1/4 사용 중",
     );
 
     await act(async () => root.unmount());
