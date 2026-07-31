@@ -3,7 +3,7 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../i18n";
 import type { ExecutionWorker } from "../types";
 import {
@@ -49,6 +49,7 @@ describe("WorkerStatusBar", () => {
     const markup = renderToStaticMarkup(
       <I18nProvider>
         <WorkerStatusBar
+          onOpenSettings={() => undefined}
           workers={[
             worker(),
             worker({
@@ -75,7 +76,10 @@ describe("WorkerStatusBar", () => {
     await act(async () => {
       root.render(
         <I18nProvider>
-          <WorkerStatusBar workers={[worker()]} />
+          <WorkerStatusBar
+            onOpenSettings={() => undefined}
+            workers={[worker()]}
+          />
         </I18nProvider>,
       );
     });
@@ -106,6 +110,7 @@ describe("WorkerStatusBar", () => {
       root.render(
         <I18nProvider>
           <WorkerStatusBar
+            onOpenSettings={() => undefined}
             workers={[
               worker({
                 activeSessions: 2,
@@ -129,6 +134,41 @@ describe("WorkerStatusBar", () => {
     expect(meter?.getAttribute("aria-valuemax")).toBe("4");
     expect(meter?.querySelector("b")?.style.width).toBe("50%");
     expect(meter?.textContent).toBe("2/4");
+
+    await act(async () => root.unmount());
+  });
+
+  it("opens Worker settings from the popover header", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    const onOpenSettings = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <I18nProvider>
+          <WorkerStatusBar
+            onOpenSettings={onOpenSettings}
+            workers={[worker()]}
+          />
+        </I18nProvider>,
+      );
+    });
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".worker-status-trigger")
+        ?.click();
+    });
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(
+          '[aria-label="Worker 설정 열기"]',
+        )
+        ?.click();
+    });
+
+    expect(onOpenSettings).toHaveBeenCalledOnce();
+    expect(container.querySelector(".worker-status-popover")).toBeNull();
 
     await act(async () => root.unmount());
   });

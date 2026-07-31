@@ -861,7 +861,19 @@ export function App() {
               navigateToPage("settings");
             }}
           />
-          <WorkerStatusBar workers={briar.dashboard?.workers ?? []} />
+          <WorkerStatusBar
+            onOpenSettings={() => {
+              if (!briar.activeOrganizationId) return;
+              setSettingsTarget({
+                scope: "organization",
+                organizationId: briar.activeOrganizationId,
+                section: "workers",
+              });
+              setIsSidebarOpen(true);
+              navigateToPage("settings");
+            }}
+            workers={briar.dashboard?.workers ?? []}
+          />
           <AppVersionStatus />
           <ConnectionHealth
             error={briar.healthError}

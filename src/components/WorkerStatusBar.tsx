@@ -1,4 +1,4 @@
-import { Monitor } from "lucide-react";
+import { Monitor, Settings } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { useI18n } from "../i18n";
 import type { AgentProvider } from "../lib/project-llm";
@@ -17,8 +17,10 @@ export function activeWorkerCount(workers: ExecutionWorker[]): number {
 }
 
 export function WorkerStatusBar({
+  onOpenSettings,
   workers,
 }: {
+  onOpenSettings: () => void;
   workers: ExecutionWorker[];
 }) {
   const { t } = useI18n();
@@ -79,11 +81,24 @@ export function WorkerStatusBar({
         >
           <header>
             <strong>{t("worker.executionEnvironment")}</strong>
-            <span>
-              {t("worker.activeSummary", {
-                active: activeCount,
-                total: workers.length,
-              })}
+            <span className="worker-status-header-actions">
+              <span>
+                {t("worker.activeSummary", {
+                  active: activeCount,
+                  total: workers.length,
+                })}
+              </span>
+              <button
+                aria-label={t("worker.openSettings")}
+                onClick={() => {
+                  setIsOpen(false);
+                  onOpenSettings();
+                }}
+                title={t("worker.openSettings")}
+                type="button"
+              >
+                <Settings aria-hidden size={14} strokeWidth={1.8} />
+              </button>
             </span>
           </header>
           <div className="worker-status-list">

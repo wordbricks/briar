@@ -32,7 +32,10 @@ body { overflow: hidden; font-synthesis: none; }
 @keyframes worker-status-popover-in { from { opacity:0; transform:translateY(5px) scale(.985); } }
 .worker-status-popover > header { height:42px; padding:0 13px; display:flex; align-items:center; justify-content:space-between; gap:12px; border-bottom:1px solid var(--border); }
 .worker-status-popover > header > strong { font-size:var(--text-sm); font-weight:700; }
-.worker-status-popover > header > span { color:var(--muted-foreground); font-size:var(--text-2xs); }
+.worker-status-header-actions { display:flex; align-items:center; gap:6px; color:var(--muted-foreground); font-size:var(--text-2xs); }
+.worker-status-header-actions > button { width:24px; height:24px; padding:0; display:grid; place-items:center; border:0; border-radius:7px; color:var(--muted-foreground); background:transparent; cursor:pointer; }
+.worker-status-header-actions > button:hover { color:var(--accent-foreground); background:var(--accent); }
+.worker-status-header-actions > button:focus-visible { outline:2px solid #8b70dd; outline-offset:1px; }
 .worker-status-list { max-height:376px; overflow-y:auto; }
 .worker-status-item { min-width:0; min-height:52px; padding:8px 12px; display:grid; grid-template-columns:7px minmax(0,1fr) auto; align-items:center; gap:9px; color:var(--muted-foreground); background:var(--popover); }
 .worker-status-item + .worker-status-item { border-top:1px solid var(--border); }
