@@ -10,7 +10,9 @@ import {
   Database,
   Download,
   Flag,
+  FolderGit2,
   GitBranch,
+  ImagePlus,
   Link2,
   LoaderCircle,
   Plug,
@@ -73,6 +75,10 @@ import type {
   LinearImportStatesResult,
 } from "../lib/linear-import";
 import { requiredExecutableWorkflowStages } from "../lib/auto-hunt-contract";
+import {
+  projectIconAccept,
+  projectIconFromFile,
+} from "../lib/project-icon";
 import { LinearIssueImport } from "./LinearIssueImport";
 import { ProjectExecutionSettings } from "./ProjectExecutionSettings";
 import { SelectMenu } from "./SelectMenu";
@@ -108,6 +114,7 @@ export function ProjectSettings({
   onConnectLinearImport,
   onLoadLinearImportStates,
   onImportLinearIssues,
+  onIconChange,
   onRefreshVelen,
   project,
   repositoryConnected,
@@ -139,6 +146,7 @@ export function ProjectSettings({
     teamIds: string[];
     statusMapping: Record<string, string>;
   }) => Promise<LinearImportResult>;
+  onIconChange: (projectId: string, icon: string | null) => Promise<unknown>;
   onRefreshVelen: (org?: string | null) => Promise<VelenInspection | null>;
   project: Project;
   repositoryConnected: boolean;
@@ -181,6 +189,9 @@ export function ProjectSettings({
   const [sandboxLoading, setSandboxLoading] = useState(true);
   const [sandboxSaving, setSandboxSaving] = useState(false);
   const [sandboxError, setSandboxError] = useState<string | null>(null);
+  const [isIconSaving, setIsIconSaving] = useState(false);
+  const [iconError, setIconError] = useState<string | null>(null);
+  const [iconSaved, setIconSaved] = useState(false);
   useEffect(() => {
     if (initialSection) setActiveSection(initialSection);
   }, [initialSection]);
@@ -578,20 +589,123 @@ export function ProjectSettings({
           />
 
           {activeSection === "general" ? (
-            <section className="project-settings-card mx-auto flex min-h-[84px] w-full max-w-[720px] items-center justify-between rounded-xl border border-border bg-card px-5 py-4 shadow-xs">
-              <div className="grid gap-1">
-                <Typography tone="muted" variant="caption">
-                  {t("settings.projectName")}
-                </Typography>
-                <Typography as="strong" variant="body">
-                  {project.name}
+            <section className="project-settings-card mx-auto grid w-full max-w-[720px] gap-5 rounded-xl border border-border bg-card px-5 py-4 shadow-xs">
+              <div className="flex min-h-12 items-center justify-between gap-4">
+                <div className="grid gap-1">
+                  <Typography tone="muted" variant="caption">
+                    {t("settings.projectName")}
+                  </Typography>
+                  <Typography as="strong" variant="body">
+                    {project.name}
+                  </Typography>
+                </div>
+                <Typography as="small" tone="muted" variant="caption">
+                  {t("settings.created", {
+                    date: new Date(project.createdAt).toLocaleDateString(localeTag),
+                  })}
                 </Typography>
               </div>
-              <Typography as="small" tone="muted" variant="caption">
-                {t("settings.created", {
-                  date: new Date(project.createdAt).toLocaleDateString(localeTag),
-                })}
-              </Typography>
+              <div className="border-t border-border pt-5">
+                <div className="flex items-start gap-4">
+                  <div className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-xl border border-border bg-muted/40">
+                    {project.icon ? (
+                      <img
+                        alt={t("settings.iconPreview", { name: project.name })}
+                        className="size-full object-contain"
+                        src={project.icon}
+                      />
+                    ) : (
+                      <FolderGit2
+                        aria-hidden="true"
+                        className="text-muted-foreground"
+                        size={28}
+                        strokeWidth={1.6}
+                      />
+                    )}
+                  </div>
+                  <div className="grid min-w-0 flex-1 gap-2">
+                    <div>
+                      <Typography as="strong" variant="body">
+                        {t("settings.projectIcon")}
+                      </Typography>
+                      <Typography className="mt-1" tone="muted" variant="caption">
+                        {t("settings.projectIconDescription")}
+                      </Typography>
+                    </div>
+                    {project.role !== "member" ? (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          className={isIconSaving ? "pointer-events-none opacity-50" : undefined}
+                          size="sm"
+                          type="button"
+                          variant="outline"
+                        >
+                          <label>
+                            <ImagePlus aria-hidden="true" size={15} strokeWidth={1.8} />
+                            {t(project.icon ? "settings.replaceIcon" : "settings.uploadIcon")}
+                            <input
+                              accept={projectIconAccept}
+                              aria-label={t("settings.uploadIcon")}
+                              className="sr-only"
+                              disabled={isIconSaving}
+                              onChange={(event) => {
+                                const file = event.currentTarget.files?.[0];
+                                event.currentTarget.value = "";
+                                if (!file) return;
+                                setIsIconSaving(true);
+                                setIconError(null);
+                                setIconSaved(false);
+                                void projectIconFromFile(file)
+                                  .then((icon) => onIconChange(project.id, icon))
+                                  .then(() => setIconSaved(true))
+                                  .catch(() => setIconError(t("settings.iconUploadFailed")))
+                                  .finally(() => setIsIconSaving(false));
+                              }}
+                              type="file"
+                            />
+                          </label>
+                        </Button>
+                        {project.icon ? (
+                          <Button
+                            disabled={isIconSaving}
+                            onClick={() => {
+                              setIsIconSaving(true);
+                              setIconError(null);
+                              setIconSaved(false);
+                              void onIconChange(project.id, null)
+                                .then(() => setIconSaved(true))
+                                .catch(() => setIconError(t("settings.iconUploadFailed")))
+                                .finally(() => setIsIconSaving(false));
+                            }}
+                            size="sm"
+                            type="button"
+                            variant="ghost"
+                          >
+                            <Trash2 aria-hidden="true" size={14} strokeWidth={1.8} />
+                            {t("settings.removeIcon")}
+                          </Button>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <Typography tone="muted" variant="caption">
+                        {t("settings.iconPermission")}
+                      </Typography>
+                    )}
+                    <Typography tone="muted" variant="micro">
+                      {t("settings.iconHint")}
+                    </Typography>
+                    {iconError ? (
+                      <Typography className="text-destructive" role="alert" variant="caption">
+                        {iconError}
+                      </Typography>
+                    ) : iconSaved ? (
+                      <Typography className="text-success" role="status" variant="caption">
+                        {t("settings.iconSaved")}
+                      </Typography>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
             </section>
           ) : null}
 

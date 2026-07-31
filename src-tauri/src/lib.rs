@@ -4,6 +4,7 @@ mod auto_hunt_dispatch;
 mod host;
 
 use crate::host::CommandRunner;
+use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -39,6 +40,39 @@ const GITHUB_CLI_NOOP_BROWSER: &str = "cmd.exe /D /C rem";
 const DEFAULT_MAIN_WINDOW_SIZE: (f64, f64) = (1440.0, 900.0);
 const DEFAULT_MAIN_WINDOW_MIN_SIZE: (f64, f64) = (980.0, 680.0);
 const ONBOARDING_MAIN_WINDOW_SIZE: (f64, f64) = (780.0, 580.0);
+const MAX_REPOSITORY_ICON_BYTES: u64 = 10 * 1024 * 1024;
+const REPOSITORY_ICON_CANDIDATES: &[&str] = &[
+    "favicon.svg",
+    "favicon.ico",
+    "favicon.png",
+    "public/favicon.svg",
+    "public/favicon.ico",
+    "public/favicon.png",
+    "app/favicon.ico",
+    "app/favicon.png",
+    "app/icon.svg",
+    "app/icon.png",
+    "app/icon.ico",
+    "src/favicon.ico",
+    "src/favicon.svg",
+    "src/app/favicon.ico",
+    "src/app/icon.svg",
+    "src/app/icon.png",
+    "assets/icon.svg",
+    "assets/icon.png",
+    "assets/logo.svg",
+    "assets/logo.png",
+    ".idea/icon.svg",
+];
+const REPOSITORY_ICON_SOURCE_FILES: &[&str] = &[
+    "index.html",
+    "public/index.html",
+    "app/routes/__root.tsx",
+    "src/routes/__root.tsx",
+    "app/root.tsx",
+    "src/root.tsx",
+    "src/index.html",
+];
 
 #[derive(Deserialize, Serialize)]
 struct StoredSession {
@@ -1264,6 +1298,158 @@ fn command_failure(output: &std::process::Output) -> String {
     } else {
         message.lines().next().unwrap_or(message).to_string()
     }
+}
+
+fn quoted_attribute(tag: &str, attribute: &str) -> Option<String> {
+    let lower = tag.to_ascii_lowercase();
+    let mut offset = 0;
+    while let Some(found) = lower[offset..].find(attribute) {
+        let start = offset + found;
+        let before = lower[..start].chars().next_back();
+        let after = lower[start + attribute.len()..].chars().next();
+        if before.is_some_and(|character| character.is_ascii_alphanumeric() || character == '_')
+            || after.is_some_and(|character| character.is_ascii_alphanumeric() || character == '_')
+        {
+            offset = start + attribute.len();
+            continue;
+        }
+        let remainder = &tag[start + attribute.len()..];
+        let delimiter = remainder.find(['=', ':'])?;
+        let value = remainder[delimiter + 1..].trim_start();
+        let quote = value.chars().next()?;
+        if quote != '\'' && quote != '"' {
+            offset = start + attribute.len();
+            continue;
+        }
+        let quoted = &value[quote.len_utf8()..];
+        return quoted.find(quote).map(|end| quoted[..end].to_string());
+    }
+    None
+}
+
+fn repository_icon_href(source: &str) -> Option<String> {
+    let lower = source.to_ascii_lowercase();
+    let mut offset = 0;
+    while let Some(found) = lower[offset..].find("<link") {
+        let start = offset + found;
+        let end = source[start..].find('>').map(|end| start + end + 1)?;
+        let tag = &source[start..end];
+        let rel = quoted_attribute(tag, "rel");
+        if rel.as_deref().is_some_and(|rel| {
+            matches!(rel.to_ascii_lowercase().as_str(), "icon" | "shortcut icon")
+        }) {
+            if let Some(href) = quoted_attribute(tag, "href") {
+                return Some(href);
+            }
+        }
+        offset = end;
+    }
+
+    // React router metadata commonly declares icons as object literals.
+    for object in source.split(['{', '}']) {
+        let rel = quoted_attribute(object, "rel");
+        if rel.as_deref().is_some_and(|rel| {
+            matches!(rel.to_ascii_lowercase().as_str(), "icon" | "shortcut icon")
+        }) {
+            if let Some(href) = quoted_attribute(object, "href") {
+                return Some(href);
+            }
+        }
+    }
+    None
+}
+
+fn safe_repository_file(root: &Path, relative_path: &str) -> Option<PathBuf> {
+    let root = fs::canonicalize(root).ok()?;
+    let candidate = fs::canonicalize(root.join(relative_path)).ok()?;
+    let metadata = fs::metadata(&candidate).ok()?;
+    (candidate.starts_with(&root)
+        && metadata.is_file()
+        && metadata.len() <= MAX_REPOSITORY_ICON_BYTES)
+        .then_some(candidate)
+}
+
+fn repository_icon_path(root: &Path) -> Option<PathBuf> {
+    let configured_icon = fs::read_to_string(root.join("t3.json"))
+        .ok()
+        .and_then(|contents| serde_json::from_str::<serde_json::Value>(&contents).ok())
+        .and_then(|project| project.get("iconPath")?.as_str().map(str::to_string));
+    if let Some(path) = configured_icon
+        .as_deref()
+        .and_then(|path| safe_repository_file(root, path))
+    {
+        return Some(path);
+    }
+
+    for candidate in REPOSITORY_ICON_CANDIDATES {
+        if let Some(path) = safe_repository_file(root, candidate) {
+            return Some(path);
+        }
+    }
+
+    for source_file in REPOSITORY_ICON_SOURCE_FILES {
+        let Some(source_path) = safe_repository_file(root, source_file) else {
+            continue;
+        };
+        let Ok(source) = fs::read_to_string(source_path) else {
+            continue;
+        };
+        let Some(href) = repository_icon_href(&source) else {
+            continue;
+        };
+        if href.starts_with("//") || href.contains("://") || href.starts_with("data:") {
+            continue;
+        }
+        let clean = href
+            .split(['?', '#'])
+            .next()
+            .unwrap_or("")
+            .trim_start_matches('/');
+        if clean.is_empty() {
+            continue;
+        }
+        for candidate in [format!("public/{clean}"), clean.to_string()] {
+            if let Some(path) = safe_repository_file(root, &candidate) {
+                return Some(path);
+            }
+        }
+    }
+    None
+}
+
+fn repository_icon_data_url(root: &Path) -> Result<Option<String>, String> {
+    let Some(path) = repository_icon_path(root) else {
+        return Ok(None);
+    };
+    let extension = path
+        .extension()
+        .and_then(OsStr::to_str)
+        .map(str::to_ascii_lowercase)
+        .unwrap_or_default();
+    let mime = match extension.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "webp" => "image/webp",
+        "svg" => "image/svg+xml",
+        "ico" => "image/x-icon",
+        _ => return Ok(None),
+    };
+    let bytes =
+        fs::read(&path).map_err(|error| format!("저장소 아이콘을 읽지 못했습니다: {error}"))?;
+    Ok(Some(format!(
+        "data:{mime};base64,{}",
+        BASE64_STANDARD.encode(bytes)
+    )))
+}
+
+#[tauri::command]
+async fn discover_repository_icon(repository_path: String) -> Result<Option<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let root = git_repository_root(Path::new(&repository_path))?;
+        repository_icon_data_url(&root)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 fn inspect_repository_readiness_on(
@@ -5534,6 +5720,7 @@ pub fn run() {
             project_workspace_root,
             create_project_workspace,
             inspect_repository_readiness,
+            discover_repository_icon,
             connected_project_ids,
             project_llm_chat,
             run_project_agent,
@@ -5585,6 +5772,71 @@ pub fn run() {
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn discovers_repository_icons_using_t3code_candidate_priority() {
+        let directory = tempfile::tempdir().expect("temporary repository");
+        fs::create_dir_all(directory.path().join("brand")).expect("brand directory");
+        fs::write(
+            directory.path().join("t3.json"),
+            r#"{"iconPath":"brand/mark.svg"}"#,
+        )
+        .expect("project metadata");
+        fs::write(directory.path().join("brand/mark.svg"), "<svg>mark</svg>")
+            .expect("configured icon");
+        fs::write(directory.path().join("favicon.png"), b"fallback").expect("fallback icon");
+
+        let icon = repository_icon_path(directory.path()).expect("repository icon");
+        assert!(icon.ends_with("brand/mark.svg"));
+        assert!(repository_icon_data_url(directory.path())
+            .expect("icon data URL")
+            .expect("icon")
+            .starts_with("data:image/svg+xml;base64,"));
+    }
+
+    #[test]
+    fn discovers_repository_icon_declared_in_html() {
+        let directory = tempfile::tempdir().expect("temporary repository");
+        fs::create_dir_all(directory.path().join("public/brand")).expect("icon directory");
+        fs::write(
+            directory.path().join("index.html"),
+            r#"<link href="/brand/logo.svg" rel="icon">"#,
+        )
+        .expect("html");
+        fs::write(
+            directory.path().join("public/brand/logo.svg"),
+            "<svg>brand</svg>",
+        )
+        .expect("icon");
+
+        let icon = repository_icon_path(directory.path()).expect("repository icon");
+        assert!(icon.ends_with("public/brand/logo.svg"));
+    }
+
+    #[test]
+    fn extracts_repository_icon_from_router_metadata() {
+        assert_eq!(
+            repository_icon_href(
+                r#"export const links = () => [{ href: "/favicon.svg", rel: "icon" }];"#,
+            ),
+            Some("/favicon.svg".to_string())
+        );
+    }
+
+    #[test]
+    fn repository_icon_never_escapes_repository_root() {
+        let parent = tempfile::tempdir().expect("temporary parent");
+        let repository = parent.path().join("repository");
+        fs::create_dir_all(&repository).expect("repository");
+        fs::write(parent.path().join("secret.svg"), "<svg>secret</svg>").expect("outside icon");
+        fs::write(
+            repository.join("t3.json"),
+            r#"{"iconPath":"../secret.svg"}"#,
+        )
+        .expect("project metadata");
+
+        assert_eq!(repository_icon_path(&repository), None);
+    }
 
     #[cfg(desktop)]
     #[test]

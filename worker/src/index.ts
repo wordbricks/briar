@@ -127,6 +127,7 @@ import {
   updateOrganization,
   updateOrganizationLogo,
   updateOrganizationMemberRole,
+  updateProjectIcon,
   updateIssue,
   updateIssueExecutionPreferences,
   updateSlackInstallationProject,
@@ -532,6 +533,15 @@ const projectInputSchema = z.object({
   name: z.string().trim().min(1).max(100),
   organizationId: z.string().uuid().optional(),
 });
+export const projectIconInputSchema = z
+  .object({
+    icon: z
+      .string()
+      .max(400_000)
+      .regex(/^data:image\/webp;base64,[a-z0-9+/]+={0,2}$/iu)
+      .nullable(),
+  })
+  .strict();
 const projectAgentInputSchema = z
   .object({
     name: z.string().trim().min(1).max(100).nullable().optional(),
@@ -1785,6 +1795,7 @@ function projectJson(row: ProjectRow) {
   return {
     id: row.id,
     name: row.name,
+    icon: row.icon,
     organizationId: row.organization_id,
     organizationName: row.organization_name,
     role: row.member_role,
@@ -3326,6 +3337,23 @@ async function route(
       throw new HttpError(404, "Project not found");
     }
     return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  const projectIconMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/icon$/u,
+  );
+  if (projectIconMatch && request.method === "PUT") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, projectIconMatch[1], session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    if (!canManageOrganization(project.member_role)) {
+      throw new HttpError(403, "Organization admin access required");
+    }
+    const input = projectIconInputSchema.parse(await readJson(request));
+    if (!(await updateProjectIcon(db, project.id, input.icon))) {
+      throw new HttpError(404, "Project not found");
+    }
+    return json({ project: projectJson({ ...project, icon: input.icon }) });
   }
 
   const settingsMatch = pathname.match(/^\/projects\/([0-9a-f-]+)\/settings$/u);

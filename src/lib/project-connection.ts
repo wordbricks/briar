@@ -163,6 +163,16 @@ export async function inspectRepositoryReadiness(
   });
 }
 
+export async function discoverRepositoryIcon(
+  repositoryPath: string,
+): Promise<string | null> {
+  if (!isTauri()) return null;
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<string | null>("discover_repository_icon", {
+    repositoryPath,
+  });
+}
+
 export async function loadProjectRepositoryReadiness(projectId: string) {
   if (!isTauri()) return null;
   const { invoke } = await import("@tauri-apps/api/core");

@@ -90,6 +90,23 @@ describe("Sidebar", () => {
     expect(markup).not.toContain("<select");
   });
 
+  it("shows a saved project icon in the project hierarchy", () => {
+    const markup = renderToStaticMarkup(
+      <Sidebar
+        {...sidebarProps}
+        projects={[
+          {
+            ...sidebarProps.projects[0],
+            icon: "data:image/webp;base64,aWNvbg==",
+          },
+        ]}
+      />,
+    );
+
+    expect(markup).toContain('src="data:image/webp;base64,aWNvbg=="');
+    expect(markup).toContain('class="shrink-0 rounded-sm object-contain size-4"');
+  });
+
   it("opens projects by default and lets each project collapse independently", async () => {
     const container = document.createElement("div");
     document.body.append(container);

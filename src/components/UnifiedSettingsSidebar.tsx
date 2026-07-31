@@ -33,6 +33,7 @@ import type { Organization, Project } from "../types";
 import type { SettingsSection } from "./AppSettings";
 import type { OrganizationSettingsSection } from "./OrganizationSettings";
 import type { ProjectSettingsSection } from "./ProjectSettings";
+import { ProjectIcon } from "./ProjectIcon";
 
 export type UnifiedSettingsTarget =
   | { scope: "application"; section: SettingsSection }
@@ -347,7 +348,7 @@ export function UnifiedSettingsSidebar({
                     aria-expanded={expanded}
                     className="settings-nav-parent [&>span:last-child]:flex [&>span:last-child]:flex-1"
                     data-project-settings={project.id}
-                    icon={<Settings2 size={16} strokeWidth={1.75} />}
+                    icon={<ProjectIcon className="size-4" project={project} />}
                     onClick={() => {
                       setExpandedProjectId((current) =>
                         current === project.id ? null : project.id,
