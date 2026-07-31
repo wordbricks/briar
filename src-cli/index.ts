@@ -1479,6 +1479,17 @@ const workerBindingSchema = workerRegistrationSchema.omit({
 });
 
 const claimedRunSchema = queuedIssueSchema.extend({
+  execution: z
+    .object({
+      provider: z.enum(["codex", "claude", "grok"]),
+      model: z.string().nullable(),
+      effort: z
+        .enum(["low", "medium", "high", "xhigh", "max", "ultra"])
+        .nullable()
+        .default(null),
+    })
+    .nullable()
+    .optional(),
   agent: z
     .object({
       id: z.string().uuid(),
@@ -1568,8 +1579,16 @@ async function runClaimedIssueInRuntime(
   signal: AbortSignal,
   runtimeDirectory: string,
 ) {
-  if (!issue.agent) {
-    throw new Error("이 실행에 배정된 Briar Agent가 없습니다.");
+  const execution = issue.execution ??
+    (issue.agent
+      ? {
+          provider: issue.agent.provider,
+          model: issue.agent.model,
+          effort: issue.agent.effort,
+        }
+      : null);
+  if (!execution) {
+    throw new Error("이 실행에 사용할 프로바이더가 지정되지 않았습니다.");
   }
   const activeProject =
     config.projects.find((candidate) => candidate.id === project.id) ?? project;
@@ -1585,7 +1604,7 @@ async function runClaimedIssueInRuntime(
     );
   }
 
-  const provider = issue.agent.provider;
+  const provider = execution.provider;
   const binaryName = provider === "claude" ? "claude" : provider;
   const agentBinary = Bun.which(binaryName);
   if (!agentBinary) {
@@ -1647,7 +1666,15 @@ async function runClaimedIssueInRuntime(
   };
 
   const launch = detachedProviderRequest({
-    agent: issue.agent,
+    agent: {
+      id: issue.agent?.id ?? issue.runId,
+      name: issue.agent?.name ?? "Briar Worker",
+      provider: execution.provider,
+      model: execution.model,
+      effort: execution.effort,
+      responsibility: issue.agent?.responsibility ?? "",
+      skill: issue.agent?.skill ?? "",
+    },
     prompt,
     workspacePath: workspace.path,
     fullAccess,

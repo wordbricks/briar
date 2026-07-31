@@ -18,6 +18,20 @@ const agent = {
 };
 
 describe("detached Agent runner", () => {
+  it("builds a neutral issue prompt when no logical Agent is assigned", () => {
+    const prompt = detachedAgentPrompt({
+      agent: null,
+      snapshot: {
+        sourceKey: "BRIAR-7",
+        title: "Run on selected Worker",
+      },
+      workspacePath: "/worktree",
+    });
+
+    expect(prompt).toContain("Process the Briar issue BRIAR-7 on the selected Worker");
+    expect(prompt).not.toContain("Briar Agent assigned");
+  });
+
   it("uses the logical Agent configuration independently of a Worker", () => {
     const prompt = detachedAgentPrompt({
       agent,

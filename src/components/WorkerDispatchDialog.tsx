@@ -1,5 +1,4 @@
 import {
-  Bot,
   Check,
   CircleAlert,
   Cpu,
@@ -29,14 +28,12 @@ import {
 import type {
   ExecutionWorker,
   HuntRun,
-  ProjectAgent,
   ProjectExecutionWorkerPolicy,
 } from "../types";
 import { NativeSelect } from "./NativeSelect";
 import { WorkerIcon } from "./WorkerIcon";
 
 export function WorkerDispatchDialog({
-  agents,
   error,
   isDispatching,
   onOpenChange,
@@ -46,16 +43,14 @@ export function WorkerDispatchDialog({
   run,
   workers,
 }: {
-  agents: ProjectAgent[];
   error: string | null;
   isDispatching: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (input: {
-    agentId: string;
     provider: AgentProvider;
     model: string | null;
     effort: ModelEffort | null;
-    workerId: string | null;
+    workerId: string;
   }) => void;
   open: boolean;
   policy?: ProjectExecutionWorkerPolicy;
@@ -63,12 +58,10 @@ export function WorkerDispatchDialog({
   workers: ExecutionWorker[];
 }) {
   const { t } = useI18n();
-  const [agentId, setAgentId] = useState("");
   const [provider, setProvider] = useState<AgentProvider>("codex");
   const [model, setModel] = useState("");
   const [effort, setEffort] = useState("");
-  const [workerId, setWorkerId] = useState("any");
-  const selectedAgent = agents.find((agent) => agent.id === agentId) ?? null;
+  const [workerId, setWorkerId] = useState("");
   const policyWorkers = useMemo(
     () =>
       workers.filter(
@@ -104,13 +97,15 @@ export function WorkerDispatchDialog({
 
   useEffect(() => {
     if (!open) return;
-    const preferredAgent =
-      agents.find((agent) => agent.id === run?.agentId) ?? agents[0] ?? null;
-    setAgentId(preferredAgent?.id ?? "");
+    const preferredWorker = policyWorkers.find(
+      (worker) =>
+        worker.id === (run?.requestedWorkerId ?? policy?.defaultWorkerId),
+    );
     const initialProvider =
       run?.preferredProvider ??
       run?.requestedProvider ??
-      preferredAgent?.provider ??
+      preferredWorker?.agentProvider ??
+      healthyProviders[0] ??
       "codex";
     setProvider(initialProvider);
     setModel(
@@ -118,21 +113,19 @@ export function WorkerDispatchDialog({
         ? (run.preferredModel ?? "")
         : run?.requestedProvider
           ? (run.requestedModel ?? "")
-          : preferredAgent?.provider === initialProvider
-            ? (preferredAgent.model ?? "")
-            : "",
+          : "",
     );
     setEffort(
       run?.preferredProvider
         ? (run.preferredEffort ?? "")
         : (run?.requestedEffort ?? ""),
     );
-    setWorkerId(run?.requestedWorkerId ?? policy?.defaultWorkerId ?? "any");
+    setWorkerId(run?.requestedWorkerId ?? policy?.defaultWorkerId ?? "");
   }, [
-    agents,
+    healthyProviders,
     open,
     policy?.defaultWorkerId,
-    run?.agentId,
+    policyWorkers,
     run?.preferredEffort,
     run?.preferredModel,
     run?.preferredProvider,
@@ -149,28 +142,23 @@ export function WorkerDispatchDialog({
   useEffect(() => {
     if (!open || healthyProviders.length === 0) return;
     if (healthyProviders.includes(provider)) return;
-    setProvider(
-      selectedAgent && healthyProviders.includes(selectedAgent.provider)
-        ? selectedAgent.provider
-        : healthyProviders[0],
-    );
-  }, [healthyProviders, open, provider, selectedAgent]);
+    setProvider(healthyProviders[0]);
+  }, [healthyProviders, open, provider]);
 
   useEffect(() => {
-    if (workerId === "any") return;
-    if (!eligibleWorkers.some((worker) => worker.id === workerId)) {
-      setWorkerId("any");
-    }
+    const selectedWorker = eligibleWorkers.find(
+      (worker) => worker.id === workerId && worker.readiness === "available",
+    );
+    if (selectedWorker) return;
+    setWorkerId(
+      eligibleWorkers.find((worker) => worker.readiness === "available")?.id ??
+        "",
+    );
   }, [eligibleWorkers, workerId]);
 
-  const available = eligibleWorkers.filter(
-    (worker) => worker.readiness === "available",
+  const canDispatch = eligibleWorkers.some(
+    (worker) => worker.id === workerId && worker.readiness === "available",
   );
-  const canDispatch =
-    Boolean(selectedAgent) &&
-    (workerId === "any"
-      ? available.length > 0
-      : available.some((worker) => worker.id === workerId));
   const isReassign = Boolean(run?.dispatchedAt || run?.workerId);
 
   return (
@@ -184,18 +172,6 @@ export function WorkerDispatchDialog({
         </DialogHeader>
 
         <div className="worker-dispatch-form">
-          <label>
-            <span><Bot size={15} />{t("worker.agent")}</span>
-            <NativeSelect
-              label={t("worker.agent")}
-              onValueChange={setAgentId}
-              options={agents.map((agent) => ({
-                label: agent.name,
-                value: agent.id,
-              }))}
-              value={agentId}
-            />
-          </label>
           <label>
             <span><Waypoints size={15} />{t("worker.provider")}</span>
             <NativeSelect
@@ -258,17 +234,11 @@ export function WorkerDispatchDialog({
             <NativeSelect
               label={t("worker.executionEnvironment")}
               onValueChange={setWorkerId}
-              options={[
-                {
-                  label: t("worker.anyAvailable"),
-                  value: "any",
-                },
-                ...eligibleWorkers.map((worker) => ({
-                  disabled: worker.readiness !== "available",
-                  label: `${worker.icon?.type === "emoji" ? `${worker.icon.value} ` : ""}${worker.label} · ${t(`worker.readiness.${worker.readiness}` as MessageKey)}`,
-                  value: worker.id,
-                })),
-              ]}
+              options={eligibleWorkers.map((worker) => ({
+                disabled: worker.readiness !== "available",
+                label: `${worker.icon?.type === "emoji" ? `${worker.icon.value} ` : ""}${worker.label} · ${t(`worker.readiness.${worker.readiness}` as MessageKey)}`,
+                value: worker.id,
+              }))}
               value={workerId}
             />
           </label>
@@ -321,11 +291,10 @@ export function WorkerDispatchDialog({
             disabled={!canDispatch || isDispatching}
             onClick={() =>
               onSubmit({
-                agentId,
                 provider,
                 model: model || null,
                 effort: (effort || null) as ModelEffort | null,
-                workerId: workerId === "any" ? null : workerId,
+                workerId,
               })
             }
           >

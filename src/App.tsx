@@ -359,19 +359,15 @@ export function App() {
     },
   ) => briar.addIssueMessage(runId, input);
   const processIssueNow = (run: HuntRun) => {
-    if (!activeProject || issueAgents.length === 0) {
-      setQuickProcessError(t("issue.processNowNoAgent"));
-      return;
-    }
+    if (!activeProject) return;
     setQuickProcessError(null);
     setDispatchRun(run);
   };
   const submitWorkerDispatch = async (input: {
-    agentId: string;
     provider: AgentProvider;
     model: string | null;
     effort: ModelEffort | null;
-    workerId: string | null;
+    workerId: string;
   }) => {
     if (!activeProject || !briar.token || !dispatchRun) return;
     setQuickStartingRunId(dispatchRun.id);
@@ -1052,7 +1048,6 @@ export function App() {
     <>
       {content}
       <WorkerDispatchDialog
-        agents={issueAgents}
         error={quickProcessError}
         isDispatching={Boolean(quickStartingRunId)}
         onOpenChange={(open) => {
