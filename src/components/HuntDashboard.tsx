@@ -74,7 +74,6 @@ import {
   type ReactElement,
   type FormEvent,
   type KeyboardEvent as ReactKeyboardEvent,
-  type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from "react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
@@ -2620,11 +2619,10 @@ export function RunPage({
   const [shareStatus, setShareStatus] = useState<"copied" | "error" | null>(
     null,
   );
-  const [contentSplit, setContentSplit] = useState(50);
-  const [isResizingContent, setIsResizingContent] = useState(false);
+  const [isPropertiesOpen, setIsPropertiesOpen] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState<
-    "description" | "statusHistory" | "evidence"
-  >("description");
+    "description" | "result" | "statusHistory" | "evidence"
+  >(() => run.status === "completed" ? "result" : "description");
   useMobileBackHandler(
     () => {
       if (!companionMode) return false;
@@ -2640,15 +2638,20 @@ export function RunPage({
         setConfirmCancel(false);
         return true;
       }
+      if (isPropertiesOpen) {
+        setIsPropertiesOpen(false);
+        return true;
+      }
       onBack();
       return true;
     },
     { enabled: companionMode, priority: 200 },
   );
   const detailTabsId = useId();
-  const contentRef = useRef<HTMLDivElement | null>(null);
-  const activeResizePointerRef = useRef<number | null>(null);
-  const resizeGrabOffsetRef = useRef(0);
+  useEffect(() => {
+    setActiveDetailTab(run.status === "completed" ? "result" : "description");
+    setIsPropertiesOpen(false);
+  }, [run.id]);
   const placementOptions = [
     { label: t("status.backlog"), value: "status:backlog" },
     { label: t("status.queued"), value: "status:queued" },
@@ -2668,7 +2671,10 @@ export function RunPage({
     (attachment) => !embeddedAttachmentReferences.has(attachment.id),
   );
   const completionSummary =
-    run.structuredResult?.summary?.trim() || run.resultSummary?.trim() || null;
+    run.structuredResult?.summary?.trim() ||
+    run.resultSummary?.trim() ||
+    (run.status === "completed" ? run.detail?.trim() : null) ||
+    null;
   const blockerReason =
     run.structuredResult?.summary?.trim() ||
     run.detail?.trim() ||
@@ -2715,57 +2721,26 @@ export function RunPage({
       setShareStatus("error");
     }
   };
-  const clampContentSplit = (value: number) =>
-    Math.min(80, Math.max(20, value));
-  const updateContentSplitFromPointer = (clientY: number) => {
-    const content = contentRef.current;
-    if (!content) return;
-    const bounds = content.getBoundingClientRect();
-    const availableHeight = Math.max(1, bounds.height - 12);
-    const dividerTop =
-      clientY - bounds.top - resizeGrabOffsetRef.current;
-    setContentSplit(
-      clampContentSplit(Math.round((dividerTop / availableHeight) * 100)),
-    );
-  };
-  const startContentResize = (
-    event: ReactPointerEvent<HTMLDivElement>,
-  ) => {
-    const dividerBounds = event.currentTarget.getBoundingClientRect();
-    activeResizePointerRef.current = event.pointerId;
-    resizeGrabOffsetRef.current = event.clientY - dividerBounds.top;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    setIsResizingContent(true);
-    event.preventDefault();
-  };
-  const moveContentResize = (
-    event: ReactPointerEvent<HTMLDivElement>,
-  ) => {
-    if (activeResizePointerRef.current !== event.pointerId) return;
-    updateContentSplitFromPointer(event.clientY);
-  };
-  const finishContentResize = (
-    event: ReactPointerEvent<HTMLDivElement>,
-  ) => {
-    if (activeResizePointerRef.current !== event.pointerId) return;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-    activeResizePointerRef.current = null;
-    setIsResizingContent(false);
-  };
-  const resizeContentWithKeyboard = (
-    event: ReactKeyboardEvent<HTMLDivElement>,
-  ) => {
-    let nextSplit: number | null = null;
-    if (event.key === "ArrowUp") nextSplit = contentSplit - 5;
-    if (event.key === "ArrowDown") nextSplit = contentSplit + 5;
-    if (event.key === "Home") nextSplit = 20;
-    if (event.key === "End") nextSplit = 80;
-    if (nextSplit === null) return;
-    event.preventDefault();
-    setContentSplit(clampContentSplit(nextSplit));
-  };
+  const compactProperties = (
+    <div className="run-page-property-badges" aria-label={t("run.properties")}>
+      <span className={`run-page-property-badge ${meta.tone}`} title={t("dashboard.status")}>
+        <Activity aria-hidden="true" size={13} />
+        {label}
+      </span>
+      <span className="run-page-property-badge priority" title={t("issue.priority")}>
+        <Signal aria-hidden="true" size={13} />
+        {priorityLabel}
+      </span>
+      <span className="run-page-property-badge worker" title={t("run.assignee")}>
+        <UserRound aria-hidden="true" size={13} />
+        {run.claimedBy ?? t("run.unassigned")}
+      </span>
+      <span className="run-page-property-badge agent" title={t("run.agent")}>
+        <Bot aria-hidden="true" size={13} />
+        {performedAgentName ?? t("run.unassigned")}
+      </span>
+    </div>
+  );
   return (
     <MainContent className="run-page-shell" id="issue-detail">
       {!companionMode && (
@@ -2795,6 +2770,7 @@ export function RunPage({
             {run.title}
           </strong>
           <div className="run-page-titlebar-actions">
+            {compactProperties}
             {shareStatus ? (
               <span
                 aria-live="polite"
@@ -2808,6 +2784,17 @@ export function RunPage({
                 )}
               </span>
             ) : null}
+            <button
+              aria-controls="run-properties-panel"
+              aria-expanded={isPropertiesOpen}
+              className="run-page-properties-toggle"
+              onClick={() => setIsPropertiesOpen((open) => !open)}
+              type="button"
+            >
+              <Columns3 aria-hidden="true" size={15} />
+              {t("run.properties")}
+              <ChevronDown aria-hidden="true" size={13} />
+            </button>
             <button
               aria-label={t("issue.copyLink")}
               className="run-page-link-copy"
@@ -2873,66 +2860,85 @@ export function RunPage({
                     />
                   </div>
                 </div>
+                <div className="run-page-companion-actions">
+                  {compactProperties}
+                  <button
+                    aria-controls="run-properties-panel"
+                    aria-expanded={isPropertiesOpen}
+                    className="run-page-properties-toggle"
+                    onClick={() => setIsPropertiesOpen((open) => !open)}
+                    type="button"
+                  >
+                    <Columns3 aria-hidden="true" size={15} />
+                    {t("run.properties")}
+                    <ChevronDown aria-hidden="true" size={13} />
+                  </button>
+                </div>
               </div>
             </header>
           ) : null}
           <div className="run-page-body">
             <div className="run-page-layout">
-              <div
-                className={`run-page-content${isResizingContent ? " is-resizing" : ""}`}
-                ref={contentRef}
-                style={{
-                  gridTemplateRows: `minmax(96px,${contentSplit}fr) 12px minmax(220px,${100 - contentSplit}fr)`,
-                }}
-              >
+              <div className="run-page-main">
+                <div
+                  aria-label={t("run.detailTabs")}
+                  className="issue-detail-tabs"
+                  role="tablist"
+                >
+                  <button
+                    aria-controls={`${detailTabsId}-description-panel`}
+                    aria-selected={activeDetailTab === "description"}
+                    id={`${detailTabsId}-description-tab`}
+                    onClick={() => setActiveDetailTab("description")}
+                    role="tab"
+                    type="button"
+                  >
+                    {t("run.issue")}
+                  </button>
+                  <button
+                    aria-controls={`${detailTabsId}-result-panel`}
+                    aria-selected={activeDetailTab === "result"}
+                    id={`${detailTabsId}-result-tab`}
+                    onClick={() => setActiveDetailTab("result")}
+                    role="tab"
+                    type="button"
+                  >
+                    {t("run.resultTab")}
+                  </button>
+                  <button
+                    aria-controls={`${detailTabsId}-evidence-panel`}
+                    aria-selected={activeDetailTab === "evidence"}
+                    id={`${detailTabsId}-evidence-tab`}
+                    onClick={() => setActiveDetailTab("evidence")}
+                    role="tab"
+                    type="button"
+                  >
+                    {t("run.evidence")}
+                  </button>
+                  <button
+                    aria-controls={`${detailTabsId}-status-history-panel`}
+                    aria-selected={activeDetailTab === "statusHistory"}
+                    id={`${detailTabsId}-status-history-tab`}
+                    onClick={() => setActiveDetailTab("statusHistory")}
+                    role="tab"
+                    type="button"
+                  >
+                    {t("run.status")}
+                  </button>
+                </div>
+                <div className="run-page-content">
                 <section
                   aria-label={t(
                     activeDetailTab === "description"
-                      ? "issue.description"
+                      ? "run.issue"
+                      : activeDetailTab === "result"
+                        ? "run.result"
                       : activeDetailTab === "statusHistory"
-                        ? "run.statusHistory"
-                        : "run.evidence",
+                          ? "run.status"
+                          : "run.evidence",
                   )}
                   className="issue-description-pane"
                 >
-                  <div
-                    aria-label={t("run.detailTabs")}
-                    className="issue-detail-tabs"
-                    role="tablist"
-                  >
-                    <button
-                      aria-controls={`${detailTabsId}-description-panel`}
-                      aria-selected={activeDetailTab === "description"}
-                      id={`${detailTabsId}-description-tab`}
-                      onClick={() => setActiveDetailTab("description")}
-                      role="tab"
-                      type="button"
-                    >
-                      {t("issue.description")}
-                    </button>
-                    <button
-                      aria-controls={`${detailTabsId}-status-history-panel`}
-                      aria-selected={activeDetailTab === "statusHistory"}
-                      id={`${detailTabsId}-status-history-tab`}
-                      onClick={() => setActiveDetailTab("statusHistory")}
-                      role="tab"
-                      type="button"
-                    >
-                      <Activity aria-hidden="true" size={14} />
-                      {t("run.statusHistory")}
-                    </button>
-                    <button
-                      aria-controls={`${detailTabsId}-evidence-panel`}
-                      aria-selected={activeDetailTab === "evidence"}
-                      id={`${detailTabsId}-evidence-tab`}
-                      onClick={() => setActiveDetailTab("evidence")}
-                      role="tab"
-                      type="button"
-                    >
-                      <ListChecks aria-hidden="true" size={14} />
-                      {t("run.evidence")}
-                    </button>
-                  </div>
                   {activeDetailTab === "description" ? (
                     <div
                       aria-labelledby={`${detailTabsId}-description-tab`}
@@ -3025,34 +3031,6 @@ export function RunPage({
                           </div>
                         </section>
                       ) : null}
-                      {run.status === "completed" && completionSummary ? (
-                        <section
-                          aria-labelledby={`${detailTabsId}-result-title`}
-                          className="completed-issue-card"
-                        >
-                          <div className="completed-issue-card-heading">
-                            <Check aria-hidden="true" size={18} />
-                            <strong id={`${detailTabsId}-result-title`}>
-                              {t("run.result")}
-                            </strong>
-                          </div>
-                          <p>{completionSummary}</p>
-                          {run.structuredResult?.humanActionRequired &&
-                          run.structuredResult.nextAction ? (
-                            <div>
-                              <strong>{t("run.resultNextAction")}</strong>
-                              <span>{run.structuredResult.nextAction}</span>
-                            </div>
-                          ) : null}
-                          <button
-                            onClick={() => setActiveDetailTab("evidence")}
-                            type="button"
-                          >
-                            <ImageIcon aria-hidden="true" size={14} />
-                            {t("run.viewResultEvidence")}
-                          </button>
-                        </section>
-                      ) : null}
                       {issueContent ? (
                         <div className="issue-description-markdown">
                           <ReactMarkdown
@@ -3124,6 +3102,73 @@ export function RunPage({
                         </div>
                       )}
                     </div>
+                  ) : activeDetailTab === "result" ? (
+                    <div
+                      aria-labelledby={`${detailTabsId}-result-tab`}
+                      className="run-result-panel"
+                      id={`${detailTabsId}-result-panel`}
+                      role="tabpanel"
+                    >
+                      {completionSummary ? (
+                        <section
+                          aria-labelledby={`${detailTabsId}-result-title`}
+                          className="completed-issue-card"
+                        >
+                          <div className="completed-issue-card-heading">
+                            <span className={`status-pill ${meta.tone}`}>
+                              {label}
+                            </span>
+                            <strong id={`${detailTabsId}-result-title`}>
+                              {t("run.result")}
+                            </strong>
+                            <small>
+                              {t("run.attempt", { count: run.currentAttempt })} ·{" "}
+                              {t("run.revision", { count: run.currentRevision })}
+                            </small>
+                          </div>
+                          <p>{completionSummary}</p>
+                          {run.structuredResult?.humanActionRequired &&
+                          run.structuredResult.nextAction ? (
+                            <div>
+                              <strong>{t("run.resultNextAction")}</strong>
+                              <span>{run.structuredResult.nextAction}</span>
+                            </div>
+                          ) : null}
+                          {run.pullRequestUrls.length > 0 ? (
+                            <div className="run-result-links">
+                              {run.pullRequestUrls.map((url, index) => {
+                                const pullRequestLabel = pullRequestDisplayName(url, index);
+                                return (
+                                  <a
+                                    href={url}
+                                    key={url}
+                                    rel="noreferrer"
+                                    target="_blank"
+                                  >
+                                    <GitPullRequest aria-hidden="true" size={14} />
+                                    {pullRequestLabel}
+                                    <ArrowUp aria-hidden="true" size={13} />
+                                  </a>
+                                );
+                              })}
+                            </div>
+                          ) : null}
+                          <button
+                            onClick={() => setActiveDetailTab("evidence")}
+                            type="button"
+                          >
+                            <ImageIcon aria-hidden="true" size={14} />
+                            {t("run.viewResultEvidence")}
+                          </button>
+                        </section>
+                      ) : (
+                        <div className="run-result-empty">
+                          <ListChecks aria-hidden="true" size={20} />
+                          <strong>{t("run.result")}</strong>
+                          <p>{run.detail?.trim() || t("run.resultEmpty")}</p>
+                        </div>
+                      )}
+                    </div>
                   ) : activeDetailTab === "statusHistory" ? (
                     <IssueStatusHistoryPanel
                       id={`${detailTabsId}-status-history-panel`}
@@ -3140,31 +3185,31 @@ export function RunPage({
                     />
                   )}
                 </section>
-                <div
-                  aria-label={t("run.resizeContentPanels")}
-                  aria-orientation="horizontal"
-                  aria-valuemax={80}
-                  aria-valuemin={20}
-                  aria-valuenow={contentSplit}
-                  className="issue-content-divider"
-                  onKeyDown={resizeContentWithKeyboard}
-                  onPointerCancel={finishContentResize}
-                  onPointerDown={startContentResize}
-                  onPointerMove={moveContentResize}
-                  onPointerUp={finishContentResize}
-                  role="separator"
-                  tabIndex={0}
-                />
-                <IssueConversation
-                  mentionMembers={mentionMembers}
-                  onLoad={onLoadIssueMessages}
-                  onSend={onSendIssueMessage}
-                  run={run}
-                />
+                </div>
               </div>
-              <aside aria-label={t("run.properties")} className="run-properties">
-                <section>
+              <IssueConversation
+                mentionMembers={mentionMembers}
+                onLoad={onLoadIssueMessages}
+                onSend={onSendIssueMessage}
+                run={run}
+              />
+              {isPropertiesOpen ? (
+              <aside
+                aria-label={t("run.properties")}
+                className="run-properties"
+                id="run-properties-panel"
+              >
+                <header className="run-properties-header">
                   <h2>{t("run.properties")}</h2>
+                  <button
+                    aria-label={t("common.close")}
+                    onClick={() => setIsPropertiesOpen(false)}
+                    type="button"
+                  >
+                    <X aria-hidden="true" size={16} />
+                  </button>
+                </header>
+                <section>
                   <label className="run-property run-status-control">
                     <span className={`run-property-icon ${meta.tone}`}><Activity size={15} /></span>
                     <span className="run-property-copy">
@@ -3398,6 +3443,7 @@ export function RunPage({
                   </div>
                 </section>
               </aside>
+              ) : null}
             </div>
           </div>
         </article>
@@ -4050,6 +4096,13 @@ function IssueConversation({
 
   return (
     <section className="issue-conversation" aria-label={t("run.messages")}>
+      <header className="issue-conversation-header">
+        <strong>
+          {t("run.messages")}
+          {!loading && <span>{roots.length}</span>}
+        </strong>
+        <small>{t("run.agentRepliesHere")}</small>
+      </header>
       <div className="issue-message-list" ref={messageListRef}>
         {loading ? (
           <div className="issue-message-state">
