@@ -484,6 +484,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db,
       await readFile(resolve("migrations/0046_project_icons.sql"), "utf8"),
     );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0047_project_icon_browser_formats.sql"),
+        "utf8",
+      ),
+    );
   }, 30_000);
 
   afterAll(async () => {
@@ -1743,12 +1750,17 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
   });
 
   it("stores and removes a project icon", async () => {
-    const icon = "data:image/webp;base64,bG9nbw==";
-    await expect(updateProjectIcon(db, projectId, icon)).resolves.toBe(true);
-    await expect(getProject(db, projectId, "owner")).resolves.toMatchObject({
-      id: projectId,
-      icon,
-    });
+    for (const icon of [
+      "data:image/webp;base64,bG9nbw==",
+      "data:image/png;base64,bG9nbw==",
+      "data:image/jpeg;base64,bG9nbw==",
+    ]) {
+      await expect(updateProjectIcon(db, projectId, icon)).resolves.toBe(true);
+      await expect(getProject(db, projectId, "owner")).resolves.toMatchObject({
+        id: projectId,
+        icon,
+      });
+    }
     await expect(updateProjectIcon(db, projectId, null)).resolves.toBe(true);
     await expect(getProject(db, projectId, "owner")).resolves.toMatchObject({
       id: projectId,
