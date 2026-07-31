@@ -2,6 +2,7 @@ import type { HuntRun, ProjectAgent } from "../types";
 import type { ModelEffort } from "./project-llm";
 import {
   defaultAutoHuntMaxIssues,
+  isAutoHuntCandidateReady,
   selectAutoHuntCandidates,
 } from "./auto-hunt-automation";
 
@@ -39,6 +40,11 @@ export async function dispatchAutoHuntToWorkers(
     if (candidates.length !== targets.size) {
       throw new Error(
         "재시도할 Auto Hunt 이슈를 현재 프로젝트에서 찾지 못했습니다.",
+      );
+    }
+    if (candidates.some((run) => !isAutoHuntCandidateReady(run))) {
+      throw new Error(
+        "선행 이슈가 완료되지 않아 Auto Hunt를 시작할 수 없습니다.",
       );
     }
     for (const run of candidates) {

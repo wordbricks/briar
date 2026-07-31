@@ -31,4 +31,20 @@ describe("Auto Hunt queue selection", () => {
 
     expect(selectAutoHuntCandidates([backlog], 3)).toEqual([]);
   });
+
+  it("waits until every prerequisite issue is completed", () => {
+    const waiting = {
+      ...queued(1, 1),
+      prerequisites: [
+        { status: "completed" },
+        { status: "running" },
+      ],
+    };
+    const ready = {
+      ...queued(2, 2),
+      prerequisites: [{ status: "completed" }],
+    };
+
+    expect(selectAutoHuntCandidates([waiting, ready], 3)).toEqual([ready]);
+  });
 });

@@ -164,6 +164,8 @@ export type HuntRun = {
   attachments: IssueAttachment[];
   prerequisites?: IssueDependencyReference[];
   dependents?: IssueDependencyReference[];
+  executionReadiness?: "ready" | "waiting";
+  waitingOnPrerequisiteCount?: number;
   resultSummary: string | null;
   structuredResult: StructuredAgentResult | null;
   pullRequestUrls: string[];

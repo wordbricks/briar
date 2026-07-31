@@ -2752,6 +2752,9 @@ function dashboardRunJson(
   prerequisites: IssueDependencyRow[] = [],
   dependents: IssueDependencyRow[] = [],
 ) {
+  const waitingOnPrerequisiteCount = prerequisites.filter(
+    (dependency) => dependency.prerequisite_status !== "completed",
+  ).length;
   return {
     id: run.id,
     runNumber: run.run_number,
@@ -2790,6 +2793,9 @@ function dashboardRunJson(
       title: dependency.prerequisite_title,
       status: dependency.prerequisite_status,
     })),
+    executionReadiness:
+      waitingOnPrerequisiteCount > 0 ? "waiting" : "ready",
+    waitingOnPrerequisiteCount,
     dependents: dependents.map((dependency) => ({
       id: dependency.dependent_run_id,
       runNumber: dependency.dependent_run_number,
@@ -4423,6 +4429,12 @@ async function route(
     if (outcome === "cycle") {
       throw new HttpError(409, "Dependency would create a cycle");
     }
+    if (outcome === "ineligible") {
+      throw new HttpError(
+        409,
+        "Dependencies cannot be added after an issue starts executing",
+      );
+    }
     return json(
       {
         prerequisiteRunId: issueDependencyMatch[3],
@@ -5289,6 +5301,26 @@ async function route(
         : undefined,
       detachedOnly: Boolean(authenticatedWorkerId),
     });
+    if (!run && input.runId) {
+      const waiting = await db
+        .prepare(
+          `select count(*) as count
+           from briar_issue_dependencies dependency
+           join briar_hunt_runs prerequisite
+             on prerequisite.id = dependency.prerequisite_run_id
+           where dependency.project_id = ?
+             and dependency.dependent_run_id = ?
+             and prerequisite.status != 'completed'`,
+        )
+        .bind(projectId, input.runId)
+        .first<{ count: number }>();
+      if ((waiting?.count ?? 0) > 0) {
+        throw new HttpError(
+          409,
+          "Run is waiting for prerequisite issues to complete",
+        );
+      }
+    }
     if (run && authenticatedWorker) {
       await auditExecutionEvent(db, {
         organizationId: authenticatedWorker.principal.organizationId,

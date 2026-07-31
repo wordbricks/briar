@@ -1946,6 +1946,11 @@ function KanbanCard({
         </span>
         <span className="kanban-card-badges">
           <i className={`status-pill ${meta.tone}`}>{run.status === "running" && <LoaderCircle className="spin" size={11} />}{label}</i>
+          {run.executionReadiness === "waiting" && (
+            <i>{t("issue.waitingOnPrerequisites", {
+              count: run.waitingOnPrerequisiteCount ?? 0,
+            })}</i>
+          )}
           {run.priority !== null && <i className="kanban-priority">P{run.priority}</i>}
           {(run.attachments ?? []).length > 0 && <i><Paperclip size={11} />{run.attachments.length}</i>}
         </span>
@@ -2090,6 +2095,7 @@ function IssueContextMenu({
     !["completed", "cancelled"].includes(run.status);
   const processNowDisabled =
     !onProcessNow ||
+    run.executionReadiness === "waiting" ||
     (run.status !== "queued" && !canReassign) ||
     (isClaimed && !canReassign) ||
     isProcessing;
@@ -2118,6 +2124,10 @@ function IssueContextMenu({
             <span>{t(canReassign ? "worker.reassign" : "issue.processNow")}</span>
             {isProcessing ? (
               <small>{t("issue.processNowRunning")}</small>
+            ) : run.executionReadiness === "waiting" ? (
+              <small>{t("issue.waitingOnPrerequisites", {
+                count: run.waitingOnPrerequisiteCount ?? 0,
+              })}</small>
             ) : run.status !== "queued" ? (
               <small>{t("issue.processNowQueuedOnly")}</small>
             ) : isClaimed ? (

@@ -361,6 +361,14 @@ export function App() {
   const processIssueNow = (run: HuntRun) => {
     if (!activeProject) return;
     setQuickProcessError(null);
+    if (run.executionReadiness === "waiting") {
+      setQuickProcessError(
+        t("issue.waitingOnPrerequisites", {
+          count: run.waitingOnPrerequisiteCount ?? 0,
+        }),
+      );
+      return;
+    }
     setDispatchRun(run);
   };
   const submitWorkerDispatch = async (input: {

@@ -172,6 +172,31 @@ describe("dispatchAutoHuntToWorkers", () => {
     expect(dispatch).not.toHaveBeenCalled();
   });
 
+  it("does not retry a requested issue while prerequisites are unfinished", async () => {
+    const dispatch = vi.fn(async () => undefined);
+    const retry = vi.fn(async () => undefined);
+    const blocked = run("run-4", {
+      status: "blocked",
+      executionReadiness: "waiting",
+      waitingOnPrerequisiteCount: 1,
+    });
+
+    await expect(
+      dispatchAutoHuntToWorkers(
+        { dispatch, retry },
+        {
+          agent,
+          runs: [blocked],
+          targetRunIds: [blocked.id],
+        },
+      ),
+    ).rejects.toThrow(
+      "선행 이슈가 완료되지 않아 Auto Hunt를 시작할 수 없습니다.",
+    );
+    expect(retry).not.toHaveBeenCalled();
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
   it("rejects an empty queue without starting a local runtime", async () => {
     const dispatch = vi.fn(async () => undefined);
     const retry = vi.fn(async () => undefined);

@@ -7,7 +7,16 @@ export type AutoHuntQueueCandidate = {
   sourceCreatedAt?: string | null;
   startedAt?: string;
   runNumber: number;
+  prerequisites?: Array<{ status: string }>;
+  executionReadiness?: "ready" | "waiting";
 };
+
+export function isAutoHuntCandidateReady(run: AutoHuntQueueCandidate) {
+  if (run.executionReadiness) return run.executionReadiness === "ready";
+  return (run.prerequisites ?? []).every(
+    (prerequisite) => prerequisite.status === "completed",
+  );
+}
 
 const boundedInteger = (
   value: unknown,
@@ -25,7 +34,7 @@ export function selectAutoHuntCandidates<T extends AutoHuntQueueCandidate>(
 ) {
   const limit = boundedInteger(maximum, defaultAutoHuntMaxIssues, 1, maxAutoHuntIssuesLimit);
   return runs
-    .filter((run) => run.status === "queued")
+    .filter((run) => run.status === "queued" && isAutoHuntCandidateReady(run))
     .sort((left, right) => {
       const leftPriority = left.priority ?? Number.POSITIVE_INFINITY;
       const rightPriority = right.priority ?? Number.POSITIVE_INFINITY;
