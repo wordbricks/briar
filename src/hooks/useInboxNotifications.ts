@@ -2,8 +2,10 @@ import { useEffect, useRef } from "react";
 
 import { useI18n } from "../i18n";
 import {
+  listenForInboxNotificationClicks,
   readInboxNotificationPreferences,
   sendInboxNotification,
+  type InboxNotificationTarget,
 } from "../lib/inbox-notifications";
 import {
   classifyInboxMessage,
@@ -71,4 +73,27 @@ export function useInboxNotifications(
       });
     }
   }, [messages, organizationId, t, userId]);
+}
+
+export function useInboxNotificationClicks(
+  onOpen: (target: InboxNotificationTarget) => void,
+) {
+  useEffect(() => {
+    let disposed = false;
+    let stopListening: (() => void | Promise<void>) | null = null;
+
+    void listenForInboxNotificationClicks(onOpen)
+      .then((stop) => {
+        if (disposed) void stop();
+        else stopListening = stop;
+      })
+      .catch((error) => {
+        console.error("Failed to listen for inbox notification clicks", error);
+      });
+
+    return () => {
+      disposed = true;
+      void stopListening?.();
+    };
+  }, [onOpen]);
 }
