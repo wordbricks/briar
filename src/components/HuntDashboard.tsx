@@ -54,6 +54,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Typography } from "@/components/ui/typography";
 import {
   useCallback,
@@ -2385,17 +2390,28 @@ export function RunPage({
                             </details>
                           ) : null}
                           <div className="recovery-actions">
-                            <button
-                              disabled={isRecovering}
-                              onClick={() => void runAction(onRetry)}
-                              type="button"
-                            >
-                              <RotateCcw
-                                className={isRecovering ? "spin" : ""}
-                                size={14}
-                              />
-                              {t("run.retry")}
-                            </button>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  aria-description={t("run.retryWorkerTooltip")}
+                                  disabled={isRecovering}
+                                  onClick={() => void runAction(onRetry)}
+                                  type="button"
+                                >
+                                  <RotateCcw
+                                    className={isRecovering ? "spin" : ""}
+                                    size={14}
+                                  />
+                                  {t("run.retry")}
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent
+                                className="max-w-72 text-center leading-relaxed"
+                                side="top"
+                              >
+                                {t("run.retryWorkerTooltip")}
+                              </TooltipContent>
+                            </Tooltip>
                             {confirmCancel ? (
                               <>
                                 <button
@@ -2450,7 +2466,30 @@ export function RunPage({
                         <div className="recovery-panel">
                           <div><CircleAlert size={16} /><span><strong>{needsAttention ? (run.status === "failed" ? t("run.failed") : t("run.blocked")) : label}</strong><small>{needsAttention ? t("run.retryDescription", { count: run.currentAttempt + 1 }) : (run.detail ?? t("worker.sharingDescriptionOn"))}</small></span></div>
                           <div className="recovery-actions">
-                            {needsAttention && <button disabled={isRecovering} onClick={() => void runAction(onRetry)} type="button"><RotateCcw className={isRecovering ? "spin" : ""} size={14} />{t("run.retry")}</button>}
+                            {needsAttention && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    aria-description={t("run.retryWorkerTooltip")}
+                                    disabled={isRecovering}
+                                    onClick={() => void runAction(onRetry)}
+                                    type="button"
+                                  >
+                                    <RotateCcw
+                                      className={isRecovering ? "spin" : ""}
+                                      size={14}
+                                    />
+                                    {t("run.retry")}
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent
+                                  className="max-w-72 text-center leading-relaxed"
+                                  side="top"
+                                >
+                                  {t("run.retryWorkerTooltip")}
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
                             {confirmCancel ? (
                               <><button className="danger" disabled={isRecovering} onClick={() => void runAction(onCancel)} type="button">{t("run.confirmCancel")}</button><button disabled={isRecovering} onClick={() => setConfirmCancel(false)} type="button">{t("run.back")}</button></>
                             ) : (
