@@ -66,6 +66,7 @@ export function ProjectAgents({
   dashboard,
   error: appError,
   isSidebarOpen,
+  onIssueOpen,
   onRequestedSessionOpen,
   onSettleTaskSession,
   onStopSession,
@@ -79,6 +80,7 @@ export function ProjectAgents({
   dashboard: DashboardPayload | null;
   error: string | null;
   isSidebarOpen: boolean;
+  onIssueOpen: (runId: string) => void;
   onRequestedSessionOpen?: () => void;
   onSettleTaskSession: (
     sessionId: string,
@@ -327,6 +329,7 @@ export function ProjectAgents({
         error={appError}
         isSidebarOpen={isSidebarOpen}
         onBack={() => setSelectedAgent(null)}
+        onIssueOpen={onIssueOpen}
         onRequestedSessionOpen={onRequestedSessionOpen}
         onSettleTaskSession={onSettleTaskSession}
         onStopSession={onStopSession}

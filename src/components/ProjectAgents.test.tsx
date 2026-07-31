@@ -61,6 +61,7 @@ const projectAgentsProps = {
   dashboard,
   error: null,
   isSidebarOpen: true,
+  onIssueOpen: () => undefined,
   onSettleTaskSession: () => undefined,
   onStopSession: async () => true,
   onStart: () => "session-new",
@@ -371,6 +372,7 @@ describe("ProjectAgents", () => {
   });
 
   it("shows the selected agent sessions and opens task input in a dialog", async () => {
+    const onIssueOpen = vi.fn();
     const sessions: AutoHuntSession[] = [
       {
         id: "legacy-auto-session",
@@ -422,7 +424,11 @@ describe("ProjectAgents", () => {
       },
     ];
     const container = await mount(
-      <ProjectAgents {...projectAgentsProps} sessions={sessions} />,
+      <ProjectAgents
+        {...projectAgentsProps}
+        onIssueOpen={onIssueOpen}
+        sessions={sessions}
+      />,
     );
     await act(async () => Promise.resolve());
 
@@ -449,6 +455,15 @@ describe("ProjectAgents", () => {
     expect(container.querySelector('[role="dialog"]')).toBeNull();
     expect(container.textContent).not.toContain("수행 로그");
     expect(container.textContent).toContain("세션 타임라인");
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(
+          'button[aria-label="자동 사냥 이슈 상세"]',
+        )
+        ?.click();
+    });
+    expect(onIssueOpen).toHaveBeenCalledWith("run-auto");
 
     await act(async () => {
       container

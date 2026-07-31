@@ -47,6 +47,7 @@ export function ProjectAgentDetail({
   error: appError,
   isSidebarOpen,
   onBack,
+  onIssueOpen,
   onRequestedSessionOpen,
   onSettleTaskSession,
   onStopSession,
@@ -60,6 +61,7 @@ export function ProjectAgentDetail({
   error: string | null;
   isSidebarOpen: boolean;
   onBack: () => void;
+  onIssueOpen: (runId: string) => void;
   onRequestedSessionOpen?: () => void;
   onSettleTaskSession: (
     sessionId: string,
@@ -178,6 +180,7 @@ export function ProjectAgentDetail({
       <ProjectAgentSessionDetail
         isSidebarOpen={isSidebarOpen}
         onBack={() => setSelectedSessionId(null)}
+        onIssueOpen={onIssueOpen}
         onStop={() => onStopSession(selectedSession.id)}
         session={selectedSession}
       />

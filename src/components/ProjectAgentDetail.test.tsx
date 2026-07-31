@@ -117,6 +117,7 @@ function ProjectAgentDetailHarness({
       error={null}
       isSidebarOpen={true}
       onBack={() => undefined}
+      onIssueOpen={() => undefined}
       onSettleTaskSession={(sessionId, settlement) => {
         onSettleTaskSession(sessionId, settlement);
         setSessions((current) =>
@@ -176,6 +177,7 @@ describe("ProjectAgentDetail", () => {
         error={null}
         isSidebarOpen={true}
         onBack={onBack}
+        onIssueOpen={() => undefined}
         onSettleTaskSession={() => undefined}
         onStopSession={async () => true}
         onStartAutoHunt={() => "dispatch-1"}
@@ -245,6 +247,7 @@ describe("ProjectAgentDetail", () => {
         summary: null,
       }],
     };
+    const onIssueOpen = vi.fn();
     const container = await mount(
       <ProjectAgentDetail
         agent={agent}
@@ -252,6 +255,7 @@ describe("ProjectAgentDetail", () => {
         error={null}
         isSidebarOpen={true}
         onBack={() => undefined}
+        onIssueOpen={onIssueOpen}
         onSettleTaskSession={() => undefined}
         onStopSession={async () => true}
         onStartAutoHunt={() => dispatchSession.id}
@@ -265,6 +269,15 @@ describe("ProjectAgentDetail", () => {
 
     expect(container.textContent).toContain("연결된 Auto Hunt 이슈");
     expect(container.textContent).not.toContain("Auto Hunt를 요청했습니다.");
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(
+          'button[aria-label="연결된 Auto Hunt 이슈 상세"]',
+        )
+        ?.click();
+    });
+    expect(onIssueOpen).toHaveBeenCalledWith("run-1");
   });
 
   it("opens the task session detail as soon as the session is created", async () => {
