@@ -1,15 +1,40 @@
 /** @vitest-environment jsdom */
 
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { InboxMessage } from "../hooks/useInbox";
 import {
   defaultInboxNotificationPreferences,
+  inboxNotificationTarget,
+  listenForInboxNotificationClicks,
   readInboxNotificationPreferences,
+  sendInboxNotification,
+  targetFromNotificationAction,
   writeInboxNotificationPreferences,
 } from "./inbox-notifications";
+
+const message: InboxMessage = {
+  id: "issue:run-1",
+  kind: "issue",
+  projectId: "project-1",
+  projectName: "Briar",
+  targetId: "run-1",
+  title: "Notification test",
+  occurredAt: "2026-07-31T00:00:00.000Z",
+  version: "event-1",
+  runNumber: 1,
+  status: "completed",
+  workflowStage: null,
+  priority: 2,
+  structuredResult: null,
+};
 
 describe("inbox notification preferences", () => {
   beforeEach(() => {
     window.localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("defaults every inbox importance category off", () => {
@@ -46,5 +71,75 @@ describe("inbox notification preferences", () => {
       important: false,
       activity: true,
     });
+  });
+});
+
+describe("inbox notification navigation", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    Reflect.deleteProperty(window, "__TAURI_INTERNALS__");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("reads an Android notification target from the action payload", () => {
+    const target = inboxNotificationTarget(message);
+
+    expect(
+      targetFromNotificationAction({
+        actionId: "tap",
+        notification: {
+          extra: { briarInboxTarget: JSON.stringify(target) },
+        },
+      }),
+    ).toEqual(target);
+  });
+
+  it("falls back to the stored target for iOS action payloads", () => {
+    const target = inboxNotificationTarget(message);
+    window.localStorage.setItem(
+      "briar.inbox.notification-targets.v1",
+      JSON.stringify({ 42: { ...target, storedAt: Date.now() } }),
+    );
+
+    expect(
+      targetFromNotificationAction({
+        actionId: "tap",
+        notification: { id: 42 },
+      }),
+    ).toEqual(target);
+    expect(
+      targetFromNotificationAction({
+        actionId: "dismiss",
+        notification: { id: 42 },
+      }),
+    ).toBeNull();
+  });
+
+  it("opens the matching target when a browser notification is clicked", async () => {
+    const notifications: MockNotification[] = [];
+    class MockNotification {
+      static permission = "granted";
+      onclick: (() => void) | null = null;
+      close = vi.fn();
+
+      constructor() {
+        notifications.push(this);
+      }
+    }
+    vi.stubGlobal("Notification", MockNotification);
+    vi.spyOn(window, "focus").mockImplementation(() => {});
+    const onOpen = vi.fn();
+    const stopListening = await listenForInboxNotificationClicks(onOpen);
+
+    expect(await sendInboxNotification(message, "Important")).toBe(true);
+    const [notification] = notifications;
+    notification.onclick?.();
+
+    expect(onOpen).toHaveBeenCalledWith(inboxNotificationTarget(message));
+    expect(notification.close).toHaveBeenCalledOnce();
+    stopListening();
   });
 });

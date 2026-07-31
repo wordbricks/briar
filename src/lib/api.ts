@@ -1149,7 +1149,7 @@ export const cancelHuntRun = (
 
 export type HuntDispatchResult = {
   runId: string;
-  agentId: string;
+  agentId: string | null;
   provider: AgentProvider;
   model: string | null;
   effort: ModelEffort | null;
@@ -1165,7 +1165,7 @@ export async function dispatchHuntRun(
   projectId: string,
   runId: string,
   input: {
-    agentId: string;
+    agentId?: string | null;
     provider: AgentProvider;
     model: string | null;
     effort: ModelEffort | null;
@@ -1180,7 +1180,7 @@ export async function dispatchHuntRun(
     {
       method: "POST",
       body: JSON.stringify({
-        agentId: input.agentId,
+        ...(input.agentId ? { agentId: input.agentId } : {}),
         provider: input.provider,
         model: input.model,
         effort: input.effort,

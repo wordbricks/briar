@@ -24,6 +24,11 @@ export type ClaimedIssue = {
   title: string;
   claimToken: string;
   leaseExpiresAt: string;
+  execution?: {
+    provider: AgentProvider;
+    model: string | null;
+    effort: ModelEffort | null;
+  } | null;
   agent?: {
     id: string;
     name: string;

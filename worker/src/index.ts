@@ -1048,7 +1048,7 @@ const workerLabelSchema = z
 
 const dispatchRunSchema = z
   .object({
-    agentId: z.string().uuid(),
+    agentId: z.string().uuid().nullable().optional(),
     provider: z.enum(["codex", "claude", "grok"]).optional(),
     model: z.string().trim().min(1).max(100).nullable().optional(),
     effort: modelEffortSchema.nullable().optional(),
@@ -4468,7 +4468,7 @@ async function route(
       project.id,
       {
         runId: dispatchRunMatch[2],
-        agentId: input.agentId,
+        agentId: input.agentId ?? null,
         provider: input.provider,
         model: input.model,
         effort: input.effort,
@@ -5156,6 +5156,20 @@ async function route(
     }
     const agent =
       run?.agent_id ? await getProjectAgent(db, projectId, run.agent_id) : null;
+    const executionProvider = run
+      ? run.preferred_agent_provider ??
+        run.requested_agent_provider ??
+        agent?.provider ??
+        null
+      : null;
+    const executionModel = run?.preferred_agent_provider
+      ? run.preferred_agent_model
+      : run?.requested_agent_provider
+        ? run.requested_agent_model
+        : (agent?.model ?? null);
+    const executionEffort = run?.preferred_agent_provider
+      ? run.preferred_agent_effort
+      : (run?.requested_agent_effort ?? null);
     const [attachments, messages] = run
       ? await Promise.all([
           listIssueAttachments(db, projectId, run.id),
@@ -5187,6 +5201,13 @@ async function route(
             claimedAt: run.claimed_at,
             leaseExpiresAt: run.lease_expires_at,
             claimAttempts: run.claim_attempts,
+            execution: executionProvider
+              ? {
+                  provider: executionProvider,
+                  model: executionModel,
+                  effort: executionEffort,
+                }
+              : null,
             agent: agent
               ? {
                   id: agent.id,
@@ -5195,14 +5216,8 @@ async function route(
                     run.preferred_agent_provider ??
                     run.requested_agent_provider ??
                     agent.provider,
-                  model: run.preferred_agent_model ??
-                    (run.preferred_agent_provider
-                      ? null
-                      : run.requested_agent_model ??
-                        (run.requested_agent_provider ? null : agent.model)),
-                  effort: run.preferred_agent_provider
-                    ? run.preferred_agent_effort
-                    : run.requested_agent_effort,
+                  model: executionModel,
+                  effort: executionEffort,
                   responsibility: agent.responsibility,
                   skill: agent.skill_markdown,
                 }

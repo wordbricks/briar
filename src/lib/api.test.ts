@@ -146,7 +146,7 @@ describe("API errors", () => {
         new Response(
           JSON.stringify({
             runId,
-            agentId: "33333333-3333-4333-8333-333333333333",
+            agentId: null,
             provider: "claude",
             model: "opus",
             effort: "high",
@@ -162,7 +162,6 @@ describe("API errors", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await dispatchHuntRun("token", projectId, runId, {
-      agentId: "33333333-3333-4333-8333-333333333333",
       provider: "claude",
       model: "opus",
       effort: "high",
@@ -178,6 +177,7 @@ describe("API errors", () => {
       effort: "high",
       persistPreferences: true,
     });
+    expect(body).not.toHaveProperty("agentId");
   });
 
   it("returns a durable worker reply job for an @briar message", async () => {

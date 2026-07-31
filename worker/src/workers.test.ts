@@ -240,6 +240,50 @@ describe("detached execution workers", () => {
       observedAt: atMinute(minute),
     });
 
+  it("dispatches a queued issue to a selected Worker without an Agent", async () => {
+    const selected = await register("agentless");
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      queuedEvent("agentless-dispatch", 2),
+    );
+
+    await expect(
+      dispatchHuntRun(db, projectId, projectId, {
+        runId,
+        provider: "codex",
+        model: "gpt-5.6-sol",
+        effort: "high",
+        workerId: selected.worker.id,
+        requestedByUserId: "member",
+        requestId: "99999999-aaaa-4999-8999-999999999999",
+        occurredAt: atMinute(2),
+      }),
+    ).resolves.toMatchObject({
+      agentId: null,
+      provider: "codex",
+      requestedWorkerId: selected.worker.id,
+      dispatchMode: "specific",
+    });
+
+    const claimed = await claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: fingerprint("agentless-claim"),
+      claimedBy: selected.worker.label,
+      claimedAt: atMinute(3),
+      leaseExpiresAt: leaseExpiryFrom(atMinute(3)),
+      workerId: selected.worker.id,
+      agentProviders: ["codex"],
+      detachedOnly: true,
+    });
+    expect(claimed).toMatchObject({
+      id: runId,
+      agent_id: null,
+      requested_agent_provider: "codex",
+      requested_worker_id: selected.worker.id,
+      worker_id: selected.worker.id,
+    });
+  });
+
   it("gives an issue mention to its previous worker before another worker", async () => {
     const previous = await register("previous", 1);
     const fallback = await register("fallback", 1);

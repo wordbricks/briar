@@ -2561,36 +2561,42 @@ export async function claimNextQueuedHuntRun(
              )
            )
            and (
-             ? = 0 or agent_id is null or exists (
-               select 1 from briar_project_agents agent
-               where agent.id = briar_hunt_runs.agent_id
-                 and agent.project_id = briar_hunt_runs.project_id
-                 and (
-                   (
-                     ? = 1
-                     and coalesce(
-                       briar_hunt_runs.preferred_agent_provider,
-                       briar_hunt_runs.requested_agent_provider,
-                       agent.provider
-                     ) = 'codex'
-                   )
-                   or (
-                     ? = 1
-                     and coalesce(
-                       briar_hunt_runs.preferred_agent_provider,
-                       briar_hunt_runs.requested_agent_provider,
-                       agent.provider
-                     ) = 'claude'
-                   )
-                   or (
-                     ? = 1
-                     and coalesce(
-                       briar_hunt_runs.preferred_agent_provider,
-                       briar_hunt_runs.requested_agent_provider,
-                       agent.provider
-                     ) = 'grok'
-                   )
+             ? = 0
+             or (
+               ? = 1
+               and coalesce(
+                 preferred_agent_provider,
+                 requested_agent_provider,
+                 (
+                   select agent.provider from briar_project_agents agent
+                   where agent.id = briar_hunt_runs.agent_id
+                     and agent.project_id = briar_hunt_runs.project_id
                  )
+               ) = 'codex'
+             )
+             or (
+               ? = 1
+               and coalesce(
+                 preferred_agent_provider,
+                 requested_agent_provider,
+                 (
+                   select agent.provider from briar_project_agents agent
+                   where agent.id = briar_hunt_runs.agent_id
+                     and agent.project_id = briar_hunt_runs.project_id
+                 )
+               ) = 'claude'
+             )
+             or (
+               ? = 1
+               and coalesce(
+                 preferred_agent_provider,
+                 requested_agent_provider,
+                 (
+                   select agent.provider from briar_project_agents agent
+                   where agent.id = briar_hunt_runs.agent_id
+                     and agent.project_id = briar_hunt_runs.project_id
+                 )
+               ) = 'grok'
              )
            )
            and (
