@@ -7,6 +7,7 @@ import {
   assertPathWithinRoot,
   copyWorktreeIncludes,
   defaultWorktreeRoot,
+  findExistingIssueWorktree,
   isPathWithinRoot,
   listIssueWorktrees,
   parseRemoteTrackingBase,
@@ -258,6 +259,39 @@ describe("worktree list parsing", () => {
     expect(listIssueWorktrees(git, "/repo", "/roots/project")).toEqual([
       { path: "/roots/project/fix-1a2b3c4d", branch: "briar/fix-1a2b3c4d" },
     ]);
+  });
+
+  it("finds the previous issue worktree without allocating a replacement", () => {
+    const issue = {
+      runId: "3f6b9c21-1111-2222-3333-444455556666",
+      sourceKey: "github://wordbricks/briar/issues/42",
+      title: "Fix login redirect",
+    };
+    const { git, calls } = fakeGit(() =>
+      ok(
+        [
+          "worktree /repo",
+          "branch refs/heads/main",
+          "",
+          "worktree /roots/project/fix-login-redirect-3f6b9c21",
+          "branch refs/heads/briar/fix-login-redirect-3f6b9c21",
+        ].join("\n"),
+      ),
+    );
+
+    expect(
+      findExistingIssueWorktree(
+        git,
+        "/repo",
+        "/roots/project",
+        issue,
+        null,
+      ),
+    ).toEqual({
+      path: "/roots/project/fix-login-redirect-3f6b9c21",
+      branch: "briar/fix-login-redirect-3f6b9c21",
+    });
+    expect(calls).toEqual([["worktree", "list", "--porcelain"]]);
   });
 });
 

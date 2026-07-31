@@ -1777,7 +1777,7 @@ export async function readAgentTranscript(
   db: D1Database,
   projectId: string,
   sessionId: string,
-  options: { afterSequence?: number; limit?: number } = {},
+  options: { afterSequence?: number; limit?: number; tail?: boolean } = {},
 ) {
   const session = await db
     .prepare(
@@ -1792,7 +1792,7 @@ export async function readAgentTranscript(
       `select sequence, direction, payload_json, recorded_at
        from briar_agent_transcripts
        where session_id = ? and sequence > ?
-       order by sequence asc
+       order by sequence ${options.tail ? "desc" : "asc"}
        limit ?`,
     )
     .bind(
@@ -1806,5 +1806,6 @@ export async function readAgentTranscript(
       payload_json: string;
       recorded_at: string;
     }>();
-  return { session, events: result.results ?? [] };
+  const events = result.results ?? [];
+  return { session, events: options.tail ? events.reverse() : events };
 }

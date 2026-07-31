@@ -1040,12 +1040,56 @@ export async function createIssueMessage(
     agentConversationId?: string | null;
   },
 ) {
-  const result = await request<{ message: IssueMessage }>(
+  const result = await request<{
+    message: IssueMessage;
+    agentReply: {
+      id: string;
+      triggerMessageId: string;
+      status: "queued" | "running" | "completed" | "failed";
+      error: string | null;
+    } | null;
+  }>(
     `/projects/${projectId}/runs/${runId}/messages`,
     token,
     { method: "POST", body: JSON.stringify(input) },
   );
-  return result.message;
+  return result;
+}
+
+export async function waitForIssueAgentReply(
+  token: string,
+  projectId: string,
+  runId: string,
+  triggerMessageId: string,
+  options: { pollIntervalMs?: number; timeoutMs?: number } = {},
+) {
+  const pollIntervalMs = options.pollIntervalMs ?? 1_500;
+  const timeoutMs = options.timeoutMs ?? 5 * 60_000;
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    const result = await request<{
+      agentReply: {
+        status: "queued" | "running" | "completed" | "failed";
+        error: string | null;
+      };
+      message: IssueMessage | null;
+    }>(
+      `/projects/${projectId}/runs/${runId}/messages/${triggerMessageId}/agent-reply`,
+      token,
+    );
+    if (result.agentReply.status === "completed" && result.message) {
+      return result.message;
+    }
+    if (result.agentReply.status === "failed") {
+      throw new Error(
+        result.agentReply.error ?? "워커가 Briar 답변을 만들지 못했습니다.",
+      );
+    }
+    await new Promise((resolve) => globalThis.setTimeout(resolve, pollIntervalMs));
+  }
+  throw new Error(
+    "Briar 답변이 아직 대기 중입니다. 사용 가능한 워커가 있는지 확인해 주세요.",
+  );
 }
 
 export type HuntRecoveryResult = {
