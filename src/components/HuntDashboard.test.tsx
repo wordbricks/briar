@@ -889,7 +889,8 @@ describe("HuntDashboard", () => {
     expect(container.querySelector(".run-page-back")).toBeNull();
     expect(container.querySelector(".run-page-title-row")).toBeNull();
     expect(container.querySelector(".run-page-summary .run-page-description")).toBeNull();
-    expect(container.querySelector(".run-page-summary > .issue-activity")).not.toBeNull();
+    expect(container.querySelector(".run-page-summary > .issue-activity")).toBeNull();
+    expect(container.querySelector(".issue-activity-trigger")).toBeNull();
     expect(container.querySelector(".run-page-content > h1")).toBeNull();
     expect(container.querySelector(".run-page-content > .eyebrow")).toBeNull();
     expect(container.querySelector(".run-page-content > .run-detail")).toBeNull();
@@ -910,34 +911,28 @@ describe("HuntDashboard", () => {
     expect(container.textContent).not.toContain(
       "Auto Hunt 실행 증거를 실시간으로 표시합니다.",
     );
-    const activityTrigger = container.querySelector<HTMLButtonElement>(
-      ".issue-activity-trigger",
+    expect(container.querySelector(".issue-status-history-panel")).toBeNull();
+    const statusHistoryTab = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
+    ).find((button) => button.textContent?.includes("상태 히스토리"));
+    expect(statusHistoryTab).not.toBeNull();
+    await act(async () => statusHistoryTab?.click());
+    const statusHistoryPanel = container.querySelector(
+      ".issue-status-history-panel",
     );
-    expect(activityTrigger?.getAttribute("aria-label")).toBe("상태 히스토리 열기");
-    expect(activityTrigger?.querySelector("strong")?.textContent).toBe(
-      demoDashboard.runs[0].events[0].detail,
+    expect(statusHistoryPanel?.getAttribute("role")).toBe("tabpanel");
+    expect(statusHistoryPanel?.textContent).toContain(
+      demoDashboard.runs[0].events[0].detail ?? "",
     );
-    expect(activityTrigger?.textContent).toContain("시도 1");
-    expect(activityTrigger?.textContent).not.toContain("기록 3개");
-    expect(container.querySelectorAll(".issue-activity .timeline-event")).toHaveLength(0);
-
-    await act(async () => activityTrigger?.click());
-    const activityDialog = container.querySelector(".issue-activity-dialog");
-    expect(activityDialog?.getAttribute("role")).toBe("dialog");
-    expect(activityDialog?.textContent).toContain("상태 히스토리");
-    expect(activityDialog?.textContent).toContain("기록 3개");
     expect(
-      activityDialog?.querySelectorAll(".timeline-event"),
+      statusHistoryPanel?.querySelectorAll(".timeline-event"),
     ).toHaveLength(demoDashboard.runs[0].events.length);
-    expect(document.activeElement).toBe(
-      activityDialog?.querySelector('button[aria-label="닫기"]'),
-    );
-
-    await act(async () => {
-      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
-    });
     expect(container.querySelector(".issue-activity-dialog")).toBeNull();
-    expect(document.activeElement).toBe(activityTrigger);
+    const descriptionTab = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
+    ).find((button) => button.textContent?.includes("설명"));
+    await act(async () => descriptionTab?.click());
+    expect(container.querySelector(".issue-status-history-panel")).toBeNull();
     const descriptionPane = container.querySelector(".issue-description-pane");
     expect(descriptionPane).not.toBeNull();
     expect(descriptionPane?.querySelector(":scope > header")).toBeNull();

@@ -2336,7 +2336,7 @@ export function RunPage({
   const [contentSplit, setContentSplit] = useState(50);
   const [isResizingContent, setIsResizingContent] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState<
-    "description" | "evidence"
+    "description" | "statusHistory" | "evidence"
   >("description");
   useMobileBackHandler(
     () => {
@@ -2540,62 +2540,56 @@ export function RunPage({
         >
           <header>
             {companionMode ? (
-              <>
-                <div className="run-page-heading">
-                  <button
-                    className="run-page-back"
-                    onClick={onBack}
-                    type="button"
-                  >
-                    <ArrowLeft size={16} />
-                    {t("run.back")}
-                  </button>
-                  <div className="run-page-overview">
-                    <div className="run-page-title-row">
-                      <small>AH-{run.runNumber}</small>
-                      <h1 id="run-page-title">{run.title}</h1>
-                      {shareStatus ? (
-                        <span
-                          aria-live="polite"
-                          className={`run-page-share-status${shareStatus === "error" ? " error" : ""}`}
-                          role="status"
-                        >
-                          {t(
-                            shareStatus === "copied"
-                              ? "issue.linkCopied"
-                              : "issue.shareFailed",
-                          )}
-                        </span>
-                      ) : null}
-                      <IssueActionsMenu
-                        disabled={isUpdatingIssue || isDeletingIssue}
-                        onDelete={
-                          onDelete ? () => setIsDeleteDialogOpen(true) : undefined
-                        }
-                        onEdit={
-                          onUpdateIssue
-                            ? () => setIsEditDialogOpen(true)
-                            : undefined
-                        }
-                        onShare={() => void shareIssue()}
-                      />
-                    </div>
-                  </div>
-                  <div className="run-page-meta">
-                    <span className={`status-pill ${meta.tone}`}>{label}</span>
-                    <small>
-                      {t("run.attempt", { count: run.currentAttempt })} ·{" "}
-                      {t("run.revision", { count: run.currentRevision })}
-                    </small>
+              <div className="run-page-heading">
+                <button
+                  className="run-page-back"
+                  onClick={onBack}
+                  type="button"
+                >
+                  <ArrowLeft size={16} />
+                  {t("run.back")}
+                </button>
+                <div className="run-page-overview">
+                  <div className="run-page-title-row">
+                    <small>AH-{run.runNumber}</small>
+                    <h1 id="run-page-title">{run.title}</h1>
+                    {shareStatus ? (
+                      <span
+                        aria-live="polite"
+                        className={`run-page-share-status${shareStatus === "error" ? " error" : ""}`}
+                        role="status"
+                      >
+                        {t(
+                          shareStatus === "copied"
+                            ? "issue.linkCopied"
+                            : "issue.shareFailed",
+                        )}
+                      </span>
+                    ) : null}
+                    <IssueActionsMenu
+                      disabled={isUpdatingIssue || isDeletingIssue}
+                      onDelete={
+                        onDelete ? () => setIsDeleteDialogOpen(true) : undefined
+                      }
+                      onEdit={
+                        onUpdateIssue
+                          ? () => setIsEditDialogOpen(true)
+                          : undefined
+                      }
+                      onShare={() => void shareIssue()}
+                    />
                   </div>
                 </div>
-                <div className="run-page-summary">
-                  <IssueActivity run={run} />
+                <div className="run-page-meta">
+                  <span className={`status-pill ${meta.tone}`}>{label}</span>
+                  <small>
+                    {t("run.attempt", { count: run.currentAttempt })} ·{" "}
+                    {t("run.revision", { count: run.currentRevision })}
+                  </small>
                 </div>
-              </>
+              </div>
             ) : (
               <div className="run-page-summary">
-                <IssueActivity run={run} />
                 <div className="run-page-meta">
                   <span className={`status-pill ${meta.tone}`}>{label}</span>
                   <small>
@@ -2619,7 +2613,9 @@ export function RunPage({
                   aria-label={t(
                     activeDetailTab === "description"
                       ? "issue.description"
-                      : "run.evidence",
+                      : activeDetailTab === "statusHistory"
+                        ? "run.statusHistory"
+                        : "run.evidence",
                   )}
                   className="issue-description-pane"
                 >
@@ -2637,6 +2633,17 @@ export function RunPage({
                       type="button"
                     >
                       {t("issue.description")}
+                    </button>
+                    <button
+                      aria-controls={`${detailTabsId}-status-history-panel`}
+                      aria-selected={activeDetailTab === "statusHistory"}
+                      id={`${detailTabsId}-status-history-tab`}
+                      onClick={() => setActiveDetailTab("statusHistory")}
+                      role="tab"
+                      type="button"
+                    >
+                      <Activity aria-hidden="true" size={14} />
+                      {t("run.statusHistory")}
                     </button>
                     <button
                       aria-controls={`${detailTabsId}-evidence-panel`}
@@ -2798,6 +2805,12 @@ export function RunPage({
                         </div>
                       )}
                     </div>
+                  ) : activeDetailTab === "statusHistory" ? (
+                    <IssueStatusHistoryPanel
+                      id={`${detailTabsId}-status-history-panel`}
+                      labelledBy={`${detailTabsId}-status-history-tab`}
+                      run={run}
+                    />
                   ) : (
                     <RunEvidencePanel
                       id={`${detailTabsId}-evidence-panel`}
@@ -3207,140 +3220,59 @@ function IssueActionsMenu({
   );
 }
 
-function IssueActivity({ run }: { run: HuntRun }) {
+function IssueStatusHistoryPanel({
+  id,
+  labelledBy,
+  run,
+}: {
+  id: string;
+  labelledBy: string;
+  run: HuntRun;
+}) {
   const { t } = useI18n();
-  const [isOpen, setIsOpen] = useState(false);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const closeRef = useRef<HTMLButtonElement>(null);
-  const latestEvent = run.events[0] ?? null;
-  const latestDisplay = latestEvent
-    ? eventMeta(latestEvent.status, latestEvent.workflowStage, run.workflow)
-    : runMeta(run.status, run.workflowStage, run.workflow);
-  const latestLabel = latestEvent
-    ? localizeEvent(
-        t,
-        latestEvent.status,
-        latestEvent.workflowStage,
-        latestDisplay.label,
-      )
-    : localizeStatus(t, run.status, run.workflowStage, latestDisplay.label);
-  const latestMessage =
-    latestEvent?.detail?.trim() || run.detail?.trim() || latestLabel;
-
-  useEffect(() => {
-    if (!isOpen) return;
-    closeRef.current?.focus();
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setIsOpen(false);
-      if (event.key === "Tab") {
-        event.preventDefault();
-        closeRef.current?.focus();
-      }
-    };
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("keydown", closeOnEscape);
-      triggerRef.current?.focus();
-    };
-  }, [isOpen]);
 
   return (
-    <div className="issue-activity">
-      <button
-        aria-expanded={isOpen}
-        aria-haspopup="dialog"
-        aria-label={t("run.openStatusHistory")}
-        className="issue-activity-trigger"
-        onClick={() => setIsOpen(true)}
-        ref={triggerRef}
-        type="button"
-      >
-        <span className={`issue-activity-dot ${latestDisplay.tone}`} />
-        <span className="issue-activity-latest">
-          <strong>{latestMessage}</strong>
-          <small>
-            {latestEvent
-              ? `${t("run.attempt", { count: latestEvent.attempt })} · ${t("run.revision", { count: latestEvent.revision })} · ${relativeTime(latestEvent.occurredAt, t)}`
-              : t("run.notSet")}
-          </small>
-        </span>
-        <ChevronRight aria-hidden="true" size={15} />
-      </button>
-      {isOpen && (
-        <div
-          className="dialog-backdrop issue-activity-backdrop"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setIsOpen(false);
-          }}
-          role="presentation"
-        >
-          <section
-            aria-labelledby="issue-activity-dialog-title"
-            aria-modal="true"
-            className="issue-activity-dialog"
-            role="dialog"
-          >
-            <header>
-              <div>
-                <span className="issue-activity-dialog-icon">
-                  <Activity aria-hidden="true" size={16} />
-                </span>
+    <div
+      aria-labelledby={labelledBy}
+      className="issue-status-history-panel"
+      id={id}
+      role="tabpanel"
+    >
+      {run.events.length > 0 ? (
+        <div className="issue-activity-history">
+          {run.events.map((event) => {
+            const display = eventMeta(
+              event.status,
+              event.workflowStage,
+              run.workflow,
+            );
+            return (
+              <div className="timeline-event" key={event.id}>
+                <i className={display.tone} />
                 <span>
-                  <h2 id="issue-activity-dialog-title">
-                    {t("run.statusHistory")}
-                  </h2>
+                  <strong>
+                    {localizeEvent(
+                      t,
+                      event.status,
+                      event.workflowStage,
+                      display.label,
+                    )}{" "}
+                    <em>
+                      {t("run.attempt", { count: event.attempt })} ·{" "}
+                      {t("run.revision", { count: event.revision })}
+                    </em>
+                  </strong>
+                  {event.detail && <p>{event.detail}</p>}
                   <small>
-                    {t("run.activityCount", { count: run.events.length })}
+                    {event.actor} · {relativeTime(event.occurredAt, t)}
                   </small>
                 </span>
               </div>
-              <button
-                aria-label={t("common.close")}
-                onClick={() => setIsOpen(false)}
-                ref={closeRef}
-                type="button"
-              >
-                <X aria-hidden="true" size={17} />
-              </button>
-            </header>
-            <div className="issue-activity-history">
-              {run.events.length > 0 ? (
-                run.events.map((event) => {
-                  const display = eventMeta(
-                    event.status,
-                    event.workflowStage,
-                    run.workflow,
-                  );
-                  return (
-                    <div className="timeline-event" key={event.id}>
-                      <i className={display.tone} />
-                      <span>
-                        <strong>
-                          {localizeEvent(
-                            t,
-                            event.status,
-                            event.workflowStage,
-                            display.label,
-                          )}{" "}
-                          <em>
-                            {t("run.attempt", { count: event.attempt })} ·{" "}
-                            {t("run.revision", { count: event.revision })}
-                          </em>
-                        </strong>
-                        {event.detail && <p>{event.detail}</p>}
-                        <small>
-                          {event.actor} · {relativeTime(event.occurredAt, t)}
-                        </small>
-                      </span>
-                    </div>
-                  );
-                })
-              ) : (
-                <p className="issue-activity-empty">{t("run.activityEmpty")}</p>
-              )}
-            </div>
-          </section>
+            );
+          })}
         </div>
+      ) : (
+        <p className="issue-activity-empty">{t("run.activityEmpty")}</p>
       )}
     </div>
   );
