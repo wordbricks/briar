@@ -1,4 +1,12 @@
-import { Cpu, LoaderCircle, MonitorCog, RefreshCw, Trash2 } from "lucide-react";
+import {
+  Cpu,
+  ImagePlus,
+  LoaderCircle,
+  MonitorCog,
+  Pencil,
+  RefreshCw,
+  Trash2,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { SettingsAlert, SettingsPageHeader } from "@/components/settings";
@@ -11,14 +19,24 @@ import {
   disableOrganizationExecutionWorker,
   loadOrganizationExecutionWorkers,
   updateOrganizationExecutionWorkerConcurrency,
+  updateOrganizationExecutionWorkerIcon,
 } from "../lib/api";
 import { isDesktopTauri } from "../lib/platform";
+import {
+  isWorkerEmoji,
+  maxWorkerEmojiLength,
+  workerLogoAccept,
+  workerLogoFromFile,
+} from "../lib/worker-icon";
 import type {
   Organization,
   OrganizationExecutionWorker,
   Project,
+  WorkerIcon as WorkerIconValue,
 } from "../types";
+import { Input } from "./ui/input";
 import { SelectMenu } from "./SelectMenu";
+import { WorkerIcon } from "./WorkerIcon";
 import { WorkerProviderIcons } from "./WorkerProviderIcons";
 
 type LocalWorkerStatus = {
@@ -72,6 +90,11 @@ export function OrganizationWorkersSettings({
   const [loading, setLoading] = useState(true);
   const [savingProjectId, setSavingProjectId] = useState<string | null>(null);
   const [savingDeviceId, setSavingDeviceId] = useState<string | null>(null);
+  const [editingIconDeviceId, setEditingIconDeviceId] = useState<string | null>(
+    null,
+  );
+  const [iconDraft, setIconDraft] = useState<WorkerIconValue | null>(null);
+  const [processingIcon, setProcessingIcon] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -192,6 +215,48 @@ export function OrganizationWorkersSettings({
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
       setSavingDeviceId(null);
+    }
+  };
+
+  const editIcon = (worker: OrganizationExecutionWorker) => {
+    setEditingIconDeviceId(worker.deviceId);
+    setIconDraft(worker.icon ?? null);
+    setError(null);
+  };
+
+  const saveIcon = async (worker: OrganizationExecutionWorker) => {
+    if (iconDraft?.type === "emoji" && !isWorkerEmoji(iconDraft.value)) {
+      setError(t("organization.workerIconEmojiInvalid"));
+      return;
+    }
+    setSavingDeviceId(worker.deviceId);
+    setError(null);
+    try {
+      await updateOrganizationExecutionWorkerIcon(
+        token,
+        organization.id,
+        worker.deviceId,
+        iconDraft,
+      );
+      setEditingIconDeviceId(null);
+      await refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setSavingDeviceId(null);
+    }
+  };
+
+  const selectLogo = async (file: File | undefined) => {
+    if (!file) return;
+    setProcessingIcon(true);
+    setError(null);
+    try {
+      setIconDraft({ type: "image", value: await workerLogoFromFile(file) });
+    } catch {
+      setError(t("organization.workerIconUploadFailed"));
+    } finally {
+      setProcessingIcon(false);
     }
   };
 
@@ -319,36 +384,51 @@ export function OrganizationWorkersSettings({
                   key={worker.deviceId}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <Typography as="h3" variant="bodyLg">
-                          {worker.label}
-                        </Typography>
-                        {worker.deviceId === currentDeviceId ? (
-                          <Badge variant="secondary">
-                            {t("organization.thisComputerBadge")}
+                    <div className="flex min-w-0 items-center gap-3">
+                      <WorkerIcon icon={worker.icon} size={42} />
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Typography as="h3" variant="bodyLg">
+                            {worker.label}
+                          </Typography>
+                          {worker.deviceId === currentDeviceId ? (
+                            <Badge variant="secondary">
+                              {t("organization.thisComputerBadge")}
+                            </Badge>
+                          ) : null}
+                          <Badge
+                            variant={
+                              worker.state === "online" ? "default" : "outline"
+                            }
+                          >
+                            {t(`worker.state.${worker.state}`)}
                           </Badge>
-                        ) : null}
-                        <Badge
-                          variant={
-                            worker.state === "online" ? "default" : "outline"
-                          }
+                        </div>
+                        <Typography
+                          className="mt-1"
+                          tone="muted"
+                          variant="caption"
                         >
-                          {t(`worker.state.${worker.state}`)}
-                        </Badge>
+                          {t("organization.workerOwnedBy", {
+                            name: worker.ownerName,
+                          })}
+                        </Typography>
                       </div>
-                      <Typography
-                        className="mt-1"
-                        tone="muted"
-                        variant="caption"
-                      >
-                        {t("organization.workerOwnedBy", {
-                          name: worker.ownerName,
-                        })}
-                      </Typography>
                     </div>
                     {mayManage ? (
                       <div className="flex items-center gap-2">
+                        <Button
+                          aria-label={t("organization.workerIconEdit", {
+                            name: worker.label,
+                          })}
+                          disabled={savingDeviceId === worker.deviceId}
+                          onClick={() => editIcon(worker)}
+                          size="icon-sm"
+                          type="button"
+                          variant="outline"
+                        >
+                          <Pencil size={14} />
+                        </Button>
                         <SelectMenu
                           disabled={savingDeviceId === worker.deviceId}
                           label={t("organization.workerConcurrency")}
@@ -379,6 +459,98 @@ export function OrganizationWorkersSettings({
                       </div>
                     ) : null}
                   </div>
+                  {editingIconDeviceId === worker.deviceId ? (
+                    <div className="mt-4 grid gap-3 rounded-lg border border-border bg-muted/40 p-4">
+                      <div className="flex items-center gap-3">
+                        <WorkerIcon icon={iconDraft} size={48} />
+                        <div className="min-w-0 flex-1">
+                          <label
+                            className="mb-1.5 block text-xs font-medium"
+                            htmlFor={`worker-emoji-${worker.deviceId}`}
+                          >
+                            {t("organization.workerIconEmoji")}
+                          </label>
+                          <Input
+                            id={`worker-emoji-${worker.deviceId}`}
+                            maxLength={maxWorkerEmojiLength}
+                            onChange={(event) =>
+                              setIconDraft(
+                                event.target.value
+                                  ? {
+                                      type: "emoji",
+                                      value: event.target.value,
+                                    }
+                                  : null,
+                              )
+                            }
+                            placeholder={t(
+                              "organization.workerIconEmojiPlaceholder",
+                            )}
+                            value={
+                              iconDraft?.type === "emoji"
+                                ? iconDraft.value
+                                : ""
+                            }
+                          />
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <label className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-md border border-border bg-card px-3 text-xs font-medium hover:bg-accent">
+                          <ImagePlus size={14} />
+                          {t(
+                            iconDraft?.type === "image"
+                              ? "organization.workerIconReplaceLogo"
+                              : "organization.workerIconUploadLogo",
+                          )}
+                          <input
+                            accept={workerLogoAccept}
+                            className="sr-only"
+                            disabled={processingIcon}
+                            onChange={(event) => {
+                              const file = event.target.files?.[0];
+                              event.target.value = "";
+                              void selectLogo(file);
+                            }}
+                            type="file"
+                          />
+                        </label>
+                        <Button
+                          disabled={!iconDraft}
+                          onClick={() => setIconDraft(null)}
+                          size="sm"
+                          type="button"
+                          variant="ghost"
+                        >
+                          {t("organization.workerIconRemove")}
+                        </Button>
+                        <span className="flex-1" />
+                        <Button
+                          onClick={() => setEditingIconDeviceId(null)}
+                          size="sm"
+                          type="button"
+                          variant="ghost"
+                        >
+                          {t("common.cancel")}
+                        </Button>
+                        <Button
+                          disabled={
+                            processingIcon ||
+                            savingDeviceId === worker.deviceId
+                          }
+                          onClick={() => void saveIcon(worker)}
+                          size="sm"
+                          type="button"
+                        >
+                          {savingDeviceId === worker.deviceId
+                            ? t("common.saving")
+                            : t("common.save")}
+                        </Button>
+                      </div>
+                      <Typography tone="muted" variant="micro">
+                        {t("organization.workerIconHint")}
+                      </Typography>
+                    </div>
+                  ) : null}
                   <div className="mt-4 flex flex-wrap gap-2">
                     {worker.bindings.length === 0 ? (
                       <Typography tone="muted" variant="caption">

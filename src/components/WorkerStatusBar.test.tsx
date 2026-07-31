@@ -78,7 +78,9 @@ describe("WorkerStatusBar", () => {
         <I18nProvider>
           <WorkerStatusBar
             onOpenSettings={() => undefined}
-            workers={[worker()]}
+            workers={[
+              worker({ icon: { type: "emoji", value: "🍋" } }),
+            ]}
           />
         </I18nProvider>,
       );
@@ -91,6 +93,7 @@ describe("WorkerStatusBar", () => {
 
     expect(container.innerHTML).toContain("worker-status-dot available");
     expect(container.innerHTML).toContain("Janet's Mac");
+    expect(container.querySelector(".worker-icon")?.textContent).toBe("🍋");
     expect(container.innerHTML).toContain("사용 가능");
     expect(container.innerHTML).toContain('aria-label="Codex"');
     expect(container.innerHTML).toContain('aria-label="Claude"');

@@ -12,9 +12,31 @@ import worker, {
   readRunEvidenceRequest,
   runEvidenceInputSchema,
   runReworkInputSchema,
+  workerSettingsSchema,
 } from "./index";
 
 describe("Worker HTTP contract", () => {
+  it("accepts one Worker emoji or image and rejects invalid icon text", () => {
+    expect(
+      workerSettingsSchema.parse({
+        icon: { type: "emoji", value: "👩🏽‍💻" },
+      }),
+    ).toEqual({ icon: { type: "emoji", value: "👩🏽‍💻" } });
+    expect(
+      workerSettingsSchema.parse({
+        icon: { type: "image", value: "data:image/webp;base64,aA==" },
+      }),
+    ).toEqual({
+      icon: { type: "image", value: "data:image/webp;base64,aA==" },
+    });
+    expect(() =>
+      workerSettingsSchema.parse({
+        icon: { type: "emoji", value: "worker" },
+      }),
+    ).toThrow(/one emoji/u);
+    expect(workerSettingsSchema.parse({ icon: null })).toEqual({ icon: null });
+  });
+
   it("requires an actionable structured handoff for blocked work", () => {
     const blockedEvent = {
       runId: "11111111-1111-4111-8111-111111111111",
