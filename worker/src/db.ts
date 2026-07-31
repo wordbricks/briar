@@ -874,7 +874,9 @@ export async function releaseSlackEvent(
 export async function listProjects(db: D1Database, userId: string) {
   const result = await db
     .prepare(
-      `select project.id, project.name, project.icon_data_url as icon, project.organization_id,
+      `select project.id, project.name,
+              coalesce(project.icon_data_url_browser, project.icon_data_url) as icon,
+              project.organization_id,
               organization.name as organization_name,
               membership.role as member_role, project.created_at
        from briar_projects project
@@ -895,7 +897,9 @@ export async function listOrganizationProjects(
 ) {
   const result = await db
     .prepare(
-      `select project.id, project.name, project.icon_data_url as icon, project.organization_id,
+      `select project.id, project.name,
+              coalesce(project.icon_data_url_browser, project.icon_data_url) as icon,
+              project.organization_id,
               organization.name as organization_name,
               'member' as member_role, project.created_at
        from briar_projects project
@@ -1005,7 +1009,9 @@ export async function getProject(
 ) {
   return await db
     .prepare(
-      `select project.id, project.name, project.icon_data_url as icon, project.organization_id,
+      `select project.id, project.name,
+              coalesce(project.icon_data_url_browser, project.icon_data_url) as icon,
+              project.organization_id,
               organization.name as organization_name,
               membership.role as member_role, project.created_at
        from briar_projects project
@@ -1028,7 +1034,7 @@ export async function updateProjectIcon(
   const result = await db
     .prepare(
       `update briar_projects
-       set icon_data_url = ?, updated_at = ?
+       set icon_data_url_browser = ?, icon_data_url = null, updated_at = ?
        where id = ?`,
     )
     .bind(icon, updatedAt, projectId)

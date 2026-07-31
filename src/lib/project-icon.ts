@@ -12,20 +12,37 @@ const supportedProjectIconTypes = new Set([
   "image/x-icon",
   "image/vnd.microsoft.icon",
 ]);
+const supportedProjectIconExtensions = new Set([
+  "ico",
+  "jpeg",
+  "jpg",
+  "png",
+  "svg",
+  "webp",
+]);
 
 export function isProjectIconDataUrl(value: string): boolean {
   return (
-    /^data:image\/webp;base64,/u.test(value) &&
+    /^data:image\/(?:jpeg|png|webp);base64,/u.test(value) &&
     value.length <= maxProjectIconDataUrlLength
   );
 }
 
+export function isSupportedProjectIconFile(
+  file: Pick<File, "name" | "size" | "type">,
+): boolean {
+  const extension = file.name.toLocaleLowerCase().split(".").pop() ?? "";
+  const type = file.type.toLocaleLowerCase();
+  const canFallBackToExtension = type === "" || type === "application/octet-stream";
+  return (
+    (supportedProjectIconTypes.has(type) ||
+      (canFallBackToExtension && supportedProjectIconExtensions.has(extension))) &&
+    file.size <= maxProjectIconSourceBytes
+  );
+}
+
 export async function projectIconFromFile(file: File): Promise<string> {
-  const extension = file.name.toLocaleLowerCase().split(".").pop();
-  if (
-    (!supportedProjectIconTypes.has(file.type) && extension !== "ico") ||
-    file.size > maxProjectIconSourceBytes
-  ) {
+  if (!isSupportedProjectIconFile(file)) {
     throw new Error("invalid-project-icon");
   }
 

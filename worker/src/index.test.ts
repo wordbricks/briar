@@ -19,12 +19,14 @@ import worker, {
 } from "./index";
 
 describe("Worker HTTP contract", () => {
-  it("accepts bounded WebP project icons or removal", () => {
-    expect(
-      projectIconInputSchema.parse({
-        icon: "data:image/webp;base64,bG9nbw==",
-      }),
-    ).toEqual({ icon: "data:image/webp;base64,bG9nbw==" });
+  it("accepts bounded browser-supported project icons or removal", () => {
+    for (const icon of [
+      "data:image/webp;base64,bG9nbw==",
+      "data:image/png;base64,bG9nbw==",
+      "data:image/jpeg;base64,bG9nbw==",
+    ]) {
+      expect(projectIconInputSchema.parse({ icon })).toEqual({ icon });
+    }
     expect(projectIconInputSchema.parse({ icon: null })).toEqual({ icon: null });
     expect(() =>
       projectIconInputSchema.parse({

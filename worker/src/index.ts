@@ -533,12 +533,16 @@ const projectInputSchema = z.object({
   name: z.string().trim().min(1).max(100),
   organizationId: z.string().uuid().optional(),
 });
+const maxProjectIconDataUrlLength = 400_000;
+const maxProjectIconRequestBytes = maxProjectIconDataUrlLength + 20;
 export const projectIconInputSchema = z
   .object({
     icon: z
       .string()
-      .max(400_000)
-      .regex(/^data:image\/webp;base64,[a-z0-9+/]+={0,2}$/iu)
+      .max(maxProjectIconDataUrlLength)
+      .regex(
+        /^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/]+={0,2}$/iu,
+      )
       .nullable(),
   })
   .strict();
@@ -3349,7 +3353,9 @@ async function route(
     if (!canManageOrganization(project.member_role)) {
       throw new HttpError(403, "Organization admin access required");
     }
-    const input = projectIconInputSchema.parse(await readJson(request));
+    const input = projectIconInputSchema.parse(
+      await readJson(request, maxProjectIconRequestBytes),
+    );
     if (!(await updateProjectIcon(db, project.id, input.icon))) {
       throw new HttpError(404, "Project not found");
     }
