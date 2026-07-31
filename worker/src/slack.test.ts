@@ -146,6 +146,7 @@ describe("Slack integration", () => {
       type: "file_input",
       max_files: 5,
     });
+    expect(modal.blocks[3]?.element).not.toHaveProperty("filetypes");
   });
 
   it("parses a /create modal submission", () => {
