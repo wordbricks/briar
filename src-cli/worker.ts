@@ -342,8 +342,44 @@ export type ServiceDefinition = {
   contents: string;
   enableCommand: string[];
   disableCommand: string[];
+  restartCommand: string[];
   logPath: string;
 };
+
+export type RestartServicesResult = {
+  restarted: number;
+  skipped: number;
+};
+
+export function restartInstalledServices(
+  definitions: ServiceDefinition[],
+  dependencies: {
+    exists: (path: string) => boolean;
+    run: (command: string[]) => { success: boolean; error?: string };
+  },
+): RestartServicesResult {
+  let restarted = 0;
+  let skipped = 0;
+  const failures: string[] = [];
+  for (const definition of definitions) {
+    if (!dependencies.exists(definition.path)) {
+      skipped += 1;
+      continue;
+    }
+    const result = dependencies.run(definition.restartCommand);
+    if (result.success) {
+      restarted += 1;
+    } else {
+      failures.push(
+        `${definition.label}: ${result.error?.trim() || "restart failed"}`,
+      );
+    }
+  }
+  if (failures.length > 0) {
+    throw new Error(`Worker service restart failed: ${failures.join("; ")}`);
+  }
+  return { restarted, skipped };
+}
 
 type WorkerServiceCommand = {
   projectId: string;
@@ -467,6 +503,12 @@ export function serviceDefinition(input: {
       }),
       enableCommand: ["launchctl", "bootstrap", `gui/${process.getuid?.() ?? 501}`],
       disableCommand: ["launchctl", "bootout", `gui/${process.getuid?.() ?? 501}`],
+      restartCommand: [
+        "launchctl",
+        "kickstart",
+        "-k",
+        `gui/${process.getuid?.() ?? 501}/${label}`,
+      ],
       logPath,
     };
   }
@@ -484,6 +526,7 @@ export function serviceDefinition(input: {
       }),
       enableCommand: ["systemctl", "--user", "enable", "--now", unitName],
       disableCommand: ["systemctl", "--user", "disable", "--now", unitName],
+      restartCommand: ["systemctl", "--user", "restart", unitName],
       logPath,
     };
   }
