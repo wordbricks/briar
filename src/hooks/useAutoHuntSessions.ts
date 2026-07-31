@@ -2,23 +2,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   listenToAutoHuntDispatchEvents,
   loadAutoHuntDispatch,
-  startProjectAutoHunt,
-  type AutoHuntAgentResponse,
   type AutoHuntDispatchEvent,
   type AutoHuntDispatchGroup,
   type AutoHuntWorkerResult,
 } from "../lib/auto-hunt-agent";
 import { stopProjectAgentSession } from "../lib/project-llm";
 import {
-  defaultAutoHuntMaxIssues,
-  selectAutoHuntCandidates,
-} from "../lib/auto-hunt-automation";
-import {
   loadProjectAgentSessions,
   upsertProjectAgentSession,
 } from "../lib/api";
 import { DASHBOARD_POLL_INTERVAL_MS } from "../lib/dashboard-polling";
-import type { HuntRun, ProjectAgent } from "../types";
 
 const storageKey = "briar.auto-hunt-sessions.v1";
 
@@ -92,7 +85,6 @@ export function collapseLinkedAutoHuntSessions(
   return sessions.filter((session) => !parentSessionIds.has(session.id));
 }
 
-type AutoHuntRunner = typeof startProjectAutoHunt;
 type AutoHuntStopper = typeof stopProjectAgentSession;
 
 function event(type: AutoHuntSessionEventType, occurredAt: string) {
@@ -135,34 +127,6 @@ function readSessions(): AutoHuntSession[] {
   } catch {
     return [];
   }
-}
-
-function completedSession(
-  session: AutoHuntSession,
-  response: AutoHuntAgentResponse,
-  completedAt: string,
-): AutoHuntSession {
-  return {
-    ...session,
-    dispatchGroupId: response.dispatchGroupId,
-    status: "completed",
-    completedAt,
-    conversationId: response.conversationId,
-    workspaceRoot: response.workspaceRoot,
-    summary: response.result.summary,
-    error: null,
-    workers: response.workers,
-    updatedAt: completedAt,
-    issues: session.issues.map((issue) => {
-      const result = response.result.issues.find(
-        (candidate) => candidate.sourceKey === issue.sourceKey,
-      );
-      return result
-        ? { ...issue, outcome: result.outcome, summary: result.summary }
-        : { ...issue, outcome: "skipped", summary: null };
-    }),
-    events: [...session.events, event("completed", completedAt)],
-  };
 }
 
 function outcomeForWorker(
@@ -258,7 +222,6 @@ export function mergeSynchronizedSessions(
 }
 
 export function useAutoHuntSessions(
-  runner: AutoHuntRunner = startProjectAutoHunt,
   stopper: AutoHuntStopper = stopProjectAgentSession,
 ) {
   const [sessions, setSessions] = useState<AutoHuntSession[]>(readSessions);
@@ -595,107 +558,8 @@ export function useAutoHuntSessions(
     return sessionId;
   }, [settleTaskSession, startTaskSession]);
 
-  const startSession = useCallback((
-    projectId: string,
-    runs: HuntRun[],
-    onSettled: (() => void) | undefined,
-    options: {
-      agent: ProjectAgent;
-      maxIssues?: number;
-      coordinatorConversationId?: string | null;
-      parentSessionId?: string;
-    },
-  ) => {
-    const activeRunIds = new Set(
-      sessionsRef.current.flatMap((session) =>
-        session.projectId === projectId &&
-        session.sessionType === "dispatch" &&
-        session.status === "running"
-          ? session.issues
-              .filter((issue) => issue.outcome === "pending")
-              .map((issue) => issue.runId)
-          : [],
-      ),
-    );
-    const candidates = selectAutoHuntCandidates(
-      runs.filter((run) => !activeRunIds.has(run.id)),
-      options.maxIssues ?? defaultAutoHuntMaxIssues,
-    );
-    if (candidates.length === 0) {
-      throw new Error("대기 상태인 이슈가 없습니다.");
-    }
-    const startedAt = new Date().toISOString();
-    const coordinatorSession = options.parentSessionId
-      ? sessionsRef.current.find(
-          (session) => session.id === options.parentSessionId,
-        )
-      : undefined;
-    const session: AutoHuntSession = {
-      id: crypto.randomUUID(),
-      dispatchGroupId: "",
-      projectId,
-      agentId: options.agent.id,
-      sessionType: "dispatch",
-      trigger: "manual",
-      parentSessionId: coordinatorSession?.id,
-      request: coordinatorSession?.request,
-      status: "running",
-      issues: candidates.map((run) => ({
-        runId: run.id,
-        runNumber: run.runNumber,
-        sourceKey: run.sourceKey,
-        title: run.title,
-        outcome: "pending",
-        summary: null,
-      })),
-      startedAt,
-      completedAt: null,
-      conversationId: null,
-      workspaceRoot: null,
-      summary: null,
-      error: null,
-      events: [event("started", startedAt)],
-      workers: [],
-      dispatchEvents: [],
-      updatedAt: startedAt,
-      localOwner: true,
-    };
-    session.dispatchGroupId = session.id;
-    sessionsRef.current = [session, ...sessionsRef.current];
-    setSessions(sessionsRef.current);
-
-    void runner(projectId, candidates, session.id, options.agent, {
-      coordinatorConversationId: options.coordinatorConversationId,
-    })
-      .then((response) => {
-        const completedAt = new Date().toISOString();
-        setSessions((current) => current.map((candidate) =>
-          candidate.id === session.id && candidate.status === "running"
-            ? completedSession(candidate, response, completedAt)
-            : candidate));
-      })
-      .catch((caught) => {
-        const completedAt = new Date().toISOString();
-        const error = caught instanceof Error ? caught.message : String(caught);
-        setSessions((current) => current.map((candidate) =>
-          candidate.id === session.id && candidate.status === "running"
-          ? {
-              ...candidate,
-              status: "failed",
-              completedAt,
-              error,
-              updatedAt: completedAt,
-              events: [...candidate.events, event("failed", completedAt)],
-            }
-          : candidate));
-      })
-      .finally(onSettled);
-    return session.id;
-  }, [runner]);
-
   return {
     sessions,
-    startSession,
     startTaskSession,
     settleTaskSession,
     stopSession,

@@ -1,8 +1,4 @@
-import type { AutoHuntAgentResponse } from "./auto-hunt-agent";
-import {
-  defaultAutoHuntMaxIssues,
-  selectAutoHuntCandidates,
-} from "./auto-hunt-automation";
+import { dispatchAutoHuntToWorkers } from "./auto-hunt-worker-dispatch";
 import { executeProjectAgentTurn } from "./project-agent-execution";
 import { projectAgentRunSnapshots } from "./project-llm";
 import type {
@@ -31,15 +27,17 @@ export type ProjectAgentScheduleExecutionDependencies = {
     runId: string,
     reason: string | null,
   ) => Promise<unknown>;
-  startAutoHunt: (
+  dispatchRun: (
+    token: string,
     projectId: string,
-    issues: HuntRun[],
-    sessionId: string,
-    agent: ClaimedProjectAgentScheduleRun["agent"],
-    options: {
-      coordinatorConversationId: string;
+    run: HuntRun,
+    input: {
+      agentId: string;
+      provider: ClaimedProjectAgentScheduleRun["agent"]["provider"];
+      workerId: null;
+      reassign: boolean;
     },
-  ) => Promise<AutoHuntAgentResponse>;
+  ) => Promise<unknown>;
   startSession?: (
     run: ClaimedProjectAgentScheduleRun,
   ) => string | null;
@@ -77,40 +75,33 @@ export async function executeScheduledProjectAgent(
       {
         runAgent: dependencies.runAgent,
         dispatchAutoHunt: async (decision) => {
-          const targetRunIds = decision.targetRunIds ?? [];
-          for (const runId of targetRunIds) {
-            await dependencies.retryRun(
-              token,
-              run.projectId,
-              runId,
-              decision.retryReason ?? null,
-            );
-          }
-          const dashboard = await dependencies.loadDashboard(
-            token,
-            run.projectId,
-          );
-          const availableRuns =
-            targetRunIds.length === 0
-              ? dashboard.runs
-              : dashboard.runs.filter((candidate) =>
-                  targetRunIds.includes(candidate.id)
-                );
-          const candidates = selectAutoHuntCandidates(
-            availableRuns,
-            targetRunIds.length > 0
-              ? targetRunIds.length
-              : decision.maxIssues ?? defaultAutoHuntMaxIssues,
-          );
-          if (candidates.length === 0) {
-            throw new Error("대기 상태인 이슈가 없습니다.");
-          }
-          return dependencies.startAutoHunt(
-            run.projectId,
-            candidates,
-            crypto.randomUUID(),
-            run.agent,
-            { coordinatorConversationId: decision.conversationId },
+          const dashboard = decision.targetRunIds?.length
+            ? initialDashboard
+            : await dependencies.loadDashboard(token, run.projectId);
+          return dispatchAutoHuntToWorkers(
+            {
+              dispatch: (candidate, dispatchInput) =>
+                dependencies.dispatchRun(
+                  token,
+                  run.projectId,
+                  candidate,
+                  dispatchInput,
+                ),
+              retry: (candidate, reason) =>
+                dependencies.retryRun(
+                  token,
+                  run.projectId,
+                  candidate.id,
+                  reason,
+                ),
+            },
+            {
+              agent: run.agent,
+              runs: dashboard.runs,
+              maxIssues: decision.maxIssues ?? undefined,
+              targetRunIds: decision.targetRunIds ?? undefined,
+              retryReason: decision.retryReason,
+            },
           );
         },
       },
@@ -142,39 +133,23 @@ export async function executeScheduledProjectAgent(
         structuredResult: response.structuredResult,
       };
     } else {
-      const needsAction = dispatchResult.result.issues.some((issue) =>
-        ["blocked", "failed"].includes(issue.outcome),
-      );
-      const completedCount = dispatchResult.result.issues.filter(
-        (issue) => issue.outcome === "completed",
-      ).length;
-      const outcome: StructuredAgentResult["outcome"] = needsAction
-        ? completedCount > 0
-          ? "partial"
-          : dispatchResult.result.issues.some(
-                (issue) => issue.outcome === "failed",
-              )
-            ? "failed"
-            : "blocked"
-        : "completed";
+      const dispatchedCount = dispatchResult.runIds.length;
+      const summary = `${dispatchedCount}개 이슈를 등록 Worker에 배정했습니다.`;
       result = {
-          conversationId: dispatchResult.conversationId,
-          message: dispatchResult.result.summary,
-          workspaceRoot: dispatchResult.workspaceRoot,
-          structuredResult: {
-            summary: dispatchResult.result.summary,
-            outcome,
-            importance: needsAction ? "important" : "routine",
-            urgency: needsAction ? "time_sensitive" : "normal",
-            impact:
-              dispatchResult.result.issues.length > 1 ? "project" : "issue",
-            humanActionRequired: needsAction,
-            nextAction: needsAction
-              ? "차단되거나 실패한 이슈를 확인하고 후속 조치를 결정하세요."
-              : null,
-            dueAt: null,
-          },
-        };
+        conversationId: response.conversationId,
+        message: summary,
+        workspaceRoot: response.workspaceRoot,
+        structuredResult: {
+          summary,
+          outcome: "completed",
+          importance: "routine",
+          urgency: "normal",
+          impact: dispatchedCount > 1 ? "project" : "issue",
+          humanActionRequired: false,
+          nextAction: null,
+          dueAt: null,
+        },
+      };
     }
     if (sessionId) {
       dependencies.settleSession?.(sessionId, {
