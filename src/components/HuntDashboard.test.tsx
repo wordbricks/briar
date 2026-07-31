@@ -2034,6 +2034,40 @@ describe("HuntDashboard", () => {
     expect(markup).toContain('aria-expanded="false" class="run-page-properties-toggle"');
   });
 
+  it("does not show a status message panel for queued worker runs", () => {
+    const queuedRun = {
+      ...demoDashboard.runs[0],
+      status: "queued" as const,
+      workflowStage: null,
+      workerId: "worker-1",
+      detail: "사용자가 특정 Worker에 작업을 배정했습니다.",
+    };
+    const markup = renderToStaticMarkup(
+      <RunPage
+        isSidebarOpen
+        error={null}
+        isRecovering={false}
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => []}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }}
+        run={queuedRun}
+      />,
+    );
+
+    expect(markup).not.toContain('class="recovery-panel"');
+    expect(markup).not.toContain(queuedRun.detail);
+    expect(markup).not.toContain("작업 취소");
+    expect(markup).toContain('class="run-page-property-badge slate"');
+    expect(markup).toContain(">대기</span>");
+  });
+
   it("shows a plain-language result card for a completed issue", () => {
     const completedRun = {
       ...demoDashboard.runs[0],
