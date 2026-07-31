@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  addIssueDependency,
   beginDeviceAuthorization,
   cancelHuntRun,
   claimProjectAgentScheduleRun,
@@ -29,6 +30,7 @@ import {
   pollDeviceToken,
   renewProjectAgentScheduleRun,
   retryHuntRun,
+  removeIssueDependency,
   updateIssue,
   updateIssueExecutionPreferences,
   updateOrganization as updateRemoteOrganization,
@@ -1884,6 +1886,108 @@ export function useBriar(options: UseBriarOptions = {}) {
     [activeProjectId, dashboard, token],
   );
 
+  const changeIssueDependency = useCallback(
+    async (
+      dependentRunId: string,
+      prerequisiteRunId: string,
+      action: "add" | "remove",
+    ) => {
+      if (!activeProjectId || !dashboard) {
+        throw new Error("의존성을 수정할 프로젝트가 없습니다.");
+      }
+      setUpdatingIssueId(dependentRunId);
+      setError(null);
+      try {
+        if (demoMode) {
+          setDashboard((current) => {
+            if (!current) return current;
+            const prerequisite = current.runs.find(
+              (run) => run.id === prerequisiteRunId,
+            );
+            const dependent = current.runs.find(
+              (run) => run.id === dependentRunId,
+            );
+            if (!prerequisite || !dependent) return current;
+            const prerequisiteReference = {
+              id: prerequisite.id,
+              runNumber: prerequisite.runNumber,
+              title: prerequisite.title,
+              status: prerequisite.status,
+            };
+            const dependentReference = {
+              id: dependent.id,
+              runNumber: dependent.runNumber,
+              title: dependent.title,
+              status: dependent.status,
+            };
+            return {
+              ...current,
+              runs: current.runs.map((run) => {
+                if (run.id === dependentRunId) {
+                  return {
+                    ...run,
+                    prerequisites:
+                      action === "add"
+                        ? [
+                            ...(run.prerequisites ?? []).filter(
+                              (candidate) => candidate.id !== prerequisiteRunId,
+                            ),
+                            prerequisiteReference,
+                          ]
+                        : (run.prerequisites ?? []).filter(
+                            (candidate) => candidate.id !== prerequisiteRunId,
+                          ),
+                  };
+                }
+                if (run.id === prerequisiteRunId) {
+                  return {
+                    ...run,
+                    dependents:
+                      action === "add"
+                        ? [
+                            ...(run.dependents ?? []).filter(
+                              (candidate) => candidate.id !== dependentRunId,
+                            ),
+                            dependentReference,
+                          ]
+                        : (run.dependents ?? []).filter(
+                            (candidate) => candidate.id !== dependentRunId,
+                          ),
+                  };
+                }
+                return run;
+              }),
+            };
+          });
+          return;
+        }
+        if (!token) throw new Error("로그인이 필요합니다.");
+        if (action === "add") {
+          await addIssueDependency(
+            token,
+            activeProjectId,
+            dependentRunId,
+            prerequisiteRunId,
+          );
+        } else {
+          await removeIssueDependency(
+            token,
+            activeProjectId,
+            dependentRunId,
+            prerequisiteRunId,
+          );
+        }
+        setDashboard(await loadDashboard(token, activeProjectId));
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : String(caught));
+        throw caught;
+      } finally {
+        setUpdatingIssueId(null);
+      }
+    },
+    [activeProjectId, dashboard, token],
+  );
+
   const removeIssue = useCallback(
     async (runId: string) => {
       if (!activeProjectId || !dashboard) {
@@ -1900,7 +2004,17 @@ export function useBriar(options: UseBriarOptions = {}) {
           current
             ? {
                 ...current,
-                runs: current.runs.filter((run) => run.id !== runId),
+                runs: current.runs
+                  .filter((run) => run.id !== runId)
+                  .map((run) => ({
+                    ...run,
+                    prerequisites: (run.prerequisites ?? []).filter(
+                      (dependency) => dependency.id !== runId,
+                    ),
+                    dependents: (run.dependents ?? []).filter(
+                      (dependency) => dependency.id !== runId,
+                    ),
+                  })),
               }
             : current,
         );
@@ -2297,6 +2411,12 @@ export function useBriar(options: UseBriarOptions = {}) {
     readIssueAttachment,
     editIssue,
     editIssueExecutionPreferences,
+    addIssueDependency: (dependentRunId: string, prerequisiteRunId: string) =>
+      changeIssueDependency(dependentRunId, prerequisiteRunId, "add"),
+    removeIssueDependency: (
+      dependentRunId: string,
+      prerequisiteRunId: string,
+    ) => changeIssueDependency(dependentRunId, prerequisiteRunId, "remove"),
     readIssueMessages,
     readRunEvidence,
     readRunEvidenceImage,

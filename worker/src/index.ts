@@ -61,6 +61,7 @@ import {
   completeSlackEvent,
   consumeSlackOAuthState,
   createIssueMessage,
+  createIssueDependency,
   createIssueAttachments,
   createRunEvidenceImages,
   createOrganization,
@@ -73,6 +74,7 @@ import {
   deleteProjectAgent,
   deleteProjectAgentSchedule,
   deleteIssue,
+  deleteIssueDependency,
   deleteProject,
   EventKeyConflictError,
   enqueueIssueAgentReply,
@@ -93,6 +95,7 @@ import {
   HuntTransitionError,
   importLinearHuntRuns,
   listIssueAttachments,
+  listIssueDependencies,
   listIssueConversationNotifications,
   listIssueMessages,
   listAllRunEvidenceImages,
@@ -140,6 +143,7 @@ import {
   type IssueAgentReplyJobRow,
   type IssueConversationNotificationRow,
   type IssueMessageRow,
+  type IssueDependencyRow,
   type ProjectRow,
   type ProjectAgentRow,
   type ProjectAgentScheduleRunRow,
@@ -2745,6 +2749,8 @@ function dashboardRunJson(
   run: HuntRunRow,
   events: HuntEventRow[],
   attachments: IssueAttachmentRow[],
+  prerequisites: IssueDependencyRow[] = [],
+  dependents: IssueDependencyRow[] = [],
 ) {
   return {
     id: run.id,
@@ -2778,6 +2784,18 @@ function dashboardRunJson(
       : null,
     issueDescription: run.issue_description,
     attachments: attachments.map(attachmentJson),
+    prerequisites: prerequisites.map((dependency) => ({
+      id: dependency.prerequisite_run_id,
+      runNumber: dependency.prerequisite_run_number,
+      title: dependency.prerequisite_title,
+      status: dependency.prerequisite_status,
+    })),
+    dependents: dependents.map((dependency) => ({
+      id: dependency.dependent_run_id,
+      runNumber: dependency.dependent_run_number,
+      title: dependency.dependent_title,
+      status: dependency.dependent_status,
+    })),
     resultSummary: run.result_summary,
     structuredResult: parseStructuredResult(run.structured_result_json),
     pullRequestUrls: parseJsonArray(run.pull_request_urls),
@@ -4023,6 +4041,7 @@ async function route(
       { runs, events },
       settings,
       attachments,
+      dependencies,
       workers,
       organizationWorkers,
       executionPolicy,
@@ -4033,6 +4052,7 @@ async function route(
         listDashboardRuns(db, project.id),
         getProjectSettings(db, project.id),
         listIssueAttachments(db, project.id),
+        listIssueDependencies(db, project.id),
         listExecutionWorkers(db, project.id, observedAt),
         listOrganizationExecutionWorkers(
           db,
@@ -4059,6 +4079,18 @@ async function route(
       runAttachments.push(attachment);
       attachmentsByRun.set(attachment.run_id, runAttachments);
     }
+    const prerequisitesByRun = new Map<string, IssueDependencyRow[]>();
+    const dependentsByRun = new Map<string, IssueDependencyRow[]>();
+    for (const dependency of dependencies) {
+      const prerequisites =
+        prerequisitesByRun.get(dependency.dependent_run_id) ?? [];
+      prerequisites.push(dependency);
+      prerequisitesByRun.set(dependency.dependent_run_id, prerequisites);
+      const dependents =
+        dependentsByRun.get(dependency.prerequisite_run_id) ?? [];
+      dependents.push(dependency);
+      dependentsByRun.set(dependency.prerequisite_run_id, dependents);
+    }
     return json({
       project: projectJson(project),
       settings: settingsJson(settings),
@@ -4067,6 +4099,8 @@ async function route(
           run,
           eventsByRun.get(run.id) ?? [],
           attachmentsByRun.get(run.id) ?? [],
+          prerequisitesByRun.get(run.id) ?? [],
+          dependentsByRun.get(run.id) ?? [],
         ),
       ),
       workers: workers.map((worker) => workerJson(worker, observedAt)),
@@ -4363,9 +4397,57 @@ async function route(
   const issueUpdateMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)$/u,
   );
+  const issueDependencyMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/dependencies\/([0-9a-f-]+)$/u,
+  );
   const issuePreferencesMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/preferences$/u,
   );
+  if (issueDependencyMatch && request.method === "PUT") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      issueDependencyMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const outcome = await createIssueDependency(db, project.id, {
+      dependentRunId: issueDependencyMatch[2],
+      prerequisiteRunId: issueDependencyMatch[3],
+      createdByUserId: session.user.id,
+      createdAt: new Date().toISOString(),
+    });
+    if (outcome === "not_found") {
+      throw new HttpError(404, "Dependency issue not found");
+    }
+    if (outcome === "cycle") {
+      throw new HttpError(409, "Dependency would create a cycle");
+    }
+    return json(
+      {
+        prerequisiteRunId: issueDependencyMatch[3],
+        dependentRunId: issueDependencyMatch[2],
+        outcome,
+      },
+      outcome === "created" ? 201 : 200,
+    );
+  }
+  if (issueDependencyMatch && request.method === "DELETE") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      issueDependencyMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    await deleteIssueDependency(
+      db,
+      project.id,
+      issueDependencyMatch[3],
+      issueDependencyMatch[2],
+    );
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
   if (issuePreferencesMatch && request.method === "PUT") {
     const session = await requireSession(auth, request);
     const project = await getProject(

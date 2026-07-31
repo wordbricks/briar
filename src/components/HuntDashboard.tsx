@@ -167,6 +167,8 @@ export function HuntDashboard({
   onCreateIssue,
   onIssueDialogOpenChange,
   onDeleteIssue,
+  onAddIssueDependency,
+  onRemoveIssueDependency,
   onUpdateIssue,
   onUpdateIssuePreferences = async () => undefined,
   onLoadAttachment,
@@ -206,6 +208,14 @@ export function HuntDashboard({
   onCreateIssue: (input: CreateIssueInput) => Promise<unknown>;
   onIssueDialogOpenChange?: (isOpen: boolean) => void;
   onDeleteIssue: (runId: string) => Promise<unknown>;
+  onAddIssueDependency?: (
+    dependentRunId: string,
+    prerequisiteRunId: string,
+  ) => Promise<unknown>;
+  onRemoveIssueDependency?: (
+    dependentRunId: string,
+    prerequisiteRunId: string,
+  ) => Promise<unknown>;
   onUpdateIssue: (runId: string, input: UpdateIssueInput) => Promise<unknown>;
   onUpdateIssuePreferences?: (
     runId: string,
@@ -558,6 +568,15 @@ export function HuntDashboard({
             await onDeleteIssue(selected.id);
             setSelectedRunId(null);
           }}
+          onAddDependency={onAddIssueDependency
+            ? (prerequisiteRunId) =>
+                onAddIssueDependency(selected.id, prerequisiteRunId)
+            : undefined}
+          onRemoveDependency={onRemoveIssueDependency
+            ? (prerequisiteRunId) =>
+                onRemoveIssueDependency(selected.id, prerequisiteRunId)
+            : undefined}
+          onDependencyOpen={setSelectedRunId}
           onLoadAttachment={onLoadAttachment}
           onLoadIssueMessages={() => onLoadIssueMessages(selected.id)}
           onLoadRunEvidence={() => onLoadRunEvidence(selected.id)}
@@ -576,6 +595,7 @@ export function HuntDashboard({
           }
           projectId={dashboard!.project.id}
           run={selected}
+          availableRuns={dashboard!.runs}
         />
         {createIssueDialog}
       </>
@@ -2549,6 +2569,7 @@ function IssueList({
 
 export function RunPage({
   availableProviders = [],
+  availableRuns = [],
   companionMode = false,
   error,
   isDeletingIssue = false,
@@ -2556,8 +2577,10 @@ export function RunPage({
   isUpdatingIssue = false,
   isSidebarOpen,
   onBack,
+  onAddDependency,
   onCancel,
   onDelete,
+  onDependencyOpen,
   onLoadAttachment,
   onLoadIssueMessages,
   onLoadRunEvidence,
@@ -2565,6 +2588,7 @@ export function RunPage({
   mentionMembers = [],
   onMove,
   onRetry,
+  onRemoveDependency,
   onSendIssueMessage,
   onUpdateIssue,
   onUpdateIssuePreferences = async () => undefined,
@@ -2573,6 +2597,7 @@ export function RunPage({
   run,
 }: {
   availableProviders?: AgentProvider[];
+  availableRuns?: HuntRun[];
   companionMode?: boolean;
   error: string | null;
   isDeletingIssue?: boolean;
@@ -2580,8 +2605,10 @@ export function RunPage({
   isUpdatingIssue?: boolean;
   isSidebarOpen: boolean;
   onBack: () => void;
+  onAddDependency?: (prerequisiteRunId: string) => Promise<unknown>;
   onCancel: () => Promise<unknown>;
   onDelete?: () => Promise<unknown>;
+  onDependencyOpen?: (runId: string) => void;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onLoadIssueMessages: () => Promise<IssueMessage[]>;
   onLoadRunEvidence: () => Promise<RunEvidence[]>;
@@ -2589,6 +2616,7 @@ export function RunPage({
   mentionMembers?: OrganizationMember[];
   onMove: (placement: HuntRunPlacement) => Promise<unknown>;
   onRetry: () => Promise<unknown>;
+  onRemoveDependency?: (prerequisiteRunId: string) => Promise<unknown>;
   onSendIssueMessage: (input: {
     body: string;
     parentMessageId: string | null;
@@ -2946,6 +2974,14 @@ export function RunPage({
                       id={`${detailTabsId}-description-panel`}
                       role="tabpanel"
                     >
+                      <IssueDependenciesPanel
+                        availableRuns={availableRuns}
+                        isUpdating={isUpdatingIssue}
+                        onAdd={onAddDependency}
+                        onOpen={onDependencyOpen}
+                        onRemove={onRemoveDependency}
+                        run={run}
+                      />
                       {run.status === "blocked" ? (
                         <section
                           aria-labelledby={`${detailTabsId}-blocked-title`}
@@ -3583,6 +3619,147 @@ function IssueActionsMenu({
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
+  );
+}
+
+function IssueDependenciesPanel({
+  availableRuns,
+  isUpdating,
+  onAdd,
+  onOpen,
+  onRemove,
+  run,
+}: {
+  availableRuns: HuntRun[];
+  isUpdating: boolean;
+  onAdd?: (prerequisiteRunId: string) => Promise<unknown>;
+  onOpen?: (runId: string) => void;
+  onRemove?: (prerequisiteRunId: string) => Promise<unknown>;
+  run: HuntRun;
+}) {
+  const { t } = useI18n();
+  const [selectedRunId, setSelectedRunId] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const prerequisiteIds = new Set(
+    (run.prerequisites ?? []).map((dependency) => dependency.id),
+  );
+  const candidates = availableRuns
+    .filter(
+      (candidate) =>
+        candidate.id !== run.id && !prerequisiteIds.has(candidate.id),
+    )
+    .sort((left, right) => left.runNumber - right.runNumber);
+
+  useEffect(() => {
+    if (
+      selectedRunId &&
+      !candidates.some((candidate) => candidate.id === selectedRunId)
+    ) {
+      setSelectedRunId("");
+    }
+  }, [candidates, selectedRunId]);
+
+  const mutate = async (action: () => Promise<unknown>) => {
+    setError(null);
+    try {
+      await action();
+      setSelectedRunId("");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    }
+  };
+  const relationList = (
+    dependencies: NonNullable<HuntRun["prerequisites"]>,
+    removable: boolean,
+  ) => (
+    <ul className="issue-dependency-list">
+      {dependencies.map((dependency) => (
+        <li key={dependency.id}>
+          <button
+            className="issue-dependency-link"
+            disabled={!onOpen}
+            onClick={() => onOpen?.(dependency.id)}
+            type="button"
+          >
+            <span>AH-{dependency.runNumber}</span>
+            <strong>{dependency.title}</strong>
+            <small>{t(`status.${dependency.status}` as MessageKey)}</small>
+          </button>
+          {removable && onRemove ? (
+            <button
+              aria-label={t("issue.dependencyRemove", {
+                title: dependency.title,
+              })}
+              className="issue-dependency-remove"
+              disabled={isUpdating}
+              onClick={() => void mutate(() => onRemove(dependency.id))}
+              type="button"
+            >
+              {isUpdating ? (
+                <LoaderCircle className="spin" size={13} />
+              ) : (
+                <X size={13} />
+              )}
+            </button>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  );
+
+  return (
+    <section className="issue-dependencies" aria-label={t("issue.dependencies")}>
+      <header>
+        <span><Waypoints aria-hidden="true" size={16} /></span>
+        <div>
+          <strong>{t("issue.dependencies")}</strong>
+          <small>{t("issue.dependenciesDescription")}</small>
+        </div>
+      </header>
+      <div className="issue-dependency-group">
+        <strong>{t("issue.prerequisites")}</strong>
+        {(run.prerequisites ?? []).length > 0 ? (
+          relationList(run.prerequisites ?? [], true)
+        ) : (
+          <p>{t("issue.prerequisitesEmpty")}</p>
+        )}
+      </div>
+      {onAdd ? (
+        <div className="issue-dependency-add">
+          <select
+            aria-label={t("issue.prerequisiteSelect")}
+            disabled={isUpdating || candidates.length === 0}
+            onChange={(event) => setSelectedRunId(event.target.value)}
+            value={selectedRunId}
+          >
+            <option value="">{t("issue.prerequisiteSelect")}</option>
+            {candidates.map((candidate) => (
+              <option key={candidate.id} value={candidate.id}>
+                AH-{candidate.runNumber} · {candidate.title}
+              </option>
+            ))}
+          </select>
+          <button
+            disabled={isUpdating || !selectedRunId}
+            onClick={() =>
+              selectedRunId && void mutate(() => onAdd(selectedRunId))}
+            type="button"
+          >
+            {isUpdating ? <LoaderCircle className="spin" size={13} /> : <Plus size={13} />}
+            {t("issue.dependencyAdd")}
+          </button>
+        </div>
+      ) : null}
+      <div className="issue-dependency-group">
+        <strong>{t("issue.dependents")}</strong>
+        {(run.dependents ?? []).length > 0 ? (
+          relationList(run.dependents ?? [], false)
+        ) : (
+          <p>{t("issue.dependentsEmpty")}</p>
+        )}
+      </div>
+      {error ? <p className="issue-dependency-error" role="alert">{error}</p> : null}
+    </section>
   );
 }
 

@@ -56,6 +56,13 @@ export type IssueExecutionPreferences = {
   effort: ModelEffort | null;
 };
 
+export type IssueDependencyReference = {
+  id: string;
+  runNumber: number;
+  title: string;
+  status: HuntStatus;
+};
+
 export type HuntEvent = {
   id: string;
   attempt: number;
@@ -155,6 +162,8 @@ export type HuntRun = {
   tracker: TrackerReference | null;
   issueDescription: string | null;
   attachments: IssueAttachment[];
+  prerequisites?: IssueDependencyReference[];
+  dependents?: IssueDependencyReference[];
   resultSummary: string | null;
   structuredResult: StructuredAgentResult | null;
   pullRequestUrls: string[];

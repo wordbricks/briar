@@ -19,9 +19,11 @@ import {
   createProjectAgentSchedule,
   createProject,
   createIssueAttachments,
+  createIssueDependency,
   createRunEvidenceImages,
   deleteProjectAgent,
   deleteIssue,
+  deleteIssueDependency,
   deleteProjectAgentSchedule,
   deleteProject,
   findProjectIdByAgentTokenHash,
@@ -34,6 +36,7 @@ import {
   HuntClaimError,
   HuntTransitionError,
   listIssueAttachments,
+  listIssueDependencies,
   listIssueConversationNotifications,
   listIssueMessages,
   listOrganizations,
@@ -490,6 +493,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         resolve("migrations/0047_project_icon_browser_formats.sql"),
         "utf8",
       ),
+    );
+    await executeSql(
+      db,
+      await readFile(resolve("migrations/0048_issue_dependencies.sql"), "utf8"),
     );
   }, 30_000);
 
@@ -2199,6 +2206,116 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       "active",
     );
     expect(await getHuntRunForProject(db, projectId, runId)).not.toBeNull();
+  });
+
+  it("stores an acyclic issue dependency graph and exposes both directions", async () => {
+    const prerequisiteRunId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 20.1, {
+        sourceKey: "dependency-prerequisite",
+        eventKey: "dependency-prerequisite:queued:intake",
+        title: "Prepare the schema",
+        branch: null,
+        commitSha: null,
+      }),
+    );
+    const dependentRunId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 20.2, {
+        sourceKey: "dependency-dependent",
+        eventKey: "dependency-dependent:queued:intake",
+        title: "Use the schema",
+        branch: null,
+        commitSha: null,
+      }),
+    );
+    const finalRunId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 20.3, {
+        sourceKey: "dependency-final",
+        eventKey: "dependency-final:queued:intake",
+        title: "Release the feature",
+        branch: null,
+        commitSha: null,
+      }),
+    );
+
+    await expect(
+      createIssueDependency(db, projectId, {
+        prerequisiteRunId,
+        dependentRunId,
+        createdByUserId: "owner",
+        createdAt: atMinute(20.4),
+      }),
+    ).resolves.toBe("created");
+    await expect(
+      createIssueDependency(db, projectId, {
+        prerequisiteRunId: dependentRunId,
+        dependentRunId: finalRunId,
+        createdByUserId: "owner",
+        createdAt: atMinute(20.5),
+      }),
+    ).resolves.toBe("created");
+    await expect(
+      createIssueDependency(db, projectId, {
+        prerequisiteRunId,
+        dependentRunId,
+        createdByUserId: "owner",
+        createdAt: atMinute(20.6),
+      }),
+    ).resolves.toBe("already_exists");
+
+    expect(await listIssueDependencies(db, projectId)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          prerequisite_run_id: prerequisiteRunId,
+          prerequisite_title: "Prepare the schema",
+          dependent_run_id: dependentRunId,
+          dependent_title: "Use the schema",
+        }),
+        expect.objectContaining({
+          prerequisite_run_id: dependentRunId,
+          dependent_run_id: finalRunId,
+        }),
+      ]),
+    );
+
+    await expect(
+      createIssueDependency(db, projectId, {
+        prerequisiteRunId: finalRunId,
+        dependentRunId: prerequisiteRunId,
+        createdByUserId: "owner",
+        createdAt: atMinute(20.7),
+      }),
+    ).resolves.toBe("cycle");
+    await expect(
+      createIssueDependency(db, projectId, {
+        prerequisiteRunId,
+        dependentRunId: prerequisiteRunId,
+        createdByUserId: "owner",
+        createdAt: atMinute(20.8),
+      }),
+    ).resolves.toBe("cycle");
+
+    await expect(
+      deleteIssueDependency(
+        db,
+        projectId,
+        dependentRunId,
+        finalRunId,
+      ),
+    ).resolves.toBe(true);
+    expect(await listIssueDependencies(db, projectId)).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          prerequisite_run_id: dependentRunId,
+          dependent_run_id: finalRunId,
+        }),
+      ]),
+    );
   });
 
   it("returns the highest-priority oldest queued run", async () => {

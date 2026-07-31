@@ -1071,6 +1071,50 @@ describe("HuntDashboard", () => {
     expect(markup).not.toContain("run-page-summary");
   });
 
+  it("shows editable prerequisite and follow-up relationships on issue details", () => {
+    const prerequisite = demoDashboard.runs[1];
+    const dependent = demoDashboard.runs[0];
+    const markup = renderToStaticMarkup(
+      <RunPage
+        availableRuns={demoDashboard.runs}
+        isSidebarOpen
+        error={null}
+        isRecovering={false}
+        onAddDependency={async () => undefined}
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => []}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRemoveDependency={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }}
+        run={{
+          ...dependent,
+          prerequisites: [
+            {
+              id: prerequisite.id,
+              runNumber: prerequisite.runNumber,
+              title: prerequisite.title,
+              status: prerequisite.status,
+            },
+          ],
+          dependents: [],
+        }}
+      />,
+    );
+
+    expect(markup).toContain('class="issue-dependencies"');
+    expect(markup).toContain("선행 이슈");
+    expect(markup).toContain(`AH-${prerequisite.runNumber}`);
+    expect(markup).toContain(prerequisite.title);
+    expect(markup).toContain("후속 이슈");
+    expect(markup).toContain("의존성 제거");
+  });
+
   it("renders the issue description as Markdown above the conversation", () => {
     const markup = renderToStaticMarkup(
       <RunPage
