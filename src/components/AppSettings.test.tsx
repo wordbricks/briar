@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../i18n";
 import {
   inspectOnboardingPrerequisites,
+  installOnboardingPrerequisite,
   type OnboardingPrerequisites,
 } from "../lib/initial-onboarding";
 import {
@@ -22,6 +23,7 @@ import { AppSettings } from "./AppSettings";
 
 vi.mock("../lib/initial-onboarding", () => ({
   inspectOnboardingPrerequisites: vi.fn(),
+  installOnboardingPrerequisite: vi.fn(),
 }));
 
 vi.mock("../lib/project-llm", async (importOriginal) => {
@@ -84,6 +86,7 @@ const providerStatuses: OnboardingPrerequisites = {
 describe("AppSettings", () => {
   beforeEach(() => {
     vi.mocked(inspectOnboardingPrerequisites).mockReset();
+    vi.mocked(installOnboardingPrerequisite).mockReset();
     vi.mocked(loadAppProviderSettings).mockReset();
     vi.mocked(updateAppProviderSettings).mockReset();
     vi.mocked(loadAppRuntimeSettings).mockReset();
@@ -328,6 +331,68 @@ describe("AppSettings", () => {
         ?.click();
     });
     expect(inspectOnboardingPrerequisites).toHaveBeenCalledTimes(2);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("installs a missing provider from the Providers settings", async () => {
+    const missingCodex = {
+      ...providerStatuses,
+      codex: {
+        installed: false,
+        version: null,
+        authenticated: false,
+      },
+    };
+    vi.mocked(inspectOnboardingPrerequisites).mockResolvedValue(missingCodex);
+    vi.mocked(installOnboardingPrerequisite).mockResolvedValue({
+      ...providerStatuses,
+      codex: {
+        installed: true,
+        version: "codex-cli 0.145.0",
+        authenticated: false,
+      },
+    });
+    vi.mocked(loadAppProviderSettings).mockResolvedValue({
+      codex: true,
+      claude: true,
+      grok: true,
+    });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <I18nProvider>
+          <AppSettings
+            error={null}
+            initialSection="providers"
+            isSidebarOpen
+            loading={false}
+            onBack={() => undefined}
+            onRefresh={() => Promise.resolve(readiness)}
+            projectId="project-1"
+            projectName="Briar"
+            readiness={readiness}
+          />
+        </I18nProvider>,
+      );
+    });
+
+    const installButton = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Install Codex"]',
+    );
+    expect(installButton).not.toBeNull();
+
+    await act(async () => installButton?.click());
+
+    expect(installOnboardingPrerequisite).toHaveBeenCalledWith("codex");
+    expect(container.textContent).toContain("codex-cli 0.145.0");
+    expect(
+      container.querySelector('[aria-label="Install Codex"]'),
+    ).toBeNull();
 
     await act(async () => root.unmount());
     container.remove();
