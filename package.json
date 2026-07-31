@@ -26,6 +26,7 @@
     "android:dev": "tauri android dev",
     "android:build": "tauri android build --apk --aab --ci",
     "android:build:debug": "tauri android build --debug --apk --target aarch64 --split-per-abi --ci",
+    "release:ios:testflight": "dotenvx run --strict --overload -f .env.release -- bash scripts/release-ios-testflight.sh",
     "cli": "bun run src-cli/index.ts",
     "cli:build": "bun run skills:generate && bun build src-cli/index.ts --target=bun --outfile dist-cli/briar.js",
     "cli:install": "bun run cli:build && sh scripts/install-cli.sh",

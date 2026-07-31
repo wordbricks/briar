@@ -34,6 +34,16 @@ describe("encrypted environment verification", () => {
     );
   });
 
+  it("requires iOS distribution assets to remain encrypted", () => {
+    expect(encryptedEnvPolicies[".env.release"]?.secrets).toEqual(
+      expect.arrayContaining([
+        "APPLE_IOS_CERTIFICATE",
+        "APPLE_IOS_CERTIFICATE_PASSWORD",
+        "APPLE_IOS_PROVISIONING_PROFILE",
+      ]),
+    );
+  });
+
   it("accepts a public key and encrypted secret values", () => {
     expect(() => verifyEncryptedEnv(".env.test", fixture(), policy)).not.toThrow();
   });

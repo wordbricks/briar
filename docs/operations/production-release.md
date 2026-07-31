@@ -34,6 +34,9 @@ Repeat that command for the following variables:
 - `APPLE_CERTIFICATE` — base64 Developer ID Application `.p12`
 - `APPLE_CERTIFICATE_PASSWORD` and `KEYCHAIN_PASSWORD`
 - `APPLE_API_KEY_CONTENT`
+- `APPLE_IOS_CERTIFICATE` — base64 Apple Distribution `.p12`
+- `APPLE_IOS_CERTIFICATE_PASSWORD`
+- `APPLE_IOS_PROVISIONING_PROFILE` — base64 App Store `.mobileprovision`
 - `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
 - `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`,
   `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`
@@ -126,6 +129,29 @@ sentinel whose private key was destroyed and an endpoint that always returns
 authority. The Production command replaces both values with the offline-backed
 public key and stable endpoint; preflight rejects a missing or malformed
 override.
+
+## iOS TestFlight release
+
+After the iOS distribution certificate and App Store provisioning profile are
+stored in `.env.release`, routine TestFlight uploads do not require an Apple
+Developer web login:
+
+```sh
+bun run release:ios:testflight
+```
+
+The command imports an ephemeral signing keychain, selects the next build suffix
+from App Store Connect, builds and manually signs the IPA, validates it, uploads
+it, and waits for Apple processing to finish. Use `-- --build-number N` only to
+override the automatically selected suffix. Use `-- --dry-run` to verify the
+encrypted signing assets and show the next build number without building or
+uploading.
+
+The encrypted profile must already contain every entitlement used by the app.
+Apple Distribution certificates and provisioning profiles expire and must be
+renewed in `.env.release` before their expiration date. With the current API key
+role, enabling a new App ID capability or issuing replacement signing assets
+still requires an authorized Developer Portal session.
 
 ## Shared Cargo build cache
 
