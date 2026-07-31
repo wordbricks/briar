@@ -330,17 +330,6 @@ export function buildSlackCreateIssueModal(input: {
         element: {
           type: "file_input",
           action_id: slackCreateIssueActions.attachments,
-          filetypes: [
-            "jpg",
-            "jpeg",
-            "png",
-            "gif",
-            "webp",
-            "avif",
-            "mp4",
-            "webm",
-            "mov",
-          ],
           max_files: maxIssueAttachmentCount,
         },
       },
