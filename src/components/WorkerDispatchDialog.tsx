@@ -58,17 +58,37 @@ export function WorkerDispatchDialog({
   const [provider, setProvider] = useState<AgentProvider>("codex");
   const [workerId, setWorkerId] = useState("any");
   const selectedAgent = agents.find((agent) => agent.id === agentId) ?? null;
-  const eligibleWorkers = useMemo(
+  const policyWorkers = useMemo(
     () =>
       workers.filter(
         (worker) =>
-          (policy?.selectionMode !== "allowlist" ||
-            policy.allowedWorkerIds.includes(worker.id)) &&
-          (worker.providers ?? [worker.agentProvider]).includes(provider) &&
+          policy?.selectionMode !== "allowlist" ||
+          policy.allowedWorkerIds.includes(worker.id),
+      ),
+    [policy, workers],
+  );
+  const healthyProviders = useMemo(
+    () =>
+      agentProviders.filter((candidate) =>
+        policyWorkers.some(
+          (worker) =>
+            (worker.providers ?? []).includes(candidate) &&
+            worker.acceptingWork &&
+            (worker.readiness === "available" ||
+              worker.readiness === "busy"),
+        ),
+      ),
+    [policyWorkers],
+  );
+  const eligibleWorkers = useMemo(
+    () =>
+      policyWorkers.filter(
+        (worker) =>
+          (worker.providers ?? []).includes(provider) &&
           worker.acceptingWork &&
           worker.readiness !== "disabled",
       ),
-    [policy, provider, workers],
+    [policyWorkers, provider],
   );
 
   useEffect(() => {
@@ -86,6 +106,16 @@ export function WorkerDispatchDialog({
     run?.requestedProvider,
     run?.requestedWorkerId,
   ]);
+
+  useEffect(() => {
+    if (!open || healthyProviders.length === 0) return;
+    if (healthyProviders.includes(provider)) return;
+    setProvider(
+      selectedAgent && healthyProviders.includes(selectedAgent.provider)
+        ? selectedAgent.provider
+        : healthyProviders[0],
+    );
+  }, [healthyProviders, open, provider, selectedAgent]);
 
   useEffect(() => {
     if (workerId === "any") return;
@@ -132,7 +162,7 @@ export function WorkerDispatchDialog({
             <NativeSelect
               label={t("worker.provider")}
               onValueChange={(value) => setProvider(value as AgentProvider)}
-              options={agentProviders.map((candidate) => ({
+              options={healthyProviders.map((candidate) => ({
                 label:
                   candidate === "codex"
                     ? "Codex"

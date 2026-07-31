@@ -7,10 +7,15 @@ import { WorkerIcon } from "./WorkerIcon";
 import { WorkerProviderIcons } from "./WorkerProviderIcons";
 
 export function workerProviders(worker: ExecutionWorker): AgentProvider[] {
+  if (
+    worker.state !== "online" ||
+    !worker.acceptingWork ||
+    (worker.readiness !== "available" && worker.readiness !== "busy")
+  ) {
+    return [];
+  }
   const providers = worker.providers ?? [];
-  return providers.length > 0
-    ? [...new Set(providers)]
-    : [worker.agentProvider];
+  return [...new Set(providers)];
 }
 
 export function activeWorkerCount(workers: ExecutionWorker[]): number {

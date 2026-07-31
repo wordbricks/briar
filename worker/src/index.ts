@@ -862,6 +862,18 @@ const claimInputSchema = z
   })
   .strict();
 
+const providerHealthSchema = z.record(
+  z.enum(["codex", "claude", "grok"]),
+  z
+    .object({
+      installed: z.boolean(),
+      authenticated: z.boolean(),
+      healthy: z.boolean(),
+      reason: z.string().trim().max(64).nullable().optional(),
+    })
+    .strict(),
+);
+
 const workerRegisterSchema = z
   .object({
     label: z.string().trim().min(1).max(100),
@@ -871,6 +883,7 @@ const workerRegisterSchema = z
       .array(z.enum(["codex", "claude", "grok"]))
       .max(3)
       .optional(),
+    providerHealth: providerHealthSchema.optional(),
     maxConcurrentSessions: z
       .number()
       .int()
@@ -885,6 +898,7 @@ const workerBindSchema = workerRegisterSchema.pick({
   deviceIdentity: true,
   agentProvider: true,
   providers: true,
+  providerHealth: true,
   versions: true,
 });
 
@@ -4057,6 +4071,7 @@ async function route(
       credentialTokenHash: await sha256(workerToken),
       agentProvider: input.agentProvider,
       providers: input.providers,
+      providerHealth: input.providerHealth,
       maxConcurrentSessions: input.maxConcurrentSessions,
       versions: input.versions,
       observedAt,
@@ -4091,6 +4106,7 @@ async function route(
       deviceIdentityHash: await sha256(input.deviceIdentity),
       agentProvider: input.agentProvider,
       providers: input.providers,
+      providerHealth: input.providerHealth,
       versions: input.versions,
       observedAt,
     });

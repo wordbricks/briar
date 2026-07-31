@@ -302,6 +302,31 @@ describe("briar worker loop", () => {
     expect(test.heartbeats).toBe(5);
   });
 
+  it("does not claim work until the heartbeat reports a healthy provider", async () => {
+    let heartbeats = 0;
+    let claims = 0;
+    const test = harness([issue("issue-after-login")], {
+      heartbeat: async () => {
+        heartbeats += 1;
+        return { acceptingWork: heartbeats > 1 };
+      },
+      claim: async () => {
+        claims += 1;
+        return issue("issue-after-login");
+      },
+    });
+
+    const result = await runWorkerLoop(test.dependencies, {
+      maxIssues: 1,
+      heartbeatIntervalMs: 1,
+      idleDelayMs: 1,
+    });
+
+    expect(result.processed).toBe(1);
+    expect(heartbeats).toBeGreaterThanOrEqual(2);
+    expect(claims).toBe(1);
+  });
+
   it("keeps heartbeating while every session slot is occupied", async () => {
     const readinessStates: Array<"ready" | "busy" | undefined> = [];
     const wakeDelays: number[] = [];
