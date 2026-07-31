@@ -4177,7 +4177,7 @@ function MessageComposer({
         onSelect={(event) => setCaret(event.currentTarget.selectionStart)}
         placeholder={placeholder}
         ref={textareaRef}
-        rows={compact ? 2 : 3}
+        rows={2}
         value={body}
       />
       <footer>

@@ -1005,7 +1005,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .issue-composer-mention-menu button small { margin-left:auto; overflow:hidden; color:var(--muted-foreground); font-size:var(--text-2xs); text-overflow:ellipsis; white-space:nowrap; }
 .issue-composer-mention-menu button:hover { color:var(--accent-foreground); background:var(--secondary); }
 .issue-composer-mention-menu button:focus-visible { outline:2px solid #8b70dd; outline-offset:1px; }
-.issue-message-composer textarea { width:100%; min-height:92px; padding:18px 18px 6px; resize:none; border:0; outline:0; color:var(--foreground); background:transparent; font:400 var(--text-sm)/1.55 inherit; }
+.issue-message-composer textarea { width:100%; min-height:68px; padding:18px 18px 6px; resize:none; border:0; outline:0; color:var(--foreground); background:transparent; font:400 var(--text-sm)/1.55 inherit; }
 .issue-message-composer textarea::placeholder { color:var(--muted-foreground); }
 .issue-message-composer footer { min-height:48px; padding:4px 12px 11px; display:flex; align-items:center; justify-content:flex-end; gap:5px; }
 .issue-message-composer footer button { width:32px; height:32px; padding:0; display:grid; place-items:center; border:0; border-radius:9px; color:var(--muted-foreground); background:transparent; cursor:pointer; transition:color .12s ease-out,background-color .12s ease-out,transform .1s ease-out; }
@@ -1016,7 +1016,6 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .issue-message-composer footer .issue-message-send:disabled { color:var(--muted-foreground); background:transparent; cursor:default; transform:none; }
 .issue-composer-error { margin:0; padding:0 10px 8px; display:flex; align-items:center; gap:5px; color:#b13f54; font-size:var(--text-2xs); }
 .issue-message-composer.compact { margin:12px max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left)); box-shadow:0 8px 26px rgba(43,42,37,.07); }
-.issue-message-composer.compact textarea { min-height:68px; }
 .issue-thread-layer { position:fixed; inset:0; z-index:40; visibility:hidden; pointer-events:none; }
 .issue-thread-layer.open { visibility:visible; }
 .issue-thread-drawer { width:min(max(430px,50vw),calc(100vw - 56px)); height:100%; margin-left:auto; display:grid; grid-template-rows:auto minmax(0,1fr) auto; overflow:hidden; border-left:1px solid var(--border); background:color-mix(in srgb,var(--card) 94%,transparent); box-shadow:-24px 0 70px rgba(0,0,0,.24); backdrop-filter:blur(24px) saturate(150%); -webkit-backdrop-filter:blur(24px) saturate(150%); transform:translateX(102%); transition:transform .3s cubic-bezier(.2,.8,.2,1); }
