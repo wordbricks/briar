@@ -18,6 +18,7 @@ import {
   HuntDashboard,
   RunPage,
 } from "./HuntDashboard";
+import { TooltipProvider } from "./ui/tooltip";
 
 const dashboardProps = {
   error: null,
@@ -1698,27 +1699,32 @@ describe("HuntDashboard", () => {
       ],
     };
     const markup = renderToStaticMarkup(
-      <RunPage
-        isSidebarOpen
-        error={null}
-        isRecovering={false}
-        onBack={() => undefined}
-        onCancel={async () => undefined}
-        onLoadAttachment={async () => new Blob()}
-        onLoadIssueMessages={async () => []}
-        onLoadRunEvidence={async () => []}
-        onMove={async () => undefined}
-        onRetry={async () => undefined}
-        onSendIssueMessage={async () => {
-          throw new Error("not implemented in this test");
-        }}
-        run={failedRun}
-      />,
+      <TooltipProvider>
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          run={failedRun}
+        />
+      </TooltipProvider>,
     );
 
     expect(markup).toContain("실행이 실패했습니다");
     expect(markup).toContain("3번 시도로 새 작업이 시작됩니다");
     expect(markup).toContain("재시도");
+    expect(markup).toContain(
+      'aria-description="재시도하면 기존 Agent·Worker 배정으로 작업이 다시 대기열에 들어가며, 사용 가능한 Worker가 자동으로 가져가 다시 실행합니다."',
+    );
     expect(markup).toContain("작업 취소");
     expect(markup).toContain("시도 2");
     expect(markup).toContain('<label class="run-property run-status-control">');
@@ -1745,22 +1751,24 @@ describe("HuntDashboard", () => {
       },
     };
     const markup = renderToStaticMarkup(
-      <RunPage
-        isSidebarOpen
-        error={null}
-        isRecovering={false}
-        onBack={() => undefined}
-        onCancel={async () => undefined}
-        onLoadAttachment={async () => new Blob()}
-        onLoadIssueMessages={async () => []}
-        onLoadRunEvidence={async () => []}
-        onMove={async () => undefined}
-        onRetry={async () => undefined}
-        onSendIssueMessage={async () => {
-          throw new Error("not implemented in this test");
-        }}
-        run={blockedRun}
-      />,
+      <TooltipProvider>
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          run={blockedRun}
+        />
+      </TooltipProvider>,
     );
 
     expect(markup).toContain('class="blocked-issue-card"');

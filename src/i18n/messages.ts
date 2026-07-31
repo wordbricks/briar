@@ -709,6 +709,7 @@ export const ko = {
   "run.blockedDetails": "자세한 내용 보기",
   "run.retryDescription": "이전 시도의 활동 기록은 보존됩니다. 재시도하면 {count}번 시도로 새 작업이 시작됩니다.",
   "run.retry": "재시도",
+  "run.retryWorkerTooltip": "재시도하면 기존 Agent·Worker 배정으로 작업이 다시 대기열에 들어가며, 사용 가능한 Worker가 자동으로 가져가 다시 실행합니다.",
   "run.confirmCancel": "취소 확정",
   "run.back": "돌아가기",
   "run.cancel": "작업 취소",
@@ -1071,6 +1072,7 @@ export type Messages = Record<MessageKey, string>;
 
 export const en: Messages = {
   ...ko,
+  "run.retryWorkerTooltip": "Retrying returns the task to the queue with its existing Agent and Worker assignment. An available Worker will automatically claim and run it again.",
   "onboarding.purposeEyebrow": "Choose how to start",
   "onboarding.purposeTitle": "How would you like to use Briar?",
   "onboarding.purposeDescription": "Choose the starting point that fits your goal. You can add a project at any time.",
@@ -1570,6 +1572,7 @@ export const en: Messages = {
 };
 export const zh: Messages = {
   ...en,
+  "run.retryWorkerTooltip": "重试会保留现有的 Agent 和 Worker 分配，并将任务重新放入队列。可用的 Worker 会自动领取并再次执行。",
   "onboarding.purposeEyebrow": "选择开始方式",
   "onboarding.purposeTitle": "你想如何使用 Briar？",
   "onboarding.purposeDescription": "请选择符合你目标的开始方式。之后也可以随时添加项目。",
