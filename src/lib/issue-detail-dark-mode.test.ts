@@ -61,15 +61,15 @@ describe("issue detail dark mode", () => {
     );
   });
 
-  it("keeps the current activity summary readable", () => {
-    expect(firstRule(".issue-activity-trigger")).toContain(
-      "color:var(--foreground)",
+  it("keeps status history timeline text readable in the detail tab", () => {
+    expect(firstRule(".issue-status-history-panel")).toContain(
+      "overflow-y:auto",
     );
-    expect(firstRule(".issue-activity-latest strong")).toContain(
-      "color:var(--foreground)",
+    expect(firstRule(".issue-activity-history .timeline-event strong em")).toContain(
+      "color:var(--muted-foreground)",
     );
-    expect(firstRule(".issue-activity-dialog")).toContain(
-      "border:1px solid var(--border)",
+    expect(firstRule(".issue-activity-empty")).toContain(
+      "color:var(--muted-foreground)",
     );
   });
 });
