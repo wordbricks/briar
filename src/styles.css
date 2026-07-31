@@ -1066,7 +1066,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 }
 .issue-dialog {
   width: min(760px, calc(100vw - 48px));
-  height: min(460px, calc(100dvh - 48px));
+  height: min(560px, calc(100dvh - 48px));
   min-height: 380px;
   position: relative;
   overflow: hidden;
@@ -1205,6 +1205,12 @@ button.issue-message-state { width:100%; cursor:pointer; }
   line-height: 1.35;
   letter-spacing: -.025em;
 }
+.issue-description-editor {
+  min-height: 90px;
+  flex: 1 0 90px;
+  display: flex;
+  flex-direction: column;
+}
 .issue-form-body .issue-description-input {
   min-height: 90px;
   flex: 1 0 90px;
@@ -1213,9 +1219,71 @@ button.issue-message-state { width:100%; cursor:pointer; }
   font-weight: 400;
   line-height: 1.5;
 }
-.issue-editor-content.has-attachments .issue-description-input {
+.issue-editor-content.has-attachments .issue-description-editor:not(.has-inline-attachments) .issue-description-input {
   min-height: 72px;
   flex-basis: 72px;
+}
+.issue-description-editor.has-inline-attachments {
+  min-height: 0;
+  flex-basis: auto;
+}
+.issue-form-body .issue-description-editor.has-inline-attachments .issue-description-input {
+  min-height: 32px;
+  flex: 0 0 auto;
+  padding-top: 8px;
+  overflow: hidden;
+}
+.issue-form-body .issue-description-editor.has-inline-attachments .issue-description-input:first-child {
+  padding-top: 12px;
+}
+.issue-form-body .issue-description-editor.has-inline-attachments .issue-description-input:last-child {
+  min-height: 48px;
+  flex-grow: 1;
+}
+.issue-inline-attachment {
+  width: fit-content;
+  max-width: 100%;
+  position: relative;
+  flex: 0 0 auto;
+  margin: 2px 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--muted);
+}
+.issue-inline-attachment img {
+  width: auto;
+  max-width: 100%;
+  max-height: 220px;
+  display: block;
+  object-fit: contain;
+}
+.issue-inline-attachment button {
+  width: 30px;
+  height: 30px;
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb,var(--destructive) 24%,var(--border));
+  border-radius: 8px;
+  color: var(--destructive);
+  background: color-mix(in srgb,var(--card) 92%,transparent);
+  box-shadow: 0 1px 4px rgba(30,31,28,.12);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity .12s ease-out, background .12s ease-out;
+}
+.issue-inline-attachment:hover button,
+.issue-inline-attachment button:focus-visible {
+  opacity: 1;
+}
+.issue-inline-attachment button:hover {
+  background: var(--card);
+}
+@media (hover:none) {
+  .issue-inline-attachment button { opacity: 1; }
 }
 .issue-title-input::placeholder,
 .issue-description-input::placeholder {
@@ -3233,6 +3301,17 @@ button.issue-message-state { width:100%; cursor:pointer; }
   padding-top: 16px;
   font-size:var(--text-lg);
 }
+.companion-shell .issue-form-body .issue-description-editor.has-inline-attachments .issue-description-input {
+  min-height: 40px;
+  padding-top: 10px;
+}
+.companion-shell .issue-form-body .issue-description-editor.has-inline-attachments .issue-description-input:first-child {
+  padding-top: 16px;
+}
+.companion-shell .issue-form-body .issue-description-editor.has-inline-attachments .issue-description-input:last-child {
+  min-height: 56px;
+}
+.companion-shell .issue-inline-attachment img { max-height: 280px; }
 .companion-shell .issue-attachment-list {
   max-height: 188px;
 }
@@ -3342,6 +3421,17 @@ button.issue-message-state { width:100%; cursor:pointer; }
     padding-top: 16px;
     font-size:var(--text-lg);
   }
+  .issue-form-body .issue-description-editor.has-inline-attachments .issue-description-input {
+    min-height: 40px;
+    padding-top: 10px;
+  }
+  .issue-form-body .issue-description-editor.has-inline-attachments .issue-description-input:first-child {
+    padding-top: 16px;
+  }
+  .issue-form-body .issue-description-editor.has-inline-attachments .issue-description-input:last-child {
+    min-height: 56px;
+  }
+  .issue-inline-attachment img { max-height: 280px; }
   .issue-metadata-bar {
     min-height: 76px;
     margin: 0 -18px;

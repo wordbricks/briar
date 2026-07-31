@@ -54,15 +54,20 @@ describe("CreateIssueDialog attachments", () => {
     });
 
     expect(pasteEvent.defaultPrevented).toBe(true);
-    expect(container.textContent).toContain("clipboard.png");
-    expect(container.querySelector<HTMLImageElement>(".issue-attachment-preview img")?.src)
-      .toBe("blob:clipboard-preview");
-    expect(container.querySelector<HTMLTextAreaElement>("textarea")?.value).toMatch(
-      /^!\[clipboard\.png\]\(briar-attachment:\/\/[0-9a-f-]+\)$/u,
+    const inlineImage = container.querySelector<HTMLImageElement>(
+      ".issue-inline-attachment img",
     );
+    expect(inlineImage?.alt).toBe("clipboard.png");
+    expect(inlineImage?.src).toBe("blob:clipboard-preview");
+    expect(
+      Array.from(container.querySelectorAll<HTMLTextAreaElement>("textarea"))
+        .map((textarea) => textarea.value)
+        .join(""),
+    ).not.toContain("briar-attachment://");
+    expect(container.querySelector(".issue-attachment-item")).toBeNull();
     await act(async () => {
       container
-        .querySelector<HTMLButtonElement>(".issue-attachment-item button")
+        .querySelector<HTMLButtonElement>(".issue-inline-attachment button")
         ?.click();
     });
     expect(container.querySelector<HTMLTextAreaElement>("textarea")?.value).toBe("");
@@ -115,8 +120,20 @@ describe("CreateIssueDialog attachments", () => {
     });
     await act(async () => textarea?.dispatchEvent(pasteEvent));
 
-    expect(textarea?.value).toMatch(
-      /^before\n\n!\[inline\.png\]\(briar-attachment:\/\/([0-9a-f-]+)\)\n\n after$/u,
+    expect(
+      Array.from(container.querySelectorAll<HTMLTextAreaElement>("textarea"))
+        .map((segment) => segment.value)
+        .join(""),
+    ).toBe("before\n\n\n\n after");
+    expect(
+      container.querySelector<HTMLImageElement>(".issue-inline-attachment img")?.src,
+    ).toBe("blob:clipboard-preview");
+    expect(
+      Array.from(container.querySelectorAll<HTMLTextAreaElement>("textarea"))
+        .map((segment) => segment.value)
+        .join(""),
+    ).not.toContain(
+      "briar-attachment://",
     );
     await act(async () => {
       container.querySelector<HTMLFormElement>("form")?.requestSubmit();
@@ -209,10 +226,14 @@ describe("CreateIssueDialog attachments", () => {
 
     expect(dropEvent.defaultPrevented).toBe(true);
     expect(container.querySelector(".issue-attachment-drop-overlay")).toBeNull();
-    expect(container.textContent).toContain("dropped.png");
     expect(
       container.querySelector<HTMLImageElement>(
-        ".issue-attachment-preview img",
+        ".issue-inline-attachment img",
+      )?.alt,
+    ).toBe("dropped.png");
+    expect(
+      container.querySelector<HTMLImageElement>(
+        ".issue-inline-attachment img",
       )?.src,
     ).toBe("blob:clipboard-preview");
 
