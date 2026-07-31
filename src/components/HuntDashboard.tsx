@@ -76,7 +76,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { NativeSelect } from "./NativeSelect";
 import { SelectMenu } from "./SelectMenu";
@@ -95,6 +95,12 @@ import {
   maxIssueAttachmentCount,
   validateIssueAttachments,
 } from "../lib/issue-attachments";
+import {
+  issueAttachmentMarkdown,
+  issueAttachmentReference,
+  issueAttachmentReferences,
+  removeIssueAttachmentMarkdown,
+} from "../lib/issue-markdown";
 import {
   issueMentionAtCaret,
   issueMentionHandle,
@@ -1152,18 +1158,56 @@ export function CreateIssueDialog({
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<"backlog" | "queued">("queued");
   const [priority, setPriority] = useState("2");
-  const [attachments, setAttachments] = useState<File[]>([]);
+  const [attachments, setAttachments] = useState<
+    Array<{ file: File; reference: string }>
+  >([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isDraggingAttachments, setIsDraggingAttachments] = useState(false);
   const attachmentDragDepthRef = useRef(0);
+  const descriptionInputRef = useRef<HTMLTextAreaElement>(null);
 
-  const addAttachments = (selected: File[]) => {
+  const addAttachments = (selected: File[], insertImages = false) => {
     if (selected.length === 0) return;
-    const next = [...attachments, ...selected];
-    const error = validateIssueAttachments(next);
+    const added = selected.map((file) => ({
+      file,
+      reference: crypto.randomUUID(),
+    }));
+    const next = [...attachments, ...added];
+    const error = validateIssueAttachments(next.map(({ file }) => file));
     setAttachmentError(error);
-    if (!error) setAttachments(next);
+    if (error) return;
+    setAttachments(next);
+
+    const inlineImages = insertImages
+      ? added.filter(({ file }) => file.type.startsWith("image/"))
+      : [];
+    if (inlineImages.length === 0) return;
+    const textarea = descriptionInputRef.current;
+    const start = textarea?.selectionStart ?? description.length;
+    const end = textarea?.selectionEnd ?? start;
+    const before = description.slice(0, start);
+    const after = description.slice(end);
+    const markdown = inlineImages
+      .map(({ file, reference }) => issueAttachmentMarkdown(reference, file.name))
+      .join("\n\n");
+    const prefix = before.length === 0 || before.endsWith("\n\n")
+      ? ""
+      : before.endsWith("\n")
+        ? "\n"
+        : "\n\n";
+    const suffix = after.length === 0 || after.startsWith("\n\n")
+      ? ""
+      : after.startsWith("\n")
+        ? "\n"
+        : "\n\n";
+    const insertion = `${prefix}${markdown}${suffix}`;
+    setDescription(`${before}${insertion}${after}`);
+    requestAnimationFrame(() => {
+      const caret = start + insertion.length;
+      textarea?.focus();
+      textarea?.setSelectionRange(caret, caret);
+    });
   };
 
   useEffect(() => {
@@ -1219,7 +1263,7 @@ export function CreateIssueDialog({
           attachmentDragDepthRef.current = 0;
           setIsDraggingAttachments(false);
           if (!isSubmitting) {
-            addAttachments(Array.from(event.dataTransfer.files));
+            addAttachments(Array.from(event.dataTransfer.files), true);
           }
         }}
         onKeyDown={(event) => {
@@ -1260,7 +1304,7 @@ export function CreateIssueDialog({
               );
           if (images.length === 0) return;
           event.preventDefault();
-          addAttachments(images);
+          addAttachments(images, true);
         }}
         onSubmit={(event) => {
           event.preventDefault();
@@ -1271,7 +1315,14 @@ export function CreateIssueDialog({
             description: description.trim() || null,
             priority: Number(priority),
             status,
-            attachments,
+            attachments: attachments.map(({ file }) => file),
+            ...(attachments.length > 0
+              ? {
+                  attachmentReferences: attachments.map(
+                    ({ reference }) => reference,
+                  ),
+                }
+              : {}),
           }).catch((error) =>
             setSubmitError(error instanceof Error ? error.message : String(error)),
           );
@@ -1330,6 +1381,7 @@ export function CreateIssueDialog({
               maxLength={100000}
               onChange={(event) => setDescription(event.target.value)}
               placeholder={t("issue.descriptionPlaceholder")}
+              ref={descriptionInputRef}
               value={description}
             />
             {attachments.length > 0 && (
@@ -1337,14 +1389,20 @@ export function CreateIssueDialog({
                 aria-label={t("issue.attachments")}
                 className="issue-attachment-list"
               >
-                {attachments.map((file, index) => (
+                {attachments.map(({ file, reference }, index) => (
                   <SelectedAttachment
                     file={file}
-                    key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
+                    key={reference}
                     onRemove={() => {
                       setAttachments((current) =>
                         current.filter(
                           (_, candidateIndex) => candidateIndex !== index,
+                        ),
+                      );
+                      setDescription((current) =>
+                        removeIssueAttachmentMarkdown(
+                          current,
+                          reference,
                         ),
                       );
                       setAttachmentError(null);
@@ -1437,7 +1495,7 @@ export function CreateIssueDialog({
                     event.currentTarget.files ?? [],
                   );
                   event.currentTarget.value = "";
-                  addAttachments(selected);
+                  addAttachments(selected, true);
                 }}
                 type="file"
               />
@@ -2387,6 +2445,10 @@ export function RunPage({
   ];
   const placementValue = placementIdForRun(run);
   const issueContent = run.issueDescription?.trim() || null;
+  const embeddedAttachmentReferences = issueAttachmentReferences(issueContent);
+  const remainingAttachments = (run.attachments ?? []).filter(
+    (attachment) => !embeddedAttachmentReferences.has(attachment.id),
+  );
   const blockerReason =
     run.structuredResult?.summary?.trim() ||
     run.detail?.trim() ||
@@ -2763,8 +2825,23 @@ export function RunPage({
                       {issueContent ? (
                         <div className="issue-description-markdown">
                           <ReactMarkdown
+                            components={{
+                              img: ({ alt, src }) => (
+                                <IssueMarkdownImage
+                                  alt={alt ?? ""}
+                                  attachments={run.attachments ?? []}
+                                  onLoadAttachment={onLoadAttachment}
+                                  src={src}
+                                />
+                              ),
+                            }}
                             remarkPlugins={[remarkGfm]}
                             skipHtml
+                            urlTransform={(url, key) =>
+                              key === "src" && issueAttachmentReference(url)
+                                ? url
+                                : defaultUrlTransform(url)
+                            }
                           >
                             {issueContent}
                           </ReactMarkdown>
@@ -2772,9 +2849,9 @@ export function RunPage({
                       ) : (
                         <p className="issue-description-empty">{t("run.notSet")}</p>
                       )}
-                      {(run.attachments ?? []).length > 0 && (
+                      {remainingAttachments.length > 0 && (
                         <IssueAttachmentGallery
-                          attachments={run.attachments ?? []}
+                          attachments={remainingAttachments}
                           onLoadAttachment={onLoadAttachment}
                         />
                       )}
@@ -4153,6 +4230,66 @@ function MessageComposer({
       )}
     </form>
   );
+}
+
+function IssueMarkdownImage({
+  alt,
+  attachments,
+  onLoadAttachment,
+  src,
+}: {
+  alt: string;
+  attachments: IssueAttachment[];
+  onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
+  src?: string;
+}) {
+  const { t } = useI18n();
+  const reference = issueAttachmentReference(src);
+  const attachment = reference
+    ? attachments.find((candidate) => candidate.id === reference) ?? null
+    : null;
+  const [source, setSource] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if (!reference || !attachment) return;
+    let active = true;
+    let objectUrl: string | null = null;
+    setSource(null);
+    setFailed(false);
+    void onLoadAttachment(attachment)
+      .then((blob) => {
+        if (!active) return;
+        objectUrl = URL.createObjectURL(blob);
+        setSource(objectUrl);
+      })
+      .catch(() => active && setFailed(true));
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [attachment, onLoadAttachment, reference]);
+
+  if (!reference) {
+    return src ? <img alt={alt} loading="lazy" src={src} /> : null;
+  }
+  if (!attachment || failed) {
+    return (
+      <span className="issue-markdown-image-state" role="img" aria-label={alt}>
+        <CircleAlert aria-hidden="true" size={16} />
+        {failed ? t("run.loadFailed") : alt}
+      </span>
+    );
+  }
+  if (!source) {
+    return (
+      <span className="issue-markdown-image-state" role="img" aria-label={alt}>
+        <LoaderCircle aria-hidden="true" className="spin" size={16} />
+        {alt}
+      </span>
+    );
+  }
+  return <img alt={alt || attachment.filename} loading="lazy" src={source} />;
 }
 
 function IssueAttachmentGallery({

@@ -832,7 +832,7 @@ body { overflow: hidden; font-synthesis: none; }
 .run-page-back { width:max-content; padding:5px 7px 5px 5px; display:flex; align-items:center; gap:5px; border:0; border-radius:8px; color:var(--muted-foreground); background:transparent; cursor:pointer; font-size:var(--text-2xs); font-weight:600; }
 .run-page-back:hover { color:var(--accent-foreground); background:var(--accent); }
 .run-page-back:focus-visible { outline:2px solid #8b70dd; outline-offset:2px; }
-.run-page-body { width:100%; min-height:0; flex:1; margin:0; padding:6px 22px 18px 28px; overflow:hidden; }
+.run-page-body { width:100%; min-height:0; flex:1; margin:0; padding:6px 16px 14px 20px; overflow:hidden; }
 .run-page-layout { height:100%; min-height:0; display:grid; grid-template-columns:minmax(0,1fr) minmax(210px,240px); align-items:stretch; gap:20px; }
 .run-page-content { width:100%; min-width:0; min-height:0; display:grid; overflow:hidden; }
 .run-page-content.is-resizing { cursor:row-resize; user-select:none; }
@@ -864,14 +864,14 @@ body { overflow: hidden; font-synthesis: none; }
 .run-properties .run-status-error { margin:0 0 4px 34px; }
 .recovery-panel { margin-top:18px; padding:14px; border:1px solid color-mix(in srgb,var(--destructive) 36%,var(--border)); border-radius:12px; background:color-mix(in srgb,var(--destructive) 10%,var(--card)); }.recovery-panel > div:first-child { display:flex; align-items:flex-start; gap:9px; color:var(--destructive); }.recovery-panel > div:first-child span { display:grid; gap:3px; }.recovery-panel strong { color:var(--foreground); font-size:var(--text-xs); }.recovery-panel small { color:var(--muted-foreground); font-size:var(--text-2xs); line-height:1.5; }.recovery-panel > p { margin:10px 0 0; display:flex; align-items:center; gap:6px; color:var(--destructive); font-size:var(--text-2xs); }.recovery-actions { margin-top:12px; display:flex; justify-content:flex-end; gap:7px; }.recovery-actions button { min-height:30px; padding:0 11px; display:inline-flex; align-items:center; gap:6px; font-size:var(--text-2xs); }.recovery-actions button:first-child { border-color:var(--primary); background:var(--primary); color:var(--primary-foreground); }.recovery-actions .danger { border-color:var(--destructive); background:var(--destructive); color:var(--destructive-foreground); }.recovery-actions .danger-secondary { border-color:color-mix(in srgb,var(--destructive) 48%,var(--border)); background:var(--card); color:var(--foreground); }.timeline-event strong em { margin-left:5px; padding:2px 5px; border-radius:999px; background:var(--secondary); color:var(--muted-foreground); font:500 var(--text-2xs) "DM Mono",monospace; }
 .issue-description-pane { width:100%; min-width:0; min-height:0; display:flex; flex-direction:column; overflow:hidden; }
-.issue-detail-tabs { min-height:34px; flex:0 0 34px; display:flex; align-items:flex-start; gap:4px; border-bottom:1px solid var(--border); }
-.issue-detail-tabs button { height:34px; position:relative; padding:0 9px; display:flex; align-items:center; gap:6px; border:0; color:var(--muted-foreground); background:transparent; cursor:pointer; font-size:var(--text-2xs); font-weight:650; }
+.issue-detail-tabs { min-height:30px; flex:0 0 30px; display:flex; align-items:flex-start; gap:2px; border-bottom:1px solid var(--border); }
+.issue-detail-tabs button { height:30px; position:relative; padding:0 7px; display:flex; align-items:center; gap:5px; border:0; color:var(--muted-foreground); background:transparent; cursor:pointer; font-size:var(--text-2xs); font-weight:650; }
 .issue-detail-tabs button::after { content:""; height:2px; position:absolute; right:8px; bottom:-1px; left:8px; border-radius:999px 999px 0 0; background:transparent; }
 .issue-detail-tabs button:hover { color:var(--accent-foreground); background:var(--accent); }
 .issue-detail-tabs button[aria-selected="true"] { color:var(--accent-foreground); }
 .issue-detail-tabs button[aria-selected="true"]::after { background:var(--primary); }
 .issue-detail-tabs button:focus-visible { z-index:1; outline:2px solid #8b70dd; outline-offset:-2px; border-radius:7px; }
-.issue-description-scroll { width:100%; min-height:0; flex:1; padding:10px 10px 12px 2px; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; scrollbar-width:thin; }
+.issue-description-scroll { width:100%; min-height:0; flex:1; padding:7px 6px 8px 0; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; scrollbar-width:thin; }
 .issue-status-history-panel { width:100%; min-height:0; flex:1; overflow-y:auto; padding:10px 10px 12px 2px; overscroll-behavior:contain; scrollbar-gutter:stable; scrollbar-width:thin; }
 .blocked-issue-card { margin:0 0 14px; padding:14px; border:1px solid color-mix(in srgb,var(--destructive) 38%,var(--border)); border-radius:12px; background:color-mix(in srgb,var(--destructive) 8%,var(--card)); box-shadow:0 1px 2px color-mix(in srgb,var(--destructive) 8%,transparent); }
 .blocked-issue-card-heading { display:flex; align-items:center; gap:8px; color:var(--destructive); }
@@ -955,6 +955,8 @@ body { overflow: hidden; font-synthesis: none; }
 .issue-description-markdown th { color:var(--foreground); background:var(--muted); }
 .issue-description-markdown hr { height:1px; margin:1.2em 0; border:0; background:var(--border); }
 .issue-description-markdown input[type="checkbox"] { margin-right:.45em; accent-color:#7259c6; }
+.issue-description-markdown img { width:auto; max-width:100%; max-height:min(520px,62vh); display:block; object-fit:contain; border:1px solid var(--border); border-radius:9px; background:var(--muted); }
+.issue-markdown-image-state { min-height:42px; max-width:100%; margin:.7em 0; padding:9px 11px; display:flex; align-items:center; gap:7px; border:1px solid var(--border); border-radius:9px; color:var(--muted-foreground); background:var(--muted); font-size:var(--text-2xs); }
 .issue-activity-history { min-height:0; overflow:visible; padding:4px 2px 8px; overscroll-behavior:contain; }
 .issue-activity-history .timeline-event { min-height:72px; margin:0; padding-left:30px; }
 .issue-activity-history .timeline-event > span { min-width:0; padding-bottom:16px; }
@@ -1212,8 +1214,8 @@ button.issue-message-state { width:100%; cursor:pointer; }
   line-height: 1.5;
 }
 .issue-editor-content.has-attachments .issue-description-input {
-  min-height: 32px;
-  flex-basis: 32px;
+  min-height: 72px;
+  flex-basis: 72px;
 }
 .issue-title-input::placeholder,
 .issue-description-input::placeholder {
@@ -1225,7 +1227,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
   box-shadow: none;
 }
 .issue-attachment-list {
-  max-height: 180px;
+  max-height: 140px;
   flex: 0 0 auto;
   padding: 4px 0 6px;
   display: flex;
@@ -1237,18 +1239,18 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .issue-attachment-item {
   width: min(320px, 60vw);
   min-width: 220px;
-  min-height: 170px;
+  min-height: 132px;
   margin: 0;
   overflow: hidden;
   display: grid;
-  grid-template-rows: 132px 38px;
+  grid-template-rows: 96px 36px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background:var(--card);
 }
 .issue-attachment-preview {
   width: 100%;
-  height: 132px;
+  height: 96px;
   overflow: hidden;
   display: grid;
   place-items: center;
@@ -1489,7 +1491,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .run-attachments > h3 { margin:0 0 8px; display:flex; align-items:center; gap:6px; color:#64665f; font-size:var(--text-xs); }
 .run-attachments > h3 span { padding:2px 5px; border-radius:5px; color:#6a55b0; background:#eee9ff; font:500 var(--text-2xs) "DM Mono",monospace; }
 .run-attachments > div { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:10px; }
-.run-attachment { min-width:0; overflow:hidden; display:grid; grid-template-columns:minmax(0,1fr) auto; grid-template-rows:minmax(150px,22vw) 38px; align-items:center; border:1px solid #e5e5df; border-radius:11px; background:var(--muted); }
+.run-attachment { min-width:0; overflow:hidden; display:grid; grid-template-columns:minmax(0,1fr) auto; grid-template-rows:minmax(96px,16vw) 34px; align-items:center; border:1px solid #e5e5df; border-radius:11px; background:var(--muted); }
 .run-attachment-media { width:100%; height:100%; grid-column:1/-1; overflow:hidden; display:grid; place-items:center; color:#8068ce; background:#f4f1fb; }
 .run-attachment-media img,.run-attachment-media video { width:100%; height:100%; display:block; object-fit:contain; }
 .run-attachment > span { min-width:0; padding:0 9px; display:grid; gap:2px; }

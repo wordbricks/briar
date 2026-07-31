@@ -94,6 +94,7 @@ import {
   repositoryWorkflowBootstrap,
 } from "../lib/auto-hunt-contract";
 import { isMobileCompanion } from "../lib/platform";
+import { canonicalizeIssueAttachmentReferences } from "../lib/issue-markdown";
 import { runProjectAgent } from "../lib/project-llm";
 import { executeScheduledProjectAgent } from "../lib/project-agent-schedule-execution";
 import { startProjectAgentSchedulePolling } from "../lib/project-agent-schedule-runner";
@@ -1625,6 +1626,11 @@ export function useBriar(options: UseBriarOptions = {}) {
             byteSize: file.size,
             url: URL.createObjectURL(file),
           }));
+          const issueDescription = canonicalizeIssueAttachmentReferences(
+            input.description,
+            input.attachmentReferences ?? [],
+            attachments.map((attachment) => attachment.id),
+          );
           const detail = input.status === "backlog"
             ? "Briar 앱에서 생성된 이슈가 백로그에 추가되었습니다."
             : "Briar 앱에서 생성된 이슈가 Auto Hunt 처리를 기다리고 있습니다.";
@@ -1648,7 +1654,7 @@ export function useBriar(options: UseBriarOptions = {}) {
             branch: null,
             commitSha: null,
             tracker: null,
-            issueDescription: input.description,
+            issueDescription,
             attachments,
             resultSummary: null,
             structuredResult: null,

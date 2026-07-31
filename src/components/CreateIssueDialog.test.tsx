@@ -4,6 +4,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CreateIssueDialog } from "./HuntDashboard";
+import type { CreateIssueInput } from "../types";
 
 describe("CreateIssueDialog attachments", () => {
   let container: HTMLDivElement;
@@ -56,6 +57,76 @@ describe("CreateIssueDialog attachments", () => {
     expect(container.textContent).toContain("clipboard.png");
     expect(container.querySelector<HTMLImageElement>(".issue-attachment-preview img")?.src)
       .toBe("blob:clipboard-preview");
+    expect(container.querySelector<HTMLTextAreaElement>("textarea")?.value).toMatch(
+      /^!\[clipboard\.png\]\(briar-attachment:\/\/[0-9a-f-]+\)$/u,
+    );
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".issue-attachment-item button")
+        ?.click();
+    });
+    expect(container.querySelector<HTMLTextAreaElement>("textarea")?.value).toBe("");
+    expect(container.querySelector(".issue-attachment-item")).toBeNull();
+
+    await act(async () => root.unmount());
+  });
+
+  it("inserts a pasted image at the description caret and submits its reference", async () => {
+    const onCreate = vi.fn<(input: CreateIssueInput) => Promise<void>>(
+      async () => undefined,
+    );
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <CreateIssueDialog
+          isSubmitting={false}
+          onClose={() => undefined}
+          onCreate={onCreate}
+        />,
+      );
+    });
+
+    const title = container.querySelector<HTMLInputElement>(".issue-title-input");
+    const textarea = container.querySelector<HTMLTextAreaElement>("textarea");
+    await act(async () => {
+      const titleSetter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set;
+      const textareaSetter = Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )?.set;
+      titleSetter?.call(title, "Inline screenshot");
+      title?.dispatchEvent(new Event("input", { bubbles: true }));
+      textareaSetter?.call(textarea, "before after");
+      textarea?.dispatchEvent(new Event("input", { bubbles: true }));
+      textarea?.focus();
+      textarea?.setSelectionRange(6, 6);
+    });
+
+    const image = new File(["image"], "inline.png", { type: "image/png" });
+    const pasteEvent = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(pasteEvent, "clipboardData", {
+      value: {
+        files: [],
+        items: [{ getAsFile: () => image, kind: "file", type: "image/png" }],
+      },
+    });
+    await act(async () => textarea?.dispatchEvent(pasteEvent));
+
+    expect(textarea?.value).toMatch(
+      /^before\n\n!\[inline\.png\]\(briar-attachment:\/\/([0-9a-f-]+)\)\n\n after$/u,
+    );
+    await act(async () => {
+      container.querySelector<HTMLFormElement>("form")?.requestSubmit();
+    });
+    const [submitted] = onCreate.mock.calls[0]!;
+    expect(submitted.attachments).toEqual([image]);
+    expect(submitted.attachmentReferences).toHaveLength(1);
+    expect(submitted.description).toContain(
+      `briar-attachment://${submitted.attachmentReferences?.[0]}`,
+    );
 
     await act(async () => root.unmount());
   });

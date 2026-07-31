@@ -925,7 +925,11 @@ export async function createIssue(
   input: CreateIssueInput,
 ) {
   if (input.attachments.length === 0) {
-    const { attachments: _attachments, ...issue } = input;
+    const {
+      attachments: _attachments,
+      attachmentReferences: _attachmentReferences,
+      ...issue
+    } = input;
     return request<{
       runId: string;
       sourceKey: string;
@@ -944,6 +948,12 @@ export async function createIssue(
   form.set("description", input.description ?? "");
   form.set("priority", input.priority === null ? "" : String(input.priority));
   form.set("status", input.status);
+  if (input.attachmentReferences?.length) {
+    form.set(
+      "attachmentReferences",
+      JSON.stringify(input.attachmentReferences),
+    );
+  }
   for (const attachment of input.attachments) {
     form.append("attachments", attachment, attachment.name);
   }
