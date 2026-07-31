@@ -61,6 +61,7 @@ import {
   updateOrganization,
   updateOrganizationLogo,
   updateOrganizationMemberRole,
+  updateProjectIcon,
   updateIssue,
   upsertProjectAgentSession,
 } from "./db";
@@ -478,6 +479,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         resolve("migrations/0045_issue_execution_preferences.sql"),
         "utf8",
       ),
+    );
+    await executeSql(
+      db,
+      await readFile(resolve("migrations/0046_project_icons.sql"), "utf8"),
     );
   }, 30_000);
 
@@ -1734,6 +1739,20 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       id: projectId,
       logo: null,
       role: "owner",
+    });
+  });
+
+  it("stores and removes a project icon", async () => {
+    const icon = "data:image/webp;base64,bG9nbw==";
+    await expect(updateProjectIcon(db, projectId, icon)).resolves.toBe(true);
+    await expect(getProject(db, projectId, "owner")).resolves.toMatchObject({
+      id: projectId,
+      icon,
+    });
+    await expect(updateProjectIcon(db, projectId, null)).resolves.toBe(true);
+    await expect(getProject(db, projectId, "owner")).resolves.toMatchObject({
+      id: projectId,
+      icon: null,
     });
   });
 

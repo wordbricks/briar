@@ -59,6 +59,12 @@ const sessionUserSchema = z.object({
 const projectSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
+  icon: z
+    .string()
+    .max(400_000)
+    .regex(/^data:image\/webp;base64,/u)
+    .nullable()
+    .default(null),
   organizationId: z.string().uuid(),
   organizationName: z.string(),
   role: z.enum(["owner", "admin", "member"]),
@@ -636,6 +642,22 @@ export async function createProject(
 
 export async function deleteProject(token: string, projectId: string) {
   return request<void>(`/projects/${projectId}`, token, { method: "DELETE" });
+}
+
+export async function updateProjectIcon(
+  token: string,
+  projectId: string,
+  icon: string | null,
+) {
+  const result = await request<{ project: unknown }>(
+    `/projects/${projectId}/icon`,
+    token,
+    {
+      method: "PUT",
+      body: JSON.stringify({ icon }),
+    },
+  );
+  return { project: projectSchema.parse(result.project) };
 }
 
 export async function loadProjectAgents(

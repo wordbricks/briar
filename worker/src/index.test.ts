@@ -8,6 +8,7 @@ import worker, {
   organizationLogoInputSchema,
   organizationMemberRoleInputSchema,
   organizationUpdateInputSchema,
+  projectIconInputSchema,
   projectAgentSessionInputSchema,
   projectAgentScheduleInputSchema,
   projectAgentScheduleRunCompletionSchema,
@@ -18,6 +19,20 @@ import worker, {
 } from "./index";
 
 describe("Worker HTTP contract", () => {
+  it("accepts bounded WebP project icons or removal", () => {
+    expect(
+      projectIconInputSchema.parse({
+        icon: "data:image/webp;base64,bG9nbw==",
+      }),
+    ).toEqual({ icon: "data:image/webp;base64,bG9nbw==" });
+    expect(projectIconInputSchema.parse({ icon: null })).toEqual({ icon: null });
+    expect(() =>
+      projectIconInputSchema.parse({
+        icon: "data:image/svg+xml;base64,bG9nbw==",
+      }),
+    ).toThrow();
+  });
+
   it("validates provider-specific issue model effort preferences", () => {
     expect(
       issueExecutionPreferencesSchema.parse({

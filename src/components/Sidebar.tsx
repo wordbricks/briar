@@ -9,7 +9,6 @@ import {
   ChevronUp,
   Check,
   Ellipsis,
-  FolderGit2,
   Inbox,
   LogOut,
   Plus,
@@ -31,6 +30,7 @@ import type {
   SessionUser,
 } from "../types";
 import { ProjectAgentAvatar } from "./ProjectAgentAvatar";
+import { ProjectIcon } from "./ProjectIcon";
 import { UpdateControl } from "./UpdateControl";
 
 export function Sidebar({
@@ -579,7 +579,7 @@ export function Sidebar({
                       onClick={() => selectProject(project.id)}
                       type="button"
                     >
-                      <FolderGit2 size={16} strokeWidth={1.7} />
+                      <ProjectIcon className="size-4" project={project} />
                       <span>{project.name}</span>
                       {isActive && <i aria-label={t("sidebar.currentProject")} />}
                     </button>

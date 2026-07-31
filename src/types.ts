@@ -257,6 +257,7 @@ export type HuntRunPlacement = {
 export type Project = {
   id: string;
   name: string;
+  icon?: string | null;
   organizationId?: string;
   organizationName?: string;
   role?: "owner" | "admin" | "member";

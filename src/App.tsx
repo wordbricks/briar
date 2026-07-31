@@ -768,6 +768,7 @@ export function App() {
             onImportLinearIssues={(input) =>
               briar.runLinearIssueImport(activeProject.id, input)
             }
+            onIconChange={briar.changeProjectIcon}
             onRefreshVelen={briar.refreshVelen}
             project={activeProject}
             repositoryConnected={isRepositoryConnectedForImport({

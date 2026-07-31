@@ -33,6 +33,7 @@ import {
   updateIssueExecutionPreferences,
   updateOrganization as updateRemoteOrganization,
   updateOrganizationLogo as updateRemoteOrganizationLogo,
+  updateProjectIcon as updateRemoteProjectIcon,
   updateProjectSettings,
   waitForIssueAgentReply,
   type DeviceClientId,
@@ -46,6 +47,7 @@ import {
   connectLocalProject,
   createProjectWorkspace,
   disconnectLocalProject,
+  discoverRepositoryIcon,
   inspectVelen,
   inspectRepositoryReadiness,
   installProjectGithubCli,
@@ -64,6 +66,7 @@ import {
   type RepositoryReadiness,
   type VelenInspection,
 } from "../lib/project-connection";
+import { projectIconFromDataUrl } from "../lib/project-icon";
 import {
   isProjectConnectedLocally,
   withConnectedProject,
@@ -868,6 +871,35 @@ export function useBriar(options: UseBriarOptions = {}) {
     [organizations, token],
   );
 
+  const changeProjectIcon = useCallback(
+    async (projectId: string, icon: string | null) => {
+      const currentProject = projects.find((project) => project.id === projectId);
+      if (!currentProject) throw new Error("변경할 프로젝트를 찾을 수 없습니다.");
+      if (!demoMode && !token) throw new Error("로그인이 필요합니다.");
+      const project =
+        demoMode || !token
+          ? { ...currentProject, icon }
+          : (await updateRemoteProjectIcon(token, projectId, icon)).project;
+      setProjects((current) =>
+        current.map((candidate) =>
+          candidate.id === projectId ? project : candidate,
+        ),
+      );
+      setDashboard((current) =>
+        current?.project.id === projectId
+          ? { ...current, project }
+          : current,
+      );
+      setProjectConnection((current) =>
+        current?.project.id === projectId
+          ? { ...current, project }
+          : current,
+      );
+      return project;
+    },
+    [projects, token],
+  );
+
   const checkOrganizationHandle = useCallback(
     async (handle: string) => {
       if (demoMode) {
@@ -1125,12 +1157,32 @@ export function useBriar(options: UseBriarOptions = {}) {
         savedSettings = saved.settings;
       }
 
+      let connectedProject = connection.project;
+      if (token && !connectedProject.icon) {
+        try {
+          const discovered = await discoverRepositoryIcon(connected.repositoryPath);
+          if (discovered) {
+            const icon = await projectIconFromDataUrl(discovered);
+            connectedProject = (
+              await updateRemoteProjectIcon(token, connectedProject.id, icon)
+            ).project;
+            setProjects((current) =>
+              current.map((project) =>
+                project.id === connectedProject.id ? connectedProject : project,
+              ),
+            );
+          }
+        } catch (iconError) {
+          console.warn("Failed to discover the connected repository icon", iconError);
+        }
+      }
+
       if (shouldPersistProjectSettings) {
         setDashboard((current) =>
           current?.project.id === connection.project.id
-            ? { ...current, settings: savedSettings }
+            ? { ...current, project: connectedProject, settings: savedSettings }
             : {
-                ...emptyDashboard(connection.project),
+                ...emptyDashboard(connectedProject),
                 settings: savedSettings,
               },
         );
@@ -2193,6 +2245,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     cancelProjectCreation,
     cancelLogin,
     changeOrganizationLogo,
+    changeProjectIcon,
     checkOrganizationHandle,
     connectProject,
     connectedProjectIds,

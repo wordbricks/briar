@@ -34,6 +34,7 @@ type ModelEffort = "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
 export type ProjectRow = {
   id: string;
   name: string;
+  icon: string | null;
   organization_id: string;
   organization_name: string;
   member_role: OrganizationRole;
@@ -873,7 +874,7 @@ export async function releaseSlackEvent(
 export async function listProjects(db: D1Database, userId: string) {
   const result = await db
     .prepare(
-      `select project.id, project.name, project.organization_id,
+      `select project.id, project.name, project.icon_data_url as icon, project.organization_id,
               organization.name as organization_name,
               membership.role as member_role, project.created_at
        from briar_projects project
@@ -894,7 +895,7 @@ export async function listOrganizationProjects(
 ) {
   const result = await db
     .prepare(
-      `select project.id, project.name, project.organization_id,
+      `select project.id, project.name, project.icon_data_url as icon, project.organization_id,
               organization.name as organization_name,
               'member' as member_role, project.created_at
        from briar_projects project
@@ -921,6 +922,7 @@ export async function createProject(
   const project: ProjectRow = {
     id: crypto.randomUUID(),
     name: input.name,
+    icon: null,
     organization_id: input.organizationId,
     organization_name: "",
     member_role: "owner",
@@ -1003,7 +1005,7 @@ export async function getProject(
 ) {
   return await db
     .prepare(
-      `select project.id, project.name, project.organization_id,
+      `select project.id, project.name, project.icon_data_url as icon, project.organization_id,
               organization.name as organization_name,
               membership.role as member_role, project.created_at
        from briar_projects project
@@ -1015,6 +1017,23 @@ export async function getProject(
     )
     .bind(userId, projectId)
     .first<ProjectRow>();
+}
+
+export async function updateProjectIcon(
+  db: D1Database,
+  projectId: string,
+  icon: string | null,
+) {
+  const updatedAt = new Date().toISOString();
+  const result = await db
+    .prepare(
+      `update briar_projects
+       set icon_data_url = ?, updated_at = ?
+       where id = ?`,
+    )
+    .bind(icon, updatedAt, projectId)
+    .run();
+  return result.meta.changes > 0;
 }
 
 export async function deleteProject(

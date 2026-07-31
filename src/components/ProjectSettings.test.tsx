@@ -4,8 +4,14 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
 import { demoDashboard } from "../lib/demo-data";
+import { projectIconFromFile } from "../lib/project-icon";
 import type { ProjectSettings as ProjectSettingsData } from "../types";
 import { ProjectSettings } from "./ProjectSettings";
+
+vi.mock("../lib/project-icon", () => ({
+  projectIconAccept: "image/jpeg,image/png,image/webp,image/svg+xml,image/x-icon,.ico",
+  projectIconFromFile: vi.fn(),
+}));
 
 describe("ProjectSettings", () => {
   it("keeps project settings focused on project-wide configuration", async () => {
@@ -43,6 +49,10 @@ describe("ProjectSettings", () => {
         status: "active",
       }],
     }));
+    const onIconChange = vi.fn(async () => undefined);
+    vi.mocked(projectIconFromFile).mockResolvedValue(
+      "data:image/webp;base64,aWNvbg==",
+    );
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
@@ -69,6 +79,7 @@ describe("ProjectSettings", () => {
           onConnectLinearImport={onConnectLinearImport}
           onLoadLinearImportStates={onLoadLinearImportStates}
           onImportLinearIssues={onImportLinearIssues}
+          onIconChange={onIconChange}
           onRefreshVelen={onRefreshVelen}
           project={{
             id: "project-1",
@@ -303,6 +314,23 @@ describe("ProjectSettings", () => {
     expect(container.querySelector(".project-settings-card")?.textContent).toContain(
       "Briar",
     );
+    const iconFile = new File(["icon"], "icon.svg", { type: "image/svg+xml" });
+    const iconInput = container.querySelector<HTMLInputElement>(
+      'input[aria-label="아이콘 업로드"]',
+    )!;
+    Object.defineProperty(iconInput, "files", {
+      configurable: true,
+      value: [iconFile],
+    });
+    await act(async () => {
+      iconInput.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(projectIconFromFile).toHaveBeenCalledWith(iconFile);
+    expect(onIconChange).toHaveBeenCalledWith(
+      "project-1",
+      "data:image/webp;base64,aWNvbg==",
+    );
+    expect(container.textContent).toContain("프로젝트 아이콘을 저장했습니다.");
 
     await act(async () => root.unmount());
     container.remove();
@@ -338,6 +366,7 @@ describe("ProjectSettings", () => {
             total: 0,
             truncated: false,
           })}
+          onIconChange={async () => undefined}
           onRefreshVelen={async () => null}
           project={{
             id: "project-1",
