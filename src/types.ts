@@ -195,7 +195,8 @@ export type HuntRun = {
   startedAt: string;
   updatedAt: string;
   completedAt: string | null;
-  events: HuntEvent[];
+  lastEventAt: string;
+  eventCount: number;
 };
 
 export type ExecutionWorker = {

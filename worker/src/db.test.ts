@@ -41,6 +41,8 @@ import {
   listIssueConversationNotifications,
   listIssueMessages,
   listDashboardChanges,
+  listDashboardRuns,
+  listHuntRunEvents,
   listOrganizations,
   listOrganizationMembers,
   isOrganizationHandleAvailable,
@@ -523,6 +525,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db,
       await readFile(resolve("migrations/0049_dashboard_delta_sync.sql"), "utf8"),
     );
+    await executeTriggerMigration(
+      db,
+      await readFile(resolve("migrations/0050_hunt_run_event_count.sql"), "utf8"),
+    );
   }, 30_000);
 
   afterAll(async () => {
@@ -614,6 +620,12 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
 
     expect(run).toMatchObject({ stage: "cancelled", status: "cancelled" });
     expect(
+      await db
+        .prepare("select event_count from briar_hunt_runs where id = ?")
+        .bind(run!.id)
+        .first<number>("event_count"),
+    ).toBe(1);
+    expect(
       JSON.parse((await getProjectSettings(db, projectId))!.workflow_json),
     ).toEqual(repositoryWorkflowBootstrap);
     expect(
@@ -649,6 +661,67 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     expect(await db.prepare("pragma foreign_key_check").all()).toMatchObject({
       results: [],
     });
+  });
+
+  it("serves dashboard summaries without reading the event table", async () => {
+    await updateProjectSettings(db, projectId, {
+      velenOrg: "example",
+      dataSource: null,
+      linear: { enabled: false, source: null, teamKey: null },
+      githubRepository: null,
+      workflow: releaseWorkflow,
+    });
+    const sourceKey = "dashboard-summary-read-model";
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 1.1, {
+        sourceKey,
+        eventKey: `${sourceKey}:queued`,
+      }),
+    );
+    await recordHuntEvent(
+      db,
+      projectId,
+      event("analyzing", 1.2, {
+        sourceKey,
+        eventKey: `${sourceKey}:analyzing`,
+      }),
+    );
+    await updateProjectSettings(db, projectId, {
+      velenOrg: "example",
+      dataSource: null,
+      linear: { enabled: false, source: null, teamKey: null },
+      githubRepository: null,
+      workflow: repositoryWorkflowBootstrap,
+    });
+
+    const summaries = await listDashboardRuns(db, projectId);
+    const summary = summaries.find((candidate) => candidate.id === runId);
+    expect(summary).toMatchObject({
+      id: runId,
+      event_count: 2,
+      status: "running",
+      workflow_stage: "analyzing",
+    });
+    expect(await listHuntRunEvents(db, projectId, runId)).toHaveLength(2);
+
+    const plan = await db
+      .prepare(
+        `explain query plan
+         select run.id, run.event_count
+         from briar_hunt_runs run
+         where run.project_id = ?
+         order by
+           case when run.status in ('completed', 'cancelled') then 1 else 0 end,
+           run.updated_at desc
+         limit 200`,
+      )
+      .bind(projectId)
+      .all<{ detail: string }>();
+    const details = plan.results.map((row) => row.detail).join("\n");
+    expect(details).toContain("briar_hunt_runs");
+    expect(details).not.toContain("briar_hunt_events");
   });
 
   it("synchronizes the newest project agent session snapshot", async () => {

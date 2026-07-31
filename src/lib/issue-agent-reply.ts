@@ -171,7 +171,8 @@ export function issueConversationSnapshot(
           startedAt: run.startedAt,
           updatedAt: run.updatedAt,
           completedAt: run.completedAt,
-          events: run.events,
+          lastEventAt: run.lastEventAt,
+          eventCount: run.eventCount,
         }
       : null,
     messages: messages.map((message) => ({

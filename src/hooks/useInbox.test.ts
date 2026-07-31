@@ -72,17 +72,8 @@ describe("Inbox messages", () => {
           workflowStage: null,
           updatedAt: occurredAt,
           completedAt: occurredAt,
-          events: [
-            ...run.events,
-            {
-              ...run.events[0],
-              id: "latest-completed-event",
-              status: "completed" as const,
-              workflowStage: null,
-              occurredAt,
-              recordedAt: occurredAt,
-            },
-          ],
+          lastEventAt: occurredAt,
+          eventCount: run.eventCount + 1,
         },
       ],
     };
@@ -98,7 +89,7 @@ describe("Inbox messages", () => {
     expect(merged[0]).toMatchObject({
       id: `issue:${run.id}`,
       status: "completed",
-      version: "latest-completed-event",
+      version: `1:1:completed:none:${occurredAt}:${run.eventCount + 1}`,
     });
   });
 

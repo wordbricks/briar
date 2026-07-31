@@ -5,7 +5,7 @@ import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
-import { demoDashboard } from "../lib/demo-data";
+import { demoDashboard, demoRunEvents } from "../lib/demo-data";
 import type {
   ExecutionWorker,
   HuntRun,
@@ -34,6 +34,7 @@ const dashboardProps = {
   onUpdateIssue: async () => undefined,
   onLoadAttachment: async () => new Blob(),
   onLoadIssueMessages: async () => [],
+  onLoadRunEvents: async (runId: string) => demoRunEvents[runId] ?? [],
   onLoadRunEvidence: async () => [],
   onMoveRun: async () => undefined,
   onRetryRun: async () => undefined,
@@ -997,11 +998,11 @@ describe("HuntDashboard", () => {
     );
     expect(statusHistoryPanel?.getAttribute("role")).toBe("tabpanel");
     expect(statusHistoryPanel?.textContent).toContain(
-      demoDashboard.runs[0].events[0].detail ?? "",
+      demoRunEvents[demoDashboard.runs[0].id][0].detail ?? "",
     );
     expect(
       statusHistoryPanel?.querySelectorAll(".timeline-event"),
-    ).toHaveLength(demoDashboard.runs[0].events.length);
+    ).toHaveLength(demoRunEvents[demoDashboard.runs[0].id].length);
     expect(container.querySelector(".issue-activity-dialog")).toBeNull();
     const descriptionTab = Array.from(
       container.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
@@ -1035,6 +1036,42 @@ describe("HuntDashboard", () => {
 
     expect(container.querySelector(".run-page")).toBeNull();
     expect(container.querySelector(".kanban-board")).not.toBeNull();
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("shows a retryable state when the detail timeline fails to load", async () => {
+    const events = demoRunEvents[demoDashboard.runs[0].id];
+    const onLoadRunEvents = vi
+      .fn<() => Promise<typeof events>>()
+      .mockRejectedValueOnce(new Error("Timeline unavailable"))
+      .mockResolvedValueOnce(events);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={demoDashboard}
+        onLoadRunEvents={onLoadRunEvents}
+        requestedRunId={demoDashboard.runs[0].id}
+      />,
+    ));
+    const statusHistoryTab = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
+    ).find((button) => button.textContent === "상태");
+    await act(async () => statusHistoryTab?.click());
+
+    const retry = container.querySelector<HTMLButtonElement>(
+      ".issue-status-history-panel .run-evidence-state.error",
+    );
+    expect(retry?.textContent).toContain("Timeline unavailable");
+    await act(async () => retry?.click());
+    expect(
+      container.querySelectorAll(".issue-status-history-panel .timeline-event"),
+    ).toHaveLength(events.length);
+    expect(onLoadRunEvents).toHaveBeenCalledTimes(2);
+
     await act(async () => root.unmount());
     container.remove();
   });
@@ -1963,15 +2000,6 @@ describe("HuntDashboard", () => {
       status: "failed" as const,
       currentAttempt: 2,
       detail: "Worker deployment timed out",
-      events: [
-        {
-          ...demoDashboard.runs[0].events[0],
-          status: "failed" as const,
-          attempt: 2,
-          detail: "Worker deployment timed out",
-        },
-        ...demoDashboard.runs[0].events,
-      ],
     };
     const markup = renderToStaticMarkup(
       <TooltipProvider>

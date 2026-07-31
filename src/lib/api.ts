@@ -26,6 +26,7 @@ import type {
   OrganizationExecutionWorker,
   ProjectExecutionWorkerPolicy,
   HuntRunPlacement,
+  HuntEvent,
   IssueAttachment,
   IssueMessage,
   IssueExecutionPreferences,
@@ -602,23 +603,13 @@ export async function disconnectSlackInstallation(
 }
 
 const normalizeDashboardRuns = (runs: DashboardPayload["runs"]) =>
-  runs.map((run) => {
-    const events = run.events.map((event) => ({
-      ...event,
-      revision:
-        Number.isInteger(event.revision) && event.revision >= 1
-          ? event.revision
-          : 1,
-    }));
-    return {
-      ...run,
-      currentRevision:
-        Number.isInteger(run.currentRevision) && run.currentRevision >= 1
-          ? run.currentRevision
-          : Math.max(1, ...events.map((event) => event.revision)),
-      events,
-    };
-  });
+  runs.map((run) => ({
+    ...run,
+    currentRevision:
+      Number.isInteger(run.currentRevision) && run.currentRevision >= 1
+        ? run.currentRevision
+        : 1,
+  }));
 
 export async function loadDashboard(
   token: string,
@@ -648,6 +639,24 @@ export async function loadDashboardDelta(
     { signal },
   );
   return { ...delta, runs: normalizeDashboardRuns(delta.runs) };
+}
+
+export async function loadRunEvents(
+  token: string,
+  projectId: string,
+  runId: string,
+): Promise<HuntEvent[]> {
+  const result = await request<{ events: HuntEvent[] }>(
+    `/projects/${projectId}/runs/${runId}/events`,
+    token,
+  );
+  return result.events.map((event) => ({
+    ...event,
+    revision:
+      Number.isInteger(event.revision) && event.revision >= 1
+        ? event.revision
+        : 1,
+  }));
 }
 
 export async function createProject(
