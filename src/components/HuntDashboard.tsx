@@ -826,9 +826,13 @@ export function HuntDashboard({
                       agentAssociationsByRunId.activeAgents.get(run.id) ?? null
                     }
                     assignedWorker={
-                      workerById.get(run.workerId ?? "") ??
-                      workerById.get(run.requestedWorkerId ?? "") ??
-                      null
+                      ["completed", "cancelled", "blocked", "failed"].includes(
+                        run.status,
+                      )
+                        ? null
+                        : workerById.get(run.workerId ?? "") ??
+                          workerById.get(run.requestedWorkerId ?? "") ??
+                          null
                     }
                     contextMenuDisabled={companionMode}
                     deletingIssueId={deletingIssueId}

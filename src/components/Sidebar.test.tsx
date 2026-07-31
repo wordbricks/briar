@@ -84,7 +84,101 @@ describe("Sidebar", () => {
     expect(markup).not.toContain("도움말");
     expect(markup).not.toContain('href="#help"');
     expect(markup).toContain('aria-label="Briar 프로젝트 메뉴"');
+    expect(markup).toContain('aria-label="Briar 프로젝트 접기"');
+    expect(markup).toContain('class="sidebar-project-toggle"');
+    expect(markup).toContain('id="project-views-project-1"');
     expect(markup).not.toContain("<select");
+  });
+
+  it("opens projects by default and lets each project collapse independently", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <Sidebar
+          {...sidebarProps}
+          projects={[
+            ...sidebarProps.projects,
+            {
+              id: "project-2",
+              name: "Console",
+              organizationId: "organization-1",
+              organizationName: "Briar",
+              role: "member",
+              createdAt: "2026-07-23T00:00:00Z",
+            },
+          ]}
+        />,
+      );
+    });
+
+    expect(container.querySelector("#project-views-project-1")).not.toBeNull();
+    expect(container.querySelector("#project-views-project-2")).not.toBeNull();
+    expect(
+      container.querySelectorAll(".sidebar-project-view").length,
+    ).toBeGreaterThanOrEqual(6);
+
+    const collapseBriar = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Briar 프로젝트 접기"]',
+    );
+    await act(async () => collapseBriar?.click());
+
+    expect(container.querySelector("#project-views-project-1")).toBeNull();
+    expect(container.querySelector("#project-views-project-2")).not.toBeNull();
+    expect(
+      container.querySelector('[aria-label="Briar 프로젝트 펼치기"]'),
+    ).not.toBeNull();
+    expect(
+      container.querySelector('[aria-label="Console 프로젝트 접기"]'),
+    ).not.toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("selects a project and keeps it expanded when opening a child view", async () => {
+    const onProjectChange = vi.fn();
+    const onIssuesOpen = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <Sidebar
+          {...sidebarProps}
+          activeProjectId="project-1"
+          onIssuesOpen={onIssuesOpen}
+          onProjectChange={onProjectChange}
+          projects={[
+            ...sidebarProps.projects,
+            {
+              id: "project-2",
+              name: "Console",
+              organizationId: "organization-1",
+              organizationName: "Briar",
+              role: "member",
+              createdAt: "2026-07-23T00:00:00Z",
+            },
+          ]}
+        />,
+      );
+    });
+
+    const consoleIssues = Array.from(
+      container.querySelectorAll<HTMLAnchorElement>(".sidebar-project-view"),
+    ).find(
+      (link) =>
+        link.getAttribute("href") === "#issues" &&
+        link.closest(".sidebar-project-group")?.textContent?.includes("Console"),
+    );
+    await act(async () => consoleIssues?.click());
+
+    expect(onProjectChange).toHaveBeenCalledWith("project-2");
+    expect(onIssuesOpen).toHaveBeenCalledOnce();
+
+    await act(async () => root.unmount());
+    container.remove();
   });
 
   it("opens issue creation from the Issues row action", async () => {

@@ -3,23 +3,8 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ExecutionWorker, ProjectAgent } from "../types";
+import type { ExecutionWorker } from "../types";
 import { WorkerDispatchDialog } from "./WorkerDispatchDialog";
-
-const agent: ProjectAgent = {
-  id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-  projectId: "11111111-1111-4111-8111-111111111111",
-  name: "Builder",
-  avatar: null,
-  codexPet: null,
-  provider: "claude",
-  model: null,
-  responsibility: "Build",
-  skill: "# Build",
-  calendarColor: "#000000",
-  createdAt: "2026-07-29T00:00:00Z",
-  updatedAt: "2026-07-29T00:00:00Z",
-};
 
 const worker = (id: string, label: string): ExecutionWorker => ({
   id,
@@ -64,7 +49,6 @@ describe("WorkerDispatchDialog", () => {
     await act(async () => {
       root.render(
         <WorkerDispatchDialog
-          agents={[agent]}
           error={null}
           isDispatching={false}
           onOpenChange={vi.fn()}
@@ -84,16 +68,25 @@ describe("WorkerDispatchDialog", () => {
 
     expect(document.body.textContent).toContain("Allowed Mac");
     expect(document.body.textContent).not.toContain("Denied Mac");
+    expect(document.body.textContent).not.toContain("Briar Agent");
     expect(
       document.body.querySelector<HTMLButtonElement>(
         '[aria-label="Worker 실행 환경"]',
       )?.textContent,
     ).toContain("Allowed Mac");
+    await act(async () => {
+      document.body
+        .querySelector<HTMLButtonElement>('[aria-label="Worker 실행 환경"]')
+        ?.click();
+    });
+    expect(
+      document.body.querySelector('.select-menu-option[data-value="any"]'),
+    ).toBeNull();
 
     await act(async () => root.unmount());
   });
 
-  it("selects an execution provider independently from the logical Agent", async () => {
+  it("selects an execution provider independently", async () => {
     const codexWorker = {
       ...worker("worker-codex", "Codex Mac"),
       providers: ["codex"] as ExecutionWorker["providers"],
@@ -109,7 +102,6 @@ describe("WorkerDispatchDialog", () => {
     await act(async () => {
       root.render(
         <WorkerDispatchDialog
-          agents={[agent]}
           error={null}
           isDispatching={false}
           onOpenChange={vi.fn()}
@@ -121,8 +113,8 @@ describe("WorkerDispatchDialog", () => {
       );
     });
 
-    expect(document.body.textContent).toContain("Claude Mac");
-    expect(document.body.textContent).not.toContain("Codex Mac");
+    expect(document.body.textContent).toContain("Codex Mac");
+    expect(document.body.textContent).not.toContain("Claude Mac");
 
     await act(async () => {
       document.body
@@ -137,13 +129,13 @@ describe("WorkerDispatchDialog", () => {
     await act(async () => {
       document.body
         .querySelector<HTMLButtonElement>(
-          '.select-menu-option[data-value="codex"]',
+          '.select-menu-option[data-value="claude"]',
         )
         ?.click();
     });
 
-    expect(document.body.textContent).toContain("Codex Mac");
-    expect(document.body.textContent).not.toContain("Claude Mac");
+    expect(document.body.textContent).toContain("Claude Mac");
+    expect(document.body.textContent).not.toContain("Codex Mac");
 
     await act(async () => root.unmount());
   });
@@ -159,7 +151,6 @@ describe("WorkerDispatchDialog", () => {
     await act(async () => {
       root.render(
         <WorkerDispatchDialog
-          agents={[agent]}
           error={null}
           isDispatching={false}
           onOpenChange={vi.fn()}
@@ -186,10 +177,9 @@ describe("WorkerDispatchDialog", () => {
     await act(async () => dispatchButton?.click());
 
     expect(onSubmit).toHaveBeenCalledWith({
-      agentId: agent.id,
       effort: null,
       model: null,
-      provider: "claude",
+      provider: "codex",
       workerId: second.id,
     });
 
@@ -205,7 +195,6 @@ describe("WorkerDispatchDialog", () => {
     await act(async () => {
       root.render(
         <WorkerDispatchDialog
-          agents={[agent]}
           error={null}
           isDispatching={false}
           onOpenChange={vi.fn()}
@@ -215,6 +204,18 @@ describe("WorkerDispatchDialog", () => {
           workers={[worker("worker-model", "Model Mac")]}
         />,
       );
+    });
+    await act(async () => {
+      document.body
+        .querySelector<HTMLButtonElement>('[aria-label="실행 프로바이더"]')
+        ?.click();
+    });
+    await act(async () => {
+      document.body
+        .querySelector<HTMLButtonElement>(
+          '.select-menu-option[data-value="claude"]',
+        )
+        ?.click();
     });
     await act(async () => {
       document.body

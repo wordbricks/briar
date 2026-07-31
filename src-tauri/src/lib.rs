@@ -29,6 +29,7 @@ const AUTO_HUNT_EVENT_DIRECTORY: &str = "auto-hunt-sessions";
 const AUTO_HUNT_APP_SERVER_EVENT: &str = "auto-hunt-app-server-event";
 const AUTO_HUNT_DISPATCH_EVENT: &str = "auto-hunt-dispatch-event";
 const PROJECT_AGENT_SCHEDULE_POLL_EVENT: &str = "project-agent-schedule-poll";
+const INBOX_NOTIFICATION_OPEN_EVENT: &str = "inbox-notification-open";
 const AGENT_SESSION_STOPPED_ERROR: &str = "사용자가 에이전트 세션을 중지했습니다.";
 const GITHUB_DEVICE_LOGIN_URL: &str = "https://github.com/login/device";
 #[cfg(not(target_os = "windows"))]
@@ -42,6 +43,15 @@ const ONBOARDING_MAIN_WINDOW_SIZE: (f64, f64) = (780.0, 580.0);
 #[derive(Deserialize, Serialize)]
 struct StoredSession {
     token: String,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct InboxNotificationTarget {
+    message_id: String,
+    project_id: String,
+    target_id: String,
+    kind: String,
 }
 
 #[cfg(desktop)]
@@ -5181,6 +5191,83 @@ fn main_window_state_flags() -> tauri_plugin_window_state::StateFlags {
 }
 
 #[tauri::command]
+fn show_inbox_notification(
+    app: tauri::AppHandle,
+    title: String,
+    body: String,
+    target: InboxNotificationTarget,
+) -> Result<(), String> {
+    #[cfg(desktop)]
+    {
+        #[cfg(target_os = "macos")]
+        {
+            let application_identifier = if cfg!(dev) {
+                "com.apple.Terminal".to_string()
+            } else {
+                app.config().identifier.clone()
+            };
+            let _ = notify_rust::set_application(&application_identifier);
+        }
+
+        std::thread::spawn(move || {
+            let mut notification = notify_rust::Notification::new();
+            notification.summary(&title).body(&body).auto_icon();
+            // The macOS backend only waits for body clicks when an action is attached.
+            #[cfg(unix)]
+            notification.action("default", "Open");
+            #[cfg(windows)]
+            if let Ok(executable) = tauri::utils::platform::current_exe() {
+                if let Some(directory) = executable.parent() {
+                    let separator = std::path::MAIN_SEPARATOR;
+                    let directory = directory.display().to_string();
+                    if !(directory.ends_with(format!("{separator}target{separator}debug").as_str())
+                        || directory
+                            .ends_with(format!("{separator}target{separator}release").as_str()))
+                    {
+                        notification.app_id(&app.config().identifier);
+                    }
+                }
+            }
+
+            let handle = match notification.show() {
+                Ok(handle) => handle,
+                Err(error) => {
+                    eprintln!("Inbox notification failed: {error}");
+                    return;
+                }
+            };
+            if let Err(error) =
+                handle.wait_for_response(move |response: &notify_rust::NotificationResponse| {
+                    let opens_notification = match response {
+                        notify_rust::NotificationResponse::Default => true,
+                        notify_rust::NotificationResponse::Action(action) => action == "default",
+                        _ => false,
+                    };
+                    if !opens_notification {
+                        return;
+                    }
+
+                    if let Some(main) = app.get_webview_window("main") {
+                        let _ = main.show();
+                        let _ = main.unminimize();
+                        let _ = main.set_focus();
+                    }
+                    let _ = app.emit(INBOX_NOTIFICATION_OPEN_EVENT, target);
+                })
+            {
+                eprintln!("Inbox notification response failed: {error}");
+            }
+        });
+        Ok(())
+    }
+    #[cfg(mobile)]
+    {
+        let _ = (app, title, body, target);
+        Err("Desktop inbox notifications are unavailable on mobile".to_string())
+    }
+}
+
+#[tauri::command]
 fn set_main_window_onboarding_mode(app: tauri::AppHandle, compact: bool) -> Result<(), String> {
     let main = main_window(&app)?;
     let (width, height) = main_window_size(compact);
@@ -5477,7 +5564,8 @@ pub fn run() {
             repair_auto_hunt,
             configure_execution_worker,
             sync_execution_worker_labels,
-            inspect_execution_workers
+            inspect_execution_workers,
+            show_inbox_notification
         ])
         .build(tauri::generate_context!())
         .expect("error while building Briar");

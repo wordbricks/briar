@@ -20,6 +20,7 @@ import { OrganizationSettings } from "./components/OrganizationSettings";
 import { OrganizationCreate } from "./components/OrganizationCreate";
 import { ProjectOnboarding } from "./components/ProjectOnboarding";
 import { ProjectAgents } from "./components/ProjectAgents";
+import { ProjectAgentSessionDetail } from "./components/ProjectAgentSessionDetail";
 import { ProjectSchedule } from "./components/ProjectSchedule";
 import { ProjectRepositorySetupDialog } from "./components/ProjectRepositorySetupDialog";
 import { ProjectSettings } from "./components/ProjectSettings";
@@ -33,7 +34,10 @@ import { WindowNavigationControls } from "./components/WindowNavigationControls"
 import { useBriar, type UseBriarOptions } from "./hooks/useBriar";
 import { useAutoHuntSessions } from "./hooks/useAutoHuntSessions";
 import { useInbox } from "./hooks/useInbox";
-import { useInboxNotifications } from "./hooks/useInboxNotifications";
+import {
+  useInboxNotificationClicks,
+  useInboxNotifications,
+} from "./hooks/useInboxNotifications";
 import {
   useMobileBackHandler,
   useMobileNavigationGestures,
@@ -50,6 +54,10 @@ import {
   markInitialOnboardingComplete,
 } from "./lib/initial-onboarding";
 import { syncAppBadgeCount } from "./lib/app-badge";
+import {
+  inboxNotificationTarget,
+  type InboxNotificationTarget,
+} from "./lib/inbox-notifications";
 import {
   hasDeferredProjectOnboarding,
   markProjectOnboardingDeferred,
@@ -165,6 +173,9 @@ export function App() {
   } = useNavigationHistory<ActivePage>("issues");
   const [pendingIssueLink, setPendingIssueLink] =
     useState<IssueLinkTarget | null>(null);
+  const [pendingInboxNotificationTarget, setPendingInboxNotificationTarget] =
+    useState<InboxNotificationTarget | null>(null);
+  useInboxNotificationClicks(setPendingInboxNotificationTarget);
   const [requestedRunId, setRequestedRunId] = useState<string | null>(null);
   const [requestedSessionId, setRequestedSessionId] = useState<string | null>(
     null,
@@ -214,9 +225,56 @@ export function App() {
     navigateToPage,
     pendingIssueLink,
   ]);
+  useEffect(() => {
+    if (!pendingInboxNotificationTarget || !briar.user || briar.loading) return;
+    if (
+      !briar.projects.some(
+        (project) => project.id === pendingInboxNotificationTarget.projectId,
+      )
+    ) {
+      return;
+    }
+
+    inbox.markRead(pendingInboxNotificationTarget.messageId);
+    if (pendingInboxNotificationTarget.projectId !== briar.activeProjectId) {
+      briar.setActiveProjectId(pendingInboxNotificationTarget.projectId);
+    }
+    if (
+      pendingInboxNotificationTarget.kind === "issue" ||
+      pendingInboxNotificationTarget.kind === "conversation"
+    ) {
+      setRequestedSessionId(null);
+      setRequestedRunId(pendingInboxNotificationTarget.targetId);
+      if (briar.companionMode) {
+        setCompanionStatus("all");
+        setCompanionPage("issues");
+      } else {
+        navigateToPage("issues");
+      }
+    } else {
+      setRequestedRunId(null);
+      setRequestedSessionId(pendingInboxNotificationTarget.targetId);
+      if (!briar.companionMode) navigateToPage("agents");
+    }
+    setPendingInboxNotificationTarget(null);
+  }, [
+    briar.activeProjectId,
+    briar.companionMode,
+    briar.loading,
+    briar.projects,
+    briar.setActiveProjectId,
+    briar.user,
+    inbox.markRead,
+    navigateToPage,
+    pendingInboxNotificationTarget,
+  ]);
   useMobileNavigationGestures(briar.companionMode);
   useMobileBackHandler(
     () => {
+      if (briar.companionMode && requestedSessionId) {
+        setRequestedSessionId(null);
+        return true;
+      }
       if (!briar.companionMode || companionPage === "issues") return false;
       setCompanionPage("issues");
       setRequestedRunId(null);
@@ -231,6 +289,11 @@ export function App() {
   const activeProject = briar.projects.find(
     (project) => project.id === briar.activeProjectId,
   );
+  const requestedCompanionSession = briar.companionMode
+    ? autoHunt.sessions.find(
+        (session) => session.id === requestedSessionId,
+      ) ?? null
+    : null;
   const [issueAgents, setIssueAgents] = useState<ProjectAgent[]>([]);
   useEffect(() => {
     if (!activeProject) {
@@ -296,19 +359,15 @@ export function App() {
     },
   ) => briar.addIssueMessage(runId, input);
   const processIssueNow = (run: HuntRun) => {
-    if (!activeProject || issueAgents.length === 0) {
-      setQuickProcessError(t("issue.processNowNoAgent"));
-      return;
-    }
+    if (!activeProject) return;
     setQuickProcessError(null);
     setDispatchRun(run);
   };
   const submitWorkerDispatch = async (input: {
-    agentId: string;
     provider: AgentProvider;
     model: string | null;
     effort: ModelEffort | null;
-    workerId: string | null;
+    workerId: string;
   }) => {
     if (!activeProject || !briar.token || !dispatchRun) return;
     setQuickStartingRunId(dispatchRun.id);
@@ -655,24 +714,10 @@ export function App() {
             messages={inbox.messages}
             onMarkAllRead={inbox.markAllRead}
             onMarkRead={inbox.markRead}
-            onOpen={(message) => {
-              inbox.markRead(message.id);
-              if (message.projectId !== briar.activeProjectId) {
-                briar.setActiveProjectId(message.projectId);
-              }
-              if (
-                message.kind === "issue" ||
-                message.kind === "conversation"
-              ) {
-                setRequestedSessionId(null);
-                setRequestedRunId(message.targetId);
-                navigateToPage("issues");
-              } else {
-                setRequestedRunId(null);
-                setRequestedSessionId(message.targetId);
-                navigateToPage("agents");
-              }
-            }}
+            onOpen={(message) =>
+              setPendingInboxNotificationTarget(
+                inboxNotificationTarget(message),
+              )}
             unreadCount={inbox.unreadCount}
           />
         ) : activePage === "settings" &&
@@ -910,7 +955,20 @@ export function App() {
           projects={briar.projects}
           user={briar.user}
         />
-        {companionPage === "settings" ? (
+        {requestedCompanionSession ? (
+          <ProjectAgentSessionDetail
+            isSidebarOpen
+            onBack={() => setRequestedSessionId(null)}
+            onIssueOpen={(runId) => {
+              setRequestedSessionId(null);
+              setRequestedRunId(runId);
+              setCompanionStatus("all");
+              setCompanionPage("issues");
+            }}
+            onStop={() => autoHunt.stopSession(requestedCompanionSession.id)}
+            session={requestedCompanionSession}
+          />
+        ) : companionPage === "settings" ? (
           <CompanionSettings
             onBack={() => setCompanionPage("issues")}
             user={briar.user}
@@ -923,22 +981,10 @@ export function App() {
               messages={inbox.messages}
               onMarkAllRead={inbox.markAllRead}
               onMarkRead={inbox.markRead}
-              onOpen={(message) => {
-                inbox.markRead(message.id);
-                if (message.projectId !== briar.activeProjectId) {
-                  briar.setActiveProjectId(message.projectId);
-                }
-                if (
-                  message.kind === "issue" ||
-                  message.kind === "conversation"
-                ) {
-                  setRequestedRunId(message.targetId);
-                  setCompanionStatus("all");
-                  setCompanionPage("issues");
-                } else {
-                  setRequestedSessionId(message.targetId);
-                }
-              }}
+              onOpen={(message) =>
+                setPendingInboxNotificationTarget(
+                  inboxNotificationTarget(message),
+                )}
               unreadCount={inbox.unreadCount}
             />
             <CompanionBottomNavigation
@@ -1002,7 +1048,6 @@ export function App() {
     <>
       {content}
       <WorkerDispatchDialog
-        agents={issueAgents}
         error={quickProcessError}
         isDispatching={Boolean(quickStartingRunId)}
         onOpenChange={(open) => {

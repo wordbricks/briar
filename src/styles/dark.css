@@ -16,6 +16,7 @@
 .dark .sidebar-brand,
 .dark .sidebar-primary-nav a,
 .dark .sidebar-project-heading,
+.dark .sidebar-project-toggle,
 .dark .sidebar-project-view,
 .dark .sidebar-agent-session {
   color: var(--sidebar-foreground);
@@ -26,6 +27,7 @@
 .dark .sidebar-primary-nav a:hover,
 .dark .sidebar-primary-nav a.active,
 .dark .sidebar-project-heading:hover,
+.dark .sidebar-project-toggle:hover,
 .dark .sidebar-project-view:hover,
 .dark .sidebar-project-view.active,
 .dark .sidebar-agent-session:hover {
