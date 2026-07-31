@@ -206,6 +206,31 @@ describe("HuntDashboard", () => {
     expect(markup).not.toContain('class="metric-grid"');
   });
 
+  it("separates header actions from status and type filters", async () => {
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={demoDashboard}
+      />,
+    ));
+
+    const header = container.querySelector(".queue-header");
+    const tools = header?.querySelector(".queue-tools");
+    const filterBar = container.querySelector(".queue-filter-bar");
+
+    expect(tools?.querySelector(".search-box")).not.toBeNull();
+    expect(tools?.querySelector(".view-switch")).not.toBeNull();
+    expect(tools?.querySelector(".create-issue-button")).not.toBeNull();
+    expect(header?.querySelector(".source-filter")).toBeNull();
+    expect(filterBar?.querySelector(".status-tabs")).not.toBeNull();
+    expect(filterBar?.querySelector(".source-filter")).not.toBeNull();
+    expect(filterBar?.textContent).toContain("유형");
+
+    await act(async () => root.unmount());
+  });
+
   it("does not show a repository connection banner", () => {
     const disconnectedState = { needsLocalConnection: true };
     const markup = renderToStaticMarkup(

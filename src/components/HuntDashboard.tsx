@@ -578,38 +578,15 @@ export function HuntDashboard({
         <PageHeader
           action={
             <div className="queue-tools">
-              <Button
-                aria-keyshortcuts="Meta+N"
-                aria-label={t("dashboard.createIssue")}
-                className="create-issue-button"
-                onClick={() => setIsIssueDialogOpen(true)}
-                type="button"
-              >
-                <Plus size={14} />
-                {t("dashboard.createIssue")}
-              </Button>
               <label className="search-box">
-                <Search size={15} />
                 <Input
                   className="h-full border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder={t("dashboard.search")}
                   value={query}
                 />
+                <Search aria-hidden="true" size={15} />
               </label>
-              <div className="source-filter">
-                {(["all", "issue", "feedback", "error"] as const).map((value) => (
-                  <button
-                    key={value}
-                    className={source === value ? "active" : ""}
-                    onClick={() => setSource(value)}
-                  >
-                    {value === "all"
-                      ? t("dashboard.all")
-                      : t(`source.${value}` as MessageKey)}
-                  </button>
-                ))}
-              </div>
               <div
                 aria-label={t("dashboard.viewMode")}
                 className="view-switch"
@@ -638,6 +615,16 @@ export function HuntDashboard({
                   <span>{t("dashboard.list")}</span>
                 </button>
               </div>
+              <Button
+                aria-keyshortcuts="Meta+N"
+                aria-label={t("dashboard.createIssue")}
+                className="create-issue-button"
+                onClick={() => setIsIssueDialogOpen(true)}
+                type="button"
+              >
+                <Plus size={16} />
+                {t("issue.newIssue")}
+              </Button>
             </div>
           }
           className={`app-page-header queue-header${isSidebarOpen ? "" : " sidebar-closed"}`}
@@ -651,7 +638,7 @@ export function HuntDashboard({
                 tone="muted"
                 variant="caption"
               >
-                {t("dashboard.taskCount", { count: filtered.length })}
+                {t("dashboard.taskCount", { count: runs.length })}
               </Typography>
             </span>
           }
@@ -737,12 +724,32 @@ export function HuntDashboard({
             )}
           </div>
         ) : null}
-        {!companionMode && <div className="status-tabs">
-          <button className={status === "all" ? "active" : ""} onClick={() => setStatus("all")}>{t("dashboard.all")} <span>{runs.length}</span></button>
-          <button className={status === "active" ? "active" : ""} onClick={() => setStatus("active")}>{t("dashboard.active")} <span>{activeCount}</span></button>
-          <button className={status === "attention" ? "active" : ""} onClick={() => setStatus("attention")}>{t("dashboard.attention")} <span>{attentionCount}</span></button>
-          <button className={status === "completed" ? "active" : ""} onClick={() => setStatus("completed")}>{t("dashboard.completed")} <span>{completedCount}</span></button>
-        </div>}
+        {!companionMode && (
+          <div className="queue-filter-bar">
+            <div className="status-tabs">
+              <button className={status === "all" ? "active" : ""} onClick={() => setStatus("all")}>{t("dashboard.all")} <span>{runs.length}</span></button>
+              <button className={status === "active" ? "active" : ""} onClick={() => setStatus("active")}>{t("dashboard.active")} <span>{activeCount}</span></button>
+              <button className={status === "attention" ? "active" : ""} onClick={() => setStatus("attention")}>{t("dashboard.attention")} <span>{attentionCount}</span></button>
+              <button className={status === "completed" ? "active" : ""} onClick={() => setStatus("completed")}>{t("dashboard.completed")} <span>{completedCount}</span></button>
+            </div>
+            <div className="source-filter-group">
+              <span>{t("dashboard.type")}</span>
+              <div className="source-filter">
+                {(["all", "issue", "feedback", "error"] as const).map((value) => (
+                  <button
+                    key={value}
+                    className={source === value ? "active" : ""}
+                    onClick={() => setSource(value)}
+                  >
+                    {value === "all"
+                      ? t("dashboard.all")
+                      : t(`source.${value}` as MessageKey)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
         {view === "list" && !companionMode ? (
           <IssueList
             availableProviders={availableProviders}
