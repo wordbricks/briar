@@ -4,6 +4,7 @@ import {
   CircleAlert,
   LoaderCircle,
   Pencil,
+  Play,
   Plus,
   Settings,
   X,
@@ -12,6 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import {
   EmptyState,
+  ErrorBanner,
   MainContent,
   PageHeader,
 } from "@/components/layout";
@@ -33,6 +35,12 @@ import {
   defaultProjectAgentCalendarColor,
   projectAgentSkill,
 } from "../lib/project-agent";
+import {
+  executeProjectAgentTask,
+  type ProjectAgentTaskSessionSettlement,
+  type ProjectAgentTaskSessionStart,
+} from "../lib/project-agent-execution";
+import { runProjectAgent } from "../lib/project-llm";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import type {
   CreateProjectAgentInput,
@@ -45,11 +53,7 @@ import type {
 import { AgentProviderIcon } from "./AgentIcons";
 import { NativeSelect } from "./NativeSelect";
 import { ProjectAgentAvatar } from "./ProjectAgentAvatar";
-import {
-  ProjectAgentDetail,
-  type ProjectAgentTaskSessionSettlement,
-  type ProjectAgentTaskSessionStart,
-} from "./ProjectAgentDetail";
+import { ProjectAgentDetail } from "./ProjectAgentDetail";
 import { ProjectAgentSettings } from "./ProjectAgentSettings";
 
 const providerLabels: Record<AgentProvider, string> = {
@@ -62,6 +66,7 @@ export function ProjectAgents({
   dashboard,
   error: appError,
   isSidebarOpen,
+  onIssueOpen,
   onRequestedSessionOpen,
   onSettleTaskSession,
   onStopSession,
@@ -75,6 +80,7 @@ export function ProjectAgents({
   dashboard: DashboardPayload | null;
   error: string | null;
   isSidebarOpen: boolean;
+  onIssueOpen: (runId: string) => void;
   onRequestedSessionOpen?: () => void;
   onSettleTaskSession: (
     sessionId: string,
@@ -108,6 +114,10 @@ export function ProjectAgents({
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [settingsAgent, setSettingsAgent] = useState<ProjectAgent | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<ProjectAgent | null>(null);
+  const [executingAgentIds, setExecutingAgentIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [executionError, setExecutionError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const runningAgentIds = useMemo(
     () =>
@@ -151,6 +161,7 @@ export function ProjectAgents({
   useEffect(() => {
     setSelectedAgent(null);
     setSettingsAgent(null);
+    setExecutionError(null);
   }, [project.id]);
 
   useEffect(() => {
@@ -259,6 +270,43 @@ export function ProjectAgents({
     setIsDialogOpen(false);
   };
 
+  const runResponsibility = async (agent: ProjectAgent) => {
+    if (
+      !dashboard ||
+      runningAgentIds.has(agent.id) ||
+      executingAgentIds.has(agent.id)
+    ) {
+      return;
+    }
+    setExecutionError(null);
+    setExecutingAgentIds((current) => new Set(current).add(agent.id));
+    try {
+      await executeProjectAgentTask(
+        {
+          runAgent: runProjectAgent,
+          startSession: (session) => onStartTaskSession(agent, session),
+          settleSession: onSettleTaskSession,
+          startAutoHunt: (runs, options) => onStart(agent, runs, options),
+        },
+        {
+          agent,
+          dashboard,
+          message: agent.responsibility,
+        },
+      );
+    } catch (caught) {
+      setExecutionError(
+        caught instanceof Error ? caught.message : String(caught),
+      );
+    } finally {
+      setExecutingAgentIds((current) => {
+        const next = new Set(current);
+        next.delete(agent.id);
+        return next;
+      });
+    }
+  };
+
   if (settingsAgent) {
     return (
       <ProjectAgentSettings
@@ -281,6 +329,7 @@ export function ProjectAgents({
         error={appError}
         isSidebarOpen={isSidebarOpen}
         onBack={() => setSelectedAgent(null)}
+        onIssueOpen={onIssueOpen}
         onRequestedSessionOpen={onRequestedSessionOpen}
         onSettleTaskSession={onSettleTaskSession}
         onStopSession={onStopSession}
@@ -313,6 +362,11 @@ export function ProjectAgents({
         titleId="project-agents-title"
       />
       <div className="project-agents-scroll">
+        {appError || executionError ? (
+          <ErrorBanner className="m-4">
+            {executionError ?? appError}
+          </ErrorBanner>
+        ) : null}
         <section
           aria-labelledby="project-agents-title"
           className="project-agents-content"
@@ -365,7 +419,9 @@ export function ProjectAgents({
                 className="project-agent-grid"
               >
                 {agents.map((agent) => {
-                  const isRunning = runningAgentIds.has(agent.id);
+                  const isRunning =
+                    runningAgentIds.has(agent.id) ||
+                    executingAgentIds.has(agent.id);
                   return (
                     <article className="project-agent-card" key={agent.id}>
                       <button
@@ -424,6 +480,30 @@ export function ProjectAgents({
                             }).format(new Date(agent.createdAt)),
                           })}
                         </time>
+                        <button
+                          aria-label={t("agents.runAgent", {
+                            name: agent.name,
+                          })}
+                          className="project-agent-run-button"
+                          disabled={isRunning || !dashboard}
+                          onClick={() => void runResponsibility(agent)}
+                          title={t("agents.runAgent", { name: agent.name })}
+                          type="button"
+                        >
+                          {isRunning ? (
+                            <LoaderCircle
+                              aria-hidden="true"
+                              className="spin"
+                              size={14}
+                            />
+                          ) : (
+                            <Play
+                              aria-hidden="true"
+                              fill="currentColor"
+                              size={14}
+                            />
+                          )}
+                        </button>
                         <button
                           aria-label={t("agents.settingsAgent", {
                             name: agent.name,

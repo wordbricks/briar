@@ -739,6 +739,11 @@ export function App() {
             dashboard={briar.dashboard}
             error={briar.error}
             isSidebarOpen={isSidebarOpen}
+            onIssueOpen={(runId) => {
+              setRequestedSessionId(null);
+              setRequestedRunId(runId);
+              navigateToPage("issues");
+            }}
             onRequestedSessionOpen={() => setRequestedSessionId(null)}
             onSettleTaskSession={(sessionId, settlement) =>
               autoHunt.settleTaskSession(sessionId, settlement)}

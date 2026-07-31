@@ -4,11 +4,20 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
+import { runProjectAgent } from "../lib/project-llm";
 import type { DashboardPayload } from "../types";
 import {
   CreateProjectAgentDialog,
   ProjectAgents,
 } from "./ProjectAgents";
+
+vi.mock("../lib/project-llm", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../lib/project-llm")>();
+  return {
+    ...actual,
+    runProjectAgent: vi.fn(),
+  };
+});
 
 const mounted: Array<{ container: HTMLDivElement; root: ReturnType<typeof createRoot> }> = [];
 
@@ -52,6 +61,7 @@ const projectAgentsProps = {
   dashboard,
   error: null,
   isSidebarOpen: true,
+  onIssueOpen: () => undefined,
   onSettleTaskSession: () => undefined,
   onStopSession: async () => true,
   onStart: () => "session-new",
@@ -131,6 +141,81 @@ describe("ProjectAgents", () => {
         'button[aria-label="Sentry 오류 탐지 에이전트 세부 정보 열기"]',
       )?.textContent,
     ).toContain("준비됨");
+  });
+
+  it("runs an agent's saved responsibility immediately from the play button", async () => {
+    let finishRun:
+      | ((value: Awaited<ReturnType<typeof runProjectAgent>>) => void)
+      | undefined;
+    vi.mocked(runProjectAgent).mockReturnValue(
+      new Promise((resolve) => {
+        finishRun = resolve;
+      }),
+    );
+    const onStartTaskSession = vi.fn();
+    const onSettleTaskSession = vi.fn();
+    const onStart = vi.fn(() => "dispatch-session");
+    const container = await mount(
+      <ProjectAgents
+        {...projectAgentsProps}
+        onSettleTaskSession={onSettleTaskSession}
+        onStart={onStart}
+        onStartTaskSession={onStartTaskSession}
+      />,
+    );
+    await act(async () => Promise.resolve());
+
+    const runButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="자동 사냥 에이전트 책임 실행"]',
+    );
+    expect(runButton).not.toBeNull();
+
+    await act(async () => {
+      runButton?.click();
+      await Promise.resolve();
+    });
+
+    const [startedAgent, startedSession] =
+      onStartTaskSession.mock.calls[0] ?? [];
+    expect(startedAgent.id).toBe("demo-agent-auto-hunt");
+    expect(startedSession).toMatchObject({
+      sessionId: expect.any(String),
+      request: "모든 대기중인 이슈에 대해서 자동사냥을 수행하는것",
+      startedAt: expect.any(String),
+    });
+    expect(runProjectAgent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agent: expect.objectContaining({ id: "demo-agent-auto-hunt" }),
+        message: "모든 대기중인 이슈에 대해서 자동사냥을 수행하는것",
+        sessionId: startedSession.sessionId,
+      }),
+    );
+    expect(runButton?.disabled).toBe(true);
+
+    await act(async () => {
+      finishRun?.({
+        conversationId: "agent-conversation",
+        action: "respond",
+        message: "책임 수행 완료",
+        maxIssues: null,
+        workspaceRoot: "/repo",
+        structuredResult: null,
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(onStart).not.toHaveBeenCalled();
+    expect(onSettleTaskSession).toHaveBeenCalledWith(
+      startedSession.sessionId,
+      {
+        status: "completed",
+        conversationId: "agent-conversation",
+        workspaceRoot: "/repo",
+        summary: "책임 수행 완료",
+        error: null,
+      },
+    );
   });
 
   it("submits provider, default model, and a concrete responsibility", async () => {
@@ -287,6 +372,7 @@ describe("ProjectAgents", () => {
   });
 
   it("shows the selected agent sessions and opens task input in a dialog", async () => {
+    const onIssueOpen = vi.fn();
     const sessions: AutoHuntSession[] = [
       {
         id: "legacy-auto-session",
@@ -338,7 +424,11 @@ describe("ProjectAgents", () => {
       },
     ];
     const container = await mount(
-      <ProjectAgents {...projectAgentsProps} sessions={sessions} />,
+      <ProjectAgents
+        {...projectAgentsProps}
+        onIssueOpen={onIssueOpen}
+        sessions={sessions}
+      />,
     );
     await act(async () => Promise.resolve());
 
@@ -365,6 +455,15 @@ describe("ProjectAgents", () => {
     expect(container.querySelector('[role="dialog"]')).toBeNull();
     expect(container.textContent).not.toContain("수행 로그");
     expect(container.textContent).toContain("세션 타임라인");
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(
+          'button[aria-label="자동 사냥 이슈 상세"]',
+        )
+        ?.click();
+    });
+    expect(onIssueOpen).toHaveBeenCalledWith("run-auto");
 
     await act(async () => {
       container

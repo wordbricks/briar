@@ -22,11 +22,12 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import { useI18n } from "../i18n";
-import { executeProjectAgentTurn } from "../lib/project-agent-execution";
 import {
-  projectAgentRunSnapshots,
-  runProjectAgent,
-} from "../lib/project-llm";
+  executeProjectAgentTask,
+  type ProjectAgentTaskSessionSettlement,
+  type ProjectAgentTaskSessionStart,
+} from "../lib/project-agent-execution";
+import { runProjectAgent } from "../lib/project-llm";
 import type {
   DashboardPayload,
   HuntRun,
@@ -35,19 +36,10 @@ import type {
 import { ProjectAgentSessionDetail } from "./ProjectAgentSessionDetail";
 import { ProjectAgentSessions } from "./ProjectAgentSessions";
 
-export type ProjectAgentTaskSessionStart = {
-  sessionId: string;
-  request: string;
-  startedAt: string;
-};
-
-export type ProjectAgentTaskSessionSettlement = {
-  status: "completed" | "failed";
-  conversationId: string | null;
-  workspaceRoot: string | null;
-  summary: string | null;
-  error: string | null;
-};
+export type {
+  ProjectAgentTaskSessionSettlement,
+  ProjectAgentTaskSessionStart,
+} from "../lib/project-agent-execution";
 
 export function ProjectAgentDetail({
   agent,
@@ -55,6 +47,7 @@ export function ProjectAgentDetail({
   error: appError,
   isSidebarOpen,
   onBack,
+  onIssueOpen,
   onRequestedSessionOpen,
   onSettleTaskSession,
   onStopSession,
@@ -68,6 +61,7 @@ export function ProjectAgentDetail({
   error: string | null;
   isSidebarOpen: boolean;
   onBack: () => void;
+  onIssueOpen: (runId: string) => void;
   onRequestedSessionOpen?: () => void;
   onSettleTaskSession: (
     sessionId: string,
@@ -156,64 +150,26 @@ export function ProjectAgentDetail({
     const message = request.trim();
     if (!message || isRunning || !dashboard) return;
     setError(null);
-    const startedAt = new Date().toISOString();
-    const sessionId = crypto.randomUUID();
-    let sessionStarted = false;
     setIsRunning(true);
     try {
-      onStartTaskSession({
-        sessionId,
-        request: message,
-        startedAt,
-      });
-      sessionStarted = true;
+      const sessionId = crypto.randomUUID();
       setSelectedSessionId(sessionId);
-      const { response } = await executeProjectAgentTurn(
+      await executeProjectAgentTask(
         {
           runAgent: runProjectAgent,
-          dispatchAutoHunt: (decision) =>
-            onStartAutoHunt(dashboard.runs, {
-              coordinatorConversationId: decision.conversationId,
-              parentSessionId: sessionId,
-              maxIssues: decision.maxIssues ?? undefined,
-              ...(decision.targetRunIds?.length
-                ? {
-                    targetRunIds: decision.targetRunIds,
-                    retryReason: decision.retryReason,
-                  }
-                : {}),
-            }),
+          startSession: onStartTaskSession,
+          settleSession: onSettleTaskSession,
+          startAutoHunt: onStartAutoHunt,
         },
         {
-          projectId: dashboard.project.id,
           agent,
+          dashboard,
           message,
-          conversationId: null,
           sessionId,
-          runs: projectAgentRunSnapshots(dashboard.runs),
         },
       );
-      onSettleTaskSession(sessionId, {
-        status: "completed",
-        conversationId: response.conversationId,
-        workspaceRoot: response.workspaceRoot,
-        summary: response.message,
-        error: null,
-      });
     } catch (caught) {
-      const messageText =
-        caught instanceof Error ? caught.message : String(caught);
-      if (sessionStarted) {
-        onSettleTaskSession(sessionId, {
-          status: "failed",
-          conversationId: null,
-          workspaceRoot: null,
-          summary: null,
-          error: messageText,
-        });
-      } else {
-        setError(messageText);
-      }
+      setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
       setIsRunning(false);
     }
@@ -224,6 +180,7 @@ export function ProjectAgentDetail({
       <ProjectAgentSessionDetail
         isSidebarOpen={isSidebarOpen}
         onBack={() => setSelectedSessionId(null)}
+        onIssueOpen={onIssueOpen}
         onStop={() => onStopSession(selectedSession.id)}
         session={selectedSession}
       />

@@ -15,6 +15,16 @@ function firstRule(selector: string) {
 }
 
 describe("issue conversation layout", () => {
+  it("pins the thread layer to the viewport", () => {
+    const layerRule = firstRule(".issue-thread-layer");
+    const drawerRule = firstRule(".issue-thread-drawer");
+
+    expect(layerRule).toContain("position:fixed");
+    expect(layerRule).toContain("inset:0");
+    expect(drawerRule).toContain("margin-left:auto");
+    expect(drawerRule).toContain("50vw");
+  });
+
   it("keeps hover actions out of the message flow", () => {
     const messageRule = firstRule(".issue-message");
     const actionsRule = firstRule(".issue-message-actions");

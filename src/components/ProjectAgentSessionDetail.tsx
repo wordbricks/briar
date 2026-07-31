@@ -1,6 +1,7 @@
 import {
   ArrowLeft,
   Bot,
+  ChevronRight,
   CircleAlert,
   Clock3,
   LoaderCircle,
@@ -26,11 +27,13 @@ import {
 export function ProjectAgentSessionDetail({
   isSidebarOpen,
   onBack,
+  onIssueOpen,
   onStop,
   session,
 }: {
   isSidebarOpen: boolean;
   onBack: () => void;
+  onIssueOpen: (runId: string) => void;
   onStop: () => Promise<boolean>;
   session: AutoHuntSession;
 }) {
@@ -156,16 +159,25 @@ export function ProjectAgentSessionDetail({
                 <h3>{t("autoHunt.targets")}</h3>
                 <div className="auto-hunt-target-list">
                   {session.issues.map((issue) => (
-                    <article className="auto-hunt-target" key={issue.runId}>
+                    <button
+                      aria-label={t("run.details", { title: issue.title })}
+                      className="auto-hunt-target"
+                      key={issue.runId}
+                      onClick={() => onIssueOpen(issue.runId)}
+                      type="button"
+                    >
                       <span>AH-{issue.runNumber}</span>
                       <div>
                         <strong>{issue.title}</strong>
                         {issue.summary ? <small>{issue.summary}</small> : null}
                       </div>
-                      <span className={`auto-hunt-outcome ${issue.outcome}`}>
-                        {outcomeLabel(t, issue.outcome)}
+                      <span className="auto-hunt-target-trailing">
+                        <span className={`auto-hunt-outcome ${issue.outcome}`}>
+                          {outcomeLabel(t, issue.outcome)}
+                        </span>
+                        <ChevronRight aria-hidden="true" size={15} />
                       </span>
-                    </article>
+                    </button>
                   ))}
                 </div>
               </section>
