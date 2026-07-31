@@ -3,13 +3,10 @@ import {
   Archive,
   Bell,
   Bot,
-  Cable,
   ChevronDown,
-  Cloud,
   Download,
   Github,
   GitBranch,
-  Gitlab,
   Keyboard,
   Link2,
   LoaderCircle,
@@ -911,15 +908,6 @@ export function AppSettings({
                     </span>
                   </div>
                 ) : null}
-                <ProviderRow
-                  available={false}
-                  badge={t("appSettings.comingSoon")}
-                  description={t("appSettings.jujutsuDescription")}
-                  enabled={false}
-                  icon={<ProviderIcon tone="jujutsu">jj</ProviderIcon>}
-                  name="Jujutsu"
-                  title="Jujutsu"
-                />
               </SettingsCard>
 
               <SettingsGroupHeading
@@ -958,43 +946,6 @@ export function AppSettings({
                       ) : null}
                     </>
                   }
-                />
-                <ProviderRow
-                  available={false}
-                  description={t("appSettings.gitlabUnavailable")}
-                  enabled={false}
-                  icon={
-                    <ProviderIcon tone="gitlab">
-                      <Gitlab size={20} strokeWidth={1.8} />
-                    </ProviderIcon>
-                  }
-                  name="GitLab"
-                  title="GitLab"
-                />
-                <ProviderRow
-                  available={false}
-                  description={t("appSettings.azureUnavailable")}
-                  enabled={false}
-                  icon={
-                    <ProviderIcon tone="azure">
-                      <Cloud size={20} strokeWidth={1.8} />
-                    </ProviderIcon>
-                  }
-                  name="Azure DevOps"
-                  title="Azure DevOps"
-                />
-                <ProviderRow
-                  available={false}
-                  badge={t("appSettings.notAuthenticated")}
-                  description={t("appSettings.bitbucketUnavailable")}
-                  enabled={false}
-                  icon={
-                    <ProviderIcon tone="bitbucket">
-                      <Cable size={19} strokeWidth={1.9} />
-                    </ProviderIcon>
-                  }
-                  name="Bitbucket"
-                  title="Bitbucket"
                 />
               </SettingsCard>
 

@@ -86,11 +86,7 @@ export function ProviderIcon({
   tone?:
     | "neutral"
     | "git"
-    | "jujutsu"
     | "github"
-    | "gitlab"
-    | "azure"
-    | "bitbucket"
     | "codex"
     | "claude"
     | "grok";
@@ -101,12 +97,7 @@ export function ProviderIcon({
         "grid size-[30px] place-items-center rounded-md [&_img]:block [&_svg]:block",
         tone === "neutral" && "bg-secondary text-foreground",
         tone === "git" && "-rotate-1 bg-[#e65d42] text-white [&_svg]:rotate-1",
-        tone === "jujutsu" &&
-          "bg-gradient-to-br from-[#e5f4ff] to-[#c8dfed] font-mono text-xs font-extrabold text-[#557b93]",
         tone === "github" && "bg-secondary text-foreground",
-        tone === "gitlab" && "bg-[#fff1e9] text-[#e45b32]",
-        tone === "azure" && "bg-[#ecf6fd] text-[#2789ce]",
-        tone === "bitbucket" && "bg-[#edf5ff] text-[#2477df]",
         tone === "codex" && "bg-secondary text-foreground",
         tone === "claude" && "bg-[#fff1e9] text-[#d66f45]",
         tone === "grok" && "bg-[#ececf1] text-[#111114]",
