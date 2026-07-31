@@ -3,6 +3,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { useI18n } from "../i18n";
 import type { AgentProvider } from "../lib/project-llm";
 import type { ExecutionWorker } from "../types";
+import { WorkerIcon } from "./WorkerIcon";
 import { WorkerProviderIcons } from "./WorkerProviderIcons";
 
 export function workerProviders(worker: ExecutionWorker): AgentProvider[] {
@@ -125,6 +126,7 @@ export function WorkerStatusBar({
                     className={`worker-status-dot ${worker.readiness}`}
                     role="img"
                   />
+                  <WorkerIcon icon={worker.icon} size={28} />
                   <span className="worker-status-copy">
                     <strong>{worker.label}</strong>
                     <span className="worker-status-meta">

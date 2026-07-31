@@ -66,8 +66,12 @@ import {
 } from "./lib/issue-links";
 import { isRepositoryConnectedForImport } from "./lib/linear-import";
 import { settingsAccountSelection } from "./lib/settings-account-selection";
-import { dispatchHuntRun, loadProjectAgents } from "./lib/api";
-import { retryProjectAutoHuntRun } from "./lib/auto-hunt-agent";
+import {
+  dispatchHuntRun,
+  loadProjectAgents,
+  retryHuntRun,
+} from "./lib/api";
+import { dispatchAutoHuntToWorkers } from "./lib/auto-hunt-worker-dispatch";
 import { demoProjectAgents } from "./lib/demo-project-agents";
 import type { AgentProvider } from "./lib/project-llm";
 import { useI18n } from "./i18n";
@@ -750,50 +754,37 @@ export function App() {
             onStopSession={(sessionId) => autoHunt.stopSession(sessionId)}
             onStart={async (agent, runs, options) => {
               rememberIssueAgent(agent);
-              const targetRunIds = options?.targetRunIds ?? [];
-              let dispatchRuns = runs;
-              if (targetRunIds.length > 0) {
-                const targets = new Set(targetRunIds);
-                const selected = runs.filter((run) => targets.has(run.id));
-                if (selected.length !== targets.size) {
-                  throw new Error(
-                    "재시도할 Auto Hunt 이슈를 현재 프로젝트에서 찾지 못했습니다.",
-                  );
-                }
-                for (const run of selected) {
-                  await retryProjectAutoHuntRun(
-                    activeProject.id,
-                    run.id,
-                    options?.retryReason ??
-                      "저장된 Agent가 블로킹 해소를 확인하여 재시도를 요청했습니다.",
-                  );
-                }
-                dispatchRuns = selected.map((run) => ({
-                  ...run,
-                  status: "queued" as const,
-                  currentAttempt: run.currentAttempt + 1,
-                  currentRevision: 1,
-                  workflowStage: null,
-                  claimedBy: null,
-                  claimedAt: null,
-                  leaseExpiresAt: null,
-                }));
+              const token = briar.token;
+              if (!token) {
+                throw new Error("로그인이 필요합니다.");
               }
-              return autoHunt.startSession(
-                activeProject.id,
-                dispatchRuns,
-                () => void briar.refresh(),
+              const result = await dispatchAutoHuntToWorkers(
+                {
+                  dispatch: (run, input) =>
+                    dispatchHuntRun(
+                      token,
+                      activeProject.id,
+                      run.id,
+                      input,
+                    ),
+                  retry: (run, reason) =>
+                    retryHuntRun(
+                      token,
+                      activeProject.id,
+                      run.id,
+                      reason,
+                    ),
+                },
                 {
                   agent,
-                  coordinatorConversationId:
-                    options?.coordinatorConversationId,
-                  parentSessionId: options?.parentSessionId,
-                  maxIssues:
-                    targetRunIds.length > 0
-                      ? targetRunIds.length
-                      : options?.maxIssues,
+                  runs,
+                  maxIssues: options?.maxIssues,
+                  targetRunIds: options?.targetRunIds,
+                  retryReason: options?.retryReason,
                 },
               );
+              await briar.refresh();
+              return result.dispatchId;
             }}
             onStartTaskSession={(agent, session) => {
               rememberIssueAgent(agent);

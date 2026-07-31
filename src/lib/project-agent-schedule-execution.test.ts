@@ -87,16 +87,7 @@ const dependencies = (): ProjectAgentScheduleExecutionDependencies => ({
       dueAt: null,
     } as const,
   })),
-  startAutoHunt: vi.fn(async () => ({
-    dispatchGroupId: "dispatch-1",
-    conversationId: "coordinator-conversation",
-    workspaceRoot: "/worktree",
-    workers: [],
-    result: {
-      summary: "Auto Hunt complete.",
-      issues: [],
-    },
-  })),
+  dispatchRun: vi.fn(async () => ({ outcome: "dispatched" })),
 });
 
 describe("scheduled project agent execution", () => {
@@ -125,7 +116,7 @@ describe("scheduled project agent execution", () => {
       runs: [],
     });
     expect(current.loadDashboard).toHaveBeenCalledOnce();
-    expect(current.startAutoHunt).not.toHaveBeenCalled();
+    expect(current.dispatchRun).not.toHaveBeenCalled();
   });
 
   it("records a scheduled Agent session from start through completion", async () => {
@@ -184,17 +175,21 @@ describe("scheduled project agent execution", () => {
         scheduledRun("Any saved Agent"),
       ),
     ).resolves.toMatchObject({
-      conversationId: "coordinator-conversation",
-      message: "Auto Hunt complete.",
-      workspaceRoot: "/worktree",
+      conversationId: "agent-conversation",
+      message: "1개 이슈를 등록 Worker에 배정했습니다.",
+      workspaceRoot: "/repo",
     });
 
-    expect(current.startAutoHunt).toHaveBeenCalledWith(
+    expect(current.dispatchRun).toHaveBeenCalledWith(
+      "token",
       scheduledRun().projectId,
-      dashboard.runs,
-      expect.any(String),
-      scheduledRun("Any saved Agent").agent,
-      { coordinatorConversationId: "agent-conversation" },
+      dashboard.runs[0],
+      {
+        agentId: scheduledRun().agent.id,
+        provider: scheduledRun().agent.provider,
+        workerId: null,
+        reassign: false,
+      },
     );
   });
 
@@ -204,16 +199,11 @@ describe("scheduled project agent execution", () => {
       status: "blocked" as const,
       detail: "GitHub authentication is missing.",
     };
-    const queuedRun = {
-      ...blockedRun,
-      status: "queued" as const,
-      currentAttempt: 2,
-      detail: "GitHub authentication was restored.",
-    };
     const current = dependencies();
-    vi.mocked(current.loadDashboard)
-      .mockResolvedValueOnce({ ...dashboard, runs: [blockedRun] })
-      .mockResolvedValueOnce({ ...dashboard, runs: [queuedRun] });
+    vi.mocked(current.loadDashboard).mockResolvedValueOnce({
+      ...dashboard,
+      runs: [blockedRun],
+    });
     vi.mocked(current.runAgent).mockResolvedValue({
       conversationId: "agent-conversation",
       action: "dispatch_auto_hunt",
@@ -233,12 +223,16 @@ describe("scheduled project agent execution", () => {
       blockedRun.id,
       "GitHub authentication was restored.",
     );
-    expect(current.startAutoHunt).toHaveBeenCalledWith(
+    expect(current.dispatchRun).toHaveBeenCalledWith(
+      "token",
       scheduledRun().projectId,
-      [queuedRun],
-      expect.any(String),
-      scheduledRun().agent,
-      { coordinatorConversationId: "agent-conversation" },
+      blockedRun,
+      {
+        agentId: scheduledRun().agent.id,
+        provider: scheduledRun().agent.provider,
+        workerId: null,
+        reassign: false,
+      },
     );
   });
 
@@ -254,7 +248,7 @@ describe("scheduled project agent execution", () => {
     ).resolves.toMatchObject({ message: "Responsibility complete." });
 
     expect(current.loadDashboard).toHaveBeenCalledOnce();
-    expect(current.startAutoHunt).not.toHaveBeenCalled();
+    expect(current.dispatchRun).not.toHaveBeenCalled();
   });
 
   it("fails the schedule when the Agent requests dispatch with no queued work", async () => {
@@ -276,6 +270,6 @@ describe("scheduled project agent execution", () => {
       executeScheduledProjectAgent(current, "token", scheduledRun()),
     ).rejects.toThrow("대기 상태인 이슈가 없습니다.");
 
-    expect(current.startAutoHunt).not.toHaveBeenCalled();
+    expect(current.dispatchRun).not.toHaveBeenCalled();
   });
 });

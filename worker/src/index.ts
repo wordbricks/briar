@@ -38,6 +38,12 @@ import {
   maxIssueMultipartBytes,
   validateIssueAttachments,
 } from "../../src/lib/issue-attachments";
+import {
+  isWorkerEmoji,
+  isWorkerLogoDataUrl,
+  maxWorkerEmojiLength,
+  maxWorkerLogoDataUrlLength,
+} from "../../src/lib/worker-icon-validation";
 import { createAuth, type BriarAuth } from "./auth";
 import {
   addOrganizationMember,
@@ -179,6 +185,7 @@ import {
   workerStateAt,
   unbindExecutionWorker,
   updateExecutionWorkerConcurrency,
+  updateExecutionWorkerIcon,
   updateExecutionWorkerLabel,
   updateProjectExecutionWorkerPolicy,
 } from "./workers";
@@ -860,6 +867,42 @@ const workerConcurrencySchema = z
   })
   .strict();
 
+const workerIconSchema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("emoji"),
+      value: z
+        .string()
+        .trim()
+        .min(1)
+        .max(maxWorkerEmojiLength)
+        .refine(isWorkerEmoji, "Worker emoji must be one emoji"),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("image"),
+      value: z
+        .string()
+        .max(maxWorkerLogoDataUrlLength)
+        .refine(isWorkerLogoDataUrl, "Worker image must be a supported data URL"),
+    })
+    .strict(),
+]);
+
+export const workerSettingsSchema = z
+  .object({
+    maxConcurrentSessions: workerConcurrencySchema.shape.maxConcurrentSessions
+      .optional(),
+    icon: workerIconSchema.nullable().optional(),
+  })
+  .strict()
+  .refine(
+    (input) =>
+      input.maxConcurrentSessions !== undefined || input.icon !== undefined,
+    "At least one Worker setting is required",
+  );
+
 const executionWorkerPolicySchema = z
   .object({
     selectionMode: z.enum(["any", "allowlist"]),
@@ -1262,6 +1305,8 @@ const workerJson = (
     capabilities_json?: string;
     max_concurrent_sessions?: number;
     active_sessions?: number;
+    icon_type?: "emoji" | "image" | null;
+    icon_value?: string | null;
     last_heartbeat_at: string;
     created_at: string;
   },
@@ -1280,6 +1325,10 @@ const workerJson = (
   ...(worker.device_id ? { deviceId: worker.device_id } : {}),
   ...(worker.owner_user_id ? { ownerUserId: worker.owner_user_id } : {}),
   label: worker.label,
+  icon:
+    worker.icon_type && worker.icon_value
+      ? { type: worker.icon_type, value: worker.icon_value }
+      : null,
   agentProvider: worker.agent_provider,
   providers: executionWorkerProviders({
     agent_provider: worker.agent_provider,
@@ -2382,17 +2431,33 @@ async function route(
         "Worker owner or organization admin access required",
       );
     }
-    const input = workerConcurrencySchema.parse(await readJson(request));
-    const updated = await updateExecutionWorkerConcurrency(
-      db,
-      device.id,
-      input.maxConcurrentSessions,
-      new Date().toISOString(),
-    );
+    const input = workerSettingsSchema.parse(await readJson(request));
+    const observedAt = new Date().toISOString();
+    let updated =
+      input.maxConcurrentSessions === undefined
+        ? null
+        : await updateExecutionWorkerConcurrency(
+            db,
+            device.id,
+            input.maxConcurrentSessions,
+            observedAt,
+          );
+    if (input.icon !== undefined) {
+      updated = await updateExecutionWorkerIcon(
+        db,
+        device.id,
+        input.icon,
+        observedAt,
+      );
+    }
     if (!updated) throw new HttpError(409, "Worker is disabled");
     return json({
       deviceId: updated.id,
       maxConcurrentSessions: updated.max_concurrent_sessions,
+      icon:
+        updated.icon_type && updated.icon_value
+          ? { type: updated.icon_type, value: updated.icon_value }
+          : null,
     });
   }
   if (organizationWorkerMatch && request.method === "DELETE") {

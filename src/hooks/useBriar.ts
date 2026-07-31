@@ -12,6 +12,7 @@ import {
   createProject,
   deleteIssue as deleteRemoteIssue,
   deleteProject as deleteRemoteProject,
+  dispatchHuntRun,
   importLinearIssues,
   isApiConfigured,
   loadDashboard,
@@ -94,10 +95,6 @@ import { isMobileCompanion } from "../lib/platform";
 import { chatWithProjectLlm, runProjectAgent } from "../lib/project-llm";
 import { executeScheduledProjectAgent } from "../lib/project-agent-schedule-execution";
 import { startProjectAgentSchedulePolling } from "../lib/project-agent-schedule-runner";
-import {
-  retryProjectAutoHuntRun,
-  startProjectAutoHunt,
-} from "../lib/auto-hunt-agent";
 import {
   agentReplyParentMessageId,
   issueConversationSnapshot,
@@ -506,28 +503,21 @@ export function useBriar(options: UseBriarOptions = {}) {
           executeScheduledProjectAgent(
             {
               loadDashboard,
-              retryRun: (_token, projectId, runId, reason) =>
-                retryProjectAutoHuntRun(
-                  projectId,
-                  runId,
-                  reason ??
-                    "저장된 Agent가 블로킹 해소를 확인하여 재시도를 요청했습니다.",
-                ),
-              runAgent: runProjectAgent,
-              startAutoHunt: (
+              dispatchRun: (
+                currentToken,
                 projectId,
-                issues,
-                sessionId,
-                agent,
-                options,
+                candidate,
+                input,
               ) =>
-                startProjectAutoHunt(
+                dispatchHuntRun(
+                  currentToken,
                   projectId,
-                  issues,
-                  sessionId,
-                  agent,
-                  options,
+                  candidate.id,
+                  input,
                 ),
+              retryRun: (currentToken, projectId, runId, reason) =>
+                retryHuntRun(currentToken, projectId, runId, reason),
+              runAgent: runProjectAgent,
               startSession: startScheduledAgentSession,
               settleSession: settleScheduledAgentSession,
             },

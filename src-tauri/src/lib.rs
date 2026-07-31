@@ -2496,11 +2496,7 @@ fn project_llm_settings_from(
 }
 
 fn app_provider_settings_from(config_path: &Path) -> Result<AppProviderSettings, String> {
-    let contents = fs::read_to_string(config_path)
-        .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
-    let config = serde_json::from_str::<CliConfig>(&contents)
-        .map_err(|error| format!("Briar 로컬 설정이 손상되었습니다: {error}"))?;
-    Ok(config.agent_providers)
+    Ok(read_cli_config(config_path)?.agent_providers)
 }
 
 fn app_runtime_settings_from(config_path: &Path) -> Result<StoredAppRuntimeSettings, String> {
@@ -2524,10 +2520,7 @@ fn update_app_provider_settings_at(
     if !settings.any_enabled() {
         return Err("하나 이상의 에이전트 프로바이더를 활성화해야 합니다.".to_string());
     }
-    let contents = fs::read_to_string(config_path)
-        .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
-    let mut config = serde_json::from_str::<CliConfig>(&contents)
-        .map_err(|error| format!("Briar 로컬 설정이 손상되었습니다: {error}"))?;
+    let mut config = read_cli_config(config_path)?;
     config.agent_providers = settings;
     write_cli_config(config_path, &config)?;
     Ok(settings)
@@ -6467,6 +6460,39 @@ branch refs/heads/briar/second-11111111
         assert_eq!(saved["projects"][0]["llm"]["approvalPolicy"], "on-request");
 
         fs::remove_dir_all(directory).expect("test config directory should be removed");
+    }
+
+    #[test]
+    fn initializes_provider_settings_when_local_config_is_missing() {
+        let config_path = test_config_path("missing-provider-settings");
+
+        let defaults = app_provider_settings_from(&config_path)
+            .expect("missing provider settings should use defaults");
+        assert!(defaults.codex);
+        assert!(defaults.claude);
+        assert!(defaults.grok);
+
+        update_app_provider_settings_at(
+            &config_path,
+            AppProviderSettings {
+                codex: true,
+                claude: false,
+                grok: false,
+            },
+        )
+        .expect("provider settings should initialize the local config");
+
+        let saved = read_cli_config(&config_path).expect("saved config should be readable");
+        assert!(saved.agent_providers.codex);
+        assert!(!saved.agent_providers.claude);
+        assert!(!saved.agent_providers.grok);
+
+        fs::remove_dir_all(
+            config_path
+                .parent()
+                .expect("test config should have a parent directory"),
+        )
+        .expect("test config directory should be removed");
     }
 
     #[test]

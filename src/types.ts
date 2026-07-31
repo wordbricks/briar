@@ -178,6 +178,7 @@ export type ExecutionWorker = {
   deviceId: string;
   ownerUserId: string;
   label: string;
+  icon?: WorkerIcon | null;
   agentProvider: AgentProvider;
   providers?: AgentProvider[];
   versions: Record<string, string>;
@@ -198,6 +199,10 @@ export type ExecutionWorker = {
   createdAt: string;
 };
 
+export type WorkerIcon =
+  | { type: "emoji"; value: string }
+  | { type: "image"; value: string };
+
 export type ProjectExecutionWorkerPolicy = {
   selectionMode: "any" | "allowlist";
   defaultWorkerId: string | null;
@@ -210,6 +215,7 @@ export type OrganizationExecutionWorker = {
   ownerUserId: string;
   ownerName: string;
   label: string;
+  icon?: WorkerIcon | null;
   state: "online" | "stale" | "disabled";
   maxConcurrentSessions: number;
   activeSessions: number;
