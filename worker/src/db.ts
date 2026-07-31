@@ -350,6 +350,22 @@ export type IssueConversationNotificationRow = IssueMessageRow & {
   notification_reason: "mention" | "thread_reply";
 };
 
+export type DashboardChangeRow = {
+  version: number;
+  entity_type: "run" | "worker" | "notifications" | "metadata";
+  entity_id: string | null;
+  operation: "upsert" | "delete" | "replace";
+};
+
+export type DashboardChangesPage = {
+  currentVersion: number;
+  oldestVersion: number | null;
+  changes: DashboardChangeRow[];
+  hasMore: boolean;
+  nextCursor: number;
+  expired: boolean;
+};
+
 export type IssueAttachmentRow = {
   id: string;
   run_id: string;
@@ -421,6 +437,96 @@ export class EventKeyConflictError extends Error {
 }
 export class HuntTransitionError extends Error {}
 export class HuntClaimError extends Error {}
+
+const DASHBOARD_CHANGE_PAGE_SIZE = 500;
+const DASHBOARD_CHANGE_RETENTION_MS = 7 * 24 * 60 * 60 * 1_000;
+
+export async function getDashboardSyncCursor(
+  db: D1Database,
+  projectId: string,
+) {
+  const state = await db
+    .prepare(
+      `select current_version from briar_dashboard_sync_state
+       where project_id = ?`,
+    )
+    .bind(projectId)
+    .first<{ current_version: number }>();
+  return state?.current_version ?? 0;
+}
+
+export async function listDashboardChanges(
+  db: D1Database,
+  projectId: string,
+  cursor: number,
+): Promise<DashboardChangesPage> {
+  const currentVersion = await getDashboardSyncCursor(db, projectId);
+  const retentionCutoff = new Date(
+    Date.now() - DASHBOARD_CHANGE_RETENTION_MS,
+  ).toISOString().replace("T", " ").slice(0, 19);
+  const stale = await db
+    .prepare(
+      `select 1 as stale from briar_dashboard_changes
+       where project_id = ? and created_at < ? limit 1`,
+    )
+    .bind(projectId, retentionCutoff)
+    .first<{ stale: number }>();
+  if (stale) {
+    await db
+      .prepare(
+        `delete from briar_dashboard_changes
+         where project_id = ? and created_at < ?`,
+      )
+      .bind(projectId, retentionCutoff)
+      .run();
+  }
+  const oldest = await db
+    .prepare(
+      `select min(version) as oldest_version
+       from briar_dashboard_changes where project_id = ?`,
+    )
+    .bind(projectId)
+    .first<{ oldest_version: number | null }>();
+  const oldestVersion = oldest?.oldest_version ?? null;
+  const expired =
+    cursor < 0 ||
+    cursor > currentVersion ||
+    (cursor < currentVersion &&
+      (oldestVersion === null || cursor < oldestVersion - 1));
+  if (expired) {
+    return {
+      currentVersion,
+      oldestVersion,
+      changes: [],
+      hasMore: false,
+      nextCursor: currentVersion,
+      expired: true,
+    };
+  }
+
+  const result = await db
+    .prepare(
+      `select version, entity_type, entity_id, operation
+       from briar_dashboard_changes
+       where project_id = ? and version > ? and version <= ?
+       order by version
+       limit ?`,
+    )
+    .bind(projectId, cursor, currentVersion, DASHBOARD_CHANGE_PAGE_SIZE + 1)
+    .all<DashboardChangeRow>();
+  const hasMore = result.results.length > DASHBOARD_CHANGE_PAGE_SIZE;
+  const changes = result.results.slice(0, DASHBOARD_CHANGE_PAGE_SIZE);
+  return {
+    currentVersion,
+    oldestVersion,
+    changes,
+    hasMore,
+    nextCursor: hasMore
+      ? (changes.at(-1)?.version ?? cursor)
+      : currentVersion,
+    expired: false,
+  };
+}
 
 const stableJson = (value: unknown) => JSON.stringify(value);
 const parseWorkflow = (value: string | null | undefined) => {
@@ -2167,7 +2273,7 @@ export async function deleteIssueDependency(
     )
     .bind(projectId, prerequisiteRunId, dependentRunId)
     .run();
-  return result.meta.changes === 1;
+  return result.meta.changes > 0;
 }
 
 export async function listIssueMessages(
@@ -2238,7 +2344,7 @@ export async function createIssueMessage(
       input.parentMessageId,
     )
     .run();
-  if (result.meta.changes !== 1) return null;
+  if (result.meta.changes < 1) return null;
   const mentionedUserIds = [...new Set(input.mentionedUserIds ?? [])];
   if (mentionedUserIds.length > 0) {
     await db.batch(
@@ -2690,7 +2796,7 @@ export async function rollbackNewAppIssue(
     )
     .bind(runId, projectId, runId)
     .run();
-  return result.meta.changes === 1;
+  return result.meta.changes > 0;
 }
 
 export async function getNextQueuedHuntRun(db: D1Database, projectId: string) {

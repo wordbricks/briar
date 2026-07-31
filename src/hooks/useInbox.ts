@@ -335,7 +335,14 @@ export function useInbox(
   const storageKey = `${storagePrefix}:${userId ?? "signed-out"}`;
   const currentMessages = useMemo(
     () => buildCurrentInboxMessages(dashboard, sessions, projects),
-    [dashboard, projects, sessions],
+    [
+      dashboard?.conversationNotifications,
+      dashboard?.project.id,
+      dashboard?.project.name,
+      dashboard?.runs,
+      projects,
+      sessions,
+    ],
   );
   const [state, setState] = useState<InboxState>(() => ({
     storageKey,

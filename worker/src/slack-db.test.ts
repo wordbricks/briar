@@ -16,8 +16,21 @@ import {
 } from "./db";
 
 const executeSql = async (db: D1Database, sql: string) => {
-  for (const statement of sql.split(/;\s*(?:\n|$)/u)) {
-    if (statement.trim()) await db.prepare(statement).run();
+  let statement: string[] = [];
+  let inTrigger = false;
+  for (const line of sql.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed && statement.length === 0) continue;
+    statement.push(line);
+    if (/^create trigger\b/iu.test(trimmed)) inTrigger = true;
+    const complete = inTrigger ? /^end;$/iu.test(trimmed) : trimmed.endsWith(";");
+    if (!complete) continue;
+    await db.prepare(statement.join("\n")).run();
+    statement = [];
+    inTrigger = false;
+  }
+  if (statement.some((line) => line.trim())) {
+    throw new Error("Incomplete SQL migration statement");
   }
 };
 

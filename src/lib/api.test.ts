@@ -11,6 +11,7 @@ import {
   dispatchHuntRun,
   deleteProjectAgentSchedule,
   loadDashboard,
+  loadDashboardDelta,
   loadProjectAgentSessions,
   loadProjectAgentScheduleRuns,
   loadProjectAgents,
@@ -486,6 +487,34 @@ describe("API errors", () => {
 
     expect(dashboard.runs[0].currentRevision).toBe(1);
     expect(dashboard.runs[0].events[0].revision).toBe(1);
+  });
+
+  it("requests dashboard changes after the supplied cursor", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({
+        cursor: 18,
+        hasMore: false,
+        runs: [],
+        deletedRunIds: ["deleted-run"],
+        workers: [],
+        organizationProviders: [],
+        generatedAt: "2026-08-01T00:00:00.000Z",
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      loadDashboardDelta("token", demoDashboard.project.id, 17),
+    ).resolves.toMatchObject({ cursor: 18, deletedRunIds: ["deleted-run"] });
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(
+        `/projects/${demoDashboard.project.id}/dashboard/delta?cursor=17`,
+      ),
+      expect.objectContaining({ headers: expect.any(Headers) }),
+    );
   });
 
   it("loads run evidence through the user-authenticated project endpoint", async () => {

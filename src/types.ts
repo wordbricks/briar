@@ -401,6 +401,22 @@ export type DashboardPayload = {
   executionPolicy?: ProjectExecutionWorkerPolicy;
   members?: OrganizationMember[];
   conversationNotifications?: IssueConversationNotification[];
+  cursor?: number;
+  generatedAt: string;
+};
+
+export type DashboardDeltaPayload = {
+  cursor: number;
+  hasMore: boolean;
+  runs: HuntRun[];
+  deletedRunIds: string[];
+  workers: ExecutionWorker[];
+  organizationProviders: AgentProvider[];
+  project?: Project;
+  settings?: ProjectSettings;
+  executionPolicy?: ProjectExecutionWorkerPolicy;
+  members?: OrganizationMember[];
+  conversationNotifications?: IssueConversationNotification[];
   generatedAt: string;
 };
 

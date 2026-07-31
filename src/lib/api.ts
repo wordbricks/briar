@@ -21,6 +21,7 @@ import type {
   CreateProjectAgentInput,
   CreateProjectAgentScheduleInput,
   DashboardPayload,
+  DashboardDeltaPayload,
   ExecutionWorker,
   OrganizationExecutionWorker,
   ProjectExecutionWorkerPolicy,
@@ -600,34 +601,53 @@ export async function disconnectSlackInstallation(
   );
 }
 
+const normalizeDashboardRuns = (runs: DashboardPayload["runs"]) =>
+  runs.map((run) => {
+    const events = run.events.map((event) => ({
+      ...event,
+      revision:
+        Number.isInteger(event.revision) && event.revision >= 1
+          ? event.revision
+          : 1,
+    }));
+    return {
+      ...run,
+      currentRevision:
+        Number.isInteger(run.currentRevision) && run.currentRevision >= 1
+          ? run.currentRevision
+          : Math.max(1, ...events.map((event) => event.revision)),
+      events,
+    };
+  });
+
 export async function loadDashboard(
   token: string,
   projectId: string,
+  signal?: AbortSignal,
 ): Promise<DashboardPayload> {
   const dashboard = await request<DashboardPayload>(
     `/projects/${projectId}/dashboard`,
     token,
+    { signal },
   );
   return {
     ...dashboard,
-    runs: dashboard.runs.map((run) => {
-      const events = run.events.map((event) => ({
-        ...event,
-        revision:
-          Number.isInteger(event.revision) && event.revision >= 1
-            ? event.revision
-            : 1,
-      }));
-      return {
-        ...run,
-        currentRevision:
-          Number.isInteger(run.currentRevision) && run.currentRevision >= 1
-            ? run.currentRevision
-            : Math.max(1, ...events.map((event) => event.revision)),
-        events,
-      };
-    }),
+    runs: normalizeDashboardRuns(dashboard.runs),
   };
+}
+
+export async function loadDashboardDelta(
+  token: string,
+  projectId: string,
+  cursor: number,
+  signal?: AbortSignal,
+): Promise<DashboardDeltaPayload> {
+  const delta = await request<DashboardDeltaPayload>(
+    `/projects/${projectId}/dashboard/delta?cursor=${cursor}`,
+    token,
+    { signal },
+  );
+  return { ...delta, runs: normalizeDashboardRuns(delta.runs) };
 }
 
 export async function createProject(

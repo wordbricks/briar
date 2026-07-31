@@ -682,7 +682,7 @@ export async function disableExecutionWorker(
       )
       .bind(observedAt, deviceId),
   ]);
-  return results[0]?.meta.changes === 1;
+  return (results[0]?.meta.changes ?? 0) > 0;
 }
 
 /** Remove one project binding; revoke the device only after its last binding. */
@@ -699,7 +699,7 @@ export async function unbindExecutionWorker(
     )
     .bind(deviceId, projectId)
     .run();
-  if (deleted.meta.changes !== 1) return false;
+  if (deleted.meta.changes < 1) return false;
   const remaining = await db
     .prepare(
       `select count(*) as bindings from briar_execution_workers
@@ -1451,7 +1451,7 @@ export async function dispatchHuntRun(
       projectId,
     )
     .run();
-  if (result.meta.changes !== 1) {
+  if (result.meta.changes < 1) {
     throw new WorkerConflictError("Run dispatch raced with another update");
   }
   await auditExecutionEvent(db, {
