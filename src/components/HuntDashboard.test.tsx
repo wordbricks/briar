@@ -311,6 +311,31 @@ describe("HuntDashboard", () => {
     expect(markup).not.toContain("kanban-card-agent-badge");
   });
 
+  it.each(["completed", "cancelled", "blocked", "failed"] as const)(
+    "hides the assigned worker icon when an issue is %s",
+    (status) => {
+      const run = {
+        ...demoDashboard.runs[0],
+        status,
+        workflowStage: null,
+        workerId: dashboardWorker.id,
+      };
+      const markup = renderToStaticMarkup(
+        <HuntDashboard
+          {...dashboardProps}
+          dashboard={{
+            ...demoDashboard,
+            runs: [run],
+            workers: [dashboardWorker],
+          }}
+        />,
+      );
+
+      expect(markup).not.toContain("kanban-card-worker-badge");
+      expect(markup).not.toContain("has-assignees");
+    },
+  );
+
   it("keeps the performed agent name in issue properties after completion", async () => {
     const run = demoDashboard.runs[0];
     const container = document.createElement("div");
