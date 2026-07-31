@@ -1845,25 +1845,16 @@ export async function appendAgentTranscript(
   return { sessionId, stored, storedBytes, pruned };
 }
 
-/** Keep the newest sessions per project, oldest pruned first. */
-export async function pruneAgentTranscriptSessions(db: D1Database, projectId: string) {
-  const stale = await db
-    .prepare(
-      `select session_id from briar_agent_transcript_sessions
-       where project_id = ?
-       order by last_event_at desc, session_id asc
-       limit -1 offset ?`,
-    )
-    .bind(projectId, MAX_TRANSCRIPT_SESSIONS_PER_PROJECT)
-    .all<{ session_id: string }>();
-  const sessions = (stale.results ?? []).map((row) => row.session_id);
-  for (const sessionId of sessions) {
-    await db
-      .prepare(`delete from briar_agent_transcript_sessions where session_id = ?`)
-      .bind(sessionId)
-      .run();
-  }
-  return sessions;
+/**
+ * Payload retention is handled by the verified R2 archive job. Keeping this
+ * compatibility hook as a no-op prevents an append from deleting an old
+ * session before its archive upload and checksum have succeeded.
+ */
+export async function pruneAgentTranscriptSessions(
+  _db: D1Database,
+  _projectId: string,
+) {
+  return [] as string[];
 }
 
 export async function readAgentTranscript(

@@ -1621,7 +1621,7 @@ describe("detached execution workers", () => {
   });
 
   it(
-    "prunes the oldest sessions past the project retention limit",
+    "keeps transcript payloads until the verified archive job removes them",
     async () => {
       for (
         let index = 0;
@@ -1644,10 +1644,11 @@ describe("detached execution workers", () => {
         )
         .bind(projectId)
         .first<{ sessions: number }>();
-      expect(remaining?.sessions).toBe(MAX_TRANSCRIPT_SESSIONS_PER_PROJECT);
+      expect(remaining?.sessions).toBe(MAX_TRANSCRIPT_SESSIONS_PER_PROJECT + 3);
 
-      // The oldest sessions go first, and their events go with them.
-      expect(await readAgentTranscript(db, projectId, "session-000")).toBeNull();
+      // The append path must not remove a source row before R2 verification.
+      expect(await readAgentTranscript(db, projectId, "session-000"))
+        .not.toBeNull();
       expect(
         await readAgentTranscript(db, projectId, "session-052"),
       ).not.toBeNull();
@@ -1657,7 +1658,7 @@ describe("detached execution workers", () => {
         )
         .bind("session-000")
         .first<{ events: number }>();
-      expect(orphans?.events).toBe(0);
+      expect(orphans?.events).toBe(1);
     },
     20_000,
   );

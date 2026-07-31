@@ -35,8 +35,15 @@
     {
       "binding": "ATTACHMENTS",
       "bucket_name": "briar-attachments"
+    },
+    {
+      "binding": "ARCHIVES",
+      "bucket_name": "briar-archives"
     }
   ],
+  "triggers": {
+    "crons": ["0 3 * * *"]
+  },
   "secrets": {
     "required": [
       "BETTER_AUTH_SECRET",
