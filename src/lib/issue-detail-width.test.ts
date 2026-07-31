@@ -37,10 +37,18 @@ describe("issue detail width", () => {
     const bodyRule = firstRule(".run-page-body");
     const layoutRule = firstRule(".run-page-layout");
     const propertiesRule = firstRule(".run-properties");
+    const propertiesHeadingRule = firstRule(".run-properties h2");
     const propertyRule = firstRule(".run-property");
     const propertyIconRule = firstRule(".run-property-icon");
+    const propertyCopyRule = firstRule(".run-property-copy strong");
     const statusControlRule = firstRule(
       ".run-properties .run-status-control",
+    );
+    const nativeStatusSelectRule = firstRule(
+      ".run-properties .run-status-control select",
+    );
+    const statusSelectRule = firstRule(
+      ".run-properties .run-status-select .select-menu-trigger",
     );
     const statusErrorRule = firstRule(".run-properties .run-status-error");
 
@@ -48,23 +56,27 @@ describe("issue detail width", () => {
     expect(bodyRule).not.toContain("1180px");
     expect(bodyRule).toContain("margin:0");
     expect(layoutRule).toContain(
-      "grid-template-columns:minmax(0,1fr) minmax(240px,280px)",
+      "grid-template-columns:minmax(0,1fr) minmax(210px,240px)",
     );
-    expect(layoutRule).toContain("gap:24px");
+    expect(layoutRule).toContain("gap:20px");
     expect(styles).toContain(
-      "grid-template-columns:minmax(0,1fr) minmax(220px,250px)",
+      "grid-template-columns:minmax(0,1fr) minmax(190px,215px)",
     );
     expect(styles).toContain(
-      "grid-template-columns:minmax(0,1fr) minmax(200px,220px)",
+      "grid-template-columns:minmax(0,1fr) minmax(180px,195px)",
     );
-    expect(propertiesRule).toContain("padding:4px 4px 18px 22px");
+    expect(propertiesRule).toContain("padding:4px 4px 18px 18px");
+    expect(propertiesHeadingRule).toContain("font-size:var(--text-base)");
     expect(propertyRule).toContain("min-height:40px");
     expect(propertyRule).toContain("grid-template-columns:24px minmax(0,1fr)");
     expect(propertyIconRule).toContain("width:24px");
     expect(propertyIconRule).toContain("height:24px");
+    expect(propertyCopyRule).toContain("font-size:var(--text-sm)");
     expect(statusControlRule).toContain(
       "grid-template-columns:24px minmax(0,1fr) 14px",
     );
+    expect(nativeStatusSelectRule).toContain("font-size:var(--text-sm)");
+    expect(statusSelectRule).toContain("font-size:var(--text-sm)");
     expect(statusErrorRule).toContain("margin:0 0 4px 34px");
   });
 
