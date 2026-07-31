@@ -25,6 +25,8 @@ describe("detached Agent runner", () => {
         sourceKey: "BRIAR-42",
         title: "Detached execution",
         issueDescription: "Use the attached design.",
+        briarIssueUrl:
+          "https://briar-api.example/open/issues/project-1/run-42",
         attachments: [
           {
             filename: "design.png",
@@ -53,6 +55,12 @@ describe("detached Agent runner", () => {
     expect(prompt).toContain("Use the attached design.");
     expect(prompt).toContain("/runtime/attachments/run-42/design.png");
     expect(prompt).toContain("The mobile layout is the acceptance criterion.");
+    expect(prompt).toContain(
+      "include the durable snapshot's briarIssueUrl in the pull request description",
+    );
+    expect(prompt).toContain(
+      "https://briar-api.example/open/issues/project-1/run-42",
+    );
     expect(prompt).toContain("nontechnical PM or CEO");
     expect(prompt).toContain("observable completion condition");
     expect(prompt).toContain("available under View details");
