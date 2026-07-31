@@ -1022,6 +1022,36 @@ export async function updateIssueExecutionPreferences(
   );
 }
 
+export async function addIssueDependency(
+  token: string,
+  projectId: string,
+  dependentRunId: string,
+  prerequisiteRunId: string,
+) {
+  return request<{
+    prerequisiteRunId: string;
+    dependentRunId: string;
+    outcome: "created" | "already_exists";
+  }>(
+    `/projects/${projectId}/runs/${dependentRunId}/dependencies/${prerequisiteRunId}`,
+    token,
+    { method: "PUT" },
+  );
+}
+
+export async function removeIssueDependency(
+  token: string,
+  projectId: string,
+  dependentRunId: string,
+  prerequisiteRunId: string,
+) {
+  await request<void>(
+    `/projects/${projectId}/runs/${dependentRunId}/dependencies/${prerequisiteRunId}`,
+    token,
+    { method: "DELETE" },
+  );
+}
+
 export async function deleteIssue(
   token: string,
   projectId: string,
