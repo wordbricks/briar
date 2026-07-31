@@ -37,6 +37,7 @@ import type {
   OrganizationMember,
   ProjectSettings,
   RunEvidence,
+  RunEvidenceImage,
   SessionUser,
   UpdateProjectAgentInput,
   UpdateProjectAgentScheduleInput,
@@ -1054,6 +1055,22 @@ export async function loadRunEvidence(
     evidence: RunEvidence[];
   }>(`/projects/${projectId}/runs/${runId}/evidence`, token);
   return result.evidence;
+}
+
+export async function loadRunEvidenceImage(
+  token: string,
+  image: RunEvidenceImage,
+) {
+  if (!apiUrl || !image.url.startsWith("/")) {
+    throw new Error("증빙 이미지 경로가 유효하지 않습니다.");
+  }
+  const response = await fetch(`${apiUrl}${image.url}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    throw new Error(`증빙 이미지를 열 수 없습니다. (${response.status})`);
+  }
+  return response.blob();
 }
 
 export async function createIssueMessage(

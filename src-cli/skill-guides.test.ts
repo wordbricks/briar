@@ -20,6 +20,9 @@ describe("bundled skill guides", () => {
     expect(guide?.markdown).toContain("briar run rework");
     expect(guide?.markdown).toContain("## Optional Velen and Linear");
     expect(guide?.markdown).toContain("nontechnical PM or CEO");
+    expect(guide?.markdown).toContain("main result card");
+    expect(guide?.markdown).toContain("user-visible interface");
+    expect(guide?.markdown).toContain("repeated `--image` arguments");
     expect(guide?.markdown).toContain("--structured-result-file '<blocked-result.json>'");
     expect(guide?.markdown).toContain("how they can tell it worked");
     expect(guide?.markdown).toContain("collapsed technical detail");

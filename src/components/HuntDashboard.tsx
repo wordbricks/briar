@@ -124,6 +124,7 @@ import type {
   OrganizationMember,
   ProjectAgent,
   RunEvidence,
+  RunEvidenceImage,
   UpdateIssueInput,
 } from "../types";
 import {
@@ -171,6 +172,7 @@ export function HuntDashboard({
   onLoadAttachment,
   onLoadIssueMessages,
   onLoadRunEvidence,
+  onLoadRunEvidenceImage,
   onMoveRun,
   onProcessIssueNow,
   onRetryRun,
@@ -212,6 +214,7 @@ export function HuntDashboard({
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onLoadIssueMessages: (runId: string) => Promise<IssueMessage[]>;
   onLoadRunEvidence: (runId: string) => Promise<RunEvidence[]>;
+  onLoadRunEvidenceImage?: (image: RunEvidenceImage) => Promise<Blob>;
   onMoveRun: (runId: string, placement: HuntRunPlacement) => Promise<unknown>;
   onProcessIssueNow?: (run: HuntRun) => void;
   onRetryRun: (runId: string) => Promise<unknown>;
@@ -558,6 +561,7 @@ export function HuntDashboard({
           onLoadAttachment={onLoadAttachment}
           onLoadIssueMessages={() => onLoadIssueMessages(selected.id)}
           onLoadRunEvidence={() => onLoadRunEvidence(selected.id)}
+          onLoadRunEvidenceImage={onLoadRunEvidenceImage}
           mentionMembers={dashboard?.members ?? []}
           onMove={(placement) => onMoveRun(selected.id, placement)}
           onRetry={() => onRetryRun(selected.id)}
@@ -2346,6 +2350,7 @@ export function RunPage({
   onLoadAttachment,
   onLoadIssueMessages,
   onLoadRunEvidence,
+  onLoadRunEvidenceImage,
   mentionMembers = [],
   onMove,
   onRetry,
@@ -2369,6 +2374,7 @@ export function RunPage({
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onLoadIssueMessages: () => Promise<IssueMessage[]>;
   onLoadRunEvidence: () => Promise<RunEvidence[]>;
+  onLoadRunEvidenceImage?: (image: RunEvidenceImage) => Promise<Blob>;
   mentionMembers?: OrganizationMember[];
   onMove: (placement: HuntRunPlacement) => Promise<unknown>;
   onRetry: () => Promise<unknown>;
@@ -2449,6 +2455,8 @@ export function RunPage({
   const remainingAttachments = (run.attachments ?? []).filter(
     (attachment) => !embeddedAttachmentReferences.has(attachment.id),
   );
+  const completionSummary =
+    run.structuredResult?.summary?.trim() || run.resultSummary?.trim() || null;
   const blockerReason =
     run.structuredResult?.summary?.trim() ||
     run.detail?.trim() ||
@@ -2822,6 +2830,34 @@ export function RunPage({
                           </div>
                         </section>
                       ) : null}
+                      {run.status === "completed" && completionSummary ? (
+                        <section
+                          aria-labelledby={`${detailTabsId}-result-title`}
+                          className="completed-issue-card"
+                        >
+                          <div className="completed-issue-card-heading">
+                            <Check aria-hidden="true" size={18} />
+                            <strong id={`${detailTabsId}-result-title`}>
+                              {t("run.result")}
+                            </strong>
+                          </div>
+                          <p>{completionSummary}</p>
+                          {run.structuredResult?.humanActionRequired &&
+                          run.structuredResult.nextAction ? (
+                            <div>
+                              <strong>{t("run.resultNextAction")}</strong>
+                              <span>{run.structuredResult.nextAction}</span>
+                            </div>
+                          ) : null}
+                          <button
+                            onClick={() => setActiveDetailTab("evidence")}
+                            type="button"
+                          >
+                            <ImageIcon aria-hidden="true" size={14} />
+                            {t("run.viewResultEvidence")}
+                          </button>
+                        </section>
+                      ) : null}
                       {issueContent ? (
                         <div className="issue-description-markdown">
                           <ReactMarkdown
@@ -2904,6 +2940,7 @@ export function RunPage({
                       id={`${detailTabsId}-evidence-panel`}
                       labelledBy={`${detailTabsId}-evidence-tab`}
                       onLoad={onLoadRunEvidence}
+                      onLoadImage={onLoadRunEvidenceImage}
                       run={run}
                     />
                   )}
@@ -3370,11 +3407,13 @@ function RunEvidencePanel({
   id,
   labelledBy,
   onLoad,
+  onLoadImage,
   run,
 }: {
   id: string;
   labelledBy: string;
   onLoad: () => Promise<RunEvidence[]>;
+  onLoadImage?: (image: RunEvidenceImage) => Promise<Blob>;
   run: HuntRun;
 }) {
   const { localeTag, t } = useI18n();
@@ -3509,6 +3548,12 @@ function RunEvidencePanel({
                         </span>
                       </header>
                       {item.detail && <p>{item.detail}</p>}
+                      {(item.images?.length ?? 0) > 0 && onLoadImage ? (
+                        <RunEvidenceImageGallery
+                          images={item.images ?? []}
+                          onLoadImage={onLoadImage}
+                        />
+                      ) : null}
                       {item.command && (
                         <div className="run-evidence-command">
                           <small>{t("run.evidenceCommand")}</small>
@@ -3562,6 +3607,86 @@ function RunEvidencePanel({
         </div>
       )}
     </div>
+  );
+}
+
+function RunEvidenceImageGallery({
+  images,
+  onLoadImage,
+}: {
+  images: RunEvidenceImage[];
+  onLoadImage: (image: RunEvidenceImage) => Promise<Blob>;
+}) {
+  const { t } = useI18n();
+  return (
+    <section
+      aria-label={t("run.resultScreenshots")}
+      className="run-evidence-images"
+    >
+      <strong>
+        <ImageIcon aria-hidden="true" size={14} />
+        {t("run.resultScreenshots")}
+        <span>{images.length}</span>
+      </strong>
+      <div>
+        {images.map((image) => (
+          <RunEvidenceImagePreview
+            image={image}
+            key={image.id}
+            onLoadImage={onLoadImage}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function RunEvidenceImagePreview({
+  image,
+  onLoadImage,
+}: {
+  image: RunEvidenceImage;
+  onLoadImage: (image: RunEvidenceImage) => Promise<Blob>;
+}) {
+  const { t } = useI18n();
+  const [source, setSource] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let active = true;
+    let objectUrl: string | null = null;
+    setSource(null);
+    setFailed(false);
+    void onLoadImage(image)
+      .then((blob) => {
+        if (!active) return;
+        objectUrl = URL.createObjectURL(blob);
+        setSource(objectUrl);
+      })
+      .catch(() => active && setFailed(true));
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [image, onLoadImage]);
+
+  return (
+    <figure className="run-evidence-image">
+      <div>
+        {source ? <img alt={image.filename} src={source} /> : null}
+        {!source && !failed ? <LoaderCircle className="spin" size={20} /> : null}
+        {failed ? <CircleAlert size={20} /> : null}
+      </div>
+      <figcaption>
+        <span>{image.filename}</span>
+        {source ? (
+          <a download={image.filename} href={source}>
+            {t("common.open")}
+          </a>
+        ) : failed ? (
+          <small>{t("run.loadFailed")}</small>
+        ) : null}
+      </figcaption>
+    </figure>
   );
 }
 

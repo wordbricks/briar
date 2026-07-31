@@ -106,6 +106,16 @@ export type IssueConversationNotification = {
   createdAt: string;
 };
 
+export type RunEvidenceImage = {
+  id: string;
+  filename: string;
+  contentType: string;
+  byteSize: number;
+  sha256: string;
+  position: number;
+  url: string;
+};
+
 export type RunEvidence = {
   key: string;
   attempt: number;
@@ -120,15 +130,7 @@ export type RunEvidence = {
   actor: string;
   observedAt: string;
   recordedAt: string;
-  images?: Array<{
-    id: string;
-    filename: string;
-    contentType: string;
-    byteSize: number;
-    sha256: string;
-    position: number;
-    url: string;
-  }>;
+  images?: RunEvidenceImage[];
   requiredRevision: number;
   canonical: boolean;
 };
