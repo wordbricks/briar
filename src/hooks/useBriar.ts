@@ -15,8 +15,10 @@ import {
   deleteProject as deleteRemoteProject,
   dispatchHuntRun,
   importLinearIssues,
+  isApiErrorStatus,
   isApiConfigured,
   loadDashboard,
+  loadDashboardDelta,
   loadIssueAttachment,
   loadIssueMessages,
   loadRunEvidence,
@@ -94,6 +96,7 @@ import {
   openAuthorization,
 } from "../lib/auth-session";
 import { startDashboardPolling } from "../lib/dashboard-polling";
+import { mergeDashboardDelta } from "../lib/dashboard-sync";
 import {
   isRepositoryWorkflowPending,
   progressForAutoHuntRun,
@@ -283,7 +286,7 @@ export function useBriar(options: UseBriarOptions = {}) {
   const [connectedProjectIds, setConnectedProjectIds] = useState<
     string[] | null
   >(null);
-  const [dashboard, setDashboard] = useState<DashboardPayload | null>(
+  const [dashboard, setDashboardState] = useState<DashboardPayload | null>(
     demoMode ? demoDashboard : null,
   );
   const [loading, setLoading] = useState(!demoMode);
@@ -325,6 +328,32 @@ export function useBriar(options: UseBriarOptions = {}) {
   const pollLoginNow = useRef<(() => void) | null>(null);
   const loginAttempt = useRef(0);
   const workflowGenerationAttempts = useRef(new Set<string>());
+  const dashboardRef = useRef<DashboardPayload | null>(
+    demoMode ? demoDashboard : null,
+  );
+  const dashboardCursor = useRef<number | null>(demoDashboard.cursor ?? null);
+  const dashboardRequest = useRef<{
+    projectId: string;
+    abort: AbortController;
+    promise: Promise<void>;
+  } | null>(null);
+  const dashboardRequestGeneration = useRef(0);
+
+  const setDashboard = useCallback((
+    value: Parameters<typeof setDashboardState>[0],
+  ) => {
+    dashboardRequestGeneration.current += 1;
+    dashboardRequest.current?.abort.abort();
+    dashboardRequest.current = null;
+    setDashboardState((current) => {
+      const next = typeof value === "function" ? value(current) : value;
+      dashboardRef.current = next;
+      dashboardCursor.current = next && Number.isSafeInteger(next.cursor)
+        ? (next.cursor ?? null)
+        : null;
+      return next;
+    });
+  }, []);
 
   const clearLoginTimer = useCallback(() => {
     if (pollTimer.current === null) return;
@@ -357,15 +386,93 @@ export function useBriar(options: UseBriarOptions = {}) {
     writeActiveOrganizationId(user.id, activeOrganizationId);
   }, [activeOrganizationId, user]);
 
-  const refresh = useCallback(async () => {
-    if (demoMode || !token || !activeProjectId) return;
-    try {
-      const next = await loadDashboard(token, activeProjectId);
-      setDashboard(next);
-      setError(null);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught));
+  useEffect(() => {
+    dashboardRef.current = dashboard;
+    dashboardCursor.current = dashboard && Number.isSafeInteger(dashboard.cursor)
+      ? (dashboard.cursor ?? null)
+      : null;
+  }, [dashboard]);
+
+  useEffect(() => {
+    dashboardRequestGeneration.current += 1;
+    dashboardRequest.current?.abort.abort();
+    dashboardRequest.current = null;
+    if (dashboardRef.current?.project.id !== activeProjectId) {
+      dashboardCursor.current = null;
     }
+  }, [activeProjectId, token]);
+
+  const refresh = useCallback(async (
+    mode: "delta" | "snapshot" = "delta",
+  ) => {
+    if (demoMode || !token || !activeProjectId) return;
+    const currentRequest = dashboardRequest.current;
+    if (currentRequest?.projectId === activeProjectId && mode === "delta") {
+      return currentRequest.promise;
+    }
+    currentRequest?.abort.abort();
+    const abort = new AbortController();
+    const generation = ++dashboardRequestGeneration.current;
+    const projectId = activeProjectId;
+    const promise = (async () => {
+      try {
+        let current = dashboardRef.current?.project.id === projectId
+          ? dashboardRef.current
+          : null;
+        let cursor = dashboardCursor.current;
+        if (mode === "snapshot" || !current || cursor === null) {
+          current = await loadDashboard(token, projectId, abort.signal);
+          cursor = current.cursor ?? null;
+        } else {
+          let pages = 0;
+          while (true) {
+            let delta;
+            try {
+              delta = await loadDashboardDelta(
+                token,
+                projectId,
+                cursor,
+                abort.signal,
+              );
+            } catch (caught) {
+              if (!isApiErrorStatus(caught, 410)) throw caught;
+              current = await loadDashboard(token, projectId, abort.signal);
+              cursor = current.cursor ?? null;
+              break;
+            }
+            const merged = mergeDashboardDelta(current, delta);
+            current = merged.dashboard;
+            cursor = delta.cursor;
+            pages += 1;
+            if (!delta.hasMore) break;
+            if (pages >= 20) {
+              current = await loadDashboard(token, projectId, abort.signal);
+              cursor = current.cursor ?? null;
+              break;
+            }
+          }
+        }
+        if (
+          abort.signal.aborted ||
+          generation !== dashboardRequestGeneration.current
+        ) return;
+        dashboardCursor.current = cursor;
+        if (current !== dashboardRef.current) {
+          dashboardRef.current = current;
+          setDashboard(current);
+        }
+        setError(null);
+      } catch (caught) {
+        if (abort.signal.aborted) return;
+        setError(caught instanceof Error ? caught.message : String(caught));
+      } finally {
+        if (dashboardRequest.current?.abort === abort) {
+          dashboardRequest.current = null;
+        }
+      }
+    })();
+    dashboardRequest.current = { projectId, abort, promise };
+    return promise;
   }, [activeProjectId, token]);
 
   useEffect(() => {
@@ -478,7 +585,9 @@ export function useBriar(options: UseBriarOptions = {}) {
 
   useEffect(() => {
     if (demoMode || !token || !activeProjectId) return;
-    return startDashboardPolling(() => void refresh());
+    return startDashboardPolling((reason) =>
+      void refresh(reason === "poll" ? "delta" : "snapshot")
+    );
   }, [activeProjectId, refresh, token]);
 
   useEffect(() => {
@@ -1535,11 +1644,11 @@ export function useBriar(options: UseBriarOptions = {}) {
       if (!token) throw new Error("로그인이 필요합니다.");
       const result = await importLinearIssues(token, projectId, input);
       if (activeProjectId === projectId) {
-        setDashboard(await loadDashboard(token, projectId));
+        await refresh("snapshot");
       }
       return result;
     },
-    [activeProjectId, assertRepositoryReadyForLinearImport, token],
+    [activeProjectId, assertRepositoryReadyForLinearImport, refresh, token],
   );
 
   const saveVelenIntegration = useCallback(
@@ -1763,8 +1872,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         }
         if (!token) throw new Error("로그인이 필요합니다.");
         const result = await createIssue(token, activeProjectId, input);
-        const nextDashboard = await loadDashboard(token, activeProjectId);
-        setDashboard(nextDashboard);
+        await refresh("snapshot");
         return result;
       } catch (caught) {
         const message = caught instanceof Error ? caught.message : String(caught);
@@ -1774,7 +1882,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         setIsCreatingIssue(false);
       }
     },
-    [activeProjectId, dashboard, token],
+    [activeProjectId, dashboard, refresh, token],
   );
 
   const readIssueAttachment = useCallback(
@@ -1824,8 +1932,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         }
         if (!token) throw new Error("로그인이 필요합니다.");
         const result = await updateIssue(token, activeProjectId, runId, input);
-        const nextDashboard = await loadDashboard(token, activeProjectId);
-        setDashboard(nextDashboard);
+        await refresh("snapshot");
         return result;
       } catch (caught) {
         const message = caught instanceof Error ? caught.message : String(caught);
@@ -1835,7 +1942,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         setUpdatingIssueId(null);
       }
     },
-    [activeProjectId, dashboard, token],
+    [activeProjectId, dashboard, refresh, token],
   );
 
   const editIssueExecutionPreferences = useCallback(
@@ -1874,7 +1981,7 @@ export function useBriar(options: UseBriarOptions = {}) {
           runId,
           input,
         );
-        setDashboard(await loadDashboard(token, activeProjectId));
+        await refresh("snapshot");
         return result;
       } catch (caught) {
         setError(caught instanceof Error ? caught.message : String(caught));
@@ -1883,7 +1990,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         setUpdatingIssueId(null);
       }
     },
-    [activeProjectId, dashboard, token],
+    [activeProjectId, dashboard, refresh, token],
   );
 
   const changeIssueDependency = useCallback(
@@ -2217,7 +2324,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         } else {
           await cancelHuntRun(token, activeProjectId, runId);
         }
-        setDashboard(await loadDashboard(token, activeProjectId));
+        await refresh("snapshot");
       } catch (caught) {
         const message = caught instanceof Error ? caught.message : String(caught);
         setRecoveryError(message);
@@ -2226,7 +2333,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         setRecoveringRunId(null);
       }
     },
-    [activeProjectId, dashboard, token],
+    [activeProjectId, dashboard, refresh, token],
   );
 
   const moveRun = useCallback(
@@ -2338,7 +2445,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         }
         if (!token) throw new Error("로그인이 필요합니다.");
         await moveHuntRun(token, activeProjectId, runId, placement);
-        setDashboard(await loadDashboard(token, activeProjectId));
+        await refresh("snapshot");
       } catch (caught) {
         const message = caught instanceof Error ? caught.message : String(caught);
         setRecoveryError(message);
@@ -2347,7 +2454,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         setRecoveringRunId(null);
       }
     },
-    [activeProjectId, dashboard, token],
+    [activeProjectId, dashboard, refresh, token],
   );
 
   return {

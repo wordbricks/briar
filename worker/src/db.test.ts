@@ -29,6 +29,7 @@ import {
   findProjectIdByAgentTokenHash,
   getProject,
   getProjectSettings,
+  getDashboardSyncCursor,
   getHuntRunForProject,
   getIssueAttachment,
   getRunEvidenceImage,
@@ -39,6 +40,7 @@ import {
   listIssueDependencies,
   listIssueConversationNotifications,
   listIssueMessages,
+  listDashboardChanges,
   listOrganizations,
   listOrganizationMembers,
   isOrganizationHandleAvailable,
@@ -144,6 +146,25 @@ const completedStructuredResult = {
 const executeSql = async (db: D1Database, sql: string) => {
   for (const statement of sql.split(/;\s*(?:\n|$)/u)) {
     if (statement.trim()) await db.prepare(statement).run();
+  }
+};
+
+const executeTriggerMigration = async (db: D1Database, sql: string) => {
+  let statement: string[] = [];
+  let inTrigger = false;
+  for (const line of sql.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed && statement.length === 0) continue;
+    statement.push(line);
+    if (/^create trigger\b/iu.test(trimmed)) inTrigger = true;
+    const complete = inTrigger ? /^end;$/iu.test(trimmed) : trimmed.endsWith(";");
+    if (!complete) continue;
+    await db.prepare(statement.join("\n")).run();
+    statement = [];
+    inTrigger = false;
+  }
+  if (statement.some((line) => line.trim())) {
+    throw new Error("Incomplete dashboard sync migration statement");
   }
 };
 
@@ -498,10 +519,89 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db,
       await readFile(resolve("migrations/0048_issue_dependencies.sql"), "utf8"),
     );
+    await executeTriggerMigration(
+      db,
+      await readFile(resolve("migrations/0049_dashboard_delta_sync.sql"), "utf8"),
+    );
   }, 30_000);
 
   afterAll(async () => {
     await miniflare.dispose();
+  });
+
+  it("records monotonic dashboard deltas and a deletion tombstone", async () => {
+    await db
+      .prepare(
+        `update briar_project_settings set workflow_json = ? where project_id = ?`,
+      )
+      .bind(JSON.stringify(releaseWorkflow), projectId)
+      .run();
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 2, {
+        sourceKey: "dashboard-delta-contract",
+        eventKey: "dashboard-delta-contract:queued",
+        title: "Dashboard delta contract",
+        branch: null,
+        commitSha: null,
+      }),
+    );
+    const snapshotCursor = await getDashboardSyncCursor(db, projectId);
+
+    await updateIssue(db, projectId, runId, {
+      title: "Dashboard delta contract updated",
+      description: "Only this run should be returned.",
+      priority: 1,
+      updatedAt: atMinute(3),
+    });
+    const updatePage = await listDashboardChanges(db, projectId, snapshotCursor);
+
+    expect(updatePage.expired).toBe(false);
+    expect(updatePage.nextCursor).toBeGreaterThan(snapshotCursor);
+    expect(updatePage.changes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          entity_type: "run",
+          entity_id: runId,
+          operation: "upsert",
+        }),
+      ]),
+    );
+
+    await deleteIssue(db, projectId, runId, atMinute(4));
+    const deletePage = await listDashboardChanges(
+      db,
+      projectId,
+      updatePage.nextCursor,
+    );
+    await db
+      .prepare(
+        `update briar_project_settings set workflow_json = ? where project_id = ?`,
+      )
+      .bind(JSON.stringify(repositoryWorkflowBootstrap), projectId)
+      .run();
+    expect(deletePage.changes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          entity_type: "run",
+          entity_id: runId,
+          operation: "delete",
+        }),
+      ]),
+    );
+    await db
+      .prepare(
+        `update briar_dashboard_changes
+         set created_at = '2000-01-01 00:00:00'
+         where project_id = ?`,
+      )
+      .bind(projectId)
+      .run();
+    await expect(listDashboardChanges(db, projectId, 0)).resolves.toMatchObject({
+      expired: true,
+      changes: [],
+    });
   });
 
   it("preserves existing run data and child foreign keys in the backlog migration", async () => {
@@ -2242,6 +2342,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         commitSha: null,
       }),
     );
+    const dependencyCursor = await getDashboardSyncCursor(db, projectId);
 
     await expect(
       createIssueDependency(db, projectId, {
@@ -2251,6 +2352,20 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         createdAt: atMinute(20.4),
       }),
     ).resolves.toBe("created");
+    await expect(
+      listDashboardChanges(db, projectId, dependencyCursor),
+    ).resolves.toMatchObject({
+      changes: expect.arrayContaining([
+        expect.objectContaining({
+          entity_type: "run",
+          entity_id: prerequisiteRunId,
+        }),
+        expect.objectContaining({
+          entity_type: "run",
+          entity_id: dependentRunId,
+        }),
+      ]),
+    });
     await expect(
       createIssueDependency(db, projectId, {
         prerequisiteRunId: dependentRunId,
@@ -2346,6 +2461,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       }),
     ).resolves.toMatchObject({ id: dependentRunId });
 
+    const deleteDependencyCursor = await getDashboardSyncCursor(db, projectId);
     await expect(
       deleteIssueDependency(
         db,
@@ -2354,6 +2470,20 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         finalRunId,
       ),
     ).resolves.toBe(true);
+    await expect(
+      listDashboardChanges(db, projectId, deleteDependencyCursor),
+    ).resolves.toMatchObject({
+      changes: expect.arrayContaining([
+        expect.objectContaining({
+          entity_type: "run",
+          entity_id: dependentRunId,
+        }),
+        expect.objectContaining({
+          entity_type: "run",
+          entity_id: finalRunId,
+        }),
+      ]),
+    });
     expect(await listIssueDependencies(db, projectId)).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({

@@ -90,6 +90,7 @@ import {
   isOrganizationHandleAvailable,
   getProject,
   getProjectSettings,
+  getDashboardSyncCursor,
   getHuntRunForProject,
   HuntClaimError,
   HuntTransitionError,
@@ -101,6 +102,7 @@ import {
   listAllRunEvidenceImages,
   listEvidenceImagesForEvidence,
   listDashboardRuns,
+  listDashboardChanges,
   listRunEvidence,
   listRunEvidenceImages,
   listRunStageRevisions,
@@ -4035,6 +4037,169 @@ async function route(
     return json({ agentToken });
   }
 
+  const dashboardDeltaMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/dashboard\/delta$/u,
+  );
+  if (dashboardDeltaMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      dashboardDeltaMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const rawCursor = new URL(request.url).searchParams.get("cursor");
+    if (!rawCursor || !/^\d+$/u.test(rawCursor)) {
+      throw new HttpError(400, "A non-negative dashboard cursor is required");
+    }
+    const cursor = Number(rawCursor);
+    if (!Number.isSafeInteger(cursor)) {
+      throw new HttpError(400, "Dashboard cursor is outside the safe range");
+    }
+    const page = await listDashboardChanges(db, project.id, cursor);
+    if (page.expired) {
+      return json(
+        {
+          code: "dashboard_cursor_expired",
+          message: "Dashboard cursor expired; reload the full snapshot",
+        },
+        410,
+      );
+    }
+
+    const observedAt = new Date().toISOString();
+    const changedRunIds = new Set(
+      page.changes.flatMap((change) =>
+        change.entity_type === "run" && change.entity_id
+          ? [change.entity_id]
+          : [],
+      ),
+    );
+    const metadataChanged = page.changes.some(
+      (change) => change.entity_type === "metadata",
+    );
+    const notificationsChanged = page.changes.some(
+      (change) =>
+        change.entity_type === "notifications" || change.entity_type === "run",
+    );
+    const [
+      dashboardRows,
+      attachments,
+      dependencies,
+      workers,
+      organizationWorkers,
+    ] =
+      await Promise.all([
+        changedRunIds.size > 0
+          ? listDashboardRuns(db, project.id)
+          : Promise.resolve({ runs: [], events: [] }),
+        changedRunIds.size > 0
+          ? listIssueAttachments(db, project.id)
+          : Promise.resolve([]),
+        changedRunIds.size > 0
+          ? listIssueDependencies(db, project.id)
+          : Promise.resolve([]),
+        listExecutionWorkers(db, project.id, observedAt),
+        listOrganizationExecutionWorkers(
+          db,
+          project.organization_id,
+          observedAt,
+        ),
+      ]);
+    const eventsByRun = new Map<string, HuntEventRow[]>();
+    for (const event of dashboardRows.events) {
+      if (!changedRunIds.has(event.run_id)) continue;
+      const runEvents = eventsByRun.get(event.run_id) ?? [];
+      runEvents.push(event);
+      eventsByRun.set(event.run_id, runEvents);
+    }
+    const attachmentsByRun = new Map<string, IssueAttachmentRow[]>();
+    for (const attachment of attachments) {
+      if (!changedRunIds.has(attachment.run_id)) continue;
+      const runAttachments = attachmentsByRun.get(attachment.run_id) ?? [];
+      runAttachments.push(attachment);
+      attachmentsByRun.set(attachment.run_id, runAttachments);
+    }
+    const prerequisitesByRun = new Map<string, IssueDependencyRow[]>();
+    const dependentsByRun = new Map<string, IssueDependencyRow[]>();
+    for (const dependency of dependencies) {
+      if (changedRunIds.has(dependency.dependent_run_id)) {
+        const prerequisites =
+          prerequisitesByRun.get(dependency.dependent_run_id) ?? [];
+        prerequisites.push(dependency);
+        prerequisitesByRun.set(dependency.dependent_run_id, prerequisites);
+      }
+      if (changedRunIds.has(dependency.prerequisite_run_id)) {
+        const dependents =
+          dependentsByRun.get(dependency.prerequisite_run_id) ?? [];
+        dependents.push(dependency);
+        dependentsByRun.set(dependency.prerequisite_run_id, dependents);
+      }
+    }
+    const changedRuns = dashboardRows.runs.filter((run) =>
+      changedRunIds.has(run.id),
+    );
+    const existingRunIds = new Set(changedRuns.map((run) => run.id));
+    const organizationProviders = [
+      ...new Set(
+        organizationWorkers.flatMap((worker) =>
+          worker.bindings.flatMap((binding) => binding.providers ?? []),
+        ),
+      ),
+    ];
+    const metadata = metadataChanged
+      ? await Promise.all([
+          getProjectSettings(db, project.id),
+          getProjectExecutionWorkerPolicy(db, project.id),
+          listOrganizationMembers(db, project.organization_id),
+        ])
+      : null;
+    const conversationNotifications = notificationsChanged
+      ? await listIssueConversationNotifications(
+          db,
+          project.id,
+          session.user.id,
+        )
+      : null;
+
+    return json({
+      cursor: page.nextCursor,
+      hasMore: page.hasMore,
+      runs: changedRuns.map((run) =>
+        dashboardRunJson(
+          run,
+          eventsByRun.get(run.id) ?? [],
+          attachmentsByRun.get(run.id) ?? [],
+          prerequisitesByRun.get(run.id) ?? [],
+          dependentsByRun.get(run.id) ?? [],
+        ),
+      ),
+      deletedRunIds: [...changedRunIds].filter(
+        (runId) => !existingRunIds.has(runId),
+      ),
+      // Worker liveness also changes as time passes without a database write,
+      // so this small projection is refreshed on every delta request.
+      workers: workers.map((worker) => workerJson(worker, observedAt)),
+      organizationProviders,
+      ...(metadata
+        ? {
+            project: projectJson(project),
+            settings: settingsJson(metadata[0]),
+            executionPolicy: metadata[1],
+            members: metadata[2].map(organizationMemberJson),
+          }
+        : {}),
+      ...(conversationNotifications
+        ? {
+            conversationNotifications: conversationNotifications.map(
+              issueConversationNotificationJson,
+            ),
+          }
+        : {}),
+      generatedAt: observedAt,
+    });
+  }
+
   const dashboardMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/dashboard$/u,
   );
@@ -4042,6 +4207,9 @@ async function route(
     const session = await requireSession(auth, request);
     const project = await getProject(db, dashboardMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
+    // Capture the cursor before reading the snapshot. A concurrent write is
+    // therefore either visible here or guaranteed to appear in the next delta.
+    const cursor = await getDashboardSyncCursor(db, project.id);
     const observedAt = new Date().toISOString();
     const [
       { runs, events },
@@ -4122,6 +4290,7 @@ async function route(
       conversationNotifications: conversationNotifications.map(
         issueConversationNotificationJson,
       ),
+      cursor,
       generatedAt: observedAt,
     });
   }

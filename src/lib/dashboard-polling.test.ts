@@ -9,6 +9,7 @@ function pollingHarness(initiallyVisible: boolean) {
   let visible = initiallyVisible;
   let intervalCallback: (() => void) | null = null;
   let visibilityListener: (() => void) | null = null;
+  let onlineListener: (() => void) | null = null;
   const clearInterval = vi.fn();
   const setInterval = vi.fn((callback: () => void) => {
     intervalCallback = callback;
@@ -24,6 +25,12 @@ function pollingHarness(initiallyVisible: boolean) {
         visibilityListener = null;
       };
     },
+    addOnlineListener: (listener) => {
+      onlineListener = listener;
+      return () => {
+        onlineListener = null;
+      };
+    },
   };
   return {
     environment,
@@ -34,6 +41,7 @@ function pollingHarness(initiallyVisible: boolean) {
       visible = next;
       visibilityListener?.();
     },
+    reconnect: () => onlineListener?.(),
   };
 }
 
@@ -46,7 +54,7 @@ describe("dashboard polling", () => {
 
     expect(refresh).toHaveBeenCalledTimes(1);
     expect(harness.setInterval).toHaveBeenCalledWith(
-      refresh,
+      expect.any(Function),
       DASHBOARD_POLL_INTERVAL_MS,
     );
     harness.tick();
@@ -71,6 +79,22 @@ describe("dashboard polling", () => {
 
     harness.setVisible(false);
     expect(harness.clearInterval).toHaveBeenCalledWith(41);
+
+    stop();
+  });
+
+  it("requests a safe snapshot after reconnecting or returning to foreground", () => {
+    const refresh = vi.fn();
+    const harness = pollingHarness(true);
+
+    const stop = startDashboardPolling(refresh, harness.environment);
+    expect(refresh).toHaveBeenLastCalledWith("poll");
+
+    harness.reconnect();
+    expect(refresh).toHaveBeenLastCalledWith("reconnect");
+    harness.setVisible(false);
+    harness.setVisible(true);
+    expect(refresh).toHaveBeenLastCalledWith("resume");
 
     stop();
   });
