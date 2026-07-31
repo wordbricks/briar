@@ -28,6 +28,7 @@ import {
   RefreshCw,
   RotateCcw,
   Search,
+  Share2,
   Signal,
   Tag,
   Trash2,
@@ -91,6 +92,7 @@ import {
   issueMentionHandle,
   mentionsIssueHandle,
 } from "../lib/issue-agent-reply";
+import { shareIssueLink } from "../lib/issue-links";
 import type {
   CreateIssueInput,
   DashboardPayload,
@@ -518,6 +520,7 @@ export function HuntDashboard({
             agentAssociationsByRunId.performedAgents.get(selected.id)?.name ??
             null
           }
+          projectId={dashboard!.project.id}
           run={selected}
         />
         {createIssueDialog}
@@ -1978,6 +1981,7 @@ export function RunPage({
   onSendIssueMessage,
   onUpdateIssue,
   performedAgentName = null,
+  projectId = "",
   run,
 }: {
   companionMode?: boolean;
@@ -2002,6 +2006,7 @@ export function RunPage({
   }) => Promise<IssueMessageSendResult>;
   onUpdateIssue?: (input: UpdateIssueInput) => Promise<unknown>;
   performedAgentName?: string | null;
+  projectId?: string;
   run: HuntRun;
 }) {
   const { localeTag, t } = useI18n();
@@ -2018,6 +2023,9 @@ export function RunPage({
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [shareStatus, setShareStatus] = useState<"copied" | "error" | null>(
+    null,
+  );
   const [contentSplit, setContentSplit] = useState(50);
   const [isResizingContent, setIsResizingContent] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState<
@@ -2067,6 +2075,19 @@ export function RunPage({
       setConfirmCancel(false);
     } catch {
       // The hook exposes the actionable error on this page.
+    }
+  };
+  const shareIssue = async () => {
+    setShareStatus(null);
+    try {
+      const result = await shareIssueLink({
+        projectId,
+        runId: run.id,
+        title: run.title,
+      });
+      if (result === "copied") setShareStatus("copied");
+    } catch {
+      setShareStatus("error");
     }
   };
   const clampContentSplit = (value: number) =>
@@ -2148,13 +2169,25 @@ export function RunPage({
           >
             {run.title}
           </strong>
-          {(onUpdateIssue || onDelete) && (
-            <IssueActionsMenu
-              disabled={isUpdatingIssue || isDeletingIssue}
-              onDelete={onDelete ? () => setIsDeleteDialogOpen(true) : undefined}
-              onEdit={onUpdateIssue ? () => setIsEditDialogOpen(true) : undefined}
-            />
-          )}
+          {shareStatus ? (
+            <span
+              aria-live="polite"
+              className={`run-page-share-status${shareStatus === "error" ? " error" : ""}`}
+              role="status"
+            >
+              {t(
+                shareStatus === "copied"
+                  ? "issue.linkCopied"
+                  : "issue.shareFailed",
+              )}
+            </span>
+          ) : null}
+          <IssueActionsMenu
+            disabled={isUpdatingIssue || isDeletingIssue}
+            onDelete={onDelete ? () => setIsDeleteDialogOpen(true) : undefined}
+            onEdit={onUpdateIssue ? () => setIsEditDialogOpen(true) : undefined}
+            onShare={() => void shareIssue()}
+          />
         </header>
       )}
       <div className="run-page-scroll">
@@ -2178,19 +2211,31 @@ export function RunPage({
                     <div className="run-page-title-row">
                       <small>AH-{run.runNumber}</small>
                       <h1 id="run-page-title">{run.title}</h1>
-                      {(onUpdateIssue || onDelete) && (
-                        <IssueActionsMenu
-                          disabled={isUpdatingIssue || isDeletingIssue}
-                          onDelete={
-                            onDelete ? () => setIsDeleteDialogOpen(true) : undefined
-                          }
-                          onEdit={
-                            onUpdateIssue
-                              ? () => setIsEditDialogOpen(true)
-                              : undefined
-                          }
-                        />
-                      )}
+                      {shareStatus ? (
+                        <span
+                          aria-live="polite"
+                          className={`run-page-share-status${shareStatus === "error" ? " error" : ""}`}
+                          role="status"
+                        >
+                          {t(
+                            shareStatus === "copied"
+                              ? "issue.linkCopied"
+                              : "issue.shareFailed",
+                          )}
+                        </span>
+                      ) : null}
+                      <IssueActionsMenu
+                        disabled={isUpdatingIssue || isDeletingIssue}
+                        onDelete={
+                          onDelete ? () => setIsDeleteDialogOpen(true) : undefined
+                        }
+                        onEdit={
+                          onUpdateIssue
+                            ? () => setIsEditDialogOpen(true)
+                            : undefined
+                        }
+                        onShare={() => void shareIssue()}
+                      />
                     </div>
                   </div>
                   <div className="run-page-meta">
@@ -2533,10 +2578,12 @@ function IssueActionsMenu({
   disabled,
   onDelete,
   onEdit,
+  onShare,
 }: {
   disabled: boolean;
   onDelete?: () => void;
   onEdit?: () => void;
+  onShare: () => void;
 }) {
   const { t } = useI18n();
   return (
@@ -2561,6 +2608,13 @@ function IssueActionsMenu({
           className="run-page-actions-menu"
           sideOffset={6}
         >
+          <DropdownMenu.Item
+            className="run-page-actions-item"
+            onSelect={onShare}
+          >
+            <Share2 size={14} />
+            {t("issue.share")}
+          </DropdownMenu.Item>
           {onEdit ? (
             <DropdownMenu.Item
               className="run-page-actions-item"

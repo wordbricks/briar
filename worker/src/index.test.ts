@@ -408,6 +408,44 @@ describe("Worker HTTP contract", () => {
     expect(page).not.toContain("<h1>Companion 로그인 승인</h1>");
   });
 
+  it("serves issue links that open the exact issue in Companion", async () => {
+    const projectId = "11111111-1111-4111-8111-111111111111";
+    const runId = "22222222-2222-4222-8222-222222222222";
+    const response = await worker.fetch(
+      new Request(
+        `https://briar-api.example/open/issues/${projectId}/${runId}`,
+      ),
+      {} as never,
+    );
+    const page = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toContain("text/html");
+    expect(page).toContain(
+      `briar-companion://issues/${projectId}/${runId}`,
+    );
+    expect(page).not.toContain("authorization");
+  });
+
+  it("publishes the iOS Universal Link association", async () => {
+    const response = await worker.fetch(
+      new Request(
+        "https://briar-api.example/.well-known/apple-app-site-association",
+      ),
+      {} as never,
+    );
+
+    expect(response.headers.get("Content-Type")).toBe("application/json");
+    await expect(response.json()).resolves.toMatchObject({
+      applinks: {
+        details: [{
+          appIDs: ["QFJZ2V3829.app.briar.companion"],
+          components: [{ "/": "/open/issues/*" }],
+        }],
+      },
+    });
+  });
+
   it("allows project deletion through CORS preflight", async () => {
     const response = await worker.fetch(
       new Request(

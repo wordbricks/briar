@@ -466,7 +466,7 @@ describe("HuntDashboard", () => {
     await act(async () => root.unmount());
   });
 
-  it("shows edit and delete in the title actions menu and confirms deletion", async () => {
+  it("shows share, edit, and delete in the title actions menu and confirms deletion", async () => {
     const onDeleteIssue = vi.fn(async () => undefined);
     const container = document.createElement("div");
     document.body.append(container);
@@ -495,6 +495,7 @@ describe("HuntDashboard", () => {
       );
     });
     const menu = document.body.querySelector('[role="menu"]');
+    expect(menu?.textContent).toContain("링크 공유");
     expect(menu?.textContent).toContain("수정");
     expect(menu?.textContent).toContain("삭제");
 

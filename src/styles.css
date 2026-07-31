@@ -779,6 +779,8 @@ body { overflow: hidden; font-synthesis: none; }
 .run-page-description { max-width:900px; max-height:3.2em; margin:0; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; white-space:pre-wrap; color:var(--muted-foreground); font-size:var(--text-xs); line-height:1.6; }
 .run-page-meta { display:flex; align-items:center; gap:8px; padding-top:1px; }
 .run-page-shell .run-page-window-title { flex:0 1 auto; }
+.run-page-share-status { flex:0 0 auto; color:#4b8a70; font-size:var(--text-2xs); font-weight:600; white-space:nowrap; }
+.run-page-share-status.error { color:#b44255; }
 .run-page-actions-trigger { width:28px; height:28px; flex:0 0 28px; padding:0; display:grid; place-items:center; align-self:center; border:1px solid transparent; border-radius:8px; color:var(--muted-foreground); background:transparent; cursor:pointer; }
 .run-page-actions-trigger:hover:not(:disabled),.run-page-actions-trigger[data-state="open"] { border-color:var(--border); color:var(--accent-foreground); background:var(--accent); }
 .run-page-actions-trigger:focus-visible { outline:2px solid #8b70dd; outline-offset:2px; }
