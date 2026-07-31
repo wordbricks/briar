@@ -109,6 +109,10 @@ export function Sidebar({
     "actions" | "organizations"
   >("actions");
   const organizationMenuRef = useRef<HTMLDivElement | null>(null);
+  // Projects start expanded; only explicitly collapsed IDs are stored.
+  const [collapsedProjectIds, setCollapsedProjectIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [openProjectMenuId, setOpenProjectMenuId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const menuItemRef = useRef<HTMLButtonElement | null>(null);
@@ -235,31 +239,63 @@ export function Sidebar({
         (project) => project.organizationId === activeOrganization.id,
       )
     : projects;
-  const runningAgentSessions = useMemo(() => {
-    const agentById = new Map(
-      agents
-        .filter((agent) => agent.projectId === activeProjectId)
-        .map((agent) => [agent.id, agent]),
-    );
-    return collapseLinkedAutoHuntSessions(
-      sessions.filter(
-        (session) =>
-          session.projectId === activeProjectId &&
-          session.status === "running" &&
-          session.agentId &&
-          agentById.has(session.agentId),
-      ),
-    )
-      .map((session) => ({
-        agent: agentById.get(session.agentId as string)!,
-        session,
-      }))
-      .sort(
-        (left, right) =>
-          new Date(right.session.startedAt).getTime() -
-          new Date(left.session.startedAt).getTime(),
+  const runningAgentSessionsByProjectId = useMemo(() => {
+    const agentById = new Map(agents.map((agent) => [agent.id, agent]));
+    const grouped = new Map<
+      string,
+      Array<{ agent: ProjectAgent; session: AutoHuntSession }>
+    >();
+
+    for (const project of projects) {
+      const projectAgents = new Map(
+        agents
+          .filter((agent) => agent.projectId === project.id)
+          .map((agent) => [agent.id, agent]),
       );
-  }, [activeProjectId, agents, sessions]);
+      const running = collapseLinkedAutoHuntSessions(
+        sessions.filter(
+          (session) =>
+            session.projectId === project.id &&
+            session.status === "running" &&
+            session.agentId &&
+            projectAgents.has(session.agentId),
+        ),
+      )
+        .map((session) => ({
+          agent: agentById.get(session.agentId as string)!,
+          session,
+        }))
+        .sort(
+          (left, right) =>
+            new Date(right.session.startedAt).getTime() -
+            new Date(left.session.startedAt).getTime(),
+        );
+      grouped.set(project.id, running);
+    }
+
+    return grouped;
+  }, [agents, projects, sessions]);
+
+  const isProjectExpanded = (projectId: string) =>
+    !collapsedProjectIds.has(projectId);
+
+  const setProjectExpanded = (projectId: string, expanded: boolean) => {
+    setCollapsedProjectIds((current) => {
+      const next = new Set(current);
+      if (expanded) next.delete(projectId);
+      else next.add(projectId);
+      return next;
+    });
+  };
+
+  const toggleProjectExpanded = (projectId: string) => {
+    setProjectExpanded(projectId, !isProjectExpanded(projectId));
+  };
+
+  const selectProject = (projectId: string) => {
+    onProjectChange(projectId);
+    setProjectExpanded(projectId, true);
+  };
 
   return (
     <aside
@@ -490,6 +526,7 @@ export function Sidebar({
         <div className="sidebar-project-list">
           {visibleProjects.map((project) => {
             const isActive = project.id === activeProjectId;
+            const isExpanded = isProjectExpanded(project.id);
             const isMenuOpen = project.id === openProjectMenuId;
             const readiness = projectReadiness[project.id];
             const needsConnection = !isProjectConnectedLocally(
@@ -498,22 +535,55 @@ export function Sidebar({
             );
             const needsAttention =
               !needsConnection && readiness?.requiresGithub && !readiness.prReady;
+            const runningAgentSessions =
+              runningAgentSessionsByProjectId.get(project.id) ?? [];
+            const openProjectPage = (open: () => void) => {
+              if (!isActive) onProjectChange(project.id);
+              setProjectExpanded(project.id, true);
+              open();
+            };
 
             return (
               <section className="sidebar-project-group" key={project.id}>
                 <div
                   className={`sidebar-project-row${needsAttention ? " has-warning" : ""}`}
                 >
-                  <button
-                    aria-expanded={isActive}
-                    className="sidebar-project-heading"
-                    onClick={() => onProjectChange(project.id)}
-                    type="button"
-                  >
-                    <FolderGit2 size={16} strokeWidth={1.7} />
-                    <span>{project.name}</span>
-                    {isActive && <i aria-label={t("sidebar.currentProject")} />}
-                  </button>
+                  <div className="sidebar-project-heading-group">
+                    <button
+                      aria-controls={`project-views-${project.id}`}
+                      aria-expanded={isExpanded}
+                      aria-label={t(
+                        isExpanded
+                          ? "sidebar.collapseProject"
+                          : "sidebar.expandProject",
+                        { name: project.name },
+                      )}
+                      className="sidebar-project-toggle"
+                      onClick={() => toggleProjectExpanded(project.id)}
+                      title={t(
+                        isExpanded
+                          ? "sidebar.collapseProject"
+                          : "sidebar.expandProject",
+                        { name: project.name },
+                      )}
+                      type="button"
+                    >
+                      {isExpanded ? (
+                        <ChevronDown size={14} strokeWidth={1.9} />
+                      ) : (
+                        <ChevronRight size={14} strokeWidth={1.9} />
+                      )}
+                    </button>
+                    <button
+                      className="sidebar-project-heading"
+                      onClick={() => selectProject(project.id)}
+                      type="button"
+                    >
+                      <FolderGit2 size={16} strokeWidth={1.7} />
+                      <span>{project.name}</span>
+                      {isActive && <i aria-label={t("sidebar.currentProject")} />}
+                    </button>
+                  </div>
                   {needsAttention ? (
                     <button
                       aria-label={t("repositorySetup.open", { name: project.name })}
@@ -564,16 +634,23 @@ export function Sidebar({
                     </div>
                   )}
                 </div>
-                {isActive && (
-                  <div className="sidebar-project-views">
+                {isExpanded && (
+                  <div
+                    className="sidebar-project-views"
+                    id={`project-views-${project.id}`}
+                  >
                     <div className="sidebar-project-view-row">
                       <a
-                        aria-current={activePage === "issues" ? "page" : undefined}
-                        className={`sidebar-project-view${activePage === "issues" ? " active" : ""}`}
+                        aria-current={
+                          isActive && activePage === "issues" ? "page" : undefined
+                        }
+                        className={`sidebar-project-view${
+                          isActive && activePage === "issues" ? " active" : ""
+                        }`}
                         href="#issues"
                         onClick={(event) => {
                           event.preventDefault();
-                          onIssuesOpen();
+                          openProjectPage(onIssuesOpen);
                         }}
                       >
                         <Activity size={14} strokeWidth={1.7} />
@@ -582,7 +659,7 @@ export function Sidebar({
                       <button
                         aria-label={t("dashboard.createIssue")}
                         className="sidebar-issue-add"
-                        onClick={onCreateIssue}
+                        onClick={() => openProjectPage(onCreateIssue)}
                         title={t("dashboard.createIssue")}
                         type="button"
                       >
@@ -591,12 +668,16 @@ export function Sidebar({
                     </div>
                     <div className="sidebar-agent-navigation">
                       <a
-                        aria-current={activePage === "agents" ? "page" : undefined}
-                        className={`sidebar-project-view${activePage === "agents" ? " active" : ""}`}
+                        aria-current={
+                          isActive && activePage === "agents" ? "page" : undefined
+                        }
+                        className={`sidebar-project-view${
+                          isActive && activePage === "agents" ? " active" : ""
+                        }`}
                         href="#agents"
                         onClick={(event) => {
                           event.preventDefault();
-                          onAgentsOpen();
+                          openProjectPage(onAgentsOpen);
                         }}
                       >
                         <Bot size={14} strokeWidth={1.7} />
@@ -619,7 +700,10 @@ export function Sidebar({
                                 })}
                                 className="sidebar-agent-session"
                                 key={session.id}
-                                onClick={() => onAgentSessionOpen(session.id)}
+                                onClick={() => {
+                                  if (!isActive) onProjectChange(project.id);
+                                  onAgentSessionOpen(session.id);
+                                }}
                                 title={title}
                                 type="button"
                               >
@@ -647,12 +731,16 @@ export function Sidebar({
                       ) : null}
                     </div>
                     <a
-                      aria-current={activePage === "schedule" ? "page" : undefined}
-                      className={`sidebar-project-view${activePage === "schedule" ? " active" : ""}`}
+                      aria-current={
+                        isActive && activePage === "schedule" ? "page" : undefined
+                      }
+                      className={`sidebar-project-view${
+                        isActive && activePage === "schedule" ? " active" : ""
+                      }`}
                       href="#schedule"
                       onClick={(event) => {
                         event.preventDefault();
-                        onScheduleOpen();
+                        openProjectPage(onScheduleOpen);
                       }}
                     >
                       <CalendarDays size={14} strokeWidth={1.7} />
