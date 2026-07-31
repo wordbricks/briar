@@ -2273,7 +2273,7 @@ export async function deleteIssueDependency(
     )
     .bind(projectId, prerequisiteRunId, dependentRunId)
     .run();
-  return result.meta.changes === 1;
+  return result.meta.changes > 0;
 }
 
 export async function listIssueMessages(
