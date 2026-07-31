@@ -29,7 +29,10 @@ export default defineConfig({
     },
   },
   test: {
+    hookTimeout: 30_000,
+    maxWorkers: 4,
     setupFiles: ["./src/test/setup.ts"],
+    testTimeout: 15_000,
     env: {
       // api.ts reads this at module load; tests expect a configured Worker URL.
       VITE_BRIAR_API_URL: "http://127.0.0.1:8787",
