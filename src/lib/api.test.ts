@@ -17,6 +17,7 @@ import {
   loadProjectAgents,
   loadRunEvidence,
   loadRunEvidenceImage,
+  loadRunEvents,
   loadSession,
   removeIssueDependency,
   updateProjectAgent,
@@ -28,7 +29,7 @@ import {
   waitForIssueAgentReply,
 } from "./api";
 import { repositoryWorkflowBootstrap } from "./auto-hunt-contract";
-import { demoDashboard } from "./demo-data";
+import { demoDashboard, demoRunEvents } from "./demo-data";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -458,16 +459,9 @@ describe("API errors", () => {
       runs: demoDashboard.runs.map((run) => {
         const {
           currentRevision: _currentRevision,
-          events: currentEvents,
           ...legacyRun
         } = run;
-        return {
-          ...legacyRun,
-          events: currentEvents.map((event) => {
-            const { revision: _revision, ...legacyEvent } = event;
-            return legacyEvent;
-          }),
-        };
+        return legacyRun;
       }),
     };
     vi.stubGlobal(
@@ -486,7 +480,27 @@ describe("API errors", () => {
     );
 
     expect(dashboard.runs[0].currentRevision).toBe(1);
-    expect(dashboard.runs[0].events[0].revision).toBe(1);
+    expect(dashboard.runs[0]).not.toHaveProperty("events");
+  });
+
+  it("loads and normalizes timeline events from the run detail endpoint", async () => {
+    const projectId = "22222222-2222-4222-8222-222222222222";
+    const runId = "11111111-1111-4111-8111-111111111111";
+    const [{ revision: _revision, ...legacyEvent }] = demoRunEvents["demo-1"];
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ events: [legacyEvent] }), {
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const events = await loadRunEvents("token", projectId, runId);
+
+    expect(events[0].revision).toBe(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(`/projects/${projectId}/runs/${runId}/events`),
+      expect.objectContaining({ headers: expect.any(Headers) }),
+    );
   });
 
   it("requests dashboard changes after the supplied cursor", async () => {

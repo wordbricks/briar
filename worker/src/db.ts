@@ -2085,8 +2085,7 @@ export async function listDashboardRuns(db: D1Database, projectId: string) {
               run.dispatch_request_id, run.dispatched_at, run.worker_id,
               run.started_at,
               run.updated_at, run.completed_at, run.last_event_at,
-              (select count(*) from briar_hunt_events event
-               where event.run_id = run.id) as event_count
+              run.event_count
        from briar_hunt_runs run
        where run.project_id = ?
        order by
@@ -2097,31 +2096,31 @@ export async function listDashboardRuns(db: D1Database, projectId: string) {
     .bind(projectId)
     .all<HuntRunRow>();
 
+  return runs.results;
+}
+
+export async function listHuntRunEvents(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+) {
   const events = await db
     .prepare(
-      `select ranked.id, ranked.run_id, ranked.event_key, ranked.attempt,
-              ranked.stage, ranked.status, ranked.workflow_stage,
-              ranked.detail, ranked.actor, ranked.branch, ranked.commit_sha,
-              ranked.qa_status, ranked.tracker_issue_state,
-              ranked.pull_request_urls, ranked.target_sha,
-              ranked.occurred_at, ranked.recorded_at
-       from (
-         select event.*,
-                row_number() over (
-                  partition by event.run_id
-                  order by event.occurred_at desc, event.id desc
-                ) as event_rank
-         from briar_hunt_events event
-         join briar_hunt_runs run on run.id = event.run_id
-         where run.project_id = ?
-       ) ranked
-       where ranked.event_rank <= 20
-       order by ranked.occurred_at desc, ranked.id desc`,
+      `select event.id, event.run_id, event.event_key, event.attempt,
+              event.revision, event.stage, event.status, event.workflow_stage,
+              event.detail, event.actor, event.branch, event.commit_sha,
+              event.qa_status, event.tracker_issue_state,
+              event.pull_request_urls, event.target_sha,
+              event.occurred_at, event.recorded_at
+       from briar_hunt_events event
+       join briar_hunt_runs run on run.id = event.run_id
+       where run.project_id = ? and event.run_id = ?
+       order by event.occurred_at desc, event.id desc`,
     )
-    .bind(projectId)
+    .bind(projectId, runId)
     .all<HuntEventRow>();
 
-  return { runs: runs.results, events: events.results };
+  return events.results;
 }
 
 export async function listIssueDependencies(
@@ -2792,9 +2791,9 @@ export async function rollbackNewAppIssue(
       `delete from briar_hunt_runs
        where id = ? and project_id = ? and source = 'issue'
          and status = 'queued' and claim_attempts = 0
-         and (select count(*) from briar_hunt_events where run_id = ?) = 1`,
+         and event_count = 1`,
     )
-    .bind(runId, projectId, runId)
+    .bind(runId, projectId)
     .run();
   return result.meta.changes > 0;
 }
@@ -2802,9 +2801,7 @@ export async function rollbackNewAppIssue(
 export async function getNextQueuedHuntRun(db: D1Database, projectId: string) {
   return await db
     .prepare(
-      `select run.*,
-              (select count(*) from briar_hunt_events event
-               where event.run_id = run.id) as event_count
+      `select run.*
        from briar_hunt_runs run
        where run.project_id = ? and run.status = 'queued'
          and not exists (

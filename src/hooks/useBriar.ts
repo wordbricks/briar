@@ -21,6 +21,7 @@ import {
   loadDashboardDelta,
   loadIssueAttachment,
   loadIssueMessages,
+  loadRunEvents,
   loadRunEvidence,
   loadRunEvidenceImage,
   loadLinearImportStates,
@@ -44,6 +45,7 @@ import {
 } from "../lib/api";
 import {
   demoDashboard,
+  demoRunEvents,
   demoRepositoryReadiness,
 } from "../lib/demo-data";
 import { isRepositoryConnectedForImport } from "../lib/linear-import";
@@ -111,6 +113,7 @@ import type {
   ClaimedProjectAgentScheduleRun,
   CreateIssueInput,
   DashboardPayload,
+  HuntEvent,
   HuntRun,
   HuntRunPlacement,
   IssueAttachment,
@@ -306,6 +309,9 @@ export function useBriar(options: UseBriarOptions = {}) {
   );
   const runEvidenceByRun = useRef<Record<string, RunEvidence[]>>(
     demoMode ? initialDemoRunEvidence : {},
+  );
+  const runEventsByRun = useRef<Record<string, HuntEvent[]>>(
+    demoMode ? structuredClone(demoRunEvents) : {},
   );
   const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const [velen, setVelen] = useState<VelenInspection | null>(null);
@@ -1799,6 +1805,21 @@ export function useBriar(options: UseBriarOptions = {}) {
           const detail = input.status === "backlog"
             ? "Briar 앱에서 생성된 이슈가 백로그에 추가되었습니다."
             : "Briar 앱에서 생성된 이슈가 Auto Hunt 처리를 기다리고 있습니다.";
+          const initialEvent: HuntEvent = {
+            id: crypto.randomUUID(),
+            attempt: 1,
+            revision: 1,
+            status: input.status,
+            workflowStage: null,
+            detail,
+            actor: "briar-app",
+            qaStatus: null,
+            trackerState: null,
+            pullRequestUrls: [],
+            targetSha: null,
+            occurredAt,
+            recordedAt: occurredAt,
+          };
           const run: HuntRun = {
             id: crypto.randomUUID(),
             runNumber:
@@ -1842,24 +1863,10 @@ export function useBriar(options: UseBriarOptions = {}) {
             startedAt: occurredAt,
             updatedAt: occurredAt,
             completedAt: null,
-            events: [
-              {
-                id: crypto.randomUUID(),
-                attempt: 1,
-                revision: 1,
-                status: input.status,
-                workflowStage: null,
-                detail,
-                actor: "briar-app",
-                qaStatus: null,
-                trackerState: null,
-                pullRequestUrls: [],
-                targetSha: null,
-                occurredAt,
-                recordedAt: occurredAt,
-              },
-            ],
+            lastEventAt: occurredAt,
+            eventCount: 1,
           };
+          runEventsByRun.current[run.id] = [initialEvent];
           setDashboard((current) =>
             current ? { ...current, runs: [run, ...current.runs] } : current,
           );
@@ -2127,6 +2134,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         );
         delete issueMessagesByRun.current[runId];
         delete runEvidenceByRun.current[runId];
+        delete runEventsByRun.current[runId];
       } catch (caught) {
         const message = caught instanceof Error ? caught.message : String(caught);
         setError(message);
@@ -2164,6 +2172,21 @@ export function useBriar(options: UseBriarOptions = {}) {
         [runId]: evidence,
       };
       return evidence;
+    },
+    [activeProjectId, token],
+  );
+
+  const readRunEvents = useCallback(
+    async (runId: string) => {
+      if (!activeProjectId) throw new Error("이벤트를 불러올 프로젝트가 없습니다.");
+      if (demoMode) return runEventsByRun.current[runId] ?? [];
+      if (!token) throw new Error("이벤트를 불러오려면 로그인이 필요합니다.");
+      const events = await loadRunEvents(token, activeProjectId, runId);
+      runEventsByRun.current = {
+        ...runEventsByRun.current,
+        [runId]: events,
+      };
+      return events;
     },
     [activeProjectId, token],
   );
@@ -2274,6 +2297,25 @@ export function useBriar(options: UseBriarOptions = {}) {
                       action === "retry"
                         ? `Auto Hunt ${attempt}차 시도를 요청했습니다.`
                         : "사용자가 Auto Hunt 작업을 취소했습니다.";
+                    const nextEvent: HuntEvent = {
+                      id: crypto.randomUUID(),
+                      attempt,
+                      revision: action === "retry" ? 1 : run.currentRevision,
+                      status,
+                      workflowStage: action === "retry" ? null : run.workflowStage,
+                      detail,
+                      actor: "briar-app",
+                      qaStatus: null,
+                      trackerState: run.tracker?.state ?? null,
+                      pullRequestUrls: [],
+                      targetSha: null,
+                      occurredAt,
+                      recordedAt: occurredAt,
+                    };
+                    runEventsByRun.current[run.id] = [
+                      nextEvent,
+                      ...(runEventsByRun.current[run.id] ?? []),
+                    ];
                     return {
                       ...run,
                       currentAttempt: attempt,
@@ -2291,26 +2333,8 @@ export function useBriar(options: UseBriarOptions = {}) {
                       leaseExpiresAt: null,
                       completedAt: action === "cancel" ? occurredAt : null,
                       updatedAt: occurredAt,
-                      events: [
-                        {
-                          id: crypto.randomUUID(),
-                          attempt,
-                          revision:
-                            action === "retry" ? 1 : run.currentRevision,
-                          status,
-                          workflowStage:
-                            action === "retry" ? null : run.workflowStage,
-                          detail,
-                          actor: "briar-app",
-                          qaStatus: null,
-                          trackerState: run.tracker?.state ?? null,
-                          pullRequestUrls: [],
-                          targetSha: null,
-                          occurredAt,
-                          recordedAt: occurredAt,
-                        },
-                        ...run.events,
-                      ],
+                      lastEventAt: occurredAt,
+                      eventCount: run.eventCount + 1,
                     };
                   }),
                 }
@@ -2394,6 +2418,25 @@ export function useBriar(options: UseBriarOptions = {}) {
                             cancelled: "취소",
                           }[placement.status];
                     const detail = `사용자가 작업을 ${targetLabel ?? placement.status} 상태로 이동했습니다.`;
+                    const nextEvent: HuntEvent = {
+                      id: crypto.randomUUID(),
+                      attempt: currentAttempt,
+                      revision: currentRevision,
+                      status: placement.status,
+                      workflowStage,
+                      detail,
+                      actor: "briar-app",
+                      qaStatus: null,
+                      trackerState: run.tracker?.state ?? null,
+                      pullRequestUrls: run.pullRequestUrls,
+                      targetSha: run.targetSha,
+                      occurredAt,
+                      recordedAt: occurredAt,
+                    };
+                    runEventsByRun.current[run.id] = [
+                      nextEvent,
+                      ...(runEventsByRun.current[run.id] ?? []),
+                    ];
                     return {
                       ...run,
                       currentAttempt,
@@ -2418,24 +2461,8 @@ export function useBriar(options: UseBriarOptions = {}) {
                         ? occurredAt
                         : null,
                       updatedAt: occurredAt,
-                      events: [
-                        {
-                          id: crypto.randomUUID(),
-                          attempt: currentAttempt,
-                          revision: currentRevision,
-                          status: placement.status,
-                          workflowStage,
-                          detail,
-                          actor: "briar-app",
-                          qaStatus: null,
-                          trackerState: run.tracker?.state ?? null,
-                          pullRequestUrls: run.pullRequestUrls,
-                          targetSha: run.targetSha,
-                          occurredAt,
-                          recordedAt: occurredAt,
-                        },
-                        ...run.events,
-                      ],
+                      lastEventAt: occurredAt,
+                      eventCount: run.eventCount + 1,
                     };
                   }),
                 }
@@ -2525,6 +2552,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       prerequisiteRunId: string,
     ) => changeIssueDependency(dependentRunId, prerequisiteRunId, "remove"),
     readIssueMessages,
+    readRunEvents,
     readRunEvidence,
     readRunEvidenceImage,
     addIssueMessage,

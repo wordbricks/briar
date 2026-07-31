@@ -114,6 +114,7 @@ import type {
   CreateIssueInput,
   DashboardPayload,
   ExecutionWorker,
+  HuntEvent,
   HuntRun,
   HuntRunPlacement,
   HuntSource,
@@ -173,6 +174,7 @@ export function HuntDashboard({
   onUpdateIssuePreferences = async () => undefined,
   onLoadAttachment,
   onLoadIssueMessages,
+  onLoadRunEvents = async () => [],
   onLoadRunEvidence,
   onLoadRunEvidenceImage,
   onMoveRun,
@@ -223,6 +225,7 @@ export function HuntDashboard({
   ) => Promise<unknown>;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onLoadIssueMessages: (runId: string) => Promise<IssueMessage[]>;
+  onLoadRunEvents?: (runId: string) => Promise<HuntEvent[]>;
   onLoadRunEvidence: (runId: string) => Promise<RunEvidence[]>;
   onLoadRunEvidenceImage?: (image: RunEvidenceImage) => Promise<Blob>;
   onMoveRun: (runId: string, placement: HuntRunPlacement) => Promise<unknown>;
@@ -579,6 +582,7 @@ export function HuntDashboard({
           onDependencyOpen={setSelectedRunId}
           onLoadAttachment={onLoadAttachment}
           onLoadIssueMessages={() => onLoadIssueMessages(selected.id)}
+          onLoadRunEvents={() => onLoadRunEvents(selected.id)}
           onLoadRunEvidence={() => onLoadRunEvidence(selected.id)}
           onLoadRunEvidenceImage={onLoadRunEvidenceImage}
           mentionMembers={dashboard?.members ?? []}
@@ -2593,6 +2597,7 @@ export function RunPage({
   onDependencyOpen,
   onLoadAttachment,
   onLoadIssueMessages,
+  onLoadRunEvents = async () => [],
   onLoadRunEvidence,
   onLoadRunEvidenceImage,
   mentionMembers = [],
@@ -2621,6 +2626,7 @@ export function RunPage({
   onDependencyOpen?: (runId: string) => void;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onLoadIssueMessages: () => Promise<IssueMessage[]>;
+  onLoadRunEvents?: () => Promise<HuntEvent[]>;
   onLoadRunEvidence: () => Promise<RunEvidence[]>;
   onLoadRunEvidenceImage?: (image: RunEvidenceImage) => Promise<Blob>;
   mentionMembers?: OrganizationMember[];
@@ -2661,6 +2667,30 @@ export function RunPage({
   const [activeDetailTab, setActiveDetailTab] = useState<
     "description" | "result" | "statusHistory" | "evidence"
   >(() => run.status === "completed" ? "result" : "description");
+  const [runEvents, setRunEvents] = useState<HuntEvent[]>([]);
+  const [runEventsLoading, setRunEventsLoading] = useState(true);
+  const [runEventsLoadError, setRunEventsLoadError] = useState<string | null>(
+    null,
+  );
+  const onLoadRunEventsRef = useRef(onLoadRunEvents);
+  const runEventsRequest = useRef(0);
+  onLoadRunEventsRef.current = onLoadRunEvents;
+  const loadRunEvents = useCallback(async () => {
+    const request = ++runEventsRequest.current;
+    setRunEventsLoading(true);
+    setRunEventsLoadError(null);
+    try {
+      const events = await onLoadRunEventsRef.current();
+      if (request === runEventsRequest.current) setRunEvents(events);
+    } catch (caught) {
+      if (request !== runEventsRequest.current) return;
+      setRunEventsLoadError(
+        caught instanceof Error ? caught.message : t("run.activityLoadFailed"),
+      );
+    } finally {
+      if (request === runEventsRequest.current) setRunEventsLoading(false);
+    }
+  }, [t]);
   useMobileBackHandler(
     () => {
       if (!companionMode) return false;
@@ -2689,7 +2719,9 @@ export function RunPage({
   useEffect(() => {
     setActiveDetailTab(run.status === "completed" ? "result" : "description");
     setIsPropertiesOpen(false);
-  }, [run.id]);
+    setRunEvents([]);
+    void loadRunEvents();
+  }, [loadRunEvents, run.id]);
   const placementOptions = [
     { label: t("status.backlog"), value: "status:backlog" },
     { label: t("status.queued"), value: "status:queued" },
@@ -3217,9 +3249,13 @@ export function RunPage({
                     </div>
                   ) : activeDetailTab === "statusHistory" ? (
                     <IssueStatusHistoryPanel
+                      events={runEvents}
                       id={`${detailTabsId}-status-history-panel`}
                       labelledBy={`${detailTabsId}-status-history-tab`}
-                      run={run}
+                      loadError={runEventsLoadError}
+                      loading={runEventsLoading}
+                      onRetry={() => void loadRunEvents()}
+                      workflow={run.workflow}
                     />
                   ) : (
                     <RunEvidencePanel
@@ -3774,13 +3810,21 @@ function IssueDependenciesPanel({
 }
 
 function IssueStatusHistoryPanel({
+  events,
   id,
   labelledBy,
-  run,
+  loadError,
+  loading,
+  onRetry,
+  workflow,
 }: {
+  events: HuntEvent[];
   id: string;
   labelledBy: string;
-  run: HuntRun;
+  loadError: string | null;
+  loading: boolean;
+  onRetry: () => void;
+  workflow: HuntRun["workflow"];
 }) {
   const { t } = useI18n();
 
@@ -3791,13 +3835,28 @@ function IssueStatusHistoryPanel({
       id={id}
       role="tabpanel"
     >
-      {run.events.length > 0 ? (
+      {loading ? (
+        <div className="run-evidence-state">
+          <LoaderCircle className="spin" size={16} />
+          {t("run.activityLoading")}
+        </div>
+      ) : loadError ? (
+        <button
+          className="run-evidence-state error"
+          onClick={onRetry}
+          type="button"
+        >
+          <CircleAlert size={15} />
+          <span>{loadError}</span>
+          <RefreshCw size={13} />
+        </button>
+      ) : events.length > 0 ? (
         <div className="issue-activity-history">
-          {run.events.map((event) => {
+          {events.map((event) => {
             const display = eventMeta(
               event.status,
               event.workflowStage,
-              run.workflow,
+              workflow,
             );
             return (
               <div className="timeline-event" key={event.id}>

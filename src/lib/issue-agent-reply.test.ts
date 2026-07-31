@@ -225,7 +225,8 @@ describe("issue agent replies", () => {
       startedAt: "2026-07-29T00:00:00.000Z",
       updatedAt: "2026-07-29T02:00:00.000Z",
       completedAt: "2026-07-29T02:00:00.000Z",
-      events: [],
+      lastEventAt: "2026-07-29T02:00:00.000Z",
+      eventCount: 4,
     } as HuntRun;
 
     const snapshot = issueConversationSnapshot(run, []);
@@ -246,6 +247,7 @@ describe("issue agent replies", () => {
         },
       ],
     });
+    expect(snapshot.run).not.toHaveProperty("events");
     expect(JSON.stringify(snapshot)).not.toContain("private-result.png");
   });
 });

@@ -875,6 +875,7 @@ export function App() {
             onUpdateIssuePreferences={briar.editIssueExecutionPreferences}
             onLoadAttachment={briar.readIssueAttachment}
             onLoadIssueMessages={briar.readIssueMessages}
+            onLoadRunEvents={briar.readRunEvents}
             onLoadRunEvidence={briar.readRunEvidence}
             onLoadRunEvidenceImage={briar.readRunEvidenceImage}
             onMoveRun={briar.moveRun}
@@ -1042,6 +1043,7 @@ export function App() {
             onUpdateIssuePreferences={briar.editIssueExecutionPreferences}
             onLoadAttachment={briar.readIssueAttachment}
             onLoadIssueMessages={briar.readIssueMessages}
+            onLoadRunEvents={briar.readRunEvents}
             onLoadRunEvidence={briar.readRunEvidence}
             onLoadRunEvidenceImage={briar.readRunEvidenceImage}
             onMoveRun={briar.moveRun}

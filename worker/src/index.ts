@@ -103,6 +103,7 @@ import {
   listEvidenceImagesForEvidence,
   listDashboardRuns,
   listDashboardChanges,
+  listHuntRunEvents,
   listRunEvidence,
   listRunEvidenceImages,
   listRunStageRevisions,
@@ -2749,7 +2750,6 @@ const runEvidenceJson = (
 
 function dashboardRunJson(
   run: HuntRunRow,
-  events: HuntEventRow[],
   attachments: IssueAttachmentRow[],
   prerequisites: IssueDependencyRow[] = [],
   dependents: IssueDependencyRow[] = [],
@@ -2833,8 +2833,8 @@ function dashboardRunJson(
     startedAt: run.started_at,
     updatedAt: run.updated_at,
     completedAt: run.completed_at,
+    lastEventAt: run.last_event_at,
     eventCount: run.event_count,
-    events: events.map(dashboardEventJson),
   };
 }
 
@@ -4092,7 +4092,7 @@ async function route(
       await Promise.all([
         changedRunIds.size > 0
           ? listDashboardRuns(db, project.id)
-          : Promise.resolve({ runs: [], events: [] }),
+          : Promise.resolve([]),
         changedRunIds.size > 0
           ? listIssueAttachments(db, project.id)
           : Promise.resolve([]),
@@ -4106,13 +4106,6 @@ async function route(
           observedAt,
         ),
       ]);
-    const eventsByRun = new Map<string, HuntEventRow[]>();
-    for (const event of dashboardRows.events) {
-      if (!changedRunIds.has(event.run_id)) continue;
-      const runEvents = eventsByRun.get(event.run_id) ?? [];
-      runEvents.push(event);
-      eventsByRun.set(event.run_id, runEvents);
-    }
     const attachmentsByRun = new Map<string, IssueAttachmentRow[]>();
     for (const attachment of attachments) {
       if (!changedRunIds.has(attachment.run_id)) continue;
@@ -4136,7 +4129,7 @@ async function route(
         dependentsByRun.set(dependency.prerequisite_run_id, dependents);
       }
     }
-    const changedRuns = dashboardRows.runs.filter((run) =>
+    const changedRuns = dashboardRows.filter((run) =>
       changedRunIds.has(run.id),
     );
     const existingRunIds = new Set(changedRuns.map((run) => run.id));
@@ -4168,7 +4161,6 @@ async function route(
       runs: changedRuns.map((run) =>
         dashboardRunJson(
           run,
-          eventsByRun.get(run.id) ?? [],
           attachmentsByRun.get(run.id) ?? [],
           prerequisitesByRun.get(run.id) ?? [],
           dependentsByRun.get(run.id) ?? [],
@@ -4212,7 +4204,7 @@ async function route(
     const cursor = await getDashboardSyncCursor(db, project.id);
     const observedAt = new Date().toISOString();
     const [
-      { runs, events },
+      runs,
       settings,
       attachments,
       dependencies,
@@ -4241,12 +4233,6 @@ async function route(
           session.user.id,
         ),
       ]);
-    const eventsByRun = new Map<string, HuntEventRow[]>();
-    for (const event of events) {
-      const runEvents = eventsByRun.get(event.run_id) ?? [];
-      runEvents.push(event);
-      eventsByRun.set(event.run_id, runEvents);
-    }
     const attachmentsByRun = new Map<string, IssueAttachmentRow[]>();
     for (const attachment of attachments) {
       const runAttachments = attachmentsByRun.get(attachment.run_id) ?? [];
@@ -4271,7 +4257,6 @@ async function route(
       runs: runs.map((run) =>
         dashboardRunJson(
           run,
-          eventsByRun.get(run.id) ?? [],
           attachmentsByRun.get(run.id) ?? [],
           prerequisitesByRun.get(run.id) ?? [],
           dependentsByRun.get(run.id) ?? [],
@@ -4292,6 +4277,23 @@ async function route(
       ),
       cursor,
       generatedAt: observedAt,
+    });
+  }
+
+  const runEventsMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/events$/u,
+  );
+  if (runEventsMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, runEventsMatch[1], session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    const run = await getHuntRunForProject(db, project.id, runEventsMatch[2]);
+    if (!run) throw new HttpError(404, "Run not found");
+    const events = await listHuntRunEvents(db, project.id, run.id);
+    return json({
+      runId: run.id,
+      eventCount: run.event_count,
+      events: events.map(dashboardEventJson),
     });
   }
 
@@ -5249,9 +5251,10 @@ async function route(
     });
     if (!job) return json({ work: null });
 
-    const [{ runs, events }, attachments, messages, evidence, transcript] =
+    const [run, events, attachments, messages, evidence, transcript] =
       await Promise.all([
-        listDashboardRuns(db, input.projectId),
+        getHuntRunForProject(db, input.projectId, job.run_id),
+        listHuntRunEvents(db, input.projectId, job.run_id),
         listIssueAttachments(db, input.projectId, job.run_id),
         listIssueMessages(db, input.projectId, job.run_id),
         listRunEvidence(db, input.projectId, job.run_id),
@@ -5262,7 +5265,6 @@ async function route(
           { limit: 200, tail: true },
         ),
       ]);
-    const run = runs.find((candidate) => candidate.id === job.run_id);
     if (!run || !job.agent_provider) {
       throw new HttpError(409, "Reply job lost its issue context");
     }
@@ -5286,11 +5288,10 @@ async function route(
         claimedAt: job.claimed_at,
         leaseExpiresAt: job.lease_expires_at,
         snapshot: {
-          run: dashboardRunJson(
-            run,
-            events.filter((event) => event.run_id === run.id),
-            attachments,
-          ),
+          run: {
+            ...dashboardRunJson(run, attachments),
+            events: events.map(dashboardEventJson),
+          },
           messages: claimConversationJson(messages),
           agentTranscript:
             transcript?.events.flatMap((event) => {

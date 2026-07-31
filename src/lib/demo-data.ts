@@ -81,7 +81,11 @@ const event = (
   recordedAt: input.occurredAt,
 });
 
-const runs: HuntRun[] = [
+type DemoRunSeed = Omit<HuntRun, "eventCount" | "lastEventAt"> & {
+  events: HuntEvent[];
+};
+
+const runSeeds: DemoRunSeed[] = [
   {
     ...runDefaults,
     id: "demo-1",
@@ -222,6 +226,16 @@ const runs: HuntRun[] = [
     ],
   },
 ];
+
+export const demoRunEvents: Record<string, HuntEvent[]> = Object.fromEntries(
+  runSeeds.map((run) => [run.id, run.events]),
+);
+
+const runs: HuntRun[] = runSeeds.map(({ events, ...run }) => ({
+  ...run,
+  eventCount: events.length,
+  lastEventAt: events[0]?.occurredAt ?? run.updatedAt,
+}));
 
 export const demoDashboard: DashboardPayload = {
   project: {

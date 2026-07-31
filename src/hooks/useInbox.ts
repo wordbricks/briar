@@ -3,12 +3,7 @@ import {
   collapseLinkedAutoHuntSessions,
   type AutoHuntSession,
 } from "./useAutoHuntSessions";
-import type {
-  DashboardPayload,
-  HuntRun,
-  HuntStatus,
-  Project,
-} from "../types";
+import type { DashboardPayload, HuntStatus, Project } from "../types";
 import type { AutoHuntWorkflowStageId } from "../lib/auto-hunt-contract";
 import type { StructuredAgentResult } from "../lib/agent-result";
 
@@ -83,15 +78,6 @@ type InboxState = InboxStorage & {
 
 const emptyStorage = (): InboxStorage => ({ messages: [], readVersions: {} });
 
-function latestMatchingEvent(run: HuntRun) {
-  return [...run.events].reverse().find(
-    (event) =>
-      event.status === run.status &&
-      event.workflowStage === run.workflowStage &&
-      event.attempt === run.currentAttempt,
-  );
-}
-
 export function buildCurrentInboxMessages(
   dashboard: DashboardPayload | null,
   sessions: AutoHuntSession[],
@@ -104,7 +90,6 @@ export function buildCurrentInboxMessages(
 
   if (dashboard) {
     for (const run of dashboard.runs) {
-      const latestEvent = latestMatchingEvent(run);
       messages.push({
         id: `issue:${run.id}`,
         kind: "issue",
@@ -112,10 +97,8 @@ export function buildCurrentInboxMessages(
         projectName: dashboard.project.name,
         targetId: run.id,
         title: run.title,
-        occurredAt: latestEvent?.occurredAt ?? run.updatedAt,
-        version:
-          latestEvent?.id ??
-          `${run.currentAttempt}:${run.status}:${run.workflowStage ?? "none"}`,
+        occurredAt: run.lastEventAt,
+        version: `${run.currentAttempt}:${run.currentRevision}:${run.status}:${run.workflowStage ?? "none"}:${run.lastEventAt}:${run.eventCount}`,
         runNumber: run.runNumber,
         status: run.status,
         workflowStage: run.workflowStage,
