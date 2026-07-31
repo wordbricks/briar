@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   applyTheme,
   initializeTheme,
+  loadThemePreference,
   ThemeProvider,
   themeStorageKey,
   useTheme,
@@ -58,8 +59,19 @@ describe("theme", () => {
     expect(document.documentElement.style.colorScheme).toBe("dark");
   });
 
+  it("defaults first-time users to light regardless of the system theme", () => {
+    installMatchMedia(true);
+
+    expect(loadThemePreference()).toBe("light");
+    expect(initializeTheme()).toBe("light");
+    expect(document.documentElement.classList.contains("dark")).toBe(false);
+    expect(document.documentElement.dataset.theme).toBe("light");
+    expect(document.documentElement.style.colorScheme).toBe("light");
+  });
+
   it("tracks system changes and persists an explicit selection", async () => {
     const systemTheme = installMatchMedia(false);
+    window.localStorage.setItem(themeStorageKey, "system");
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
