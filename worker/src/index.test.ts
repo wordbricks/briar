@@ -4,6 +4,7 @@ import worker, {
   claimConversationJson,
   eventSchema,
   issueUpdateInputSchema,
+  issueExecutionPreferencesSchema,
   organizationLogoInputSchema,
   organizationMemberRoleInputSchema,
   organizationUpdateInputSchema,
@@ -17,6 +18,34 @@ import worker, {
 } from "./index";
 
 describe("Worker HTTP contract", () => {
+  it("validates provider-specific issue model effort preferences", () => {
+    expect(
+      issueExecutionPreferencesSchema.parse({
+        provider: "codex",
+        model: "gpt-5.6-sol",
+        effort: "ultra",
+      }),
+    ).toEqual({
+      provider: "codex",
+      model: "gpt-5.6-sol",
+      effort: "ultra",
+    });
+    expect(() =>
+      issueExecutionPreferencesSchema.parse({
+        provider: null,
+        model: "gpt-5.6-sol",
+        effort: null,
+      }),
+    ).toThrow(/provider is required/iu);
+    expect(() =>
+      issueExecutionPreferencesSchema.parse({
+        provider: "grok",
+        model: "grok-4.5",
+        effort: "xhigh",
+      }),
+    ).toThrow(/Grok supports/iu);
+  });
+
   it("accepts one Worker emoji or image and rejects invalid icon text", () => {
     expect(
       workerSettingsSchema.parse({

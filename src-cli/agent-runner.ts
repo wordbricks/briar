@@ -5,6 +5,7 @@ export type DetachedAgent = {
   name: string;
   provider: "codex" | "claude" | "grok";
   model: string | null;
+  effort?: "low" | "medium" | "high" | "xhigh" | "max" | "ultra" | null;
   responsibility: string;
   skill: string;
 };
@@ -105,6 +106,9 @@ export function detachedProviderRequest(input: {
         "-c",
         'approval_policy="never"',
         ...(input.agent.model ? ["--model", input.agent.model] : []),
+        ...(input.agent.effort
+          ? ["-c", `model_reasoning_effort="${input.agent.effort}"`]
+          : []),
         input.prompt,
       ],
       request: null,
@@ -121,7 +125,7 @@ export function detachedProviderRequest(input: {
       instructions: input.agent.skill,
       outputSchema: null,
       model: input.agent.model,
-      effort: null,
+      effort: input.agent.effort,
       approvalPolicy: "never",
       sandboxMode: input.readOnly
         ? "readOnly"

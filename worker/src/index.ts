@@ -124,6 +124,7 @@ import {
   updateOrganizationLogo,
   updateOrganizationMemberRole,
   updateIssue,
+  updateIssueExecutionPreferences,
   updateSlackInstallationProject,
   upsertProjectAgentSession,
   upsertSlackInstallation,
@@ -748,6 +749,68 @@ export const issueUpdateInputSchema = issueInputSchema
   })
   .strict();
 
+const modelEffortSchema = z.enum([
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+  "ultra",
+]);
+const providerModels = {
+  codex: new Set(["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"]),
+  claude: new Set(["sonnet", "opus", "haiku", "fable"]),
+  grok: new Set(["grok-4.5", "grok-build"]),
+} as const;
+
+export const issueExecutionPreferencesSchema = z
+  .object({
+    provider: z.enum(["codex", "claude", "grok"]).nullable(),
+    model: z.string().trim().min(1).max(100).nullable(),
+    effort: modelEffortSchema.nullable(),
+  })
+  .strict()
+  .superRefine((input, context) => {
+    if (!input.provider && (input.model || input.effort)) {
+      context.addIssue({
+        code: "custom",
+        message: "A provider is required for a model or effort preference",
+      });
+    }
+    if (!input.model && input.effort) {
+      context.addIssue({
+        code: "custom",
+        message: "A model is required for an effort preference",
+      });
+    }
+    if (
+      input.provider &&
+      input.model &&
+      !providerModels[input.provider].has(input.model)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: `${input.model} is not available from ${input.provider}`,
+      });
+    }
+    if (input.provider === "claude" && input.effort === "ultra") {
+      context.addIssue({
+        code: "custom",
+        message: "Claude does not support ultra effort",
+      });
+    }
+    if (
+      input.provider === "grok" &&
+      input.effort &&
+      !["low", "medium", "high"].includes(input.effort)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Grok supports low, medium, or high effort",
+      });
+    }
+  });
+
 const linearApiKeySchema = z
   .object({
     apiKey: z.string().trim().min(10).max(500),
@@ -987,10 +1050,30 @@ const dispatchRunSchema = z
   .object({
     agentId: z.string().uuid(),
     provider: z.enum(["codex", "claude", "grok"]).optional(),
+    model: z.string().trim().min(1).max(100).nullable().optional(),
+    effort: modelEffortSchema.nullable().optional(),
+    persistPreferences: z.boolean().optional(),
     workerId: z.string().trim().min(1).max(128).nullable().optional(),
     requestId: z.string().uuid(),
   })
-  .strict();
+  .strict()
+  .superRefine((input, context) => {
+    const preferences = {
+      provider: input.provider ?? null,
+      model: input.model ?? null,
+      effort: input.effort ?? null,
+    };
+    const parsed = issueExecutionPreferencesSchema.safeParse(preferences);
+    if (!parsed.success) {
+      for (const issue of parsed.error.issues) {
+        context.addIssue({
+          code: "custom",
+          message: issue.message,
+          path: issue.path,
+        });
+      }
+    }
+  });
 
 const leaseRenewSchema = z
   .object({
@@ -2665,7 +2748,12 @@ function dashboardRunJson(
     leaseExpiresAt: run.lease_expires_at,
     claimAttempts: run.claim_attempts,
     agentId: run.agent_id,
+    preferredProvider: run.preferred_agent_provider,
+    preferredModel: run.preferred_agent_model,
+    preferredEffort: run.preferred_agent_effort,
     requestedProvider: run.requested_agent_provider,
+    requestedModel: run.requested_agent_model,
+    requestedEffort: run.requested_agent_effort,
     requestedWorkerId: run.requested_worker_id,
     requestedByUserId: run.requested_by_user_id,
     dispatchMode: run.dispatch_mode,
@@ -3872,6 +3960,7 @@ async function route(
       settings,
       attachments,
       workers,
+      organizationWorkers,
       executionPolicy,
       members,
       conversationNotifications,
@@ -3881,6 +3970,11 @@ async function route(
         getProjectSettings(db, project.id),
         listIssueAttachments(db, project.id),
         listExecutionWorkers(db, project.id, observedAt),
+        listOrganizationExecutionWorkers(
+          db,
+          project.organization_id,
+          observedAt,
+        ),
         getProjectExecutionWorkerPolicy(db, project.id),
         listOrganizationMembers(db, project.organization_id),
         listIssueConversationNotifications(
@@ -3912,6 +4006,13 @@ async function route(
         ),
       ),
       workers: workers.map((worker) => workerJson(worker, observedAt)),
+      organizationProviders: [
+        ...new Set(
+          organizationWorkers.flatMap((worker) =>
+            worker.bindings.flatMap((binding) => binding.providers ?? []),
+          ),
+        ),
+      ],
       executionPolicy,
       members: members.map(organizationMemberJson),
       conversationNotifications: conversationNotifications.map(
@@ -4196,6 +4297,35 @@ async function route(
   const issueUpdateMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)$/u,
   );
+  const issuePreferencesMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/preferences$/u,
+  );
+  if (issuePreferencesMatch && request.method === "PUT") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      issuePreferencesMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const input = issueExecutionPreferencesSchema.parse(await readJson(request));
+    const run = await updateIssueExecutionPreferences(
+      db,
+      project.id,
+      issuePreferencesMatch[2],
+      {
+        ...input,
+        updatedAt: new Date().toISOString(),
+      },
+    );
+    if (!run) throw new HttpError(404, "Run not found");
+    return json({
+      runId: run.id,
+      provider: run.preferred_agent_provider,
+      model: run.preferred_agent_model,
+      effort: run.preferred_agent_effort,
+    });
+  }
   if (issueUpdateMatch && request.method === "PATCH") {
     const session = await requireSession(auth, request);
     const project = await getProject(db, issueUpdateMatch[1], session.user.id);
@@ -4340,6 +4470,9 @@ async function route(
         runId: dispatchRunMatch[2],
         agentId: input.agentId,
         provider: input.provider,
+        model: input.model,
+        effort: input.effort,
+        persistPreferences: input.persistPreferences,
         workerId: input.workerId ?? null,
         requestedByUserId: session.user.id,
         requestId: input.requestId,
@@ -5058,12 +5191,18 @@ async function route(
               ? {
                   id: agent.id,
                   name: agent.name,
-                  provider: run.requested_agent_provider ?? agent.provider,
-                  model:
-                    run.requested_agent_provider &&
-                    run.requested_agent_provider !== agent.provider
+                  provider:
+                    run.preferred_agent_provider ??
+                    run.requested_agent_provider ??
+                    agent.provider,
+                  model: run.preferred_agent_model ??
+                    (run.preferred_agent_provider
                       ? null
-                      : agent.model,
+                      : run.requested_agent_model ??
+                        (run.requested_agent_provider ? null : agent.model)),
+                  effort: run.preferred_agent_provider
+                    ? run.preferred_agent_effort
+                    : run.requested_agent_effort,
                   responsibility: agent.responsibility,
                   skill: agent.skill_markdown,
                 }

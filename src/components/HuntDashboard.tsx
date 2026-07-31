@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   ArrowUp,
   Bot,
+  BrainCircuit,
   Check,
   ChevronDown,
   ChevronRight,
@@ -34,6 +35,7 @@ import {
   Trash2,
   UserRound,
   Video,
+  Waypoints,
   X,
 } from "lucide-react";
 import * as ContextMenu from "@radix-ui/react-context-menu";
@@ -112,11 +114,18 @@ import type {
   IssueAttachment,
   IssueMessage,
   IssueMessageSendResult,
+  IssueExecutionPreferences,
   OrganizationMember,
   ProjectAgent,
   RunEvidence,
   UpdateIssueInput,
 } from "../types";
+import {
+  agentEfforts,
+  agentModels,
+  type AgentProvider,
+  type ModelEffort,
+} from "../lib/project-llm";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
 
@@ -152,6 +161,7 @@ export function HuntDashboard({
   onIssueDialogOpenChange,
   onDeleteIssue,
   onUpdateIssue,
+  onUpdateIssuePreferences = async () => undefined,
   onLoadAttachment,
   onLoadIssueMessages,
   onLoadRunEvidence,
@@ -189,6 +199,10 @@ export function HuntDashboard({
   onIssueDialogOpenChange?: (isOpen: boolean) => void;
   onDeleteIssue: (runId: string) => Promise<unknown>;
   onUpdateIssue: (runId: string, input: UpdateIssueInput) => Promise<unknown>;
+  onUpdateIssuePreferences?: (
+    runId: string,
+    input: IssueExecutionPreferences,
+  ) => Promise<unknown>;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onLoadIssueMessages: (runId: string) => Promise<IssueMessage[]>;
   onLoadRunEvidence: (runId: string) => Promise<RunEvidence[]>;
@@ -383,6 +397,16 @@ export function HuntDashboard({
       ),
     [dashboard?.workers],
   );
+  const availableProviders = useMemo<AgentProvider[]>(() => {
+    if (dashboard?.organizationProviders?.length) {
+      return dashboard.organizationProviders;
+    }
+    return [
+      ...new Set(
+        (dashboard?.workers ?? []).flatMap((worker) => worker.providers ?? []),
+      ),
+    ];
+  }, [dashboard?.organizationProviders, dashboard?.workers]);
 
   useEffect(() => {
     if (!requestedRunId) return;
@@ -533,6 +557,9 @@ export function HuntDashboard({
           onRetry={() => onRetryRun(selected.id)}
           onSendIssueMessage={(input) => onSendIssueMessage(selected.id, input)}
           onUpdateIssue={(input) => onUpdateIssue(selected.id, input)}
+          onUpdateIssuePreferences={(input) =>
+            onUpdateIssuePreferences(selected.id, input)}
+          availableProviders={availableProviders}
           performedAgentName={
             agentAssociationsByRunId.performedAgents.get(selected.id)?.name ??
             null
@@ -718,6 +745,7 @@ export function HuntDashboard({
         </div>}
         {view === "list" && !companionMode ? (
           <IssueList
+            availableProviders={availableProviders}
             deletingIssueId={deletingIssueId}
             onDelete={(runId) => {
               setContextDeleteError(null);
@@ -735,6 +763,11 @@ export function HuntDashboard({
                 description: run.issueDescription,
                 priority,
               }).catch(() => undefined)
+            }
+            onPreferencesChange={(run, preferences) =>
+              onUpdateIssuePreferences(run.id, preferences).catch(
+                () => undefined,
+              )
             }
             runs={filtered}
             processingIssueIds={processingIssueIds}
@@ -788,6 +821,7 @@ export function HuntDashboard({
               <div>
                 {column.runs.length ? column.runs.map((run) => (
                   <KanbanCard
+                    availableProviders={availableProviders}
                     activeAgent={
                       agentAssociationsByRunId.activeAgents.get(run.id) ?? null
                     }
@@ -829,6 +863,11 @@ export function HuntDashboard({
                         description: run.issueDescription,
                         priority,
                       }).catch(() => undefined)
+                    }
+                    onPreferencesChange={(preferences) =>
+                      onUpdateIssuePreferences(run.id, preferences).catch(
+                        () => undefined,
+                      )
                     }
                     run={run}
                     isProcessing={processingIssueIds.has(run.id)}
@@ -1477,6 +1516,7 @@ function SelectedAttachment({
 }
 
 function KanbanCard({
+  availableProviders,
   activeAgent,
   assignedWorker,
   contextMenuDisabled,
@@ -1492,9 +1532,11 @@ function KanbanCard({
   onOpen,
   onProcessNow,
   onPriorityChange,
+  onPreferencesChange,
   token,
   updatingIssueId,
 }: {
+  availableProviders: AgentProvider[];
   activeAgent: ProjectAgent | null;
   assignedWorker: ExecutionWorker | null;
   contextMenuDisabled: boolean;
@@ -1510,6 +1552,7 @@ function KanbanCard({
   onOpen: () => void;
   onProcessNow?: () => void;
   onPriorityChange: (priority: number | null) => void;
+  onPreferencesChange: (preferences: IssueExecutionPreferences) => void;
   token: string | null;
   updatingIssueId: string | null;
 }) {
@@ -1522,6 +1565,7 @@ function KanbanCard({
     Date.parse(run.leaseExpiresAt!) > Date.now();
   return (
     <IssueContextMenu
+      availableProviders={availableProviders}
       disabled={
         contextMenuDisabled ||
         isMoving ||
@@ -1534,6 +1578,7 @@ function KanbanCard({
       onOpen={onOpen}
       onProcessNow={onProcessNow}
       onPriorityChange={onPriorityChange}
+      onPreferencesChange={onPreferencesChange}
       run={run}
       isProcessing={isProcessing}
     >
@@ -1650,7 +1695,23 @@ function pullRequestDisplayName(url: string, index: number) {
   return index === 0 ? "PR" : `PR ${index + 1}`;
 }
 
+function providerDisplayName(provider: AgentProvider) {
+  return provider === "codex"
+    ? "Codex"
+    : provider === "claude"
+      ? "Claude"
+      : "Grok";
+}
+
+function modelDisplayName(provider: AgentProvider, model: string) {
+  return (
+    agentModels[provider].find((option) => option.value === model)?.label ??
+    model
+  );
+}
+
 function IssueContextMenu({
+  availableProviders,
   children,
   disabled,
   onDelete,
@@ -1659,9 +1720,11 @@ function IssueContextMenu({
   onOpen,
   onProcessNow,
   onPriorityChange,
+  onPreferencesChange,
   run,
   isProcessing,
 }: {
+  availableProviders: AgentProvider[];
   children: ReactElement;
   disabled: boolean;
   onDelete: () => void;
@@ -1670,6 +1733,7 @@ function IssueContextMenu({
   onOpen: () => void;
   onProcessNow?: () => void;
   onPriorityChange: (priority: number | null) => void;
+  onPreferencesChange: (preferences: IssueExecutionPreferences) => void;
   run: HuntRun;
   isProcessing: boolean;
 }) {
@@ -1702,6 +1766,17 @@ function IssueContextMenu({
   const currentPriorityLabel =
     priorityOptions.find((option) => option.value === currentPriority)?.label ??
     t("run.notSet");
+  const currentProvider = run.preferredProvider ?? "none";
+  const currentProviderLabel = run.preferredProvider
+    ? providerDisplayName(run.preferredProvider)
+    : t("issue.agentDefault");
+  const currentModelLabel = run.preferredProvider
+    ? run.preferredModel
+      ? `${modelDisplayName(run.preferredProvider, run.preferredModel)}${
+          run.preferredEffort ? ` · ${run.preferredEffort}` : ""
+        }`
+      : t("settings.providerDefaultModel")
+    : t("run.notSet");
   const isClaimed =
     run.status === "queued" &&
     Boolean(run.leaseExpiresAt) &&
@@ -1835,6 +1910,180 @@ function IssueContextMenu({
             </ContextMenu.Portal>
           </ContextMenu.Sub>
 
+          <ContextMenu.Sub>
+            <ContextMenu.SubTrigger className="issue-context-item">
+              <Waypoints aria-hidden="true" size={17} />
+              <span>{t("issue.preferredProvider")}</span>
+              <small>{currentProviderLabel}</small>
+              <ChevronRight aria-hidden="true" size={14} />
+            </ContextMenu.SubTrigger>
+            <ContextMenu.Portal>
+              <ContextMenu.SubContent
+                className="issue-context-menu issue-context-submenu"
+                collisionPadding={10}
+                sideOffset={7}
+              >
+                <ContextMenu.RadioGroup value={currentProvider}>
+                  <ContextMenu.RadioItem
+                    className="issue-context-item issue-context-choice"
+                    onSelect={() => {
+                      if (!run.preferredProvider) return;
+                      onPreferencesChange({
+                        provider: null,
+                        model: null,
+                        effort: null,
+                      });
+                    }}
+                    value="none"
+                  >
+                    <ContextMenu.ItemIndicator
+                      className="issue-context-check"
+                      forceMount
+                    >
+                      {!run.preferredProvider ? (
+                        <Check aria-hidden="true" size={14} />
+                      ) : null}
+                    </ContextMenu.ItemIndicator>
+                    <span>{t("issue.agentDefault")}</span>
+                  </ContextMenu.RadioItem>
+                  {availableProviders.map((provider) => (
+                    <ContextMenu.RadioItem
+                      className="issue-context-item issue-context-choice"
+                      key={provider}
+                      onSelect={() => {
+                        if (provider === run.preferredProvider) return;
+                        onPreferencesChange({
+                          provider,
+                          model: null,
+                          effort: null,
+                        });
+                      }}
+                      value={provider}
+                    >
+                      <ContextMenu.ItemIndicator
+                        className="issue-context-check"
+                        forceMount
+                      >
+                        {provider === run.preferredProvider ? (
+                          <Check aria-hidden="true" size={14} />
+                        ) : null}
+                      </ContextMenu.ItemIndicator>
+                      <span>{providerDisplayName(provider)}</span>
+                    </ContextMenu.RadioItem>
+                  ))}
+                  {availableProviders.length === 0 ? (
+                    <ContextMenu.Item
+                      className="issue-context-item"
+                      disabled
+                    >
+                      <span>{t("issue.noProviders")}</span>
+                    </ContextMenu.Item>
+                  ) : null}
+                </ContextMenu.RadioGroup>
+              </ContextMenu.SubContent>
+            </ContextMenu.Portal>
+          </ContextMenu.Sub>
+
+          <ContextMenu.Sub>
+            <ContextMenu.SubTrigger
+              className="issue-context-item"
+              disabled={!run.preferredProvider}
+            >
+              <BrainCircuit aria-hidden="true" size={17} />
+              <span>{t("issue.preferredModel")}</span>
+              <small>{currentModelLabel}</small>
+              <ChevronRight aria-hidden="true" size={14} />
+            </ContextMenu.SubTrigger>
+            {run.preferredProvider ? (
+              <ContextMenu.Portal>
+                <ContextMenu.SubContent
+                  className="issue-context-menu issue-context-submenu"
+                  collisionPadding={10}
+                  sideOffset={7}
+                >
+                  <ContextMenu.Label className="issue-context-label">
+                    {t("settings.model")}
+                  </ContextMenu.Label>
+                  <ContextMenu.RadioGroup value={run.preferredModel ?? ""}>
+                    {agentModels[run.preferredProvider].map((option) => (
+                      <ContextMenu.RadioItem
+                        className="issue-context-item issue-context-choice"
+                        key={option.value || "default"}
+                        onSelect={() => {
+                          if ((run.preferredModel ?? "") === option.value) {
+                            return;
+                          }
+                          onPreferencesChange({
+                            provider: run.preferredProvider!,
+                            model: option.value || null,
+                            effort: null,
+                          });
+                        }}
+                        value={option.value}
+                      >
+                        <ContextMenu.ItemIndicator
+                          className="issue-context-check"
+                          forceMount
+                        >
+                          {(run.preferredModel ?? "") === option.value ? (
+                            <Check aria-hidden="true" size={14} />
+                          ) : null}
+                        </ContextMenu.ItemIndicator>
+                        <span>
+                          {option.value
+                            ? option.label
+                            : t("settings.providerDefaultModel")}
+                        </span>
+                      </ContextMenu.RadioItem>
+                    ))}
+                  </ContextMenu.RadioGroup>
+                  {run.preferredModel ? (
+                    <>
+                      <ContextMenu.Separator className="issue-context-separator" />
+                      <ContextMenu.Label className="issue-context-label">
+                        {t("settings.effort")}
+                      </ContextMenu.Label>
+                      <ContextMenu.RadioGroup
+                        value={run.preferredEffort ?? ""}
+                      >
+                        {[
+                          null,
+                          ...agentEfforts[run.preferredProvider],
+                        ].map((effort) => (
+                          <ContextMenu.RadioItem
+                            className="issue-context-item issue-context-choice"
+                            key={effort ?? "default"}
+                            onSelect={() =>
+                              onPreferencesChange({
+                                provider: run.preferredProvider!,
+                                model: run.preferredModel!,
+                                effort,
+                              })
+                            }
+                            value={effort ?? ""}
+                          >
+                            <ContextMenu.ItemIndicator
+                              className="issue-context-check"
+                              forceMount
+                            >
+                              {(run.preferredEffort ?? null) === effort ? (
+                                <Check aria-hidden="true" size={14} />
+                              ) : null}
+                            </ContextMenu.ItemIndicator>
+                            <span>
+                              {effort ??
+                                t("settings.providerDefaultEffort")}
+                            </span>
+                          </ContextMenu.RadioItem>
+                        ))}
+                      </ContextMenu.RadioGroup>
+                    </>
+                  ) : null}
+                </ContextMenu.SubContent>
+              </ContextMenu.Portal>
+            ) : null}
+          </ContextMenu.Sub>
+
           <ContextMenu.Separator className="issue-context-separator" />
 
           <ContextMenu.Item
@@ -1868,6 +2117,7 @@ function IssueContextMenu({
 }
 
 function IssueList({
+  availableProviders,
   deletingIssueId,
   onDelete,
   onEdit,
@@ -1875,10 +2125,12 @@ function IssueList({
   onOpen,
   onProcessIssueNow,
   onPriorityChange,
+  onPreferencesChange,
   runs,
   processingIssueIds,
   updatingIssueId,
 }: {
+  availableProviders: AgentProvider[];
   deletingIssueId: string | null;
   onDelete: (runId: string) => void;
   onEdit: (runId: string) => void;
@@ -1886,6 +2138,10 @@ function IssueList({
   onOpen: (runId: string) => void;
   onProcessIssueNow?: (run: HuntRun) => void;
   onPriorityChange: (run: HuntRun, priority: number | null) => void;
+  onPreferencesChange: (
+    run: HuntRun,
+    preferences: IssueExecutionPreferences,
+  ) => void;
   runs: HuntRun[];
   processingIssueIds: ReadonlySet<string>;
   updatingIssueId: string | null;
@@ -1931,6 +2187,7 @@ function IssueList({
 
           return (
             <IssueContextMenu
+              availableProviders={availableProviders}
               disabled={
                 deletingIssueId === run.id ||
                 updatingIssueId === run.id
@@ -1947,6 +2204,9 @@ function IssueList({
               }
               onPriorityChange={(priority) =>
                 onPriorityChange(run, priority)
+              }
+              onPreferencesChange={(preferences) =>
+                onPreferencesChange(run, preferences)
               }
               run={run}
               isProcessing={processingIssueIds.has(run.id)}
@@ -2004,6 +2264,7 @@ function IssueList({
 }
 
 export function RunPage({
+  availableProviders = [],
   companionMode = false,
   error,
   isDeletingIssue = false,
@@ -2021,10 +2282,12 @@ export function RunPage({
   onRetry,
   onSendIssueMessage,
   onUpdateIssue,
+  onUpdateIssuePreferences = async () => undefined,
   performedAgentName = null,
   projectId = "",
   run,
 }: {
+  availableProviders?: AgentProvider[];
   companionMode?: boolean;
   error: string | null;
   isDeletingIssue?: boolean;
@@ -2046,6 +2309,9 @@ export function RunPage({
     mentionedUserIds?: string[];
   }) => Promise<IssueMessageSendResult>;
   onUpdateIssue?: (input: UpdateIssueInput) => Promise<unknown>;
+  onUpdateIssuePreferences?: (
+    input: IssueExecutionPreferences,
+  ) => Promise<unknown>;
   performedAgentName?: string | null;
   projectId?: string;
   run: HuntRun;
@@ -2595,6 +2861,120 @@ export function RunPage({
                     <span className="run-property-icon priority"><Signal size={15} /></span>
                     <span className="run-property-copy"><strong>{priorityLabel}</strong></span>
                   </div>
+                  <label className="run-property">
+                    <span className="run-property-icon provider">
+                      <Waypoints size={15} />
+                    </span>
+                    <span className="run-property-copy">
+                      <SelectMenu
+                        align="end"
+                        disabled={isUpdatingIssue}
+                        label={t("issue.preferredProvider")}
+                        onValueChange={(value) => {
+                          void onUpdateIssuePreferences({
+                            provider: (value || null) as AgentProvider | null,
+                            model: null,
+                            effort: null,
+                          }).catch(() => undefined);
+                        }}
+                        options={[
+                          {
+                            label: t("issue.agentDefault"),
+                            value: "",
+                          },
+                          ...availableProviders.map((provider) => ({
+                            label: providerDisplayName(provider),
+                            value: provider,
+                          })),
+                        ]}
+                        size="small"
+                        value={run.preferredProvider ?? ""}
+                      />
+                    </span>
+                  </label>
+                  <label className="run-property">
+                    <span className="run-property-icon model">
+                      <BrainCircuit size={15} />
+                    </span>
+                    <span className="run-property-copy">
+                      <SelectMenu
+                        align="end"
+                        disabled={
+                          isUpdatingIssue || !run.preferredProvider
+                        }
+                        label={t("issue.preferredModel")}
+                        onValueChange={(value) => {
+                          if (!run.preferredProvider) return;
+                          void onUpdateIssuePreferences({
+                            provider: run.preferredProvider,
+                            model: value || null,
+                            effort: null,
+                          }).catch(() => undefined);
+                        }}
+                        options={
+                          run.preferredProvider
+                            ? agentModels[run.preferredProvider].map(
+                                (option) => ({
+                                  ...option,
+                                  label: option.value
+                                    ? option.label
+                                    : t("settings.providerDefaultModel"),
+                                }),
+                              )
+                            : []
+                        }
+                        placeholder={t("issue.selectProviderFirst")}
+                        size="small"
+                        value={run.preferredModel ?? ""}
+                      />
+                    </span>
+                  </label>
+                  <label className="run-property">
+                    <span className="run-property-icon effort">
+                      <BrainCircuit size={15} />
+                    </span>
+                    <span className="run-property-copy">
+                      <SelectMenu
+                        align="end"
+                        disabled={
+                          isUpdatingIssue ||
+                          !run.preferredProvider ||
+                          !run.preferredModel
+                        }
+                        label={t("settings.effort")}
+                        onValueChange={(value) => {
+                          if (
+                            !run.preferredProvider ||
+                            !run.preferredModel
+                          ) {
+                            return;
+                          }
+                          void onUpdateIssuePreferences({
+                            provider: run.preferredProvider,
+                            model: run.preferredModel,
+                            effort: (value || null) as ModelEffort | null,
+                          }).catch(() => undefined);
+                        }}
+                        options={[
+                          {
+                            label: t("settings.providerDefaultEffort"),
+                            value: "",
+                          },
+                          ...(run.preferredProvider
+                            ? agentEfforts[run.preferredProvider].map(
+                                (effort) => ({
+                                  label: effort,
+                                  value: effort,
+                                }),
+                              )
+                            : []),
+                        ]}
+                        placeholder={t("issue.selectModelFirst")}
+                        size="small"
+                        value={run.preferredEffort ?? ""}
+                      />
+                    </span>
+                  </label>
                   <div
                     aria-label={`${t("run.assignee")}: ${run.claimedBy ?? t("run.unassigned")}`}
                     className="run-property"

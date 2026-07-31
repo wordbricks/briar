@@ -9,7 +9,7 @@ import {
   defaultProjectAgentCalendarColor,
   type ProjectAgentLocale,
 } from "./project-agent";
-import type { AgentProvider } from "./project-llm";
+import type { AgentProvider, ModelEffort } from "./project-llm";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import type {
   LinearImportConnectResult,
@@ -27,6 +27,7 @@ import type {
   HuntRunPlacement,
   IssueAttachment,
   IssueMessage,
+  IssueExecutionPreferences,
   ClaimedProjectAgentScheduleRun,
   Project,
   ProjectAgent,
@@ -972,6 +973,22 @@ export async function updateIssue(
   });
 }
 
+export async function updateIssueExecutionPreferences(
+  token: string,
+  projectId: string,
+  runId: string,
+  input: IssueExecutionPreferences,
+) {
+  return request<{ runId: string } & IssueExecutionPreferences>(
+    `/projects/${projectId}/runs/${runId}/preferences`,
+    token,
+    {
+      method: "PUT",
+      body: JSON.stringify(input),
+    },
+  );
+}
+
 export async function deleteIssue(
   token: string,
   projectId: string,
@@ -1134,6 +1151,8 @@ export type HuntDispatchResult = {
   runId: string;
   agentId: string;
   provider: AgentProvider;
+  model: string | null;
+  effort: ModelEffort | null;
   requestedWorkerId: string | null;
   requestedByUserId: string;
   dispatchMode: "any" | "specific";
@@ -1148,8 +1167,11 @@ export async function dispatchHuntRun(
   input: {
     agentId: string;
     provider: AgentProvider;
+    model: string | null;
+    effort: ModelEffort | null;
     workerId: string | null;
     reassign?: boolean;
+    persistPreferences?: boolean;
   },
 ) {
   return request<HuntDispatchResult>(
@@ -1160,6 +1182,9 @@ export async function dispatchHuntRun(
       body: JSON.stringify({
         agentId: input.agentId,
         provider: input.provider,
+        model: input.model,
+        effort: input.effort,
+        persistPreferences: input.persistPreferences,
         workerId: input.workerId,
         requestId: crypto.randomUUID(),
       }),

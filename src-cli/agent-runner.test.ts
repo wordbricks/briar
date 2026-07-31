@@ -12,6 +12,7 @@ const agent = {
   name: "Release Agent",
   provider: "codex" as const,
   model: "gpt-5",
+  effort: "high" as const,
   responsibility: "Ship the assigned issue.",
   skill: "# Release Agent",
 };
@@ -68,6 +69,7 @@ describe("detached Agent runner", () => {
     expect(prompt).not.toContain("claimToken");
     expect(launch.arguments).toContain("workspace-write");
     expect(launch.arguments).toContain("gpt-5");
+    expect(launch.arguments).toContain('model_reasoning_effort="high"');
   });
 
   it("uses the same noninteractive contract for standalone providers", () => {
@@ -81,6 +83,7 @@ describe("detached Agent runner", () => {
     expect(launch.kind).toBe("runner");
     expect(launch.request).toMatchObject({
       approvalPolicy: "never",
+      effort: "high",
       sandboxMode: "dangerFullAccess",
       claudeBinary: "/bin/claude",
     });

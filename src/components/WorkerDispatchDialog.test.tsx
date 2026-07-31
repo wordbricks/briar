@@ -187,9 +187,71 @@ describe("WorkerDispatchDialog", () => {
 
     expect(onSubmit).toHaveBeenCalledWith({
       agentId: agent.id,
+      effort: null,
+      model: null,
       provider: "claude",
       workerId: second.id,
     });
+
+    await act(async () => root.unmount());
+  });
+
+  it("submits the selected model and effort", async () => {
+    const onSubmit = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <WorkerDispatchDialog
+          agents={[agent]}
+          error={null}
+          isDispatching={false}
+          onOpenChange={vi.fn()}
+          onSubmit={onSubmit}
+          open
+          run={null}
+          workers={[worker("worker-model", "Model Mac")]}
+        />,
+      );
+    });
+    await act(async () => {
+      document.body
+        .querySelector<HTMLButtonElement>('[aria-label="선호 모델"]')
+        ?.click();
+    });
+    await act(async () => {
+      document.body
+        .querySelector<HTMLButtonElement>(
+          '.select-menu-option[data-value="opus"]',
+        )
+        ?.click();
+    });
+    await act(async () => {
+      document.body
+        .querySelector<HTMLButtonElement>('[aria-label="Effort"]')
+        ?.click();
+    });
+    await act(async () => {
+      document.body
+        .querySelector<HTMLButtonElement>(
+          '.select-menu-option[data-value="high"]',
+        )
+        ?.click();
+    });
+    const dispatchButton = Array.from(
+      document.body.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent?.includes("실행 배정"));
+    await act(async () => dispatchButton?.click());
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: "claude",
+        model: "opus",
+        effort: "high",
+      }),
+    );
 
     await act(async () => root.unmount());
   });

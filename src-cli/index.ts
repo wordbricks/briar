@@ -1483,6 +1483,10 @@ const claimedRunSchema = queuedIssueSchema.extend({
       name: z.string().min(1),
       provider: z.enum(["codex", "claude", "grok"]),
       model: z.string().nullable(),
+      effort: z
+        .enum(["low", "medium", "high", "xhigh", "max", "ultra"])
+        .nullable()
+        .default(null),
       responsibility: z.string(),
       skill: z.string(),
     })
@@ -1870,6 +1874,7 @@ async function runClaimedIssueReply(
       name: "Briar",
       provider,
       model: issue.model,
+      effort: null,
       responsibility: "",
       skill: "",
     },

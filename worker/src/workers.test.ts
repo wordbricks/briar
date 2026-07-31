@@ -137,6 +137,7 @@ describe("detached execution workers", () => {
       "migrations/0040_run_execution_provider.sql",
       "migrations/0043_execution_worker_icons.sql",
       "migrations/0044_issue_agent_reply_jobs.sql",
+      "migrations/0045_issue_execution_preferences.sql",
     ]) {
       await executeSql(db, await readFile(resolve(migration), "utf8"));
     }
@@ -858,6 +859,10 @@ describe("detached execution workers", () => {
     const dispatched = await dispatchHuntRun(db, projectId, projectId, {
       runId: run,
       agentId: agent!.id,
+      provider: "codex",
+      model: "gpt-5.6-sol",
+      effort: "xhigh",
+      persistPreferences: true,
       workerId: first.worker.id,
       requestedByUserId: "member",
       requestId: "11111111-aaaa-4111-8111-111111111111",
@@ -865,6 +870,9 @@ describe("detached execution workers", () => {
     });
     expect(dispatched).toMatchObject({
       agentId: agent!.id,
+      provider: "codex",
+      model: "gpt-5.6-sol",
+      effort: "xhigh",
       requestedWorkerId: first.worker.id,
       dispatchMode: "specific",
     });
@@ -891,6 +899,11 @@ describe("detached execution workers", () => {
     });
     expect(assignedClaim).toMatchObject({
       agent_id: agent!.id,
+      preferred_agent_provider: "codex",
+      preferred_agent_model: "gpt-5.6-sol",
+      preferred_agent_effort: "xhigh",
+      requested_agent_model: "gpt-5.6-sol",
+      requested_agent_effort: "xhigh",
       requested_worker_id: first.worker.id,
       worker_id: first.worker.id,
     });

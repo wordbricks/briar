@@ -187,6 +187,8 @@ describe("scheduled project agent execution", () => {
       {
         agentId: scheduledRun().agent.id,
         provider: scheduledRun().agent.provider,
+        model: null,
+        effort: null,
         workerId: null,
         reassign: false,
       },
@@ -230,6 +232,8 @@ describe("scheduled project agent execution", () => {
       {
         agentId: scheduledRun().agent.id,
         provider: scheduledRun().agent.provider,
+        model: null,
+        effort: null,
         workerId: null,
         reassign: false,
       },

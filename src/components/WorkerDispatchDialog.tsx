@@ -5,6 +5,7 @@ import {
   Cpu,
   LoaderCircle,
   Waypoints,
+  BrainCircuit,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -18,7 +19,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
-import { agentProviders, type AgentProvider } from "../lib/project-llm";
+import {
+  agentEfforts,
+  agentModels,
+  agentProviders,
+  type AgentProvider,
+  type ModelEffort,
+} from "../lib/project-llm";
 import type {
   ExecutionWorker,
   HuntRun,
@@ -46,6 +53,8 @@ export function WorkerDispatchDialog({
   onSubmit: (input: {
     agentId: string;
     provider: AgentProvider;
+    model: string | null;
+    effort: ModelEffort | null;
     workerId: string | null;
   }) => void;
   open: boolean;
@@ -56,6 +65,8 @@ export function WorkerDispatchDialog({
   const { t } = useI18n();
   const [agentId, setAgentId] = useState("");
   const [provider, setProvider] = useState<AgentProvider>("codex");
+  const [model, setModel] = useState("");
+  const [effort, setEffort] = useState("");
   const [workerId, setWorkerId] = useState("any");
   const selectedAgent = agents.find((agent) => agent.id === agentId) ?? null;
   const policyWorkers = useMemo(
@@ -96,16 +107,44 @@ export function WorkerDispatchDialog({
     const preferredAgent =
       agents.find((agent) => agent.id === run?.agentId) ?? agents[0] ?? null;
     setAgentId(preferredAgent?.id ?? "");
-    setProvider(run?.requestedProvider ?? preferredAgent?.provider ?? "codex");
+    const initialProvider =
+      run?.preferredProvider ??
+      run?.requestedProvider ??
+      preferredAgent?.provider ??
+      "codex";
+    setProvider(initialProvider);
+    setModel(
+      run?.preferredProvider
+        ? (run.preferredModel ?? "")
+        : run?.requestedProvider
+          ? (run.requestedModel ?? "")
+          : preferredAgent?.provider === initialProvider
+            ? (preferredAgent.model ?? "")
+            : "",
+    );
+    setEffort(
+      run?.preferredProvider
+        ? (run.preferredEffort ?? "")
+        : (run?.requestedEffort ?? ""),
+    );
     setWorkerId(run?.requestedWorkerId ?? policy?.defaultWorkerId ?? "any");
   }, [
     agents,
     open,
     policy?.defaultWorkerId,
     run?.agentId,
+    run?.preferredEffort,
+    run?.preferredModel,
+    run?.preferredProvider,
+    run?.requestedEffort,
+    run?.requestedModel,
     run?.requestedProvider,
     run?.requestedWorkerId,
   ]);
+
+  useEffect(() => {
+    if (!model && effort) setEffort("");
+  }, [effort, model]);
 
   useEffect(() => {
     if (!open || healthyProviders.length === 0) return;
@@ -161,7 +200,11 @@ export function WorkerDispatchDialog({
             <span><Waypoints size={15} />{t("worker.provider")}</span>
             <NativeSelect
               label={t("worker.provider")}
-              onValueChange={(value) => setProvider(value as AgentProvider)}
+              onValueChange={(value) => {
+                setProvider(value as AgentProvider);
+                setModel("");
+                setEffort("");
+              }}
               options={healthyProviders.map((candidate) => ({
                 label:
                   candidate === "codex"
@@ -172,6 +215,42 @@ export function WorkerDispatchDialog({
                 value: candidate,
               }))}
               value={provider}
+            />
+          </label>
+          <label>
+            <span><BrainCircuit size={15} />{t("issue.preferredModel")}</span>
+            <NativeSelect
+              label={t("issue.preferredModel")}
+              onValueChange={(value) => {
+                setModel(value);
+                if (!value) setEffort("");
+              }}
+              options={agentModels[provider].map((option) => ({
+                ...option,
+                label: option.value
+                  ? option.label
+                  : t("settings.providerDefaultModel"),
+              }))}
+              value={model}
+            />
+          </label>
+          <label>
+            <span><BrainCircuit size={15} />{t("settings.effort")}</span>
+            <NativeSelect
+              disabled={!model}
+              label={t("settings.effort")}
+              onValueChange={setEffort}
+              options={[
+                {
+                  label: t("settings.providerDefaultEffort"),
+                  value: "",
+                },
+                ...agentEfforts[provider].map((candidate) => ({
+                  label: candidate,
+                  value: candidate,
+                })),
+              ]}
+              value={effort}
             />
           </label>
           <label>
@@ -244,6 +323,8 @@ export function WorkerDispatchDialog({
               onSubmit({
                 agentId,
                 provider,
+                model: model || null,
+                effort: (effort || null) as ModelEffort | null,
                 workerId: workerId === "any" ? null : workerId,
               })
             }

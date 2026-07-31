@@ -421,6 +421,8 @@ describe("HuntDashboard", () => {
     );
     expect(menu?.textContent).toContain("상태");
     expect(menu?.textContent).toContain("우선순위");
+    expect(menu?.textContent).toContain("선호 프로바이더");
+    expect(menu?.textContent).toContain("선호 모델");
     expect(menu?.textContent).toContain("바로 처리하기");
     expect(menu?.textContent).toContain("열기");
     expect(menu?.textContent).toContain("수정");

@@ -96,6 +96,9 @@ const runs: HuntRun[] = [
     repository: "wordbricks/briar",
     branch: "feat/agent-event-stream",
     commitSha: "8e13ac4",
+    preferredProvider: "codex",
+    preferredModel: "gpt-5.6-sol",
+    preferredEffort: "xhigh",
     startedAt: ago(42),
     updatedAt: ago(2),
     completedAt: null,
@@ -241,6 +244,7 @@ export const demoDashboard: DashboardPayload = {
     workflow: structuredClone(demoWorkflow),
   },
   runs,
+  organizationProviders: ["codex", "claude", "grok"],
   generatedAt: new Date().toISOString(),
 };
 

@@ -29,6 +29,7 @@ import {
 } from "../../src/lib/project-agent-schedule";
 
 type ProjectAgentProvider = "codex" | "claude" | "grok";
+type ModelEffort = "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
 
 export type ProjectRow = {
   id: string;
@@ -208,7 +209,12 @@ export type HuntRunRow = {
   lease_expires_at: string | null;
   claim_attempts: number;
   agent_id: string | null;
+  preferred_agent_provider: ProjectAgentProvider | null;
+  preferred_agent_model: string | null;
+  preferred_agent_effort: ModelEffort | null;
   requested_agent_provider: ProjectAgentProvider | null;
+  requested_agent_model: string | null;
+  requested_agent_effort: ModelEffort | null;
   requested_worker_id: string | null;
   requested_by_user_id: string | null;
   dispatch_mode: "any" | "specific" | null;
@@ -1919,7 +1925,10 @@ export async function listDashboardRuns(db: D1Database, projectId: string) {
               run.production_qa_detail, run.context_json,
               run.current_attempt, run.claimed_by, run.claimed_at,
               run.current_revision, run.lease_expires_at, run.claim_attempts,
-              run.agent_id, run.requested_worker_id,
+              run.agent_id, run.preferred_agent_provider,
+              run.preferred_agent_model, run.preferred_agent_effort,
+              run.requested_agent_provider, run.requested_agent_model,
+              run.requested_agent_effort, run.requested_worker_id,
               run.requested_by_user_id, run.dispatch_mode,
               run.dispatch_request_id, run.dispatched_at, run.worker_id,
               run.started_at,
@@ -2560,6 +2569,7 @@ export async function claimNextQueuedHuntRun(
                    (
                      ? = 1
                      and coalesce(
+                       briar_hunt_runs.preferred_agent_provider,
                        briar_hunt_runs.requested_agent_provider,
                        agent.provider
                      ) = 'codex'
@@ -2567,6 +2577,7 @@ export async function claimNextQueuedHuntRun(
                    or (
                      ? = 1
                      and coalesce(
+                       briar_hunt_runs.preferred_agent_provider,
                        briar_hunt_runs.requested_agent_provider,
                        agent.provider
                      ) = 'claude'
@@ -2574,6 +2585,7 @@ export async function claimNextQueuedHuntRun(
                    or (
                      ? = 1
                      and coalesce(
+                       briar_hunt_runs.preferred_agent_provider,
                        briar_hunt_runs.requested_agent_provider,
                        agent.provider
                      ) = 'grok'
@@ -4625,6 +4637,38 @@ export async function updateIssue(
       input.title,
       input.description,
       input.priority,
+      input.updatedAt,
+      runId,
+      projectId,
+    )
+    .first<HuntRunRow>();
+}
+
+export async function updateIssueExecutionPreferences(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  input: {
+    provider: ProjectAgentProvider | null;
+    model: string | null;
+    effort: ModelEffort | null;
+    updatedAt: string;
+  },
+) {
+  return db
+    .prepare(
+      `update briar_hunt_runs
+       set preferred_agent_provider = ?,
+           preferred_agent_model = ?,
+           preferred_agent_effort = ?,
+           updated_at = ?
+       where id = ? and project_id = ?
+       returning *`,
+    )
+    .bind(
+      input.provider,
+      input.model,
+      input.effort,
       input.updatedAt,
       runId,
       projectId,
