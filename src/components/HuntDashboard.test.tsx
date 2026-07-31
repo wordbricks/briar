@@ -1264,6 +1264,7 @@ describe("HuntDashboard", () => {
     const textarea = container.querySelector<HTMLTextAreaElement>(
       ".issue-message-composer textarea",
     );
+    expect(textarea?.rows).toBe(2);
     await act(async () => {
       if (!textarea) return;
       Object.getOwnPropertyDescriptor(

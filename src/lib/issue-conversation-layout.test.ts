@@ -15,6 +15,12 @@ function firstRule(selector: string) {
 }
 
 describe("issue conversation layout", () => {
+  it("keeps the comment composer compact", () => {
+    expect(firstRule(".issue-message-composer textarea")).toContain(
+      "min-height:68px",
+    );
+  });
+
   it("pins the thread layer to the viewport", () => {
     const layerRule = firstRule(".issue-thread-layer");
     const drawerRule = firstRule(".issue-thread-drawer");
