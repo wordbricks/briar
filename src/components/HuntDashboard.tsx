@@ -75,6 +75,7 @@ import {
   type FormEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
+  type RefObject,
 } from "react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -1169,9 +1170,32 @@ export function CreateIssueDialog({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isDraggingAttachments, setIsDraggingAttachments] = useState(false);
   const attachmentDragDepthRef = useRef(0);
-  const descriptionInputRef = useRef<HTMLTextAreaElement>(null);
+  const descriptionEditorRef = useRef<HTMLDivElement>(null);
 
-  const addAttachments = (selected: File[], insertImages = false) => {
+  const focusDescriptionAt = (offset: number) => {
+    const inputs = Array.from(
+      descriptionEditorRef.current?.querySelectorAll<HTMLTextAreaElement>(
+        ".issue-description-input",
+      ) ?? [],
+    );
+    const input =
+      inputs.find((candidate) => {
+        const start = Number(candidate.dataset.descriptionStart ?? 0);
+        const end = Number(candidate.dataset.descriptionEnd ?? start);
+        return offset >= start && offset <= end;
+      }) ?? inputs.at(-1);
+    if (!input) return;
+    const start = Number(input.dataset.descriptionStart ?? 0);
+    const caret = Math.max(0, Math.min(input.value.length, offset - start));
+    input.focus();
+    input.setSelectionRange(caret, caret);
+  };
+
+  const addAttachments = (
+    selected: File[],
+    insertImages = false,
+    selection?: { start: number; end: number },
+  ) => {
     if (selected.length === 0) return;
     const added = selected.map((file) => ({
       file,
@@ -1187,9 +1211,8 @@ export function CreateIssueDialog({
       ? added.filter(({ file }) => file.type.startsWith("image/"))
       : [];
     if (inlineImages.length === 0) return;
-    const textarea = descriptionInputRef.current;
-    const start = textarea?.selectionStart ?? description.length;
-    const end = textarea?.selectionEnd ?? start;
+    const start = selection?.start ?? description.length;
+    const end = selection?.end ?? start;
     const before = description.slice(0, start);
     const after = description.slice(end);
     const markdown = inlineImages
@@ -1209,10 +1232,26 @@ export function CreateIssueDialog({
     setDescription(`${before}${insertion}${after}`);
     requestAnimationFrame(() => {
       const caret = start + insertion.length;
-      textarea?.focus();
-      textarea?.setSelectionRange(caret, caret);
+      focusDescriptionAt(caret);
     });
   };
+
+  const removeAttachment = (index: number, reference: string) => {
+    setAttachments((current) =>
+      current.filter((_, candidateIndex) => candidateIndex !== index),
+    );
+    setDescription((current) =>
+      removeIssueAttachmentMarkdown(current, reference),
+    );
+    setAttachmentError(null);
+  };
+
+  const inlineAttachmentReferences = issueAttachmentReferences(description);
+  const remainingAttachments = attachments.filter(
+    ({ file, reference }) =>
+      !file.type.startsWith("image/") ||
+      !inlineAttachmentReferences.has(reference),
+  );
 
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -1308,7 +1347,22 @@ export function CreateIssueDialog({
               );
           if (images.length === 0) return;
           event.preventDefault();
-          addAttachments(images, true);
+          const target = event.target instanceof HTMLTextAreaElement
+            ? event.target
+            : null;
+          const segmentStart = Number(
+            target?.dataset.descriptionStart ?? description.length,
+          );
+          addAttachments(
+            images,
+            true,
+            target
+              ? {
+                  start: segmentStart + target.selectionStart,
+                  end: segmentStart + target.selectionEnd,
+                }
+              : undefined,
+          );
         }}
         onSubmit={(event) => {
           event.preventDefault();
@@ -1379,37 +1433,35 @@ export function CreateIssueDialog({
               required
               value={title}
             />
-            <textarea
-              aria-label={t("issue.description")}
-              className="issue-description-input"
-              maxLength={100000}
-              onChange={(event) => setDescription(event.target.value)}
+            <DraftIssueDescriptionEditor
+              attachments={attachments}
+              description={description}
+              editorRef={descriptionEditorRef}
+              label={t("issue.description")}
+              onChange={setDescription}
+              onRemoveAttachment={(reference) => {
+                const index = attachments.findIndex(
+                  (attachment) => attachment.reference === reference,
+                );
+                if (index >= 0) removeAttachment(index, reference);
+              }}
               placeholder={t("issue.descriptionPlaceholder")}
-              ref={descriptionInputRef}
-              value={description}
+              removeLabel={(name) => t("issue.remove", { name })}
             />
-            {attachments.length > 0 && (
+            {remainingAttachments.length > 0 && (
               <div
                 aria-label={t("issue.attachments")}
                 className="issue-attachment-list"
               >
-                {attachments.map(({ file, reference }, index) => (
+                {remainingAttachments.map(({ file, reference }) => (
                   <SelectedAttachment
                     file={file}
                     key={reference}
                     onRemove={() => {
-                      setAttachments((current) =>
-                        current.filter(
-                          (_, candidateIndex) => candidateIndex !== index,
-                        ),
+                      const index = attachments.findIndex(
+                        (attachment) => attachment.reference === reference,
                       );
-                      setDescription((current) =>
-                        removeIssueAttachmentMarkdown(
-                          current,
-                          reference,
-                        ),
-                      );
-                      setAttachmentError(null);
+                      if (index >= 0) removeAttachment(index, reference);
                     }}
                   />
                 ))}
@@ -1542,6 +1594,166 @@ export function CreateIssueDialog({
         )}
       </form>
     </div>
+  );
+}
+
+type DraftIssueAttachment = { file: File; reference: string };
+
+type DraftIssueDescriptionPart =
+  | { type: "text"; start: number; end: number; value: string }
+  | {
+      type: "attachment";
+      start: number;
+      end: number;
+      attachment: DraftIssueAttachment;
+    };
+
+function draftIssueDescriptionParts(
+  description: string,
+  attachments: DraftIssueAttachment[],
+): DraftIssueDescriptionPart[] {
+  const ranges = attachments
+    .filter(({ file }) => file.type.startsWith("image/"))
+    .flatMap((attachment) => {
+      const target = `briar-attachment://${attachment.reference}`;
+      const matches: Array<{
+        start: number;
+        end: number;
+        attachment: DraftIssueAttachment;
+      }> = [];
+      let targetIndex = description.indexOf(target);
+      while (targetIndex >= 0) {
+        const start = description.lastIndexOf("![", targetIndex);
+        const destinationStart = description.lastIndexOf("](", targetIndex);
+        const end = description.indexOf(")", targetIndex + target.length);
+        if (
+          start >= 0 &&
+          destinationStart > start &&
+          destinationStart < targetIndex &&
+          end >= 0
+        ) {
+          matches.push({ attachment, end: end + 1, start });
+        }
+        targetIndex = description.indexOf(target, targetIndex + target.length);
+      }
+      return matches;
+    })
+    .sort((left, right) => left.start - right.start)
+    .filter((range, index, all) => index === 0 || range.start >= all[index - 1]!.end);
+
+  if (ranges.length === 0) {
+    return [{ end: description.length, start: 0, type: "text", value: description }];
+  }
+
+  const parts: DraftIssueDescriptionPart[] = [];
+  let offset = 0;
+  for (const range of ranges) {
+    parts.push({
+      end: range.start,
+      start: offset,
+      type: "text",
+      value: description.slice(offset, range.start),
+    });
+    parts.push({ ...range, type: "attachment" });
+    offset = range.end;
+  }
+  parts.push({
+    end: description.length,
+    start: offset,
+    type: "text",
+    value: description.slice(offset),
+  });
+  return parts;
+}
+
+function DraftIssueDescriptionEditor({
+  attachments,
+  description,
+  editorRef,
+  label,
+  onChange,
+  onRemoveAttachment,
+  placeholder,
+  removeLabel,
+}: {
+  attachments: DraftIssueAttachment[];
+  description: string;
+  editorRef: RefObject<HTMLDivElement | null>;
+  label: string;
+  onChange: (value: string) => void;
+  onRemoveAttachment: (reference: string) => void;
+  placeholder: string;
+  removeLabel: (name: string) => string;
+}) {
+  const parts = useMemo(
+    () => draftIssueDescriptionParts(description, attachments),
+    [attachments, description],
+  );
+  const hasInlineAttachments = parts.some((part) => part.type === "attachment");
+
+  return (
+    <div
+      className={`issue-description-editor${
+        hasInlineAttachments ? " has-inline-attachments" : ""
+      }`}
+      ref={editorRef}
+    >
+      {parts.map((part, index) =>
+        part.type === "text" ? (
+          <textarea
+            aria-label={label}
+            className="issue-description-input"
+            data-description-end={part.end}
+            data-description-start={part.start}
+            key={`text-${index}`}
+            maxLength={Math.max(
+              0,
+              100000 - (description.length - part.value.length),
+            )}
+            onChange={(event) =>
+              onChange(
+                `${description.slice(0, part.start)}${event.target.value}${description.slice(part.end)}`,
+              )
+            }
+            placeholder={parts.length === 1 ? placeholder : undefined}
+            rows={Math.max(1, part.value.split("\n").length)}
+            value={part.value}
+          />
+        ) : (
+          <DraftInlineAttachment
+            file={part.attachment.file}
+            key={`attachment-${part.attachment.reference}`}
+            onRemove={() => onRemoveAttachment(part.attachment.reference)}
+            removeLabel={removeLabel(part.attachment.file.name)}
+          />
+        ),
+      )}
+    </div>
+  );
+}
+
+function DraftInlineAttachment({
+  file,
+  onRemove,
+  removeLabel,
+}: {
+  file: File;
+  onRemove: () => void;
+  removeLabel: string;
+}) {
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  useEffect(() => {
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+  return (
+    <figure className="issue-inline-attachment">
+      {previewUrl && <img alt={file.name} src={previewUrl} />}
+      <button aria-label={removeLabel} onClick={onRemove} type="button">
+        <Trash2 size={14} />
+      </button>
+    </figure>
   );
 }
 
