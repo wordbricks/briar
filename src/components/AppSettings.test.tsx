@@ -226,9 +226,11 @@ describe("AppSettings", () => {
     expect(container.textContent).toContain("Version Control");
     expect(container.textContent).toContain("git version 2.50.1");
     expect(container.textContent).toContain("Authenticated as jay");
-    expect(container.textContent).toContain("GitLab");
-    expect(container.textContent).toContain("Azure DevOps");
-    expect(container.textContent).toContain("Bitbucket");
+    expect(container.textContent).toContain("GitHub");
+    expect(container.textContent).not.toContain("Jujutsu");
+    expect(container.textContent).not.toContain("GitLab");
+    expect(container.textContent).not.toContain("Azure DevOps");
+    expect(container.textContent).not.toContain("Bitbucket");
 
     const gitToggle = container.querySelector<HTMLButtonElement>(
       '[aria-label="Git enabled"]',

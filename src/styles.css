@@ -3878,11 +3878,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 }
 .source-control-provider-icon.git { color:#fff; background:#e65d42; transform:rotate(-4deg); }
 .source-control-provider-icon.git svg { transform:rotate(4deg); }
-.source-control-provider-icon.jujutsu { color:#557b93; background:linear-gradient(145deg,#e5f4ff,#c8dfed); font:700 var(--text-sm)/1 ui-monospace,monospace; }
 .source-control-provider-icon.github { color:#454641; background:#f3f3f0; }
-.source-control-provider-icon.gitlab { color:#e45b32; background:#fff1e9; }
-.source-control-provider-icon.azure { color:#2789ce; background:#ecf6fd; }
-.source-control-provider-icon.bitbucket { color:#2477df; background:#edf5ff; }
 .source-control-provider-icon.codex { color:var(--foreground); background:#f1f2ee; }
 .source-control-provider-icon.claude { color:#d66f45; background:#fff1e9; }
 .source-control-provider-icon.grok { color:#111114; background:#ececf1; }
