@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
+import { useMobileBackHandler } from "../hooks/useMobileNavigation";
 import { useI18n } from "../i18n";
 import {
   executeProjectAgentTask,
@@ -43,26 +44,31 @@ export type {
 
 export function ProjectAgentDetail({
   agent,
+  companionMode = false,
   dashboard,
   error: appError,
   isSidebarOpen,
   onBack,
   onIssueOpen,
   onRequestedSessionOpen,
+  onRunResponsibility,
   onSettleTaskSession,
   onStopSession,
   onStartAutoHunt,
   onStartTaskSession,
   requestedSessionId,
+  isRunning: isResponsibilityRunning = false,
   sessions,
 }: {
   agent: ProjectAgent;
+  companionMode?: boolean;
   dashboard: DashboardPayload | null;
   error: string | null;
   isSidebarOpen: boolean;
   onBack: () => void;
   onIssueOpen: (runId: string) => void;
   onRequestedSessionOpen?: () => void;
+  onRunResponsibility?: () => void | Promise<void>;
   onSettleTaskSession: (
     sessionId: string,
     settlement: ProjectAgentTaskSessionSettlement,
@@ -80,6 +86,7 @@ export function ProjectAgentDetail({
   ) => string | Promise<string>;
   onStartTaskSession: (session: ProjectAgentTaskSessionStart) => void;
   requestedSessionId: string | null;
+  isRunning?: boolean;
   sessions: AutoHuntSession[];
 }) {
   const { t } = useI18n();
@@ -97,6 +104,18 @@ export function ProjectAgentDetail({
         session.projectId === agent.projectId &&
         session.agentId === agent.id,
     ) ?? null;
+  useMobileBackHandler(
+    () => {
+      if (!companionMode) return false;
+      if (selectedSessionId) {
+        setSelectedSessionId(null);
+        return true;
+      }
+      onBack();
+      return true;
+    },
+    { enabled: companionMode, priority: 200 },
+  );
 
   useEffect(() => {
     if (
@@ -141,6 +160,10 @@ export function ProjectAgentDetail({
   ]);
 
   const openTaskDialog = () => {
+    if (companionMode) {
+      void onRunResponsibility?.();
+      return;
+    }
     setRequest(agent.responsibility);
     setError(null);
     setIsTaskDialogOpen(true);
@@ -193,11 +216,22 @@ export function ProjectAgentDetail({
         action={
           <Button
             className="project-agent-create project-agent-run-task"
+            disabled={isResponsibilityRunning || !dashboard}
             onClick={openTaskDialog}
             type="button"
           >
-            <Play fill="currentColor" size={17} />
-            {t("agents.runTask")}
+            {isResponsibilityRunning ? (
+              <LoaderCircle className="spin" size={17} />
+            ) : (
+              <Play fill="currentColor" size={17} />
+            )}
+            {t(
+              isResponsibilityRunning
+                ? "agents.running"
+                : companionMode
+                  ? "agents.runNow"
+                  : "agents.runTask",
+            )}
           </Button>
         }
         className={`app-page-header project-agents-heading project-agent-detail-heading${isSidebarOpen ? "" : " sidebar-closed"}`}
@@ -232,55 +266,59 @@ export function ProjectAgentDetail({
         />
       </div>
 
-      <Dialog
-        onOpenChange={(open) => {
-          if (!isRunning) setIsTaskDialogOpen(open);
-        }}
-        open={isTaskDialogOpen}
-      >
-        <DialogContent className="project-agent-task-dialog">
-          <DialogHeader>
-            <DialogTitle>{t("agents.taskTitle")}</DialogTitle>
-            <DialogDescription>
-              {t("agents.taskDescription")}
-            </DialogDescription>
-          </DialogHeader>
+      {!companionMode ? (
+        <Dialog
+          onOpenChange={(open) => {
+            if (!isRunning) setIsTaskDialogOpen(open);
+          }}
+          open={isTaskDialogOpen}
+        >
+          <DialogContent className="project-agent-task-dialog">
+            <DialogHeader>
+              <DialogTitle>{t("agents.taskTitle")}</DialogTitle>
+              <DialogDescription>
+                {t("agents.taskDescription")}
+              </DialogDescription>
+            </DialogHeader>
 
-          {error ? <ErrorBanner>{error}</ErrorBanner> : null}
+            {error ? <ErrorBanner>{error}</ErrorBanner> : null}
 
-          <form
-            className="project-agent-run-composer"
-            id="project-agent-task-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void submit();
-            }}
-          >
-            <Textarea
-              aria-label={t("agents.taskInput")}
-              disabled={isRunning}
-              onChange={(event) => setRequest(event.target.value)}
-              placeholder={t("agents.taskPlaceholder")}
-              value={request}
-            />
-          </form>
-
-          <DialogFooter>
-            <Button
-              disabled={isRunning || request.trim().length === 0 || !dashboard}
-              form="project-agent-task-form"
-              type="submit"
+            <form
+              className="project-agent-run-composer"
+              id="project-agent-task-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void submit();
+              }}
             >
-              {isRunning ? (
-                <LoaderCircle className="spin" size={16} />
-              ) : (
-                <Play size={16} />
-              )}
-              {isRunning ? t("agents.running") : t("agents.runTask")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              <Textarea
+                aria-label={t("agents.taskInput")}
+                disabled={isRunning}
+                onChange={(event) => setRequest(event.target.value)}
+                placeholder={t("agents.taskPlaceholder")}
+                value={request}
+              />
+            </form>
+
+            <DialogFooter>
+              <Button
+                disabled={
+                  isRunning || request.trim().length === 0 || !dashboard
+                }
+                form="project-agent-task-form"
+                type="submit"
+              >
+                {isRunning ? (
+                  <LoaderCircle className="spin" size={16} />
+                ) : (
+                  <Play size={16} />
+                )}
+                {isRunning ? t("agents.running") : t("agents.runTask")}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
     </MainContent>
   );
 }

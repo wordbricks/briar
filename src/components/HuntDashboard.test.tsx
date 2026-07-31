@@ -1093,6 +1093,7 @@ describe("HuntDashboard", () => {
         onLoadIssueMessages={async () => []}
         onLoadRunEvidence={async () => []}
         onMove={async () => undefined}
+        onProcessNow={() => undefined}
         onRetry={async () => undefined}
         onSendIssueMessage={async () => {
           throw new Error("not implemented in this test");
@@ -1111,6 +1112,8 @@ describe("HuntDashboard", () => {
       demoDashboard.runs[0].title,
     );
     expect(container.querySelector(".run-page-actions-trigger")).not.toBeNull();
+    expect(container.querySelector(".run-page-process-now")).not.toBeNull();
+    expect(container.textContent).toContain("바로 처리");
     expect(container.querySelector(".run-page-meta")).toBeNull();
     expect(container.querySelector(".run-page-summary")).toBeNull();
 

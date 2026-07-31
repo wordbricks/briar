@@ -208,6 +208,37 @@ describe("ProjectAgentDetail", () => {
     expect(onBack).toHaveBeenCalledOnce();
   });
 
+  it("runs the saved responsibility without opening a local task dialog on mobile", async () => {
+    const onRunResponsibility = vi.fn(async () => undefined);
+    const container = await mount(
+      <ProjectAgentDetail
+        agent={agent}
+        companionMode
+        dashboard={dashboard}
+        error={null}
+        isSidebarOpen
+        onBack={() => undefined}
+        onIssueOpen={() => undefined}
+        onRunResponsibility={onRunResponsibility}
+        onSettleTaskSession={() => undefined}
+        onStopSession={async () => true}
+        onStartAutoHunt={() => "dispatch-1"}
+        onStartTaskSession={() => undefined}
+        requestedSessionId={null}
+        sessions={[]}
+      />,
+    );
+
+    const runButton = container.querySelector<HTMLButtonElement>(
+      ".project-agent-run-task",
+    );
+    expect(runButton?.textContent).toContain("지금 실행");
+    await act(async () => runButton?.click());
+
+    expect(onRunResponsibility).toHaveBeenCalledOnce();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+  });
+
   it("opens the linked Auto Hunt dispatch instead of its coordinator task", async () => {
     const coordinatorSession: AutoHuntSession = {
       id: "task-session",

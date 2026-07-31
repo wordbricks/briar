@@ -189,7 +189,7 @@ export function App() {
   );
   const [dispatchRun, setDispatchRun] = useState<HuntRun | null>(null);
   const [companionPage, setCompanionPage] = useState<
-    "issues" | "search" | "inbox" | "settings"
+    "issues" | "agents" | "search" | "inbox" | "settings"
   >("issues");
   const [companionStatus, setCompanionStatus] =
     useState<CompanionStatusFilter>("all");
@@ -400,6 +400,40 @@ export function App() {
     } finally {
       setQuickStartingRunId(null);
     }
+  };
+
+  const startAgentAutoHunt = async (
+    agent: ProjectAgent,
+    runs: HuntRun[],
+    options?: {
+      coordinatorConversationId?: string | null;
+      parentSessionId?: string;
+      maxIssues?: number;
+      targetRunIds?: string[];
+      retryReason?: string | null;
+    },
+  ) => {
+    if (!activeProject) throw new Error("프로젝트를 선택해 주세요.");
+    rememberIssueAgent(agent);
+    const token = briar.token;
+    if (!token) throw new Error("로그인이 필요합니다.");
+    const result = await dispatchAutoHuntToWorkers(
+      {
+        dispatch: (run, input) =>
+          dispatchHuntRun(token, activeProject.id, run.id, input),
+        retry: (run, reason) =>
+          retryHuntRun(token, activeProject.id, run.id, reason),
+      },
+      {
+        agent,
+        runs,
+        maxIssues: options?.maxIssues,
+        targetRunIds: options?.targetRunIds,
+        retryReason: options?.retryReason,
+      },
+    );
+    await briar.refresh();
+    return result.dispatchId;
   };
 
   useEffect(() => {
@@ -802,40 +836,7 @@ export function App() {
             onSettleTaskSession={(sessionId, settlement) =>
               autoHunt.settleTaskSession(sessionId, settlement)}
             onStopSession={(sessionId) => autoHunt.stopSession(sessionId)}
-            onStart={async (agent, runs, options) => {
-              rememberIssueAgent(agent);
-              const token = briar.token;
-              if (!token) {
-                throw new Error("로그인이 필요합니다.");
-              }
-              const result = await dispatchAutoHuntToWorkers(
-                {
-                  dispatch: (run, input) =>
-                    dispatchHuntRun(
-                      token,
-                      activeProject.id,
-                      run.id,
-                      input,
-                    ),
-                  retry: (run, reason) =>
-                    retryHuntRun(
-                      token,
-                      activeProject.id,
-                      run.id,
-                      reason,
-                    ),
-                },
-                {
-                  agent,
-                  runs,
-                  maxIssues: options?.maxIssues,
-                  targetRunIds: options?.targetRunIds,
-                  retryReason: options?.retryReason,
-                },
-              );
-              await briar.refresh();
-              return result.dispatchId;
-            }}
+            onStart={startAgentAutoHunt}
             onStartTaskSession={(agent, session) => {
               rememberIssueAgent(agent);
               autoHunt.startTaskSession(activeProject.id, agent.id, session);
@@ -1002,7 +1003,47 @@ export function App() {
             />
             <CompanionBottomNavigation
               activeDestination="inbox"
+              onAgentsOpen={() => setCompanionPage("agents")}
               onInboxOpen={() => {}}
+              onSearchOpen={() => setCompanionPage("search")}
+              onStatusChange={(status) => {
+                setCompanionStatus(status);
+                setCompanionPage("issues");
+              }}
+              unreadInboxCount={inbox.unreadCount}
+            />
+          </>
+        ) : companionPage === "agents" && activeProject ? (
+          <>
+            <ProjectAgents
+              companionMode
+              dashboard={briar.dashboard}
+              error={briar.error}
+              isSidebarOpen
+              onIssueOpen={(runId) => {
+                setRequestedSessionId(null);
+                setRequestedRunId(runId);
+                setCompanionStatus("all");
+                setCompanionPage("issues");
+              }}
+              onRequestedSessionOpen={() => setRequestedSessionId(null)}
+              onSettleTaskSession={(sessionId, settlement) =>
+                autoHunt.settleTaskSession(sessionId, settlement)}
+              onStopSession={(sessionId) => autoHunt.stopSession(sessionId)}
+              onStart={startAgentAutoHunt}
+              onStartTaskSession={(agent, session) => {
+                rememberIssueAgent(agent);
+                autoHunt.startTaskSession(activeProject.id, agent.id, session);
+              }}
+              project={activeProject}
+              requestedSessionId={requestedSessionId}
+              sessions={autoHunt.sessions}
+              token={briar.token}
+            />
+            <CompanionBottomNavigation
+              activeDestination="agents"
+              onAgentsOpen={() => {}}
+              onInboxOpen={() => setCompanionPage("inbox")}
               onSearchOpen={() => setCompanionPage("search")}
               onStatusChange={(status) => {
                 setCompanionStatus(status);
@@ -1019,7 +1060,7 @@ export function App() {
             companionStatus={companionStatus}
             companionUnreadInboxCount={inbox.unreadCount}
             dashboard={briar.dashboard}
-            error={briar.error}
+            error={quickProcessError ?? briar.error}
             isCreatingIssue={briar.isCreatingIssue}
             isIssueDialogOpen={isIssueDialogOpen}
             deletingIssueId={briar.deletingIssueId}
@@ -1028,6 +1069,7 @@ export function App() {
             recoveryError={briar.recoveryError}
             requestedRunId={requestedRunId}
             isSidebarOpen
+            onCompanionAgentsOpen={() => setCompanionPage("agents")}
             onCompanionInboxOpen={() => setCompanionPage("inbox")}
             onCompanionSearchOpen={() => setCompanionPage("search")}
             onCompanionStatusChange={(status) => {
@@ -1057,6 +1099,18 @@ export function App() {
             token={briar.token}
           />
         )}
+        <WorkerDispatchDialog
+          error={quickProcessError}
+          isDispatching={Boolean(quickStartingRunId)}
+          onOpenChange={(open) => {
+            if (!open && !quickStartingRunId) setDispatchRun(null);
+          }}
+          onSubmit={(input) => void submitWorkerDispatch(input)}
+          open={Boolean(dispatchRun)}
+          policy={briar.dashboard?.executionPolicy}
+          run={dispatchRun}
+          workers={briar.dashboard?.workers ?? []}
+        />
       </div>
     );
   }

@@ -218,6 +218,37 @@ describe("ProjectAgents", () => {
     );
   });
 
+  it("dispatches an agent to remote Workers directly in companion mode", async () => {
+    vi.mocked(runProjectAgent).mockClear();
+    const onStart = vi.fn(async () => "remote-dispatch");
+    const onStartTaskSession = vi.fn();
+    const container = await mount(
+      <ProjectAgents
+        {...projectAgentsProps}
+        companionMode
+        onStart={onStart}
+        onStartTaskSession={onStartTaskSession}
+      />,
+    );
+    await act(async () => Promise.resolve());
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(
+          'button[aria-label="자동 사냥 에이전트 책임 실행"]',
+        )
+        ?.click();
+      await Promise.resolve();
+    });
+
+    expect(onStart).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "demo-agent-auto-hunt" }),
+      dashboard.runs,
+    );
+    expect(runProjectAgent).not.toHaveBeenCalled();
+    expect(onStartTaskSession).not.toHaveBeenCalled();
+  });
+
   it("submits provider, default model, and a concrete responsibility", async () => {
     const onCreate = vi.fn(async () => undefined);
     const container = await mount(

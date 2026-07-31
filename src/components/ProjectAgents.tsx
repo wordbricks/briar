@@ -42,6 +42,7 @@ import {
 } from "../lib/project-agent-execution";
 import { runProjectAgent } from "../lib/project-llm";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
+import { useMobileBackHandler } from "../hooks/useMobileNavigation";
 import type {
   CreateProjectAgentInput,
   DashboardPayload,
@@ -63,6 +64,7 @@ const providerLabels: Record<AgentProvider, string> = {
 };
 
 export function ProjectAgents({
+  companionMode = false,
   dashboard,
   error: appError,
   isSidebarOpen,
@@ -77,6 +79,7 @@ export function ProjectAgents({
   sessions,
   token,
 }: {
+  companionMode?: boolean;
   dashboard: DashboardPayload | null;
   error: string | null;
   isSidebarOpen: boolean;
@@ -132,6 +135,25 @@ export function ProjectAgents({
           .map((session) => session.agentId as string),
       ),
     [project.id, sessions],
+  );
+  useMobileBackHandler(
+    () => {
+      if (!companionMode) return false;
+      if (isDialogOpen) {
+        setIsDialogOpen(false);
+        return true;
+      }
+      if (settingsAgent) {
+        setSettingsAgent(null);
+        return true;
+      }
+      if (selectedAgent) {
+        setSelectedAgent(null);
+        return true;
+      }
+      return false;
+    },
+    { enabled: companionMode, priority: 150 },
   );
 
   useEffect(() => {
@@ -281,6 +303,10 @@ export function ProjectAgents({
     setExecutionError(null);
     setExecutingAgentIds((current) => new Set(current).add(agent.id));
     try {
+      if (companionMode) {
+        await onStart(agent, dashboard.runs);
+        return;
+      }
       await executeProjectAgentTask(
         {
           runAgent: runProjectAgent,
@@ -325,12 +351,14 @@ export function ProjectAgents({
     return (
       <ProjectAgentDetail
         agent={selectedAgent}
+        companionMode={companionMode}
         dashboard={dashboard}
         error={appError}
         isSidebarOpen={isSidebarOpen}
         onBack={() => setSelectedAgent(null)}
         onIssueOpen={onIssueOpen}
         onRequestedSessionOpen={onRequestedSessionOpen}
+        onRunResponsibility={() => runResponsibility(selectedAgent)}
         onSettleTaskSession={onSettleTaskSession}
         onStopSession={onStopSession}
         onStartAutoHunt={(runs, options) =>
@@ -338,6 +366,10 @@ export function ProjectAgents({
         onStartTaskSession={(session) =>
           onStartTaskSession(selectedAgent, session)}
         requestedSessionId={requestedSessionId}
+        isRunning={
+          runningAgentIds.has(selectedAgent.id) ||
+          executingAgentIds.has(selectedAgent.id)
+        }
         sessions={sessions}
       />
     );
