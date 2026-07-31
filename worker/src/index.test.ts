@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { createHmac } from "node:crypto";
+import { describe, expect, it, vi } from "vitest";
 import worker, {
   claimConversationJson,
   eventSchema,
@@ -573,5 +574,58 @@ describe("Worker HTTP contract", () => {
         ?.split(",")
         .map((method) => method.trim()),
     ).toContain("PATCH");
+  });
+
+  it("acknowledges /create immediately on the command and legacy event URLs", async () => {
+    const signingSecret = "test-slack-signing-secret";
+    const pendingInstallation = new Promise<never>(() => {});
+    const first = vi.fn(() => pendingInstallation);
+    const bind = vi.fn(() => ({ first }));
+    const prepare = vi.fn(() => ({ bind }));
+    const waitUntil = vi.fn();
+    const env = {
+      DB: { prepare },
+      SLACK_SIGNING_SECRET: signingSecret,
+    } as never;
+    const ctx = {
+      waitUntil,
+      passThroughOnException: vi.fn(),
+    } as unknown as ExecutionContext;
+
+    const request = (pathname: string) => {
+      const body = new URLSearchParams({
+        team_id: "T123",
+        channel_id: "C123",
+        user_id: "U123",
+        command: "/create",
+        text: "Prefilled title",
+        trigger_id: "123.456.test",
+        response_url:
+          "https://hooks.slack.com/commands/T123/B123/response-token",
+      }).toString();
+      const timestamp = Math.floor(Date.now() / 1000).toString();
+      const signature = `v0=${
+        createHmac("sha256", signingSecret)
+          .update(`v0:${timestamp}:${body}`)
+          .digest("hex")
+      }`;
+      return new Request(`https://briar-api.example${pathname}`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+          "x-slack-request-timestamp": timestamp,
+          "x-slack-signature": signature,
+        },
+        body,
+      });
+    };
+
+    for (const pathname of ["/slack/commands", "/slack/events"]) {
+      const response = await worker.fetch(request(pathname), env, ctx);
+      expect(response.status).toBe(200);
+      expect(await response.text()).toBe("");
+    }
+    expect(waitUntil).toHaveBeenCalledTimes(2);
+    expect(first).toHaveBeenCalledTimes(2);
   });
 });

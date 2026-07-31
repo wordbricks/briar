@@ -55,6 +55,10 @@ import {
   inspectWorkerProviderHealth,
 } from "./provider-health";
 import { getSkillGuide, skillGuides } from "./skill-guides";
+import {
+  briarIssueUrl,
+  ensureBriarIssueLinkInGithubPullRequest,
+} from "./github-pr";
 
 const workflowStageIdSchema = z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/u);
 const evidenceTypeSchema = z
@@ -947,7 +951,16 @@ async function claimWork() {
   const { claimToken: _claimToken, ...publicIssue } = issue;
   console.log(
     JSON.stringify({
-      work: { ...publicIssue, attachments, workspace },
+      work: {
+        ...publicIssue,
+        briarIssueUrl: briarIssueUrl(
+          config.apiUrl,
+          project.id,
+          issue.runId,
+        ),
+        attachments,
+        workspace,
+      },
       ...(workspaceError ? { workspaceError } : {}),
     }),
   );
@@ -1307,6 +1320,16 @@ async function addRunEvidence() {
     url: z.string().url().nullable(),
     metadata: z.record(z.string(), z.unknown()).nullable(),
   }).parse(input);
+  if (
+    parsed.type === "pull_request" &&
+    parsed.url &&
+    (parsed.status === "passed" || parsed.status === "pending")
+  ) {
+    ensureBriarIssueLinkInGithubPullRequest({
+      pullRequestUrl: parsed.url,
+      issueUrl: briarIssueUrl(config.apiUrl, project.id, runId),
+    });
+  }
   const imagePaths = values("--image").map((path) => resolve(path));
   const images = await Promise.all(
     imagePaths.map(async (path) => {
@@ -1595,6 +1618,11 @@ async function runClaimedIssueInRuntime(
       sourceKey: issue.sourceKey,
       title: issue.title,
       issueDescription: issue.description,
+      briarIssueUrl: briarIssueUrl(
+        config.apiUrl,
+        project.id,
+        issue.runId,
+      ),
       priority: issue.priority,
       sourceCreatedAt: issue.sourceCreatedAt,
       context: issue.context,

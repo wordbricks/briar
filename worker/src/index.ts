@@ -2054,6 +2054,14 @@ async function handleSlackEventRequest(
   ctx?: ExecutionContext,
 ) {
   const rawBody = await readVerifiedSlackBody(request, env);
+  if (
+    request.headers
+      .get("content-type")
+      ?.toLowerCase()
+      .startsWith("application/x-www-form-urlencoded")
+  ) {
+    return handleSlackCommandForm(new URLSearchParams(rawBody), env, ctx);
+  }
 
   let payload: unknown;
   try {
@@ -2082,8 +2090,73 @@ async function handleSlackEventRequest(
 const slackCommandMessage = (text: string) =>
   Response.json({ response_type: "ephemeral", text });
 
-async function handleSlackCommandRequest(request: Request, env: Env) {
-  const form = new URLSearchParams(await readVerifiedSlackBody(request, env));
+async function openSlackCreateIssueModal(
+  form: URLSearchParams,
+  env: Env,
+  teamId: string,
+  channelId: string,
+  triggerId: string,
+  responseUrl: string,
+) {
+  try {
+    const installation = await getSlackInstallation(env.DB, teamId);
+    if (!installation) {
+      await postSlackCommandResponse(
+        responseUrl,
+        "이 Slack 워크스페이스가 Briar에 연결되어 있지 않습니다.",
+      );
+      return;
+    }
+    const projects = await listOrganizationProjects(
+      env.DB,
+      installation.organization_id,
+    );
+    if (projects.length === 0) {
+      await postSlackCommandResponse(
+        responseUrl,
+        "이슈를 만들 Briar 프로젝트가 없습니다. 먼저 프로젝트를 만들어 주세요.",
+      );
+      return;
+    }
+    const token = await decryptSlackToken(
+      installation.encrypted_bot_token,
+      installation.token_iv,
+      env.SLACK_TOKEN_ENCRYPTION_KEY,
+    );
+    await callSlackApi("views.open", token, {
+      trigger_id: triggerId,
+      view: buildSlackCreateIssueModal({
+        projects,
+        defaultProjectId: installation.default_project_id,
+        responseUrl,
+        channelId,
+        initialTitle: form.get("text") ?? undefined,
+      }),
+    });
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        message: "Slack create issue modal failed",
+        error: error instanceof Error ? error.message : String(error),
+        teamId,
+      }),
+    );
+    try {
+      await postSlackCommandResponse(
+        responseUrl,
+        "Briar 이슈 생성 화면을 열지 못했습니다. Slack 연결을 새로고침한 뒤 다시 시도해 주세요.",
+      );
+    } catch {
+      // The slash command has already been acknowledged.
+    }
+  }
+}
+
+async function handleSlackCommandForm(
+  form: URLSearchParams,
+  env: Env,
+  ctx?: ExecutionContext,
+) {
   if (form.get("ssl_check") === "1") return new Response(null);
   if (form.get("command") !== "/create") {
     return slackCommandMessage("지원하지 않는 Slack 명령입니다.");
@@ -2096,37 +2169,29 @@ async function handleSlackCommandRequest(request: Request, env: Env) {
     return slackCommandMessage("Slack 명령 정보를 확인할 수 없습니다.");
   }
 
-  const installation = await getSlackInstallation(env.DB, teamId);
-  if (!installation) {
-    return slackCommandMessage(
-      "이 Slack 워크스페이스가 Briar에 연결되어 있지 않습니다.",
-    );
-  }
-  const projects = await listOrganizationProjects(
-    env.DB,
-    installation.organization_id,
+  const processing = openSlackCreateIssueModal(
+    form,
+    env,
+    teamId,
+    channelId,
+    triggerId,
+    responseUrl,
   );
-  if (projects.length === 0) {
-    return slackCommandMessage(
-      "이슈를 만들 Briar 프로젝트가 없습니다. 먼저 프로젝트를 만들어 주세요.",
-    );
-  }
-  const token = await decryptSlackToken(
-    installation.encrypted_bot_token,
-    installation.token_iv,
-    env.SLACK_TOKEN_ENCRYPTION_KEY,
-  );
-  await callSlackApi("views.open", token, {
-    trigger_id: triggerId,
-    view: buildSlackCreateIssueModal({
-      projects,
-      defaultProjectId: installation.default_project_id,
-      responseUrl,
-      channelId,
-      initialTitle: form.get("text") ?? undefined,
-    }),
-  });
+  if (ctx) ctx.waitUntil(processing);
+  else await processing;
   return new Response(null);
+}
+
+async function handleSlackCommandRequest(
+  request: Request,
+  env: Env,
+  ctx?: ExecutionContext,
+) {
+  return handleSlackCommandForm(
+    new URLSearchParams(await readVerifiedSlackBody(request, env)),
+    env,
+    ctx,
+  );
 }
 
 async function processSlackCreateIssueSubmission(
@@ -5359,7 +5424,7 @@ export default {
     }
     if (url.pathname === "/slack/commands" && request.method === "POST") {
       try {
-        return await handleSlackCommandRequest(request, env);
+        return await handleSlackCommandRequest(request, env, ctx);
       } catch (error) {
         if (error instanceof HttpError) {
           return json({ message: error.message }, error.status);
