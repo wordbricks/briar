@@ -182,7 +182,7 @@ export function executionWorkerProviders(
 
 export type ExecutionDispatchRow = {
   runId: string;
-  agentId: string;
+  agentId: string | null;
   provider: AgentProvider;
   model: string | null;
   effort: ModelEffort | null;
@@ -1176,8 +1176,8 @@ export async function auditExecutionEvent(
 }
 
 /**
- * Assign a logical Agent and an execution-time Worker policy to one run.
- * This deliberately creates no ownership edge between Agent and Worker.
+ * Assign execution settings and a Worker policy to one run. A logical Agent
+ * remains optional and does not create an ownership edge with the Worker.
  */
 export async function dispatchHuntRun(
   db: D1Database,
@@ -1185,7 +1185,7 @@ export async function dispatchHuntRun(
   projectId: string,
   input: {
     runId: string;
-    agentId: string;
+    agentId?: string | null;
     provider?: AgentProvider;
     model?: string | null;
     effort?: ModelEffort | null;
@@ -1197,14 +1197,18 @@ export async function dispatchHuntRun(
     reassign?: boolean;
   },
 ): Promise<ExecutionDispatchRow | null> {
-  const agent = await db
-    .prepare(
-      `select id, provider, model from briar_project_agents
-       where id = ? and project_id = ?`,
-    )
-    .bind(input.agentId, projectId)
-    .first<{ id: string; provider: AgentProvider; model: string | null }>();
-  if (!agent) throw new WorkerConflictError("Agent not found for this project");
+  const agent = input.agentId
+    ? await db
+        .prepare(
+          `select id, provider, model from briar_project_agents
+           where id = ? and project_id = ?`,
+        )
+        .bind(input.agentId, projectId)
+        .first<{ id: string; provider: AgentProvider; model: string | null }>()
+    : null;
+  if (input.agentId && !agent) {
+    throw new WorkerConflictError("Agent not found for this project");
+  }
   const preferences = await db
     .prepare(
       `select preferred_agent_provider, preferred_agent_model,
@@ -1219,13 +1223,16 @@ export async function dispatchHuntRun(
     }>();
   if (!preferences) return null;
   const provider =
-    input.provider ?? preferences.preferred_agent_provider ?? agent.provider;
+    input.provider ?? preferences.preferred_agent_provider ?? agent?.provider;
+  if (!provider) {
+    throw new WorkerConflictError("Provider is required when no Agent is assigned");
+  }
   const model =
     input.model !== undefined
       ? input.model
       : preferences.preferred_agent_provider
         ? preferences.preferred_agent_model
-        : agent.model;
+        : (agent?.model ?? null);
   const effort =
     input.effort !== undefined
       ? input.effort
@@ -1326,7 +1333,7 @@ export async function dispatchHuntRun(
     .bind(projectId, input.requestId)
     .first<{
       id: string;
-      agent_id: string;
+      agent_id: string | null;
       requested_agent_provider: AgentProvider | null;
       requested_agent_model: string | null;
       requested_agent_effort: ModelEffort | null;
@@ -1339,7 +1346,7 @@ export async function dispatchHuntRun(
     return {
       runId: existing.id,
       agentId: existing.agent_id,
-      provider: existing.requested_agent_provider ?? agent.provider,
+      provider: existing.requested_agent_provider ?? agent?.provider ?? provider,
       model: existing.requested_agent_model,
       effort: existing.requested_agent_effort,
       requestedWorkerId: existing.requested_worker_id,
@@ -1407,7 +1414,7 @@ export async function dispatchHuntRun(
          and status not in ('completed', 'cancelled')`,
     )
     .bind(
-      agent.id,
+      agent?.id ?? null,
       provider,
       model,
       effort,
@@ -1438,7 +1445,7 @@ export async function dispatchHuntRun(
     projectId,
     runId: input.runId,
     workerId: input.workerId ?? null,
-    agentId: agent.id,
+    agentId: agent?.id ?? null,
     actorUserId: input.requestedByUserId,
     action,
     requestId: input.requestId,
@@ -1453,7 +1460,7 @@ export async function dispatchHuntRun(
   });
   return {
     runId: input.runId,
-    agentId: agent.id,
+    agentId: agent?.id ?? null,
     provider,
     model,
     effort,
