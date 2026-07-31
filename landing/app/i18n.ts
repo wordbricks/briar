@@ -45,6 +45,11 @@ export const copy = {
       english: "영어",
       korean: "한국어",
     },
+    theme: {
+      label: "테마",
+      dark: "다크 모드로 전환",
+      light: "화이트 모드로 전환",
+    },
     nav: {
       product: "제품",
       workflow: "워크플로",
@@ -235,6 +240,11 @@ export const copy = {
       label: "Language",
       english: "English",
       korean: "Korean",
+    },
+    theme: {
+      label: "Theme",
+      dark: "Switch to dark mode",
+      light: "Switch to light mode",
     },
     nav: {
       product: "Product",

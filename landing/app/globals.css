@@ -3458,3 +3458,594 @@ footer {
     display: none;
   }
 }
+
+/* Theme control */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid #513d3f;
+  border-radius: 9px;
+  color: #8f8183;
+  background: #251c1e;
+  cursor: pointer;
+  transition:
+    border-color 180ms ease,
+    background 180ms ease,
+    color 180ms ease;
+}
+
+.theme-toggle:hover {
+  border-color: #806467;
+  color: #f0e7e8;
+  background: #423033;
+}
+
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--violet);
+  outline-offset: 2px;
+}
+
+.theme-toggle-track {
+  position: relative;
+  display: grid;
+  width: 40px;
+  height: 22px;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  border-radius: 999px;
+  background: #171113;
+}
+
+.theme-icon {
+  position: relative;
+  z-index: 2;
+  font-style: normal;
+  font-size: 11px;
+  line-height: 1;
+  text-align: center;
+}
+
+.theme-icon-sun {
+  color: #776a6c;
+}
+
+.theme-icon-moon {
+  color: #1a1415;
+}
+
+.theme-toggle-track b {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #e9dfe0;
+  box-shadow: 0 2px 7px rgb(0 0 0 / 0.28);
+  transition: transform 200ms ease;
+}
+
+/* Briar light theme */
+html[data-theme="light"] {
+  --ink: #21191b;
+  --ink-muted: #665a5d;
+  --ink-soft: #817477;
+  --paper: #fbf8f6;
+  --paper-soft: #f3eeeb;
+  --panel: #fffdfc;
+  --panel-raised: #ffffff;
+  --line: #d9ceca;
+  --line-soft: #e5dcd8;
+  --violet: #6550bc;
+  --violet-bright: #5843af;
+  --green: #258058;
+  --noise-texture: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='surface-noise-light'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23surface-noise-light)' opacity='.035'/%3E%3C/svg%3E");
+}
+
+html[data-theme="light"] body {
+  color: var(--ink);
+  background-color: var(--paper);
+}
+
+html[data-theme="light"] .site-header {
+  border-color: rgb(91 65 68 / 0.13);
+  background: rgb(251 248 246 / 0.7);
+  backdrop-filter: blur(16px);
+}
+
+html[data-theme="light"] .brand {
+  color: #21191b;
+}
+
+html[data-theme="light"] .nav-shell nav,
+html[data-theme="light"] .footer-shell > div {
+  color: #71666a;
+}
+
+html[data-theme="light"] .nav-shell nav a:hover,
+html[data-theme="light"] .footer-shell a:hover {
+  color: #21191b;
+}
+
+html[data-theme="light"] .language-switcher,
+html[data-theme="light"] .theme-toggle,
+html[data-theme="light"] .header-cta,
+html[data-theme="light"] .button-secondary {
+  border-color: #d8ceca;
+  color: #665b5e;
+  background: rgb(255 253 252 / 0.84);
+}
+
+html[data-theme="light"] .language-switcher > span,
+html[data-theme="light"] .language-switcher button {
+  color: #8d8285;
+}
+
+html[data-theme="light"] .language-switcher button:hover,
+html[data-theme="light"] .language-switcher button.is-active {
+  color: #2b2224;
+}
+
+html[data-theme="light"] .language-switcher i {
+  background: #dcd3d0;
+}
+
+html[data-theme="light"] .theme-toggle:hover,
+html[data-theme="light"] .header-cta:hover,
+html[data-theme="light"] .button-secondary:hover {
+  border-color: #bcaeaa;
+  color: #2b2224;
+  background: #fff;
+}
+
+html[data-theme="light"] .theme-toggle-track {
+  background: #e8dfdc;
+}
+
+html[data-theme="light"] .theme-toggle-track b {
+  right: 2px;
+  transform: translateX(-18px);
+  background: #fff;
+  box-shadow: 0 2px 7px rgb(81 60 62 / 0.2);
+}
+
+html[data-theme="light"] .theme-icon-sun {
+  color: #6c5518;
+}
+
+html[data-theme="light"] .theme-icon-moon {
+  color: #8f8385;
+}
+
+html[data-theme="light"] .header-download {
+  border-color: #c7b8b3;
+  color: #3b3033;
+  background: #eee7e3;
+}
+
+html[data-theme="light"] .header-download:hover {
+  border-color: #a99791;
+  background: #e6dcd7;
+}
+
+html[data-theme="light"] .button-primary {
+  color: #fff;
+  background: #251d20;
+  box-shadow: 0 8px 28px rgb(58 42 45 / 0.16);
+}
+
+html[data-theme="light"] .button-primary:hover {
+  background: #100b0d;
+  box-shadow: 0 12px 34px rgb(58 42 45 / 0.22);
+}
+
+html[data-theme="light"] .hero::before {
+  background:
+    radial-gradient(
+      ellipse at 50% 34%,
+      rgb(255 252 249 / 0.38) 0,
+      rgb(251 248 246 / 0.7) 58%,
+      rgb(251 248 246 / 0.92) 82%,
+      var(--paper) 100%
+    ),
+    linear-gradient(
+      180deg,
+      rgb(251 248 246 / 0.24) 0,
+      rgb(251 248 246 / 0.55) 48%,
+      var(--paper) 100%
+    );
+}
+
+html[data-theme="light"] .hero-art {
+  background: var(--paper);
+}
+
+html[data-theme="light"] .hero-art::before {
+  opacity: 0.07;
+  mix-blend-mode: multiply;
+}
+
+html[data-theme="light"] .hero-art::after {
+  background:
+    radial-gradient(ellipse at 50% 35%, transparent, rgb(251 248 246 / 0.22) 74%),
+    linear-gradient(90deg, rgb(251 248 246 / 0.4), transparent 26% 72%, rgb(251 248 246 / 0.48));
+}
+
+html[data-theme="light"] .hero-art img {
+  content: url("/briar-hero-orchestration-light.webp");
+  opacity: 0.55;
+  filter: saturate(0.78) contrast(0.92) brightness(1.04);
+}
+
+html[data-theme="light"] .hero-content h1,
+html[data-theme="light"] .section-intro h2,
+html[data-theme="light"] .security-copy h2,
+html[data-theme="light"] .final-cta h2 {
+  color: #21191b;
+  text-shadow: none;
+}
+
+html[data-theme="light"] .hero-kicker,
+html[data-theme="light"] .hero-content > p,
+html[data-theme="light"] .section-intro > p,
+html[data-theme="light"] .security-copy > p,
+html[data-theme="light"] .final-cta p {
+  color: #6e6265;
+  text-shadow: none;
+}
+
+html[data-theme="light"] .hero-meta,
+html[data-theme="light"] .hero-meta i,
+html[data-theme="light"] .section-index,
+html[data-theme="light"] .card-figure,
+html[data-theme="light"] .download-note,
+html[data-theme="light"] .footer-shell > p {
+  color: #8b7f82;
+}
+
+html[data-theme="light"] .stage-glow {
+  background: radial-gradient(ellipse at 50% 32%, rgb(118 89 221 / 0.13), rgb(188 133 145 / 0.1) 42%, transparent 72%);
+}
+
+html[data-theme="light"] .board-window {
+  border-color: #cbbfbb;
+  background: #f8f5f3;
+  box-shadow:
+    0 44px 90px rgb(83 61 65 / 0.19),
+    0 0 90px rgb(126 103 217 / 0.08);
+}
+
+html[data-theme="light"] .board-window .window-topbar {
+  border-color: #ddd5d2;
+  background: #f3efed;
+}
+
+html[data-theme="light"] .window-traffic i {
+  background: #c8bfbc;
+}
+
+html[data-theme="light"] .window-project,
+html[data-theme="light"] .window-live {
+  color: #786e71;
+}
+
+html[data-theme="light"] .window-project-mark {
+  color: #54459c;
+  background: #e2ddf3;
+}
+
+html[data-theme="light"] .board-rail {
+  border-color: #ddd5d2;
+  background: #eee9e6;
+}
+
+html[data-theme="light"] .board-rail span {
+  color: #8d8385;
+}
+
+html[data-theme="light"] .board-rail span.rail-active {
+  color: #433655;
+  background: #ded7e4;
+  box-shadow: inset 0 0 0 1px #c7bdcf;
+}
+
+html[data-theme="light"] .board-rail > i,
+html[data-theme="light"] .board-profile,
+html[data-theme="light"] .board-toolbar,
+html[data-theme="light"] .board-filters,
+html[data-theme="light"] .board-statusbar,
+html[data-theme="light"] .detail-tabs,
+html[data-theme="light"] .implement-section,
+html[data-theme="light"] .agent-board-top,
+html[data-theme="light"] .agent-row + .agent-row {
+  border-color: #ddd5d2;
+}
+
+html[data-theme="light"] .board-sidebar,
+html[data-theme="light"] .detail-properties {
+  border-color: #ddd5d2;
+  background: #f4f0ee;
+}
+
+html[data-theme="light"] .board-sidebar-brand,
+html[data-theme="light"] .board-toolbar strong,
+html[data-theme="light"] .kanban-card > strong,
+html[data-theme="light"] .detail-toolbar strong,
+html[data-theme="light"] .evidence-card-head strong,
+html[data-theme="light"] .implementation-track strong,
+html[data-theme="light"] .agent-board-top,
+html[data-theme="light"] .agent-row strong {
+  color: #43383b;
+}
+
+html[data-theme="light"] .board-sidebar > a,
+html[data-theme="light"] .board-project > a,
+html[data-theme="light"] .board-project > div,
+html[data-theme="light"] .board-profile strong,
+html[data-theme="light"] .board-toolbar small,
+html[data-theme="light"] .board-filters > span,
+html[data-theme="light"] .kanban-column-head strong,
+html[data-theme="light"] .kanban-card-meta span,
+html[data-theme="light"] .kanban-card > small,
+html[data-theme="light"] .board-statusbar span,
+html[data-theme="light"] .detail-toolbar > span,
+html[data-theme="light"] .detail-toolbar > i,
+html[data-theme="light"] .detail-tabs span,
+html[data-theme="light"] .evidence-heading strong,
+html[data-theme="light"] .evidence-heading small,
+html[data-theme="light"] .evidence-card p,
+html[data-theme="light"] .evidence-card > small,
+html[data-theme="light"] .evidence-card footer,
+html[data-theme="light"] .implementation-track p,
+html[data-theme="light"] .implementation-track small,
+html[data-theme="light"] .detail-properties > div,
+html[data-theme="light"] .detail-properties > div strong,
+html[data-theme="light"] .agent-row small,
+html[data-theme="light"] .agent-state {
+  color: #786d70;
+}
+
+html[data-theme="light"] .board-project > a.board-project-active,
+html[data-theme="light"] .board-filters > span.is-selected {
+  color: #51418f;
+  background: #e5e0ed;
+}
+
+html[data-theme="light"] .board-main,
+html[data-theme="light"] .detail-content {
+  background: #fbf9f8;
+}
+
+html[data-theme="light"] .board-toolbar-actions button,
+html[data-theme="light"] .board-toolbar-actions span,
+html[data-theme="light"] .board-toolbar-actions i {
+  border-color: #d7cecb;
+  color: #6f6467;
+  background: #f0ebe9;
+}
+
+html[data-theme="light"] .board-toolbar-actions button,
+html[data-theme="light"] .board-toolbar-actions i {
+  border-color: #c4b9d8;
+  color: #5c49a5;
+  background: #e8e3f1;
+}
+
+html[data-theme="light"] .kanban-column {
+  border-color: #ded6d3;
+  background: #f2eeec;
+}
+
+html[data-theme="light"] .kanban-card {
+  border-color: #d8cfcc;
+  background: #fff;
+  box-shadow: 0 5px 14px rgb(75 54 58 / 0.08);
+}
+
+html[data-theme="light"] .kanban-card.is-running {
+  border-color: #a99ac8;
+  background: linear-gradient(145deg, #f0ebf5, #fff);
+  box-shadow: 0 8px 22px rgb(75 54 58 / 0.1);
+}
+
+html[data-theme="light"] .kanban-progress > span {
+  background: #ddd5e4;
+}
+
+html[data-theme="light"] .kanban-empty {
+  color: #a09698;
+}
+
+html[data-theme="light"] .board-statusbar {
+  background: #eee9e7;
+}
+
+html[data-theme="light"] .floating-note {
+  border-color: #d3c8c5;
+  background: rgb(255 253 252 / 0.95);
+  box-shadow: 0 18px 44px rgb(75 54 58 / 0.14);
+}
+
+html[data-theme="light"] .floating-note strong {
+  color: #3d3335;
+}
+
+html[data-theme="light"] .floating-note small {
+  color: #827679;
+}
+
+html[data-theme="light"] .principle-grid article,
+html[data-theme="light"] .agent-board,
+html[data-theme="light"] .security-visual {
+  background-color: rgb(255 253 252 / 0.72);
+}
+
+html[data-theme="light"] .principle-grid h3,
+html[data-theme="light"] .workflow-steps h3 {
+  color: #33282b;
+}
+
+html[data-theme="light"] .principle-grid p,
+html[data-theme="light"] .workflow-steps p,
+html[data-theme="light"] .security-points span {
+  color: #74686b;
+}
+
+html[data-theme="light"] .symbol-local::before {
+  border-color: #cfc5c2;
+  background: #fff;
+  box-shadow: 15px 15px 0 -7px #f3eeeb, 15px 15px 0 -6px #d8ceca;
+}
+
+html[data-theme="light"] .symbol-local::after {
+  background: #9d90c9;
+  box-shadow: 0 17px 0 #d4ccca, 0 34px 0 #d4ccca;
+}
+
+html[data-theme="light"] .symbol-agents span {
+  border-color: var(--paper);
+}
+
+html[data-theme="light"] .symbol-flow::before {
+  background: #cfc6c3;
+}
+
+html[data-theme="light"] .symbol-flow i {
+  border-color: #fbf8f6;
+}
+
+html[data-theme="light"] .workflow-section {
+  background-color: var(--paper-soft);
+}
+
+html[data-theme="light"] .workflow-steps li,
+html[data-theme="light"] .workflow-steps li:first-child {
+  border-color: #d7cdca;
+}
+
+html[data-theme="light"] .detail-window {
+  border-color: #cfc4c1;
+  background: #fff;
+  box-shadow: 0 35px 80px rgb(75 54 58 / 0.14);
+}
+
+html[data-theme="light"] .detail-toolbar {
+  border-color: #ddd5d2;
+  background: #f1ecea;
+}
+
+html[data-theme="light"] .detail-tabs strong {
+  color: #604ca8;
+}
+
+html[data-theme="light"] .evidence-heading span {
+  color: #5f4ba7;
+  background: #e9e3f2;
+}
+
+html[data-theme="light"] .evidence-card,
+html[data-theme="light"] .implementation-track,
+html[data-theme="light"] .detail-composer {
+  border-color: #d8cfcc;
+  background: #fff;
+}
+
+html[data-theme="light"] .evidence-card-head span {
+  color: #26704e;
+  background: #e0f0e7;
+}
+
+html[data-theme="light"] .evidence-card code {
+  border-color: #dbd2cf;
+  color: #5e5356;
+  background: #f3efed;
+}
+
+html[data-theme="light"] .detail-composer {
+  color: #918588;
+}
+
+html[data-theme="light"] .detail-properties h3 {
+  color: #514649;
+}
+
+html[data-theme="light"] .agent-board {
+  border-color: #d6ccca;
+  box-shadow: 0 35px 80px rgb(75 54 58 / 0.12);
+}
+
+html[data-theme="light"] .agent-state {
+  border-color: #d9cfcc;
+  background: #faf7f5;
+}
+
+html[data-theme="light"] .security-section {
+  background: #eee7e3;
+}
+
+html[data-theme="light"] .secure-device {
+  border-color: #cfc5c1;
+  background: #fff;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.8);
+}
+
+html[data-theme="light"] .device-top {
+  border-color: #ddd4d1;
+}
+
+html[data-theme="light"] .device-top small,
+html[data-theme="light"] .repo-card small,
+html[data-theme="light"] .secure-agent-row small,
+html[data-theme="light"] .secure-cloud small,
+html[data-theme="light"] .secure-bridge span {
+  color: #7d7174;
+}
+
+html[data-theme="light"] .repo-card {
+  border-color: #cfc4dd;
+  background: #f3eff8;
+}
+
+html[data-theme="light"] .repo-card strong,
+html[data-theme="light"] .secure-agent-row strong,
+html[data-theme="light"] .secure-cloud strong {
+  color: #43383b;
+}
+
+html[data-theme="light"] .secure-agent-row + .secure-agent-row {
+  border-color: #e0d7d4;
+}
+
+html[data-theme="light"] .secure-cloud {
+  border-color: #b9d2c4;
+  background: #edf6f1;
+}
+
+html[data-theme="light"] .final-cta::before {
+  background: radial-gradient(circle, rgb(128 92 112 / 0.11), transparent 69%);
+}
+
+html[data-theme="light"] footer {
+  border-color: #ded5d2;
+}
+
+@media (max-width: 800px) {
+  html[data-theme="light"] .workflow-steps {
+    background: #d8ceca;
+  }
+
+  html[data-theme="light"] .workflow-steps li,
+  html[data-theme="light"] .workflow-steps li:first-child {
+    background: #f3eeeb;
+  }
+}
+
+@media (max-width: 560px) {
+  .theme-toggle {
+    width: 48px;
+  }
+}
