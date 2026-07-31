@@ -379,6 +379,9 @@ describe("HuntDashboard", () => {
     await act(async () => {
       container.querySelector<HTMLElement>(".kanban-card")?.click();
     });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".run-page-properties-toggle")?.click();
+    });
     const agentProperty = Array.from(
       container.querySelectorAll<HTMLElement>(".run-property"),
     ).find((property) => property.getAttribute("aria-label")?.startsWith("에이전트:"));
@@ -432,6 +435,9 @@ describe("HuntDashboard", () => {
 
     await act(async () => {
       container.querySelector<HTMLElement>(".kanban-card")?.click();
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".run-page-properties-toggle")?.click();
     });
     const detailLink = container.querySelector<HTMLAnchorElement>(
       ".run-property-link",
@@ -622,7 +628,12 @@ describe("HuntDashboard", () => {
     );
     expect(copyLink?.getAttribute("aria-label")).toBe("링크 복사");
     expect(title?.nextElementSibling).toBe(titlebarActions);
-    expect(titlebarActions?.firstElementChild).toBe(copyLink);
+    expect(titlebarActions?.firstElementChild?.classList).toContain(
+      "run-page-property-badges",
+    );
+    expect(
+      titlebarActions?.querySelector(".run-page-properties-toggle"),
+    ).not.toBeNull();
     expect(copyLink?.nextElementSibling).toBe(trigger);
     expect(container.querySelector(".run-page-edit")).toBeNull();
 
@@ -943,18 +954,27 @@ describe("HuntDashboard", () => {
     expect(container.querySelector(".run-page-meta")).toBeNull();
     expect(container.querySelector(".run-page > header")).toBeNull();
     expect(container.querySelector(".issue-activity-trigger")).toBeNull();
-    const propertiesAfterOpen = container.querySelector(".run-properties");
-    expect(propertiesAfterOpen?.textContent).toContain("시도");
-    expect(propertiesAfterOpen?.textContent).toContain("리비전");
     expect(container.querySelector(".run-page-content > h1")).toBeNull();
     expect(container.querySelector(".run-page-content > .eyebrow")).toBeNull();
     expect(container.querySelector(".run-page-content > .run-detail")).toBeNull();
     expect(container.querySelector(".run-page-content > .run-issue-description")).toBeNull();
     expect(container.querySelector(".run-page-content > .issue-activity")).toBeNull();
+    expect(container.querySelector(".run-properties")).toBeNull();
+    expect(
+      container.querySelectorAll(".run-page-property-badge"),
+    ).toHaveLength(4);
+    const propertiesToggle = container.querySelector<HTMLButtonElement>(
+      ".run-page-properties-toggle",
+    );
+    expect(propertiesToggle?.getAttribute("aria-expanded")).toBe("false");
+    await act(async () => propertiesToggle?.click());
     const properties = container.querySelector(".run-properties");
+    expect(propertiesToggle?.getAttribute("aria-expanded")).toBe("true");
     expect(properties).not.toBeNull();
     expect(properties?.textContent).toContain("속성");
     expect(properties?.textContent).toContain("저장소");
+    expect(properties?.textContent).toContain("시도");
+    expect(properties?.textContent).toContain("리비전");
     expect(
       properties?.querySelector('[aria-label^="우선순위:"]'),
     ).not.toBeNull();
@@ -969,7 +989,7 @@ describe("HuntDashboard", () => {
     expect(container.querySelector(".issue-status-history-panel")).toBeNull();
     const statusHistoryTab = Array.from(
       container.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
-    ).find((button) => button.textContent?.includes("상태 히스토리"));
+    ).find((button) => button.textContent === "상태");
     expect(statusHistoryTab).not.toBeNull();
     await act(async () => statusHistoryTab?.click());
     const statusHistoryPanel = container.querySelector(
@@ -985,7 +1005,7 @@ describe("HuntDashboard", () => {
     expect(container.querySelector(".issue-activity-dialog")).toBeNull();
     const descriptionTab = Array.from(
       container.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
-    ).find((button) => button.textContent?.includes("설명"));
+    ).find((button) => button.textContent === "이슈");
     await act(async () => descriptionTab?.click());
     expect(container.querySelector(".issue-status-history-panel")).toBeNull();
     const descriptionPane = container.querySelector(".issue-description-pane");
@@ -994,28 +1014,16 @@ describe("HuntDashboard", () => {
     expect(descriptionPane?.querySelector(".issue-description-markdown")).toBeNull();
     expect(descriptionPane?.querySelector(".issue-description-empty")).not.toBeNull();
     expect(descriptionPane?.textContent).not.toContain(demoDashboard.runs[0].detail);
-    const content = container.querySelector<HTMLElement>(".run-page-content");
-    const contentDivider = container.querySelector<HTMLElement>(
-      ".issue-content-divider",
-    );
-    expect(content?.style.gridTemplateRows).toContain("50fr");
-    expect(contentDivider?.getAttribute("role")).toBe("separator");
-    expect(contentDivider?.getAttribute("aria-orientation")).toBe("horizontal");
-    expect(contentDivider?.getAttribute("aria-valuenow")).toBe("50");
-    await act(async () => {
-      contentDivider?.dispatchEvent(
-        new KeyboardEvent("keydown", { bubbles: true, key: "ArrowDown" }),
-      );
-    });
-    expect(contentDivider?.getAttribute("aria-valuenow")).toBe("55");
-    expect(content?.style.gridTemplateRows).toContain("55fr");
-    expect(content?.style.gridTemplateRows).toContain("45fr");
+    expect(container.querySelector(".issue-content-divider")).toBeNull();
     const conversation = container.querySelector(".issue-conversation");
     expect(conversation).not.toBeNull();
     expect(conversation?.getAttribute("aria-label")).toBe("대화");
-    expect(conversation?.querySelector(":scope > header")).toBeNull();
-    expect(descriptionPane?.nextElementSibling).toBe(contentDivider);
-    expect(contentDivider?.nextElementSibling).toBe(conversation);
+    expect(conversation?.querySelector(":scope > header")?.textContent).toContain(
+      "대화",
+    );
+    expect(container.querySelector(".run-page-main")?.nextElementSibling).toBe(
+      conversation,
+    );
     expect(
       conversation?.querySelector(".issue-message-list + .issue-message-composer"),
     ).not.toBeNull();
@@ -1949,10 +1957,9 @@ describe("HuntDashboard", () => {
       'aria-description="재시도하면 기존 Agent·Worker 배정으로 작업이 다시 대기열에 들어가며, 사용 가능한 Worker가 자동으로 가져가 다시 실행합니다."',
     );
     expect(markup).toContain("작업 취소");
-    expect(markup).toContain("시도 2");
-    expect(markup).toContain('<label class="run-property run-status-control">');
-    expect(markup).toContain('aria-haspopup="listbox" aria-label="상태"');
-    expect(markup).toContain('<span class="select-menu-value">실패</span>');
+    expect(markup).toContain('class="run-page-property-badge red"');
+    expect(markup).toContain(">실패</span>");
+    expect(markup).toContain('aria-expanded="false" class="run-page-properties-toggle"');
   });
 
   it("shows a plain-language result card for a completed issue", () => {
@@ -1995,9 +2002,9 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("작업 결과");
     expect(markup).toContain(completedRun.structuredResult.summary);
     expect(markup).toContain("결과 화면과 증빙 보기");
-    expect(markup.indexOf("completed-issue-card")).toBeLessThan(
-      markup.indexOf("issue-description-markdown"),
-    );
+    expect(markup).toContain('aria-selected="true"');
+    expect(markup).toContain('class="run-result-panel"');
+    expect(markup).not.toContain('class="issue-description-markdown"');
   });
 
   it("shows blocker details at the top of the issue description", () => {
