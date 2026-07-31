@@ -2443,8 +2443,11 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .project-agent-card > footer > svg { color:var(--muted-foreground); }
 .project-agent-card > footer button { height:34px; padding:0 9px; display:flex; align-items:center; gap:5px; border:1px solid transparent; border-radius:9px; color:var(--muted-foreground); background:transparent; cursor:pointer; font-family:inherit; font-size:var(--text-xs); font-weight:600; }
 .project-agent-card > footer button:hover { border-color:var(--border); color:var(--foreground); background:var(--secondary); }
+.project-agent-card > footer button:disabled { opacity:.5; cursor:not-allowed; }
+.project-agent-card > footer button:disabled:hover { border-color:transparent; color:var(--muted-foreground); background:transparent; }
 .project-agent-card > footer button:focus-visible { outline:2px solid var(--ring); outline-offset:1px; }
-.project-agent-card > footer .project-agent-settings-button { width:34px; padding:0; justify-content:center; }
+.project-agent-card > footer .project-agent-run-button,.project-agent-card > footer .project-agent-settings-button { width:34px; padding:0; justify-content:center; }
+.project-agent-card > footer .project-agent-run-button:not(:disabled) { color:var(--primary); }
 @keyframes project-agent-codex-pet-running {
   0%,14.633% { background-position-x:0; }
   14.634%,29.267% { background-position-x:14.285714%; }
