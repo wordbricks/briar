@@ -701,6 +701,7 @@ export const ko = {
   "issue.submitHint": "Enter로 등록",
   "issue.remove": "{name} 제거",
   "run.assigned": "{agent} 할당",
+  "run.workerAssigned": "배정된 Worker: {worker}",
   "run.details": "{title} 상세",
   "run.attempt": "시도 {count}",
   "run.revision": "리비전 {count}",
@@ -1085,6 +1086,7 @@ export type Messages = Record<MessageKey, string>;
 
 export const en: Messages = {
   ...ko,
+  "run.workerAssigned": "Assigned Worker: {worker}",
   "run.retryWorkerTooltip": "Retrying returns the task to the queue with its existing Agent and Worker assignment. An available Worker will automatically claim and run it again.",
   "onboarding.purposeEyebrow": "Choose how to start",
   "onboarding.purposeTitle": "How would you like to use Briar?",
@@ -1598,6 +1600,7 @@ export const en: Messages = {
 };
 export const zh: Messages = {
   ...en,
+  "run.workerAssigned": "已分配的 Worker：{worker}",
   "run.retryWorkerTooltip": "重试会保留现有的 Agent 和 Worker 分配，并将任务重新放入队列。可用的 Worker 会自动领取并再次执行。",
   "onboarding.purposeEyebrow": "选择开始方式",
   "onboarding.purposeTitle": "你想如何使用 Briar？",

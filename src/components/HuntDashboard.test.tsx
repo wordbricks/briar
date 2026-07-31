@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import { demoDashboard } from "../lib/demo-data";
 import type {
+  ExecutionWorker,
   HuntRun,
   IssueMessage,
   ProjectAgent,
@@ -55,6 +56,27 @@ const dashboardAgent: ProjectAgent = {
   calendarColor: "#3275d5",
   createdAt: "2026-07-29T00:00:00.000Z",
   updatedAt: "2026-07-29T00:00:00.000Z",
+};
+
+const dashboardWorker: ExecutionWorker = {
+  id: "worker-1",
+  deviceId: "device-1",
+  ownerUserId: "user-1",
+  label: "Lemon Worker",
+  icon: { type: "emoji", value: "🍋" },
+  agentProvider: "codex",
+  providers: ["codex"],
+  versions: { briar: "1.2.25" },
+  state: "online",
+  readiness: "busy",
+  acceptingWork: true,
+  readinessDetail: null,
+  capabilities: {},
+  maxConcurrentSessions: 1,
+  activeSessions: 1,
+  availableSessions: 0,
+  lastHeartbeatAt: "2026-07-29T00:00:00.000Z",
+  createdAt: "2026-07-29T00:00:00.000Z",
 };
 
 function dashboardAgentSession(
@@ -230,10 +252,63 @@ describe("HuntDashboard", () => {
       />,
     );
 
-    expect(markup).toContain("kanban-card violet has-agent");
+    expect(markup).toContain("kanban-card violet has-assignees");
     expect(markup).toContain('class="kanban-card-agent-badge"');
     expect(markup).toContain('aria-label="Briar Agent 할당"');
     expect(markup).toContain(`src="${dashboardAgent.avatar}"`);
+  });
+
+  it("stacks the assigned worker icon with the active agent avatar", () => {
+    const run = {
+      ...demoDashboard.runs[0],
+      workerId: dashboardWorker.id,
+    };
+    const markup = renderToStaticMarkup(
+      <HuntDashboard
+        {...dashboardProps}
+        agents={[dashboardAgent]}
+        dashboard={{
+          ...demoDashboard,
+          runs: [run],
+          workers: [dashboardWorker],
+        }}
+        sessions={[dashboardAgentSession(run)]}
+      />,
+    );
+
+    expect(markup).toContain(
+      "kanban-card violet has-assignees has-multiple-assignees",
+    );
+    expect(markup).toContain('class="kanban-card-assignee-badges"');
+    expect(markup).toContain('class="kanban-card-worker-badge"');
+    expect(markup).toContain('aria-label="배정된 Worker: Lemon Worker"');
+    expect(markup).toContain("🍋");
+    expect(markup).toContain('class="kanban-card-agent-badge"');
+  });
+
+  it("shows a specifically requested worker before it claims the issue", () => {
+    const run = {
+      ...demoDashboard.runs[0],
+      status: "queued" as const,
+      workflowStage: null,
+      requestedWorkerId: dashboardWorker.id,
+      workerId: null,
+    };
+    const markup = renderToStaticMarkup(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={{
+          ...demoDashboard,
+          runs: [run],
+          workers: [dashboardWorker],
+        }}
+      />,
+    );
+
+    expect(markup).toContain("kanban-card slate has-assignees");
+    expect(markup).toContain('class="kanban-card-worker-badge"');
+    expect(markup).toContain('aria-label="배정된 Worker: Lemon Worker"');
+    expect(markup).not.toContain("kanban-card-agent-badge");
   });
 
   it("keeps the performed agent name in issue properties after completion", async () => {
@@ -276,7 +351,7 @@ describe("HuntDashboard", () => {
     );
 
     expect(markup).not.toContain("kanban-card-agent-badge");
-    expect(markup).not.toContain("has-agent");
+    expect(markup).not.toContain("has-assignees");
   });
 
   it("opens a linked pull request from the issue card icon", async () => {
