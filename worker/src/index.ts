@@ -38,6 +38,7 @@ import {
   maxIssueMultipartBytes,
   validateIssueAttachments,
 } from "../../src/lib/issue-attachments";
+import { mentionsBriar } from "../../src/lib/briar-mention";
 import {
   isWorkerEmoji,
   isWorkerLogoDataUrl,
@@ -48,8 +49,10 @@ import { createAuth, type BriarAuth } from "./auth";
 import {
   addOrganizationMember,
   assertQueuedHuntClaim,
+  claimNextIssueAgentReply,
   claimDueProjectAgentScheduleRun,
   claimNextQueuedHuntRun,
+  completeIssueAgentReply,
   completeProjectAgentScheduleRun,
   completeSlackEvent,
   consumeSlackOAuthState,
@@ -68,8 +71,12 @@ import {
   deleteIssue,
   deleteProject,
   EventKeyConflictError,
+  enqueueIssueAgentReply,
+  failIssueAgentReply,
   findProjectIdByAgentTokenHash,
   getProjectAgent,
+  getClaimedIssueAgentReply,
+  getIssueAgentReplyJob,
   getIssueAttachment,
   getRunEvidenceImage,
   getOrganizationRole,
@@ -107,6 +114,7 @@ import {
   recordRunEvidence,
   removeOrganizationMember,
   renewProjectAgentScheduleRunLease,
+  renewIssueAgentReplyLease,
   rollbackNewAppIssue,
   releaseSlackEvent,
   updateProjectAgent,
@@ -123,6 +131,7 @@ import {
   type HuntRunRow,
   type IssueAttachmentInput,
   type IssueAttachmentRow,
+  type IssueAgentReplyJobRow,
   type IssueConversationNotificationRow,
   type IssueMessageRow,
   type ProjectRow,
@@ -175,6 +184,7 @@ import {
   getProjectExecutionWorkerPolicy,
   MAX_WORKER_CONCURRENT_SESSIONS,
   MAX_TRANSCRIPT_EVENTS_PER_REQUEST,
+  WORKER_STALE_AFTER_MS,
   reapStalledHuntRuns,
   readAgentTranscript,
   recordWorkerHeartbeat,
@@ -770,6 +780,27 @@ const issueMessageInputSchema = z
       .max(1_000)
       .nullable()
       .optional(),
+  })
+  .strict();
+
+const issueAgentReplyCompletionSchema = z
+  .object({
+    projectId: z.string().uuid(),
+    workerId: z.string().trim().min(1).max(128),
+    claimToken: z.string().startsWith("briar_reply_claim_"),
+    body: z.string().trim().min(1).max(10_000).optional(),
+    error: z.string().trim().min(1).max(4_000).optional(),
+  })
+  .strict()
+  .refine((input) => Boolean(input.body) !== Boolean(input.error), {
+    message: "Provide exactly one of body or error",
+  });
+
+const issueAgentReplyLeaseSchema = z
+  .object({
+    projectId: z.string().uuid(),
+    workerId: z.string().trim().min(1).max(128),
+    claimToken: z.string().startsWith("briar_reply_claim_"),
   })
   .strict();
 
@@ -2069,6 +2100,39 @@ const issueMessageJson = (message: IssueMessageRow) => ({
   createdAt: message.created_at,
   updatedAt: message.updated_at,
 });
+
+const issueAgentReplyJson = (job: IssueAgentReplyJobRow) => ({
+  id: job.id,
+  triggerMessageId: job.trigger_message_id,
+  status: job.status,
+  workerId: job.claimed_worker_id,
+  provider: job.agent_provider,
+  error: job.status === "failed" ? job.error : null,
+  updatedAt: job.updated_at,
+});
+
+const issueReplyTranscriptPayload = (value: unknown) => {
+  if (!value || typeof value !== "object") return null;
+  const payload = value as Record<string, unknown>;
+  if (payload.type === "result" || payload.type === "error") return payload;
+  const normalized =
+    payload.event && typeof payload.event === "object"
+      ? (payload.event as Record<string, unknown>)
+      : null;
+  if (
+    payload.type === "event" &&
+    normalized?.type === "messageCompleted"
+  ) {
+    return payload;
+  }
+  const item =
+    payload.item && typeof payload.item === "object"
+      ? (payload.item as Record<string, unknown>)
+      : null;
+  return payload.type === "item.completed" && item?.type === "agent_message"
+    ? payload
+    : null;
+};
 
 const issueConversationNotificationJson = (
   notification: IssueConversationNotificationRow,
@@ -3497,6 +3561,7 @@ async function route(
         "Agent conversation does not belong to this project",
       );
     }
+    const createdAt = new Date().toISOString();
     const message = await createIssueMessage(db, {
       id: crypto.randomUUID(),
       projectId: project.id,
@@ -3506,7 +3571,7 @@ async function route(
       authorAgentProvider: agentProvider,
       body: input.body,
       mentionedUserIds: agentProvider ? [] : input.mentionedUserIds,
-      createdAt: new Date().toISOString(),
+      createdAt,
     });
     if (!message) {
       throw new HttpError(
@@ -3514,7 +3579,57 @@ async function route(
         input.parentMessageId ? "Thread message not found" : "Run not found",
       );
     }
-    return json({ message: issueMessageJson(message) }, 201);
+    const agentReply =
+      !agentProvider && mentionsBriar(input.body)
+        ? await enqueueIssueAgentReply(db, {
+            id: crypto.randomUUID(),
+            projectId: project.id,
+            runId: issueMessagesMatch[2],
+            triggerMessageId: message.id,
+            parentMessageId: message.parent_message_id ?? message.id,
+            replyMessageId: crypto.randomUUID(),
+            createdAt,
+          })
+        : null;
+    return json(
+      {
+        message: issueMessageJson(message),
+        agentReply: agentReply ? issueAgentReplyJson(agentReply) : null,
+      },
+      201,
+    );
+  }
+
+  const issueAgentReplyStatusMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/messages\/([0-9a-f-]+)\/agent-reply$/u,
+  );
+  if (issueAgentReplyStatusMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      issueAgentReplyStatusMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const job = await getIssueAgentReplyJob(
+      db,
+      project.id,
+      issueAgentReplyStatusMatch[3],
+    );
+    if (!job || job.run_id !== issueAgentReplyStatusMatch[2]) {
+      throw new HttpError(404, "Agent reply not found");
+    }
+    const messages =
+      job.status === "completed"
+        ? await listIssueMessages(db, project.id, job.run_id)
+        : [];
+    const reply = messages.find(
+      (message) => message.id === job.reply_message_id,
+    );
+    return json({
+      agentReply: issueAgentReplyJson(job),
+      message: reply ? issueMessageJson(reply) : null,
+    });
   }
 
   const projectRunEvidenceMatch = pathname.match(
@@ -4278,6 +4393,220 @@ async function route(
         message: JSON.parse(event.payload_json),
         recordedAt: event.recorded_at,
       })),
+    });
+  }
+
+  if (pathname === "/issue-reply-claims" && request.method === "POST") {
+    const input = claimInputSchema
+      .pick({ claimedBy: true, workerId: true, projectId: true })
+      .required({ workerId: true, projectId: true })
+      .parse(await readJson(request));
+    const authenticatedWorker = await requireWorkerProjectBinding(
+      db,
+      request,
+      input.projectId,
+      input.workerId,
+    );
+    const observedAt = new Date().toISOString();
+    if (
+      workerStateAt(
+        authenticatedWorker.binding.last_heartbeat_at,
+        observedAt,
+        authenticatedWorker.binding.state,
+      ) !== "online" ||
+      authenticatedWorker.binding.accepting_work !== 1 ||
+      authenticatedWorker.binding.readiness_state === "needs_attention"
+    ) {
+      throw new HttpError(409, "Worker is not ready to claim replies");
+    }
+    const providers = executionWorkerProviders(authenticatedWorker.binding);
+    const defaultProvider = providers.includes(
+      authenticatedWorker.binding.agent_provider,
+    )
+      ? authenticatedWorker.binding.agent_provider
+      : providers[0];
+    if (!defaultProvider) {
+      throw new HttpError(409, "Worker has no available reply provider");
+    }
+    const claimToken = `briar_reply_claim_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
+    const job = await claimNextIssueAgentReply(db, input.projectId, {
+      workerId: authenticatedWorker.binding.id,
+      agentProvider: defaultProvider,
+      agentProviders: providers,
+      claimTokenHash: await sha256(claimToken),
+      claimedAt: observedAt,
+      leaseExpiresAt: leaseExpiryFrom(observedAt),
+      staleBefore: new Date(
+        Date.parse(observedAt) - WORKER_STALE_AFTER_MS,
+      ).toISOString(),
+    });
+    if (!job) return json({ work: null });
+
+    const [{ runs, events }, attachments, messages, evidence, transcript] =
+      await Promise.all([
+        listDashboardRuns(db, input.projectId),
+        listIssueAttachments(db, input.projectId, job.run_id),
+        listIssueMessages(db, input.projectId, job.run_id),
+        listRunEvidence(db, input.projectId, job.run_id),
+        readAgentTranscript(
+          db,
+          input.projectId,
+          `detached-${job.run_id}`,
+          { limit: 200, tail: true },
+        ),
+      ]);
+    const run = runs.find((candidate) => candidate.id === job.run_id);
+    if (!run || !job.agent_provider) {
+      throw new HttpError(409, "Reply job lost its issue context");
+    }
+    const agent = run.agent_id
+      ? await getProjectAgent(db, input.projectId, run.agent_id)
+      : null;
+    return json({
+      work: {
+        workType: "issueReply",
+        workId: job.id,
+        runId: run.id,
+        sourceKey: `${run.source_key}:reply:${job.trigger_message_id}`,
+        title: run.title,
+        triggerMessageId: job.trigger_message_id,
+        parentMessageId: job.parent_message_id,
+        provider: job.agent_provider,
+        model:
+          agent?.provider === job.agent_provider ? agent.model : null,
+        branch: run.branch,
+        claimToken,
+        claimedAt: job.claimed_at,
+        leaseExpiresAt: job.lease_expires_at,
+        snapshot: {
+          run: dashboardRunJson(
+            run,
+            events.filter((event) => event.run_id === run.id),
+            attachments,
+          ),
+          messages: claimConversationJson(messages),
+          agentTranscript:
+            transcript?.events.flatMap((event) => {
+              const payload = issueReplyTranscriptPayload(
+                JSON.parse(event.payload_json),
+              );
+              return payload
+                ? [{
+                    sequence: event.sequence,
+                    message: payload,
+                    recordedAt: event.recorded_at,
+                  }]
+                : [];
+            }) ?? [],
+          evidence: (evidence ?? []).map((item) => ({
+            stage: item.workflow_stage,
+            type: item.evidence_type,
+            status: item.status,
+            detail: item.detail,
+            command: item.command,
+            url: item.url,
+            metadata: item.metadata_json
+              ? JSON.parse(item.metadata_json)
+              : null,
+            observedAt: item.observed_at,
+          })),
+        },
+      },
+    });
+  }
+
+  const issueReplyClaimMatch = pathname.match(
+    /^\/issue-reply-claims\/([0-9a-f-]+)\/(lease|complete)$/u,
+  );
+  if (issueReplyClaimMatch && request.method === "POST") {
+    if (issueReplyClaimMatch[2] === "lease") {
+      const input = issueAgentReplyLeaseSchema.parse(await readJson(request));
+      const worker = await requireWorkerProjectBinding(
+        db,
+        request,
+        input.projectId,
+        input.workerId,
+      );
+      const observedAt = new Date().toISOString();
+      const renewed = await renewIssueAgentReplyLease(
+        db,
+        input.projectId,
+        issueReplyClaimMatch[1],
+        {
+          workerId: worker.binding.id,
+          claimTokenHash: await sha256(input.claimToken),
+          leaseExpiresAt: leaseExpiryFrom(observedAt),
+          updatedAt: observedAt,
+        },
+      );
+      if (!renewed) throw new HttpError(409, "Reply claim is no longer active");
+      return json({ leaseExpiresAt: renewed.lease_expires_at });
+    }
+
+    const input = issueAgentReplyCompletionSchema.parse(
+      await readJson(request),
+    );
+    const worker = await requireWorkerProjectBinding(
+      db,
+      request,
+      input.projectId,
+      input.workerId,
+    );
+    const claimTokenHash = await sha256(input.claimToken);
+    const job = await getClaimedIssueAgentReply(
+      db,
+      input.projectId,
+      issueReplyClaimMatch[1],
+      { workerId: worker.binding.id, claimTokenHash },
+    );
+    if (!job) throw new HttpError(409, "Reply claim is no longer active");
+    const observedAt = new Date().toISOString();
+    if (input.error) {
+      const failed = await failIssueAgentReply(
+        db,
+        input.projectId,
+        job.id,
+        {
+          workerId: worker.binding.id,
+          claimTokenHash,
+          error: input.error,
+          updatedAt: observedAt,
+        },
+      );
+      if (!failed) throw new HttpError(409, "Reply claim is no longer active");
+      return json({ agentReply: issueAgentReplyJson(failed) });
+    }
+
+    let reply = await createIssueMessage(db, {
+      id: job.reply_message_id,
+      projectId: input.projectId,
+      runId: job.run_id,
+      parentMessageId: job.parent_message_id,
+      authorUserId: null,
+      authorAgentProvider: job.agent_provider,
+      body: input.body!,
+      createdAt: observedAt,
+    });
+    if (!reply) {
+      reply = (await listIssueMessages(db, input.projectId, job.run_id)).find(
+        (message) => message.id === job.reply_message_id,
+      ) ?? null;
+    }
+    if (!reply) throw new HttpError(409, "Agent reply could not be persisted");
+    const completed = await completeIssueAgentReply(
+      db,
+      input.projectId,
+      job.id,
+      {
+        workerId: worker.binding.id,
+        claimTokenHash,
+        completedAt: observedAt,
+      },
+    );
+    if (!completed) throw new HttpError(409, "Reply claim is no longer active");
+    return json({
+      agentReply: issueAgentReplyJson(completed),
+      message: issueMessageJson(reply),
     });
   }
 

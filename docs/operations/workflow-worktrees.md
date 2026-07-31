@@ -193,12 +193,19 @@ briar project configure \
 `--enable-worktrees` turns it back on. The block is owned by the CLI and is
 preserved when the app saves project settings.
 
-Issue conversation replies follow the same isolation rule. When a user mentions
-`@briar`, the app resolves the run's recorded branch (or its run-id token before
-the branch has been recorded) against Git's registered worktree list and resumes
-the agent conversation with that worktree as its workspace. If the original
-worktree has already been removed, the reply fails explicitly instead of
-running in the shared connected checkout.
+Issue conversation replies are durable Worker jobs. When a user mentions
+`@briar`, Briar first offers the reply to the Worker that most recently handled
+the run. That Worker resolves the recorded branch, or the deterministic run-id
+worktree name before a branch was recorded, against Git's registered worktree
+list and uses the existing worktree as read-only context.
+
+The reply never creates a replacement worktree. If the original worktree has
+already been removed, the Worker answers from the durable server snapshot and
+its connected repository checkout. If the previous Worker is offline, disabled,
+not accepting work, needs attention, or excluded by project policy, another
+eligible Worker may claim the reply and answer from the same server snapshot.
+An issue that has never been assigned has no preferred Worker, so any eligible
+Worker may claim its mention reply.
 
 Removal is conservative by design:
 

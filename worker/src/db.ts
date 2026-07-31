@@ -294,6 +294,28 @@ export type IssueMessageRow = {
   updated_at: string;
 };
 
+export type IssueAgentReplyJobRow = {
+  id: string;
+  project_id: string;
+  run_id: string;
+  trigger_message_id: string;
+  parent_message_id: string;
+  reply_message_id: string;
+  status: "queued" | "running" | "completed" | "failed";
+  preferred_worker_id: string | null;
+  claimed_worker_id: string | null;
+  preferred_provider: ProjectAgentProvider | null;
+  agent_provider: ProjectAgentProvider | null;
+  claim_token_hash: string | null;
+  claimed_at: string | null;
+  lease_expires_at: string | null;
+  attempts: number;
+  error: string | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+};
+
 export type IssueConversationNotificationRow = IssueMessageRow & {
   run_title: string;
   root_message_id: string;
@@ -2036,6 +2058,291 @@ export async function createIssueMessage(
   }
   const messages = await listIssueMessages(db, input.projectId, input.runId);
   return messages.find((message) => message.id === input.id) ?? null;
+}
+
+export async function enqueueIssueAgentReply(
+  db: D1Database,
+  input: {
+    id: string;
+    projectId: string;
+    runId: string;
+    triggerMessageId: string;
+    parentMessageId: string;
+    replyMessageId: string;
+    createdAt: string;
+  },
+) {
+  await db
+    .prepare(
+      `insert into briar_issue_agent_reply_jobs (
+         id, project_id, run_id, trigger_message_id, parent_message_id,
+         reply_message_id, preferred_worker_id, preferred_provider,
+         created_at, updated_at
+       )
+       select ?, run.project_id, run.id, trigger.id, parent.id, ?,
+              run.worker_id,
+              coalesce(run.requested_agent_provider, agent.provider),
+              ?, ?
+       from briar_hunt_runs run
+       join briar_issue_messages trigger
+         on trigger.id = ? and trigger.project_id = run.project_id
+        and trigger.run_id = run.id
+       join briar_issue_messages parent
+         on parent.id = ? and parent.project_id = run.project_id
+        and parent.run_id = run.id and parent.parent_message_id is null
+       left join briar_project_agents agent
+         on agent.id = run.agent_id and agent.project_id = run.project_id
+       where run.id = ? and run.project_id = ?
+       on conflict (project_id, trigger_message_id) do nothing`,
+    )
+    .bind(
+      input.id,
+      input.replyMessageId,
+      input.createdAt,
+      input.createdAt,
+      input.triggerMessageId,
+      input.parentMessageId,
+      input.runId,
+      input.projectId,
+    )
+    .run();
+  return getIssueAgentReplyJob(db, input.projectId, input.triggerMessageId);
+}
+
+export async function getIssueAgentReplyJob(
+  db: D1Database,
+  projectId: string,
+  triggerMessageId: string,
+) {
+  return await db
+    .prepare(
+      `select * from briar_issue_agent_reply_jobs
+       where project_id = ? and trigger_message_id = ?`,
+    )
+    .bind(projectId, triggerMessageId)
+    .first<IssueAgentReplyJobRow>();
+}
+
+export async function claimNextIssueAgentReply(
+  db: D1Database,
+  projectId: string,
+  input: {
+    workerId: string;
+    agentProvider: ProjectAgentProvider;
+    agentProviders: ProjectAgentProvider[];
+    claimTokenHash: string;
+    claimedAt: string;
+    leaseExpiresAt: string;
+    staleBefore: string;
+  },
+) {
+  await db
+    .prepare(
+      `update briar_issue_agent_reply_jobs
+       set status = 'failed',
+           error = coalesce(error, 'Worker reply lease expired repeatedly.'),
+           claim_token_hash = null, lease_expires_at = null, updated_at = ?
+       where project_id = ? and status = 'running' and attempts >= 3
+         and lease_expires_at <= ?`,
+    )
+    .bind(input.claimedAt, projectId, input.claimedAt)
+    .run();
+  return await db
+    .prepare(
+      `update briar_issue_agent_reply_jobs
+       set status = 'running', claimed_worker_id = ?,
+           agent_provider = case
+             when preferred_provider = 'codex' and ? = 1 then 'codex'
+             when preferred_provider = 'claude' and ? = 1 then 'claude'
+             when preferred_provider = 'grok' and ? = 1 then 'grok'
+             else ?
+           end,
+           claim_token_hash = ?, claimed_at = ?, lease_expires_at = ?,
+           attempts = attempts + 1, error = null, updated_at = ?
+       where id = (
+         select job.id
+         from briar_issue_agent_reply_jobs job
+         where job.project_id = ?
+           and job.attempts < 3
+           and (
+             job.status = 'queued'
+             or (job.status = 'running' and job.lease_expires_at <= ?)
+           )
+           and (
+             not exists (
+               select 1 from briar_project_execution_worker_policies policy
+               where policy.project_id = job.project_id
+                 and policy.selection_mode = 'allowlist'
+             )
+             or exists (
+               select 1
+               from briar_project_execution_worker_allowlist allowed
+               where allowed.project_id = job.project_id
+                 and allowed.worker_id = ?
+             )
+           )
+           and (
+             job.preferred_worker_id is null
+             or job.preferred_worker_id = ?
+             or not exists (
+               select 1
+               from briar_execution_workers preferred
+               join briar_execution_worker_devices device
+                 on device.id = preferred.device_id
+               where preferred.id = job.preferred_worker_id
+                 and preferred.project_id = job.project_id
+                 and preferred.state != 'disabled'
+                 and device.state != 'disabled'
+                 and preferred.accepting_work = 1
+                 and preferred.readiness_state != 'needs_attention'
+                 and preferred.last_heartbeat_at >= ?
+                 and (
+                   not exists (
+                     select 1
+                     from briar_project_execution_worker_policies policy
+                     where policy.project_id = job.project_id
+                       and policy.selection_mode = 'allowlist'
+                   )
+                   or exists (
+                     select 1
+                     from briar_project_execution_worker_allowlist allowed
+                     where allowed.project_id = job.project_id
+                       and allowed.worker_id = preferred.id
+                   )
+                 )
+             )
+           )
+         order by job.created_at, job.id
+         limit 1
+       )
+       returning *`,
+    )
+    .bind(
+      input.workerId,
+      input.agentProviders.includes("codex") ? 1 : 0,
+      input.agentProviders.includes("claude") ? 1 : 0,
+      input.agentProviders.includes("grok") ? 1 : 0,
+      input.agentProvider,
+      input.claimTokenHash,
+      input.claimedAt,
+      input.leaseExpiresAt,
+      input.claimedAt,
+      projectId,
+      input.claimedAt,
+      input.workerId,
+      input.workerId,
+      input.staleBefore,
+    )
+    .first<IssueAgentReplyJobRow>();
+}
+
+export async function renewIssueAgentReplyLease(
+  db: D1Database,
+  projectId: string,
+  jobId: string,
+  input: {
+    workerId: string;
+    claimTokenHash: string;
+    leaseExpiresAt: string;
+    updatedAt: string;
+  },
+) {
+  return await db
+    .prepare(
+      `update briar_issue_agent_reply_jobs
+       set lease_expires_at = ?, updated_at = ?
+       where id = ? and project_id = ? and status = 'running'
+         and claimed_worker_id = ? and claim_token_hash = ?
+       returning *`,
+    )
+    .bind(
+      input.leaseExpiresAt,
+      input.updatedAt,
+      jobId,
+      projectId,
+      input.workerId,
+      input.claimTokenHash,
+    )
+    .first<IssueAgentReplyJobRow>();
+}
+
+export async function getClaimedIssueAgentReply(
+  db: D1Database,
+  projectId: string,
+  jobId: string,
+  input: { workerId: string; claimTokenHash: string },
+) {
+  return await db
+    .prepare(
+      `select * from briar_issue_agent_reply_jobs
+       where id = ? and project_id = ? and status = 'running'
+         and claimed_worker_id = ? and claim_token_hash = ?`,
+    )
+    .bind(jobId, projectId, input.workerId, input.claimTokenHash)
+    .first<IssueAgentReplyJobRow>();
+}
+
+export async function failIssueAgentReply(
+  db: D1Database,
+  projectId: string,
+  jobId: string,
+  input: {
+    workerId: string;
+    claimTokenHash: string;
+    error: string;
+    updatedAt: string;
+  },
+) {
+  return await db
+    .prepare(
+      `update briar_issue_agent_reply_jobs
+       set status = case when attempts >= 3 then 'failed' else 'queued' end,
+           preferred_worker_id = null,
+           claim_token_hash = null, claimed_at = null, lease_expires_at = null,
+           error = ?, updated_at = ?
+       where id = ? and project_id = ? and status = 'running'
+         and claimed_worker_id = ? and claim_token_hash = ?
+       returning *`,
+    )
+    .bind(
+      input.error,
+      input.updatedAt,
+      jobId,
+      projectId,
+      input.workerId,
+      input.claimTokenHash,
+    )
+    .first<IssueAgentReplyJobRow>();
+}
+
+export async function completeIssueAgentReply(
+  db: D1Database,
+  projectId: string,
+  jobId: string,
+  input: {
+    workerId: string;
+    claimTokenHash: string;
+    completedAt: string;
+  },
+) {
+  return await db
+    .prepare(
+      `update briar_issue_agent_reply_jobs
+       set status = 'completed', claim_token_hash = null,
+           lease_expires_at = null, completed_at = ?, updated_at = ?
+       where id = ? and project_id = ? and status = 'running'
+         and claimed_worker_id = ? and claim_token_hash = ?
+       returning *`,
+    )
+    .bind(
+      input.completedAt,
+      input.completedAt,
+      jobId,
+      projectId,
+      input.workerId,
+      input.claimTokenHash,
+    )
+    .first<IssueAgentReplyJobRow>();
 }
 
 export async function listIssueConversationNotifications(

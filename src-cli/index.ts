@@ -20,7 +20,9 @@ import { validateEvidenceImages } from "../src/lib/evidence-images";
 import {
   boundedTranscriptPayload,
   detachedAgentPrompt,
+  detachedIssueReplyPrompt,
   detachedProviderRequest,
+  issueReplyTextFromPayload,
 } from "./agent-runner";
 import {
   createWorkerDeviceIdentity,
@@ -34,6 +36,7 @@ import {
 import {
   allocateIssueWorktree,
   defaultWorktreeRoot,
+  findExistingIssueWorktree,
   listIssueWorktrees,
   projectWorktreeRoot,
   removeIssueWorktree,
@@ -1466,6 +1469,30 @@ const claimedRunSchema = queuedIssueSchema.extend({
     .nullable(),
 });
 
+const claimedIssueReplySchema = z.object({
+  workType: z.literal("issueReply"),
+  workId: z.string().uuid(),
+  runId: z.string().uuid(),
+  sourceKey: z.string().min(1),
+  title: z.string().min(1),
+  triggerMessageId: z.string().uuid(),
+  parentMessageId: z.string().uuid(),
+  provider: z.enum(["codex", "claude", "grok"]),
+  model: z.string().nullable(),
+  branch: z.string().nullable(),
+  claimToken: z.string().startsWith("briar_reply_claim_"),
+  claimedAt: z.string().datetime({ offset: true }),
+  leaseExpiresAt: z.string().datetime({ offset: true }),
+  snapshot: z.object({
+    run: z.record(z.string(), z.unknown()),
+    messages: z.array(queuedIssueMessageSchema),
+    agentTranscript: z.array(z.record(z.string(), z.unknown())).default([]),
+    evidence: z.array(z.record(z.string(), z.unknown())),
+  }),
+});
+
+type ClaimedIssueReply = z.infer<typeof claimedIssueReplySchema>;
+
 async function runClaimedIssue(
   config: Config,
   project: ProjectConfig,
@@ -1756,6 +1783,230 @@ async function runClaimedIssueInRuntime(
   }
 }
 
+async function runClaimedIssueReply(
+  config: Config,
+  project: ProjectConfig,
+  issue: ClaimedIssueReply,
+  workerToken: string,
+  signal: AbortSignal,
+) {
+  const registered = project.executionWorker;
+  if (!registered) throw new Error("Worker registration is missing");
+  const provider = issue.provider;
+  const binaryName = provider === "claude" ? "claude" : provider;
+  const agentBinary = Bun.which(binaryName);
+  if (!agentBinary) {
+    throw new Error(`${binaryName} coding agent is not installed on this Worker`);
+  }
+
+  let workspacePath = project.repositoryPath;
+  let workspaceAvailable = false;
+  if (worktreesEnabled(project)) {
+    try {
+      const root = projectWorktreeRoot(
+        worktreeSettings(project).root,
+        project.id,
+      );
+      const originalSourceKey =
+        typeof issue.snapshot.run.sourceKey === "string"
+          ? issue.snapshot.run.sourceKey
+          : issue.sourceKey;
+      const worktree = findExistingIssueWorktree(
+        runGit,
+        project.repositoryPath,
+        root,
+        {
+          runId: issue.runId,
+          sourceKey: originalSourceKey,
+          title: issue.title,
+        },
+        issue.branch,
+      );
+      if (worktree) {
+        workspacePath = worktree.path;
+        workspaceAvailable = true;
+      }
+    } catch {
+      // A missing or unreadable worktree is an expected fallback condition.
+    }
+  }
+  const trigger = issue.snapshot.messages.find(
+    (message) => message.id === issue.triggerMessageId,
+  );
+  if (!trigger) throw new Error("Mention message is missing from the reply snapshot");
+  const prompt = detachedIssueReplyPrompt({
+    snapshot: issue.snapshot,
+    userMessage: trigger.body,
+    workspaceAvailable,
+  });
+  const launch = detachedProviderRequest({
+    agent: {
+      id: issue.workId,
+      name: "Briar",
+      provider,
+      model: issue.model,
+      responsibility: "",
+      skill: "",
+    },
+    prompt,
+    workspacePath,
+    fullAccess: false,
+    readOnly: true,
+    agentBinary,
+  });
+  let command = agentBinary;
+  let commandArgs = launch.arguments;
+  const runnerRequest = launch.request;
+  if (launch.kind === "runner") {
+    const runnerPath = (
+      await Promise.all(
+        [
+          resolve(import.meta.dir, `agent/${provider}-runner.js`),
+          resolve(import.meta.dir, `../dist-agent/${provider}-runner.js`),
+        ].map(async (path) => ((await Bun.file(path).exists()) ? path : null)),
+      )
+    ).find((path): path is string => Boolean(path));
+    if (!runnerPath) {
+      throw new Error(
+        `${provider} runner bundle is missing; run \`bun run agent:build\``,
+      );
+    }
+    command = process.execPath;
+    commandArgs = [runnerPath];
+  }
+
+  const child = spawn(command, commandArgs, {
+    cwd: workspacePath,
+    env: {
+      ...process.env,
+      BRIAR_WORKER_TOKEN: workerToken,
+      BRIAR_PROJECT_ID: project.id,
+    },
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  const exitPromise = new Promise<number | null>((resolveExit, rejectExit) => {
+    child.once("error", rejectExit);
+    child.once("close", resolveExit);
+  });
+  let sequence = 0;
+  let stderr = "";
+  let replyBody: string | null = null;
+  let runnerError: string | null = null;
+  const terminate = () => {
+    if (child.exitCode !== null || child.killed) return;
+    child.kill("SIGTERM");
+    setTimeout(() => {
+      if (child.exitCode === null) child.kill("SIGKILL");
+    }, 5_000).unref();
+  };
+  signal.addEventListener("abort", terminate, { once: true });
+  child.stderr.setEncoding("utf8");
+  child.stderr.on("data", (chunk: string) => {
+    stderr = `${stderr}${chunk}`.slice(-8_000);
+  });
+  if (runnerRequest) {
+    child.stdin.write(`${JSON.stringify(runnerRequest)}\n`);
+  } else {
+    child.stdin.end();
+  }
+
+  try {
+    const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
+    for await (const line of lines) {
+      if (!line.trim()) continue;
+      sequence += 1;
+      let payload: unknown = line;
+      try {
+        payload = JSON.parse(line);
+      } catch {
+        // Plain output remains useful as a transcript diagnostic.
+      }
+      const candidate = issueReplyTextFromPayload(payload);
+      if (candidate) replyBody = candidate;
+      if (
+        payload &&
+        typeof payload === "object" &&
+        "type" in payload &&
+        (payload as { type?: string }).type === "error"
+      ) {
+        runnerError = String(
+          (payload as { message?: unknown }).message ?? "Agent failed",
+        );
+      }
+      const bounded = boundedTranscriptPayload(payload, line);
+      try {
+        await request(config.apiUrl, "/transcripts", workerToken, {
+          method: "POST",
+          body: JSON.stringify({
+            projectId: project.id,
+            sessionId: `reply-${issue.workId}`,
+            runId: issue.runId,
+            workerId: registered.workerId,
+            agentProvider: provider,
+            events: [{ sequence, direction: "server", payload: bounded }],
+          }),
+        });
+      } catch {
+        // The durable reply result is more important than optional transcript data.
+      }
+    }
+    const exitCode = await exitPromise;
+    if (signal.aborted) {
+      throw signal.reason instanceof Error
+        ? signal.reason
+        : new Error("Worker execution was cancelled");
+    }
+    if (exitCode !== 0 || runnerError) {
+      throw new Error(
+        runnerError ?? (stderr.trim() || `Agent exited with ${exitCode}`),
+      );
+    }
+    if (!replyBody) throw new Error("Agent returned an empty issue reply");
+    await request(
+      config.apiUrl,
+      `/issue-reply-claims/${issue.workId}/complete`,
+      workerToken,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          projectId: project.id,
+          workerId: registered.workerId,
+          claimToken: issue.claimToken,
+          body: replyBody,
+        }),
+      },
+    );
+  } finally {
+    signal.removeEventListener("abort", terminate);
+    terminate();
+  }
+}
+
+async function failClaimedIssueReply(
+  config: Config,
+  project: ProjectConfig,
+  issue: ClaimedIssueReply,
+  workerToken: string,
+  error: unknown,
+) {
+  const workerId = project.executionWorker?.workerId;
+  if (!workerId) throw error;
+  await request(
+    config.apiUrl,
+    `/issue-reply-claims/${issue.workId}/complete`,
+    workerToken,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        projectId: project.id,
+        workerId,
+        claimToken: issue.claimToken,
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    },
+  );
+}
+
 async function workerRegisterCommand() {
   const config = await loadConfig();
   const userToken = process.env.BRIAR_USER_TOKEN ?? config.userToken;
@@ -2020,6 +2271,22 @@ async function workerCommand() {
   const result = await runWorkerLoop(
     {
       claim: async () => {
+        const replyClaim = await request<{ work: unknown }>(
+          config.apiUrl,
+          "/issue-reply-claims",
+          workerToken,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              claimedBy: label,
+              workerId,
+              projectId: project.id,
+            }),
+          },
+        );
+        if (replyClaim.work !== null) {
+          return claimedIssueReplySchema.parse(replyClaim.work);
+        }
         const claimed = await request<{ work: unknown }>(
           config.apiUrl,
           "/queue/claims",
@@ -2038,6 +2305,23 @@ async function workerCommand() {
           : claimedRunSchema.parse(claimed.work);
       },
       renewLease: async (issue) => {
+        if (issue.workType === "issueReply") {
+          const reply = claimedIssueReplySchema.parse(issue);
+          await request(
+            config.apiUrl,
+            `/issue-reply-claims/${reply.workId}/lease`,
+            workerToken,
+            {
+              method: "POST",
+              body: JSON.stringify({
+                projectId: project.id,
+                workerId,
+                claimToken: reply.claimToken,
+              }),
+            },
+          );
+          return;
+        }
         await request(
           config.apiUrl,
           `/runs/${issue.runId}/lease`,
@@ -2078,14 +2362,36 @@ async function workerCommand() {
             registered.maxConcurrentSessions,
         };
       },
-      runIssue: (issue, signal) =>
-        runClaimedIssue(
+      runIssue: async (issue, signal) => {
+        if (issue.workType === "issueReply") {
+          const reply = claimedIssueReplySchema.parse(issue);
+          try {
+            await runClaimedIssueReply(
+              config,
+              project,
+              reply,
+              workerToken,
+              signal,
+            );
+          } catch (error) {
+            await failClaimedIssueReply(
+              config,
+              project,
+              reply,
+              workerToken,
+              error,
+            );
+          }
+          return;
+        }
+        await runClaimedIssue(
           config,
           project,
           claimedRunSchema.parse(issue),
           workerToken,
           signal,
-        ),
+        );
+      },
       sleep: interruptibleSleep,
       now: () => Date.now(),
       log: (line) => console.log(line),

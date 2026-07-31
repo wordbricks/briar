@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   claimProjectAgentScheduleRun,
   completeProjectAgentScheduleRun,
+  createIssueMessage,
   createProjectAgent,
   createProjectAgentSchedule,
   deleteProjectAgent,
@@ -18,6 +19,7 @@ import {
   updateOrganizationMemberRole,
   updateIssue,
   upsertProjectAgentSession,
+  waitForIssueAgentReply,
 } from "./api";
 import { repositoryWorkflowBootstrap } from "./auto-hunt-contract";
 import { demoDashboard } from "./demo-data";
@@ -96,6 +98,96 @@ describe("API errors", () => {
       expect.stringContaining(`/projects/${projectId}/runs/${runId}`),
       expect.objectContaining({ method: "DELETE" }),
     );
+  });
+
+  it("returns a durable worker reply job for an @briar message", async () => {
+    const projectId = "22222222-2222-4222-8222-222222222222";
+    const runId = "11111111-1111-4111-8111-111111111111";
+    const message = {
+      id: "33333333-3333-4333-8333-333333333333",
+      runId,
+      parentMessageId: null,
+      body: "@briar summarize this",
+      author: { id: "owner", name: "Owner", image: null, provider: null },
+      replyCount: 0,
+      createdAt: "2026-07-31T00:00:00.000Z",
+      updatedAt: "2026-07-31T00:00:00.000Z",
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            message,
+            agentReply: {
+              id: "44444444-4444-4444-8444-444444444444",
+              triggerMessageId: message.id,
+              status: "queued",
+              error: null,
+            },
+          }),
+          { status: 201, headers: { "Content-Type": "application/json" } },
+        ),
+      ),
+    );
+
+    await expect(
+      createIssueMessage("token", projectId, runId, {
+        body: message.body,
+        parentMessageId: null,
+      }),
+    ).resolves.toEqual({
+      message,
+      agentReply: expect.objectContaining({ status: "queued" }),
+    });
+  });
+
+  it("polls the server until the assigned worker persists its reply", async () => {
+    const projectId = "22222222-2222-4222-8222-222222222222";
+    const runId = "11111111-1111-4111-8111-111111111111";
+    const triggerMessageId = "33333333-3333-4333-8333-333333333333";
+    const reply = {
+      id: "55555555-5555-4555-8555-555555555555",
+      runId,
+      parentMessageId: triggerMessageId,
+      body: "The worker fixed the retry race.",
+      author: { id: null, name: "Briar · Codex", image: null, provider: "codex" },
+      replyCount: 0,
+      createdAt: "2026-07-31T00:00:01.000Z",
+      updatedAt: "2026-07-31T00:00:01.000Z",
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            agentReply: { status: "running", error: null },
+            message: null,
+          }),
+          { headers: { "Content-Type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            agentReply: { status: "completed", error: null },
+            message: reply,
+          }),
+          { headers: { "Content-Type": "application/json" } },
+        ),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      waitForIssueAgentReply(
+        "token",
+        projectId,
+        runId,
+        triggerMessageId,
+        { pollIntervalMs: 0, timeoutMs: 1_000 },
+      ),
+    ).resolves.toEqual(reply);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("loads synchronized agent sessions as remote-owned snapshots", async () => {

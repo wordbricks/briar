@@ -59,7 +59,6 @@ import {
   isDesktopTauri,
   isMacDesktopTauri,
 } from "./lib/platform";
-import { issueAgentConversation } from "./lib/issue-agent-reply";
 import {
   listenForIssueLinks,
   type IssueLinkTarget,
@@ -290,18 +289,12 @@ export function App() {
     !hasCompletedOnboarding;
   const sendIssueMessage = (
     runId: string,
-    input: { body: string; parentMessageId: string | null },
-  ) => {
-    const agentConversation =
-      briar.activeProjectId
-        ? issueAgentConversation(
-            autoHunt.sessions,
-            briar.activeProjectId,
-            runId,
-          )
-        : null;
-    return briar.addIssueMessage(runId, input, agentConversation);
-  };
+    input: {
+      body: string;
+      parentMessageId: string | null;
+      mentionedUserIds?: string[];
+    },
+  ) => briar.addIssueMessage(runId, input);
   const processIssueNow = (run: HuntRun) => {
     if (!activeProject || issueAgents.length === 0) {
       setQuickProcessError(t("issue.processNowNoAgent"));

@@ -14,7 +14,7 @@
 import { copyFile, cp, lstat, mkdir, readFile, stat } from "node:fs/promises";
 import { realpathSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 /** Project-level list of gitignored paths to copy into each new worktree. */
 export const WORKTREE_INCLUDE_FILE = ".worktreeinclude";
@@ -637,4 +637,22 @@ export function listIssueWorktrees(
       message: "워크트리 목록을 읽지 못했습니다.",
     }),
   ).filter((worktree) => isPathWithinRoot(worktree.path, root));
+}
+
+/** Find an already-attached issue worktree without creating or fetching one. */
+export function findExistingIssueWorktree(
+  git: GitRunner,
+  repositoryPath: string,
+  root: string,
+  issue: WorktreeIssue,
+  branch: string | null,
+) {
+  const expectedName = worktreeNameFor(issue);
+  return (
+    listIssueWorktrees(git, repositoryPath, root).find(
+      (candidate) =>
+        (branch !== null && candidate.branch === branch) ||
+        basename(candidate.path) === expectedName,
+    ) ?? null
+  );
 }

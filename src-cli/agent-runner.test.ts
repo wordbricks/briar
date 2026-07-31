@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   boundedTranscriptPayload,
   detachedAgentPrompt,
+  detachedIssueReplyPrompt,
   detachedProviderRequest,
+  issueReplyTextFromPayload,
 } from "./agent-runner";
 
 const agent = {
@@ -74,6 +76,49 @@ describe("detached Agent runner", () => {
       sandboxMode: "dangerFullAccess",
       claudeBinary: "/bin/claude",
     });
+  });
+
+  it("answers issue mentions read-only even without the issue worktree", () => {
+    const prompt = detachedIssueReplyPrompt({
+      snapshot: {
+        run: { resultSummary: "Fixed the retry race.", branch: "briar/retry" },
+        messages: [{ body: "@briar what changed?" }],
+      },
+      userMessage: "@briar what changed?",
+      workspaceAvailable: false,
+    });
+    const launch = detachedProviderRequest({
+      agent,
+      prompt,
+      workspacePath: "/connected-repository",
+      fullAccess: false,
+      readOnly: true,
+      agentBinary: "/bin/codex",
+    });
+
+    expect(prompt).toContain("worktree is unavailable");
+    expect(prompt).toContain("Fixed the retry race.");
+    expect(prompt).toContain("@briar what changed?");
+    expect(launch.arguments).toContain("read-only");
+    expect(launch.arguments).not.toContain("workspace-write");
+  });
+
+  it("extracts final replies from every detached provider event shape", () => {
+    expect(
+      issueReplyTextFromPayload({ type: "result", message: " Claude reply " }),
+    ).toBe("Claude reply");
+    expect(
+      issueReplyTextFromPayload({
+        type: "event",
+        event: { type: "messageCompleted", text: "Grok reply" },
+      }),
+    ).toBe("Grok reply");
+    expect(
+      issueReplyTextFromPayload({
+        type: "item.completed",
+        item: { type: "agent_message", text: "Codex reply" },
+      }),
+    ).toBe("Codex reply");
   });
 
   it("bounds untrusted transcript payloads", () => {

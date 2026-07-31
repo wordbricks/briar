@@ -1,5 +1,8 @@
 import type { HuntRun, IssueMessage, OrganizationMember } from "../types";
 import type { AgentProvider } from "./project-llm";
+import { mentionsBriar } from "./briar-mention";
+
+export { mentionsBriar } from "./briar-mention";
 
 type IssueSession = {
   projectId: string;
@@ -15,10 +18,6 @@ export type IssueAgentConversation = {
   conversationId: string | null;
   provider: AgentProvider | null;
 };
-
-export function mentionsBriar(body: string) {
-  return /(^|[^\p{L}\p{N}_])@briar(?=$|[^\p{L}\p{N}_])/iu.test(body);
-}
 
 export function shouldBriarReply(
   messages: readonly IssueMessage[],

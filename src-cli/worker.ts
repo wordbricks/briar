@@ -13,9 +13,11 @@ import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { homedir, hostname, platform, arch } from "node:os";
 import { join } from "node:path";
 
-export type AgentProvider = "codex" | "claude";
+export type AgentProvider = "codex" | "claude" | "grok";
 
 export type ClaimedIssue = {
+  workType?: "issue" | "issueReply";
+  workId?: string;
   runId: string;
   sourceKey: string;
   title: string;
@@ -143,6 +145,7 @@ export async function runWorkerLoop(
     string,
     Promise<{ issue: ClaimedIssue; error: unknown | null }>
   >();
+  const workKey = (issue: ClaimedIssue) => issue.workId ?? issue.runId;
 
   const applyHeartbeat = (
     heartbeat: { maxConcurrentSessions?: number } | void,
@@ -213,7 +216,7 @@ export async function runWorkerLoop(
           break;
         }
         dependencies.log(`claimed ${issue.sourceKey} (${issue.runId})`);
-        active.set(issue.runId, execute(issue));
+        active.set(workKey(issue), execute(issue));
         await reportState();
       }
     } catch (error) {
@@ -256,7 +259,7 @@ export async function runWorkerLoop(
     wake.abort();
     if (!outcome) continue;
 
-    active.delete(outcome.issue.runId);
+    active.delete(workKey(outcome.issue));
     if (outcome.error === null) {
       processed += 1;
       consecutiveFailures = 0;

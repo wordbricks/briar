@@ -2,7 +2,14 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { claimNextQueuedHuntRun, recordHuntEvent, type HuntEventInput } from "./db";
+import {
+  claimNextIssueAgentReply,
+  claimNextQueuedHuntRun,
+  createIssueMessage,
+  enqueueIssueAgentReply,
+  recordHuntEvent,
+  type HuntEventInput,
+} from "./db";
 import {
   appendAgentTranscript,
   authenticateExecutionWorker,
@@ -129,6 +136,7 @@ describe("detached execution workers", () => {
       "migrations/0039_project_agent_tokens.sql",
       "migrations/0040_run_execution_provider.sql",
       "migrations/0043_execution_worker_icons.sql",
+      "migrations/0044_issue_agent_reply_jobs.sql",
     ]) {
       await executeSql(db, await readFile(resolve(migration), "utf8"));
     }
@@ -222,6 +230,164 @@ describe("detached execution workers", () => {
       versions: { briar: "1.1.1" },
       observedAt: atMinute(minute),
     });
+
+  it("gives an issue mention to its previous worker before another worker", async () => {
+    const previous = await register("previous", 1);
+    const fallback = await register("fallback", 1);
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      queuedEvent("mention-priority", 2),
+    );
+    await db
+      .prepare(
+        `update briar_hunt_runs
+         set worker_id = ?, requested_agent_provider = 'codex'
+         where id = ?`,
+      )
+      .bind(previous.worker.id, runId)
+      .run();
+    const triggerMessageId = "11111111-aaaa-4aaa-8aaa-111111111111";
+    await createIssueMessage(db, {
+      id: triggerMessageId,
+      projectId,
+      runId,
+      parentMessageId: null,
+      authorUserId: "owner",
+      authorAgentProvider: null,
+      body: "@briar what changed?",
+      createdAt: atMinute(3),
+    });
+    await enqueueIssueAgentReply(db, {
+      id: "22222222-bbbb-4bbb-8bbb-222222222222",
+      projectId,
+      runId,
+      triggerMessageId,
+      parentMessageId: triggerMessageId,
+      replyMessageId: "33333333-cccc-4ccc-8ccc-333333333333",
+      createdAt: atMinute(3),
+    });
+
+    await expect(
+      claimNextIssueAgentReply(db, projectId, {
+        workerId: fallback.worker.id,
+        agentProvider: "codex",
+        agentProviders: ["codex"],
+        claimTokenHash: fingerprint("fallback-claim"),
+        claimedAt: atMinute(4),
+        leaseExpiresAt: atMinute(19),
+        staleBefore: atMinute(1),
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      claimNextIssueAgentReply(db, projectId, {
+        workerId: previous.worker.id,
+        agentProvider: "codex",
+        agentProviders: ["codex"],
+        claimTokenHash: fingerprint("previous-claim"),
+        claimedAt: atMinute(4),
+        leaseExpiresAt: atMinute(19),
+        staleBefore: atMinute(1),
+      }),
+    ).resolves.toMatchObject({
+      trigger_message_id: triggerMessageId,
+      claimed_worker_id: previous.worker.id,
+      agent_provider: "codex",
+    });
+  });
+
+  it("lets another worker answer when the previous worker is inaccessible", async () => {
+    const previous = await register("offline", 1);
+    const fallback = await register("available", 10);
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      queuedEvent("mention-fallback", 11),
+    );
+    await db
+      .prepare(`update briar_hunt_runs set worker_id = ? where id = ?`)
+      .bind(previous.worker.id, runId)
+      .run();
+    const triggerMessageId = "44444444-dddd-4ddd-8ddd-444444444444";
+    await createIssueMessage(db, {
+      id: triggerMessageId,
+      projectId,
+      runId,
+      parentMessageId: null,
+      authorUserId: "owner",
+      authorAgentProvider: null,
+      body: "@briar summarize the result",
+      createdAt: atMinute(11),
+    });
+    await enqueueIssueAgentReply(db, {
+      id: "55555555-eeee-4eee-8eee-555555555555",
+      projectId,
+      runId,
+      triggerMessageId,
+      parentMessageId: triggerMessageId,
+      replyMessageId: "66666666-ffff-4fff-8fff-666666666666",
+      createdAt: atMinute(11),
+    });
+
+    await expect(
+      claimNextIssueAgentReply(db, projectId, {
+        workerId: fallback.worker.id,
+        agentProvider: "codex",
+        agentProviders: ["codex"],
+        claimTokenHash: fingerprint("available-claim"),
+        claimedAt: atMinute(12),
+        leaseExpiresAt: atMinute(27),
+        staleBefore: atMinute(9),
+      }),
+    ).resolves.toMatchObject({
+      trigger_message_id: triggerMessageId,
+      claimed_worker_id: fallback.worker.id,
+    });
+  });
+
+  it("lets any eligible worker answer an issue that was never assigned", async () => {
+    const worker = await register("unassigned", 1);
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      queuedEvent("mention-unassigned", 2),
+    );
+    const triggerMessageId = "77777777-aaaa-4aaa-8aaa-777777777777";
+    await createIssueMessage(db, {
+      id: triggerMessageId,
+      projectId,
+      runId,
+      parentMessageId: null,
+      authorUserId: "owner",
+      authorAgentProvider: null,
+      body: "@briar inspect the server record",
+      createdAt: atMinute(3),
+    });
+    await enqueueIssueAgentReply(db, {
+      id: "88888888-bbbb-4bbb-8bbb-888888888888",
+      projectId,
+      runId,
+      triggerMessageId,
+      parentMessageId: triggerMessageId,
+      replyMessageId: "99999999-cccc-4ccc-8ccc-999999999999",
+      createdAt: atMinute(3),
+    });
+
+    await expect(
+      claimNextIssueAgentReply(db, projectId, {
+        workerId: worker.worker.id,
+        agentProvider: "codex",
+        agentProviders: ["codex"],
+        claimTokenHash: fingerprint("unassigned-claim"),
+        claimedAt: atMinute(4),
+        leaseExpiresAt: atMinute(19),
+        staleBefore: atMinute(1),
+      }),
+    ).resolves.toMatchObject({
+      preferred_worker_id: null,
+      claimed_worker_id: worker.worker.id,
+    });
+  });
 
   it("registers a worker and adopts the same machine on restart", async () => {
     const first = await register("a");
@@ -1240,19 +1406,25 @@ describe("detached execution workers", () => {
       events: [
         { sequence: 1, direction: "client", payload: { type: "run" } },
         { sequence: 2, direction: "server", payload: { type: "messageDelta" } },
+        { sequence: 3, direction: "server", payload: { type: "result" } },
       ],
     });
-    expect(result.stored).toBe(2);
+    expect(result.stored).toBe(3);
 
     const transcript = await readAgentTranscript(db, projectId, "session-1");
-    expect(transcript?.session.event_count).toBe(2);
-    expect(transcript?.events.map((event) => event.sequence)).toEqual([1, 2]);
+    expect(transcript?.session.event_count).toBe(3);
+    expect(transcript?.events.map((event) => event.sequence)).toEqual([1, 2, 3]);
     expect(JSON.parse(transcript!.events[0].payload_json)).toEqual({ type: "run" });
 
     const tail = await readAgentTranscript(db, projectId, "session-1", {
       afterSequence: 1,
     });
-    expect(tail?.events.map((event) => event.sequence)).toEqual([2]);
+    expect(tail?.events.map((event) => event.sequence)).toEqual([2, 3]);
+    const boundedTail = await readAgentTranscript(db, projectId, "session-1", {
+      limit: 2,
+      tail: true,
+    });
+    expect(boundedTail?.events.map((event) => event.sequence)).toEqual([2, 3]);
     expect(await readAgentTranscript(db, projectId, "session-missing")).toBeNull();
   });
 
