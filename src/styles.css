@@ -3120,6 +3120,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .companion-shell .queue-header h2 { font-size:var(--text-xl); letter-spacing: -.025em; }
 .companion-shell .queue-tools { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .companion-shell .search-box { width: auto; min-height: 46px; grid-column: 1; grid-row: 1; border: 0; border-radius: 13px; background: #f2f2ee; }
+.companion-shell .search-box input { font-size: 16px; }
 .platform-android .companion-shell .search-box { border-radius: 24px; background: #f3f1f8; }
 .companion-shell .status-tabs button { min-height: 40px; white-space: nowrap; }
 .companion-source-filter { position:relative; flex:0 0 auto; }

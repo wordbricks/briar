@@ -27,6 +27,12 @@ describe("iOS safe area layout", () => {
     );
   });
 
+  it("keeps the mobile search field from triggering iOS focus zoom", () => {
+    expect(styles).toContain(
+      ".companion-shell .search-box input { font-size: 16px; }",
+    );
+  });
+
   it("keeps thread controls inside the mobile safe areas", () => {
     expect(styles).toContain(
       ".issue-thread-drawer > header { min-height:calc(66px + env(safe-area-inset-top,0px)); padding:calc(8px + env(safe-area-inset-top,0px)) max(13px,env(safe-area-inset-right)) 8px max(18px,env(safe-area-inset-left));",
