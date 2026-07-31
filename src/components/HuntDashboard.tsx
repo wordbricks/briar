@@ -2831,8 +2831,8 @@ export function RunPage({
           aria-labelledby="run-page-title"
           className="run-page"
         >
-          <header>
-            {companionMode ? (
+          {companionMode ? (
+            <header>
               <div className="run-page-heading">
                 <button
                   className="run-page-back"
@@ -2873,26 +2873,9 @@ export function RunPage({
                     />
                   </div>
                 </div>
-                <div className="run-page-meta">
-                  <span className={`status-pill ${meta.tone}`}>{label}</span>
-                  <small>
-                    {t("run.attempt", { count: run.currentAttempt })} ·{" "}
-                    {t("run.revision", { count: run.currentRevision })}
-                  </small>
-                </div>
               </div>
-            ) : (
-              <div className="run-page-summary">
-                <div className="run-page-meta">
-                  <span className={`status-pill ${meta.tone}`}>{label}</span>
-                  <small>
-                    {t("run.attempt", { count: run.currentAttempt })} ·{" "}
-                    {t("run.revision", { count: run.currentRevision })}
-                  </small>
-                </div>
-              </div>
-            )}
-          </header>
+            </header>
+          ) : null}
           <div className="run-page-body">
             <div className="run-page-layout">
               <div
