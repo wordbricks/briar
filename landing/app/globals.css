@@ -1322,26 +1322,6 @@ button {
   font-weight: 500;
 }
 
-.running-badge {
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
-  padding: 5px 8px;
-  border: 1px solid #3c3651;
-  border-radius: 10px;
-  color: #b8a9f4;
-  background: #26203a;
-  font-size: 7px;
-}
-
-.running-badge i {
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: #9d82ff;
-  box-shadow: 0 0 6px #9d82ff;
-}
-
 .workflow-grid {
   display: grid;
   grid-template-columns: 0.9fr 1.35fr;
@@ -3083,44 +3063,6 @@ footer {
   white-space: nowrap;
 }
 
-.detail-runbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 38px;
-  padding: 0 14px;
-  border-bottom: 1px solid #29262c;
-}
-
-.detail-runbar > div {
-  display: flex;
-  gap: 7px;
-  align-items: center;
-  min-width: 0;
-}
-
-.detail-runbar > div > i {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: #a894ff;
-  box-shadow: 0 0 7px rgb(168 148 255 / 0.44);
-}
-
-.detail-runbar strong {
-  overflow: hidden;
-  color: #aaa3ac;
-  font-size: 6px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.detail-runbar > div span {
-  color: #5e5862;
-  font-family: var(--font-geist-mono), monospace;
-  font-size: 5px;
-}
-
 .detail-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 170px;
@@ -3510,10 +3452,6 @@ footer {
 
   .detail-window {
     min-height: 500px;
-  }
-
-  .detail-runbar > div span {
-    display: none;
   }
 
   .evidence-card footer span:last-child {

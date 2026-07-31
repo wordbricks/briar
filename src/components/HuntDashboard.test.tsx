@@ -938,9 +938,14 @@ describe("HuntDashboard", () => {
     expect(container.querySelector(".run-page-heading")).toBeNull();
     expect(container.querySelector(".run-page-back")).toBeNull();
     expect(container.querySelector(".run-page-title-row")).toBeNull();
-    expect(container.querySelector(".run-page-summary .run-page-description")).toBeNull();
-    expect(container.querySelector(".run-page-summary > .issue-activity")).toBeNull();
+    // Status strip (Queued + Attempt/Revision) was removed; those values live in Properties.
+    expect(container.querySelector(".run-page-summary")).toBeNull();
+    expect(container.querySelector(".run-page-meta")).toBeNull();
+    expect(container.querySelector(".run-page > header")).toBeNull();
     expect(container.querySelector(".issue-activity-trigger")).toBeNull();
+    const propertiesAfterOpen = container.querySelector(".run-properties");
+    expect(propertiesAfterOpen?.textContent).toContain("시도");
+    expect(propertiesAfterOpen?.textContent).toContain("리비전");
     expect(container.querySelector(".run-page-content > h1")).toBeNull();
     expect(container.querySelector(".run-page-content > .eyebrow")).toBeNull();
     expect(container.querySelector(".run-page-content > .run-detail")).toBeNull();
@@ -1054,6 +1059,8 @@ describe("HuntDashboard", () => {
     expect(markup).toContain(`AH-${demoDashboard.runs[0].runNumber}`);
     expect(markup).toContain(`<h1 id="run-page-title">${demoDashboard.runs[0].title}</h1>`);
     expect(markup).toContain('class="run-page-actions-trigger"');
+    expect(markup).not.toContain("run-page-meta");
+    expect(markup).not.toContain("run-page-summary");
   });
 
   it("renders the issue description as Markdown above the conversation", () => {

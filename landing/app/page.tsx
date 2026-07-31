@@ -229,16 +229,6 @@ function WorkflowVisual({ c }: { c: LandingCopy }) {
         <strong>{c.workflow.issueTitle}</strong>
         <i>•••</i>
       </div>
-      <div className="detail-runbar">
-        <div>
-          <i />
-          <strong>{c.workflow.issueTitle}</strong>
-          <span>Attempt 1 · Revision 1</span>
-        </div>
-        <small className="running-badge">
-          <i /> {c.workflow.running}
-        </small>
-      </div>
       <div className="detail-layout">
         <div className="detail-content">
           <div className="detail-tabs">
