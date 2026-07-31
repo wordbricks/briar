@@ -1212,16 +1212,30 @@ export async function dispatchHuntRun(
   const preferences = await db
     .prepare(
       `select preferred_agent_provider, preferred_agent_model,
-              preferred_agent_effort
-       from briar_hunt_runs where id = ? and project_id = ?`,
+              preferred_agent_effort,
+              (select count(*)
+               from briar_issue_dependencies dependency
+               join briar_hunt_runs prerequisite
+                 on prerequisite.id = dependency.prerequisite_run_id
+               where dependency.project_id = run.project_id
+                 and dependency.dependent_run_id = run.id
+                 and prerequisite.status != 'completed'
+              ) as unsatisfied_dependency_count
+       from briar_hunt_runs run where id = ? and project_id = ?`,
     )
     .bind(input.runId, projectId)
     .first<{
       preferred_agent_provider: AgentProvider | null;
       preferred_agent_model: string | null;
       preferred_agent_effort: ModelEffort | null;
+      unsatisfied_dependency_count: number;
     }>();
   if (!preferences) return null;
+  if (preferences.unsatisfied_dependency_count > 0) {
+    throw new WorkerConflictError(
+      "Run is waiting for prerequisite issues to complete",
+    );
+  }
   const provider =
     input.provider ?? preferences.preferred_agent_provider ?? agent?.provider;
   if (!provider) {

@@ -5,6 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   claimNextIssueAgentReply,
   claimNextQueuedHuntRun,
+  createIssueDependency,
   createIssueMessage,
   enqueueIssueAgentReply,
   recordHuntEvent,
@@ -284,6 +285,54 @@ describe("detached execution workers", () => {
       requested_agent_provider: "codex",
       requested_worker_id: selected.worker.id,
       worker_id: selected.worker.id,
+    });
+  });
+
+  it("does not dispatch an issue until all prerequisites are completed", async () => {
+    const selected = await register("dependency-aware");
+    const prerequisiteRunId = await recordHuntEvent(
+      db,
+      projectId,
+      queuedEvent("dispatch-prerequisite", 2),
+    );
+    const dependentRunId = await recordHuntEvent(
+      db,
+      projectId,
+      queuedEvent("dispatch-dependent", 3),
+    );
+    await createIssueDependency(db, projectId, {
+      prerequisiteRunId,
+      dependentRunId,
+      createdByUserId: "member",
+      createdAt: atMinute(3),
+    });
+
+    const dispatch = () =>
+      dispatchHuntRun(db, projectId, projectId, {
+        runId: dependentRunId,
+        provider: "codex",
+        workerId: selected.worker.id,
+        requestedByUserId: "member",
+        requestId: "77777777-aaaa-4777-8777-777777777777",
+        occurredAt: atMinute(4),
+      });
+
+    await expect(dispatch()).rejects.toThrow(
+      "Run is waiting for prerequisite issues to complete",
+    );
+
+    await db
+      .prepare(
+        `update briar_hunt_runs
+         set status = 'completed', stage = 'completed', completed_at = ?
+         where id = ?`,
+      )
+      .bind(atMinute(5), prerequisiteRunId)
+      .run();
+
+    await expect(dispatch()).resolves.toMatchObject({
+      runId: dependentRunId,
+      requestedWorkerId: selected.worker.id,
     });
   });
 

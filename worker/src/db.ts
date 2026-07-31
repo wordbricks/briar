@@ -247,6 +247,7 @@ export type IssueDependencyMutationOutcome =
   | "created"
   | "already_exists"
   | "cycle"
+  | "ineligible"
   | "not_found";
 
 export type HuntEventRow = {
@@ -2079,6 +2080,7 @@ export async function createIssueDependency(
          and exists (
            select 1 from briar_hunt_runs
            where id = ? and project_id = ?
+             and status in ('backlog', 'queued', 'blocked', 'failed')
          )
          and not exists (
            select 1 from reachable where run_id = ?
@@ -2113,15 +2115,23 @@ export async function createIssueDependency(
          exists(
            select 1 from briar_hunt_runs
            where project_id = ? and id = ?
-         ) as dependent_exists`,
+         ) as dependent_exists,
+         (select status from briar_hunt_runs
+          where project_id = ? and id = ?) as dependent_status`,
     )
     .bind(
       projectId,
       input.prerequisiteRunId,
       projectId,
       input.dependentRunId,
+      projectId,
+      input.dependentRunId,
     )
-    .first<{ prerequisite_exists: number; dependent_exists: number }>();
+    .first<{
+      prerequisite_exists: number;
+      dependent_exists: number;
+      dependent_status: AutoHuntRunStatus | null;
+    }>();
   if (!runs?.prerequisite_exists || !runs.dependent_exists) return "not_found";
 
   const existing = await db
@@ -2132,7 +2142,15 @@ export async function createIssueDependency(
     )
     .bind(projectId, input.prerequisiteRunId, input.dependentRunId)
     .first<{ present: number }>();
-  return existing ? "already_exists" : "cycle";
+  if (existing) return "already_exists";
+  if (
+    !["backlog", "queued", "blocked", "failed"].includes(
+      runs.dependent_status ?? "",
+    )
+  ) {
+    return "ineligible";
+  }
+  return "cycle";
 }
 
 export async function deleteIssueDependency(
@@ -2683,6 +2701,15 @@ export async function getNextQueuedHuntRun(db: D1Database, projectId: string) {
                where event.run_id = run.id) as event_count
        from briar_hunt_runs run
        where run.project_id = ? and run.status = 'queued'
+         and not exists (
+           select 1
+           from briar_issue_dependencies dependency
+           join briar_hunt_runs prerequisite
+             on prerequisite.id = dependency.prerequisite_run_id
+           where dependency.project_id = run.project_id
+             and dependency.dependent_run_id = run.id
+             and prerequisite.status != 'completed'
+         )
        order by
          case when run.priority is null then 1 else 0 end,
          run.priority asc,
@@ -2724,6 +2751,15 @@ export async function claimNextQueuedHuntRun(
          where project_id = ? and status = 'queued'
            and (lease_expires_at is null or lease_expires_at <= ?)
            and (? is null or id = ?)
+           and not exists (
+             select 1
+             from briar_issue_dependencies dependency
+             join briar_hunt_runs prerequisite
+               on prerequisite.id = dependency.prerequisite_run_id
+             where dependency.project_id = briar_hunt_runs.project_id
+               and dependency.dependent_run_id = briar_hunt_runs.id
+               and prerequisite.status != 'completed'
+           )
            and (? = 0 or dispatched_at is not null)
            and (? is null or requested_worker_id is null or requested_worker_id = ?)
            and (

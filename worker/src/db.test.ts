@@ -2300,6 +2300,52 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       }),
     ).resolves.toBe("cycle");
 
+    await db
+      .prepare("update briar_hunt_runs set status = 'running' where id = ?")
+      .bind(finalRunId)
+      .run();
+    await expect(
+      createIssueDependency(db, projectId, {
+        prerequisiteRunId,
+        dependentRunId: finalRunId,
+        createdByUserId: "owner",
+        createdAt: atMinute(20.85),
+      }),
+    ).resolves.toBe("ineligible");
+    await db
+      .prepare("update briar_hunt_runs set status = 'queued' where id = ?")
+      .bind(finalRunId)
+      .run();
+
+    await expect(
+      claimNextQueuedHuntRun(db, projectId, {
+        claimTokenHash: "9".repeat(64),
+        claimedBy: "dependency-worker",
+        claimedAt: atMinute(20.9),
+        leaseExpiresAt: atMinute(30.9),
+        runId: dependentRunId,
+      }),
+    ).resolves.toBeNull();
+
+    await db
+      .prepare(
+        `update briar_hunt_runs
+         set status = 'completed', stage = 'completed', completed_at = ?
+         where id = ?`,
+      )
+      .bind(atMinute(21), prerequisiteRunId)
+      .run();
+
+    await expect(
+      claimNextQueuedHuntRun(db, projectId, {
+        claimTokenHash: "8".repeat(64),
+        claimedBy: "dependency-worker",
+        claimedAt: atMinute(21.1),
+        leaseExpiresAt: atMinute(31.1),
+        runId: dependentRunId,
+      }),
+    ).resolves.toMatchObject({ id: dependentRunId });
+
     await expect(
       deleteIssueDependency(
         db,
