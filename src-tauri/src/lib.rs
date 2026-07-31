@@ -2932,7 +2932,7 @@ fn configure_execution_worker(
         .resource_dir()
         .map_err(|error| error.to_string())?;
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
-    sync_auto_hunt_assets(&resource_directory, &home)?;
+    sync_auto_hunt_assets_and_restart_workers(&resource_directory, &home)?;
     let bun = bundled_bun_binary()
         .ok_or_else(|| "Briar에 포함된 Bun runtime을 찾지 못했습니다.".to_string())?;
     let cli = home.join(".local/share/briar/briar.js");
@@ -2998,7 +2998,7 @@ fn sync_execution_worker_labels(app: AppHandle) -> Result<serde_json::Value, Str
         .resource_dir()
         .map_err(|error| error.to_string())?;
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
-    sync_auto_hunt_assets(&resource_directory, &home)?;
+    sync_auto_hunt_assets_and_restart_workers(&resource_directory, &home)?;
     let bun = bundled_bun_binary()
         .ok_or_else(|| "Briar에 포함된 Bun runtime을 찾지 못했습니다.".to_string())?;
     let cli = home.join(".local/share/briar/briar.js");
@@ -3067,6 +3067,43 @@ fn sync_auto_hunt_assets(resource_directory: &Path, home: &Path) -> Result<bool,
     }
     install_auto_hunt_assets(resource_directory, home)?;
     Ok(true)
+}
+
+fn sync_auto_hunt_assets_and_restart_workers(
+    resource_directory: &Path,
+    home: &Path,
+) -> Result<bool, String> {
+    let updated = sync_auto_hunt_assets(resource_directory, home)?;
+    if !updated {
+        return Ok(false);
+    }
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    if let Err(error) = restart_execution_worker_services(home) {
+        // Keep the installed version stale so a transient service-manager
+        // failure is retried the next time the desktop app starts.
+        let _ = fs::remove_file(home.join(".local/share/briar/VERSION"));
+        return Err(error);
+    }
+    Ok(true)
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+fn restart_execution_worker_services(home: &Path) -> Result<(), String> {
+    let bun = bundled_bun_binary()
+        .ok_or_else(|| "Briar에 포함된 Bun runtime을 찾지 못했습니다.".to_string())?;
+    let cli = home.join(".local/share/briar/briar.js");
+    let output = Command::new(&bun)
+        .arg(&cli)
+        .args(["worker", "restart-services"])
+        .env("PATH", cli_execution_path(home)?)
+        .output()
+        .map_err(|error| format!("업데이트된 Worker 재시작을 시작하지 못했습니다: {error}"))?;
+    if output.status.success() {
+        return Ok(());
+    }
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    Err(if stderr.is_empty() { stdout } else { stderr })
 }
 
 fn read_trimmed_file_on(runner: &dyn host::CommandRunner, path: &Path) -> Option<String> {
@@ -5377,7 +5414,9 @@ pub fn run() {
                 {
                     eprintln!("Auto Hunt dispatch recovery failed: {error}");
                 }
-                if let Err(error) = sync_auto_hunt_assets(&resource_directory, &home) {
+                if let Err(error) =
+                    sync_auto_hunt_assets_and_restart_workers(&resource_directory, &home)
+                {
                     eprintln!(
                         "Briar CLI and Auto Hunt skill automatic synchronization failed: {error}"
                     );

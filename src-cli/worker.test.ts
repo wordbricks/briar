@@ -7,6 +7,7 @@ import {
   hostFingerprint,
   launchdPlist,
   runWorkerLoop,
+  restartInstalledServices,
   serviceDefinition,
   serviceLabel,
   systemdUnit,
@@ -441,6 +442,12 @@ describe("worker service definitions", () => {
     );
     expect(definition.contents).toContain(workerLogPath(projectId, "/Users/dev"));
     expect(definition.enableCommand[0]).toBe("launchctl");
+    expect(definition.restartCommand).toEqual([
+      "launchctl",
+      "kickstart",
+      "-k",
+      `gui/${process.getuid?.() ?? 501}/${serviceLabel(projectId)}`,
+    ]);
   });
 
   it("runs a packaged CLI with the bundled runtime on macOS", () => {
@@ -525,6 +532,12 @@ describe("worker service definitions", () => {
       "--now",
       `briar-worker@${projectId}.service`,
     ]);
+    expect(definition.restartCommand).toEqual([
+      "systemctl",
+      "--user",
+      "restart",
+      `briar-worker@${projectId}.service`,
+    ]);
   });
 
   it("never writes a credential into the unit", () => {
@@ -558,5 +571,36 @@ describe("worker service definitions", () => {
     expect(() => serviceDefinition({ ...input, platform: "win32" })).toThrow(
       /지원하지 않습니다/u,
     );
+  });
+
+  it("restarts only installed worker services", () => {
+    const installed = serviceDefinition({ ...input, platform: "darwin" });
+    const missing = serviceDefinition({
+      ...input,
+      projectId: "22222222-2222-4222-8222-222222222222",
+      platform: "darwin",
+    });
+    const commands: string[][] = [];
+
+    expect(
+      restartInstalledServices([installed, missing], {
+        exists: (path) => path === installed.path,
+        run: (command) => {
+          commands.push(command);
+          return { success: true };
+        },
+      }),
+    ).toEqual({ restarted: 1, skipped: 1 });
+    expect(commands).toEqual([installed.restartCommand]);
+  });
+
+  it("reports worker service restart failures", () => {
+    const definition = serviceDefinition({ ...input, platform: "darwin" });
+    expect(() =>
+      restartInstalledServices([definition], {
+        exists: () => true,
+        run: () => ({ success: false, error: "service unavailable" }),
+      }),
+    ).toThrow(`${definition.label}: service unavailable`);
   });
 });

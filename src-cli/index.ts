@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 
+import { existsSync } from "node:fs";
 import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { homedir, platform } from "node:os";
@@ -28,6 +29,7 @@ import {
   createWorkerDeviceIdentity,
   defaultWorkerLabel,
   interruptibleSleep,
+  restartInstalledServices,
   runWorkerLoop,
   serviceDefinition,
   writeServiceDefinition,
@@ -2488,6 +2490,34 @@ async function workerStatus() {
   );
 }
 
+async function workerRestartServices() {
+  const config = await loadConfig();
+  const definitions = config.projects
+    .filter((project) => Boolean(project.executionWorker))
+    .map((project) =>
+      serviceDefinition({
+        projectId: project.id,
+        briarBinary: process.execPath,
+        workingDirectory: project.repositoryPath,
+      }),
+    );
+  const result = restartInstalledServices(definitions, {
+    exists: existsSync,
+    run: (command) => {
+      const spawned = Bun.spawnSync({
+        cmd: command,
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      return {
+        success: spawned.success,
+        error: new TextDecoder().decode(spawned.stderr).trim(),
+      };
+    },
+  });
+  console.log(JSON.stringify(result));
+}
+
 async function workerService(action: "install" | "uninstall") {
   const config = await loadConfig();
   const project = value("--project")
@@ -2628,6 +2658,7 @@ const usage = `Briar CLI
   briar worker unregister [--project <uuid>]
   briar worker [--project <uuid>] [--max-issues <n>] [--once]
   briar worker status [--project <uuid>]
+  briar worker restart-services
   briar worker install-service [--project <uuid>] [--briar-binary <path>] [--runtime-binary <path> --cli-script <path>]
   briar worker uninstall-service [--project <uuid>]
 
@@ -2693,6 +2724,9 @@ async function main() {
     return workerSyncLabelCommand();
   }
   if (args[0] === "worker" && args[1] === "status") return workerStatus();
+  if (args[0] === "worker" && args[1] === "restart-services") {
+    return workerRestartServices();
+  }
   if (args[0] === "worker" && args[1] === "install-service") {
     return workerService("install");
   }
