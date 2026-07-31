@@ -4,8 +4,8 @@
   --ink: #fff9fa;
   --ink-muted: #c7b9ba;
   --ink-soft: #9d898b;
-  --paper: #171011;
-  --paper-soft: #130d0e;
+  --paper: #0d090a;
+  --paper-soft: #0a0708;
   --panel: #181315;
   --panel-raised: #211a1c;
   --line: #493738;
@@ -2432,14 +2432,14 @@ footer {
     radial-gradient(
       ellipse at 50% 34%,
       rgb(31 23 23 / 0.14) 0,
-      rgb(23 16 17 / 0.48) 58%,
-      rgb(23 16 17 / 0.82) 82%,
+      rgb(13 9 10 / 0.48) 58%,
+      rgb(13 9 10 / 0.82) 82%,
       var(--paper) 100%
     ),
     linear-gradient(
       180deg,
-      rgb(23 16 17 / 0.08) 0,
-      rgb(23 16 17 / 0.12) 48%,
+      rgb(13 9 10 / 0.08) 0,
+      rgb(13 9 10 / 0.12) 48%,
       var(--paper) 100%
     );
   transform: none;
@@ -2512,13 +2512,13 @@ footer {
     radial-gradient(
       ellipse at 50% 35%,
       rgb(31 23 23 / 0.05),
-      rgb(23 16 17 / 0.28) 74%
+      rgb(13 9 10 / 0.28) 74%
     ),
     linear-gradient(
       90deg,
-      rgb(23 16 17 / 0.28),
+      rgb(13 9 10 / 0.28),
       transparent 26% 72%,
-      rgb(23 16 17 / 0.34)
+      rgb(13 9 10 / 0.34)
     );
   pointer-events: none;
   content: "";
