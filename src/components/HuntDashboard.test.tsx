@@ -1081,7 +1081,18 @@ describe("HuntDashboard", () => {
             "- 대화 위에 배치합니다.",
             "",
             "~~일반 텍스트~~ **마크다운**",
+            "",
+            "![화면](briar-attachment://attachment-1)",
           ].join("\n"),
+          attachments: [
+            {
+              id: "attachment-1",
+              filename: "screen.png",
+              contentType: "image/png",
+              byteSize: 1024,
+              url: "/attachments/attachment-1",
+            },
+          ],
         }}
       />,
     );
@@ -1090,6 +1101,8 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("<h1>목표</h1>");
     expect(markup).toContain("<li>상세 내용을 표시합니다.</li>");
     expect(markup).toContain("<del>일반 텍스트</del>");
+    expect(markup).toContain('class="issue-markdown-image-state"');
+    expect(markup).not.toContain('class="run-attachments"');
     expect(markup.indexOf("issue-description-pane")).toBeLessThan(
       markup.indexOf("issue-conversation"),
     );

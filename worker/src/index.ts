@@ -38,6 +38,10 @@ import {
   maxIssueMultipartBytes,
   validateIssueAttachments,
 } from "../../src/lib/issue-attachments";
+import {
+  canonicalizeIssueAttachmentReferences,
+  isIssueAttachmentReference,
+} from "../../src/lib/issue-markdown";
 import { mentionsBriar } from "../../src/lib/briar-mention";
 import {
   isWorkerEmoji,
@@ -881,6 +885,7 @@ export async function readIssueRequest(request: Request) {
     return {
       input: issueInputSchema.parse(await readJson(request)),
       attachments: [] as File[],
+      attachmentReferences: [] as string[],
     };
   }
 
@@ -906,6 +911,24 @@ export async function readIssueRequest(request: Request) {
   const attachmentError = validateIssueAttachments(attachments);
   if (attachmentError) throw new HttpError(400, attachmentError);
 
+  const rawAttachmentReferences = form.get("attachmentReferences");
+  let attachmentReferences: string[] = [];
+  if (typeof rawAttachmentReferences === "string" && rawAttachmentReferences) {
+    try {
+      const parsed: unknown = JSON.parse(rawAttachmentReferences);
+      if (
+        !Array.isArray(parsed) ||
+        parsed.length !== attachments.length ||
+        !parsed.every(isIssueAttachmentReference)
+      ) {
+        throw new Error("invalid attachment references");
+      }
+      attachmentReferences = parsed;
+    } catch {
+      throw new HttpError(400, "Attachment references are invalid");
+    }
+  }
+
   const description = form.get("description");
   const priority = form.get("priority");
   const status = form.get("status");
@@ -921,6 +944,7 @@ export async function readIssueRequest(request: Request) {
       status: typeof status === "string" && status ? status : undefined,
     }),
     attachments,
+    attachmentReferences,
   };
 }
 
@@ -1341,6 +1365,7 @@ async function createIssueWithAttachments(input: {
   project: Pick<ProjectRow, "id" | "name">;
   issue: z.infer<typeof issueInputSchema>;
   attachments: File[];
+  attachmentReferences?: string[];
   sourceKey: string;
   actor: string;
   detail: string;
@@ -1363,6 +1388,11 @@ async function createIssueWithAttachments(input: {
       };
     });
   const uploadedKeys: string[] = [];
+  const issueDescription = canonicalizeIssueAttachmentReferences(
+    input.issue.description,
+    input.attachmentReferences ?? [],
+    storedAttachments.map((attachment) => attachment.id),
+  );
   let runId: string | null = null;
   try {
     for (const attachment of storedAttachments) {
@@ -1398,7 +1428,7 @@ async function createIssueWithAttachments(input: {
       branch: null,
       commitSha: null,
       tracker: null,
-      issueDescription: input.issue.description || null,
+      issueDescription,
       resultSummary: null,
       structuredResult: null,
       pullRequestUrls: [],
@@ -4259,7 +4289,8 @@ async function route(
     const session = await requireSession(auth, request);
     const project = await getProject(db, issuesMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
-    const { input, attachments } = await readIssueRequest(request);
+    const { input, attachments, attachmentReferences } =
+      await readIssueRequest(request);
     const issueId = crypto.randomUUID();
     const sourceKey = `briar-issue:${issueId}`;
     const detail =
@@ -4272,6 +4303,7 @@ async function route(
       project,
       issue: input,
       attachments,
+      attachmentReferences,
       sourceKey,
       actor: "briar-app",
       detail,

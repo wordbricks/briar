@@ -41,6 +41,7 @@ export type CreateIssueInput = {
   priority: number | null;
   status: "backlog" | "queued";
   attachments: File[];
+  attachmentReferences?: string[];
 };
 
 export type UpdateIssueInput = {
