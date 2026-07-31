@@ -2072,6 +2072,19 @@ export function RunPage({
   ];
   const placementValue = placementIdForRun(run);
   const issueContent = run.issueDescription?.trim() || null;
+  const blockerReason =
+    run.structuredResult?.summary?.trim() ||
+    run.detail?.trim() ||
+    t("run.blockedReasonUnknown");
+  const blockerDetails =
+    run.structuredResult && run.detail?.trim() !== blockerReason
+      ? run.detail?.trim() || null
+      : null;
+  const unblockAction =
+    run.structuredResult?.nextAction?.trim() ||
+    t("run.blockedResolutionDefault", {
+      count: run.currentAttempt + 1,
+    });
   const runAction = async (action: () => Promise<unknown>) => {
     try {
       await action();
@@ -2340,6 +2353,80 @@ export function RunPage({
                       id={`${detailTabsId}-description-panel`}
                       role="tabpanel"
                     >
+                      {run.status === "blocked" ? (
+                        <section
+                          aria-labelledby={`${detailTabsId}-blocked-title`}
+                          className="blocked-issue-card"
+                          role="alert"
+                        >
+                          <div className="blocked-issue-card-heading">
+                            <CircleAlert aria-hidden="true" size={18} />
+                            <strong id={`${detailTabsId}-blocked-title`}>
+                              {t("run.blocked")}
+                            </strong>
+                          </div>
+                          <dl>
+                            <div>
+                              <dt>{t("run.blockedReason")}</dt>
+                              <dd>{blockerReason}</dd>
+                            </div>
+                            <div>
+                              <dt>{t("run.blockedResolution")}</dt>
+                              <dd>{unblockAction}</dd>
+                            </div>
+                          </dl>
+                          {blockerDetails ? (
+                            <details className="blocked-issue-details">
+                              <summary>
+                                <ChevronRight aria-hidden="true" size={14} />
+                                {t("run.blockedDetails")}
+                              </summary>
+                              <p>{blockerDetails}</p>
+                            </details>
+                          ) : null}
+                          <div className="recovery-actions">
+                            <button
+                              disabled={isRecovering}
+                              onClick={() => void runAction(onRetry)}
+                              type="button"
+                            >
+                              <RotateCcw
+                                className={isRecovering ? "spin" : ""}
+                                size={14}
+                              />
+                              {t("run.retry")}
+                            </button>
+                            {confirmCancel ? (
+                              <>
+                                <button
+                                  className="danger"
+                                  disabled={isRecovering}
+                                  onClick={() => void runAction(onCancel)}
+                                  type="button"
+                                >
+                                  {t("run.confirmCancel")}
+                                </button>
+                                <button
+                                  disabled={isRecovering}
+                                  onClick={() => setConfirmCancel(false)}
+                                  type="button"
+                                >
+                                  {t("run.back")}
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                className="danger-secondary"
+                                disabled={isRecovering}
+                                onClick={() => setConfirmCancel(true)}
+                                type="button"
+                              >
+                                {t("run.cancel")}
+                              </button>
+                            )}
+                          </div>
+                        </section>
+                      ) : null}
                       {issueContent ? (
                         <div className="issue-description-markdown">
                           <ReactMarkdown
@@ -2358,7 +2445,8 @@ export function RunPage({
                           onLoadAttachment={onLoadAttachment}
                         />
                       )}
-                      {(needsAttention || canCancelRemoteExecution) && (
+                      {((needsAttention && run.status !== "blocked") ||
+                        canCancelRemoteExecution) && (
                         <div className="recovery-panel">
                           <div><CircleAlert size={16} /><span><strong>{needsAttention ? (run.status === "failed" ? t("run.failed") : t("run.blocked")) : label}</strong><small>{needsAttention ? t("run.retryDescription", { count: run.currentAttempt + 1 }) : (run.detail ?? t("worker.sharingDescriptionOn"))}</small></span></div>
                           <div className="recovery-actions">

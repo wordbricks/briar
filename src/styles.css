@@ -840,6 +840,19 @@ body { overflow: hidden; font-synthesis: none; }
 .issue-detail-tabs button[aria-selected="true"]::after { background:var(--primary); }
 .issue-detail-tabs button:focus-visible { z-index:1; outline:2px solid #8b70dd; outline-offset:-2px; border-radius:7px; }
 .issue-description-scroll { width:100%; min-height:0; flex:1; padding:10px 10px 12px 2px; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; scrollbar-width:thin; }
+.blocked-issue-card { margin:0 0 14px; padding:14px; border:1px solid color-mix(in srgb,var(--destructive) 38%,var(--border)); border-radius:12px; background:color-mix(in srgb,var(--destructive) 8%,var(--card)); box-shadow:0 1px 2px color-mix(in srgb,var(--destructive) 8%,transparent); }
+.blocked-issue-card-heading { display:flex; align-items:center; gap:8px; color:var(--destructive); }
+.blocked-issue-card-heading strong { color:var(--foreground); font-size:var(--text-xs); }
+.blocked-issue-card dl { margin:12px 0 0; display:grid; gap:10px; }
+.blocked-issue-card dl > div { display:grid; grid-template-columns:minmax(86px,auto) 1fr; align-items:start; gap:10px; }
+.blocked-issue-card dt { color:var(--destructive); font-size:var(--text-2xs); font-weight:700; }
+.blocked-issue-card dd { min-width:0; margin:0; color:var(--foreground); font-size:var(--text-xs); line-height:1.55; overflow-wrap:anywhere; }
+.blocked-issue-details { margin-top:12px; padding-top:10px; border-top:1px solid color-mix(in srgb,var(--destructive) 22%,var(--border)); }
+.blocked-issue-details summary { width:max-content; max-width:100%; display:flex; align-items:center; gap:5px; color:var(--muted-foreground); font-size:var(--text-2xs); font-weight:650; cursor:pointer; list-style:none; }
+.blocked-issue-details summary::-webkit-details-marker { display:none; }
+.blocked-issue-details summary svg { flex:0 0 auto; transition:transform 140ms ease; }
+.blocked-issue-details[open] summary svg { transform:rotate(90deg); }
+.blocked-issue-details p { margin:9px 0 0; padding:10px 11px; border-radius:8px; color:var(--muted-foreground); background:color-mix(in srgb,var(--muted) 70%,transparent); font:500 var(--text-2xs)/1.6 "DM Mono",monospace; white-space:pre-wrap; overflow-wrap:anywhere; }
 .run-evidence-panel { width:100%; min-height:0; flex:1; overflow-y:auto; padding:10px 10px 12px 2px; overscroll-behavior:contain; scrollbar-gutter:stable; scrollbar-width:thin; }
 .run-evidence-state,.run-evidence-empty { min-height:120px; display:flex; align-items:center; justify-content:center; gap:8px; color:var(--muted-foreground); font-size:var(--text-2xs); }
 .run-evidence-state.error { width:100%; border:0; border-radius:10px; color:var(--foreground); background:color-mix(in srgb,var(--destructive) 10%,var(--card)); cursor:pointer; }

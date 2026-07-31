@@ -3902,6 +3902,69 @@ fn auto_hunt_claim_arguments(run_id: &str) -> Vec<String> {
     ]
 }
 
+fn auto_hunt_terminal_event_arguments(
+    run_id: &str,
+    source_key: &str,
+    status: &str,
+    cause: &str,
+    detail: &str,
+) -> Vec<String> {
+    let event_key = format!("{source_key}:{status}:{cause}");
+    let (status_detail, structured_result) = if status == "blocked" {
+        let reason = match cause {
+            "workspace-allocation" => "Briar가 이 이슈를 처리할 별도 작업 공간을 준비하지 못해 작업을 시작할 수 없습니다. 아직 코드 변경은 시작되지 않았습니다.".to_string(),
+            _ => detail.to_string(),
+        };
+        let technical_detail = match cause {
+            "workspace-allocation" => {
+                format!("이슈 전용 작업 공간 생성 단계가 실패했습니다. 원본 오류: {detail}")
+            }
+            _ => detail.to_string(),
+        };
+        let next_action = match cause {
+            "workspace-allocation" => "프로젝트 저장소에 접근할 수 있는 담당자가 Worker 컴퓨터의 Briar에서 저장소 연결을 다시 확인한 뒤 이 이슈를 재시도해 주세요. 이슈가 ‘진행 중’ 상태로 바뀌면 문제가 해결된 것입니다.",
+            _ => "이 문제를 담당할 수 있는 사람이 안내된 원인을 해결한 뒤 이 이슈를 재시도해 주세요. 이슈가 ‘진행 중’ 상태로 바뀌면 문제가 해결된 것입니다.",
+        };
+        (
+            technical_detail,
+            Some(
+                serde_json::json!({
+                    "summary": reason,
+                    "outcome": "blocked",
+                    "importance": "important",
+                    "urgency": "normal",
+                    "impact": "issue",
+                    "humanActionRequired": true,
+                    "nextAction": next_action,
+                    "dueAt": null
+                })
+                .to_string(),
+            ),
+        )
+    } else {
+        (detail.to_string(), None)
+    };
+    let mut arguments = vec![
+        "run".to_string(),
+        "event".to_string(),
+        "add".to_string(),
+        "--run".to_string(),
+        run_id.to_string(),
+        "--status".to_string(),
+        status.to_string(),
+        "--event-key".to_string(),
+        event_key,
+        "--status-detail".to_string(),
+        status_detail,
+        "--actor".to_string(),
+        "briar-auto-hunt-runtime".to_string(),
+    ];
+    if let Some(structured_result) = structured_result {
+        arguments.extend(["--structured-result".to_string(), structured_result]);
+    }
+    arguments
+}
+
 fn record_auto_hunt_terminal_event(
     runner: &dyn host::CommandRunner,
     cli_environment: &agent::AutoHuntCliEnvironment,
@@ -3911,26 +3974,9 @@ fn record_auto_hunt_terminal_event(
     cause: &str,
     detail: &str,
 ) -> Result<(), String> {
-    let event_key = format!("{}:{status}:{cause}", run.source_key);
-    let output = cli_environment.run_briar(
-        runner,
-        workspace,
-        [
-            "run",
-            "event",
-            "add",
-            "--run",
-            run.run_id.as_str(),
-            "--status",
-            status,
-            "--event-key",
-            event_key.as_str(),
-            "--status-detail",
-            detail,
-            "--actor",
-            "briar-auto-hunt-runtime",
-        ],
-    )?;
+    let arguments =
+        auto_hunt_terminal_event_arguments(&run.run_id, &run.source_key, status, cause, detail);
+    let output = cli_environment.run_briar(runner, workspace, arguments)?;
     if output.success() {
         Ok(())
     } else {
@@ -6010,6 +6056,41 @@ branch refs/heads/briar/second-11111111
                 "--runtime-dispatch",
             ],
         );
+    }
+
+    #[test]
+    fn records_an_actionable_handoff_for_runtime_blockers() {
+        let arguments = auto_hunt_terminal_event_arguments(
+            "515b7a2c-8918-5a8f-a292-f0b95090281c",
+            "BRIAR-13",
+            "blocked",
+            "workspace-allocation",
+            "worktree creation failed",
+        );
+
+        let detail_index = arguments
+            .iter()
+            .position(|argument| argument == "--status-detail")
+            .expect("blocked event should include a reason");
+        assert!(arguments[detail_index + 1].contains("작업 공간 생성 단계가 실패했습니다"));
+        assert!(arguments[detail_index + 1].contains("원본 오류: worktree creation failed"));
+
+        let result_index = arguments
+            .iter()
+            .position(|argument| argument == "--structured-result")
+            .expect("blocked event should include a structured result");
+        let result: serde_json::Value = serde_json::from_str(&arguments[result_index + 1])
+            .expect("structured result should be valid JSON");
+        assert_eq!(result["outcome"], "blocked");
+        assert_eq!(result["humanActionRequired"], true);
+        assert!(result["summary"]
+            .as_str()
+            .expect("summary should be text")
+            .contains("작업을 시작할 수 없습니다"));
+        assert!(result["nextAction"]
+            .as_str()
+            .expect("next action should be text")
+            .contains("저장소 연결을 다시 확인"));
     }
 
     #[test]

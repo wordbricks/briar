@@ -306,7 +306,7 @@ const trackerSchema = z
   })
   .strict();
 
-const eventSchema = z
+export const eventSchema = z
   .object({
     runId: z.string().uuid().nullable().optional(),
     source: z.enum(autoHuntSources).nullable().optional(),
@@ -366,8 +366,38 @@ const eventSchema = z
     if (input.status === "blocked" && !input.detail?.trim()) {
       context.addIssue({
         code: "custom",
-        message: "blocked progress requires an exact blocker reason",
+        message: "blocked progress requires technical blocker details",
         path: ["detail"],
+      });
+    }
+    if (input.status === "blocked" && !input.structuredResult) {
+      context.addIssue({
+        code: "custom",
+        message: "blocked progress requires a structured blocked result",
+        path: ["structuredResult"],
+      });
+    }
+    if (
+      input.status === "blocked" &&
+      input.structuredResult &&
+      input.structuredResult.outcome !== "blocked"
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "blocked progress requires a blocked structured outcome",
+        path: ["structuredResult", "outcome"],
+      });
+    }
+    if (
+      input.status === "blocked" &&
+      input.structuredResult &&
+      (!input.structuredResult.humanActionRequired ||
+        !input.structuredResult.nextAction)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "blocked progress requires an exact human next action",
+        path: ["structuredResult", "nextAction"],
       });
     }
     if (input.status === "completed" && !input.structuredResult) {

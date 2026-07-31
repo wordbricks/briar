@@ -19,6 +19,10 @@ describe("bundled skill guides", () => {
     expect(guide?.markdown).toContain("briar run evidence add");
     expect(guide?.markdown).toContain("briar run rework");
     expect(guide?.markdown).toContain("## Optional Velen and Linear");
+    expect(guide?.markdown).toContain("nontechnical PM or CEO");
+    expect(guide?.markdown).toContain("--structured-result-file '<blocked-result.json>'");
+    expect(guide?.markdown).toContain("how they can tell it worked");
+    expect(guide?.markdown).toContain("collapsed technical detail");
     expect(getSkillGuide("missing")).toBeNull();
   });
 

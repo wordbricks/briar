@@ -1725,4 +1725,59 @@ describe("HuntDashboard", () => {
     expect(markup).toContain('aria-haspopup="listbox" aria-label="상태"');
     expect(markup).toContain('<span class="select-menu-value">실패</span>');
   });
+
+  it("shows blocker details at the top of the issue description", () => {
+    const blockedRun = {
+      ...demoDashboard.runs[0],
+      status: "blocked" as const,
+      currentAttempt: 2,
+      detail: "GitHub 인증이 만료되어 PR을 생성할 수 없습니다.",
+      issueDescription: "## 작업 내용\n\nPR을 생성하고 검증합니다.",
+      structuredResult: {
+        summary: "GitHub 인증이 필요합니다.",
+        outcome: "blocked" as const,
+        importance: "important" as const,
+        urgency: "normal" as const,
+        impact: "issue" as const,
+        humanActionRequired: true,
+        nextAction: "GitHub CLI에 다시 로그인한 뒤 이 이슈를 재시도하세요.",
+        dueAt: null,
+      },
+    };
+    const markup = renderToStaticMarkup(
+      <RunPage
+        isSidebarOpen
+        error={null}
+        isRecovering={false}
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => []}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }}
+        run={blockedRun}
+      />,
+    );
+
+    expect(markup).toContain('class="blocked-issue-card"');
+    expect(markup).toContain("작업이 멈춘 이유");
+    expect(markup).toContain(blockedRun.structuredResult.summary);
+    expect(markup).toContain(blockedRun.detail);
+    expect(markup).toContain("다시 진행하려면");
+    expect(markup).toContain(blockedRun.structuredResult.nextAction);
+    expect(markup).toContain('<details class="blocked-issue-details">');
+    expect(markup).toContain("<summary>");
+    expect(markup).toContain("자세한 내용 보기");
+    expect(markup).not.toContain('<details class="blocked-issue-details" open="">');
+    expect(markup.indexOf("blocked-issue-card")).toBeLessThan(
+      markup.indexOf("issue-description-markdown"),
+    );
+    expect(markup).toContain("재시도");
+    expect(markup).toContain("작업 취소");
+    expect(markup).not.toContain('class="recovery-panel"');
+  });
 });
