@@ -92,7 +92,10 @@ import {
   issueMentionHandle,
   mentionsIssueHandle,
 } from "../lib/issue-agent-reply";
-import { shareIssueLink } from "../lib/issue-links";
+import {
+  copyIssueShareLink,
+  shareIssueLink,
+} from "../lib/issue-links";
 import type {
   CreateIssueInput,
   DashboardPayload,
@@ -2090,6 +2093,18 @@ export function RunPage({
       setShareStatus("error");
     }
   };
+  const copyIssueLink = async () => {
+    setShareStatus(null);
+    try {
+      await copyIssueShareLink({
+        projectId,
+        runId: run.id,
+      });
+      setShareStatus("copied");
+    } catch {
+      setShareStatus("error");
+    }
+  };
   const clampContentSplit = (value: number) =>
     Math.min(80, Math.max(20, value));
   const updateContentSplitFromPointer = (clientY: number) => {
@@ -2169,25 +2184,36 @@ export function RunPage({
           >
             {run.title}
           </strong>
-          {shareStatus ? (
-            <span
-              aria-live="polite"
-              className={`run-page-share-status${shareStatus === "error" ? " error" : ""}`}
-              role="status"
+          <div className="run-page-titlebar-actions">
+            {shareStatus ? (
+              <span
+                aria-live="polite"
+                className={`run-page-share-status${shareStatus === "error" ? " error" : ""}`}
+                role="status"
+              >
+                {t(
+                  shareStatus === "copied"
+                    ? "issue.linkCopied"
+                    : "issue.shareFailed",
+                )}
+              </span>
+            ) : null}
+            <button
+              aria-label={t("issue.copyLink")}
+              className="run-page-link-copy"
+              disabled={!projectId}
+              onClick={() => void copyIssueLink()}
+              title={t("issue.copyLink")}
+              type="button"
             >
-              {t(
-                shareStatus === "copied"
-                  ? "issue.linkCopied"
-                  : "issue.shareFailed",
-              )}
-            </span>
-          ) : null}
-          <IssueActionsMenu
-            disabled={isUpdatingIssue || isDeletingIssue}
-            onDelete={onDelete ? () => setIsDeleteDialogOpen(true) : undefined}
-            onEdit={onUpdateIssue ? () => setIsEditDialogOpen(true) : undefined}
-            onShare={() => void shareIssue()}
-          />
+              <Link2 aria-hidden="true" size={16} />
+            </button>
+            <IssueActionsMenu
+              disabled={isUpdatingIssue || isDeletingIssue}
+              onDelete={onDelete ? () => setIsDeleteDialogOpen(true) : undefined}
+              onEdit={onUpdateIssue ? () => setIsEditDialogOpen(true) : undefined}
+            />
+          </div>
         </header>
       )}
       <div className="run-page-scroll">
@@ -2583,7 +2609,7 @@ function IssueActionsMenu({
   disabled: boolean;
   onDelete?: () => void;
   onEdit?: () => void;
-  onShare: () => void;
+  onShare?: () => void;
 }) {
   const { t } = useI18n();
   return (
@@ -2608,13 +2634,15 @@ function IssueActionsMenu({
           className="run-page-actions-menu"
           sideOffset={6}
         >
-          <DropdownMenu.Item
-            className="run-page-actions-item"
-            onSelect={onShare}
-          >
-            <Share2 size={14} />
-            {t("issue.share")}
-          </DropdownMenu.Item>
+          {onShare ? (
+            <DropdownMenu.Item
+              className="run-page-actions-item"
+              onSelect={onShare}
+            >
+              <Share2 size={14} />
+              {t("issue.share")}
+            </DropdownMenu.Item>
+          ) : null}
           {onEdit ? (
             <DropdownMenu.Item
               className="run-page-actions-item"
