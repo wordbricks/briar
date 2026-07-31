@@ -78,6 +78,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { NativeSelect } from "./NativeSelect";
 import { SelectMenu } from "./SelectMenu";
+import { WorkerIcon } from "./WorkerIcon";
 import {
   CompanionBottomNavigation,
   type CompanionStatusFilter,
@@ -104,6 +105,7 @@ import {
 import type {
   CreateIssueInput,
   DashboardPayload,
+  ExecutionWorker,
   HuntRun,
   HuntRunPlacement,
   HuntSource,
@@ -374,6 +376,13 @@ export function HuntDashboard({
     }
     return { activeAgents, performedAgents };
   }, [agents, dashboard?.project.id, runs, sessions]);
+  const workerById = useMemo(
+    () =>
+      new Map(
+        (dashboard?.workers ?? []).map((worker) => [worker.id, worker]),
+      ),
+    [dashboard?.workers],
+  );
 
   useEffect(() => {
     if (!requestedRunId) return;
@@ -781,6 +790,11 @@ export function HuntDashboard({
                   <KanbanCard
                     activeAgent={
                       agentAssociationsByRunId.activeAgents.get(run.id) ?? null
+                    }
+                    assignedWorker={
+                      workerById.get(run.workerId ?? "") ??
+                      workerById.get(run.requestedWorkerId ?? "") ??
+                      null
                     }
                     contextMenuDisabled={companionMode}
                     deletingIssueId={deletingIssueId}
@@ -1464,6 +1478,7 @@ function SelectedAttachment({
 
 function KanbanCard({
   activeAgent,
+  assignedWorker,
   contextMenuDisabled,
   deletingIssueId,
   isMoving,
@@ -1481,6 +1496,7 @@ function KanbanCard({
   updatingIssueId,
 }: {
   activeAgent: ProjectAgent | null;
+  assignedWorker: ExecutionWorker | null;
   contextMenuDisabled: boolean;
   deletingIssueId: string | null;
   isMoving: boolean;
@@ -1524,7 +1540,7 @@ function KanbanCard({
       <div
         aria-label={t("run.details", { title: run.title })}
         aria-disabled={isMoving}
-        className={`kanban-card ${meta.tone}${isMoving ? " moving" : ""}${activeAgent ? " has-agent" : ""}`}
+        className={`kanban-card ${meta.tone}${isMoving ? " moving" : ""}${activeAgent || assignedWorker ? " has-assignees" : ""}${activeAgent && assignedWorker ? " has-multiple-assignees" : ""}`}
         draggable={!isMoving}
         onDragEnd={onDragEnd}
         onDragStart={onDragStart}
@@ -1537,17 +1553,34 @@ function KanbanCard({
         role="button"
         tabIndex={0}
       >
-        {activeAgent && (
-          <span
-            aria-label={t("run.assigned", { agent: activeAgent.name })}
-            className="kanban-card-agent-badge"
-            title={t("run.assigned", { agent: activeAgent.name })}
-          >
-            <ProjectAgentAvatar
-              agent={activeAgent}
-              isRunning
-              token={token}
-            />
+        {(activeAgent || assignedWorker) && (
+          <span className="kanban-card-assignee-badges">
+            {assignedWorker && (
+              <span
+                aria-label={t("run.workerAssigned", {
+                  worker: assignedWorker.label,
+                })}
+                className="kanban-card-worker-badge"
+                title={t("run.workerAssigned", {
+                  worker: assignedWorker.label,
+                })}
+              >
+                <WorkerIcon icon={assignedWorker.icon} size={30} />
+              </span>
+            )}
+            {activeAgent && (
+              <span
+                aria-label={t("run.assigned", { agent: activeAgent.name })}
+                className="kanban-card-agent-badge"
+                title={t("run.assigned", { agent: activeAgent.name })}
+              >
+                <ProjectAgentAvatar
+                  agent={activeAgent}
+                  isRunning
+                  token={token}
+                />
+              </span>
+            )}
           </span>
         )}
         <span className="kanban-card-kicker">
