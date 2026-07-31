@@ -64,6 +64,7 @@ briar queue claim
 ```
 
 The result contains `work` or `null`. Stop when it is `null`; never invent queue work.
+`work.briarIssueUrl` is the stable link back to the claimed Briar issue.
 To claim one specific queued run, pass its ID:
 
 ```sh
@@ -237,6 +238,10 @@ For a GitHub `pr_open` stage, verify `gh --version`,
 `gh auth status --hostname github.com`, the `origin` remote, and authenticated push access
 before depending on PR delivery. Record the exact missing install, login, remote, or
 permission action as a blocker.
+When creating a GitHub pull request, include `work.briarIssueUrl` in the pull request
+description and preserve it in later description edits. Recording passed or pending
+`pull_request` evidence also verifies the GitHub PR description and appends the Briar issue
+link when it is missing.
 
 Never create an environment merely to satisfy a workflow. Completion evidence must describe
 the target actually used, observed behavior, rollback posture when relevant, and remaining risk.
