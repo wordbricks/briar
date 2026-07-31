@@ -14,6 +14,7 @@ import { homedir, hostname, platform, arch } from "node:os";
 import { join } from "node:path";
 
 export type AgentProvider = "codex" | "claude" | "grok";
+export type ModelEffort = "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
 
 export type ClaimedIssue = {
   workType?: "issue" | "issueReply";
@@ -28,6 +29,7 @@ export type ClaimedIssue = {
     name: string;
     provider: "codex" | "claude" | "grok";
     model: string | null;
+    effort: ModelEffort | null;
     responsibility: string;
     skill: string;
   } | null;

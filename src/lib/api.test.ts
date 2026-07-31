@@ -7,6 +7,7 @@ import {
   createProjectAgentSchedule,
   deleteProjectAgent,
   deleteIssue,
+  dispatchHuntRun,
   deleteProjectAgentSchedule,
   loadDashboard,
   loadProjectAgentSessions,
@@ -18,6 +19,7 @@ import {
   updateProjectAgentSchedule,
   updateOrganizationMemberRole,
   updateIssue,
+  updateIssueExecutionPreferences,
   upsertProjectAgentSession,
   waitForIssueAgentReply,
 } from "./api";
@@ -98,6 +100,84 @@ describe("API errors", () => {
       expect.stringContaining(`/projects/${projectId}/runs/${runId}`),
       expect.objectContaining({ method: "DELETE" }),
     );
+  });
+
+  it("updates issue execution preferences independently of issue content", async () => {
+    const projectId = "22222222-2222-4222-8222-222222222222";
+    const runId = "11111111-1111-4111-8111-111111111111";
+    const preferences = {
+      provider: "codex" as const,
+      model: "gpt-5.6-sol",
+      effort: "xhigh" as const,
+    };
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) =>
+        new Response(
+          JSON.stringify({ runId, ...JSON.parse(String(init?.body)) }),
+          { headers: { "Content-Type": "application/json" } },
+        ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      updateIssueExecutionPreferences(
+        "token",
+        projectId,
+        runId,
+        preferences,
+      ),
+    ).resolves.toEqual({ runId, ...preferences });
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(
+        `/projects/${projectId}/runs/${runId}/preferences`,
+      ),
+      expect.objectContaining({
+        method: "PUT",
+        body: JSON.stringify(preferences),
+      }),
+    );
+  });
+
+  it("sends model and effort when dispatching an issue now", async () => {
+    const projectId = "22222222-2222-4222-8222-222222222222";
+    const runId = "11111111-1111-4111-8111-111111111111";
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(
+          JSON.stringify({
+            runId,
+            agentId: "33333333-3333-4333-8333-333333333333",
+            provider: "claude",
+            model: "opus",
+            effort: "high",
+            requestedWorkerId: null,
+            requestedByUserId: "owner",
+            dispatchMode: "any",
+            dispatchedAt: "2026-07-31T00:00:00.000Z",
+            outcome: "dispatched",
+          }),
+          { headers: { "Content-Type": "application/json" } },
+        ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await dispatchHuntRun("token", projectId, runId, {
+      agentId: "33333333-3333-4333-8333-333333333333",
+      provider: "claude",
+      model: "opus",
+      effort: "high",
+      workerId: null,
+      persistPreferences: true,
+    });
+    const body = JSON.parse(
+      String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
+    );
+    expect(body).toMatchObject({
+      provider: "claude",
+      model: "opus",
+      effort: "high",
+      persistPreferences: true,
+    });
   });
 
   it("returns a durable worker reply job for an @briar message", async () => {

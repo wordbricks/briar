@@ -12,6 +12,7 @@ import type {
   HuntRun,
 } from "../types";
 import type { StructuredAgentResult } from "./agent-result";
+import type { ModelEffort } from "./project-llm";
 
 export type ProjectAgentScheduleExecutionDependencies = {
   loadDashboard: (
@@ -34,6 +35,8 @@ export type ProjectAgentScheduleExecutionDependencies = {
     input: {
       agentId: string;
       provider: ClaimedProjectAgentScheduleRun["agent"]["provider"];
+      model: string | null;
+      effort: ModelEffort | null;
       workerId: null;
       reassign: boolean;
     },

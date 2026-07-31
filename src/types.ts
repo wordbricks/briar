@@ -8,7 +8,7 @@ import {
 } from "./lib/auto-hunt-contract";
 import type { StructuredAgentResult } from "./lib/agent-result";
 import type { ProjectAgentCodexPet } from "./lib/codex-pets";
-import type { AgentProvider } from "./lib/project-llm";
+import type { AgentProvider, ModelEffort } from "./lib/project-llm";
 import type {
   ProjectAgentScheduleIntervalUnit,
   ProjectAgentScheduleNotificationLevel,
@@ -47,6 +47,12 @@ export type UpdateIssueInput = {
   title: string;
   description: string | null;
   priority: number | null;
+};
+
+export type IssueExecutionPreferences = {
+  provider: AgentProvider | null;
+  model: string | null;
+  effort: ModelEffort | null;
 };
 
 export type HuntEvent = {
@@ -161,7 +167,12 @@ export type HuntRun = {
   leaseExpiresAt: string | null;
   claimAttempts: number;
   agentId?: string | null;
+  preferredProvider?: AgentProvider | null;
+  preferredModel?: string | null;
+  preferredEffort?: ModelEffort | null;
   requestedProvider?: AgentProvider | null;
+  requestedModel?: string | null;
+  requestedEffort?: ModelEffort | null;
   requestedWorkerId?: string | null;
   requestedByUserId?: string | null;
   dispatchMode?: "any" | "specific" | null;
@@ -371,6 +382,7 @@ export type DashboardPayload = {
   settings: ProjectSettings;
   runs: HuntRun[];
   workers?: ExecutionWorker[];
+  organizationProviders?: AgentProvider[];
   executionPolicy?: ProjectExecutionWorkerPolicy;
   members?: OrganizationMember[];
   conversationNotifications?: IssueConversationNotification[];

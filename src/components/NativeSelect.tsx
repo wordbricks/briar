@@ -4,6 +4,7 @@ export type NativeSelectOption = SelectMenuOption;
 
 export function NativeSelect({
   className,
+  disabled,
   label,
   onValueChange,
   options,
@@ -11,6 +12,7 @@ export function NativeSelect({
   value,
 }: {
   className?: string;
+  disabled?: boolean;
   label: string;
   onValueChange: (value: string) => void;
   options: NativeSelectOption[];
@@ -20,6 +22,7 @@ export function NativeSelect({
   return (
     <SelectMenu
       className={["native-select", className].filter(Boolean).join(" ")}
+      disabled={disabled}
       label={label}
       onValueChange={onValueChange}
       options={options}

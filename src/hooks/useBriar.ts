@@ -29,6 +29,7 @@ import {
   renewProjectAgentScheduleRun,
   retryHuntRun,
   updateIssue,
+  updateIssueExecutionPreferences,
   updateOrganization as updateRemoteOrganization,
   updateOrganizationLogo as updateRemoteOrganizationLogo,
   updateProjectSettings,
@@ -105,6 +106,7 @@ import type {
   IssueAttachment,
   IssueMessage,
   IssueMessageSendResult,
+  IssueExecutionPreferences,
   Organization,
   Project,
   ProjectSettings,
@@ -1774,6 +1776,54 @@ export function useBriar(options: UseBriarOptions = {}) {
     [activeProjectId, dashboard, token],
   );
 
+  const editIssueExecutionPreferences = useCallback(
+    async (runId: string, input: IssueExecutionPreferences) => {
+      if (!activeProjectId || !dashboard) {
+        throw new Error("이슈를 수정할 프로젝트가 없습니다.");
+      }
+      setUpdatingIssueId(runId);
+      setError(null);
+      try {
+        if (demoMode) {
+          setDashboard((current) =>
+            current
+              ? {
+                  ...current,
+                  runs: current.runs.map((run) =>
+                    run.id === runId
+                      ? {
+                          ...run,
+                          preferredProvider: input.provider,
+                          preferredModel: input.model,
+                          preferredEffort: input.effort,
+                          updatedAt: new Date().toISOString(),
+                        }
+                      : run,
+                  ),
+                }
+              : current,
+          );
+          return { runId, ...input };
+        }
+        if (!token) throw new Error("로그인이 필요합니다.");
+        const result = await updateIssueExecutionPreferences(
+          token,
+          activeProjectId,
+          runId,
+          input,
+        );
+        setDashboard(await loadDashboard(token, activeProjectId));
+        return result;
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : String(caught));
+        throw caught;
+      } finally {
+        setUpdatingIssueId(null);
+      }
+    },
+    [activeProjectId, dashboard, token],
+  );
+
   const removeIssue = useCallback(
     async (runId: string) => {
       if (!activeProjectId || !dashboard) {
@@ -2177,6 +2227,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     refreshVelen,
     readIssueAttachment,
     editIssue,
+    editIssueExecutionPreferences,
     readIssueMessages,
     readRunEvidence,
     addIssueMessage,

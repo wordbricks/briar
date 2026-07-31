@@ -46,6 +46,8 @@ describe("dispatchAutoHuntToWorkers", () => {
       expect.objectContaining({ id: "run-2" }),
       {
         agentId: agent.id,
+        effort: null,
+        model: null,
         provider: "claude",
         workerId: null,
         reassign: false,
@@ -56,6 +58,8 @@ describe("dispatchAutoHuntToWorkers", () => {
       expect.objectContaining({ id: "run-3" }),
       {
         agentId: agent.id,
+        effort: null,
+        model: null,
         provider: "claude",
         workerId: null,
         reassign: false,
@@ -85,10 +89,67 @@ describe("dispatchAutoHuntToWorkers", () => {
     expect(retry).toHaveBeenCalledWith(blocked, "권한 복구 확인");
     expect(dispatch).toHaveBeenCalledWith(blocked, {
       agentId: agent.id,
+      effort: null,
+      model: null,
       provider: "claude",
       workerId: null,
       reassign: true,
     });
+  });
+
+  it("prefers an issue model, then an issue provider, then the Agent model", async () => {
+    const dispatch = vi.fn(async () => undefined);
+    const retry = vi.fn(async () => undefined);
+    const configuredAgent = {
+      id: "agent-1",
+      provider: "claude" as const,
+      model: "sonnet",
+    };
+
+    await dispatchAutoHuntToWorkers(
+      { dispatch, retry },
+      {
+        agent: configuredAgent,
+        runs: [
+          run("run-1"),
+          run("run-2", { preferredProvider: "grok" }),
+          run("run-3", {
+            preferredProvider: "codex",
+            preferredModel: "gpt-5.6-sol",
+            preferredEffort: "xhigh",
+          }),
+        ],
+        maxIssues: 3,
+      },
+    );
+
+    expect(dispatch).toHaveBeenNthCalledWith(
+      1,
+      expect.anything(),
+      expect.objectContaining({
+        provider: "claude",
+        model: "sonnet",
+        effort: null,
+      }),
+    );
+    expect(dispatch).toHaveBeenNthCalledWith(
+      2,
+      expect.anything(),
+      expect.objectContaining({
+        provider: "grok",
+        model: null,
+        effort: null,
+      }),
+    );
+    expect(dispatch).toHaveBeenNthCalledWith(
+      3,
+      expect.anything(),
+      expect.objectContaining({
+        provider: "codex",
+        model: "gpt-5.6-sol",
+        effort: "xhigh",
+      }),
+    );
   });
 
   it("does not dispatch when a requested retry target is missing", async () => {

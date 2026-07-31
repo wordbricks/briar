@@ -72,7 +72,7 @@ import {
 } from "./lib/api";
 import { dispatchAutoHuntToWorkers } from "./lib/auto-hunt-worker-dispatch";
 import { demoProjectAgents } from "./lib/demo-project-agents";
-import type { AgentProvider } from "./lib/project-llm";
+import type { AgentProvider, ModelEffort } from "./lib/project-llm";
 import { useI18n } from "./i18n";
 import type { HuntRun, ProjectAgent } from "./types";
 
@@ -306,6 +306,8 @@ export function App() {
   const submitWorkerDispatch = async (input: {
     agentId: string;
     provider: AgentProvider;
+    model: string | null;
+    effort: ModelEffort | null;
     workerId: string | null;
   }) => {
     if (!activeProject || !briar.token || !dispatchRun) return;
@@ -318,6 +320,7 @@ export function App() {
         dispatchRun.id,
         {
           ...input,
+          persistPreferences: true,
           reassign: Boolean(dispatchRun.dispatchedAt || dispatchRun.workerId),
         },
       );
@@ -813,6 +816,7 @@ export function App() {
             onIssueDialogOpenChange={setIsIssueDialogOpen}
             onDeleteIssue={briar.deleteIssue}
             onUpdateIssue={briar.editIssue}
+            onUpdateIssuePreferences={briar.editIssueExecutionPreferences}
             onLoadAttachment={briar.readIssueAttachment}
             onLoadIssueMessages={briar.readIssueMessages}
             onLoadRunEvidence={briar.readRunEvidence}
@@ -975,6 +979,7 @@ export function App() {
             onIssueDialogOpenChange={setIsIssueDialogOpen}
             onDeleteIssue={briar.deleteIssue}
             onUpdateIssue={briar.editIssue}
+            onUpdateIssuePreferences={briar.editIssueExecutionPreferences}
             onLoadAttachment={briar.readIssueAttachment}
             onLoadIssueMessages={briar.readIssueMessages}
             onLoadRunEvidence={briar.readRunEvidence}

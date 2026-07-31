@@ -1,4 +1,5 @@
 import type { HuntRun, ProjectAgent } from "../types";
+import type { ModelEffort } from "./project-llm";
 import {
   defaultAutoHuntMaxIssues,
   selectAutoHuntCandidates,
@@ -10,6 +11,8 @@ export type AutoHuntWorkerDispatchDependencies = {
     input: {
       agentId: string;
       provider: ProjectAgent["provider"];
+      model: string | null;
+      effort: ModelEffort | null;
       workerId: null;
       reassign: boolean;
     },
@@ -20,7 +23,7 @@ export type AutoHuntWorkerDispatchDependencies = {
 export async function dispatchAutoHuntToWorkers(
   dependencies: AutoHuntWorkerDispatchDependencies,
   input: {
-    agent: Pick<ProjectAgent, "id" | "provider">;
+    agent: Pick<ProjectAgent, "id" | "provider" | "model">;
     runs: HuntRun[];
     maxIssues?: number;
     targetRunIds?: string[];
@@ -57,9 +60,15 @@ export async function dispatchAutoHuntToWorkers(
   }
 
   for (const run of candidates) {
+    const provider = run.preferredProvider ?? input.agent.provider;
+    const model =
+      run.preferredModel ??
+      (run.preferredProvider ? null : (input.agent.model ?? null));
     await dependencies.dispatch(run, {
       agentId: input.agent.id,
-      provider: input.agent.provider,
+      provider,
+      model,
+      effort: run.preferredModel ? (run.preferredEffort ?? null) : null,
       workerId: null,
       reassign: Boolean(run.dispatchedAt || run.workerId),
     });

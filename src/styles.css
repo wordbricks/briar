@@ -765,6 +765,7 @@ body { overflow: hidden; font-synthesis: none; }
 .issue-context-item[data-disabled] { opacity:.48; cursor:not-allowed; }
 .issue-context-choice { grid-template-columns:18px minmax(0,1fr); }
 .issue-context-check { width:18px; height:18px; display:grid; place-items:center; color:var(--accent-foreground); }
+.issue-context-label { padding:7px 8px 5px; color:var(--muted-foreground); font-size:var(--text-2xs); font-weight:600; letter-spacing:.04em; text-transform:uppercase; }
 .issue-context-item.danger { color:#b44155; }
 .issue-context-item.danger > svg { color:#bd5365; }
 .issue-context-item.danger[data-highlighted] { color:var(--destructive); background:color-mix(in srgb,var(--destructive) 12%,var(--card)); }

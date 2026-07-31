@@ -15,6 +15,13 @@ import {
 export type ExecutionWorkerState = "online" | "stale" | "disabled";
 export type ExecutionWorkerReadiness = "ready" | "busy" | "needs_attention";
 export type AgentProvider = "codex" | "claude" | "grok";
+export type ModelEffort =
+  | "low"
+  | "medium"
+  | "high"
+  | "xhigh"
+  | "max"
+  | "ultra";
 export type ProviderHealth = {
   installed: boolean;
   authenticated: boolean;
@@ -177,6 +184,8 @@ export type ExecutionDispatchRow = {
   runId: string;
   agentId: string;
   provider: AgentProvider;
+  model: string | null;
+  effort: ModelEffort | null;
   requestedWorkerId: string | null;
   requestedByUserId: string;
   dispatchMode: "any" | "specific";
@@ -1178,6 +1187,9 @@ export async function dispatchHuntRun(
     runId: string;
     agentId: string;
     provider?: AgentProvider;
+    model?: string | null;
+    effort?: ModelEffort | null;
+    persistPreferences?: boolean;
     workerId?: string | null;
     requestedByUserId: string;
     requestId: string;
@@ -1187,13 +1199,39 @@ export async function dispatchHuntRun(
 ): Promise<ExecutionDispatchRow | null> {
   const agent = await db
     .prepare(
-      `select id, provider from briar_project_agents
+      `select id, provider, model from briar_project_agents
        where id = ? and project_id = ?`,
     )
     .bind(input.agentId, projectId)
-    .first<{ id: string; provider: AgentProvider }>();
+    .first<{ id: string; provider: AgentProvider; model: string | null }>();
   if (!agent) throw new WorkerConflictError("Agent not found for this project");
-  const provider = input.provider ?? agent.provider;
+  const preferences = await db
+    .prepare(
+      `select preferred_agent_provider, preferred_agent_model,
+              preferred_agent_effort
+       from briar_hunt_runs where id = ? and project_id = ?`,
+    )
+    .bind(input.runId, projectId)
+    .first<{
+      preferred_agent_provider: AgentProvider | null;
+      preferred_agent_model: string | null;
+      preferred_agent_effort: ModelEffort | null;
+    }>();
+  if (!preferences) return null;
+  const provider =
+    input.provider ?? preferences.preferred_agent_provider ?? agent.provider;
+  const model =
+    input.model !== undefined
+      ? input.model
+      : preferences.preferred_agent_provider
+        ? preferences.preferred_agent_model
+        : agent.model;
+  const effort =
+    input.effort !== undefined
+      ? input.effort
+      : preferences.preferred_agent_model
+        ? preferences.preferred_agent_effort
+        : null;
 
   if (input.workerId) {
     const worker = await db
@@ -1279,7 +1317,8 @@ export async function dispatchHuntRun(
 
   const existing = await db
     .prepare(
-      `select id, agent_id, requested_agent_provider, requested_worker_id,
+      `select id, agent_id, requested_agent_provider, requested_agent_model,
+              requested_agent_effort, requested_worker_id,
               requested_by_user_id, dispatch_mode, dispatched_at
        from briar_hunt_runs
        where project_id = ? and dispatch_request_id = ?`,
@@ -1289,6 +1328,8 @@ export async function dispatchHuntRun(
       id: string;
       agent_id: string;
       requested_agent_provider: AgentProvider | null;
+      requested_agent_model: string | null;
+      requested_agent_effort: ModelEffort | null;
       requested_worker_id: string | null;
       requested_by_user_id: string;
       dispatch_mode: "any" | "specific";
@@ -1299,6 +1340,8 @@ export async function dispatchHuntRun(
       runId: existing.id,
       agentId: existing.agent_id,
       provider: existing.requested_agent_provider ?? agent.provider,
+      model: existing.requested_agent_model,
+      effort: existing.requested_agent_effort,
       requestedWorkerId: existing.requested_worker_id,
       requestedByUserId: existing.requested_by_user_id,
       dispatchMode: existing.dispatch_mode,
@@ -1347,7 +1390,12 @@ export async function dispatchHuntRun(
   const result = await db
     .prepare(
       `update briar_hunt_runs
-       set agent_id = ?, requested_agent_provider = ?, requested_worker_id = ?,
+       set agent_id = ?, requested_agent_provider = ?,
+           requested_agent_model = ?, requested_agent_effort = ?,
+           preferred_agent_provider = case when ? = 1 then ? else preferred_agent_provider end,
+           preferred_agent_model = case when ? = 1 then ? else preferred_agent_model end,
+           preferred_agent_effort = case when ? = 1 then ? else preferred_agent_effort end,
+           requested_worker_id = ?,
            requested_by_user_id = ?,
            dispatch_mode = ?, dispatch_request_id = ?, dispatched_at = ?,
            status = 'queued', stage = 'queued', workflow_stage = null,
@@ -1361,6 +1409,14 @@ export async function dispatchHuntRun(
     .bind(
       agent.id,
       provider,
+      model,
+      effort,
+      input.persistPreferences ? 1 : 0,
+      provider,
+      input.persistPreferences ? 1 : 0,
+      model,
+      input.persistPreferences ? 1 : 0,
+      effort,
       input.workerId ?? null,
       input.requestedByUserId,
       input.workerId ? "specific" : "any",
@@ -1389,6 +1445,8 @@ export async function dispatchHuntRun(
     detail: {
       previousWorkerId: run.worker_id,
       provider,
+      model,
+      effort,
       dispatchMode: input.workerId ? "specific" : "any",
     },
     occurredAt: input.occurredAt,
@@ -1397,6 +1455,8 @@ export async function dispatchHuntRun(
     runId: input.runId,
     agentId: agent.id,
     provider,
+    model,
+    effort,
     requestedWorkerId: input.workerId ?? null,
     requestedByUserId: input.requestedByUserId,
     dispatchMode: input.workerId ? "specific" : "any",
