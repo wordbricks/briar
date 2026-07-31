@@ -227,6 +227,14 @@ describe("detached execution workers", () => {
       deviceIdentityHash: fingerprint(seed),
       credentialTokenHash: fingerprint(`token-${seed}`),
       agentProvider: "codex",
+      providers: ["codex"],
+      providerHealth: {
+        codex: {
+          installed: true,
+          authenticated: true,
+          healthy: true,
+        },
+      },
       versions: { briar: "1.1.1" },
       observedAt: atMinute(minute),
     });
@@ -894,6 +902,11 @@ describe("detached execution workers", () => {
       workerId: registered.worker.id,
       capabilities: {
         providers: ["codex", "claude", "grok"],
+        providerHealth: {
+          codex: { installed: true, authenticated: true, healthy: true },
+          claude: { installed: true, authenticated: true, healthy: true },
+          grok: { installed: true, authenticated: true, healthy: true },
+        },
         worktrees: true,
       },
       observedAt: atMinute(2),
@@ -962,6 +975,11 @@ describe("detached execution workers", () => {
       workerId: registered.worker.id,
       capabilities: {
         providers: ["codex", "claude"],
+        providerHealth: {
+          codex: { installed: true, authenticated: true, healthy: true },
+          claude: { installed: true, authenticated: true, healthy: true },
+          grok: { installed: true, authenticated: false, healthy: false },
+        },
         worktrees: true,
       },
       observedAt: atMinute(2),
@@ -978,6 +996,18 @@ describe("detached execution workers", () => {
       projectId,
       queuedEvent("provider-override-issue", 3),
     );
+
+    await expect(
+      dispatchHuntRun(db, projectId, projectId, {
+        runId,
+        agentId: agent!.id,
+        provider: "grok",
+        workerId: registered.worker.id,
+        requestedByUserId: "member",
+        requestId: "88888888-aaaa-4888-8888-888888888888",
+        occurredAt: atMinute(3),
+      }),
+    ).rejects.toThrow("Worker does not support the grok provider");
 
     await expect(
       dispatchHuntRun(db, projectId, projectId, {

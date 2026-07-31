@@ -40,7 +40,10 @@ export type WorkerLoopDependencies = {
   renewLease: (issue: ClaimedIssue) => Promise<void>;
   heartbeat: (
     readinessState?: "ready" | "busy",
-  ) => Promise<{ maxConcurrentSessions?: number } | void>;
+  ) => Promise<{
+    acceptingWork?: boolean;
+    maxConcurrentSessions?: number;
+  } | void>;
   /** Run the agent for one claimed issue. */
   runIssue: (issue: ClaimedIssue, signal: AbortSignal) => Promise<void>;
   /**
@@ -134,6 +137,7 @@ export async function runWorkerLoop(
   let maxConcurrentSessions = normalizeConcurrency(
     options.maxConcurrentSessions ?? DEFAULT_MAX_CONCURRENT_SESSIONS,
   );
+  let acceptingWork = true;
 
   let processed = 0;
   let failures = 0;
@@ -148,8 +152,13 @@ export async function runWorkerLoop(
   const workKey = (issue: ClaimedIssue) => issue.workId ?? issue.runId;
 
   const applyHeartbeat = (
-    heartbeat: { maxConcurrentSessions?: number } | void,
+    heartbeat:
+      | { acceptingWork?: boolean; maxConcurrentSessions?: number }
+      | void,
   ) => {
+    if (heartbeat?.acceptingWork !== undefined) {
+      acceptingWork = heartbeat.acceptingWork;
+    }
     if (heartbeat?.maxConcurrentSessions !== undefined) {
       maxConcurrentSessions = normalizeConcurrency(
         heartbeat.maxConcurrentSessions,
@@ -206,6 +215,7 @@ export async function runWorkerLoop(
     try {
       await beat();
       while (
+        acceptingWork &&
         active.size < maxConcurrentSessions &&
         processed + active.size < maxIssues
       ) {
@@ -218,6 +228,9 @@ export async function runWorkerLoop(
         dependencies.log(`claimed ${issue.sourceKey} (${issue.runId})`);
         active.set(workKey(issue), execute(issue));
         await reportState();
+      }
+      if (!acceptingWork && active.size === 0) {
+        queueWasEmpty = true;
       }
     } catch (error) {
       failures += 1;

@@ -15,6 +15,13 @@ import {
 export type ExecutionWorkerState = "online" | "stale" | "disabled";
 export type ExecutionWorkerReadiness = "ready" | "busy" | "needs_attention";
 export type AgentProvider = "codex" | "claude" | "grok";
+export type ProviderHealth = {
+  installed: boolean;
+  authenticated: boolean;
+  healthy: boolean;
+  reason?: string | null;
+};
+export type ProviderHealthMap = Partial<Record<AgentProvider, ProviderHealth>>;
 export type TranscriptDirection = "client" | "server";
 
 const agentProviders: readonly AgentProvider[] = ["codex", "claude", "grok"];
@@ -141,18 +148,29 @@ export function executionWorkerProviders(
 ): AgentProvider[] {
   try {
     const capabilities = JSON.parse(worker.capabilities_json) as {
-      providers?: unknown;
+      providerHealth?: unknown;
     };
-    if (Array.isArray(capabilities.providers)) {
-      const providers: unknown[] = capabilities.providers;
+    if (
+      capabilities.providerHealth &&
+      typeof capabilities.providerHealth === "object" &&
+      !Array.isArray(capabilities.providerHealth)
+    ) {
+      const providerHealth = capabilities.providerHealth as Record<
+        string,
+        unknown
+      >;
       return agentProviders.filter((provider) =>
-        providers.includes(provider),
+        Boolean(
+          providerHealth[provider] &&
+            typeof providerHealth[provider] === "object" &&
+            (providerHealth[provider] as { healthy?: unknown }).healthy === true,
+        ),
       );
     }
   } catch {
-    // Older rows may predate structured capabilities. Keep their provider.
+    // Invalid or legacy capability payloads are not safe dispatch targets.
   }
-  return [worker.agent_provider];
+  return [];
 }
 
 export type ExecutionDispatchRow = {
@@ -210,6 +228,7 @@ export async function registerExecutionWorker(
     label: string;
     agentProvider: AgentProvider;
     providers?: AgentProvider[];
+    providerHealth?: ProviderHealthMap;
     versions: Record<string, string>;
     maxConcurrentSessions?: number;
     observedAt: string;
@@ -246,7 +265,8 @@ export async function registerExecutionWorker(
 
   const versions = JSON.stringify(input.versions ?? {});
   const capabilities = JSON.stringify({
-    providers: input.providers ?? [input.agentProvider],
+    providers: input.providers ?? [],
+    providerHealth: input.providerHealth ?? {},
   });
   await db
     .prepare(
@@ -367,6 +387,7 @@ export async function bindExecutionWorkerProject(
     deviceIdentityHash: string;
     agentProvider: AgentProvider;
     providers?: AgentProvider[];
+    providerHealth?: ProviderHealthMap;
     versions: Record<string, string>;
     observedAt: string;
   },
@@ -425,7 +446,8 @@ export async function bindExecutionWorkerProject(
       input.agentProvider,
       JSON.stringify(input.versions ?? {}),
       JSON.stringify({
-        providers: input.providers ?? [input.agentProvider],
+        providers: input.providers ?? [],
+        providerHealth: input.providerHealth ?? {},
       }),
       input.observedAt,
       input.observedAt,
@@ -1224,23 +1246,13 @@ export async function dispatchHuntRun(
            and worker.state != 'disabled'
            and worker.accepting_work = 1
            and worker.readiness_state != 'needs_attention'
-           and (
-             (
-               json_type(worker.capabilities_json, '$.providers') = 'array'
-               and exists (
-                 select 1
-                 from json_each(worker.capabilities_json, '$.providers') provider
-                 where provider.value = ?
-               )
-             )
-             or (
-               (
-                 json_type(worker.capabilities_json, '$.providers') is null
-                 or json_type(worker.capabilities_json, '$.providers') != 'array'
-               )
-               and worker.agent_provider = ?
-             )
-           )
+           and coalesce(
+             json_extract(
+               worker.capabilities_json,
+               '$.providerHealth.' || ? || '.healthy'
+             ),
+             0
+           ) = 1
            and (
              not exists (
                select 1 from briar_project_execution_worker_policies policy
@@ -1256,7 +1268,7 @@ export async function dispatchHuntRun(
            )
          limit 1`,
       )
-      .bind(projectId, organizationId, provider, provider)
+      .bind(projectId, organizationId, provider)
       .first<{ id: string }>();
     if (!eligible) {
       throw new WorkerConflictError(

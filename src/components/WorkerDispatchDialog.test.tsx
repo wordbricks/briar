@@ -129,6 +129,11 @@ describe("WorkerDispatchDialog", () => {
         .querySelector<HTMLButtonElement>('[aria-label="실행 프로바이더"]')
         ?.click();
     });
+    expect(
+      document.body.querySelector(
+        '.select-menu-option[data-value="grok"]',
+      ),
+    ).toBeNull();
     await act(async () => {
       document.body
         .querySelector<HTMLButtonElement>(

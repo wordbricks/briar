@@ -176,10 +176,22 @@ describe("WorkerStatusBar", () => {
     await act(async () => root.unmount());
   });
 
-  it("falls back to the worker binding provider for older responses", () => {
+  it("does not expose a provider when health information is missing", () => {
     expect(
       workerProviders(worker({ agentProvider: "grok", providers: undefined })),
-    ).toEqual(["grok"]);
+    ).toEqual([]);
+  });
+
+  it("does not expose providers from a Worker that cannot accept work", () => {
+    expect(
+      workerProviders(
+        worker({
+          acceptingWork: false,
+          providers: ["codex", "grok"],
+          readiness: "needs_attention",
+        }),
+      ),
+    ).toEqual([]);
   });
 
   it("only counts online workers as active", () => {

@@ -50,6 +50,10 @@ import {
   sameApiEnvironment,
   selectProjectForApi,
 } from "./config-environment";
+import {
+  healthyWorkerProviders,
+  inspectWorkerProviderHealth,
+} from "./provider-health";
 import { getSkillGuide, skillGuides } from "./skill-guides";
 
 const workflowStageIdSchema = z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/u);
@@ -189,13 +193,6 @@ const configSchema = z
 
 type Config = z.infer<typeof configSchema>;
 type ProjectConfig = z.infer<typeof projectConfigSchema>;
-const workerProviderIds = ["codex", "claude", "grok"] as const;
-type WorkerProvider = (typeof workerProviderIds)[number];
-const availableWorkerProviders = (config: Config): WorkerProvider[] =>
-  workerProviderIds.filter(
-    (provider) =>
-      config.agentProviders[provider] && Boolean(Bun.which(provider)),
-  );
 const executionToken = (project: ProjectConfig) =>
   process.env.BRIAR_WORKER_TOKEN ??
   process.env.BRIAR_AGENT_TOKEN ??
@@ -2022,7 +2019,10 @@ async function workerRegisterCommand() {
     config.workerDeviceIdentity ?? createWorkerDeviceIdentity();
   const label = value("--label") ?? defaultWorkerLabel();
   const configuredProvider = project.llm?.provider ?? "codex";
-  const providers = availableWorkerProviders(config);
+  const providerHealth = await inspectWorkerProviderHealth(
+    config.agentProviders,
+  );
+  const providers = healthyWorkerProviders(providerHealth);
   const provider = providers.includes(configuredProvider)
     ? configuredProvider
     : (providers[0] ?? configuredProvider);
@@ -2044,6 +2044,7 @@ async function workerRegisterCommand() {
               deviceIdentity,
               agentProvider: provider,
               providers,
+              providerHealth,
               versions: { briar: cliVersion },
             }),
           },
@@ -2075,6 +2076,7 @@ async function workerRegisterCommand() {
           deviceIdentity,
           agentProvider: provider,
           providers,
+          providerHealth,
           ...(Number.isInteger(requestedMaxSessions) &&
           requestedMaxSessions > 0
             ? { maxConcurrentSessions: requestedMaxSessions }
@@ -2237,18 +2239,18 @@ async function workerCommand() {
   const workerToken = process.env.BRIAR_WORKER_TOKEN ?? registered.token;
   const label = registered.label;
   const workerId = registered.workerId;
-  const providers = availableWorkerProviders(config);
   const readinessProblem = !gitValueAt(project.repositoryPath, [
     "rev-parse",
     "--show-toplevel",
   ])
     ? "연결된 저장소를 열 수 없습니다."
-    : providers.length === 0
-      ? "활성화되고 설치된 coding agent가 없습니다."
-      : null;
+    : null;
   console.log(`worker ${label} starting as ${workerId}`);
 
   if (readinessProblem) {
+    const providerHealth = await inspectWorkerProviderHealth(
+      config.agentProviders,
+    );
     await request(
       config.apiUrl,
       `/workers/${workerId}/heartbeat`,
@@ -2260,7 +2262,11 @@ async function workerCommand() {
           acceptingWork: false,
           readinessState: "needs_attention",
           readinessDetail: readinessProblem,
-          capabilities: { providers, worktrees: true },
+          capabilities: {
+            providers: healthyWorkerProviders(providerHealth),
+            providerHealth,
+            worktrees: true,
+          },
         }),
       },
     );
@@ -2336,6 +2342,11 @@ async function workerCommand() {
         );
       },
       heartbeat: async (readinessState = "ready") => {
+        const providerHealth = await inspectWorkerProviderHealth(
+          config.agentProviders,
+        );
+        const providers = healthyWorkerProviders(providerHealth);
+        const hasHealthyProvider = providers.length > 0;
         const heartbeat = await request<{
           worker: { maxConcurrentSessions?: number };
         }>(
@@ -2346,17 +2357,23 @@ async function workerCommand() {
             method: "POST",
             body: JSON.stringify({
               versions: { briar: cliVersion },
-              acceptingWork: true,
-              readinessState,
-              readinessDetail: null,
+              acceptingWork: hasHealthyProvider,
+              readinessState: hasHealthyProvider
+                ? readinessState
+                : "needs_attention",
+              readinessDetail: hasHealthyProvider
+                ? null
+                : "로그인되어 사용할 수 있는 coding agent가 없습니다.",
               capabilities: {
                 providers,
+                providerHealth,
                 worktrees: worktreesEnabled(project),
               },
             }),
           },
         );
         return {
+          acceptingWork: hasHealthyProvider,
           maxConcurrentSessions:
             heartbeat.worker.maxConcurrentSessions ??
             registered.maxConcurrentSessions,
