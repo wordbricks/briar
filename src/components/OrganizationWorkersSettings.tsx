@@ -52,10 +52,15 @@ const readinessTone = (
   readiness: OrganizationExecutionWorker["bindings"][number]["readiness"],
 ) =>
   readiness === "available"
-    ? "default"
+    ? "success"
     : readiness === "busy"
-      ? "secondary"
-      : "outline";
+      ? "warning"
+      : readiness === "needs_attention"
+        ? "destructive"
+        : "outline";
+
+const workerStateTone = (state: OrganizationExecutionWorker["state"]) =>
+  state === "online" ? "success" : state === "stale" ? "warning" : "outline";
 
 export function OrganizationWorkersSettings({
   connectedProjectIds,
@@ -375,20 +380,33 @@ export function OrganizationWorkersSettings({
             </Typography>
           </div>
         ) : (
-          <div className="grid gap-3">
+          <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
             {workers.map((worker) => {
               const mayManage = canManage || worker.ownerUserId === userId;
+              const maximumSlots = Math.max(1, worker.maxConcurrentSessions);
+              const activeSlots = Math.min(
+                maximumSlots,
+                Math.max(0, worker.activeSessions),
+              );
+              const capacityLabel = t("organization.workerCapacity", {
+                active: activeSlots,
+                maximum: maximumSlots,
+              });
               return (
                 <article
-                  className="rounded-xl border border-border bg-card p-5 shadow-xs"
+                  className="border-b border-border/80 p-4 transition-colors last:border-b-0 hover:bg-muted/20 sm:p-5"
                   key={worker.deviceId}
                 >
-                  <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-3">
-                      <WorkerIcon icon={worker.icon} size={42} />
+                      <WorkerIcon icon={worker.icon} size={44} />
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <Typography as="h3" variant="bodyLg">
+                          <Typography
+                            as="h3"
+                            className="truncate font-medium"
+                            variant="bodyLg"
+                          >
                             {worker.label}
                           </Typography>
                           {worker.deviceId === currentDeviceId ? (
@@ -397,10 +415,13 @@ export function OrganizationWorkersSettings({
                             </Badge>
                           ) : null}
                           <Badge
-                            variant={
-                              worker.state === "online" ? "default" : "outline"
-                            }
+                            className="gap-1.5"
+                            variant={workerStateTone(worker.state)}
                           >
+                            <span
+                              aria-hidden="true"
+                              className="size-1.5 rounded-full bg-current"
+                            />
                             {t(`worker.state.${worker.state}`)}
                           </Badge>
                         </div>
@@ -416,7 +437,7 @@ export function OrganizationWorkersSettings({
                       </div>
                     </div>
                     {mayManage ? (
-                      <div className="flex items-center gap-2">
+                      <div className="ml-auto flex items-center gap-1.5">
                         <Button
                           aria-label={t("organization.workerIconEdit", {
                             name: worker.label,
@@ -448,6 +469,7 @@ export function OrganizationWorkersSettings({
                           aria-label={t("organization.workersDisable", {
                             name: worker.label,
                           })}
+                          className="text-muted-foreground hover:text-destructive"
                           disabled={savingDeviceId === worker.deviceId}
                           onClick={() => void disableDevice(worker)}
                           size="icon-sm"
@@ -460,7 +482,7 @@ export function OrganizationWorkersSettings({
                     ) : null}
                   </div>
                   {editingIconDeviceId === worker.deviceId ? (
-                    <div className="mt-4 grid gap-3 rounded-lg border border-border bg-muted/40 p-4">
+                    <div className="mt-4 grid gap-3 rounded-lg border border-border bg-muted/40 p-4 sm:ml-14">
                       <div className="flex items-center gap-3">
                         <WorkerIcon icon={iconDraft} size={48} />
                         <div className="min-w-0 flex-1">
@@ -551,36 +573,76 @@ export function OrganizationWorkersSettings({
                       </Typography>
                     </div>
                   ) : null}
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {worker.bindings.length === 0 ? (
-                      <Typography tone="muted" variant="caption">
-                        {t("organization.workerNoBindings")}
+                  <div className="mt-4 grid gap-3 border-t border-border/70 pt-4 sm:ml-14 lg:grid-cols-[minmax(0,1fr)_180px] lg:gap-5">
+                    <div className="grid gap-2">
+                      {worker.bindings.length === 0 ? (
+                        <div className="rounded-lg bg-muted/45 px-3 py-2.5">
+                          <Typography tone="muted" variant="caption">
+                            {t("organization.workerNoBindings")}
+                          </Typography>
+                        </div>
+                      ) : (
+                        worker.bindings.map((binding) => (
+                          <div
+                            className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-border/80 bg-muted/30 px-3 py-2.5"
+                            key={binding.id}
+                          >
+                            <div className="flex min-w-0 items-center gap-2.5">
+                              <Typography
+                                as="strong"
+                                className="truncate"
+                                variant="bodySm"
+                              >
+                                {binding.projectName}
+                              </Typography>
+                              <span
+                                aria-hidden="true"
+                                className="h-3.5 w-px shrink-0 bg-border"
+                              />
+                              <WorkerProviderIcons
+                                providers={
+                                  binding.providers ?? [binding.agentProvider]
+                                }
+                                size={14}
+                              />
+                            </div>
+                            <Badge
+                              className="shrink-0"
+                              variant={readinessTone(binding.readiness)}
+                            >
+                              {t(`worker.readiness.${binding.readiness}`)}
+                            </Badge>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    <div className="rounded-lg bg-muted/45 px-3 py-2.5">
+                      <Typography
+                        className="mb-2 block"
+                        tone="muted"
+                        variant="micro"
+                      >
+                        {capacityLabel}
                       </Typography>
-                    ) : (
-                      worker.bindings.map((binding) => (
-                        <Badge
-                          key={binding.id}
-                          variant={readinessTone(binding.readiness)}
-                        >
-                          {binding.projectName}
-                          <span aria-hidden>·</span>
-                          <WorkerProviderIcons
-                            providers={
-                              binding.providers ?? [binding.agentProvider]
-                            }
-                          />
-                          <span aria-hidden>·</span>
-                          {t(`worker.readiness.${binding.readiness}`)}
-                        </Badge>
-                      ))
-                    )}
+                      <div
+                        aria-label={capacityLabel}
+                        aria-valuemax={maximumSlots}
+                        aria-valuemin={0}
+                        aria-valuenow={activeSlots}
+                        className="h-1.5 overflow-hidden rounded-full bg-border"
+                        role="progressbar"
+                        title={capacityLabel}
+                      >
+                        <div
+                          aria-hidden="true"
+                          className="h-full rounded-full bg-primary transition-[width]"
+                          style={{
+                            width: `${(activeSlots / maximumSlots) * 100}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <Typography className="mt-3" tone="muted" variant="micro">
-                    {t("organization.workerCapacity", {
-                      active: worker.activeSessions,
-                      maximum: worker.maxConcurrentSessions,
-                    })}
-                  </Typography>
                 </article>
               );
             })}
