@@ -48,7 +48,9 @@ export const copy = {
     theme: {
       label: "테마",
       dark: "다크 모드로 전환",
-      light: "화이트 모드로 전환",
+      light: "라이트 모드로 전환",
+      darkName: "다크",
+      lightName: "라이트",
     },
     nav: {
       product: "제품",
@@ -245,6 +247,8 @@ export const copy = {
       label: "Theme",
       dark: "Switch to dark mode",
       light: "Switch to light mode",
+      darkName: "Dark",
+      lightName: "Light",
     },
     nav: {
       product: "Product",

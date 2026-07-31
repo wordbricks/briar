@@ -54,7 +54,9 @@ test("server-renders Korean for a Korean browser", async () => {
   assert.match(html, /Android용 다운로드/);
   assert.match(html, /Android companion/);
   assert.match(html, /aria-label="언어"/);
-  assert.match(html, /aria-label="테마: 화이트 모드로 전환"/);
+  assert.match(html, /aria-label="테마: 다크 모드로 전환"/);
+  assert.match(html, />라이트</);
+  assert.match(html, />다크</);
   assert.match(html, /briar-theme/);
   assert.match(html, /aria-pressed="true"[^>]*aria-label="한국어"/);
   assert.match(
@@ -89,7 +91,9 @@ test("server-renders English for an English browser", async () => {
   assert.match(html, /class="detail-properties"/);
   assert.match(html, /Download Briar for Mac/);
   assert.match(html, /aria-label="Language"/);
-  assert.match(html, /aria-label="Theme: Switch to light mode"/);
+  assert.match(html, /aria-label="Theme: Switch to dark mode"/);
+  assert.match(html, />Light</);
+  assert.match(html, />Dark</);
   assert.match(html, /aria-pressed="true"[^>]*aria-label="English"/);
 });
 

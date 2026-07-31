@@ -8,6 +8,8 @@ type ThemeToggleProps = {
   label: string;
   darkLabel: string;
   lightLabel: string;
+  darkName: string;
+  lightName: string;
 };
 
 function currentTheme(): Theme {
@@ -23,8 +25,10 @@ export function ThemeToggle({
   label,
   darkLabel,
   lightLabel,
+  darkName,
+  lightName,
 }: ThemeToggleProps) {
-  const theme = useSyncExternalStore(subscribe, currentTheme, () => "dark");
+  const theme = useSyncExternalStore(subscribe, currentTheme, () => "light");
 
   function changeTheme() {
     const nextTheme = currentTheme() === "dark" ? "light" : "dark";
@@ -46,8 +50,14 @@ export function ThemeToggle({
       onClick={changeTheme}
     >
       <span className="theme-toggle-track" aria-hidden="true">
-        <i className="theme-icon theme-icon-sun">☼</i>
-        <i className="theme-icon theme-icon-moon">◐</i>
+        <span className="theme-toggle-option theme-toggle-option-light">
+          <i className="theme-icon theme-icon-sun">☼</i>
+          <em>{lightName}</em>
+        </span>
+        <span className="theme-toggle-option theme-toggle-option-dark">
+          <i className="theme-icon theme-icon-moon">◐</i>
+          <em>{darkName}</em>
+        </span>
         <b />
       </span>
     </button>

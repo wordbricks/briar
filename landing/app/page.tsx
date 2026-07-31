@@ -366,6 +366,8 @@ export default async function Home() {
               label={c.theme.label}
               darkLabel={c.theme.dark}
               lightLabel={c.theme.light}
+              darkName={c.theme.darkName}
+              lightName={c.theme.lightName}
             />
             <LanguageSwitcher
               locale={locale}
