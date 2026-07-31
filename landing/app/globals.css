@@ -3464,7 +3464,7 @@ footer {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 54px;
+  width: 118px;
   height: 36px;
   padding: 0;
   border: 1px solid #513d3f;
@@ -3492,19 +3492,35 @@ footer {
 .theme-toggle-track {
   position: relative;
   display: grid;
-  width: 40px;
-  height: 22px;
+  width: 106px;
+  height: 28px;
   grid-template-columns: 1fr 1fr;
   align-items: center;
   border-radius: 999px;
   background: #171113;
 }
 
-.theme-icon {
+.theme-toggle-option {
   position: relative;
   z-index: 2;
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  font-family: var(--font-geist-mono), monospace;
+}
+
+.theme-toggle-option em {
   font-style: normal;
-  font-size: 11px;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.theme-icon {
+  font-style: normal;
+  font-size: 10px;
   line-height: 1;
   text-align: center;
 }
@@ -3517,13 +3533,22 @@ footer {
   color: #1a1415;
 }
 
+.theme-toggle-option-light {
+  color: #776a6c;
+}
+
+.theme-toggle-option-dark {
+  color: #1a1415;
+}
+
 .theme-toggle-track b {
   position: absolute;
   top: 2px;
   right: 2px;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
+  z-index: 1;
+  width: 51px;
+  height: 24px;
+  border-radius: 999px;
   background: #e9dfe0;
   box-shadow: 0 2px 7px rgb(0 0 0 / 0.28);
   transition: transform 200ms ease;
@@ -3608,7 +3633,7 @@ html[data-theme="light"] .theme-toggle-track {
 
 html[data-theme="light"] .theme-toggle-track b {
   right: 2px;
-  transform: translateX(-18px);
+  transform: translateX(-51px);
   background: #fff;
   box-shadow: 0 2px 7px rgb(81 60 62 / 0.2);
 }
@@ -3618,6 +3643,14 @@ html[data-theme="light"] .theme-icon-sun {
 }
 
 html[data-theme="light"] .theme-icon-moon {
+  color: #8f8385;
+}
+
+html[data-theme="light"] .theme-toggle-option-light {
+  color: #47360e;
+}
+
+html[data-theme="light"] .theme-toggle-option-dark {
   color: #8f8385;
 }
 
@@ -4046,6 +4079,22 @@ html[data-theme="light"] footer {
 
 @media (max-width: 560px) {
   .theme-toggle {
-    width: 48px;
+    width: 106px;
+  }
+
+  .theme-toggle-track {
+    width: 94px;
+  }
+
+  .theme-toggle-track b {
+    width: 45px;
+  }
+
+  html[data-theme="light"] .theme-toggle-track b {
+    transform: translateX(-45px);
+  }
+
+  .theme-toggle-option em {
+    font-size: 7px;
   }
 }
