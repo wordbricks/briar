@@ -40,6 +40,7 @@ import type {
   UpdateProjectAgentInput,
   UpdateProjectAgentScheduleInput,
   UpdateIssueInput,
+  WorkerIcon,
 } from "../types";
 
 const apiUrl = import.meta.env.VITE_BRIAR_API_URL?.replace(/\/$/u, "") ?? "";
@@ -461,6 +462,22 @@ export async function updateOrganizationExecutionWorkerConcurrency(
     {
       method: "PATCH",
       body: JSON.stringify({ maxConcurrentSessions }),
+    },
+  );
+}
+
+export async function updateOrganizationExecutionWorkerIcon(
+  token: string,
+  organizationId: string,
+  deviceId: string,
+  icon: WorkerIcon | null,
+) {
+  return request<{ deviceId: string; icon: WorkerIcon | null }>(
+    `/organizations/${organizationId}/workers/${encodeURIComponent(deviceId)}`,
+    token,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ icon }),
     },
   );
 }

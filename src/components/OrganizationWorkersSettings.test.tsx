@@ -4,7 +4,10 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
-import { loadOrganizationExecutionWorkers } from "../lib/api";
+import {
+  loadOrganizationExecutionWorkers,
+  updateOrganizationExecutionWorkerIcon,
+} from "../lib/api";
 import { OrganizationWorkersSettings } from "./OrganizationWorkersSettings";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
@@ -13,6 +16,7 @@ vi.mock("../lib/api", () => ({
   disableOrganizationExecutionWorker: vi.fn(),
   loadOrganizationExecutionWorkers: vi.fn(),
   updateOrganizationExecutionWorkerConcurrency: vi.fn(),
+  updateOrganizationExecutionWorkerIcon: vi.fn(),
 }));
 
 describe("OrganizationWorkersSettings", () => {
@@ -54,6 +58,11 @@ describe("OrganizationWorkersSettings", () => {
       canManage: true,
       generatedAt: "2026-07-30T00:00:00Z",
     });
+    vi.mocked(updateOrganizationExecutionWorkerIcon).mockResolvedValue({
+      deviceId: "device-1",
+      icon: { type: "emoji", value: "🍋" },
+    });
+    localStorage.setItem("briar.locale.v1", "ko");
     (
       globalThis as typeof globalThis & {
         IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -98,6 +107,74 @@ describe("OrganizationWorkersSettings", () => {
       "organization-1",
     );
     expect(container.textContent).toContain("renamed-host");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("saves one emoji as the Worker icon", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <OrganizationWorkersSettings
+          connectedProjectIds={["project-1"]}
+          organization={{
+            id: "organization-1",
+            name: "Wordbricks",
+            handle: "wordbricks",
+            logo: null,
+            role: "owner",
+            createdAt: "2026-07-30T00:00:00Z",
+          }}
+          projects={[
+            {
+              id: "project-1",
+              organizationId: "organization-1",
+              name: "Briar",
+              createdAt: "2026-07-30T00:00:00Z",
+            },
+          ]}
+          token="token"
+          userId="user-1"
+        />,
+      );
+    });
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(
+          '[aria-label="renamed-host Worker 아이콘 편집"]',
+        )
+        ?.click();
+    });
+    const input = container.querySelector<HTMLInputElement>(
+      "#worker-emoji-device-1",
+    );
+    await act(async () => {
+      if (!input) return;
+      const valueSetter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set;
+      valueSetter?.call(input, "🍋");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const save = [...container.querySelectorAll<HTMLButtonElement>("button")].find(
+      (button) => button.textContent === "저장",
+    );
+    await act(async () => {
+      save?.click();
+    });
+
+    expect(updateOrganizationExecutionWorkerIcon).toHaveBeenCalledWith(
+      "token",
+      "organization-1",
+      "device-1",
+      { type: "emoji", value: "🍋" },
+    );
 
     await act(async () => root.unmount());
     container.remove();

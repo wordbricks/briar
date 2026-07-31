@@ -26,6 +26,7 @@ import type {
   ProjectExecutionWorkerPolicy,
 } from "../types";
 import { NativeSelect } from "./NativeSelect";
+import { WorkerIcon } from "./WorkerIcon";
 
 export function WorkerDispatchDialog({
   agents,
@@ -155,7 +156,7 @@ export function WorkerDispatchDialog({
                 },
                 ...eligibleWorkers.map((worker) => ({
                   disabled: worker.readiness !== "available",
-                  label: `${worker.label} · ${t(`worker.readiness.${worker.readiness}` as MessageKey)}`,
+                  label: `${worker.icon?.type === "emoji" ? `${worker.icon.value} ` : ""}${worker.label} · ${t(`worker.readiness.${worker.readiness}` as MessageKey)}`,
                   value: worker.id,
                 })),
               ]}
@@ -177,6 +178,7 @@ export function WorkerDispatchDialog({
                   type="button"
                 >
                   <span className={`worker-readiness-dot ${worker.readiness}`} />
+                  <WorkerIcon icon={worker.icon} size={30} />
                   <span>
                     <strong>{worker.label}</strong>
                     <small>

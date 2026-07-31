@@ -17,6 +17,7 @@ import type {
   ProjectExecutionWorkerPolicy,
 } from "../types";
 import { SelectMenu } from "./SelectMenu";
+import { WorkerIcon } from "./WorkerIcon";
 import { WorkerProviderIcons } from "./WorkerProviderIcons";
 
 const defaultPolicy: ProjectExecutionWorkerPolicy = {
@@ -223,33 +224,36 @@ export function ProjectExecutionSettings({
                       className="flex items-center justify-between gap-4 border-b border-border px-5 py-3.5 last:border-b-0"
                       key={worker.id}
                     >
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <Typography as="strong" variant="bodySm">
-                            {worker.label}
-                          </Typography>
-                          <Badge variant="outline">
-                            <WorkerProviderIcons
-                              providers={
-                                worker.providers ?? [worker.agentProvider]
+                      <div className="flex min-w-0 items-center gap-3">
+                        <WorkerIcon icon={worker.icon} size={32} />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <Typography as="strong" variant="bodySm">
+                              {worker.label}
+                            </Typography>
+                            <Badge variant="outline">
+                              <WorkerProviderIcons
+                                providers={
+                                  worker.providers ?? [worker.agentProvider]
+                                }
+                              />
+                            </Badge>
+                            <Badge
+                              variant={
+                                worker.readiness === "available"
+                                  ? "default"
+                                  : "secondary"
                               }
-                            />
-                          </Badge>
-                          <Badge
-                            variant={
-                              worker.readiness === "available"
-                                ? "default"
-                                : "secondary"
-                            }
-                          >
-                            {t(`worker.readiness.${worker.readiness}`)}
-                          </Badge>
+                            >
+                              {t(`worker.readiness.${worker.readiness}`)}
+                            </Badge>
+                          </div>
+                          {worker.readinessDetail ? (
+                            <Typography tone="muted" variant="micro">
+                              {worker.readinessDetail}
+                            </Typography>
+                          ) : null}
                         </div>
-                        {worker.readinessDetail ? (
-                          <Typography tone="muted" variant="micro">
-                            {worker.readinessDetail}
-                          </Typography>
-                        ) : null}
                       </div>
                       <Switch
                         aria-label={t("executionPolicy.allowWorker", {
@@ -294,7 +298,7 @@ export function ProjectExecutionSettings({
                     ).join(", ")} · ${t(
                       `worker.readiness.${worker.readiness}`,
                     )}`,
-                    label: worker.label,
+                    label: `${worker.icon?.type === "emoji" ? `${worker.icon.value} ` : ""}${worker.label}`,
                     value: worker.id,
                   })),
                 ]}

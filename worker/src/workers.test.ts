@@ -28,6 +28,7 @@ import {
   TranscriptLimitError,
   unbindExecutionWorker,
   updateExecutionWorkerConcurrency,
+  updateExecutionWorkerIcon,
   updateExecutionWorkerLabel,
   updateProjectExecutionWorkerPolicy,
   WorkerConflictError,
@@ -127,6 +128,7 @@ describe("detached execution workers", () => {
       "migrations/0038_project_execution_worker_policies.sql",
       "migrations/0039_project_agent_tokens.sql",
       "migrations/0040_run_execution_provider.sql",
+      "migrations/0043_execution_worker_icons.sql",
     ]) {
       await executeSql(db, await readFile(resolve(migration), "utf8"));
     }
@@ -324,6 +326,47 @@ describe("detached execution workers", () => {
       id: second.worker.id,
       label: "new-hostname",
     });
+  });
+
+  it("stores one device icon and exposes it through every Worker listing", async () => {
+    const registered = await register("icon");
+    const icon = { type: "emoji", value: "🍋" } as const;
+
+    await expect(
+      updateExecutionWorkerIcon(
+        db,
+        registered.device.id,
+        icon,
+        atMinute(3),
+      ),
+    ).resolves.toMatchObject({
+      icon_type: "emoji",
+      icon_value: "🍋",
+    });
+
+    await expect(
+      listOrganizationExecutionWorkers(db, projectId, atMinute(3)),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        icon,
+      }),
+    ]);
+    await expect(
+      listExecutionWorkers(db, projectId, atMinute(3)),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        icon_type: "emoji",
+        icon_value: "🍋",
+      }),
+    ]);
+    await expect(
+      updateExecutionWorkerIcon(
+        db,
+        registered.device.id,
+        { type: "emoji", value: "not-an-emoji" },
+        atMinute(4),
+      ),
+    ).rejects.toThrow("one emoji");
   });
 
   it("binds one organization device to several projects", async () => {

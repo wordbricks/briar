@@ -7,6 +7,11 @@
  * limiting concurrency — see docs/plans/detached-execution-workers.md.
  */
 
+import {
+  isWorkerEmoji,
+  isWorkerLogoDataUrl,
+} from "../../src/lib/worker-icon-validation";
+
 export type ExecutionWorkerState = "online" | "stale" | "disabled";
 export type ExecutionWorkerReadiness = "ready" | "busy" | "needs_attention";
 export type AgentProvider = "codex" | "claude" | "grok";
@@ -32,6 +37,8 @@ export type ExecutionWorkerRow = {
   updated_at: string;
   max_concurrent_sessions?: number;
   active_sessions?: number;
+  icon_type?: "emoji" | "image" | null;
+  icon_value?: string | null;
 };
 
 export type ExecutionWorkerDeviceRow = {
@@ -39,6 +46,8 @@ export type ExecutionWorkerDeviceRow = {
   organization_id: string;
   owner_user_id: string;
   label: string;
+  icon_type: "emoji" | "image" | null;
+  icon_value: string | null;
   device_identity_hash: string;
   state: ExecutionWorkerState;
   max_concurrent_sessions: number;
@@ -59,6 +68,10 @@ export type OrganizationExecutionWorker = {
   ownerUserId: string;
   ownerName: string;
   label: string;
+  icon:
+    | { type: "emoji"; value: string }
+    | { type: "image"; value: string }
+    | null;
   state: ExecutionWorkerState;
   maxConcurrentSessions: number;
   activeSessions: number;
@@ -169,6 +182,14 @@ export const workerStateAt = (
 
 export const leaseExpiryFrom = (observedAt: string) =>
   new Date(Date.parse(observedAt) + LEASE_DURATION_MS).toISOString();
+
+const executionWorkerIcon = (input: {
+  icon_type?: "emoji" | "image" | null;
+  icon_value?: string | null;
+}) =>
+  input.icon_type && input.icon_value
+    ? { type: input.icon_type, value: input.icon_value }
+    : null;
 
 /**
  * Enroll an organization-scoped device and bind it to one project.
@@ -484,6 +505,7 @@ export async function recordWorkerHeartbeat(
   const updated = await db
     .prepare(
       `select worker.*, device.max_concurrent_sessions,
+              device.icon_type, device.icon_value,
               (
                 select count(*)
                 from briar_hunt_runs active
@@ -516,7 +538,8 @@ export async function executionWorkerBindingForProject(
 ) {
   return await db
     .prepare(
-      `select worker.*, device.max_concurrent_sessions
+      `select worker.*, device.max_concurrent_sessions,
+              device.icon_type, device.icon_value
        from briar_execution_workers worker
        join briar_projects project on project.id = worker.project_id
        join briar_execution_worker_devices device on device.id = worker.device_id
@@ -534,7 +557,8 @@ export async function executionWorkerBindingById(
 ) {
   return await db
     .prepare(
-      `select worker.*, device.max_concurrent_sessions
+      `select worker.*, device.max_concurrent_sessions,
+              device.icon_type, device.icon_value
        from briar_execution_workers worker
        join briar_execution_worker_devices device on device.id = worker.device_id
        where worker.id = ? and worker.device_id = ?`,
@@ -674,7 +698,8 @@ export async function listExecutionWorkers(
   const result = await db
     .prepare(
       `select worker.*, device.owner_user_id, device.organization_id,
-              device.max_concurrent_sessions,
+              device.max_concurrent_sessions, device.icon_type,
+              device.icon_value,
               (
                 select count(*)
                 from briar_hunt_runs active
@@ -714,7 +739,8 @@ export async function listOrganizationExecutionWorkers(
   const result = await db
     .prepare(
       `select device.id as device_id, device.owner_user_id, owner.name as owner_name,
-              device.label as device_label, device.state as device_state,
+              device.label as device_label, device.icon_type, device.icon_value,
+              device.state as device_state,
               device.max_concurrent_sessions, device.last_heartbeat_at,
               device.created_at, worker.id as worker_id,
               worker.project_id, project.name as project_name,
@@ -749,6 +775,8 @@ export async function listOrganizationExecutionWorkers(
       owner_user_id: string;
       owner_name: string;
       device_label: string;
+      icon_type: "emoji" | "image" | null;
+      icon_value: string | null;
       device_state: ExecutionWorkerState;
       max_concurrent_sessions: number;
       last_heartbeat_at: string;
@@ -775,6 +803,7 @@ export async function listOrganizationExecutionWorkers(
         ownerUserId: row.owner_user_id,
         ownerName: row.owner_name,
         label: row.device_label,
+        icon: executionWorkerIcon(row),
         state: workerStateAt(
           row.last_heartbeat_at,
           observedAt,
@@ -998,6 +1027,38 @@ export async function updateExecutionWorkerConcurrency(
        returning *`,
     )
     .bind(maxConcurrentSessions, observedAt, deviceId)
+    .first<ExecutionWorkerDeviceRow>();
+}
+
+export async function updateExecutionWorkerIcon(
+  db: D1Database,
+  deviceId: string,
+  icon:
+    | { type: "emoji"; value: string }
+    | { type: "image"; value: string }
+    | null,
+  observedAt: string,
+) {
+  if (
+    icon?.type === "emoji" &&
+    !isWorkerEmoji(icon.value)
+  ) {
+    throw new WorkerConflictError("Worker emoji must be one emoji");
+  }
+  if (
+    icon?.type === "image" &&
+    !isWorkerLogoDataUrl(icon.value)
+  ) {
+    throw new WorkerConflictError("Worker image must be a supported data URL");
+  }
+  return await db
+    .prepare(
+      `update briar_execution_worker_devices
+       set icon_type = ?, icon_value = ?, updated_at = ?
+       where id = ? and state != 'disabled'
+       returning *`,
+    )
+    .bind(icon?.type ?? null, icon?.value ?? null, observedAt, deviceId)
     .first<ExecutionWorkerDeviceRow>();
 }
 
