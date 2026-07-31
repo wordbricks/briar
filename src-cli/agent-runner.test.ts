@@ -80,6 +80,9 @@ describe("detached Agent runner", () => {
     expect(prompt).toContain("observable completion condition");
     expect(prompt).toContain("available under View details");
     expect(prompt).toContain("structured blocked result");
+    expect(prompt).toContain("visible outcome and business impact");
+    expect(prompt).toContain("briar run evidence add --image");
+    expect(prompt).toContain("issue detail page");
     expect(prompt).not.toContain("claimToken");
     expect(launch.arguments).toContain("workspace-write");
     expect(launch.arguments).toContain("gpt-5");
