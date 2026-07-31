@@ -43,7 +43,10 @@ afterEach(async () => {
   });
 });
 
-async function mount(session: AutoHuntSession) {
+async function mount(
+  session: AutoHuntSession,
+  onIssueOpen: (runId: string) => void = vi.fn(),
+) {
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
@@ -53,6 +56,7 @@ async function mount(session: AutoHuntSession) {
       <ProjectAgentSessionDetail
         isSidebarOpen={true}
         onBack={vi.fn()}
+        onIssueOpen={onIssueOpen}
         onStop={vi.fn().mockResolvedValue(true)}
         session={session}
       />,
@@ -92,6 +96,33 @@ const session: AutoHuntSession = {
 };
 
 describe("ProjectAgentSessionDetail", () => {
+  it("opens a target's linked issue", async () => {
+    const onIssueOpen = vi.fn();
+    const container = await mount({
+      ...session,
+      issues: [{
+        runId: "run-42",
+        runNumber: 42,
+        sourceKey: "issue-42",
+        title: "연결된 이슈",
+        outcome: "pending",
+        summary: "이슈 카드 요약",
+      }],
+    }, onIssueOpen);
+    const card = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="연결된 이슈 상세"]',
+    );
+
+    expect(card?.textContent).toContain("AH-42");
+    expect(card?.textContent).toContain("이슈 카드 요약");
+    expect(card?.querySelector("svg")).not.toBeNull();
+
+    await act(async () => card?.click());
+
+    expect(onIssueOpen).toHaveBeenCalledOnce();
+    expect(onIssueOpen).toHaveBeenCalledWith("run-42");
+  });
+
   it("shows readable worker progress in a scroll region without an execution log", async () => {
     const container = await mount(session);
     const progress = container.querySelector(".auto-hunt-worker-progress");
