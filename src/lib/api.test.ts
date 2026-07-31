@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  addIssueDependency,
   claimProjectAgentScheduleRun,
   completeProjectAgentScheduleRun,
   createIssueMessage,
@@ -16,6 +17,7 @@ import {
   loadRunEvidence,
   loadRunEvidenceImage,
   loadSession,
+  removeIssueDependency,
   updateProjectAgent,
   updateProjectAgentSchedule,
   updateOrganizationMemberRole,
@@ -99,6 +101,55 @@ describe("API errors", () => {
     await expect(deleteIssue("token", projectId, runId)).resolves.toBeUndefined();
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining(`/projects/${projectId}/runs/${runId}`),
+      expect.objectContaining({ method: "DELETE" }),
+    );
+  });
+
+  it("adds and removes an issue prerequisite through the dependency endpoint", async () => {
+    const projectId = "22222222-2222-4222-8222-222222222222";
+    const dependentRunId = "11111111-1111-4111-8111-111111111111";
+    const prerequisiteRunId = "33333333-3333-4333-8333-333333333333";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            dependentRunId,
+            prerequisiteRunId,
+            outcome: "created",
+          }),
+          { status: 201, headers: { "Content-Type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      addIssueDependency(
+        "token",
+        projectId,
+        dependentRunId,
+        prerequisiteRunId,
+      ),
+    ).resolves.toMatchObject({ outcome: "created" });
+    await expect(
+      removeIssueDependency(
+        "token",
+        projectId,
+        dependentRunId,
+        prerequisiteRunId,
+      ),
+    ).resolves.toBeUndefined();
+
+    const endpoint = `/projects/${projectId}/runs/${dependentRunId}/dependencies/${prerequisiteRunId}`;
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining(endpoint),
+      expect.objectContaining({ method: "PUT" }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining(endpoint),
       expect.objectContaining({ method: "DELETE" }),
     );
   });
