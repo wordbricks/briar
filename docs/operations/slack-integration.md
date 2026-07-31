@@ -1,6 +1,8 @@
 # Slack integration
 
-Briar's Slack app creates an issue when someone mentions `@Briar`. Each
+Briar's Slack app opens an issue form with `/create`. The form lets a user
+choose a Briar project and enter a title, description, and attachments.
+`@Briar` mentions remain available as a quick text-only intake path. Each
 connected Slack workspace has one default Briar project, which an organization
 owner or admin can change in **Organization settings → Integrations**.
 
@@ -19,6 +21,10 @@ The configured URLs must be:
 
 - OAuth redirect:
   `https://<worker-host>/slack/oauth/callback`
+- Slash command:
+  `https://<worker-host>/slack/commands`
+- Interactivity:
+  `https://<worker-host>/slack/interactions`
 - Events request URL:
   `https://<worker-host>/slack/events`
 
@@ -63,13 +69,38 @@ bun run worker:deploy
 The person connecting Slack must be a Briar organization owner or admin and
 must be permitted to install apps in the Slack workspace.
 
+After adding `/create` or attachment support to an existing Slack app, apply
+the updated manifest and reinstall each connected workspace. Existing bot
+tokens do not automatically receive the new `commands` and `files:read`
+scopes.
+
 For private Slack channels, invite the bot first:
 
 ```text
 /invite @Briar
 ```
 
-## Create issues
+## Create issues with `/create`
+
+Enter `/create` in any Slack message composer. Briar opens a modal with:
+
+- Project, preselected to the workspace's default Briar project
+- Title
+- Optional description
+- Up to five optional image or video attachments
+
+The optional text after the command pre-fills the title:
+
+```text
+/create 로그인 버튼이 동작하지 않아요
+```
+
+Submitted issues enter the Auto Hunt queue. Briar sends the invoking user an
+ephemeral confirmation containing the project and issue ID. Attachments use the
+same limits as the Briar app: JPEG, PNG, GIF, WebP, AVIF, MP4, WebM, or
+QuickTime; 20MB per file and 25MB total.
+
+## Quick text intake with `@Briar`
 
 The first non-empty line becomes the title. Additional lines become the issue
 description.
@@ -98,8 +129,9 @@ duplicate issues. Failed events are released for a later retry.
 
 ## Access model
 
-Anyone who can mention the installed bot in a channel can create an issue in
-that workspace's selected default project. Do not add Briar to external shared
-channels unless those participants should have that ability. Disconnecting a
-workspace removes the stored encrypted bot token from Briar; remove the app in
-Slack as well if it should no longer appear there.
+Anyone who can use `/create` or mention the installed bot can create an issue
+in one of the Briar organization projects exposed by that workspace
+connection. Do not add Briar to external shared channels unless those
+participants should have that ability. Disconnecting a workspace removes the
+stored encrypted bot token from Briar; remove the app in Slack as well if it
+should no longer appear there.

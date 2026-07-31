@@ -1,11 +1,33 @@
 import type { AutoHuntRunStatus } from "../../src/lib/auto-hunt-contract";
+import {
+  maxIssueAttachmentCount,
+  validateIssueAttachments,
+} from "../../src/lib/issue-attachments";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
-export const slackBotScopes = ["app_mentions:read", "chat:write"] as const;
+export const slackBotScopes = [
+  "app_mentions:read",
+  "chat:write",
+  "commands",
+  "files:read",
+] as const;
 export const slackOAuthStateTtlMs = 10 * 60_000;
 export const slackEventClaimTtlMs = 5 * 60_000;
+export const slackCreateIssueCallbackId = "briar_create_issue";
+export const slackCreateIssueBlocks = {
+  project: "briar_create_project",
+  title: "briar_create_title",
+  description: "briar_create_description",
+  attachments: "briar_create_attachments",
+} as const;
+const slackCreateIssueActions = {
+  project: "project",
+  title: "title",
+  description: "description",
+  attachments: "attachments",
+} as const;
 
 const bytesToHex = (bytes: Uint8Array) =>
   Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -194,6 +216,276 @@ export function slackHelpMessage() {
   ].join("\n");
 }
 
+type SlackCreateIssueProject = {
+  id: string;
+  name: string;
+};
+
+type SlackCreateIssueMetadata = {
+  responseUrl: string;
+  channelId: string;
+};
+
+export type SlackCreateIssueSubmission = {
+  teamId: string;
+  userId: string;
+  viewId: string;
+  projectId: string;
+  title: string;
+  description: string | null;
+  fileIds: string[];
+  responseUrl: string;
+  channelId: string;
+};
+
+export class SlackCreateIssueValidationError extends Error {
+  constructor(
+    readonly blockId: string,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+const plainText = (text: string) => ({
+  type: "plain_text" as const,
+  text,
+  emoji: true,
+});
+
+const slackOption = (project: SlackCreateIssueProject) => ({
+  text: plainText(project.name.slice(0, 75)),
+  value: project.id,
+});
+
+export function buildSlackCreateIssueModal(input: {
+  projects: SlackCreateIssueProject[];
+  defaultProjectId: string | null;
+  responseUrl: string;
+  channelId: string;
+  initialTitle?: string;
+}) {
+  const projects = input.projects.slice(0, 100);
+  const defaultProject =
+    projects.find((project) => project.id === input.defaultProjectId) ??
+    projects[0];
+  if (!defaultProject) {
+    throw new Error("A project is required to build the Slack issue modal");
+  }
+  const initialTitle = input.initialTitle?.trim().slice(0, 300);
+  return {
+    type: "modal",
+    callback_id: slackCreateIssueCallbackId,
+    private_metadata: JSON.stringify({
+      responseUrl: input.responseUrl,
+      channelId: input.channelId,
+    } satisfies SlackCreateIssueMetadata),
+    title: plainText("Create a new issue"),
+    submit: plainText("Create"),
+    close: plainText("Cancel"),
+    blocks: [
+      {
+        type: "input",
+        block_id: slackCreateIssueBlocks.project,
+        label: plainText("Project"),
+        element: {
+          type: "static_select",
+          action_id: slackCreateIssueActions.project,
+          placeholder: plainText("Select a project"),
+          options: projects.map(slackOption),
+          initial_option: slackOption(defaultProject),
+        },
+      },
+      {
+        type: "input",
+        block_id: slackCreateIssueBlocks.title,
+        label: plainText("Title"),
+        element: {
+          type: "plain_text_input",
+          action_id: slackCreateIssueActions.title,
+          placeholder: plainText("Issue title"),
+          max_length: 300,
+          ...(initialTitle ? { initial_value: initialTitle } : {}),
+        },
+      },
+      {
+        type: "input",
+        block_id: slackCreateIssueBlocks.description,
+        optional: true,
+        label: plainText("Description"),
+        element: {
+          type: "plain_text_input",
+          action_id: slackCreateIssueActions.description,
+          placeholder: plainText("Add some details…"),
+          multiline: true,
+          max_length: 3000,
+        },
+      },
+      {
+        type: "input",
+        block_id: slackCreateIssueBlocks.attachments,
+        optional: true,
+        label: plainText("Attachments"),
+        hint: plainText("Up to 5 images or videos, 25MB total"),
+        element: {
+          type: "file_input",
+          action_id: slackCreateIssueActions.attachments,
+          filetypes: [
+            "jpg",
+            "jpeg",
+            "png",
+            "gif",
+            "webp",
+            "avif",
+            "mp4",
+            "webm",
+            "mov",
+          ],
+          max_files: maxIssueAttachmentCount,
+        },
+      },
+    ],
+  };
+}
+
+const recordValue = (value: unknown) =>
+  value && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : null;
+
+const stateAction = (
+  values: unknown,
+  blockId: string,
+  actionId: string,
+) => {
+  const block = recordValue(recordValue(values)?.[blockId]);
+  return recordValue(block?.[actionId]);
+};
+
+const selectedFileIds = (value: Record<string, unknown> | null) => {
+  const rawFiles = Array.isArray(value?.files)
+    ? value.files
+    : Array.isArray(value?.selected_files)
+      ? value.selected_files
+      : [];
+  return rawFiles
+    .map((file) =>
+      typeof file === "string"
+        ? file
+        : typeof recordValue(file)?.id === "string"
+          ? (recordValue(file)!.id as string)
+          : null,
+    )
+    .filter((id): id is string => Boolean(id));
+};
+
+const parseSlackResponseUrl = (value: unknown) => {
+  if (typeof value !== "string") throw new Error("Slack response URL is missing");
+  const url = new URL(value);
+  if (
+    url.protocol !== "https:" ||
+    url.hostname !== "hooks.slack.com" ||
+    !url.pathname.startsWith("/commands/")
+  ) {
+    throw new Error("Slack response URL is invalid");
+  }
+  return url.toString();
+};
+
+export function parseSlackCreateIssueSubmission(
+  payload: unknown,
+): SlackCreateIssueSubmission {
+  const root = recordValue(payload);
+  const view = recordValue(root?.view);
+  const team = recordValue(root?.team);
+  const user = recordValue(root?.user);
+  const state = recordValue(view?.state);
+  const project = stateAction(
+    state?.values,
+    slackCreateIssueBlocks.project,
+    slackCreateIssueActions.project,
+  );
+  const selectedProject = recordValue(project?.selected_option);
+  const projectId =
+    typeof selectedProject?.value === "string" ? selectedProject.value : "";
+  if (!projectId) {
+    throw new SlackCreateIssueValidationError(
+      slackCreateIssueBlocks.project,
+      "프로젝트를 선택해 주세요.",
+    );
+  }
+
+  const titleState = stateAction(
+    state?.values,
+    slackCreateIssueBlocks.title,
+    slackCreateIssueActions.title,
+  );
+  const title = typeof titleState?.value === "string" ? titleState.value.trim() : "";
+  if (!title || title.length > 300) {
+    throw new SlackCreateIssueValidationError(
+      slackCreateIssueBlocks.title,
+      "제목을 300자 이내로 입력해 주세요.",
+    );
+  }
+
+  const descriptionState = stateAction(
+    state?.values,
+    slackCreateIssueBlocks.description,
+    slackCreateIssueActions.description,
+  );
+  const description =
+    typeof descriptionState?.value === "string" && descriptionState.value.trim()
+      ? descriptionState.value.trim()
+      : null;
+  const fileIds = selectedFileIds(
+    stateAction(
+      state?.values,
+      slackCreateIssueBlocks.attachments,
+      slackCreateIssueActions.attachments,
+    ),
+  );
+  if (fileIds.length > maxIssueAttachmentCount) {
+    throw new SlackCreateIssueValidationError(
+      slackCreateIssueBlocks.attachments,
+      `첨부 파일은 최대 ${maxIssueAttachmentCount}개까지 추가할 수 있습니다.`,
+    );
+  }
+
+  let metadata: Record<string, unknown>;
+  try {
+    metadata = recordValue(
+      JSON.parse(typeof view?.private_metadata === "string" ? view.private_metadata : ""),
+    ) ?? {};
+  } catch {
+    throw new Error("Slack modal metadata is invalid");
+  }
+  const teamId =
+    typeof team?.id === "string"
+      ? team.id
+      : typeof user?.team_id === "string"
+        ? user.team_id
+        : "";
+  const userId = typeof user?.id === "string" ? user.id : "";
+  const viewId = typeof view?.id === "string" ? view.id : "";
+  const channelId =
+    typeof metadata.channelId === "string" ? metadata.channelId : "";
+  if (!teamId || !userId || !viewId || !channelId) {
+    throw new Error("Slack modal context is incomplete");
+  }
+
+  return {
+    teamId,
+    userId,
+    viewId,
+    projectId,
+    title,
+    description,
+    fileIds,
+    responseUrl: parseSlackResponseUrl(metadata.responseUrl),
+    channelId,
+  };
+}
+
 type SlackApiResponse = {
   ok: boolean;
   error?: string;
@@ -218,6 +510,71 @@ export async function callSlackApi<T extends SlackApiResponse>(
     throw new Error(`Slack ${method} failed: ${result.error ?? response.status}`);
   }
   return result;
+}
+
+export async function downloadSlackIssueAttachments(
+  token: string,
+  fileIds: string[],
+) {
+  const files = await Promise.all(
+    fileIds.map(async (fileId) => {
+      const result = await callSlackApi<SlackApiResponse & {
+        file?: {
+          id?: string;
+          name?: string;
+          title?: string;
+          mimetype?: string;
+          size?: number;
+          url_private?: string;
+          url_private_download?: string;
+        };
+      }>("files.info", token, { file: fileId });
+      const file = result.file;
+      const name = file?.name?.trim() || file?.title?.trim() || "";
+      const type = file?.mimetype ?? "";
+      const size = file?.size ?? 0;
+      const downloadUrl = file?.url_private_download ?? file?.url_private;
+      if (!file || file.id !== fileId || !downloadUrl) {
+        throw new Error("Slack file metadata is incomplete");
+      }
+      return { name, type, size, downloadUrl };
+    }),
+  );
+  const attachmentError = validateIssueAttachments(files);
+  if (attachmentError) throw new Error(attachmentError);
+
+  const downloads = await Promise.all(
+    files.map(async (file) => {
+      const response = await fetch(file.downloadUrl, {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        throw new Error(`Slack file download failed: ${response.status}`);
+      }
+      const bytes = await response.arrayBuffer();
+      if (bytes.byteLength !== file.size) {
+        throw new Error("Slack file size changed during download");
+      }
+      return new File([bytes], file.name, { type: file.type });
+    }),
+  );
+  const downloadedAttachmentError = validateIssueAttachments(downloads);
+  if (downloadedAttachmentError) throw new Error(downloadedAttachmentError);
+  return downloads;
+}
+
+export async function postSlackCommandResponse(
+  responseUrl: string,
+  text: string,
+) {
+  const response = await fetch(parseSlackResponseUrl(responseUrl), {
+    method: "POST",
+    headers: { "content-type": "application/json; charset=utf-8" },
+    body: JSON.stringify({ response_type: "ephemeral", text }),
+  });
+  if (!response.ok) {
+    throw new Error(`Slack command response failed: ${response.status}`);
+  }
 }
 
 export async function exchangeSlackOAuthCode(input: {

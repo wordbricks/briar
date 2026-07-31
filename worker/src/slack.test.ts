@@ -1,12 +1,21 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  buildSlackCreateIssueModal,
   decryptSlackToken,
+  downloadSlackIssueAttachments,
   encryptSlackToken,
+  parseSlackCreateIssueSubmission,
   parseSlackIssueInstruction,
+  slackCreateIssueBlocks,
+  SlackCreateIssueValidationError,
   verifySlackRequest,
 } from "./slack";
 
 describe("Slack integration", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("verifies Slack signatures and rejects stale requests", async () => {
     // Slack's published verification test vector, split so scanners do not
     // mistake the public fixture for a live credential.
@@ -83,5 +92,150 @@ describe("Slack integration", () => {
       status: "queued",
     });
     expect(parseSlackIssueInstruction("<@U123ABC> 도움말")).toBeNull();
+  });
+
+  it("builds a /create modal with project, text, and attachment inputs", () => {
+    const modal = buildSlackCreateIssueModal({
+      projects: [
+        { id: "project-1", name: "First" },
+        { id: "project-2", name: "Second" },
+      ],
+      defaultProjectId: "project-2",
+      responseUrl:
+        "https://hooks.slack.com/commands/T123/B123/response-token",
+      channelId: "C123",
+      initialTitle: "Prefilled title",
+    });
+
+    expect(modal.callback_id).toBe("briar_create_issue");
+    expect(modal.blocks.map((block) => block.block_id)).toEqual([
+      slackCreateIssueBlocks.project,
+      slackCreateIssueBlocks.title,
+      slackCreateIssueBlocks.description,
+      slackCreateIssueBlocks.attachments,
+    ]);
+    expect(modal.blocks[0]?.element).toMatchObject({
+      type: "static_select",
+      initial_option: { value: "project-2" },
+    });
+    expect(modal.blocks[1]?.element).toMatchObject({
+      type: "plain_text_input",
+      initial_value: "Prefilled title",
+    });
+    expect(modal.blocks[3]?.element).toMatchObject({
+      type: "file_input",
+      max_files: 5,
+    });
+  });
+
+  it("parses a /create modal submission", () => {
+    expect(
+      parseSlackCreateIssueSubmission({
+        type: "view_submission",
+        team: { id: "T123" },
+        user: { id: "U123" },
+        view: {
+          id: "V123",
+          private_metadata: JSON.stringify({
+            responseUrl:
+              "https://hooks.slack.com/commands/T123/B123/response-token",
+            channelId: "C123",
+          }),
+          state: {
+            values: {
+              [slackCreateIssueBlocks.project]: {
+                project: {
+                  selected_option: { value: "project-2" },
+                },
+              },
+              [slackCreateIssueBlocks.title]: {
+                title: { value: "  Login is broken  " },
+              },
+              [slackCreateIssueBlocks.description]: {
+                description: { value: "Safari OAuth" },
+              },
+              [slackCreateIssueBlocks.attachments]: {
+                attachments: {
+                  files: [{ id: "F123" }, { id: "F456" }],
+                },
+              },
+            },
+          },
+        },
+      }),
+    ).toEqual({
+      teamId: "T123",
+      userId: "U123",
+      viewId: "V123",
+      projectId: "project-2",
+      title: "Login is broken",
+      description: "Safari OAuth",
+      fileIds: ["F123", "F456"],
+      responseUrl:
+        "https://hooks.slack.com/commands/T123/B123/response-token",
+      channelId: "C123",
+    });
+  });
+
+  it("returns a block-level validation error for an empty modal title", () => {
+    expect(() =>
+      parseSlackCreateIssueSubmission({
+        team: { id: "T123" },
+        user: { id: "U123" },
+        view: {
+          id: "V123",
+          private_metadata: "{}",
+          state: {
+            values: {
+              [slackCreateIssueBlocks.project]: {
+                project: { selected_option: { value: "project-1" } },
+              },
+              [slackCreateIssueBlocks.title]: {
+                title: { value: " " },
+              },
+            },
+          },
+        },
+      }),
+    ).toThrow(
+      expect.objectContaining({
+        constructor: SlackCreateIssueValidationError,
+        blockId: slackCreateIssueBlocks.title,
+      }),
+    );
+  });
+
+  it("downloads modal attachments with the bot token", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        Response.json({
+          ok: true,
+          file: {
+            id: "F123",
+            name: "screen.png",
+            mimetype: "image/png",
+            size: 3,
+            url_private_download:
+              "https://files.slack.com/files-pri/T123-F123/screen.png",
+          },
+        }),
+      )
+      .mockResolvedValueOnce(new Response(new Uint8Array([1, 2, 3])));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const files = await downloadSlackIssueAttachments("xoxb-token", ["F123"]);
+
+    expect(files).toHaveLength(1);
+    expect(files[0]).toMatchObject({
+      name: "screen.png",
+      type: "image/png",
+      size: 3,
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "https://files.slack.com/files-pri/T123-F123/screen.png",
+      { headers: { authorization: "Bearer xoxb-token" } },
+    );
   });
 });

@@ -201,17 +201,25 @@ import {
 } from "./workers";
 import { serveRelease } from "./releases";
 import {
+  buildSlackCreateIssueModal,
   callSlackApi,
   decryptSlackToken,
+  downloadSlackIssueAttachments,
   encryptSlackToken,
   exchangeSlackOAuthCode,
   parseSlackIssueInstruction,
+  parseSlackCreateIssueSubmission,
+  postSlackCommandResponse,
   randomUrlSafeToken,
   sha256Hex,
   slackBotScopes,
+  slackCreateIssueBlocks,
+  slackCreateIssueCallbackId,
+  SlackCreateIssueValidationError,
   slackEventClaimTtlMs,
   slackHelpMessage,
   slackOAuthStateTtlMs,
+  type SlackCreateIssueSubmission,
   verifySlackRequest,
 } from "./slack";
 
@@ -1244,6 +1252,136 @@ const attachmentResponse = (
   return new Response(body, { headers });
 };
 
+async function createIssueWithAttachments(input: {
+  db: D1Database;
+  attachmentsBucket: R2Bucket;
+  project: Pick<ProjectRow, "id" | "name">;
+  issue: z.infer<typeof issueInputSchema>;
+  attachments: File[];
+  sourceKey: string;
+  actor: string;
+  detail: string;
+  context: Record<string, unknown>;
+  issueId?: string;
+}) {
+  const settings = await getProjectSettings(input.db, input.project.id);
+  const issueStorageId = input.issueId ?? crypto.randomUUID();
+  const occurredAt = new Date().toISOString();
+  const storedAttachments: Array<IssueAttachmentInput & { file: File }> =
+    input.attachments.map((file) => {
+      const id = crypto.randomUUID();
+      return {
+        id,
+        object_key: `issue-attachments/${input.project.id}/${issueStorageId}/${id}`,
+        filename: file.name.normalize("NFC").trim(),
+        content_type: file.type,
+        byte_size: file.size,
+        file,
+      };
+    });
+  const uploadedKeys: string[] = [];
+  let runId: string | null = null;
+  try {
+    for (const attachment of storedAttachments) {
+      await input.attachmentsBucket.put(
+        attachment.object_key,
+        attachment.file.stream(),
+        {
+          httpMetadata: {
+            contentType: attachment.content_type,
+            contentDisposition: contentDisposition(attachment.filename),
+          },
+          customMetadata: {
+            attachmentId: attachment.id,
+            projectId: input.project.id,
+          },
+        },
+      );
+      uploadedKeys.push(attachment.object_key);
+    }
+    runId = await recordHuntEvent(input.db, input.project.id, {
+      source: "issue",
+      sourceKey: input.sourceKey,
+      title: input.issue.title,
+      stage: "queued",
+      status: input.issue.status,
+      workflowStage: null,
+      eventKey: `${input.sourceKey}:${input.issue.status}:intake`,
+      occurredAt,
+      actor: input.actor,
+      repository: settings?.github_repository ?? input.project.name,
+      detail: input.detail,
+      priority: input.issue.priority ?? null,
+      branch: null,
+      commitSha: null,
+      tracker: null,
+      issueDescription: input.issue.description || null,
+      resultSummary: null,
+      structuredResult: null,
+      pullRequestUrls: [],
+      targetSha: null,
+      sourceCreatedAt: occurredAt,
+      qaStatus: null,
+      stagingQaDetail: null,
+      productionQaDetail: null,
+      context: {
+        ...input.context,
+        issueId: issueStorageId,
+        attachmentCount: storedAttachments.length,
+      },
+    });
+    await createIssueAttachments(
+      input.db,
+      input.project.id,
+      runId,
+      storedAttachments.map(({ file: _file, ...attachment }) => attachment),
+    );
+    return {
+      runId,
+      sourceKey: input.sourceKey,
+      attachments: await listIssueAttachments(
+        input.db,
+        input.project.id,
+        runId,
+      ),
+    };
+  } catch (error) {
+    if (runId) {
+      try {
+        await rollbackNewAppIssue(input.db, input.project.id, runId);
+      } catch (rollbackError) {
+        console.error(
+          JSON.stringify({
+            message: "issue creation rollback failed",
+            error:
+              rollbackError instanceof Error
+                ? rollbackError.message
+                : String(rollbackError),
+            runId,
+          }),
+        );
+      }
+    }
+    if (uploadedKeys.length > 0) {
+      try {
+        await input.attachmentsBucket.delete(uploadedKeys);
+      } catch (cleanupError) {
+        console.error(
+          JSON.stringify({
+            message: "attachment cleanup failed",
+            error:
+              cleanupError instanceof Error
+                ? cleanupError.message
+                : String(cleanupError),
+            issueStorageId,
+          }),
+        );
+      }
+    }
+    throw error;
+  }
+}
+
 const devicePage = (apiOrigin: string, mobileCompanion: boolean) => {
   const copy = mobileCompanion
     ? {
@@ -1893,13 +2031,9 @@ async function processSlackAppMention(env: Env, payload: SlackEventCallback) {
   }
 }
 
-async function handleSlackEventRequest(
-  request: Request,
-  env: Env,
-  ctx?: ExecutionContext,
-) {
+async function readVerifiedSlackBody(request: Request, env: Env) {
   if (!env.SLACK_SIGNING_SECRET?.trim()) {
-    return json({ message: "Slack integration is not configured" }, 503);
+    throw new HttpError(503, "Slack integration is not configured");
   }
   const rawBody = await request.text();
   if (
@@ -1909,8 +2043,17 @@ async function handleSlackEventRequest(
       env.SLACK_SIGNING_SECRET,
     ))
   ) {
-    return json({ message: "Invalid Slack signature" }, 401);
+    throw new HttpError(401, "Invalid Slack signature");
   }
+  return rawBody;
+}
+
+async function handleSlackEventRequest(
+  request: Request,
+  env: Env,
+  ctx?: ExecutionContext,
+) {
+  const rawBody = await readVerifiedSlackBody(request, env);
 
   let payload: unknown;
   try {
@@ -1934,6 +2077,224 @@ async function handleSlackEventRequest(
     else await processing;
   }
   return json({ ok: true });
+}
+
+const slackCommandMessage = (text: string) =>
+  Response.json({ response_type: "ephemeral", text });
+
+async function handleSlackCommandRequest(request: Request, env: Env) {
+  const form = new URLSearchParams(await readVerifiedSlackBody(request, env));
+  if (form.get("ssl_check") === "1") return new Response(null);
+  if (form.get("command") !== "/create") {
+    return slackCommandMessage("지원하지 않는 Slack 명령입니다.");
+  }
+  const teamId = form.get("team_id")?.trim() ?? "";
+  const channelId = form.get("channel_id")?.trim() ?? "";
+  const triggerId = form.get("trigger_id")?.trim() ?? "";
+  const responseUrl = form.get("response_url")?.trim() ?? "";
+  if (!teamId || !channelId || !triggerId || !responseUrl) {
+    return slackCommandMessage("Slack 명령 정보를 확인할 수 없습니다.");
+  }
+
+  const installation = await getSlackInstallation(env.DB, teamId);
+  if (!installation) {
+    return slackCommandMessage(
+      "이 Slack 워크스페이스가 Briar에 연결되어 있지 않습니다.",
+    );
+  }
+  const projects = await listOrganizationProjects(
+    env.DB,
+    installation.organization_id,
+  );
+  if (projects.length === 0) {
+    return slackCommandMessage(
+      "이슈를 만들 Briar 프로젝트가 없습니다. 먼저 프로젝트를 만들어 주세요.",
+    );
+  }
+  const token = await decryptSlackToken(
+    installation.encrypted_bot_token,
+    installation.token_iv,
+    env.SLACK_TOKEN_ENCRYPTION_KEY,
+  );
+  await callSlackApi("views.open", token, {
+    trigger_id: triggerId,
+    view: buildSlackCreateIssueModal({
+      projects,
+      defaultProjectId: installation.default_project_id,
+      responseUrl,
+      channelId,
+      initialTitle: form.get("text") ?? undefined,
+    }),
+  });
+  return new Response(null);
+}
+
+async function processSlackCreateIssueSubmission(
+  env: Env,
+  submission: SlackCreateIssueSubmission,
+  project: ProjectRow,
+  token: string,
+) {
+  const now = new Date();
+  const eventId = `view_submission:${submission.viewId}`;
+  const claimed = await claimSlackEvent(
+    env.DB,
+    submission.teamId,
+    eventId,
+    now.toISOString(),
+    new Date(now.getTime() - slackEventClaimTtlMs).toISOString(),
+  );
+  if (!claimed) return;
+
+  try {
+    const attachments = await downloadSlackIssueAttachments(
+      token,
+      submission.fileIds,
+    );
+    const sourceKey = `slack-create:${submission.teamId}:${submission.viewId}`;
+    const created = await createIssueWithAttachments({
+      db: env.DB,
+      attachmentsBucket: env.ATTACHMENTS,
+      project,
+      issue: {
+        title: submission.title,
+        description: submission.description,
+        priority: null,
+        status: "queued",
+      },
+      attachments,
+      sourceKey,
+      actor: `slack:${submission.userId}`,
+      detail:
+        "Slack /create 명령으로 생성된 이슈가 Auto Hunt 처리를 기다리고 있습니다.",
+      context: {
+        origin: "slack-command",
+        slackTeamId: submission.teamId,
+        slackChannelId: submission.channelId,
+        slackUserId: submission.userId,
+        slackViewId: submission.viewId,
+      },
+    });
+    await completeSlackEvent(
+      env.DB,
+      submission.teamId,
+      eventId,
+      new Date().toISOString(),
+    );
+    try {
+      await postSlackCommandResponse(
+        submission.responseUrl,
+        `:white_check_mark: *${submission.title}* 이슈를 만들었습니다.\n프로젝트: ${project.name} · 작업 대기열\n이슈 ID: \`${created.runId}\``,
+      );
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          message: "Slack create issue confirmation failed",
+          error: error instanceof Error ? error.message : String(error),
+          teamId: submission.teamId,
+          viewId: submission.viewId,
+          runId: created.runId,
+        }),
+      );
+    }
+  } catch (error) {
+    await releaseSlackEvent(env.DB, submission.teamId, eventId);
+    console.error(
+      JSON.stringify({
+        message: "Slack create issue submission failed",
+        error: error instanceof Error ? error.message : String(error),
+        teamId: submission.teamId,
+        viewId: submission.viewId,
+      }),
+    );
+    try {
+      await postSlackCommandResponse(
+        submission.responseUrl,
+        ":warning: 이슈를 만들지 못했습니다. 첨부파일 제한과 프로젝트 워크플로를 확인한 뒤 `/create`로 다시 시도해 주세요.",
+      );
+    } catch {
+      // The command response URL is best-effort after the modal is acknowledged.
+    }
+  }
+}
+
+async function handleSlackInteractionRequest(
+  request: Request,
+  env: Env,
+  ctx?: ExecutionContext,
+) {
+  const form = new URLSearchParams(await readVerifiedSlackBody(request, env));
+  const rawPayload = form.get("payload");
+  if (!rawPayload) throw new HttpError(400, "Missing Slack interaction payload");
+  let payload: unknown;
+  try {
+    payload = JSON.parse(rawPayload);
+  } catch {
+    throw new HttpError(400, "Invalid Slack interaction payload");
+  }
+  const root =
+    payload && typeof payload === "object"
+      ? (payload as Record<string, unknown>)
+      : null;
+  const view =
+    root?.view && typeof root.view === "object"
+      ? (root.view as Record<string, unknown>)
+      : null;
+  if (
+    root?.type !== "view_submission" ||
+    view?.callback_id !== slackCreateIssueCallbackId
+  ) {
+    return new Response(null);
+  }
+
+  let submission: SlackCreateIssueSubmission;
+  try {
+    submission = parseSlackCreateIssueSubmission(payload);
+  } catch (error) {
+    if (error instanceof SlackCreateIssueValidationError) {
+      return Response.json({
+        response_action: "errors",
+        errors: { [error.blockId]: error.message },
+      });
+    }
+    throw error;
+  }
+  const installation = await getSlackInstallation(env.DB, submission.teamId);
+  if (!installation) {
+    return Response.json({
+      response_action: "errors",
+      errors: {
+        [slackCreateIssueBlocks.project]:
+          "이 Slack 워크스페이스를 Briar에 다시 연결해 주세요.",
+      },
+    });
+  }
+  const project = (
+    await listOrganizationProjects(env.DB, installation.organization_id)
+  ).find((candidate) => candidate.id === submission.projectId);
+  if (!project) {
+    return Response.json({
+      response_action: "errors",
+      errors: {
+        [slackCreateIssueBlocks.project]:
+          "선택한 프로젝트를 사용할 수 없습니다.",
+      },
+    });
+  }
+  const token = await decryptSlackToken(
+    installation.encrypted_bot_token,
+    installation.token_iv,
+    env.SLACK_TOKEN_ENCRYPTION_KEY,
+  );
+  const processing = processSlackCreateIssueSubmission(
+    env,
+    submission,
+    project,
+    token,
+  );
+  if (ctx) ctx.waitUntil(processing);
+  else await processing;
+  return new Response(null);
 }
 
 async function handleSlackOAuthCallback(request: Request, env: Env) {
@@ -3732,132 +4093,35 @@ async function route(
     const session = await requireSession(auth, request);
     const project = await getProject(db, issuesMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
-    const [{ input, attachments }, settings] = await Promise.all([
-      readIssueRequest(request),
-      getProjectSettings(db, project.id),
-    ]);
+    const { input, attachments } = await readIssueRequest(request);
     const issueId = crypto.randomUUID();
     const sourceKey = `briar-issue:${issueId}`;
-    const occurredAt = new Date().toISOString();
     const detail =
       input.status === "backlog"
         ? "Briar 앱에서 생성된 이슈가 백로그에 추가되었습니다."
         : "Briar 앱에서 생성된 이슈가 Auto Hunt 처리를 기다리고 있습니다.";
-    const storedAttachments: Array<IssueAttachmentInput & { file: File }> =
-      attachments.map((file) => {
-        const id = crypto.randomUUID();
-        return {
-          id,
-          object_key: `issue-attachments/${project.id}/${issueId}/${id}`,
-          filename: file.name.normalize("NFC").trim(),
-          content_type: file.type,
-          byte_size: file.size,
-          file,
-        };
-      });
-    const uploadedKeys: string[] = [];
-    let runId: string | null = null;
-    try {
-      for (const attachment of storedAttachments) {
-        await attachmentsBucket.put(
-          attachment.object_key,
-          attachment.file.stream(),
-          {
-            httpMetadata: {
-              contentType: attachment.content_type,
-              contentDisposition: contentDisposition(attachment.filename),
-            },
-            customMetadata: {
-              attachmentId: attachment.id,
-              projectId: project.id,
-            },
-          },
-        );
-        uploadedKeys.push(attachment.object_key);
-      }
-      runId = await recordHuntEvent(db, project.id, {
-        source: "issue",
+    const created = await createIssueWithAttachments({
+      db,
+      attachmentsBucket,
+      project,
+      issue: input,
+      attachments,
+      sourceKey,
+      actor: "briar-app",
+      detail,
+      context: { origin: "briar-app" },
+      issueId,
+    });
+    return json(
+      {
+        runId: created.runId,
         sourceKey,
-        title: input.title,
         stage: "queued",
         status: input.status,
-        workflowStage: null,
-        eventKey: `${sourceKey}:${input.status}:intake`,
-        occurredAt,
-        actor: "briar-app",
-        repository: settings?.github_repository ?? project.name,
-        detail,
-        priority: input.priority ?? null,
-        branch: null,
-        commitSha: null,
-        tracker: null,
-        issueDescription: input.description || null,
-        resultSummary: null,
-        structuredResult: null,
-        pullRequestUrls: [],
-        targetSha: null,
-        sourceCreatedAt: occurredAt,
-        qaStatus: null,
-        stagingQaDetail: null,
-        productionQaDetail: null,
-        context: {
-          origin: "briar-app",
-          issueId,
-          attachmentCount: storedAttachments.length,
-        },
-      });
-      await createIssueAttachments(
-        db,
-        project.id,
-        runId,
-        storedAttachments.map(({ file: _file, ...attachment }) => attachment),
-      );
-      const attachmentRows = await listIssueAttachments(db, project.id, runId);
-      return json(
-        {
-          runId,
-          sourceKey,
-          stage: "queued",
-          status: input.status,
-          attachments: attachmentRows.map(attachmentJson),
-        },
-        201,
-      );
-    } catch (error) {
-      if (runId) {
-        try {
-          await rollbackNewAppIssue(db, project.id, runId);
-        } catch (rollbackError) {
-          console.error(
-            JSON.stringify({
-              message: "issue creation rollback failed",
-              error:
-                rollbackError instanceof Error
-                  ? rollbackError.message
-                  : String(rollbackError),
-              runId,
-            }),
-          );
-        }
-      }
-      if (uploadedKeys.length > 0) {
-        try {
-          await attachmentsBucket.delete(uploadedKeys);
-        } catch (cleanupError) {
-          console.error(
-            JSON.stringify({
-              message: "attachment cleanup failed",
-              error:
-                cleanupError instanceof Error
-                  ? cleanupError.message
-                  : String(cleanupError),
-              issueId,
-            }),
-          );
-        }
-      }
-      throw error;
-    }
+        attachments: created.attachments.map(attachmentJson),
+      },
+      201,
+    );
   }
 
   const recoveryMatch = pathname.match(
@@ -5092,6 +5356,40 @@ export default {
         database: "cloudflare-d1",
         updates: "cloudflare-r2",
       });
+    }
+    if (url.pathname === "/slack/commands" && request.method === "POST") {
+      try {
+        return await handleSlackCommandRequest(request, env);
+      } catch (error) {
+        if (error instanceof HttpError) {
+          return json({ message: error.message }, error.status);
+        }
+        console.error(
+          JSON.stringify({
+            message: "Slack command request failed",
+            error: error instanceof Error ? error.message : String(error),
+          }),
+        );
+        return slackCommandMessage(
+          "Briar 이슈 생성 화면을 열지 못했습니다. Slack 연결을 새로고침한 뒤 다시 시도해 주세요.",
+        );
+      }
+    }
+    if (url.pathname === "/slack/interactions" && request.method === "POST") {
+      try {
+        return await handleSlackInteractionRequest(request, env, ctx);
+      } catch (error) {
+        if (error instanceof HttpError) {
+          return json({ message: error.message }, error.status);
+        }
+        console.error(
+          JSON.stringify({
+            message: "Slack interaction request failed",
+            error: error instanceof Error ? error.message : String(error),
+          }),
+        );
+        return json({ message: "Internal server error" }, 500);
+      }
     }
     if (url.pathname === "/slack/events" && request.method === "POST") {
       try {

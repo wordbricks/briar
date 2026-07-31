@@ -21,7 +21,7 @@ Repository source code stays local. Agents send only task state and Git metadata
 - Project-scoped LLM conversations through Codex App Server or Claude Agent SDK
 - Optional Velen CLI context with repository-specific organization/source settings
 - Optional Linear integration through a configured Velen source
-- Slack OAuth integration for creating issues with `@Briar` mentions
+- Slack OAuth integration with a `/create` issue modal and `@Briar` quick intake
 - Native React controls in a light desktop theme
 - Universal run status plus repository-specific workflow stages selected at connection time
 - Exceptional states: `blocked`, `failed`, `cancelled`
