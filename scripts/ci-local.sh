@@ -104,13 +104,14 @@ run_rust() {
   rustup toolchain install "$rust_toolchain" \
     --profile minimal \
     --component rustfmt,clippy
-  cargo +"$rust_toolchain" fmt --manifest-path src-tauri/Cargo.toml --all --check
-  cargo +"$rust_toolchain" clippy \
+  rustup run "$rust_toolchain" cargo fmt \
+    --manifest-path src-tauri/Cargo.toml --all --check
+  rustup run "$rust_toolchain" cargo clippy \
     --manifest-path src-tauri/Cargo.toml \
     --all-targets \
     -- \
     -D warnings
-  cargo +"$rust_toolchain" test --manifest-path src-tauri/Cargo.toml
+  rustup run "$rust_toolchain" cargo test --manifest-path src-tauri/Cargo.toml
 }
 
 run_security() {
