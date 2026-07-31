@@ -1076,8 +1076,11 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
-  it("keeps in-page issue navigation in companion mode", () => {
-    const markup = renderToStaticMarkup(
+  it("keeps in-page issue navigation and adds conversation as a tab in companion mode", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
       <RunPage
         companionMode
         isSidebarOpen
@@ -1097,15 +1100,48 @@ describe("HuntDashboard", () => {
         onUpdateIssue={async () => undefined}
         run={demoDashboard.runs[0]}
       />,
-    );
+    ));
 
-    expect(markup).not.toContain("run-page-titlebar-back");
-    expect(markup).toContain("run-page-back");
-    expect(markup).toContain(`AH-${demoDashboard.runs[0].runNumber}`);
-    expect(markup).toContain(`<h1 id="run-page-title">${demoDashboard.runs[0].title}</h1>`);
-    expect(markup).toContain('class="run-page-actions-trigger"');
-    expect(markup).not.toContain("run-page-meta");
-    expect(markup).not.toContain("run-page-summary");
+    expect(container.querySelector(".run-page-titlebar-back")).toBeNull();
+    expect(container.querySelector(".run-page-back")).not.toBeNull();
+    expect(container.textContent).toContain(
+      `AH-${demoDashboard.runs[0].runNumber}`,
+    );
+    expect(container.querySelector("#run-page-title")?.textContent).toBe(
+      demoDashboard.runs[0].title,
+    );
+    expect(container.querySelector(".run-page-actions-trigger")).not.toBeNull();
+    expect(container.querySelector(".run-page-meta")).toBeNull();
+    expect(container.querySelector(".run-page-summary")).toBeNull();
+
+    const tabs = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
+    );
+    const conversationTab = tabs.find((tab) => tab.textContent === "대화");
+    const conversationPanel = container.querySelector<HTMLElement>(
+      ".issue-conversation-tab-panel",
+    );
+    expect(tabs).toHaveLength(5);
+    expect(conversationTab).not.toBeNull();
+    expect(conversationPanel?.hidden).toBe(true);
+    expect(conversationTab?.getAttribute("aria-controls")).toBe(
+      conversationPanel?.id,
+    );
+    expect(
+      container
+        .querySelector(".run-page-main")
+        ?.nextElementSibling?.classList.contains("issue-conversation"),
+    ).not.toBe(true);
+
+    await act(async () => conversationTab?.click());
+
+    expect(conversationTab?.getAttribute("aria-selected")).toBe("true");
+    expect(conversationPanel?.hidden).toBe(false);
+    expect(conversationPanel?.getAttribute("role")).toBe("tabpanel");
+    expect(conversationPanel?.querySelector(".issue-conversation")).not.toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
   });
 
   it("shows editable prerequisite and follow-up relationships on issue details", () => {
