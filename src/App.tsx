@@ -60,6 +60,10 @@ import {
   isMacDesktopTauri,
 } from "./lib/platform";
 import { issueAgentConversation } from "./lib/issue-agent-reply";
+import {
+  listenForIssueLinks,
+  type IssueLinkTarget,
+} from "./lib/issue-links";
 import { isRepositoryConnectedForImport } from "./lib/linear-import";
 import { settingsAccountSelection } from "./lib/settings-account-selection";
 import { dispatchHuntRun, loadProjectAgents } from "./lib/api";
@@ -156,6 +160,8 @@ export function App() {
     navigate: navigateToPage,
     reset: resetNavigation,
   } = useNavigationHistory<ActivePage>("issues");
+  const [pendingIssueLink, setPendingIssueLink] =
+    useState<IssueLinkTarget | null>(null);
   const [requestedRunId, setRequestedRunId] = useState<string | null>(null);
   const [requestedSessionId, setRequestedSessionId] = useState<string | null>(
     null,
@@ -173,6 +179,38 @@ export function App() {
   >("issues");
   const [companionStatus, setCompanionStatus] =
     useState<CompanionStatusFilter>("all");
+  useEffect(
+    () => listenForIssueLinks(setPendingIssueLink),
+    [],
+  );
+  useEffect(() => {
+    if (!pendingIssueLink || !briar.user || briar.loading) return;
+    if (
+      !briar.projects.some(
+        (project) => project.id === pendingIssueLink.projectId,
+      )
+    ) {
+      return;
+    }
+
+    if (pendingIssueLink.projectId !== briar.activeProjectId) {
+      briar.setActiveProjectId(pendingIssueLink.projectId);
+    }
+    setRequestedSessionId(null);
+    setRequestedRunId(pendingIssueLink.runId);
+    setCompanionPage("issues");
+    setCompanionStatus("all");
+    navigateToPage("issues");
+    setPendingIssueLink(null);
+  }, [
+    briar.activeProjectId,
+    briar.loading,
+    briar.projects,
+    briar.setActiveProjectId,
+    briar.user,
+    navigateToPage,
+    pendingIssueLink,
+  ]);
   useMobileNavigationGestures(briar.companionMode);
   useMobileBackHandler(
     () => {

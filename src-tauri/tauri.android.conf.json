@@ -12,6 +12,16 @@
       "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost https://briar-api.wbai.workers.dev https://raw.githubusercontent.com; img-src 'self' asset: http://asset.localhost https: data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; script-src 'self'"
     }
   },
+  "plugins": {
+    "deep-link": {
+      "mobile": [
+        {
+          "scheme": ["briar-companion"],
+          "appLink": false
+        }
+      ]
+    }
+  },
   "bundle": {
     "active": true,
     "resources": [],
