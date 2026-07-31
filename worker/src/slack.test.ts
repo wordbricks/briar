@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildSlackCreateIssueModal,
+  callSlackApi,
   decryptSlackToken,
   downloadSlackIssueAttachments,
   encryptSlackToken,
@@ -68,6 +69,25 @@ describe("Slack integration", () => {
     await expect(
       decryptSlackToken(first.encryptedToken, first.iv, "wrong secret"),
     ).rejects.toThrow();
+  });
+
+  it("includes Slack response validation messages in API errors", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockResolvedValue(
+        Response.json({
+          ok: false,
+          error: "invalid_arguments",
+          response_metadata: {
+            messages: ["invalid view.blocks[3].element.filetypes"],
+          },
+        }),
+      ),
+    );
+
+    await expect(callSlackApi("views.open", "xoxb-test", {})).rejects.toThrow(
+      "invalid view.blocks[3].element.filetypes",
+    );
   });
 
   it("parses a mention into title, description, placement, and priority", () => {

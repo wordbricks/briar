@@ -507,7 +507,16 @@ export async function callSlackApi<T extends SlackApiResponse>(
   });
   const result = (await response.json()) as T;
   if (!response.ok || !result.ok) {
-    throw new Error(`Slack ${method} failed: ${result.error ?? response.status}`);
+    const metadata = recordValue(result.response_metadata);
+    const messages = Array.isArray(metadata?.messages)
+      ? metadata.messages.filter(
+          (message): message is string => typeof message === "string",
+        )
+      : [];
+    const detail = messages.length > 0 ? ` (${messages.join("; ")})` : "";
+    throw new Error(
+      `Slack ${method} failed: ${result.error ?? response.status}${detail}`,
+    );
   }
   return result;
 }
