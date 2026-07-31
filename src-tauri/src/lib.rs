@@ -35,7 +35,7 @@ const GITHUB_DEVICE_LOGIN_URL: &str = "https://github.com/login/device";
 const GITHUB_CLI_NOOP_BROWSER: &str = "/usr/bin/true";
 #[cfg(target_os = "windows")]
 const GITHUB_CLI_NOOP_BROWSER: &str = "cmd.exe /D /C rem";
-const DEFAULT_MAIN_WINDOW_SIZE: (f64, f64) = (1280.0, 820.0);
+const DEFAULT_MAIN_WINDOW_SIZE: (f64, f64) = (1440.0, 900.0);
 const DEFAULT_MAIN_WINDOW_MIN_SIZE: (f64, f64) = (980.0, 680.0);
 const ONBOARDING_MAIN_WINDOW_SIZE: (f64, f64) = (780.0, 580.0);
 
@@ -5136,6 +5136,13 @@ fn main_window_decorated(compact: bool) -> bool {
     !compact
 }
 
+#[cfg(desktop)]
+fn main_window_state_flags() -> tauri_plugin_window_state::StateFlags {
+    use tauri_plugin_window_state::StateFlags;
+
+    StateFlags::SIZE | StateFlags::MAXIMIZED
+}
+
 #[tauri::command]
 fn set_main_window_onboarding_mode(app: tauri::AppHandle, compact: bool) -> Result<(), String> {
     let main = main_window(&app)?;
@@ -5330,7 +5337,13 @@ pub fn run() {
             }
         })
         .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_updater::Builder::new().build());
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(main_window_state_flags())
+                .with_denylist(&["launch-intro"])
+                .build(),
+        );
     let app = builder
         .setup(|_app| {
             #[cfg(desktop)]
@@ -5981,6 +5994,20 @@ branch refs/heads/briar/second-11111111
         assert_eq!(main_window_min_size(false), DEFAULT_MAIN_WINDOW_MIN_SIZE);
         assert!(!main_window_decorated(true));
         assert!(main_window_decorated(false));
+    }
+
+    #[cfg(desktop)]
+    #[test]
+    fn restores_only_the_main_window_size_and_maximized_state() {
+        use tauri_plugin_window_state::StateFlags;
+
+        let flags = main_window_state_flags();
+        assert!(flags.contains(StateFlags::SIZE));
+        assert!(flags.contains(StateFlags::MAXIMIZED));
+        assert!(!flags.contains(StateFlags::POSITION));
+        assert!(!flags.contains(StateFlags::VISIBLE));
+        assert!(!flags.contains(StateFlags::DECORATIONS));
+        assert!(!flags.contains(StateFlags::FULLSCREEN));
     }
 
     #[test]
