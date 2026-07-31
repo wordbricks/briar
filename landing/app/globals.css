@@ -4,8 +4,8 @@
   --ink: #fff9fa;
   --ink-muted: #c7b9ba;
   --ink-soft: #9d898b;
-  --paper: #2b2020;
-  --paper-soft: #241a1b;
+  --paper: #24191a;
+  --paper-soft: #1f1516;
   --panel: #181315;
   --panel-raised: #211a1c;
   --line: #493738;
@@ -2409,7 +2409,7 @@ footer {
 }
 
 .button-primary {
-  color: #2b2020;
+  color: var(--paper);
   background: #fff9fa;
 }
 
@@ -2432,14 +2432,14 @@ footer {
     radial-gradient(
       ellipse at 50% 34%,
       rgb(31 23 23 / 0.14) 0,
-      rgb(43 32 32 / 0.48) 58%,
-      rgb(43 32 32 / 0.82) 82%,
+      rgb(36 25 26 / 0.48) 58%,
+      rgb(36 25 26 / 0.82) 82%,
       var(--paper) 100%
     ),
     linear-gradient(
       180deg,
-      rgb(43 32 32 / 0.08) 0,
-      rgb(43 32 32 / 0.12) 48%,
+      rgb(36 25 26 / 0.08) 0,
+      rgb(36 25 26 / 0.12) 48%,
       var(--paper) 100%
     );
   transform: none;
@@ -2512,13 +2512,13 @@ footer {
     radial-gradient(
       ellipse at 50% 35%,
       rgb(31 23 23 / 0.05),
-      rgb(43 32 32 / 0.28) 74%
+      rgb(36 25 26 / 0.28) 74%
     ),
     linear-gradient(
       90deg,
-      rgb(43 32 32 / 0.28),
+      rgb(36 25 26 / 0.28),
       transparent 26% 72%,
-      rgb(43 32 32 / 0.34)
+      rgb(36 25 26 / 0.34)
     );
   pointer-events: none;
   content: "";
