@@ -25,6 +25,30 @@ function ruleAfter(marker: string, selector: string) {
 }
 
 describe("kanban card layout", () => {
+  it("uses a slim translucent scrollbar inside desktop columns", () => {
+    const columnScrollbarRule = ruleAfter(
+      ".kanban-column > div { scrollbar-width",
+      ".kanban-column > div",
+    );
+    const webkitScrollbarRule = firstRule(
+      ".kanban-column > div::-webkit-scrollbar",
+    );
+    const webkitTrackRule = firstRule(
+      ".kanban-column > div::-webkit-scrollbar-track",
+    );
+    const webkitThumbRule = firstRule(
+      ".kanban-column > div::-webkit-scrollbar-thumb",
+    );
+
+    expect(columnScrollbarRule).toContain("scrollbar-width:thin");
+    expect(columnScrollbarRule).toContain(
+      "scrollbar-color:rgba(82,83,77,.18) transparent",
+    );
+    expect(webkitScrollbarRule).toContain("width:6px");
+    expect(webkitTrackRule).toContain("background:transparent");
+    expect(webkitThumbRule).toContain("background:rgba(82,83,77,.18)");
+  });
+
   it("keeps full titles and clamps descriptions to three lines", () => {
     const columnBodyRule = firstRule(".kanban-column > div");
     const cardRule = firstRule(".kanban-card");
