@@ -474,9 +474,9 @@ export function ProjectSchedule({
               type="button"
             >
               {isScheduleDataLoading ? (
-                <LoaderCircle className="spin" size={15} />
+                <LoaderCircle className="spin" size={16} />
               ) : (
-                <Plus size={15} />
+                <Plus size={16} />
               )}
               {t("schedule.create")}
             </Button>

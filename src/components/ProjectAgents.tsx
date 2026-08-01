@@ -384,7 +384,7 @@ export function ProjectAgents({
             onClick={openCreateDialog}
             type="button"
           >
-            <Plus size={15} />
+            <Plus size={16} />
             {t("agents.create")}
           </Button>
         }
