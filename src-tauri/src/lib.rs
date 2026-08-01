@@ -4154,6 +4154,36 @@ fn auto_hunt_claim_arguments(run_id: &str) -> Vec<String> {
     ]
 }
 
+fn auto_hunt_worktree_maintenance_arguments(path: &Path) -> Vec<String> {
+    vec![
+        "worktree".to_string(),
+        "maintain".to_string(),
+        "--path".to_string(),
+        path.to_string_lossy().into_owned(),
+    ]
+}
+
+fn maintain_auto_hunt_worktree(
+    runner: &dyn host::CommandRunner,
+    cli_environment: &agent::AutoHuntCliEnvironment,
+    connected_workspace: &Path,
+    worktree_path: &Path,
+) -> Result<(), String> {
+    let output = cli_environment.run_briar(
+        runner,
+        connected_workspace,
+        auto_hunt_worktree_maintenance_arguments(worktree_path),
+    )?;
+    if output.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "Auto Hunt 워크트리 유지보수에 실패했습니다: {}",
+            output.failure_message()
+        ))
+    }
+}
+
 fn auto_hunt_terminal_event_arguments(
     run_id: &str,
     source_key: &str,
@@ -4767,6 +4797,14 @@ async fn start_project_auto_hunt(
                             Some(detail.clone()),
                         )?;
                         emit_latest_auto_hunt_dispatch_event(&dispatch_app, &dispatch);
+                        if let Err(error) = maintain_auto_hunt_worktree(
+                            runner.as_ref(),
+                            &cli_environment,
+                            &workspace,
+                            &worker_workspace,
+                        ) {
+                            eprintln!("{error}");
+                        }
                         return Err(detail);
                     }
                     let record_error = record_auto_hunt_terminal_event(
@@ -4821,6 +4859,15 @@ async fn start_project_auto_hunt(
                     )?;
                     emit_latest_auto_hunt_dispatch_event(&dispatch_app, &dispatch);
                 }
+            }
+
+            if let Err(error) = maintain_auto_hunt_worktree(
+                runner.as_ref(),
+                &cli_environment,
+                &workspace,
+                &worker_workspace,
+            ) {
+                eprintln!("{error}");
             }
         }
 
@@ -6496,6 +6543,23 @@ branch refs/heads/briar/second-11111111
                 "--actor",
                 "briar-auto-hunt-runtime",
                 "--runtime-dispatch",
+            ],
+        );
+    }
+
+    #[test]
+    fn maintains_the_finished_workers_exact_worktree() {
+        let arguments = auto_hunt_worktree_maintenance_arguments(Path::new(
+            "/tmp/briar/workspaces/project/issue-515b7a2c",
+        ));
+
+        assert_eq!(
+            arguments,
+            vec![
+                "worktree",
+                "maintain",
+                "--path",
+                "/tmp/briar/workspaces/project/issue-515b7a2c",
             ],
         );
     }

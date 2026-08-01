@@ -181,6 +181,7 @@ summary.
 briar project doctor                   # worktrees.enabled/root/branchPrefix/baseRef
 briar worktree list                    # every worktree under this project's root
 briar worktree show                    # the active claim's worktree
+briar worktree maintain [--path <dir>] # compact outputs; GC only if merged + clean
 briar worktree remove [--path <dir>] [--force]
 ```
 
@@ -215,6 +216,27 @@ Removal is conservative by design:
    is behind, the branch is dropped with `-D` **after** proving it is an
    ancestor of the base ref (no unique commits). Otherwise the branch is kept
    and reported as `preservedBranch`.
+
+## Terminal-run maintenance
+
+After an Auto Hunt Worker exits and evidence capture has finished, Briar runs
+worktree maintenance from the connected repository rather than from the
+Worker's former current directory. Maintenance has two ordered phases:
+
+1. Compact reproducible directories such as `node_modules`, Cargo `target`,
+   `.next`, `dist`, and `build`. A directory is removed only when its name is
+   on Briar's allowlist **and** `git check-ignore` confirms that exact path is
+   ignored. Tracked source directories and ignored secrets such as `.env` are
+   not removed.
+2. Garbage-collect the worktree only when its branch is already an ancestor of
+   the configured base ref and the remaining checkout is clean. An unmerged
+   branch, source changes, an unreadable Git status, or a removal error keeps
+   the worktree in place.
+
+Maintenance is best-effort and never changes the run outcome. Blocked and
+failed runs therefore keep their source checkout for inspection, while their
+reproducible dependency and build output can be restored on retry. The same
+logic is available manually through `briar worktree maintain`.
 
 ## Failure modes
 

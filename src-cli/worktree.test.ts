@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -5,11 +6,13 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   allocateIssueWorktree,
   assertPathWithinRoot,
+  compactWorktreeArtifacts,
   copyWorktreeIncludes,
   defaultWorktreeRoot,
   findExistingIssueWorktree,
   isPathWithinRoot,
   listIssueWorktrees,
+  maintainTerminalIssueWorktree,
   parseRemoteTrackingBase,
   parseWorktreeIncludeFile,
   parseWorktreeList,
@@ -596,5 +599,103 @@ describe("removal", () => {
     );
     expect(removeIssueWorktree(git, "/repo", worktree, { force: true }).removed).toBe(true);
     expect(calls).toContainEqual(["worktree", "prune"]);
+  });
+});
+
+describe("terminal worktree maintenance", () => {
+  it("compacts only known artifact directories that Git confirms are ignored", async () => {
+    const worktree = await temporaryDirectory("briar-worktree-compact-");
+    const ignoredArtifacts = ["node_modules", "src-tauri/target", "apps/web/.next"];
+    const trackedBuild = "src/build";
+    for (const path of [...ignoredArtifacts, trackedBuild]) {
+      await mkdir(join(worktree, path), { recursive: true });
+      await writeFile(join(worktree, path, "artifact.bin"), path);
+    }
+    await mkdir(join(worktree, "config"), { recursive: true });
+    await writeFile(join(worktree, "config/.env"), "SECRET=preserved\n");
+
+    const ignored = new Set(ignoredArtifacts);
+    const { git } = fakeGit((gitArgs) =>
+      gitArgs[0] === "check-ignore" && ignored.has(gitArgs.at(-1) ?? "") ? ok() : fail(),
+    );
+    const result = await compactWorktreeArtifacts(git, worktree);
+
+    expect(result).toEqual({ compactedPaths: ignoredArtifacts.sort(), failedPaths: [] });
+    for (const path of ignoredArtifacts) {
+      expect(existsSync(join(worktree, path))).toBe(false);
+    }
+    expect(existsSync(join(worktree, trackedBuild, "artifact.bin"))).toBe(true);
+    expect(existsSync(join(worktree, "config/.env"))).toBe(true);
+  });
+
+  it("compacts outputs and removes a clean worktree whose branch is merged", async () => {
+    const path = await temporaryDirectory("briar-worktree-gc-");
+    await mkdir(join(path, "node_modules"));
+    await writeFile(join(path, "node_modules/package.json"), "{}");
+    const worktree = { path, branch: "briar/merged-12345678" };
+    const { git, calls } = fakeGit((gitArgs) => {
+      if (gitArgs[0] === "check-ignore") return ok();
+      return ok();
+    });
+
+    await expect(
+      maintainTerminalIssueWorktree(git, "/repo", worktree, { baseRef: "origin/main" }),
+    ).resolves.toEqual({
+      compactedPaths: ["node_modules"],
+      failedPaths: [],
+      gc: { status: "removed", branchDeleted: true },
+    });
+    expect(calls).toContainEqual([
+      "merge-base",
+      "--is-ancestor",
+      "refs/heads/briar/merged-12345678",
+      "refs/remotes/origin/main",
+    ]);
+    expect(calls).toContainEqual(["worktree", "remove", path]);
+  });
+
+  it("keeps an unmerged branch after compacting its reproducible outputs", async () => {
+    const path = await temporaryDirectory("briar-worktree-unmerged-");
+    await mkdir(join(path, "src-tauri/target"), { recursive: true });
+    await writeFile(join(path, "src-tauri/target/app"), "binary");
+    const worktree = { path, branch: "briar/open-12345678" };
+    const { git, calls } = fakeGit((gitArgs) => {
+      if (gitArgs[0] === "check-ignore") return ok();
+      if (gitArgs[0] === "merge-base") return fail("not an ancestor");
+      return ok();
+    });
+
+    await expect(
+      maintainTerminalIssueWorktree(git, "/repo", worktree, { baseRef: "origin/main" }),
+    ).resolves.toEqual({
+      compactedPaths: ["src-tauri/target"],
+      failedPaths: [],
+      gc: { status: "retained", reason: "unmerged" },
+    });
+    expect(calls.some((gitArgs) => gitArgs[0] === "worktree" && gitArgs[1] === "remove")).toBe(
+      false,
+    );
+  });
+
+  it("keeps merged worktrees that still contain source changes", async () => {
+    const path = await temporaryDirectory("briar-worktree-dirty-");
+    const worktree = { path, branch: "briar/dirty-12345678" };
+    let statusCalls = 0;
+    const { git, calls } = fakeGit((gitArgs) => {
+      if (gitArgs[0] === "merge-base") return ok();
+      if (gitArgs[0] === "status") {
+        statusCalls += 1;
+        return ok(" M src/app.ts\n");
+      }
+      return ok();
+    });
+
+    await expect(
+      maintainTerminalIssueWorktree(git, "/repo", worktree, { baseRef: "origin/main" }),
+    ).resolves.toMatchObject({ gc: { status: "retained", reason: "dirty" } });
+    expect(statusCalls).toBe(1);
+    expect(calls.some((gitArgs) => gitArgs[0] === "worktree" && gitArgs[1] === "remove")).toBe(
+      false,
+    );
   });
 });
