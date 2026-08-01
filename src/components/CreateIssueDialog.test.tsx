@@ -6,6 +6,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CreateIssueDialog } from "./HuntDashboard";
 import type { CreateIssueInput } from "../types";
 
+const projects = [
+  {
+    id: "project-1",
+    name: "GG",
+    organizationId: "organization-1",
+    createdAt: "2026-07-01T00:00:00.000Z",
+  },
+  {
+    id: "project-2",
+    name: "Mobile",
+    organizationId: "organization-1",
+    createdAt: "2026-07-02T00:00:00.000Z",
+  },
+];
+const projectProps = { defaultProjectId: "project-1", projects };
+
 describe("CreateIssueDialog attachments", () => {
   let container: HTMLDivElement;
 
@@ -28,6 +44,7 @@ describe("CreateIssueDialog attachments", () => {
     await act(async () => {
       root.render(
         <CreateIssueDialog
+          {...projectProps}
           isSubmitting={false}
           onClose={() => undefined}
           onCreate={async () => undefined}
@@ -77,13 +94,17 @@ describe("CreateIssueDialog attachments", () => {
   });
 
   it("inserts a pasted image at the description caret and submits its reference", async () => {
-    const onCreate = vi.fn<(input: CreateIssueInput) => Promise<void>>(
+    const onCreate = vi.fn<(
+      projectId: string,
+      input: CreateIssueInput,
+    ) => Promise<void>>(
       async () => undefined,
     );
     const root = createRoot(container);
     await act(async () => {
       root.render(
         <CreateIssueDialog
+          {...projectProps}
           isSubmitting={false}
           onClose={() => undefined}
           onCreate={onCreate}
@@ -138,7 +159,8 @@ describe("CreateIssueDialog attachments", () => {
     await act(async () => {
       container.querySelector<HTMLFormElement>("form")?.requestSubmit();
     });
-    const [submitted] = onCreate.mock.calls[0]!;
+    const [submittedProjectId, submitted] = onCreate.mock.calls[0]!;
+    expect(submittedProjectId).toBe("project-1");
     expect(submitted.attachments).toEqual([image]);
     expect(submitted.attachmentReferences).toHaveLength(1);
     expect(submitted.description).toContain(
@@ -153,6 +175,7 @@ describe("CreateIssueDialog attachments", () => {
     await act(async () => {
       root.render(
         <CreateIssueDialog
+          {...projectProps}
           isSubmitting={false}
           onClose={() => undefined}
           onCreate={async () => undefined}
@@ -183,6 +206,7 @@ describe("CreateIssueDialog attachments", () => {
     await act(async () => {
       root.render(
         <CreateIssueDialog
+          {...projectProps}
           isSubmitting={false}
           onClose={() => undefined}
           onCreate={async () => undefined}
@@ -246,10 +270,10 @@ describe("CreateIssueDialog attachments", () => {
     await act(async () => {
       root.render(
         <CreateIssueDialog
+          {...projectProps}
           isSubmitting={false}
           onClose={() => undefined}
           onCreate={onCreate}
-          projectName="GG"
         />,
       );
     });
@@ -277,13 +301,16 @@ describe("CreateIssueDialog attachments", () => {
       );
     });
 
-    expect(onCreate).toHaveBeenCalledWith({
-      attachments: [],
-      description: null,
-      priority: 2,
-      status: "queued",
-      title: "Keyboard-created issue",
-    });
+    expect(onCreate).toHaveBeenCalledWith(
+      "project-1",
+      {
+        attachments: [],
+        description: null,
+        priority: 2,
+        status: "queued",
+        title: "Keyboard-created issue",
+      },
+    );
 
     await act(async () => root.unmount());
   });
@@ -294,6 +321,7 @@ describe("CreateIssueDialog attachments", () => {
     await act(async () => {
       root.render(
         <CreateIssueDialog
+          {...projectProps}
           isSubmitting={false}
           onClose={() => undefined}
           onCreate={onCreate}
@@ -336,6 +364,7 @@ describe("CreateIssueDialog attachments", () => {
     await act(async () => {
       root.render(
         <CreateIssueDialog
+          {...projectProps}
           isSubmitting={false}
           onClose={() => undefined}
           onCreate={onCreate}
@@ -364,6 +393,7 @@ describe("CreateIssueDialog attachments", () => {
     await act(async () => {
       root.render(
         <CreateIssueDialog
+          {...projectProps}
           isSubmitting={false}
           onClose={() => undefined}
           onCreate={onCreate}
@@ -395,6 +425,7 @@ describe("CreateIssueDialog attachments", () => {
     await act(async () => {
       root.render(
         <CreateIssueDialog
+          {...projectProps}
           isSubmitting={false}
           onClose={() => undefined}
           onCreate={onCreate}
@@ -428,13 +459,64 @@ describe("CreateIssueDialog attachments", () => {
       container.querySelector<HTMLFormElement>("form")?.requestSubmit();
     });
 
-    expect(onCreate).toHaveBeenCalledWith({
-      attachments: [],
-      description: null,
-      priority: 2,
-      status: "backlog",
-      title: "Backlog issue",
+    expect(onCreate).toHaveBeenCalledWith(
+      "project-1",
+      {
+        attachments: [],
+        description: null,
+        priority: 2,
+        status: "backlog",
+        title: "Backlog issue",
+      },
+    );
+
+    await act(async () => root.unmount());
+  });
+
+  it("defaults to the active project and can create in another organization project", async () => {
+    const onCreate = vi.fn(async () => undefined);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <CreateIssueDialog
+          {...projectProps}
+          isSubmitting={false}
+          onClose={() => undefined}
+          onCreate={onCreate}
+        />,
+      );
     });
+
+    const projectTrigger = container.querySelector<HTMLButtonElement>(
+      ".issue-project-context .select-menu-trigger",
+    );
+    expect(projectTrigger?.textContent).toContain("GG");
+    await act(async () => projectTrigger?.click());
+    await act(async () => {
+      document
+        .querySelector<HTMLButtonElement>(
+          '[role="option"][data-value="project-2"]',
+        )
+        ?.click();
+    });
+    expect(projectTrigger?.textContent).toContain("Mobile");
+
+    const titleInput = container.querySelector<HTMLInputElement>(
+      ".issue-title-input",
+    );
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set?.call(titleInput, "Cross-project issue");
+      titleInput?.dispatchEvent(new Event("input", { bubbles: true }));
+      container.querySelector<HTMLFormElement>("form")?.requestSubmit();
+    });
+
+    expect(onCreate).toHaveBeenCalledWith(
+      "project-2",
+      expect.objectContaining({ title: "Cross-project issue" }),
+    );
 
     await act(async () => root.unmount());
   });

@@ -1779,14 +1779,18 @@ export function useBriar(options: UseBriarOptions = {}) {
   );
 
   const addIssue = useCallback(
-    async (input: CreateIssueInput) => {
-      if (!activeProjectId || !dashboard) {
+    async (projectId: string, input: CreateIssueInput) => {
+      const project = projects.find((candidate) => candidate.id === projectId);
+      if (!project) {
         throw new Error("이슈를 추가할 프로젝트가 없습니다.");
       }
       setIsCreatingIssue(true);
       setError(null);
       try {
         if (demoMode) {
+          const targetDashboard = dashboard?.project.id === projectId
+            ? dashboard
+            : emptyDashboard(project);
           const occurredAt = new Date().toISOString();
           const issueId = crypto.randomUUID();
           const sourceKey = `briar-issue:${issueId}`;
@@ -1823,7 +1827,10 @@ export function useBriar(options: UseBriarOptions = {}) {
           const run: HuntRun = {
             id: crypto.randomUUID(),
             runNumber:
-              Math.max(0, ...dashboard.runs.map((candidate) => candidate.runNumber)) + 1,
+              Math.max(
+                0,
+                ...targetDashboard.runs.map((candidate) => candidate.runNumber),
+              ) + 1,
             currentAttempt: 1,
             currentRevision: 1,
             source: "issue",
@@ -1831,12 +1838,12 @@ export function useBriar(options: UseBriarOptions = {}) {
             title: input.title.trim(),
             status: input.status,
             workflowStage: null,
-            workflow: dashboard.settings.workflow,
+            workflow: targetDashboard.settings.workflow,
             progress: input.status === "backlog" ? 0 : 5,
             detail,
             priority: input.priority,
             repository:
-              dashboard.settings.githubRepository ?? dashboard.project.name,
+              targetDashboard.settings.githubRepository ?? project.name,
             branch: null,
             commitSha: null,
             tracker: null,
@@ -1867,9 +1874,12 @@ export function useBriar(options: UseBriarOptions = {}) {
             eventCount: 1,
           };
           runEventsByRun.current[run.id] = [initialEvent];
-          setDashboard((current) =>
-            current ? { ...current, runs: [run, ...current.runs] } : current,
-          );
+          setActiveProjectId(projectId);
+          setActiveOrganizationId((current) => project.organizationId ?? current);
+          setDashboard({
+            ...targetDashboard,
+            runs: [run, ...targetDashboard.runs],
+          });
           return {
             runId: run.id,
             sourceKey,
@@ -1878,8 +1888,12 @@ export function useBriar(options: UseBriarOptions = {}) {
           };
         }
         if (!token) throw new Error("로그인이 필요합니다.");
-        const result = await createIssue(token, activeProjectId, input);
-        await refresh("snapshot");
+        const result = await createIssue(token, projectId, input);
+        if (projectId === activeProjectId) {
+          await refresh("snapshot");
+        } else {
+          selectProject(projectId);
+        }
         return result;
       } catch (caught) {
         const message = caught instanceof Error ? caught.message : String(caught);
@@ -1889,7 +1903,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         setIsCreatingIssue(false);
       }
     },
-    [activeProjectId, dashboard, refresh, token],
+    [activeProjectId, dashboard, projects, refresh, selectProject, token],
   );
 
   const readIssueAttachment = useCallback(

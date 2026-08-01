@@ -289,6 +289,11 @@ export function App() {
   const activeProject = briar.projects.find(
     (project) => project.id === briar.activeProjectId,
   );
+  const activeOrganizationProjects = briar.projects.filter(
+    (project) =>
+      project.organizationId === briar.activeOrganizationId ||
+      project.id === briar.activeProjectId,
+  );
   const requestedCompanionSession = briar.companionMode
     ? autoHunt.sessions.find(
         (session) => session.id === requestedSessionId,
@@ -886,6 +891,7 @@ export function App() {
             onRequestedRunOpen={() => setRequestedRunId(null)}
             onSendIssueMessage={sendIssueMessage}
             processingIssueIds={processingIssueIds}
+            projects={activeOrganizationProjects}
             sessions={autoHunt.sessions}
             token={briar.token}
           />
@@ -1095,6 +1101,7 @@ export function App() {
             onCancelRun={briar.cancelRun}
             onSendIssueMessage={sendIssueMessage}
             processingIssueIds={processingIssueIds}
+            projects={activeOrganizationProjects}
             sessions={autoHunt.sessions}
             token={briar.token}
           />
