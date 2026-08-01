@@ -4,6 +4,24 @@ Record each uploaded Briar Companion build after App Store Connect processing
 finishes. A release is complete only when the build is valid and its internal
 TestFlight state is `IN_BETA_TESTING`.
 
+## 2026-08-02
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.39`
+- App Store Connect build: `1.2.39.1`
+- App Store Connect build ID: `e03b843f-e24b-486b-925c-e21821ee1fab`
+- Source commit: `805c11d`
+- Toolchain: Xcode 26.6, iOS 26.5 SDK, Tauri CLI 2.11.4
+- Minimum iOS version: 14.0
+- TestFlight state: `IN_BETA_TESTING`
+- Internal group: `wordbricks` (`hasAccessToAllBuilds=true`)
+- Automatic tester notification: enabled
+
+The release build passed all 761 frontend tests and the release frontend
+configuration check. The automated release workflow archived, manually signed,
+validated, and uploaded the IPA; App Store Connect reported the build as
+`VALID` before making it available to internal testers.
+
 ## 2026-07-27
 
 - App: Briar Companion (`app.briar.companion`)
