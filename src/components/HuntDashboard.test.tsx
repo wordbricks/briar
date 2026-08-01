@@ -1003,6 +1003,16 @@ describe("HuntDashboard", () => {
     expect(properties?.querySelector(".run-status-control")).not.toBeNull();
     expect(properties?.textContent).not.toContain("전체 진행률");
     expect(properties?.querySelector(".run-property.progress")).toBeNull();
+    const propertiesLayer = container.querySelector<HTMLElement>(
+      ".run-properties-layer",
+    );
+    await act(async () => properties?.dispatchEvent(
+      new MouseEvent("click", { bubbles: true }),
+    ));
+    expect(container.querySelector(".run-properties")).not.toBeNull();
+    await act(async () => propertiesLayer?.click());
+    expect(container.querySelector(".run-properties")).toBeNull();
+    expect(propertiesToggle?.getAttribute("aria-expanded")).toBe("false");
     expect(container.textContent).not.toContain("로컬 저장소 열기");
     expect(container.textContent).not.toContain(
       "Auto Hunt 실행 증거를 실시간으로 표시합니다.",
@@ -1692,6 +1702,18 @@ describe("HuntDashboard", () => {
       "스레드 답장",
     );
     expect(threadContent?.scrollTop).toBe(480);
+    const threadDrawer = container.querySelector<HTMLElement>(
+      ".issue-thread-drawer",
+    );
+    const threadLayer = container.querySelector<HTMLElement>(
+      ".issue-thread-layer",
+    );
+    await act(async () => threadDrawer?.click());
+    expect(container.querySelector('[role="dialog"]')).not.toBeNull();
+    await act(async () => threadLayer?.click());
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.activeElement).toBe(threadSummary);
+    await act(async () => threadSummary?.click());
 
     const threadComposer = container.querySelector<HTMLElement>(
       ".issue-thread-drawer .issue-message-composer",

@@ -3406,22 +3406,30 @@ export function RunPage({
                 />
               ) : null}
               {isPropertiesOpen ? (
-              <aside
-                aria-label={t("run.properties")}
-                className="run-properties"
-                id="run-properties-panel"
+              <div
+                className="run-properties-layer"
+                onClick={(event) => {
+                  if (event.target === event.currentTarget) {
+                    setIsPropertiesOpen(false);
+                  }
+                }}
               >
-                <header className="run-properties-header">
-                  <h2>{t("run.properties")}</h2>
-                  <button
-                    aria-label={t("common.close")}
-                    onClick={() => setIsPropertiesOpen(false)}
-                    type="button"
-                  >
-                    <X aria-hidden="true" size={16} />
-                  </button>
-                </header>
-                <section>
+                <aside
+                  aria-label={t("run.properties")}
+                  className="run-properties"
+                  id="run-properties-panel"
+                >
+                  <header className="run-properties-header">
+                    <h2>{t("run.properties")}</h2>
+                    <button
+                      aria-label={t("common.close")}
+                      onClick={() => setIsPropertiesOpen(false)}
+                      type="button"
+                    >
+                      <X aria-hidden="true" size={16} />
+                    </button>
+                  </header>
+                  <section>
                   <label className="run-property run-status-control">
                     <span className={`run-property-icon ${meta.tone}`}><Activity size={15} /></span>
                     <span className="run-property-copy">
@@ -3661,8 +3669,9 @@ export function RunPage({
                     <span className="run-property-icon"><Clock3 size={15} /></span>
                     <span className="run-property-copy"><strong>{formatDate(run.startedAt, localeTag)}</strong></span>
                   </div>
-                </section>
-              </aside>
+                  </section>
+                </aside>
+              </div>
               ) : null}
             </div>
           </div>
@@ -4542,6 +4551,9 @@ function IssueConversation({
       <div
         aria-hidden={activeThread === null}
         className={`issue-thread-layer${activeThread ? " open" : ""}`}
+        onClick={(event) => {
+          if (event.target === event.currentTarget) closeThread();
+        }}
       >
         <aside
           aria-label={t("run.thread")}
