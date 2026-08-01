@@ -23,6 +23,7 @@ import {
   updateProjectAgent,
   updateProjectAgentSchedule,
   updateOrganizationMemberRole,
+  updateAccountProfile,
   updateIssue,
   updateIssueExecutionPreferences,
   upsertProjectAgentSession,
@@ -36,6 +37,43 @@ afterEach(() => {
 });
 
 describe("API errors", () => {
+  it("updates the signed-in account profile", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) =>
+      new Response(
+        JSON.stringify({
+          user: {
+            id: "user-1",
+            username: "jay_dev",
+            name: "Jay Kim",
+            email: "jay@example.com",
+            image: null,
+          },
+        }),
+        { headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      updateAccountProfile("token", {
+        username: "jay_dev",
+        name: "Jay Kim",
+        image: null,
+      }),
+    ).resolves.toMatchObject({ username: "jay_dev", name: "Jay Kim" });
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/me"),
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({
+          username: "jay_dev",
+          name: "Jay Kim",
+          image: null,
+        }),
+      }),
+    );
+  });
+
   it("preserves the HTTP status for authentication decisions", async () => {
     vi.stubGlobal(
       "fetch",

@@ -507,7 +507,7 @@ export function App() {
   const openAppSettings = useCallback(() => {
     setSettingsTarget({
       scope: "application",
-      section: "source-control",
+      section: "account",
     });
     navigateToPage("settings");
   }, [navigateToPage]);
@@ -723,18 +723,36 @@ export function App() {
           />
         ) : activePage === "settings" &&
           settingsTarget.scope === "application" &&
-          activeProject ? (
+          briar.user ? (
           <AppSettings
-            error={briar.projectReadinessError[activeProject.id] ?? null}
+            error={
+              activeProject
+                ? briar.projectReadinessError[activeProject.id] ?? null
+                : null
+            }
             initialSection={settingsTarget.section}
             isSidebarOpen={isSidebarOpen}
-            loading={briar.projectReadinessLoadingId === activeProject.id}
+            loading={
+              activeProject
+                ? briar.projectReadinessLoadingId === activeProject.id
+                : false
+            }
             navigationSidebar={unifiedSettingsSidebar}
             onBack={() => (canGoBack ? goBack() : navigateToPage("issues"))}
-            onRefresh={() => briar.refreshProjectReadiness(activeProject.id)}
-            projectId={activeProject.id}
-            projectName={activeProject.name}
-            readiness={briar.projectReadiness[activeProject.id] ?? null}
+            onAccountSave={briar.updateAccountProfile}
+            onRefresh={() =>
+              activeProject
+                ? briar.refreshProjectReadiness(activeProject.id)
+                : Promise.resolve(null)
+            }
+            projectId={activeProject?.id ?? ""}
+            projectName={activeProject?.name ?? ""}
+            readiness={
+              activeProject
+                ? briar.projectReadiness[activeProject.id] ?? null
+                : null
+            }
+            user={briar.user}
           />
         ) : activePage === "settings" &&
         settingsTarget.scope === "organization" &&
@@ -991,6 +1009,7 @@ export function App() {
         ) : companionPage === "settings" ? (
           <CompanionSettings
             onBack={() => setCompanionPage("issues")}
+            onAccountSave={briar.updateAccountProfile}
             user={briar.user}
           />
         ) : companionPage === "inbox" ? (

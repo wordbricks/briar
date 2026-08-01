@@ -2,6 +2,7 @@ import { createHmac } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import worker, {
   claimConversationJson,
+  accountProfileInputSchema,
   eventSchema,
   issueUpdateInputSchema,
   issueExecutionPreferencesSchema,
@@ -19,6 +20,34 @@ import worker, {
 } from "./index";
 
 describe("Worker HTTP contract", () => {
+  it("normalizes and validates account profiles", () => {
+    expect(
+      accountProfileInputSchema.parse({
+        username: " Jay_Dev ",
+        name: " Jay Kim ",
+        image: "data:image/webp;base64,aA==",
+      }),
+    ).toEqual({
+      username: "jay_dev",
+      name: "Jay Kim",
+      image: "data:image/webp;base64,aA==",
+    });
+    expect(() =>
+      accountProfileInputSchema.parse({
+        username: "has spaces",
+        name: "Jay",
+        image: null,
+      }),
+    ).toThrow();
+    expect(() =>
+      accountProfileInputSchema.parse({
+        username: "jay",
+        name: "Jay",
+        image: "data:image/svg+xml;base64,aA==",
+      }),
+    ).toThrow();
+  });
+
   it("accepts bounded browser-supported project icons or removal", () => {
     for (const icon of [
       "data:image/webp;base64,bG9nbw==",
