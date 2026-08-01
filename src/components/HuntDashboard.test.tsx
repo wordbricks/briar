@@ -601,7 +601,7 @@ describe("HuntDashboard", () => {
     await act(async () => root.unmount());
   });
 
-  it("shows copy link beside the title and edit/delete in the actions menu", async () => {
+  it("shows copy ID and link beside the title and edit/delete in the actions menu", async () => {
     const onDeleteIssue = vi.fn(async () => undefined);
     const container = document.createElement("div");
     document.body.append(container);
@@ -622,12 +622,16 @@ describe("HuntDashboard", () => {
       ".run-page-actions-trigger",
     );
     const copyLink = container.querySelector<HTMLButtonElement>(
-      ".run-page-link-copy",
+      ".run-page-share-copy",
+    );
+    const copyId = container.querySelector<HTMLButtonElement>(
+      ".run-page-id-copy",
     );
     const titlebarActions = container.querySelector(
       ".run-page-titlebar-actions",
     );
     expect(copyLink?.getAttribute("aria-label")).toBe("링크 복사");
+    expect(copyId?.getAttribute("aria-label")).toBe("이슈 ID 복사");
     expect(title?.nextElementSibling).toBe(titlebarActions);
     expect(titlebarActions?.firstElementChild?.classList).toContain(
       "run-page-property-badges",
@@ -635,6 +639,7 @@ describe("HuntDashboard", () => {
     expect(
       titlebarActions?.querySelector(".run-page-properties-toggle"),
     ).not.toBeNull();
+    expect(copyId?.nextElementSibling).toBe(copyLink);
     expect(copyLink?.nextElementSibling).toBe(trigger);
     expect(container.querySelector(".run-page-edit")).toBeNull();
 

@@ -10,6 +10,7 @@ import {
   CircleAlert,
   Clock3,
   Columns3,
+  Copy,
   FolderGit2,
   GitCommitHorizontal,
   GitFork,
@@ -105,6 +106,7 @@ import {
   mentionsIssueHandle,
 } from "../lib/issue-agent-reply";
 import {
+  copyIssueId,
   copyIssueShareLink,
   shareIssueLink,
 } from "../lib/issue-links";
@@ -2679,9 +2681,9 @@ export function RunPage({
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [shareStatus, setShareStatus] = useState<"copied" | "error" | null>(
-    null,
-  );
+  const [copyStatus, setCopyStatus] = useState<
+    "link-copied" | "id-copied" | "link-error" | "id-error" | null
+  >(null);
   const [isPropertiesOpen, setIsPropertiesOpen] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState<
     "description" | "result" | "statusHistory" | "evidence" | "conversation"
@@ -2786,28 +2788,37 @@ export function RunPage({
     }
   };
   const shareIssue = async () => {
-    setShareStatus(null);
+    setCopyStatus(null);
     try {
       const result = await shareIssueLink({
         projectId,
         runId: run.id,
         title: run.title,
       });
-      if (result === "copied") setShareStatus("copied");
+      if (result === "copied") setCopyStatus("link-copied");
     } catch {
-      setShareStatus("error");
+      setCopyStatus("link-error");
     }
   };
   const copyIssueLink = async () => {
-    setShareStatus(null);
+    setCopyStatus(null);
     try {
       await copyIssueShareLink({
         projectId,
         runId: run.id,
       });
-      setShareStatus("copied");
+      setCopyStatus("link-copied");
     } catch {
-      setShareStatus("error");
+      setCopyStatus("link-error");
+    }
+  };
+  const copyId = async () => {
+    setCopyStatus(null);
+    try {
+      await copyIssueId(run.sourceKey);
+      setCopyStatus("id-copied");
+    } catch {
+      setCopyStatus("id-error");
     }
   };
   const compactProperties = (
@@ -2860,16 +2871,20 @@ export function RunPage({
           </strong>
           <div className="run-page-titlebar-actions">
             {compactProperties}
-            {shareStatus ? (
+            {copyStatus ? (
               <span
                 aria-live="polite"
-                className={`run-page-share-status${shareStatus === "error" ? " error" : ""}`}
+                className={`run-page-share-status${copyStatus.endsWith("error") ? " error" : ""}`}
                 role="status"
               >
                 {t(
-                  shareStatus === "copied"
+                  copyStatus === "link-copied"
                     ? "issue.linkCopied"
-                    : "issue.shareFailed",
+                    : copyStatus === "id-copied"
+                      ? "issue.idCopied"
+                      : copyStatus === "id-error"
+                        ? "issue.copyIdFailed"
+                        : "issue.shareFailed",
                 )}
               </span>
             ) : null}
@@ -2885,8 +2900,17 @@ export function RunPage({
               <ChevronDown aria-hidden="true" size={13} />
             </button>
             <button
+              aria-label={t("issue.copyId")}
+              className="run-page-link-copy run-page-id-copy"
+              onClick={() => void copyId()}
+              title={t("issue.copyId")}
+              type="button"
+            >
+              <Copy aria-hidden="true" size={16} />
+            </button>
+            <button
               aria-label={t("issue.copyLink")}
-              className="run-page-link-copy"
+              className="run-page-link-copy run-page-share-copy"
               disabled={!projectId}
               onClick={() => void copyIssueLink()}
               title={t("issue.copyLink")}
@@ -2927,16 +2951,20 @@ export function RunPage({
                   <div className="run-page-title-row">
                     <small>AH-{run.runNumber}</small>
                     <h1 id="run-page-title">{run.title}</h1>
-                    {shareStatus ? (
+                    {copyStatus ? (
                       <span
                         aria-live="polite"
-                        className={`run-page-share-status${shareStatus === "error" ? " error" : ""}`}
+                        className={`run-page-share-status${copyStatus.endsWith("error") ? " error" : ""}`}
                         role="status"
                       >
                         {t(
-                          shareStatus === "copied"
+                          copyStatus === "link-copied"
                             ? "issue.linkCopied"
-                            : "issue.shareFailed",
+                            : copyStatus === "id-copied"
+                              ? "issue.idCopied"
+                              : copyStatus === "id-error"
+                                ? "issue.copyIdFailed"
+                                : "issue.shareFailed",
                         )}
                       </span>
                     ) : null}

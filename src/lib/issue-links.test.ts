@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  copyIssueId,
   copyIssueShareLink,
+  issueIdFromSourceKey,
   issueDeepLinkUrl,
   issueShareUrl,
   parseIssueLink,
@@ -103,6 +105,20 @@ describe("issue links", () => {
     expect(writeText).toHaveBeenCalledWith(
       `http://127.0.0.1:8787/open/issues/${projectId}/${runId}`,
     );
+  });
+
+  it("copies a Briar issue ID without its source-key prefix", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    expect(issueIdFromSourceKey(`briar-issue:${runId}`)).toBe(runId);
+    expect(issueIdFromSourceKey("BRIAR-42")).toBe("BRIAR-42");
+    await copyIssueId(`briar-issue:${runId}`);
+
+    expect(writeText).toHaveBeenCalledWith(runId);
   });
 
   it("uses native sharing when the WebView supports it", async () => {
