@@ -2,12 +2,14 @@ mod agent;
 mod agent_usage;
 mod auto_hunt_dispatch;
 mod host;
+#[cfg(target_os = "macos")]
+mod macos_inbox_notifications;
 
 use crate::host::CommandRunner;
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     env,
     ffi::{OsStr, OsString},
     fs::{self, OpenOptions},
@@ -30,7 +32,10 @@ const AUTO_HUNT_EVENT_DIRECTORY: &str = "auto-hunt-sessions";
 const AUTO_HUNT_APP_SERVER_EVENT: &str = "auto-hunt-app-server-event";
 const AUTO_HUNT_DISPATCH_EVENT: &str = "auto-hunt-dispatch-event";
 const PROJECT_AGENT_SCHEDULE_POLL_EVENT: &str = "project-agent-schedule-poll";
+#[cfg(all(desktop, not(target_os = "macos")))]
 const INBOX_NOTIFICATION_OPEN_EVENT: &str = "inbox-notification-open";
+#[cfg(target_os = "macos")]
+const INBOX_NOTIFICATION_OPEN_AVAILABLE_EVENT: &str = "inbox-notification-open-available";
 const AGENT_SESSION_STOPPED_ERROR: &str = "사용자가 에이전트 세션을 중지했습니다.";
 const GITHUB_DEVICE_LOGIN_URL: &str = "https://github.com/login/device";
 #[cfg(not(target_os = "windows"))]
@@ -79,13 +84,34 @@ struct StoredSession {
     token: String,
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct InboxNotificationTarget {
     message_id: String,
     project_id: String,
     target_id: String,
     kind: String,
+}
+
+#[derive(Default)]
+struct PendingInboxNotificationOpens(Mutex<VecDeque<InboxNotificationTarget>>);
+
+impl PendingInboxNotificationOpens {
+    #[cfg(target_os = "macos")]
+    fn push(&self, target: InboxNotificationTarget) {
+        self.0
+            .lock()
+            .expect("pending inbox notification opens lock")
+            .push_back(target);
+    }
+
+    fn drain(&self) -> Vec<InboxNotificationTarget> {
+        self.0
+            .lock()
+            .expect("pending inbox notification opens lock")
+            .drain(..)
+            .collect()
+    }
 }
 
 #[cfg(desktop)]
@@ -5376,22 +5402,6 @@ fn main_window_state_flags() -> tauri_plugin_window_state::StateFlags {
     StateFlags::SIZE | StateFlags::MAXIMIZED
 }
 
-#[cfg(desktop)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum InboxNotificationResponseMode {
-    FireAndForget,
-    WaitForOpen,
-}
-
-#[cfg(desktop)]
-const fn inbox_notification_response_mode() -> InboxNotificationResponseMode {
-    if cfg!(target_os = "macos") {
-        InboxNotificationResponseMode::FireAndForget
-    } else {
-        InboxNotificationResponseMode::WaitForOpen
-    }
-}
-
 #[tauri::command]
 fn show_inbox_notification(
     app: tauri::AppHandle,
@@ -5399,26 +5409,19 @@ fn show_inbox_notification(
     body: String,
     target: InboxNotificationTarget,
 ) -> Result<(), String> {
-    #[cfg(desktop)]
+    #[cfg(target_os = "macos")]
     {
-        #[cfg(target_os = "macos")]
-        {
-            let application_identifier = if cfg!(dev) {
-                "com.apple.Terminal".to_string()
-            } else {
-                app.config().identifier.clone()
-            };
-            let _ = notify_rust::set_application(&application_identifier);
-        }
+        let _ = app;
+        macos_inbox_notifications::show(title, body, target)
+    }
 
+    #[cfg(all(desktop, not(target_os = "macos")))]
+    {
         std::thread::spawn(move || {
-            let response_mode = inbox_notification_response_mode();
             let mut notification = notify_rust::Notification::new();
             notification.summary(&title).body(&body).auto_icon();
             #[cfg(unix)]
-            if response_mode == InboxNotificationResponseMode::WaitForOpen {
-                notification.action("default", "Open");
-            }
+            notification.action("default", "Open");
             #[cfg(windows)]
             if let Ok(executable) = tauri::utils::platform::current_exe() {
                 if let Some(directory) = executable.parent() {
@@ -5440,13 +5443,6 @@ fn show_inbox_notification(
                     return;
                 }
             };
-            if response_mode == InboxNotificationResponseMode::FireAndForget {
-                // notify-rust's legacy macOS response path installs a repeating
-                // main-run-loop timer for every delivered notification. Letting
-                // the handle drop still delivers the notification without
-                // accumulating response threads or polling Notification Center.
-                return;
-            }
             if let Err(error) =
                 handle.wait_for_response(move |response: &notify_rust::NotificationResponse| {
                     let opens_notification = match response {
@@ -5476,6 +5472,23 @@ fn show_inbox_notification(
         let _ = (app, title, body, target);
         Err("Desktop inbox notifications are unavailable on mobile".to_string())
     }
+}
+
+#[tauri::command]
+async fn request_inbox_notification_permission() -> Result<bool, String> {
+    #[cfg(target_os = "macos")]
+    {
+        macos_inbox_notifications::request_permission().await
+    }
+    #[cfg(not(target_os = "macos"))]
+    Err("Native macOS notification permission is unavailable on this platform".to_string())
+}
+
+#[tauri::command]
+fn drain_pending_inbox_notification_opens(
+    state: tauri::State<'_, PendingInboxNotificationOpens>,
+) -> Vec<InboxNotificationTarget> {
+    state.drain()
 }
 
 #[tauri::command]
@@ -5654,6 +5667,7 @@ pub fn run() {
     let builder = tauri::Builder::default()
         .manage(SleepPreventionState::default())
         .manage(AgentSessionCancellationState::default())
+        .manage(PendingInboxNotificationOpens::default())
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
@@ -5681,6 +5695,8 @@ pub fn run() {
         );
     let app = builder
         .setup(|_app| {
+            #[cfg(target_os = "macos")]
+            macos_inbox_notifications::install(_app.handle());
             #[cfg(desktop)]
             {
                 if let Ok(config_path) = cli_config_path(_app.handle()) {
@@ -5777,7 +5793,9 @@ pub fn run() {
             configure_execution_worker,
             sync_execution_worker_labels,
             inspect_execution_workers,
-            show_inbox_notification
+            show_inbox_notification,
+            request_inbox_notification_permission,
+            drain_pending_inbox_notification_opens
         ])
         .build(tauri::generate_context!())
         .expect("error while building Briar");
@@ -5797,20 +5815,6 @@ pub fn run() {
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
-
-    #[test]
-    fn macos_inbox_notifications_do_not_wait_for_responses() {
-        #[cfg(target_os = "macos")]
-        assert_eq!(
-            inbox_notification_response_mode(),
-            InboxNotificationResponseMode::FireAndForget
-        );
-        #[cfg(not(target_os = "macos"))]
-        assert_eq!(
-            inbox_notification_response_mode(),
-            InboxNotificationResponseMode::WaitForOpen
-        );
-    }
 
     #[test]
     fn discovers_repository_icons_using_t3code_candidate_priority() {

@@ -5,6 +5,7 @@ import type { InboxMessage } from "../hooks/useInbox";
 import {
   defaultInboxNotificationPreferences,
   inboxNotificationTarget,
+  listenForMacInboxNotificationClicks,
   listenForInboxNotificationClicks,
   readInboxNotificationPreferences,
   sendInboxNotification,
@@ -141,5 +142,31 @@ describe("inbox notification navigation", () => {
     expect(onOpen).toHaveBeenCalledWith(inboxNotificationTarget(message));
     expect(notification.close).toHaveBeenCalledOnce();
     stopListening();
+  });
+
+  it("drains macOS notification clicks registered before the webview starts", async () => {
+    const target = inboxNotificationTarget(message);
+    let notifyAvailable: (() => void) | undefined;
+    const onOpen = vi.fn();
+    const drain = vi
+      .fn<() => Promise<unknown>>()
+      .mockResolvedValueOnce([target, { malformed: true }])
+      .mockResolvedValueOnce([{ ...target, targetId: "run-2" }]);
+    const unlisten = vi.fn();
+    const stopListening = await listenForMacInboxNotificationClicks(onOpen, {
+      listenAvailable: async (callback) => {
+        notifyAvailable = callback;
+        return unlisten;
+      },
+      drain,
+    });
+
+    expect(onOpen).toHaveBeenCalledWith(target);
+    notifyAvailable?.();
+    await vi.waitFor(() => expect(onOpen).toHaveBeenCalledTimes(2));
+    expect(onOpen).toHaveBeenLastCalledWith({ ...target, targetId: "run-2" });
+
+    stopListening();
+    expect(unlisten).toHaveBeenCalledOnce();
   });
 });
