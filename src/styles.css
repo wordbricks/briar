@@ -1042,7 +1042,9 @@ body { overflow: hidden; font-synthesis: none; }
 .issue-conversation-tab-panel[hidden] { display:none; }
 .issue-conversation-header { min-height:46px; flex:0 0 46px; padding:0 18px; display:flex; align-items:center; justify-content:space-between; gap:10px; border-bottom:1px solid var(--border); }
 .issue-conversation-header strong { min-width:0; display:flex; align-items:center; gap:7px; color:var(--foreground); font-size:var(--text-sm); }.issue-conversation-header strong span { color:var(--muted-foreground); font:500 var(--text-2xs) "DM Mono",monospace; }.issue-conversation-header small { overflow:hidden; color:var(--muted-foreground); font-size:var(--text-2xs); text-overflow:ellipsis; white-space:nowrap; }
-.issue-message-list { min-height:0; flex:1; margin:10px 8px 12px; display:grid; align-content:start; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; scrollbar-width:thin; }
+.issue-message-list { min-height:0; flex:1; margin:0 8px; display:grid; align-content:start; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; scrollbar-width:thin; }
+.issue-message-list::before,.issue-message-list::after { content:""; height:10px; }
+.issue-message-list::after { height:12px; }
 .issue-message { min-width:0; position:relative; padding:6px 10px; display:grid; grid-template-columns:34px minmax(0,1fr); align-items:start; gap:10px; border-radius:10px; transition:background-color .12s ease-out; }
 .issue-message:hover { background:var(--muted); }
 .issue-message-avatar { width:34px; height:34px; overflow:hidden; display:grid; place-items:center; border:1px solid rgba(83,72,118,.1); border-radius:9px; color:#fff; background:linear-gradient(145deg,#8068ce,#5943a4); object-fit:cover; font-size:var(--text-sm); font-weight:700; }
@@ -1076,7 +1078,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .issue-agent-reply-state { margin:4px 10px; padding:9px 11px; display:flex; align-items:center; gap:7px; border-radius:9px; color:var(--accent-foreground); background:var(--accent); font-size:var(--text-2xs); }
 .issue-message > div > .issue-agent-reply-state { margin:7px 0 1px; }
 .issue-agent-reply-state.error { color:var(--foreground); background:color-mix(in srgb,var(--destructive) 10%,var(--card)); }
-.issue-message-composer { position:relative; flex:0 0 auto; overflow:hidden; display:grid; grid-template-rows:minmax(0,1fr) auto; border:1px solid var(--border); border-radius:16px; background:var(--card); box-shadow:0 5px 18px rgba(0,0,0,.08); transition:border-color .14s ease-out,box-shadow .14s ease-out; }
+.issue-message-composer { position:relative; z-index:1; flex:0 0 auto; overflow:visible; display:grid; grid-template-rows:minmax(0,1fr) auto; border:1px solid var(--border); border-radius:16px; background:var(--card); box-shadow:0 5px 18px rgba(0,0,0,.08); transition:border-color .14s ease-out,box-shadow .14s ease-out; }
 .issue-conversation > .issue-message-composer { margin:0 14px 14px; }
 .issue-message-composer:focus-within { border-color:var(--input); box-shadow:0 0 0 3px color-mix(in srgb,var(--ring) 14%,transparent),0 7px 22px rgba(0,0,0,.1); }
 .issue-composer-mention-menu { position:absolute; z-index:3; right:12px; bottom:51px; left:12px; max-height:220px; padding:3px; overflow-y:auto; border:1px solid var(--border); border-radius:9px; background:var(--card); box-shadow:0 7px 20px rgba(0,0,0,.16); }
