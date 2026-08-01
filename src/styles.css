@@ -2387,11 +2387,11 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .project-schedule-summary > span { display:grid; gap:2px; color:var(--muted-foreground); font-size:var(--text-2xs); white-space:nowrap; }
 .project-schedule-summary strong { color:var(--foreground); font:600 var(--text-xs) "DM Mono",monospace; }
 .project-schedule-summary i { width:1px; height:24px; background:var(--border); }
-.project-schedule-create { height:38px; padding:0 14px; display:flex; align-items:center; justify-content:center; gap:7px; border:1px solid #2f69be; border-radius:999px; color:#fff; background:#3275d5; box-shadow:0 8px 20px rgba(50,117,213,.18); cursor:pointer; font-size:var(--text-2xs); font-weight:700; white-space:nowrap; }
-.project-schedule-create:hover:not(:disabled) { background:#2868c5; }
+.project-schedule-create { height:34px; padding:0 12px; display:flex; align-items:center; justify-content:center; gap:7px; border:1px solid #1f201d; border-radius:9px; color:#fff; background:#1f201d; box-shadow:0 1px 2px rgba(24,25,22,.12); cursor:pointer; font-size:var(--text-xs); font-weight:600; white-space:nowrap; }
+.project-schedule-create:hover:not(:disabled) { border-color:#343530; background:#343530; }
 .project-schedule-create:active:not(:disabled) { transform:scale(.97); }
 .project-schedule-create:disabled { opacity:.55; cursor:not-allowed; box-shadow:none; }
-.project-schedule-create:focus-visible { outline:2px solid #3975d2; outline-offset:2px; }
+.project-schedule-create:focus-visible { outline:2px solid #8068ce; outline-offset:2px; }
 .project-schedule-error { min-height:34px; padding:8px 16px; display:flex; align-items:center; gap:7px; flex:0 0 auto; border-bottom:1px solid #f0cdd4; color:#a13e50; background:#fff5f7; font-size:var(--text-2xs); }
 .project-schedule-calendar { min-height:0; flex:1; display:flex; flex-direction:column; background:var(--card); }
 .project-schedule-toolbar { min-height:52px; padding:0 16px 0 13px; display:flex; align-items:center; justify-content:space-between; gap:16px; border-bottom:1px solid var(--border); background:var(--card); }
@@ -2561,8 +2561,8 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .project-agents-heading > div { min-width:0; }
 .project-agents-heading h1 { margin:0; color:var(--foreground); font-size:var(--text-lg); font-weight:650; letter-spacing:-.02em; line-height:1.25; }
 .project-agents-heading > div > p:last-child { display:none; }
-.project-agent-create { height:44px; padding:0 18px; display:flex; align-items:center; gap:8px; border:1px solid var(--primary); border-radius:12px; color:var(--primary-foreground); background:var(--primary); box-shadow:none; cursor:pointer; font-size:var(--text-base); font-weight:600; white-space:nowrap; }
-.project-agent-create:hover { background:var(--primary-hover); }
+.project-agent-create { height:34px; padding:0 12px; display:flex; align-items:center; gap:7px; border:1px solid #1f201d; border-radius:9px; color:#fff; background:#1f201d; box-shadow:0 1px 2px rgba(24,25,22,.12); cursor:pointer; font-size:var(--text-xs); font-weight:600; white-space:nowrap; }
+.project-agent-create:hover { border-color:#343530; background:#343530; }
 .project-agent-create:active { transform:scale(.97); }
 .project-agent-create:focus-visible,.project-agent-create-card:focus-visible,.project-agents-state button:focus-visible,.project-agent-dialog button:focus-visible { outline:2px solid var(--ring); outline-offset:3px; }
 .project-agents-body { padding:32px 32px 0; }
