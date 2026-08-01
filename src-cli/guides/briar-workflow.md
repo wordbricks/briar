@@ -255,7 +255,7 @@ whether a person must act, the exact next action, and any due time. Use this con
 
 ```json
 {
-  "summary": "What changed and what was verified.",
+  "summary": "What problem was addressed, what specifically changed and how, the before-and-after impact, and what was verified.",
   "outcome": "completed",
   "importance": "routine",
   "urgency": "normal",
@@ -269,11 +269,33 @@ whether a person must act, the exact next action, and any due time. Use this con
 The issue detail page presents `structuredResult.summary` as the main result card. Write it
 for a PM or CEO who may not know the codebase:
 
-- Lead with what is now different for users or the business, then say what was verified.
+- Make the result a standalone explanation. The reader should understand what was done
+  without opening the evidence or knowing the implementation beforehand.
+- Cover all four of these parts with concrete facts relevant to the issue:
+  1. **Problem and scope:** what was wrong or costly and the specific data, behavior, or
+     component involved. Include observed size, volume, latency, frequency, or other
+     measurements when available; never invent a number.
+  2. **Implementation:** the scope, relevant selection or decision criteria, key approach,
+     and consequential design decisions. Adapt the explanation to the work performed and
+     cover material boundaries, state transitions, integrations, data handling, error
+     behavior, fallback, recovery, or cleanup when they affect the outcome.
+  3. **Before and after:** what concretely changes for users, operators, reliability, cost,
+     capacity, or performance compared with the previous behavior.
+  4. **Verification and limits:** what behavior was verified and any important remaining
+     limitation or risk. Do not claim a production outcome that was not observed.
 - Use the issue's language and explain any necessary technical term on first use.
-- Keep commands, file paths, test internals, raw errors, and low-level implementation detail
-  in evidence or status detail rather than the summary.
-- Do not merely list files changed or say that work was completed.
+- Include meaningful implementation decisions in the summary, while keeping commands, file
+  paths, test internals, raw errors, and incidental low-level detail in evidence or status
+  detail.
+- Prefer a few readable paragraphs in problem → implementation → outcome → verification
+  order. Do not merely list files changed, say that work was completed, or use generic claims
+  such as "processing was improved" or "the change was verified."
+
+Choose details by consequence, not by technology. A data change should explain what data is
+affected and its lifecycle; an interface change should explain the changed user flow and
+states; an integration should explain the system boundary and failure behavior; and an
+operational change should explain the trigger, safeguards, and recovery path. Include only
+criteria, thresholds, measurements, and outcomes established by the work.
 
 When the work changes a user-visible interface, make a reasonable effort to run the relevant
 screen and capture the finished state. Attach one or more useful screenshots to the most
