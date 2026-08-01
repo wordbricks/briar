@@ -24,4 +24,16 @@ describe("project onboarding layout", () => {
       /\.onboarding-shell \{[^}]*align-items:start;[^}]*overflow-y:auto;/u,
     );
   });
+
+  it("uses the compact, cardless layout from the repository setup design", () => {
+    expect(styles).toMatch(
+      /\.repository-connect-card \{[^}]*width:min\(470px,[^}]*border:0;[^}]*background:transparent;[^}]*box-shadow:none;/u,
+    );
+    expect(styles).toMatch(
+      /\.repository-connect-panel \{[^}]*overflow:hidden;[^}]*border:1px solid #dedede;[^}]*border-radius:12px;/u,
+    );
+    expect(styles).toMatch(
+      /\.repository-connect-progress \{[^}]*grid-template-columns:1fr 1fr;/u,
+    );
+  });
 });

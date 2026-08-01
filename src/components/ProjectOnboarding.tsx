@@ -10,7 +10,6 @@ import {
   FolderPlus,
   GitBranch,
   LayoutDashboard,
-  ListChecks,
   LoaderCircle,
   LogOut,
   UploadCloud,
@@ -88,6 +87,7 @@ export function ProjectOnboarding({
   const [startMode, setStartMode] = useState<ProjectStartMode>("existing");
   const [workspaceRoot, setWorkspaceRoot] = useState<string | null>(null);
   const [creatingWorkspace, setCreatingWorkspace] = useState(false);
+  const [showWorkflowDetails, setShowWorkflowDetails] = useState(false);
   const [firstProjectStep, setFirstProjectStep] =
     useState<FirstProjectStep>("purpose");
   const initialWorkflow = normalizeAutoHuntWorkflow(connection?.workflow);
@@ -191,11 +191,13 @@ export function ProjectOnboarding({
   };
 
   return (
-    <div className="onboarding-shell">
+    <div
+      className={`onboarding-shell${connection ? " repository-connect-shell" : ""}`}
+    >
       <header className="onboarding-topbar">
         <Logo />
         <div className="onboarding-topbar-actions">
-          {canCancel ? (
+          {canCancel || connection ? (
             <button onClick={onCancel} type="button">
               <ArrowLeft size={14} /> {t("onboarding.back")}
             </button>
@@ -213,7 +215,7 @@ export function ProjectOnboarding({
         </div>
       </header>
       <main
-        className={`onboarding-card${showPurposeStep ? " project-purpose-card" : ""}`}
+        className={`onboarding-card${showPurposeStep ? " project-purpose-card" : ""}${connection ? " repository-connect-card" : ""}`}
       >
         {showPurposeStep ? (
           <>
@@ -266,118 +268,165 @@ export function ProjectOnboarding({
           </>
         ) : (
           <>
-            <div className="onboarding-icon">
-              {connection ? <Check size={24} /> : <FolderGit2 size={24} />}
-            </div>
             {connection ? (
-              <>
-                <p className="eyebrow">AUTO HUNT CONNECTION</p>
-                <h1>{t("onboarding.connectTitle", { name: connection.project.name })}</h1>
-                <p className="onboarding-copy">
-                  {reusesExistingWorkflow
-                    ? t("dashboard.connectRepositoryDescription")
-                    : t("onboarding.repositoryConnectDescription")}
+              <section className="repository-connect-flow">
+                <p className="repository-connect-step">
+                  {t("onboarding.setupLabel")}
+                  <span aria-hidden="true">/</span>
+                  {t("onboarding.stepTwoOfTwo")}
+                </p>
+                <h1>
+                  {t("onboarding.repositoryConnectTitle", {
+                    name: connection.project.name,
+                  })}
+                </h1>
+                <p className="repository-connect-description">
+                  {t("onboarding.repositoryConnectAccountDescription")}
                 </p>
 
-                <div className="setup-grid">
-                  <section className="setup-section">
-                    <div className="setup-section-heading">
-                      <ListChecks size={18} />
-                      <div>
-                        <strong>
-                          {reusesExistingWorkflow
-                            ? t("settings.workflowTitle")
-                            : t("onboarding.workflow")}
-                        </strong>
-                        <span>
-                          {reusesExistingWorkflow
-                            ? t("settings.workflowDescription")
-                            : t("onboarding.workflowDescription").replace(
-                                "Codex App Server",
-                                "Agent backend",
-                              )}
-                        </span>
-                      </div>
-                    </div>
-                  </section>
+                <div aria-hidden="true" className="repository-connect-progress">
+                  <span />
+                  <span />
+                </div>
 
-                  <section className={`setup-section repository-setup${repositoryPath ? " connected" : ""}`}>
-                    <div className="setup-section-heading">
-                      {repositoryPath ? <Check size={18} /> : <FolderOpen size={18} />}
-                      <div>
-                        <strong>{t("onboarding.localRepository")}</strong>
-                        <span className={repositoryPath ? "repository-path" : undefined} title={repositoryPath || undefined}>
-                          {repositoryPath || t("onboarding.folderPicker")}
-                        </span>
+                <div className="repository-connect-panel">
+                  <section className="repository-connect-workflow">
+                    <span className="repository-connect-status-icon">
+                      <Check aria-hidden="true" size={17} strokeWidth={2.2} />
+                    </span>
+                    <div className="repository-connect-section-copy">
+                      <div className="repository-connect-section-title">
+                        <strong>{t("onboarding.workflowLabel")}</strong>
+                        <em>{t("onboarding.workflowReady")}</em>
                       </div>
+                      <p>{t("onboarding.workflowAccountDescription")}</p>
                       <button
-                        className="setup-repository-action"
-                        disabled={loading || selectingRepository}
-                        onClick={() => void selectRepository()}
+                        aria-expanded={showWorkflowDetails}
+                        className="repository-connect-review"
+                        onClick={() => setShowWorkflowDetails((current) => !current)}
                         type="button"
                       >
-                        {selectingRepository ? (
-                          <LoaderCircle aria-hidden="true" className="spin" size={14} />
-                        ) : (
-                          <FolderOpen aria-hidden="true" size={14} />
-                        )}
-                        {selectingRepository
-                          ? t("onboarding.repositorySelecting")
-                          : repositoryPath
-                            ? t("onboarding.repositoryChange")
-                            : t("onboarding.repositorySelect")}
+                        {t("onboarding.reviewWorkflow")}
                       </button>
+                      {showWorkflowDetails ? (
+                        <div className="repository-connect-workflow-details">
+                          {initialWorkflow.stages.map((stage, index) => (
+                            <span key={stage.id}>
+                              {index + 1}. {stage.label}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
-                    {repositoryPath ? (
-                      <div
-                        aria-label={t("onboarding.gitReadiness")}
-                        className="repository-readiness"
-                      >
-                        <span className={repositoryReadiness?.gitReady ? "ready" : "warning"}>
-                          {repositoryReadiness?.gitReady ? <Check size={13} /> : <CircleAlert size={13} />}
-                          <i><strong>Git</strong><small>{repositoryReadiness?.gitVersion ?? t("common.checkNeeded")}</small></i>
-                        </span>
-                        <span className={repositoryReadiness?.remoteReachable ? "ready" : "warning"}>
-                          {repositoryReadiness?.remoteReachable ? <Check size={13} /> : <GitBranch size={13} />}
-                          <i><strong>origin</strong><small>{repositoryReadiness?.remote ?? t("onboarding.remoteMissing")}</small></i>
-                        </span>
-                        <span className={repositoryReadiness?.pushAccess ? "ready" : "warning"}>
-                          {repositoryReadiness?.pushAccess ? <Check size={13} /> : <UploadCloud size={13} />}
-                          <i><strong>push</strong><small>{repositoryReadiness?.pushAccess ? t("onboarding.pushReady") : t("onboarding.pushCheckNeeded")}</small></i>
-                        </span>
-                      </div>
-                    ) : null}
-                    {repositoryError ? (
-                      <p className="repository-readiness-error" role="alert">
-                        <CircleAlert size={13} />
-                        {repositoryError}
-                      </p>
-                    ) : null}
                   </section>
 
+                  <section
+                    className={`repository-connect-repository${repositoryPath ? " connected" : ""}`}
+                  >
+                    <span className="repository-connect-step-number">
+                      {repositoryPath ? (
+                        <Check aria-hidden="true" size={17} strokeWidth={2.2} />
+                      ) : (
+                        "2"
+                      )}
+                    </span>
+                    <div className="repository-connect-section-copy">
+                      <div className="repository-connect-section-title">
+                        <strong>{t("onboarding.localRepository")}</strong>
+                        <small>{t("common.required")}</small>
+                      </div>
+                      <p>{t("onboarding.repositoryAccessDescription")}</p>
+                      {repositoryPath ? (
+                        <p className="repository-connect-path" title={repositoryPath}>
+                          {repositoryPath}
+                        </p>
+                      ) : null}
+                      <div className="repository-connect-picker-actions">
+                        <button
+                          className="repository-connect-choose"
+                          disabled={loading || selectingRepository}
+                          onClick={() => void selectRepository()}
+                          type="button"
+                        >
+                          {selectingRepository ? (
+                            <LoaderCircle
+                              aria-hidden="true"
+                              className="spin"
+                              size={15}
+                            />
+                          ) : null}
+                          {selectingRepository
+                            ? t("onboarding.repositorySelecting")
+                            : repositoryPath
+                              ? t("onboarding.repositoryChange")
+                              : t("onboarding.chooseFolder")}
+                        </button>
+                        {!repositoryPath ? (
+                          <span>{t("onboarding.recentRepositories")}</span>
+                        ) : null}
+                      </div>
+
+                      {repositoryPath ? (
+                        <div
+                          aria-label={t("onboarding.gitReadiness")}
+                          className="repository-readiness repository-connect-readiness"
+                        >
+                          <span className={repositoryReadiness?.gitReady ? "ready" : "warning"}>
+                            {repositoryReadiness?.gitReady ? <Check size={13} /> : <CircleAlert size={13} />}
+                            <i><strong>Git</strong><small>{repositoryReadiness?.gitVersion ?? t("common.checkNeeded")}</small></i>
+                          </span>
+                          <span className={repositoryReadiness?.remoteReachable ? "ready" : "warning"}>
+                            {repositoryReadiness?.remoteReachable ? <Check size={13} /> : <GitBranch size={13} />}
+                            <i><strong>origin</strong><small>{repositoryReadiness?.remote ?? t("onboarding.remoteMissing")}</small></i>
+                          </span>
+                          <span className={repositoryReadiness?.pushAccess ? "ready" : "warning"}>
+                            {repositoryReadiness?.pushAccess ? <Check size={13} /> : <UploadCloud size={13} />}
+                            <i><strong>push</strong><small>{repositoryReadiness?.pushAccess ? t("onboarding.pushReady") : t("onboarding.pushCheckNeeded")}</small></i>
+                          </span>
+                        </div>
+                      ) : null}
+                      {repositoryError ? (
+                        <p className="repository-readiness-error" role="alert">
+                          <CircleAlert size={13} />
+                          {repositoryError}
+                        </p>
+                      ) : null}
+                    </div>
+                  </section>
                 </div>
 
                 {error ? <div className="login-error" role="alert">{error}</div> : null}
-                <button
-                  className="onboarding-primary-action"
-                  disabled={loading || selectingRepository || !repositoryReadiness?.gitReady}
-                  onClick={() => void connect()}
-                  type="button"
-                >
-                  {loading
-                    ? reusesExistingWorkflow
-                      ? t("common.saving")
-                      : t("onboarding.connecting")
-                    : t("onboarding.connect")} <ArrowRight size={17} />
-                </button>
-                {!reusesExistingWorkflow ? (
-                  <p className="token-warning">
-                    {t("onboarding.localStorageNotice")}
-                  </p>
-                ) : null}
-              </>
+                <div className="repository-connect-footer-actions">
+                  <button
+                    className="repository-connect-primary"
+                    disabled={loading || selectingRepository || !repositoryReadiness?.gitReady}
+                    onClick={() => void connect()}
+                    type="button"
+                  >
+                    {loading
+                      ? reusesExistingWorkflow
+                        ? t("common.saving")
+                        : t("onboarding.connecting")
+                      : t("dashboard.connectRepository")}
+                  </button>
+                  <button
+                    className="repository-connect-skip"
+                    disabled={loading}
+                    onClick={onSkip}
+                    type="button"
+                  >
+                    {t("onboarding.skipForNow")}
+                  </button>
+                </div>
+                <p className="repository-connect-footnote">
+                  {t("onboarding.repositoryConnectFootnote")}
+                </p>
+              </section>
             ) : (
               <>
+                <div className="onboarding-icon">
+                  <FolderGit2 size={24} />
+                </div>
                 <p className="eyebrow">{canCancel ? "NEW PROJECT" : "FIRST PROJECT"}</p>
                 <h1>{canCancel ? t("onboarding.addProject") : t("onboarding.createProject")}</h1>
                 <p className="onboarding-copy">
