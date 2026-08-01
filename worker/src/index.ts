@@ -739,6 +739,22 @@ const organizationInputSchema = z.object({
     .max(63)
     .regex(/^[a-z0-9-]+$/u),
 });
+
+export const accountProfileInputSchema = z.object({
+  username: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .min(3)
+    .max(30)
+    .regex(/^[a-z0-9_]+$/u),
+  name: z.string().trim().min(1).max(100),
+  image: z
+    .string()
+    .max(400_000)
+    .regex(/^data:image\/(?:jpeg|png|webp);base64,/u)
+    .nullable(),
+});
 export const organizationUpdateInputSchema = organizationInputSchema.pick({
   name: true,
 });
@@ -2896,6 +2912,46 @@ async function route(
   if (pathname === "/me" && request.method === "GET") {
     const session = await requireSession(auth, request);
     return json({ user: session.user });
+  }
+
+  if (pathname === "/me" && request.method === "PATCH") {
+    const session = await requireSession(auth, request);
+    const input = accountProfileInputSchema.parse(
+      await readJson(request, 450_000),
+    );
+    const updatedAt = new Date().toISOString();
+    const result = await db
+      .prepare(
+        `update "user"
+         set "username" = ?, "name" = ?, "image" = ?, "updatedAt" = ?
+         where "id" = ?
+           and not exists (
+             select 1 from "user" as existing
+             where lower(existing."username") = lower(?)
+               and existing."id" <> ?
+           )`,
+      )
+      .bind(
+        input.username,
+        input.name,
+        input.image,
+        updatedAt,
+        session.user.id,
+        input.username,
+        session.user.id,
+      )
+      .run();
+    if (result.meta.changes !== 1) {
+      throw new HttpError(409, "Username is already taken");
+    }
+    return json({
+      user: {
+        ...session.user,
+        username: input.username,
+        name: input.name,
+        image: input.image,
+      },
+    });
   }
 
   if (pathname === "/organizations" && request.method === "GET") {

@@ -36,6 +36,7 @@ import {
   removeIssueDependency,
   updateIssue,
   updateIssueExecutionPreferences,
+  updateAccountProfile as updateRemoteAccountProfile,
   updateOrganization as updateRemoteOrganization,
   updateOrganizationLogo as updateRemoteOrganizationLogo,
   updateProjectIcon as updateRemoteProjectIcon,
@@ -863,6 +864,19 @@ export function useBriar(options: UseBriarOptions = {}) {
     setProjectConnection(null);
     setIsCreatingProject(false);
   }, [cancelLogin]);
+
+  const updateAccountProfile = useCallback(
+    async (input: { username: string; name: string; image: string | null }) => {
+      if (!user) throw new Error("로그인이 필요합니다.");
+      const nextUser =
+        demoMode || !token
+          ? { ...user, ...input }
+          : await updateRemoteAccountProfile(token, input);
+      setUser(nextUser);
+      return nextUser;
+    },
+    [token, user],
+  );
 
   const startProjectCreation = useCallback(() => {
     setError(null);
@@ -2544,6 +2558,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     regenerateWorkflow,
     reviseWorkflow,
     updateWorkflowStopAfterStage,
+    updateAccountProfile,
     saveVelenIntegration,
     saveLinearIntegration,
     connectLinearForImport,

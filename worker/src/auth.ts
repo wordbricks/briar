@@ -7,6 +7,15 @@ export function createAuth(env: Env, apiOrigin: string) {
     baseURL: `${apiOrigin}/api/auth`,
     secret: env.BETTER_AUTH_SECRET,
     database: env.DB,
+    user: {
+      additionalFields: {
+        username: {
+          type: "string",
+          required: false,
+          input: false,
+        },
+      },
+    },
     trustedOrigins: [
       apiOrigin,
       "http://localhost:1420",
