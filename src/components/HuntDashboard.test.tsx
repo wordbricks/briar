@@ -1595,6 +1595,100 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
+  it("keeps attachment images loaded when the run snapshot refreshes", async () => {
+    const createObjectUrl = vi.fn((blob: Blob) =>
+      `blob:issue-attachment-${blob.size}`
+    );
+    const revokeObjectUrl = vi.fn();
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: createObjectUrl,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: revokeObjectUrl,
+    });
+    const attachments = [
+      {
+        id: "attachment-inline",
+        filename: "inline.png",
+        contentType: "image/png",
+        byteSize: 6,
+        url: "/attachments/attachment-inline",
+      },
+      {
+        id: "attachment-gallery",
+        filename: "gallery.png",
+        contentType: "image/png",
+        byteSize: 7,
+        url: "/attachments/attachment-gallery",
+      },
+    ];
+    const onLoadAttachment = vi.fn(
+      async (attachment: typeof attachments[number]) =>
+        new Blob([attachment.filename], { type: attachment.contentType }),
+    );
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    const renderPage = (nextAttachments = attachments) => (
+      <RunPage
+        isSidebarOpen
+        error={null}
+        isRecovering={false}
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={onLoadAttachment}
+        onLoadIssueMessages={async () => []}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }}
+        run={{
+          ...demoDashboard.runs[0],
+          issueDescription:
+            "![inline](briar-attachment://attachment-inline)",
+          attachments: nextAttachments,
+        }}
+      />
+    );
+
+    await act(async () => root.render(renderPage()));
+    expect(onLoadAttachment).toHaveBeenCalledTimes(2);
+    expect(createObjectUrl).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      root.render(renderPage(attachments.map((attachment) => ({
+        ...attachment,
+      }))));
+    });
+
+    expect(onLoadAttachment).toHaveBeenCalledTimes(2);
+    expect(createObjectUrl).toHaveBeenCalledTimes(2);
+    expect(revokeObjectUrl).not.toHaveBeenCalled();
+    expect(
+      container.querySelectorAll(".issue-description-scroll img"),
+    ).toHaveLength(2);
+
+    await act(async () => {
+      root.render(renderPage(attachments.map((attachment) => ({
+        ...attachment,
+        url: attachment.id === "attachment-inline"
+          ? "/attachments/attachment-inline-v2"
+          : attachment.url,
+      }))));
+    });
+
+    expect(onLoadAttachment).toHaveBeenCalledTimes(3);
+    expect(createObjectUrl).toHaveBeenCalledTimes(3);
+    expect(revokeObjectUrl).toHaveBeenCalledTimes(1);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("scrolls the conversation to the bottom after loading and sending", async () => {
     const createdAt = new Date().toISOString();
     const loadedMessage: IssueMessage = {
