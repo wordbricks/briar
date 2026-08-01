@@ -9,7 +9,6 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Typography } from "@/components/ui/typography";
 import { cn } from "@/lib/utils";
 import iconGray from "../assets/app-icons/gray.png";
@@ -25,12 +24,19 @@ import {
 import type { SessionUser } from "../types";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { InboxNotificationSettings } from "./InboxNotificationSettings";
+import { AccountProfileSettings } from "./AccountProfileSettings";
 
 export function CompanionSettings({
   onBack,
+  onAccountSave,
   user,
 }: {
   onBack: () => void;
+  onAccountSave?: (input: {
+    username: string;
+    name: string;
+    image: string | null;
+  }) => Promise<SessionUser>;
   user: SessionUser;
 }) {
   const { locale, setLocale, t } = useI18n();
@@ -104,16 +110,11 @@ export function CompanionSettings({
             {t("companion.settingsAccount")}
           </Typography>
         </div>
-        <Card>
-          <CardContent className="grid gap-1 p-4">
-            <Typography as="strong" variant="body">
-              {user.name || user.email}
-            </Typography>
-            <Typography as="small" tone="muted" variant="caption">
-              {user.email}
-            </Typography>
-          </CardContent>
-        </Card>
+        <AccountProfileSettings
+          compact
+          onSave={onAccountSave ?? (async (input) => ({ ...user, ...input }))}
+          user={user}
+        />
       </section>
 
       <section className="mb-7 grid gap-3">

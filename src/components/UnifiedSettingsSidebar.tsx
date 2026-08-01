@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Users,
+  UserRound,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -89,6 +90,11 @@ export function UnifiedSettingsSidebar({
 
   const applicationItems = useMemo<NavigationItem<SettingsSection>[]>(
     () => [
+      {
+        id: "account",
+        icon: <UserRound size={16} strokeWidth={1.75} />,
+        label: t("account.profile"),
+      },
       {
         id: "general",
         icon: <SlidersHorizontal size={16} strokeWidth={1.75} />,

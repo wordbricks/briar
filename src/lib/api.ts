@@ -53,6 +53,7 @@ export const briarApiUrl = apiUrl;
 
 const sessionUserSchema = z.object({
   id: z.string(),
+  username: z.string().nullable().optional(),
   name: z.string(),
   email: z.string().email(),
   image: z.string().nullable().optional(),
@@ -351,6 +352,17 @@ export async function pollDeviceToken(
 
 export async function loadSession(token: string): Promise<SessionUser> {
   const result = await request<{ user: unknown }>("/me", token);
+  return sessionUserSchema.parse(result.user);
+}
+
+export async function updateAccountProfile(
+  token: string,
+  input: { username: string; name: string; image: string | null },
+): Promise<SessionUser> {
+  const result = await request<{ user: unknown }>("/me", token, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
   return sessionUserSchema.parse(result.user);
 }
 

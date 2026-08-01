@@ -15,6 +15,7 @@ import {
   RefreshCw,
   Settings2,
   SlidersHorizontal,
+  UserRound,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -70,8 +71,11 @@ import { AgentUsageSettings } from "./AgentUsageSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { InboxNotificationSettings } from "./InboxNotificationSettings";
 import type { RepositoryReadiness } from "../lib/project-connection";
+import type { SessionUser } from "../types";
+import { AccountProfileSettings } from "./AccountProfileSettings";
 
 export type SettingsSection =
+  | "account"
   | "general"
   | "appearance"
   | "notifications"
@@ -130,10 +134,12 @@ export function AppSettings({
   loading,
   navigationSidebar,
   onBack,
+  onAccountSave,
   onRefresh,
   projectId,
   projectName,
   readiness,
+  user,
 }: {
   error: string | null;
   initialSection?: SettingsSection;
@@ -141,10 +147,16 @@ export function AppSettings({
   loading: boolean;
   navigationSidebar?: ReactNode;
   onBack: () => void;
+  onAccountSave?: (input: {
+    username: string;
+    name: string;
+    image: string | null;
+  }) => Promise<SessionUser>;
   onRefresh: () => Promise<unknown>;
   projectId: string;
   projectName: string;
   readiness: RepositoryReadiness | null;
+  user?: SessionUser;
 }) {
   const { t } = useI18n();
   const [activeSection, setActiveSection] =
@@ -323,6 +335,11 @@ export function AppSettings({
         label: t("appSettings.groupSetup"),
         items: [
           {
+            id: "account",
+            icon: <UserRound size={16} strokeWidth={1.75} />,
+            label: t("account.profile"),
+          },
+          {
             id: "general",
             icon: <SlidersHorizontal size={16} strokeWidth={1.75} />,
             label: t("appSettings.general"),
@@ -411,6 +428,7 @@ export function AppSettings({
 
   const activeItem = flatNavigation.find((item) => item.id === activeSection);
   const sectionDescriptions: Record<SettingsSection, string> = {
+    account: t("account.profileDescription"),
     general: t("appSettings.generalDescription"),
     appearance: t("appSettings.appearanceDescription"),
     notifications: t("notifications.description"),
@@ -461,7 +479,14 @@ export function AppSettings({
             title={activeItem?.label ?? t("appSettings.title")}
           />
 
-          {activeSection === "usage" ? (
+          {activeSection === "account" ? (
+            <SettingsContent>
+              <SettingsGroupHeading title={t("account.publicProfile")} />
+              {user && onAccountSave ? (
+                <AccountProfileSettings onSave={onAccountSave} user={user} />
+              ) : null}
+            </SettingsContent>
+          ) : activeSection === "usage" ? (
             <AgentUsageSettings
               onManageAccounts={() => setActiveSection("providers")}
             />
