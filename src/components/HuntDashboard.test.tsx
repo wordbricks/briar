@@ -2083,9 +2083,46 @@ describe("HuntDashboard", () => {
       'aria-description="재시도하면 기존 Agent·Worker 배정으로 작업이 다시 대기열에 들어가며, 사용 가능한 Worker가 자동으로 가져가 다시 실행합니다."',
     );
     expect(markup).toContain("작업 취소");
+    expect(markup).toContain('class="recovery-panel"');
     expect(markup).toContain('class="run-page-property-badge red"');
     expect(markup).toContain(">실패</span>");
     expect(markup).toContain('aria-expanded="false" class="run-page-properties-toggle"');
+  });
+
+  it("does not show an error-like status banner for queued remote work", () => {
+    const queuedRemoteRun = {
+      ...demoDashboard.runs[0],
+      status: "queued" as const,
+      workflowStage: null,
+      workerId: "worker-1",
+      detail: "사용자가 특정 Worker에 작업을 배정했습니다.",
+    };
+    const markup = renderToStaticMarkup(
+      <TooltipProvider>
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          run={queuedRemoteRun}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(markup).not.toContain('class="recovery-panel"');
+    expect(markup).not.toContain("사용자가 특정 Worker에 작업을 배정했습니다.");
+    // Status remains visible in compact property badges, not as an error card.
+    expect(markup).toContain('class="run-page-property-badge');
+    expect(markup).toContain(">대기</span>");
   });
 
   it("shows a plain-language result card for a completed issue", () => {

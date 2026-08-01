@@ -2895,7 +2895,12 @@ export function RunPage({
               <Link2 aria-hidden="true" size={16} />
             </button>
             <IssueActionsMenu
-              disabled={isUpdatingIssue || isDeletingIssue}
+              disabled={isUpdatingIssue || isDeletingIssue || isRecovering}
+              onCancel={
+                canCancelRemoteExecution
+                  ? () => void runAction(onCancel)
+                  : undefined
+              }
               onDelete={onDelete ? () => setIsDeleteDialogOpen(true) : undefined}
               onEdit={onUpdateIssue ? () => setIsEditDialogOpen(true) : undefined}
             />
@@ -2936,7 +2941,12 @@ export function RunPage({
                       </span>
                     ) : null}
                     <IssueActionsMenu
-                      disabled={isUpdatingIssue || isDeletingIssue}
+                      disabled={isUpdatingIssue || isDeletingIssue || isRecovering}
+                      onCancel={
+                        canCancelRemoteExecution
+                          ? () => void runAction(onCancel)
+                          : undefined
+                      }
                       onDelete={
                         onDelete ? () => setIsDeleteDialogOpen(true) : undefined
                       }
@@ -3194,43 +3204,73 @@ export function RunPage({
                           onLoadAttachment={onLoadAttachment}
                         />
                       )}
-                      {((needsAttention && run.status !== "blocked") ||
-                        canCancelRemoteExecution) && (
+                      {needsAttention && run.status !== "blocked" ? (
                         <div className="recovery-panel">
-                          <div><CircleAlert size={16} /><span><strong>{needsAttention ? (run.status === "failed" ? t("run.failed") : t("run.blocked")) : label}</strong><small>{needsAttention ? t("run.retryDescription", { count: run.currentAttempt + 1 }) : (run.detail ?? t("worker.sharingDescriptionOn"))}</small></span></div>
+                          <div>
+                            <CircleAlert size={16} />
+                            <span>
+                              <strong>{t("run.failed")}</strong>
+                              <small>
+                                {t("run.retryDescription", {
+                                  count: run.currentAttempt + 1,
+                                })}
+                              </small>
+                            </span>
+                          </div>
                           <div className="recovery-actions">
-                            {needsAttention && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <button
-                                    aria-description={t("run.retryWorkerTooltip")}
-                                    disabled={isRecovering}
-                                    onClick={() => void runAction(onRetry)}
-                                    type="button"
-                                  >
-                                    <RotateCcw
-                                      className={isRecovering ? "spin" : ""}
-                                      size={14}
-                                    />
-                                    {t("run.retry")}
-                                  </button>
-                                </TooltipTrigger>
-                                <TooltipContent
-                                  className="max-w-72 text-center leading-relaxed"
-                                  side="top"
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  aria-description={t("run.retryWorkerTooltip")}
+                                  disabled={isRecovering}
+                                  onClick={() => void runAction(onRetry)}
+                                  type="button"
                                 >
-                                  {t("run.retryWorkerTooltip")}
-                                </TooltipContent>
-                              </Tooltip>
-                            )}
+                                  <RotateCcw
+                                    className={isRecovering ? "spin" : ""}
+                                    size={14}
+                                  />
+                                  {t("run.retry")}
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent
+                                className="max-w-72 text-center leading-relaxed"
+                                side="top"
+                              >
+                                {t("run.retryWorkerTooltip")}
+                              </TooltipContent>
+                            </Tooltip>
                             {confirmCancel ? (
-                              <><button className="danger" disabled={isRecovering} onClick={() => void runAction(onCancel)} type="button">{t("run.confirmCancel")}</button><button disabled={isRecovering} onClick={() => setConfirmCancel(false)} type="button">{t("run.back")}</button></>
+                              <>
+                                <button
+                                  className="danger"
+                                  disabled={isRecovering}
+                                  onClick={() => void runAction(onCancel)}
+                                  type="button"
+                                >
+                                  {t("run.confirmCancel")}
+                                </button>
+                                <button
+                                  disabled={isRecovering}
+                                  onClick={() => setConfirmCancel(false)}
+                                  type="button"
+                                >
+                                  {t("run.back")}
+                                </button>
+                              </>
                             ) : (
-                              <button className="danger-secondary" disabled={isRecovering} onClick={() => setConfirmCancel(true)} type="button">{t("run.cancel")}</button>
+                              <button
+                                className="danger-secondary"
+                                disabled={isRecovering}
+                                onClick={() => setConfirmCancel(true)}
+                                type="button"
+                              >
+                                {t("run.cancel")}
+                              </button>
                             )}
                           </div>
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   ) : activeDetailTab === "result" ? (
                     <div
@@ -3673,11 +3713,13 @@ export function RunPage({
 
 function IssueActionsMenu({
   disabled,
+  onCancel,
   onDelete,
   onEdit,
   onShare,
 }: {
   disabled: boolean;
+  onCancel?: () => void;
   onDelete?: () => void;
   onEdit?: () => void;
   onShare?: () => void;
@@ -3721,6 +3763,15 @@ function IssueActionsMenu({
             >
               <Pencil size={14} />
               {t("issue.edit")}
+            </DropdownMenu.Item>
+          ) : null}
+          {onCancel ? (
+            <DropdownMenu.Item
+              className="run-page-actions-item danger"
+              onSelect={onCancel}
+            >
+              <X size={14} />
+              {t("run.cancel")}
             </DropdownMenu.Item>
           ) : null}
           {onDelete ? (
