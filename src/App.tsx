@@ -66,6 +66,7 @@ import {
   getMobilePlatform,
   isDesktopTauri,
   isMacDesktopTauri,
+  isWebApp,
 } from "./lib/platform";
 import {
   listenForIssueLinks,
@@ -133,6 +134,7 @@ export function App() {
   const mobilePlatform = getMobilePlatform() ?? "android";
   const previewsLaunchIntro = isLaunchIntroPreview();
   const runsOnDesktopTauri = isDesktopTauri();
+  const runsOnWeb = isWebApp();
   useEffect(() => {
     if (!runsOnDesktopTauri) return;
     void import("@tauri-apps/api/core")
@@ -145,6 +147,7 @@ export function App() {
   const usesNativeLaunchIntro = isMacDesktopTauri();
   const [isLaunchIntroVisible, setIsLaunchIntroVisible] = useState(
     () =>
+      !runsOnWeb &&
       !usesNativeLaunchIntro &&
       (previewsLaunchIntro || shouldShowLaunchIntro()),
   );
