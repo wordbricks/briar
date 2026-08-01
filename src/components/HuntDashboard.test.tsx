@@ -1162,48 +1162,68 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
-  it("shows editable prerequisite and follow-up relationships on issue details", () => {
+  it("shows editable prerequisite and follow-up relationships in issue properties", async () => {
     const prerequisite = demoDashboard.runs[1];
     const dependent = demoDashboard.runs[0];
-    const markup = renderToStaticMarkup(
-      <RunPage
-        availableRuns={demoDashboard.runs}
-        isSidebarOpen
-        error={null}
-        isRecovering={false}
-        onAddDependency={async () => undefined}
-        onBack={() => undefined}
-        onCancel={async () => undefined}
-        onLoadAttachment={async () => new Blob()}
-        onLoadIssueMessages={async () => []}
-        onLoadRunEvidence={async () => []}
-        onMove={async () => undefined}
-        onRemoveDependency={async () => undefined}
-        onRetry={async () => undefined}
-        onSendIssueMessage={async () => {
-          throw new Error("not implemented in this test");
-        }}
-        run={{
-          ...dependent,
-          prerequisites: [
-            {
-              id: prerequisite.id,
-              runNumber: prerequisite.runNumber,
-              title: prerequisite.title,
-              status: prerequisite.status,
-            },
-          ],
-          dependents: [],
-        }}
-      />,
-    );
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <TooltipProvider>
+        <RunPage
+          availableRuns={demoDashboard.runs}
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onAddDependency={async () => undefined}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRemoveDependency={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          run={{
+            ...dependent,
+            prerequisites: [
+              {
+                id: prerequisite.id,
+                runNumber: prerequisite.runNumber,
+                title: prerequisite.title,
+                status: prerequisite.status,
+              },
+            ],
+            dependents: [],
+          }}
+        />
+      </TooltipProvider>,
+    ));
 
-    expect(markup).toContain('class="issue-dependencies"');
-    expect(markup).toContain("선행 이슈");
-    expect(markup).toContain(`AH-${prerequisite.runNumber}`);
-    expect(markup).toContain(prerequisite.title);
-    expect(markup).toContain("후속 이슈");
-    expect(markup).toContain("의존성 제거");
+    expect(
+      container.querySelector(".issue-description-scroll .issue-dependencies"),
+    ).toBeNull();
+    expect(container.querySelector(".issue-dependencies")).toBeNull();
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".run-page-properties-toggle")?.click();
+    });
+    const dependencies = container.querySelector(
+      ".run-properties .issue-dependencies",
+    );
+    expect(dependencies).not.toBeNull();
+    expect(dependencies?.textContent).toContain("선행 이슈");
+    expect(dependencies?.textContent).toContain(`AH-${prerequisite.runNumber}`);
+    expect(dependencies?.textContent).toContain(prerequisite.title);
+    expect(dependencies?.textContent).toContain("후속 이슈");
+    expect(
+      dependencies?.querySelector('[aria-label*="의존성 제거"]'),
+    ).not.toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
   });
 
   it("renders the issue description as Markdown above the conversation", () => {
