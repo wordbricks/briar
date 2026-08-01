@@ -545,6 +545,8 @@ export const ko = {
   "inbox.description": "사람의 판단과 행동이 필요한 업데이트부터 확인하세요.",
   "inbox.messages": "메시지",
   "inbox.filters": "메시지 필터",
+  "inbox.projectFilter": "프로젝트 필터",
+  "inbox.allProjects": "모든 프로젝트",
   "inbox.filteredCount": "{count}개 표시",
   "inbox.needsAttention": "우선 확인할 내용",
   "inbox.priorityCount": "중요 메시지 {count}개",
@@ -1678,6 +1680,8 @@ export const en: Messages = {
   "executionPolicy.noDefault": "No default · choose for each run",
   "executionPolicy.permission": "Only organization owners and admins can change execution policy.",
   "executionPolicy.registrationHint": "Manage computer registration and project repository connections under Organization settings → Workers.",
+  "inbox.projectFilter": "Project filter",
+  "inbox.allProjects": "All projects",
 };
 export const zh: Messages = {
   ...en,
@@ -2218,4 +2222,6 @@ export const zh: Messages = {
   "executionPolicy.noDefault": "无默认值 · 每次运行时选择",
   "executionPolicy.permission": "只有组织所有者和管理员可以修改执行策略。",
   "executionPolicy.registrationHint": "请在组织设置 → Workers 中管理电脑注册和项目仓库连接。",
+  "inbox.projectFilter": "项目筛选",
+  "inbox.allProjects": "所有项目",
 };

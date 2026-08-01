@@ -783,6 +783,7 @@ export function App() {
               setPendingInboxNotificationTarget(
                 inboxNotificationTarget(message),
               )}
+            projects={activeOrganizationProjects}
             unreadCount={inbox.unreadCount}
           />
         ) : activePage === "settings" &&
@@ -1024,6 +1025,7 @@ export function App() {
                 setPendingInboxNotificationTarget(
                   inboxNotificationTarget(message),
                 )}
+              projects={activeOrganizationProjects}
               unreadCount={inbox.unreadCount}
             />
             <CompanionBottomNavigation

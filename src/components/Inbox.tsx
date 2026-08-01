@@ -17,8 +17,10 @@ import { EmptyState, MainContent, PageHeader } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Typography } from "@/components/ui/typography";
 import { cn } from "@/lib/utils";
+import { SelectMenu } from "./SelectMenu";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
+import type { Project } from "../types";
 import {
   classifyInboxMessage,
   type InboxCategory,
@@ -46,6 +48,7 @@ export function Inbox({
   onMarkAllRead,
   onMarkRead,
   onOpen,
+  projects,
   unreadCount,
 }: {
   companionMode?: boolean;
@@ -54,29 +57,55 @@ export function Inbox({
   onMarkAllRead: () => void;
   onMarkRead: (messageId: string) => void;
   onOpen: (message: InboxMessageWithReadState) => void;
+  projects: Project[];
   unreadCount: number;
 }) {
   const { localeTag, t } = useI18n();
   const [activeFilters, setActiveFilters] = useState<Set<InboxCategory>>(
     () => new Set(defaultInboxFilters),
   );
+  const [selectedProjectId, setSelectedProjectId] = useState("all");
+  const projectOptions = useMemo(
+    () => [
+      { label: t("inbox.allProjects"), value: "all" },
+      ...projects.map((project) => ({
+        label: project.name,
+        value: project.id,
+      })),
+    ],
+    [projects, t],
+  );
+  const effectiveProjectId = projectOptions.some(
+    (option) => option.value === selectedProjectId,
+  )
+    ? selectedProjectId
+    : "all";
+  const projectMessages = useMemo(
+    () =>
+      effectiveProjectId === "all"
+        ? messages
+        : messages.filter(
+            (message) => message.projectId === effectiveProjectId,
+          ),
+    [effectiveProjectId, messages],
+  );
   const categoryCounts = useMemo(
     () =>
-      messages.reduce<Record<InboxCategory, number>>(
+      projectMessages.reduce<Record<InboxCategory, number>>(
         (counts, message) => {
           counts[classifyInboxMessage(message)] += 1;
           return counts;
         },
         { urgent: 0, action_required: 0, important: 0, activity: 0 },
       ),
-    [messages],
+    [projectMessages],
   );
   const filteredMessages = useMemo(
     () =>
-      messages.filter((message) =>
+      projectMessages.filter((message) =>
         activeFilters.has(classifyInboxMessage(message)),
       ),
-    [activeFilters, messages],
+    [activeFilters, projectMessages],
   );
 
   const toggleFilter = (category: InboxCategory) => {
@@ -119,28 +148,38 @@ export function Inbox({
           className="inbox-panel rounded-none border-0 bg-card"
         >
           <header className="inbox-filter-bar">
-            <div
-              aria-label={t("inbox.filters")}
-              className="inbox-filters"
-              role="group"
-            >
-              {inboxFilters.map((category) => (
-                <button
-                  aria-pressed={activeFilters.has(category)}
-                  className={cn("inbox-filter", category)}
-                  key={category}
-                  onClick={() => toggleFilter(category)}
-                  type="button"
-                >
-                  <FilterIcon category={category} />
-                  <span>
-                    {t(`inbox.category.${category}` as MessageKey)}
-                  </span>
-                  <span className="inbox-filter-count">
-                    {categoryCounts[category]}
-                  </span>
-                </button>
-              ))}
+            <div className="inbox-filter-controls">
+              <SelectMenu
+                className="inbox-project-filter"
+                label={t("inbox.projectFilter")}
+                onValueChange={setSelectedProjectId}
+                options={projectOptions}
+                size="small"
+                value={effectiveProjectId}
+              />
+              <div
+                aria-label={t("inbox.filters")}
+                className="inbox-filters"
+                role="group"
+              >
+                {inboxFilters.map((category) => (
+                  <button
+                    aria-pressed={activeFilters.has(category)}
+                    className={cn("inbox-filter", category)}
+                    key={category}
+                    onClick={() => toggleFilter(category)}
+                    type="button"
+                  >
+                    <FilterIcon category={category} />
+                    <span>
+                      {t(`inbox.category.${category}` as MessageKey)}
+                    </span>
+                    <span className="inbox-filter-count">
+                      {categoryCounts[category]}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
             <Typography as="span" tone="muted" variant="caption">
               {t("inbox.filteredCount", { count: filteredMessages.length })}
