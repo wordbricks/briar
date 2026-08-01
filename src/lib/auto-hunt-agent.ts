@@ -294,6 +294,31 @@ export function agentMessagesFromAppServerEvents(
       continue;
     }
 
+    // Detached Codex workers stream JSONL directly from `codex exec` rather
+    // than through the App Server RPC envelope used by saved-Agent turns.
+    const directType = string(event.message.type);
+    const directItem = record(event.message.item);
+    if (
+      (directType === "item.started" || directType === "item.completed") &&
+      directItem?.type === "agent_message"
+    ) {
+      const id = `${event.sessionId}:${
+        string(directItem.id) ?? `agent-message:${event.sequence}`
+      }`;
+      const existing = messages.get(id);
+      if (!existing) order.push(id);
+      messages.set(id, {
+        id,
+        phase: string(directItem.phase) ?? existing?.phase ??
+          (directType === "item.completed" ? "final_answer" : null),
+        text: string(directItem.text) ?? existing?.text ?? "",
+        startedAtMs: existing?.startedAtMs ?? event.occurredAtMs,
+        updatedAtMs: event.occurredAtMs,
+        isComplete: directType === "item.completed",
+      });
+      continue;
+    }
+
     // Legacy Codex logs did not include a normalized event. Keep decoding
     // their raw App Server message so existing session history still renders.
     if (event.direction !== "server") continue;

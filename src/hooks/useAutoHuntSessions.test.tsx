@@ -3,8 +3,10 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { beforeEach, describe, expect, it } from "vitest";
+import type { HuntRun } from "../types";
 import {
   mergeSynchronizedSessions,
+  reconcileWorkerDispatchSession,
   useAutoHuntSessions,
   type AutoHuntSession,
 } from "./useAutoHuntSessions";
@@ -25,6 +27,64 @@ beforeEach(() => {
 });
 
 describe("useAutoHuntSessions", () => {
+  it("links dispatched Worker runs and completes the session from run outcomes", async () => {
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    await act(async () => root.render(<Harness />));
+
+    await act(async () => {
+      sessionsHook.startTaskSession("project-1", "agent-1", {
+        sessionId: "task-session-1",
+        request: "대기 이슈를 처리해 줘",
+        startedAt: "2026-07-28T01:00:00.000Z",
+      });
+      sessionsHook.startWorkerDispatchSession(
+        "project-1",
+        { id: "agent-1" },
+        [{
+          id: "run-1",
+          runNumber: 1,
+          sourceKey: "BRIAR-1",
+          title: "세션 로그 복구",
+        } as HuntRun],
+        {
+          dispatchId: "dispatch-1",
+          runIds: ["run-1"],
+          parentSessionId: "task-session-1",
+          startedAt: "2026-07-28T01:00:01.000Z",
+        },
+      );
+    });
+
+    const dispatch = sessionsHook.sessions.find(
+      (candidate) => candidate.id === "dispatch-1",
+    )!;
+    expect(dispatch).toMatchObject({
+      parentSessionId: "task-session-1",
+      status: "running",
+      issues: [{ runId: "run-1", outcome: "pending" }],
+    });
+
+    const completed = reconcileWorkerDispatchSession(
+      dispatch,
+      [{
+        id: "run-1",
+        status: "completed",
+        resultSummary: "워커 결과가 저장되었습니다.",
+      } as HuntRun],
+      "2026-07-28T01:10:00.000Z",
+    );
+    expect(completed).toMatchObject({
+      status: "completed",
+      completedAt: "2026-07-28T01:10:00.000Z",
+      summary: "BRIAR-1: 워커 결과가 저장되었습니다.",
+      issues: [{ outcome: "completed", summary: "워커 결과가 저장되었습니다." }],
+    });
+    expect(completed.events.at(-1)?.type).toBe("completed");
+
+    await act(async () => root.unmount());
+  });
+
   it("keeps a remotely owned running session active after app restart", async () => {
     window.localStorage.setItem(
       "briar.auto-hunt-sessions.v1",

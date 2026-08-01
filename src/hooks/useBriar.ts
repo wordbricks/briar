@@ -144,6 +144,12 @@ export type UseBriarOptions = {
       error: string | null;
     },
   ) => void;
+  startScheduledAgentWorkerDispatch?: (
+    parentSessionId: string,
+    run: ClaimedProjectAgentScheduleRun,
+    runs: readonly HuntRun[],
+    dispatch: { dispatchId: string; runIds: string[] },
+  ) => void;
 };
 
 export type ProjectConnection = {
@@ -275,6 +281,7 @@ async function readConnectedProjectIds() {
 export function useBriar(options: UseBriarOptions = {}) {
   const {
     startScheduledAgentSession,
+    startScheduledAgentWorkerDispatch,
     settleScheduledAgentSession,
   } = options;
   const [user, setUser] = useState<SessionUser | null>(demoMode ? demoUser : null);
@@ -643,6 +650,8 @@ export function useBriar(options: UseBriarOptions = {}) {
                 retryHuntRun(currentToken, projectId, runId, reason),
               runAgent: runProjectAgent,
               startSession: startScheduledAgentSession,
+              startWorkerDispatchSession:
+                startScheduledAgentWorkerDispatch,
               settleSession: settleScheduledAgentSession,
             },
             token,
@@ -657,6 +666,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     projects,
     settleScheduledAgentSession,
     startScheduledAgentSession,
+    startScheduledAgentWorkerDispatch,
     token,
   ]);
 
