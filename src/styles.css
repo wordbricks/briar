@@ -1192,22 +1192,27 @@ button.issue-message-state { width:100%; cursor:pointer; }
   font-size:var(--text-md);
   font-weight:400;
 }
-.issue-dialog .issue-project-context {
+.issue-dialog .issue-project-context.select-menu {
   width: auto;
   height: 28px;
-  padding: 0;
-  display: flex;
-  align-items: center;
+}
+.issue-dialog .issue-project-context .select-menu-trigger {
+  width: auto;
+  height: 28px;
+  padding: 0 4px;
   gap: 5px;
   border: 0;
   color: var(--foreground);
   background: transparent;
-  cursor: default;
   font-family: inherit;
   font-size:var(--text-sm);
   font-weight:600;
   line-height: 1;
+  box-shadow: none;
 }
+.issue-project-context .select-menu-trigger:hover:not(:disabled),
+.issue-project-context[data-open] .select-menu-trigger { background: var(--accent); }
+.issue-project-context .select-menu-trigger:focus-visible { box-shadow:0 0 0 2px var(--ring); }
 .issue-project-context svg { color: var(--muted-foreground); }
 .issue-dialog .issue-dialog-close {
   width: 32px;
@@ -1451,7 +1456,6 @@ button.issue-message-state { width:100%; cursor:pointer; }
   gap: 8px;
   border-top: 1px solid var(--border);
 }
-.issue-metadata-chip,
 .issue-attachment-trigger,
 .issue-dialog .issue-status-select.select-menu .select-menu-trigger,
 .issue-dialog .issue-priority-select.select-menu .select-menu-trigger {
@@ -1471,22 +1475,8 @@ button.issue-message-state { width:100%; cursor:pointer; }
   font-weight: 500;
   line-height: 1;
 }
-.issue-metadata-chip {
-  cursor: default;
-}
-.issue-metadata-chip > i {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #e2e3e1;
-}
-.issue-metadata-chip > svg:first-child,
 .issue-attachment-trigger > svg {
   color: #a5a6a4;
-}
-.issue-metadata-chip > svg:last-child {
-  margin-left: 1px;
-  color: #999a98;
 }
 .issue-dialog .issue-status-select.select-menu,
 .issue-dialog .issue-priority-select.select-menu {
@@ -3376,8 +3366,11 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .companion-shell .issue-dialog-context > span {
   font-size:var(--text-xl);
 }
-.companion-shell .issue-dialog .issue-project-context {
+.companion-shell .issue-dialog .issue-project-context.select-menu,
+.companion-shell .issue-dialog .issue-project-context .select-menu-trigger {
   height: 34px;
+}
+.companion-shell .issue-dialog .issue-project-context .select-menu-trigger {
   gap: 5px;
   font-size:var(--text-md);
 }
@@ -3428,7 +3421,6 @@ button.issue-message-state { width:100%; cursor:pointer; }
   scrollbar-width: none;
 }
 .companion-shell .issue-metadata-bar::-webkit-scrollbar { display: none; }
-.companion-shell .issue-metadata-chip,
 .companion-shell .issue-attachment-trigger,
 .companion-shell .issue-dialog .issue-status-select.select-menu .select-menu-trigger,
 .companion-shell .issue-dialog .issue-priority-select.select-menu .select-menu-trigger {
@@ -3500,8 +3492,11 @@ button.issue-message-state { width:100%; cursor:pointer; }
   .issue-dialog-context { gap: 10px; }
   .issue-dialog-context > strong { font-size:var(--text-md); }
   .issue-dialog-context > span { font-size:var(--text-xl); }
-  .issue-dialog .issue-project-context {
+  .issue-dialog .issue-project-context.select-menu,
+  .issue-dialog .issue-project-context .select-menu-trigger {
     height: 34px;
+  }
+  .issue-dialog .issue-project-context .select-menu-trigger {
     gap: 5px;
     font-size:var(--text-md);
   }
@@ -3541,7 +3536,6 @@ button.issue-message-state { width:100%; cursor:pointer; }
     scrollbar-width: none;
   }
   .issue-metadata-bar::-webkit-scrollbar { display: none; }
-  .issue-metadata-chip,
   .issue-attachment-trigger,
   .issue-dialog .issue-status-select.select-menu .select-menu-trigger,
   .issue-dialog .issue-priority-select.select-menu .select-menu-trigger {

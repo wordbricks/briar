@@ -10,7 +10,6 @@ import {
   CircleAlert,
   Clock3,
   Columns3,
-  FolderKanban,
   FolderGit2,
   GitCommitHorizontal,
   GitFork,
@@ -31,7 +30,6 @@ import {
   Search,
   Share2,
   Signal,
-  Tag,
   Trash2,
   UserRound,
   Video,
@@ -123,6 +121,7 @@ import type {
   IssueMessageSendResult,
   IssueExecutionPreferences,
   OrganizationMember,
+  Project,
   ProjectAgent,
   RunEvidence,
   RunEvidenceImage,
@@ -166,6 +165,7 @@ export function HuntDashboard({
   isSidebarOpen,
   onAddProject,
   onCreateIssue,
+  projects = [],
   onIssueDialogOpenChange,
   onDeleteIssue,
   onAddIssueDependency,
@@ -208,7 +208,11 @@ export function HuntDashboard({
   recoveryError: string | null;
   isSidebarOpen: boolean;
   onAddProject?: () => void;
-  onCreateIssue: (input: CreateIssueInput) => Promise<unknown>;
+  onCreateIssue: (
+    projectId: string,
+    input: CreateIssueInput,
+  ) => Promise<unknown>;
+  projects?: Project[];
   onIssueDialogOpenChange?: (isOpen: boolean) => void;
   onDeleteIssue: (runId: string) => Promise<unknown>;
   onAddIssueDependency?: (
@@ -515,13 +519,20 @@ export function HuntDashboard({
   }, [companionMode, dashboard?.settings.workflow, filtered, status, t]);
   const createIssueDialog = isIssueDialogOpen ? (
     <CreateIssueDialog
+      defaultProjectId={dashboard?.project.id}
       isSubmitting={isCreatingIssue}
       onClose={() => setIsIssueDialogOpen(false)}
-      onCreate={async (input) => {
-        await onCreateIssue(input);
+      onCreate={async (projectId, input) => {
+        await onCreateIssue(projectId, input);
         setIsIssueDialogOpen(false);
       }}
-      projectName={dashboard?.project.name}
+      projects={
+        projects.length > 0
+          ? projects
+          : dashboard
+            ? [dashboard.project]
+            : []
+      }
     />
   ) : null;
 
@@ -1178,21 +1189,28 @@ export function EditIssueDialog({
 }
 
 export function CreateIssueDialog({
+  defaultProjectId,
   isSubmitting,
   onClose,
   onCreate,
-  projectName,
+  projects,
 }: {
+  defaultProjectId?: string;
   isSubmitting: boolean;
   onClose: () => void;
-  onCreate: (input: CreateIssueInput) => Promise<void>;
-  projectName?: string;
+  onCreate: (projectId: string, input: CreateIssueInput) => Promise<void>;
+  projects: Project[];
 }) {
   const { t } = useI18n();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<"backlog" | "queued">("queued");
   const [priority, setPriority] = useState("2");
+  const [projectId, setProjectId] = useState(() =>
+    projects.some((project) => project.id === defaultProjectId)
+      ? defaultProjectId!
+      : projects[0]?.id ?? ""
+  );
   const [attachments, setAttachments] = useState<
     Array<{ file: File; reference: string }>
   >([]);
@@ -1398,20 +1416,24 @@ export function CreateIssueDialog({
           event.preventDefault();
           if (!title.trim() || isSubmitting) return;
           setSubmitError(null);
-          void onCreate({
-            title: title.trim(),
-            description: description.trim() || null,
-            priority: Number(priority),
-            status,
-            attachments: attachments.map(({ file }) => file),
-            ...(attachments.length > 0
-              ? {
-                  attachmentReferences: attachments.map(
-                    ({ reference }) => reference,
-                  ),
-                }
-              : {}),
-          }).catch((error) =>
+          if (!projectId) return;
+          void onCreate(
+            projectId,
+            {
+              title: title.trim(),
+              description: description.trim() || null,
+              priority: Number(priority),
+              status,
+              attachments: attachments.map(({ file }) => file),
+              ...(attachments.length > 0
+                ? {
+                    attachmentReferences: attachments.map(
+                      ({ reference }) => reference,
+                    ),
+                  }
+                : {}),
+            },
+          ).catch((error) =>
             setSubmitError(error instanceof Error ? error.message : String(error)),
           );
         }}
@@ -1422,18 +1444,21 @@ export function CreateIssueDialog({
         <header>
           <div className="issue-dialog-context">
             <strong>{t("issue.newIssue")}</strong>
-            {projectName && (
+            {projects.length > 0 && (
               <>
                 <span aria-hidden="true">/</span>
-                <button
-                  aria-disabled="true"
+                <SelectMenu
                   className="issue-project-context"
-                  disabled
-                  type="button"
-                >
-                  {projectName}
-                  <ChevronDown size={12} />
-                </button>
+                  disabled={isSubmitting}
+                  label={t("issue.project")}
+                  onValueChange={setProjectId}
+                  options={projects.map((project) => ({
+                    label: project.name,
+                    value: project.id,
+                  }))}
+                  size="small"
+                  value={projectId}
+                />
               </>
             )}
           </div>
@@ -1517,16 +1542,6 @@ export function CreateIssueDialog({
               ]}
               value={status}
             />
-            <button
-              aria-disabled="true"
-              className="issue-metadata-chip"
-              disabled
-              type="button"
-            >
-              <UserRound size={13} />
-              {t("issue.assignee")}
-              <ChevronDown size={12} />
-            </button>
             <NativeSelect
               className="issue-priority-select"
               label={t("issue.priority")}
@@ -1539,26 +1554,6 @@ export function CreateIssueDialog({
               ]}
               value={priority}
             />
-            <button
-              aria-disabled="true"
-              className="issue-metadata-chip"
-              disabled
-              type="button"
-            >
-              <FolderKanban size={13} />
-              {t("issue.project")}
-              <ChevronDown size={12} />
-            </button>
-            <button
-              aria-disabled="true"
-              className="issue-metadata-chip"
-              disabled
-              type="button"
-            >
-              <Tag size={13} />
-              {t("issue.labels")}
-              <ChevronDown size={12} />
-            </button>
             <label className="issue-attachment-trigger">
               <Paperclip size={13} />
               <span>
@@ -1604,7 +1599,7 @@ export function CreateIssueDialog({
             </button>
             <button
               className="issue-submit-button"
-              disabled={isSubmitting || !title.trim()}
+              disabled={isSubmitting || !title.trim() || !projectId}
               type="submit"
             >
               {isSubmitting && <LoaderCircle className="spin" size={13} />}

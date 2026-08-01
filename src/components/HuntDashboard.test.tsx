@@ -771,19 +771,34 @@ describe("HuntDashboard", () => {
   it("renders the issue editor metadata and accepts image or video files", () => {
     const markup = renderToStaticMarkup(
       <CreateIssueDialog
+        defaultProjectId="project-1"
         isSubmitting={false}
         onClose={() => undefined}
         onCreate={async () => undefined}
-        projectName="GG"
+        projects={[
+          {
+            id: "project-1",
+            name: "GG",
+            organizationId: "organization-1",
+            createdAt: "2026-07-01T00:00:00.000Z",
+          },
+          {
+            id: "project-2",
+            name: "Mobile",
+            organizationId: "organization-1",
+            createdAt: "2026-07-02T00:00:00.000Z",
+          },
+        ]}
       />,
     );
 
     expect(markup).toContain("새 이슈");
     expect(markup).toContain(">GG<");
     expect(markup).toContain("대기");
-    expect(markup).toContain("담당자");
     expect(markup).toContain("프로젝트");
-    expect(markup).toContain("라벨");
+    expect(markup).not.toContain("담당자");
+    expect(markup).not.toContain("라벨");
+    expect(markup).toContain('aria-haspopup="listbox" aria-label="프로젝트"');
     expect(markup).toContain('aria-haspopup="listbox" aria-label="상태"');
     expect(markup).toContain("native-select issue-status-select");
     expect(markup).toContain('aria-haspopup="listbox" aria-label="우선순위"');
