@@ -206,6 +206,7 @@ export function App() {
     useState<InboxNotificationTarget | null>(null);
   useInboxNotificationClicks(setPendingInboxNotificationTarget);
   const [requestedRunId, setRequestedRunId] = useState<string | null>(null);
+  const [issueListRequestKey, setIssueListRequestKey] = useState(0);
   const [requestedSessionId, setRequestedSessionId] = useState<string | null>(
     null,
   );
@@ -662,7 +663,11 @@ export function App() {
             onAgentsOpen={() => navigateToPage("agents")}
             onScheduleOpen={() => navigateToPage("schedule")}
             onInboxOpen={() => navigateToPage("inbox")}
-            onIssuesOpen={() => navigateToPage("issues")}
+            onIssuesOpen={() => {
+              setRequestedRunId(null);
+              setIssueListRequestKey((key) => key + 1);
+              navigateToPage("issues");
+            }}
             onCreateIssue={() => {
               navigateToPage("issues");
               setIsIssueDialogOpen(true);
@@ -925,6 +930,7 @@ export function App() {
             recoveringRunId={briar.recoveringRunId}
             recoveryError={briar.recoveryError}
             requestedRunId={requestedRunId}
+            issueListRequestKey={issueListRequestKey}
             isSidebarOpen={isSidebarOpen}
             onAddProject={briar.startProjectCreation}
             onCreateIssue={briar.addIssue}

@@ -191,6 +191,7 @@ export function HuntDashboard({
   onRequestedRunOpen,
   onSendIssueMessage,
   requestedRunId = null,
+  issueListRequestKey = 0,
   processingIssueIds = new Set<string>(),
   sessions = [],
   token = null,
@@ -254,6 +255,7 @@ export function HuntDashboard({
     },
   ) => Promise<IssueMessageSendResult>;
   requestedRunId?: string | null;
+  issueListRequestKey?: number;
   processingIssueIds?: ReadonlySet<string>;
   sessions?: AutoHuntSession[];
   token?: string | null;
@@ -438,6 +440,10 @@ export function HuntDashboard({
       ),
     ];
   }, [dashboard?.organizationProviders, dashboard?.workers]);
+
+  useEffect(() => {
+    setSelectedRunId(null);
+  }, [issueListRequestKey]);
 
   useEffect(() => {
     if (!requestedRunId) return;

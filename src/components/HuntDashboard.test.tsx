@@ -1106,6 +1106,35 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
+  it("returns from issue details when the issue list is requested", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={demoDashboard}
+        requestedRunId={demoDashboard.runs[0].id}
+      />,
+    ));
+
+    expect(container.querySelector(".run-page")).not.toBeNull();
+
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={demoDashboard}
+        issueListRequestKey={1}
+      />,
+    ));
+
+    expect(container.querySelector(".run-page")).toBeNull();
+    expect(container.querySelector(".kanban-board")).not.toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("keeps in-page issue navigation and adds conversation as a tab in companion mode", async () => {
     const container = document.createElement("div");
     document.body.append(container);
