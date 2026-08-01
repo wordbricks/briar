@@ -21,6 +21,12 @@ describe("bundled skill guides", () => {
     expect(guide?.markdown).toContain("## Optional Velen and Linear");
     expect(guide?.markdown).toContain("nontechnical PM or CEO");
     expect(guide?.markdown).toContain("main result card");
+    expect(guide?.markdown).toContain("Problem and scope");
+    expect(guide?.markdown).toContain("Before and after");
+    expect(guide?.markdown).toContain("Choose details by consequence, not by technology");
+    expect(guide?.markdown).toContain("interface change");
+    expect(guide?.markdown).toContain("integration");
+    expect(guide?.markdown).toContain("operational change");
     expect(guide?.markdown).toContain("user-visible interface");
     expect(guide?.markdown).toContain("repeated `--image` arguments");
     expect(guide?.markdown).toContain("--structured-result-file '<blocked-result.json>'");

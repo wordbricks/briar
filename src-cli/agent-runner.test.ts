@@ -80,7 +80,13 @@ describe("detached Agent runner", () => {
     expect(prompt).toContain("observable completion condition");
     expect(prompt).toContain("available under View details");
     expect(prompt).toContain("structured blocked result");
-    expect(prompt).toContain("visible outcome and business impact");
+    expect(prompt).toContain("original problem and the specific data");
+    expect(prompt).toContain("key implementation approach");
+    expect(prompt).toContain("before-and-after operational or user impact");
+    expect(prompt).toContain("relevant selection or decision criteria");
+    expect(prompt).toContain("Adapt the explanation to the work performed");
+    expect(prompt).toContain("fallback, recovery, or cleanup");
+    expect(prompt).toContain("never invent them");
     expect(prompt).toContain("briar run evidence add --image");
     expect(prompt).toContain("issue detail page");
     expect(prompt).not.toContain("claimToken");
