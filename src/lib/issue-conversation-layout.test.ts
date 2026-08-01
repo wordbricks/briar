@@ -23,10 +23,12 @@ describe("issue conversation layout", () => {
 
   it("pins the thread layer to the viewport", () => {
     const layerRule = firstRule(".issue-thread-layer");
+    const openLayerRule = firstRule(".issue-thread-layer.open");
     const drawerRule = firstRule(".issue-thread-drawer");
 
     expect(layerRule).toContain("position:fixed");
     expect(layerRule).toContain("inset:0");
+    expect(openLayerRule).toContain("pointer-events:auto");
     expect(drawerRule).toContain("margin-left:auto");
     expect(drawerRule).toContain("50vw");
   });
