@@ -11,8 +11,9 @@
  * runs can recover without trusting stale bookkeeping.
  */
 
-import { copyFile, cp, lstat, mkdir, readFile, stat } from "node:fs/promises";
+import { copyFile, cp, lstat, mkdir, readFile, readdir, rm, stat } from "node:fs/promises";
 import { realpathSync } from "node:fs";
+import type { Dirent } from "node:fs";
 import { createHash } from "node:crypto";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
@@ -28,6 +29,25 @@ const FETCH_TIMEOUT_MS = 120_000;
 const WORKTREE_INCLUDE_MAX_BYTES = 256 * 1024;
 const WORKTREE_INCLUDE_MAX_ENTRIES = 200;
 const MAX_SLUG_LENGTH = 40;
+
+/**
+ * Reproducible directories that can dominate an issue worktree after a run.
+ * A matching name is only removed after Git confirms that exact path is
+ * ignored, so a tracked `build` or `target` directory is never compacted.
+ */
+export const RECLAIMABLE_ARTIFACT_DIRECTORY_NAMES = new Set([
+  ".cache",
+  ".next",
+  ".turbo",
+  ".vite",
+  ".vite-plus",
+  "DerivedData",
+  "build",
+  "coverage",
+  "dist",
+  "node_modules",
+  "target",
+]);
 
 /**
  * Base-ref probe order. Remote-tracking refs come first so a new worktree is
@@ -549,6 +569,164 @@ export type RemoveWorktreeResult = {
   preservedBranch?: string;
 };
 
+export type TerminalWorktreeMaintenanceResult = {
+  compactedPaths: string[];
+  failedPaths: string[];
+  gc:
+    | { status: "removed"; branchDeleted: boolean }
+    | {
+        status: "retained";
+        reason: "unmerged" | "dirty" | "git-status-error" | "removal-error";
+        detail?: string;
+      };
+};
+
+function relativeGitPath(worktreePath: string, candidatePath: string): string {
+  return relative(resolve(worktreePath), resolve(candidatePath)).split(sep).join("/");
+}
+
+function gitIgnoresPath(
+  git: GitRunner,
+  worktreePath: string,
+  candidatePath: string,
+): boolean {
+  const candidate = relativeGitPath(worktreePath, candidatePath);
+  if (!candidate || candidate === ".." || candidate.startsWith("../")) return false;
+  return (
+    git(["check-ignore", "--quiet", "--", candidate], {
+      cwd: worktreePath,
+    }).exitCode === 0
+  );
+}
+
+/**
+ * Remove only well-known, Git-ignored build/dependency directories.
+ *
+ * The walk never follows symlinks and prunes a directory as soon as it is
+ * removed. Failures are isolated per path: a locked build directory must not
+ * prevent the remaining artifacts or the later GC decision from being
+ * processed.
+ */
+export async function compactWorktreeArtifacts(
+  git: GitRunner,
+  worktreePath: string,
+): Promise<{ compactedPaths: string[]; failedPaths: string[] }> {
+  const root = resolve(worktreePath);
+  const compactedPaths: string[] = [];
+  const failedPaths: string[] = [];
+
+  const walk = async (directory: string): Promise<void> => {
+    let entries: Dirent[];
+    try {
+      entries = await readdir(directory, { withFileTypes: true });
+    } catch {
+      return;
+    }
+
+    for (const entry of entries) {
+      if (!entry.isDirectory() || entry.name === ".git") continue;
+      const candidate = join(directory, entry.name);
+      if (
+        RECLAIMABLE_ARTIFACT_DIRECTORY_NAMES.has(entry.name) &&
+        gitIgnoresPath(git, root, candidate)
+      ) {
+        try {
+          await rm(candidate, { recursive: true, force: true });
+          compactedPaths.push(relativeGitPath(root, candidate));
+        } catch {
+          failedPaths.push(relativeGitPath(root, candidate));
+        }
+        continue;
+      }
+      await walk(candidate);
+    }
+  };
+
+  await walk(root);
+  compactedPaths.sort();
+  failedPaths.sort();
+  return { compactedPaths, failedPaths };
+}
+
+/** True only when every commit on the issue branch is already in the base. */
+export function issueWorktreeMergedIntoBase(
+  git: GitRunner,
+  repositoryPath: string,
+  branch: string,
+  baseRef?: string,
+): boolean {
+  const resolvedBase = baseRef ?? resolveBaseRef(git, repositoryPath);
+  if (!resolvedBase) return false;
+  const qualified = qualifyBaseRef(resolvedBase, (ref) =>
+    refExistsIn(git, repositoryPath, ref),
+  );
+  return (
+    git(["merge-base", "--is-ancestor", `refs/heads/${branch}`, qualified], {
+      cwd: repositoryPath,
+    }).exitCode === 0
+  );
+}
+
+/**
+ * Compact a terminal run's reproducible outputs, then garbage-collect its
+ * worktree only when the branch is merged and the remaining checkout is clean.
+ * Source changes and unmerged commits are always retained.
+ */
+export async function maintainTerminalIssueWorktree(
+  git: GitRunner,
+  repositoryPath: string,
+  worktree: { path: string; branch: string },
+  options: { baseRef?: string } = {},
+): Promise<TerminalWorktreeMaintenanceResult> {
+  const compacted = await compactWorktreeArtifacts(git, worktree.path);
+  if (
+    !issueWorktreeMergedIntoBase(
+      git,
+      repositoryPath,
+      worktree.branch,
+      options.baseRef,
+    )
+  ) {
+    return { ...compacted, gc: { status: "retained", reason: "unmerged" } };
+  }
+
+  const status = git(["status", "--porcelain", "--untracked-files=all"], {
+    cwd: worktree.path,
+  });
+  if (status.exitCode !== 0) {
+    return {
+      ...compacted,
+      gc: {
+        status: "retained",
+        reason: "git-status-error",
+        detail: status.stderr.trim() || status.stdout.trim(),
+      },
+    };
+  }
+  if (status.stdout.trim()) {
+    return { ...compacted, gc: { status: "retained", reason: "dirty" } };
+  }
+
+  try {
+    const removed = removeIssueWorktree(git, repositoryPath, worktree, {
+      baseRef: options.baseRef,
+    });
+    return {
+      ...compacted,
+      gc: { status: "removed", branchDeleted: removed.branchDeleted },
+    };
+  } catch (error) {
+    return {
+      ...compacted,
+      gc: {
+        status: "retained",
+        reason: "removal-error",
+        detail: error instanceof Error ? error.message : String(error),
+      },
+    };
+  }
+}
+
 /**
  * Whether the branch holds commits the base ref does not already contain.
  *
@@ -563,16 +741,7 @@ function branchHasUniqueWork(
   branch: string,
   baseRef: string | undefined,
 ): boolean {
-  const resolvedBase = baseRef ?? resolveBaseRef(git, repositoryPath);
-  if (!resolvedBase) return true;
-  const qualified = qualifyBaseRef(resolvedBase, (ref) =>
-    refExistsIn(git, repositoryPath, ref),
-  );
-  return (
-    git(["merge-base", "--is-ancestor", `refs/heads/${branch}`, qualified], {
-      cwd: repositoryPath,
-    }).exitCode !== 0
-  );
+  return !issueWorktreeMergedIntoBase(git, repositoryPath, branch, baseRef);
 }
 
 /**

@@ -389,12 +389,19 @@ Worktree commands:
 ```sh
 briar worktree show
 briar worktree list
+briar worktree maintain [--path '<worktree>']
 briar worktree remove [--path '<worktree>'] [--force]
 ```
 
 Leave blocked or failed worktrees in place for inspection. After completion, remove a
 worktree only when the work is merged or intentionally abandoned. Removal refuses dirty
 worktrees and preserves a branch whose commits are not in the base ref.
+
+After a Worker exits, the Briar host automatically runs the same maintenance operation.
+It removes only allowlisted reproducible directories that Git confirms are ignored, then
+deletes the worktree only when its branch is merged into the base ref and the remaining
+checkout is clean. Unmerged commits and source changes are retained; maintenance failure
+does not change the run outcome.
 
 ## Handoff
 

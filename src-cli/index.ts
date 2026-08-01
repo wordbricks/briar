@@ -40,6 +40,7 @@ import {
   defaultWorktreeRoot,
   findExistingIssueWorktree,
   listIssueWorktrees,
+  maintainTerminalIssueWorktree,
   projectWorktreeRoot,
   removeIssueWorktree,
   resolveBaseRef,
@@ -1099,6 +1100,43 @@ async function worktreeRemove() {
   console.log(JSON.stringify({ path: registered.path, branch: registered.branch, ...result }));
 }
 
+async function worktreeMaintain() {
+  const config = await loadConfig();
+  const project = await currentProject(config);
+  const root = projectWorktreeRoot(worktreeSettings(project).root, project.id);
+  const activeWorktree = project.activeClaim?.worktree;
+  const target = resolve(value("--path") ?? activeClaimWorktree(project).path);
+  const registered = listIssueWorktrees(runGit, project.repositoryPath, root).find((worktree) =>
+    samePath(worktree.path, target),
+  );
+  if (!registered?.branch) {
+    throw new Error(`이 프로젝트의 워크트리가 아닙니다: ${target}`);
+  }
+  const baseRef =
+    activeWorktree && samePath(activeWorktree.path, registered.path)
+      ? activeWorktree.baseRef
+      : undefined;
+  const result = await maintainTerminalIssueWorktree(
+    runGit,
+    project.repositoryPath,
+    { path: registered.path, branch: registered.branch },
+    { ...(baseRef ? { baseRef } : {}) },
+  );
+  if (
+    result.gc.status === "removed" &&
+    project.activeClaim?.worktree &&
+    samePath(project.activeClaim.worktree.path, registered.path)
+  ) {
+    config.projects = config.projects.map((candidate) => {
+      if (candidate.id !== project.id || !candidate.activeClaim) return candidate;
+      const { worktree: _removed, ...activeClaim } = candidate.activeClaim;
+      return { ...candidate, activeClaim };
+    });
+    await saveConfig(config);
+  }
+  console.log(JSON.stringify({ path: registered.path, branch: registered.branch, ...result }));
+}
+
 async function optionalText(valueFlag: string, fileFlag: string) {
   const path = value(fileFlag);
   if (path) return readFile(resolve(path), "utf8");
@@ -1838,6 +1876,26 @@ async function runClaimedIssueInRuntime(
   } finally {
     signal.removeEventListener("abort", terminate);
     terminate();
+    await exitPromise.catch(() => null);
+    if (workspace.type === "worktree") {
+      try {
+        const maintenance = await maintainTerminalIssueWorktree(
+          runGit,
+          project.repositoryPath,
+          { path: workspace.path, branch: workspace.branch },
+          { baseRef: workspace.baseRef },
+        );
+        console.error(
+          `worktree maintenance for ${issue.sourceKey}: ${JSON.stringify(maintenance)}`,
+        );
+      } catch (error) {
+        console.error(
+          `worktree maintenance failed for ${issue.sourceKey}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
   }
 }
 
@@ -2663,6 +2721,7 @@ const usage = `Briar CLI
     [--base-branch <ref>]
   briar worktree show
   briar worktree list
+  briar worktree maintain [--path <worktree>]
   briar worktree remove [--path <worktree>] [--force]
   briar run event add [--run <uuid>]
     [--source <issue|feedback|error> --source-key <key> --title <title>]
@@ -2725,6 +2784,7 @@ async function main() {
   if (args[0] === "queue" && args[1] === "claim") return claimWork();
   if (args[0] === "worktree" && args[1] === "show") return worktreeShow();
   if (args[0] === "worktree" && args[1] === "list") return worktreeList();
+  if (args[0] === "worktree" && args[1] === "maintain") return worktreeMaintain();
   if (args[0] === "worktree" && args[1] === "remove") return worktreeRemove();
   if (args[0] === "run" && args[1] === "event" && args[2] === "add") {
     return addRunEvent();
