@@ -59,6 +59,7 @@ export function ProjectAgentDetail({
   requestedSessionId,
   isRunning: isResponsibilityRunning = false,
   sessions,
+  token = null,
 }: {
   agent: ProjectAgent;
   companionMode?: boolean;
@@ -88,6 +89,7 @@ export function ProjectAgentDetail({
   requestedSessionId: string | null;
   isRunning?: boolean;
   sessions: AutoHuntSession[];
+  token?: string | null;
 }) {
   const { t } = useI18n();
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
@@ -206,6 +208,7 @@ export function ProjectAgentDetail({
         onIssueOpen={onIssueOpen}
         onStop={() => onStopSession(selectedSession.id)}
         session={selectedSession}
+        token={token}
       />
     );
   }

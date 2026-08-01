@@ -17,6 +17,7 @@ import type {
   AutoHuntSessionStatus,
 } from "../hooks/useAutoHuntSessions";
 import { useAutoHuntAppServerEvents } from "../hooks/useAutoHuntAppServerEvents";
+import { useProjectAgentWorkerEvents } from "../hooks/useProjectAgentWorkerEvents";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
 import {
@@ -30,20 +31,33 @@ export function ProjectAgentSessionDetail({
   onIssueOpen,
   onStop,
   session,
+  token = null,
 }: {
   isSidebarOpen: boolean;
   onBack: () => void;
   onIssueOpen: (runId: string) => void;
   onStop: () => Promise<boolean>;
   session: AutoHuntSession;
+  token?: string | null;
 }) {
   const { localeTag, t } = useI18n();
   const appServerEvents = useAutoHuntAppServerEvents(
     session.sessionType === "task" ? session.id : null,
   );
+  const workerEvents = useProjectAgentWorkerEvents(
+    token,
+    session.projectId,
+    session.sessionType === "dispatch"
+      ? session.issues.map((issue) => issue.runId)
+      : [],
+    session.status === "running",
+  );
+  const executionEvents = session.sessionType === "task"
+    ? appServerEvents
+    : workerEvents;
   const agentMessages = useMemo(
-    () => agentMessagesFromAppServerEvents(appServerEvents.events),
-    [appServerEvents.events],
+    () => agentMessagesFromAppServerEvents(executionEvents.events),
+    [executionEvents.events],
   );
   const agentMessagesRef = useRef<HTMLDivElement>(null);
   const workerProgressRef = useRef<HTMLDivElement>(null);
@@ -233,7 +247,7 @@ export function ProjectAgentSessionDetail({
               </section>
             ) : null}
 
-            {session.sessionType === "task" ? (
+            {session.sessionType === "task" || session.issues.length > 0 ? (
               <section className="auto-hunt-dialog-section auto-hunt-app-server-section">
                 <header>
                   <div>
@@ -252,12 +266,12 @@ export function ProjectAgentSessionDetail({
                     })}
                   </span>
                 </header>
-                {appServerEvents.error ? (
+                {executionEvents.error ? (
                   <div className="auto-hunt-event-state error">
                     <CircleAlert size={14} />
-                    {appServerEvents.error}
+                    {executionEvents.error}
                   </div>
-                ) : appServerEvents.isLoading ? (
+                ) : executionEvents.isLoading ? (
                   <div className="auto-hunt-event-state">
                     <LoaderCircle className="spin" size={14} />
                     {t("autoHunt.eventsLoading")}

@@ -46,6 +46,31 @@ describe("mergeAutoHuntAppServerEvents", () => {
 });
 
 describe("agentMessagesFromAppServerEvents", () => {
+  it("renders final messages from detached Codex worker transcripts", () => {
+    expect(agentMessagesFromAppServerEvents([{
+      sessionId: "detached-run-1",
+      sequence: 7,
+      occurredAtMs: 700,
+      direction: "server",
+      provider: "codex",
+      message: {
+        type: "item.completed",
+        item: {
+          id: "worker-message-1",
+          type: "agent_message",
+          text: "워커 구현과 검증을 완료했습니다.",
+        },
+      },
+    }])).toEqual([{
+      id: "detached-run-1:worker-message-1",
+      phase: "final_answer",
+      text: "워커 구현과 검증을 완료했습니다.",
+      startedAtMs: 700,
+      updatedAtMs: 700,
+      isComplete: true,
+    }]);
+  });
+
   it("renders provider-neutral agent events without parsing the raw protocol", () => {
     const events: AutoHuntAppServerEvent[] = [
       {

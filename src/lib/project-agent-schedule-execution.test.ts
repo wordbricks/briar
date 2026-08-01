@@ -159,6 +159,8 @@ describe("scheduled project agent execution", () => {
 
   it("honors a dispatch decision from any scheduled Agent", async () => {
     const current = dependencies();
+    current.startSession = vi.fn(() => "scheduled-session");
+    current.startWorkerDispatchSession = vi.fn();
     vi.mocked(current.runAgent).mockResolvedValue({
       conversationId: "agent-conversation",
       action: "dispatch_auto_hunt",
@@ -191,6 +193,15 @@ describe("scheduled project agent execution", () => {
         effort: null,
         workerId: null,
         reassign: false,
+      },
+    );
+    expect(current.startWorkerDispatchSession).toHaveBeenCalledWith(
+      "scheduled-session",
+      scheduledRun("Any saved Agent"),
+      dashboard.runs,
+      {
+        dispatchId: expect.any(String),
+        runIds: [dashboard.runs[0].id],
       },
     );
   });

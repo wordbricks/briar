@@ -106,7 +106,26 @@ export function App() {
         scheduleRunId: run.id,
       }),
     settleScheduledAgentSession: autoHunt.settleTaskSession,
-  }), [autoHunt.settleTaskSession, autoHunt.startTaskSession]);
+    startScheduledAgentWorkerDispatch: (
+      parentSessionId,
+      run,
+      runs,
+      dispatch,
+    ) => autoHunt.startWorkerDispatchSession(
+      run.projectId,
+      run.agent,
+      runs,
+      {
+        ...dispatch,
+        parentSessionId,
+        startedAt: run.startedAt,
+      },
+    ),
+  }), [
+    autoHunt.settleTaskSession,
+    autoHunt.startTaskSession,
+    autoHunt.startWorkerDispatchSession,
+  ]);
   const briar = useBriar(scheduleSessionOptions);
   useEffect(() => {
     autoHunt.configureSync(
@@ -114,6 +133,13 @@ export function App() {
       briar.projects.map((project) => project.id),
     );
   }, [autoHunt.configureSync, briar.projects, briar.token]);
+  useEffect(() => {
+    if (!briar.dashboard) return;
+    autoHunt.reconcileWorkerDispatches(
+      briar.dashboard.project.id,
+      briar.dashboard.runs,
+    );
+  }, [autoHunt.reconcileWorkerDispatches, briar.dashboard]);
   const inbox = useInbox(
     briar.user?.id ?? null,
     briar.activeOrganizationId,
@@ -440,6 +466,12 @@ export function App() {
         retryReason: options?.retryReason,
       },
     );
+    autoHunt.startWorkerDispatchSession(activeProject.id, agent, runs, {
+      dispatchId: result.dispatchId,
+      runIds: result.runIds,
+      parentSessionId: options?.parentSessionId,
+      coordinatorConversationId: options?.coordinatorConversationId,
+    });
     await briar.refresh();
     return result.dispatchId;
   };

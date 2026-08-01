@@ -371,6 +371,7 @@ export function ProjectAgents({
           executingAgentIds.has(selectedAgent.id)
         }
         sessions={sessions}
+        token={token}
       />
     );
   }

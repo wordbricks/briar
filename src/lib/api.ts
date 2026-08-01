@@ -684,6 +684,36 @@ export async function loadRunEvents(
   }));
 }
 
+export type ProjectAgentTranscript = {
+  session: {
+    sessionId: string;
+    runId: string | null;
+    workerId: string | null;
+    agentProvider: AgentProvider;
+    startedAt: string;
+    lastEventAt: string;
+    eventCount: number;
+  };
+  events: Array<{
+    sequence: number;
+    direction: "client" | "server";
+    message: unknown;
+    recordedAt: string;
+  }>;
+};
+
+export async function loadProjectAgentTranscript(
+  token: string,
+  projectId: string,
+  sessionId: string,
+  afterSequence = 0,
+): Promise<ProjectAgentTranscript> {
+  return request<ProjectAgentTranscript>(
+    `/projects/${projectId}/sessions/${encodeURIComponent(sessionId)}/transcript?afterSequence=${afterSequence}`,
+    token,
+  );
+}
+
 export async function createProject(
   token: string,
   input: { name: string; organizationId?: string },

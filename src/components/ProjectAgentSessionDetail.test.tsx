@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import { useAutoHuntAppServerEvents } from "../hooks/useAutoHuntAppServerEvents";
+import { useProjectAgentWorkerEvents } from "../hooks/useProjectAgentWorkerEvents";
 import { ProjectAgentSessionDetail } from "./ProjectAgentSessionDetail";
 
 vi.mock("../hooks/useAutoHuntAppServerEvents", () => ({
@@ -14,8 +15,16 @@ vi.mock("../hooks/useAutoHuntAppServerEvents", () => ({
     error: null,
   })),
 }));
+vi.mock("../hooks/useProjectAgentWorkerEvents", () => ({
+  useProjectAgentWorkerEvents: vi.fn(() => ({
+    events: [],
+    isLoading: false,
+    error: null,
+  })),
+}));
 
 const mockedAppServerEvents = vi.mocked(useAutoHuntAppServerEvents);
+const mockedWorkerEvents = vi.mocked(useProjectAgentWorkerEvents);
 
 const mounted: Array<{
   container: HTMLDivElement;
@@ -37,6 +46,11 @@ afterEach(async () => {
     item.container.remove();
   }
   mockedAppServerEvents.mockReturnValue({
+    events: [],
+    isLoading: false,
+    error: null,
+  });
+  mockedWorkerEvents.mockReturnValue({
     events: [],
     isLoading: false,
     error: null,
@@ -177,5 +191,51 @@ describe("ProjectAgentSessionDetail", () => {
       container.querySelector(".auto-hunt-agent-messages")
         ?.getAttribute("role"),
     ).toBe("log");
+  });
+
+  it("shows a detached Worker's final result in the linked Agent session", async () => {
+    mockedWorkerEvents.mockReturnValue({
+      events: [{
+        sessionId: "detached-run-42",
+        sequence: 9,
+        occurredAtMs: Date.parse("2026-07-29T11:09:00.000Z"),
+        direction: "server",
+        provider: "codex",
+        message: {
+          type: "item.completed",
+          item: {
+            id: "worker-final-1",
+            type: "agent_message",
+            text: "워커가 수정과 검증을 완료했습니다.",
+          },
+        },
+      }],
+      isLoading: false,
+      error: null,
+    });
+
+    const container = await mount({
+      ...session,
+      id: "worker-dispatch-1",
+      issues: [{
+        runId: "run-42",
+        runNumber: 42,
+        sourceKey: "BRIAR-42",
+        title: "누락된 워커 로그",
+        outcome: "completed",
+        summary: "수정 완료",
+      }],
+      status: "completed",
+    });
+
+    expect(mockedWorkerEvents).toHaveBeenCalledWith(
+      null,
+      "project-1",
+      ["run-42"],
+      false,
+    );
+    expect(container.textContent).toContain("수행 로그");
+    expect(container.textContent).toContain("워커가 수정과 검증을 완료했습니다.");
+    expect(container.textContent).toContain("최종 메시지");
   });
 });

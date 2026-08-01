@@ -54,6 +54,12 @@ export type ProjectAgentScheduleExecutionDependencies = {
       error: string | null;
     },
   ) => void;
+  startWorkerDispatchSession?: (
+    parentSessionId: string,
+    run: ClaimedProjectAgentScheduleRun,
+    runs: readonly HuntRun[],
+    dispatch: { dispatchId: string; runIds: string[] },
+  ) => void;
 };
 
 /**
@@ -74,6 +80,7 @@ export async function executeScheduledProjectAgent(
       token,
       run.projectId,
     );
+    let dispatchRuns = initialDashboard.runs;
     const { response, dispatchResult } = await executeProjectAgentTurn(
       {
         runAgent: dependencies.runAgent,
@@ -81,6 +88,7 @@ export async function executeScheduledProjectAgent(
           const dashboard = decision.targetRunIds?.length
             ? initialDashboard
             : await dependencies.loadDashboard(token, run.projectId);
+          dispatchRuns = dashboard.runs;
           return dispatchAutoHuntToWorkers(
             {
               dispatch: (candidate, dispatchInput) =>
@@ -136,6 +144,14 @@ export async function executeScheduledProjectAgent(
         structuredResult: response.structuredResult,
       };
     } else {
+      if (sessionId) {
+        dependencies.startWorkerDispatchSession?.(
+          sessionId,
+          run,
+          dispatchRuns,
+          dispatchResult,
+        );
+      }
       const dispatchedCount = dispatchResult.runIds.length;
       const summary = `${dispatchedCount}개 이슈를 등록 Worker에 배정했습니다.`;
       result = {

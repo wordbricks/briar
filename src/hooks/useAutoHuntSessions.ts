@@ -8,10 +8,12 @@ import {
 } from "../lib/auto-hunt-agent";
 import { stopProjectAgentSession } from "../lib/project-llm";
 import {
+  cancelHuntRun,
   loadProjectAgentSessions,
   upsertProjectAgentSession,
 } from "../lib/api";
 import { DASHBOARD_POLL_INTERVAL_MS } from "../lib/dashboard-polling";
+import type { HuntRun, ProjectAgent } from "../types";
 
 const storageKey = "briar.auto-hunt-sessions.v1";
 
@@ -182,6 +184,65 @@ function reconcileDispatch(
           }
         : issue;
     }),
+  };
+}
+
+function issueOutcomeForRun(
+  status: HuntRun["status"],
+): AutoHuntSessionIssueOutcome {
+  if (status === "completed" || status === "blocked" || status === "failed") {
+    return status;
+  }
+  if (status === "cancelled") return "skipped";
+  return "pending";
+}
+
+export function reconcileWorkerDispatchSession(
+  session: AutoHuntSession,
+  runs: readonly HuntRun[],
+  now = new Date().toISOString(),
+): AutoHuntSession {
+  if (session.sessionType !== "dispatch" || session.issues.length === 0) {
+    return session;
+  }
+  const runsById = new Map(runs.map((run) => [run.id, run]));
+  if (session.issues.some((issue) => !runsById.has(issue.runId))) {
+    return session;
+  }
+  const issues = session.issues.map((issue) => {
+    const run = runsById.get(issue.runId)!;
+    return {
+      ...issue,
+      outcome: issueOutcomeForRun(run.status),
+      summary: run.status === "completed"
+        ? run.resultSummary
+        : run.status === "blocked" || run.status === "failed"
+        ? run.resultSummary ?? run.detail
+        : issue.summary,
+    };
+  });
+  const changed = issues.some((issue, index) =>
+    issue.outcome !== session.issues[index]?.outcome ||
+    issue.summary !== session.issues[index]?.summary
+  );
+  const isTerminal = issues.every((issue) => issue.outcome !== "pending");
+  if (!changed && (!isTerminal || session.status !== "running")) return session;
+
+  if (!isTerminal || session.status !== "running") {
+    return { ...session, issues, updatedAt: now };
+  }
+  const summaries = issues.flatMap((issue) =>
+    issue.summary ? [`${issue.sourceKey}: ${issue.summary}`] : []
+  );
+  return {
+    ...session,
+    issues,
+    status: "completed",
+    completedAt: now,
+    summary: summaries.length > 0 ? summaries.join("\n\n") : null,
+    error: null,
+    updatedAt: now,
+    events: [...session.events, event("completed", now)],
   };
 }
 
@@ -480,6 +541,86 @@ export function useAutoHuntSessions(
     return session.id;
   }, []);
 
+  const startWorkerDispatchSession = useCallback((
+    projectId: string,
+    agent: Pick<ProjectAgent, "id">,
+    runs: readonly HuntRun[],
+    input: {
+      dispatchId: string;
+      runIds: readonly string[];
+      parentSessionId?: string;
+      coordinatorConversationId?: string | null;
+      startedAt?: string;
+    },
+  ) => {
+    const existing = sessionsRef.current.find(
+      (session) => session.id === input.dispatchId,
+    );
+    if (existing) return existing.id;
+    const selectedRunIds = new Set(input.runIds);
+    const selectedRuns = runs.filter((run) => selectedRunIds.has(run.id));
+    if (selectedRuns.length !== selectedRunIds.size) {
+      throw new Error("전송한 Auto Hunt 이슈를 세션에 연결하지 못했습니다.");
+    }
+    const startedAt = input.startedAt ?? new Date().toISOString();
+    const parent = input.parentSessionId
+      ? sessionsRef.current.find(
+          (session) => session.id === input.parentSessionId,
+        )
+      : undefined;
+    const session: AutoHuntSession = {
+      id: input.dispatchId,
+      dispatchGroupId: input.dispatchId,
+      projectId,
+      agentId: agent.id,
+      sessionType: "dispatch",
+      trigger: parent?.trigger ?? "manual",
+      parentSessionId: parent?.id,
+      request: parent?.request,
+      status: "running",
+      issues: selectedRuns.map((run) => ({
+        runId: run.id,
+        runNumber: run.runNumber,
+        sourceKey: run.sourceKey,
+        title: run.title,
+        outcome: "pending",
+        summary: null,
+      })),
+      startedAt,
+      completedAt: null,
+      conversationId:
+        input.coordinatorConversationId ?? parent?.conversationId ?? null,
+      workspaceRoot: null,
+      summary: null,
+      error: null,
+      events: [event("started", startedAt)],
+      workers: [],
+      dispatchEvents: [],
+      updatedAt: startedAt,
+      localOwner: true,
+    };
+    sessionsRef.current = [session, ...sessionsRef.current];
+    setSessions(sessionsRef.current);
+    return session.id;
+  }, []);
+
+  const reconcileWorkerDispatches = useCallback((
+    projectId: string,
+    runs: readonly HuntRun[],
+  ) => {
+    const now = new Date().toISOString();
+    let changed = false;
+    const next = sessionsRef.current.map((session) => {
+      if (session.projectId !== projectId) return session;
+      const reconciled = reconcileWorkerDispatchSession(session, runs, now);
+      if (reconciled !== session) changed = true;
+      return reconciled;
+    });
+    if (!changed) return;
+    sessionsRef.current = next;
+    setSessions(next);
+  }, []);
+
   const settleTaskSession = useCallback((
     sessionId: string,
     input: {
@@ -515,7 +656,27 @@ export function useAutoHuntSessions(
       (candidate) => candidate.id === sessionId,
     );
     if (!session || session.status !== "running") return false;
-    const stopped = await stopper(sessionId);
+    const pendingRunIds = session.sessionType === "dispatch"
+      ? session.issues
+          .filter((issue) => issue.outcome === "pending")
+          .map((issue) => issue.runId)
+      : [];
+    let stopped: boolean;
+    if (pendingRunIds.length > 0 && syncContext) {
+      await Promise.all(
+        pendingRunIds.map((runId) =>
+          cancelHuntRun(
+            syncContext.token,
+            session.projectId,
+            runId,
+            "Agent 세션에서 실행을 중지했습니다.",
+          )
+        ),
+      );
+      stopped = true;
+    } else {
+      stopped = await stopper(sessionId);
+    }
     if (!stopped) return false;
     const completedAt = new Date().toISOString();
     const next = sessionsRef.current.map((candidate) =>
@@ -533,7 +694,7 @@ export function useAutoHuntSessions(
     sessionsRef.current = next;
     setSessions(next);
     return true;
-  }, [stopper]);
+  }, [stopper, syncContext]);
 
   const recordTaskSession = useCallback((
     projectId: string,
@@ -561,6 +722,8 @@ export function useAutoHuntSessions(
   return {
     sessions,
     startTaskSession,
+    startWorkerDispatchSession,
+    reconcileWorkerDispatches,
     settleTaskSession,
     stopSession,
     recordTaskSession,
