@@ -9,15 +9,15 @@ set event_count = (
 );
 
 create trigger briar_hunt_events_increment_run_event_count
-after insert on briar_hunt_events begin
+after insert on briar_hunt_events BEGIN
   update briar_hunt_runs
   set event_count = event_count + 1
   where id = new.run_id;
-end;
+END;
 
 create trigger briar_hunt_events_decrement_run_event_count
-after delete on briar_hunt_events begin
+after delete on briar_hunt_events BEGIN
   update briar_hunt_runs
   set event_count = max(event_count - 1, 0)
   where id = old.run_id;
-end;
+END;

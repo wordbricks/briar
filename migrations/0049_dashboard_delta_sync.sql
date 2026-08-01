@@ -23,37 +23,37 @@ create index briar_dashboard_changes_created_idx
   on briar_dashboard_changes (created_at);
 
 create trigger briar_dashboard_runs_insert_sync
-after insert on briar_hunt_runs begin
+after insert on briar_hunt_runs BEGIN
   insert into briar_dashboard_changes (
     project_id, entity_type, entity_id, operation, created_at
   ) values (new.project_id, 'run', new.id, 'upsert', datetime('now'));
   insert into briar_dashboard_sync_state (project_id, current_version)
   values (new.project_id, last_insert_rowid())
   on conflict (project_id) do update set current_version = excluded.current_version;
-end;
+END;
 
 create trigger briar_dashboard_runs_update_sync
-after update on briar_hunt_runs begin
+after update on briar_hunt_runs BEGIN
   insert into briar_dashboard_changes (
     project_id, entity_type, entity_id, operation, created_at
   ) values (new.project_id, 'run', new.id, 'upsert', datetime('now'));
   insert into briar_dashboard_sync_state (project_id, current_version)
   values (new.project_id, last_insert_rowid())
   on conflict (project_id) do update set current_version = excluded.current_version;
-end;
+END;
 
 create trigger briar_dashboard_runs_delete_sync
-before delete on briar_hunt_runs begin
+before delete on briar_hunt_runs BEGIN
   insert into briar_dashboard_changes (
     project_id, entity_type, entity_id, operation, created_at
   ) values (old.project_id, 'run', old.id, 'delete', datetime('now'));
   insert into briar_dashboard_sync_state (project_id, current_version)
   values (old.project_id, last_insert_rowid())
   on conflict (project_id) do update set current_version = excluded.current_version;
-end;
+END;
 
 create trigger briar_dashboard_events_insert_sync
-after insert on briar_hunt_events begin
+after insert on briar_hunt_events BEGIN
   insert into briar_dashboard_changes (
     project_id, entity_type, entity_id, operation, created_at
   ) select project_id, 'run', new.run_id, 'upsert', datetime('now')
@@ -61,10 +61,10 @@ after insert on briar_hunt_events begin
   insert into briar_dashboard_sync_state (project_id, current_version)
   select project_id, last_insert_rowid() from briar_hunt_runs where id = new.run_id
   on conflict (project_id) do update set current_version = excluded.current_version;
-end;
+END;
 
 create trigger briar_dashboard_events_update_sync
-after update on briar_hunt_events begin
+after update on briar_hunt_events BEGIN
   insert into briar_dashboard_changes (
     project_id, entity_type, entity_id, operation, created_at
   ) select project_id, 'run', new.run_id, 'upsert', datetime('now')
@@ -72,10 +72,10 @@ after update on briar_hunt_events begin
   insert into briar_dashboard_sync_state (project_id, current_version)
   select project_id, last_insert_rowid() from briar_hunt_runs where id = new.run_id
   on conflict (project_id) do update set current_version = excluded.current_version;
-end;
+END;
 
 create trigger briar_dashboard_events_delete_sync
-after delete on briar_hunt_events begin
+after delete on briar_hunt_events BEGIN
   insert into briar_dashboard_changes (
     project_id, entity_type, entity_id, operation, created_at
   ) select project_id, 'run', old.run_id, 'upsert', datetime('now')
@@ -83,60 +83,60 @@ after delete on briar_hunt_events begin
   insert into briar_dashboard_sync_state (project_id, current_version)
   select project_id, last_insert_rowid() from briar_hunt_runs where id = old.run_id
   on conflict (project_id) do update set current_version = excluded.current_version;
-end;
+END;
 
 create trigger briar_dashboard_attachments_insert_sync
-after insert on briar_issue_attachments begin
+after insert on briar_issue_attachments BEGIN
   insert into briar_dashboard_changes (
     project_id, entity_type, entity_id, operation, created_at
   ) values (new.project_id, 'run', new.run_id, 'upsert', datetime('now'));
   insert into briar_dashboard_sync_state (project_id, current_version)
   values (new.project_id, last_insert_rowid())
   on conflict (project_id) do update set current_version = excluded.current_version;
-end;
+END;
 
 create trigger briar_dashboard_attachments_delete_sync
-after delete on briar_issue_attachments begin
+after delete on briar_issue_attachments BEGIN
   insert into briar_dashboard_changes (
     project_id, entity_type, entity_id, operation, created_at
   ) values (old.project_id, 'run', old.run_id, 'upsert', datetime('now'));
   insert into briar_dashboard_sync_state (project_id, current_version)
   values (old.project_id, last_insert_rowid())
   on conflict (project_id) do update set current_version = excluded.current_version;
-end;
+END;
 
 create trigger briar_dashboard_workers_insert_sync
-after insert on briar_execution_workers begin
+after insert on briar_execution_workers BEGIN
   insert into briar_dashboard_changes (
     project_id, entity_type, entity_id, operation, created_at
   ) values (new.project_id, 'worker', new.id, 'upsert', datetime('now'));
   insert into briar_dashboard_sync_state (project_id, current_version)
   values (new.project_id, last_insert_rowid())
   on conflict (project_id) do update set current_version = excluded.current_version;
-end;
+END;
 
 create trigger briar_dashboard_workers_update_sync
-after update on briar_execution_workers begin
+after update on briar_execution_workers BEGIN
   insert into briar_dashboard_changes (
     project_id, entity_type, entity_id, operation, created_at
   ) values (new.project_id, 'worker', new.id, 'upsert', datetime('now'));
   insert into briar_dashboard_sync_state (project_id, current_version)
   values (new.project_id, last_insert_rowid())
   on conflict (project_id) do update set current_version = excluded.current_version;
-end;
+END;
 
 create trigger briar_dashboard_workers_delete_sync
-before delete on briar_execution_workers begin
+before delete on briar_execution_workers BEGIN
   insert into briar_dashboard_changes (
     project_id, entity_type, entity_id, operation, created_at
   ) values (old.project_id, 'worker', old.id, 'delete', datetime('now'));
   insert into briar_dashboard_sync_state (project_id, current_version)
   values (old.project_id, last_insert_rowid())
   on conflict (project_id) do update set current_version = excluded.current_version;
-end;
+END;
 
 create trigger briar_dashboard_worker_devices_update_sync
-after update on briar_execution_worker_devices begin
+after update on briar_execution_worker_devices BEGIN
   insert into briar_dashboard_changes (
     project_id, entity_type, entity_id, operation, created_at
   ) select project_id, 'worker', id, 'upsert', datetime('now')
@@ -148,100 +148,100 @@ after update on briar_execution_worker_devices begin
      and entity_id in (select id from briar_execution_workers where device_id = new.id)
    group by project_id
   on conflict (project_id) do update set current_version = excluded.current_version;
-end;
+END;
 
 create trigger briar_dashboard_settings_update_sync
-after update on briar_project_settings begin
+after update on briar_project_settings BEGIN
   insert into briar_dashboard_changes (
     project_id, entity_type, entity_id, operation, created_at
   ) values (new.project_id, 'metadata', new.project_id, 'replace', datetime('now'));
   insert into briar_dashboard_sync_state (project_id, current_version)
   values (new.project_id, last_insert_rowid())
   on conflict (project_id) do update set current_version = excluded.current_version;
-end;
+END;
 
 create trigger briar_dashboard_projects_update_sync
-after update on briar_projects begin
+after update on briar_projects BEGIN
   insert into briar_dashboard_changes (
     project_id, entity_type, entity_id, operation, created_at
   ) values (new.id, 'metadata', new.id, 'replace', datetime('now'));
   insert into briar_dashboard_sync_state (project_id, current_version)
   values (new.id, last_insert_rowid())
   on conflict (project_id) do update set current_version = excluded.current_version;
-end;
+END;
 
 create trigger briar_dashboard_worker_policy_insert_sync
-after insert on briar_project_execution_worker_policies begin
+after insert on briar_project_execution_worker_policies BEGIN
   insert into briar_dashboard_changes (
     project_id, entity_type, entity_id, operation, created_at
   ) values (new.project_id, 'metadata', new.project_id, 'replace', datetime('now'));
   insert into briar_dashboard_sync_state (project_id, current_version)
   values (new.project_id, last_insert_rowid())
   on conflict (project_id) do update set current_version = excluded.current_version;
-end;
+END;
 
 create trigger briar_dashboard_worker_policy_update_sync
-after update on briar_project_execution_worker_policies begin
+after update on briar_project_execution_worker_policies BEGIN
   insert into briar_dashboard_changes (
     project_id, entity_type, entity_id, operation, created_at
   ) values (new.project_id, 'metadata', new.project_id, 'replace', datetime('now'));
   insert into briar_dashboard_sync_state (project_id, current_version)
   values (new.project_id, last_insert_rowid())
   on conflict (project_id) do update set current_version = excluded.current_version;
-end;
+END;
 
 create trigger briar_dashboard_worker_allowlist_insert_sync
-after insert on briar_project_execution_worker_allowlist begin
+after insert on briar_project_execution_worker_allowlist BEGIN
   insert into briar_dashboard_changes (
     project_id, entity_type, entity_id, operation, created_at
   ) values (new.project_id, 'metadata', new.project_id, 'replace', datetime('now'));
   insert into briar_dashboard_sync_state (project_id, current_version)
   values (new.project_id, last_insert_rowid())
   on conflict (project_id) do update set current_version = excluded.current_version;
-end;
+END;
 
 create trigger briar_dashboard_worker_allowlist_delete_sync
-after delete on briar_project_execution_worker_allowlist begin
+after delete on briar_project_execution_worker_allowlist BEGIN
   insert into briar_dashboard_changes (
     project_id, entity_type, entity_id, operation, created_at
   ) values (old.project_id, 'metadata', old.project_id, 'replace', datetime('now'));
   insert into briar_dashboard_sync_state (project_id, current_version)
   values (old.project_id, last_insert_rowid())
   on conflict (project_id) do update set current_version = excluded.current_version;
-end;
+END;
 
 create trigger briar_dashboard_messages_insert_sync
-after insert on briar_issue_messages begin
+after insert on briar_issue_messages BEGIN
   insert into briar_dashboard_changes (
     project_id, entity_type, entity_id, operation, created_at
   ) values (new.project_id, 'notifications', new.id, 'replace', datetime('now'));
   insert into briar_dashboard_sync_state (project_id, current_version)
   values (new.project_id, last_insert_rowid())
   on conflict (project_id) do update set current_version = excluded.current_version;
-end;
+END;
 
 create trigger briar_dashboard_messages_update_sync
-after update on briar_issue_messages begin
+after update on briar_issue_messages BEGIN
   insert into briar_dashboard_changes (
     project_id, entity_type, entity_id, operation, created_at
   ) values (new.project_id, 'notifications', new.id, 'replace', datetime('now'));
   insert into briar_dashboard_sync_state (project_id, current_version)
   values (new.project_id, last_insert_rowid())
   on conflict (project_id) do update set current_version = excluded.current_version;
-end;
+END;
 
 create trigger briar_dashboard_messages_delete_sync
-before delete on briar_issue_messages begin
+before delete on briar_issue_messages BEGIN
   insert into briar_dashboard_changes (
     project_id, entity_type, entity_id, operation, created_at
   ) values (old.project_id, 'notifications', old.id, 'replace', datetime('now'));
   insert into briar_dashboard_sync_state (project_id, current_version)
   values (old.project_id, last_insert_rowid())
   on conflict (project_id) do update set current_version = excluded.current_version;
-end;
+END;
 
 create trigger briar_dashboard_mentions_insert_sync
-after insert on briar_issue_message_mentions begin
+after insert on briar_issue_message_mentions BEGIN
   insert into briar_dashboard_changes (
     project_id, entity_type, entity_id, operation, created_at
   ) select message.project_id, 'notifications', new.message_id, 'replace', datetime('now')
@@ -250,10 +250,10 @@ after insert on briar_issue_message_mentions begin
   select message.project_id, last_insert_rowid()
     from briar_issue_messages message where message.id = new.message_id
   on conflict (project_id) do update set current_version = excluded.current_version;
-end;
+END;
 
 create trigger briar_dashboard_mentions_delete_sync
-after delete on briar_issue_message_mentions begin
+after delete on briar_issue_message_mentions BEGIN
   insert into briar_dashboard_changes (
     project_id, entity_type, entity_id, operation, created_at
   ) select message.project_id, 'notifications', old.message_id, 'replace', datetime('now')
@@ -262,10 +262,10 @@ after delete on briar_issue_message_mentions begin
   select message.project_id, last_insert_rowid()
     from briar_issue_messages message where message.id = old.message_id
   on conflict (project_id) do update set current_version = excluded.current_version;
-end;
+END;
 
 create trigger briar_dashboard_dependencies_insert_sync
-after insert on briar_issue_dependencies begin
+after insert on briar_issue_dependencies BEGIN
   insert into briar_dashboard_changes (
     project_id, entity_type, entity_id, operation, created_at
   ) values
@@ -274,10 +274,10 @@ after insert on briar_issue_dependencies begin
   insert into briar_dashboard_sync_state (project_id, current_version)
   values (new.project_id, last_insert_rowid())
   on conflict (project_id) do update set current_version = excluded.current_version;
-end;
+END;
 
 create trigger briar_dashboard_dependencies_delete_sync
-before delete on briar_issue_dependencies begin
+before delete on briar_issue_dependencies BEGIN
   insert into briar_dashboard_changes (
     project_id, entity_type, entity_id, operation, created_at
   ) values
@@ -286,10 +286,10 @@ before delete on briar_issue_dependencies begin
   insert into briar_dashboard_sync_state (project_id, current_version)
   values (old.project_id, last_insert_rowid())
   on conflict (project_id) do update set current_version = excluded.current_version;
-end;
+END;
 
 create trigger briar_dashboard_members_insert_sync
-after insert on briar_organization_members begin
+after insert on briar_organization_members BEGIN
   insert into briar_dashboard_changes (
     project_id, entity_type, entity_id, operation, created_at
   ) select id, 'metadata', new.user_id, 'replace', datetime('now')
@@ -302,10 +302,10 @@ after insert on briar_organization_members begin
      and change.entity_type = 'metadata'
    group by change.project_id
   on conflict (project_id) do update set current_version = excluded.current_version;
-end;
+END;
 
 create trigger briar_dashboard_members_update_sync
-after update on briar_organization_members begin
+after update on briar_organization_members BEGIN
   insert into briar_dashboard_changes (
     project_id, entity_type, entity_id, operation, created_at
   ) select id, 'metadata', new.user_id, 'replace', datetime('now')
@@ -318,10 +318,10 @@ after update on briar_organization_members begin
      and change.entity_type = 'metadata'
    group by change.project_id
   on conflict (project_id) do update set current_version = excluded.current_version;
-end;
+END;
 
 create trigger briar_dashboard_members_delete_sync
-after delete on briar_organization_members begin
+after delete on briar_organization_members BEGIN
   insert into briar_dashboard_changes (
     project_id, entity_type, entity_id, operation, created_at
   ) select id, 'metadata', old.user_id, 'replace', datetime('now')
@@ -334,4 +334,4 @@ after delete on briar_organization_members begin
      and change.entity_type = 'metadata'
    group by change.project_id
   on conflict (project_id) do update set current_version = excluded.current_version;
-end;
+END;
