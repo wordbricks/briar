@@ -6235,6 +6235,14 @@ export default {
     if (request.method === "OPTIONS") {
       return new Response(null, { headers: corsHeaders });
     }
+    if (
+      (request.method === "GET" || request.method === "HEAD") &&
+      (url.pathname === "/app" || url.pathname.startsWith("/app/"))
+    ) {
+      const assetUrl = new URL(request.url);
+      assetUrl.pathname = url.pathname.slice("/app".length) || "/";
+      return env.ASSETS.fetch(new Request(assetUrl, request));
+    }
     if (url.pathname === "/health") {
       return json({
         ok: true,
