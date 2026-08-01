@@ -1,5 +1,5 @@
 import type { InboxCategory, InboxMessage } from "../hooks/useInbox";
-import { isDesktopTauri } from "./platform";
+import { isDesktopTauri, isMacDesktopTauri } from "./platform";
 
 export const inboxNotificationCategories = [
   "urgent",
@@ -14,6 +14,7 @@ const storageKey = "briar.settings.inbox-notifications.v1";
 const targetStorageKey = "briar.inbox.notification-targets.v1";
 const browserOpenEvent = "briar:inbox-notification-open";
 const desktopOpenEvent = "inbox-notification-open";
+const desktopOpenAvailableEvent = "inbox-notification-open-available";
 
 export type InboxNotificationTarget = {
   messageId: string;
@@ -102,6 +103,40 @@ function isInboxNotificationTarget(
       target.kind === "conversation" ||
       target.kind === "session")
   );
+}
+
+type MacInboxNotificationBridge = {
+  listenAvailable: (callback: () => void) => Promise<() => void>;
+  drain: () => Promise<unknown>;
+};
+
+export async function listenForMacInboxNotificationClicks(
+  onOpen: (target: InboxNotificationTarget) => void,
+  bridge: MacInboxNotificationBridge,
+) {
+  let stopped = false;
+  let drainQueue = Promise.resolve();
+  const drain = () => {
+    const next = drainQueue.catch(() => undefined).then(async () => {
+      const pending = await bridge.drain();
+      if (stopped || !Array.isArray(pending)) return;
+      for (const target of pending) {
+        if (isInboxNotificationTarget(target)) onOpen(target);
+      }
+    });
+    drainQueue = next;
+    return next;
+  };
+  const unlisten = await bridge.listenAvailable(() => {
+    void drain().catch((error) => {
+      console.error("Pending inbox notification open failed", error);
+    });
+  });
+  await drain();
+  return () => {
+    stopped = true;
+    unlisten();
+  };
 }
 
 function inboxNotificationId(messageId: string) {
@@ -201,6 +236,14 @@ export async function listenForInboxNotificationClicks(
   if (isTauriRuntime()) {
     if (isDesktopTauri()) {
       const { listen } = await import("@tauri-apps/api/event");
+      if (isMacDesktopTauri()) {
+        const { invoke } = await import("@tauri-apps/api/core");
+        return listenForMacInboxNotificationClicks(onOpen, {
+          listenAvailable: (callback) =>
+            listen(desktopOpenAvailableEvent, callback),
+          drain: () => invoke("drain_pending_inbox_notification_opens"),
+        });
+      }
       return listen<InboxNotificationTarget>(desktopOpenEvent, ({ payload }) => {
         if (isInboxNotificationTarget(payload)) onOpen(payload);
       });
@@ -224,6 +267,10 @@ export async function listenForInboxNotificationClicks(
 
 export async function requestInboxNotificationPermission() {
   if (isTauriRuntime()) {
+    if (isMacDesktopTauri()) {
+      const { invoke } = await import("@tauri-apps/api/core");
+      return invoke<boolean>("request_inbox_notification_permission");
+    }
     const { isPermissionGranted, requestPermission } = await import(
       "@tauri-apps/plugin-notification"
     );
