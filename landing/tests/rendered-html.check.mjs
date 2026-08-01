@@ -69,7 +69,7 @@ test("server-renders Korean for a Korean browser", async () => {
   );
   assert.match(html, /최신 릴리즈 · macOS Apple Silicon · Android companion/);
   assert.match(html, /https:\/\/github\.com\/wordbricks\/briar/);
-  assert.match(html, /http:\/\/localhost\/og\.png/);
+  assert.match(html, /http:\/\/localhost\/og-briar-workflow\.png/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
 });
 
