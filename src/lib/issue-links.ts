@@ -1,6 +1,7 @@
 const issueLinkPathPattern =
   /^\/open\/issues\/([0-9a-f-]{36})\/([0-9a-f-]{36})\/?$/iu;
 const issueDeepLinkScheme = "briar-companion:";
+const briarIssueSourceKeyPrefix = "briar-issue:";
 
 export type IssueLinkTarget = {
   projectId: string;
@@ -53,14 +54,14 @@ export function parseIssueLink(value: string): IssueLinkTarget | null {
   return null;
 }
 
-async function copyIssueLink(url: string): Promise<void> {
+async function copyText(value: string): Promise<void> {
   if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(url);
+    await navigator.clipboard.writeText(value);
     return;
   }
 
   const input = document.createElement("textarea");
-  input.value = url;
+  input.value = value;
   input.setAttribute("readonly", "");
   input.style.position = "fixed";
   input.style.opacity = "0";
@@ -68,14 +69,24 @@ async function copyIssueLink(url: string): Promise<void> {
   input.select();
   const copied = document.execCommand("copy");
   input.remove();
-  if (!copied) throw new Error("Unable to copy issue link");
+  if (!copied) throw new Error("Unable to copy text");
+}
+
+export function issueIdFromSourceKey(sourceKey: string): string {
+  return sourceKey.startsWith(briarIssueSourceKeyPrefix)
+    ? sourceKey.slice(briarIssueSourceKeyPrefix.length)
+    : sourceKey;
+}
+
+export async function copyIssueId(sourceKey: string): Promise<void> {
+  await copyText(issueIdFromSourceKey(sourceKey));
 }
 
 export async function copyIssueShareLink(input: {
   projectId: string;
   runId: string;
 }): Promise<void> {
-  await copyIssueLink(issueShareUrl(input.projectId, input.runId));
+  await copyText(issueShareUrl(input.projectId, input.runId));
 }
 
 export async function shareIssueLink(input: {
@@ -96,7 +107,7 @@ export async function shareIssueLink(input: {
     }
   }
 
-  await copyIssueLink(url);
+  await copyText(url);
   return "copied";
 }
 

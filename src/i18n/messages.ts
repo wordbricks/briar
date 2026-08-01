@@ -691,6 +691,9 @@ export const ko = {
   "issue.copyLink": "링크 복사",
   "issue.linkCopied": "링크가 복사되었습니다",
   "issue.shareFailed": "링크를 복사하지 못했습니다",
+  "issue.copyId": "이슈 ID 복사",
+  "issue.idCopied": "이슈 ID가 복사되었습니다",
+  "issue.copyIdFailed": "이슈 ID를 복사하지 못했습니다",
   "issue.editDialog": "Auto Hunt 이슈 수정",
   "issue.editIssue": "이슈 수정",
   "issue.delete": "삭제",
@@ -1156,6 +1159,9 @@ export type Messages = Record<MessageKey, string>;
 
 export const en: Messages = {
   ...ko,
+  "issue.copyId": "Copy issue ID",
+  "issue.idCopied": "Issue ID copied",
+  "issue.copyIdFailed": "Couldn't copy the issue ID",
   "account.profile": "My account",
   "account.profileDescription": "Manage the account profile shown to other people.",
   "account.publicProfile": "Profile information",
@@ -1700,6 +1706,9 @@ export const en: Messages = {
 };
 export const zh: Messages = {
   ...en,
+  "issue.copyId": "复制问题 ID",
+  "issue.idCopied": "问题 ID 已复制",
+  "issue.copyIdFailed": "无法复制问题 ID",
   "account.profile": "我的账户",
   "account.profileDescription": "管理向其他用户显示的账户资料。",
   "account.publicProfile": "个人资料",
