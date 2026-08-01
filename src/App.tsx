@@ -352,7 +352,7 @@ export function App() {
         )
       : null;
   const shouldShowInitialOnboarding =
-    !briar.companionMode &&
+    !briar.remoteMode &&
     !briar.user &&
     !hasCompletedOnboarding;
   const sendIssueMessage = (
@@ -558,10 +558,11 @@ export function App() {
         loginCode={briar.loginCode}
         onCancel={briar.cancelLogin}
         onLogin={() => void briar.login()}
+        webMode={briar.webMode}
       />
     );
   } else if (
-    !briar.companionMode &&
+    !briar.remoteMode &&
     ((briar.projects.length === 0 && !hasDeferredFirstProject) ||
       briar.isCreatingProject ||
       briar.projectConnection)

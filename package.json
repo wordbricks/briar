@@ -11,6 +11,7 @@
     "dev": "vite",
     "dev:all": "bash scripts/dev-all.sh",
     "build": "bun run runtime:prepare && bun run skills:check && tsc --noEmit && vite build && bun run agent:build",
+    "web:build": "bash scripts/with-release-env.sh env VITE_BRIAR_WEB=true vite build",
     "build:release": "bash scripts/with-release-env.sh bun run build && bash scripts/verify-release-config.sh",
     "check": "bun run skills:check && tsc --noEmit",
     "test": "vitest run",
@@ -41,8 +42,8 @@
     "worker:dev": "dotenvx run --strict --overload -f .env.production -- bun run scripts/with-worker-secrets.ts dev",
     "worker:types": "wrangler types worker-configuration.d.ts",
     "worker:check": "tsc --project worker/tsconfig.json",
-    "worker:build": "wrangler deploy --dry-run --outdir dist-worker",
-    "worker:deploy": "dotenvx run --strict --overload -f .env.production -- bun run scripts/with-worker-secrets.ts deploy",
+    "worker:build": "bun run web:build && wrangler deploy --dry-run --outdir dist-worker",
+    "worker:deploy": "bun run web:build && dotenvx run --strict --overload -f .env.production -- bun run scripts/with-worker-secrets.ts deploy",
     "worker:startup": "wrangler check startup"
   },
   "dependencies": {

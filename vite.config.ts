@@ -6,6 +6,7 @@ import { defineConfig } from "vitest/config";
 const host = process.env.TAURI_DEV_HOST;
 
 export default defineConfig({
+  base: process.env.VITE_BRIAR_WEB === "true" ? "/app/" : undefined,
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

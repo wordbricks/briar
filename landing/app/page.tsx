@@ -8,6 +8,7 @@ const MAC_DOWNLOAD_URL =
   "https://briar-api.wbai.workers.dev/releases/latest/mac-aarch64.dmg";
 const GITHUB_URL = "https://github.com/wordbricks/briar";
 const ANDROID_DOWNLOAD_URL = `${GITHUB_URL}/releases/latest`;
+const WEB_APP_URL = "/app/";
 
 function Brand({ c }: { c: LandingCopy }) {
   return (
@@ -377,10 +378,10 @@ export default async function Home() {
             />
             <a
               className="header-cta header-download"
-              href={MAC_DOWNLOAD_URL}
-              aria-label={c.aria.macDownload}
+              href={WEB_APP_URL}
+              aria-label={c.aria.openWebApp}
             >
-              {c.nav.macDownload} <span aria-hidden="true">↓</span>
+              {c.nav.openWebApp} <Arrow />
             </a>
           </div>
         </div>
@@ -410,6 +411,13 @@ export default async function Home() {
           <div className="hero-actions">
             <a
               className="button button-primary"
+              href={WEB_APP_URL}
+              aria-label={c.aria.openWebApp}
+            >
+              {c.hero.openWebApp} <Arrow />
+            </a>
+            <a
+              className="button button-secondary"
               href={MAC_DOWNLOAD_URL}
               aria-label={c.aria.macDownload}
             >
@@ -635,6 +643,13 @@ export default async function Home() {
         <div className="final-actions">
           <a
             className="button button-primary"
+            href={WEB_APP_URL}
+            aria-label={c.aria.openWebApp}
+          >
+            {c.final.openWebApp} <Arrow />
+          </a>
+          <a
+            className="button button-secondary"
             href={MAC_DOWNLOAD_URL}
             aria-label={c.aria.macDownload}
           >

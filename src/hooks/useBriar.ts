@@ -105,7 +105,7 @@ import {
   progressForAutoHuntRun,
   repositoryWorkflowBootstrap,
 } from "../lib/auto-hunt-contract";
-import { isMobileCompanion } from "../lib/platform";
+import { isMobileCompanion, isWebApp } from "../lib/platform";
 import { canonicalizeIssueAttachmentReferences } from "../lib/issue-markdown";
 import { runProjectAgent } from "../lib/project-llm";
 import { executeScheduledProjectAgent } from "../lib/project-agent-schedule-execution";
@@ -154,9 +154,13 @@ export type ProjectConnection = {
 
 const demoMode = import.meta.env.VITE_BRIAR_DEMO !== "false" && !isApiConfigured;
 const companionMode = isMobileCompanion();
+const webMode = isWebApp();
+const remoteMode = companionMode || webMode;
 const deviceClientId: DeviceClientId = companionMode
   ? "briar-mobile"
-  : "briar-desktop";
+  : webMode
+    ? "briar-web"
+    : "briar-desktop";
 const demoUser: SessionUser = {
   id: "demo-user",
   name: "Jay",
@@ -533,7 +537,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         if (!cancelled) scheduleRetry(caught);
         return;
       }
-      const nextConnectedProjectIds = companionMode
+      const nextConnectedProjectIds = remoteMode
         ? null
         : await readConnectedProjectIds();
       if (cancelled) return;
@@ -598,7 +602,7 @@ export function useBriar(options: UseBriarOptions = {}) {
   }, [activeProjectId, refresh, token]);
 
   useEffect(() => {
-    if (demoMode || companionMode || !token || connectedProjectIds === null) {
+    if (demoMode || remoteMode || !token || connectedProjectIds === null) {
       return;
     }
     const projectIds = projects
@@ -659,7 +663,7 @@ export function useBriar(options: UseBriarOptions = {}) {
   const refreshHealth = useCallback(async () => {
     if (
       demoMode ||
-      companionMode ||
+      remoteMode ||
       !activeProjectId ||
       // 이 기기에 저장소를 연결하기 전에는 로컬 상태를 검사할 대상이 없습니다.
       !isProjectConnectedLocally(connectedProjectIds, activeProjectId)
@@ -689,7 +693,7 @@ export function useBriar(options: UseBriarOptions = {}) {
   }, [refreshHealth]);
 
   const refreshProjectReadiness = useCallback(async (projectId: string) => {
-    if (demoMode || companionMode) return null;
+    if (demoMode || remoteMode) return null;
     setProjectReadinessLoadingId(projectId);
     try {
       const readiness = await loadProjectRepositoryReadiness(projectId);
@@ -719,7 +723,7 @@ export function useBriar(options: UseBriarOptions = {}) {
   }, []);
 
   useEffect(() => {
-    if (demoMode || companionMode || projects.length === 0) return;
+    if (demoMode || remoteMode || projects.length === 0) return;
     let cancelled = false;
     void Promise.all(
       projects.map(async (project) => {
@@ -789,7 +793,7 @@ export function useBriar(options: UseBriarOptions = {}) {
                 loadOrganizations,
               },
             );
-            const nextConnectedProjectIds = companionMode
+            const nextConnectedProjectIds = remoteMode
               ? null
               : await readConnectedProjectIds();
             if (attempt !== loginAttempt.current) return;
@@ -1533,7 +1537,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     const projectId = dashboard?.project.id;
     if (
       demoMode ||
-      companionMode ||
+      remoteMode ||
       !token ||
       !projectId ||
       !connectedProjectIds?.includes(projectId) ||
@@ -1694,7 +1698,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       if (!token) throw new Error("로그인이 필요합니다.");
 
       const previous = dashboard.settings.velenOrg;
-      const local = companionMode
+      const local = remoteMode
         ? normalized
         : await updateLocalProjectVelenOrg(projectId, normalized);
       try {
@@ -1710,7 +1714,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         );
         return result.settings.velenOrg;
       } catch (caught) {
-        if (!companionMode) {
+        if (!remoteMode) {
           try {
             await updateLocalProjectVelenOrg(projectId, previous);
           } catch (rollbackError) {
@@ -1726,7 +1730,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         throw caught;
       }
     },
-    [companionMode, dashboard, token],
+    [dashboard, token],
   );
 
   const saveLinearIntegration = useCallback(
@@ -1758,7 +1762,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       if (!token) throw new Error("로그인이 필요합니다.");
 
       const previous = dashboard.settings.linear;
-      const local = companionMode
+      const local = remoteMode
         ? normalized
         : await updateLocalProjectLinear(projectId, normalized);
       try {
@@ -1773,7 +1777,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         );
         return result.settings.linear;
       } catch (caught) {
-        if (!companionMode) {
+        if (!remoteMode) {
           try {
             await updateLocalProjectLinear(projectId, previous);
           } catch (rollbackError) {
@@ -2536,6 +2540,8 @@ export function useBriar(options: UseBriarOptions = {}) {
     deletingProjectId,
     demoMode,
     companionMode,
+    remoteMode,
+    webMode,
     error,
     health,
     healthError,

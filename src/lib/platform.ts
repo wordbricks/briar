@@ -13,6 +13,14 @@ export function isMobileCompanion() {
   return getMobilePlatform() !== null;
 }
 
+export function isWebApp() {
+  return (
+    import.meta.env.VITE_BRIAR_WEB === "true" &&
+    typeof window !== "undefined" &&
+    !("__TAURI_INTERNALS__" in window)
+  );
+}
+
 export function isDesktopTauri() {
   return (
     typeof window !== "undefined" &&
