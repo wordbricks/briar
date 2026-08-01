@@ -3365,6 +3365,10 @@ export function RunPage({
                           <p>{run.detail?.trim() || t("run.resultEmpty")}</p>
                         </div>
                       )}
+                      <RunResultScreenshots
+                        onLoad={onLoadRunEvidence}
+                        onLoadImage={onLoadRunEvidenceImage}
+                      />
                     </div>
                   ) : activeDetailTab === "statusHistory" ? (
                     <IssueStatusHistoryPanel
@@ -4259,6 +4263,76 @@ function RunEvidencePanel({
         </div>
       )}
     </div>
+  );
+}
+
+function RunResultScreenshots({
+  onLoad,
+  onLoadImage,
+}: {
+  onLoad: () => Promise<RunEvidence[]>;
+  onLoadImage?: (image: RunEvidenceImage) => Promise<Blob>;
+}) {
+  const { t } = useI18n();
+  const [evidence, setEvidence] = useState<RunEvidence[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const onLoadRef = useRef(onLoad);
+  onLoadRef.current = onLoad;
+
+  const loadScreenshots = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      setEvidence(await onLoadRef.current());
+    } catch (caught) {
+      setLoadError(
+        caught instanceof Error ? caught.message : t("run.evidenceLoadFailed"),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [t]);
+
+  useEffect(() => {
+    if (!onLoadImage) return;
+    void loadScreenshots();
+  }, [loadScreenshots, onLoadImage]);
+
+  const images = useMemo(
+    () => evidence
+      .filter((item) => item.canonical && item.status === "passed")
+      .flatMap((item) => item.images ?? []),
+    [evidence],
+  );
+
+  if (!onLoadImage) return null;
+  if (!loading && !loadError && images.length === 0) return null;
+
+  return (
+    <section
+      aria-label={t("run.resultScreenshots")}
+      className="run-result-screenshots"
+    >
+      {loading ? (
+        <div className="run-evidence-state">
+          <LoaderCircle className="spin" size={16} />
+          {t("run.evidenceLoading")}
+        </div>
+      ) : loadError ? (
+        <button
+          className="run-evidence-state error"
+          onClick={() => void loadScreenshots()}
+          type="button"
+        >
+          <CircleAlert size={15} />
+          <span>{loadError}</span>
+          <RefreshCw size={13} />
+        </button>
+      ) : (
+        <RunEvidenceImageGallery images={images} onLoadImage={onLoadImage} />
+      )}
+    </section>
   );
 }
 

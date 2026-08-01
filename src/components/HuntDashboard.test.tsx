@@ -1377,7 +1377,7 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
-  it("shows authenticated result screenshots with their evidence", async () => {
+  it("shows authenticated result screenshots in the result and evidence tabs", async () => {
     const observedAt = "2026-07-28T04:30:00.000Z";
     const image = {
       id: "image-1",
@@ -1388,24 +1388,74 @@ describe("HuntDashboard", () => {
       position: 0,
       url: "/projects/project-1/runs/run-1/evidence/images/image-1",
     };
-    const evidence: RunEvidence[] = [{
-      key: "BRIAR-12:local_qa:ui_result",
-      attempt: 1,
-      revision: 1,
-      stage: "local_qa",
-      type: "ui_result",
-      status: "passed",
-      detail: "완성된 대시보드 화면을 확인했습니다.",
-      command: null,
-      url: null,
-      metadata: null,
-      actor: "briar-workflow",
-      observedAt,
-      recordedAt: observedAt,
-      images: [image],
-      requiredRevision: 1,
-      canonical: true,
-    }];
+    const staleImage = {
+      ...image,
+      id: "image-stale",
+      filename: "stale-dashboard.png",
+      url: "/projects/project-1/runs/run-1/evidence/images/image-stale",
+    };
+    const failedImage = {
+      ...image,
+      id: "image-failed",
+      filename: "failed-dashboard.png",
+      url: "/projects/project-1/runs/run-1/evidence/images/image-failed",
+    };
+    const evidence: RunEvidence[] = [
+      {
+        key: "BRIAR-12:local_qa:ui_result",
+        attempt: 1,
+        revision: 1,
+        stage: "local_qa",
+        type: "ui_result",
+        status: "passed",
+        detail: "완성된 대시보드 화면을 확인했습니다.",
+        command: null,
+        url: null,
+        metadata: null,
+        actor: "briar-workflow",
+        observedAt,
+        recordedAt: observedAt,
+        images: [image],
+        requiredRevision: 1,
+        canonical: true,
+      },
+      {
+        key: "BRIAR-12:local_qa:stale_ui_result",
+        attempt: 1,
+        revision: 0,
+        stage: "local_qa",
+        type: "ui_result",
+        status: "passed",
+        detail: "이전 리비전 화면입니다.",
+        command: null,
+        url: null,
+        metadata: null,
+        actor: "briar-workflow",
+        observedAt,
+        recordedAt: observedAt,
+        images: [staleImage],
+        requiredRevision: 1,
+        canonical: false,
+      },
+      {
+        key: "BRIAR-12:local_qa:failed_ui_result",
+        attempt: 1,
+        revision: 1,
+        stage: "local_qa",
+        type: "ui_result",
+        status: "failed",
+        detail: "실패한 화면입니다.",
+        command: null,
+        url: null,
+        metadata: null,
+        actor: "briar-workflow",
+        observedAt,
+        recordedAt: observedAt,
+        images: [failedImage],
+        requiredRevision: 1,
+        canonical: true,
+      },
+    ];
     const onLoadImage = vi.fn(async () => new Blob(["image"], { type: "image/png" }));
     Object.defineProperty(URL, "createObjectURL", {
       configurable: true,
@@ -1436,16 +1486,41 @@ describe("HuntDashboard", () => {
           onSendIssueMessage={async () => {
             throw new Error("not implemented in this test");
           }}
-          run={demoDashboard.runs[0]}
+          run={{
+            ...demoDashboard.runs[0],
+            status: "completed",
+            resultSummary: "완료된 결과를 확인했습니다.",
+          }}
         />,
       );
     });
+
+    expect(onLoadImage).toHaveBeenCalledTimes(1);
+    expect(onLoadImage).toHaveBeenCalledWith(image);
+    expect(onLoadImage).not.toHaveBeenCalledWith(staleImage);
+    expect(onLoadImage).not.toHaveBeenCalledWith(failedImage);
+    expect(
+      container
+        .querySelector(".run-result-screenshots .run-evidence-image img")
+        ?.getAttribute("src"),
+    ).toBe("blob:result-screenshot");
+    expect(
+      container.querySelectorAll(
+        ".run-result-screenshots .run-evidence-image",
+      ),
+    ).toHaveLength(1);
+    expect(
+      container.querySelector(".run-result-screenshots")?.textContent,
+    ).toContain("결과 화면");
+
     const evidenceTab = Array.from(
       container.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
     ).find((button) => button.textContent?.includes("증빙"));
     await act(async () => evidenceTab?.click());
 
     expect(onLoadImage).toHaveBeenCalledWith(image);
+    expect(onLoadImage).toHaveBeenCalledWith(staleImage);
+    expect(onLoadImage).toHaveBeenCalledWith(failedImage);
     expect(
       container.querySelector(".run-evidence-image img")?.getAttribute("src"),
     ).toBe("blob:result-screenshot");
@@ -2305,7 +2380,7 @@ describe("HuntDashboard", () => {
     expect(markup).toContain('class="completed-issue-card"');
     expect(markup).toContain("작업 결과");
     expect(markup).toContain(completedRun.structuredResult.summary);
-    expect(markup).toContain("결과 화면과 증빙 보기");
+    expect(markup).toContain("증빙 자세히 보기");
     expect(markup).toContain('aria-selected="true"');
     expect(markup).toContain('class="run-result-panel"');
     expect(markup).not.toContain('class="issue-description-markdown"');
