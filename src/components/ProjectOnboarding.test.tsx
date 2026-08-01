@@ -75,7 +75,7 @@ describe("ProjectOnboarding", () => {
     expect(markup).toContain("대시보드로 돌아가기");
   });
 
-  it("explains automatic workflow generation during repository connection", () => {
+  it("shows the two-step repository connection experience", () => {
     const markup = renderToStaticMarkup(
       <ProjectOnboarding
         {...baseProps}
@@ -86,15 +86,17 @@ describe("ProjectOnboarding", () => {
       />,
     );
 
-    expect(markup).not.toContain("Velen");
-    expect(markup).not.toContain("Linear 연동");
-    expect(markup).toContain("워크플로우 자동 생성");
-    expect(markup).toContain("Agent backend");
-    expect(markup).toContain("저장소 선택");
-    expect(markup).toContain("완료되어야 연결");
-    expect(markup).toContain(">확인 ");
-    expect(markup).not.toContain('label="Auto Hunt 워크플로"');
-    expect(markup).not.toContain('aria-pressed="true"');
+    expect(markup).toContain("2 / 2단계");
+    expect(markup).toContain("Briar에 저장소 연결");
+    expect(markup).toContain("Auto Hunt 워크플로");
+    expect(markup).toContain("준비됨");
+    expect(markup).toContain("로컬 Git 저장소");
+    expect(markup).toContain("필수");
+    expect(markup).toContain("폴더 선택…");
+    expect(markup).toContain("최근 저장소");
+    expect(markup).toContain("저장소 연결");
+    expect(markup).toContain("나중에 하기");
+    expect(markup).toContain('aria-expanded="false"');
   });
 
   it("does not show repository analysis or workflow generation when reconnecting", () => {
@@ -118,11 +120,47 @@ describe("ProjectOnboarding", () => {
       />,
     );
 
-    expect(markup).toContain("Auto Hunt 실행 워크플로");
+    expect(markup).toContain("Auto Hunt 워크플로");
     expect(markup).toContain("저장 중");
-    expect(markup).not.toContain("워크플로우 자동 생성");
-    expect(markup).not.toContain("저장소를 분석");
-    expect(markup).not.toContain("완료되어야 연결");
+    expect(markup).toContain("단계별 증거");
+  });
+
+  it("lets users review the configured workflow or skip connection", async () => {
+    const { container, root } = mountOnboarding();
+    const onSkip = vi.fn();
+
+    await act(async () => root.render(
+      <ProjectOnboarding
+        {...baseProps}
+        connection={{
+          project: { id: "project-1", name: "Briar", createdAt: "2026-07-22T00:00:00Z" },
+          agentToken: "token",
+          workflow: {
+            version: 1,
+            stages: [
+              { id: "implementing", label: "구현", required: true },
+              { id: "local_qa", label: "로컬 검증", required: true },
+            ],
+            execution: { stopAfterStage: "local_qa" },
+            completion: { requiredStages: ["implementing", "local_qa"] },
+          },
+        }}
+        onSkip={onSkip}
+      />,
+    ));
+
+    const review = buttonWithText(container, "워크플로 확인");
+    expect(review?.getAttribute("aria-expanded")).toBe("false");
+    await act(async () => review?.click());
+    expect(review?.getAttribute("aria-expanded")).toBe("true");
+    expect(container.textContent).toContain("1. 구현");
+    expect(container.textContent).toContain("2. 로컬 검증");
+
+    await act(async () => buttonWithText(container, "나중에 하기")?.click());
+    expect(onSkip).toHaveBeenCalledOnce();
+
+    await act(async () => root.unmount());
+    container.remove();
   });
 
   it("asks first-time users how they want to use Briar", () => {
@@ -334,11 +372,11 @@ describe("ProjectOnboarding", () => {
 
     const confirm = Array.from(
       container.querySelectorAll<HTMLButtonElement>("button"),
-    ).find((button) => button.textContent?.trim() === "확인");
+    ).find((button) => button.textContent?.trim() === "저장소 연결");
     expect(confirm?.disabled).toBe(true);
 
     const select = container.querySelector<HTMLButtonElement>(
-      ".repository-setup .setup-repository-action",
+      ".repository-connect-choose",
     );
     await act(async () => select?.click());
 
