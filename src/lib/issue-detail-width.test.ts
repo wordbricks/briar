@@ -95,4 +95,23 @@ describe("issue detail width", () => {
     expect(conversationRule).toContain("height:100%");
     expect(conversationRule).toContain("border-left:1px solid var(--border)");
   });
+
+  it("bounds every issue detail tab to its shared scrolling viewport", () => {
+    const descriptionPaneRule = firstRule(".issue-description-pane");
+    const issueRule = firstRule(".issue-description-scroll");
+    const resultRule = firstRule(".run-result-panel");
+    const statusRule = firstRule(".issue-status-history-panel");
+    const evidenceRule = firstRule(".run-evidence-panel");
+    const companionPaneRule = firstRule(
+      ".companion-shell .issue-description-pane",
+    );
+
+    expect(descriptionPaneRule).toContain("height:100%");
+    for (const tabRule of [issueRule, resultRule, statusRule, evidenceRule]) {
+      expect(tabRule).toContain("min-height:0");
+      expect(tabRule).toContain("flex:1");
+      expect(tabRule).toContain("overflow-y:auto");
+    }
+    expect(companionPaneRule).toContain("height:auto");
+  });
 });
