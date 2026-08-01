@@ -1377,7 +1377,7 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
-  it("shows authenticated result screenshots with their evidence", async () => {
+  it("shows authenticated result screenshots in the result and evidence tabs", async () => {
     const observedAt = "2026-07-28T04:30:00.000Z";
     const image = {
       id: "image-1",
@@ -1436,10 +1436,25 @@ describe("HuntDashboard", () => {
           onSendIssueMessage={async () => {
             throw new Error("not implemented in this test");
           }}
-          run={demoDashboard.runs[0]}
+          run={{
+            ...demoDashboard.runs[0],
+            status: "completed",
+            resultSummary: "완료된 결과를 확인했습니다.",
+          }}
         />,
       );
     });
+
+    expect(onLoadImage).toHaveBeenCalledWith(image);
+    expect(
+      container
+        .querySelector(".run-result-screenshots .run-evidence-image img")
+        ?.getAttribute("src"),
+    ).toBe("blob:result-screenshot");
+    expect(
+      container.querySelector(".run-result-screenshots")?.textContent,
+    ).toContain("결과 화면");
+
     const evidenceTab = Array.from(
       container.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
     ).find((button) => button.textContent?.includes("증빙"));
@@ -2211,7 +2226,7 @@ describe("HuntDashboard", () => {
     expect(markup).toContain('class="completed-issue-card"');
     expect(markup).toContain("작업 결과");
     expect(markup).toContain(completedRun.structuredResult.summary);
-    expect(markup).toContain("결과 화면과 증빙 보기");
+    expect(markup).toContain("증빙 자세히 보기");
     expect(markup).toContain('aria-selected="true"');
     expect(markup).toContain('class="run-result-panel"');
     expect(markup).not.toContain('class="issue-description-markdown"');
