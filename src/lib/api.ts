@@ -47,7 +47,14 @@ import type {
   WorkerIcon,
 } from "../types";
 
-const apiUrl = import.meta.env.VITE_BRIAR_API_URL?.replace(/\/$/u, "") ?? "";
+const configuredApiUrl = import.meta.env.VITE_BRIAR_API_URL?.trim();
+const webAppOrigin =
+  import.meta.env.VITE_BRIAR_WEB === "true" &&
+  typeof window !== "undefined" &&
+  /^https?:$/u.test(window.location.protocol)
+    ? window.location.origin
+    : "";
+const apiUrl = (configuredApiUrl || webAppOrigin).replace(/\/$/u, "");
 
 export const briarApiUrl = apiUrl;
 
@@ -289,7 +296,11 @@ export type DeviceAuthorization = {
   interval: number;
 };
 
-export type DeviceClientId = "briar-mobile" | "briar-android" | "briar-desktop";
+export type DeviceClientId =
+  | "briar-mobile"
+  | "briar-android"
+  | "briar-desktop"
+  | "briar-web";
 
 export async function beginDeviceAuthorization(
   clientId: DeviceClientId = "briar-desktop",
@@ -312,6 +323,8 @@ export async function beginDeviceAuthorization(
   const clientVerificationUrl = new URL(verificationUrl);
   if (clientId === "briar-mobile" || clientId === "briar-android") {
     clientVerificationUrl.searchParams.set("client", "mobile");
+  } else if (clientId === "briar-web") {
+    clientVerificationUrl.searchParams.set("client", "web");
   }
   return {
     deviceCode: response.device_code,

@@ -54,6 +54,16 @@ describe("LoginScreen", () => {
     expect(markup).toContain('class="login-shell companion-login-shell"');
   });
 
+  it("uses web-specific sign-in copy without the mobile layout", () => {
+    const markup = renderToStaticMarkup(
+      <LoginScreen {...baseProps} loginCode={null} webMode />,
+    );
+
+    expect(markup).toContain("BRIAR FOR WEB");
+    expect(markup).toContain("웹에서 관리할 수 있습니다");
+    expect(markup).not.toContain("companion-login-shell");
+  });
+
   it("uses an embeddable shell inside onboarding", () => {
     const markup = renderToStaticMarkup(
       <LoginScreen {...baseProps} embedded loginCode={null} />,

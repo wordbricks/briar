@@ -14,6 +14,7 @@ export function LoginScreen({
   loginCode,
   onCancel,
   onLogin,
+  webMode = false,
 }: {
   companionMode?: boolean;
   embedded?: boolean;
@@ -22,6 +23,7 @@ export function LoginScreen({
   loginCode: string | null;
   onCancel: () => void;
   onLogin: () => void;
+  webMode?: boolean;
 }) {
   const { t } = useI18n();
   const Shell = embedded ? "div" : "main";
@@ -55,10 +57,22 @@ export function LoginScreen({
             tone="primary"
             variant="micro"
           >
-            {companionMode ? t("companion.badge") : t("login.eyebrow")}
+            {t(
+              companionMode
+                ? "companion.badge"
+                : webMode
+                  ? "web.loginEyebrow"
+                  : "login.eyebrow",
+            )}
           </Typography>
           <Typography as="h1" variant="title">
-            {t(companionMode ? "companion.loginTitle" : "login.title")
+            {t(
+              companionMode
+                ? "companion.loginTitle"
+                : webMode
+                  ? "web.loginTitle"
+                  : "login.title",
+            )
               .split("\n")
               .map((line, index) => (
                 <span key={line}>
@@ -71,7 +85,9 @@ export function LoginScreen({
             {t(
               companionMode
                 ? "companion.loginDescription"
-                : "login.description",
+                : webMode
+                  ? "web.loginDescription"
+                  : "login.description",
             )}
           </Typography>
         </div>

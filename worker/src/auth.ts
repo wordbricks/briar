@@ -18,6 +18,7 @@ export function createAuth(env: Env, apiOrigin: string) {
     },
     trustedOrigins: [
       apiOrigin,
+      "https://briar.wordbricks.ai",
       "http://localhost:1420",
       "tauri://localhost",
       "http://tauri.localhost",
@@ -41,6 +42,7 @@ export function createAuth(env: Env, apiOrigin: string) {
           clientId === "briar-mobile" ||
           clientId === "briar-android" ||
           clientId === "briar-desktop" ||
+          clientId === "briar-web" ||
           clientId === "briar-cli",
       }),
     ],

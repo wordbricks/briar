@@ -547,6 +547,20 @@ describe("Worker HTTP contract", () => {
     expect(page).not.toContain("briar-mark.svg");
   });
 
+  it("serves web assets after removing the public /app prefix", async () => {
+    const fetchAsset = vi.fn(async (request: Request) =>
+      new Response(new URL(request.url).pathname)
+    );
+    const response = await worker.fetch(
+      new Request("https://briar.wordbricks.ai/app/assets/index.js"),
+      { ASSETS: { fetch: fetchAsset } } as never,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("/assets/index.js");
+    expect(fetchAsset).toHaveBeenCalledOnce();
+  });
+
   it("keeps the desktop authorization copy for desktop clients", async () => {
     const response = await worker.fetch(
       new Request("https://briar-api.example/device?user_code=F65P9NQN"),

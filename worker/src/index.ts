@@ -1548,7 +1548,12 @@ async function createIssueWithAttachments(input: {
   }
 }
 
-const devicePage = (apiOrigin: string, mobileCompanion: boolean) => {
+const devicePage = (
+  apiOrigin: string,
+  client: "desktop" | "mobile" | "web",
+) => {
+  const mobileCompanion = client === "mobile";
+  const webApp = client === "web";
   const copy = mobileCompanion
     ? {
         eyebrow: "MOBILE COMPANION",
@@ -1557,13 +1562,21 @@ const devicePage = (apiOrigin: string, mobileCompanion: boolean) => {
           "Google 계정으로 로그인한 뒤 이 기기의 Briar Companion 로그인을 승인하세요.",
         approve: "이 기기에서 로그인하기",
       }
-    : {
-        eyebrow: "DEVICE AUTHORIZATION",
-        title: "데스크톱 연결 승인",
-        description:
-          "Google 계정으로 로그인한 뒤 Briar 데스크톱의 접근을 승인하세요.",
-        approve: "이 기기 승인하기",
-      };
+    : webApp
+      ? {
+          eyebrow: "BRIAR FOR WEB",
+          title: "웹 로그인 승인",
+          description:
+            "Google 계정으로 로그인한 뒤 열려 있는 Briar 웹 로그인을 승인하세요.",
+          approve: "웹에서 로그인하기",
+        }
+      : {
+          eyebrow: "DEVICE AUTHORIZATION",
+          title: "데스크톱 연결 승인",
+          description:
+            "Google 계정으로 로그인한 뒤 Briar 데스크톱의 접근을 승인하세요.",
+          approve: "이 기기 승인하기",
+        };
 
   return new Response(
     `<!doctype html>
@@ -1572,11 +1585,11 @@ const devicePage = (apiOrigin: string, mobileCompanion: boolean) => {
 *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#08090b;color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.card{width:min(390px,calc(100vw - 32px));padding:30px;border:1px solid #282a30;border-radius:14px;background:#111318;box-shadow:0 30px 100px #0008}.brand{display:flex;align-items:center;gap:10px;font-weight:750;font-size:20px}.brand img{width:26px;height:26px;display:block;border-radius:6px}.eyebrow{margin-top:32px;color:#8979cf;font:500 10px monospace;letter-spacing:1px}.code{margin:18px 0;padding:15px;border:1px solid #332e49;border-radius:8px;background:#171420;text-align:center;font:600 26px monospace;letter-spacing:4px}.copy{color:#838792;font-size:12px;line-height:1.6}.actions{display:grid;gap:8px;margin-top:22px}button{height:42px;border:1px solid #34363d;border-radius:8px;background:#f4f4f5;color:#18191d;font-weight:650;cursor:pointer}button.secondary{background:#191b20;color:#aaaeb8}.status{min-height:18px;margin-top:12px;color:#777b86;font-size:11px;text-align:center}</style></head>
 <body><main class="card"><div class="brand"><img src="/brand/briar-icon.png" alt="">briar</div><p class="eyebrow">${copy.eyebrow}</p><h1>${copy.title}</h1><p class="copy">${copy.description}</p><div class="code" id="code">--------</div><div class="actions"><button id="google">Google로 로그인</button><button id="approve" hidden>${copy.approve}</button><button id="deny" class="secondary" hidden>거절</button></div><div class="status" id="status"></div></main>
 <script>
-const base=${JSON.stringify(apiOrigin)};const mobileCompanion=${JSON.stringify(mobileCompanion)};const returnUrl='briar-companion://auth-complete';const params=new URLSearchParams(location.search);const code=(params.get('user_code')||'').replace(/-/g,'').toUpperCase();const callbackParams=new URLSearchParams({user_code:code});if(mobileCompanion)callbackParams.set('client','mobile');const callbackUrl=base+'/device?'+callbackParams.toString();document.querySelector('#code').textContent=code||'코드 없음';const status=document.querySelector('#status');const google=document.querySelector('#google');const approve=document.querySelector('#approve');const deny=document.querySelector('#deny');
+const base=${JSON.stringify(apiOrigin)};const mobileCompanion=${JSON.stringify(mobileCompanion)};const webApp=${JSON.stringify(webApp)};const returnUrl='briar-companion://auth-complete';const params=new URLSearchParams(location.search);const code=(params.get('user_code')||'').replace(/-/g,'').toUpperCase();const callbackParams=new URLSearchParams({user_code:code});if(mobileCompanion)callbackParams.set('client','mobile');if(webApp)callbackParams.set('client','web');const callbackUrl=base+'/device?'+callbackParams.toString();document.querySelector('#code').textContent=code||'코드 없음';const status=document.querySelector('#status');const google=document.querySelector('#google');const approve=document.querySelector('#approve');const deny=document.querySelector('#deny');
 async function api(path,options={}){const response=await fetch(base+'/api/auth'+path,{credentials:'include',headers:{'content-type':'application/json'},...options});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.message||data.error_description||'요청에 실패했습니다.');return data}
 async function boot(){if(!code){status.textContent='유효한 기기 코드가 없습니다.';google.hidden=true;return}const session=await api('/get-session').catch(()=>null);if(!session?.user){status.textContent='먼저 Google 계정으로 로그인하세요.';return}google.hidden=true;await api('/device?user_code='+encodeURIComponent(code));approve.hidden=false;deny.hidden=false;status.textContent=session.user.email+' 계정으로 연결합니다.'}
 google.onclick=async()=>{status.textContent='Google 로그인 페이지를 여는 중…';try{const data=await api('/sign-in/social',{method:'POST',body:JSON.stringify({provider:'google',callbackURL:callbackUrl})});location.href=data.url}catch(error){status.textContent=error.message}};
-approve.onclick=async()=>{try{await api('/device/approve',{method:'POST',body:JSON.stringify({userCode:code})});approve.hidden=true;deny.hidden=true;if(mobileCompanion){status.textContent='승인되었습니다. Briar Companion으로 돌아갑니다…';window.setTimeout(()=>location.replace(returnUrl),250)}else{status.textContent='승인되었습니다. Briar 앱으로 돌아가세요.'}}catch(error){status.textContent=error.message}};
+approve.onclick=async()=>{try{await api('/device/approve',{method:'POST',body:JSON.stringify({userCode:code})});approve.hidden=true;deny.hidden=true;if(mobileCompanion){status.textContent='승인되었습니다. Briar Companion으로 돌아갑니다…';window.setTimeout(()=>location.replace(returnUrl),250)}else if(webApp){status.textContent='승인되었습니다. Briar 웹 탭으로 돌아가세요.';window.setTimeout(()=>window.close(),800)}else{status.textContent='승인되었습니다. Briar 앱으로 돌아가세요.'}}catch(error){status.textContent=error.message}};
 deny.onclick=async()=>{try{await api('/device/deny',{method:'POST',body:JSON.stringify({userCode:code})});status.textContent='요청을 거절했습니다.'}catch(error){status.textContent=error.message}};void boot();
 </script></body></html>`,
     {
@@ -6222,6 +6235,14 @@ export default {
     if (request.method === "OPTIONS") {
       return new Response(null, { headers: corsHeaders });
     }
+    if (
+      (request.method === "GET" || request.method === "HEAD") &&
+      (url.pathname === "/app" || url.pathname.startsWith("/app/"))
+    ) {
+      const assetUrl = new URL(request.url);
+      assetUrl.pathname = url.pathname.slice("/app".length) || "/";
+      return env.ASSETS.fetch(new Request(assetUrl, request));
+    }
     if (url.pathname === "/health") {
       return json({
         ok: true,
@@ -6308,11 +6329,13 @@ export default {
       return pngResponse(briarIconPng);
     }
     if (url.pathname === "/device" && request.method === "GET") {
-      return devicePage(
-        url.origin,
-        url.searchParams.get("client") === "mobile" ||
-          url.searchParams.get("client") === "android",
-      );
+      const client = url.searchParams.get("client");
+      const deviceClient = client === "mobile" || client === "android"
+        ? "mobile"
+        : client === "web"
+          ? "web"
+          : "desktop";
+      return devicePage(url.origin, deviceClient);
     }
 
     try {

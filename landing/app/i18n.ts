@@ -37,6 +37,7 @@ export const copy = {
       heroArtwork: "사람이 Briar 작업 흐름을 이끄는 리소그래프 일러스트",
       securityVisual: "Briar 보안 구조",
       sendCommand: "에이전트에게 전송",
+      openWebApp: "Briar 웹 앱 열기",
       macDownload: "Mac용 Briar 최신 버전 다운로드",
       androidDownload: "Android용 Briar 최신 릴리즈 다운로드",
     },
@@ -57,6 +58,7 @@ export const copy = {
       workflow: "워크플로",
       security: "보안",
       agents: "에이전트",
+      openWebApp: "웹에서 열기",
       macDownload: "Mac용 다운로드",
     },
     hero: {
@@ -64,6 +66,7 @@ export const copy = {
       line2: "에이전트 작업을 운영하세요.",
       description:
         "Briar는 사람과 코딩 에이전트가 실제 저장소에서 함께 일하는 과정을 연결하고, 관찰하고, 끝까지 완료하는 로컬 우선 개발 환경입니다.",
+      openWebApp: "웹에서 Briar 열기",
       macDownload: "Mac용 Briar 다운로드",
       androidDownload: "Android용 다운로드",
       howItWorks: "작동 방식 보기",
@@ -207,6 +210,7 @@ export const copy = {
       line2: "결과에는 확신을 가지세요.",
       description:
         "Briar로 사람과 에이전트가 함께 일하는 개발 흐름을 시작하세요.",
+      openWebApp: "웹에서 Briar 열기",
       macDownload: "Mac용 Briar 다운로드",
       androidDownload: "Android용 다운로드",
       github: "GitHub에서 보기",
@@ -235,6 +239,7 @@ export const copy = {
         "Risograph illustration of a person guiding a Briar workflow",
       securityVisual: "Briar security architecture",
       sendCommand: "Send to agent",
+      openWebApp: "Open the Briar web app",
       macDownload: "Download the latest Briar for Mac",
       androidDownload: "Download the latest Briar release for Android",
     },
@@ -255,6 +260,7 @@ export const copy = {
       workflow: "Workflow",
       security: "Security",
       agents: "Agents",
+      openWebApp: "Open web app",
       macDownload: "Download for Mac",
     },
     hero: {
@@ -262,6 +268,7 @@ export const copy = {
       line2: "Operate your agent work.",
       description:
         "Briar is a local-first development environment that connects, observes, and completes the work people and coding agents do together in real repositories.",
+      openWebApp: "Open Briar on the web",
       macDownload: "Download Briar for Mac",
       androidDownload: "Download for Android",
       howItWorks: "See how it works",
@@ -409,6 +416,7 @@ export const copy = {
       line2: "Trust the result.",
       description:
         "Start a development flow where people and agents work together with Briar.",
+      openWebApp: "Open Briar on the web",
       macDownload: "Download Briar for Mac",
       androidDownload: "Download for Android",
       github: "View on GitHub",
