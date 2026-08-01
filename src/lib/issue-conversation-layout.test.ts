@@ -21,6 +21,21 @@ describe("issue conversation layout", () => {
     );
   });
 
+  it("keeps mention suggestions and the composer visible in short panels", () => {
+    const messageListRule = firstRule(".issue-message-list");
+    const composerRule = firstRule(".issue-message-composer");
+
+    expect(messageListRule).toContain("margin:0 8px");
+    expect(
+      firstRule(
+        ".issue-message-list::before,.issue-message-list::after",
+      ),
+    ).toContain('content:""');
+    expect(styles).toContain(".issue-message-list::after { height:12px; }");
+    expect(composerRule).toContain("z-index:1");
+    expect(composerRule).toContain("overflow:visible");
+  });
+
   it("pins the thread layer to the viewport", () => {
     const layerRule = firstRule(".issue-thread-layer");
     const drawerRule = firstRule(".issue-thread-drawer");
