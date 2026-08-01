@@ -2085,7 +2085,13 @@ export async function listDashboardRuns(db: D1Database, projectId: string) {
               run.dispatch_request_id, run.dispatched_at, run.worker_id,
               run.started_at,
               run.updated_at, run.completed_at, run.last_event_at,
-              run.event_count
+              run.event_count + coalesce((
+                select sum(archive.row_count)
+                from briar_log_archives archive
+                where archive.run_id = run.id
+                  and archive.archive_kind = 'run_events'
+                  and archive.status = 'complete'
+              ), 0) as event_count
        from briar_hunt_runs run
        where run.project_id = ?
        order by

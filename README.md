@@ -167,6 +167,10 @@ read-only project analysis exposes only `Read`, `Glob`, and `Grep`.
 
 ## Production D1 database
 
+Completed log retention, R2 archive verification, monitoring, deletion, backup,
+and recovery are documented in
+[the D1 hot / R2 cold retention runbook](docs/operations/log-retention-archive.md).
+
 The checked-in Wrangler configuration is linked to the `briar-db` database in the Wordbricks Cloudflare account. To provision another environment, authenticate Wrangler, create a new database, and replace the existing `database_id` in `wrangler.jsonc`:
 
 ```bash

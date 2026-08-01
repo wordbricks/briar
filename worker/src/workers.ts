@@ -1714,8 +1714,9 @@ export async function countLeasedRuns(
 }
 
 /**
- * Append transcript events and prune old sessions in the same request, so
- * retention needs no scheduled job.
+ * Append transcript events without destructively pruning older sessions.
+ * The archive scheduler moves eligible sessions to verified R2 objects before
+ * deleting their D1 rows, so an overloaded project never loses its history.
  */
 export async function appendAgentTranscript(
   db: D1Database,
@@ -1841,29 +1842,17 @@ export async function appendAgentTranscript(
     )
     .run();
 
-  const pruned = await pruneAgentTranscriptSessions(db, projectId);
-  return { sessionId, stored, storedBytes, pruned };
+  return { sessionId, stored, storedBytes, pruned: [] as string[] };
 }
 
-/** Keep the newest sessions per project, oldest pruned first. */
+/**
+ * Legacy compatibility helper. Destructive pruning is intentionally disabled;
+ * callers must use the R2 archival flow instead.
+ */
 export async function pruneAgentTranscriptSessions(db: D1Database, projectId: string) {
-  const stale = await db
-    .prepare(
-      `select session_id from briar_agent_transcript_sessions
-       where project_id = ?
-       order by last_event_at desc, session_id asc
-       limit -1 offset ?`,
-    )
-    .bind(projectId, MAX_TRANSCRIPT_SESSIONS_PER_PROJECT)
-    .all<{ session_id: string }>();
-  const sessions = (stale.results ?? []).map((row) => row.session_id);
-  for (const sessionId of sessions) {
-    await db
-      .prepare(`delete from briar_agent_transcript_sessions where session_id = ?`)
-      .bind(sessionId)
-      .run();
-  }
-  return sessions;
+  void db;
+  void projectId;
+  return [] as string[];
 }
 
 export async function readAgentTranscript(

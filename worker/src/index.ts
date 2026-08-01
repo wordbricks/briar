@@ -51,6 +51,22 @@ import {
 } from "../../src/lib/worker-icon-validation";
 import { createAuth, type BriarAuth } from "./auth";
 import {
+  archiveCompletedLogs,
+  cancelArchiveCleanup,
+  collectStorageMetrics,
+  enqueueArchiveCleanup,
+  expireArchives,
+  getArchivedEvidenceImage,
+  listArchivedExecutionAuditEvents,
+  listArchivedIssueMessages,
+  listArchivedProjectAgentSessions,
+  listArchivedRunEvidence,
+  listArchivedRunEvents,
+  listArchiveObjectsForDeletion,
+  processArchiveCleanupQueue,
+  readArchivedTranscript,
+} from "./archive";
+import {
   addOrganizationMember,
   assertQueuedHuntClaim,
   claimNextIssueAgentReply,
@@ -2725,6 +2741,27 @@ const issueConversationNotificationJson = (
 export const claimConversationJson = (messages: IssueMessageRow[]) =>
   messages.map(issueMessageJson);
 
+const listIssueMessagesWithArchive = async (
+  db: D1Database,
+  archivesBucket: R2Bucket,
+  projectId: string,
+  runId: string,
+) => {
+  const [hot, archived] = await Promise.all([
+    listIssueMessages(db, projectId, runId),
+    listArchivedIssueMessages(db, archivesBucket, projectId, runId),
+  ]);
+  return [
+    ...new Map(
+      [...archived, ...hot].map((message) => [message.id, message]),
+    ).values(),
+  ].sort(
+    (left, right) =>
+      left.created_at.localeCompare(right.created_at) ||
+      left.id.localeCompare(right.id),
+  );
+};
+
 const runEvidenceJson = (
   evidence: RunEvidenceRow,
   requiredRevision: number,
@@ -3351,21 +3388,43 @@ async function route(
     if (project.member_role !== "owner") {
       throw new HttpError(403, "Organization owner access required");
     }
-    const [attachments, evidenceImages] = await Promise.all([
+    const [attachments, evidenceImages, archivedObjects] = await Promise.all([
       listIssueAttachments(db, project.id),
       listRunEvidenceImages(db, project.id),
+      listArchiveObjectsForDeletion(db, project.id),
     ]);
+    const observedAt = new Date().toISOString();
+    await enqueueArchiveCleanup(
+      db,
+      project.id,
+      null,
+      archivedObjects,
+      observedAt,
+    );
     const attachmentKeys = [...attachments, ...(evidenceImages ?? [])].map(
       (attachment) => attachment.object_key,
     );
-    for (let offset = 0; offset < attachmentKeys.length; offset += 1_000) {
-      await attachmentsBucket.delete(
-        attachmentKeys.slice(offset, offset + 1_000),
-      );
+    try {
+      for (let offset = 0; offset < attachmentKeys.length; offset += 1_000) {
+        await attachmentsBucket.delete(
+          attachmentKeys.slice(offset, offset + 1_000),
+        );
+      }
+    } catch (error) {
+      await cancelArchiveCleanup(db, archivedObjects);
+      throw error;
     }
     if (!(await deleteProject(db, project.id, session.user.id))) {
+      await cancelArchiveCleanup(db, archivedObjects);
       throw new HttpError(404, "Project not found");
     }
+    await processArchiveCleanupQueue(
+      db,
+      env.ARCHIVES,
+      attachmentsBucket,
+      observedAt,
+      1_000,
+    );
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
@@ -3389,6 +3448,18 @@ async function route(
   }
 
   const settingsMatch = pathname.match(/^\/projects\/([0-9a-f-]+)\/settings$/u);
+  const storageMetricsMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/storage-metrics$/u,
+  );
+  if (storageMetricsMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, storageMetricsMatch[1], session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    if (!canManageOrganization(project.member_role)) {
+      throw new HttpError(403, "Organization admin access required");
+    }
+    return json({ metrics: await collectStorageMetrics(db, project.id) });
+  }
   if (settingsMatch && request.method === "GET") {
     const session = await requireSession(auth, request);
     const project = await getProject(db, settingsMatch[1], session.user.id);
@@ -3464,7 +3535,17 @@ async function route(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
-    const sessions = await listProjectAgentSessions(db, project.id);
+    const [hotSessions, archivedSessions] = await Promise.all([
+      listProjectAgentSessions(db, project.id),
+      listArchivedProjectAgentSessions(db, env.ARCHIVES, project.id),
+    ]);
+    const sessions = [
+      ...new Map(
+        [...archivedSessions, ...hotSessions].map((item) => [item.id, item]),
+      ).values(),
+    ]
+      .sort((left, right) => right.updated_at.localeCompare(left.updated_at))
+      .slice(0, 200);
     return json({ sessions: sessions.map(projectAgentSessionJson) });
   }
   const projectAgentSessionMatch = pathname.match(
@@ -4289,10 +4370,22 @@ async function route(
     if (!project) throw new HttpError(404, "Project not found");
     const run = await getHuntRunForProject(db, project.id, runEventsMatch[2]);
     if (!run) throw new HttpError(404, "Run not found");
-    const events = await listHuntRunEvents(db, project.id, run.id);
+    const [hotEvents, archivedEvents] = await Promise.all([
+      listHuntRunEvents(db, project.id, run.id),
+      listArchivedRunEvents(db, env.ARCHIVES, project.id, run.id),
+    ]);
+    const events = [
+      ...new Map(
+        [...archivedEvents, ...hotEvents].map((event) => [event.id, event]),
+      ).values(),
+    ].sort(
+      (left, right) =>
+        right.occurred_at.localeCompare(left.occurred_at) ||
+        right.id.localeCompare(left.id),
+    );
     return json({
       runId: run.id,
-      eventCount: run.event_count,
+      eventCount: events.length,
       events: events.map(dashboardEventJson),
     });
   }
@@ -4348,7 +4441,12 @@ async function route(
       issueMessagesMatch[2],
     );
     if (!run) throw new HttpError(404, "Run not found");
-    const messages = await listIssueMessages(db, project.id, run.id);
+    const messages = await listIssueMessagesWithArchive(
+      db,
+      env.ARCHIVES,
+      project.id,
+      run.id,
+    );
     return json({ messages: messages.map(issueMessageJson) });
   }
   if (issueMessagesMatch && request.method === "POST") {
@@ -4437,7 +4535,12 @@ async function route(
     }
     const messages =
       job.status === "completed"
-        ? await listIssueMessages(db, project.id, job.run_id)
+        ? await listIssueMessagesWithArchive(
+            db,
+            env.ARCHIVES,
+            project.id,
+            job.run_id,
+          )
         : [];
     const reply = messages.find(
       (message) => message.id === job.reply_message_id,
@@ -4459,14 +4562,34 @@ async function route(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
-    const [evidence, revisions, images] = await Promise.all([
+    const [hotEvidence, revisions, hotImages, archived] = await Promise.all([
       listRunEvidence(db, project.id, projectRunEvidenceMatch[2]),
       listRunStageRevisions(db, project.id, projectRunEvidenceMatch[2]),
       listRunEvidenceImages(db, project.id, projectRunEvidenceMatch[2]),
+      listArchivedRunEvidence(
+        db,
+        env.ARCHIVES,
+        project.id,
+        projectRunEvidenceMatch[2],
+      ),
     ]);
-    if (!evidence || !revisions || !images) {
+    if (!hotEvidence || !revisions || !hotImages) {
       throw new HttpError(404, "Run not found");
     }
+    const evidence = [
+      ...new Map(
+        [...archived.evidence, ...hotEvidence].map((item) => [item.id, item]),
+      ).values(),
+    ].sort(
+      (left, right) =>
+        left.observed_at.localeCompare(right.observed_at) ||
+        left.id.localeCompare(right.id),
+    );
+    const images = [
+      ...new Map(
+        [...archived.images, ...hotImages].map((item) => [item.id, item]),
+      ).values(),
+    ];
     const imagesByEvidence = new Map<string, RunEvidenceImageRow[]>();
     for (const image of images) {
       const evidenceImages = imagesByEvidence.get(image.evidence_id) ?? [];
@@ -4512,12 +4635,18 @@ async function route(
         projectEvidenceImageMatch[1],
       );
     }
-    const image = await getRunEvidenceImage(
+    const image = (await getRunEvidenceImage(
       db,
       projectEvidenceImageMatch[1],
       projectEvidenceImageMatch[2],
       projectEvidenceImageMatch[3],
-    );
+    )) ?? (await getArchivedEvidenceImage(
+      db,
+      env.ARCHIVES,
+      projectEvidenceImageMatch[1],
+      projectEvidenceImageMatch[2],
+      projectEvidenceImageMatch[3],
+    ));
     if (!image) throw new HttpError(404, "Evidence image not found");
     if (request.method === "HEAD") {
       const object = await attachmentsBucket.head(image.object_key);
@@ -4680,18 +4809,31 @@ async function route(
     const session = await requireSession(auth, request);
     const project = await getProject(db, issueUpdateMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
-    const [attachments, evidenceImages] = await Promise.all([
+    const [attachments, evidenceImages, archivedObjects] = await Promise.all([
       listIssueAttachments(db, project.id, issueUpdateMatch[2]),
       listAllRunEvidenceImages(db, project.id, issueUpdateMatch[2]),
+      listArchiveObjectsForDeletion(db, project.id, issueUpdateMatch[2]),
     ]);
+    const observedAt = new Date().toISOString();
+    await enqueueArchiveCleanup(
+      db,
+      project.id,
+      issueUpdateMatch[2],
+      archivedObjects,
+      observedAt,
+    );
     const outcome = await deleteIssue(
       db,
       project.id,
       issueUpdateMatch[2],
-      new Date().toISOString(),
+      observedAt,
     );
-    if (outcome === "not_found") throw new HttpError(404, "Run not found");
+    if (outcome === "not_found") {
+      await cancelArchiveCleanup(db, archivedObjects);
+      throw new HttpError(404, "Run not found");
+    }
     if (outcome === "active") {
+      await cancelArchiveCleanup(db, archivedObjects);
       throw new HttpError(409, "An active Auto Hunt issue cannot be deleted");
     }
     const attachmentKeys = [...attachments, ...(evidenceImages ?? [])].map(
@@ -4710,6 +4852,13 @@ async function route(
         );
       }
     }
+    await processArchiveCleanupQueue(
+      db,
+      env.ARCHIVES,
+      attachmentsBucket,
+      observedAt,
+      1_000,
+    );
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
@@ -4826,7 +4975,24 @@ async function route(
       throw new HttpError(403, "Organization admin access required");
     }
     const runId = new URL(request.url).searchParams.get("runId") ?? undefined;
-    const events = await listExecutionAuditEvents(db, project.id, runId);
+    const [hotEvents, archivedEvents] = await Promise.all([
+      listExecutionAuditEvents(db, project.id, runId),
+      listArchivedExecutionAuditEvents(
+        db,
+        env.ARCHIVES,
+        project.id,
+        runId,
+      ),
+    ]);
+    const events = [
+      ...new Map(
+        [...archivedEvents, ...hotEvents].map((event) => [event.id, event]),
+      ).values(),
+    ].sort(
+      (left, right) =>
+        right.occurred_at.localeCompare(left.occurred_at) ||
+        right.id.localeCompare(left.id),
+    );
     return json({
       events: events.map((event) => ({
         id: event.id,
@@ -5174,7 +5340,7 @@ async function route(
       new URL(request.url).searchParams.get("afterSequence") ?? "0",
       10,
     );
-    const transcript = await readAgentTranscript(
+    const hotTranscript = await readAgentTranscript(
       db,
       projectId,
       transcriptMatch[2],
@@ -5185,6 +5351,28 @@ async function route(
             : 0,
       },
     );
+    const archivedTranscript = hotTranscript
+      ? null
+      : await readArchivedTranscript(
+          db,
+          env.ARCHIVES,
+          projectId,
+          transcriptMatch[2],
+        );
+    const transcript =
+      hotTranscript ??
+      (archivedTranscript
+        ? {
+            ...archivedTranscript,
+            events: archivedTranscript.events.filter(
+              (event) =>
+                event.sequence >
+                (Number.isFinite(afterSequence) && afterSequence > 0
+                  ? afterSequence
+                  : 0),
+            ),
+          }
+        : null);
     if (!transcript) throw new HttpError(404, "Transcript not found");
     return json({
       session: {
@@ -5256,7 +5444,12 @@ async function route(
         getHuntRunForProject(db, input.projectId, job.run_id),
         listHuntRunEvents(db, input.projectId, job.run_id),
         listIssueAttachments(db, input.projectId, job.run_id),
-        listIssueMessages(db, input.projectId, job.run_id),
+        listIssueMessagesWithArchive(
+          db,
+          env.ARCHIVES,
+          input.projectId,
+          job.run_id,
+        ),
         listRunEvidence(db, input.projectId, job.run_id),
         readAgentTranscript(
           db,
@@ -5396,7 +5589,12 @@ async function route(
       createdAt: observedAt,
     });
     if (!reply) {
-      reply = (await listIssueMessages(db, input.projectId, job.run_id)).find(
+      reply = (await listIssueMessagesWithArchive(
+        db,
+        env.ARCHIVES,
+        input.projectId,
+        job.run_id,
+      )).find(
         (message) => message.id === job.reply_message_id,
       ) ?? null;
     }
@@ -5523,7 +5721,7 @@ async function route(
     const [attachments, messages] = run
       ? await Promise.all([
           listIssueAttachments(db, projectId, run.id),
-          listIssueMessages(db, projectId, run.id),
+          listIssueMessagesWithArchive(db, env.ARCHIVES, projectId, run.id),
         ])
       : [[], []];
     return json({
@@ -5640,14 +5838,29 @@ async function route(
       request,
       evidenceMatch[1],
     );
-    const [evidence, revisions, images] = await Promise.all([
+    const [hotEvidence, revisions, hotImages, archived] = await Promise.all([
       listRunEvidence(db, projectId, evidenceMatch[1]),
       listRunStageRevisions(db, projectId, evidenceMatch[1]),
       listRunEvidenceImages(db, projectId, evidenceMatch[1]),
+      listArchivedRunEvidence(db, env.ARCHIVES, projectId, evidenceMatch[1]),
     ]);
-    if (!evidence || !revisions || !images) {
+    if (!hotEvidence || !revisions || !hotImages) {
       throw new HttpError(404, "Run not found");
     }
+    const evidence = [
+      ...new Map(
+        [...archived.evidence, ...hotEvidence].map((item) => [item.id, item]),
+      ).values(),
+    ].sort(
+      (left, right) =>
+        left.observed_at.localeCompare(right.observed_at) ||
+        left.id.localeCompare(right.id),
+    );
+    const images = [
+      ...new Map(
+        [...archived.images, ...hotImages].map((item) => [item.id, item]),
+      ).values(),
+    ];
     const imagesByEvidence = new Map<string, RunEvidenceImageRow[]>();
     for (const image of images) {
       const evidenceImages = imagesByEvidence.get(image.evidence_id) ?? [];
@@ -5909,6 +6122,41 @@ async function route(
 }
 
 export default {
+  async scheduled(
+    controller: ScheduledController,
+    env: Env,
+    ctx: ExecutionContext,
+  ): Promise<void> {
+    const observedAt = new Date(controller.scheduledTime).toISOString();
+    ctx.waitUntil((async () => {
+      try {
+        const [archive, expired, cleanup] = await Promise.all([
+          archiveCompletedLogs(env.DB, env.ARCHIVES, observedAt),
+          expireArchives(env.DB, env.ARCHIVES, observedAt),
+          processArchiveCleanupQueue(
+            env.DB,
+            env.ARCHIVES,
+            env.ATTACHMENTS,
+            observedAt,
+          ),
+        ]);
+        console.log(JSON.stringify({
+          message: "log archive sweep completed",
+          observedAt,
+          archive,
+          expiredObjects: expired,
+          cleanup,
+        }));
+      } catch (error) {
+        console.error(JSON.stringify({
+          message: "log archive sweep failed",
+          observedAt,
+          error: error instanceof Error ? error.message : String(error),
+        }));
+        throw error;
+      }
+    })());
+  },
   async fetch(
     request: Request,
     env: Env,
