@@ -2327,7 +2327,11 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .inbox-panel { min-height:0; flex:1; overflow:hidden; display:flex; flex-direction:column; border:0; border-radius:0; background:var(--card); box-shadow:none; }
 .inbox-filter-bar { min-height:58px; padding:10px 18px 10px 21px; display:flex; align-items:center; justify-content:space-between; gap:16px; border-bottom:1px solid #e9eae4; background:rgba(255,255,255,.92); }
 .inbox-filter-bar > span { flex:0 0 auto; color:#888a83; font:500 var(--text-2xs) "DM Mono",monospace; }
-.inbox-filters { min-width:0; display:flex; align-items:center; gap:6px; overflow-x:auto; scrollbar-width:none; }
+.inbox-filter-controls { min-width:0; flex:1; display:flex; align-items:center; gap:10px; }
+.inbox-project-filter.select-menu { width:176px; flex:0 0 176px; }
+.inbox-project-filter.select-menu .select-menu-trigger { height:32px; border-color:#e1e2dd; border-radius:9px; color:#5e605a; background:#fafaf8; }
+.inbox-project-filter.select-menu .select-menu-trigger:hover:not(:disabled) { border-color:#d3d0dc; background:#f7f6fa; }
+.inbox-filters { min-width:0; flex:1; display:flex; align-items:center; gap:6px; overflow-x:auto; scrollbar-width:none; }
 .inbox-filters::-webkit-scrollbar { display:none; }
 .inbox-filter { height:32px; padding:0 9px; display:inline-flex; align-items:center; gap:6px; flex:0 0 auto; border:1px solid #e1e2dd; border-radius:9px; color:#74766f; background:#fafaf8; cursor:pointer; font-size:var(--text-2xs); font-weight:var(--font-weight-semibold); transition:transform 100ms ease-out,border-color 140ms ease,background-color 140ms ease,color 140ms ease; }
 .inbox-filter:hover { border-color:#d3d0dc; color:#555750; background:#f7f6fa; }
@@ -2770,6 +2774,8 @@ button.issue-message-state { width:100%; cursor:pointer; }
   .inbox-heading { min-height:48px; padding:0 18px; gap:12px; }
   .inbox-heading > button { width:34px; padding:0; justify-content:center; font-size:0; }
   .inbox-filter-bar { padding-right:12px; padding-left:12px; }
+  .inbox-filter-controls { align-items:stretch; flex-direction:column; gap:8px; }
+  .inbox-project-filter.select-menu { width:100%; flex-basis:auto; }
   .inbox-filter-bar > span { display:none; }
   .inbox-message-open { grid-template-columns:36px minmax(0,1fr) auto; padding-right:12px; padding-left:12px; column-gap:10px; }
   .inbox-mark-read { right:3px; }
@@ -3309,6 +3315,8 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .companion-shell .inbox-heading > button { width:34px; flex:0 0 34px; margin-top:0; padding:0; justify-content:center; font-size:0; }
 .companion-shell .inbox-panel { border:0; border-radius:0; box-shadow:none; }
 .companion-shell .inbox-filter-bar { min-height:52px; padding:8px 0; }
+.companion-shell .inbox-filter-controls { align-items:stretch; flex-direction:column; gap:8px; }
+.companion-shell .inbox-project-filter.select-menu { width:100%; flex-basis:auto; }
 .companion-shell .inbox-filter-bar > span { display:none; }
 .companion-shell .inbox-message,.companion-shell .inbox-message-open { min-height:66px; }
 .companion-shell .inbox-message-open { padding:9px 0; grid-template-columns:36px minmax(0,1fr) auto; column-gap:10px; }
