@@ -3078,14 +3078,6 @@ export function RunPage({
                       id={`${detailTabsId}-description-panel`}
                       role="tabpanel"
                     >
-                      <IssueDependenciesPanel
-                        availableRuns={availableRuns}
-                        isUpdating={isUpdatingIssue}
-                        onAdd={onAddDependency}
-                        onOpen={onDependencyOpen}
-                        onRemove={onRemoveDependency}
-                        run={run}
-                      />
                       {run.status === "blocked" ? (
                         <section
                           aria-labelledby={`${detailTabsId}-blocked-title`}
@@ -3570,6 +3562,14 @@ export function RunPage({
                     <span className="run-property-copy"><strong>{t("run.attempt", { count: run.currentAttempt })} · {t("run.revision", { count: run.currentRevision })}</strong></span>
                   </div>
                 </section>
+                <IssueDependenciesPanel
+                  availableRuns={availableRuns}
+                  isUpdating={isUpdatingIssue}
+                  onAdd={onAddDependency}
+                  onOpen={onDependencyOpen}
+                  onRemove={onRemoveDependency}
+                  run={run}
+                />
                 <section>
                   <h2>{t("run.repository")}</h2>
                   <div
