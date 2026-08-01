@@ -69,6 +69,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ComponentProps,
   type DragEvent,
   type ReactElement,
   type FormEvent,
@@ -2763,6 +2764,19 @@ export function RunPage({
   ];
   const placementValue = placementIdForRun(run);
   const issueContent = run.issueDescription?.trim() || null;
+  const issueAttachmentsRef = useRef(run.attachments ?? []);
+  issueAttachmentsRef.current = run.attachments ?? [];
+  const renderIssueMarkdownImage = useCallback(
+    ({ alt, src }: ComponentProps<"img">) => (
+      <IssueMarkdownImage
+        alt={alt ?? ""}
+        attachments={issueAttachmentsRef.current}
+        onLoadAttachment={onLoadAttachment}
+        src={src}
+      />
+    ),
+    [onLoadAttachment],
+  );
   const embeddedAttachmentReferences = issueAttachmentReferences(issueContent);
   const remainingAttachments = (run.attachments ?? []).filter(
     (attachment) => !embeddedAttachmentReferences.has(attachment.id),
@@ -3201,14 +3215,7 @@ export function RunPage({
                         <div className="issue-description-markdown">
                           <ReactMarkdown
                             components={{
-                              img: ({ alt, src }) => (
-                                <IssueMarkdownImage
-                                  alt={alt ?? ""}
-                                  attachments={run.attachments ?? []}
-                                  onLoadAttachment={onLoadAttachment}
-                                  src={src}
-                                />
-                              ),
+                              img: renderIssueMarkdownImage,
                             }}
                             remarkPlugins={[remarkGfm]}
                             skipHtml
@@ -5128,7 +5135,7 @@ function IssueMarkdownImage({
       active = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [attachment, onLoadAttachment, reference]);
+  }, [attachment?.url, onLoadAttachment, reference]);
 
   if (!reference) {
     return src ? <img alt={alt} loading="lazy" src={src} /> : null;
@@ -5202,7 +5209,7 @@ function IssueAttachmentPreview({
       active = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [attachment, onLoadAttachment]);
+  }, [attachment.url, onLoadAttachment]);
   const isImage = attachment.contentType.startsWith("image/");
   return (
     <article className="run-attachment">
