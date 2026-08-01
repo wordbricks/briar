@@ -5376,6 +5376,22 @@ fn main_window_state_flags() -> tauri_plugin_window_state::StateFlags {
     StateFlags::SIZE | StateFlags::MAXIMIZED
 }
 
+#[cfg(desktop)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum InboxNotificationResponseMode {
+    FireAndForget,
+    WaitForOpen,
+}
+
+#[cfg(desktop)]
+const fn inbox_notification_response_mode() -> InboxNotificationResponseMode {
+    if cfg!(target_os = "macos") {
+        InboxNotificationResponseMode::FireAndForget
+    } else {
+        InboxNotificationResponseMode::WaitForOpen
+    }
+}
+
 #[tauri::command]
 fn show_inbox_notification(
     app: tauri::AppHandle,
@@ -5396,11 +5412,13 @@ fn show_inbox_notification(
         }
 
         std::thread::spawn(move || {
+            let response_mode = inbox_notification_response_mode();
             let mut notification = notify_rust::Notification::new();
             notification.summary(&title).body(&body).auto_icon();
-            // The macOS backend only waits for body clicks when an action is attached.
             #[cfg(unix)]
-            notification.action("default", "Open");
+            if response_mode == InboxNotificationResponseMode::WaitForOpen {
+                notification.action("default", "Open");
+            }
             #[cfg(windows)]
             if let Ok(executable) = tauri::utils::platform::current_exe() {
                 if let Some(directory) = executable.parent() {
@@ -5422,6 +5440,13 @@ fn show_inbox_notification(
                     return;
                 }
             };
+            if response_mode == InboxNotificationResponseMode::FireAndForget {
+                // notify-rust's legacy macOS response path installs a repeating
+                // main-run-loop timer for every delivered notification. Letting
+                // the handle drop still delivers the notification without
+                // accumulating response threads or polling Notification Center.
+                return;
+            }
             if let Err(error) =
                 handle.wait_for_response(move |response: &notify_rust::NotificationResponse| {
                     let opens_notification = match response {
@@ -5772,6 +5797,20 @@ pub fn run() {
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn macos_inbox_notifications_do_not_wait_for_responses() {
+        #[cfg(target_os = "macos")]
+        assert_eq!(
+            inbox_notification_response_mode(),
+            InboxNotificationResponseMode::FireAndForget
+        );
+        #[cfg(not(target_os = "macos"))]
+        assert_eq!(
+            inbox_notification_response_mode(),
+            InboxNotificationResponseMode::WaitForOpen
+        );
+    }
 
     #[test]
     fn discovers_repository_icons_using_t3code_candidate_priority() {
