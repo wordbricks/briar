@@ -36,6 +36,7 @@ describe("issue detail width", () => {
   it("keeps conversation on the right and properties in a collapsible overlay", () => {
     const bodyRule = firstRule(".run-page-body");
     const layoutRule = firstRule(".run-page-layout");
+    const propertiesLayerRule = firstRule(".run-properties-layer");
     const propertiesRule = firstRule(".run-properties");
     const propertiesHeadingRule = firstRule(".run-properties h2");
     const propertyRule = firstRule(".run-property");
@@ -64,6 +65,8 @@ describe("issue detail width", () => {
     expect(styles).toContain(
       "grid-template-columns:minmax(0,1fr) minmax(310px,38%)",
     );
+    expect(propertiesLayerRule).toContain("position:absolute");
+    expect(propertiesLayerRule).toContain("inset:0");
     expect(propertiesRule).toContain("position:absolute");
     expect(propertiesRule).toContain("right:0");
     expect(propertiesRule).toContain("width:min(310px,100%)");
