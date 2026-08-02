@@ -33,12 +33,12 @@ describe("iOS safe area layout", () => {
     );
   });
 
-  it("keeps thread controls inside the mobile safe areas", () => {
+  it("keeps inline replies within the conversation scroll area", () => {
     expect(styles).toContain(
-      ".issue-thread-drawer > header { min-height:calc(66px + env(safe-area-inset-top,0px)); padding:calc(8px + env(safe-area-inset-top,0px)) max(13px,env(safe-area-inset-right)) 8px max(18px,env(safe-area-inset-left));",
+      ".issue-message-replies { min-width:0; margin:2px 10px 2px 54px;",
     );
     expect(styles).toContain(
-      ".issue-message-composer.compact { margin:12px max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));",
+      ".issue-inline-reply-composer { margin:7px 10px 7px 64px; }",
     );
   });
 });

@@ -36,16 +36,13 @@ describe("issue conversation layout", () => {
     expect(composerRule).toContain("overflow:visible");
   });
 
-  it("pins the thread layer to the viewport", () => {
-    const layerRule = firstRule(".issue-thread-layer");
-    const openLayerRule = firstRule(".issue-thread-layer.open");
-    const drawerRule = firstRule(".issue-thread-drawer");
+  it("nests replies below their root message", () => {
+    const repliesRule = firstRule(".issue-message-replies");
+    const composerRule = firstRule(".issue-inline-reply-composer");
 
-    expect(layerRule).toContain("position:fixed");
-    expect(layerRule).toContain("inset:0");
-    expect(openLayerRule).toContain("pointer-events:auto");
-    expect(drawerRule).toContain("margin-left:auto");
-    expect(drawerRule).toContain("50vw");
+    expect(repliesRule).toContain("margin:2px 10px 2px 54px");
+    expect(repliesRule).toContain("border-left:1px solid var(--border)");
+    expect(composerRule).toContain("margin:7px 10px 7px 64px");
   });
 
   it("keeps hover actions out of the message flow", () => {
@@ -55,6 +52,7 @@ describe("issue conversation layout", () => {
     expect(messageRule).toContain("position:relative");
     expect(messageRule).toContain("padding:6px 10px");
     expect(actionsRule).toContain("position:absolute");
+    expect(actionsRule).toContain("top:4px");
     expect(actionsRule).toContain("opacity:0");
     expect(actionsRule).toContain("pointer-events:none");
     expect(styles).toContain(
@@ -62,11 +60,12 @@ describe("issue conversation layout", () => {
     );
   });
 
-  it("makes the existing thread summary a full-width click target", () => {
-    const summaryRule = firstRule(".issue-thread-summary");
-
-    expect(summaryRule).toContain("width:100%");
-    expect(summaryRule).toContain("min-height:38px");
-    expect(summaryRule).toContain("display:flex");
+  it("uses a compact composer for an inline reply", () => {
+    expect(firstRule(".issue-message-composer.compact")).toContain(
+      "box-shadow:0 4px 14px",
+    );
+    expect(
+      firstRule(".issue-inline-reply-composer .issue-message-composer textarea"),
+    ).toContain("min-height:52px");
   });
 });
