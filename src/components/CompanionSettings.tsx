@@ -25,13 +25,16 @@ import type { SessionUser } from "../types";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { InboxNotificationSettings } from "./InboxNotificationSettings";
 import { AccountProfileSettings } from "./AccountProfileSettings";
+import { AccountDeletionSettings } from "./AccountDeletionSettings";
 
 export function CompanionSettings({
   onBack,
+  onAccountDelete,
   onAccountSave,
   user,
 }: {
   onBack: () => void;
+  onAccountDelete?: (confirmation: string) => Promise<void>;
   onAccountSave?: (input: {
     username: string;
     name: string;
@@ -115,6 +118,13 @@ export function CompanionSettings({
           onSave={onAccountSave ?? (async (input) => ({ ...user, ...input }))}
           user={user}
         />
+        {onAccountDelete ? (
+          <AccountDeletionSettings
+            compact
+            onDelete={onAccountDelete}
+            user={user}
+          />
+        ) : null}
       </section>
 
       <section className="mb-7 grid gap-3">

@@ -7,6 +7,7 @@ import {
   createIssueMessage,
   createProjectAgent,
   createProjectAgentSchedule,
+  deleteAccount,
   deleteProjectAgent,
   deleteIssue,
   dispatchHuntRun,
@@ -71,6 +72,22 @@ describe("API errors", () => {
           name: "Jay Kim",
           image: null,
         }),
+      }),
+    );
+  });
+
+  it("deletes the signed-in account with an email confirmation", async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      deleteAccount("token", "jay@example.com"),
+    ).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/me"),
+      expect.objectContaining({
+        method: "DELETE",
+        body: JSON.stringify({ confirmation: "jay@example.com" }),
       }),
     );
   });

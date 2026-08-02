@@ -22,6 +22,7 @@ import {
   createIssueAttachments,
   createIssueDependency,
   createRunEvidenceImages,
+  deleteAccountData,
   deleteProjectAgent,
   deleteIssue,
   deleteIssueDependency,
@@ -57,6 +58,7 @@ import {
   listRunEvidence,
   listRunEvidenceImages,
   moveHuntRun,
+  planAccountDeletion,
   recoverHuntRun,
   reworkHuntRun,
   recordHuntEvent,
@@ -410,6 +412,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await executeSql(
       db,
       await readFile(resolve("migrations/0031_organization_logos.sql"), "utf8"),
+    );
+    await executeSql(
+      db,
+      await readFile(resolve("migrations/0032_slack_integration.sql"), "utf8"),
     );
     await executeSql(
       db,
@@ -1929,6 +1935,132 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await expect(
       findProjectIdByAgentTokenHash(db, memberTokenHash),
     ).resolves.toBeNull();
+  });
+
+  it("deletes a personal account, its sole-member organization, and auth data", async () => {
+    const userId = "account-deletion-personal";
+    const email = "account-deletion-personal@example.com";
+    await executeSql(
+      db,
+      `insert into user (id, name, email, emailVerified, createdAt, updatedAt)
+       values (
+         '${userId}', 'Delete Me', '${email}', 1,
+         '${atMinute(0)}', '${atMinute(0)}'
+       );
+       insert into verification (
+         id, identifier, value, expiresAt, createdAt, updatedAt
+       ) values (
+         'account-deletion-verification', '${email}', 'token',
+         '${atMinute(30)}', '${atMinute(0)}', '${atMinute(0)}'
+       );
+       insert into deviceCode (
+         id, deviceCode, userCode, userId, expiresAt, status
+       ) values (
+         'account-deletion-device', 'device-code', 'user-code', '${userId}',
+         '${atMinute(30)}', 'approved'
+       );`,
+    );
+    const organization = await createOrganization(db, {
+      name: "Disposable Organization",
+      handle: "account-deletion-personal",
+      ownerUserId: userId,
+    });
+    const project = await createProject(db, {
+      ownerUserId: userId,
+      organizationId: organization.id,
+      name: "Disposable Project",
+      agentTokenHash: "9".repeat(64),
+    });
+
+    const plan = await planAccountDeletion(db, userId);
+    expect(plan.blockedOrganizations).toEqual([]);
+    expect(plan.organizationIds).toEqual([organization.id]);
+    expect(plan.projectIds).toEqual([project.id]);
+    await expect(
+      deleteAccountData(db, {
+        userId,
+        email,
+        organizationIds: plan.organizationIds,
+      }),
+    ).resolves.toBe(true);
+
+    await expect(
+      db.prepare(`select id from "user" where id = ?`).bind(userId).first(),
+    ).resolves.toBeNull();
+    await expect(
+      db
+        .prepare(`select id from briar_organizations where id = ?`)
+        .bind(organization.id)
+        .first(),
+    ).resolves.toBeNull();
+    await expect(
+      db.prepare(`select id from briar_projects where id = ?`).bind(project.id).first(),
+    ).resolves.toBeNull();
+    await expect(
+      db
+        .prepare(`select id from verification where identifier = ?`)
+        .bind(email)
+        .first(),
+    ).resolves.toBeNull();
+    await expect(
+      db
+        .prepare(`select id from deviceCode where userId = ?`)
+        .bind(userId)
+        .first(),
+    ).resolves.toBeNull();
+  });
+
+  it("blocks shared owners while allowing a resource-free member to leave", async () => {
+    const ownerId = "account-deletion-shared-owner";
+    const memberId = "account-deletion-shared-member";
+    const ownerEmail = "account-deletion-owner@example.com";
+    const memberEmail = "account-deletion-member@example.com";
+    await executeSql(
+      db,
+      `insert into user (id, name, email, emailVerified, createdAt, updatedAt)
+       values
+         ('${ownerId}', 'Shared Owner', '${ownerEmail}', 1,
+          '${atMinute(0)}', '${atMinute(0)}'),
+         ('${memberId}', 'Shared Member', '${memberEmail}', 1,
+          '${atMinute(0)}', '${atMinute(0)}');`,
+    );
+    const organization = await createOrganization(db, {
+      name: "Shared Organization",
+      handle: "account-deletion-shared",
+      ownerUserId: ownerId,
+    });
+    await expect(
+      addOrganizationMember(db, organization.id, memberEmail, "member"),
+    ).resolves.toBe(memberId);
+
+    await expect(planAccountDeletion(db, ownerId)).resolves.toMatchObject({
+      blockedOrganizations: [{ id: organization.id, name: organization.name }],
+      organizationIds: [],
+    });
+    const memberPlan = await planAccountDeletion(db, memberId);
+    expect(memberPlan).toEqual({
+      blockedOrganizations: [],
+      organizationIds: [],
+      projectIds: [],
+    });
+    await expect(
+      deleteAccountData(db, {
+        userId: memberId,
+        email: memberEmail,
+        organizationIds: memberPlan.organizationIds,
+      }),
+    ).resolves.toBe(true);
+    await expect(
+      db
+        .prepare(`select id from briar_organizations where id = ?`)
+        .bind(organization.id)
+        .first(),
+    ).resolves.not.toBeNull();
+
+    await db.batch([
+      db.prepare(`delete from briar_organizations where id = ?`).bind(organization.id),
+      db.prepare(`delete from "user" where id = ?`).bind(ownerId),
+    ]);
   });
 
   it("updates an organization name while preserving its membership role", async () => {

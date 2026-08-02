@@ -73,6 +73,7 @@ import { AppearanceSettings } from "./AppearanceSettings";
 import { InboxNotificationSettings } from "./InboxNotificationSettings";
 import type { RepositoryReadiness } from "../lib/project-connection";
 import type { SessionUser } from "../types";
+import { AccountDeletionSettings } from "./AccountDeletionSettings";
 import { AccountProfileSettings } from "./AccountProfileSettings";
 import { BrowserSettings } from "./BrowserSettings";
 
@@ -137,6 +138,7 @@ export function AppSettings({
   loading,
   navigationSidebar,
   onBack,
+  onAccountDelete,
   onAccountSave,
   onRefresh,
   projectId,
@@ -150,6 +152,7 @@ export function AppSettings({
   loading: boolean;
   navigationSidebar?: ReactNode;
   onBack: () => void;
+  onAccountDelete?: (confirmation: string) => Promise<void>;
   onAccountSave?: (input: {
     username: string;
     name: string;
@@ -493,6 +496,15 @@ export function AppSettings({
               <SettingsGroupHeading title={t("account.publicProfile")} />
               {user && onAccountSave ? (
                 <AccountProfileSettings onSave={onAccountSave} user={user} />
+              ) : null}
+              {user && onAccountDelete ? (
+                <>
+                  <SettingsGroupHeading title={t("account.dangerZone")} />
+                  <AccountDeletionSettings
+                    onDelete={onAccountDelete}
+                    user={user}
+                  />
+                </>
               ) : null}
             </SettingsContent>
           ) : activeSection === "usage" ? (

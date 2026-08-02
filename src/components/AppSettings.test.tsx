@@ -111,6 +111,47 @@ describe("AppSettings", () => {
     ).IS_REACT_ACT_ENVIRONMENT = true;
   });
 
+  it("shows account deletion beside the profile settings", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <I18nProvider>
+          <AppSettings
+            error={null}
+            initialSection="account"
+            isSidebarOpen
+            loading={false}
+            onAccountDelete={async () => undefined}
+            onAccountSave={async (input) => ({
+              id: "user-1",
+              email: "jay@example.com",
+              ...input,
+            })}
+            onBack={() => undefined}
+            onRefresh={() => Promise.resolve(readiness)}
+            projectId="project-1"
+            projectName="Briar"
+            readiness={readiness}
+            user={{
+              id: "user-1",
+              username: "jay",
+              name: "Jay",
+              email: "jay@example.com",
+            }}
+          />
+        </I18nProvider>,
+      );
+    });
+
+    expect(container.textContent).toContain("Profile information");
+    expect(container.textContent).toContain("Delete account and data");
+    expect(container.textContent).toContain("Delete account");
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("checks and installs agent-browser from Browser settings", async () => {
     vi.mocked(inspectAgentBrowser).mockResolvedValue({
       supported: true,

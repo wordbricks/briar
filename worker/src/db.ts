@@ -60,6 +60,12 @@ export type OrganizationMemberRow = {
   created_at: string;
 };
 
+export type AccountDeletionPlan = {
+  blockedOrganizations: Array<{ id: string; name: string }>;
+  organizationIds: string[];
+  projectIds: string[];
+};
+
 export type SlackInstallationRow = {
   team_id: string;
   team_name: string;
@@ -569,6 +575,120 @@ export async function listOrganizations(db: D1Database, userId: string) {
     .bind(userId)
     .all<OrganizationRow>();
   return result.results;
+}
+
+export async function planAccountDeletion(
+  db: D1Database,
+  userId: string,
+): Promise<AccountDeletionPlan> {
+  const organizationResult = await db
+    .prepare(
+      `select organization.id, organization.name, membership.role,
+              (select count(*)
+               from briar_organization_members peer
+               where peer.organization_id = organization.id) as member_count,
+              exists(
+                select 1 from briar_projects project
+                where project.organization_id = organization.id
+                  and project.owner_user_id = ?
+              ) as owns_project,
+              exists(
+                select 1 from briar_execution_worker_devices device
+                where device.organization_id = organization.id
+                  and device.owner_user_id = ?
+              ) as owns_worker,
+              exists(
+                select 1 from briar_slack_installations installation
+                where installation.organization_id = organization.id
+                  and installation.installed_by_user_id = ?
+              ) as owns_slack_installation
+       from briar_organization_members membership
+       join briar_organizations organization
+         on organization.id = membership.organization_id
+       where membership.user_id = ?
+       order by organization.created_at, organization.id`,
+    )
+    .bind(userId, userId, userId, userId)
+    .all<{
+      id: string;
+      name: string;
+      role: OrganizationRole;
+      member_count: number;
+      owns_project: number;
+      owns_worker: number;
+      owns_slack_installation: number;
+    }>();
+  const organizations = organizationResult.results ?? [];
+  const blockedOrganizations = organizations
+    .filter(
+      (organization) =>
+        organization.member_count > 1 &&
+        (organization.role === "owner" ||
+          organization.owns_project > 0 ||
+          organization.owns_worker > 0 ||
+          organization.owns_slack_installation > 0),
+    )
+    .map(({ id, name }) => ({ id, name }));
+  const organizationIds = organizations
+    .filter((organization) => organization.member_count === 1)
+    .map((organization) => organization.id);
+  const projectResult = await db
+    .prepare(
+      `select distinct project.id
+       from briar_projects project
+       where project.owner_user_id = ?
+          or project.organization_id in (
+            select membership.organization_id
+            from briar_organization_members membership
+            where membership.user_id = ?
+              and 1 = (
+                select count(*)
+                from briar_organization_members peer
+                where peer.organization_id = membership.organization_id
+              )
+          )
+       order by project.id`,
+    )
+    .bind(userId, userId)
+    .all<{ id: string }>();
+  return {
+    blockedOrganizations,
+    organizationIds,
+    projectIds: (projectResult.results ?? []).map((project) => project.id),
+  };
+}
+
+export async function deleteAccountData(
+  db: D1Database,
+  input: {
+    userId: string;
+    email: string;
+    organizationIds: readonly string[];
+  },
+) {
+  const statements = [
+    ...input.organizationIds.map((organizationId) =>
+      db
+        .prepare(`delete from briar_organizations where id = ?`)
+        .bind(organizationId),
+    ),
+    db
+      .prepare(`delete from verification where lower(identifier) = lower(?)`)
+      .bind(input.email),
+    db.prepare(`delete from deviceCode where userId = ?`).bind(input.userId),
+    db
+      .prepare(
+        `delete from briar_project_agent_tokens where issued_to_user_id = ?`,
+      )
+      .bind(input.userId),
+    db.prepare(`delete from "user" where id = ?`).bind(input.userId),
+  ];
+  await db.batch(statements);
+  const remaining = await db
+    .prepare(`select 1 as present from "user" where id = ?`)
+    .bind(input.userId)
+    .first<{ present: number }>();
+  return remaining === null;
 }
 
 export async function createOrganization(

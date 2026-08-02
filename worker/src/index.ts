@@ -88,6 +88,7 @@ import {
   createProject,
   createSlackOAuthState,
   claimSlackEvent,
+  deleteAccountData,
   deleteSlackInstallation,
   deleteProjectAgent,
   deleteProjectAgentSchedule,
@@ -136,6 +137,7 @@ import {
   listProjectAgentSchedules,
   listSlackInstallations,
   moveHuntRun,
+  planAccountDeletion,
   issueProjectAgentToken,
   recoverHuntRun,
   reworkHuntRun,
@@ -263,6 +265,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "DELETE, GET, HEAD, PATCH, POST, PUT, OPTIONS",
   "Access-Control-Allow-Origin": "*",
 };
+const accountDeletionFreshAgeMs = 24 * 60 * 60 * 1_000;
 
 const json = (body: unknown, status = 200) =>
   Response.json(body, { status, headers: corsHeaders });
@@ -761,6 +764,11 @@ export const accountProfileInputSchema = z.object({
     .regex(/^data:image\/(?:jpeg|png|webp);base64,/u)
     .nullable(),
 });
+export const accountDeletionInputSchema = z
+  .object({
+    confirmation: z.string().trim().email().max(320),
+  })
+  .strict();
 export const organizationUpdateInputSchema = organizationInputSchema.pick({
   name: true,
 });
@@ -3006,6 +3014,117 @@ async function route(
         image: input.image,
       },
     });
+  }
+
+  if (pathname === "/me" && request.method === "DELETE") {
+    const session = await requireSession(auth, request);
+    const input = accountDeletionInputSchema.parse(await readJson(request));
+    if (input.confirmation.toLowerCase() !== session.user.email.toLowerCase()) {
+      throw new HttpError(400, "Confirmation email does not match");
+    }
+    const signedInAt = new Date(session.session.createdAt).getTime();
+    if (
+      !Number.isFinite(signedInAt) ||
+      Date.now() - signedInAt >= accountDeletionFreshAgeMs
+    ) {
+      throw new HttpError(403, "Recent sign-in required for account deletion");
+    }
+
+    const plan = await planAccountDeletion(db, session.user.id);
+    if (plan.blockedOrganizations.length > 0) {
+      throw new HttpError(
+        409,
+        "Account deletion is blocked by shared organization resources",
+      );
+    }
+
+    const cleanupPlans = await Promise.all(
+      plan.projectIds.map(async (projectId) => {
+        const [attachments, evidenceImages, archivedObjects, agents] =
+          await Promise.all([
+            listIssueAttachments(db, projectId),
+            listRunEvidenceImages(db, projectId),
+            listArchiveObjectsForDeletion(db, projectId),
+            listProjectAgents(db, projectId),
+          ]);
+        return {
+          projectId,
+          objects: {
+            archives: [...new Set(archivedObjects.archives)],
+            attachments: [
+              ...new Set([
+                ...archivedObjects.attachments,
+                ...attachments.map((attachment) => attachment.object_key),
+                ...(evidenceImages ?? []).map((image) => image.object_key),
+                ...agents.flatMap((agent) =>
+                  agent.avatar_spritesheet_object_key
+                    ? [agent.avatar_spritesheet_object_key]
+                    : [],
+                ),
+              ]),
+            ],
+          },
+        };
+      }),
+    );
+    const observedAt = new Date().toISOString();
+    for (const cleanup of cleanupPlans) {
+      await enqueueArchiveCleanup(
+        db,
+        cleanup.projectId,
+        null,
+        cleanup.objects,
+        observedAt,
+      );
+    }
+
+    const slackInstallations = (
+      await Promise.all(
+        plan.organizationIds.map((organizationId) =>
+          listSlackInstallations(db, organizationId),
+        ),
+      )
+    ).flat();
+    if (slackConfigAvailable(env)) {
+      for (const installation of slackInstallations) {
+        try {
+          const token = await decryptSlackToken(
+            installation.encrypted_bot_token,
+            installation.token_iv,
+            env.SLACK_TOKEN_ENCRYPTION_KEY,
+          );
+          await callSlackApi("auth.revoke", token, { test: false });
+        } catch (error) {
+          console.error(
+            JSON.stringify({
+              message: "Slack token revoke failed during account deletion",
+              error: error instanceof Error ? error.message : String(error),
+              teamId: installation.team_id,
+            }),
+          );
+        }
+      }
+    }
+
+    const deleted = await deleteAccountData(db, {
+      userId: session.user.id,
+      email: session.user.email,
+      organizationIds: plan.organizationIds,
+    });
+    if (!deleted) {
+      for (const cleanup of cleanupPlans) {
+        await cancelArchiveCleanup(db, cleanup.objects);
+      }
+      throw new HttpError(404, "Account not found");
+    }
+    await processArchiveCleanupQueue(
+      db,
+      env.ARCHIVES,
+      attachmentsBucket,
+      observedAt,
+      1_000,
+    );
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   if (pathname === "/organizations" && request.method === "GET") {
