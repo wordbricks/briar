@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { isDesktopTauri } from "../lib/platform";
+import { prepareForAppUpdate } from "../lib/planned-update-recovery";
 
 /** How often the signed update channel is re-checked while the app is open. */
 export const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
@@ -104,6 +105,7 @@ export function AppUpdateProvider({
     setInstallError(null);
     try {
       await update.downloadAndInstall();
+      await prepareForAppUpdate();
       const { relaunch } = await import("@tauri-apps/plugin-process");
       await relaunch();
     } catch (caught) {

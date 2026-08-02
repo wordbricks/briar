@@ -95,7 +95,7 @@ pub(crate) struct ProjectAutoHuntRequest {
     pub(crate) issues: Vec<ProjectAutoHuntIssue>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProjectAgentRunRequest {
     pub(crate) session_id: String,
@@ -110,6 +110,8 @@ pub(crate) struct ProjectAgentRunRequest {
     pub(crate) conversation_id: Option<String>,
     #[serde(default)]
     pub(crate) runs: Vec<ProjectAgentRunSnapshot>,
+    #[serde(default)]
+    pub(crate) resume_after_update: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -652,6 +654,7 @@ pub(crate) fn chat(
         .map(|conversation_id| decode_conversation_id(project_id, conversation_id))
         .transpose()?;
 
+    let conversation_event_sink = execution.event_sink.clone();
     let mut connection = CodexConnection::start(
         runner.clone(),
         binary,
@@ -677,6 +680,20 @@ pub(crate) fn chat(
         .pointer("/thread/id")
         .and_then(Value::as_str)
         .ok_or_else(|| "Codex App Server가 대화 ID를 반환하지 않았습니다.".to_string())?;
+    let active_conversation_id = encode_conversation_id(project_id, active_thread_id);
+    if let Some(event_sink) = conversation_event_sink {
+        event_sink(AgentProviderEvent {
+            provider: AgentProviderKind::Codex,
+            direction: AgentEventDirection::Server,
+            raw: json!({
+                "type": "conversationStarted",
+                "conversationId": active_conversation_id.clone(),
+            }),
+            event: Some(AgentEvent::ConversationStarted {
+                conversation_id: active_conversation_id.clone(),
+            }),
+        })?;
+    }
     let active_workspace = thread_result
         .get("cwd")
         .and_then(Value::as_str)
@@ -695,7 +712,7 @@ pub(crate) fn chat(
     let response_message = connection.read_turn(active_thread_id, approve)?;
 
     Ok(ProjectLlmResponse {
-        conversation_id: encode_conversation_id(project_id, active_thread_id),
+        conversation_id: active_conversation_id,
         message: response_message,
         workspace_root: workspace.to_string(),
     })
@@ -2397,6 +2414,7 @@ mod tests {
                 message: "Auto Hunt로 대기 이슈 2개를 처리해 줘".to_string(),
                 conversation_id: None,
                 runs: Vec::new(),
+                resume_after_update: false,
             },
             &|_, _| false,
         )
@@ -2452,6 +2470,7 @@ mod tests {
                     result_summary: None,
                     updated_at: "2026-07-30T09:00:00Z".to_string(),
                 }],
+                resume_after_update: false,
             },
             &|_, _| false,
         )
@@ -2495,6 +2514,7 @@ mod tests {
                 message: "Auto Hunt로 대기 이슈 2개를 처리해 줘".to_string(),
                 conversation_id: None,
                 runs: Vec::new(),
+                resume_after_update: false,
             },
             &|_, _| false,
         )
@@ -2533,6 +2553,7 @@ mod tests {
                 message: "저장소를 점검해 줘".to_string(),
                 conversation_id: None,
                 runs: Vec::new(),
+                resume_after_update: false,
             },
             &|_, _| false,
         )
@@ -2725,7 +2746,7 @@ printf '%s\n' '{"method":"turn/completed","params":{"threadId":"thread-1","turn"
         assert_eq!(requests[4]["id"], 4);
         assert_eq!(requests[4]["result"]["decision"], "accept");
         let events = recorded_events.lock().expect("recorded events should lock");
-        assert_eq!(events.len(), 11);
+        assert_eq!(events.len(), 12);
         assert!(matches!(events[0].direction, AgentEventDirection::Client));
         assert_eq!(events[0].raw["method"], "initialize");
         assert!(matches!(
@@ -2736,6 +2757,11 @@ printf '%s\n' '{"method":"turn/completed","params":{"threadId":"thread-1","turn"
             events.last().expect("last event should exist").raw["method"],
             "turn/completed"
         );
+        assert!(events.iter().any(|event| matches!(
+            &event.event,
+            Some(AgentEvent::ConversationStarted { conversation_id })
+                if conversation_id == "briar:project-1:thread-1"
+        )));
         assert!(events.iter().any(|event| matches!(
             &event.event,
             Some(AgentEvent::MessageCompleted { phase, text, .. })

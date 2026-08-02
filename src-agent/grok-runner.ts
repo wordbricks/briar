@@ -332,6 +332,7 @@ async function main() {
         throw new Error("Grok agent did not return a session id.");
       }
     }
+    emit({ type: "session", sessionId });
 
     const modelId = resolveGrokModelId(request.model);
     if (modelId) {

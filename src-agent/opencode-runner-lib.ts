@@ -42,6 +42,7 @@ export type NormalizedAgentEvent =
   | { type: "turnCompleted"; status: string };
 
 export type OpenCodeRunnerOutput =
+  | { type: "session"; sessionId: string }
   | { type: "event"; raw: unknown; event?: NormalizedAgentEvent }
   | {
       type: "approval";

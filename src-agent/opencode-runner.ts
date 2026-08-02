@@ -218,6 +218,7 @@ async function main() {
       throwOnError: true,
     });
     const sessionId = await resolveSession(client, request);
+    emit({ type: "session", sessionId });
     const eventState = createOpenCodeEventState();
     const controller = new AbortController();
     const subscription = await client.event.subscribe(undefined, {

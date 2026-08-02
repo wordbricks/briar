@@ -102,6 +102,10 @@ struct ClaudeRunnerRequest<'a> {
 #[derive(Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 enum ClaudeRunnerMessage {
+    Session {
+        #[serde(rename = "sessionId")]
+        session_id: String,
+    },
     Event {
         raw: Value,
         event: Option<AgentEvent>,
@@ -282,6 +286,23 @@ pub(crate) fn chat(
     connection.send(&raw_request)?;
     loop {
         match connection.read()? {
+            Some(ClaudeRunnerMessage::Session { session_id }) => {
+                if session_id.trim().is_empty() {
+                    return Err("Claude Agent SDK가 빈 대화 ID를 반환했습니다.".to_string());
+                }
+                if let Some(event_sink) = execution.event_sink.as_ref() {
+                    let conversation_id = encode_conversation_id(project_id, &session_id);
+                    event_sink(AgentProviderEvent {
+                        provider: AgentProviderKind::Claude,
+                        direction: AgentEventDirection::Server,
+                        raw: json!({
+                            "type": "conversationStarted",
+                            "conversationId": conversation_id.clone(),
+                        }),
+                        event: Some(AgentEvent::ConversationStarted { conversation_id }),
+                    })?;
+                }
+            }
             Some(ClaudeRunnerMessage::Event { raw, event }) => {
                 if let Some(event_sink) = execution.event_sink.as_ref() {
                     event_sink(AgentProviderEvent {
@@ -364,6 +385,7 @@ mod tests {
             &runner,
             r#"#!/bin/sh
 read request
+echo '{"type":"session","sessionId":"session-1"}'
 echo '{"type":"event","raw":{"type":"assistant"},"event":{"type":"messageCompleted","id":"message-1","phase":"commentary","text":"working"}}'
 echo '{"type":"approval","id":"1","toolName":"Bash","input":{"command":"bun test"},"title":"Run tests"}'
 read approval
@@ -413,11 +435,16 @@ echo '{"type":"result","sessionId":"session-1","message":"done"}'
         assert_eq!(response.conversation_id, "briar:claude:project-1:session-1");
         assert_eq!(response.message, "done");
         let events = events.lock().expect("events should lock");
-        assert_eq!(events.len(), 2);
+        assert_eq!(events.len(), 3);
         assert_eq!(events[0].provider, AgentProviderKind::Claude);
         assert_eq!(events[0].raw["effort"], "high");
         assert!(matches!(
             events[1].event,
+            Some(AgentEvent::ConversationStarted { ref conversation_id })
+                if conversation_id == "briar:claude:project-1:session-1"
+        ));
+        assert!(matches!(
+            events[2].event,
             Some(AgentEvent::MessageCompleted { .. })
         ));
     }

@@ -432,6 +432,7 @@ describe("ProjectAgentDetail", () => {
       message: "Auto Hunt로 대기 이슈 세 건을 처리해 줘",
       conversationId: null,
       runs: [],
+      resumeAfterUpdate: true,
     });
     expect(onStartAutoHunt).toHaveBeenCalledWith([], {
       coordinatorConversationId: "briar:project-1:coordinator-1",

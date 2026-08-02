@@ -4,6 +4,7 @@ mod auto_hunt_dispatch;
 mod host;
 #[cfg(target_os = "macos")]
 mod macos_inbox_notifications;
+mod planned_update_recovery;
 
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use serde::{Deserialize, Serialize};
@@ -534,6 +535,14 @@ impl AgentSessionCancellationState {
         };
         cancelled.store(true, Ordering::SeqCst);
         Ok(true)
+    }
+
+    fn active_session_ids(&self) -> Result<Vec<String>, String> {
+        let sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| "에이전트 세션 중단 상태 잠금이 손상되었습니다.".to_string())?;
+        Ok(sessions.keys().cloned().collect())
     }
 }
 
@@ -3952,10 +3961,32 @@ async fn run_project_agent(
         "agent/opencode-runner.js",
         "dist-agent/opencode-runner.js",
     );
-    let event_sink =
+    let recovery_store = planned_update_recovery::PlannedUpdateRecoveryStore::new(
+        &app.path()
+            .app_data_dir()
+            .map_err(|error| error.to_string())?,
+    )?;
+    let resume_after_update = request.resume_after_update;
+    if resume_after_update {
+        recovery_store.begin(&project_id, &request)?;
+    }
+    let recovery_session_id = request.session_id.clone();
+    let recovery_event_store = recovery_store.clone();
+    let stored_event_sink =
         create_auto_hunt_event_sink(&app, &request.session_id, Arc::clone(&cancellation_signal))?;
+    let event_sink: agent::AgentEventSink = Arc::new(move |provider_event| {
+        if resume_after_update {
+            if let Some(agent::AgentEvent::ConversationStarted { conversation_id }) =
+                provider_event.event.as_ref()
+            {
+                recovery_event_store.record_conversation(&recovery_session_id, conversation_id)?;
+            }
+        }
+        stored_event_sink(provider_event)
+    });
     let approval_app = app.clone();
-    tauri::async_runtime::spawn_blocking(move || {
+    let session_id = request.session_id.clone();
+    let outcome = tauri::async_runtime::spawn_blocking(move || {
         let _cancellation = cancellation;
         ensure_agent_session_running(&cancellation_signal)?;
         let (runner, workspace) = connected_project_runtime(&config_path, &project_id, &home)?;
@@ -4016,7 +4047,45 @@ async fn run_project_agent(
         )
     })
     .await
-    .map_err(|error| error.to_string())?
+    .map_err(|error| error.to_string())?;
+    let cleanup = if resume_after_update {
+        recovery_store.finish(&session_id)
+    } else {
+        Ok(())
+    };
+    match (outcome, cleanup) {
+        (Ok(response), Ok(())) => Ok(response),
+        (Err(error), Ok(())) => Err(error),
+        (Ok(_), Err(cleanup_error)) => Err(cleanup_error),
+        (Err(error), Err(cleanup_error)) => Err(format!(
+            "{error} (업데이트 복구 상태 정리 실패: {cleanup_error})"
+        )),
+    }
+}
+
+#[tauri::command]
+fn prepare_for_app_update(
+    app: tauri::AppHandle,
+    session_cancellations: tauri::State<'_, AgentSessionCancellationState>,
+) -> Result<usize, String> {
+    let directory = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| error.to_string())?;
+    let active_session_ids = session_cancellations.active_session_ids()?;
+    planned_update_recovery::PlannedUpdateRecoveryStore::new(&directory)?
+        .prepare_for_update(&active_session_ids)
+}
+
+#[tauri::command]
+fn take_planned_update_agent_recoveries(
+    app: tauri::AppHandle,
+) -> Result<Vec<planned_update_recovery::PlannedUpdateAgentRecovery>, String> {
+    let directory = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| error.to_string())?;
+    planned_update_recovery::PlannedUpdateRecoveryStore::new(&directory)?.take_prepared()
 }
 
 #[tauri::command]
@@ -4578,6 +4647,12 @@ fn create_auto_hunt_worker_event_sink(
     worker_session_id: String,
 ) -> agent::AgentEventSink {
     Arc::new(move |provider_event| {
+        let conversation_id = match provider_event.event.as_ref() {
+            Some(agent::AgentEvent::ConversationStarted { conversation_id }) => {
+                Some(conversation_id.clone())
+            }
+            _ => None,
+        };
         let progress = match provider_event.event.as_ref() {
             Some(agent::AgentEvent::MessageCompleted { text, phase, .. })
                 if !text.trim().is_empty() =>
@@ -4599,6 +4674,17 @@ fn create_auto_hunt_worker_event_sink(
             _ => None,
         };
         base(provider_event)?;
+        if let Some(conversation_id) = conversation_id {
+            let group = store.transition_worker(
+                &dispatch_group_id,
+                &worker_session_id,
+                auto_hunt_dispatch::AutoHuntWorkerStatus::Running,
+                None,
+                Some(conversation_id),
+                Some("프로바이더 대화가 시작되어 복구 지점을 저장했습니다.".to_string()),
+            )?;
+            emit_latest_auto_hunt_dispatch_event(&app, &group);
+        }
         if let Some((event_type, message)) = progress {
             let group = store.record_worker_progress(
                 &dispatch_group_id,
@@ -5956,6 +6042,12 @@ pub fn run() {
                 let home = _app.path().home_dir()?;
                 let app_data_directory = _app.path().app_data_dir()?;
                 if let Err(error) =
+                    planned_update_recovery::PlannedUpdateRecoveryStore::new(&app_data_directory)
+                        .and_then(|store| store.cleanup_unprepared())
+                {
+                    eprintln!("Planned update recovery cleanup failed: {error}");
+                }
+                if let Err(error) =
                     auto_hunt_dispatch::AutoHuntDispatchStore::new(&app_data_directory)
                         .and_then(|store| store.interrupt_orphaned_groups())
                 {
@@ -6001,6 +6093,8 @@ pub fn run() {
             project_llm_chat,
             run_project_agent,
             stop_project_agent_session,
+            prepare_for_app_update,
+            take_planned_update_agent_recoveries,
             retry_project_auto_hunt_run,
             start_project_auto_hunt,
             load_auto_hunt_app_server_events,

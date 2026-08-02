@@ -84,6 +84,9 @@ pub(crate) enum AgentEventDirection {
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub(crate) enum AgentEvent {
+    ConversationStarted {
+        conversation_id: String,
+    },
     MessageStarted {
         id: String,
         phase: Option<String>,

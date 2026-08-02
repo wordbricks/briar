@@ -137,6 +137,7 @@ describe("project LLM gateway", () => {
         message: "Auto Hunt로 대기 이슈 3개를 처리해 줘",
         conversationId: null,
         runs: [],
+        resumeAfterUpdate: false,
       },
     });
     expect(invoke.mock.calls[0]?.[1]).not.toHaveProperty("workspaceRoot");

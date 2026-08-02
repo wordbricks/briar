@@ -58,6 +58,10 @@ export type ClaudeEventState = {
 
 export type ClaudeRunnerOutput =
   | {
+      type: "session";
+      sessionId: string;
+    }
+  | {
       type: "event";
       raw: SDKMessage;
       event?: NormalizedAgentEvent;
