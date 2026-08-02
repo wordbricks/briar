@@ -14,7 +14,7 @@
 3. 네이티브 앱이 사용하는 서버 경계는 `contracts/mobile/companion.openapi.yaml`에 OpenAPI 3.1 subset으로 명시한다. 첫 subset은 서비스 상태, device authorization 시작/폴링, 현재 사용자, 프로젝트 목록만 포함한다.
 4. iOS는 `briar-mobile`, Android는 `briar-android` client ID를 사용하되 응답 모델과 오류 의미는 공유한다. Worker fixture와 계약 테스트가 두 client ID, endpoint, 응답 필수 필드를 함께 검증한다.
 5. API 계약은 추가 방식으로 확장한다. 기존 필드 삭제·이름 변경·의미 변경은 새 계약 버전과 명시적 이행 계획 없이는 허용하지 않는다. 알 수 없는 응답 필드는 모바일 클라이언트가 무시한다.
-6. 저장소의 로컬 CI `app-worker` signoff에 모바일 검증을 포함한다. 새 SwiftUI App/Unit/UI Test, 기존 Tauri iOS 시뮬레이터 빌드, 기존 Tauri Android debug 빌드, Worker 모바일 계약을 한 경로에서 검사한다.
+6. 모바일 플랫폼 빌드는 필수 `app-worker` signoff와 분리한다. Worker 모바일 계약은 일반 테스트에서 계속 검증하고, 새 SwiftUI App/Unit/UI Test와 기존 Tauri iOS/Android 빌드는 명시적인 `bun run mobile:ci`에서 검사한다.
 
 ## 오류와 복구 원칙
 
@@ -25,10 +25,10 @@
 
 ## Android 동등성
 
-이번 단계는 iOS 렌더링 기반을 만드는 작업이므로 별도 Android UI 프로젝트를 만들지 않는다. Android Tauri 앱은 계속 같은 사용자 기능을 제공하며, 모바일 API 계약과 CI에서는 Android client ID와 기존 Android 빌드를 동등하게 필수 검증한다. 이후 iOS 기능 PR은 아래 표의 Android 열을 함께 갱신해야 한다.
+이번 단계는 iOS 렌더링 기반을 만드는 작업이므로 별도 Android UI 프로젝트를 만들지 않는다. Android Tauri 앱은 계속 같은 사용자 기능을 제공하며, 모바일 API 계약 테스트에서는 Android client ID를 함께 검증한다. 기존 Android 빌드는 명시적인 모바일 CI에서 확인한다. 이후 iOS 기능 PR은 아래 표의 Android 열을 함께 갱신해야 한다.
 
 ## 결과
 
 - SwiftUI 작업은 기존 TestFlight 앱을 덮어쓰지 않고 메인에 병합할 수 있다.
 - 서버 팀과 두 모바일 플랫폼이 사용하는 최소 데이터 형식과 오류 경계가 한 계약으로 고정된다.
-- 새 네이티브 기능이 추가되어도 기존 Tauri iOS와 Android가 계속 빌드되는지를 동일 signoff에서 확인한다.
+- 기존 Tauri iOS와 Android의 회귀 빌드는 필요할 때 명시적인 모바일 CI로 확인한다.
