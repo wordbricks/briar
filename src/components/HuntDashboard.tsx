@@ -331,6 +331,15 @@ export function HuntDashboard({
   );
   const [draggedRunId, setDraggedRunId] = useState<string | null>(null);
   const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null);
+  // Keep a ref so dragover/drop can authorize the transfer before React re-renders.
+  const draggedRunIdRef = useRef<string | null>(null);
+  const suppressCardClickRef = useRef(false);
+
+  const clearKanbanDragState = useCallback(() => {
+    draggedRunIdRef.current = null;
+    setDraggedRunId(null);
+    setDragOverColumnId(null);
+  }, []);
 
   useEffect(() => {
     if (noProject) return;
@@ -724,9 +733,9 @@ export function HuntDashboard({
         />
       ) : null}
       <div className="dashboard-scroll">
-        {error ? (
+        {error || recoveryError ? (
           <ErrorBanner className="error-banner" icon={<CircleAlert size={16} />}>
-            {error}
+            {error ?? recoveryError}
           </ErrorBanner>
         ) : null}
         {companionMode ? (
@@ -872,14 +881,17 @@ export function HuntDashboard({
               className={`kanban-column ${column.tone}${dragOverColumnId === column.id ? " drag-over" : ""}`}
               key={column.id}
               onDragEnter={(event) => {
-                if (!draggedRunId) return;
+                if (!draggedRunIdRef.current) return;
                 event.preventDefault();
                 setDragOverColumnId(column.id);
               }}
               onDragOver={(event) => {
-                if (!draggedRunId) return;
+                if (!draggedRunIdRef.current) return;
                 event.preventDefault();
                 event.dataTransfer.dropEffect = "move";
+                if (dragOverColumnId !== column.id) {
+                  setDragOverColumnId(column.id);
+                }
               }}
               onDragLeave={(event) => {
                 if (
@@ -892,9 +904,11 @@ export function HuntDashboard({
               onDrop={(event) => {
                 event.preventDefault();
                 const runId =
-                  draggedRunId || event.dataTransfer.getData("text/plain");
-                setDraggedRunId(null);
-                setDragOverColumnId(null);
+                  draggedRunIdRef.current ||
+                  draggedRunId ||
+                  event.dataTransfer.getData("text/plain");
+                suppressCardClickRef.current = true;
+                clearKanbanDragState();
                 const run = runs.find((candidate) => candidate.id === runId);
                 if (!run || placementMatchesRun(run, column.placement)) return;
                 void onMoveRun(run.id, column.placement).catch(() => undefined);
@@ -922,6 +936,7 @@ export function HuntDashboard({
                     }
                     contextMenuDisabled={companionMode}
                     deletingIssueId={deletingIssueId}
+                    isDragging={draggedRunId === run.id}
                     isMoving={recoveringRunId === run.id}
                     key={run.id}
                     onDelete={() => {
@@ -929,19 +944,32 @@ export function HuntDashboard({
                       setDeletingRunFromMenuId(run.id);
                     }}
                     onDragEnd={() => {
-                      setDraggedRunId(null);
-                      setDragOverColumnId(null);
+                      // A completed drag should not also open the issue page.
+                      suppressCardClickRef.current = true;
+                      clearKanbanDragState();
                     }}
                     onDragStart={(event) => {
                       event.dataTransfer.effectAllowed = "move";
                       event.dataTransfer.setData("text/plain", run.id);
+                      event.dataTransfer.setData(
+                        "application/x-briar-run-id",
+                        run.id,
+                      );
+                      draggedRunIdRef.current = run.id;
+                      suppressCardClickRef.current = false;
                       setDraggedRunId(run.id);
                     }}
                     onEdit={() => setEditingRunId(run.id)}
                     onMove={(placement) =>
                       onMoveRun(run.id, placement).catch(() => undefined)
                     }
-                    onOpen={() => setSelectedRunId(run.id)}
+                    onOpen={() => {
+                      if (suppressCardClickRef.current) {
+                        suppressCardClickRef.current = false;
+                        return;
+                      }
+                      setSelectedRunId(run.id);
+                    }}
                     onProcessNow={
                       onProcessIssueNow
                         ? () => onProcessIssueNow(run)
@@ -1899,6 +1927,7 @@ function KanbanCard({
   assignedWorker,
   contextMenuDisabled,
   deletingIssueId,
+  isDragging = false,
   isMoving,
   isProcessing,
   onDelete,
@@ -1919,6 +1948,7 @@ function KanbanCard({
   assignedWorker: ExecutionWorker | null;
   contextMenuDisabled: boolean;
   deletingIssueId: string | null;
+  isDragging?: boolean;
   isMoving: boolean;
   isProcessing: boolean;
   onDelete: () => void;
@@ -1947,6 +1977,7 @@ function KanbanCard({
       disabled={
         contextMenuDisabled ||
         isMoving ||
+        isDragging ||
         deletingIssueId === run.id ||
         updatingIssueId === run.id
       }
@@ -1963,7 +1994,7 @@ function KanbanCard({
       <div
         aria-label={t("run.details", { title: run.title })}
         aria-disabled={isMoving}
-        className={`kanban-card ${meta.tone}${isMoving ? " moving" : ""}${activeAgent || assignedWorker ? " has-assignees" : ""}${activeAgent && assignedWorker ? " has-multiple-assignees" : ""}`}
+        className={`kanban-card ${meta.tone}${isMoving ? " moving" : ""}${isDragging ? " dragging" : ""}${activeAgent || assignedWorker ? " has-assignees" : ""}${activeAgent && assignedWorker ? " has-multiple-assignees" : ""}`}
         draggable={!isMoving}
         onDragEnd={onDragEnd}
         onDragStart={onDragStart}
