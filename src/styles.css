@@ -3719,6 +3719,9 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .companion-shell .issue-detail-tabs { padding:0; }
 .companion-shell .issue-description-pane { height:auto; min-height:220px; }
 .companion-shell .issue-description-scroll { overflow:visible; }
+.companion-shell .run-result-panel { padding-right:0; }
+.companion-shell .run-result-panel .completed-issue-card { padding:0; border:0; border-radius:0; background:transparent; box-shadow:none; }
+.companion-shell .run-result-screenshots { margin-top:20px; padding:20px 0 0; border-width:1px 0 0; border-radius:0; background:transparent; }
 .companion-shell .issue-status-history-panel { max-height:520px; }
 .companion-shell .run-evidence-panel { max-height:520px; }
 .companion-shell .run-evidence-item > footer { align-items:flex-start; flex-direction:column; gap:4px; }
