@@ -19,6 +19,18 @@ enum MobileAPIContract {
         static func dashboardDelta(projectID: UUID, cursor: Int) -> String {
             "\(dashboard(projectID: projectID))/delta?cursor=\(cursor)"
         }
+
+        static func runEvents(projectID: UUID, runID: UUID) -> String {
+            "/projects/\(projectID.uuidString.lowercased())/runs/\(runID.uuidString.lowercased())/events"
+        }
+
+        static func runMessages(projectID: UUID, runID: UUID) -> String {
+            "/projects/\(projectID.uuidString.lowercased())/runs/\(runID.uuidString.lowercased())/messages"
+        }
+
+        static func runEvidence(projectID: UUID, runID: UUID) -> String {
+            "/projects/\(projectID.uuidString.lowercased())/runs/\(runID.uuidString.lowercased())/evidence"
+        }
     }
 }
 
@@ -164,6 +176,14 @@ protocol MobileAPIClientProtocol: Sendable {
         body: (any Encodable & Sendable)?,
         as responseType: Response.Type
     ) async throws -> Response
+
+    func download(_ path: String, token: String, to destination: URL) async throws -> URL
+}
+
+extension MobileAPIClientProtocol {
+    func download(_ path: String, token: String, to destination: URL) async throws -> URL {
+        throw MobileAPIError.invalidDownload
+    }
 }
 
 struct MobileAPIClient: MobileAPIClientProtocol, Sendable {

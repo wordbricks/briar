@@ -6,15 +6,68 @@ final class BriarCompanionUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    func testDashboardScreen() {
+    func testLoginProjectSelectionSearchAndDetailFlow() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing"]
         app.launch()
 
-        XCTAssertTrue(app.navigationBars["Dashboard"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.descendants(matching: .any)["dashboard-list"].exists)
-        XCTAssertTrue(app.staticTexts["iOS Native Dashboard 동기화"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["login-title"].waitForExistence(timeout: 5))
+        app.buttons["login-button"].tap()
+        XCTAssertTrue(app.navigationBars["프로젝트 선택"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["organization-picker"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["project-picker"].exists)
+        app.buttons["project-continue-button"].tap()
+
+        XCTAssertTrue(app.tabBars.buttons["Search"].waitForExistence(timeout: 5))
+        app.tabBars.buttons["Search"].tap()
+        let searchField = app.searchFields["작업 검색"]
+        XCTAssertTrue(searchField.waitForExistence(timeout: 5))
+        searchField.tap()
+        searchField.typeText("Companion")
+
+        let result = app.descendants(matching: .any)[
+            "search-result-33333333-3333-4333-8333-333333333333"
+        ]
+        XCTAssertTrue(result.waitForExistence(timeout: 5))
+        result.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["run-detail"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["iOS Native Companion 읽기 경험"].exists)
+        XCTAssertTrue(app.staticTexts["읽기 전용"].exists)
+    }
+
+    func testRepresentativeRunStatesAndFilters() {
+        let app = launchInsideCompanion()
+
         XCTAssertTrue(app.staticTexts["진행 중"].exists)
-        XCTAssertTrue(app.descendants(matching: .any)["dashboard-synced-at"].exists)
+        XCTAssertTrue(app.staticTexts["완료"].exists)
+        XCTAssertTrue(app.staticTexts["확인 필요"].exists)
+        XCTAssertTrue(app.staticTexts["실패"].exists)
+
+        app.segmentedControls.buttons["Attention"].tap()
+        XCTAssertTrue(app.staticTexts["오프라인 복구 확인"].exists)
+        XCTAssertTrue(app.staticTexts["실패 상태 예시"].exists)
+        XCTAssertFalse(app.staticTexts["공유 API 계약 검증"].exists)
+    }
+
+    func testOfflineErrorAndRetryScreen() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--ui-testing-offline"]
+        app.launch()
+
+        XCTAssertTrue(app.descendants(matching: .any)["offline-state"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["오프라인"].exists)
+        XCTAssertTrue(app.buttons["dashboard-retry-button"].exists)
+    }
+
+    private func launchInsideCompanion() -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing"]
+        app.launch()
+        XCTAssertTrue(app.buttons["login-button"].waitForExistence(timeout: 5))
+        app.buttons["login-button"].tap()
+        XCTAssertTrue(app.buttons["project-continue-button"].waitForExistence(timeout: 5))
+        app.buttons["project-continue-button"].tap()
+        XCTAssertTrue(app.navigationBars["Tasks"].waitForExistence(timeout: 5))
+        return app
     }
 }

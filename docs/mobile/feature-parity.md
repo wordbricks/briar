@@ -4,22 +4,27 @@
 
 | 사용자 기능 | 기존 Tauri iOS | 기존 Tauri Android | 네이티브 SwiftUI iOS | 공유 계약/결정 |
 | --- | --- | --- | --- | --- |
-| 앱 실행 및 독립 설치 | 제공 | 제공 | 기반 | 개발 앱은 기존 iOS 앱과 다른 bundle ID 사용 |
+| 앱 실행 및 독립 설치 | 제공 | 제공 | 제공 | 개발 앱은 기존 iOS 앱과 다른 bundle ID 사용 |
 | Device Authorization 로그인 | 제공 (`briar-mobile`) | 제공 (`briar-android`) | 제공 | `ASWebAuthenticationSession`, device code 시작/폴링과 4개 종료·대기 오류를 사용 |
 | 현재 사용자 조회 | 제공 | 제공 | 제공 | `GET /me`, bearer token, `401` 시 Keychain을 비우고 재로그인 |
 | 프로젝트 목록 조회 | 제공 | 제공 | 제공 | 사용자·조직·프로젝트 저장소가 선택 상태를 관리 |
-| 이슈 목록 및 상세 | 제공 | 제공 | 계획 | 다음 계약 확장 전에는 네이티브 앱에서 호출하지 않음 |
+| Tasks/Agents/Search/Inbox 앱 셸 | 제공 | 제공 | 제공 | Android의 기존 React 탭과 네이티브 iOS 읽기 탭을 유지 |
+| 작업 목록·상태 필터·검색 | 제공 | 제공 | 제공 | All/Active/Attention/Completed 필터와 제목·설명·진행·결과 통합 검색 |
+| 이슈 설명 및 결과 상세 | 제공 | 제공 | 제공 | dashboard snapshot/delta의 Markdown 설명, structured result, 리뷰 필드를 읽기 전용으로 사용 |
 | 실행 진행 상황 | 제공 | 제공 | 제공 | snapshot/delta 공유 계약, 15초 polling, foreground·오프라인 복귀, cursor 만료 시 snapshot 복구 |
-| 이슈 대화 및 첨부 | 제공 | 제공 | 계획 | 메시지/첨부 생명주기를 이후 단계에서 추가 |
+| 이벤트 및 증빙 | 제공 | 제공 | 제공 | 인증된 GET 경로만 사용하며 증빙 이미지도 기기 임시 미리보기로 다운로드 |
+| 이슈 대화 및 첨부 | 제공 | 제공 | 제공 | 메시지는 읽기 전용 목록, 첨부는 인증 다운로드 후 Quick Look 미리보기 |
 | 알림 및 딥 링크 | 제공 | 제공 | 계획 | 플랫폼별 권한·복구 동작을 별도 ADR에서 정의 |
-| 앱 설정/테마 | 제공 | 제공 | 계획 | 로컬 설정은 플랫폼별 저장, 서버 설정만 계약화 |
-| App/Unit/UI 자동 검증 | 해당 없음 | 해당 없음 | 기반 | SwiftUI 3개 target과 개발 scheme을 명시적 `mobile:ci`에서 실행 |
+| 앱 설정/테마 | 제공 | 제공 | 제공 | system/light/dark를 로컬 저장하고 읽기 전용 권한 경계를 설정 화면에 명시 |
+| 쓰기 기능 차단 | 제공 | 제공 | 제공 | 네이티브 iOS는 작업 생성·상태 변경·메시지 작성 제어와 쓰기 API 호출을 노출하지 않음 |
+| App/Unit/UI 자동 검증 | 해당 없음 | 해당 없음 | 제공 | 로그인→프로젝트→검색→상세, 대표 상태 필터, 오프라인 재시도 UI 테스트 포함 |
 | 기존 릴리스 회귀 빌드 | 제공 | 제공 | 제공 | Tauri iOS/Android 빌드를 명시적 `mobile:ci`에서 검사 |
 
 ## 병합 기준
 
 - 네이티브 iOS 기능은 Android에서 대응 기능이 이미 제공되는지 확인하고 표를 갱신한다.
 - 서버 필드가 필요하면 먼저 OpenAPI, fixture, Worker 계약 테스트를 함께 변경한다.
+- 상세 읽기 계약은 두 모바일 client ID에 공통이며 Android의 기존 React 경로도 같은 fixture로 회귀 검증한다.
 - 기존 Tauri iOS/Android 릴리스 설정 변경은 네이티브 전환 PR과 분리한다.
 
 ## 세션 전환 경계

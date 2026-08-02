@@ -11,10 +11,13 @@
 		0376DCB4538E3FA2EC0DF1BF /* MobileAPIContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A65B754A339632E2DB2E3E6 /* MobileAPIContract.swift */; };
 		1D25F8B15FC04A11B87EE369 /* MobileAPIContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE453FFA6A7F97CAF774A8E8 /* MobileAPIContractTests.swift */; };
 		27D6AD1FB92763BB44078C73 /* FoundationStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D59E70E330C5C3C60094A493 /* FoundationStatusView.swift */; };
+		2E57FEC834A9552E0E4879A9 /* CompanionViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B0BE22C1849DA483E8B7BFF /* CompanionViews.swift */; };
 		3C2F3D1E9973B1EA2A461D44 /* CompanionRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D2CC4C3D7F505A0B3A0C564 /* CompanionRootView.swift */; };
 		3DB8D1A6D350998AF802BF7C /* DeviceAuthorization.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3A2BD65A5BF60B1D39F7690 /* DeviceAuthorization.swift */; };
-		4D8CD2AA4B594953984D7FB5 /* companion-v1.json in Resources */ = {isa = PBXBuildFile; fileRef = 711FBF70A0BFD68CFA2C5C26 /* companion-v1.json */; };
+		59BBB62DF78911D04208BC69 /* companion-v1.json in Resources */ = {isa = PBXBuildFile; fileRef = DC46D57C0DC749BA873F0330 /* companion-v1.json */; };
 		8C3ACBC240C3C93066779D21 /* CompanionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE917D55AAB7F8525B5D6FA0 /* CompanionStore.swift */; };
+		8F3D3B8B9C201AD8938E12AA /* AttachmentPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF612FD7D34E422E51B3A302 /* AttachmentPreview.swift */; };
+		967C64C6A88A080B5711C4CA /* CompanionReadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B5F0E3F338DC5E3C1A397CA /* CompanionReadTests.swift */; };
 		A2E278A9A475BB7D7F2FCA36 /* BriarCompanionUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CA08856EAF2B67E13727846 /* BriarCompanionUITests.swift */; };
 		BD262102FD3DB68CD134EB04 /* CoreAPITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A25CB67D8121593018F56432 /* CoreAPITests.swift */; };
 		EE5D250A1092057DAB5C1206 /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C3D7B1D017C131E8DD36044 /* SessionStore.swift */; };
@@ -51,26 +54,38 @@
 		48888E3E40EC72372BEEB40F /* BriarCompanion.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = BriarCompanion.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5004E20D26F2AC91C541EE9A /* BriarCompanionApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BriarCompanionApp.swift; sourceTree = "<group>"; };
 		5AA73A269C0859E5CC863982 /* DashboardSyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardSyncTests.swift; sourceTree = "<group>"; };
-		711FBF70A0BFD68CFA2C5C26 /* companion-v1.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "companion-v1.json"; sourceTree = "<group>"; };
+		5B0BE22C1849DA483E8B7BFF /* CompanionViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionViews.swift; sourceTree = "<group>"; };
+		6B5F0E3F338DC5E3C1A397CA /* CompanionReadTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionReadTests.swift; sourceTree = "<group>"; };
 		8A65B754A339632E2DB2E3E6 /* MobileAPIContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileAPIContract.swift; sourceTree = "<group>"; };
 		A25CB67D8121593018F56432 /* CoreAPITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreAPITests.swift; sourceTree = "<group>"; };
 		C3A2BD65A5BF60B1D39F7690 /* DeviceAuthorization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceAuthorization.swift; sourceTree = "<group>"; };
 		CE453FFA6A7F97CAF774A8E8 /* MobileAPIContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileAPIContractTests.swift; sourceTree = "<group>"; };
 		CE917D55AAB7F8525B5D6FA0 /* CompanionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionStore.swift; sourceTree = "<group>"; };
 		D59E70E330C5C3C60094A493 /* FoundationStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoundationStatusView.swift; sourceTree = "<group>"; };
+		DC46D57C0DC749BA873F0330 /* companion-v1.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "companion-v1.json"; sourceTree = "<group>"; };
 		DD272B5B12C58571A215C0E8 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		DF612FD7D34E422E51B3A302 /* AttachmentPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachmentPreview.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
 		199D6281C5C9968DA1B0EF3F /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+				6B5F0E3F338DC5E3C1A397CA /* CompanionReadTests.swift */,
 				A25CB67D8121593018F56432 /* CoreAPITests.swift */,
 				5AA73A269C0859E5CC863982 /* DashboardSyncTests.swift */,
 				CE453FFA6A7F97CAF774A8E8 /* MobileAPIContractTests.swift */,
 				216793AD86019D1D7BDF5133 /* SessionStoreTests.swift */,
 			);
 			path = Tests;
+			sourceTree = "<group>";
+		};
+		3A77720DF0EE0C0EA7AADEC2 /* fixtures */ = {
+			isa = PBXGroup;
+			children = (
+				DC46D57C0DC749BA873F0330 /* companion-v1.json */,
+			);
+			path = fixtures;
 			sourceTree = "<group>";
 		};
 		4BCD825065EC73B0BFB812A0 /* Products */ = {
@@ -83,12 +98,22 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		5F05A97FECA4E07F5170FF8C /* mobile */ = {
+			isa = PBXGroup;
+			children = (
+				3A77720DF0EE0C0EA7AADEC2 /* fixtures */,
+			);
+			path = mobile;
+			sourceTree = "<group>";
+		};
 		61C931BA8B64C4D161851EBE /* App */ = {
 			isa = PBXGroup;
 			children = (
+				DF612FD7D34E422E51B3A302 /* AttachmentPreview.swift */,
 				5004E20D26F2AC91C541EE9A /* BriarCompanionApp.swift */,
 				3D2CC4C3D7F505A0B3A0C564 /* CompanionRootView.swift */,
 				CE917D55AAB7F8525B5D6FA0 /* CompanionStore.swift */,
+				5B0BE22C1849DA483E8B7BFF /* CompanionViews.swift */,
 				34368CFC402513DE2753ABCA /* DashboardModels.swift */,
 				C3A2BD65A5BF60B1D39F7690 /* DeviceAuthorization.swift */,
 				D59E70E330C5C3C60094A493 /* FoundationStatusView.swift */,
@@ -99,28 +124,20 @@
 			path = App;
 			sourceTree = "<group>";
 		};
-		686741F5A217120BA67934F0 /* mobile */ = {
+		6DE50D5BD4E3F96C783B6FCE /* contracts */ = {
 			isa = PBXGroup;
 			children = (
-				B362CC36365C07CA2C62E25D /* fixtures */,
-			);
-			path = mobile;
-			sourceTree = "<group>";
-		};
-		828453AF52945CFEE9B4E6EE /* contracts */ = {
-			isa = PBXGroup;
-			children = (
-				686741F5A217120BA67934F0 /* mobile */,
+				5F05A97FECA4E07F5170FF8C /* mobile */,
 			);
 			path = contracts;
 			sourceTree = "<group>";
 		};
-		836E68A5F96ADB64737A221E /* ios-native-2-6-core-api-인증과-dashboard-동기-09b4de74 */ = {
+		89BC528D728ABEE4532F9DA1 /* ios-native-3-6-앱-셸과-읽기-전용-companion-3b31e217 */ = {
 			isa = PBXGroup;
 			children = (
-				828453AF52945CFEE9B4E6EE /* contracts */,
+				6DE50D5BD4E3F96C783B6FCE /* contracts */,
 			);
-			name = "ios-native-2-6-core-api-인증과-dashboard-동기-09b4de74";
+			name = "ios-native-3-6-앱-셸과-읽기-전용-companion-3b31e217";
 			path = ../..;
 			sourceTree = "<group>";
 		};
@@ -128,7 +145,7 @@
 			isa = PBXGroup;
 			children = (
 				61C931BA8B64C4D161851EBE /* App */,
-				836E68A5F96ADB64737A221E /* ios-native-2-6-core-api-인증과-dashboard-동기-09b4de74 */,
+				89BC528D728ABEE4532F9DA1 /* ios-native-3-6-앱-셸과-읽기-전용-companion-3b31e217 */,
 				199D6281C5C9968DA1B0EF3F /* Tests */,
 				9E47CF88E04EB2D5307A8187 /* UITests */,
 				4BCD825065EC73B0BFB812A0 /* Products */,
@@ -141,14 +158,6 @@
 				0CA08856EAF2B67E13727846 /* BriarCompanionUITests.swift */,
 			);
 			path = UITests;
-			sourceTree = "<group>";
-		};
-		B362CC36365C07CA2C62E25D /* fixtures */ = {
-			isa = PBXGroup;
-			children = (
-				711FBF70A0BFD68CFA2C5C26 /* companion-v1.json */,
-			);
-			path = fixtures;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -256,7 +265,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				4D8CD2AA4B594953984D7FB5 /* companion-v1.json in Resources */,
+				59BBB62DF78911D04208BC69 /* companion-v1.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -267,6 +276,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				967C64C6A88A080B5711C4CA /* CompanionReadTests.swift in Sources */,
 				BD262102FD3DB68CD134EB04 /* CoreAPITests.swift in Sources */,
 				EEE6E17CFBF66C47153E1380 /* DashboardSyncTests.swift in Sources */,
 				1D25F8B15FC04A11B87EE369 /* MobileAPIContractTests.swift in Sources */,
@@ -286,9 +296,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8F3D3B8B9C201AD8938E12AA /* AttachmentPreview.swift in Sources */,
 				00CD54C44CB1141D697446B6 /* BriarCompanionApp.swift in Sources */,
 				3C2F3D1E9973B1EA2A461D44 /* CompanionRootView.swift in Sources */,
 				8C3ACBC240C3C93066779D21 /* CompanionStore.swift in Sources */,
+				2E57FEC834A9552E0E4879A9 /* CompanionViews.swift in Sources */,
 				F132013FB482B8BFC9068619 /* DashboardModels.swift in Sources */,
 				3DB8D1A6D350998AF802BF7C /* DeviceAuthorization.swift in Sources */,
 				27D6AD1FB92763BB44078C73 /* FoundationStatusView.swift in Sources */,

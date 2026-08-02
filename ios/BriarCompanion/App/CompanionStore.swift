@@ -215,3 +215,73 @@ final class DashboardStore: ObservableObject {
         )
     }
 }
+
+@MainActor
+final class RunDetailStore: ObservableObject {
+    @Published private(set) var events: [RunEvent] = []
+    @Published private(set) var messages: [IssueMessage] = []
+    @Published private(set) var evidence: [RunEvidence] = []
+    @Published private(set) var loading = false
+    @Published private(set) var errorMessage: String?
+
+    private let api: any MobileAPIClientProtocol
+    private let projectID: UUID
+    private let runID: UUID
+    private let token: String
+
+    init(
+        api: any MobileAPIClientProtocol,
+        projectID: UUID,
+        runID: UUID,
+        token: String
+    ) {
+        self.api = api
+        self.projectID = projectID
+        self.runID = runID
+        self.token = token
+    }
+
+    func load() async {
+        guard !loading else { return }
+        loading = true
+        defer { loading = false }
+        do {
+            async let eventResponse: RunEventsResponse = api.send(
+                MobileAPIContract.Endpoint.runEvents(projectID: projectID, runID: runID),
+                method: "GET",
+                token: token,
+                body: nil,
+                as: RunEventsResponse.self
+            )
+            async let messageResponse: IssueMessagesResponse = api.send(
+                MobileAPIContract.Endpoint.runMessages(projectID: projectID, runID: runID),
+                method: "GET",
+                token: token,
+                body: nil,
+                as: IssueMessagesResponse.self
+            )
+            async let evidenceResponse: RunEvidenceResponse = api.send(
+                MobileAPIContract.Endpoint.runEvidence(projectID: projectID, runID: runID),
+                method: "GET",
+                token: token,
+                body: nil,
+                as: RunEvidenceResponse.self
+            )
+            let loaded = try await (eventResponse, messageResponse, evidenceResponse)
+            events = loaded.0.events
+            messages = loaded.1.messages
+            evidence = loaded.2.evidence
+            errorMessage = nil
+        } catch {
+            errorMessage = CompanionStore.message(for: error)
+        }
+    }
+
+    func download(path: String, filename: String) async throws -> URL {
+        let safeName = filename.replacingOccurrences(of: "/", with: "-")
+        let destination = FileManager.default.temporaryDirectory
+            .appending(path: "briar-previews", directoryHint: .isDirectory)
+            .appending(path: "\(runID.uuidString)-\(safeName)")
+        return try await api.download(path, token: token, to: destination)
+    }
+}
