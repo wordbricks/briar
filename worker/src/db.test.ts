@@ -3244,4 +3244,70 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       }),
     ).rejects.toBeInstanceOf(HuntTransitionError);
   });
+
+  it("preserves related rows while migration 0055 rebuilds provider tables", async () => {
+    // This suite intentionally retains the legacy `kind` column for earlier
+    // compatibility tests. Production removed it in migration 0028.
+    await db.prepare("alter table briar_project_agents drop column kind").run();
+    const protectedTables = [
+      "briar_hunt_runs",
+      "briar_issue_messages",
+      "briar_issue_agent_reply_jobs",
+      "briar_agent_transcript_sessions",
+      "briar_execution_audit_events",
+      "briar_agent_transcripts",
+      "briar_hunt_events",
+      "briar_issue_attachments",
+      "briar_issue_dependencies",
+      "briar_issue_message_mentions",
+      "briar_issue_result_reviews",
+      "briar_log_archives",
+      "briar_run_evidence",
+      "briar_run_evidence_images",
+      "briar_run_stage_revisions",
+      "briar_project_agent_schedules",
+      "briar_project_agent_schedule_runs",
+      "briar_project_execution_worker_allowlist",
+      "briar_project_execution_worker_policies",
+    ] as const;
+    const snapshot = async () =>
+      Object.fromEntries(
+        await Promise.all(
+          protectedTables.map(async (table) => {
+            const rows = await db
+              .prepare(`select * from "${table}"`)
+              .all<Record<string, unknown>>();
+            return [
+              table,
+              rows.results.map((row) => JSON.stringify(row)).sort(),
+            ] as const;
+          }),
+        ),
+      );
+
+    const before = await snapshot();
+    expect(before.briar_hunt_events.length).toBeGreaterThan(0);
+    expect(before.briar_issue_messages.length).toBeGreaterThan(0);
+    expect(before.briar_run_evidence.length).toBeGreaterThan(0);
+
+    await executeTriggerMigration(
+      db,
+      await readFile(
+        resolve("migrations/0055_agent_provider_opencode.sql"),
+        "utf8",
+      ),
+    );
+
+    expect(await snapshot()).toEqual(before);
+    expect(
+      (await db.prepare("pragma foreign_key_check").all()).results,
+    ).toEqual([]);
+    const backupTables = await db
+      .prepare(
+        `select name from sqlite_master
+         where type = 'table' and name like 'briar_0055_backup_%'`,
+      )
+      .all();
+    expect(backupTables.results).toEqual([]);
+  });
 });
