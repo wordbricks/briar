@@ -1004,12 +1004,16 @@ body { overflow: hidden; font-synthesis: none; }
 .run-evidence-images > strong span { padding:1px 5px; border-radius:999px; color:var(--muted-foreground); background:var(--muted); font-size:var(--text-2xs); }
 .run-evidence-images > div { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:8px; }
 .run-evidence-image { min-width:0; margin:0; overflow:hidden; border:1px solid var(--border); border-radius:9px; background:var(--muted); }
-.run-evidence-image > div { min-height:120px; display:flex; align-items:center; justify-content:center; color:var(--muted-foreground); background:color-mix(in srgb,var(--muted) 65%,#000); }
+.run-evidence-image-trigger { width:100%; min-height:120px; padding:0; display:flex; align-items:center; justify-content:center; border:0; color:var(--muted-foreground); background:color-mix(in srgb,var(--muted) 65%,#000); cursor:zoom-in; }
+.run-evidence-image-trigger:disabled { cursor:default; }
+.run-evidence-image-trigger:focus-visible { position:relative; z-index:1; outline:2px solid var(--ring); outline-offset:-2px; }
 .run-evidence-image img { width:100%; height:auto; max-height:360px; display:block; object-fit:contain; }
 .run-evidence-image figcaption { min-width:0; padding:7px 8px; display:flex; align-items:center; justify-content:space-between; gap:8px; color:var(--muted-foreground); background:var(--card); font-size:var(--text-2xs); }
 .run-evidence-image figcaption span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.run-evidence-image figcaption a { flex:0 0 auto; color:var(--accent-foreground); font-weight:650; }
 .run-evidence-image figcaption small { color:var(--destructive); }
+.run-evidence-image-dialog { width:min(94vw,1200px); max-width:none; max-height:92vh; padding:44px 18px 18px; grid-template-rows:auto minmax(0,1fr); background:color-mix(in srgb,var(--card) 96%,#000); }
+.run-evidence-image-dialog-title { overflow:hidden; padding-right:28px; color:var(--foreground); font-size:var(--text-sm); text-overflow:ellipsis; white-space:nowrap; }
+.run-evidence-image-dialog > img { width:100%; height:100%; min-height:0; max-height:calc(92vh - 84px); display:block; object-fit:contain; }
 .run-evidence-command { margin-top:8px; display:grid; gap:4px; }
 .run-evidence-command small { color:#999b94; font-size:var(--text-2xs); }
 .run-evidence-command code { overflow-x:auto; padding:7px 8px; border:1px solid var(--border); border-radius:7px; color:var(--foreground); background:var(--muted); font:500 var(--text-2xs)/1.45 "DM Mono",monospace; white-space:pre; }
