@@ -21,6 +21,7 @@ export type AutoHuntSessionStatus =
   | "running"
   | "completed"
   | "failed"
+  | "skipped"
   | "interrupted";
 export type AutoHuntSessionIssueOutcome =
   | "pending"
@@ -32,6 +33,7 @@ export type AutoHuntSessionEventType =
   | "started"
   | "completed"
   | "failed"
+  | "skipped"
   | "interrupted"
   | "stopped";
 
@@ -624,7 +626,7 @@ export function useAutoHuntSessions(
   const settleTaskSession = useCallback((
     sessionId: string,
     input: {
-      status: "completed" | "failed";
+      status: "completed" | "failed" | "skipped";
       conversationId: string | null;
       workspaceRoot: string | null;
       summary: string | null;
@@ -703,7 +705,7 @@ export function useAutoHuntSessions(
       sessionId: string;
       request: string;
       startedAt: string;
-      status: "completed" | "failed";
+      status: "completed" | "failed" | "skipped";
       conversationId: string | null;
       workspaceRoot: string | null;
       summary: string | null;

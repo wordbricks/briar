@@ -115,7 +115,7 @@ export type ProjectAgentSessionRow = {
   project_id: string;
   id: string;
   agent_id: string | null;
-  status: "running" | "completed" | "failed" | "interrupted";
+  status: "running" | "completed" | "failed" | "skipped" | "interrupted";
   session_type: "task" | "dispatch";
   payload_json: string;
   started_at: string;

@@ -379,15 +379,19 @@ describe("API errors", () => {
             scheduleRunId: null,
             parentSessionId: null,
             request: "Review the repository",
-            status: "running",
+            status: "skipped",
             issues: [],
             startedAt: "2026-07-30T00:00:00.000Z",
-            completedAt: null,
+            completedAt: "2026-07-30T00:01:00.000Z",
             conversationId: null,
             workspaceRoot: null,
-            summary: null,
+            summary: "No queued issues.",
             error: null,
-            events: [],
+            events: [{
+              id: "event-1",
+              type: "skipped",
+              occurredAt: "2026-07-30T00:01:00.000Z",
+            }],
             dispatchEvents: [],
             workers: [],
             updatedAt: "2026-07-30T00:00:00.000Z",
@@ -401,7 +405,7 @@ describe("API errors", () => {
     await expect(loadProjectAgentSessions("token", projectId)).resolves.toEqual([
       expect.objectContaining({
         id: "session-1",
-        status: "running",
+        status: "skipped",
         localOwner: false,
       }),
     ]);

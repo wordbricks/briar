@@ -266,8 +266,11 @@ describe("scheduled project agent execution", () => {
     expect(current.dispatchRun).not.toHaveBeenCalled();
   });
 
-  it("fails the schedule when the Agent requests dispatch with no queued work", async () => {
+  it("skips the session when the Agent requests dispatch with no queued work", async () => {
     const current = dependencies();
+    current.startSession = vi.fn(() => "scheduled-session");
+    current.settleSession = vi.fn();
+    current.startWorkerDispatchSession = vi.fn();
     vi.mocked(current.runAgent).mockResolvedValue({
       conversationId: "agent-conversation",
       action: "dispatch_auto_hunt",
@@ -283,8 +286,49 @@ describe("scheduled project agent execution", () => {
 
     await expect(
       executeScheduledProjectAgent(current, "token", scheduledRun()),
-    ).rejects.toThrow("대기 상태인 이슈가 없습니다.");
+    ).resolves.toMatchObject({
+      conversationId: "agent-conversation",
+      message: "대기 상태인 이슈가 없어 세션을 건너뛰었습니다.",
+      structuredResult: {
+        outcome: "completed",
+        importance: "routine",
+        humanActionRequired: false,
+      },
+    });
 
+    expect(current.dispatchRun).not.toHaveBeenCalled();
+    expect(current.startWorkerDispatchSession).not.toHaveBeenCalled();
+    expect(current.settleSession).toHaveBeenCalledWith("scheduled-session", {
+      status: "skipped",
+      conversationId: "agent-conversation",
+      workspaceRoot: "/repo",
+      summary: "대기 상태인 이슈가 없어 세션을 건너뛰었습니다.",
+      error: null,
+    });
+  });
+
+  it("keeps a queued issue with unfinished prerequisites as a failure", async () => {
+    const current = dependencies();
+    vi.mocked(current.runAgent).mockResolvedValue({
+      conversationId: "agent-conversation",
+      action: "dispatch_auto_hunt",
+      message: "Dispatch the queued work.",
+      maxIssues: null,
+      workspaceRoot: "/repo",
+      structuredResult: null,
+    });
+    vi.mocked(current.loadDashboard).mockResolvedValue({
+      ...dashboard,
+      runs: [{
+        ...dashboard.runs[0],
+        executionReadiness: "waiting",
+        waitingOnPrerequisiteCount: 1,
+      }],
+    });
+
+    await expect(
+      executeScheduledProjectAgent(current, "token", scheduledRun()),
+    ).rejects.toThrow("대기 상태인 이슈가 없습니다.");
     expect(current.dispatchRun).not.toHaveBeenCalled();
   });
 });

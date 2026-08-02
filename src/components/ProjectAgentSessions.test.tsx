@@ -61,6 +61,13 @@ describe("ProjectAgentSessions", () => {
               id: "scheduled-session",
               trigger: "scheduled",
               request: "Daily repository audit",
+              status: "skipped",
+              summary: "대기 상태인 이슈가 없어 세션을 건너뛰었습니다.",
+              events: [{
+                id: "scheduled-session-skipped",
+                type: "skipped",
+                occurredAt: "2026-07-28T01:01:00.000Z",
+              }],
             },
             {
               ...taskSession,
@@ -78,6 +85,7 @@ describe("ProjectAgentSessions", () => {
     );
     expect(container.textContent).toContain("스케줄 실행");
     expect(container.textContent).toContain("Daily repository audit");
+    expect(container.textContent).toContain("건너뜀");
     expect(container.textContent).not.toContain("Do not show this task.");
 
     await act(async () => {

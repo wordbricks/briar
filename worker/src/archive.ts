@@ -293,7 +293,7 @@ const projectAgentSessionSchema: z.ZodType<ProjectAgentSessionRow> = z.object({
   project_id: z.string(),
   id: z.string(),
   agent_id: nullableString,
-  status: z.enum(["running", "completed", "failed", "interrupted"]),
+  status: z.enum(["running", "completed", "failed", "skipped", "interrupted"]),
   session_type: z.enum(["task", "dispatch"]),
   payload_json: z.string(),
   started_at: z.string(),

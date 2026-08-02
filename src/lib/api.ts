@@ -123,7 +123,7 @@ const projectAgentSessionSchema = z.object({
   scheduleRunId: z.string().nullable(),
   parentSessionId: z.string().nullable(),
   request: z.string().nullable(),
-  status: z.enum(["running", "completed", "failed", "interrupted"]),
+  status: z.enum(["running", "completed", "failed", "skipped", "interrupted"]),
   issues: z.array(z.object({
     runId: z.string(),
     runNumber: z.number().int(),
@@ -150,6 +150,7 @@ const projectAgentSessionSchema = z.object({
       "started",
       "completed",
       "failed",
+      "skipped",
       "interrupted",
       "stopped",
     ]),

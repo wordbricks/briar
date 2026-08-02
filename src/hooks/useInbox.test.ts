@@ -51,6 +51,12 @@ function session(
 }
 
 describe("Inbox messages", () => {
+  it("does not add skipped no-work sessions to important notifications", () => {
+    expect(
+      buildCurrentInboxMessages(null, [session("skipped")], [project]),
+    ).toEqual([]);
+  });
+
   it("keeps only the latest message when an issue status changes", () => {
     const originalDashboard = {
       ...demoDashboard,

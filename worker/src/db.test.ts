@@ -533,6 +533,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db,
       await readFile(resolve("migrations/0051_log_archives.sql"), "utf8"),
     );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0052_project_agent_session_skipped.sql"),
+        "utf8",
+      ),
+    );
   }, 30_000);
 
   afterAll(async () => {
@@ -780,6 +787,27 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         updated_at: atMinute(2),
       }),
     ]);
+  });
+
+  it("persists skipped project agent session snapshots", async () => {
+    const sessionId = "66666666-6666-4666-8666-666666666666";
+    await upsertProjectAgentSession(db, {
+      project_id: projectId,
+      id: sessionId,
+      agent_id: null,
+      status: "skipped",
+      session_type: "task",
+      payload_json: JSON.stringify({ status: "skipped" }),
+      started_at: atMinute(2),
+      completed_at: atMinute(3),
+      updated_at: atMinute(3),
+    });
+
+    await expect(
+      db.prepare(
+        "select status from briar_project_agent_sessions where project_id = ? and id = ?",
+      ).bind(projectId, sessionId).first<{ status: string }>(),
+    ).resolves.toEqual({ status: "skipped" });
   });
 
   it("backfills legacy workers as organization devices without issuing credentials", async () => {
