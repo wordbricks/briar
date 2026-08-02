@@ -51,6 +51,27 @@ describe("project agents layout", () => {
     );
   });
 
+  it("aligns agent settings chrome with the agent list page", () => {
+    expect(firstRule(".project-agent-settings-scroll")).toContain(
+      "background:var(--card)",
+    );
+    expect(firstRule(".project-agent-settings-card")).toContain(
+      "box-shadow:var(--shadow-xs)",
+    );
+    expect(firstRule(".project-agent-settings-card-icon")).toContain(
+      "color:var(--muted-foreground)",
+    );
+    expect(firstRule(".project-agent-settings-card-icon")).toContain(
+      "background:var(--muted)",
+    );
+    expect(firstRule(".project-agent-avatar-preview")).toContain(
+      "border:1px solid var(--border)",
+    );
+    expect(styles).toContain(
+      ".project-agent-settings-heading { flex:0 0 48px; }",
+    );
+  });
+
   it("keeps agent session details readable in dark mode", () => {
     expect(firstRule(".auto-hunt-session-page")).toContain(
       "color:var(--foreground)",
