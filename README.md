@@ -242,6 +242,28 @@ You can also create and connect a project from inside a Git repository with the 
 briar project create --name wordbricks
 ```
 
+Create issues and manage their execution order from a connected repository:
+
+```bash
+briar issue create \
+  --title "Ship checkout retry" \
+  --description-file ./issue.md \
+  --priority 2 \
+  --status queued
+
+briar issue dependency add \
+  --dependent-run "<run-id>" \
+  --prerequisite-run "<run-id-that-must-finish-first>"
+
+briar issue dependency remove \
+  --dependent-run "<run-id>" \
+  --prerequisite-run "<run-id-that-no-longer-blocks-it>"
+```
+
+These commands use the account from `briar login` and the project connected to
+the current repository. Issue priority is optional and ranges from 1 to 4; new
+issues enter the Auto Hunt queue unless `--status backlog` is selected.
+
 The installed Skill is intentionally a small discovery stub. Load the full guide from the
 same CLI binary that will execute the workflow:
 

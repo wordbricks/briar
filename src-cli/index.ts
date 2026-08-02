@@ -1148,6 +1148,68 @@ async function optionalText(valueFlag: string, fileFlag: string) {
   return value(valueFlag) ?? null;
 }
 
+async function createIssueCommand() {
+  const config = await loadConfig();
+  if (!config.userToken) throw new Error("먼저 `briar login`을 실행하세요.");
+  const project = await currentProject(config);
+  const priorityValue = value("--priority");
+  const input = z.object({
+    title: z.string().trim().min(1).max(300),
+    description: z.string().trim().max(100_000).nullable(),
+    priority: z.number().int().min(1).max(4).nullable(),
+    status: z.enum(["backlog", "queued"]),
+  }).parse({
+    title: required("--title"),
+    description: await optionalText("--description", "--description-file"),
+    priority: priorityValue === undefined ? null : Number(priorityValue),
+    status: value("--status") ?? "queued",
+  });
+  const result = await request<{
+    runId: string;
+    sourceKey: string;
+    stage: "queued";
+    status: "backlog" | "queued";
+    attachments: unknown[];
+  }>(
+    config.apiUrl,
+    `/projects/${encodeURIComponent(project.id)}/issues`,
+    config.userToken,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+  console.log(JSON.stringify(result));
+}
+
+async function changeIssueDependencyCommand(action: "add" | "remove") {
+  const config = await loadConfig();
+  if (!config.userToken) throw new Error("먼저 `briar login`을 실행하세요.");
+  const project = await currentProject(config);
+  const dependentRunId = z.string().uuid().parse(required("--dependent-run"));
+  const prerequisiteRunId = z.string().uuid().parse(
+    required("--prerequisite-run"),
+  );
+  const path =
+    `/projects/${encodeURIComponent(project.id)}` +
+    `/runs/${encodeURIComponent(dependentRunId)}` +
+    `/dependencies/${encodeURIComponent(prerequisiteRunId)}`;
+
+  if (action === "add") {
+    const result = await request<{
+      prerequisiteRunId: string;
+      dependentRunId: string;
+      outcome: "created" | "already_exists";
+    }>(config.apiUrl, path, config.userToken, { method: "PUT" });
+    console.log(JSON.stringify(result));
+    return;
+  }
+
+  await request<void>(config.apiUrl, path, config.userToken, {
+    method: "DELETE",
+  });
+  console.log(
+    JSON.stringify({ dependentRunId, prerequisiteRunId, outcome: "removed" }),
+  );
+}
+
 async function addRunEvent(forcedStatus?: string) {
   const config = await loadConfig();
   const project = await currentProject(config);
@@ -2757,6 +2819,11 @@ const usage = `Briar CLI
     [--enable-worktrees|--disable-worktrees] [--worktree-root <dir>]
     [--branch-prefix <prefix>]
     [--enable-full-access --i-understand-the-risk | --disable-full-access]
+  briar issue create --title <title>
+    [--description <text>|--description-file <path>]
+    [--priority <1-4>] [--status <queued|backlog>]
+  briar issue dependency add --dependent-run <uuid> --prerequisite-run <uuid>
+  briar issue dependency remove --dependent-run <uuid> --prerequisite-run <uuid>
   briar workflow show
   briar queue claim [--run <uuid>] [--workspace <project|worktree|current|none>]
     [--base-branch <ref>]
@@ -2821,6 +2888,21 @@ async function main() {
   if (args[0] === "connect") return connectProject();
   if (args[0] === "project" && args[1] === "doctor") return projectDoctor();
   if (args[0] === "project" && args[1] === "configure") return configureProject();
+  if (args[0] === "issue" && args[1] === "create") return createIssueCommand();
+  if (
+    args[0] === "issue" &&
+    args[1] === "dependency" &&
+    args[2] === "add"
+  ) {
+    return changeIssueDependencyCommand("add");
+  }
+  if (
+    args[0] === "issue" &&
+    args[1] === "dependency" &&
+    args[2] === "remove"
+  ) {
+    return changeIssueDependencyCommand("remove");
+  }
   if (args[0] === "workflow" && args[1] === "show") return showWorkflow();
   if (args[0] === "queue" && args[1] === "claim") return claimWork();
   if (args[0] === "worktree" && args[1] === "show") return worktreeShow();
