@@ -21,6 +21,13 @@ export type AutoHuntWorkerDispatchDependencies = {
   retry: (run: HuntRun, reason: string) => Promise<unknown>;
 };
 
+export class NoQueuedAutoHuntIssuesError extends Error {
+  constructor() {
+    super("대기 상태인 이슈가 없습니다.");
+    this.name = "NoQueuedAutoHuntIssuesError";
+  }
+}
+
 export async function dispatchAutoHuntToWorkers(
   dependencies: AutoHuntWorkerDispatchDependencies,
   input: {
@@ -62,7 +69,7 @@ export async function dispatchAutoHuntToWorkers(
   }
 
   if (candidates.length === 0) {
-    throw new Error("대기 상태인 이슈가 없습니다.");
+    throw new NoQueuedAutoHuntIssuesError();
   }
 
   for (const run of candidates) {

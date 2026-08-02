@@ -137,7 +137,7 @@ export type UseBriarOptions = {
   settleScheduledAgentSession?: (
     sessionId: string,
     input: {
-      status: "completed" | "failed";
+      status: "completed" | "failed" | "skipped";
       conversationId: string | null;
       workspaceRoot: string | null;
       summary: string | null;
