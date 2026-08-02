@@ -304,7 +304,10 @@ When the work changes a user-visible interface, make a reasonable effort to run 
 screen and capture the finished state. Attach one or more useful screenshots to the most
 relevant passed evidence record with repeated `--image` arguments. Prefer screenshots that
 show the completed experience and the changed area clearly; avoid duplicate or incidental
-screens. These images appear with the result evidence on the issue detail page. If the
+screens. Before browser-based verification or capture, run `briar skills get browser`, read the
+returned guide completely, and follow its standalone `agent-browser` workflow. Do not treat an
+unavailable in-app browser integration as proof that browser automation is unavailable. These
+images appear with the result evidence on the issue detail page. If the
 available environment cannot render the interface or capture a screenshot, state the reason
 in the evidence detail. Do not fabricate a screenshot, and do not block otherwise completed
 work solely because screenshot capture is unavailable.

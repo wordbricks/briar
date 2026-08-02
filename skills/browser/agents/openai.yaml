@@ -1,0 +1,4 @@
+interface:
+  display_name: "Briar Browser"
+  short_description: "Verify interfaces with agent-browser"
+  default_prompt: "Use $browser to verify this user-visible change and capture result screenshots with agent-browser."

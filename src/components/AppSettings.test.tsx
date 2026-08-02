@@ -20,6 +20,10 @@ import {
 } from "../lib/app-runtime-settings";
 import { ThemeProvider, themeStorageKey } from "../theme";
 import { AppSettings } from "./AppSettings";
+import {
+  inspectAgentBrowser,
+  installAgentBrowser,
+} from "../lib/agent-browser";
 
 vi.mock("../lib/initial-onboarding", () => ({
   inspectOnboardingPrerequisites: vi.fn(),
@@ -38,6 +42,11 @@ vi.mock("../lib/project-llm", async (importOriginal) => {
 vi.mock("../lib/app-runtime-settings", () => ({
   loadAppRuntimeSettings: vi.fn(),
   updateAppRuntimeSettings: vi.fn(),
+}));
+
+vi.mock("../lib/agent-browser", () => ({
+  inspectAgentBrowser: vi.fn(),
+  installAgentBrowser: vi.fn(),
 }));
 
 const readiness: RepositoryReadiness = {
@@ -91,6 +100,8 @@ describe("AppSettings", () => {
     vi.mocked(updateAppProviderSettings).mockReset();
     vi.mocked(loadAppRuntimeSettings).mockReset();
     vi.mocked(updateAppRuntimeSettings).mockReset();
+    vi.mocked(inspectAgentBrowser).mockReset();
+    vi.mocked(installAgentBrowser).mockReset();
     window.localStorage.clear();
     window.localStorage.setItem("briar.locale.v1", "en");
     (
@@ -98,6 +109,58 @@ describe("AppSettings", () => {
         IS_REACT_ACT_ENVIRONMENT: boolean;
       }
     ).IS_REACT_ACT_ENVIRONMENT = true;
+  });
+
+  it("checks and installs agent-browser from Browser settings", async () => {
+    vi.mocked(inspectAgentBrowser).mockResolvedValue({
+      supported: true,
+      installed: false,
+      browserReady: false,
+      version: null,
+    });
+    vi.mocked(installAgentBrowser).mockResolvedValue({
+      supported: true,
+      installed: true,
+      browserReady: true,
+      version: "agent-browser 0.32.3",
+    });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <I18nProvider>
+          <AppSettings
+            error={null}
+            initialSection="browser"
+            isSidebarOpen
+            loading={false}
+            onBack={() => undefined}
+            onRefresh={() => Promise.resolve(readiness)}
+            projectId="project-1"
+            projectName="Briar"
+            readiness={readiness}
+          />
+        </I18nProvider>,
+      );
+    });
+
+    expect(inspectAgentBrowser).toHaveBeenCalledOnce();
+    expect(container.textContent).toContain("Not installed or not available on PATH.");
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="Install agent-browser"]')
+        ?.click();
+    });
+
+    expect(installAgentBrowser).toHaveBeenCalledOnce();
+    expect(container.textContent).toContain("agent-browser 0.32.3");
+    expect(container.textContent).toContain("Agents can verify interfaces");
+
+    await act(async () => root.unmount());
+    container.remove();
   });
 
   it("persists the Prevent sleep while running setting", async () => {

@@ -374,6 +374,15 @@ struct OnboardingPrerequisites {
     grok: OnboardingPrerequisiteStatus,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AgentBrowserStatus {
+    supported: bool,
+    installed: bool,
+    browser_ready: bool,
+    version: Option<String>,
+}
+
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct RepositoryReadiness {
@@ -1189,6 +1198,103 @@ async fn install_onboarding_prerequisite(
             );
         }
         Ok(prerequisites)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+fn inspect_agent_browser_sync(home: &Path) -> AgentBrowserStatus {
+    #[cfg(desktop)]
+    {
+        let binary = cli_execution_path(home).and_then(|execution_path| {
+            which::which_in("agent-browser", Some(execution_path), home)
+                .map_err(|_| "agent-browser가 설치되지 않았습니다.".to_string())
+        });
+        let status = inspect_cli(binary.clone());
+        let browser_ready = binary
+            .ok()
+            .and_then(|binary| {
+                Command::new(binary)
+                    .args(["doctor", "--offline", "--quick"])
+                    .env("PATH", cli_execution_path(home).ok()?)
+                    .env("HOME", home)
+                    .output()
+                    .ok()
+            })
+            .is_some_and(|output| output.status.success());
+        AgentBrowserStatus {
+            supported: true,
+            installed: status.installed,
+            browser_ready,
+            version: status.version,
+        }
+    }
+    #[cfg(not(desktop))]
+    {
+        let _ = home;
+        AgentBrowserStatus {
+            supported: false,
+            installed: false,
+            browser_ready: false,
+            version: None,
+        }
+    }
+}
+
+#[tauri::command]
+async fn inspect_agent_browser(app: tauri::AppHandle) -> Result<AgentBrowserStatus, String> {
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || inspect_agent_browser_sync(&home))
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+async fn install_agent_browser(app: tauri::AppHandle) -> Result<AgentBrowserStatus, String> {
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        #[cfg(desktop)]
+        {
+            install_cli_package(&home, "agent-browser")?;
+            let execution_path = cli_execution_path(&home)?;
+            let binary = which::which_in("agent-browser", Some(&execution_path), &home)
+                .map_err(|_| {
+                    "설치는 완료됐지만 agent-browser를 찾지 못했습니다. Briar를 다시 열어 주세요."
+                        .to_string()
+                })?;
+            let output = Command::new(binary)
+                .arg("install")
+                .env("PATH", execution_path)
+                .env("HOME", &home)
+                .output()
+                .map_err(|error| {
+                    format!("agent-browser용 Chrome 설치를 시작하지 못했습니다: {error}")
+                })?;
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                let detail = [stderr.trim(), stdout.trim()]
+                    .into_iter()
+                    .find(|part| !part.is_empty())
+                    .unwrap_or("unknown error");
+                return Err(format!(
+                    "agent-browser용 Chrome을 설치하지 못했습니다: {detail}"
+                ));
+            }
+            let status = inspect_agent_browser_sync(&home);
+            if !status.installed || !status.browser_ready {
+                return Err(
+                    "설치는 완료됐지만 agent-browser 브라우저 런타임을 확인하지 못했습니다. Briar를 다시 열어 주세요."
+                        .to_string(),
+                );
+            }
+            Ok(status)
+        }
+        #[cfg(not(desktop))]
+        {
+            let _ = home;
+            Err("agent-browser는 Briar 데스크톱 앱에서만 설치할 수 있습니다.".to_string())
+        }
     })
     .await
     .map_err(|error| error.to_string())?
@@ -3029,23 +3135,23 @@ fn bundled_path(resource_directory: &Path, bundled: &str, development: &str) -> 
 }
 
 fn install_auto_hunt_assets(resource_directory: &Path, home: &Path) -> Result<(), String> {
-    let skill_source = bundled_path(
-        resource_directory,
-        "skills/briar-workflow",
-        "skills/briar-workflow",
-    );
-    if !skill_source.is_dir() {
-        return Err("Briar Workflow 스킬 번들을 찾지 못했습니다.".to_string());
-    }
-    let skill_destinations = [".codex", ".claude", ".grok"]
-        .map(|directory| home.join(directory).join("skills").join("briar-workflow"));
-    for skill_destination in &skill_destinations {
-        let stale_references = skill_destination.join("references");
-        if stale_references.exists() {
-            fs::remove_dir_all(&stale_references)
-                .map_err(|error| format!("이전 스킬 참조를 제거하지 못했습니다: {error}"))?;
+    let mut skill_destinations = Vec::new();
+    for skill_name in ["briar-workflow", "browser"] {
+        let relative_path = format!("skills/{skill_name}");
+        let skill_source = bundled_path(resource_directory, &relative_path, &relative_path);
+        if !skill_source.is_dir() {
+            return Err(format!("{skill_name} 스킬 번들을 찾지 못했습니다."));
         }
-        copy_directory(&skill_source, skill_destination)?;
+        for directory in [".codex", ".claude", ".grok"] {
+            let skill_destination = home.join(directory).join("skills").join(skill_name);
+            let stale_references = skill_destination.join("references");
+            if stale_references.exists() {
+                fs::remove_dir_all(&stale_references)
+                    .map_err(|error| format!("이전 스킬 참조를 제거하지 못했습니다: {error}"))?;
+            }
+            copy_directory(&skill_source, &skill_destination)?;
+            skill_destinations.push(skill_destination);
+        }
     }
 
     let cli_source = bundled_path(resource_directory, "cli/briar.js", "dist-cli/briar.js");
@@ -3124,18 +3230,17 @@ fn auto_hunt_assets_are_current(resource_directory: &Path, home: &Path) -> bool 
         return false;
     }
 
-    let skill_source = bundled_path(
-        resource_directory,
-        "skills/briar-workflow",
-        "skills/briar-workflow",
-    );
-    let expected_version = read_trimmed_file(&skill_source.join("VERSION"))
-        .unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string());
-    [".codex", ".claude", ".grok"].iter().all(|directory| {
-        let skill = home.join(directory).join("skills").join("briar-workflow");
-        skill.join("SKILL.md").is_file()
-            && read_trimmed_file(&skill.join("VERSION")).as_deref()
-                == Some(expected_version.as_str())
+    ["briar-workflow", "browser"].iter().all(|skill_name| {
+        let relative_path = format!("skills/{skill_name}");
+        let skill_source = bundled_path(resource_directory, &relative_path, &relative_path);
+        let expected_version = read_trimmed_file(&skill_source.join("VERSION"))
+            .unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string());
+        [".codex", ".claude", ".grok"].iter().all(|directory| {
+            let skill = home.join(directory).join("skills").join(skill_name);
+            skill.join("SKILL.md").is_file()
+                && read_trimmed_file(&skill.join("VERSION")).as_deref()
+                    == Some(expected_version.as_str())
+        })
     })
 }
 
@@ -5796,8 +5901,10 @@ pub fn run() {
             finish_launch_intro,
             set_main_window_onboarding_mode,
             inspect_onboarding_prerequisites,
+            inspect_agent_browser,
             open_agent_provider_login,
             install_onboarding_prerequisite,
+            install_agent_browser,
             read_session_token,
             write_session_token,
             clear_session_token,
@@ -7239,9 +7346,16 @@ branch refs/heads/briar/second-11111111
             .join(".claude/skills/briar-workflow/SKILL.md")
             .is_file());
         assert!(home.join(".grok/skills/briar-workflow/SKILL.md").is_file());
+        assert!(home.join(".codex/skills/browser/SKILL.md").is_file());
+        assert!(home.join(".claude/skills/browser/SKILL.md").is_file());
+        assert!(home.join(".grok/skills/browser/SKILL.md").is_file());
         assert!(!stale_references.exists());
         assert_eq!(
             read_trimmed_file(&home.join(".codex/skills/briar-workflow/VERSION")),
+            Some(env!("CARGO_PKG_VERSION").to_string())
+        );
+        assert_eq!(
+            read_trimmed_file(&home.join(".codex/skills/browser/VERSION")),
             Some(env!("CARGO_PKG_VERSION").to_string())
         );
         assert!(

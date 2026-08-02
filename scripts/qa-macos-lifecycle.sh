@@ -119,6 +119,10 @@ assert_app_bundle() {
     echo "Bundled workflow skill version does not match the app." >&2
     exit 1
   fi
+  if [[ "$(tr -d '\n' < "$app/Contents/Resources/skills/browser/VERSION")" != "$expected_version" ]]; then
+    echo "Bundled browser skill version does not match the app." >&2
+    exit 1
+  fi
   if ! codesign --verify --deep --strict "$app"; then
     if [[ "$signature_required" == "true" ]]; then
       echo "Candidate app has an invalid ad-hoc signature." >&2

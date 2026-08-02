@@ -9,6 +9,10 @@ describe("bundled skill guides", () => {
         name: "briar-workflow",
         description: "Execute and track repository work through a Briar workflow.",
       },
+      {
+        name: "browser",
+        description: "Verify interfaces and capture result evidence with agent-browser.",
+      },
     ]);
   });
 
@@ -38,11 +42,24 @@ describe("bundled skill guides", () => {
     expect(getSkillGuide("missing")).toBeNull();
   });
 
+  it("serves the agent-browser guide", () => {
+    const guide = getSkillGuide("browser");
+    expect(guide?.markdown).toContain("# Browser Automation with agent-browser");
+    expect(guide?.markdown).toContain("agent-browser skills get core --full");
+    expect(guide?.markdown).toContain("Briar Settings → Browser");
+    expect(guide?.markdown).toContain("briar run evidence add");
+    expect(guide?.markdown).toContain("--image");
+  });
+
   it("keeps the installed skill as a discovery stub", async () => {
     const stub = await readFile("skills/briar-workflow/SKILL.md", "utf8");
     expect(stub).toContain("briar skills get briar-workflow");
     expect(stub).toContain("discovery stub");
     expect(stub).not.toContain("briar run event add --run");
     expect(stub).not.toContain("references/");
+
+    const browserStub = await readFile("skills/browser/SKILL.md", "utf8");
+    expect(browserStub).toContain("briar skills get browser");
+    expect(browserStub).toContain("discovery stub");
   });
 });
