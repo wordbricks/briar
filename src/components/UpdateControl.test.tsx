@@ -9,11 +9,13 @@ import {
 } from "./AppUpdateProvider";
 import { UpdateControl } from "./UpdateControl";
 
-const { check, relaunch } = vi.hoisted(() => ({
+const { check, invoke, relaunch } = vi.hoisted(() => ({
   check: vi.fn(),
+  invoke: vi.fn(),
   relaunch: vi.fn(),
 }));
 
+vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 vi.mock("@tauri-apps/plugin-updater", () => ({ check }));
 vi.mock("@tauri-apps/plugin-process", () => ({ relaunch }));
 
@@ -26,6 +28,8 @@ describe("UpdateControl", () => {
     container = document.createElement("div");
     document.body.append(container);
     check.mockReset();
+    invoke.mockReset();
+    invoke.mockResolvedValue(0);
     relaunch.mockReset();
   });
 
@@ -73,6 +77,7 @@ describe("UpdateControl", () => {
       button?.click();
     });
     expect(downloadAndInstall).toHaveBeenCalledOnce();
+    expect(invoke).toHaveBeenCalledWith("prepare_for_app_update");
     expect(relaunch).toHaveBeenCalledOnce();
     await act(async () => root.unmount());
   });

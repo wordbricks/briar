@@ -59,6 +59,10 @@ export type GrokEventState = {
 
 export type GrokRunnerOutput =
   | {
+      type: "session";
+      sessionId: string;
+    }
+  | {
       type: "event";
       raw: unknown;
       event?: NormalizedAgentEvent;

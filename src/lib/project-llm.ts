@@ -123,6 +123,7 @@ export type ProjectAgentRunInput = {
   message: string;
   conversationId?: string | null;
   runs?: ProjectAgentRunSnapshot[];
+  resumeAfterUpdate?: boolean;
 };
 
 export type ProjectAgentRunSnapshot = {
@@ -245,6 +246,7 @@ export async function runProjectAgent(
       message: input.message,
       conversationId: input.conversationId ?? null,
       runs: input.runs ?? [],
+      resumeAfterUpdate: input.resumeAfterUpdate ?? false,
     },
   });
 }

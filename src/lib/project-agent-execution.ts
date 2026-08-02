@@ -6,8 +6,8 @@ import { projectAgentRunSnapshots } from "./project-llm";
 import type {
   DashboardPayload,
   HuntRun,
-  ProjectAgent,
 } from "../types";
+import { plannedUpdateContinuationMessage } from "./planned-update-recovery";
 
 export type ProjectAgentTurnDependencies<DispatchResult> = {
   runAgent: (
@@ -81,11 +81,13 @@ export type ProjectAgentTaskExecutionDependencies = {
 export async function executeProjectAgentTask(
   dependencies: ProjectAgentTaskExecutionDependencies,
   input: {
-    agent: ProjectAgent;
+    agent: ProjectAgentRunInput["agent"];
     dashboard: DashboardPayload;
     message: string;
     sessionId?: string;
     startedAt?: string;
+    conversationId?: string | null;
+    recoveringAfterUpdate?: boolean;
   },
 ) {
   const sessionId = input.sessionId ?? crypto.randomUUID();
@@ -118,10 +120,13 @@ export async function executeProjectAgentTask(
       {
         projectId: input.dashboard.project.id,
         agent: input.agent,
-        message: input.message,
-        conversationId: null,
+        message: input.recoveringAfterUpdate
+          ? plannedUpdateContinuationMessage(input.message)
+          : input.message,
+        conversationId: input.conversationId ?? null,
         sessionId,
         runs: projectAgentRunSnapshots(input.dashboard.runs),
+        resumeAfterUpdate: true,
       },
     );
     dependencies.settleSession(sessionId, {

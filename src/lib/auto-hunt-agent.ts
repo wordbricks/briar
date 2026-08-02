@@ -17,6 +17,10 @@ export type AutoHuntAppServerEvent = {
 
 export type AutoHuntAgentEvent =
   | {
+      type: "conversationStarted";
+      conversationId: string;
+    }
+  | {
       type: "messageStarted" | "messageCompleted";
       id: string;
       phase: string | null;

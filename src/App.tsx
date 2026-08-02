@@ -77,12 +77,23 @@ import { isRepositoryConnectedForImport } from "./lib/linear-import";
 import { settingsAccountSelection } from "./lib/settings-account-selection";
 import {
   dispatchHuntRun,
+  loadDashboard,
   loadProjectAgents,
   retryHuntRun,
 } from "./lib/api";
 import { dispatchAutoHuntToWorkers } from "./lib/auto-hunt-worker-dispatch";
 import { demoProjectAgents } from "./lib/demo-project-agents";
-import type { AgentProvider, ModelEffort } from "./lib/project-llm";
+import { executeProjectAgentTask } from "./lib/project-agent-execution";
+import { runProjectAgent } from "./lib/project-llm";
+import type {
+  AgentProvider,
+  ModelEffort,
+  ProjectAgentRunInput,
+} from "./lib/project-llm";
+import {
+  recoveryAgent,
+  takePlannedUpdateAgentRecoveries,
+} from "./lib/planned-update-recovery";
 import { useI18n } from "./i18n";
 import type { HuntRun, ProjectAgent } from "./types";
 
@@ -94,9 +105,18 @@ type ActivePage =
   | "organization-create"
   | "settings";
 
+type AgentAutoHuntOptions = {
+  coordinatorConversationId?: string | null;
+  parentSessionId?: string;
+  maxIssues?: number;
+  targetRunIds?: string[];
+  retryReason?: string | null;
+};
+
 export function App() {
   const { locale, t } = useI18n();
   const autoHunt = useAutoHuntSessions();
+  const plannedUpdateRecoveryRef = useRef<Promise<void> | null>(null);
   const scheduleSessionOptions = useMemo<UseBriarOptions>(() => ({
     startScheduledAgentSession: (run) =>
       autoHunt.startTaskSession(run.projectId, run.agent.id, {
@@ -481,27 +501,20 @@ export function App() {
     }
   };
 
-  const startAgentAutoHunt = async (
-    agent: ProjectAgent,
+  const dispatchAgentAutoHunt = useCallback(async (
+    projectId: string,
+    agent: ProjectAgentRunInput["agent"],
     runs: HuntRun[],
-    options?: {
-      coordinatorConversationId?: string | null;
-      parentSessionId?: string;
-      maxIssues?: number;
-      targetRunIds?: string[];
-      retryReason?: string | null;
-    },
+    options?: AgentAutoHuntOptions,
   ) => {
-    if (!activeProject) throw new Error("프로젝트를 선택해 주세요.");
-    rememberIssueAgent(agent);
     const token = briar.token;
     if (!token) throw new Error("로그인이 필요합니다.");
     const result = await dispatchAutoHuntToWorkers(
       {
         dispatch: (run, input) =>
-          dispatchHuntRun(token, activeProject.id, run.id, input),
+          dispatchHuntRun(token, projectId, run.id, input),
         retry: (run, reason) =>
-          retryHuntRun(token, activeProject.id, run.id, reason),
+          retryHuntRun(token, projectId, run.id, reason),
       },
       {
         agent,
@@ -511,15 +524,88 @@ export function App() {
         retryReason: options?.retryReason,
       },
     );
-    autoHunt.startWorkerDispatchSession(activeProject.id, agent, runs, {
+    autoHunt.startWorkerDispatchSession(projectId, agent, runs, {
       dispatchId: result.dispatchId,
       runIds: result.runIds,
       parentSessionId: options?.parentSessionId,
       coordinatorConversationId: options?.coordinatorConversationId,
     });
-    await briar.refresh();
+    if (activeProject?.id === projectId) await briar.refresh();
     return result.dispatchId;
+  }, [
+    activeProject?.id,
+    autoHunt.startWorkerDispatchSession,
+    briar.refresh,
+    briar.token,
+  ]);
+
+  const startAgentAutoHunt = async (
+    agent: ProjectAgent,
+    runs: HuntRun[],
+    options?: AgentAutoHuntOptions,
+  ) => {
+    if (!activeProject) throw new Error("프로젝트를 선택해 주세요.");
+    rememberIssueAgent(agent);
+    return dispatchAgentAutoHunt(activeProject.id, agent, runs, options);
   };
+
+  useEffect(() => {
+    if (!runsOnDesktopTauri || !briar.token || plannedUpdateRecoveryRef.current) {
+      return;
+    }
+    const token = briar.token;
+    plannedUpdateRecoveryRef.current = (async () => {
+      const recoveries = await takePlannedUpdateAgentRecoveries();
+      for (const recovery of recoveries) {
+        try {
+          const dashboard = await loadDashboard(token, recovery.projectId);
+          const agent = recoveryAgent(recovery);
+          await executeProjectAgentTask(
+            {
+              runAgent: runProjectAgent,
+              startSession: (session) =>
+                autoHunt.startTaskSession(
+                  recovery.projectId,
+                  recovery.request.agentId,
+                  session,
+                ),
+              settleSession: autoHunt.settleTaskSession,
+              startAutoHunt: (runs, options) =>
+                dispatchAgentAutoHunt(
+                  recovery.projectId,
+                  agent,
+                  runs,
+                  options,
+                ),
+            },
+            {
+              agent,
+              dashboard,
+              message: recovery.request.message,
+              sessionId: recovery.request.sessionId,
+              startedAt: recovery.startedAt,
+              conversationId: recovery.request.conversationId,
+              recoveringAfterUpdate: true,
+            },
+          );
+        } catch (caught) {
+          setQuickProcessError(
+            caught instanceof Error ? caught.message : String(caught),
+          );
+        }
+      }
+    })().catch((caught) => {
+      setQuickProcessError(
+        caught instanceof Error ? caught.message : String(caught),
+      );
+    });
+  }, [
+    autoHunt.settleTaskSession,
+    autoHunt.startTaskSession,
+    briar.token,
+    dispatchAgentAutoHunt,
+    runsOnDesktopTauri,
+  ]);
 
   useEffect(() => {
     setQuickProcessError(null);

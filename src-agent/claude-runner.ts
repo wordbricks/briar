@@ -98,6 +98,12 @@ async function main() {
     prompt: request.message,
     options: claudeOptions(request, canUseTool),
   })) {
+    if (message.type === "system" && message.subtype === "init") {
+      const sessionId = (message as unknown as { session_id?: unknown }).session_id;
+      if (typeof sessionId === "string" && sessionId.trim()) {
+        emit({ type: "session", sessionId });
+      }
+    }
     const event = normalizeClaudeMessage(message, state);
     emit({
       type: "event",
