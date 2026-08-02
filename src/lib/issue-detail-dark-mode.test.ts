@@ -53,10 +53,7 @@ describe("issue detail dark mode", () => {
     expect(firstRule(".issue-message-composer textarea")).toContain(
       "color:var(--foreground)",
     );
-    expect(firstRule(".issue-thread-summary")).toContain(
-      "border:1px solid var(--border)",
-    );
-    expect(firstRule(".issue-thread-drawer")).toContain(
+    expect(firstRule(".issue-message-replies")).toContain(
       "border-left:1px solid var(--border)",
     );
   });

@@ -4484,16 +4484,15 @@ function IssueConversation({
 }) {
   const { localeTag, t } = useI18n();
   const [messages, setMessages] = useState<IssueMessage[]>([]);
-  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  const [activeReplyRootId, setActiveReplyRootId] = useState<string | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [agentReplyStates, setAgentReplyStates] = useState<
     Record<string, { pending: number; error: string | null }>
   >({});
-  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const messageListRef = useRef<HTMLDivElement | null>(null);
-  const threadContentRef = useRef<HTMLDivElement | null>(null);
-  const threadTriggerRef = useRef<HTMLButtonElement | null>(null);
   const onLoadRef = useRef(onLoad);
   onLoadRef.current = onLoad;
 
@@ -4513,18 +4512,6 @@ function IssueConversation({
     void loadMessages();
   }, [loadMessages, run.id]);
 
-  useEffect(() => {
-    if (!activeThreadId) return;
-    closeButtonRef.current?.focus();
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      setActiveThreadId(null);
-      threadTriggerRef.current?.focus();
-    };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [activeThreadId]);
-
   const roots = messages.filter((message) => message.parentMessageId === null);
   const repliesByRootId = useMemo(() => {
     const grouped = new Map<string, IssueMessage[]>();
@@ -4536,11 +4523,6 @@ function IssueConversation({
     }
     return grouped;
   }, [messages]);
-  const activeThread =
-    roots.find((message) => message.id === activeThreadId) ?? null;
-  const replies = activeThread
-    ? repliesByRootId.get(activeThread.id) ?? []
-    : [];
   const pendingAgentReplyCount = Object.values(agentReplyStates).reduce(
     (total, state) => total + state.pending,
     0,
@@ -4551,21 +4533,6 @@ function IssueConversation({
     if (messageList) messageList.scrollTop = messageList.scrollHeight;
   }, [loading, messages.length, pendingAgentReplyCount]);
 
-  useLayoutEffect(() => {
-    const threadContent = threadContentRef.current;
-    if (activeThread && threadContent) {
-      threadContent.scrollTop = threadContent.scrollHeight;
-    }
-  }, [activeThreadId, pendingAgentReplyCount, replies.length]);
-
-  const openThread = (messageId: string, trigger: HTMLButtonElement) => {
-    threadTriggerRef.current = trigger;
-    setActiveThreadId(messageId);
-  };
-  const closeThread = () => {
-    setActiveThreadId(null);
-    threadTriggerRef.current?.focus();
-  };
   const sendMessage = async (
     body: string,
     parentMessageId: string | null,
@@ -4657,20 +4624,54 @@ function IssueConversation({
         ) : roots.length === 0 ? (
           <p className="issue-message-empty">{t("run.messagesEmpty")}</p>
         ) : (
-          roots.map((message) => (
-            <IssueMessageItem
-              key={message.id}
-              localeTag={localeTag}
-              message={message}
-              onOpenThread={openThread}
-              replyState={
-                message.id === activeThreadId
-                  ? undefined
-                  : agentReplyStates[message.id]
-              }
-              threadReplies={repliesByRootId.get(message.id) ?? []}
-            />
-          ))
+          roots.map((message) => {
+            const replies = repliesByRootId.get(message.id) ?? [];
+            const replyComposerId = `issue-reply-composer-${message.id}`;
+            const isReplying = activeReplyRootId === message.id;
+            return (
+              <div className="issue-message-group" key={message.id}>
+                <IssueMessageItem
+                  isReplying={isReplying}
+                  localeTag={localeTag}
+                  message={message}
+                  onReply={() =>
+                    setActiveReplyRootId((current) =>
+                      current === message.id ? null : message.id,
+                    )
+                  }
+                  replyComposerId={replyComposerId}
+                />
+                {replies.length > 0 && (
+                  <div
+                    aria-label={t("run.replies", { count: replies.length })}
+                    className="issue-message-replies"
+                  >
+                    {replies.map((reply) => (
+                      <IssueMessageItem
+                        key={reply.id}
+                        localeTag={localeTag}
+                        message={reply}
+                      />
+                    ))}
+                  </div>
+                )}
+                <AgentReplyState state={agentReplyStates[message.id]} />
+                {isReplying && (
+                  <div className="issue-inline-reply-composer" id={replyComposerId}>
+                    <MessageComposer
+                      autoFocus
+                      compact
+                      mentionMembers={mentionMembers}
+                      onSubmit={(body, mentionedUserIds) =>
+                        sendMessage(body, message.id, mentionedUserIds)
+                      }
+                      placeholder={t("run.threadPlaceholder")}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })
         )}
       </div>
       <MessageComposer
@@ -4680,88 +4681,24 @@ function IssueConversation({
         }
         placeholder={t("run.messagePlaceholder", { title: run.title })}
       />
-      <div
-        aria-hidden={activeThread === null}
-        className={`issue-thread-layer${activeThread ? " open" : ""}`}
-        onClick={(event) => {
-          if (event.target === event.currentTarget) closeThread();
-        }}
-      >
-        <aside
-          aria-label={t("run.thread")}
-          className="issue-thread-drawer"
-          role={activeThread ? "dialog" : undefined}
-        >
-          <header>
-            <div>
-              <strong>{t("run.thread")}</strong>
-              {activeThread && (
-                <small>{t("run.replies", { count: replies.length })}</small>
-              )}
-            </div>
-            <button
-              aria-label={t("common.close")}
-              onClick={closeThread}
-              ref={closeButtonRef}
-              type="button"
-            >
-              <X size={18} />
-            </button>
-          </header>
-          <div className="issue-thread-content" ref={threadContentRef}>
-            {activeThread && (
-              <>
-                <IssueMessageItem
-                  localeTag={localeTag}
-                  message={activeThread}
-                />
-                <div className="issue-thread-divider">
-                  <span>{t("run.replies", { count: replies.length })}</span>
-                </div>
-                {replies.map((message) => (
-                  <IssueMessageItem
-                    key={message.id}
-                    localeTag={localeTag}
-                    message={message}
-                  />
-                ))}
-                <AgentReplyState
-                  state={agentReplyStates[activeThread.id]}
-                />
-              </>
-            )}
-          </div>
-          {activeThread && (
-            <MessageComposer
-              compact
-              mentionMembers={mentionMembers}
-              onSubmit={(body, mentionedUserIds) =>
-                sendMessage(body, activeThread.id, mentionedUserIds)
-              }
-              placeholder={t("run.threadPlaceholder")}
-            />
-          )}
-        </aside>
-      </div>
     </section>
   );
 }
 
 function IssueMessageItem({
+  isReplying = false,
   localeTag,
   message,
-  onOpenThread,
-  replyState,
-  threadReplies = [],
+  onReply,
+  replyComposerId,
 }: {
+  isReplying?: boolean;
   localeTag: string;
   message: IssueMessage;
-  onOpenThread?: (messageId: string, trigger: HTMLButtonElement) => void;
-  replyState?: { pending: number; error: string | null };
-  threadReplies?: IssueMessage[];
+  onReply?: () => void;
+  replyComposerId?: string;
 }) {
   const { t } = useI18n();
-  const threadParticipants = uniqueThreadParticipants(threadReplies);
   return (
     <article className="issue-message">
       <MessageAvatar message={message} />
@@ -4773,42 +4710,19 @@ function IssueMessageItem({
           </time>
         </header>
         <p>{message.body}</p>
-        {onOpenThread && message.replyCount > 0 && (
-          <button
-            className="issue-thread-summary"
-            onClick={(event) =>
-              onOpenThread(message.id, event.currentTarget)
-            }
-            title={t("run.replyInThread")}
-            type="button"
-          >
-            <span aria-hidden="true" className="issue-thread-participants">
-              {threadParticipants.map((participant) => (
-                <ThreadParticipantAvatar
-                  author={participant}
-                  key={`${participant.provider ?? "user"}:${participant.id ?? participant.name}`}
-                />
-              ))}
-            </span>
-            <strong>{t("run.replies", { count: message.replyCount })}</strong>
-            <span>{t("run.viewThread")}</span>
-            <ChevronRight aria-hidden="true" size={16} />
-          </button>
-        )}
-        <AgentReplyState state={replyState} />
       </div>
-      {onOpenThread && message.replyCount === 0 && (
+      {onReply && (
         <div
           aria-label={t("run.replyInThread")}
           className="issue-message-actions"
           role="toolbar"
         >
           <button
+            aria-controls={replyComposerId}
+            aria-expanded={isReplying}
             aria-label={t("run.replyInThread")}
-            className="issue-thread-trigger"
-            onClick={(event) =>
-              onOpenThread(message.id, event.currentTarget)
-            }
+            className="issue-reply-trigger"
+            onClick={onReply}
             title={t("run.replyInThread")}
             type="button"
           >
@@ -4844,41 +4758,6 @@ function AgentReplyState({
   );
 }
 
-function uniqueThreadParticipants(replies: IssueMessage[]) {
-  const participants: IssueMessage["author"][] = [];
-  const seen = new Set<string>();
-  for (let index = replies.length - 1; index >= 0; index -= 1) {
-    const author = replies[index].author;
-    const key = `${author.provider ?? "user"}:${author.id ?? author.name}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    participants.push(author);
-    if (participants.length === 3) break;
-  }
-  return participants;
-}
-
-function ThreadParticipantAvatar({
-  author,
-}: {
-  author: IssueMessage["author"];
-}) {
-  return (
-    <span
-      className={`issue-thread-participant${author.provider ? " agent" : ""}`}
-      title={author.name}
-    >
-      {author.image ? (
-        <img alt="" src={author.image} />
-      ) : author.provider ? (
-        <Bot aria-hidden="true" size={13} />
-      ) : (
-        author.name.trim().charAt(0).toUpperCase() || "?"
-      )}
-    </span>
-  );
-}
-
 function MessageAvatar({ message }: { message: IssueMessage }) {
   if (message.author.provider) {
     return (
@@ -4907,11 +4786,13 @@ function MessageAvatar({ message }: { message: IssueMessage }) {
 }
 
 function MessageComposer({
+  autoFocus = false,
   compact = false,
   mentionMembers,
   onSubmit,
   placeholder,
 }: {
+  autoFocus?: boolean;
   compact?: boolean;
   mentionMembers: OrganizationMember[];
   onSubmit: (body: string, mentionedUserIds: string[]) => Promise<void>;
@@ -5071,6 +4952,7 @@ function MessageComposer({
         </div>
       )}
       <textarea
+        autoFocus={autoFocus}
         aria-autocomplete="list"
         aria-controls={showsMentionSuggestion ? mentionListId : undefined}
         aria-expanded={showsMentionSuggestion}
