@@ -96,6 +96,11 @@ import {
   validateIssueAttachments,
 } from "../lib/issue-attachments";
 import {
+  clearCreateIssueDraft,
+  loadCreateIssueDraft,
+  saveCreateIssueDraft,
+} from "../lib/create-issue-draft";
+import {
   issueAttachmentMarkdown,
   issueAttachmentReference,
   issueAttachmentReferences,
@@ -1211,14 +1216,26 @@ export function CreateIssueDialog({
   projects: Project[];
 }) {
   const { t } = useI18n();
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [status, setStatus] = useState<"backlog" | "queued">("queued");
-  const [priority, setPriority] = useState("2");
+  const [initialDraft] = useState(() => {
+    const draft = loadCreateIssueDraft();
+    return draft && projects.some((project) => project.id === draft.projectId)
+      ? draft
+      : null;
+  });
+  const [title, setTitle] = useState(initialDraft?.title ?? "");
+  const [description, setDescription] = useState(
+    initialDraft?.description ?? "",
+  );
+  const [status, setStatus] = useState<"backlog" | "queued">(
+    initialDraft?.status ?? "queued",
+  );
+  const [priority, setPriority] = useState(initialDraft?.priority ?? "2");
   const [projectId, setProjectId] = useState(() =>
-    projects.some((project) => project.id === defaultProjectId)
-      ? defaultProjectId!
-      : projects[0]?.id ?? ""
+    projects.some((project) => project.id === initialDraft?.projectId)
+      ? initialDraft!.projectId
+      : projects.some((project) => project.id === defaultProjectId)
+        ? defaultProjectId!
+        : projects[0]?.id ?? ""
   );
   const [attachments, setAttachments] = useState<
     Array<{ file: File; reference: string }>
@@ -1228,6 +1245,26 @@ export function CreateIssueDialog({
   const [isDraggingAttachments, setIsDraggingAttachments] = useState(false);
   const attachmentDragDepthRef = useRef(0);
   const descriptionEditorRef = useRef<HTMLDivElement>(null);
+
+  const persistDraft = useCallback(() => {
+    const draftDescription = attachments.reduce(
+      (current, { reference }) =>
+        removeIssueAttachmentMarkdown(current, reference),
+      description,
+    );
+    saveCreateIssueDraft({
+      description: draftDescription,
+      priority,
+      projectId,
+      status,
+      title,
+    });
+  }, [attachments, description, priority, projectId, status, title]);
+
+  const closeWithDraft = useCallback(() => {
+    persistDraft();
+    onClose();
+  }, [onClose, persistDraft]);
 
   const focusDescriptionAt = (offset: number) => {
     const inputs = Array.from(
@@ -1312,11 +1349,15 @@ export function CreateIssueDialog({
 
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !isSubmitting) onClose();
+      if (event.key === "Escape" && !isSubmitting) closeWithDraft();
     };
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [isSubmitting, onClose]);
+  }, [closeWithDraft, isSubmitting]);
+
+  useEffect(() => {
+    persistDraft();
+  }, [persistDraft]);
 
   useEffect(() => {
     if (!isSubmitting) return;
@@ -1328,7 +1369,7 @@ export function CreateIssueDialog({
     <div
       className="dialog-backdrop issue-dialog-backdrop"
       onMouseDown={(event) =>
-        event.target === event.currentTarget && !isSubmitting && onClose()
+        event.target === event.currentTarget && !isSubmitting && closeWithDraft()
       }
     >
       <form
@@ -1442,9 +1483,11 @@ export function CreateIssueDialog({
                   }
                 : {}),
             },
-          ).catch((error) =>
-            setSubmitError(error instanceof Error ? error.message : String(error)),
-          );
+          )
+            .then(clearCreateIssueDraft)
+            .catch((error) =>
+              setSubmitError(error instanceof Error ? error.message : String(error)),
+            );
         }}
         role="dialog"
         aria-modal="true"
@@ -1474,7 +1517,7 @@ export function CreateIssueDialog({
           <button
             className="issue-dialog-close"
             disabled={isSubmitting}
-            onClick={onClose}
+            onClick={closeWithDraft}
             type="button"
             aria-label={t("common.close")}
           >
@@ -1554,7 +1597,9 @@ export function CreateIssueDialog({
             <NativeSelect
               className="issue-priority-select"
               label={t("issue.priority")}
-              onValueChange={setPriority}
+              onValueChange={(value) =>
+                setPriority(value as "1" | "2" | "3" | "4")
+              }
               options={[
                 { label: t("issue.priority1"), value: "1" },
                 { label: t("issue.priority2"), value: "2" },
@@ -1601,7 +1646,7 @@ export function CreateIssueDialog({
             <button
               className="issue-cancel-button"
               disabled={isSubmitting}
-              onClick={onClose}
+              onClick={closeWithDraft}
               type="button"
             >
               {t("common.cancel")}

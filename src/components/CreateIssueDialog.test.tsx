@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CreateIssueDialog } from "./HuntDashboard";
 import type { CreateIssueInput } from "../types";
+import { createIssueDraftStorageKey } from "../lib/create-issue-draft";
 
 const projects = [
   {
@@ -30,6 +31,7 @@ describe("CreateIssueDialog attachments", () => {
       .IS_REACT_ACT_ENVIRONMENT = true;
     container = document.createElement("div");
     document.body.append(container);
+    window.localStorage.clear();
     URL.createObjectURL = vi.fn(() => "blob:clipboard-preview");
     URL.revokeObjectURL = vi.fn();
   });
@@ -518,6 +520,196 @@ describe("CreateIssueDialog attachments", () => {
       expect.objectContaining({ title: "Cross-project issue" }),
     );
 
+    await act(async () => root.unmount());
+  });
+
+  it("restores a draft after the backdrop closes the dialog", async () => {
+    const onClose = vi.fn();
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <CreateIssueDialog
+          {...projectProps}
+          isSubmitting={false}
+          onClose={onClose}
+          onCreate={async () => undefined}
+        />,
+      );
+    });
+
+    const titleInput = container.querySelector<HTMLInputElement>(
+      ".issue-title-input",
+    );
+    const descriptionInput = container.querySelector<HTMLTextAreaElement>(
+      ".issue-description-input",
+    );
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set?.call(titleInput, "Accidentally closed issue");
+      titleInput?.dispatchEvent(new Event("input", { bubbles: true }));
+      Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )?.set?.call(descriptionInput, "Keep this description");
+      descriptionInput?.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(
+          ".issue-project-context .select-menu-trigger",
+        )
+        ?.click();
+    });
+    await act(async () => {
+      document
+        .querySelector<HTMLButtonElement>(
+          '[role="option"][data-value="project-2"]',
+        )
+        ?.click();
+      container
+        .querySelector<HTMLButtonElement>(
+          ".issue-status-select .select-menu-trigger",
+        )
+        ?.click();
+    });
+    await act(async () => {
+      document
+        .querySelector<HTMLButtonElement>('[role="option"][data-value="backlog"]')
+        ?.click();
+      container
+        .querySelector<HTMLButtonElement>(
+          ".issue-priority-select .select-menu-trigger",
+        )
+        ?.click();
+    });
+    await act(async () => {
+      document
+        .querySelector<HTMLButtonElement>('[role="option"][data-value="4"]')
+        ?.click();
+    });
+
+    const backdrop = container.querySelector(".issue-dialog-backdrop");
+    await act(async () => {
+      backdrop?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    });
+
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(JSON.parse(window.localStorage.getItem(createIssueDraftStorageKey)!))
+      .toEqual({
+        description: "Keep this description",
+        priority: "4",
+        projectId: "project-2",
+        status: "backlog",
+        title: "Accidentally closed issue",
+      });
+
+    await act(async () => root.unmount());
+    const restoredOnCreate = vi.fn(async () => undefined);
+    const restoredRoot = createRoot(container);
+    await act(async () => {
+      restoredRoot.render(
+        <CreateIssueDialog
+          {...projectProps}
+          isSubmitting={false}
+          onClose={() => undefined}
+          onCreate={restoredOnCreate}
+        />,
+      );
+    });
+
+    expect(
+      container.querySelector<HTMLInputElement>(".issue-title-input")?.value,
+    ).toBe("Accidentally closed issue");
+    expect(
+      container.querySelector<HTMLTextAreaElement>(
+        ".issue-description-input",
+      )?.value,
+    ).toBe("Keep this description");
+    expect(
+      container.querySelector(
+        ".issue-project-context .select-menu-trigger",
+      )?.textContent,
+    ).toContain("Mobile");
+    await act(async () => {
+      container.querySelector<HTMLFormElement>("form")?.requestSubmit();
+    });
+    expect(restoredOnCreate).toHaveBeenCalledWith(
+      "project-2",
+      expect.objectContaining({
+        description: "Keep this description",
+        priority: 4,
+        status: "backlog",
+        title: "Accidentally closed issue",
+      }),
+    );
+
+    await act(async () => restoredRoot.unmount());
+  });
+
+  it("clears the saved draft after issue creation succeeds", async () => {
+    window.localStorage.setItem(
+      createIssueDraftStorageKey,
+      JSON.stringify({
+        description: "Ready to submit",
+        priority: "2",
+        projectId: "project-1",
+        status: "queued",
+        title: "Saved issue",
+      }),
+    );
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <CreateIssueDialog
+          {...projectProps}
+          isSubmitting={false}
+          onClose={() => undefined}
+          onCreate={async () => undefined}
+        />,
+      );
+    });
+    await act(async () => {
+      container.querySelector<HTMLFormElement>("form")?.requestSubmit();
+    });
+
+    expect(window.localStorage.getItem(createIssueDraftStorageKey)).toBeNull();
+    await act(async () => root.unmount());
+  });
+
+  it("keeps the saved draft when issue creation fails", async () => {
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <CreateIssueDialog
+          {...projectProps}
+          isSubmitting={false}
+          onClose={() => undefined}
+          onCreate={async () => {
+            throw new Error("Creation failed");
+          }}
+        />,
+      );
+    });
+    const titleInput = container.querySelector<HTMLInputElement>(
+      ".issue-title-input",
+    );
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set?.call(titleInput, "Retry this issue");
+      titleInput?.dispatchEvent(new Event("input", { bubbles: true }));
+      container.querySelector<HTMLFormElement>("form")?.requestSubmit();
+    });
+
+    expect(
+      JSON.parse(window.localStorage.getItem(createIssueDraftStorageKey)!).title,
+    ).toBe("Retry this issue");
+    expect(container.querySelector(".issue-form-error")?.textContent).toContain(
+      "Creation failed",
+    );
     await act(async () => root.unmount());
   });
 });
