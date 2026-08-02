@@ -1541,6 +1541,27 @@ describe("HuntDashboard", () => {
     expect(
       container.querySelector(".run-result-screenshots")?.textContent,
     ).toContain("결과 화면");
+    const enlargeButton = container.querySelector<HTMLButtonElement>(
+      '.run-result-screenshots [aria-label="finished-dashboard.png 크게 보기"]',
+    );
+    expect(enlargeButton).not.toBeNull();
+    expect(
+      container.querySelector(".run-result-screenshots .run-evidence-image a"),
+    ).toBeNull();
+
+    await act(async () => enlargeButton?.click());
+
+    expect(document.querySelector('[role="dialog"] img')?.getAttribute("src"))
+      .toBe("blob:result-screenshot");
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain(
+      "finished-dashboard.png",
+    );
+
+    await act(async () => {
+      document.querySelector<HTMLButtonElement>('[role="dialog"] button')?.click();
+    });
+
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
 
     const evidenceTab = Array.from(
       container.querySelectorAll<HTMLButtonElement>('[role="tab"]'),

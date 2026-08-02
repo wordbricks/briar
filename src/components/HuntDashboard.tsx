@@ -4435,6 +4435,7 @@ function RunEvidenceImagePreview({
   const { t } = useI18n();
   const [source, setSource] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   useEffect(() => {
     let active = true;
     let objectUrl: string | null = null;
@@ -4454,23 +4455,36 @@ function RunEvidenceImagePreview({
   }, [image, onLoadImage]);
 
   return (
-    <figure className="run-evidence-image">
-      <div>
-        {source ? <img alt={image.filename} src={source} /> : null}
-        {!source && !failed ? <LoaderCircle className="spin" size={20} /> : null}
-        {failed ? <CircleAlert size={20} /> : null}
-      </div>
-      <figcaption>
-        <span>{image.filename}</span>
-        {source ? (
-          <a download={image.filename} href={source}>
-            {t("common.open")}
-          </a>
-        ) : failed ? (
-          <small>{t("run.loadFailed")}</small>
-        ) : null}
-      </figcaption>
-    </figure>
+    <>
+      <figure className="run-evidence-image">
+        <button
+          aria-label={t("run.enlargeScreenshot", { name: image.filename })}
+          className="run-evidence-image-trigger"
+          disabled={!source}
+          onClick={() => setPreviewOpen(true)}
+          type="button"
+        >
+          {source ? <img alt={image.filename} src={source} /> : null}
+          {!source && !failed ? <LoaderCircle className="spin" size={20} /> : null}
+          {failed ? <CircleAlert size={20} /> : null}
+        </button>
+        <figcaption>
+          <span>{image.filename}</span>
+          {failed ? <small>{t("run.loadFailed")}</small> : null}
+        </figcaption>
+      </figure>
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent
+          aria-describedby={undefined}
+          className="run-evidence-image-dialog"
+        >
+          <DialogTitle className="run-evidence-image-dialog-title">
+            {image.filename}
+          </DialogTitle>
+          {source ? <img alt={image.filename} src={source} /> : null}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
