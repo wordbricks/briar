@@ -1811,7 +1811,7 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
-  it("opens a message thread in the right drawer and closes it with Escape", async () => {
+  it("shows replies inline and writes a reply below its root message", async () => {
     const rootMessage: IssueMessage = {
       id: "message-root",
       runId: demoDashboard.runs[0].id,
@@ -1826,18 +1826,18 @@ describe("HuntDashboard", () => {
       ...rootMessage,
       id: "message-reply",
       parentMessageId: rootMessage.id,
-      body: "스레드 답장",
+      body: "기존 답글",
       replyCount: 0,
     };
     const sentReply: IssueMessage = {
       ...reply,
       id: "message-new-reply",
-      body: "새 스레드 답장",
+      body: "새 답글",
     };
     const agentReply: IssueMessage = {
       ...sentReply,
       id: "message-agent-reply",
-      body: "스레드에서 답변합니다.",
+      body: "대댓글에서 답변합니다.",
       author: {
         id: null,
         name: "Briar · Codex",
@@ -1874,70 +1874,54 @@ describe("HuntDashboard", () => {
       );
     });
 
-    const threadSummary = container.querySelector<HTMLButtonElement>(
-      ".issue-thread-summary",
+    const messageGroup = container.querySelector<HTMLElement>(
+      ".issue-message-group",
     );
-    expect(threadSummary?.getAttribute("title")).toBe("스레드에서 답장하기");
-    expect(threadSummary?.textContent).toContain("답장 1개");
-    expect(threadSummary?.textContent).toContain("스레드 보기");
-    expect(
-      threadSummary?.querySelector('.issue-thread-participant[title="Jay"]'),
-    ).not.toBeNull();
-    expect(container.querySelector(".issue-message-actions")).toBeNull();
-    const threadContent = container.querySelector<HTMLElement>(
-      ".issue-thread-content",
+    const inlineReplies = messageGroup?.querySelector<HTMLElement>(
+      ".issue-message-replies",
     );
-    expect(threadContent).not.toBeNull();
-    if (!threadContent) throw new Error("thread content was not rendered");
-    Object.defineProperty(threadContent, "scrollHeight", {
+    expect(inlineReplies?.textContent).toContain("기존 답글");
+    expect(container.querySelector(".issue-thread-drawer")).toBeNull();
+    expect(container.querySelector(".issue-thread-summary")).toBeNull();
+
+    const replyButton = messageGroup?.querySelector<HTMLButtonElement>(
+      ".issue-reply-trigger",
+    );
+    expect(replyButton?.getAttribute("title")).toBe("답글 작성");
+    expect(replyButton?.getAttribute("aria-expanded")).toBe("false");
+    await act(async () => replyButton?.click());
+    expect(replyButton?.getAttribute("aria-expanded")).toBe("true");
+
+    const replyComposer = messageGroup?.querySelector<HTMLElement>(
+      ".issue-inline-reply-composer .issue-message-composer",
+    );
+    const replyTextarea = replyComposer?.querySelector<HTMLTextAreaElement>(
+      "textarea",
+    );
+    expect(replyComposer?.querySelector(".issue-composer-formatting")).toBeNull();
+    expect(replyComposer?.querySelector(".issue-composer-link")).not.toBeNull();
+    expect(replyComposer?.querySelectorAll("footer button")).toHaveLength(2);
+    expect(replyTextarea?.placeholder).toBe("답장 남기기…");
+
+    const messageList = container.querySelector<HTMLElement>(
+      ".issue-message-list",
+    );
+    if (!messageList) throw new Error("message list was not rendered");
+    Object.defineProperty(messageList, "scrollHeight", {
       configurable: true,
       value: 480,
     });
-    threadContent.scrollTop = 0;
-    await act(async () => threadSummary?.click());
-    expect(container.querySelector('[role="dialog"]')).not.toBeNull();
-    expect(container.querySelector(".issue-thread-content")?.textContent).toContain(
-      "스레드 답장",
-    );
-    expect(threadContent?.scrollTop).toBe(480);
-    const threadDrawer = container.querySelector<HTMLElement>(
-      ".issue-thread-drawer",
-    );
-    const threadLayer = container.querySelector<HTMLElement>(
-      ".issue-thread-layer",
-    );
-    await act(async () => threadDrawer?.click());
-    expect(container.querySelector('[role="dialog"]')).not.toBeNull();
-    await act(async () => threadLayer?.click());
-    expect(container.querySelector('[role="dialog"]')).toBeNull();
-    expect(document.activeElement).toBe(threadSummary);
-    await act(async () => threadSummary?.click());
-
-    const threadComposer = container.querySelector<HTMLElement>(
-      ".issue-thread-drawer .issue-message-composer",
-    );
-    const threadTextarea = container.querySelector<HTMLTextAreaElement>(
-      ".issue-thread-drawer .issue-message-composer textarea",
-    );
-    expect(
-      threadComposer?.querySelector(".issue-composer-formatting"),
-    ).toBeNull();
-    expect(
-      threadComposer?.querySelector(".issue-composer-link"),
-    ).not.toBeNull();
-    expect(threadComposer?.querySelectorAll("footer button")).toHaveLength(2);
-    expect(threadTextarea?.placeholder).toBe("답장 남기기…");
     await act(async () => {
-      if (!threadTextarea) return;
+      if (!replyTextarea) return;
       Object.getOwnPropertyDescriptor(
         HTMLTextAreaElement.prototype,
         "value",
-      )?.set?.call(threadTextarea, sentReply.body);
-      threadTextarea.dispatchEvent(new Event("input", { bubbles: true }));
+      )?.set?.call(replyTextarea, sentReply.body);
+      replyTextarea.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    threadContent.scrollTop = 0;
+    messageList.scrollTop = 0;
     await act(async () => {
-      threadTextarea?.dispatchEvent(
+      replyTextarea?.dispatchEvent(
         new KeyboardEvent("keydown", {
           bubbles: true,
           cancelable: true,
@@ -1946,34 +1930,28 @@ describe("HuntDashboard", () => {
       );
       await Promise.resolve();
     });
-    expect(threadContent?.scrollTop).toBe(480);
+    expect(messageList.scrollTop).toBe(480);
     expect(
-      threadContent.querySelector(":scope > .issue-agent-reply-state")
-        ?.textContent,
+      messageGroup?.querySelector(":scope > .issue-agent-reply-state")?.textContent,
     ).toContain("Briar가 답변을 작성하고 있습니다");
-    expect(
-      container.querySelector(".issue-message-list > .issue-agent-reply-state"),
-    ).toBeNull();
+    expect(inlineReplies?.textContent).toContain(sentReply.body);
 
     await act(async () => {
       resolveAgentReply(agentReply);
       await pendingAgentReply;
     });
-    expect(threadContent.textContent).toContain(agentReply.body);
+    expect(inlineReplies?.textContent).toContain(agentReply.body);
     expect(
-      threadContent.querySelector(":scope > .issue-agent-reply-state"),
+      messageGroup?.querySelector(":scope > .issue-agent-reply-state"),
     ).toBeNull();
 
-    await act(async () => {
-      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
-    });
-    expect(container.querySelector('[role="dialog"]')).toBeNull();
-    expect(document.activeElement).toBe(threadSummary);
+    await act(async () => replyButton?.click());
+    expect(messageGroup?.querySelector(".issue-inline-reply-composer")).toBeNull();
     await act(async () => root.unmount());
     container.remove();
   });
 
-  it("inserts @briar and places the provider reply in its thread", async () => {
+  it("inserts @briar and places the provider reply below its comment", async () => {
     const createdAt = new Date().toISOString();
     const userMessage: IssueMessage = {
       id: "message-user",
@@ -2080,11 +2058,11 @@ describe("HuntDashboard", () => {
     expect(textarea?.value).toBe("");
     expect(container.textContent).toContain(userMessage.body);
     expect(container.textContent).toContain("Briar가 답변을 작성하고 있습니다");
-    const userMessageItem = Array.from(
-      container.querySelectorAll<HTMLElement>(".issue-message"),
-    ).find((item) => item.textContent?.includes(userMessage.body));
+    const userMessageGroup = Array.from(
+      container.querySelectorAll<HTMLElement>(".issue-message-group"),
+    ).find((group) => group.textContent?.includes(userMessage.body));
     expect(
-      userMessageItem?.querySelector(".issue-agent-reply-state"),
+      userMessageGroup?.querySelector(":scope > .issue-agent-reply-state"),
     ).not.toBeNull();
     expect(
       container.querySelector(".issue-message-list > .issue-agent-reply-state"),
@@ -2095,22 +2073,11 @@ describe("HuntDashboard", () => {
     });
     expect(
       container.querySelector(".issue-message-list")?.textContent,
-    ).not.toContain(agentMessage.body);
-    const threadSummary = container.querySelector<HTMLButtonElement>(
-      ".issue-thread-summary",
-    );
-    expect(threadSummary?.textContent).toContain("답장 1개");
-    expect(threadSummary?.textContent).toContain("스레드 보기");
+    ).toContain(agentMessage.body);
     expect(
-      threadSummary?.querySelector(
-        '.issue-thread-participant.agent[title="Briar · Codex"]',
+      container.querySelector(
+        '.issue-message-replies .issue-message-avatar.agent[aria-label="Briar · Codex"]',
       ),
-    ).not.toBeNull();
-    await act(async () => threadSummary?.click());
-    expect(container.querySelector(".issue-thread-content")?.textContent)
-      .toContain(agentMessage.body);
-    expect(
-      container.querySelector('.issue-message-avatar.agent[aria-label="Briar · Codex"]'),
     ).not.toBeNull();
     await act(async () => root.unmount());
     container.remove();
