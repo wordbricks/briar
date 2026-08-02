@@ -19,6 +19,49 @@ drop trigger if exists briar_hunt_events_decrement_run_event_count;
 drop trigger if exists briar_issue_result_reviews_insert_sync;
 drop trigger if exists briar_issue_result_reviews_delete_sync;
 
+-- Dropping a parent table still executes ON DELETE actions even while foreign
+-- key validation is deferred. Preserve every row that can be cascaded or have
+-- a foreign-key column nulled while the provider-constrained tables are
+-- rebuilt, then restore those rows before the transaction commits.
+create table briar_0055_backup_hunt_runs as
+select * from briar_hunt_runs;
+create table briar_0055_backup_issue_messages as
+select * from briar_issue_messages;
+create table briar_0055_backup_issue_agent_reply_jobs as
+select * from briar_issue_agent_reply_jobs;
+create table briar_0055_backup_agent_transcript_sessions as
+select * from briar_agent_transcript_sessions;
+create table briar_0055_backup_execution_audit_events as
+select * from briar_execution_audit_events;
+create table briar_0055_backup_agent_transcripts as
+select * from briar_agent_transcripts;
+create table briar_0055_backup_hunt_events as
+select * from briar_hunt_events;
+create table briar_0055_backup_issue_attachments as
+select * from briar_issue_attachments;
+create table briar_0055_backup_issue_dependencies as
+select * from briar_issue_dependencies;
+create table briar_0055_backup_issue_message_mentions as
+select * from briar_issue_message_mentions;
+create table briar_0055_backup_issue_result_reviews as
+select * from briar_issue_result_reviews;
+create table briar_0055_backup_log_archives as
+select * from briar_log_archives;
+create table briar_0055_backup_run_evidence as
+select * from briar_run_evidence;
+create table briar_0055_backup_run_evidence_images as
+select * from briar_run_evidence_images;
+create table briar_0055_backup_run_stage_revisions as
+select * from briar_run_stage_revisions;
+create table briar_0055_backup_project_agent_schedules as
+select * from briar_project_agent_schedules;
+create table briar_0055_backup_project_agent_schedule_runs as
+select * from briar_project_agent_schedule_runs;
+create table briar_0055_backup_worker_allowlist as
+select * from briar_project_execution_worker_allowlist;
+create table briar_0055_backup_worker_policies as
+select * from briar_project_execution_worker_policies;
+
 create table briar_issue_messages_new (
   id text primary key not null,
   project_id text not null references briar_projects (id) on delete cascade,
@@ -322,7 +365,9 @@ create table briar_hunt_runs_new (
   )
 );
 
-insert into briar_hunt_runs_new select * from briar_hunt_runs;
+-- Earlier worker and project-agent rebuilds temporarily null foreign keys on
+-- the live table, so copy the untouched snapshot into the final run table.
+insert into briar_hunt_runs_new select * from briar_0055_backup_hunt_runs;
 drop table briar_hunt_runs;
 alter table briar_hunt_runs_new rename to briar_hunt_runs;
 create index briar_hunt_runs_project_idx
@@ -349,6 +394,85 @@ create unique index briar_hunt_runs_dispatch_request_idx
 create index briar_hunt_runs_dispatch_queue_idx on briar_hunt_runs (
   project_id, status, requested_worker_id, agent_id, dispatched_at
 );
+
+-- Restore rows affected by the implicit deletes above while synchronization
+-- triggers are still absent. Deleting first also repairs surviving SET NULL
+-- rows, such as audit events without a run and worker-selection policies.
+delete from briar_run_evidence_images;
+delete from briar_agent_transcripts;
+delete from briar_project_agent_schedule_runs;
+delete from briar_issue_message_mentions;
+delete from briar_issue_agent_reply_jobs;
+delete from briar_project_agent_schedules;
+delete from briar_project_execution_worker_allowlist;
+delete from briar_run_evidence;
+delete from briar_run_stage_revisions;
+delete from briar_issue_result_reviews;
+delete from briar_issue_dependencies;
+delete from briar_issue_attachments;
+delete from briar_log_archives;
+delete from briar_hunt_events;
+delete from briar_execution_audit_events;
+delete from briar_issue_messages;
+delete from briar_agent_transcript_sessions;
+delete from briar_project_execution_worker_policies;
+
+insert into briar_agent_transcript_sessions
+select * from briar_0055_backup_agent_transcript_sessions;
+insert into briar_issue_messages
+select * from briar_0055_backup_issue_messages;
+insert into briar_project_execution_worker_policies
+select * from briar_0055_backup_worker_policies;
+insert into briar_project_execution_worker_allowlist
+select * from briar_0055_backup_worker_allowlist;
+insert into briar_project_agent_schedules
+select * from briar_0055_backup_project_agent_schedules;
+insert into briar_project_agent_schedule_runs
+select * from briar_0055_backup_project_agent_schedule_runs;
+insert into briar_execution_audit_events
+select * from briar_0055_backup_execution_audit_events;
+insert into briar_hunt_events
+select * from briar_0055_backup_hunt_events;
+insert into briar_issue_attachments
+select * from briar_0055_backup_issue_attachments;
+insert into briar_issue_dependencies
+select * from briar_0055_backup_issue_dependencies;
+insert into briar_issue_result_reviews
+select * from briar_0055_backup_issue_result_reviews;
+insert into briar_log_archives
+select * from briar_0055_backup_log_archives;
+insert into briar_run_evidence
+select * from briar_0055_backup_run_evidence;
+insert into briar_run_stage_revisions
+select * from briar_0055_backup_run_stage_revisions;
+insert into briar_run_evidence_images
+select * from briar_0055_backup_run_evidence_images;
+insert into briar_issue_agent_reply_jobs
+select * from briar_0055_backup_issue_agent_reply_jobs;
+insert into briar_issue_message_mentions
+select * from briar_0055_backup_issue_message_mentions;
+insert into briar_agent_transcripts
+select * from briar_0055_backup_agent_transcripts;
+
+drop table briar_0055_backup_hunt_runs;
+drop table briar_0055_backup_issue_messages;
+drop table briar_0055_backup_issue_agent_reply_jobs;
+drop table briar_0055_backup_agent_transcript_sessions;
+drop table briar_0055_backup_execution_audit_events;
+drop table briar_0055_backup_agent_transcripts;
+drop table briar_0055_backup_hunt_events;
+drop table briar_0055_backup_issue_attachments;
+drop table briar_0055_backup_issue_dependencies;
+drop table briar_0055_backup_issue_message_mentions;
+drop table briar_0055_backup_issue_result_reviews;
+drop table briar_0055_backup_log_archives;
+drop table briar_0055_backup_run_evidence;
+drop table briar_0055_backup_run_evidence_images;
+drop table briar_0055_backup_run_stage_revisions;
+drop table briar_0055_backup_project_agent_schedules;
+drop table briar_0055_backup_project_agent_schedule_runs;
+drop table briar_0055_backup_worker_allowlist;
+drop table briar_0055_backup_worker_policies;
 
 -- Rebuilding tables removes their dashboard-sync triggers.
 create trigger briar_dashboard_messages_insert_sync
