@@ -3,15 +3,21 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   copyIssueId,
   copyIssueShareLink,
+  copySessionShareLink,
   issueIdFromSourceKey,
   issueDeepLinkUrl,
   issueShareUrl,
+  parseBriarLink,
   parseIssueLink,
+  parseSessionLink,
+  sessionDeepLinkUrl,
+  sessionShareUrl,
   shareIssueLink,
 } from "./issue-links";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
 const runId = "22222222-2222-4222-8222-222222222222";
+const sessionId = "33333333-3333-4333-8333-333333333333";
 const mobileConfig = (platform: "android" | "ios") =>
   JSON.parse(
     readFileSync(
@@ -65,7 +71,45 @@ describe("issue links", () => {
       .toBeNull();
   });
 
-  it("registers issue deep links on both mobile platforms", () => {
+  it("builds and parses matching session share and app deep links", () => {
+    expect(
+      sessionShareUrl(projectId, sessionId, "https://briar-api.example/base"),
+    ).toBe(
+      `https://briar-api.example/open/sessions/${projectId}/${sessionId}`,
+    );
+    expect(sessionDeepLinkUrl(projectId, sessionId)).toBe(
+      `briar-companion://sessions/${projectId}/${sessionId}`,
+    );
+    expect(
+      parseSessionLink(
+        `https://briar-api.example/open/sessions/${projectId}/${sessionId}`,
+      ),
+    ).toEqual({ projectId, sessionId });
+    expect(
+      parseSessionLink(
+        `briar-companion://sessions/${projectId}/${sessionId}`,
+      ),
+    ).toEqual({ projectId, sessionId });
+    expect(parseSessionLink("briar-companion://issues/nope/nope")).toBeNull();
+    expect(
+      parseSessionLink("https://briar-api.example/open/sessions/nope/nope"),
+    ).toBeNull();
+  });
+
+  it("classifies issue and session links through one app-link parser", () => {
+    expect(
+      parseBriarLink(
+        `briar-companion://issues/${projectId}/${runId}`,
+      ),
+    ).toEqual({ kind: "issue", projectId, runId });
+    expect(
+      parseBriarLink(
+        `briar-companion://sessions/${projectId}/${sessionId}`,
+      ),
+    ).toEqual({ kind: "session", projectId, sessionId });
+  });
+
+  it("registers issue and session deep links on both mobile platforms", () => {
     expect(mobileConfig("android").plugins["deep-link"].mobile).toContainEqual({
       scheme: ["briar-companion"],
       appLink: false,
@@ -79,7 +123,7 @@ describe("issue links", () => {
         {
           scheme: ["https"],
           host: "briar-api.wbai.workers.dev",
-          pathPrefix: ["/open/issues"],
+          pathPrefix: ["/open/issues", "/open/sessions"],
           appLink: true,
         },
       ]),
@@ -104,6 +148,20 @@ describe("issue links", () => {
 
     expect(writeText).toHaveBeenCalledWith(
       `http://127.0.0.1:8787/open/issues/${projectId}/${runId}`,
+    );
+  });
+
+  it("copies the deterministic session URL directly", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    await copySessionShareLink({ projectId, sessionId });
+
+    expect(writeText).toHaveBeenCalledWith(
+      `http://127.0.0.1:8787/open/sessions/${projectId}/${sessionId}`,
     );
   });
 

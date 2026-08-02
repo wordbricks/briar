@@ -608,6 +608,26 @@ describe("Worker HTTP contract", () => {
     expect(page).not.toContain("authorization");
   });
 
+  it("serves session links that open the exact session in the Briar app", async () => {
+    const projectId = "11111111-1111-4111-8111-111111111111";
+    const sessionId = "33333333-3333-4333-8333-333333333333";
+    const response = await worker.fetch(
+      new Request(
+        `https://briar-api.example/open/sessions/${projectId}/${sessionId}`,
+      ),
+      {} as never,
+    );
+    const page = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toContain("text/html");
+    expect(page).toContain(
+      `briar-companion://sessions/${projectId}/${sessionId}`,
+    );
+    expect(page).toContain("Briar에서 세션을 여는 중입니다");
+    expect(page).toContain("Briar 앱이 설치되어 있어야 합니다.");
+  });
+
   it("publishes the iOS Universal Link association", async () => {
     const response = await worker.fetch(
       new Request(
@@ -621,7 +641,10 @@ describe("Worker HTTP contract", () => {
       applinks: {
         details: [{
           appIDs: ["QFJZ2V3829.app.briar.companion"],
-          components: [{ "/": "/open/issues/*" }],
+          components: [
+            { "/": "/open/issues/*" },
+            { "/": "/open/sessions/*" },
+          ],
         }],
       },
     });
