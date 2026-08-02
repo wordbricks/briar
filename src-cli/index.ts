@@ -17,6 +17,11 @@ import {
   repositoryWorkflowPendingStageId,
 } from "../src/lib/auto-hunt-contract";
 import { structuredAgentResultSchema } from "../src/lib/agent-result";
+import {
+  agentExecutionMetrics,
+  agentExecutionTokenUsageFromPayload,
+  type AgentExecutionTokenUsage,
+} from "../src/lib/agent-execution-metrics";
 import { validateEvidenceImages } from "../src/lib/evidence-images";
 import {
   boundedTranscriptPayload,
@@ -1739,6 +1744,7 @@ async function runClaimedIssueInRuntime(
     commandArgs = [runnerPath];
   }
 
+  const executionStartedAt = Date.now();
   const child = spawn(command, commandArgs, {
     cwd: workspace.path,
     env: environment,
@@ -1752,6 +1758,7 @@ async function runClaimedIssueInRuntime(
   let stderr = "";
   let runnerError: string | null = null;
   let completed = false;
+  let tokenUsage: AgentExecutionTokenUsage | null = null;
   const terminate = () => {
     if (child.exitCode !== null || child.killed) return;
     child.kill("SIGTERM");
@@ -1781,6 +1788,8 @@ async function runClaimedIssueInRuntime(
       } catch {
         // Plain output is still useful in the remote transcript.
       }
+      tokenUsage =
+        agentExecutionTokenUsageFromPayload(provider, payload) ?? tokenUsage;
       payload = boundedTranscriptPayload(payload, line);
       if (
         runnerRequest &&
@@ -1836,6 +1845,38 @@ async function runClaimedIssueInRuntime(
       }
     }
     const exitCode = await exitPromise;
+    const executionMetrics = agentExecutionMetrics(
+      Date.now() - executionStartedAt,
+      tokenUsage,
+    );
+    sequence += 1;
+    try {
+      await request(config.apiUrl, "/transcripts", workerToken, {
+        method: "POST",
+        body: JSON.stringify({
+          projectId: project.id,
+          sessionId,
+          runId: issue.runId,
+          runAttempt: issue.currentAttempt,
+          workerId: activeProject.executionWorker?.workerId,
+          agentProvider: provider,
+          executionMetrics,
+          events: [
+            {
+              sequence,
+              direction: "server",
+              payload: { type: "execution.metrics", executionMetrics },
+            },
+          ],
+        }),
+      });
+    } catch (error) {
+      console.error(
+        `execution metrics upload failed for ${issue.sourceKey}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
     if (signal.aborted) {
       throw signal.reason instanceof Error
         ? signal.reason

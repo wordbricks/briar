@@ -14,6 +14,7 @@ import {
   type AutoHuntWorkflowStageId,
 } from "../../src/lib/auto-hunt-contract";
 import type { StructuredAgentResult } from "../../src/lib/agent-result";
+import type { AgentExecutionMetrics } from "../../src/lib/agent-execution-metrics";
 import {
   defaultProjectAgentCalendarColor,
   defaultProjectAgentCopy,
@@ -194,6 +195,7 @@ export type HuntRunRow = {
   issue_description: string | null;
   result_summary: string | null;
   structured_result_json: string | null;
+  execution_metrics_json: string | null;
   pull_request_urls: string;
   target_sha: string | null;
   source_created_at: string | null;
@@ -2080,6 +2082,7 @@ export async function listDashboardRuns(db: D1Database, projectId: string) {
               run.tracker_issue_identifier, run.tracker_issue_url,
               run.tracker_issue_state, run.issue_description,
               run.result_summary, run.structured_result_json,
+              run.execution_metrics_json,
               run.pull_request_urls, run.target_sha,
               run.source_created_at, run.staging_qa_status,
               run.production_qa_status, run.staging_qa_detail,
@@ -2131,6 +2134,34 @@ export async function listIssueResultReviews(
     .bind(projectId)
     .all<IssueResultReviewRow>();
   return reviews.results;
+}
+
+export async function updateHuntRunExecutionMetrics(
+  db: D1Database,
+  projectId: string,
+  input: {
+    runId: string;
+    attempt: number;
+    workerId: string;
+    metrics: AgentExecutionMetrics;
+  },
+) {
+  const result = await db
+    .prepare(
+      `update briar_hunt_runs
+       set execution_metrics_json = ?
+       where id = ? and project_id = ? and current_attempt = ?
+         and worker_id = ?`,
+    )
+    .bind(
+      stableJson(input.metrics),
+      input.runId,
+      projectId,
+      input.attempt,
+      input.workerId,
+    )
+    .run();
+  return result.meta.changes > 0;
 }
 
 export async function listHuntRunEvents(
@@ -4291,6 +4322,7 @@ export async function recoverHuntRun(
                  detail = ?, current_attempt = ?, current_revision = 1,
                  branch = null, commit_sha = null, result_summary = null,
                  structured_result_json = null,
+                 execution_metrics_json = null,
                  pull_request_urls = '[]',
                  target_sha = null, staging_qa_status = null,
                  production_qa_status = null, staging_qa_detail = null,

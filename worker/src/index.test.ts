@@ -16,10 +16,44 @@ import worker, {
   readRunEvidenceRequest,
   runEvidenceInputSchema,
   runReworkInputSchema,
+  transcriptSchema,
   workerSettingsSchema,
 } from "./index";
 
 describe("Worker HTTP contract", () => {
+  it("accepts Worker execution metrics only with a run attempt", () => {
+    const metrics = {
+      inputTokens: 1_000,
+      outputTokens: 250,
+      cacheReadTokens: 800,
+      cacheWriteTokens: null,
+      reasoningOutputTokens: 100,
+      totalTokens: 1_250,
+      durationMs: 90_000,
+    };
+    expect(
+      transcriptSchema.parse({
+        sessionId: "detached-run",
+        runId: "11111111-1111-4111-8111-111111111111",
+        runAttempt: 2,
+        projectId: "22222222-2222-4222-8222-222222222222",
+        workerId: "worker-1",
+        agentProvider: "codex",
+        executionMetrics: metrics,
+        events: [{ sequence: 1, direction: "server", payload: {} }],
+      }).executionMetrics,
+    ).toEqual(metrics);
+    expect(() =>
+      transcriptSchema.parse({
+        sessionId: "detached-run",
+        runId: "11111111-1111-4111-8111-111111111111",
+        agentProvider: "codex",
+        executionMetrics: metrics,
+        events: [{ sequence: 1, direction: "server", payload: {} }],
+      }),
+    ).toThrow(/runId and runAttempt/iu);
+  });
+
   it("normalizes and validates account profiles", () => {
     expect(
       accountProfileInputSchema.parse({

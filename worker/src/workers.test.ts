@@ -9,6 +9,7 @@ import {
   createIssueMessage,
   enqueueIssueAgentReply,
   recordHuntEvent,
+  updateHuntRunExecutionMetrics,
   type HuntEventInput,
 } from "./db";
 import {
@@ -142,6 +143,7 @@ describe("detached execution workers", () => {
       "migrations/0046_project_icons.sql",
       "migrations/0047_project_icon_browser_formats.sql",
       "migrations/0048_issue_dependencies.sql",
+      "migrations/0054_run_execution_metrics.sql",
     ]) {
       await executeSql(db, await readFile(resolve(migration), "utf8"));
     }
@@ -286,6 +288,63 @@ describe("detached execution workers", () => {
       requested_worker_id: selected.worker.id,
       worker_id: selected.worker.id,
     });
+  });
+
+  it("records execution metrics only for the assigned Worker attempt", async () => {
+    const selected = await register("metrics");
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      queuedEvent("worker-metrics", 2),
+    );
+    await dispatchHuntRun(db, projectId, projectId, {
+      runId,
+      provider: "codex",
+      workerId: selected.worker.id,
+      requestedByUserId: "member",
+      requestId: "88888888-aaaa-4888-8888-888888888888",
+      occurredAt: atMinute(2),
+    });
+    await claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: fingerprint("metrics-claim"),
+      claimedBy: selected.worker.label,
+      claimedAt: atMinute(3),
+      leaseExpiresAt: leaseExpiryFrom(atMinute(3)),
+      workerId: selected.worker.id,
+      agentProvider: "codex",
+      detachedOnly: true,
+    });
+    const metrics = {
+      inputTokens: 1_000,
+      outputTokens: 250,
+      cacheReadTokens: 800,
+      cacheWriteTokens: null,
+      reasoningOutputTokens: 100,
+      totalTokens: 1_250,
+      durationMs: 90_000,
+    };
+
+    await expect(
+      updateHuntRunExecutionMetrics(db, projectId, {
+        runId,
+        attempt: 2,
+        workerId: selected.worker.id,
+        metrics,
+      }),
+    ).resolves.toBe(false);
+    await expect(
+      updateHuntRunExecutionMetrics(db, projectId, {
+        runId,
+        attempt: 1,
+        workerId: selected.worker.id,
+        metrics,
+      }),
+    ).resolves.toBe(true);
+    const stored = await db
+      .prepare(`select execution_metrics_json from briar_hunt_runs where id = ?`)
+      .bind(runId)
+      .first<{ execution_metrics_json: string }>();
+    expect(JSON.parse(stored!.execution_metrics_json)).toEqual(metrics);
   });
 
   it("does not dispatch an issue until all prerequisites are completed", async () => {
@@ -1276,6 +1335,20 @@ describe("detached execution workers", () => {
       agentProvider: "codex",
       detachedOnly: true,
     });
+    await updateHuntRunExecutionMetrics(db, projectId, {
+      runId: run,
+      attempt: 1,
+      workerId: first.worker.id,
+      metrics: {
+        inputTokens: 100,
+        outputTokens: 20,
+        cacheReadTokens: 50,
+        cacheWriteTokens: null,
+        reasoningOutputTokens: null,
+        totalTokens: 120,
+        durationMs: 1_000,
+      },
+    });
 
     await dispatchHuntRun(db, projectId, projectId, {
       runId: run,
@@ -1296,7 +1369,8 @@ describe("detached execution workers", () => {
     ).rejects.toBeInstanceOf(WorkerConflictError);
     const reassigned = await db
       .prepare(
-        `select agent_id, requested_worker_id, worker_id, claim_token_hash
+        `select agent_id, requested_worker_id, worker_id, claim_token_hash,
+                execution_metrics_json
          from briar_hunt_runs where id = ?`,
       )
       .bind(run)
@@ -1305,12 +1379,14 @@ describe("detached execution workers", () => {
         requested_worker_id: string;
         worker_id: string | null;
         claim_token_hash: string | null;
+        execution_metrics_json: string | null;
       }>();
     expect(reassigned).toEqual({
       agent_id: agent!.id,
       requested_worker_id: second.worker.id,
       worker_id: null,
       claim_token_hash: null,
+      execution_metrics_json: null,
     });
   });
 
