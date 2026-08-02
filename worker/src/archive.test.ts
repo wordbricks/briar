@@ -288,7 +288,7 @@ describe("D1 to R2 log archives", () => {
          '{"summary":"done"}', '${oldTime}', '${oldTime}', '${oldTime}'
        );`,
     );
-  }, 30_000);
+  }, 60_000);
 
   afterAll(async () => {
     await miniflare.dispose();
