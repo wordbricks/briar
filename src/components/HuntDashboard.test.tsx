@@ -2409,6 +2409,75 @@ describe("HuntDashboard", () => {
     expect(markup).not.toContain('class="issue-description-markdown"');
   });
 
+  it("shows result reviewers in the result and properties panels and records the current member", async () => {
+    const onCompleteResultReview = vi.fn(async () => undefined);
+    const completedRun = {
+      ...demoDashboard.runs[0],
+      status: "completed" as const,
+      resultSummary: "검수할 작업 결과입니다.",
+      resultReviews: [
+        {
+          userId: "reviewer-1",
+          name: "민지 김",
+          username: "minji",
+          image: "https://example.com/minji.png",
+          completedAt: "2026-08-02T01:00:00.000Z",
+        },
+      ],
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <TooltipProvider>
+        <RunPage
+          currentUserId="reviewer-2"
+          error={null}
+          isRecovering={false}
+          isSidebarOpen
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onCompleteResultReview={onCompleteResultReview}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          run={completedRun}
+        />
+      </TooltipProvider>,
+    ));
+
+    expect(container.querySelector(".run-result-review")?.textContent).toContain(
+      "@minji",
+    );
+    const reviewButton = container.querySelector<HTMLButtonElement>(
+      ".run-result-review-complete",
+    );
+    expect(reviewButton?.textContent).toContain("검수 완료");
+    await act(async () => reviewButton?.click());
+    expect(onCompleteResultReview).toHaveBeenCalledOnce();
+
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>(
+        ".run-page-properties-toggle",
+      )?.click()
+    );
+    const reviewProperty = container.querySelector(
+      ".run-result-review-property",
+    );
+    expect(reviewProperty?.getAttribute("aria-label")).toContain("@minji");
+    expect(reviewProperty?.querySelector("img")?.getAttribute("src")).toBe(
+      "https://example.com/minji.png",
+    );
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("shows blocker details at the top of the issue description", () => {
     const blockedRun = {
       ...demoDashboard.runs[0],

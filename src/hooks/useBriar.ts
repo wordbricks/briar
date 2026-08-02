@@ -5,6 +5,7 @@ import {
   cancelHuntRun,
   claimProjectAgentScheduleRun,
   completeProjectAgentScheduleRun,
+  completeIssueResultReview as completeRemoteIssueResultReview,
   connectLinearImport,
   createAgentToken,
   createOrganization as createRemoteOrganization,
@@ -121,6 +122,7 @@ import type {
   IssueMessage,
   IssueMessageSendResult,
   IssueExecutionPreferences,
+  IssueResultReview,
   Organization,
   Project,
   ProjectSettings,
@@ -2042,6 +2044,62 @@ export function useBriar(options: UseBriarOptions = {}) {
     [activeProjectId, dashboard, refresh, token],
   );
 
+  const completeResultReview = useCallback(
+    async (runId: string): Promise<IssueResultReview> => {
+      if (!activeProjectId || !dashboard || !user) {
+        throw new Error("검수를 기록할 이슈 또는 로그인 정보가 없습니다.");
+      }
+      setError(null);
+      try {
+        const existing = dashboard.runs
+          .find((run) => run.id === runId)
+          ?.resultReviews?.find((review) => review.userId === user.id);
+        let review = existing;
+        if (!review) {
+          if (demoMode) {
+            review = {
+              userId: user.id,
+              name: user.name,
+              username: user.username ?? null,
+              image: user.image ?? null,
+              completedAt: new Date().toISOString(),
+            };
+          } else {
+            if (!token) throw new Error("로그인이 필요합니다.");
+            review = await completeRemoteIssueResultReview(
+              token,
+              activeProjectId,
+              runId,
+            );
+          }
+        }
+        setDashboard((current) =>
+          current
+            ? {
+                ...current,
+                runs: current.runs.map((run) =>
+                  run.id === runId &&
+                  !(run.resultReviews ?? []).some(
+                    (candidate) => candidate.userId === review.userId,
+                  )
+                    ? {
+                        ...run,
+                        resultReviews: [...(run.resultReviews ?? []), review],
+                      }
+                    : run,
+                ),
+              }
+            : current,
+        );
+        return review;
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : String(caught));
+        throw caught;
+      }
+    },
+    [activeProjectId, dashboard, token, user],
+  );
+
   const changeIssueDependency = useCallback(
     async (
       dependentRunId: string,
@@ -2590,6 +2648,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     readIssueAttachment,
     editIssue,
     editIssueExecutionPreferences,
+    completeResultReview,
     addIssueDependency: (dependentRunId: string, prerequisiteRunId: string) =>
       changeIssueDependency(dependentRunId, prerequisiteRunId, "add"),
     removeIssueDependency: (

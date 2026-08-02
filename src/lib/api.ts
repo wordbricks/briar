@@ -30,6 +30,7 @@ import type {
   IssueAttachment,
   IssueMessage,
   IssueExecutionPreferences,
+  IssueResultReview,
   ClaimedProjectAgentScheduleRun,
   Project,
   ProjectAgent,
@@ -631,6 +632,7 @@ export async function disconnectSlackInstallation(
 const normalizeDashboardRuns = (runs: DashboardPayload["runs"]) =>
   runs.map((run) => ({
     ...run,
+    resultReviews: run.resultReviews ?? [],
     currentRevision:
       Number.isInteger(run.currentRevision) && run.currentRevision >= 1
         ? run.currentRevision
@@ -1104,6 +1106,18 @@ export async function updateIssueExecutionPreferences(
       method: "PUT",
       body: JSON.stringify(input),
     },
+  );
+}
+
+export async function completeIssueResultReview(
+  token: string,
+  projectId: string,
+  runId: string,
+) {
+  return request<IssueResultReview>(
+    `/projects/${projectId}/runs/${runId}/result-reviews`,
+    token,
+    { method: "POST" },
   );
 }
 

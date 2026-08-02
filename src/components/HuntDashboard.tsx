@@ -2,6 +2,7 @@ import {
   Activity,
   ArrowLeft,
   ArrowUp,
+  BadgeCheck,
   Bot,
   BrainCircuit,
   Check,
@@ -128,6 +129,7 @@ import type {
   IssueMessage,
   IssueMessageSendResult,
   IssueExecutionPreferences,
+  IssueResultReview,
   OrganizationMember,
   Project,
   ProjectAgent,
@@ -161,6 +163,7 @@ export function HuntDashboard({
   companionSearchMode = false,
   companionStatus,
   companionUnreadInboxCount = 0,
+  currentUserId = null,
   dashboard,
   error,
   isCreatingIssue,
@@ -185,6 +188,7 @@ export function HuntDashboard({
   onLoadRunEvents = async () => [],
   onLoadRunEvidence,
   onLoadRunEvidenceImage,
+  onCompleteResultReview,
   onMoveRun,
   onProcessIssueNow,
   onRetryRun,
@@ -206,6 +210,7 @@ export function HuntDashboard({
   companionSearchMode?: boolean;
   companionStatus?: CompanionStatusFilter;
   companionUnreadInboxCount?: number;
+  currentUserId?: string | null;
   dashboard: DashboardPayload | null;
   error: string | null;
   isCreatingIssue: boolean;
@@ -242,6 +247,7 @@ export function HuntDashboard({
   onLoadRunEvents?: (runId: string) => Promise<HuntEvent[]>;
   onLoadRunEvidence: (runId: string) => Promise<RunEvidence[]>;
   onLoadRunEvidenceImage?: (image: RunEvidenceImage) => Promise<Blob>;
+  onCompleteResultReview?: (runId: string) => Promise<unknown>;
   onMoveRun: (runId: string, placement: HuntRunPlacement) => Promise<unknown>;
   onProcessIssueNow?: (run: HuntRun) => void;
   onRetryRun: (runId: string) => Promise<unknown>;
@@ -587,6 +593,7 @@ export function HuntDashboard({
       <>
         <RunPage
           companionMode={companionMode}
+          currentUserId={currentUserId}
           error={recoveryError}
           isDeletingIssue={deletingIssueId === selected.id}
           isRecovering={recoveringRunId === selected.id}
@@ -612,6 +619,9 @@ export function HuntDashboard({
           onLoadRunEvents={() => onLoadRunEvents(selected.id)}
           onLoadRunEvidence={() => onLoadRunEvidence(selected.id)}
           onLoadRunEvidenceImage={onLoadRunEvidenceImage}
+          onCompleteResultReview={onCompleteResultReview
+            ? () => onCompleteResultReview(selected.id)
+            : undefined}
           mentionMembers={dashboard?.members ?? []}
           onMove={(placement) => onMoveRun(selected.id, placement)}
           onProcessNow={
@@ -2641,6 +2651,7 @@ export function RunPage({
   availableProviders = [],
   availableRuns = [],
   companionMode = false,
+  currentUserId = null,
   error,
   isDeletingIssue = false,
   isProcessing = false,
@@ -2657,6 +2668,7 @@ export function RunPage({
   onLoadRunEvents = async () => [],
   onLoadRunEvidence,
   onLoadRunEvidenceImage,
+  onCompleteResultReview,
   mentionMembers = [],
   onMove,
   onProcessNow,
@@ -2672,6 +2684,7 @@ export function RunPage({
   availableProviders?: AgentProvider[];
   availableRuns?: HuntRun[];
   companionMode?: boolean;
+  currentUserId?: string | null;
   error: string | null;
   isDeletingIssue?: boolean;
   isProcessing?: boolean;
@@ -2688,6 +2701,7 @@ export function RunPage({
   onLoadRunEvents?: () => Promise<HuntEvent[]>;
   onLoadRunEvidence: () => Promise<RunEvidence[]>;
   onLoadRunEvidenceImage?: (image: RunEvidenceImage) => Promise<Blob>;
+  onCompleteResultReview?: () => Promise<unknown>;
   mentionMembers?: OrganizationMember[];
   onMove: (placement: HuntRunPlacement) => Promise<unknown>;
   onProcessNow?: () => void;
@@ -2737,6 +2751,11 @@ export function RunPage({
     "link-copied" | "id-copied" | "link-error" | "id-error" | null
   >(null);
   const [isPropertiesOpen, setIsPropertiesOpen] = useState(false);
+  const [isCompletingResultReview, setIsCompletingResultReview] =
+    useState(false);
+  const [resultReviewError, setResultReviewError] = useState<string | null>(
+    null,
+  );
   const [activeDetailTab, setActiveDetailTab] = useState<
     "description" | "result" | "statusHistory" | "evidence" | "conversation"
   >(() => run.status === "completed" ? "result" : "description");
@@ -2793,6 +2812,8 @@ export function RunPage({
     setActiveDetailTab(run.status === "completed" ? "result" : "description");
     setIsPropertiesOpen(false);
     setRunEvents([]);
+    setIsCompletingResultReview(false);
+    setResultReviewError(null);
     void loadRunEvents();
   }, [loadRunEvents, run.id]);
   const placementOptions = [
@@ -2831,6 +2852,11 @@ export function RunPage({
     run.resultSummary?.trim() ||
     (run.status === "completed" ? run.detail?.trim() : null) ||
     null;
+  const resultReviews = run.resultReviews ?? [];
+  const currentUserHasReviewed = Boolean(
+    currentUserId &&
+    resultReviews.some((review) => review.userId === currentUserId),
+  );
   const blockerReason =
     run.structuredResult?.summary?.trim() ||
     run.detail?.trim() ||
@@ -2850,6 +2876,18 @@ export function RunPage({
       setConfirmCancel(false);
     } catch {
       // The hook exposes the actionable error on this page.
+    }
+  };
+  const completeResultReview = async () => {
+    if (!onCompleteResultReview || currentUserHasReviewed) return;
+    setIsCompletingResultReview(true);
+    setResultReviewError(null);
+    try {
+      await onCompleteResultReview();
+    } catch {
+      setResultReviewError(t("run.resultReviewFailed"));
+    } finally {
+      setIsCompletingResultReview(false);
     }
   };
   const shareIssue = async () => {
@@ -3408,6 +3446,56 @@ export function RunPage({
                               })}
                             </div>
                           ) : null}
+                          <div className="run-result-review">
+                            <div className="run-result-review-heading">
+                              <span>
+                                <BadgeCheck aria-hidden="true" size={17} />
+                                <strong>{t("run.resultReview")}</strong>
+                              </span>
+                              <small>
+                                {t("run.resultReviewerCount", {
+                                  count: resultReviews.length,
+                                })}
+                              </small>
+                            </div>
+                            <IssueResultReviewers
+                              emptyLabel={t("run.resultReviewEmpty")}
+                              reviews={resultReviews}
+                            />
+                            {currentUserId && onCompleteResultReview ? (
+                              <button
+                                className="run-result-review-complete"
+                                disabled={
+                                  currentUserHasReviewed ||
+                                  isCompletingResultReview
+                                }
+                                onClick={() => void completeResultReview()}
+                                type="button"
+                              >
+                                {isCompletingResultReview ? (
+                                  <LoaderCircle
+                                    aria-hidden="true"
+                                    className="spin"
+                                    size={15}
+                                  />
+                                ) : (
+                                  <Check aria-hidden="true" size={15} />
+                                )}
+                                {t(
+                                  isCompletingResultReview
+                                    ? "run.resultReviewSaving"
+                                    : currentUserHasReviewed
+                                      ? "run.resultReviewed"
+                                      : "run.resultReviewComplete",
+                                )}
+                              </button>
+                            ) : null}
+                            {resultReviewError ? (
+                              <p className="run-result-review-error" role="alert">
+                                {resultReviewError}
+                              </p>
+                            ) : null}
+                          </div>
                           <button
                             onClick={() => setActiveDetailTab("evidence")}
                             type="button"
@@ -3657,6 +3745,21 @@ export function RunPage({
                   >
                     <span className="run-property-icon agent"><Bot size={15} /></span>
                     <span className="run-property-copy"><strong>{performedAgentName ?? t("run.unassigned")}</strong></span>
+                  </div>
+                  <div
+                    aria-label={`${t("run.resultReview")}: ${resultReviews.length > 0 ? resultReviews.map((review) => review.username ? `@${review.username}` : review.name).join(", ") : t("run.resultReviewEmpty")}`}
+                    className="run-property run-result-review-property"
+                    title={t("run.resultReview")}
+                  >
+                    <span className="run-property-icon result-review"><BadgeCheck size={16} /></span>
+                    <div className="run-property-copy">
+                      <strong>{t("run.resultReview")}</strong>
+                      <IssueResultReviewers
+                        compact
+                        emptyLabel={t("run.resultReviewEmpty")}
+                        reviews={resultReviews}
+                      />
+                    </div>
                   </div>
                   <div
                     aria-label={`${t("run.currentAttempt")} · ${t("run.currentRevision")}: ${t("run.attempt", { count: run.currentAttempt })} · ${t("run.revision", { count: run.currentRevision })}`}
@@ -4320,6 +4423,46 @@ function RunEvidencePanel({
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function IssueResultReviewers({
+  compact = false,
+  emptyLabel,
+  reviews,
+}: {
+  compact?: boolean;
+  emptyLabel: string;
+  reviews: IssueResultReview[];
+}) {
+  if (reviews.length === 0) {
+    return <span className="issue-result-reviewers-empty">{emptyLabel}</span>;
+  }
+  return (
+    <div className={`issue-result-reviewers${compact ? " compact" : ""}`}>
+      {reviews.map((review) => {
+        const displayName = review.username
+          ? `@${review.username}`
+          : review.name;
+        return (
+          <span
+            className="issue-result-reviewer"
+            key={review.userId}
+            title={`${review.name} · ${review.completedAt}`}
+          >
+            <span className="issue-result-reviewer-avatar">
+              {review.image ? (
+                <img alt="" src={review.image} />
+              ) : (
+                review.name.slice(0, 1).toUpperCase()
+              )}
+            </span>
+            <strong>{displayName}</strong>
+            <Check aria-hidden="true" size={13} />
+          </span>
+        );
+      })}
     </div>
   );
 }

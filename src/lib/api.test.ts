@@ -3,6 +3,7 @@ import {
   addIssueDependency,
   claimProjectAgentScheduleRun,
   completeProjectAgentScheduleRun,
+  completeIssueResultReview,
   createIssueMessage,
   createProjectAgent,
   createProjectAgentSchedule,
@@ -129,6 +130,35 @@ describe("API errors", () => {
           priority: 1,
         }),
       }),
+    );
+  });
+
+  it("records a result review through the project-scoped run endpoint", async () => {
+    const projectId = "22222222-2222-4222-8222-222222222222";
+    const runId = "11111111-1111-4111-8111-111111111111";
+    const review = {
+      userId: "reviewer-1",
+      name: "Reviewer",
+      username: "reviewer",
+      image: null,
+      completedAt: "2026-08-02T01:00:00.000Z",
+    };
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify(review), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      completeIssueResultReview("token", projectId, runId),
+    ).resolves.toEqual(review);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(
+        `/projects/${projectId}/runs/${runId}/result-reviews`,
+      ),
+      expect.objectContaining({ method: "POST" }),
     );
   });
 

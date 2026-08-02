@@ -968,6 +968,7 @@ export function App() {
         ) : (
           <HuntDashboard
             agents={activeProjectAgents}
+            currentUserId={briar.user?.id ?? null}
             dashboard={briar.dashboard}
             error={quickProcessError ?? briar.error}
             isCreatingIssue={briar.isCreatingIssue}
@@ -993,6 +994,7 @@ export function App() {
             onLoadRunEvents={briar.readRunEvents}
             onLoadRunEvidence={briar.readRunEvidence}
             onLoadRunEvidenceImage={briar.readRunEvidenceImage}
+            onCompleteResultReview={briar.completeResultReview}
             onMoveRun={briar.moveRun}
             onProcessIssueNow={processIssueNow}
             onRetryRun={briar.retryRun}
@@ -1035,6 +1037,7 @@ export function App() {
                     briar.updatingIssueId === inboxDetailRun.id
                   }
                   mentionMembers={briar.dashboard?.members ?? []}
+                  currentUserId={briar.user?.id ?? null}
                   onAddDependency={(prerequisiteRunId) =>
                     briar.addIssueDependency(
                       inboxDetailRun.id,
@@ -1058,6 +1061,8 @@ export function App() {
                   onLoadRunEvidence={() =>
                     briar.readRunEvidence(inboxDetailRun.id)}
                   onLoadRunEvidenceImage={briar.readRunEvidenceImage}
+                  onCompleteResultReview={() =>
+                    briar.completeResultReview(inboxDetailRun.id)}
                   onMove={(placement) =>
                     briar.moveRun(inboxDetailRun.id, placement)}
                   onProcessNow={() => {
@@ -1285,6 +1290,7 @@ export function App() {
         ) : (
           <HuntDashboard
             agents={activeProjectAgents}
+            currentUserId={briar.user?.id ?? null}
             companionMode
             companionSearchMode={companionPage === "search"}
             companionStatus={companionStatus}
@@ -1318,6 +1324,7 @@ export function App() {
             onLoadRunEvents={briar.readRunEvents}
             onLoadRunEvidence={briar.readRunEvidence}
             onLoadRunEvidenceImage={briar.readRunEvidenceImage}
+            onCompleteResultReview={briar.completeResultReview}
             onMoveRun={briar.moveRun}
             onProcessIssueNow={processIssueNow}
             onRequestedRunOpen={() => setRequestedRunId(null)}
