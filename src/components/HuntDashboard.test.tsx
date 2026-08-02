@@ -934,6 +934,128 @@ describe("HuntDashboard", () => {
     expect(markup).toContain('aria-label="취소"');
   });
 
+  it("changes issue status when a kanban card is dragged onto another column", async () => {
+    const onMoveRun = vi.fn(async () => undefined);
+    const queuedRun = {
+      ...demoDashboard.runs[0],
+      id: "run-drag-queued",
+      status: "queued" as const,
+      workflowStage: null,
+      progress: 0,
+      claimedBy: null,
+      claimedAt: null,
+      leaseExpiresAt: null,
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () =>
+      root.render(
+        <HuntDashboard
+          {...dashboardProps}
+          dashboard={{ ...demoDashboard, runs: [queuedRun] }}
+          onMoveRun={onMoveRun}
+        />,
+      ),
+    );
+
+    const card = container.querySelector<HTMLElement>(".kanban-card");
+    const backlogColumn = container.querySelector<HTMLElement>(
+      '[aria-label="백로그"]',
+    );
+    expect(card?.getAttribute("draggable")).toBe("true");
+    expect(backlogColumn).not.toBeNull();
+
+    const dataTransfer = {
+      dropEffect: "none",
+      effectAllowed: "all",
+      files: [] as File[],
+      types: ["text/plain", "application/x-briar-run-id"],
+      setData: vi.fn(),
+      getData: vi.fn((type: string) =>
+        type === "text/plain" || type === "application/x-briar-run-id"
+          ? queuedRun.id
+          : "",
+      ),
+      clearData: vi.fn(),
+      setDragImage: vi.fn(),
+    };
+
+    const fireDrag = (
+      target: EventTarget | null,
+      type: string,
+      options: { cancelable?: boolean } = {},
+    ) => {
+      const event = new Event(type, {
+        bubbles: true,
+        cancelable: options.cancelable ?? true,
+      });
+      Object.defineProperty(event, "dataTransfer", { value: dataTransfer });
+      target?.dispatchEvent(event);
+      return event;
+    };
+
+    await act(async () => {
+      fireDrag(card, "dragstart");
+    });
+    expect(card?.className).toContain("dragging");
+    expect(dataTransfer.setData).toHaveBeenCalledWith(
+      "text/plain",
+      queuedRun.id,
+    );
+
+    const overEvents: Event[] = [];
+    await act(async () => {
+      overEvents.push(fireDrag(backlogColumn, "dragover"));
+    });
+    expect(overEvents[0]?.defaultPrevented).toBe(true);
+    expect(dataTransfer.dropEffect).toBe("move");
+    expect(
+      container.querySelector('[aria-label="백로그"]')?.className,
+    ).toContain("drag-over");
+
+    await act(async () => {
+      fireDrag(backlogColumn, "drop");
+    });
+
+    expect(onMoveRun).toHaveBeenCalledWith(queuedRun.id, {
+      status: "backlog",
+      workflowStage: null,
+    });
+
+    // Drop should not open the issue detail page.
+    await act(async () => {
+      container.querySelector<HTMLElement>(".kanban-card")?.click();
+    });
+    expect(container.querySelector(".run-page")).toBeNull();
+    expect(container.querySelector(".kanban-board")).not.toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("shows recovery errors from failed status moves on the board", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () =>
+      root.render(
+        <HuntDashboard
+          {...dashboardProps}
+          dashboard={demoDashboard}
+          recoveryError="상태 이동에 실패했습니다."
+        />,
+      ),
+    );
+
+    expect(container.querySelector(".error-banner")?.textContent).toContain(
+      "상태 이동에 실패했습니다.",
+    );
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("opens issue details as a page and returns to the kanban", async () => {
     const container = document.createElement("div");
     document.body.append(container);
