@@ -9,6 +9,11 @@ const sources = [
     description: "Execute and track repository work through a Briar workflow.",
     path: resolve(root, "src-cli/guides/briar-workflow.md"),
   },
+  {
+    name: "browser",
+    description: "Verify interfaces and capture result evidence with agent-browser.",
+    path: resolve(root, "src-cli/guides/browser.md"),
+  },
 ];
 
 const guides = await Promise.all(

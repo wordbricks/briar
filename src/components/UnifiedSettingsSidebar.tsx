@@ -7,6 +7,7 @@ import {
   ChevronDown,
   Download,
   GitBranch,
+  Globe2,
   Keyboard,
   Link2,
   MessageSquare,
@@ -124,6 +125,11 @@ export function UnifiedSettingsSidebar({
         id: "providers",
         icon: <Bot size={16} strokeWidth={1.75} />,
         label: t("appSettings.providers"),
+      },
+      {
+        id: "browser",
+        icon: <Globe2 size={16} strokeWidth={1.75} />,
+        label: t("appSettings.browser"),
       },
       {
         id: "source-control",

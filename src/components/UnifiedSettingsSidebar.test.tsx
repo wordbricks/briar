@@ -58,6 +58,7 @@ describe("UnifiedSettingsSidebar", () => {
     expect(container.textContent).toContain("Application settings");
     expect(container.textContent).toContain("My account");
     expect(container.textContent).toContain("Appearance");
+    expect(container.textContent).toContain("Browser");
     expect(container.textContent).toContain("Organization settings");
     expect(container.textContent).toContain("Project settings");
     expect(
@@ -102,6 +103,18 @@ describe("UnifiedSettingsSidebar", () => {
     expect(onNavigate).toHaveBeenLastCalledWith({
       scope: "application",
       section: "appearance",
+    });
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(
+          '[data-settings-section="browser"]',
+        )
+        ?.click();
+    });
+    expect(onNavigate).toHaveBeenLastCalledWith({
+      scope: "application",
+      section: "browser",
     });
 
     await act(async () => {

@@ -7,6 +7,7 @@ import {
   Download,
   Github,
   GitBranch,
+  Globe2,
   Keyboard,
   Link2,
   LoaderCircle,
@@ -73,6 +74,7 @@ import { InboxNotificationSettings } from "./InboxNotificationSettings";
 import type { RepositoryReadiness } from "../lib/project-connection";
 import type { SessionUser } from "../types";
 import { AccountProfileSettings } from "./AccountProfileSettings";
+import { BrowserSettings } from "./BrowserSettings";
 
 export type SettingsSection =
   | "account"
@@ -82,6 +84,7 @@ export type SettingsSection =
   | "keybindings"
   | "usage"
   | "providers"
+  | "browser"
   | "source-control"
   | "connections"
   | "archive";
@@ -382,6 +385,11 @@ export function AppSettings({
         label: t("appSettings.groupWorkflows"),
         items: [
           {
+            id: "browser",
+            icon: <Globe2 size={16} strokeWidth={1.75} />,
+            label: t("appSettings.browser"),
+          },
+          {
             id: "source-control",
             icon: <GitBranch size={16} strokeWidth={1.75} />,
             label: t("appSettings.sourceControl"),
@@ -435,6 +443,7 @@ export function AppSettings({
     keybindings: t("appSettings.keybindingsDescription"),
     usage: t("usage.settingsDescription"),
     providers: t("appSettings.providersDescription"),
+    browser: t("appSettings.browserDescription"),
     "source-control": t("appSettings.sourceControlDescription"),
     connections: t("appSettings.connectionsDescription"),
     archive: t("appSettings.archiveDescription"),
@@ -528,6 +537,8 @@ export function AppSettings({
             </SettingsContent>
           ) : activeSection === "appearance" ? (
             <AppearanceSettings />
+          ) : activeSection === "browser" ? (
+            <BrowserSettings />
           ) : activeSection === "providers" ? (
             <SettingsContent>
               <SettingsGroupHeading
