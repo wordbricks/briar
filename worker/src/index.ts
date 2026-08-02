@@ -17,6 +17,7 @@ import {
   structuredAgentResultSchema,
   type StructuredAgentResult,
 } from "../../src/lib/agent-result";
+import { agentExecutionMetricsSchema } from "../../src/lib/agent-execution-metrics";
 import {
   defaultProjectAgentCalendarColor,
 } from "../../src/lib/project-agent";
@@ -154,6 +155,7 @@ import {
   updateProjectIcon,
   updateIssue,
   updateIssueExecutionPreferences,
+  updateHuntRunExecutionMetrics,
   updateSlackInstallationProject,
   upsertProjectAgentSession,
   upsertSlackInstallation,
@@ -1222,7 +1224,7 @@ export const projectAgentScheduleRunCompletionSchema = z
     }
   });
 
-const transcriptSchema = z
+export const transcriptSchema = z
   .object({
     sessionId: z
       .string()
@@ -1231,9 +1233,11 @@ const transcriptSchema = z
       .max(128)
       .regex(/^[A-Za-z0-9_-]+$/u),
     runId: z.string().uuid().nullable().optional(),
+    runAttempt: z.number().int().positive().optional(),
     projectId: z.string().uuid().optional(),
     workerId: z.string().trim().min(1).max(128).nullable().optional(),
     agentProvider: z.enum(["codex", "claude", "grok"]),
+    executionMetrics: agentExecutionMetricsSchema.optional(),
     events: z
       .array(
         z
@@ -1247,7 +1251,16 @@ const transcriptSchema = z
       .min(1)
       .max(MAX_TRANSCRIPT_EVENTS_PER_REQUEST),
   })
-  .strict();
+  .strict()
+  .refine(
+    (input) =>
+      input.executionMetrics === undefined ||
+      (Boolean(input.runId) && input.runAttempt !== undefined),
+    {
+      message: "runId and runAttempt are required with executionMetrics",
+      path: ["executionMetrics"],
+    },
+  );
 
 const recoveryUserInputSchema = z
   .object({
@@ -2677,6 +2690,11 @@ const parseStructuredResult = (
   return result.success ? result.data : null;
 };
 
+const parseExecutionMetrics = (value: string | null) => {
+  const result = agentExecutionMetricsSchema.safeParse(parseJsonObject(value));
+  return result.success ? result.data : null;
+};
+
 const dashboardEventJson = (event: HuntEventRow) => ({
   id: event.id,
   attempt: event.attempt,
@@ -2894,6 +2912,7 @@ function dashboardRunJson(
       image: review.image,
       completedAt: review.completed_at,
     })),
+    executionMetrics: parseExecutionMetrics(run.execution_metrics_json),
     pullRequestUrls: parseJsonArray(run.pull_request_urls),
     targetSha: run.target_sha,
     sourceCreatedAt: run.source_created_at,
@@ -5440,6 +5459,12 @@ async function route(
         throw new HttpError(403, "Run is not assigned to this worker");
       }
     }
+    if (
+      input.executionMetrics &&
+      (!authenticatedWorkerId || !input.runId || !input.runAttempt)
+    ) {
+      throw new HttpError(403, "Only execution workers can report run metrics");
+    }
     const result = await appendAgentTranscript(db, projectId, {
       sessionId: input.sessionId,
       runId: input.runId ?? null,
@@ -5448,6 +5473,14 @@ async function route(
       events: input.events,
       observedAt: new Date().toISOString(),
     });
+    if (input.executionMetrics) {
+      await updateHuntRunExecutionMetrics(db, projectId, {
+        runId: input.runId!,
+        attempt: input.runAttempt!,
+        workerId: authenticatedWorkerId!,
+        metrics: input.executionMetrics,
+      });
+    }
     return json(result, 202);
   }
 

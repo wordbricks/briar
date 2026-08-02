@@ -7,6 +7,7 @@ import {
   type AutoHuntWorkflowStageId,
 } from "./lib/auto-hunt-contract";
 import type { StructuredAgentResult } from "./lib/agent-result";
+import type { AgentExecutionMetrics } from "./lib/agent-execution-metrics";
 import type { ProjectAgentCodexPet } from "./lib/codex-pets";
 import type { AgentProvider, ModelEffort } from "./lib/project-llm";
 import type {
@@ -168,6 +169,7 @@ export type HuntRun = {
   waitingOnPrerequisiteCount?: number;
   resultSummary: string | null;
   structuredResult: StructuredAgentResult | null;
+  executionMetrics?: AgentExecutionMetrics | null;
   resultReviews?: IssueResultReview[];
   pullRequestUrls: string[];
   targetSha: string | null;

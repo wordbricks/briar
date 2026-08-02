@@ -1423,6 +1423,7 @@ export async function dispatchHuntRun(
            current_attempt = ?, current_revision = 1,
            worker_id = null, claim_token_hash = null, claimed_by = null,
            claimed_at = null, lease_expires_at = null, completed_at = null,
+           execution_metrics_json = null,
            detail = ?, last_event_at = ?, updated_at = ?
        where id = ? and project_id = ?
          and status not in ('completed', 'cancelled')`,

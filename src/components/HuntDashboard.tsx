@@ -91,6 +91,10 @@ import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import { useMobileBackHandler } from "../hooks/useMobileNavigation";
 import { eventMeta, runMeta } from "../lib/stages";
 import {
+  formatExecutionDuration,
+  formatExecutionTokens,
+} from "../lib/agent-execution-metrics";
+import {
   formatAttachmentBytes,
   issueAttachmentAccept,
   maxIssueAttachmentCount,
@@ -2857,6 +2861,61 @@ export function RunPage({
     currentUserId &&
     resultReviews.some((review) => review.userId === currentUserId),
   );
+  const executionMetrics = run.executionMetrics ?? null;
+  const cacheTokens = executionMetrics
+    ? (executionMetrics.cacheReadTokens ?? 0) +
+      (executionMetrics.cacheWriteTokens ?? 0)
+    : 0;
+  const executionMetricsPanel = executionMetrics ? (
+    <dl className="run-result-metrics" aria-label={t("run.resultMetrics")}>
+      <div>
+        <dt>{t("run.metricsDuration")}</dt>
+        <dd>{formatExecutionDuration(executionMetrics.durationMs)}</dd>
+      </div>
+      {executionMetrics.totalTokens === null ? (
+        <div>
+          <dt>{t("run.metricsTotalTokens")}</dt>
+          <dd>{t("run.metricsTokensUnavailable")}</dd>
+        </div>
+      ) : (
+        <div>
+          <dt>{t("run.metricsTotalTokens")}</dt>
+          <dd title={new Intl.NumberFormat(localeTag).format(executionMetrics.totalTokens)}>
+            {formatExecutionTokens(executionMetrics.totalTokens, localeTag)}
+          </dd>
+        </div>
+      )}
+      {executionMetrics.inputTokens !== null ? (
+        <div>
+          <dt>{t("run.metricsInputTokens")}</dt>
+          <dd>{formatExecutionTokens(executionMetrics.inputTokens, localeTag)}</dd>
+        </div>
+      ) : null}
+      {executionMetrics.outputTokens !== null ? (
+        <div>
+          <dt>{t("run.metricsOutputTokens")}</dt>
+          <dd>{formatExecutionTokens(executionMetrics.outputTokens, localeTag)}</dd>
+        </div>
+      ) : null}
+      {cacheTokens > 0 ? (
+        <div>
+          <dt>{t("run.metricsCacheTokens")}</dt>
+          <dd>{formatExecutionTokens(cacheTokens, localeTag)}</dd>
+        </div>
+      ) : null}
+      {(executionMetrics.reasoningOutputTokens ?? 0) > 0 ? (
+        <div>
+          <dt>{t("run.metricsReasoningTokens")}</dt>
+          <dd>
+            {formatExecutionTokens(
+              executionMetrics.reasoningOutputTokens!,
+              localeTag,
+            )}
+          </dd>
+        </div>
+      ) : null}
+    </dl>
+  ) : null;
   const blockerReason =
     run.structuredResult?.summary?.trim() ||
     run.detail?.trim() ||
@@ -3412,6 +3471,7 @@ export function RunPage({
                               {t("run.revision", { count: run.currentRevision })}
                             </small>
                           </div>
+                          {executionMetricsPanel}
                           <div className="completed-issue-summary">
                             <ReactMarkdown
                               remarkPlugins={[remarkGfm]}
@@ -3509,6 +3569,7 @@ export function RunPage({
                           <ListChecks aria-hidden="true" size={20} />
                           <strong>{t("run.result")}</strong>
                           <p>{run.detail?.trim() || t("run.resultEmpty")}</p>
+                          {executionMetricsPanel}
                         </div>
                       )}
                       <RunResultScreenshots

@@ -2375,6 +2375,15 @@ describe("HuntDashboard", () => {
         nextAction: null,
         dueAt: null,
       },
+      executionMetrics: {
+        inputTokens: 1_000,
+        outputTokens: 250,
+        cacheReadTokens: 800,
+        cacheWriteTokens: null,
+        reasoningOutputTokens: 100,
+        totalTokens: 1_250,
+        durationMs: 90_000,
+      },
     };
     const markup = renderToStaticMarkup(
       <RunPage
@@ -2406,6 +2415,13 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("증빙 자세히 보기");
     expect(markup).toContain('aria-selected="true"');
     expect(markup).toContain('class="run-result-panel"');
+    expect(markup).toContain('class="run-result-metrics"');
+    expect(markup).toContain("소요 시간");
+    expect(markup).toContain("1m 30s");
+    expect(markup).toContain("전체 토큰");
+    expect(markup).toContain("1,250");
+    expect(markup).toContain("캐시");
+    expect(markup).toContain("추론");
     expect(markup).not.toContain('class="issue-description-markdown"');
   });
 

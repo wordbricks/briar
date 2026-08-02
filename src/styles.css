@@ -940,6 +940,10 @@ body { overflow: hidden; font-synthesis: none; }
 .completed-issue-card-heading { display:flex; align-items:center; gap:8px; color:#318064; }
 .completed-issue-card-heading strong { color:var(--foreground); font-size:var(--text-xs); }
 .completed-issue-card-heading > small { margin-left:auto; color:var(--muted-foreground); font:500 var(--text-2xs) "DM Mono",monospace; }
+.run-result-metrics { margin:12px 0 0; display:flex; flex-wrap:wrap; gap:7px; }
+.run-result-metrics > div { min-width:92px; padding:8px 10px; display:grid; gap:3px; border:1px solid var(--border); border-radius:8px; background:color-mix(in srgb,var(--card) 82%,transparent); }
+.run-result-metrics dt { color:var(--muted-foreground); font-size:var(--text-3xs); font-weight:650; }
+.run-result-metrics dd { margin:0; color:var(--foreground); font:650 var(--text-xs) "DM Mono",monospace; }
 .completed-issue-summary { min-width:0; margin-top:12px; color:var(--foreground); font-size:var(--text-xs); line-height:1.65; overflow-wrap:anywhere; }
 .completed-issue-summary > :first-child { margin-top:0; }
 .completed-issue-summary > :last-child { margin-bottom:0; }
@@ -984,6 +988,7 @@ body { overflow: hidden; font-synthesis: none; }
 .run-result-screenshots .run-evidence-images { margin-top:0; }
 .run-result-screenshots .run-evidence-state { min-height:120px; }
 .run-result-empty { min-height:220px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:7px; color:var(--muted-foreground); text-align:center; }.run-result-empty strong { color:var(--foreground); font-size:var(--text-sm); }.run-result-empty p { max-width:420px; margin:0; font-size:var(--text-xs); line-height:1.6; }
+.run-result-empty .run-result-metrics { justify-content:center; }
 .blocked-issue-details { margin-top:12px; padding-top:10px; border-top:1px solid color-mix(in srgb,var(--destructive) 22%,var(--border)); }
 .blocked-issue-details summary { width:max-content; max-width:100%; display:flex; align-items:center; gap:5px; color:var(--muted-foreground); font-size:var(--text-2xs); font-weight:650; cursor:pointer; list-style:none; }
 .blocked-issue-details summary::-webkit-details-marker { display:none; }
