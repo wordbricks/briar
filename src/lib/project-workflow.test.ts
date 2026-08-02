@@ -20,6 +20,13 @@ describe("project workflow generator", () => {
       workspaceRoot: "/repo",
       message: JSON.stringify({
         version: 1,
+        requirements: [{
+          id: "bun",
+          label: "Bun",
+          kind: "executable",
+          tool: "bun",
+          reason: "Runs the repository test scripts.",
+        }],
         stages: [
           {
             id: "analyzing",
@@ -51,6 +58,7 @@ describe("project workflow generator", () => {
     });
 
     await expect(generateProjectWorkflow("project-1")).resolves.toMatchObject({
+      requirements: [{ id: "bun", tool: "bun" }],
       execution: { stopAfterStage: "local_qa" },
       stages: [
         { id: "analyzing" },
@@ -76,6 +84,7 @@ describe("project workflow generator", () => {
       workspaceRoot: "/repo",
       message: JSON.stringify({
         version: 1,
+        requirements: [],
         stages: [
           {
             id: "analyzing",
@@ -101,6 +110,7 @@ describe("project workflow generator", () => {
       workspaceRoot: "/repo",
       message: JSON.stringify({
         version: 1,
+        requirements: [],
         stages: [
           {
             id: "implementing",
@@ -123,6 +133,7 @@ describe("project workflow generator", () => {
   it("revises the current workflow using the repository and natural-language request", async () => {
     const currentWorkflow = {
       version: 1 as const,
+      requirements: [],
       stages: [
         {
           id: "implementing",

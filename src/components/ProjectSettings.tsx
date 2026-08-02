@@ -68,7 +68,7 @@ import {
   type ApprovalPolicy,
   type ModelEffort,
 } from "../lib/project-llm";
-import type { VelenInspection } from "../lib/project-connection";
+import type { AutoHuntHealth, VelenInspection } from "../lib/project-connection";
 import type {
   LinearImportConnectResult,
   LinearImportResult,
@@ -101,6 +101,7 @@ export type ProjectSettingsSection =
 export function ProjectSettings({
   dashboard,
   githubRepository,
+  health,
   isDeleting,
   isSidebarOpen,
   initialSection,
@@ -117,6 +118,7 @@ export function ProjectSettings({
   onImportLinearIssues,
   onIconChange,
   onRefreshVelen,
+  onRefreshHealth,
   project,
   repositoryConnected,
   sessionToken = null,
@@ -124,6 +126,7 @@ export function ProjectSettings({
 }: {
   dashboard: DashboardPayload | null;
   githubRepository: string | null;
+  health?: AutoHuntHealth | null;
   isDeleting: boolean;
   isSidebarOpen: boolean;
   initialSection?: ProjectSettingsSection;
@@ -149,6 +152,7 @@ export function ProjectSettings({
   }) => Promise<LinearImportResult>;
   onIconChange: (projectId: string, icon: string | null) => Promise<unknown>;
   onRefreshVelen: (org?: string | null) => Promise<VelenInspection | null>;
+  onRefreshHealth?: () => Promise<AutoHuntHealth | null>;
   project: Project;
   repositoryConnected: boolean;
   sessionToken?: string | null;
@@ -224,6 +228,7 @@ export function ProjectSettings({
   const workflowContract = workflow
     ? {
         version: workflow.version,
+        requirements: workflow.requirements ?? [],
         stages: workflow.stages,
         execution: workflow.execution,
         completion: workflow.completion,
@@ -232,6 +237,12 @@ export function ProjectSettings({
   const workflowJson = workflowContract
     ? JSON.stringify(workflowContract, null, 2)
     : "";
+  const requirementHealth = new Map(
+    (health?.requirements ?? []).map((requirement) => [
+      requirement.id,
+      requirement,
+    ]),
+  );
   const runtimeChanged =
     runtimeProvider !== savedRuntime.provider ||
     runtimeModel !== savedRuntime.model ||
@@ -1339,6 +1350,59 @@ export function ProjectSettings({
                     v{workflowContract.version}
                   </span>
                 </div>
+                <section className="project-workflow-requirements">
+                  <header>
+                    <span>
+                      <Cpu size={16} strokeWidth={1.8} />
+                      <span>
+                        <strong>{t("settings.workflowRequirements")}</strong>
+                        <small>{t("settings.workflowRequirementsDescription")}</small>
+                      </span>
+                    </span>
+                    {onRefreshHealth ? (
+                      <button
+                        aria-label={t("health.recheck")}
+                        onClick={() => void onRefreshHealth()}
+                        type="button"
+                      >
+                        <RefreshCw size={13} />
+                      </button>
+                    ) : null}
+                  </header>
+                  {workflowContract.requirements.length ? (
+                    <ul>
+                      {workflowContract.requirements.map((requirement) => {
+                        const status = requirementHealth.get(requirement.id);
+                        return (
+                          <li key={requirement.id}>
+                            <i className={status?.healthy ? "ok" : "warning"}>
+                              {status?.healthy ? (
+                                <CheckCircle2 size={15} />
+                              ) : (
+                                <CircleAlert size={15} />
+                              )}
+                            </i>
+                            <span>
+                              <strong>{requirement.label}</strong>
+                              <small>{requirement.reason}</small>
+                              <code>{requirement.tool}</code>
+                            </span>
+                            <em>
+                              {status
+                                ? status.healthy
+                                  ? t("common.healthy")
+                                  : t("common.checkNeeded")
+                                : t("health.notChecked")}
+                            </em>
+                            {status?.detail ? <p>{status.detail}</p> : null}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <p>{t("health.noWorkflowRequirements")}</p>
+                  )}
+                </section>
                 <div className="project-workflow-diagram">
                   <ol className="project-workflow-stages">
                     {workflowContract.stages.map((stage, index) => (

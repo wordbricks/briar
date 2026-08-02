@@ -203,6 +203,17 @@
   border-color: var(--border);
 }
 
+.dark .project-workflow-requirements,
+.dark .project-workflow-requirements > ul > li {
+  border-color: var(--border);
+  background: var(--card);
+}
+
+.dark .project-workflow-requirements li strong,
+.dark .project-workflow-requirements header strong {
+  color: var(--foreground);
+}
+
 .dark .health-item strong {
   color: var(--foreground);
 }

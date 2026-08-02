@@ -974,6 +974,7 @@ export function App() {
               briar.projectReadiness[activeProject.id]?.githubRepository ??
               null
             }
+            health={briar.health}
             isDeleting={briar.deletingProjectId === briar.activeProjectId}
             isSidebarOpen={isSidebarOpen}
             initialSection={settingsTarget.section}
@@ -1014,6 +1015,7 @@ export function App() {
             }
             onIconChange={briar.changeProjectIcon}
             onRefreshVelen={briar.refreshVelen}
+            onRefreshHealth={briar.refreshHealth}
             project={activeProject}
             repositoryConnected={isRepositoryConnectedForImport({
               projectId: activeProject.id,

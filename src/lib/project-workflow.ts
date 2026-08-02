@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   autoHuntEvidenceTypeMaxLength,
   autoHuntEvidenceTypePattern,
+  autoHuntRequirementKinds,
   normalizeAutoHuntWorkflow,
   type AutoHuntWorkflow,
 } from "./auto-hunt-contract";
@@ -27,9 +28,18 @@ const workflowStageSchema = z.object({
   checks: z.array(z.string().trim().min(1).max(300)).max(20),
 });
 
+const workflowRequirementSchema = z.object({
+  id: z.string().trim().min(1).max(64).regex(/^[a-z][a-z0-9_]*$/u),
+  label: z.string().trim().min(1).max(80),
+  kind: z.enum(autoHuntRequirementKinds),
+  tool: z.string().trim().min(1).max(80).regex(/^[a-zA-Z0-9_.+-]+$/u),
+  reason: z.string().trim().min(1).max(200),
+});
+
 const generatedWorkflowSchema = z
   .object({
     version: z.literal(1),
+    requirements: z.array(workflowRequirementSchema).max(30),
     stages: z.array(workflowStageSchema).min(1).max(30),
     execution: z.object({
       stopAfterStage: z
@@ -51,6 +61,14 @@ const generatedWorkflowSchema = z
         code: "custom",
         message: "Workflow stage ids must be unique.",
         path: ["stages"],
+      });
+    }
+    const requirementIds = workflow.requirements.map((requirement) => requirement.id);
+    if (new Set(requirementIds).size !== requirementIds.length) {
+      context.addIssue({
+        code: "custom",
+        message: "Workflow requirement ids must be unique.",
+        path: ["requirements"],
       });
     }
     const expectedRequired = workflow.stages
@@ -81,9 +99,30 @@ const generatedWorkflowSchema = z
 const workflowOutputSchema: JsonSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["version", "stages", "execution", "completion"],
+  required: ["version", "requirements", "stages", "execution", "completion"],
   properties: {
     version: { type: "integer", enum: [1] },
+    requirements: {
+      type: "array",
+      maxItems: 30,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["id", "label", "kind", "tool", "reason"],
+        properties: {
+          id: { type: "string", pattern: "^[a-z][a-z0-9_]*$", maxLength: 64 },
+          label: { type: "string", minLength: 1, maxLength: 80 },
+          kind: { type: "string", enum: [...autoHuntRequirementKinds] },
+          tool: {
+            type: "string",
+            pattern: "^[a-zA-Z0-9_.+-]+$",
+            minLength: 1,
+            maxLength: 80,
+          },
+          reason: { type: "string", minLength: 1, maxLength: 200 },
+        },
+      },
+    },
     stages: {
       type: "array",
       minItems: 1,
@@ -147,6 +186,10 @@ Inspect only the provided repository checkout using read-only tools. Briar prepa
 Return only the JSON object required by the output schema.
 
 Rules:
+- Populate requirements with every local tool needed to execute stages through execution.stopAfterStage. Return an empty array only when no project-specific tool is needed.
+- Use kind executable for a command that only needs to exist on PATH, xcode for a working Xcode toolchain, ios_simulator for an available iOS Simulator device, android_sdk for Android platform tools, and android_emulator for an installed Android Virtual Device.
+- For executable requirements, set tool to the exact executable name. For specialized kinds, use xcodebuild, xcrun, adb, and emulator respectively.
+- Give each requirement a stable snake_case id, concise English label, and a repository-grounded reason. Do not list Git, Briar CLI, the coding agent, or cloud services already checked elsewhere.
 - Model the stages that an autonomous coding task actually needs in this repository.
 - Prefer these stable ids when they fit: analyzing, planning, implementing, reviewing, pr_open, local_qa, ci_qa, staging_qa, production_qa, monitoring.
 - Never use the reserved repository_workflow_pending stage id.
