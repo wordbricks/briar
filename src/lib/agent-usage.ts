@@ -1,3 +1,5 @@
+import type { AgentProvider } from "./project-llm";
+
 export type AgentUsageStatus = "ok" | "error" | "unavailable";
 
 export type AgentUsageWindow = {
@@ -41,7 +43,7 @@ export async function loadAgentUsage(): Promise<AgentUsageSnapshot> {
 }
 
 export async function openAgentProviderLogin(
-  provider: AgentUsageProvider["provider"],
+  provider: AgentProvider,
 ) {
   if (!isTauri()) {
     throw new Error("Provider sign-in is available in the Briar desktop app.");

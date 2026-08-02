@@ -29,7 +29,7 @@ import {
   type ProjectAgentScheduleRecurrence,
 } from "../../src/lib/project-agent-schedule";
 
-type ProjectAgentProvider = "codex" | "claude" | "grok";
+type ProjectAgentProvider = "codex" | "claude" | "grok" | "opencode";
 type ModelEffort = "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
 
 export type ProjectRow = {
@@ -330,7 +330,7 @@ export type IssueMessageRow = {
   run_id: string;
   parent_message_id: string | null;
   author_user_id: string | null;
-  author_agent_provider: "codex" | "claude" | "grok" | null;
+  author_agent_provider: ProjectAgentProvider | null;
   author_name: string | null;
   author_image: string | null;
   body: string;
@@ -2493,7 +2493,7 @@ export async function createIssueMessage(
     runId: string;
     parentMessageId: string | null;
     authorUserId: string | null;
-    authorAgentProvider: "codex" | "claude" | "grok" | null;
+    authorAgentProvider: ProjectAgentProvider | null;
     body: string;
     mentionedUserIds?: string[];
     createdAt: string;
@@ -2652,6 +2652,7 @@ export async function claimNextIssueAgentReply(
              when preferred_provider = 'codex' and ? = 1 then 'codex'
              when preferred_provider = 'claude' and ? = 1 then 'claude'
              when preferred_provider = 'grok' and ? = 1 then 'grok'
+             when preferred_provider = 'opencode' and ? = 1 then 'opencode'
              else ?
            end,
            claim_token_hash = ?, claimed_at = ?, lease_expires_at = ?,
@@ -2719,6 +2720,7 @@ export async function claimNextIssueAgentReply(
       input.agentProviders.includes("codex") ? 1 : 0,
       input.agentProviders.includes("claude") ? 1 : 0,
       input.agentProviders.includes("grok") ? 1 : 0,
+      input.agentProviders.includes("opencode") ? 1 : 0,
       input.agentProvider,
       input.claimTokenHash,
       input.claimedAt,
@@ -3020,8 +3022,8 @@ export async function claimNextQueuedHuntRun(
     runId?: string;
     workerId?: string;
     workerDeviceId?: string;
-    agentProvider?: "codex" | "claude" | "grok";
-    agentProviders?: Array<"codex" | "claude" | "grok">;
+    agentProvider?: ProjectAgentProvider;
+    agentProviders?: ProjectAgentProvider[];
     detachedOnly?: boolean;
   },
 ) {
@@ -3102,6 +3104,18 @@ export async function claimNextQueuedHuntRun(
                  )
                ) = 'grok'
              )
+             or (
+               ? = 1
+               and coalesce(
+                 preferred_agent_provider,
+                 requested_agent_provider,
+                 (
+                   select agent.provider from briar_project_agents agent
+                   where agent.id = briar_hunt_runs.agent_id
+                     and agent.project_id = briar_hunt_runs.project_id
+                 )
+               ) = 'opencode'
+             )
            )
            and (
              ? is null or (
@@ -3151,6 +3165,7 @@ export async function claimNextQueuedHuntRun(
       allowedProviders?.includes("codex") ? 1 : 0,
       allowedProviders?.includes("claude") ? 1 : 0,
       allowedProviders?.includes("grok") ? 1 : 0,
+      allowedProviders?.includes("opencode") ? 1 : 0,
       input.workerDeviceId ?? null,
       input.workerDeviceId ?? null,
       input.claimedAt,

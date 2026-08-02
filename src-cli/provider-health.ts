@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-export const workerProviderIds = ["codex", "claude", "grok"] as const;
+export const workerProviderIds = ["codex", "claude", "grok", "opencode"] as const;
 export type WorkerProvider = (typeof workerProviderIds)[number];
 
 export type WorkerProviderHealth = {
@@ -143,6 +143,10 @@ const defaultDependencies: ProviderHealthDependencies = {
     }
     if (provider === "claude") {
       return claudeAuthenticated(binary, home);
+    }
+    if (provider === "opencode") {
+      // OpenCode delegates credentials to its configured model providers.
+      return true;
     }
     return grokAuthenticated(home, now);
   },

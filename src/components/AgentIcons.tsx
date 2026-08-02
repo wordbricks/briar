@@ -64,7 +64,24 @@ export function GrokIcon({ size = 14, className, style }: AgentIconProps) {
   );
 }
 
-export type AgentProviderIconId = "claude" | "codex" | "grok";
+export function OpenCodeIcon({ size = 14, className, style }: AgentIconProps) {
+  return (
+    <svg
+      aria-hidden
+      className={className}
+      fill="none"
+      height={size}
+      style={style}
+      viewBox="0 0 32 40"
+      width={size}
+    >
+      <path d="M24 32H8V16H24V32Z" fill="currentColor" opacity="0.35" />
+      <path d="M24 8H8V32H24V8ZM32 40H0V0H32V40Z" fill="currentColor" />
+    </svg>
+  );
+}
+
+export type AgentProviderIconId = "claude" | "codex" | "grok" | "opencode";
 
 export function AgentProviderIcon({
   provider,
@@ -82,6 +99,9 @@ export function AgentProviderIcon({
   }
   if (provider === "grok") {
     return <GrokIcon className={className} size={size} style={style} />;
+  }
+  if (provider === "opencode") {
+    return <OpenCodeIcon className={className} size={size} style={style} />;
   }
   return <CodexIcon className={className} size={size} style={style} />;
 }

@@ -258,7 +258,7 @@ export const demoDashboard: DashboardPayload = {
     workflow: structuredClone(demoWorkflow),
   },
   runs,
-  organizationProviders: ["codex", "claude", "grok"],
+  organizationProviders: ["codex", "claude", "grok", "opencode"],
   generatedAt: new Date().toISOString(),
 };
 

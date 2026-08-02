@@ -13,7 +13,7 @@ import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { homedir, hostname, platform, arch } from "node:os";
 import { join } from "node:path";
 
-export type AgentProvider = "codex" | "claude" | "grok";
+export type AgentProvider = "codex" | "claude" | "grok" | "opencode";
 export type ModelEffort = "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
 
 export type ClaimedIssue = {
@@ -32,7 +32,7 @@ export type ClaimedIssue = {
   agent?: {
     id: string;
     name: string;
-    provider: "codex" | "claude" | "grok";
+    provider: AgentProvider;
     model: string | null;
     effort: ModelEffort | null;
     responsibility: string;

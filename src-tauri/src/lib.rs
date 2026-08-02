@@ -372,6 +372,7 @@ struct OnboardingPrerequisites {
     codex: OnboardingPrerequisiteStatus,
     claude: OnboardingPrerequisiteStatus,
     grok: OnboardingPrerequisiteStatus,
+    opencode: OnboardingPrerequisiteStatus,
 }
 
 #[derive(Serialize)]
@@ -639,6 +640,8 @@ struct AppProviderSettings {
     claude: bool,
     #[serde(default = "enabled_by_default")]
     grok: bool,
+    #[serde(default = "enabled_by_default")]
+    opencode: bool,
 }
 
 impl Default for AppProviderSettings {
@@ -647,6 +650,7 @@ impl Default for AppProviderSettings {
             codex: true,
             claude: true,
             grok: true,
+            opencode: true,
         }
     }
 }
@@ -657,11 +661,12 @@ impl AppProviderSettings {
             agent::AgentProviderKind::Codex => self.codex,
             agent::AgentProviderKind::Claude => self.claude,
             agent::AgentProviderKind::Grok => self.grok,
+            agent::AgentProviderKind::Opencode => self.opencode,
         }
     }
 
     fn any_enabled(self) -> bool {
-        self.codex || self.claude || self.grok
+        self.codex || self.claude || self.grok || self.opencode
     }
 }
 
@@ -965,14 +970,20 @@ fn inspect_onboarding_prerequisites_sync(home: &Path) -> OnboardingPrerequisites
     let mut codex = inspect_cli(agent::codex_binary(home, &execution_path));
     let mut claude = inspect_cli(agent::claude_binary(home, &execution_path));
     let mut grok = inspect_cli(agent::grok_binary(home, &execution_path));
+    let mut opencode = inspect_cli(agent::opencode_binary(home, &execution_path));
     codex.authenticated = codex.installed && agent_usage::locally_authenticated(home, "codex");
     claude.authenticated = claude.installed && agent_usage::locally_authenticated(home, "claude");
     grok.authenticated = grok.installed && agent_usage::locally_authenticated(home, "grok");
+    // OpenCode delegates authentication to its configured model providers. A
+    // healthy installed CLI is enough to launch; the server reports any
+    // provider-specific authentication error during the request.
+    opencode.authenticated = opencode.installed;
     OnboardingPrerequisites {
         git: inspect_cli(git_binary(home)),
         codex,
         claude,
         grok,
+        opencode,
     }
 }
 
@@ -988,6 +999,10 @@ fn provider_login_binary_and_args(
             vec!["auth", "login", "--claudeai"],
         )),
         "grok" => Ok((agent::grok_binary(home, &execution_path)?, vec!["login"])),
+        "opencode" => Ok((
+            agent::opencode_binary(home, &execution_path)?,
+            vec!["auth", "login"],
+        )),
         _ => Err("지원하지 않는 Agent 프로바이더입니다.".to_string()),
     }
 }
@@ -1182,6 +1197,7 @@ async fn install_onboarding_prerequisite(
             "codex" => install_cli_package(&home, "@openai/codex")?,
             "claude" => install_cli_package(&home, "@anthropic-ai/claude-code")?,
             "grok" => install_grok_cli(&home)?,
+            "opencode" => install_cli_package(&home, "opencode-ai")?,
             _ => return Err("지원하지 않는 필수 도구입니다.".to_string()),
         }
         let prerequisites = inspect_onboarding_prerequisites_sync(&home);
@@ -1190,6 +1206,7 @@ async fn install_onboarding_prerequisite(
             "codex" => prerequisites.codex.installed,
             "claude" => prerequisites.claude.installed,
             "grok" => prerequisites.grok.installed,
+            "opencode" => prerequisites.opencode.installed,
             _ => false,
         };
         if !installed {
@@ -1330,6 +1347,7 @@ fn cli_execution_path_with_runtime(
     paths.extend([
         home.join(".local/bin"),
         home.join(".grok/bin"),
+        home.join(".opencode/bin"),
         home.join("bin"),
         home.join(".bun/bin"),
         home.join(".cargo/bin"),
@@ -3142,8 +3160,15 @@ fn install_auto_hunt_assets(resource_directory: &Path, home: &Path) -> Result<()
         if !skill_source.is_dir() {
             return Err(format!("{skill_name} 스킬 번들을 찾지 못했습니다."));
         }
-        for directory in [".codex", ".claude", ".grok"] {
-            let skill_destination = home.join(directory).join("skills").join(skill_name);
+        for skill_destination in [
+            home.join(".codex").join("skills").join(skill_name),
+            home.join(".claude").join("skills").join(skill_name),
+            home.join(".grok").join("skills").join(skill_name),
+            home.join(".config")
+                .join("opencode")
+                .join("skills")
+                .join(skill_name),
+        ] {
             let stale_references = skill_destination.join("references");
             if stale_references.exists() {
                 fs::remove_dir_all(&stale_references)
@@ -3166,10 +3191,18 @@ fn install_auto_hunt_assets(resource_directory: &Path, home: &Path) -> Result<()
         "agent/grok-runner.js",
         "dist-agent/grok-runner.js",
     );
+    let opencode_runner_source = bundled_path(
+        resource_directory,
+        "agent/opencode-runner.js",
+        "dist-agent/opencode-runner.js",
+    );
     if !cli_source.is_file() || !launcher_source.is_file() {
         return Err("Briar CLI 번들을 찾지 못했습니다.".to_string());
     }
-    if !claude_runner_source.is_file() || !grok_runner_source.is_file() {
+    if !claude_runner_source.is_file()
+        || !grok_runner_source.is_file()
+        || !opencode_runner_source.is_file()
+    {
         return Err("Briar Agent runner 번들을 찾지 못했습니다.".to_string());
     }
     let library_directory = home.join(".local").join("share").join("briar");
@@ -3187,6 +3220,11 @@ fn install_auto_hunt_assets(resource_directory: &Path, home: &Path) -> Result<()
     .map_err(|error| format!("Claude runner를 설치하지 못했습니다: {error}"))?;
     fs::copy(grok_runner_source, agent_directory.join("grok-runner.js"))
         .map_err(|error| format!("Grok runner를 설치하지 못했습니다: {error}"))?;
+    fs::copy(
+        opencode_runner_source,
+        agent_directory.join("opencode-runner.js"),
+    )
+    .map_err(|error| format!("OpenCode runner를 설치하지 못했습니다: {error}"))?;
     fs::write(
         library_directory.join("VERSION"),
         format!("{}\n", env!("CARGO_PKG_VERSION")),
@@ -3235,8 +3273,17 @@ fn auto_hunt_assets_are_current(resource_directory: &Path, home: &Path) -> bool 
         let skill_source = bundled_path(resource_directory, &relative_path, &relative_path);
         let expected_version = read_trimmed_file(&skill_source.join("VERSION"))
             .unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string());
-        [".codex", ".claude", ".grok"].iter().all(|directory| {
-            let skill = home.join(directory).join("skills").join(skill_name);
+        [
+            home.join(".codex").join("skills").join(skill_name),
+            home.join(".claude").join("skills").join(skill_name),
+            home.join(".grok").join("skills").join(skill_name),
+            home.join(".config")
+                .join("opencode")
+                .join("skills")
+                .join(skill_name),
+        ]
+        .iter()
+        .all(|skill| {
             skill.join("SKILL.md").is_file()
                 && read_trimmed_file(&skill.join("VERSION")).as_deref()
                     == Some(expected_version.as_str())
@@ -3518,6 +3565,7 @@ fn auto_hunt_health_sync_with(
         agent::AgentProviderKind::Codex => ".codex",
         agent::AgentProviderKind::Claude => ".claude",
         agent::AgentProviderKind::Grok => ".grok",
+        agent::AgentProviderKind::Opencode => ".config/opencode",
     };
     let skill_path = execution_home
         .join(skill_directory)
@@ -3659,6 +3707,11 @@ async fn project_llm_chat(
         "agent/grok-runner.js",
         "dist-agent/grok-runner.js",
     );
+    let opencode_runner = bundled_path(
+        &resource_directory,
+        "agent/opencode-runner.js",
+        "dist-agent/opencode-runner.js",
+    );
     let approval_app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let (runner, connected_workspace) =
@@ -3747,6 +3800,7 @@ async fn project_llm_chat(
             agent::AgentRunnerBundles {
                 claude: &claude_runner,
                 grok: &grok_runner,
+                opencode: &opencode_runner,
             },
         )?;
         let (model, effort) = if provider == settings.provider {
@@ -3873,6 +3927,11 @@ async fn run_project_agent(
         "agent/grok-runner.js",
         "dist-agent/grok-runner.js",
     );
+    let opencode_runner = bundled_path(
+        &resource_directory,
+        "agent/opencode-runner.js",
+        "dist-agent/opencode-runner.js",
+    );
     let event_sink =
         create_auto_hunt_event_sink(&app, &request.session_id, Arc::clone(&cancellation_signal))?;
     let approval_app = app.clone();
@@ -3895,6 +3954,7 @@ async fn run_project_agent(
             agent::AgentRunnerBundles {
                 claude: &claude_runner,
                 grok: &grok_runner,
+                opencode: &opencode_runner,
             },
         )?;
         let model = request
@@ -4565,6 +4625,11 @@ async fn start_project_auto_hunt(
         "agent/grok-runner.js",
         "dist-agent/grok-runner.js",
     );
+    let opencode_runner = bundled_path(
+        &resource_directory,
+        "agent/opencode-runner.js",
+        "dist-agent/opencode-runner.js",
+    );
     let app_data_directory = app
         .path()
         .app_data_dir()
@@ -4606,6 +4671,7 @@ async fn start_project_auto_hunt(
             agent::AgentRunnerBundles {
                 claude: &claude_runner,
                 grok: &grok_runner,
+                opencode: &opencode_runner,
             },
         )?;
         let model = request
@@ -5477,6 +5543,8 @@ async fn connect_local_project(
             agent::AgentProviderKind::Claude
         } else if runner.resolve_binary("grok").is_ok() {
             agent::AgentProviderKind::Grok
+        } else if runner.resolve_binary("opencode").is_ok() {
+            agent::AgentProviderKind::Opencode
         } else {
             agent::AgentProviderKind::Codex
         };
@@ -7044,6 +7112,7 @@ branch refs/heads/briar/second-11111111
                 codex: false,
                 claude: true,
                 grok: true,
+                opencode: true,
             },
         )
         .expect("provider settings should save");
@@ -7091,6 +7160,7 @@ branch refs/heads/briar/second-11111111
         assert!(defaults.codex);
         assert!(defaults.claude);
         assert!(defaults.grok);
+        assert!(defaults.opencode);
 
         update_app_provider_settings_at(
             &config_path,
@@ -7098,6 +7168,7 @@ branch refs/heads/briar/second-11111111
                 codex: true,
                 claude: false,
                 grok: false,
+                opencode: false,
             },
         )
         .expect("provider settings should initialize the local config");
@@ -7106,6 +7177,7 @@ branch refs/heads/briar/second-11111111
         assert!(saved.agent_providers.codex);
         assert!(!saved.agent_providers.claude);
         assert!(!saved.agent_providers.grok);
+        assert!(!saved.agent_providers.opencode);
 
         fs::remove_dir_all(
             config_path
@@ -7346,9 +7418,15 @@ branch refs/heads/briar/second-11111111
             .join(".claude/skills/briar-workflow/SKILL.md")
             .is_file());
         assert!(home.join(".grok/skills/briar-workflow/SKILL.md").is_file());
+        assert!(home
+            .join(".config/opencode/skills/briar-workflow/SKILL.md")
+            .is_file());
         assert!(home.join(".codex/skills/browser/SKILL.md").is_file());
         assert!(home.join(".claude/skills/browser/SKILL.md").is_file());
         assert!(home.join(".grok/skills/browser/SKILL.md").is_file());
+        assert!(home
+            .join(".config/opencode/skills/browser/SKILL.md")
+            .is_file());
         assert!(!stale_references.exists());
         assert_eq!(
             read_trimmed_file(&home.join(".codex/skills/briar-workflow/VERSION")),

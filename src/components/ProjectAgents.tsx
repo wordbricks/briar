@@ -61,6 +61,7 @@ const providerLabels: Record<AgentProvider, string> = {
   codex: "Codex",
   claude: "Claude",
   grok: "Grok",
+  opencode: "OpenCode",
 };
 
 export function ProjectAgents({
@@ -690,7 +691,7 @@ export function ProjectAgentDialog({
                   setModel("");
                 }}
                 options={(
-                  ["codex", "claude", "grok"] as AgentProvider[]
+                  ["codex", "claude", "grok", "opencode"] as AgentProvider[]
                 ).map((candidate) => ({
                   label: providerLabels[candidate],
                   value: candidate,

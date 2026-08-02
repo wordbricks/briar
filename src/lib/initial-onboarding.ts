@@ -1,4 +1,4 @@
-export type PrerequisiteId = "git" | "codex" | "claude" | "grok";
+export type PrerequisiteId = "git" | "codex" | "claude" | "grok" | "opencode";
 
 export type PrerequisiteStatus = {
   installed: boolean;

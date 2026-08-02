@@ -11,7 +11,7 @@ export type AutoHuntAppServerEvent = {
   occurredAtMs: number;
   direction: "client" | "server";
   message: Record<string, unknown>;
-  provider?: "codex" | "claude" | "grok";
+  provider?: "codex" | "claude" | "grok" | "opencode";
   event?: AutoHuntAgentEvent;
 };
 

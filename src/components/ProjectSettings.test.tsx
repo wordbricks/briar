@@ -230,7 +230,7 @@ describe("ProjectSettings", () => {
           "#project-runtime-provider-listbox .select-menu-option",
         ),
       ).map((option) => option.dataset.value),
-    ).toEqual(["codex", "claude", "grok"]);
+    ).toEqual(["codex", "claude", "grok", "opencode"]);
     await act(async () => {
       document
         .querySelector<HTMLButtonElement>(
