@@ -90,6 +90,11 @@ const providerStatuses: OnboardingPrerequisites = {
     version: "0.2.112",
     authenticated: true,
   },
+  opencode: {
+    installed: true,
+    version: "1.18.11",
+    authenticated: true,
+  },
 };
 
 describe("AppSettings", () => {
@@ -370,6 +375,7 @@ describe("AppSettings", () => {
       codex: true,
       claude: true,
       grok: true,
+      opencode: true,
     });
     vi.mocked(updateAppProviderSettings).mockImplementation(
       async (settings) => settings,
@@ -426,6 +432,7 @@ describe("AppSettings", () => {
       codex: true,
       claude: false,
       grok: true,
+      opencode: true,
     });
     expect(switchState("Claude enabled")).toMatch(/unchecked|false/);
 
@@ -464,6 +471,7 @@ describe("AppSettings", () => {
       codex: true,
       claude: true,
       grok: true,
+      opencode: true,
     });
     const container = document.createElement("div");
     document.body.append(container);

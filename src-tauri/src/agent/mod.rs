@@ -6,6 +6,7 @@
 mod claude;
 mod codex;
 mod grok;
+mod opencode;
 
 use std::{
     ffi::OsStr,
@@ -30,6 +31,7 @@ pub(crate) enum AgentProviderKind {
     Codex,
     Claude,
     Grok,
+    Opencode,
 }
 
 impl AgentProviderKind {
@@ -48,6 +50,13 @@ impl AgentProviderKind {
         {
             return Some(Self::Grok);
         }
+        let opencode_prefix = format!("briar:opencode:{project_id}:");
+        if conversation_id
+            .strip_prefix(&opencode_prefix)
+            .is_some_and(|id| !id.is_empty())
+        {
+            return Some(Self::Opencode);
+        }
         let codex_prefix = format!("briar:{project_id}:");
         conversation_id
             .strip_prefix(&codex_prefix)
@@ -60,6 +69,7 @@ impl AgentProviderKind {
             Self::Codex => "Codex",
             Self::Claude => "Claude",
             Self::Grok => "Grok",
+            Self::Opencode => "OpenCode",
         }
     }
 }
@@ -376,6 +386,41 @@ pub(crate) struct GrokBackend {
     runtime: grok::GrokRuntime,
 }
 
+pub(crate) struct OpenCodeBackend {
+    runtime: opencode::OpenCodeRuntime,
+}
+
+impl OpenCodeBackend {
+    pub(crate) fn discover(
+        command_runner: Arc<dyn CommandRunner>,
+        runner_bundle: &Path,
+    ) -> Result<Self, String> {
+        Ok(Self {
+            runtime: opencode::OpenCodeRuntime::discover(command_runner, runner_bundle)?,
+        })
+    }
+}
+
+impl AgentBackend for OpenCodeBackend {
+    fn run(
+        &self,
+        project_id: &str,
+        workspace_root: &Path,
+        execution: ChatExecution,
+        request: ProjectLlmRequest,
+        approve: &dyn Fn(&str, &serde_json::Value) -> bool,
+    ) -> Result<ProjectLlmResponse, String> {
+        opencode::chat(
+            &self.runtime,
+            project_id,
+            workspace_root,
+            execution,
+            request,
+            approve,
+        )
+    }
+}
+
 impl GrokBackend {
     pub(crate) fn discover(
         command_runner: Arc<dyn CommandRunner>,
@@ -411,6 +456,7 @@ pub(crate) enum AgentBackendHandle {
     Codex(CodexBackend),
     Claude(ClaudeBackend),
     Grok(GrokBackend),
+    Opencode(OpenCodeBackend),
 }
 
 impl AgentBackend for AgentBackendHandle {
@@ -433,6 +479,9 @@ impl AgentBackend for AgentBackendHandle {
             Self::Grok(backend) => {
                 backend.run(project_id, workspace_root, execution, request, approve)
             }
+            Self::Opencode(backend) => {
+                backend.run(project_id, workspace_root, execution, request, approve)
+            }
         }
     }
 }
@@ -440,6 +489,7 @@ impl AgentBackend for AgentBackendHandle {
 pub(crate) struct AgentRunnerBundles<'a> {
     pub(crate) claude: &'a Path,
     pub(crate) grok: &'a Path,
+    pub(crate) opencode: &'a Path,
 }
 
 pub(crate) fn discover_backend(
@@ -454,6 +504,9 @@ pub(crate) fn discover_backend(
         }
         AgentProviderKind::Grok => {
             GrokBackend::discover(runner, runners.grok).map(AgentBackendHandle::Grok)
+        }
+        AgentProviderKind::Opencode => {
+            OpenCodeBackend::discover(runner, runners.opencode).map(AgentBackendHandle::Opencode)
         }
     }
 }
@@ -490,6 +543,10 @@ pub(crate) fn claude_binary(home: &Path, execution_path: &OsStr) -> Result<PathB
 
 pub(crate) fn grok_binary(home: &Path, execution_path: &OsStr) -> Result<PathBuf, String> {
     grok::grok_binary(home, execution_path)
+}
+
+pub(crate) fn opencode_binary(home: &Path, execution_path: &OsStr) -> Result<PathBuf, String> {
+    opencode::opencode_binary(home, execution_path)
 }
 
 pub(crate) fn start_auto_hunt_worker(
@@ -568,6 +625,13 @@ mod tests {
         assert_eq!(
             AgentProviderKind::for_conversation_id("project-1", "briar:grok:project-1:session-1"),
             Some(AgentProviderKind::Grok)
+        );
+        assert_eq!(
+            AgentProviderKind::for_conversation_id(
+                "project-1",
+                "briar:opencode:project-1:session-1"
+            ),
+            Some(AgentProviderKind::Opencode)
         );
         assert_eq!(
             AgentProviderKind::for_conversation_id("project-2", "briar:project-1:thread-1"),

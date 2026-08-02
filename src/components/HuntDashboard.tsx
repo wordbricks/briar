@@ -2083,7 +2083,9 @@ function providerDisplayName(provider: AgentProvider) {
     ? "Codex"
     : provider === "claude"
       ? "Claude"
-      : "Grok";
+      : provider === "grok"
+        ? "Grok"
+        : "OpenCode";
 }
 
 function modelDisplayName(provider: AgentProvider, model: string) {

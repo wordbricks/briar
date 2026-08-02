@@ -10,7 +10,7 @@ import {
   type WorkerProvider,
 } from "./provider-health";
 
-const enabled = { codex: true, claude: true, grok: true };
+const enabled = { codex: true, claude: true, grok: true, opencode: true };
 
 describe("inspectWorkerProviderHealth", () => {
   it("uses Claude's loggedIn response even when its CLI exit code is unreliable", () => {
@@ -50,6 +50,12 @@ describe("inspectWorkerProviderHealth", () => {
         healthy: false,
         reason: "not_installed",
       },
+      opencode: {
+        installed: true,
+        authenticated: false,
+        healthy: false,
+        reason: "not_authenticated",
+      },
     });
     expect(healthyWorkerProviders(health)).toEqual(["codex"]);
   });
@@ -57,7 +63,7 @@ describe("inspectWorkerProviderHealth", () => {
   it("does not probe disabled providers", async () => {
     const authenticated = vi.fn(async () => true);
     const health = await inspectWorkerProviderHealth(
-      { codex: false, claude: true, grok: false },
+      { codex: false, claude: true, grok: false, opencode: false },
       {
         which: (provider) => `/usr/local/bin/${provider}`,
         authenticated,
@@ -74,6 +80,7 @@ describe("inspectWorkerProviderHealth", () => {
     expect(healthyWorkerProviders(health)).toEqual(["claude"]);
     expect(health.codex.reason).toBe("disabled");
     expect(health.grok.reason).toBe("disabled");
+    expect(health.opencode.reason).toBe("disabled");
   });
 
   it("rejects an expired Grok login and accepts a current one", async () => {

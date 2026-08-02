@@ -187,7 +187,9 @@ export function WorkerDispatchDialog({
                     ? "Codex"
                     : candidate === "claude"
                       ? "Claude"
-                      : "Grok",
+                      : candidate === "grok"
+                        ? "Grok"
+                        : "OpenCode",
                 value: candidate,
               }))}
               value={provider}

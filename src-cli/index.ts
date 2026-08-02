@@ -157,7 +157,7 @@ const projectConfigSchema = z
     apiUrl: z.string().url().optional(),
     repositoryRemote: z.string().optional(),
     llm: z
-      .object({ provider: z.enum(["codex", "claude", "grok"]) })
+      .object({ provider: z.enum(["codex", "claude", "grok", "opencode"]) })
       .passthrough()
       .optional(),
     autoHunt: autoHuntConfigSchema.optional(),
@@ -193,8 +193,9 @@ const configSchema = z
         codex: z.boolean().default(true),
         claude: z.boolean().default(true),
         grok: z.boolean().default(true),
+        opencode: z.boolean().default(true),
       })
-      .default({ codex: true, claude: true, grok: true }),
+      .default({ codex: true, claude: true, grok: true, opencode: true }),
     workerDeviceIdentity: z
       .string()
       .regex(/^briar_device_[0-9a-f]{64}$/u)
@@ -245,7 +246,7 @@ async function loadConfig(): Promise<Config> {
     ) {
       return {
         apiUrl: defaultApiUrl,
-        agentProviders: { codex: true, claude: true, grok: true },
+        agentProviders: { codex: true, claude: true, grok: true, opencode: true },
         projects: [],
       };
     }
@@ -806,7 +807,7 @@ const queuedIssueMessageSchema = z.object({
     id: z.string().nullable(),
     name: z.string().min(1),
     image: z.string().nullable(),
-    provider: z.enum(["codex", "claude", "grok"]).nullable(),
+    provider: z.enum(["codex", "claude", "grok", "opencode"]).nullable(),
   }),
   replyCount: z.number().int().nonnegative(),
   createdAt: z.string().datetime({ offset: true }),
@@ -1524,7 +1525,7 @@ const workerBindingSchema = workerRegistrationSchema.omit({
 const claimedRunSchema = queuedIssueSchema.extend({
   execution: z
     .object({
-      provider: z.enum(["codex", "claude", "grok"]),
+      provider: z.enum(["codex", "claude", "grok", "opencode"]),
       model: z.string().nullable(),
       effort: z
         .enum(["low", "medium", "high", "xhigh", "max", "ultra"])
@@ -1537,7 +1538,7 @@ const claimedRunSchema = queuedIssueSchema.extend({
     .object({
       id: z.string().uuid(),
       name: z.string().min(1),
-      provider: z.enum(["codex", "claude", "grok"]),
+      provider: z.enum(["codex", "claude", "grok", "opencode"]),
       model: z.string().nullable(),
       effort: z
         .enum(["low", "medium", "high", "xhigh", "max", "ultra"])
@@ -1557,7 +1558,7 @@ const claimedIssueReplySchema = z.object({
   title: z.string().min(1),
   triggerMessageId: z.string().uuid(),
   parentMessageId: z.string().uuid(),
-  provider: z.enum(["codex", "claude", "grok"]),
+  provider: z.enum(["codex", "claude", "grok", "opencode"]),
   model: z.string().nullable(),
   branch: z.string().nullable(),
   claimToken: z.string().startsWith("briar_reply_claim_"),

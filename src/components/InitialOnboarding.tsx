@@ -14,12 +14,12 @@ import {
   type OnboardingPrerequisites,
   type PrerequisiteId,
 } from "../lib/initial-onboarding";
-import { ClaudeIcon, CodexIcon, GrokIcon } from "./AgentIcons";
+import { ClaudeIcon, CodexIcon, GrokIcon, OpenCodeIcon } from "./AgentIcons";
 import { LoginScreen } from "./LoginScreen";
 
 type Step = "welcome" | "prerequisites" | "login";
 
-const prerequisiteIds: PrerequisiteId[] = ["git", "codex", "claude", "grok"];
+const prerequisiteIds: PrerequisiteId[] = ["git", "codex", "claude", "grok", "opencode"];
 
 export function InitialOnboarding({
   error: loginError,
@@ -168,6 +168,8 @@ export function InitialOnboarding({
                             <ClaudeIcon size={20} />
                           ) : id === "grok" ? (
                             <GrokIcon size={20} />
+                          ) : id === "opencode" ? (
+                            <OpenCodeIcon size={20} />
                           ) : null}
                         </span>
                         <div className="initial-prerequisite-copy">

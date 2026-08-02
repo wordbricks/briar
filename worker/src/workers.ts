@@ -14,7 +14,7 @@ import {
 
 export type ExecutionWorkerState = "online" | "stale" | "disabled";
 export type ExecutionWorkerReadiness = "ready" | "busy" | "needs_attention";
-export type AgentProvider = "codex" | "claude" | "grok";
+export type AgentProvider = "codex" | "claude" | "grok" | "opencode";
 export type ModelEffort =
   | "low"
   | "medium"
@@ -31,7 +31,7 @@ export type ProviderHealth = {
 export type ProviderHealthMap = Partial<Record<AgentProvider, ProviderHealth>>;
 export type TranscriptDirection = "client" | "server";
 
-const agentProviders: readonly AgentProvider[] = ["codex", "claude", "grok"];
+const agentProviders: readonly AgentProvider[] = ["codex", "claude", "grok", "opencode"];
 
 export type ExecutionWorkerRow = {
   id: string;

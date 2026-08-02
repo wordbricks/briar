@@ -281,21 +281,22 @@ describe("project LLM gateway", () => {
 
   it("loads and updates app-wide provider enablement", async () => {
     invoke
-      .mockResolvedValueOnce({ codex: true, claude: true, grok: true })
-      .mockResolvedValueOnce({ codex: false, claude: true, grok: true });
+      .mockResolvedValueOnce({ codex: true, claude: true, grok: true, opencode: true })
+      .mockResolvedValueOnce({ codex: false, claude: true, grok: true, opencode: true });
 
     await expect(loadAppProviderSettings()).resolves.toEqual({
       codex: true,
       claude: true,
       grok: true,
+      opencode: true,
     });
     await expect(
-      updateAppProviderSettings({ codex: false, claude: true, grok: true }),
-    ).resolves.toEqual({ codex: false, claude: true, grok: true });
+      updateAppProviderSettings({ codex: false, claude: true, grok: true, opencode: true }),
+    ).resolves.toEqual({ codex: false, claude: true, grok: true, opencode: true });
 
     expect(invoke).toHaveBeenNthCalledWith(1, "load_app_provider_settings");
     expect(invoke).toHaveBeenNthCalledWith(2, "update_app_provider_settings", {
-      settings: { codex: false, claude: true, grok: true },
+      settings: { codex: false, claude: true, grok: true, opencode: true },
     });
   });
 

@@ -595,7 +595,7 @@ const projectAgentInputSchema = z
       .strict()
       .nullable()
       .optional(),
-    provider: z.enum(["codex", "claude", "grok"]),
+    provider: z.enum(["codex", "claude", "grok", "opencode"]),
     model: z.string().trim().min(1).max(100).nullable().optional(),
     responsibility: z.string().trim().min(1).max(2_000),
     calendarColor: z
@@ -832,11 +832,12 @@ const providerModels = {
   codex: new Set(["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"]),
   claude: new Set(["sonnet", "opus", "haiku", "fable"]),
   grok: new Set(["grok-4.5", "grok-build"]),
+  opencode: new Set<string>(),
 } as const;
 
 export const issueExecutionPreferencesSchema = z
   .object({
-    provider: z.enum(["codex", "claude", "grok"]).nullable(),
+    provider: z.enum(["codex", "claude", "grok", "opencode"]).nullable(),
     model: z.string().trim().min(1).max(100).nullable(),
     effort: modelEffortSchema.nullable(),
   })
@@ -856,6 +857,7 @@ export const issueExecutionPreferencesSchema = z
     }
     if (
       input.provider &&
+      input.provider !== "opencode" &&
       input.model &&
       !providerModels[input.provider].has(input.model)
     ) {
@@ -871,13 +873,13 @@ export const issueExecutionPreferencesSchema = z
       });
     }
     if (
-      input.provider === "grok" &&
+      (input.provider === "grok" || input.provider === "opencode") &&
       input.effort &&
       !["low", "medium", "high"].includes(input.effort)
     ) {
       context.addIssue({
         code: "custom",
-        message: "Grok supports low, medium, or high effort",
+        message: `${input.provider} supports low, medium, or high effort`,
       });
     }
   });
@@ -1025,7 +1027,7 @@ const claimInputSchema = z
   .strict();
 
 const providerHealthSchema = z.record(
-  z.enum(["codex", "claude", "grok"]),
+  z.enum(["codex", "claude", "grok", "opencode"]),
   z
     .object({
       installed: z.boolean(),
@@ -1040,10 +1042,10 @@ const workerRegisterSchema = z
   .object({
     label: z.string().trim().min(1).max(100),
     deviceIdentity: z.string().regex(/^briar_device_[0-9a-f]{64}$/u),
-    agentProvider: z.enum(["codex", "claude", "grok"]),
+    agentProvider: z.enum(["codex", "claude", "grok", "opencode"]),
     providers: z
-      .array(z.enum(["codex", "claude", "grok"]))
-      .max(3)
+      .array(z.enum(["codex", "claude", "grok", "opencode"]))
+      .max(4)
       .optional(),
     providerHealth: providerHealthSchema.optional(),
     maxConcurrentSessions: z
@@ -1140,7 +1142,7 @@ const workerLabelSchema = z
 const dispatchRunSchema = z
   .object({
     agentId: z.string().uuid().nullable().optional(),
-    provider: z.enum(["codex", "claude", "grok"]).optional(),
+    provider: z.enum(["codex", "claude", "grok", "opencode"]).optional(),
     model: z.string().trim().min(1).max(100).nullable().optional(),
     effort: modelEffortSchema.nullable().optional(),
     persistPreferences: z.boolean().optional(),
@@ -1244,7 +1246,7 @@ export const transcriptSchema = z
     runAttempt: z.number().int().positive().optional(),
     projectId: z.string().uuid().optional(),
     workerId: z.string().trim().min(1).max(128).nullable().optional(),
-    agentProvider: z.enum(["codex", "claude", "grok"]),
+    agentProvider: z.enum(["codex", "claude", "grok", "opencode"]),
     executionMetrics: agentExecutionMetricsSchema.optional(),
     events: z
       .array(
@@ -1693,7 +1695,7 @@ const workerJson = (
     device_id?: string;
     owner_user_id?: string;
     label: string;
-    agent_provider: "codex" | "claude" | "grok";
+    agent_provider: "codex" | "claude" | "grok" | "opencode";
     versions_json: string;
     state: string;
     accepting_work?: number;

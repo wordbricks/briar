@@ -32,6 +32,11 @@ vi.mock("../lib/initial-onboarding", async (importOriginal) => {
         version: null,
         authenticated: false,
       },
+      opencode: {
+        installed: false,
+        version: null,
+        authenticated: false,
+      },
     }),
     installOnboardingPrerequisite: vi.fn(),
   };
@@ -89,13 +94,13 @@ describe("InitialOnboarding", () => {
     expect(container.textContent).not.toContain(
       "코드를 이해하고 작업을 실행하는 에이전트",
     );
-    expect(container.textContent?.match(/선택/g)).toHaveLength(4);
+    expect(container.textContent?.match(/선택/g)).toHaveLength(5);
     expect(container.textContent).not.toContain("Velen");
     expect(
       container.querySelectorAll(
         ".initial-prerequisites-list .initial-prerequisite-row",
       ),
-    ).toHaveLength(4);
+    ).toHaveLength(5);
     expect(
       container.querySelector(
         ".initial-prerequisites-content .initial-prerequisites-progress",
@@ -159,6 +164,11 @@ describe("InitialOnboarding", () => {
         version: null,
         authenticated: false,
       },
+      opencode: {
+        installed: false,
+        version: null,
+        authenticated: false,
+      },
     });
     await act(async () =>
       root.render(<InitialOnboarding {...createProps()} />),
@@ -182,6 +192,7 @@ describe("InitialOnboarding", () => {
       codex: { installed: false, version: null, authenticated: false },
       claude: { installed: false, version: null, authenticated: false },
       grok: { installed: false, version: null, authenticated: false },
+      opencode: { installed: false, version: null, authenticated: false },
     });
     const props = createProps();
     await act(async () => root.render(<InitialOnboarding {...props} />));

@@ -89,7 +89,8 @@ export function ProviderIcon({
     | "github"
     | "codex"
     | "claude"
-    | "grok";
+    | "grok"
+    | "opencode";
 }) {
   return (
     <span
@@ -101,6 +102,7 @@ export function ProviderIcon({
         tone === "codex" && "bg-secondary text-foreground",
         tone === "claude" && "bg-[#fff1e9] text-[#d66f45]",
         tone === "grok" && "bg-[#ececf1] text-[#111114]",
+        tone === "opencode" && "bg-[#ececf1] text-[#211e1e]",
         className,
       )}
     >

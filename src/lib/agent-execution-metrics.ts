@@ -54,7 +54,7 @@ const usageCandidates = (payload: unknown) => {
 };
 
 export function agentExecutionTokenUsageFromPayload(
-  provider: "codex" | "claude" | "grok",
+  provider: "codex" | "claude" | "grok" | "opencode",
   payload: unknown,
 ): AgentExecutionTokenUsage | null {
   for (const usage of usageCandidates(payload)) {

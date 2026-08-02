@@ -3,7 +3,7 @@ import { Buffer } from "node:buffer";
 export type DetachedAgent = {
   id: string;
   name: string;
-  provider: "codex" | "claude" | "grok";
+  provider: "codex" | "claude" | "grok" | "opencode";
   model: string | null;
   effort?: "low" | "medium" | "high" | "xhigh" | "max" | "ultra" | null;
   responsibility: string;
@@ -139,7 +139,9 @@ export function detachedProviderRequest(input: {
       networkAccess: true,
       ...(input.agent.provider === "claude"
         ? { claudeBinary: input.agentBinary }
-        : { grokBinary: input.agentBinary }),
+        : input.agent.provider === "grok"
+          ? { grokBinary: input.agentBinary }
+          : { opencodeBinary: input.agentBinary }),
     },
   };
 }

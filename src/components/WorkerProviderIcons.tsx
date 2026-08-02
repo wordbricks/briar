@@ -5,6 +5,7 @@ const providerLabels: Record<AgentProvider, string> = {
   codex: "Codex",
   claude: "Claude",
   grok: "Grok",
+  opencode: "OpenCode",
 };
 
 export function WorkerProviderIcons({

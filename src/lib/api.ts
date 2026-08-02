@@ -102,7 +102,7 @@ const projectAgentSchema = z.object({
     })
     .nullable()
     .default(null),
-  provider: z.enum(["codex", "claude", "grok"]),
+  provider: z.enum(["codex", "claude", "grok", "opencode"]),
   model: z.string().nullable(),
   responsibility: z.string(),
   skill: z.string(),
@@ -166,7 +166,7 @@ const projectAgentScheduleSchema = z.object({
   projectId: z.string().uuid(),
   agentId: z.string().uuid(),
   agentName: z.string(),
-  agentProvider: z.enum(["codex", "claude", "grok"]),
+  agentProvider: z.enum(["codex", "claude", "grok", "opencode"]),
   name: z.string(),
   recurrence: z.enum([
     "interval",

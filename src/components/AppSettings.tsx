@@ -67,7 +67,7 @@ import {
   type AgentUsageProvider,
   type AgentUsageSnapshot,
 } from "../lib/agent-usage";
-import { ClaudeIcon, CodexIcon, GrokIcon } from "./AgentIcons";
+import { ClaudeIcon, CodexIcon, GrokIcon, OpenCodeIcon } from "./AgentIcons";
 import { AgentUsageSettings } from "./AgentUsageSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { InboxNotificationSettings } from "./InboxNotificationSettings";
@@ -785,6 +785,76 @@ export function AppSettings({
                         {t("appSettings.install")}
                       </Button>
                     ) : providerSaving === "grok" ? (
+                      <LoaderCircle
+                        aria-label={t("common.saving")}
+                        className="spin"
+                        size={16}
+                      />
+                    ) : null
+                  }
+                />
+                <ProviderRow
+                  available={Boolean(
+                    providerStatuses?.opencode.installed &&
+                      providerStatuses.opencode.authenticated,
+                  )}
+                  description={providerDescription({
+                    authenticated: providerStatuses?.opencode.authenticated,
+                    enabled: providerSettings?.opencode ?? false,
+                    installed: providerStatuses?.opencode.installed,
+                    loading: providersLoading && !providerStatuses,
+                    providerName: "OpenCode CLI",
+                    t,
+                  })}
+                  disabled={
+                    providerSaving !== null || providerInstalling !== null
+                  }
+                  enabled={providerSettings?.opencode ?? false}
+                  icon={
+                    <ProviderIcon tone="opencode">
+                      <OpenCodeIcon size={19} />
+                    </ProviderIcon>
+                  }
+                  name="OpenCode"
+                  onToggle={(enabled) =>
+                    void toggleProvider("opencode", enabled)
+                  }
+                  title={
+                    <>
+                      OpenCode
+                      {providerStatuses?.opencode.version ? (
+                        <code>{providerStatuses.opencode.version}</code>
+                      ) : null}
+                    </>
+                  }
+                  trailing={
+                    providerInstalling === "opencode" ? (
+                      <Button
+                        aria-label={t("appSettings.installingProvider", {
+                          provider: "OpenCode",
+                        })}
+                        disabled
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        <LoaderCircle className="spin" />
+                        {t("appSettings.installing")}
+                      </Button>
+                    ) : providerStatuses?.opencode.installed === false ? (
+                      <Button
+                        aria-label={t("appSettings.installProvider", {
+                          provider: "OpenCode",
+                        })}
+                        onClick={() => void installProvider("opencode")}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        <Download />
+                        {t("appSettings.install")}
+                      </Button>
+                    ) : providerSaving === "opencode" ? (
                       <LoaderCircle
                         aria-label={t("common.saving")}
                         className="spin"
