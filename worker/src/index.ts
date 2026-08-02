@@ -52,6 +52,11 @@ import {
 } from "../../src/lib/worker-icon-validation";
 import { createAuth, type BriarAuth } from "./auth";
 import {
+  mobileCurrentUserResponseSchema,
+  mobileHealthResponseSchema,
+  mobileProjectsResponseSchema,
+} from "./mobile-contract";
+import {
   archiveCompletedLogs,
   cancelArchiveCleanup,
   collectStorageMetrics,
@@ -2973,7 +2978,7 @@ async function route(
 
   if (pathname === "/me" && request.method === "GET") {
     const session = await requireSession(auth, request);
-    return json({ user: session.user });
+    return json(mobileCurrentUserResponseSchema.parse({ user: session.user }));
   }
 
   if (pathname === "/me" && request.method === "PATCH") {
@@ -3571,7 +3576,9 @@ async function route(
   if (pathname === "/projects" && request.method === "GET") {
     const session = await requireSession(auth, request);
     const projects = await listProjects(db, session.user.id);
-    return json({ projects: projects.map(projectJson) });
+    return json(mobileProjectsResponseSchema.parse({
+      projects: projects.map(projectJson),
+    }));
   }
 
   if (pathname === "/projects" && request.method === "POST") {
@@ -6466,12 +6473,12 @@ export default {
       return env.ASSETS.fetch(new Request(assetUrl, request));
     }
     if (url.pathname === "/health") {
-      return json({
+      return json(mobileHealthResponseSchema.parse({
         ok: true,
         service: "briar-api",
         database: "cloudflare-d1",
         updates: "cloudflare-r2",
-      });
+      }));
     }
     if (url.pathname === "/slack/commands" && request.method === "POST") {
       try {

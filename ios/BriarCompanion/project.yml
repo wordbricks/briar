@@ -1,0 +1,88 @@
+name: BriarCompanion
+options:
+  bundleIdPrefix: app.briar.companion.native
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+configs:
+  Debug: debug
+  Release: release
+settings:
+  base:
+    DEVELOPMENT_TEAM: ""
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    TARGETED_DEVICE_FAMILY: "1,2"
+targets:
+  BriarCompanion:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.briar.companion.native.dev
+        CODE_SIGN_STYLE: Automatic
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Briar Native Dev
+        ITSAppUsesNonExemptEncryption: false
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+  BriarCompanionTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests
+      - path: ../../contracts/mobile/fixtures/companion-v1.json
+        buildPhase: resources
+    dependencies:
+      - target: BriarCompanion
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.briar.companion.native.dev.tests
+        GENERATE_INFOPLIST_FILE: true
+  BriarCompanionUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: UITests
+    dependencies:
+      - target: BriarCompanion
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.briar.companion.native.dev.uitests
+        GENERATE_INFOPLIST_FILE: true
+        TEST_TARGET_NAME: BriarCompanion
+schemes:
+  BriarCompanion-Dev:
+    build:
+      targets:
+        BriarCompanion: all
+        BriarCompanionTests: [test]
+        BriarCompanionUITests: [test]
+    run:
+      config: Debug
+      environmentVariables:
+        BRIAR_API_URL: http://127.0.0.1:8787
+    test:
+      config: Debug
+      gatherCoverageData: true
+      targets:
+        - name: BriarCompanionTests
+          parallelizable: true
+        - name: BriarCompanionUITests
+          parallelizable: false
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

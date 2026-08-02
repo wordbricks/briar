@@ -1,0 +1,95 @@
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+import worker from "./index";
+import { mobileClientIds, mobileOperationSchemas } from "./mobile-contract";
+
+type FixtureOperation = {
+  method: string;
+  path: string;
+  status: number;
+  request?: unknown;
+  response: unknown;
+  errorResponse?: unknown;
+};
+
+const fixture = JSON.parse(readFileSync(
+  new URL("../../contracts/mobile/fixtures/companion-v1.json", import.meta.url),
+  "utf8",
+)) as {
+  mobileClientIds: string[];
+  operations: Record<string, FixtureOperation>;
+};
+
+const openapi = JSON.parse(readFileSync(
+  new URL("../../contracts/mobile/companion.openapi.yaml", import.meta.url),
+  "utf8",
+)) as {
+  openapi: string;
+  paths: Record<string, Record<string, { operationId: string }>>;
+};
+
+describe("Companion mobile API contract", () => {
+  it("keeps the OpenAPI subset and Worker fixture operation map aligned", () => {
+    expect(openapi.openapi).toBe("3.1.0");
+    expect(fixture.mobileClientIds).toEqual([...mobileClientIds]);
+    expect(Object.keys(fixture.operations).sort()).toEqual(
+      Object.keys(mobileOperationSchemas).sort(),
+    );
+
+    for (const [operationId, operation] of Object.entries(fixture.operations)) {
+      const documentedOperation = openapi.paths[operation.path]?.[
+        operation.method.toLowerCase()
+      ];
+      expect(documentedOperation?.operationId).toBe(operationId);
+      expect(operation.status).toBe(200);
+    }
+  });
+
+  it("validates every shared request, response, and polling error fixture", () => {
+    for (const operationId of Object.keys(mobileOperationSchemas) as Array<
+      keyof typeof mobileOperationSchemas
+    >) {
+      const schemas = mobileOperationSchemas[operationId] as {
+        request?: { parse(value: unknown): unknown };
+        response: { parse(value: unknown): unknown };
+        errorResponse?: { parse(value: unknown): unknown };
+      };
+      const operation = fixture.operations[operationId];
+      expect(() => schemas.response.parse(operation.response)).not.toThrow();
+      if (schemas.request) {
+        expect(() => schemas.request?.parse(operation.request)).not.toThrow();
+      }
+      if (schemas.errorResponse) {
+        expect(() => schemas.errorResponse?.parse(operation.errorResponse))
+          .not.toThrow();
+      }
+    }
+  });
+
+  it("serves the documented health fixture from the Worker", async () => {
+    const response = await worker.fetch(
+      new Request("https://briar-api.example/health"),
+      {} as never,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(
+      fixture.operations.getHealth.response,
+    );
+  });
+
+  it.each(["mobile", "android"])(
+    "renders Companion authorization for the %s client route",
+    async (client) => {
+      const response = await worker.fetch(
+        new Request(`https://briar-api.example/device?client=${client}`),
+        {} as never,
+      );
+      const page = await response.text();
+
+      expect(response.status).toBe(200);
+      expect(page).toContain("Companion 로그인 승인");
+      expect(page).toContain("briar-companion://auth-complete");
+    },
+  );
+});
