@@ -1,0 +1,553 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		00CD54C44CB1141D697446B6 /* BriarCompanionApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5004E20D26F2AC91C541EE9A /* BriarCompanionApp.swift */; };
+		0376DCB4538E3FA2EC0DF1BF /* MobileAPIContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A65B754A339632E2DB2E3E6 /* MobileAPIContract.swift */; };
+		1D25F8B15FC04A11B87EE369 /* MobileAPIContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE453FFA6A7F97CAF774A8E8 /* MobileAPIContractTests.swift */; };
+		27D6AD1FB92763BB44078C73 /* FoundationStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D59E70E330C5C3C60094A493 /* FoundationStatusView.swift */; };
+		2ED6D796DAB5D04F827633DE /* companion-v1.json in Resources */ = {isa = PBXBuildFile; fileRef = 8CBC54C0ADFE2CC1B1CA0328 /* companion-v1.json */; };
+		A2E278A9A475BB7D7F2FCA36 /* BriarCompanionUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CA08856EAF2B67E13727846 /* BriarCompanionUITests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		2DA0E3BD4EBFC97050A8C238 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 6E235C8E700011A61ABCF9E4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 50FDB7409FB1516E4B62DC3E;
+			remoteInfo = BriarCompanion;
+		};
+		378BED4AB1720D8CD2EEB71D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 6E235C8E700011A61ABCF9E4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 50FDB7409FB1516E4B62DC3E;
+			remoteInfo = BriarCompanion;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		0CA08856EAF2B67E13727846 /* BriarCompanionUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BriarCompanionUITests.swift; sourceTree = "<group>"; };
+		2034C52B05B2B54DF7F3F3E5 /* BriarCompanionTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = BriarCompanionTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		2A26E7B294AE842A63FE02C2 /* BriarCompanionUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = BriarCompanionUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		48888E3E40EC72372BEEB40F /* BriarCompanion.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = BriarCompanion.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5004E20D26F2AC91C541EE9A /* BriarCompanionApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BriarCompanionApp.swift; sourceTree = "<group>"; };
+		8A65B754A339632E2DB2E3E6 /* MobileAPIContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileAPIContract.swift; sourceTree = "<group>"; };
+		8CBC54C0ADFE2CC1B1CA0328 /* companion-v1.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "companion-v1.json"; sourceTree = "<group>"; };
+		CE453FFA6A7F97CAF774A8E8 /* MobileAPIContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileAPIContractTests.swift; sourceTree = "<group>"; };
+		D59E70E330C5C3C60094A493 /* FoundationStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoundationStatusView.swift; sourceTree = "<group>"; };
+		DD272B5B12C58571A215C0E8 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		199D6281C5C9968DA1B0EF3F /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				CE453FFA6A7F97CAF774A8E8 /* MobileAPIContractTests.swift */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+		21C7A4B3D1A13CC6528E1AFA /* contracts */ = {
+			isa = PBXGroup;
+			children = (
+				F20AAEEB2EC35036E04A6AC5 /* mobile */,
+			);
+			path = contracts;
+			sourceTree = "<group>";
+		};
+		4BCD825065EC73B0BFB812A0 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				48888E3E40EC72372BEEB40F /* BriarCompanion.app */,
+				2034C52B05B2B54DF7F3F3E5 /* BriarCompanionTests.xctest */,
+				2A26E7B294AE842A63FE02C2 /* BriarCompanionUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		4D7F8361F451B4C067E4C09E /* fixtures */ = {
+			isa = PBXGroup;
+			children = (
+				8CBC54C0ADFE2CC1B1CA0328 /* companion-v1.json */,
+			);
+			path = fixtures;
+			sourceTree = "<group>";
+		};
+		61C931BA8B64C4D161851EBE /* App */ = {
+			isa = PBXGroup;
+			children = (
+				5004E20D26F2AC91C541EE9A /* BriarCompanionApp.swift */,
+				D59E70E330C5C3C60094A493 /* FoundationStatusView.swift */,
+				DD272B5B12C58571A215C0E8 /* Info.plist */,
+				8A65B754A339632E2DB2E3E6 /* MobileAPIContract.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		995DC18713CA2D81749A5F1C = {
+			isa = PBXGroup;
+			children = (
+				61C931BA8B64C4D161851EBE /* App */,
+				C5122E9014543C5606D99D92 /* ios-native-1-6-swiftui-기반과-모바일-api-계약-395b093d */,
+				199D6281C5C9968DA1B0EF3F /* Tests */,
+				9E47CF88E04EB2D5307A8187 /* UITests */,
+				4BCD825065EC73B0BFB812A0 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		9E47CF88E04EB2D5307A8187 /* UITests */ = {
+			isa = PBXGroup;
+			children = (
+				0CA08856EAF2B67E13727846 /* BriarCompanionUITests.swift */,
+			);
+			path = UITests;
+			sourceTree = "<group>";
+		};
+		C5122E9014543C5606D99D92 /* ios-native-1-6-swiftui-기반과-모바일-api-계약-395b093d */ = {
+			isa = PBXGroup;
+			children = (
+				21C7A4B3D1A13CC6528E1AFA /* contracts */,
+			);
+			name = "ios-native-1-6-swiftui-기반과-모바일-api-계약-395b093d";
+			path = ../..;
+			sourceTree = "<group>";
+		};
+		F20AAEEB2EC35036E04A6AC5 /* mobile */ = {
+			isa = PBXGroup;
+			children = (
+				4D7F8361F451B4C067E4C09E /* fixtures */,
+			);
+			path = mobile;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		3103E544D112793914C23EE0 /* BriarCompanionUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 11943E4C78C03C52B687FB41 /* Build configuration list for PBXNativeTarget "BriarCompanionUITests" */;
+			buildPhases = (
+				E0E7F281F91E982A90246A21 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				267B83A61C2928CFB905D3AF /* PBXTargetDependency */,
+			);
+			name = BriarCompanionUITests;
+			packageProductDependencies = (
+			);
+			productName = BriarCompanionUITests;
+			productReference = 2A26E7B294AE842A63FE02C2 /* BriarCompanionUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		50FDB7409FB1516E4B62DC3E /* BriarCompanion */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6C41B154F41823676BD3A907 /* Build configuration list for PBXNativeTarget "BriarCompanion" */;
+			buildPhases = (
+				FEE5C6DCF6D1A70B6C469D37 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = BriarCompanion;
+			packageProductDependencies = (
+			);
+			productName = BriarCompanion;
+			productReference = 48888E3E40EC72372BEEB40F /* BriarCompanion.app */;
+			productType = "com.apple.product-type.application";
+		};
+		C17083C87E9DA9038DCFCC7C /* BriarCompanionTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2754A17E99FB95431FDC398D /* Build configuration list for PBXNativeTarget "BriarCompanionTests" */;
+			buildPhases = (
+				49FC41895A7867FA6B63BFBC /* Sources */,
+				1363DEB2D9DF0431D7C6B3CD /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				1305A2EB2CE44D2B4B41A4A9 /* PBXTargetDependency */,
+			);
+			name = BriarCompanionTests;
+			packageProductDependencies = (
+			);
+			productName = BriarCompanionTests;
+			productReference = 2034C52B05B2B54DF7F3F3E5 /* BriarCompanionTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		6E235C8E700011A61ABCF9E4 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					3103E544D112793914C23EE0 = {
+						DevelopmentTeam = "";
+						TestTargetID = 50FDB7409FB1516E4B62DC3E;
+					};
+					50FDB7409FB1516E4B62DC3E = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+					C17083C87E9DA9038DCFCC7C = {
+						DevelopmentTeam = "";
+					};
+				};
+			};
+			buildConfigurationList = 0A75B9A4C54902275B1CB937 /* Build configuration list for PBXProject "BriarCompanion" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 995DC18713CA2D81749A5F1C;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 4BCD825065EC73B0BFB812A0 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				50FDB7409FB1516E4B62DC3E /* BriarCompanion */,
+				C17083C87E9DA9038DCFCC7C /* BriarCompanionTests */,
+				3103E544D112793914C23EE0 /* BriarCompanionUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		1363DEB2D9DF0431D7C6B3CD /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2ED6D796DAB5D04F827633DE /* companion-v1.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		49FC41895A7867FA6B63BFBC /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1D25F8B15FC04A11B87EE369 /* MobileAPIContractTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E0E7F281F91E982A90246A21 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A2E278A9A475BB7D7F2FCA36 /* BriarCompanionUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FEE5C6DCF6D1A70B6C469D37 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				00CD54C44CB1141D697446B6 /* BriarCompanionApp.swift in Sources */,
+				27D6AD1FB92763BB44078C73 /* FoundationStatusView.swift in Sources */,
+				0376DCB4538E3FA2EC0DF1BF /* MobileAPIContract.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		1305A2EB2CE44D2B4B41A4A9 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 50FDB7409FB1516E4B62DC3E /* BriarCompanion */;
+			targetProxy = 378BED4AB1720D8CD2EEB71D /* PBXContainerItemProxy */;
+		};
+		267B83A61C2928CFB905D3AF /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 50FDB7409FB1516E4B62DC3E /* BriarCompanion */;
+			targetProxy = 2DA0E3BD4EBFC97050A8C238 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		0824A37841628619B542B035 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		2963B71C35E1357E1C67217E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.briar.companion.native.dev;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		2F1B4DDB4379D8E3D03AA941 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.briar.companion.native.dev.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BriarCompanion.app/BriarCompanion";
+			};
+			name = Release;
+		};
+		3679245F8FD897894BC3D9DC /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.briar.companion.native.dev.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = BriarCompanion;
+			};
+			name = Release;
+		};
+		6722C5FD73F7F07481F48BF0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		75C01F3233684D1EA016585A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.briar.companion.native.dev;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		A5121A32E23E3411F7A43410 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.briar.companion.native.dev.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BriarCompanion.app/BriarCompanion";
+			};
+			name = Debug;
+		};
+		BCA9FB002900280239918593 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.briar.companion.native.dev.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = BriarCompanion;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		0A75B9A4C54902275B1CB937 /* Build configuration list for PBXProject "BriarCompanion" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0824A37841628619B542B035 /* Debug */,
+				6722C5FD73F7F07481F48BF0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		11943E4C78C03C52B687FB41 /* Build configuration list for PBXNativeTarget "BriarCompanionUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BCA9FB002900280239918593 /* Debug */,
+				3679245F8FD897894BC3D9DC /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		2754A17E99FB95431FDC398D /* Build configuration list for PBXNativeTarget "BriarCompanionTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A5121A32E23E3411F7A43410 /* Debug */,
+				2F1B4DDB4379D8E3D03AA941 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		6C41B154F41823676BD3A907 /* Build configuration list for PBXNativeTarget "BriarCompanion" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2963B71C35E1357E1C67217E /* Debug */,
+				75C01F3233684D1EA016585A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 6E235C8E700011A61ABCF9E4 /* Project object */;
+}

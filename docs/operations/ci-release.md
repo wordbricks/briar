@@ -31,6 +31,19 @@ prepares shared build inputs once, and runs the four independent contexts in
 parallel before publishing any status. Do not precede it with a separate
 `bun run check`; that check is already part of `signoff/app-worker`.
 
+`signoff/app-worker` also runs the mobile compatibility gate. On a macOS worker
+with Xcode, JDK 17, Android SDK 36, and a `Briar iPhone 17 Pro` simulator, it:
+
+- validates the Companion OpenAPI subset against Worker fixtures;
+- builds and runs the independent SwiftUI App, Unit Test, and UI Test targets;
+- builds the existing Tauri iOS project for an Apple Silicon simulator; and
+- builds the existing Tauri Android debug APK.
+
+Run this gate alone with `bun run mobile:ci`. Set `BRIAR_IOS_DESTINATION` to an
+equivalent Xcode destination when the worker uses a differently named
+simulator. The gate never changes the existing Tauri application identifiers or
+release schemes.
+
 The security phase uses `bun audit`, `cargo-audit`, and Gitleaks. Rust
 vulnerabilities and any warning not in the dated advisory allowlist fail the
 gate. The first Rust audit prints all known warnings before the strict allowlist

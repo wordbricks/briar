@@ -86,6 +86,7 @@ run_app_worker() {
   bun run worker:check
   bun run worker:build
   bun run worker:startup
+  bun run mobile:ci
 }
 
 run_d1_migrations() {
