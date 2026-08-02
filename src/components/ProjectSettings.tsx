@@ -107,6 +107,7 @@ export function ProjectSettings({
   initialSection,
   navigationSidebar,
   onBack,
+  onAnalyzeWorkflowRequirements,
   onDelete,
   onRegenerateWorkflow,
   onReviseWorkflow,
@@ -132,6 +133,7 @@ export function ProjectSettings({
   initialSection?: ProjectSettingsSection;
   navigationSidebar?: ReactNode;
   onBack: () => void;
+  onAnalyzeWorkflowRequirements: () => Promise<unknown>;
   onDelete: () => Promise<unknown>;
   onRegenerateWorkflow: () => Promise<unknown>;
   onReviseWorkflow: (requestedChange: string) => Promise<unknown>;
@@ -164,6 +166,8 @@ export function ProjectSettings({
   const [isConfirming, setIsConfirming] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [workflowCopied, setWorkflowCopied] = useState(false);
+  const [isAnalyzingWorkflowRequirements, setIsAnalyzingWorkflowRequirements] =
+    useState(false);
   const [isRegeneratingWorkflow, setIsRegeneratingWorkflow] = useState(false);
   const [isRevisingWorkflow, setIsRevisingWorkflow] = useState(false);
   const [isUpdatingWorkflowBoundary, setIsUpdatingWorkflowBoundary] =
@@ -171,6 +175,8 @@ export function ProjectSettings({
   const [workflowRevisionRequest, setWorkflowRevisionRequest] = useState("");
   const [workflowError, setWorkflowError] = useState<string | null>(null);
   const [workflowRegenerated, setWorkflowRegenerated] = useState(false);
+  const [workflowRequirementsAnalyzed, setWorkflowRequirementsAnalyzed] =
+    useState(false);
   const [workflowRevised, setWorkflowRevised] = useState(false);
   const [runtimeProvider, setRuntimeProvider] = useState<AgentProvider>(
     defaultProjectLlmSettings.provider,
@@ -416,6 +422,7 @@ export function ProjectSettings({
     setIsRegeneratingWorkflow(true);
     setWorkflowError(null);
     setWorkflowRegenerated(false);
+    setWorkflowRequirementsAnalyzed(false);
     setWorkflowRevised(false);
     try {
       await onRegenerateWorkflow();
@@ -427,12 +434,29 @@ export function ProjectSettings({
     }
   };
 
+  const analyzeWorkflowRequirements = async () => {
+    setIsAnalyzingWorkflowRequirements(true);
+    setWorkflowError(null);
+    setWorkflowRegenerated(false);
+    setWorkflowRequirementsAnalyzed(false);
+    setWorkflowRevised(false);
+    try {
+      await onAnalyzeWorkflowRequirements();
+      setWorkflowRequirementsAnalyzed(true);
+    } catch (caught) {
+      setWorkflowError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setIsAnalyzingWorkflowRequirements(false);
+    }
+  };
+
   const reviseWorkflow = async () => {
     const requestedChange = workflowRevisionRequest.trim();
     if (!requestedChange) return;
     setIsRevisingWorkflow(true);
     setWorkflowError(null);
     setWorkflowRegenerated(false);
+    setWorkflowRequirementsAnalyzed(false);
     setWorkflowRevised(false);
     try {
       await onReviseWorkflow(requestedChange);
@@ -455,6 +479,7 @@ export function ProjectSettings({
     setIsUpdatingWorkflowBoundary(true);
     setWorkflowError(null);
     setWorkflowRegenerated(false);
+    setWorkflowRequirementsAnalyzed(false);
     setWorkflowRevised(false);
     try {
       await onUpdateWorkflowStopAfterStage(stopAfterStage);
@@ -1211,6 +1236,26 @@ export function ProjectSettings({
               <div className="project-settings-automation-actions">
                 <button
                   disabled={
+                    isAnalyzingWorkflowRequirements ||
+                    isRegeneratingWorkflow ||
+                    isRevisingWorkflow ||
+                    !workflowContract
+                  }
+                  onClick={() => void analyzeWorkflowRequirements()}
+                  type="button"
+                >
+                  {isAnalyzingWorkflowRequirements ? (
+                    <LoaderCircle className="spin" size={14} />
+                  ) : (
+                    <Cpu size={14} />
+                  )}
+                  {isAnalyzingWorkflowRequirements
+                    ? t("settings.analyzingWorkflowRequirements")
+                    : t("settings.analyzeWorkflowRequirements")}
+                </button>
+                <button
+                  disabled={
+                    isAnalyzingWorkflowRequirements ||
                     isRegeneratingWorkflow ||
                     isRevisingWorkflow ||
                     !workflowContract
@@ -1260,6 +1305,7 @@ export function ProjectSettings({
               <Textarea
                 aria-label={t("settings.workflowRevisionLabel")}
                 disabled={
+                  isAnalyzingWorkflowRequirements ||
                   isRegeneratingWorkflow ||
                   isRevisingWorkflow ||
                   !workflowContract
@@ -1277,6 +1323,7 @@ export function ProjectSettings({
                 <small>{t("settings.workflowRevisionDescription")}</small>
                 <button
                   disabled={
+                    isAnalyzingWorkflowRequirements ||
                     isRegeneratingWorkflow ||
                     isRevisingWorkflow ||
                     !workflowContract ||
@@ -1301,6 +1348,12 @@ export function ProjectSettings({
                   <Check size={13} />{t("settings.workflowRegenerated")}
                 </p>
               ) : null}
+              {workflowRequirementsAnalyzed ? (
+                <p className="project-settings-workflow-success">
+                  <Check size={13} />
+                  {t("settings.workflowRequirementsAnalyzed")}
+                </p>
+              ) : null}
               {workflowRevised ? (
                 <p className="project-settings-workflow-success">
                   <Check size={13} />{t("settings.workflowRevised")}
@@ -1322,6 +1375,7 @@ export function ProjectSettings({
                   </span>
                   <SelectMenu
                     disabled={
+                      isAnalyzingWorkflowRequirements ||
                       isRegeneratingWorkflow ||
                       isRevisingWorkflow ||
                       isUpdatingWorkflowBoundary ||

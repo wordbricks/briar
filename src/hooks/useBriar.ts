@@ -82,6 +82,7 @@ import {
   withoutConnectedProject,
 } from "../lib/local-project-connection";
 import {
+  analyzeProjectWorkflowRequirements,
   generateProjectWorkflow,
   reviseProjectWorkflow,
 } from "../lib/project-workflow";
@@ -1521,6 +1522,30 @@ export function useBriar(options: UseBriarOptions = {}) {
     [dashboard, persistProjectWorkflow, token],
   );
 
+  const analyzeWorkflowRequirements = useCallback(
+    async (projectId: string) => {
+      if (demoMode) {
+        throw new Error("필요 도구 분석은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
+      }
+      if (!token) throw new Error("로그인이 필요합니다.");
+      if (!dashboard || dashboard.project.id !== projectId) {
+        throw new Error("필요 도구를 분석할 프로젝트 설정이 없습니다.");
+      }
+
+      const previousWorkflow = dashboard.settings.workflow;
+      const analyzedWorkflow = await analyzeProjectWorkflowRequirements(
+        projectId,
+        previousWorkflow,
+      );
+      return persistProjectWorkflow(
+        projectId,
+        previousWorkflow,
+        analyzedWorkflow,
+      );
+    },
+    [dashboard, persistProjectWorkflow, token],
+  );
+
   const reviseWorkflow = useCallback(
     async (projectId: string, requestedChange: string) => {
       if (demoMode) {
@@ -2657,6 +2682,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     projectReadinessLoadingId,
     reconnectProject,
     renameOrganization,
+    analyzeWorkflowRequirements,
     regenerateWorkflow,
     reviseWorkflow,
     updateWorkflowStopAfterStage,

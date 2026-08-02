@@ -15,6 +15,7 @@ vi.mock("../lib/project-icon", () => ({
 
 describe("ProjectSettings", () => {
   it("keeps project settings focused on project-wide configuration", async () => {
+    const onAnalyzeWorkflowRequirements = vi.fn(async () => undefined);
     const onRegenerateWorkflow = vi.fn(async () => undefined);
     const onReviseWorkflow = vi.fn(async () => undefined);
     const onUpdateWorkflowStopAfterStage = vi.fn(async () => undefined);
@@ -111,6 +112,7 @@ describe("ProjectSettings", () => {
           isDeleting={false}
           isSidebarOpen
           onBack={() => undefined}
+          onAnalyzeWorkflowRequirements={onAnalyzeWorkflowRequirements}
           onDelete={async () => undefined}
           onRegenerateWorkflow={onRegenerateWorkflow}
           onReviseWorkflow={onReviseWorkflow}
@@ -240,6 +242,17 @@ describe("ProjectSettings", () => {
       "요청에 맞게 워크플로우를 수정했습니다.",
     );
     expect(revisionInput?.value).toBe("");
+
+    const analyzeRequirementsButton = Array.from(
+      container.querySelectorAll<HTMLButtonElement>(
+        ".project-settings-automation-actions button",
+      ),
+    ).find((button) => button.textContent?.includes("필요 도구 분석하기"));
+    await act(async () => analyzeRequirementsButton?.click());
+    expect(onAnalyzeWorkflowRequirements).toHaveBeenCalledOnce();
+    expect(container.textContent).toContain(
+      "필요 도구 목록과 이 컴퓨터의 준비 상태를 갱신했습니다.",
+    );
 
     const regenerateButton = Array.from(
       container.querySelectorAll<HTMLButtonElement>(
@@ -396,6 +409,7 @@ describe("ProjectSettings", () => {
           isDeleting={false}
           isSidebarOpen
           onBack={() => undefined}
+          onAnalyzeWorkflowRequirements={async () => undefined}
           onDelete={onDelete}
           onRegenerateWorkflow={async () => undefined}
           onReviseWorkflow={async () => undefined}
