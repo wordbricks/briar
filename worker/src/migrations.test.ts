@@ -7,6 +7,7 @@ describe("D1 migrations", () => {
   it.each([
     "0049_dashboard_delta_sync.sql",
     "0050_hunt_run_event_count.sql",
+    "0053_issue_result_reviews.sql",
   ])("keeps each trigger in a separate Wrangler statement: %s", async (name) => {
     const sql = await readFile(resolve("migrations", name), "utf8");
     const statements = unstable_splitSqlQuery(sql);

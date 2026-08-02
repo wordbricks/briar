@@ -13,6 +13,7 @@ import {
   claimDueProjectAgentScheduleRun,
   addOrganizationMember,
   completeProjectAgentScheduleRun,
+  completeIssueResultReview,
   createOrganization,
   createIssueMessage,
   createProjectAgent,
@@ -40,6 +41,7 @@ import {
   listIssueDependencies,
   listIssueConversationNotifications,
   listIssueMessages,
+  listIssueResultReviews,
   listDashboardChanges,
   listDashboardRuns,
   listHuntRunEvents,
@@ -535,8 +537,19 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     );
     await executeSql(
       db,
+      await readFile(resolve("migrations/0051_user_profiles.sql"), "utf8"),
+    );
+    await executeSql(
+      db,
       await readFile(
         resolve("migrations/0052_project_agent_session_skipped.sql"),
+        "utf8",
+      ),
+    );
+    await executeTriggerMigration(
+      db,
+      await readFile(
+        resolve("migrations/0053_issue_result_reviews.sql"),
         "utf8",
       ),
     );
@@ -2356,6 +2369,58 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         updated_at: atMinute(19),
       }),
     );
+  });
+
+  it("records one result review per member and publishes a dashboard delta", async () => {
+    const sourceKey = "reviewed-result";
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("cancelled", 18.1, {
+        sourceKey,
+        eventKey: `${sourceKey}:cancelled`,
+        title: "Review this result",
+      }),
+    );
+    const cursor = await getDashboardSyncCursor(db, projectId);
+
+    const first = await completeIssueResultReview(
+      db,
+      projectId,
+      runId,
+      "owner",
+      atMinute(19),
+    );
+    const repeated = await completeIssueResultReview(
+      db,
+      projectId,
+      runId,
+      "owner",
+      atMinute(20),
+    );
+
+    expect(first).toMatchObject({
+      run_id: runId,
+      user_id: "owner",
+      name: "Owner",
+      completed_at: atMinute(19),
+    });
+    expect(repeated?.completed_at).toBe(atMinute(19));
+    await expect(listIssueResultReviews(db, projectId)).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ run_id: runId, user_id: "owner" }),
+      ]),
+    );
+    await expect(listDashboardChanges(db, projectId, cursor)).resolves.toMatchObject({
+      expired: false,
+      changes: expect.arrayContaining([
+        expect.objectContaining({
+          entity_type: "run",
+          entity_id: runId,
+          operation: "upsert",
+        }),
+      ]),
+    });
   });
 
   it("deletes an issue and cascades its stored records", async () => {

@@ -168,6 +168,7 @@ export type HuntRun = {
   waitingOnPrerequisiteCount?: number;
   resultSummary: string | null;
   structuredResult: StructuredAgentResult | null;
+  resultReviews?: IssueResultReview[];
   pullRequestUrls: string[];
   targetSha: string | null;
   sourceCreatedAt: string | null;
@@ -197,6 +198,14 @@ export type HuntRun = {
   completedAt: string | null;
   lastEventAt: string;
   eventCount: number;
+};
+
+export type IssueResultReview = {
+  userId: string;
+  name: string;
+  username: string | null;
+  image: string | null;
+  completedAt: string;
 };
 
 export type ExecutionWorker = {

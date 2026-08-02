@@ -73,6 +73,7 @@ import {
   claimDueProjectAgentScheduleRun,
   claimNextQueuedHuntRun,
   completeIssueAgentReply,
+  completeIssueResultReview,
   completeProjectAgentScheduleRun,
   completeSlackEvent,
   consumeSlackOAuthState,
@@ -115,6 +116,7 @@ import {
   listIssueDependencies,
   listIssueConversationNotifications,
   listIssueMessages,
+  listIssueResultReviews,
   listAllRunEvidenceImages,
   listEvidenceImagesForEvidence,
   listDashboardRuns,
@@ -162,6 +164,7 @@ import {
   type IssueAgentReplyJobRow,
   type IssueConversationNotificationRow,
   type IssueMessageRow,
+  type IssueResultReviewRow,
   type IssueDependencyRow,
   type ProjectRow,
   type ProjectAgentRow,
@@ -2830,6 +2833,7 @@ function dashboardRunJson(
   attachments: IssueAttachmentRow[],
   prerequisites: IssueDependencyRow[] = [],
   dependents: IssueDependencyRow[] = [],
+  resultReviews: IssueResultReviewRow[] = [],
 ) {
   const waitingOnPrerequisiteCount = prerequisites.filter(
     (dependency) => dependency.prerequisite_status !== "completed",
@@ -2883,6 +2887,13 @@ function dashboardRunJson(
     })),
     resultSummary: run.result_summary,
     structuredResult: parseStructuredResult(run.structured_result_json),
+    resultReviews: resultReviews.map((review) => ({
+      userId: review.user_id,
+      name: review.name,
+      username: review.username,
+      image: review.image,
+      completedAt: review.completed_at,
+    })),
     pullRequestUrls: parseJsonArray(run.pull_request_urls),
     targetSha: run.target_sha,
     sourceCreatedAt: run.source_created_at,
@@ -4247,6 +4258,7 @@ async function route(
       dashboardRows,
       attachments,
       dependencies,
+      resultReviews,
       workers,
       organizationWorkers,
     ] =
@@ -4259,6 +4271,9 @@ async function route(
           : Promise.resolve([]),
         changedRunIds.size > 0
           ? listIssueDependencies(db, project.id)
+          : Promise.resolve([]),
+        changedRunIds.size > 0
+          ? listIssueResultReviews(db, project.id)
           : Promise.resolve([]),
         listExecutionWorkers(db, project.id, observedAt),
         listOrganizationExecutionWorkers(
@@ -4276,6 +4291,13 @@ async function route(
     }
     const prerequisitesByRun = new Map<string, IssueDependencyRow[]>();
     const dependentsByRun = new Map<string, IssueDependencyRow[]>();
+    const resultReviewsByRun = new Map<string, IssueResultReviewRow[]>();
+    for (const review of resultReviews) {
+      if (!changedRunIds.has(review.run_id)) continue;
+      const runReviews = resultReviewsByRun.get(review.run_id) ?? [];
+      runReviews.push(review);
+      resultReviewsByRun.set(review.run_id, runReviews);
+    }
     for (const dependency of dependencies) {
       if (changedRunIds.has(dependency.dependent_run_id)) {
         const prerequisites =
@@ -4325,6 +4347,7 @@ async function route(
           attachmentsByRun.get(run.id) ?? [],
           prerequisitesByRun.get(run.id) ?? [],
           dependentsByRun.get(run.id) ?? [],
+          resultReviewsByRun.get(run.id) ?? [],
         ),
       ),
       deletedRunIds: [...changedRunIds].filter(
@@ -4369,6 +4392,7 @@ async function route(
       settings,
       attachments,
       dependencies,
+      resultReviews,
       workers,
       organizationWorkers,
       executionPolicy,
@@ -4380,6 +4404,7 @@ async function route(
         getProjectSettings(db, project.id),
         listIssueAttachments(db, project.id),
         listIssueDependencies(db, project.id),
+        listIssueResultReviews(db, project.id),
         listExecutionWorkers(db, project.id, observedAt),
         listOrganizationExecutionWorkers(
           db,
@@ -4402,6 +4427,12 @@ async function route(
     }
     const prerequisitesByRun = new Map<string, IssueDependencyRow[]>();
     const dependentsByRun = new Map<string, IssueDependencyRow[]>();
+    const resultReviewsByRun = new Map<string, IssueResultReviewRow[]>();
+    for (const review of resultReviews) {
+      const runReviews = resultReviewsByRun.get(review.run_id) ?? [];
+      runReviews.push(review);
+      resultReviewsByRun.set(review.run_id, runReviews);
+    }
     for (const dependency of dependencies) {
       const prerequisites =
         prerequisitesByRun.get(dependency.dependent_run_id) ?? [];
@@ -4421,6 +4452,7 @@ async function route(
           attachmentsByRun.get(run.id) ?? [],
           prerequisitesByRun.get(run.id) ?? [],
           dependentsByRun.get(run.id) ?? [],
+          resultReviewsByRun.get(run.id) ?? [],
         ),
       ),
       workers: workers.map((worker) => workerJson(worker, observedAt)),
@@ -4789,6 +4821,9 @@ async function route(
   const issuePreferencesMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/preferences$/u,
   );
+  const issueResultReviewsMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/result-reviews$/u,
+  );
   if (issueDependencyMatch && request.method === "PUT") {
     const session = await requireSession(auth, request);
     const project = await getProject(
@@ -4864,6 +4899,30 @@ async function route(
       provider: run.preferred_agent_provider,
       model: run.preferred_agent_model,
       effort: run.preferred_agent_effort,
+    });
+  }
+  if (issueResultReviewsMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      issueResultReviewsMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const review = await completeIssueResultReview(
+      db,
+      project.id,
+      issueResultReviewsMatch[2],
+      session.user.id,
+      new Date().toISOString(),
+    );
+    if (!review) throw new HttpError(404, "Run not found");
+    return json({
+      userId: review.user_id,
+      name: review.name,
+      username: review.username,
+      image: review.image,
+      completedAt: review.completed_at,
     });
   }
   if (issueUpdateMatch && request.method === "PATCH") {
