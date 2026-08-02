@@ -61,17 +61,35 @@ describe("project agents layout", () => {
     expect(styles).toContain(
       ".page-header.app-page-header {\n  height:48px;\n  min-height:48px;",
     );
+    expect(firstRule(".auto-hunt-session-request-card > p")).toContain(
+      "color:var(--foreground)",
+    );
+    expect(firstRule(".auto-hunt-session-side-card > header h3")).toContain(
+      "color:var(--foreground)",
+    );
     expect(
-      firstRule(".auto-hunt-dialog-section h3,.auto-hunt-summary h3"),
+      firstRule(
+        ".auto-hunt-session-execution-timeline .auto-hunt-agent-message > p",
+      ),
     ).toContain("color:var(--foreground)");
-    expect(firstRule(".auto-hunt-summary.error")).toContain(
-      "color:var(--foreground)",
+    expect(firstRule(".auto-hunt-session-output-card > div > p.error")).toContain(
+      "color:var(--destructive)",
     );
-    expect(firstRule(".auto-hunt-session-event strong")).toContain(
-      "color:var(--foreground)",
+  });
+
+  it("lays out session activity beside durable session context", () => {
+    expect(firstRule(".auto-hunt-session-layout")).toContain(
+      "grid-template-columns:minmax(0,1fr) minmax(300px,340px)",
     );
-    expect(firstRule(".project-agent-session-request")).toContain(
-      "border:1px solid var(--border)",
+    expect(styles).toContain(
+      ".auto-hunt-session-layout > .auto-hunt-stop-error,.auto-hunt-session-request-card { grid-column:1/-1; }",
+    );
+    expect(firstRule(".auto-hunt-session-sidebar")).toContain(
+      "display:grid",
+    );
+    expect(styles).toContain("@media (max-width:1100px)");
+    expect(styles).toContain(
+      ".auto-hunt-session-layout { grid-template-columns:minmax(0,1fr); }",
     );
   });
 });
