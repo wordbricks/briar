@@ -79,6 +79,57 @@
           }
         ]
       }
+    },
+    "getDashboardSnapshot": {
+      "method": "GET",
+      "path": "/projects/{projectId}/dashboard",
+      "status": 200,
+      "response": {
+        "project": {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "name": "Briar",
+          "icon": null,
+          "organizationId": "22222222-2222-4222-8222-222222222222",
+          "organizationName": "Wordbricks",
+          "role": "owner",
+          "createdAt": "2026-08-02T00:00:00.000Z"
+        },
+        "runs": [
+          {
+            "id": "33333333-3333-4333-8333-333333333333",
+            "title": "Native dashboard sync",
+            "status": "running",
+            "detail": "Implementing",
+            "updatedAt": "2026-08-02T01:00:00.000Z"
+          }
+        ],
+        "cursor": 41,
+        "generatedAt": "2026-08-02T01:00:00.000Z"
+      }
+    },
+    "getDashboardDelta": {
+      "method": "GET",
+      "path": "/projects/{projectId}/dashboard/delta?cursor={cursor}",
+      "status": 200,
+      "response": {
+        "cursor": 42,
+        "hasMore": false,
+        "runs": [
+          {
+            "id": "33333333-3333-4333-8333-333333333333",
+            "title": "Native dashboard sync",
+            "status": "completed",
+            "detail": null,
+            "updatedAt": "2026-08-02T01:01:00.000Z"
+          }
+        ],
+        "deletedRunIds": [],
+        "generatedAt": "2026-08-02T01:01:00.000Z"
+      },
+      "errorResponse": {
+        "code": "dashboard_cursor_expired",
+        "message": "Dashboard cursor expired; reload the full snapshot"
+      }
     }
   }
 }

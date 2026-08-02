@@ -33,6 +33,8 @@ final class MobileAPIContractTests: XCTestCase {
         )
         let user: CurrentUserResponse = try decodeResponse("getCurrentUser")
         let projects: ProjectsResponse = try decodeResponse("listProjects")
+        let snapshot: DashboardSnapshot = try decodeResponse("getDashboardSnapshot")
+        let delta: DashboardDelta = try decodeResponse("getDashboardDelta")
 
         XCTAssertTrue(health.ok)
         XCTAssertEqual(device.userCode, "BRIAR123")
@@ -40,6 +42,10 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(pending.error, .authorizationPending)
         XCTAssertEqual(user.user.email, "user@example.com")
         XCTAssertEqual(projects.projects.first?.role, .owner)
+        XCTAssertEqual(snapshot.cursor, 41)
+        XCTAssertEqual(snapshot.runs.first?.status, .running)
+        XCTAssertEqual(delta.cursor, 42)
+        XCTAssertEqual(delta.runs.first?.status, .completed)
     }
 
     func testEndpointPathsMatchOpenAPISubset() {
@@ -48,6 +54,15 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(MobileAPIContract.Endpoint.deviceToken, "/api/auth/device/token")
         XCTAssertEqual(MobileAPIContract.Endpoint.currentUser, "/me")
         XCTAssertEqual(MobileAPIContract.Endpoint.projects, "/projects")
+        let projectID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
+        XCTAssertEqual(
+            MobileAPIContract.Endpoint.dashboard(projectID: projectID),
+            "/projects/11111111-1111-4111-8111-111111111111/dashboard"
+        )
+        XCTAssertEqual(
+            MobileAPIContract.Endpoint.dashboardDelta(projectID: projectID, cursor: 41),
+            "/projects/11111111-1111-4111-8111-111111111111/dashboard/delta?cursor=41"
+        )
     }
 
     private func decodeResponse<Response: Decodable>(_ operationID: String) throws -> Response {

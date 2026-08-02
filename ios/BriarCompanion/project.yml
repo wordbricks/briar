@@ -27,7 +27,14 @@ targets:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: Briar Native Dev
+        CFBundleURLTypes:
+          - CFBundleTypeRole: Editor
+            CFBundleURLName: app.briar.companion.authentication
+            CFBundleURLSchemes:
+              - briar-companion
         ITSAppUsesNonExemptEncryption: false
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
