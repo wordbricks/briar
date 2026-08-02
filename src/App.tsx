@@ -70,8 +70,8 @@ import {
   isWebApp,
 } from "./lib/platform";
 import {
-  listenForIssueLinks,
-  type IssueLinkTarget,
+  listenForBriarLinks,
+  type BriarLinkTarget,
 } from "./lib/issue-links";
 import { isRepositoryConnectedForImport } from "./lib/linear-import";
 import { settingsAccountSelection } from "./lib/settings-account-selection";
@@ -201,8 +201,8 @@ export function App() {
     navigate: navigateToPage,
     reset: resetNavigation,
   } = useNavigationHistory<ActivePage>("issues");
-  const [pendingIssueLink, setPendingIssueLink] =
-    useState<IssueLinkTarget | null>(null);
+  const [pendingBriarLink, setPendingBriarLink] =
+    useState<BriarLinkTarget | null>(null);
   const [pendingInboxNotificationTarget, setPendingInboxNotificationTarget] =
     useState<InboxNotificationTarget | null>(null);
   const [inboxDetailTarget, setInboxDetailTarget] =
@@ -227,28 +227,35 @@ export function App() {
   const [companionStatus, setCompanionStatus] =
     useState<CompanionStatusFilter>("all");
   useEffect(
-    () => listenForIssueLinks(setPendingIssueLink),
+    () => listenForBriarLinks(setPendingBriarLink),
     [],
   );
   useEffect(() => {
-    if (!pendingIssueLink || !briar.user || briar.loading) return;
+    if (!pendingBriarLink || !briar.user || briar.loading) return;
     if (
       !briar.projects.some(
-        (project) => project.id === pendingIssueLink.projectId,
+        (project) => project.id === pendingBriarLink.projectId,
       )
     ) {
       return;
     }
 
-    if (pendingIssueLink.projectId !== briar.activeProjectId) {
-      briar.setActiveProjectId(pendingIssueLink.projectId);
+    if (pendingBriarLink.projectId !== briar.activeProjectId) {
+      briar.setActiveProjectId(pendingBriarLink.projectId);
     }
-    setRequestedSessionId(null);
-    setRequestedRunId(pendingIssueLink.runId);
-    setCompanionPage("issues");
-    setCompanionStatus("all");
-    navigateToPage("issues");
-    setPendingIssueLink(null);
+    if (pendingBriarLink.kind === "issue") {
+      setRequestedSessionId(null);
+      setRequestedRunId(pendingBriarLink.runId);
+      setCompanionPage("issues");
+      setCompanionStatus("all");
+      navigateToPage("issues");
+    } else {
+      setRequestedRunId(null);
+      setRequestedSessionId(pendingBriarLink.sessionId);
+      setCompanionPage("agents");
+      navigateToPage("agents");
+    }
+    setPendingBriarLink(null);
   }, [
     briar.activeProjectId,
     briar.loading,
@@ -256,7 +263,7 @@ export function App() {
     briar.setActiveProjectId,
     briar.user,
     navigateToPage,
-    pendingIssueLink,
+    pendingBriarLink,
   ]);
   useEffect(() => {
     if (!pendingInboxNotificationTarget || !briar.user || briar.loading) return;

@@ -5,6 +5,7 @@ import {
   CircleAlert,
   Clock3,
   LoaderCircle,
+  Link2,
   OctagonX,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -24,6 +25,7 @@ import {
   agentMessagesFromAppServerEvents,
   naturalLanguageFromAgentMessage,
 } from "../lib/auto-hunt-agent";
+import { copySessionShareLink } from "../lib/issue-links";
 
 export function ProjectAgentSessionDetail({
   isSidebarOpen,
@@ -66,6 +68,9 @@ export function ProjectAgentSessionDetail({
     session.dispatchEvents[session.dispatchEvents.length - 1];
   const [isStopping, setIsStopping] = useState(false);
   const [stopError, setStopError] = useState<string | null>(null);
+  const [copyStatus, setCopyStatus] = useState<"copied" | "error" | null>(
+    null,
+  );
 
   useEffect(() => {
     const workerProgress = workerProgressRef.current;
@@ -99,11 +104,46 @@ export function ProjectAgentSessionDetail({
     }
   };
 
+  const copySessionLink = async () => {
+    setCopyStatus(null);
+    try {
+      await copySessionShareLink({
+        projectId: session.projectId,
+        sessionId: session.id,
+      });
+      setCopyStatus("copied");
+    } catch {
+      setCopyStatus("error");
+    }
+  };
+
   return (
     <MainContent id="project-agent-session">
       <PageHeader
         action={
           <div className="auto-hunt-session-page-actions">
+            {copyStatus ? (
+              <span
+                aria-live="polite"
+                className={`run-page-share-status${copyStatus === "error" ? " error" : ""}`}
+                role="status"
+              >
+                {t(
+                  copyStatus === "copied"
+                    ? "agents.sessionLinkCopied"
+                    : "agents.copySessionLinkFailed",
+                )}
+              </span>
+            ) : null}
+            <button
+              aria-label={t("agents.copySessionLink")}
+              className="run-page-link-copy auto-hunt-session-link-copy"
+              onClick={() => void copySessionLink()}
+              title={t("agents.copySessionLink")}
+              type="button"
+            >
+              <Link2 aria-hidden="true" size={16} />
+            </button>
             {session.status === "running" ? (
               <Button
                 aria-label={t("agents.stopSession")}

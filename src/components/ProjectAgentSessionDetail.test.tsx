@@ -110,6 +110,28 @@ const session: AutoHuntSession = {
 };
 
 describe("ProjectAgentSessionDetail", () => {
+  it("copies a link that identifies the exact session", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    const container = await mount(session);
+    const copyButton = container.querySelector<HTMLButtonElement>(
+      ".auto-hunt-session-link-copy",
+    );
+
+    expect(copyButton?.getAttribute("aria-label")).toBe("세션 링크 복사");
+    await act(async () => copyButton?.click());
+
+    expect(writeText).toHaveBeenCalledWith(
+      "http://127.0.0.1:8787/open/sessions/project-1/session-1",
+    );
+    expect(container.querySelector('[role="status"]')?.textContent).toBe(
+      "세션 링크가 복사되었습니다",
+    );
+  });
+
   it("opens a target's linked issue", async () => {
     const onIssueOpen = vi.fn();
     const container = await mount({

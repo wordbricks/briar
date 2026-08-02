@@ -22,7 +22,7 @@
         {
           "scheme": ["https"],
           "host": "briar-api.wbai.workers.dev",
-          "pathPrefix": ["/open/issues"],
+          "pathPrefix": ["/open/issues", "/open/sessions"],
           "appLink": true
         }
       ]

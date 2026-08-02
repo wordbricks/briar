@@ -1,5 +1,7 @@
 const issueLinkPathPattern =
   /^\/open\/issues\/([0-9a-f-]{36})\/([0-9a-f-]{36})\/?$/iu;
+const sessionLinkPathPattern =
+  /^\/open\/sessions\/([0-9a-f-]{36})\/([0-9a-f-]{36})\/?$/iu;
 const issueDeepLinkScheme = "briar-companion:";
 const briarIssueSourceKeyPrefix = "briar-issue:";
 
@@ -7,6 +9,15 @@ export type IssueLinkTarget = {
   projectId: string;
   runId: string;
 };
+
+export type SessionLinkTarget = {
+  projectId: string;
+  sessionId: string;
+};
+
+export type BriarLinkTarget =
+  | ({ kind: "issue" } & IssueLinkTarget)
+  | ({ kind: "session" } & SessionLinkTarget);
 
 export type IssueShareResult = "cancelled" | "copied" | "shared";
 
@@ -33,6 +44,25 @@ export function issueDeepLinkUrl(projectId: string, runId: string): string {
   return `briar-companion://issues/${encodeURIComponent(projectId)}/${encodeURIComponent(runId)}`;
 }
 
+export function sessionShareUrl(
+  projectId: string,
+  sessionId: string,
+  origin = configuredShareOrigin(),
+): string {
+  const url = new URL(origin);
+  url.pathname = `/open/sessions/${encodeURIComponent(projectId)}/${encodeURIComponent(sessionId)}`;
+  url.search = "";
+  url.hash = "";
+  return url.toString();
+}
+
+export function sessionDeepLinkUrl(
+  projectId: string,
+  sessionId: string,
+): string {
+  return `briar-companion://sessions/${encodeURIComponent(projectId)}/${encodeURIComponent(sessionId)}`;
+}
+
 export function parseIssueLink(value: string): IssueLinkTarget | null {
   let url: URL;
   try {
@@ -52,6 +82,34 @@ export function parseIssueLink(value: string): IssueLinkTarget | null {
   }
 
   return null;
+}
+
+export function parseSessionLink(value: string): SessionLinkTarget | null {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+
+  if (url.protocol === issueDeepLinkScheme && url.hostname === "sessions") {
+    const match = `/open/sessions${url.pathname}`.match(sessionLinkPathPattern);
+    return match ? { projectId: match[1], sessionId: match[2] } : null;
+  }
+
+  if (url.protocol === "https:" || url.protocol === "http:") {
+    const match = url.pathname.match(sessionLinkPathPattern);
+    return match ? { projectId: match[1], sessionId: match[2] } : null;
+  }
+
+  return null;
+}
+
+export function parseBriarLink(value: string): BriarLinkTarget | null {
+  const issue = parseIssueLink(value);
+  if (issue) return { kind: "issue", ...issue };
+  const session = parseSessionLink(value);
+  return session ? { kind: "session", ...session } : null;
 }
 
 async function copyText(value: string): Promise<void> {
@@ -89,6 +147,13 @@ export async function copyIssueShareLink(input: {
   await copyText(issueShareUrl(input.projectId, input.runId));
 }
 
+export async function copySessionShareLink(input: {
+  projectId: string;
+  sessionId: string;
+}): Promise<void> {
+  await copyText(sessionShareUrl(input.projectId, input.sessionId));
+}
+
 export async function shareIssueLink(input: {
   projectId: string;
   runId: string;
@@ -111,8 +176,9 @@ export async function shareIssueLink(input: {
   return "copied";
 }
 
-export function listenForIssueLinks(
-  onIssueLink: (target: IssueLinkTarget) => void,
+function listenForLinks<T>(
+  parseLink: (value: string) => T | null,
+  onLink: (target: T) => void,
 ): () => void {
   if (
     typeof window === "undefined" ||
@@ -125,8 +191,8 @@ export function listenForIssueLinks(
   let stopListening: (() => void) | null = null;
   const acceptUrls = (urls: string[] | null) => {
     for (const url of urls ?? []) {
-      const target = parseIssueLink(url);
-      if (target) onIssueLink(target);
+      const target = parseLink(url);
+      if (target) onLink(target);
     }
   };
 
@@ -141,11 +207,29 @@ export function listenForIssueLinks(
       }
     })
     .catch((error) => {
-      console.error("Failed to listen for Briar issue links", error);
+      console.error("Failed to listen for Briar app links", error);
     });
 
   return () => {
     disposed = true;
     stopListening?.();
   };
+}
+
+export function listenForIssueLinks(
+  onIssueLink: (target: IssueLinkTarget) => void,
+): () => void {
+  return listenForLinks(parseIssueLink, onIssueLink);
+}
+
+export function listenForSessionLinks(
+  onSessionLink: (target: SessionLinkTarget) => void,
+): () => void {
+  return listenForLinks(parseSessionLink, onSessionLink);
+}
+
+export function listenForBriarLinks(
+  onLink: (target: BriarLinkTarget) => void,
+): () => void {
+  return listenForLinks(parseBriarLink, onLink);
 }
