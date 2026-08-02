@@ -23,6 +23,9 @@ describe("bundled skill guides", () => {
     expect(guide?.markdown).toContain("main result card");
     expect(guide?.markdown).toContain("Problem and scope");
     expect(guide?.markdown).toContain("Before and after");
+    expect(guide?.markdown).toContain("short `##` section headings");
+    expect(guide?.markdown).toContain("bullet points under each");
+    expect(guide?.markdown).toContain("`**bold**` emphasis");
     expect(guide?.markdown).toContain("Choose details by consequence, not by technology");
     expect(guide?.markdown).toContain("interface change");
     expect(guide?.markdown).toContain("integration");
