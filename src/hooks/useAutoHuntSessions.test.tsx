@@ -229,6 +229,37 @@ describe("useAutoHuntSessions", () => {
     await act(async () => root.unmount());
   });
 
+  it("records a no-work scheduled task as skipped", async () => {
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    await act(async () => root.render(<Harness />));
+
+    await act(async () => {
+      sessionsHook.startTaskSession("project-1", "agent-1", {
+        sessionId: "scheduled-session-1",
+        request: "Auto Hunt",
+        startedAt: "2026-07-28T01:00:00.000Z",
+        trigger: "scheduled",
+      });
+      sessionsHook.settleTaskSession("scheduled-session-1", {
+        status: "skipped",
+        conversationId: "conversation-1",
+        workspaceRoot: "/repo",
+        summary: "대기 상태인 이슈가 없어 세션을 건너뛰었습니다.",
+        error: null,
+      });
+    });
+
+    expect(sessionsHook.sessions[0]).toMatchObject({
+      status: "skipped",
+      summary: "대기 상태인 이슈가 없어 세션을 건너뛰었습니다.",
+      error: null,
+    });
+    expect(sessionsHook.sessions[0]?.events.at(-1)?.type).toBe("skipped");
+
+    await act(async () => root.unmount());
+  });
+
   it("stops a running session and ignores late settlement", async () => {
     stopper = async () => true;
     const container = document.createElement("div");

@@ -1,4 +1,7 @@
-import { dispatchAutoHuntToWorkers } from "./auto-hunt-worker-dispatch";
+import {
+  dispatchAutoHuntToWorkers,
+  NoQueuedAutoHuntIssuesError,
+} from "./auto-hunt-worker-dispatch";
 import { executeProjectAgentTurn } from "./project-agent-execution";
 import { projectAgentRunSnapshots } from "./project-llm";
 import type {
@@ -47,7 +50,7 @@ export type ProjectAgentScheduleExecutionDependencies = {
   settleSession?: (
     sessionId: string,
     input: {
-      status: "completed" | "failed";
+      status: "completed" | "failed" | "skipped";
       conversationId: string | null;
       workspaceRoot: string | null;
       summary: string | null;
@@ -81,6 +84,7 @@ export async function executeScheduledProjectAgent(
       run.projectId,
     );
     let dispatchRuns = initialDashboard.runs;
+    let skippedNoQueuedDispatch = false;
     const { response, dispatchResult } = await executeProjectAgentTurn(
       {
         runAgent: dependencies.runAgent,
@@ -89,31 +93,42 @@ export async function executeScheduledProjectAgent(
             ? initialDashboard
             : await dependencies.loadDashboard(token, run.projectId);
           dispatchRuns = dashboard.runs;
-          return dispatchAutoHuntToWorkers(
-            {
-              dispatch: (candidate, dispatchInput) =>
-                dependencies.dispatchRun(
-                  token,
-                  run.projectId,
-                  candidate,
-                  dispatchInput,
-                ),
-              retry: (candidate, reason) =>
-                dependencies.retryRun(
-                  token,
-                  run.projectId,
-                  candidate.id,
-                  reason,
-                ),
-            },
-            {
-              agent: run.agent,
-              runs: dashboard.runs,
-              maxIssues: decision.maxIssues ?? undefined,
-              targetRunIds: decision.targetRunIds ?? undefined,
-              retryReason: decision.retryReason,
-            },
-          );
+          try {
+            return await dispatchAutoHuntToWorkers(
+              {
+                dispatch: (candidate, dispatchInput) =>
+                  dependencies.dispatchRun(
+                    token,
+                    run.projectId,
+                    candidate,
+                    dispatchInput,
+                  ),
+                retry: (candidate, reason) =>
+                  dependencies.retryRun(
+                    token,
+                    run.projectId,
+                    candidate.id,
+                    reason,
+                  ),
+              },
+              {
+                agent: run.agent,
+                runs: dashboard.runs,
+                maxIssues: decision.maxIssues ?? undefined,
+                targetRunIds: decision.targetRunIds ?? undefined,
+                retryReason: decision.retryReason,
+              },
+            );
+          } catch (caught) {
+            if (
+              caught instanceof NoQueuedAutoHuntIssuesError &&
+              !dashboard.runs.some((candidate) => candidate.status === "queued")
+            ) {
+              skippedNoQueuedDispatch = true;
+              return null;
+            }
+            throw caught;
+          }
         },
       },
       {
@@ -133,7 +148,24 @@ export async function executeScheduledProjectAgent(
     let result: ProjectLlmChatResponse & {
       structuredResult: StructuredAgentResult;
     };
-    if (dispatchResult === null) {
+    if (skippedNoQueuedDispatch) {
+      const summary = "대기 상태인 이슈가 없어 세션을 건너뛰었습니다.";
+      result = {
+        conversationId: response.conversationId,
+        message: summary,
+        workspaceRoot: response.workspaceRoot,
+        structuredResult: {
+          summary,
+          outcome: "completed",
+          importance: "routine",
+          urgency: "normal",
+          impact: "issue",
+          humanActionRequired: false,
+          nextAction: null,
+          dueAt: null,
+        },
+      };
+    } else if (dispatchResult === null) {
       if (!response.structuredResult) {
         throw new Error("에이전트가 구조화된 실행 결과를 제출하지 않았습니다.");
       }
@@ -172,7 +204,7 @@ export async function executeScheduledProjectAgent(
     }
     if (sessionId) {
       dependencies.settleSession?.(sessionId, {
-        status: "completed",
+        status: skippedNoQueuedDispatch ? "skipped" : "completed",
         conversationId: result.conversationId,
         workspaceRoot: result.workspaceRoot,
         summary: result.message,
