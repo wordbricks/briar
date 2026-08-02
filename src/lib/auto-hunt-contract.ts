@@ -42,8 +42,30 @@ export type AutoHuntWorkflowStage = {
   checks?: string[];
 };
 
+export const autoHuntRequirementKinds = [
+  "executable",
+  "xcode",
+  "ios_simulator",
+  "android_sdk",
+  "android_emulator",
+] as const;
+
+export type AutoHuntRequirementKind =
+  (typeof autoHuntRequirementKinds)[number];
+
+export type AutoHuntWorkflowRequirement = {
+  id: string;
+  label: string;
+  kind: AutoHuntRequirementKind;
+  /** Executable name for generic requirements. Specialized probes ignore it. */
+  tool: string;
+  reason: string;
+};
+
 export type AutoHuntWorkflow = {
   version: 1;
+  /** Optional only for read compatibility with workflows created before tool probes. */
+  requirements?: AutoHuntWorkflowRequirement[];
   stages: AutoHuntWorkflowStage[];
   execution: {
     stopAfterStage: AutoHuntWorkflowStageId;
@@ -53,7 +75,11 @@ export type AutoHuntWorkflow = {
   };
 };
 
-type AutoHuntWorkflowInput = Omit<AutoHuntWorkflow, "completion" | "execution"> & {
+type AutoHuntWorkflowInput = Omit<
+  AutoHuntWorkflow,
+  "completion" | "execution" | "requirements"
+> & {
+  requirements?: AutoHuntWorkflowRequirement[];
   completion?: AutoHuntWorkflow["completion"];
   execution?: AutoHuntWorkflow["execution"];
   /** Read compatibility for workflows stored before execution.stopAfterStage. */
@@ -71,6 +97,7 @@ const catalogById: Map<string, (typeof autoHuntWorkflowStageCatalog)[number]> = 
 export const repositoryWorkflowPendingStageId = "repository_workflow_pending";
 export const repositoryWorkflowBootstrap: AutoHuntWorkflow = {
   version: 1,
+  requirements: [],
   stages: [
     {
       id: repositoryWorkflowPendingStageId,
@@ -92,6 +119,17 @@ export function normalizeAutoHuntWorkflow(
     return structuredClone(repositoryWorkflowBootstrap);
   }
   const seen = new Set<AutoHuntWorkflowStageId>();
+  const seenRequirements = new Set<string>();
+  const requirements = (workflow.requirements ?? []).flatMap((requirement) => {
+    const id = requirement.id.trim();
+    const label = requirement.label.trim();
+    const tool = requirement.tool.trim();
+    const reason = requirement.reason.trim();
+    if (!id || !label || !tool || !reason || seenRequirements.has(id)) return [];
+    if (!autoHuntRequirementKinds.includes(requirement.kind)) return [];
+    seenRequirements.add(id);
+    return [{ id, label, kind: requirement.kind, tool, reason }];
+  });
   const stages = workflow.stages.flatMap((stage) => {
     const id = stage.id.trim();
     const catalog = catalogById.get(id);
@@ -126,6 +164,7 @@ export function normalizeAutoHuntWorkflow(
       : requiredStages.at(-1) ?? stages.at(-1)!.id;
   return {
     version: 1,
+    requirements,
     stages,
     execution: { stopAfterStage },
     completion: { requiredStages },

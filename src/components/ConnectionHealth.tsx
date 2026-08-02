@@ -113,6 +113,7 @@ export function ConnectionHealth({
             </div>
           )}
           {health ? (
+            <>
             <div className="health-grid">
               <HealthItem
                 healthy={health.repositoryHealthy}
@@ -152,6 +153,29 @@ export function ConnectionHealth({
                 />
               ) : null}
             </div>
+            <div className="health-requirements">
+              <header>
+                <strong>{t("health.workflowRequirements")}</strong>
+                <small>{t("health.workflowRequirementsDescription")}</small>
+              </header>
+              {(health.requirements ?? []).length ? (
+                <div className="health-grid">
+                  {(health.requirements ?? []).map((requirement) => (
+                    <HealthItem
+                      expected={requirement.reason}
+                      healthy={requirement.healthy}
+                      icon={<Wrench size={15} />}
+                      key={requirement.id}
+                      label={requirement.label}
+                      value={requirement.detail}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <p>{t("health.noWorkflowRequirements")}</p>
+              )}
+            </div>
+            </>
           ) : (
             <div className="health-empty">
               {loading ? t("health.inspecting") : t("health.desktopOnly")}

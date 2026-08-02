@@ -40,7 +40,18 @@ export type AutoHuntHealth = {
   velenAuthenticated: boolean;
   velenEmail: string | null;
   velenHealthy: boolean;
+  requirements?: WorkflowRequirementHealth[];
   issues: string[];
+};
+
+export type WorkflowRequirementHealth = {
+  id: string;
+  label: string;
+  kind: NonNullable<AutoHuntWorkflow["requirements"]>[number]["kind"];
+  tool: string;
+  reason: string;
+  healthy: boolean;
+  detail: string;
 };
 
 export type RepositoryReadiness = {

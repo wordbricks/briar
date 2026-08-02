@@ -1477,7 +1477,10 @@ export function useBriar(options: UseBriarOptions = {}) {
             ? { ...current, settings: result.settings }
             : current,
         );
-        await refreshProjectReadiness(projectId);
+        await Promise.all([
+          refreshProjectReadiness(projectId),
+          refreshHealth(),
+        ]);
       } catch (caught) {
         try {
           await updateLocalProjectWorkflow(projectId, previousWorkflow);
@@ -1494,7 +1497,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       }
       return nextWorkflow;
     },
-    [dashboard, refreshProjectReadiness, token],
+    [dashboard, refreshHealth, refreshProjectReadiness, token],
   );
 
   const regenerateWorkflow = useCallback(
