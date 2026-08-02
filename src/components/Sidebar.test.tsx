@@ -486,6 +486,66 @@ describe("Sidebar", () => {
     container.remove();
   });
 
+  it("keeps a running session visible when another project is active", async () => {
+    const onAgentSessionOpen = vi.fn();
+    const onProjectChange = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <Sidebar
+          {...sidebarProps}
+          activeProjectId="project-2"
+          connectedProjectIds={["project-1", "project-2"]}
+          onAgentSessionOpen={onAgentSessionOpen}
+          onProjectChange={onProjectChange}
+          projects={[
+            ...sidebarProps.projects,
+            {
+              ...sidebarProps.projects[0],
+              id: "project-2",
+              name: "Other project",
+            },
+          ]}
+          sessions={[{
+            id: "session-running",
+            dispatchGroupId: "session-running",
+            projectId: "project-1",
+            agentId: "agent-from-project-1",
+            sessionType: "task",
+            request: "Keep this session visible",
+            status: "running",
+            issues: [],
+            startedAt: "2026-07-29T00:00:00.000Z",
+            completedAt: null,
+            conversationId: null,
+            workspaceRoot: null,
+            summary: null,
+            error: null,
+            events: [],
+            dispatchEvents: [],
+            workers: [],
+          }]}
+        />,
+      );
+    });
+
+    const sessionButton = container.querySelector<HTMLButtonElement>(
+      ".sidebar-agent-session",
+    );
+    expect(sessionButton?.textContent).toContain("Keep this session visible");
+    expect(sessionButton?.querySelector(".project-agent-avatar svg"))
+      .not.toBeNull();
+
+    await act(async () => sessionButton?.click());
+    expect(onProjectChange).toHaveBeenCalledWith("project-1");
+    expect(onAgentSessionOpen).toHaveBeenCalledWith("session-running");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("opens project settings from the project menu", async () => {
     const onProjectSettings = vi.fn();
     const container = document.createElement("div");
