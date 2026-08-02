@@ -169,12 +169,12 @@ const parseGeneratedWorkflow = (message: string): AutoHuntWorkflow => {
   try {
     parsed = JSON.parse(message);
   } catch {
-    throw new Error("Codex가 유효한 워크플로우 JSON을 반환하지 않았습니다.");
+    throw new Error("LLM 프로바이더가 유효한 워크플로우 JSON을 반환하지 않았습니다.");
   }
   const generated = generatedWorkflowSchema.safeParse(parsed);
   if (!generated.success) {
     throw new Error(
-      "Codex가 생성한 워크플로우가 실행 계약을 충족하지 않습니다.",
+      "LLM 프로바이더가 생성한 워크플로우가 실행 계약을 충족하지 않습니다.",
     );
   }
   return normalizeAutoHuntWorkflow(generated.data);

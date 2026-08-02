@@ -5,7 +5,6 @@ mod host;
 #[cfg(target_os = "macos")]
 mod macos_inbox_notifications;
 
-use crate::host::CommandRunner;
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -985,6 +984,27 @@ fn inspect_onboarding_prerequisites_sync(home: &Path) -> OnboardingPrerequisites
         grok,
         opencode,
     }
+}
+
+fn connected_agent_provider(
+    prerequisites: &OnboardingPrerequisites,
+    enabled: AppProviderSettings,
+) -> Result<agent::AgentProviderKind, String> {
+    [
+        (agent::AgentProviderKind::Codex, &prerequisites.codex),
+        (agent::AgentProviderKind::Claude, &prerequisites.claude),
+        (agent::AgentProviderKind::Grok, &prerequisites.grok),
+        (agent::AgentProviderKind::Opencode, &prerequisites.opencode),
+    ]
+    .into_iter()
+    .find_map(|(provider, status)| {
+        (enabled.is_enabled(provider) && status.installed && status.authenticated)
+            .then_some(provider)
+    })
+    .ok_or_else(|| {
+        "연결된 LLM 프로바이더가 없습니다. 앱 설정에서 Codex, Claude, Grok 또는 OpenCode를 연결한 뒤 다시 시도하세요."
+            .to_string()
+    })
 }
 
 fn provider_login_binary_and_args(
@@ -5537,17 +5557,10 @@ async fn connect_local_project(
             }
         }
         install_auto_hunt_assets(&resource_directory, &home)?;
-        let provider = if runner.resolve_binary("codex").is_ok() {
-            agent::AgentProviderKind::Codex
-        } else if runner.resolve_binary("claude").is_ok() {
-            agent::AgentProviderKind::Claude
-        } else if runner.resolve_binary("grok").is_ok() {
-            agent::AgentProviderKind::Grok
-        } else if runner.resolve_binary("opencode").is_ok() {
-            agent::AgentProviderKind::Opencode
-        } else {
-            agent::AgentProviderKind::Codex
-        };
+        let provider = connected_agent_provider(
+            &inspect_onboarding_prerequisites_sync(&home),
+            app_provider_settings_from(&config_path)?,
+        )?;
         write_cli_connection(
             &config_path,
             CliConnectionInput {
@@ -6037,6 +6050,85 @@ pub fn run() {
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn provider_prerequisite(installed: bool, authenticated: bool) -> OnboardingPrerequisiteStatus {
+        OnboardingPrerequisiteStatus {
+            installed,
+            version: installed.then(|| "test-version".to_string()),
+            authenticated,
+        }
+    }
+
+    fn provider_prerequisites(
+        codex: (bool, bool),
+        claude: (bool, bool),
+        grok: (bool, bool),
+        opencode: (bool, bool),
+    ) -> OnboardingPrerequisites {
+        OnboardingPrerequisites {
+            git: provider_prerequisite(true, true),
+            codex: provider_prerequisite(codex.0, codex.1),
+            claude: provider_prerequisite(claude.0, claude.1),
+            grok: provider_prerequisite(grok.0, grok.1),
+            opencode: provider_prerequisite(opencode.0, opencode.1),
+        }
+    }
+
+    #[test]
+    fn selects_an_authenticated_llm_provider_for_repository_analysis() {
+        let prerequisites =
+            provider_prerequisites((true, false), (true, true), (false, false), (false, false));
+
+        assert_eq!(
+            connected_agent_provider(&prerequisites, AppProviderSettings::default())
+                .expect("Claude should be selected"),
+            agent::AgentProviderKind::Claude
+        );
+    }
+
+    #[test]
+    fn skips_authenticated_llm_providers_disabled_in_app_settings() {
+        let prerequisites =
+            provider_prerequisites((true, true), (true, false), (true, true), (true, true));
+
+        assert_eq!(
+            connected_agent_provider(
+                &prerequisites,
+                AppProviderSettings {
+                    codex: false,
+                    claude: true,
+                    grok: true,
+                    opencode: true,
+                },
+            )
+            .expect("Grok should be selected"),
+            agent::AgentProviderKind::Grok
+        );
+    }
+
+    #[test]
+    fn selects_connected_opencode_for_repository_analysis() {
+        let prerequisites =
+            provider_prerequisites((false, false), (false, false), (false, false), (true, true));
+
+        assert_eq!(
+            connected_agent_provider(&prerequisites, AppProviderSettings::default())
+                .expect("OpenCode should be selected"),
+            agent::AgentProviderKind::Opencode
+        );
+    }
+
+    #[test]
+    fn rejects_repository_analysis_without_a_connected_llm_provider() {
+        let prerequisites =
+            provider_prerequisites((true, false), (false, false), (true, false), (false, false));
+
+        assert!(
+            connected_agent_provider(&prerequisites, AppProviderSettings::default())
+                .expect_err("a connected provider should be required")
+                .contains("연결된 LLM 프로바이더가 없습니다")
+        );
+    }
 
     #[test]
     fn discovers_repository_icons_using_t3code_candidate_priority() {
