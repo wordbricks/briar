@@ -19,4 +19,15 @@ describe("D1 migrations", () => {
     expect(Math.max(...triggerCounts)).toBeLessThanOrEqual(1);
     expect(triggerCounts.filter((count) => count === 1)).not.toHaveLength(0);
   });
+
+  it("uses D1 transaction-safe foreign-key deferral for table rebuilds", async () => {
+    const sql = await readFile(
+      resolve("migrations", "0055_agent_provider_opencode.sql"),
+      "utf8",
+    );
+
+    expect(sql).toMatch(/pragma\s+defer_foreign_keys\s*=\s*on\s*;/iu);
+    expect(sql).toMatch(/pragma\s+defer_foreign_keys\s*=\s*off\s*;/iu);
+    expect(sql).not.toMatch(/pragma\s+foreign_keys\s*=/iu);
+  });
 });
