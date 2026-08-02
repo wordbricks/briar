@@ -355,6 +355,10 @@ export function App() {
       briar.dashboard?.project.id !== inboxDetailTarget.projectId,
   );
   const [issueAgents, setIssueAgents] = useState<ProjectAgent[]>([]);
+  const activeProjectAgents = useMemo(
+    () => issueAgents.filter((agent) => agent.projectId === activeProject?.id),
+    [activeProject?.id, issueAgents],
+  );
   useEffect(() => {
     if (!activeProject) {
       setIssueAgents([]);
@@ -367,10 +371,18 @@ export function App() {
       : Promise.resolve(demoProjectAgents(activeProject.id, locale));
     void agents
       .then((loadedAgents) => {
-        if (!cancelled) setIssueAgents(loadedAgents);
+        if (!cancelled) {
+          setIssueAgents((current) => [
+            ...current.filter(
+              (agent) => agent.projectId !== activeProject.id,
+            ),
+            ...loadedAgents,
+          ]);
+        }
       })
       .catch(() => {
-        if (!cancelled) setIssueAgents([]);
+        // Keep previously loaded agents so their running sessions remain
+        // identifiable while another project is active or temporarily offline.
       });
     return () => {
       cancelled = true;
@@ -948,7 +960,7 @@ export function App() {
           />
         ) : (
           <HuntDashboard
-            agents={issueAgents}
+            agents={activeProjectAgents}
             dashboard={briar.dashboard}
             error={quickProcessError ?? briar.error}
             isCreatingIssue={briar.isCreatingIssue}
@@ -1265,7 +1277,7 @@ export function App() {
           </>
         ) : (
           <HuntDashboard
-            agents={issueAgents}
+            agents={activeProjectAgents}
             companionMode
             companionSearchMode={companionPage === "search"}
             companionStatus={companionStatus}

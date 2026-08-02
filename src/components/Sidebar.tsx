@@ -243,26 +243,20 @@ export function Sidebar({
     const agentById = new Map(agents.map((agent) => [agent.id, agent]));
     const grouped = new Map<
       string,
-      Array<{ agent: ProjectAgent; session: AutoHuntSession }>
+      Array<{ agent: ProjectAgent | null; session: AutoHuntSession }>
     >();
 
     for (const project of projects) {
-      const projectAgents = new Map(
-        agents
-          .filter((agent) => agent.projectId === project.id)
-          .map((agent) => [agent.id, agent]),
-      );
       const running = collapseLinkedAutoHuntSessions(
         sessions.filter(
           (session) =>
             session.projectId === project.id &&
             session.status === "running" &&
-            session.agentId &&
-            projectAgents.has(session.agentId),
+            session.agentId,
         ),
       )
         .map((session) => ({
-          agent: agentById.get(session.agentId as string)!,
+          agent: agentById.get(session.agentId as string) ?? null,
           session,
         }))
         .sort(
@@ -707,16 +701,25 @@ export function Sidebar({
                                 title={title}
                                 type="button"
                               >
-                                <ProjectAgentAvatar
-                                  agent={agent}
-                                  isRunning
-                                  token={token}
-                                />
+                                {agent ? (
+                                  <ProjectAgentAvatar
+                                    agent={agent}
+                                    isRunning
+                                    token={token}
+                                  />
+                                ) : (
+                                  <span
+                                    aria-hidden="true"
+                                    className="project-agent-avatar"
+                                  >
+                                    <Bot size={19} />
+                                  </span>
+                                )}
                                 <span>
                                   <strong>{title}</strong>
                                   <small>
                                     <i aria-hidden="true" />
-                                    {agent.name}
+                                    {agent?.name ?? t("agents.title")}
                                   </small>
                                 </span>
                                 <ChevronRight
