@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth";
 import { bearer, deviceAuthorization } from "better-auth/plugins";
+import { isMobileClientId } from "./mobile-contract";
 
 export function createAuth(env: Env, apiOrigin: string) {
   return betterAuth({
@@ -39,8 +40,7 @@ export function createAuth(env: Env, apiOrigin: string) {
       deviceAuthorization({
         verificationUri: `${apiOrigin}/device`,
         validateClient: async (clientId) =>
-          clientId === "briar-mobile" ||
-          clientId === "briar-android" ||
+          isMobileClientId(clientId) ||
           clientId === "briar-desktop" ||
           clientId === "briar-web" ||
           clientId === "briar-cli",
