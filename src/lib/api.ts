@@ -381,6 +381,16 @@ export async function updateAccountProfile(
   return sessionUserSchema.parse(result.user);
 }
 
+export async function deleteAccount(
+  token: string,
+  confirmation: string,
+): Promise<void> {
+  await request<void>("/me", token, {
+    method: "DELETE",
+    body: JSON.stringify({ confirmation }),
+  });
+}
+
 export async function loadProjects(token: string): Promise<Project[]> {
   const result = await request<{ projects: unknown[] }>("/projects", token);
   return z.array(projectSchema).parse(result.projects);

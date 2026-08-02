@@ -824,6 +824,9 @@ export function App() {
             }
             navigationSidebar={unifiedSettingsSidebar}
             onBack={() => (canGoBack ? goBack() : navigateToPage("issues"))}
+            onAccountDelete={
+              briar.demoMode ? undefined : briar.deleteAccount
+            }
             onAccountSave={briar.updateAccountProfile}
             onRefresh={() =>
               activeProject
@@ -1218,6 +1221,7 @@ export function App() {
         ) : companionPage === "settings" ? (
           <CompanionSettings
             onBack={() => setCompanionPage("issues")}
+            onAccountDelete={briar.deleteAccount}
             onAccountSave={briar.updateAccountProfile}
             user={briar.user}
           />

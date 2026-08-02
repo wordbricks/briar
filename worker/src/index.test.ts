@@ -2,6 +2,7 @@ import { createHmac } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import worker, {
   claimConversationJson,
+  accountDeletionInputSchema,
   accountProfileInputSchema,
   eventSchema,
   issueUpdateInputSchema,
@@ -52,6 +53,23 @@ describe("Worker HTTP contract", () => {
         events: [{ sequence: 1, direction: "server", payload: {} }],
       }),
     ).toThrow(/runId and runAttempt/iu);
+  });
+
+  it("requires an email confirmation for account deletion", () => {
+    expect(
+      accountDeletionInputSchema.parse({
+        confirmation: " jay@example.com ",
+      }),
+    ).toEqual({ confirmation: "jay@example.com" });
+    expect(() =>
+      accountDeletionInputSchema.parse({ confirmation: "DELETE" }),
+    ).toThrow();
+    expect(() =>
+      accountDeletionInputSchema.parse({
+        confirmation: "jay@example.com",
+        bypass: true,
+      }),
+    ).toThrow();
   });
 
   it("normalizes and validates account profiles", () => {

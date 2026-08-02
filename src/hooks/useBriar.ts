@@ -12,6 +12,7 @@ import {
   createIssue,
   createIssueMessage,
   createProject,
+  deleteAccount as deleteRemoteAccount,
   deleteIssue as deleteRemoteIssue,
   deleteProject as deleteRemoteProject,
   dispatchHuntRun,
@@ -892,6 +893,29 @@ export function useBriar(options: UseBriarOptions = {}) {
       return nextUser;
     },
     [token, user],
+  );
+
+  const deleteAccount = useCallback(
+    async (confirmation: string) => {
+      if (!token) throw new Error("로그인이 필요합니다.");
+      await deleteRemoteAccount(token, confirmation);
+      await Promise.allSettled(
+        projects.map((project) => disconnectLocalProject(project.id)),
+      );
+      cancelLogin();
+      await clearSessionToken();
+      setToken(null);
+      setUser(null);
+      setProjects([]);
+      setOrganizations([]);
+      setConnectedProjectIds(null);
+      setActiveOrganizationId(null);
+      setDashboard(null);
+      setActiveProjectId(null);
+      setProjectConnection(null);
+      setIsCreatingProject(false);
+    },
+    [cancelLogin, projects, token],
   );
 
   const startProjectCreation = useCallback(() => {
@@ -2602,6 +2626,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       activeProjectId,
     ),
     dashboard,
+    deleteAccount,
     deleteIssue: removeIssue,
     deleteProject: removeProject,
     deletingIssueId,
