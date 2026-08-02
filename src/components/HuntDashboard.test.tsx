@@ -2344,7 +2344,8 @@ describe("HuntDashboard", () => {
       issueDescription: "## 요청\n\n완료 결과를 쉽게 확인할 수 있게 해주세요.",
       resultSummary: "고객이 완료된 작업 결과를 이슈에서 바로 확인할 수 있습니다.",
       structuredResult: {
-        summary: "고객이 완료된 작업 결과와 화면을 이슈에서 바로 확인할 수 있습니다. 주요 흐름도 정상 동작하는지 확인했습니다.",
+        summary:
+          "## 변경 결과\n\n- **결과 요약**을 이슈에서 바로 확인할 수 있습니다.\n- 주요 흐름을 검증했습니다.\n\n<script>alert('unsafe')</script>",
         outcome: "completed" as const,
         importance: "important" as const,
         urgency: "normal" as const,
@@ -2375,7 +2376,12 @@ describe("HuntDashboard", () => {
 
     expect(markup).toContain('class="completed-issue-card"');
     expect(markup).toContain("작업 결과");
-    expect(markup).toContain(completedRun.structuredResult.summary);
+    expect(markup).toContain('class="completed-issue-summary"');
+    expect(markup).toContain("<h2>변경 결과</h2>");
+    expect(markup).toContain("<ul>");
+    expect(markup).toContain("<strong>결과 요약</strong>");
+    expect(markup).not.toContain("<script>");
+    expect(markup).not.toContain("unsafe");
     expect(markup).toContain("증빙 자세히 보기");
     expect(markup).toContain('aria-selected="true"');
     expect(markup).toContain('class="run-result-panel"');

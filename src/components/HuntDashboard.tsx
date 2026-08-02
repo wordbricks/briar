@@ -3374,10 +3374,17 @@ export function RunPage({
                               {t("run.revision", { count: run.currentRevision })}
                             </small>
                           </div>
-                          <p>{completionSummary}</p>
+                          <div className="completed-issue-summary">
+                            <ReactMarkdown
+                              remarkPlugins={[remarkGfm]}
+                              skipHtml
+                            >
+                              {completionSummary}
+                            </ReactMarkdown>
+                          </div>
                           {run.structuredResult?.humanActionRequired &&
                           run.structuredResult.nextAction ? (
-                            <div>
+                            <div className="completed-issue-next-action">
                               <strong>{t("run.resultNextAction")}</strong>
                               <span>{run.structuredResult.nextAction}</span>
                             </div>

@@ -86,6 +86,11 @@ describe("detached Agent runner", () => {
     expect(prompt).toContain("relevant selection or decision criteria");
     expect(prompt).toContain("Adapt the explanation to the work performed");
     expect(prompt).toContain("fallback, recovery, or cleanup");
+    expect(prompt).toContain("standalone Markdown explanation");
+    expect(prompt).toContain("short `##` section headings");
+    expect(prompt).toContain("bullet points under each section");
+    expect(prompt).toContain("`**bold**` emphasis");
+    expect(prompt).toContain("Do not return one uninterrupted block of prose");
     expect(prompt).toContain("never invent them");
     expect(prompt).toContain("briar run evidence add --image");
     expect(prompt).toContain("issue detail page");

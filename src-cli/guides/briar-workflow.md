@@ -284,12 +284,15 @@ for a PM or CEO who may not know the codebase:
   4. **Verification and limits:** what behavior was verified and any important remaining
      limitation or risk. Do not claim a production outcome that was not observed.
 - Use the issue's language and explain any necessary technical term on first use.
+- Format the summary as Markdown for quick scanning: use short `##` section headings in
+  problem → implementation → outcome → verification order, bullet points under each
+  section, and `**bold**` emphasis for the most consequential facts. Do not return one
+  uninterrupted block of prose or bold entire paragraphs.
 - Include meaningful implementation decisions in the summary, while keeping commands, file
   paths, test internals, raw errors, and incidental low-level detail in evidence or status
   detail.
-- Prefer a few readable paragraphs in problem → implementation → outcome → verification
-  order. Do not merely list files changed, say that work was completed, or use generic claims
-  such as "processing was improved" or "the change was verified."
+- Do not merely list files changed, say that work was completed, or use generic claims such
+  as "processing was improved" or "the change was verified."
 
 Choose details by consequence, not by technology. A data change should explain what data is
 affected and its lifecycle; an interface change should explain the changed user flow and
