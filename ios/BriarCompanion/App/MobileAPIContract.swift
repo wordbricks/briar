@@ -11,6 +11,14 @@ enum MobileAPIContract {
         static let deviceToken = "/api/auth/device/token"
         static let currentUser = "/me"
         static let projects = "/projects"
+
+        static func dashboard(projectID: UUID) -> String {
+            "/projects/\(projectID.uuidString.lowercased())/dashboard"
+        }
+
+        static func dashboardDelta(projectID: UUID, cursor: Int) -> String {
+            "\(dashboard(projectID: projectID))/delta?cursor=\(cursor)"
+        }
     }
 }
 
@@ -138,10 +146,27 @@ struct ProjectsResponse: Codable, Equatable, Sendable {
 
 enum MobileAPIError: Error, Equatable {
     case invalidResponse
-    case httpStatus(Int)
+    case httpStatus(Int, String)
+    case invalidRequest
+    case invalidDownload
+
+    var statusCode: Int? {
+        guard case let .httpStatus(status, _) = self else { return nil }
+        return status
+    }
 }
 
-struct MobileAPIClient: Sendable {
+protocol MobileAPIClientProtocol: Sendable {
+    func send<Response: Decodable & Sendable>(
+        _ path: String,
+        method: String,
+        token: String?,
+        body: (any Encodable & Sendable)?,
+        as responseType: Response.Type
+    ) async throws -> Response
+}
+
+struct MobileAPIClient: MobileAPIClientProtocol, Sendable {
     let baseURL: URL
     let session: URLSession
 
@@ -155,24 +180,176 @@ struct MobileAPIClient: Sendable {
         token: String? = nil,
         as responseType: Response.Type = Response.self
     ) async throws -> Response {
-        let url = baseURL.appending(
-            path: path.trimmingCharacters(
-                in: CharacterSet(charactersIn: "/")
-            )
-        )
+        try await send(path, method: "GET", token: token, body: nil, as: responseType)
+    }
+
+    func post<Body: Encodable & Sendable, Response: Decodable & Sendable>(
+        _ path: String,
+        body: Body,
+        token: String? = nil,
+        as responseType: Response.Type = Response.self
+    ) async throws -> Response {
+        try await send(path, method: "POST", token: token, body: body, as: responseType)
+    }
+
+    func send<Response: Decodable & Sendable>(
+        _ path: String,
+        method: String,
+        token: String?,
+        body: (any Encodable & Sendable)?,
+        as responseType: Response.Type = Response.self
+    ) async throws -> Response {
+        guard let url = endpointURL(path) else { throw MobileAPIError.invalidRequest }
         var request = URLRequest(url: url)
+        request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if let token {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
+        if let body {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONEncoder.mobileContract.encode(AnyEncodable(body))
+        }
         let (data, response) = try await session.data(for: request)
+        try validate(response: response, data: data)
+        return try JSONDecoder.mobileContract.decode(responseType, from: data)
+    }
+
+    func upload<Response: Decodable & Sendable>(
+        _ path: String,
+        fields: [String: String],
+        files: [MultipartFile],
+        token: String,
+        as responseType: Response.Type = Response.self
+    ) async throws -> Response {
+        guard let url = endpointURL(path) else { throw MobileAPIError.invalidRequest }
+        let boundary = "BriarBoundary-\(UUID().uuidString)"
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.httpBody = MultipartEncoder.encode(fields: fields, files: files, boundary: boundary)
+        let (data, response) = try await session.data(for: request)
+        try validate(response: response, data: data)
+        return try JSONDecoder.mobileContract.decode(responseType, from: data)
+    }
+
+    func download(_ path: String, token: String, to destination: URL) async throws -> URL {
+        guard let url = endpointURL(path) else { throw MobileAPIError.invalidRequest }
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (temporaryURL, response) = try await session.download(for: request)
+        try validate(response: response, data: Data())
+        let fileManager = FileManager.default
+        try fileManager.createDirectory(
+            at: destination.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        if fileManager.fileExists(atPath: destination.path) {
+            _ = try fileManager.replaceItemAt(destination, withItemAt: temporaryURL)
+        } else {
+            try fileManager.moveItem(at: temporaryURL, to: destination)
+        }
+        guard fileManager.fileExists(atPath: destination.path) else {
+            throw MobileAPIError.invalidDownload
+        }
+        return destination
+    }
+
+    private func endpointURL(_ path: String) -> URL? {
+        guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else {
+            return nil
+        }
+        let parts = path.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
+        let basePath = components.path.hasSuffix("/") ? String(components.path.dropLast()) : components.path
+        components.path = basePath + "/" + parts[0].trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        components.percentEncodedQuery = parts.count == 2 ? String(parts[1]) : nil
+        return components.url
+    }
+
+    private func validate(response: URLResponse, data: Data) throws {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw MobileAPIError.invalidResponse
         }
         guard (200..<300).contains(httpResponse.statusCode) else {
-            throw MobileAPIError.httpStatus(httpResponse.statusCode)
+            let error = try? JSONDecoder.mobileContract.decode(APIErrorResponse.self, from: data)
+            throw MobileAPIError.httpStatus(
+                httpResponse.statusCode,
+                error?.error ?? error?.message ?? error?.errorDescription ??
+                    HTTPURLResponse.localizedString(forStatusCode: httpResponse.statusCode)
+            )
         }
-        return try JSONDecoder.mobileContract.decode(responseType, from: data)
+    }
+}
+
+private struct AnyEncodable: Encodable {
+    private let encodeValue: (Encoder) throws -> Void
+
+    init(_ value: any Encodable) {
+        encodeValue = { encoder in try value.encode(to: encoder) }
+    }
+
+    func encode(to encoder: Encoder) throws { try encodeValue(encoder) }
+}
+
+private struct APIErrorResponse: Decodable {
+    let error: String?
+    let message: String?
+    let errorDescription: String?
+
+    enum CodingKeys: String, CodingKey {
+        case error
+        case message
+        case errorDescription = "error_description"
+    }
+}
+
+struct MultipartFile: Sendable {
+    let fieldName: String
+    let filename: String
+    let contentType: String
+    let data: Data
+}
+
+private enum MultipartEncoder {
+    static func encode(
+        fields: [String: String],
+        files: [MultipartFile],
+        boundary: String
+    ) -> Data {
+        var data = Data()
+        for key in fields.keys.sorted() {
+            data.append("--\(boundary)\r\n")
+            data.append("Content-Disposition: form-data; name=\"\(quoted(key))\"\r\n\r\n")
+            data.append("\(fields[key] ?? "")\r\n")
+        }
+        for file in files {
+            data.append("--\(boundary)\r\n")
+            data.append("Content-Disposition: form-data; name=\"\(quoted(file.fieldName))\"; filename=\"\(quoted(file.filename))\"\r\n")
+            let contentType = file.contentType.contains("\r") || file.contentType.contains("\n")
+                ? "application/octet-stream"
+                : file.contentType
+            data.append("Content-Type: \(contentType)\r\n\r\n")
+            data.append(file.data)
+            data.append("\r\n")
+        }
+        data.append("--\(boundary)--\r\n")
+        return data
+    }
+
+    private static func quoted(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+            .replacingOccurrences(of: "\r", with: "_")
+            .replacingOccurrences(of: "\n", with: "_")
+    }
+}
+
+private extension Data {
+    mutating func append(_ string: String) {
+        append(Data(string.utf8))
     }
 }
 
@@ -181,5 +358,13 @@ extension JSONDecoder {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return decoder
+    }
+}
+
+extension JSONEncoder {
+    static var mobileContract: JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        return encoder
     }
 }

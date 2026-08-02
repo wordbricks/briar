@@ -68,6 +68,45 @@ export const mobileProjectsResponseSchema = z.object({
   })),
 });
 
+export const mobileDashboardRunSchema = z.object({
+  id: z.uuid(),
+  title: z.string(),
+  status: z.enum([
+    "backlog",
+    "queued",
+    "running",
+    "blocked",
+    "failed",
+    "completed",
+    "cancelled",
+  ]),
+  detail: z.string().nullable().optional(),
+  updatedAt: z.iso.datetime(),
+});
+
+const mobileDashboardProjectSchema = mobileProjectsResponseSchema.shape.projects.element;
+
+export const mobileDashboardSnapshotSchema = z.object({
+  project: mobileDashboardProjectSchema,
+  runs: z.array(mobileDashboardRunSchema),
+  cursor: z.number().int().nonnegative().optional(),
+  generatedAt: z.iso.datetime(),
+});
+
+export const mobileDashboardDeltaSchema = z.object({
+  cursor: z.number().int().nonnegative(),
+  hasMore: z.boolean(),
+  runs: z.array(mobileDashboardRunSchema),
+  deletedRunIds: z.array(z.uuid()),
+  project: mobileDashboardProjectSchema.optional(),
+  generatedAt: z.iso.datetime(),
+});
+
+export const mobileDashboardCursorExpiredSchema = z.object({
+  code: z.literal("dashboard_cursor_expired"),
+  message: z.string(),
+});
+
 export const mobileOperationSchemas = {
   getHealth: { response: mobileHealthResponseSchema },
   beginDeviceAuthorization: {
@@ -81,6 +120,11 @@ export const mobileOperationSchemas = {
   },
   getCurrentUser: { response: mobileCurrentUserResponseSchema },
   listProjects: { response: mobileProjectsResponseSchema },
+  getDashboardSnapshot: { response: mobileDashboardSnapshotSchema },
+  getDashboardDelta: {
+    response: mobileDashboardDeltaSchema,
+    errorResponse: mobileDashboardCursorExpiredSchema,
+  },
 } as const;
 
 export function isMobileClientId(value: string) {

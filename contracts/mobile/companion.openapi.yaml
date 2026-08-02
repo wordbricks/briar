@@ -78,6 +78,43 @@
           "401": { "$ref": "#/components/responses/Error" }
         }
       }
+    },
+    "/projects/{projectId}/dashboard": {
+      "get": {
+        "operationId": "getDashboardSnapshot",
+        "parameters": [{ "$ref": "#/components/parameters/ProjectId" }],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Current project dashboard and synchronization cursor",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DashboardSnapshot" } } }
+          },
+          "401": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/projects/{projectId}/dashboard/delta": {
+      "get": {
+        "operationId": "getDashboardDelta",
+        "parameters": [
+          { "$ref": "#/components/parameters/ProjectId" },
+          { "name": "cursor", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 0 } }
+        ],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Dashboard changes after the supplied cursor",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DashboardDelta" } } }
+          },
+          "401": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" },
+          "410": {
+            "description": "Cursor retention window expired; request a new snapshot",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CursorExpiredError" } } }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -88,6 +125,14 @@
       "Error": {
         "description": "Request failed",
         "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+      }
+    },
+    "parameters": {
+      "ProjectId": {
+        "name": "projectId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
       }
     },
     "schemas": {
@@ -190,6 +235,51 @@
         "type": "object",
         "required": ["projects"],
         "properties": { "projects": { "type": "array", "items": { "$ref": "#/components/schemas/Project" } } },
+        "additionalProperties": true
+      },
+      "DashboardRun": {
+        "type": "object",
+        "required": ["id", "title", "status", "updatedAt"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "title": { "type": "string" },
+          "status": { "type": "string", "enum": ["backlog", "queued", "running", "blocked", "failed", "completed", "cancelled"] },
+          "detail": { "type": ["string", "null"] },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        },
+        "additionalProperties": true
+      },
+      "DashboardSnapshot": {
+        "type": "object",
+        "required": ["project", "runs", "generatedAt"],
+        "properties": {
+          "project": { "$ref": "#/components/schemas/Project" },
+          "runs": { "type": "array", "items": { "$ref": "#/components/schemas/DashboardRun" } },
+          "cursor": { "type": "integer", "minimum": 0 },
+          "generatedAt": { "type": "string", "format": "date-time" }
+        },
+        "additionalProperties": true
+      },
+      "DashboardDelta": {
+        "type": "object",
+        "required": ["cursor", "hasMore", "runs", "deletedRunIds", "generatedAt"],
+        "properties": {
+          "cursor": { "type": "integer", "minimum": 0 },
+          "hasMore": { "type": "boolean" },
+          "runs": { "type": "array", "items": { "$ref": "#/components/schemas/DashboardRun" } },
+          "deletedRunIds": { "type": "array", "items": { "type": "string", "format": "uuid" } },
+          "project": { "$ref": "#/components/schemas/Project" },
+          "generatedAt": { "type": "string", "format": "date-time" }
+        },
+        "additionalProperties": true
+      },
+      "CursorExpiredError": {
+        "type": "object",
+        "required": ["code", "message"],
+        "properties": {
+          "code": { "const": "dashboard_cursor_expired" },
+          "message": { "type": "string" }
+        },
         "additionalProperties": true
       },
       "ErrorResponse": {
