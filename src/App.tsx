@@ -989,6 +989,9 @@ export function App() {
               resetNavigation("issues");
             }}
             onRegenerateWorkflow={() => briar.regenerateWorkflow(activeProject.id)}
+            onAnalyzeWorkflowRequirements={() =>
+              briar.analyzeWorkflowRequirements(activeProject.id)
+            }
             onReviseWorkflow={(requestedChange) =>
               briar.reviseWorkflow(activeProject.id, requestedChange)
             }
