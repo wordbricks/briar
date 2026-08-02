@@ -1,7 +1,9 @@
 -- Expand every persisted agent-provider constraint to include OpenCode.
 -- SQLite cannot alter CHECK constraints in place, so rebuild affected tables.
 
-pragma foreign_keys = off;
+-- D1 runs migrations inside an implicit transaction, so foreign_keys cannot
+-- be changed here. Defer validation while the related tables are rebuilt.
+pragma defer_foreign_keys = on;
 
 -- Triggers attached to other tables keep references to the tables rebuilt
 -- below. Remove them first so SQLite never has to validate a temporarily
@@ -538,4 +540,4 @@ after delete on briar_issue_result_reviews BEGIN
   on conflict (project_id) do update set current_version = excluded.current_version;
 END;
 
-pragma foreign_keys = on;
+pragma defer_foreign_keys = off;
