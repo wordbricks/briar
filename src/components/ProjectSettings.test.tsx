@@ -64,9 +64,50 @@ describe("ProjectSettings", () => {
             settings: {
               ...demoDashboard.settings,
               githubRepository: null,
+              workflow: {
+                ...demoDashboard.settings.workflow,
+                requirements: [{
+                  id: "bun",
+                  label: "Bun",
+                  kind: "executable",
+                  tool: "bun",
+                  reason: "Runs repository validation.",
+                }],
+              },
             },
           }}
           githubRepository="wordbricks/briar"
+          health={{
+            projectId: "project-1",
+            healthy: true,
+            repositoryPath: "/repo",
+            repositoryRemote: null,
+            repositoryHealthy: true,
+            cliPath: "/bin/briar",
+            cliInstalled: true,
+            cliVersion: "1.0.0",
+            cliExpectedVersion: "1.0.0",
+            cliCurrent: true,
+            skillPath: "/skills/briar-workflow",
+            skillInstalled: true,
+            skillVersion: "1.0.0",
+            skillExpectedVersion: "1.0.0",
+            skillCurrent: true,
+            velenOrg: null,
+            velenAuthenticated: false,
+            velenEmail: null,
+            velenHealthy: true,
+            requirements: [{
+              id: "bun",
+              label: "Bun",
+              kind: "executable",
+              tool: "bun",
+              reason: "Runs repository validation.",
+              healthy: true,
+              detail: "/usr/local/bin/bun",
+            }],
+            issues: [],
+          }}
           isDeleting={false}
           isSidebarOpen
           onBack={() => undefined}
@@ -147,6 +188,12 @@ describe("ProjectSettings", () => {
     );
     expect(container.querySelector(".project-workflow-contract")?.textContent).toContain(
       "bun run test",
+    );
+    expect(container.querySelector(".project-workflow-requirements")?.textContent).toContain(
+      "Bun",
+    );
+    expect(container.querySelector(".project-workflow-requirements")?.textContent).toContain(
+      "정상",
     );
     expect(container.querySelector(".project-workflow-contract")?.textContent).toContain(
       "실행 종료 단계Local validation",

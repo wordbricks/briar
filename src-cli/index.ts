@@ -11,6 +11,7 @@ import packageJson from "../package.json";
 import {
   autoHuntEvidenceTypeMaxLength,
   autoHuntEvidenceTypePattern,
+  autoHuntRequirementKinds,
   autoHuntRunStatuses,
   autoHuntSources,
   normalizeAutoHuntWorkflow,
@@ -79,6 +80,19 @@ const evidenceTypeSchema = z
 const workflowConfigSchema = z
   .object({
     version: z.literal(1),
+    requirements: z
+      .array(
+        z
+          .object({
+            id: workflowStageIdSchema,
+            label: z.string().min(1),
+            kind: z.enum(autoHuntRequirementKinds),
+            tool: z.string().regex(/^[a-zA-Z0-9_.+-]+$/u),
+            reason: z.string().min(1),
+          })
+          .strict(),
+      )
+      .optional(),
     stages: z.array(
       z.object({
         id: workflowStageIdSchema,
