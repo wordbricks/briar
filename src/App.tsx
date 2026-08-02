@@ -10,9 +10,10 @@ import {
 import { CompanionEmptyState, CompanionHeader } from "./components/CompanionHeader";
 import { CompanionSettings } from "./components/CompanionSettings";
 import { ConnectionHealth } from "./components/ConnectionHealth";
-import { HuntDashboard } from "./components/HuntDashboard";
+import { HuntDashboard, RunPage } from "./components/HuntDashboard";
 import { WorkerDispatchDialog } from "./components/WorkerDispatchDialog";
 import { Inbox } from "./components/Inbox";
+import { InboxDetailPanel } from "./components/InboxDetailPanel";
 import { InitialOnboarding } from "./components/InitialOnboarding";
 import { LaunchIntro } from "./components/LaunchIntro";
 import { LoginScreen } from "./components/LoginScreen";
@@ -204,6 +205,8 @@ export function App() {
     useState<IssueLinkTarget | null>(null);
   const [pendingInboxNotificationTarget, setPendingInboxNotificationTarget] =
     useState<InboxNotificationTarget | null>(null);
+  const [inboxDetailTarget, setInboxDetailTarget] =
+    useState<InboxNotificationTarget | null>(null);
   useInboxNotificationClicks(setPendingInboxNotificationTarget);
   const [requestedRunId, setRequestedRunId] = useState<string | null>(null);
   const [issueListRequestKey, setIssueListRequestKey] = useState(0);
@@ -329,6 +332,28 @@ export function App() {
         (session) => session.id === requestedSessionId,
       ) ?? null
     : null;
+  const inboxDetailRun =
+    inboxDetailTarget && inboxDetailTarget.kind !== "session"
+      ? briar.dashboard?.runs.find(
+          (run) => run.id === inboxDetailTarget.targetId,
+        ) ?? null
+      : null;
+  const inboxDetailSession =
+    inboxDetailTarget?.kind === "session"
+      ? autoHunt.sessions.find(
+          (session) => session.id === inboxDetailTarget.targetId,
+        ) ?? null
+      : null;
+  const inboxDetailLabel = inboxDetailRun?.title ?? (inboxDetailTarget
+    ? inbox.messages.find(
+        (message) => message.id === inboxDetailTarget.messageId,
+      )?.title ?? t("inbox.messages")
+    : t("inbox.messages"));
+  const isInboxDetailLoading = Boolean(
+    inboxDetailTarget &&
+      inboxDetailTarget.kind !== "session" &&
+      briar.dashboard?.project.id !== inboxDetailTarget.projectId,
+  );
   const [issueAgents, setIssueAgents] = useState<ProjectAgent[]>([]);
   useEffect(() => {
     if (!activeProject) {
@@ -820,10 +845,14 @@ export function App() {
             messages={inbox.messages}
             onMarkAllRead={inbox.markAllRead}
             onMarkRead={inbox.markRead}
-            onOpen={(message) =>
-              setPendingInboxNotificationTarget(
-                inboxNotificationTarget(message),
-              )}
+            onOpen={(message) => {
+              const target = inboxNotificationTarget(message);
+              inbox.markRead(message.id);
+              if (target.projectId !== briar.activeProjectId) {
+                briar.setActiveProjectId(target.projectId);
+              }
+              setInboxDetailTarget(target);
+            }}
             projects={activeOrganizationProjects}
             unreadCount={inbox.unreadCount}
           />
@@ -957,6 +986,119 @@ export function App() {
             token={briar.token}
           />
           )}
+          {inboxDetailTarget ? (
+            <InboxDetailPanel
+              label={inboxDetailLabel}
+              onClose={() => setInboxDetailTarget(null)}
+            >
+              {inboxDetailRun ? (
+                <RunPage
+                  availableProviders={
+                    briar.dashboard?.organizationProviders?.length
+                      ? briar.dashboard.organizationProviders
+                      : [
+                          ...new Set(
+                            (briar.dashboard?.workers ?? []).flatMap(
+                              (worker) => worker.providers ?? [],
+                            ),
+                          ),
+                        ]
+                  }
+                  availableRuns={briar.dashboard?.runs ?? []}
+                  error={briar.recoveryError}
+                  isDeletingIssue={
+                    briar.deletingIssueId === inboxDetailRun.id
+                  }
+                  isProcessing={processingIssueIds.has(inboxDetailRun.id)}
+                  isRecovering={briar.recoveringRunId === inboxDetailRun.id}
+                  isSidebarOpen
+                  isUpdatingIssue={
+                    briar.updatingIssueId === inboxDetailRun.id
+                  }
+                  mentionMembers={briar.dashboard?.members ?? []}
+                  onAddDependency={(prerequisiteRunId) =>
+                    briar.addIssueDependency(
+                      inboxDetailRun.id,
+                      prerequisiteRunId,
+                    )}
+                  onBack={() => setInboxDetailTarget(null)}
+                  onCancel={() => briar.cancelRun(inboxDetailRun.id)}
+                  onDelete={async () => {
+                    await briar.deleteIssue(inboxDetailRun.id);
+                    setInboxDetailTarget(null);
+                  }}
+                  onDependencyOpen={(runId) =>
+                    setInboxDetailTarget((current) =>
+                      current ? { ...current, targetId: runId } : current
+                    )}
+                  onLoadAttachment={briar.readIssueAttachment}
+                  onLoadIssueMessages={() =>
+                    briar.readIssueMessages(inboxDetailRun.id)}
+                  onLoadRunEvents={() =>
+                    briar.readRunEvents(inboxDetailRun.id)}
+                  onLoadRunEvidence={() =>
+                    briar.readRunEvidence(inboxDetailRun.id)}
+                  onLoadRunEvidenceImage={briar.readRunEvidenceImage}
+                  onMove={(placement) =>
+                    briar.moveRun(inboxDetailRun.id, placement)}
+                  onProcessNow={() => {
+                    setInboxDetailTarget(null);
+                    processIssueNow(inboxDetailRun);
+                  }}
+                  onRemoveDependency={(prerequisiteRunId) =>
+                    briar.removeIssueDependency(
+                      inboxDetailRun.id,
+                      prerequisiteRunId,
+                    )}
+                  onRetry={() => briar.retryRun(inboxDetailRun.id)}
+                  onSendIssueMessage={(input) =>
+                    sendIssueMessage(inboxDetailRun.id, input)}
+                  onUpdateIssue={(input) =>
+                    briar.editIssue(inboxDetailRun.id, input)}
+                  onUpdateIssuePreferences={(input) =>
+                    briar.editIssueExecutionPreferences(
+                      inboxDetailRun.id,
+                      input,
+                    )}
+                  performedAgentName={
+                    issueAgents.find(
+                      (agent) => agent.id === inboxDetailRun.agentId,
+                    )?.name ?? null
+                  }
+                  projectId={inboxDetailTarget.projectId}
+                  run={inboxDetailRun}
+                />
+              ) : inboxDetailSession ? (
+                <ProjectAgentSessionDetail
+                  isSidebarOpen
+                  onBack={() => setInboxDetailTarget(null)}
+                  onIssueOpen={(runId) =>
+                    setInboxDetailTarget((current) =>
+                      current
+                        ? { ...current, kind: "issue", targetId: runId }
+                        : current
+                    )}
+                  onStop={() => autoHunt.stopSession(inboxDetailSession.id)}
+                  session={inboxDetailSession}
+                  token={briar.token}
+                />
+              ) : isInboxDetailLoading ? (
+                <div className="inbox-detail-loading" role="status">
+                  {t("inbox.detailLoading")}
+                </div>
+              ) : (
+                <div className="inbox-detail-unavailable" role="alert">
+                  <strong>{t("run.loadFailed")}</strong>
+                  <button
+                    onClick={() => setInboxDetailTarget(null)}
+                    type="button"
+                  >
+                    {t("common.close")}
+                  </button>
+                </div>
+              )}
+            </InboxDetailPanel>
+          ) : null}
         </div>
         <div className="app-status-bar">
           <AgentUsageStatusBar
