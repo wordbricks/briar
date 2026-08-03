@@ -79,6 +79,8 @@ describe("detached Agent runner", () => {
     expect(prompt).toContain("nontechnical PM or CEO");
     expect(prompt).toContain("observable completion condition");
     expect(prompt).toContain("available under View details");
+    expect(prompt).toContain("absolute path in `$BRIAR_CLI`");
+    expect(prompt).toContain("instead of the bare `briar` command");
     expect(prompt).toContain("structured blocked result");
     expect(prompt).toContain("original problem and the specific data");
     expect(prompt).toContain("key implementation approach");

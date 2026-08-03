@@ -11,6 +11,8 @@ import {
   serviceDefinition,
   serviceLabel,
   systemdUnit,
+  workerCliPath,
+  workerExecutionPath,
   workerLogPath,
   type ClaimedIssue,
   type WorkerLoopDependencies,
@@ -437,6 +439,10 @@ describe("worker service definitions", () => {
     expect(definition.contents).toContain("<key>RunAtLoad</key>");
     expect(definition.contents).toContain("<key>EnvironmentVariables</key>");
     expect(definition.contents).toContain("<key>PATH</key>");
+    expect(definition.contents).toContain("<key>BRIAR_CLI</key>");
+    expect(definition.contents).toContain(
+      "<string>/Users/dev/.local/bin/briar</string>",
+    );
     expect(definition.contents).toContain(
       "<string>/Users/dev/.local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>",
     );
@@ -463,7 +469,7 @@ describe("worker service definitions", () => {
     expect(definition.contents).toContain(
       "<string>/Users/dev/.local/share/briar/briar.js</string>",
     );
-    expect(definition.contents).not.toContain(
+    expect(definition.contents).toContain(
       "<string>/Users/dev/.local/bin/briar</string>",
     );
   });
@@ -488,6 +494,25 @@ describe("worker service definitions", () => {
         process.env.PATH = previousPath;
       }
     }
+  });
+
+  it("keeps the user CLI ahead of the desktop app bundle", () => {
+    const environmentPath = workerExecutionPath(
+      "/Applications/Briar.app/Contents/MacOS:/Users/dev/.local/bin:/usr/bin",
+      "/Users/dev",
+    );
+    expect(environmentPath).toBe(
+      "/Users/dev/.local/bin:/Applications/Briar.app/Contents/MacOS:/usr/bin",
+    );
+    expect(
+      workerCliPath(
+        "/Users/dev",
+        "/Applications/Briar.app/Contents/MacOS/briar",
+      ),
+    ).toBe("/Users/dev/.local/bin/briar");
+    expect(workerCliPath("/Users/dev", "briar")).toBe(
+      "/Users/dev/.local/bin/briar",
+    );
   });
 
   it("requires the packaged runtime and CLI script together", () => {
@@ -515,7 +540,7 @@ describe("worker service definitions", () => {
       "<string>/Users/dev/&lt;briar&gt;/briar.js</string>",
     );
     expect(definition.contents).toContain(
-      "<string>/Users/dev/bin&amp;tools:/usr/bin</string>",
+      "<string>/Users/dev/.local/bin:/Users/dev/bin&amp;tools:/usr/bin</string>",
     );
   });
 
