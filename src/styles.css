@@ -3003,6 +3003,10 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .project-agent-settings-card-icon { width:46px; height:46px; flex:0 0 46px; display:grid; place-items:center; border:1px solid var(--border); border-radius:12px; color:var(--muted-foreground); background:var(--muted); }
 .project-agent-settings-fields { margin-top:20px; display:grid; gap:17px; }
 .project-agent-settings-field { min-width:0; display:grid; gap:7px; }
+.project-agent-settings-runtime-heading { margin-top:3px; padding-top:17px; display:flex; align-items:flex-start; gap:9px; border-top:1px solid var(--border); color:var(--muted-foreground); }
+.project-agent-settings-runtime-heading > span { min-width:0; display:grid; gap:3px; }
+.project-agent-settings-runtime-heading strong { color:var(--foreground); }
+.project-agent-settings-runtime-heading svg { margin-top:2px; flex:0 0 auto; }
 .project-agent-avatar-field { min-width:0; display:grid; gap:7px; color:var(--foreground); font-size:var(--text-2xs); font-weight:600; }
 .project-agent-avatar-field > div { min-width:0; display:flex; align-items:center; gap:14px; }
 .project-agent-avatar-preview { width:72px; height:72px; flex:0 0 72px; overflow:hidden; display:grid; place-items:center; border:1px solid var(--border); border-radius:12px; color:var(--muted-foreground); background:var(--muted); }

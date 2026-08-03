@@ -3,6 +3,7 @@ import {
   Bot,
   Check,
   CircleAlert,
+  Cpu,
   ImagePlus,
   LoaderCircle,
   Save,
@@ -11,12 +12,18 @@ import {
 import { useState } from "react";
 import { useI18n } from "../i18n";
 import {
+  agentModels,
+  agentProviders,
+  type AgentProvider,
+} from "../lib/project-llm";
+import {
   projectAgentAvatarAccept,
   projectAgentAvatarFromFile,
 } from "../lib/project-agent-avatar";
 import { projectAgentAvatarFromCodexPet } from "../lib/codex-pets";
 import type { Project, ProjectAgent, UpdateProjectAgentInput } from "../types";
 import { CodexPetAttribution, CodexPetPicker } from "./CodexPetPicker";
+import { NativeSelect } from "./NativeSelect";
 import {
   ErrorBanner,
   MainContent,
@@ -35,6 +42,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Typography } from "@/components/ui/typography";
+
+const providerLabels: Record<AgentProvider, string> = {
+  codex: "Codex",
+  claude: "Claude",
+  grok: "Grok",
+  opencode: "OpenCode",
+};
 
 export function ProjectAgentSettings({
   agent,
@@ -57,12 +71,16 @@ export function ProjectAgentSettings({
   const [name, setName] = useState(agent.name);
   const [avatar, setAvatar] = useState(agent.avatar);
   const [codexPet, setCodexPet] = useState(agent.codexPet);
+  const [provider, setProvider] = useState<AgentProvider>(agent.provider);
+  const [model, setModel] = useState(agent.model ?? "");
   const [responsibility, setResponsibility] = useState(agent.responsibility);
   const [calendarColor, setCalendarColor] = useState(agent.calendarColor);
   const [savedProfile, setSavedProfile] = useState({
     name: agent.name,
     avatar: agent.avatar,
     codexPet: agent.codexPet,
+    provider: agent.provider,
+    model: agent.model ?? "",
     responsibility: agent.responsibility,
     calendarColor: agent.calendarColor,
   });
@@ -77,8 +95,13 @@ export function ProjectAgentSettings({
     name !== savedProfile.name ||
     avatar !== savedProfile.avatar ||
     codexPet?.slug !== savedProfile.codexPet?.slug ||
+    provider !== savedProfile.provider ||
+    model !== savedProfile.model ||
     responsibility !== savedProfile.responsibility ||
     calendarColor !== savedProfile.calendarColor;
+  const selectedModelKnown = agentModels[provider].some(
+    (option) => option.value === model,
+  );
 
   const saveProfile = async () => {
     if (!responsibility.trim() || profileSaving) return;
@@ -89,8 +112,8 @@ export function ProjectAgentSettings({
         name: name.trim() || null,
         avatar,
         codexPet,
-        provider: agent.provider,
-        model: agent.model,
+        provider,
+        model: model || null,
         responsibility: responsibility.trim(),
         calendarColor,
       });
@@ -98,12 +121,16 @@ export function ProjectAgentSettings({
         name: saved.name,
         avatar: saved.avatar,
         codexPet: saved.codexPet,
+        provider: saved.provider,
+        model: saved.model ?? "",
         responsibility: saved.responsibility,
         calendarColor: saved.calendarColor,
       };
       setName(nextProfile.name);
       setAvatar(nextProfile.avatar);
       setCodexPet(nextProfile.codexPet);
+      setProvider(nextProfile.provider);
+      setModel(nextProfile.model);
       setResponsibility(nextProfile.responsibility);
       setCalendarColor(nextProfile.calendarColor);
       setSavedProfile(nextProfile);
@@ -317,6 +344,56 @@ export function ProjectAgentSettings({
                     placeholder={t("agents.namePlaceholder")}
                     value={name}
                   />
+                </div>
+                <div className="project-agent-settings-runtime-heading">
+                  <Cpu aria-hidden="true" size={15} />
+                  <span>
+                    <Typography as="strong" variant="bodySm">
+                      {t("agents.executionTitle")}
+                    </Typography>
+                    <Typography as="small" tone="muted" variant="caption">
+                      {t("agents.executionDescription")}
+                    </Typography>
+                  </span>
+                </div>
+                <div className="project-agent-settings-field-grid">
+                  <div className="project-agent-settings-field">
+                    <Label>{t("agents.provider")}</Label>
+                    <NativeSelect
+                      disabled={profileSaving}
+                      label={t("agents.provider")}
+                      onValueChange={(value) => {
+                        setProvider(value as AgentProvider);
+                        setModel("");
+                      }}
+                      options={agentProviders.map((candidate) => ({
+                        label: providerLabels[candidate],
+                        value: candidate,
+                      }))}
+                      value={provider}
+                    />
+                  </div>
+                  <div className="project-agent-settings-field">
+                    <Label>{t("agents.model")}</Label>
+                    <NativeSelect
+                      disabled={profileSaving}
+                      label={t("agents.model")}
+                      onValueChange={setModel}
+                      options={[
+                        ...(!selectedModelKnown && model
+                          ? [{ label: model, value: model }]
+                          : []),
+                        ...agentModels[provider].map((option) => ({
+                          ...option,
+                          label:
+                            option.value === ""
+                              ? t("agents.providerDefaultModel")
+                              : option.label,
+                        })),
+                      ]}
+                      value={model}
+                    />
+                  </div>
                 </div>
                 <div className="project-agent-settings-field">
                   <Label htmlFor="project-agent-settings-responsibility">
