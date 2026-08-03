@@ -36,6 +36,7 @@ import {
   pollDeviceToken,
   renewProjectAgentScheduleRun,
   retryHuntRun,
+  resumeHuntRun,
   removeIssueDependency,
   updateIssue,
   updateIssueExecutionPreferences,
@@ -1618,8 +1619,8 @@ export function useBriar(options: UseBriarOptions = {}) {
     [dashboard, persistProjectWorkflow, token],
   );
 
-  const updateWorkflowStopAfterStage = useCallback(
-    async (projectId: string, stopAfterStage: string) => {
+  const updateWorkflowPauseAfterStage = useCallback(
+    async (projectId: string, pauseAfterStage: string) => {
       if (demoMode) {
         throw new Error("워크플로우 수정은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
       }
@@ -1628,12 +1629,12 @@ export function useBriar(options: UseBriarOptions = {}) {
         throw new Error("워크플로우를 갱신할 프로젝트 설정이 없습니다.");
       }
       const previousWorkflow = dashboard.settings.workflow;
-      if (!previousWorkflow.stages.some((stage) => stage.id === stopAfterStage)) {
-        throw new Error("실행 종료 단계가 현재 워크플로우에 없습니다.");
+      if (!previousWorkflow.stages.some((stage) => stage.id === pauseAfterStage)) {
+        throw new Error("일시정지 단계가 현재 워크플로우에 없습니다.");
       }
       const nextWorkflow = {
         ...previousWorkflow,
-        execution: { stopAfterStage },
+        execution: { pauseAfterStage },
       };
       return persistProjectWorkflow(
         projectId,
@@ -2559,6 +2560,90 @@ export function useBriar(options: UseBriarOptions = {}) {
     [activeProjectId, dashboard, refresh, token],
   );
 
+  const resumeRun = useCallback(
+    async (runId: string) => {
+      if (!activeProjectId || !dashboard) {
+        throw new Error("재개할 Auto Hunt 작업이 없습니다.");
+      }
+      setRecoveringRunId(runId);
+      setRecoveryError(null);
+      try {
+        if (demoMode) {
+          const occurredAt = new Date().toISOString();
+          setDashboard((current) =>
+            current
+              ? {
+                  ...current,
+                  runs: current.runs.map((run) => {
+                    if (run.id !== runId) return run;
+                    const currentIndex = run.workflow.stages.findIndex(
+                      (stage) => stage.id === run.workflowStage,
+                    );
+                    const workflowStage =
+                      run.workflow.stages[currentIndex + 1]?.id ??
+                      run.workflowStage;
+                    const status =
+                      currentIndex + 1 < run.workflow.stages.length
+                        ? "queued"
+                        : "running";
+                    const nextEvent: HuntEvent = {
+                      id: crypto.randomUUID(),
+                      attempt: run.currentAttempt,
+                      revision: run.currentRevision,
+                      status,
+                      workflowStage,
+                      detail: "사용자가 일시정지된 워크플로우를 재개했습니다.",
+                      actor: "briar-app",
+                      qaStatus: null,
+                      trackerState: run.tracker?.state ?? null,
+                      pullRequestUrls: run.pullRequestUrls,
+                      targetSha: run.targetSha,
+                      occurredAt,
+                      recordedAt: occurredAt,
+                    };
+                    runEventsByRun.current[run.id] = [
+                      nextEvent,
+                      ...(runEventsByRun.current[run.id] ?? []),
+                    ];
+                    return {
+                      ...run,
+                      status,
+                      workflowStage,
+                      pausedAt: null,
+                      progress: progressForAutoHuntRun(
+                        status,
+                        workflowStage,
+                        run.workflow,
+                      ),
+                      detail: nextEvent.detail,
+                      claimedBy: null,
+                      claimedAt: null,
+                      leaseExpiresAt: null,
+                      completedAt: null,
+                      updatedAt: occurredAt,
+                      lastEventAt: occurredAt,
+                      eventCount: run.eventCount + 1,
+                    };
+                  }),
+                }
+              : current,
+          );
+          return;
+        }
+        if (!token) throw new Error("로그인이 필요합니다.");
+        await resumeHuntRun(token, activeProjectId, runId);
+        await refresh("snapshot");
+      } catch (caught) {
+        const message = caught instanceof Error ? caught.message : String(caught);
+        setRecoveryError(message);
+        throw caught;
+      } finally {
+        setRecoveringRunId(null);
+      }
+    },
+    [activeProjectId, dashboard, demoMode, refresh, token],
+  );
+
   const moveRun = useCallback(
     async (runId: string, placement: HuntRunPlacement) => {
       if (!activeProjectId || !dashboard) {
@@ -2733,7 +2818,8 @@ export function useBriar(options: UseBriarOptions = {}) {
     analyzeWorkflowRequirements,
     regenerateWorkflow,
     reviseWorkflow,
-    updateWorkflowStopAfterStage,
+    resumeRun,
+    updateWorkflowPauseAfterStage,
     updateAccountProfile,
     saveVelenIntegration,
     saveLinearIntegration,

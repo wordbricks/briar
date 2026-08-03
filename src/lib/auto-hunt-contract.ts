@@ -8,6 +8,17 @@ export const autoHuntRunStatuses = [
   "backlog",
   "queued",
   "running",
+  "paused",
+  "blocked",
+  "failed",
+  "completed",
+  "cancelled",
+] as const;
+
+export const autoHuntPersistedRunStatuses = [
+  "backlog",
+  "queued",
+  "running",
   "blocked",
   "failed",
   "completed",
@@ -32,6 +43,8 @@ export const autoHuntWorkflowStageCatalog = [
 
 export type AutoHuntSource = (typeof autoHuntSources)[number];
 export type AutoHuntRunStatus = (typeof autoHuntRunStatuses)[number];
+export type AutoHuntPersistedRunStatus =
+  (typeof autoHuntPersistedRunStatuses)[number];
 export type AutoHuntWorkflowStageId = string;
 
 export type AutoHuntWorkflowStage = {
@@ -68,7 +81,7 @@ export type AutoHuntWorkflow = {
   requirements?: AutoHuntWorkflowRequirement[];
   stages: AutoHuntWorkflowStage[];
   execution: {
-    stopAfterStage: AutoHuntWorkflowStageId;
+    pauseAfterStage: AutoHuntWorkflowStageId;
   };
   completion: {
     requiredStages: AutoHuntWorkflowStageId[];
@@ -81,8 +94,11 @@ type AutoHuntWorkflowInput = Omit<
 > & {
   requirements?: AutoHuntWorkflowRequirement[];
   completion?: AutoHuntWorkflow["completion"];
-  execution?: AutoHuntWorkflow["execution"];
-  /** Read compatibility for workflows stored before execution.stopAfterStage. */
+  execution?: {
+    pauseAfterStage?: AutoHuntWorkflowStageId;
+    stopAfterStage?: AutoHuntWorkflowStageId;
+  };
+  /** Read compatibility for workflows stored before an explicit pause stage. */
   release?: { enabled: boolean };
 };
 
@@ -105,7 +121,7 @@ export const repositoryWorkflowBootstrap: AutoHuntWorkflow = {
       required: true,
     },
   ],
-  execution: { stopAfterStage: repositoryWorkflowPendingStageId },
+  execution: { pauseAfterStage: repositoryWorkflowPendingStageId },
   completion: { requiredStages: [repositoryWorkflowPendingStageId] },
 };
 
@@ -157,43 +173,43 @@ export function normalizeAutoHuntWorkflow(
   const requiredStages = workflow.completion
     ? (configuredRequiredStages ?? [])
     : stages.filter((stage) => stage.required).map((stage) => stage.id);
-  const configuredStopAfterStage = workflow.execution?.stopAfterStage.trim();
-  const stopAfterStage =
-    configuredStopAfterStage && stageIds.has(configuredStopAfterStage)
-      ? configuredStopAfterStage
+  const configuredPauseAfterStage =
+    workflow.execution?.pauseAfterStage?.trim() ||
+    workflow.execution?.stopAfterStage?.trim();
+  const pauseAfterStage =
+    configuredPauseAfterStage && stageIds.has(configuredPauseAfterStage)
+      ? configuredPauseAfterStage
       : requiredStages.at(-1) ?? stages.at(-1)!.id;
   return {
     version: 1,
     requirements,
     stages,
-    execution: { stopAfterStage },
+    execution: { pauseAfterStage },
     completion: { requiredStages },
   };
 }
 
-export function workflowStopIndex(workflow: AutoHuntWorkflow) {
+export function workflowPauseIndex(workflow: AutoHuntWorkflow) {
   const index = workflow.stages.findIndex(
-    (stage) => stage.id === workflow.execution.stopAfterStage,
+    (stage) => stage.id === workflow.execution.pauseAfterStage,
   );
   return index < 0 ? workflow.stages.length - 1 : index;
 }
 
+/** @deprecated Use workflowPauseIndex. */
+export const workflowStopIndex = workflowPauseIndex;
+
 export function executableWorkflowStages(workflow: AutoHuntWorkflow) {
-  return workflow.stages.slice(0, workflowStopIndex(workflow) + 1);
+  return [...workflow.stages];
 }
 
+export function requiredWorkflowStages(workflow: AutoHuntWorkflow) {
+  return [...new Set(workflow.completion.requiredStages)];
+}
+
+/** @deprecated Use requiredWorkflowStages. */
 export function requiredExecutableWorkflowStages(workflow: AutoHuntWorkflow) {
-  const executableStageIds = new Set(
-    executableWorkflowStages(workflow).map((stage) => stage.id),
-  );
-  return [
-    ...new Set([
-      ...workflow.completion.requiredStages.filter((stage) =>
-        executableStageIds.has(stage)
-      ),
-      workflow.execution.stopAfterStage,
-    ]),
-  ];
+  return requiredWorkflowStages(workflow);
 }
 
 export function progressForAutoHuntRun(

@@ -123,16 +123,8 @@
                   "required": true
                 }
               ],
-              "execution": {
-                "stopAfterStage": "local_qa"
-              },
-              "completion": {
-                "requiredStages": [
-                  "analyzing",
-                  "implementing",
-                  "local_qa"
-                ]
-              }
+              "execution": { "pauseAfterStage": "local_qa" },
+              "completion": { "requiredStages": ["analyzing", "implementing", "local_qa"] }
             },
             "progress": 45,
             "detail": "Implementing",

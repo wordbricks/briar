@@ -145,6 +145,7 @@ describe("detached execution workers", () => {
       "migrations/0047_project_icon_browser_formats.sql",
       "migrations/0048_issue_dependencies.sql",
       "migrations/0054_run_execution_metrics.sql",
+      "migrations/0058_workflow_pause_after_stage.sql",
     ]) {
       await executeSql(db, await readFile(resolve(migration), "utf8"));
     }

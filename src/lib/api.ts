@@ -215,7 +215,12 @@ const autoHuntWorkflowSchema: z.ZodType<AutoHuntWorkflow> = z
         checks: z.array(z.string()).optional(),
       }),
     ),
-    execution: z.object({ stopAfterStage: z.string() }).optional(),
+    execution: z
+      .object({
+        pauseAfterStage: z.string().optional(),
+        stopAfterStage: z.string().optional(),
+      })
+      .optional(),
     completion: z.object({ requiredStages: z.array(z.string()) }).optional(),
     release: z.object({ enabled: z.boolean() }).optional(),
   })
@@ -1501,6 +1506,27 @@ export type HuntRecoveryResult = {
   attempt: number;
   stage: "queued" | "cancelled";
 };
+
+export type HuntResumeResult = {
+  runId: string;
+  outcome: "resumed" | "already_resumed" | "not_found" | "ineligible";
+  workflowStage: string | null;
+};
+
+export async function resumeHuntRun(
+  token: string,
+  projectId: string,
+  runId: string,
+) {
+  return request<HuntResumeResult>(
+    `/projects/${projectId}/runs/${runId}/resume`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify({ requestId: crypto.randomUUID() }),
+    },
+  );
+}
 
 async function recoverHuntRun(
   token: string,

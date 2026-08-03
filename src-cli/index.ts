@@ -11,8 +11,8 @@ import packageJson from "../package.json";
 import {
   autoHuntEvidenceTypeMaxLength,
   autoHuntEvidenceTypePattern,
+  autoHuntPersistedRunStatuses,
   autoHuntRequirementKinds,
-  autoHuntRunStatuses,
   autoHuntSources,
   normalizeAutoHuntWorkflow,
   repositoryWorkflowPendingStageId,
@@ -118,17 +118,24 @@ const workflowConfigSchema = z
     ).min(1),
     execution: z
       .object({
-        // Older desktop builds serialized a missing execution boundary as an
+        // Older desktop builds serialized a missing execution checkpoint as an
         // empty string. normalizeAutoHuntWorkflow already repairs a missing or
-        // unknown boundary from the required stages, so keep that read
+        // unknown checkpoint from the required stages, so keep that read
         // compatibility here instead of rejecting the whole CLI config.
-        stopAfterStage: z.string().trim().max(64),
+        pauseAfterStage: z.string().trim().max(64).optional(),
+        stopAfterStage: z.string().trim().max(64).optional(),
       })
+      .refine(
+        (execution) =>
+          execution.pauseAfterStage !== undefined ||
+          execution.stopAfterStage !== undefined,
+        "Workflow pause stage is required",
+      )
       .optional(),
     completion: z.object({
       requiredStages: z.array(workflowStageIdSchema),
     }).optional(),
-    /** Read compatibility for local configurations created before stopAfterStage. */
+    /** Read compatibility for local configurations created before an explicit pause stage. */
     release: z.object({ enabled: z.boolean() }).optional(),
   })
   .strict()
@@ -871,6 +878,7 @@ const queuedIssueSchema = z.object({
   sourceCreatedAt: z.string().datetime({ offset: true }).nullable(),
   context: z.record(z.string(), z.unknown()).nullable(),
   workflow: workflowConfigSchema,
+  workflowStage: z.string().nullable(),
   attachments: z.array(queuedAttachmentSchema).max(5).default([]),
   messages: z.array(queuedIssueMessageSchema).default([]),
   claimToken: z.string().startsWith("briar_claim_"),
@@ -1358,7 +1366,7 @@ async function addRunEvent(forcedStatus?: string) {
     source: z.enum(autoHuntSources).nullable(),
     sourceKey: z.string().min(1).nullable(),
     title: z.string().min(1).nullable(),
-    status: z.enum(autoHuntRunStatuses).optional(),
+    status: z.enum(autoHuntPersistedRunStatuses).optional(),
     workflowStage: workflowStageIdSchema.nullable().optional(),
     eventKey: z.string().min(1),
     occurredAt: z.string().datetime({ offset: true }),
@@ -1611,6 +1619,41 @@ async function reworkRun() {
   console.log(JSON.stringify(result));
 }
 
+async function resumeRun() {
+  const config = await loadConfig();
+  const project = await currentProject(config);
+  const runId = value("--run") ?? project.activeClaim?.runId;
+  if (!runId) throw new Error("--run is required when there is no active claim");
+  const input = {
+    requestId: value("--request-id") ?? crypto.randomUUID(),
+    actor: value("--actor") ?? "briar-workflow",
+  };
+  z.object({
+    requestId: z.string().uuid(),
+    actor: z.string().min(1).max(128),
+  }).parse(input);
+  z.string().uuid().parse(runId);
+  const result = await request<{
+    runId: string;
+    outcome: string;
+    workflowStage: string | null;
+  }>(
+    config.apiUrl,
+    `/runs/${runId}/resume`,
+    executionToken(project),
+    { method: "POST", body: JSON.stringify(input) },
+  );
+  if (project.activeClaim?.runId === runId) {
+    config.projects = config.projects.map((candidate) =>
+      candidate.id === project.id
+        ? { ...candidate, activeClaim: undefined }
+        : candidate,
+    );
+    await saveConfig(config);
+  }
+  console.log(JSON.stringify(result));
+}
+
 const workerRegistrationSchema = z.object({
   organizationId: z.string().uuid(),
   deviceId: z.string().uuid(),
@@ -1824,6 +1867,7 @@ async function runClaimedIssueInRuntime(
       conversation: issue.messages,
     },
     workspacePath: workspace.path,
+    resumeStage: issue.workflowStage,
   });
   const fullAccess = activeProject.autoHunt?.sandbox?.fullAccess ?? true;
   const sessionId = `detached-${issue.runId}`;
@@ -3177,6 +3221,7 @@ const usage = `Briar CLI
   briar run evidence list [--run <uuid>]
   briar run rework [--run <uuid>] --to <earlier-stage> --reason <text>
     [--request-id <uuid>]
+  briar run resume [--run <uuid>] [--request-id <uuid>]
   briar run retry [--run <uuid>] [--request-id <uuid>] [--reason <text>]
   briar run cancel [--run <uuid>] [--request-id <uuid>] [--reason <text>]
   briar worker register [--project <uuid>] [--label <text>]
@@ -3254,6 +3299,7 @@ async function main() {
     return listCurrentRunEvidence();
   }
   if (args[0] === "run" && args[1] === "rework") return reworkRun();
+  if (args[0] === "run" && args[1] === "resume") return resumeRun();
   if (args[0] === "run" && args[1] === "retry") return recoverRun("retry");
   if (args[0] === "run" && args[1] === "cancel") return recoverRun("cancel");
   if (args[0] === "worker" && args[1] === "register") {

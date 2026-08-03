@@ -3,13 +3,14 @@ import briarIconPng from "../../src/assets/app-icons/aubergine-riso.png";
 import {
   autoHuntEvidenceTypeMaxLength,
   autoHuntEvidenceTypePattern,
+  autoHuntPersistedRunStatuses,
   autoHuntRequirementKinds,
-  autoHuntRunStatuses,
   autoHuntSources,
   isRepositoryWorkflowPending,
   normalizeAutoHuntWorkflow,
   progressForAutoHuntRun,
   repositoryWorkflowBootstrap,
+  type AutoHuntPersistedRunStatus,
   type AutoHuntRunStatus,
   type DashboardStage,
   type AutoHuntWorkflowStageId,
@@ -159,6 +160,7 @@ import {
   planAccountDeletion,
   issueProjectAgentToken,
   recoverHuntRun,
+  resumeHuntRun,
   reworkHuntRun,
   recordHuntEvent,
   recordRunEvidence,
@@ -320,7 +322,7 @@ class HttpError extends Error {
   }
 }
 
-const runStatusSchema = z.enum(autoHuntRunStatuses);
+const runStatusSchema = z.enum(autoHuntPersistedRunStatuses);
 const workflowStageIdSchema = z
   .string()
   .trim()
@@ -374,11 +376,18 @@ const workflowSchema = z
       .optional(),
     execution: z
       .object({
-        stopAfterStage: workflowStageIdSchema,
+        pauseAfterStage: z.string().trim().max(64).optional(),
+        stopAfterStage: z.string().trim().max(64).optional(),
       })
       .strict()
+      .refine(
+        (execution) =>
+          execution.pauseAfterStage !== undefined ||
+          execution.stopAfterStage !== undefined,
+        "Workflow pause stage is required",
+      )
       .optional(),
-    /** Read compatibility for workflows stored before stopAfterStage. */
+    /** Read compatibility for workflows stored before an explicit pause stage. */
     release: z.object({ enabled: z.boolean() }).strict().optional(),
   })
   .strict()
@@ -389,6 +398,18 @@ const dashboardStageForProgress = (
   workflowStage: AutoHuntWorkflowStageId | null,
 ): DashboardStage => {
   if (status === "backlog") return "queued";
+  if (status === "paused") {
+    return workflowStage &&
+      [
+        "analyzing",
+        "implementing",
+        "pr_open",
+        "staging_qa",
+        "production_qa",
+      ].includes(workflowStage)
+      ? (workflowStage as DashboardStage)
+      : "implementing";
+  }
   if (status !== "running") return status;
   return workflowStage &&
     [
@@ -1389,6 +1410,14 @@ const recoveryUserInputSchema = z
   .strict();
 
 const recoveryAgentInputSchema = recoveryUserInputSchema.extend({
+  actor: z.string().trim().min(1).max(128),
+});
+
+const resumeUserInputSchema = z
+  .object({ requestId: z.string().uuid() })
+  .strict();
+
+const resumeAgentInputSchema = resumeUserInputSchema.extend({
   actor: z.string().trim().min(1).max(128),
 });
 
@@ -3017,6 +3046,12 @@ function dashboardRunJson(
   dependents: IssueDependencyRow[] = [],
   resultReviews: IssueResultReviewRow[] = [],
 ) {
+  const status = run.paused_at ? ("paused" as const) : run.status;
+  const workflow = normalizeAutoHuntWorkflow(JSON.parse(run.workflow_snapshot_json));
+  const dependencyStatus = (
+    rawStatus: AutoHuntRunStatus,
+    pausedAt: string | null,
+  ) => (pausedAt ? ("paused" as const) : rawStatus);
   const waitingOnPrerequisiteCount = prerequisites.filter(
     (dependency) => dependency.prerequisite_status !== "completed",
   ).length;
@@ -3028,14 +3063,15 @@ function dashboardRunJson(
     source: run.source,
     sourceKey: run.source_key,
     title: run.title,
-    status: run.status,
+    status,
     workflowStage: run.workflow_stage,
-    workflow: normalizeAutoHuntWorkflow(JSON.parse(run.workflow_snapshot_json)),
+    workflow,
     progress: progressForAutoHuntRun(
-      run.status,
+      status,
       run.workflow_stage,
-      normalizeAutoHuntWorkflow(JSON.parse(run.workflow_snapshot_json)),
+      workflow,
     ),
+    pausedAt: run.paused_at,
     detail: run.detail,
     priority: run.priority,
     repository: run.repository,
@@ -3056,7 +3092,10 @@ function dashboardRunJson(
       id: dependency.prerequisite_run_id,
       runNumber: dependency.prerequisite_run_number,
       title: dependency.prerequisite_title,
-      status: dependency.prerequisite_status,
+      status: dependencyStatus(
+        dependency.prerequisite_status,
+        dependency.prerequisite_paused_at,
+      ),
     })),
     executionReadiness:
       waitingOnPrerequisiteCount > 0 ? "waiting" : "ready",
@@ -3065,7 +3104,10 @@ function dashboardRunJson(
       id: dependency.dependent_run_id,
       runNumber: dependency.dependent_run_number,
       title: dependency.dependent_title,
-      status: dependency.dependent_status,
+      status: dependencyStatus(
+        dependency.dependent_status,
+        dependency.dependent_paused_at,
+      ),
     })),
     resultSummary: run.result_summary,
     structuredResult: parseStructuredResult(run.structured_result_json),
@@ -4874,7 +4916,7 @@ async function route(
 
     const statusMap = new Map<
       string,
-      { status: AutoHuntRunStatus; workflowStage: string | null }
+      { status: AutoHuntPersistedRunStatus; workflowStage: string | null }
     >();
     for (const [stateId, placementKey] of Object.entries(input.statusMapping)) {
       const placement = parsePlacementKey(placementKey);
@@ -5817,6 +5859,29 @@ async function route(
     return json({ runId: recoveryMatch[2], ...result });
   }
 
+  const resumeRunMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/resume$/u,
+  );
+  if (resumeRunMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, resumeRunMatch[1], session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    const input = resumeUserInputSchema.parse(await readJson(request));
+    const result = await resumeHuntRun(db, project.id, {
+      runId: resumeRunMatch[2],
+      requestId: input.requestId,
+      actor: `briar-app:${session.user.id}`,
+      occurredAt: new Date().toISOString(),
+    });
+    if (result.outcome === "not_found") {
+      throw new HttpError(404, "Run not found");
+    }
+    if (result.outcome === "ineligible") {
+      throw new HttpError(409, "Only paused runs can be resumed");
+    }
+    return json({ runId: resumeRunMatch[2], ...result });
+  }
+
   const moveRunMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/status$/u,
   );
@@ -6665,6 +6730,7 @@ async function route(
             repository: run.repository,
             sourceCreatedAt: run.source_created_at,
             context: parseJsonObject(run.context_json),
+            workflowStage: run.workflow_stage,
             workflow: normalizeAutoHuntWorkflow(
               JSON.parse(run.workflow_snapshot_json),
             ),
@@ -6726,6 +6792,31 @@ async function route(
       throw new HttpError(409, "Only blocked or failed runs can be recovered");
     }
     return json({ runId: agentRecoveryMatch[1], ...result });
+  }
+
+  const agentResumeMatch = pathname.match(
+    /^\/runs\/([0-9a-f-]+)\/resume$/u,
+  );
+  if (agentResumeMatch && request.method === "POST") {
+    const projectId = await requireRunExecutionProject(
+      db,
+      request,
+      agentResumeMatch[1],
+    );
+    const input = resumeAgentInputSchema.parse(await readJson(request));
+    const result = await resumeHuntRun(db, projectId, {
+      runId: agentResumeMatch[1],
+      requestId: input.requestId,
+      actor: input.actor,
+      occurredAt: new Date().toISOString(),
+    });
+    if (result.outcome === "not_found") {
+      throw new HttpError(404, "Run not found");
+    }
+    if (result.outcome === "ineligible") {
+      throw new HttpError(409, "Only paused runs can be resumed");
+    }
+    return json({ runId: agentResumeMatch[1], ...result });
   }
 
   const reworkMatch = pathname.match(/^\/runs\/([0-9a-f-]+)\/rework$/u);

@@ -91,12 +91,14 @@ export const mobileDashboardRunSchema = z.object({
     "backlog",
     "queued",
     "running",
+    "paused",
     "blocked",
     "failed",
     "completed",
     "cancelled",
   ]),
   workflowStage: z.string().nullable().optional(),
+  pausedAt: z.iso.datetime().nullable().optional(),
   workflow: z.object({
     version: z.literal(1),
     stages: z.array(z.object({
@@ -114,13 +116,13 @@ export const mobileDashboardRunSchema = z.object({
     id: z.uuid(),
     runNumber: z.number().int().positive(),
     title: z.string(),
-    status: z.enum(["backlog", "queued", "running", "blocked", "failed", "completed", "cancelled"]),
+    status: z.enum(["backlog", "queued", "running", "paused", "blocked", "failed", "completed", "cancelled"]),
   })).optional(),
   dependents: z.array(z.object({
     id: z.uuid(),
     runNumber: z.number().int().positive(),
     title: z.string(),
-    status: z.enum(["backlog", "queued", "running", "blocked", "failed", "completed", "cancelled"]),
+    status: z.enum(["backlog", "queued", "running", "paused", "blocked", "failed", "completed", "cancelled"]),
   })).optional(),
   executionReadiness: z.enum(["ready", "waiting"]).optional(),
   waitingOnPrerequisiteCount: z.number().int().nonnegative().optional(),
@@ -256,6 +258,15 @@ export const mobileDashboardCursorExpiredSchema = z.object({
 });
 
 const mobileRunStatusSchema = mobileDashboardRunSchema.shape.status;
+const mobilePlacementStatusSchema = z.enum([
+  "backlog",
+  "queued",
+  "running",
+  "blocked",
+  "failed",
+  "completed",
+  "cancelled",
+]);
 const mobileProviderSchema = z.enum(["codex", "claude", "grok", "opencode"]);
 const mobileEffortSchema = z.enum(["low", "medium", "high", "xhigh", "max", "ultra"]);
 const requestIdSchema = z.object({ requestId: z.uuid() });
@@ -293,13 +304,13 @@ export const mobileDependencyResponseSchema = z.object({
   outcome: z.enum(["created", "already_exists"]),
 });
 export const mobileMoveRunRequestSchema = requestIdSchema.extend({
-  status: mobileRunStatusSchema,
+  status: mobilePlacementStatusSchema,
   workflowStage: z.string().nullable(),
 });
 export const mobileMoveRunResponseSchema = z.object({
   runId: z.uuid(),
   outcome: z.enum(["moved", "unchanged", "already_moved"]),
-  status: mobileRunStatusSchema,
+  status: mobilePlacementStatusSchema,
   workflowStage: z.string().nullable(),
 });
 export const mobileRecoveryRequestSchema = requestIdSchema.extend({ reason: z.string().nullable() });

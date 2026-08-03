@@ -2,11 +2,12 @@ import {
   isTerminalTrackerState,
   isRepositoryWorkflowPending,
   normalizeAutoHuntWorkflow,
-  requiredExecutableWorkflowStages,
+  requiredWorkflowStages,
   repositoryWorkflowBootstrap,
-  workflowStopIndex,
+  workflowPauseIndex,
   type AutoHuntQaEnvironment,
   type AutoHuntQaStatus,
+  type AutoHuntPersistedRunStatus,
   type AutoHuntRunStatus,
   type AutoHuntSource,
   type DashboardStage,
@@ -202,7 +203,7 @@ export type HuntRunRow = {
   source_key: string;
   title: string;
   stage: DashboardStage;
-  status: AutoHuntRunStatus;
+  status: AutoHuntPersistedRunStatus;
   workflow_stage: AutoHuntWorkflowStageId | null;
   workflow_snapshot_json: string;
   detail: string | null;
@@ -234,6 +235,7 @@ export type HuntRunRow = {
   claimed_at: string | null;
   lease_expires_at: string | null;
   claim_attempts: number;
+  paused_at: string | null;
   agent_id: string | null;
   preferred_agent_provider: ProjectAgentProvider | null;
   preferred_agent_model: string | null;
@@ -272,9 +274,11 @@ export type IssueDependencyRow = {
   prerequisite_run_number: number;
   prerequisite_title: string;
   prerequisite_status: AutoHuntRunStatus;
+  prerequisite_paused_at: string | null;
   dependent_run_number: number;
   dependent_title: string;
   dependent_status: AutoHuntRunStatus;
+  dependent_paused_at: string | null;
 };
 
 export type IssueDependencyMutationOutcome =
@@ -291,7 +295,7 @@ export type HuntEventRow = {
   attempt: number;
   revision: number;
   stage: DashboardStage;
-  status: AutoHuntRunStatus;
+  status: AutoHuntPersistedRunStatus;
   workflow_stage: AutoHuntWorkflowStageId | null;
   detail: string | null;
   actor: string;
@@ -429,7 +433,7 @@ export type HuntEventInput = {
   sourceKey: string;
   title: string;
   stage: DashboardStage;
-  status?: AutoHuntRunStatus;
+  status?: AutoHuntPersistedRunStatus;
   workflowStage?: AutoHuntWorkflowStageId | null;
   eventKey: string;
   occurredAt: string;
@@ -2462,6 +2466,7 @@ export async function listDashboardRuns(db: D1Database, projectId: string) {
               run.requested_agent_effort, run.requested_worker_id,
               run.requested_by_user_id, run.dispatch_mode,
               run.dispatch_request_id, run.dispatched_at, run.worker_id,
+              run.paused_at,
               run.started_at,
               run.updated_at, run.completed_at, run.last_event_at,
               run.event_count + coalesce((
@@ -2567,9 +2572,11 @@ export async function listIssueDependencies(
               prerequisite.run_number as prerequisite_run_number,
               prerequisite.title as prerequisite_title,
               prerequisite.status as prerequisite_status,
+              prerequisite.paused_at as prerequisite_paused_at,
               dependent.run_number as dependent_run_number,
               dependent.title as dependent_title,
-              dependent.status as dependent_status
+              dependent.status as dependent_status,
+              dependent.paused_at as dependent_paused_at
        from briar_issue_dependencies dependency
        join briar_hunt_runs prerequisite
          on prerequisite.id = dependency.prerequisite_run_id
@@ -3484,7 +3491,7 @@ export async function assertQueuedHuntClaim(
     .bind(claimTokenHash ?? "", projectId, input.source, input.sourceKey)
     .first<{
       stage: DashboardStage;
-      status: AutoHuntRunStatus;
+      status: AutoHuntPersistedRunStatus;
       claim_token_hash: string | null;
       lease_expires_at: string | null;
       context_json: string | null;
@@ -3682,16 +3689,16 @@ const loadRunForIdentity = async (
     .first<HuntRunRow>();
 };
 
-const assertCompletionEligible = async (
+const assertRunCompletionEligible = async (
   db: D1Database,
   projectId: string,
-  run: HuntRunRow | null,
-  input: HuntEventInput,
+  run: HuntRunRow,
+  resultSummary: string | null,
+  trackerProvider: string | null,
+  trackerState: string | null,
 ) => {
-  if (input.status !== "completed") return;
-  if (!run) throw new HuntTransitionError("Run does not exist");
   const workflow = parseWorkflow(run.workflow_snapshot_json);
-  const requiredStages = requiredExecutableWorkflowStages(workflow);
+  const requiredStages = requiredWorkflowStages(workflow);
   const revisionRequirements = await loadStageRevisionRequirements(db, run);
   const completedStages = await db
     .prepare(
@@ -3752,13 +3759,10 @@ const assertCompletionEligible = async (
       );
     }
   }
-  const resultSummary = input.resultSummary ?? run.result_summary;
   if (!resultSummary?.trim()) {
     throw new HuntTransitionError("Run completion requires a result summary");
   }
   const settings = await getProjectSettings(db, projectId);
-  const trackerProvider = input.tracker?.provider ?? run.tracker_provider;
-  const trackerState = input.tracker?.state ?? run.tracker_issue_state;
   if (
     settings?.linear_enabled === 1 &&
     trackerProvider === "linear" &&
@@ -3768,6 +3772,24 @@ const assertCompletionEligible = async (
       "Run completion requires a terminal Linear issue",
     );
   }
+};
+
+const assertCompletionEligible = async (
+  db: D1Database,
+  projectId: string,
+  run: HuntRunRow | null,
+  input: HuntEventInput,
+) => {
+  if (input.status !== "completed") return;
+  if (!run) throw new HuntTransitionError("Run does not exist");
+  await assertRunCompletionEligible(
+    db,
+    projectId,
+    run,
+    input.resultSummary ?? run.result_summary,
+    input.tracker?.provider ?? run.tracker_provider,
+    input.tracker?.state ?? run.tracker_issue_state,
+  );
 };
 
 const assertStageTransition = async (
@@ -3798,14 +3820,21 @@ const assertStageTransition = async (
       `Workflow stage is not configured for this run: ${input.workflowStage}`,
     );
   }
-  if (nextRank > workflowStopIndex(workflow)) {
-    throw new HuntTransitionError(
-      `Workflow stops after stage: ${workflow.execution.stopAfterStage}`,
-    );
-  }
-  const floorRank = run.workflow_stage
+  const pauseRank = workflowPauseIndex(workflow);
+  const currentRank = run.workflow_stage
     ? workflow.stages.findIndex((stage) => stage.id === run.workflow_stage)
     : -1;
+  if (run.paused_at && nextRank > pauseRank) {
+    throw new HuntTransitionError(
+      "Run is paused; resume it before recording a later workflow stage",
+    );
+  }
+  if (nextRank > pauseRank && currentRank <= pauseRank) {
+    throw new HuntTransitionError(
+      `Workflow is paused after stage: ${workflow.execution.pauseAfterStage}`,
+    );
+  }
+  const floorRank = currentRank;
   if (nextRank < floorRank) {
     throw new HuntTransitionError(
       `Workflow cannot regress from rank ${floorRank} to ${nextRank}`,
@@ -3813,10 +3842,12 @@ const assertStageTransition = async (
   }
 };
 
-const statusForDashboardStage = (stage: DashboardStage): AutoHuntRunStatus => {
+const statusForDashboardStage = (
+  stage: DashboardStage,
+): AutoHuntPersistedRunStatus => {
   if (stage === "queued") return "queued";
   if (["blocked", "failed", "completed", "cancelled"].includes(stage)) {
-    return stage as AutoHuntRunStatus;
+    return stage as AutoHuntPersistedRunStatus;
   }
   return "running";
 };
@@ -3839,7 +3870,7 @@ const workflowStageForDashboardStage = (
 };
 
 const dashboardStageFor = (
-  status: AutoHuntRunStatus,
+  status: AutoHuntPersistedRunStatus,
   workflowStage: AutoHuntWorkflowStageId | null,
 ): DashboardStage => {
   if (status === "backlog") return "queued";
@@ -3878,6 +3909,25 @@ export async function recordHuntEvent(
   const workflowSnapshot = existingRun
     ? parseWorkflow(existingRun.workflow_snapshot_json)
     : parseWorkflow((await getProjectSettings(db, projectId))?.workflow_json);
+  const pauseRank = workflowPauseIndex(workflowSnapshot);
+  const requestedRank = normalizedInput.workflowStage
+    ? workflowSnapshot.stages.findIndex(
+        (stage) => stage.id === normalizedInput.workflowStage,
+      )
+    : -1;
+  const currentRank = existingRun?.workflow_stage
+    ? workflowSnapshot.stages.findIndex(
+        (stage) => stage.id === existingRun.workflow_stage,
+      )
+    : -1;
+  const pausesAtBoundary =
+    normalizedInput.status === "running" &&
+    requestedRank === pauseRank &&
+    !existingRun?.paused_at &&
+    // A final-stage pause is resumed with that same stage in the queue so a
+    // worker can perform the last review before recording completion. Do not
+    // immediately create the same checkpoint again on its first progress event.
+    !(existingRun?.status === "queued" && currentRank === pauseRank);
   if (!existingRun && isRepositoryWorkflowPending(workflowSnapshot)) {
     throw new HuntTransitionError(
       "Repository workflow has not been generated for this project",
@@ -3895,12 +3945,14 @@ export async function recordHuntEvent(
     );
   }
   if (normalizedInput.status === "running" && normalizedInput.workflowStage) {
-    const requestedRank = workflowSnapshot.stages.findIndex(
-      (stage) => stage.id === normalizedInput.workflowStage,
-    );
-    if (requestedRank > workflowStopIndex(workflowSnapshot)) {
+    if (existingRun?.paused_at && requestedRank > pauseRank) {
       throw new HuntTransitionError(
-        `Workflow stops after stage: ${workflowSnapshot.execution.stopAfterStage}`,
+        "Run is paused; resume it before recording a later workflow stage",
+      );
+    }
+    if (requestedRank > pauseRank && currentRank <= pauseRank) {
+      throw new HuntTransitionError(
+        `Workflow is paused after stage: ${workflowSnapshot.execution.pauseAfterStage}`,
       );
     }
   }
@@ -3913,6 +3965,11 @@ export async function recordHuntEvent(
   );
   await assertStageTransition(db, existingRun, normalizedInput);
   await assertCompletionEligible(db, projectId, existingRun, normalizedInput);
+  if (existingRun?.paused_at && normalizedInput.status === "completed") {
+    throw new HuntTransitionError(
+      "Run is paused; resume it before completing the workflow",
+    );
+  }
 
   if (existingRun) {
     const existingEvent = await db
@@ -4167,6 +4224,30 @@ export async function recordHuntEvent(
         eventAttempt,
         eventId,
       ),
+    ...(pausesAtBoundary
+      ? [
+          db
+            .prepare(
+              `update briar_hunt_runs
+               set paused_at = ?, claim_token_hash = null, claimed_by = null,
+                   claimed_at = null, lease_expires_at = null,
+                   updated_at = max(updated_at, ?)
+               where id = ? and current_attempt = ? and last_event_at <= ?
+                 and exists (
+                   select 1 from briar_hunt_events
+                   where id = ? and run_id = briar_hunt_runs.id
+                 )`,
+            )
+            .bind(
+              normalizedInput.occurredAt,
+              recordedAt,
+              runId,
+              eventAttempt,
+              normalizedInput.occurredAt,
+              eventId,
+            ),
+        ]
+      : []),
   ]);
 
   if ((results[1]?.meta.changes ?? 0) === 0) {
@@ -4186,6 +4267,152 @@ export async function recordHuntEvent(
   }
 
   return runId;
+}
+
+export type HuntResumeOutcome =
+  | "resumed"
+  | "already_resumed"
+  | "not_found"
+  | "ineligible";
+
+export async function resumeHuntRun(
+  db: D1Database,
+  projectId: string,
+  input: {
+    runId: string;
+    requestId: string;
+    actor: string;
+    occurredAt: string;
+  },
+): Promise<{
+  outcome: HuntResumeOutcome;
+  workflowStage: AutoHuntWorkflowStageId | null;
+}> {
+  const run = await getHuntRunForProject(db, projectId, input.runId);
+  if (!run) return { outcome: "not_found", workflowStage: null };
+
+  const eventKey = `workflow:resume:${input.requestId}`;
+  const existingEvent = await db
+    .prepare(
+      `select workflow_stage from briar_hunt_events
+       where run_id = ? and event_key = ?`,
+    )
+    .bind(run.id, eventKey)
+    .first<Pick<HuntEventRow, "workflow_stage">>();
+  if (existingEvent) {
+    return {
+      outcome: "already_resumed",
+      workflowStage: existingEvent.workflow_stage,
+    };
+  }
+  if (run.status !== "running" || !run.paused_at || !run.workflow_stage) {
+    return {
+      outcome: "ineligible",
+      workflowStage: run.workflow_stage,
+    };
+  }
+
+  const workflow = parseWorkflow(run.workflow_snapshot_json);
+  const currentRank = workflow.stages.findIndex(
+    (stage) => stage.id === run.workflow_stage,
+  );
+  if (currentRank < 0) {
+    return { outcome: "ineligible", workflowStage: run.workflow_stage };
+  }
+  const nextStage = workflow.stages[currentRank + 1]?.id ?? null;
+  // Resuming always hands the run back to a worker. This is also necessary
+  // when the pause checkpoint is the final configured stage: the resumed
+  // worker must record the terminal completion after reviewing the existing
+  // final-stage evidence.
+  const targetStatus: AutoHuntPersistedRunStatus = "queued";
+  const targetStage: DashboardStage = "queued";
+  const targetWorkflowStage = nextStage ?? run.workflow_stage;
+  const detail = nextStage
+    ? `사용자가 ${workflow.stages[currentRank]?.label ?? run.workflow_stage} 이후 워크플로우를 재개했습니다.`
+    : "사용자가 마지막 일시정지 지점에서 완료 검토를 재개했습니다.";
+  const eventId = crypto.randomUUID();
+  const recordedAt = new Date().toISOString();
+  const results = await db.batch([
+    db
+      .prepare(
+        `insert into briar_hunt_events (
+           id, run_id, event_key, attempt, revision, stage, status,
+           workflow_stage, detail, actor, branch, commit_sha, qa_status,
+           tracker_issue_state, pull_request_urls, target_sha,
+           occurred_at, recorded_at
+         )
+         select ?, id, ?, current_attempt, current_revision, ?, ?, ?, ?, ?,
+                branch, commit_sha, null, tracker_issue_state,
+                pull_request_urls, target_sha, ?, ?
+         from briar_hunt_runs
+         where id = ? and project_id = ? and status = 'running'
+           and paused_at is not null and workflow_stage = ?
+           and last_event_at = ?
+         on conflict(run_id, event_key) do nothing`,
+      )
+      .bind(
+        eventId,
+        eventKey,
+        targetStage,
+        targetStatus,
+        targetWorkflowStage,
+        detail,
+        input.actor,
+        input.occurredAt,
+        recordedAt,
+        run.id,
+        projectId,
+        run.workflow_stage,
+        run.last_event_at,
+      ),
+    db
+      .prepare(
+        `update briar_hunt_runs
+         set stage = ?, status = ?, workflow_stage = ?, detail = ?,
+             paused_at = null, claim_token_hash = null, claimed_by = null,
+             claimed_at = null, lease_expires_at = null, completed_at = null,
+             last_event_at = ?, updated_at = ?
+         where id = ? and project_id = ? and status = 'running'
+           and paused_at is not null and workflow_stage = ?
+           and last_event_at = ?
+           and exists (
+             select 1 from briar_hunt_events
+             where id = ? and run_id = briar_hunt_runs.id
+           )`,
+      )
+      .bind(
+        targetStage,
+        targetStatus,
+        targetWorkflowStage,
+        detail,
+        input.occurredAt,
+        recordedAt,
+        run.id,
+        projectId,
+        run.workflow_stage,
+        run.last_event_at,
+        eventId,
+      ),
+  ]);
+
+  if ((results[1]?.meta.changes ?? 0) === 0) {
+    const duplicate = await db
+      .prepare(
+        `select workflow_stage from briar_hunt_events
+         where run_id = ? and event_key = ?`,
+      )
+      .bind(run.id, eventKey)
+      .first<Pick<HuntEventRow, "workflow_stage">>();
+    if (duplicate) {
+      return {
+        outcome: "already_resumed",
+        workflowStage: duplicate.workflow_stage,
+      };
+    }
+    return { outcome: "ineligible", workflowStage: run.workflow_stage };
+  }
+
+  return { outcome: "resumed", workflowStage: targetWorkflowStage };
 }
 
 export async function recordRunEvidence(
@@ -4216,9 +4443,15 @@ export async function recordRunEvidence(
       `Workflow stage is not configured for this run: ${input.stage}`,
     );
   }
-  if (evidenceStageRank > workflowStopIndex(workflow)) {
+  const pauseRank = workflowPauseIndex(workflow);
+  const currentRank = run.workflow_stage
+    ? workflow.stages.findIndex((stage) => stage.id === run.workflow_stage)
+    : -1;
+  if (evidenceStageRank > pauseRank && currentRank <= pauseRank) {
     throw new HuntTransitionError(
-      `Workflow stops after stage: ${workflow.execution.stopAfterStage}`,
+      run.paused_at
+        ? "Run is paused; resume it before recording later-stage evidence"
+        : `Workflow is paused after stage: ${workflow.execution.pauseAfterStage}`,
     );
   }
   const metadataJson = input.metadata ? stableJson(input.metadata) : null;
@@ -4538,11 +4771,6 @@ export async function reworkHuntRun(
       `Workflow stage is not configured for this run: ${input.workflowStage}`,
     );
   }
-  if (targetRank > workflowStopIndex(workflow)) {
-    throw new HuntTransitionError(
-      `Workflow stops after stage: ${workflow.execution.stopAfterStage}`,
-    );
-  }
   if (currentRank < 0 || targetRank >= currentRank) {
     throw new HuntTransitionError(
       `Rework target ${input.workflowStage} must precede ${run.workflow_stage}`,
@@ -4550,10 +4778,17 @@ export async function reworkHuntRun(
   }
 
   const nextRevision = run.current_revision + 1;
-  const targetDashboardStage = dashboardStageFor(
-    "running",
-    input.workflowStage,
-  );
+  const wasPaused = Boolean(run.paused_at);
+  const targetStatus: AutoHuntPersistedRunStatus = wasPaused
+    ? "queued"
+    : "running";
+  const targetDashboardStage = wasPaused
+    ? "queued"
+    : dashboardStageFor("running", input.workflowStage);
+  const claimReset = wasPaused
+    ? `claim_token_hash = null, claimed_by = null,
+             claimed_at = null, lease_expires_at = null,`
+    : "";
   const recordedAt = new Date().toISOString();
   const eventId = crypto.randomUUID();
   const invalidatedStages = workflow.stages.slice(targetRank).map((stage) => stage.id);
@@ -4561,19 +4796,21 @@ export async function reworkHuntRun(
     db
       .prepare(
         `update briar_hunt_runs
-         set stage = ?, status = 'running', workflow_stage = ?,
+         set stage = ?, status = ?, workflow_stage = ?,
              detail = ?, current_revision = ?, commit_sha = null,
              target_sha = null, result_summary = null,
              structured_result_json = null,
              staging_qa_status = null, production_qa_status = null,
              staging_qa_detail = null, production_qa_detail = null,
-             completed_at = null, last_event_at = ?, updated_at = ?
+             ${claimReset}
+             paused_at = null, completed_at = null, last_event_at = ?, updated_at = ?
          where id = ? and project_id = ? and status = 'running'
            and current_attempt = ? and current_revision = ?
            and last_event_at = ?`,
       )
       .bind(
         targetDashboardStage,
+        targetStatus,
         input.workflowStage,
         input.reason,
         nextRevision,
@@ -4593,7 +4830,7 @@ export async function reworkHuntRun(
            tracker_issue_state, pull_request_urls, target_sha,
            occurred_at, recorded_at
          )
-         select ?, id, ?, current_attempt, current_revision, ?, 'running',
+         select ?, id, ?, current_attempt, current_revision, ?, ?,
                 ?, ?, ?, branch, null, null, tracker_issue_state,
                 pull_request_urls, null, ?, ?
          from briar_hunt_runs
@@ -4605,6 +4842,7 @@ export async function reworkHuntRun(
         eventId,
         eventKey,
         targetDashboardStage,
+        targetStatus,
         input.workflowStage,
         input.reason,
         input.actor,
@@ -4755,6 +4993,7 @@ export async function recoverHuntRun(
                  production_qa_status = null, staging_qa_detail = null,
                  production_qa_detail = null, claim_token_hash = null,
                  claimed_by = null, claimed_at = null, lease_expires_at = null,
+                 paused_at = null,
                  completed_at = null, last_event_at = ?, updated_at = ?
              where id = ? and project_id = ? and status in ('blocked', 'failed')
                and current_attempt = ? and last_event_at = ?`,
@@ -4775,6 +5014,7 @@ export async function recoverHuntRun(
              set stage = 'cancelled', status = 'cancelled', detail = ?,
                  claim_token_hash = null,
                  claimed_by = null, claimed_at = null, lease_expires_at = null,
+                 paused_at = null,
                  completed_at = ?, last_event_at = ?, updated_at = ?
              where id = ? and project_id = ?
                and status not in ('completed', 'cancelled')
@@ -4865,7 +5105,7 @@ export async function moveHuntRun(
   projectId: string,
   input: {
     runId: string;
-    status: AutoHuntRunStatus;
+    status: AutoHuntPersistedRunStatus;
     workflowStage: AutoHuntWorkflowStageId | null;
     requestId: string;
     actor: string;
@@ -4894,9 +5134,18 @@ export async function moveHuntRun(
         `Workflow stage is not configured for this run: ${input.workflowStage ?? "none"}`,
       );
     }
-    if (targetRank > workflowStopIndex(workflow)) {
+    const pauseRank = workflowPauseIndex(workflow);
+    const currentRank = run.workflow_stage
+      ? workflow.stages.findIndex((stage) => stage.id === run.workflow_stage)
+      : -1;
+    if (run.paused_at) {
       throw new HuntTransitionError(
-        `Workflow stops after stage: ${workflow.execution.stopAfterStage}`,
+        "Run is paused; resume it before moving to another workflow stage",
+      );
+    }
+    if (targetRank > pauseRank && currentRank <= pauseRank) {
+      throw new HuntTransitionError(
+        `Workflow is paused after stage: ${workflow.execution.pauseAfterStage}`,
       );
     }
   } else if (input.workflowStage !== null) {
@@ -4935,6 +5184,22 @@ export async function moveHuntRun(
       status: run.status,
       workflowStage: run.workflow_stage,
     };
+  }
+
+  if (run.paused_at && input.status === "completed") {
+    throw new HuntTransitionError(
+      "Run is paused; resume it before completing the workflow",
+    );
+  }
+  if (input.status === "completed") {
+    await assertRunCompletionEligible(
+      db,
+      projectId,
+      run,
+      run.result_summary,
+      run.tracker_provider,
+      run.tracker_issue_state,
+    );
   }
 
   const targetStage = dashboardStageFor(input.status, targetWorkflowStage);
@@ -5024,7 +5289,7 @@ export async function moveHuntRun(
              staging_qa_detail = case when ? then null else staging_qa_detail end,
              production_qa_detail = case when ? then null else production_qa_detail end,
              claim_token_hash = null, claimed_by = null, claimed_at = null,
-             lease_expires_at = null, completed_at = ?, last_event_at = ?,
+             lease_expires_at = null, paused_at = null, completed_at = ?, last_event_at = ?,
              updated_at = ?
          where id = ? and project_id = ? and current_attempt = ?
            and last_event_at = ?
@@ -5113,7 +5378,7 @@ export type LinearImportRunInput = {
   title: string;
   description: string | null;
   priority: number | null;
-  status: AutoHuntRunStatus;
+  status: AutoHuntPersistedRunStatus;
   workflowStage: AutoHuntWorkflowStageId | null;
   tracker: {
     provider: string;

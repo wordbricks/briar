@@ -74,7 +74,7 @@ import type {
   LinearImportResult,
   LinearImportStatesResult,
 } from "../lib/linear-import";
-import { requiredExecutableWorkflowStages } from "../lib/auto-hunt-contract";
+import { requiredWorkflowStages } from "../lib/auto-hunt-contract";
 import {
   projectIconAccept,
   projectIconFromFile,
@@ -111,7 +111,7 @@ export function ProjectSettings({
   onDelete,
   onRegenerateWorkflow,
   onReviseWorkflow,
-  onUpdateWorkflowStopAfterStage,
+  onUpdateWorkflowPauseAfterStage,
   onUpdateVelenOrg,
   onUpdateLinear,
   onConnectLinearImport,
@@ -137,7 +137,7 @@ export function ProjectSettings({
   onDelete: () => Promise<unknown>;
   onRegenerateWorkflow: () => Promise<unknown>;
   onReviseWorkflow: (requestedChange: string) => Promise<unknown>;
-  onUpdateWorkflowStopAfterStage?: (stopAfterStage: string) => Promise<unknown>;
+  onUpdateWorkflowPauseAfterStage?: (pauseAfterStage: string) => Promise<unknown>;
   onUpdateVelenOrg: (org: string | null) => Promise<string | null>;
   onUpdateLinear: (
     linear: ProjectSettingsData["linear"],
@@ -170,7 +170,7 @@ export function ProjectSettings({
     useState(false);
   const [isRegeneratingWorkflow, setIsRegeneratingWorkflow] = useState(false);
   const [isRevisingWorkflow, setIsRevisingWorkflow] = useState(false);
-  const [isUpdatingWorkflowBoundary, setIsUpdatingWorkflowBoundary] =
+  const [isUpdatingWorkflowPause, setIsUpdatingWorkflowPause] =
     useState(false);
   const [workflowRevisionRequest, setWorkflowRevisionRequest] = useState("");
   const [workflowError, setWorkflowError] = useState<string | null>(null);
@@ -469,24 +469,24 @@ export function ProjectSettings({
     }
   };
 
-  const updateWorkflowBoundary = async (stopAfterStage: string) => {
+  const updateWorkflowPause = async (pauseAfterStage: string) => {
     if (
-      !onUpdateWorkflowStopAfterStage ||
-      stopAfterStage === workflowContract?.execution.stopAfterStage
+      !onUpdateWorkflowPauseAfterStage ||
+      pauseAfterStage === workflowContract?.execution.pauseAfterStage
     ) {
       return;
     }
-    setIsUpdatingWorkflowBoundary(true);
+    setIsUpdatingWorkflowPause(true);
     setWorkflowError(null);
     setWorkflowRegenerated(false);
     setWorkflowRequirementsAnalyzed(false);
     setWorkflowRevised(false);
     try {
-      await onUpdateWorkflowStopAfterStage(stopAfterStage);
+      await onUpdateWorkflowPauseAfterStage(pauseAfterStage);
     } catch (caught) {
       setWorkflowError(caught instanceof Error ? caught.message : String(caught));
     } finally {
-      setIsUpdatingWorkflowBoundary(false);
+      setIsUpdatingWorkflowPause(false);
     }
   };
 
@@ -1365,12 +1365,12 @@ export function ProjectSettings({
             </div>
             {workflowContract ? (
               <>
-                <div className="project-settings-workflow-boundary">
+                <div className="project-settings-workflow-pause">
                   <span>
                     <Flag size={16} strokeWidth={1.8} />
                     <span>
-                      <strong>{t("settings.workflowStopAfterStage")}</strong>
-                      <small>{t("settings.workflowStopAfterStageDescription")}</small>
+                      <strong>{t("settings.workflowPauseAfterStage")}</strong>
+                      <small>{t("settings.workflowPauseAfterStageDescription")}</small>
                     </span>
                   </span>
                   <SelectMenu
@@ -1378,18 +1378,18 @@ export function ProjectSettings({
                       isAnalyzingWorkflowRequirements ||
                       isRegeneratingWorkflow ||
                       isRevisingWorkflow ||
-                      isUpdatingWorkflowBoundary ||
-                      !onUpdateWorkflowStopAfterStage
+                      isUpdatingWorkflowPause ||
+                      !onUpdateWorkflowPauseAfterStage
                     }
-                    label={t("settings.workflowStopAfterStage")}
-                    onValueChange={(value) => void updateWorkflowBoundary(value)}
+                    label={t("settings.workflowPauseAfterStage")}
+                    onValueChange={(value) => void updateWorkflowPause(value)}
                     options={workflowContract.stages.map((stage) => ({
                       description: stage.id,
                       label: stage.label,
                       value: stage.id,
                     }))}
                     size="small"
-                    value={workflowContract.execution.stopAfterStage}
+                    value={workflowContract.execution.pauseAfterStage}
                   />
                 </div>
                 <div
@@ -1462,18 +1462,7 @@ export function ProjectSettings({
                     {workflowContract.stages.map((stage, index) => (
                       <li key={`${stage.id}-${index}`}>
                         <article
-                          className={`project-workflow-stage ${
-                            stage.required ? "required" : "optional"
-                          }${
-                            index >
-                            workflowContract.stages.findIndex(
-                              (candidate) =>
-                                candidate.id ===
-                                workflowContract.execution.stopAfterStage,
-                            )
-                              ? " outside-boundary"
-                              : ""
-                          }`}
+                          className={`project-workflow-stage ${stage.required ? "required" : "optional"}`}
                         >
                           <header>
                             <span>{index + 1}</span>
@@ -1488,9 +1477,9 @@ export function ProjectSettings({
                           <strong>{stage.label}</strong>
                           <code>{stage.id}</code>
                           {stage.id ===
-                          workflowContract.execution.stopAfterStage ? (
-                            <span className="project-workflow-stop-badge">
-                              {t("settings.workflowStopsHere")}
+                          workflowContract.execution.pauseAfterStage ? (
+                            <span className="project-workflow-pause-badge">
+                              {t("settings.workflowPausesHere")}
                             </span>
                           ) : null}
                           {stage.evidence?.length ? (
@@ -1533,24 +1522,24 @@ export function ProjectSettings({
                         <strong>
                           {t("settings.workflowRequiredStageCount", {
                             count:
-                              requiredExecutableWorkflowStages(
+                              requiredWorkflowStages(
                                 workflowContract,
                               ).length,
                           })}
                         </strong>
                       </span>
                     </div>
-                    <div className="project-workflow-boundary-summary">
+                    <div className="project-workflow-pause-summary">
                       <Flag size={18} strokeWidth={1.8} />
                       <span>
-                        <small>{t("settings.workflowStopAfterStage")}</small>
+                        <small>{t("settings.workflowPauseAfterStage")}</small>
                         <strong>
                           {workflowContract.stages.find(
                             (stage) =>
                               stage.id ===
-                              workflowContract.execution.stopAfterStage,
+                              workflowContract.execution.pauseAfterStage,
                           )?.label ??
-                            workflowContract.execution.stopAfterStage}
+                            workflowContract.execution.pauseAfterStage}
                         </strong>
                       </span>
                     </div>

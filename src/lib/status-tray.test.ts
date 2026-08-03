@@ -35,7 +35,7 @@ function run(partial: Partial<HuntRun> & Pick<HuntRun, "id" | "title" | "status"
         { id: "analyzing", label: "분석", required: true },
         { id: "implementing", label: "구현", required: true },
       ],
-      execution: { stopAfterStage: "implementing" },
+      execution: { pauseAfterStage: "implementing" },
       completion: { requiredStages: ["analyzing", "implementing"] },
     },
     progress: 0.4,

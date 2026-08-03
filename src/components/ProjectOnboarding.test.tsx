@@ -112,7 +112,7 @@ describe("ProjectOnboarding", () => {
               { id: "implementing", label: "구현", required: true },
               { id: "local_qa", label: "로컬 검증", required: true },
             ],
-            execution: { stopAfterStage: "local_qa" },
+            execution: { pauseAfterStage: "local_qa" },
             completion: { requiredStages: ["implementing", "local_qa"] },
           },
         }}
@@ -141,7 +141,7 @@ describe("ProjectOnboarding", () => {
               { id: "implementing", label: "구현", required: true },
               { id: "local_qa", label: "로컬 검증", required: true },
             ],
-            execution: { stopAfterStage: "local_qa" },
+            execution: { pauseAfterStage: "local_qa" },
             completion: { requiredStages: ["implementing", "local_qa"] },
           },
         }}

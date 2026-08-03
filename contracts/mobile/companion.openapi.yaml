@@ -1107,225 +1107,38 @@
           "updatedAt"
         ],
         "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "runNumber": {
-            "type": "integer",
-            "minimum": 1
-          },
-          "title": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "backlog",
-              "queued",
-              "running",
-              "blocked",
-              "failed",
-              "completed",
-              "cancelled"
-            ]
-          },
-          "workflowStage": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "workflow": {
-            "type": "object",
-            "additionalProperties": true
-          },
-          "progress": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 100
-          },
-          "detail": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "priority": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "minimum": 1,
-            "maximum": 4
-          },
-          "issueDescription": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "attachments": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/IssueAttachment"
-            }
-          },
-          "prerequisites": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "additionalProperties": true
-            }
-          },
-          "dependents": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "additionalProperties": true
-            }
-          },
-          "executionReadiness": {
-            "type": "string",
-            "enum": [
-              "ready",
-              "waiting"
-            ]
-          },
-          "waitingOnPrerequisiteCount": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "resultSummary": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "structuredResult": {
-            "type": [
-              "object",
-              "null"
-            ],
-            "additionalProperties": true
-          },
-          "resultReviews": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "additionalProperties": true
-            }
-          },
-          "pullRequestUrls": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "uri"
-            }
-          },
-          "branch": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "commitSha": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "preferredProvider": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "enum": [
-              "codex",
-              "claude",
-              "grok",
-              "opencode",
-              null
-            ]
-          },
-          "preferredModel": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "preferredEffort": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "enum": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max",
-              "ultra",
-              null
-            ]
-          },
-          "requestedProvider": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "enum": [
-              "codex",
-              "claude",
-              "grok",
-              "opencode",
-              null
-            ]
-          },
-          "requestedModel": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "requestedEffort": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "enum": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max",
-              "ultra",
-              null
-            ]
-          },
-          "requestedWorkerId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "workerId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "completedAt": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time"
-          }
+          "id": { "type": "string", "format": "uuid" },
+          "runNumber": { "type": "integer", "minimum": 1 },
+          "title": { "type": "string" },
+          "status": { "type": "string", "enum": ["backlog", "queued", "running", "paused", "blocked", "failed", "completed", "cancelled"] },
+          "workflowStage": { "type": ["string", "null"] },
+          "pausedAt": { "type": ["string", "null"], "format": "date-time" },
+          "workflow": { "type": "object", "additionalProperties": true },
+          "progress": { "type": "number", "minimum": 0, "maximum": 100 },
+          "detail": { "type": ["string", "null"] },
+          "priority": { "type": ["integer", "null"], "minimum": 1, "maximum": 4 },
+          "issueDescription": { "type": ["string", "null"] },
+          "attachments": { "type": "array", "items": { "$ref": "#/components/schemas/IssueAttachment" } },
+          "prerequisites": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+          "dependents": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+          "executionReadiness": { "type": "string", "enum": ["ready", "waiting"] },
+          "waitingOnPrerequisiteCount": { "type": "integer", "minimum": 0 },
+          "resultSummary": { "type": ["string", "null"] },
+          "structuredResult": { "type": ["object", "null"], "additionalProperties": true },
+          "resultReviews": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+          "pullRequestUrls": { "type": "array", "items": { "type": "string", "format": "uri" } },
+          "branch": { "type": ["string", "null"] },
+          "commitSha": { "type": ["string", "null"] },
+          "preferredProvider": { "type": ["string", "null"], "enum": ["codex", "claude", "grok", "opencode", null] },
+          "preferredModel": { "type": ["string", "null"] },
+          "preferredEffort": { "type": ["string", "null"], "enum": ["low", "medium", "high", "xhigh", "max", "ultra", null] },
+          "requestedProvider": { "type": ["string", "null"], "enum": ["codex", "claude", "grok", "opencode", null] },
+          "requestedModel": { "type": ["string", "null"] },
+          "requestedEffort": { "type": ["string", "null"], "enum": ["low", "medium", "high", "xhigh", "max", "ultra", null] },
+          "requestedWorkerId": { "type": ["string", "null"] },
+          "workerId": { "type": ["string", "null"] },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "completedAt": { "type": ["string", "null"], "format": "date-time" }
         },
         "additionalProperties": true
       },
@@ -1586,41 +1399,12 @@
                 "occurredAt"
               ],
               "properties": {
-                "id": {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                "status": {
-                  "type": "string",
-                  "enum": [
-                    "backlog",
-                    "queued",
-                    "running",
-                    "blocked",
-                    "failed",
-                    "completed",
-                    "cancelled"
-                  ]
-                },
-                "workflowStage": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "detail": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "actor": {
-                  "type": "string"
-                },
-                "occurredAt": {
-                  "type": "string",
-                  "format": "date-time"
-                }
+                "id": { "type": "string", "format": "uuid" },
+                "status": { "type": "string", "enum": ["backlog", "queued", "running", "paused", "blocked", "failed", "completed", "cancelled"] },
+                "workflowStage": { "type": ["string", "null"] },
+                "detail": { "type": ["string", "null"] },
+                "actor": { "type": "string" },
+                "occurredAt": { "type": "string", "format": "date-time" }
               },
               "additionalProperties": true
             }
