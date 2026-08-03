@@ -1512,7 +1512,10 @@ export function useBriar(options: UseBriarOptions = {}) {
       }
 
       const previousWorkflow = dashboard.settings.workflow;
-      const generatedWorkflow = await generateProjectWorkflow(projectId);
+      const generatedWorkflow = await generateProjectWorkflow(
+        projectId,
+        previousWorkflow,
+      );
       return persistProjectWorkflow(
         projectId,
         previousWorkflow,
