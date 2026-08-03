@@ -1,6 +1,5 @@
 import type { HuntRun, IssueMessage, OrganizationMember } from "../types";
 import type { AgentProvider } from "./project-llm";
-import { mentionsBriar } from "./briar-mention";
 
 export { mentionsBriar } from "./briar-mention";
 
@@ -19,19 +18,10 @@ export type IssueAgentConversation = {
   provider: AgentProvider | null;
 };
 
-export function shouldBriarReply(
-  messages: readonly IssueMessage[],
-  input: { body: string; parentMessageId: string | null },
-) {
-  if (mentionsBriar(input.body)) return true;
-  if (!input.parentMessageId) return false;
-  return messages.some(
-    (message) =>
-      (message.id === input.parentMessageId ||
-        message.parentMessageId === input.parentMessageId) &&
-      (message.author.provider !== null || mentionsBriar(message.body)),
-  );
-}
+export {
+  shouldBriarReply,
+  type IssueReplyContextMessage,
+} from "./issue-reply-decision";
 
 export function agentReplyParentMessageId(
   message: Pick<IssueMessage, "id" | "parentMessageId">,

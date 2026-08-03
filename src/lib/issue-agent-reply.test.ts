@@ -80,6 +80,42 @@ describe("issue agent replies", () => {
     ).toBe(true);
   });
 
+  it("applies the same continuation rule to worker-row shaped messages", () => {
+    const thread = [
+      {
+        id: "thread-root",
+        parentMessageId: null,
+        body: "첫 질문",
+        author: { provider: null },
+      },
+      {
+        id: "agent-reply",
+        parentMessageId: "thread-root",
+        body: "현재 진행 중입니다.",
+        author: { provider: "codex" },
+      },
+    ];
+
+    expect(
+      shouldBriarReply(thread, {
+        body: "이어서 질문",
+        parentMessageId: "thread-root",
+      }),
+    ).toBe(true);
+    expect(
+      shouldBriarReply([thread[0]], {
+        body: "이어서 질문",
+        parentMessageId: "thread-root",
+      }),
+    ).toBe(false);
+    expect(
+      shouldBriarReply(thread, {
+        body: "별도의 새 메시지",
+        parentMessageId: null,
+      }),
+    ).toBe(false);
+  });
+
   it("recognizes a standalone @briar mention without matching email-like text", () => {
     expect(mentionsBriar("@briar 이 변경을 설명해 줘")).toBe(true);
     expect(mentionsBriar("Could you check this, @BRIAR?")).toBe(true);

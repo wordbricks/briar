@@ -2485,6 +2485,32 @@ export async function listIssueMessages(
   return result.results;
 }
 
+export async function listIssueThreadMessages(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  threadRootId: string,
+) {
+  const result = await db
+    .prepare(
+      `select message.id, message.run_id, message.parent_message_id,
+              message.author_user_id, message.author_agent_provider,
+              author.name as author_name,
+              author.image as author_image, message.body,
+              (select count(*) from briar_issue_messages reply
+               where reply.parent_message_id = message.id) as reply_count,
+              message.created_at, message.updated_at
+       from briar_issue_messages message
+       left join "user" author on author.id = message.author_user_id
+       where message.project_id = ? and message.run_id = ?
+         and (message.id = ? or message.parent_message_id = ?)
+       order by message.created_at, message.id`,
+    )
+    .bind(projectId, runId, threadRootId, threadRootId)
+    .all<IssueMessageRow>();
+  return result.results;
+}
+
 export async function createIssueMessage(
   db: D1Database,
   input: {
