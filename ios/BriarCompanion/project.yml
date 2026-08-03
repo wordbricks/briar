@@ -5,11 +5,13 @@ options:
     iOS: "17.0"
   createIntermediateGroups: true
 configs:
-  Debug: debug
-  Release: release
+  Dev Debug: debug
+  Dev Release: release
+  Production: release
 settings:
   base:
-    DEVELOPMENT_TEAM: ""
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: 1.2.52
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
     TARGETED_DEVICE_FAMILY: "1,2"
@@ -21,9 +23,21 @@ targets:
       - path: App
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: app.briar.companion.native.dev
         CODE_SIGN_STYLE: Automatic
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+      configs:
+        Dev Debug:
+          BRIAR_DISPLAY_NAME: Briar Native Dev
+          DEVELOPMENT_TEAM: ""
+          PRODUCT_BUNDLE_IDENTIFIER: app.briar.companion.native.dev
+        Dev Release:
+          BRIAR_DISPLAY_NAME: Briar Native Dev
+          DEVELOPMENT_TEAM: ""
+          PRODUCT_BUNDLE_IDENTIFIER: app.briar.companion.native.dev
+        Production:
+          BRIAR_DISPLAY_NAME: Briar Companion
+          DEVELOPMENT_TEAM: QFJZ2V3829
+          PRODUCT_BUNDLE_IDENTIFIER: app.briar.companion
     entitlements:
       path: App/BriarCompanion.entitlements
       properties:
@@ -32,7 +46,9 @@ targets:
     info:
       path: App/Info.plist
       properties:
-        CFBundleDisplayName: Briar Native Dev
+        CFBundleDisplayName: $(BRIAR_DISPLAY_NAME)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleURLTypes:
           - CFBundleTypeRole: Editor
             CFBundleURLName: app.briar.companion.authentication
@@ -104,11 +120,11 @@ schemes:
         BriarCompanionTests: [test]
         BriarCompanionUITests: [test]
     run:
-      config: Debug
+      config: Dev Debug
       environmentVariables:
         BRIAR_API_URL: http://127.0.0.1:8787
     test:
-      config: Debug
+      config: Dev Debug
       gatherCoverageData: true
       targets:
         - name: BriarCompanionTests
@@ -116,8 +132,20 @@ schemes:
         - name: BriarCompanionUITests
           parallelizable: false
     profile:
-      config: Release
+      config: Dev Release
     analyze:
-      config: Debug
+      config: Dev Debug
     archive:
-      config: Release
+      config: Dev Release
+  BriarCompanion-Production:
+    build:
+      targets:
+        BriarCompanion: all
+    run:
+      config: Production
+    profile:
+      config: Production
+    analyze:
+      config: Production
+    archive:
+      config: Production

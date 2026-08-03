@@ -64,6 +64,28 @@ final class BriarCompanionUITests: XCTestCase {
         captureScreenshot(named: "companion-offline-retry")
     }
 
+    func testAccessibilityAndLargestDynamicTypeLayout() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "--ui-testing",
+            "-UIPreferredContentSizeCategoryName",
+            "UICTContentSizeCategoryAccessibilityExtraExtraExtraLarge",
+        ]
+        app.launch()
+
+        let title = app.descendants(matching: .any)["login-title"]
+        let login = app.buttons["login-button"]
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        XCTAssertTrue(login.exists)
+        XCTAssertTrue(login.isHittable)
+        try app.performAccessibilityAudit(for: [
+            .hitRegion,
+            .sufficientElementDescription,
+            .textClipped,
+        ])
+        captureScreenshot(named: "companion-accessibility-xxxl")
+    }
+
     func testAgentsInboxAndSettingsSurface() {
         let app = launchInsideCompanion()
 

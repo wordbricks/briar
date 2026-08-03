@@ -73,6 +73,8 @@ run_app_worker() {
   bun run test
   bash -n \
     scripts/import-apple-signing-assets.sh \
+    scripts/release-ios.sh \
+    scripts/verify-ios-archive.sh \
     scripts/package-macos-release.sh \
     scripts/package-production-release.sh \
     scripts/release-macos-candidate.sh \
@@ -81,6 +83,7 @@ run_app_worker() {
     scripts/qa-production-updater-build.sh \
     scripts/qa-macos-lifecycle.sh \
     scripts/release-cargo-cache.sh
+  bun run ios:release:verify
   bun run build
   bun run build:release
   bun run worker:check
