@@ -3320,7 +3320,7 @@ export function RunPage({
                       {run.status === "paused" ? (
                         <section
                           aria-labelledby={`${detailTabsId}-paused-title`}
-                          className="recovery-panel"
+                          className="recovery-panel paused"
                           role="status"
                         >
                           <div>

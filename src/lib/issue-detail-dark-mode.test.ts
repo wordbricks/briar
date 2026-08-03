@@ -32,9 +32,15 @@ describe("issue detail dark mode", () => {
 
   it("keeps recovery states legible without a light-only alert card", () => {
     const recoveryRule = firstRule(".recovery-panel");
+    const pausedRecoveryRule = firstRule(".recovery-panel.paused");
 
     expect(recoveryRule).toContain("var(--destructive)");
     expect(recoveryRule).toContain("var(--card)");
+    expect(pausedRecoveryRule).toContain("var(--warning)");
+    expect(pausedRecoveryRule).toContain("var(--card)");
+    expect(firstRule(".recovery-panel.paused > div:first-child")).toContain(
+      "color:var(--warning)",
+    );
     expect(firstRule(".recovery-panel strong")).toContain(
       "color:var(--foreground)",
     );
