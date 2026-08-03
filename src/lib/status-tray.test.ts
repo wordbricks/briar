@@ -72,31 +72,33 @@ function run(partial: Partial<HuntRun> & Pick<HuntRun, "id" | "title" | "status"
 
 describe("status tray snapshot builders", () => {
   it("keeps only running issues sorted by most recent activity", () => {
-    const items = buildStatusTrayItems(
-      [
-        run({
-          id: "older",
-          title: "Older running",
-          status: "running",
-          updatedAt: "2026-08-03T01:00:00.000Z",
-        }),
-        run({
-          id: "done",
-          title: "Completed",
-          status: "completed",
-          workflowStage: null,
-          updatedAt: "2026-08-03T03:00:00.000Z",
-        }),
-        run({
-          id: "newer",
-          title: "Newer running",
-          status: "running",
-          workflowStage: "analyzing",
-          updatedAt: "2026-08-03T02:00:00.000Z",
-        }),
-      ],
-      { id: "project-1", name: "briar" },
-    );
+    const items = buildStatusTrayItems([
+      {
+        project: { id: "project-1", name: "briar" },
+        runs: [
+          run({
+            id: "older",
+            title: "Older running",
+            status: "running",
+            updatedAt: "2026-08-03T01:00:00.000Z",
+          }),
+          run({
+            id: "done",
+            title: "Completed",
+            status: "completed",
+            workflowStage: null,
+            updatedAt: "2026-08-03T03:00:00.000Z",
+          }),
+          run({
+            id: "newer",
+            title: "Newer running",
+            status: "running",
+            workflowStage: "analyzing",
+            updatedAt: "2026-08-03T02:00:00.000Z",
+          }),
+        ],
+      },
+    ]);
 
     expect(items.map((item) => item.runId)).toEqual(["newer", "older"]);
     expect(items[0]).toMatchObject({
@@ -105,6 +107,35 @@ describe("status tray snapshot builders", () => {
       title: "Newer running",
       statusLabel: "분석",
     });
+  });
+
+  it("includes running issues from every project and keeps project groups separate", () => {
+    const items = buildStatusTrayItems([
+      {
+        project: { id: "project-1", name: "Briar" },
+        runs: [
+          run({ id: "briar-run", title: "Briar issue", status: "running" }),
+        ],
+      },
+      {
+        project: { id: "project-2", name: "Crane" },
+        runs: [
+          run({ id: "crane-run", title: "Crane issue", status: "running" }),
+          run({ id: "crane-done", title: "Done", status: "completed" }),
+        ],
+      },
+    ]);
+
+    expect(
+      items.map(({ projectId, projectName, runId }) => ({
+        projectId,
+        projectName,
+        runId,
+      })),
+    ).toEqual([
+      { projectId: "project-1", projectName: "Briar", runId: "briar-run" },
+      { projectId: "project-2", projectName: "Crane", runId: "crane-run" },
+    ]);
   });
 
   it("uses workflow stage labels for running issues", () => {

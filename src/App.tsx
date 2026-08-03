@@ -61,6 +61,7 @@ import {
   loadOrganizationInvitationToken,
 } from "./lib/organization-invitation";
 import { syncAppBadgeCount } from "./lib/app-badge";
+import { DASHBOARD_POLL_INTERVAL_MS } from "./lib/dashboard-polling";
 import {
   buildStatusTrayItems,
   buildStatusTraySnapshot,
@@ -168,6 +169,9 @@ export function App() {
     invitationToken,
   ]);
   const briar = useBriar(scheduleSessionOptions);
+  const [statusTrayRunsByProject, setStatusTrayRunsByProject] = useState<
+    Record<string, readonly HuntRun[]>
+  >({});
   useEffect(() => {
     autoHunt.configureSync(
       briar.token,
@@ -205,36 +209,85 @@ export function App() {
   const runsOnWeb = isWebApp();
   useEffect(() => {
     if (!runsOnMacDesktop) return;
-    const project = briar.dashboard?.project
-      ? {
-          id: briar.dashboard.project.id,
-          name: briar.dashboard.project.name,
-        }
-      : briar.activeProjectId
-        ? {
-            id: briar.activeProjectId,
-            name:
-              briar.projects.find((project) => project.id === briar.activeProjectId)
-                ?.name ?? "",
+    const dashboard = briar.dashboard;
+    if (!dashboard) return;
+    setStatusTrayRunsByProject((current) => ({
+      ...current,
+      [dashboard.project.id]: dashboard.runs,
+    }));
+  }, [briar.dashboard, runsOnMacDesktop]);
+  useEffect(() => {
+    if (!runsOnMacDesktop) return;
+    const projects = briar.projects;
+    const token = briar.token;
+    if (!token || projects.length === 0) {
+      setStatusTrayRunsByProject({});
+      return;
+    }
+    const projectIds = new Set(projects.map((project) => project.id));
+    setStatusTrayRunsByProject((current) =>
+      Object.fromEntries(
+        Object.entries(current).filter(([projectId]) =>
+          projectIds.has(projectId),
+        ),
+      ),
+    );
+    let cancelled = false;
+    let refreshInFlight = false;
+    const refreshAllProjects = async () => {
+      if (refreshInFlight) return;
+      refreshInFlight = true;
+      const results = await Promise.allSettled(
+        projects.map((project) => loadDashboard(token, project.id)),
+      );
+      refreshInFlight = false;
+      if (cancelled) return;
+      setStatusTrayRunsByProject((current) => {
+        const next = { ...current };
+        results.forEach((result, index) => {
+          if (result.status === "fulfilled") {
+            next[projects[index].id] = result.value.runs;
           }
-        : null;
-    const items = buildStatusTrayItems(briar.dashboard?.runs ?? [], project, {
-      untitledTitle: t("statusTray.untitledIssue"),
-      localizeStatus: (fallback, run) => {
-        if (run.status === "running" && run.workflowStage) {
-          const stageKey = `stage.${run.workflowStage}` as MessageKey;
-          const localized = t(stageKey);
-          if (localized && localized !== stageKey) return localized;
-          const configured = run.workflow.stages.find(
-            (stage) => stage.id === run.workflowStage,
-          );
-          return configured?.label ?? fallback;
-        }
-        const statusKey = `status.${run.status}` as MessageKey;
-        const localized = t(statusKey);
-        return localized && localized !== statusKey ? localized : fallback;
+        });
+        return next;
+      });
+    };
+
+    void refreshAllProjects();
+    const intervalId = window.setInterval(
+      () => void refreshAllProjects(),
+      DASHBOARD_POLL_INTERVAL_MS,
+    );
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [briar.projects, briar.token, runsOnMacDesktop]);
+  useEffect(() => {
+    if (!runsOnMacDesktop) return;
+    const items = buildStatusTrayItems(
+      briar.projects.map((project) => ({
+        project: { id: project.id, name: project.name },
+        runs: statusTrayRunsByProject[project.id] ?? [],
+      })),
+      {
+        untitledTitle: t("statusTray.untitledIssue"),
+        localizeStatus: (fallback, run) => {
+          if (run.status === "running" && run.workflowStage) {
+            const stageKey = `stage.${run.workflowStage}` as MessageKey;
+            const localized = t(stageKey);
+            if (localized && localized !== stageKey) return localized;
+            const configured = run.workflow.stages.find(
+              (stage) => stage.id === run.workflowStage,
+            );
+            return configured?.label ?? fallback;
+          }
+          const statusKey = `status.${run.status}` as MessageKey;
+          const localized = t(statusKey);
+          return localized && localized !== statusKey ? localized : fallback;
+        },
       },
-    });
+    );
     const snapshot = buildStatusTraySnapshot(items, {
       runningLabel: t("statusTray.running"),
       emptyLabel: t("statusTray.empty"),
@@ -246,12 +299,10 @@ export function App() {
       // Tray bridge may be unavailable outside the packaged macOS app.
     });
   }, [
-    briar.activeProjectId,
-    briar.dashboard?.project,
-    briar.dashboard?.runs,
     briar.projects,
     locale,
     runsOnMacDesktop,
+    statusTrayRunsByProject,
     t,
   ]);
   useEffect(() => {

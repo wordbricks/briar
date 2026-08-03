@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tauri::{
     image::Image,
-    menu::{Menu, MenuItemBuilder, PredefinedMenuItem},
+    menu::{Menu, MenuBuilder, MenuItemBuilder, SubmenuBuilder},
     tray::{TrayIcon, TrayIconBuilder},
     AppHandle, Emitter, Manager,
 };
@@ -19,7 +19,6 @@ pub const QUIT_BRIAR_MENU_ID: &str = "status-tray:quit-briar";
 pub const RUN_MENU_ID_PREFIX: &str = "status-tray:run:";
 pub const STATUS_TRAY_OPEN_RUN_EVENT: &str = "status-tray-open-run";
 
-const MAX_VISIBLE_RUNS: usize = 8;
 const MAX_TITLE_CHARS: usize = 42;
 const TRAY_TEMPLATE_PNG: &[u8] = include_bytes!("../icons/tray-template.png");
 
@@ -124,6 +123,32 @@ pub fn format_run_menu_text(title: &str, status_label: &str) -> String {
     }
 }
 
+#[derive(Debug)]
+struct ProjectGroup<'a> {
+    project_id: &'a str,
+    project_name: &'a str,
+    items: Vec<&'a StatusTrayRunItem>,
+}
+
+fn project_groups(snapshot: &StatusTraySnapshot) -> Vec<ProjectGroup<'_>> {
+    let mut groups: Vec<ProjectGroup<'_>> = Vec::new();
+    for item in &snapshot.items {
+        if let Some(group) = groups
+            .iter_mut()
+            .find(|group| group.project_id == item.project_id)
+        {
+            group.items.push(item);
+        } else {
+            groups.push(ProjectGroup {
+                project_id: &item.project_id,
+                project_name: &item.project_name,
+                items: vec![item],
+            });
+        }
+    }
+    groups
+}
+
 pub fn run_menu_id(project_id: &str, run_id: &str) -> String {
     format!("{RUN_MENU_ID_PREFIX}{project_id}:{run_id}")
 }
@@ -144,50 +169,45 @@ fn tray_icon_image() -> Result<Image<'static>, String> {
 }
 
 fn build_menu(app: &AppHandle, snapshot: &StatusTraySnapshot) -> Result<Menu<tauri::Wry>, String> {
-    let mut owned_items = Vec::new();
-
     let running_header =
         MenuItemBuilder::with_id("status-tray:running-header", &snapshot.running_label)
             .enabled(false)
             .build(app)
             .map_err(|error| format!("Status tray header failed: {error}"))?;
-    owned_items.push(running_header);
+    let mut menu = MenuBuilder::new(app).item(&running_header);
 
-    let visible = snapshot.items.iter().take(MAX_VISIBLE_RUNS);
-    let mut has_runs = false;
-    for item in visible {
-        has_runs = true;
-        let text = format_run_menu_text(&item.title, &item.status_label);
-        let id = run_menu_id(&item.project_id, &item.run_id);
-        let menu_item = MenuItemBuilder::with_id(id, text)
-            .enabled(true)
-            .build(app)
-            .map_err(|error| format!("Status tray run item failed: {error}"))?;
-        owned_items.push(menu_item);
+    let groups = project_groups(snapshot);
+    for group in &groups {
+        let project_name = if group.project_name.trim().is_empty() {
+            group.project_id
+        } else {
+            group.project_name.trim()
+        };
+        let mut submenu = SubmenuBuilder::with_id(
+            app,
+            format!("status-tray:project:{}", group.project_id),
+            project_name,
+        );
+        for item in &group.items {
+            submenu = submenu.text(
+                run_menu_id(&item.project_id, &item.run_id),
+                format_run_menu_text(&item.title, &item.status_label),
+            );
+        }
+        let submenu = submenu
+            .build()
+            .map_err(|error| format!("Status tray project menu failed: {error}"))?;
+        menu = menu.item(&submenu);
     }
 
-    let overflow = snapshot.items.len().saturating_sub(MAX_VISIBLE_RUNS);
-    if overflow > 0 {
-        let more_text = snapshot
-            .more_label
-            .replace("{count}", &overflow.to_string());
-        let more = MenuItemBuilder::with_id("status-tray:more", more_text)
-            .enabled(false)
-            .build(app)
-            .map_err(|error| format!("Status tray overflow item failed: {error}"))?;
-        owned_items.push(more);
-    }
-
-    if !has_runs {
+    if groups.is_empty() {
         let empty = MenuItemBuilder::with_id("status-tray:empty", &snapshot.empty_label)
             .enabled(false)
             .build(app)
             .map_err(|error| format!("Status tray empty item failed: {error}"))?;
-        owned_items.push(empty);
+        menu = menu.item(&empty);
     }
 
-    let separator = PredefinedMenuItem::separator(app)
-        .map_err(|error| format!("Status tray separator failed: {error}"))?;
     let open = MenuItemBuilder::with_id(OPEN_BRIAR_MENU_ID, &snapshot.open_label)
         .enabled(true)
         .build(app)
@@ -196,17 +216,11 @@ fn build_menu(app: &AppHandle, snapshot: &StatusTraySnapshot) -> Result<Menu<tau
         .enabled(true)
         .build(app)
         .map_err(|error| format!("Status tray quit item failed: {error}"))?;
-
-    let mut refs: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> =
-        Vec::with_capacity(owned_items.len() + 3);
-    for item in &owned_items {
-        refs.push(item);
-    }
-    refs.push(&separator);
-    refs.push(&open);
-    refs.push(&quit);
-
-    Menu::with_items(app, &refs).map_err(|error| format!("Status tray menu failed: {error}"))
+    menu.separator()
+        .item(&open)
+        .item(&quit)
+        .build()
+        .map_err(|error| format!("Status tray menu failed: {error}"))
 }
 
 fn tooltip_for(snapshot: &StatusTraySnapshot) -> String {
@@ -317,6 +331,33 @@ mod tests {
             Some(("proj-1".to_string(), "run-2".to_string()))
         );
         assert_eq!(parse_run_menu_id("status-tray:open-briar"), None);
+    }
+
+    #[test]
+    fn groups_every_running_issue_by_project() {
+        let items = (0..9)
+            .map(|index| StatusTrayRunItem {
+                project_id: if index % 2 == 0 { "p1" } else { "p2" }.to_string(),
+                project_name: if index % 2 == 0 { "Briar" } else { "Crane" }.to_string(),
+                run_id: format!("r{index}"),
+                title: format!("Issue {index}"),
+                status_label: "Running".to_string(),
+            })
+            .collect();
+        let snapshot = StatusTraySnapshot {
+            items,
+            ..StatusTraySnapshot::default()
+        };
+
+        let groups = project_groups(&snapshot);
+
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups[0].project_name, "Briar");
+        assert_eq!(groups[1].project_name, "Crane");
+        assert_eq!(
+            groups.iter().map(|group| group.items.len()).sum::<usize>(),
+            9
+        );
     }
 
     #[test]
