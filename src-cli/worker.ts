@@ -17,7 +17,7 @@ export type AgentProvider = "codex" | "claude" | "grok" | "opencode";
 export type ModelEffort = "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
 
 export type ClaimedIssue = {
-  workType?: "issue" | "issueReply";
+  workType?: "issue" | "issueReply" | "idea";
   workId?: string;
   runId: string;
   sourceKey: string;

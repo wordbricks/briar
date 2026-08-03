@@ -5,6 +5,7 @@ struct CompanionRootView: View {
     @StateObject private var session: SessionStore
     @StateObject private var companion: CompanionStore
     @StateObject private var dashboard: DashboardStore
+    @StateObject private var ideas: IdeasStore
     @State private var signingIn = false
     @State private var authError: String?
 
@@ -20,6 +21,7 @@ struct CompanionRootView: View {
         _session = StateObject(wrappedValue: session)
         _companion = StateObject(wrappedValue: CompanionStore(api: api))
         _dashboard = StateObject(wrappedValue: DashboardStore(api: api))
+        _ideas = StateObject(wrappedValue: IdeasStore(api: api))
         authorization = DeviceAuthorizationService(api: api)
         self.presenter = presenter
     }
@@ -40,6 +42,7 @@ struct CompanionRootView: View {
             guard let token = session.token else {
                 companion.clear()
                 dashboard.select(projectID: nil, token: nil)
+                ideas.select(projectID: nil, token: nil)
                 return
             }
             do {
@@ -52,6 +55,7 @@ struct CompanionRootView: View {
         }
         .onChange(of: companion.selectedProjectID, initial: true) { _, projectID in
             dashboard.select(projectID: projectID, token: session.token)
+            ideas.select(projectID: projectID, token: session.token)
         }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
@@ -100,35 +104,49 @@ struct CompanionRootView: View {
     }
 
     private func dashboardView(token: String) -> some View {
-        NavigationStack {
-            DashboardContentView(
-                projects: companion.projects,
-                selectedProjectID: $companion.selectedProjectID,
-                snapshot: dashboard.snapshot,
-                isRefreshing: dashboard.isRefreshing,
-                errorMessage: dashboard.errorMessage,
-                refresh: { await dashboard.refresh(forceSnapshot: true) },
-                signOut: {
-                    dashboard.select(projectID: nil, token: nil)
-                    companion.clear()
-                    try? session.signOut()
-                }
-            )
-            .navigationTitle("Dashboard")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Menu {
-                        Text(companion.user?.email ?? "")
-                        Button("로그아웃", role: .destructive) {
-                            dashboard.select(projectID: nil, token: nil)
-                            companion.clear()
-                            try? session.signOut()
+        TabView {
+            NavigationStack {
+                DashboardContentView(
+                    projects: companion.projects,
+                    selectedProjectID: $companion.selectedProjectID,
+                    snapshot: dashboard.snapshot,
+                    isRefreshing: dashboard.isRefreshing,
+                    errorMessage: dashboard.errorMessage,
+                    refresh: { await dashboard.refresh(forceSnapshot: true) },
+                    signOut: {
+                        dashboard.select(projectID: nil, token: nil)
+                        ideas.select(projectID: nil, token: nil)
+                        companion.clear()
+                        try? session.signOut()
+                    }
+                )
+                .navigationTitle("Dashboard")
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        Menu {
+                            Text(companion.user?.email ?? "")
+                            Button("로그아웃", role: .destructive) {
+                                dashboard.select(projectID: nil, token: nil)
+                                ideas.select(projectID: nil, token: nil)
+                                companion.clear()
+                                try? session.signOut()
+                            }
+                        } label: {
+                            Image(systemName: "person.crop.circle")
                         }
-                    } label: {
-                        Image(systemName: "person.crop.circle")
                     }
                 }
             }
+            .tabItem { Label("실행", systemImage: "list.bullet.rectangle") }
+
+            NavigationStack {
+                IdeasNativeView(
+                    store: ideas,
+                    projectID: companion.selectedProjectID,
+                    token: token
+                )
+            }
+            .tabItem { Label("아이디어", systemImage: "lightbulb") }
         }
     }
 
