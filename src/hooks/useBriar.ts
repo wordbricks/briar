@@ -270,7 +270,7 @@ const emptyDashboard = (project: Project): DashboardPayload => ({
     dataSource: null,
     linear: { enabled: false, source: null, teamKey: null },
     githubRepository: null,
-    workflow: structuredClone(repositoryWorkflowBootstrap),
+    workflow: repositoryWorkflowBootstrap,
   },
   runs: [],
   generatedAt: new Date().toISOString(),
@@ -1634,6 +1634,10 @@ export function useBriar(options: UseBriarOptions = {}) {
       }
       const nextWorkflow = {
         ...previousWorkflow,
+        // Keep this existing single-pause control on the v1 compatibility
+        // input path. The API and local desktop writer normalize it to the
+        // canonical v2 checkpoint representation before persisting it.
+        version: 1 as const,
         execution: { pauseAfterStage },
       };
       return persistProjectWorkflow(

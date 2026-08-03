@@ -33,7 +33,7 @@ import {
   upsertProjectAgentSession,
   waitForIssueAgentReply,
 } from "./api";
-import { repositoryWorkflowBootstrap } from "./auto-hunt-contract";
+import { cloneAutoHuntWorkflow } from "./auto-hunt-contract";
 import { demoDashboard, demoRunEvents } from "./demo-data";
 
 afterEach(() => {
@@ -1062,7 +1062,7 @@ describe("API errors", () => {
         responsibility: "Audit the connected repository.",
         skill: "# Repository auditor\n\nAudit the connected repository.",
       },
-      workflow: repositoryWorkflowBootstrap,
+      workflow: cloneAutoHuntWorkflow(),
       status: "running",
       scheduledFor: "2026-07-27T09:00:00.000Z",
       leaseExpiresAt: "2026-07-27T11:00:00.000Z",
@@ -1139,7 +1139,7 @@ describe("API errors", () => {
         responsibility: "Audit the connected repository.",
         skill: "# Repository auditor\n\nAudit the connected repository.",
       },
-      workflow: repositoryWorkflowBootstrap,
+      workflow: cloneAutoHuntWorkflow(),
       status: "completed",
       scheduledFor: "2026-07-27T09:00:00.000Z",
       leaseExpiresAt: null,

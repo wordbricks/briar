@@ -93,7 +93,7 @@ const evidenceTypeSchema = z
 
 const workflowConfigSchema = z
   .object({
-    version: z.literal(1),
+    version: z.union([z.literal(1), z.literal(2)]),
     requirements: z
       .array(
         z
@@ -118,6 +118,18 @@ const workflowConfigSchema = z
     ).min(1),
     execution: z
       .object({
+        checkpoints: z
+          .array(
+            z
+              .object({
+                key: workflowStageIdSchema,
+                stage: workflowStageIdSchema,
+                position: z.enum(["before", "after"]),
+              })
+              .strict(),
+          )
+          .max(100)
+          .optional(),
         // Older desktop builds serialized a missing execution checkpoint as an
         // empty string. normalizeAutoHuntWorkflow already repairs a missing or
         // unknown checkpoint from the required stages, so keep that read
@@ -125,12 +137,6 @@ const workflowConfigSchema = z
         pauseAfterStage: z.string().trim().max(64).optional(),
         stopAfterStage: z.string().trim().max(64).optional(),
       })
-      .refine(
-        (execution) =>
-          execution.pauseAfterStage !== undefined ||
-          execution.stopAfterStage !== undefined,
-        "Workflow pause stage is required",
-      )
       .optional(),
     completion: z.object({
       requiredStages: z.array(workflowStageIdSchema),

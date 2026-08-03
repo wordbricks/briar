@@ -1,5 +1,8 @@
 import type { DashboardPayload, HuntEvent, HuntRun } from "../types";
-import { normalizeAutoHuntWorkflow } from "./auto-hunt-contract";
+import {
+  cloneAutoHuntWorkflow,
+  normalizeAutoHuntWorkflow,
+} from "./auto-hunt-contract";
 import type { RepositoryReadiness } from "./project-connection";
 
 const now = Date.now();
@@ -17,6 +20,15 @@ const demoWorkflow = normalizeAutoHuntWorkflow({
     },
   ],
 });
+const demoWorkflowClone = cloneAutoHuntWorkflow(demoWorkflow);
+const demoWorkflowForUi = {
+  ...demoWorkflowClone,
+  version: 1 as const,
+  execution: {
+    ...demoWorkflowClone.execution,
+    pauseAfterStage: demoWorkflow.execution.pauseAfterStage,
+  },
+};
 
 const runDefaults = {
   currentAttempt: 1,
@@ -39,7 +51,7 @@ const runDefaults = {
   claimedAt: null,
   leaseExpiresAt: null,
   claimAttempts: 0,
-  workflow: structuredClone(demoWorkflow),
+  workflow: demoWorkflowForUi,
 } satisfies Pick<
   HuntRun,
   | "priority"
@@ -255,7 +267,7 @@ export const demoDashboard: DashboardPayload = {
       teamKey: "GG",
     },
     githubRepository: "wordbricks/briar",
-    workflow: structuredClone(demoWorkflow),
+    workflow: demoWorkflowForUi,
   },
   runs,
   organizationProviders: ["codex", "claude", "grok", "opencode"],

@@ -254,8 +254,8 @@ Rules:
 - Return empty evidence or checks arrays when a stage has none; never omit those fields.
 - Mark a stage required only when every successful Auto Hunt task must complete it.
 - completion.requiredStages must contain exactly the ids marked required, in stage order.
-- execution.pauseAfterStage must reference the stage after which the worker pauses for human review. It is a handoff checkpoint, not the completion boundary.
-- Stages after execution.pauseAfterStage remain part of the executable workflow and may run after an explicit human resume.
+- Use version 1 and set execution.pauseAfterStage to the stage after which the existing worker waits for human review. This is the current generation/editing input contract; the persistence layer converts it to v2 checkpoints.
+- The pause stage is a handoff checkpoint, not the completion boundary. Stages after it remain part of the executable workflow and may run after an explicit human resume.
 - Do not invent pull requests, CI, staging, production, deployment, or monitoring. Include them only when repository evidence proves they exist and are usable.
 - Do not modify files and do not run commands that can change the repository.`;
 
@@ -288,7 +288,13 @@ const parseGeneratedWorkflow = (message: string): AutoHuntWorkflow => {
       "LLM 프로바이더가 생성한 워크플로우가 실행 계약을 충족하지 않습니다.",
     );
   }
-  return normalizeAutoHuntWorkflow(generated.data);
+  try {
+    return normalizeAutoHuntWorkflow(generated.data);
+  } catch {
+    throw new Error(
+      "LLM 프로바이더가 생성한 워크플로우가 실행 계약을 충족하지 않습니다.",
+    );
+  }
 };
 
 export async function generateProjectWorkflow(

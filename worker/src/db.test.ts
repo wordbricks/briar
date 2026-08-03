@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+  cloneAutoHuntWorkflow,
   normalizeAutoHuntWorkflow,
   repositoryWorkflowBootstrap,
 } from "../../src/lib/auto-hunt-contract";
@@ -155,6 +156,20 @@ const revisionWorkflow = normalizeAutoHuntWorkflow({
     },
   ],
 });
+const legacyWorkflowSnapshot = (
+  workflow: typeof releaseWorkflow,
+  execution?: {
+    pauseAfterStage?: string;
+    stopAfterStage?: string;
+  },
+) =>
+  JSON.stringify({
+    version: 1,
+    requirements: workflow.requirements,
+    stages: workflow.stages,
+    ...(execution ? { execution } : {}),
+    completion: workflow.completion,
+  });
 const projectId = "11111111-1111-4111-8111-111111111111";
 const baseTime = Date.parse("2026-07-21T00:00:00Z");
 const atMinute = (minute: number) =>
@@ -1164,7 +1179,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       scheduled_for: "2026-07-27T09:00:00.000Z",
     });
     expect(JSON.parse(claimed!.workflow_json)).toEqual(
-      repositoryWorkflowBootstrap,
+      cloneAutoHuntWorkflow(),
     );
     await expect(
       claimDueProjectAgentScheduleRun(db, projectId, {
@@ -1406,6 +1421,12 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       workflow: releaseWorkflow,
     });
     const runId = await recordHuntEvent(db, projectId, event("queued", 1));
+    await db
+      .prepare(
+        `update briar_hunt_runs set workflow_snapshot_json = ? where id = ?`,
+      )
+      .bind(legacyWorkflowSnapshot(releaseWorkflow), runId)
+      .run();
     expect(runId).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
     );
@@ -1569,6 +1590,17 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       projectId,
       event("queued", 13, common),
     );
+    await db
+      .prepare(
+        `update briar_hunt_runs set workflow_snapshot_json = ? where id = ?`,
+      )
+      .bind(
+        legacyWorkflowSnapshot(pullRequestBoundaryWorkflow, {
+          stopAfterStage: "pr_open",
+        }),
+        runId,
+      )
+      .run();
     await expect(
       moveHuntRun(db, projectId, {
         runId,
@@ -1773,6 +1805,12 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       projectId,
       event("queued", 13, { sourceKey, eventKey: "revision:queued" }),
     );
+    await db
+      .prepare(
+        `update briar_hunt_runs set workflow_snapshot_json = ? where id = ?`,
+      )
+      .bind(legacyWorkflowSnapshot(revisionWorkflow), runId)
+      .run();
     for (const [stage, minute] of [
       ["analyzing", 13.1],
       ["implementing", 13.2],
@@ -1956,7 +1994,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ]);
     const settings = await getProjectSettings(db, project.id);
     expect(JSON.parse(settings!.workflow_json)).toEqual(
-      repositoryWorkflowBootstrap,
+      cloneAutoHuntWorkflow(),
     );
     await expect(
       recordHuntEvent(
@@ -2609,6 +2647,12 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       projectId,
       event("queued", 30, common),
     );
+    await db
+      .prepare(
+        `update briar_hunt_runs set workflow_snapshot_json = ? where id = ?`,
+      )
+      .bind(legacyWorkflowSnapshot(localWorkflow), runId)
+      .run();
     await recordHuntEvent(db, projectId, event("analyzing", 31, common));
     await recordHuntEvent(db, projectId, event("implementing", 32, common));
     await recordHuntEvent(
