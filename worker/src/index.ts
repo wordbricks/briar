@@ -6170,7 +6170,17 @@ async function route(
     // A heartbeat is the cheapest regular touchpoint, so let it also recover
     // runs whose holder stopped reporting.
     const reaped = await reapStalledHuntRuns(db, binding.project_id, observedAt);
-    return json({ worker: workerJson(worker, observedAt), reaped });
+    // Share the project workflow tool list so each worker can probe readiness
+    // against the same requirements, even when its local config is stale.
+    const projectSettings = await getProjectSettings(db, binding.project_id);
+    const projectWorkflow = projectSettings?.workflow_json
+      ? normalizeAutoHuntWorkflow(JSON.parse(projectSettings.workflow_json))
+      : null;
+    return json({
+      worker: workerJson(worker, observedAt),
+      reaped,
+      workflowRequirements: projectWorkflow?.requirements ?? [],
+    });
   }
 
   const workerLabelMatch = pathname.match(
