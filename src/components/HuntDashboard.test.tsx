@@ -603,6 +603,11 @@ describe("HuntDashboard", () => {
 
   it("shows copy ID and link beside the title and edit/delete in the actions menu", async () => {
     const onDeleteIssue = vi.fn(async () => undefined);
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
@@ -632,6 +637,10 @@ describe("HuntDashboard", () => {
     );
     expect(copyLink?.getAttribute("aria-label")).toBe("링크 복사");
     expect(copyId?.getAttribute("aria-label")).toBe("이슈 ID 복사");
+    await act(async () => copyId?.click());
+    expect(writeText).toHaveBeenCalledWith(
+      `AH-${demoDashboard.runs[0].runNumber}`,
+    );
     expect(title?.nextElementSibling).toBe(titlebarActions);
     expect(titlebarActions?.firstElementChild?.classList).toContain(
       "run-page-property-badges",
