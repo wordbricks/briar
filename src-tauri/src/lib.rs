@@ -6534,6 +6534,18 @@ fn prepare_launch_intro(app: tauri::AppHandle) -> Result<(), String> {
             return Err(error.to_string());
         }
 
+        // The intro window is driven by frontend timers. If its script fails to
+        // load after an update, do not leave the production app running with
+        // every window hidden forever.
+        let fallback_app = app.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_secs(7));
+            if let Some(intro) = fallback_app.get_webview_window("launch-intro") {
+                let _ = intro.destroy();
+                let _ = display_main_window(&fallback_app, true);
+            }
+        });
+
         Ok(())
     }
     #[cfg(not(target_os = "macos"))]
@@ -6658,10 +6670,6 @@ pub fn run() {
                     );
                 }
             }
-            #[cfg(all(target_os = "macos", not(dev)))]
-            if let Some(main) = _app.get_webview_window("main") {
-                main.hide()?;
-            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -6730,6 +6738,16 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building Briar");
     app.run(|app, event| {
+        #[cfg(target_os = "macos")]
+        if let tauri::RunEvent::Reopen {
+            has_visible_windows,
+            ..
+        } = &event
+        {
+            if !has_visible_windows {
+                let _ = display_main_window(app, true);
+            }
+        }
         #[cfg(desktop)]
         if let tauri::RunEvent::ExitRequested {
             code: None, api, ..
