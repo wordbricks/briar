@@ -13,10 +13,24 @@ export function shouldBriarReply(
 ) {
   if (mentionsBriar(input.body)) return true;
   if (!input.parentMessageId) return false;
-  return messages.some(
+  const byId = new Map(messages.map((message) => [message.id, message]));
+  const isAgentActive = (message: IssueReplyContextMessage | undefined) =>
+    message !== undefined &&
+    (message.author.provider !== null || mentionsBriar(message.body));
+  const siblingActive = messages.some(
     (message) =>
-      (message.id === input.parentMessageId ||
-        message.parentMessageId === input.parentMessageId) &&
-      (message.author.provider !== null || mentionsBriar(message.body)),
+      message.parentMessageId === input.parentMessageId &&
+      isAgentActive(message),
   );
+  if (siblingActive) return true;
+  const parent = byId.get(input.parentMessageId);
+  if (!parent) return false;
+  let ancestor: IssueReplyContextMessage | undefined = parent;
+  while (ancestor) {
+    if (isAgentActive(ancestor)) return true;
+    ancestor = ancestor.parentMessageId
+      ? byId.get(ancestor.parentMessageId)
+      : undefined;
+  }
+  return false;
 }

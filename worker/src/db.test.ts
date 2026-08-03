@@ -42,6 +42,7 @@ import {
   listIssueDependencies,
   listIssueConversationNotifications,
   listIssueMessages,
+  listIssueThreadMessages,
   listIssueResultReviews,
   listDashboardChanges,
   listDashboardRuns,
@@ -2196,7 +2197,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     });
   });
 
-  it("stores issue conversations with one-level threaded replies", async () => {
+  it("stores issue conversations with nested threaded replies", async () => {
     const runId = await recordHuntEvent(
       db,
       projectId,
@@ -2277,18 +2278,43 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         reply_count: 0,
       }),
     ]);
+    const nestedReplyId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
     await expect(
       createIssueMessage(db, {
-        id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        id: nestedReplyId,
         projectId,
         runId,
         parentMessageId: replyId,
         authorUserId: "owner",
         authorAgentProvider: null,
-        body: "Nested replies are not supported.",
+        body: "A reply to the reply keeps the thread going.",
         createdAt: atMinute(29),
       }),
-    ).resolves.toBeNull();
+    ).resolves.toEqual(
+      expect.objectContaining({
+        id: nestedReplyId,
+        parent_message_id: replyId,
+      }),
+    );
+    const thread = await listIssueThreadMessages(db, projectId, runId, rootId);
+    expect(thread.map((message) => message.id)).toEqual([
+      rootId,
+      replyId,
+      agentReplyId,
+      nestedReplyId,
+    ]);
+    const nestedThread = await listIssueThreadMessages(
+      db,
+      projectId,
+      runId,
+      nestedReplyId,
+    );
+    expect(nestedThread.map((message) => message.id)).toEqual([
+      rootId,
+      replyId,
+      agentReplyId,
+      nestedReplyId,
+    ]);
   });
 
   it("lists mentions and replies to a user's root messages for inbox delivery", async () => {

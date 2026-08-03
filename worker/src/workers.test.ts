@@ -554,7 +554,7 @@ describe("detached execution workers", () => {
     });
   });
 
-  it("lists a thread root and its replies for continuation decisions", async () => {
+  it("lists a thread root, replies, and nested replies for continuation decisions", async () => {
     const runId = await recordHuntEvent(
       db,
       projectId,
@@ -590,6 +590,16 @@ describe("detached execution workers", () => {
       body: "이어서 질문",
       createdAt: atMinute(4),
     });
+    await createIssueMessage(db, {
+      id: "dddddddd-4444-4ddd-8ddd-dddddddddddd",
+      projectId,
+      runId,
+      parentMessageId: "bbbbbbbb-2222-4bbb-8bbb-bbbbbbbbbbbb",
+      authorUserId: "owner",
+      authorAgentProvider: null,
+      body: "Briar 답변에 대한 대댓글",
+      createdAt: atMinute(5),
+    });
 
     const thread = await listIssueThreadMessages(
       db,
@@ -602,6 +612,7 @@ describe("detached execution workers", () => {
       "aaaaaaaa-1111-4aaa-8aaa-aaaaaaaaaaaa",
       "bbbbbbbb-2222-4bbb-8bbb-bbbbbbbbbbbb",
       "cccccccc-3333-4ccc-8ccc-cccccccccccc",
+      "dddddddd-4444-4ddd-8ddd-dddddddddddd",
     ]);
     expect(
       thread.map((message) => message.author_agent_provider),
