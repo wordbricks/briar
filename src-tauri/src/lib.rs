@@ -1478,9 +1478,9 @@ fn cli_execution_path_with_runtime(
     home: &Path,
     runtime_directories: impl IntoIterator<Item = PathBuf>,
 ) -> Result<OsString, String> {
-    let mut paths = runtime_directories.into_iter().collect::<Vec<_>>();
+    let mut paths = vec![home.join(".local/bin")];
+    paths.extend(runtime_directories);
     paths.extend([
-        home.join(".local/bin"),
         home.join(".grok/bin"),
         home.join(".opencode/bin"),
         home.join("bin"),
@@ -6903,6 +6903,34 @@ mod tests {
         .expect("Bun should resolve through the bundled runtime directory");
 
         assert_eq!(resolved, bundled.path().join("bun"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn prefers_the_user_cli_over_the_desktop_app_binary() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let home = tempfile::tempdir().expect("fixture home should exist");
+        let bundled = tempfile::tempdir().expect("bundled runtime directory should exist");
+        let user_bin = home.path().join(".local/bin");
+        fs::create_dir_all(&user_bin).expect("user CLI directory should exist");
+        for briar in [user_bin.join("briar"), bundled.path().join("briar")] {
+            fs::write(&briar, "#!/bin/sh\nexit 0\n").expect("fixture CLI should be written");
+            fs::set_permissions(&briar, fs::Permissions::from_mode(0o700))
+                .expect("fixture CLI should be executable");
+        }
+
+        let resolved = which::which_in(
+            "briar",
+            Some(
+                cli_execution_path_with_runtime(home.path(), [bundled.path().to_path_buf()])
+                    .expect("CLI PATH should resolve"),
+            ),
+            home.path(),
+        )
+        .expect("Briar should resolve through the user CLI directory");
+
+        assert_eq!(resolved, user_bin.join("briar"));
     }
 
     #[test]

@@ -11,7 +11,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { homedir, hostname, platform, arch } from "node:os";
-import { join } from "node:path";
+import { delimiter, isAbsolute, join } from "node:path";
 
 export type AgentProvider = "codex" | "claude" | "grok" | "opencode";
 export type ModelEffort = "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
@@ -86,6 +86,29 @@ export const DEFAULT_LEASE_RENEW_INTERVAL_MS = 30_000;
 export const DEFAULT_MAX_ERROR_DELAY_MS = 5 * 60_000;
 export const DEFAULT_MAX_CONCURRENT_SESSIONS = 1;
 export const MAX_CONCURRENT_SESSIONS = 16;
+
+export function workerCliPath(
+  home = homedir(),
+  configured = process.env.BRIAR_CLI,
+): string {
+  const desktopAppBinary = configured?.replaceAll("\\", "/").match(
+    /\/[^/]+\.app\/Contents\/MacOS\/briar$/u,
+  );
+  return configured && isAbsolute(configured) && !desktopAppBinary
+    ? configured
+    : join(home, ".local", "bin", "briar");
+}
+
+export function workerExecutionPath(
+  environmentPath = process.env.PATH,
+  home = homedir(),
+): string {
+  const localBin = join(home, ".local", "bin");
+  const paths = (environmentPath ?? "")
+    .split(delimiter)
+    .filter((path) => path.length > 0 && path !== localBin);
+  return [localBin, ...paths].join(delimiter);
+}
 
 /**
  * Stable per-machine identity. Deliberately derived from machine facts only:
@@ -409,17 +432,20 @@ export function launchdPlist(input: {
   workingDirectory: string;
   logPath: string;
   environmentPath?: string;
+  briarCli?: string;
 }): string {
   const label = serviceLabel(input.projectId);
   const programArguments = workerServiceCommand(input)
     .map((argument) => `    <string>${plistText(argument)}</string>`)
     .join("\n");
-  const environmentVariables = input.environmentPath
+  const environmentVariables = input.environmentPath || input.briarCli
     ? `  <key>EnvironmentVariables</key>
   <dict>
-    <key>PATH</key>
+${input.briarCli ? `    <key>BRIAR_CLI</key>
+    <string>${plistText(input.briarCli)}</string>
+` : ""}${input.environmentPath ? `    <key>PATH</key>
     <string>${plistText(input.environmentPath)}</string>
-  </dict>
+` : ""}  </dict>
 `
     : "";
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -491,6 +517,7 @@ export function serviceDefinition(input: {
   const logPath = workerLogPath(input.projectId, home);
 
   if (currentPlatform === "darwin") {
+    const briarCli = workerCliPath(home);
     return {
       label,
       path: join(home, "Library", "LaunchAgents", `${label}.plist`),
@@ -504,7 +531,11 @@ export function serviceDefinition(input: {
         // launchd does not inherit the PATH used to bootstrap the service.
         // Persist it so user-installed CLIs and their shebang runtimes remain
         // available after the desktop configuration command exits.
-        environmentPath: input.environmentPath ?? process.env.PATH,
+        environmentPath: workerExecutionPath(
+          input.environmentPath ?? process.env.PATH,
+          home,
+        ),
+        briarCli,
       }),
       enableCommand: ["launchctl", "bootstrap", `gui/${process.getuid?.() ?? 501}`],
       disableCommand: ["launchctl", "bootout", `gui/${process.getuid?.() ?? 501}`],

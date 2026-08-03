@@ -1,7 +1,9 @@
 import Foundation
 
 enum MobileAPIContract {
-    static let version = "1.1.0"
+    // New operations are additive so existing Android and Tauri clients stay
+    // on the stable 1.0 contract version.
+    static let version = "1.0.0"
     static let iOSClientID = "briar-mobile"
     static let androidClientID = "briar-android"
 
@@ -11,6 +13,14 @@ enum MobileAPIContract {
         static let deviceToken = "/api/auth/device/token"
         static let currentUser = "/me"
         static let projects = "/projects"
+
+        static func issues(projectID: UUID) -> String {
+            "/projects/\(projectID.uuidString.lowercased())/issues"
+        }
+
+        static func run(projectID: UUID, runID: UUID) -> String {
+            "/projects/\(projectID.uuidString.lowercased())/runs/\(runID.uuidString.lowercased())"
+        }
 
         static func dashboard(projectID: UUID) -> String {
             "/projects/\(projectID.uuidString.lowercased())/dashboard"
@@ -37,6 +47,34 @@ enum MobileAPIContract {
 
         static func runEvidence(projectID: UUID, runID: UUID) -> String {
             "/projects/\(projectID.uuidString.lowercased())/runs/\(runID.uuidString.lowercased())/evidence"
+        }
+
+        static func runPreferences(projectID: UUID, runID: UUID) -> String {
+            "\(run(projectID: projectID, runID: runID))/preferences"
+        }
+
+        static func runDependency(projectID: UUID, runID: UUID, prerequisiteID: UUID) -> String {
+            "\(run(projectID: projectID, runID: runID))/dependencies/\(prerequisiteID.uuidString.lowercased())"
+        }
+
+        static func runStatus(projectID: UUID, runID: UUID) -> String {
+            "\(run(projectID: projectID, runID: runID))/status"
+        }
+
+        static func runDispatch(projectID: UUID, runID: UUID, reassign: Bool) -> String {
+            "\(run(projectID: projectID, runID: runID))/\(reassign ? "reassign" : "dispatch")"
+        }
+
+        static func runRecovery(projectID: UUID, runID: UUID, action: String) -> String {
+            "\(run(projectID: projectID, runID: runID))/\(action)"
+        }
+
+        static func runResultReviews(projectID: UUID, runID: UUID) -> String {
+            "\(run(projectID: projectID, runID: runID))/result-reviews"
+        }
+
+        static func runAgentReply(projectID: UUID, runID: UUID, triggerMessageID: UUID) -> String {
+            "\(runMessages(projectID: projectID, runID: runID))/\(triggerMessageID.uuidString.lowercased())/agent-reply"
         }
     }
 }
@@ -184,14 +222,56 @@ protocol MobileAPIClientProtocol: Sendable {
         as responseType: Response.Type
     ) async throws -> Response
 
+    func sendVoid(
+        _ path: String,
+        method: String,
+        token: String?,
+        body: (any Encodable & Sendable)?
+    ) async throws
+
+    func upload<Response: Decodable & Sendable>(
+        _ path: String,
+        fields: [String: String],
+        files: [MultipartFile],
+        token: String,
+        as responseType: Response.Type
+    ) async throws -> Response
+
     func download(_ path: String, token: String, to destination: URL) async throws -> URL
 }
 
 extension MobileAPIClientProtocol {
+    func sendVoid(
+        _ path: String,
+        method: String,
+        token: String?,
+        body: (any Encodable & Sendable)?
+    ) async throws {
+        let _: EmptyAPIResponse = try await send(
+            path,
+            method: method,
+            token: token,
+            body: body,
+            as: EmptyAPIResponse.self
+        )
+    }
+
+    func upload<Response: Decodable & Sendable>(
+        _ path: String,
+        fields: [String: String],
+        files: [MultipartFile],
+        token: String,
+        as responseType: Response.Type
+    ) async throws -> Response {
+        throw MobileAPIError.invalidRequest
+    }
+
     func download(_ path: String, token: String, to destination: URL) async throws -> URL {
         throw MobileAPIError.invalidDownload
     }
 }
+
+private struct EmptyAPIResponse: Decodable, Sendable {}
 
 struct MobileAPIClient: MobileAPIClientProtocol, Sendable {
     let baseURL: URL
@@ -240,6 +320,27 @@ struct MobileAPIClient: MobileAPIClientProtocol, Sendable {
         let (data, response) = try await session.data(for: request)
         try validate(response: response, data: data)
         return try JSONDecoder.mobileContract.decode(responseType, from: data)
+    }
+
+    func sendVoid(
+        _ path: String,
+        method: String,
+        token: String?,
+        body: (any Encodable & Sendable)?
+    ) async throws {
+        guard let url = endpointURL(path) else { throw MobileAPIError.invalidRequest }
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        if let body {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONEncoder.mobileContract.encode(AnyEncodable(body))
+        }
+        let (data, response) = try await session.data(for: request)
+        try validate(response: response, data: data)
     }
 
     func upload<Response: Decodable & Sendable>(

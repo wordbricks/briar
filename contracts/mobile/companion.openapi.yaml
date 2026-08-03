@@ -150,6 +150,19 @@
           "401": { "$ref": "#/components/responses/Error" },
           "404": { "$ref": "#/components/responses/Error" }
         }
+      },
+      "post": {
+        "operationId": "createIssueMessage",
+        "parameters": [
+          { "$ref": "#/components/parameters/ProjectId" },
+          { "$ref": "#/components/parameters/RunId" }
+        ],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Message created and optional Agent reply queued" },
+          "400": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
       }
     },
     "/projects/{projectId}/runs/{runId}/evidence": {
@@ -207,6 +220,41 @@
           "404": { "$ref": "#/components/responses/Error" }
         }
       }
+    },
+    "/projects/{projectId}/issues": {
+      "post": { "operationId": "createIssue", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Issue created" }, "400": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/projects/{projectId}/runs/{runId}": {
+      "patch": { "operationId": "updateIssue", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Issue updated" }, "409": { "$ref": "#/components/responses/Error" } } },
+      "delete": { "operationId": "deleteIssue", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Issue deleted" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/projects/{projectId}/runs/{runId}/preferences": {
+      "put": { "operationId": "updateIssuePreferences", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Execution preferences updated" } } }
+    },
+    "/projects/{projectId}/runs/{runId}/dependencies/{prerequisiteRunId}": {
+      "put": { "operationId": "addIssueDependency", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Dependency added" }, "409": { "$ref": "#/components/responses/Error" } } },
+      "delete": { "operationId": "removeIssueDependency", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Dependency removed" } } }
+    },
+    "/projects/{projectId}/runs/{runId}/status": {
+      "put": { "operationId": "moveRun", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Run status moved idempotently" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/projects/{projectId}/runs/{runId}/retry": {
+      "post": { "operationId": "retryRun", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Run retried idempotently" } } }
+    },
+    "/projects/{projectId}/runs/{runId}/cancel": {
+      "post": { "operationId": "cancelRun", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Run cancelled idempotently" } } }
+    },
+    "/projects/{projectId}/runs/{runId}/dispatch": {
+      "post": { "operationId": "dispatchRun", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Run dispatched idempotently" } } }
+    },
+    "/projects/{projectId}/runs/{runId}/reassign": {
+      "post": { "operationId": "reassignRun", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Run reassigned idempotently" } } }
+    },
+    "/projects/{projectId}/runs/{runId}/result-reviews": {
+      "post": { "operationId": "completeResultReview", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Result review completed" } } }
+    },
+    "/projects/{projectId}/runs/{runId}/messages/{triggerMessageId}/agent-reply": {
+      "get": { "operationId": "getIssueAgentReply", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Current Agent reply status and completed message" } } }
     }
   },
   "components": {
@@ -367,16 +415,30 @@
           "title": { "type": "string" },
           "status": { "type": "string", "enum": ["backlog", "queued", "running", "blocked", "failed", "completed", "cancelled"] },
           "workflowStage": { "type": ["string", "null"] },
+          "workflow": { "type": "object", "additionalProperties": true },
           "progress": { "type": "number", "minimum": 0, "maximum": 100 },
           "detail": { "type": ["string", "null"] },
+          "priority": { "type": ["integer", "null"], "minimum": 1, "maximum": 4 },
           "issueDescription": { "type": ["string", "null"] },
           "attachments": { "type": "array", "items": { "$ref": "#/components/schemas/IssueAttachment" } },
+          "prerequisites": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+          "dependents": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+          "executionReadiness": { "type": "string", "enum": ["ready", "waiting"] },
+          "waitingOnPrerequisiteCount": { "type": "integer", "minimum": 0 },
           "resultSummary": { "type": ["string", "null"] },
           "structuredResult": { "type": ["object", "null"], "additionalProperties": true },
           "resultReviews": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
           "pullRequestUrls": { "type": "array", "items": { "type": "string", "format": "uri" } },
           "branch": { "type": ["string", "null"] },
           "commitSha": { "type": ["string", "null"] },
+          "preferredProvider": { "type": ["string", "null"], "enum": ["codex", "claude", "grok", "opencode", null] },
+          "preferredModel": { "type": ["string", "null"] },
+          "preferredEffort": { "type": ["string", "null"], "enum": ["low", "medium", "high", "xhigh", "max", "ultra", null] },
+          "requestedProvider": { "type": ["string", "null"], "enum": ["codex", "claude", "grok", "opencode", null] },
+          "requestedModel": { "type": ["string", "null"] },
+          "requestedEffort": { "type": ["string", "null"], "enum": ["low", "medium", "high", "xhigh", "max", "ultra", null] },
+          "requestedWorkerId": { "type": ["string", "null"] },
+          "workerId": { "type": ["string", "null"] },
           "updatedAt": { "type": "string", "format": "date-time" },
           "completedAt": { "type": ["string", "null"], "format": "date-time" }
         },
@@ -389,6 +451,7 @@
           "project": { "$ref": "#/components/schemas/Project" },
           "runs": { "type": "array", "items": { "$ref": "#/components/schemas/DashboardRun" } },
           "workers": { "type": "array", "items": { "$ref": "#/components/schemas/DashboardWorker" } },
+          "organizationProviders": { "type": "array", "items": { "type": "string", "enum": ["codex", "claude", "grok", "opencode"] } },
           "conversationNotifications": { "type": "array", "items": { "$ref": "#/components/schemas/ConversationNotification" } },
           "cursor": { "type": "integer", "minimum": 0 },
           "generatedAt": { "type": "string", "format": "date-time" }
@@ -405,6 +468,7 @@
           "deletedRunIds": { "type": "array", "items": { "type": "string", "format": "uuid" } },
           "project": { "$ref": "#/components/schemas/Project" },
           "workers": { "type": "array", "items": { "$ref": "#/components/schemas/DashboardWorker" } },
+          "organizationProviders": { "type": "array", "items": { "type": "string", "enum": ["codex", "claude", "grok", "opencode"] } },
           "conversationNotifications": { "type": "array", "items": { "$ref": "#/components/schemas/ConversationNotification" } },
           "generatedAt": { "type": "string", "format": "date-time" }
         },
@@ -425,6 +489,8 @@
         "properties": {
           "id": { "type": "string" },
           "label": { "type": "string" },
+          "agentProvider": { "type": "string", "enum": ["codex", "claude", "grok", "opencode"] },
+          "providers": { "type": "array", "items": { "type": "string", "enum": ["codex", "claude", "grok", "opencode"] } },
           "readiness": { "type": "string" },
           "readinessDetail": { "type": ["string", "null"] },
           "activeSessions": { "type": "integer", "minimum": 0 },

@@ -32,7 +32,7 @@ final class BriarCompanionUITests: XCTestCase {
         result.tap()
         XCTAssertTrue(app.descendants(matching: .any)["run-detail"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.navigationBars["iOS Native Companion 읽기 경험"].exists)
-        XCTAssertTrue(app.staticTexts["읽기 전용"].exists)
+        XCTAssertTrue(app.buttons["issue-actions-menu"].exists)
         captureScreenshot(named: "companion-search-detail")
     }
 
@@ -60,6 +60,38 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["오프라인"].exists)
         XCTAssertTrue(app.buttons["다시 시도"].exists)
         captureScreenshot(named: "companion-offline-retry")
+    }
+
+    func testCreateRunStateAndMessageFlow() {
+        let app = launchInsideCompanion()
+
+        app.buttons["create-issue-button"].tap()
+        let title = app.textFields["create-issue-title"]
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        title.tap()
+        title.typeText("모바일 쓰기 흐름 확인")
+        let submit = app.buttons["create-issue-submit"]
+        submit.tap()
+        XCTAssertFalse(title.waitForExistence(timeout: 5))
+
+        let createdIssue = app.staticTexts["모바일 쓰기 흐름 확인"]
+        XCTAssertTrue(createdIssue.waitForExistence(timeout: 5))
+        createdIssue.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["run-detail"].waitForExistence(timeout: 5))
+        app.buttons["process-now-button"].tap()
+        let dispatch = app.buttons["dispatch-issue-submit"]
+        XCTAssertTrue(dispatch.waitForExistence(timeout: 5))
+        dispatch.tap()
+        XCTAssertTrue(app.staticTexts["진행 중"].waitForExistence(timeout: 5))
+
+        let message = app.textFields["issue-message-field"]
+        for _ in 0..<8 where !message.exists { app.swipeUp() }
+        XCTAssertTrue(message.waitForExistence(timeout: 5))
+        message.tap()
+        message.typeText("모바일에서 확인했습니다")
+        app.buttons["issue-message-send"].tap()
+        XCTAssertTrue(app.staticTexts["모바일에서 확인했습니다"].waitForExistence(timeout: 5))
+        captureScreenshot(named: "companion-native-write-flow")
     }
 
     private func launchInsideCompanion() -> XCUIApplication {

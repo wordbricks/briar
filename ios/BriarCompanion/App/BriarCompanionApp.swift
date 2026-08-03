@@ -25,6 +25,7 @@ private struct UITestCompanionFlow: View {
     @State private var signedIn = false
     @State private var selectedProjectID: UUID?
     @State private var projectSelected = false
+    @State private var createdRunStatus: DashboardRun.Status?
 
     let offline: Bool
     private let api = UITestAPIClient()
@@ -69,7 +70,8 @@ private struct UITestCompanionFlow: View {
                 errorMessage: nil,
                 token: "ui-test-token",
                 api: api,
-                refresh: {},
+                ideas: IdeasStore(api: api),
+                refresh: { await refreshSnapshot() },
                 changeProject: { projectSelected = false },
                 signOut: {
                     projectSelected = false
@@ -80,61 +82,91 @@ private struct UITestCompanionFlow: View {
     }
 
     private var snapshot: DashboardSnapshot {
-        DashboardSnapshot(
+        var runs = [
+            DashboardRun(
+                id: UUID(uuidString: "33333333-3333-4333-8333-333333333333")!,
+                runNumber: 3832,
+                title: "iOS Native Companion 읽기 경험",
+                status: .running,
+                workflowStage: "implementing",
+                progress: 45,
+                detail: "앱 셸과 작업 상세를 구현하는 중",
+                issueDescription: "## 목표\n로그인부터 상세까지 안전하게 읽습니다.",
+                resultSummary: nil,
+                updatedAt: Date(timeIntervalSince1970: 1_775_264_400)
+            ),
+            DashboardRun(
+                id: UUID(uuidString: "44444444-4444-4444-8444-444444444444")!,
+                title: "공유 API 계약 검증",
+                status: .completed,
+                detail: "iOS와 Android 계약 통과",
+                resultSummary: "공유 계약이 검증되었습니다.",
+                updatedAt: Date(timeIntervalSince1970: 1_775_264_300),
+                completedAt: Date(timeIntervalSince1970: 1_775_264_300)
+            ),
+            DashboardRun(
+                id: UUID(uuidString: "55555555-5555-4555-8555-555555555555")!,
+                title: "오프라인 복구 확인",
+                status: .blocked,
+                detail: "네트워크 확인 필요",
+                updatedAt: Date(timeIntervalSince1970: 1_775_264_200)
+            ),
+            DashboardRun(
+                id: UUID(uuidString: "66666666-6666-4666-8666-666666666666")!,
+                title: "실패 상태 예시",
+                status: .failed,
+                detail: "재시도 가능",
+                updatedAt: Date(timeIntervalSince1970: 1_775_264_100)
+            ),
+        ]
+        if let createdRunStatus {
+            runs.insert(DashboardRun(
+                id: UUID(uuidString: "77777777-7777-4777-8777-777777777777")!,
+                runNumber: 3833,
+                title: "모바일 쓰기 흐름 확인",
+                status: createdRunStatus,
+                workflowStage: createdRunStatus == .running ? "analyzing" : nil,
+                workflow: AutoHuntWorkflow(
+                    version: 1,
+                    stages: [
+                        .init(id: "analyzing", label: "분석", required: true),
+                        .init(id: "implementing", label: "구현", required: true),
+                    ]
+                ),
+                detail: createdRunStatus == .running ? "Worker가 실행을 시작했습니다." : nil,
+                updatedAt: Date(timeIntervalSince1970: 1_775_264_500)
+            ), at: 0)
+        }
+        return DashboardSnapshot(
             project: project,
-            runs: [
-                DashboardRun(
-                    id: UUID(uuidString: "33333333-3333-4333-8333-333333333333")!,
-                    runNumber: 3832,
-                    title: "iOS Native Companion 읽기 경험",
-                    status: .running,
-                    workflowStage: "implementing",
-                    progress: 45,
-                    detail: "앱 셸과 작업 상세를 구현하는 중",
-                    issueDescription: "## 목표\n로그인부터 상세까지 안전하게 읽습니다.",
-                    resultSummary: nil,
-                    updatedAt: Date(timeIntervalSince1970: 1_775_264_400)
-                ),
-                DashboardRun(
-                    id: UUID(uuidString: "44444444-4444-4444-8444-444444444444")!,
-                    title: "공유 API 계약 검증",
-                    status: .completed,
-                    detail: "iOS와 Android 계약 통과",
-                    resultSummary: "공유 계약이 검증되었습니다.",
-                    updatedAt: Date(timeIntervalSince1970: 1_775_264_300),
-                    completedAt: Date(timeIntervalSince1970: 1_775_264_300)
-                ),
-                DashboardRun(
-                    id: UUID(uuidString: "55555555-5555-4555-8555-555555555555")!,
-                    title: "오프라인 복구 확인",
-                    status: .blocked,
-                    detail: "네트워크 확인 필요",
-                    updatedAt: Date(timeIntervalSince1970: 1_775_264_200)
-                ),
-                DashboardRun(
-                    id: UUID(uuidString: "66666666-6666-4666-8666-666666666666")!,
-                    title: "실패 상태 예시",
-                    status: .failed,
-                    detail: "재시도 가능",
-                    updatedAt: Date(timeIntervalSince1970: 1_775_264_100)
-                ),
-            ],
+            runs: runs,
             workers: [DashboardWorker(
                 id: "worker-1",
                 label: "Mac Studio",
+                agentProvider: .codex,
+                providers: [.codex],
                 readiness: "available",
                 readinessDetail: "작업 수신 가능",
                 activeSessions: 1,
                 availableSessions: 2
             )],
+            organizationProviders: [.codex],
             conversationNotifications: [],
             cursor: 41,
             generatedAt: Date(timeIntervalSince1970: 1_775_264_400)
         )
     }
+
+    private func refreshSnapshot() async {
+        createdRunStatus = await api.createdIssueStatus()
+    }
 }
 
-private struct UITestAPIClient: MobileAPIClientProtocol {
+private actor UITestAPIClient: MobileAPIClientProtocol {
+    private var issueStatus: DashboardRun.Status?
+
+    func createdIssueStatus() -> DashboardRun.Status? { issueStatus }
+
     func send<Response: Decodable & Sendable>(
         _ path: String,
         method: String,
@@ -143,7 +175,25 @@ private struct UITestAPIClient: MobileAPIClientProtocol {
         as responseType: Response.Type
     ) async throws -> Response {
         let payload: String
-        if path.hasSuffix("/events") {
+        if path.hasSuffix("/issues") && method == "POST" {
+            issueStatus = .queued
+            payload = #"{"runId":"77777777-7777-4777-8777-777777777777","sourceKey":"briar-issue:ui-test","stage":"queued","status":"queued","attachments":[]}"#
+        } else if path.hasSuffix("/dispatch") && method == "POST" {
+            issueStatus = .running
+            payload = #"{"runId":"77777777-7777-4777-8777-777777777777","agentId":null,"provider":"codex","model":null,"effort":null,"requestedWorkerId":null,"requestedByUserId":"fixture-user","dispatchMode":"any","dispatchedAt":"2026-08-02T01:01:00Z","outcome":"dispatched"}"#
+        } else if path.hasSuffix("/retry") && method == "POST" {
+            payload = #"{"runId":"66666666-6666-4666-8666-666666666666","outcome":"retried","attempt":2,"stage":"queued"}"#
+        } else if path.hasSuffix("/cancel") && method == "POST" {
+            payload = #"{"runId":"66666666-6666-4666-8666-666666666666","outcome":"cancelled","attempt":1,"stage":"cancelled"}"#
+        } else if path.hasSuffix("/status") {
+            payload = #"{"runId":"66666666-6666-4666-8666-666666666666","outcome":"moved","status":"queued","workflowStage":null}"#
+        } else if path.hasSuffix("/preferences") {
+            payload = #"{"runId":"66666666-6666-4666-8666-666666666666","provider":"codex","model":"gpt-5.6-sol","effort":"high"}"#
+        } else if path.hasSuffix("/result-reviews") {
+            payload = #"{"userId":"fixture-user","name":"Briar User","username":"briar_user","image":null,"completedAt":"2026-08-02T01:01:00Z"}"#
+        } else if path.hasSuffix("/messages") && method == "POST" {
+            payload = #"{"message":{"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","runId":"77777777-7777-4777-8777-777777777777","parentMessageId":null,"body":"모바일에서 확인했습니다","author":{"id":"fixture-user","name":"Briar User","image":null,"provider":null},"replyCount":0,"createdAt":"2026-08-02T01:02:00Z","updatedAt":"2026-08-02T01:02:00Z"},"agentReply":null}"#
+        } else if path.hasSuffix("/events") {
             payload = #"{"events":[]}"#
         } else if path.hasSuffix("/messages") {
             payload = #"{"messages":[]}"#
@@ -154,4 +204,11 @@ private struct UITestAPIClient: MobileAPIClientProtocol {
         }
         return try JSONDecoder.mobileContract.decode(Response.self, from: Data(payload.utf8))
     }
+
+    func sendVoid(
+        _ path: String,
+        method: String,
+        token: String?,
+        body: (any Encodable & Sendable)?
+    ) async throws {}
 }

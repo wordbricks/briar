@@ -6,16 +6,30 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
     let title: String
     let status: Status
     let workflowStage: String?
+    let workflow: AutoHuntWorkflow?
     let progress: Double?
     let detail: String?
+    let priority: Int?
     let issueDescription: String?
     let attachments: [IssueAttachment]?
+    let prerequisites: [IssueDependencyReference]?
+    let dependents: [IssueDependencyReference]?
+    let executionReadiness: String?
+    let waitingOnPrerequisiteCount: Int?
     let resultSummary: String?
     let structuredResult: StructuredRunResult?
     let resultReviews: [ResultReview]?
     let pullRequestUrls: [URL]?
     let branch: String?
     let commitSha: String?
+    let preferredProvider: AgentProvider?
+    let preferredModel: String?
+    let preferredEffort: ModelEffort?
+    let requestedProvider: AgentProvider?
+    let requestedModel: String?
+    let requestedEffort: ModelEffort?
+    let requestedWorkerId: String?
+    let workerId: String?
     let updatedAt: Date
     let completedAt: Date?
 
@@ -25,16 +39,30 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         title: String,
         status: Status,
         workflowStage: String? = nil,
+        workflow: AutoHuntWorkflow? = nil,
         progress: Double? = nil,
         detail: String? = nil,
+        priority: Int? = nil,
         issueDescription: String? = nil,
         attachments: [IssueAttachment]? = nil,
+        prerequisites: [IssueDependencyReference]? = nil,
+        dependents: [IssueDependencyReference]? = nil,
+        executionReadiness: String? = nil,
+        waitingOnPrerequisiteCount: Int? = nil,
         resultSummary: String? = nil,
         structuredResult: StructuredRunResult? = nil,
         resultReviews: [ResultReview]? = nil,
         pullRequestUrls: [URL]? = nil,
         branch: String? = nil,
         commitSha: String? = nil,
+        preferredProvider: AgentProvider? = nil,
+        preferredModel: String? = nil,
+        preferredEffort: ModelEffort? = nil,
+        requestedProvider: AgentProvider? = nil,
+        requestedModel: String? = nil,
+        requestedEffort: ModelEffort? = nil,
+        requestedWorkerId: String? = nil,
+        workerId: String? = nil,
         updatedAt: Date,
         completedAt: Date? = nil
     ) {
@@ -43,16 +71,30 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         self.title = title
         self.status = status
         self.workflowStage = workflowStage
+        self.workflow = workflow
         self.progress = progress
         self.detail = detail
+        self.priority = priority
         self.issueDescription = issueDescription
         self.attachments = attachments
+        self.prerequisites = prerequisites
+        self.dependents = dependents
+        self.executionReadiness = executionReadiness
+        self.waitingOnPrerequisiteCount = waitingOnPrerequisiteCount
         self.resultSummary = resultSummary
         self.structuredResult = structuredResult
         self.resultReviews = resultReviews
         self.pullRequestUrls = pullRequestUrls
         self.branch = branch
         self.commitSha = commitSha
+        self.preferredProvider = preferredProvider
+        self.preferredModel = preferredModel
+        self.preferredEffort = preferredEffort
+        self.requestedProvider = requestedProvider
+        self.requestedModel = requestedModel
+        self.requestedEffort = requestedEffort
+        self.requestedWorkerId = requestedWorkerId
+        self.workerId = workerId
         self.updatedAt = updatedAt
         self.completedAt = completedAt
     }
@@ -80,6 +122,17 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
 
         var needsAttention: Bool { self == .blocked || self == .failed }
         var isActive: Bool { self != .completed && self != .cancelled }
+    }
+}
+
+struct AutoHuntWorkflow: Codable, Equatable, Sendable {
+    let version: Int
+    let stages: [Stage]
+
+    struct Stage: Codable, Equatable, Identifiable, Sendable {
+        let id: String
+        let label: String
+        let required: Bool
     }
 }
 
@@ -115,10 +168,32 @@ struct ResultReview: Codable, Equatable, Identifiable, Sendable {
 struct DashboardWorker: Codable, Equatable, Identifiable, Sendable {
     let id: String
     let label: String
+    let agentProvider: AgentProvider?
+    let providers: [AgentProvider]?
     let readiness: String
     let readinessDetail: String?
     let activeSessions: Int
     let availableSessions: Int
+
+    init(
+        id: String,
+        label: String,
+        agentProvider: AgentProvider? = nil,
+        providers: [AgentProvider]? = nil,
+        readiness: String,
+        readinessDetail: String?,
+        activeSessions: Int,
+        availableSessions: Int
+    ) {
+        self.id = id
+        self.label = label
+        self.agentProvider = agentProvider
+        self.providers = providers
+        self.readiness = readiness
+        self.readinessDetail = readinessDetail
+        self.activeSessions = activeSessions
+        self.availableSessions = availableSessions
+    }
 }
 
 struct ConversationNotification: Codable, Equatable, Identifiable, Sendable {
@@ -136,6 +211,7 @@ struct DashboardSnapshot: Codable, Equatable, Sendable {
     var project: ProjectsResponse.Project
     var runs: [DashboardRun]
     var workers: [DashboardWorker]?
+    var organizationProviders: [AgentProvider]?
     var conversationNotifications: [ConversationNotification]?
     var cursor: Int?
     var generatedAt: Date
@@ -144,6 +220,7 @@ struct DashboardSnapshot: Codable, Equatable, Sendable {
         project: ProjectsResponse.Project,
         runs: [DashboardRun],
         workers: [DashboardWorker]? = nil,
+        organizationProviders: [AgentProvider]? = nil,
         conversationNotifications: [ConversationNotification]? = nil,
         cursor: Int?,
         generatedAt: Date
@@ -151,6 +228,7 @@ struct DashboardSnapshot: Codable, Equatable, Sendable {
         self.project = project
         self.runs = runs
         self.workers = workers
+        self.organizationProviders = organizationProviders
         self.conversationNotifications = conversationNotifications
         self.cursor = cursor
         self.generatedAt = generatedAt
@@ -164,6 +242,7 @@ struct DashboardDelta: Codable, Equatable, Sendable {
     let deletedRunIds: [UUID]
     let project: ProjectsResponse.Project?
     let workers: [DashboardWorker]?
+    let organizationProviders: [AgentProvider]?
     let conversationNotifications: [ConversationNotification]?
     let generatedAt: Date
 
@@ -174,6 +253,7 @@ struct DashboardDelta: Codable, Equatable, Sendable {
         deletedRunIds: [UUID],
         project: ProjectsResponse.Project?,
         workers: [DashboardWorker]? = nil,
+        organizationProviders: [AgentProvider]? = nil,
         conversationNotifications: [ConversationNotification]? = nil,
         generatedAt: Date
     ) {
@@ -183,6 +263,7 @@ struct DashboardDelta: Codable, Equatable, Sendable {
         self.deletedRunIds = deletedRunIds
         self.project = project
         self.workers = workers
+        self.organizationProviders = organizationProviders
         self.conversationNotifications = conversationNotifications
         self.generatedAt = generatedAt
     }
@@ -317,6 +398,7 @@ enum DashboardMerge {
             project: delta.project ?? snapshot.project,
             runs: Array(runs.prefix(200)),
             workers: delta.workers ?? snapshot.workers,
+            organizationProviders: delta.organizationProviders ?? snapshot.organizationProviders,
             conversationNotifications: delta.conversationNotifications ?? snapshot.conversationNotifications,
             cursor: delta.cursor,
             generatedAt: delta.generatedAt

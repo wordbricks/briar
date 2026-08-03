@@ -277,6 +277,12 @@ final class RunDetailStore: ObservableObject {
         }
     }
 
+    func appendMessages(_ newMessages: [IssueMessage]) {
+        let existing = Set(messages.map(\.id))
+        messages.append(contentsOf: newMessages.filter { !existing.contains($0.id) })
+        messages.sort { $0.createdAt < $1.createdAt }
+    }
+
     func download(path: String, filename: String) async throws -> URL {
         let safeName = filename.replacingOccurrences(of: "/", with: "-")
         let destination = FileManager.default.temporaryDirectory
