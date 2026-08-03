@@ -1389,7 +1389,7 @@ export function ProjectSettings({
                       value: stage.id,
                     }))}
                     size="small"
-                    value={workflowContract.execution.pauseAfterStage}
+                    value={workflowContract.execution.pauseAfterStage ?? ""}
                   />
                 </div>
                 <div

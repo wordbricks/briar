@@ -59,8 +59,8 @@ describe("issue detail dark mode", () => {
     expect(firstRule(".issue-message-composer textarea")).toContain(
       "color:var(--foreground)",
     );
-    expect(firstRule(".issue-message-replies")).toContain(
-      "border-left:1px solid var(--border)",
+    expect(firstRule(".issue-message-parent-quote")).toContain(
+      "background:color-mix(in srgb,var(--muted) 88%,var(--card))",
     );
   });
 

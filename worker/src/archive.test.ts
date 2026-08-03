@@ -419,7 +419,9 @@ describe("D1 to R2 log archives", () => {
         .prepare(`select count(*) as count from briar_hunt_events where run_id = ?`)
         .bind(secondRunId)
         .first<number>("count"),
-    ).toBe(5);
+    // v2 snapshots do not activate the legacy resume event lifecycle; the
+    // queued, two stage, and completed events are the four retained rows.
+    ).toBe(4);
 
     await bucket.delete(
       (await db

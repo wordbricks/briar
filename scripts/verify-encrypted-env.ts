@@ -24,6 +24,8 @@ export const encryptedEnvPolicies: Readonly<Record<string, EncryptedEnvPolicy>> 
     secrets: [
       "APPLE_CERTIFICATE",
       "APPLE_CERTIFICATE_PASSWORD",
+      "IOS_DISTRIBUTION_CERTIFICATE",
+      "IOS_DISTRIBUTION_CERTIFICATE_PASSWORD",
       "KEYCHAIN_PASSWORD",
       "APPLE_API_KEY_CONTENT",
       "TAURI_SIGNING_PRIVATE_KEY",

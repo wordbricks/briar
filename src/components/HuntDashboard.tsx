@@ -12,6 +12,7 @@ import {
   Clock3,
   Columns3,
   Copy,
+  CornerUpLeft,
   FolderGit2,
   GitCommitHorizontal,
   GitFork,
@@ -4969,17 +4970,20 @@ function IssueConversation({
     void loadMessages();
   }, [loadMessages, run.id]);
 
-  const roots = messages.filter((message) => message.parentMessageId === null);
-  const repliesByParentId = useMemo(() => {
-    const grouped = new Map<string, IssueMessage[]>();
-    for (const message of messages) {
-      if (!message.parentMessageId) continue;
-      const threadReplies = grouped.get(message.parentMessageId) ?? [];
-      threadReplies.push(message);
-      grouped.set(message.parentMessageId, threadReplies);
-    }
-    return grouped;
+  const messagesById = useMemo(() => {
+    const byId = new Map<string, IssueMessage>();
+    for (const message of messages) byId.set(message.id, message);
+    return byId;
   }, [messages]);
+  const orderedMessages = useMemo(
+    () =>
+      [...messages].sort((left, right) => {
+        const byTime = left.createdAt.localeCompare(right.createdAt);
+        if (byTime !== 0) return byTime;
+        return left.id.localeCompare(right.id);
+      }),
+    [messages],
+  );
   const pendingAgentReplyCount = Object.values(agentReplyStates).reduce(
     (total, state) => total + state.pending,
     0,
@@ -5054,55 +5058,12 @@ function IssueConversation({
       });
   };
 
-  const renderMessageGroup = (message: IssueMessage) => {
-    const replies = repliesByParentId.get(message.id) ?? [];
-    const replyComposerId = `issue-reply-composer-${message.id}`;
-    const isReplying = activeReplyMessageId === message.id;
-    return (
-      <div className="issue-message-group" key={message.id}>
-        <IssueMessageItem
-          isReplying={isReplying}
-          localeTag={localeTag}
-          message={message}
-          onReply={() =>
-            setActiveReplyMessageId((current) =>
-              current === message.id ? null : message.id,
-            )
-          }
-          replyComposerId={replyComposerId}
-        />
-        {replies.length > 0 && (
-          <div
-            aria-label={t("run.replies", { count: replies.length })}
-            className="issue-message-replies"
-          >
-            {replies.map((reply) => renderMessageGroup(reply))}
-          </div>
-        )}
-        <AgentReplyState state={agentReplyStates[message.id]} />
-        {isReplying && (
-          <div className="issue-inline-reply-composer" id={replyComposerId}>
-            <MessageComposer
-              autoFocus
-              compact
-              mentionMembers={mentionMembers}
-              onSubmit={(body, mentionedUserIds) =>
-                sendMessage(body, message.id, mentionedUserIds)
-              }
-              placeholder={t("run.threadPlaceholder")}
-            />
-          </div>
-        )}
-      </div>
-    );
-  };
-
   return (
     <section className="issue-conversation" aria-label={t("run.messages")}>
       <header className="issue-conversation-header">
         <strong>
           {t("run.messages")}
-          {!loading && <span>{roots.length}</span>}
+          {!loading && <span>{messages.length}</span>}
         </strong>
         <small>{t("run.agentRepliesHere")}</small>
       </header>
@@ -5121,10 +5082,49 @@ function IssueConversation({
             <CircleAlert size={15} />
             {loadError}
           </button>
-        ) : roots.length === 0 ? (
+        ) : orderedMessages.length === 0 ? (
           <p className="issue-message-empty">{t("run.messagesEmpty")}</p>
         ) : (
-          roots.map((message) => renderMessageGroup(message))
+          orderedMessages.map((message) => {
+            const replyComposerId = `issue-reply-composer-${message.id}`;
+            const isReplying = activeReplyMessageId === message.id;
+            const parentMessage = message.parentMessageId
+              ? messagesById.get(message.parentMessageId) ?? null
+              : null;
+            return (
+              <div className="issue-message-group" key={message.id}>
+                <IssueMessageItem
+                  isReplying={isReplying}
+                  localeTag={localeTag}
+                  message={message}
+                  onReply={() =>
+                    setActiveReplyMessageId((current) =>
+                      current === message.id ? null : message.id,
+                    )
+                  }
+                  parentMessage={parentMessage}
+                  replyComposerId={replyComposerId}
+                />
+                <AgentReplyState state={agentReplyStates[message.id]} />
+                {isReplying && (
+                  <div
+                    className="issue-inline-reply-composer"
+                    id={replyComposerId}
+                  >
+                    <MessageComposer
+                      autoFocus
+                      compact
+                      mentionMembers={mentionMembers}
+                      onSubmit={(body, mentionedUserIds) =>
+                        sendMessage(body, message.id, mentionedUserIds)
+                      }
+                      placeholder={t("run.threadPlaceholder")}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })
         )}
       </div>
       <MessageComposer
@@ -5143,12 +5143,14 @@ function IssueMessageItem({
   localeTag,
   message,
   onReply,
+  parentMessage = null,
   replyComposerId,
 }: {
   isReplying?: boolean;
   localeTag: string;
   message: IssueMessage;
   onReply?: () => void;
+  parentMessage?: IssueMessage | null;
   replyComposerId?: string;
 }) {
   const { t } = useI18n();
@@ -5162,6 +5164,12 @@ function IssueMessageItem({
             {formatDate(message.createdAt, localeTag)}
           </time>
         </header>
+        {parentMessage ? (
+          <blockquote className="issue-message-parent-quote">
+            <CornerUpLeft aria-hidden="true" size={13} />
+            <span>{parentMessage.body}</span>
+          </blockquote>
+        ) : null}
         <p>{message.body}</p>
       </div>
       {onReply && (

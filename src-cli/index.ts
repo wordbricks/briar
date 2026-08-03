@@ -39,6 +39,10 @@ import {
   parseDetachedJsonResult,
 } from "./agent-runner";
 import {
+  inspectWorkflowRequirements,
+  workflowRequirementReadinessDetail,
+} from "./workflow-requirements";
+import {
   createWorkerDeviceIdentity,
   defaultWorkerLabel,
   interruptibleSleep,
@@ -94,7 +98,7 @@ const evidenceTypeSchema = z
 
 const workflowConfigSchema = z
   .object({
-    version: z.literal(1),
+    version: z.union([z.literal(1), z.literal(2)]),
     requirements: z
       .array(
         z
@@ -119,6 +123,18 @@ const workflowConfigSchema = z
     ).min(1),
     execution: z
       .object({
+        checkpoints: z
+          .array(
+            z
+              .object({
+                key: workflowStageIdSchema,
+                stage: workflowStageIdSchema,
+                position: z.enum(["before", "after"]),
+              })
+              .strict(),
+          )
+          .max(100)
+          .optional(),
         // Older desktop builds serialized a missing execution checkpoint as an
         // empty string. normalizeAutoHuntWorkflow already repairs a missing or
         // unknown checkpoint from the required stages, so keep that read
@@ -126,12 +142,6 @@ const workflowConfigSchema = z
         pauseAfterStage: z.string().trim().max(64).optional(),
         stopAfterStage: z.string().trim().max(64).optional(),
       })
-      .refine(
-        (execution) =>
-          execution.pauseAfterStage !== undefined ||
-          execution.stopAfterStage !== undefined,
-        "Workflow pause stage is required",
-      )
       .optional(),
     completion: z.object({
       requiredStages: z.array(workflowStageIdSchema),
@@ -2845,6 +2855,15 @@ async function workerCommand() {
   const workerToken = process.env.BRIAR_WORKER_TOKEN ?? registered.token;
   const label = registered.label;
   const workerId = registered.workerId;
+  let sharedWorkflowRequirements:
+    | Array<{
+        id: string;
+        label: string;
+        kind: (typeof autoHuntRequirementKinds)[number];
+        tool: string;
+        reason: string;
+      }>
+    | null = project.autoHunt?.workflow?.requirements ?? null;
   const readinessProblem = !gitValueAt(project.repositoryPath, [
     "rev-parse",
     "--show-toplevel",
@@ -2982,8 +3001,34 @@ async function workerCommand() {
         );
         const providers = healthyWorkerProviders(providerHealth);
         const hasHealthyProvider = providers.length > 0;
+        // Shared project workflow tools must be ready on this worker machine.
+        // Prefer the requirements returned by the previous heartbeat (server is
+        // source of truth); fall back to the local mirrored workflow.
+        const sharedRequirements =
+          sharedWorkflowRequirements ??
+          project.autoHunt?.workflow?.requirements ??
+          [];
+        const requirementHealth =
+          inspectWorkflowRequirements(sharedRequirements);
+        const requirementDetail =
+          workflowRequirementReadinessDetail(requirementHealth);
+        const toolsReady = requirementDetail === null;
+        const acceptingWork = hasHealthyProvider && toolsReady;
+        const nextReadinessState = !hasHealthyProvider || !toolsReady
+          ? "needs_attention"
+          : readinessState;
+        const nextReadinessDetail = !hasHealthyProvider
+          ? "로그인되어 사용할 수 있는 coding agent가 없습니다."
+          : requirementDetail;
         const heartbeat = await request<{
           worker: { maxConcurrentSessions?: number };
+          workflowRequirements?: Array<{
+            id: string;
+            label: string;
+            kind: (typeof autoHuntRequirementKinds)[number];
+            tool: string;
+            reason: string;
+          }>;
         }>(
           config.apiUrl,
           `/workers/${workerId}/heartbeat`,
@@ -2992,23 +3037,83 @@ async function workerCommand() {
             method: "POST",
             body: JSON.stringify({
               versions: { briar: cliVersion },
-              acceptingWork: hasHealthyProvider,
-              readinessState: hasHealthyProvider
-                ? readinessState
-                : "needs_attention",
-              readinessDetail: hasHealthyProvider
-                ? null
-                : "로그인되어 사용할 수 있는 coding agent가 없습니다.",
+              acceptingWork,
+              readinessState: nextReadinessState,
+              readinessDetail: nextReadinessDetail,
               capabilities: {
                 providers,
                 providerHealth,
                 worktrees: worktreesEnabled(project),
+                workflowRequirements: requirementHealth.map((item) => ({
+                  id: item.id,
+                  healthy: item.healthy,
+                  detail: item.detail,
+                })),
               },
             }),
           },
         );
+        let effectiveAcceptingWork = acceptingWork;
+        if (Array.isArray(heartbeat.workflowRequirements)) {
+          const previousKey = JSON.stringify(sharedWorkflowRequirements ?? []);
+          const nextKey = JSON.stringify(heartbeat.workflowRequirements);
+          sharedWorkflowRequirements = heartbeat.workflowRequirements;
+          if (previousKey !== nextKey) {
+            // Keep the local mirror aligned so desktop health and the next
+            // worker restart see the same shared tool list.
+            if (project.autoHunt?.workflow) {
+              project.autoHunt = {
+                ...project.autoHunt,
+                workflow: {
+                  ...project.autoHunt.workflow,
+                  requirements: heartbeat.workflowRequirements,
+                },
+              };
+              config.projects = config.projects.map((candidate) =>
+                candidate.id === project.id ? project : candidate,
+              );
+              await saveConfig(config);
+            }
+            // Re-probe immediately so a stale empty local list cannot claim
+            // work before the next heartbeat interval.
+            const refreshedHealth = inspectWorkflowRequirements(
+              sharedWorkflowRequirements,
+            );
+            const refreshedDetail =
+              workflowRequirementReadinessDetail(refreshedHealth);
+            if (refreshedDetail || !hasHealthyProvider) {
+              effectiveAcceptingWork = false;
+              await request(
+                config.apiUrl,
+                `/workers/${workerId}/heartbeat`,
+                workerToken,
+                {
+                  method: "POST",
+                  body: JSON.stringify({
+                    versions: { briar: cliVersion },
+                    acceptingWork: false,
+                    readinessState: "needs_attention",
+                    readinessDetail: !hasHealthyProvider
+                      ? "로그인되어 사용할 수 있는 coding agent가 없습니다."
+                      : refreshedDetail,
+                    capabilities: {
+                      providers,
+                      providerHealth,
+                      worktrees: worktreesEnabled(project),
+                      workflowRequirements: refreshedHealth.map((item) => ({
+                        id: item.id,
+                        healthy: item.healthy,
+                        detail: item.detail,
+                      })),
+                    },
+                  }),
+                },
+              );
+            }
+          }
+        }
         return {
-          acceptingWork: hasHealthyProvider,
+          acceptingWork: effectiveAcceptingWork,
           maxConcurrentSessions:
             heartbeat.worker.maxConcurrentSessions ??
             registered.maxConcurrentSessions,

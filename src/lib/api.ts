@@ -198,7 +198,7 @@ const projectAgentScheduleSchema = z.object({
 });
 const autoHuntWorkflowSchema: z.ZodType<AutoHuntWorkflow> = z
   .object({
-    version: z.literal(1),
+    version: z.union([z.literal(1), z.literal(2)]),
     requirements: z.array(z.object({
       id: z.string(),
       label: z.string(),
@@ -217,6 +217,11 @@ const autoHuntWorkflowSchema: z.ZodType<AutoHuntWorkflow> = z
     ),
     execution: z
       .object({
+        checkpoints: z.array(z.object({
+          key: z.string(),
+          stage: z.string(),
+          position: z.enum(["before", "after"]),
+        })).optional(),
         pauseAfterStage: z.string().optional(),
         stopAfterStage: z.string().optional(),
       })
@@ -253,6 +258,30 @@ const claimedProjectAgentScheduleRunSchema =
     status: z.literal("running"),
     claimToken: z.string().regex(/^briar_schedule_claim_[0-9a-f]{64}$/u),
   });
+
+// The settings screen still exposes the v1 single-pause control. Preserve
+// that read-only projection for snapshots that were converted from v1's
+// deterministic legacy-after checkpoint, while leaving true multi-checkpoint
+// v2 workflows in their canonical shape until a later UI pass.
+const normalizeDashboardWorkflow = (workflow: AutoHuntWorkflow) => {
+  const normalized = normalizeAutoHuntWorkflow(workflow);
+  const [checkpoint] = normalized.execution.checkpoints;
+  if (
+    normalized.execution.checkpoints.length === 1 &&
+    checkpoint?.position === "after" &&
+    checkpoint.key === `legacy-after-${checkpoint.stage}`
+  ) {
+    return normalizeAutoHuntWorkflow({
+      version: 1,
+      requirements: normalized.requirements,
+      stages: normalized.stages,
+      execution: { pauseAfterStage: checkpoint.stage },
+      completion: normalized.completion,
+    });
+  }
+  return normalized;
+};
+
 const organizationSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
@@ -733,6 +762,7 @@ export async function disconnectSlackInstallation(
 const normalizeDashboardRuns = (runs: DashboardPayload["runs"]) =>
   runs.map((run) => ({
     ...run,
+    workflow: normalizeDashboardWorkflow(run.workflow),
     resultReviews: run.resultReviews ?? [],
     currentRevision:
       Number.isInteger(run.currentRevision) && run.currentRevision >= 1
@@ -752,6 +782,10 @@ export async function loadDashboard(
   );
   return {
     ...dashboard,
+    settings: {
+      ...dashboard.settings,
+      workflow: normalizeDashboardWorkflow(dashboard.settings.workflow),
+    },
     runs: normalizeDashboardRuns(dashboard.runs),
   };
 }
@@ -1686,11 +1720,18 @@ export async function updateProjectSettings(
   projectId: string,
   settings: ProjectSettings,
 ) {
-  return request<{ settings: ProjectSettings }>(
+  const result = await request<{ settings: ProjectSettings }>(
     `/projects/${projectId}/settings`,
     token,
     { method: "PUT", body: JSON.stringify(settings) },
   );
+  return {
+    ...result,
+    settings: {
+      ...result.settings,
+      workflow: normalizeDashboardWorkflow(result.settings.workflow),
+    },
+  };
 }
 
 export async function connectLinearImport(
