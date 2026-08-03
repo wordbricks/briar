@@ -44,6 +44,8 @@ import {
   restartInstalledServices,
   runWorkerLoop,
   serviceDefinition,
+  workerCliPath,
+  workerExecutionPath,
   writeServiceDefinition,
   type ClaimedIssue,
 } from "./worker";
@@ -1827,6 +1829,8 @@ async function runClaimedIssueInRuntime(
   const sessionId = `detached-${issue.runId}`;
   const environment = {
     ...process.env,
+    PATH: workerExecutionPath(),
+    BRIAR_CLI: workerCliPath(),
     BRIAR_WORKER_TOKEN: workerToken,
     BRIAR_PROJECT_ID: project.id,
     BRIAR_CONFIG_HOME: runtimeDirectory,
@@ -2161,6 +2165,8 @@ async function runClaimedIssueReply(
     cwd: workspacePath,
     env: {
       ...process.env,
+      PATH: workerExecutionPath(),
+      BRIAR_CLI: workerCliPath(),
       BRIAR_WORKER_TOKEN: workerToken,
       BRIAR_PROJECT_ID: project.id,
     },
@@ -2360,6 +2366,8 @@ async function runClaimedIdea(
       cwd: analysisWorktree.path,
       env: {
         ...process.env,
+        PATH: workerExecutionPath(),
+        BRIAR_CLI: workerCliPath(),
         BRIAR_WORKER_TOKEN: workerToken,
         BRIAR_PROJECT_ID: project.id,
       },
