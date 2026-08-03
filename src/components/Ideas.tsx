@@ -10,7 +10,7 @@ import {
   Sparkles,
   Trash2,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -111,33 +111,6 @@ export function Ideas({
     }, 2_000);
     return () => window.clearInterval(timer);
   }, [idea?.activeJob, refreshIdea, refreshList, selectedId]);
-
-  useEffect(() => {
-    if (
-      !token ||
-      !idea?.canEdit ||
-      (idea.activeJob && ["queued", "running"].includes(idea.activeJob.status)) ||
-      idea.status === "archived" ||
-      documentDraft === idea.documentMarkdown
-    ) {
-      return;
-    }
-    const expectedVersion = idea.version;
-    const timer = window.setTimeout(() => {
-      void updateIdea(token, projectId, idea.id, {
-        expectedVersion,
-        documentMarkdown: documentDraft,
-      })
-        .then((result) => {
-          setIdea(result.idea);
-          setIdeas((current) =>
-            current.map((item) => item.id === result.idea.id ? result.idea : item),
-          );
-        })
-        .catch((cause) => setError(describe(cause)));
-    }, 700);
-    return () => window.clearTimeout(timer);
-  }, [documentDraft, idea, projectId, token]);
 
   const create = async () => {
     if (!token) return;
@@ -341,19 +314,12 @@ export function Ideas({
         </section>
 
         <section className={`idea-document-pane${mobilePane === "document" ? " mobile-active" : ""}`}>
-          <div className="document-toolbar"><FileText size={15} /> Markdown 문서 <span>{documentDraft.length.toLocaleString()}자</span></div>
+          <div className="document-toolbar"><FileText size={15} /> 문서 <span>{documentDraft.length.toLocaleString()}자</span></div>
           <div className="document-workspace">
-            <textarea
-              aria-label="아이디어 Markdown 문서"
-              disabled={!idea.canEdit || isBusy || idea.status === "archived"}
-              placeholder="# 아이디어\n\n대화를 시작하면 문서가 작성됩니다."
-              value={documentDraft}
-              onChange={(event) => setDocumentDraft(event.target.value)}
-            />
-            <article className="idea-markdown-preview">
+            <article aria-label="아이디어 문서" className="idea-markdown-preview">
               {documentDraft.trim() ? (
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{documentDraft}</ReactMarkdown>
-              ) : <p className="muted">문서 미리보기</p>}
+              ) : <p className="muted">대화를 시작하면 문서가 작성됩니다.</p>}
             </article>
           </div>
         </section>

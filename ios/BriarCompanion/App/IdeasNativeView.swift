@@ -213,21 +213,23 @@ private struct IdeaNativeDetailView: View {
     }
 
     private var documentPane: some View {
-        VStack(spacing: 0) {
-            if idea.canEdit && idea.status != .archived {
-                TextEditor(text: $document)
-                    .font(.system(.body, design: .monospaced))
-                    .padding(8)
-                    .task(id: document) {
-                        guard document != idea.documentMarkdown, !isActiveJob else { return }
-                        try? await Task.sleep(for: .milliseconds(700))
-                        guard !Task.isCancelled else { return }
-                        await store.update(document: document)
-                    }
-            } else {
-                ScrollView { Text(attributed(document)).frame(maxWidth: .infinity, alignment: .leading).padding() }
+        ScrollView {
+            Group {
+                if document.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    ContentUnavailableView(
+                        "문서 없음",
+                        systemImage: "doc.text",
+                        description: Text("대화를 시작하면 문서가 작성됩니다.")
+                    )
+                } else {
+                    Text(attributed(document))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
+                        .textSelection(.enabled)
+                }
             }
         }
+        .accessibilityIdentifier("idea-document-preview")
     }
 
     private var planReview: some View {
