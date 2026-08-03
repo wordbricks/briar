@@ -1,5 +1,7 @@
 import {
   Building2,
+  Check,
+  Copy,
   Cpu,
   Download,
   ImagePlus,
@@ -40,16 +42,23 @@ import { Typography } from "@/components/ui/typography";
 import { cn } from "@/lib/utils";
 import { useI18n } from "../i18n";
 import {
-  addOrganizationMember,
+  createOrganizationInvitation,
+  loadOrganizationInvitations,
   loadOrganizationMembers,
   removeOrganizationMember,
+  revokeOrganizationInvitation,
   updateOrganizationMemberRole,
 } from "../lib/api";
 import {
   organizationLogoAccept,
   organizationLogoFromFile,
 } from "../lib/organization-logo";
-import type { Organization, OrganizationMember, Project } from "../types";
+import type {
+  Organization,
+  OrganizationInvitation,
+  OrganizationMember,
+  Project,
+} from "../types";
 import { OrganizationWorkersSettings } from "./OrganizationWorkersSettings";
 import { SelectMenu } from "./SelectMenu";
 import { SlackIntegrationSettings } from "./SlackIntegrationSettings";
@@ -102,15 +111,29 @@ export function OrganizationSettings({
   const [logoError, setLogoError] = useState<string | null>(null);
   const [logoSaved, setLogoSaved] = useState(false);
   const [members, setMembers] = useState<OrganizationMember[]>([]);
+  const [invitations, setInvitations] = useState<OrganizationInvitation[]>([]);
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"admin" | "member">("member");
+  const organizationProjects = useMemo(
+    () =>
+      projects.filter((project) => project.organizationId === organization.id),
+    [organization.id, projects],
+  );
+  const [initialProjectId, setInitialProjectId] = useState(
+    organizationProjects[0]?.id ?? "",
+  );
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [inviteLinkCopied, setInviteLinkCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
   const [updatingMemberId, setUpdatingMemberId] = useState<string | null>(null);
+  const [revokingInvitationId, setRevokingInvitationId] = useState<
+    string | null
+  >(null);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement | null>(null);
   const inviteEmailRef = useRef<HTMLInputElement | null>(null);
@@ -135,16 +158,32 @@ export function OrganizationSettings({
       return;
     }
     setLoading(true);
-    void loadOrganizationMembers(token, organizationId)
-      .then((result) => {
-        setMembers(result);
+    void Promise.all([
+      loadOrganizationMembers(token, organizationId),
+      canManage
+        ? loadOrganizationInvitations(token, organizationId)
+        : Promise.resolve([]),
+    ])
+      .then(([nextMembers, nextInvitations]) => {
+        setMembers(nextMembers);
+        setInvitations(nextInvitations);
         setError(null);
       })
       .catch((caught) =>
         setError(caught instanceof Error ? caught.message : String(caught)),
       )
       .finally(() => setLoading(false));
-  }, [organizationId, token]);
+  }, [canManage, organizationId, token]);
+
+  useEffect(() => {
+    if (
+      initialProjectId &&
+      organizationProjects.some((project) => project.id === initialProjectId)
+    ) {
+      return;
+    }
+    setInitialProjectId(organizationProjects[0]?.id ?? "");
+  }, [initialProjectId, organizationProjects]);
 
   useEffect(() => {
     if (activeSection === "members") searchRef.current?.focus();
@@ -539,6 +578,8 @@ export function OrganizationSettings({
                       <Button
                         onClick={() => {
                           setError(null);
+                          setInviteUrl(null);
+                          setInviteLinkCopied(false);
                           setIsInviteOpen(true);
                         }}
                         type="button"
@@ -717,6 +758,111 @@ export function OrganizationSettings({
                     ))
                   )}
                 </section>
+
+                {canManage ? (
+                  <section
+                    aria-label={t("organization.pendingInvites")}
+                    className="mt-5 overflow-hidden rounded-xl border border-border bg-card"
+                  >
+                    <div className="flex items-center justify-between border-b border-border bg-muted/60 px-4 py-3">
+                      <div>
+                        <Typography as="strong" variant="bodySm">
+                          {t("organization.pendingInvites")}
+                        </Typography>
+                        <Typography
+                          className="mt-0.5"
+                          tone="muted"
+                          variant="caption"
+                        >
+                          {t("organization.pendingInvitesDescription")}
+                        </Typography>
+                      </div>
+                      <Badge variant="secondary">{invitations.length}</Badge>
+                    </div>
+                    {invitations.length === 0 ? (
+                      <Typography
+                        className="p-6 text-center"
+                        tone="muted"
+                        variant="bodySm"
+                      >
+                        {t("organization.noPendingInvites")}
+                      </Typography>
+                    ) : (
+                      invitations.map((invitation) => (
+                        <div
+                          className="grid grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)_auto_40px] items-center gap-3 border-b border-border/80 px-4 py-3 last:border-b-0"
+                          key={invitation.id}
+                        >
+                          <div className="min-w-0">
+                            <Typography
+                              as="strong"
+                              className="block truncate"
+                              variant="bodySm"
+                            >
+                              {invitation.email}
+                            </Typography>
+                            <Typography tone="muted" variant="caption">
+                              {t("organization.inviteExpires", {
+                                date: new Intl.DateTimeFormat(dateLocale, {
+                                  dateStyle: "medium",
+                                }).format(new Date(invitation.expiresAt)),
+                              })}
+                            </Typography>
+                          </div>
+                          <Typography
+                            className="truncate"
+                            tone="muted"
+                            variant="bodySm"
+                          >
+                            {invitation.initialProjectName}
+                          </Typography>
+                          <Badge variant="secondary">
+                            {roleLabel(invitation.role)}
+                          </Badge>
+                          <Button
+                            aria-label={t("organization.revokeInvite", {
+                              email: invitation.email,
+                            })}
+                            className="size-8 text-muted-foreground hover:text-destructive"
+                            disabled={revokingInvitationId === invitation.id}
+                            onClick={() => {
+                              setRevokingInvitationId(invitation.id);
+                              setError(null);
+                              void revokeOrganizationInvitation(
+                                token,
+                                organizationId,
+                                invitation.id,
+                              )
+                                .then(() =>
+                                  setInvitations((current) =>
+                                    current.filter(
+                                      (item) => item.id !== invitation.id,
+                                    ),
+                                  ),
+                                )
+                                .catch((caught) =>
+                                  setError(
+                                    caught instanceof Error
+                                      ? caught.message
+                                      : String(caught),
+                                  ),
+                                )
+                                .finally(() => setRevokingInvitationId(null));
+                            }}
+                            size="icon-sm"
+                            title={t("organization.revokeInvite", {
+                              email: invitation.email,
+                            })}
+                            type="button"
+                            variant="ghost"
+                          >
+                            <Trash2 size={15} strokeWidth={1.7} />
+                          </Button>
+                        </div>
+                      ))
+                    )}
+                  </section>
+                ) : null}
               </>
             ) : activeSection === "workers" ? (
               <OrganizationWorkersSettings
@@ -738,7 +884,13 @@ export function OrganizationSettings({
 
       <Dialog
         onOpenChange={(open) => {
-          if (!saving) setIsInviteOpen(open);
+          if (!saving) {
+            setIsInviteOpen(open);
+            if (!open) {
+              setInviteUrl(null);
+              setInviteLinkCopied(false);
+            }
+          }
         }}
         open={isInviteOpen}
       >
@@ -746,14 +898,25 @@ export function OrganizationSettings({
           <form
             onSubmit={(event) => {
               event.preventDefault();
+              if (!initialProjectId || inviteUrl) return;
               setSaving(true);
               setError(null);
-              void addOrganizationMember(token, organizationId, { email, role })
+              void createOrganizationInvitation(token, organizationId, {
+                email,
+                initialProjectId,
+                role,
+              })
                 .then((result) => {
-                  setMembers(result.members);
-                  setEmail("");
-                  setRole("member");
-                  setIsInviteOpen(false);
+                  setInvitations((current) => [
+                    result.invitation,
+                    ...current.filter(
+                      (item) =>
+                        item.email.toLocaleLowerCase() !==
+                        result.invitation.email.toLocaleLowerCase(),
+                    ),
+                  ]);
+                  setInviteUrl(result.inviteUrl);
+                  setInviteLinkCopied(false);
                 })
                 .catch((caught) =>
                   setError(
@@ -771,56 +934,135 @@ export function OrganizationSettings({
                 })}
               </DialogDescription>
             </DialogHeader>
-            <div className="mt-4 grid gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="organization-invite-email">
-                  {t("organization.inviteEmail")}
-                </Label>
-                <Input
-                  id="organization-invite-email"
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder={t("organization.inviteEmailPlaceholder")}
-                  ref={inviteEmailRef}
-                  required
-                  type="email"
-                  value={email}
-                />
+            {inviteUrl ? (
+              <div className="mt-5 grid gap-3">
+                <div className="rounded-xl border border-success/30 bg-success/10 p-4">
+                  <Typography
+                    as="strong"
+                    className="flex items-center gap-2"
+                    variant="bodySm"
+                  >
+                    <Check className="text-success" size={17} />
+                    {t("organization.inviteLinkReady")}
+                  </Typography>
+                  <Typography className="mt-1" tone="muted" variant="caption">
+                    {t("organization.inviteLinkDescription")}
+                  </Typography>
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    aria-label={t("organization.copyInviteLink")}
+                    readOnly
+                    value={inviteUrl}
+                  />
+                  <Button
+                    aria-label={t("organization.copyInviteLink")}
+                    onClick={() => {
+                      void navigator.clipboard.writeText(inviteUrl).then(() => {
+                        setInviteLinkCopied(true);
+                      });
+                    }}
+                    size="icon"
+                    type="button"
+                    variant="outline"
+                  >
+                    {inviteLinkCopied ? (
+                      <Check size={17} />
+                    ) : (
+                      <Copy size={17} />
+                    )}
+                  </Button>
+                </div>
+                {inviteLinkCopied ? (
+                  <Typography
+                    className="text-success"
+                    role="status"
+                    variant="caption"
+                  >
+                    {t("organization.inviteLinkCopied")}
+                  </Typography>
+                ) : null}
               </div>
-              <div className="grid gap-2">
-                <Label>{t("organization.inviteRole")}</Label>
-                <SelectMenu
-                  label={t("organization.inviteRole")}
-                  onValueChange={(value) =>
-                    setRole(value as "admin" | "member")}
-                  options={[
-                    {
-                      label: t("organization.role.member"),
-                      value: "member",
-                    },
-                    {
-                      label: t("organization.role.admin"),
-                      value: "admin",
-                    },
-                  ]}
-                  value={role}
-                />
+            ) : (
+              <div className="mt-4 grid gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="organization-invite-email">
+                    {t("organization.inviteEmail")}
+                  </Label>
+                  <Input
+                    id="organization-invite-email"
+                    onChange={(event) => setEmail(event.target.value)}
+                    placeholder={t("organization.inviteEmailPlaceholder")}
+                    ref={inviteEmailRef}
+                    required
+                    type="email"
+                    value={email}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>{t("organization.inviteProject")}</Label>
+                  <SelectMenu
+                    disabled={organizationProjects.length === 0}
+                    label={t("organization.inviteProject")}
+                    onValueChange={setInitialProjectId}
+                    options={organizationProjects.map((project) => ({
+                      label: project.name,
+                      value: project.id,
+                    }))}
+                    placeholder={t("organization.inviteProject")}
+                    value={initialProjectId}
+                  />
+                  <Typography tone="muted" variant="caption">
+                    {t("organization.inviteProjectDescription")}
+                  </Typography>
+                </div>
+                <div className="grid gap-2">
+                  <Label>{t("organization.inviteRole")}</Label>
+                  <SelectMenu
+                    label={t("organization.inviteRole")}
+                    onValueChange={(value) =>
+                      setRole(value as "admin" | "member")
+                    }
+                    options={[
+                      {
+                        label: t("organization.role.member"),
+                        value: "member",
+                      },
+                      {
+                        label: t("organization.role.admin"),
+                        value: "admin",
+                      },
+                    ]}
+                    value={role}
+                  />
+                </div>
+                {error ? (
+                  <SettingsAlert className="mt-0">{error}</SettingsAlert>
+                ) : null}
               </div>
-              {error ? <SettingsAlert className="mt-0">{error}</SettingsAlert> : null}
-            </div>
+            )}
             <DialogFooter className="mt-6">
-              <Button
-                disabled={saving}
-                onClick={() => setIsInviteOpen(false)}
-                type="button"
-                variant="outline"
-              >
-                {t("common.cancel")}
-              </Button>
-              <Button disabled={saving} type="submit">
-                {saving
-                  ? t("organization.inviting")
-                  : t("organization.sendInvite")}
-              </Button>
+              {inviteUrl ? (
+                <Button onClick={() => setIsInviteOpen(false)} type="button">
+                  {t("common.close")}
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    disabled={saving}
+                    onClick={() => setIsInviteOpen(false)}
+                    type="button"
+                    variant="outline"
+                  >
+                    {t("common.cancel")}
+                  </Button>
+                  <Button disabled={saving || !initialProjectId} type="submit">
+                    {saving
+                      ? t("organization.inviting")
+                      : t("organization.sendInvite")}
+                  </Button>
+                </>
+              )}
             </DialogFooter>
           </form>
         </DialogContent>

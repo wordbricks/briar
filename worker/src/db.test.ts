@@ -8,6 +8,7 @@ import {
 } from "../../src/lib/auto-hunt-contract";
 import type { HuntEventInput } from "./db";
 import {
+  acceptOrganizationInvitation,
   assertQueuedHuntClaim,
   claimNextQueuedHuntRun,
   claimDueProjectAgentScheduleRun,
@@ -15,6 +16,7 @@ import {
   completeProjectAgentScheduleRun,
   completeIssueResultReview,
   createOrganization,
+  createOrganizationInvitation,
   createIssueMessage,
   createProjectAgent,
   createProjectAgentSchedule,
@@ -34,6 +36,7 @@ import {
   getDashboardSyncCursor,
   getHuntRunForProject,
   getIssueAttachment,
+  getOrganizationInvitationByTokenHash,
   getRunEvidenceImage,
   getNextQueuedHuntRun,
   HuntClaimError,
@@ -48,6 +51,7 @@ import {
   listDashboardRuns,
   listHuntRunEvents,
   listOrganizations,
+  listOrganizationInvitations,
   listOrganizationMembers,
   isOrganizationHandleAvailable,
   issueProjectAgentToken,
@@ -66,6 +70,7 @@ import {
   recordRunEvidence,
   recordQaResult,
   removeOrganizationMember,
+  revokeOrganizationInvitation,
   renewProjectAgentScheduleRunLease,
   updateProjectSettings,
   updateProjectAgent,
@@ -576,6 +581,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await executeSql(
       db,
       await readFile(resolve("migrations/0054_run_execution_metrics.sql"), "utf8"),
+    );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0057_organization_invitations.sql"),
+        "utf8",
+      ),
     );
   }, 30_000);
 
@@ -1949,6 +1961,121 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await expect(
       findProjectIdByAgentTokenHash(db, memberTokenHash),
     ).resolves.toBeNull();
+  });
+
+  it("invites an unregistered email and grants organization access on exact-email acceptance", async () => {
+    const tokenHash = "1".repeat(64);
+    const invitation = await createOrganizationInvitation(db, {
+      id: "invitation-new-member",
+      organizationId: projectId,
+      initialProjectId: projectId,
+      emailNormalized: "new-invitee@example.com",
+      role: "member",
+      tokenHash,
+      invitedByUserId: "owner",
+      expiresAt: atMinute(100),
+      createdAt: atMinute(20),
+    });
+    expect(invitation).toMatchObject({
+      outcome: "created",
+      invitation: {
+        email_normalized: "new-invitee@example.com",
+        initial_project_id: projectId,
+      },
+    });
+    await expect(listOrganizationInvitations(db, projectId)).resolves.toEqual([
+      expect.objectContaining({ id: "invitation-new-member" }),
+    ]);
+    await expect(
+      acceptOrganizationInvitation(db, {
+        tokenHash,
+        userId: "owner",
+        emailNormalized: "owner@example.com",
+        acceptedAt: atMinute(30),
+      }),
+    ).resolves.toEqual({ outcome: "email_mismatch" });
+
+    await executeSql(
+      db,
+      `insert into user (id, name, email, emailVerified, createdAt, updatedAt)
+       values (
+         'new-invitee', 'New Invitee', 'new-invitee@example.com', 1,
+         '${atMinute(30)}', '${atMinute(30)}'
+       );`,
+    );
+    await expect(
+      acceptOrganizationInvitation(db, {
+        tokenHash,
+        userId: "new-invitee",
+        emailNormalized: "new-invitee@example.com",
+        acceptedAt: atMinute(31),
+      }),
+    ).resolves.toMatchObject({ outcome: "accepted" });
+    await expect(listProjects(db, "new-invitee")).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: projectId, member_role: "member" }),
+      ]),
+    );
+    await expect(
+      acceptOrganizationInvitation(db, {
+        tokenHash,
+        userId: "new-invitee",
+        emailNormalized: "new-invitee@example.com",
+        acceptedAt: atMinute(32),
+      }),
+    ).resolves.toMatchObject({ outcome: "already_accepted" });
+    await expect(listOrganizationInvitations(db, projectId)).resolves.toEqual(
+      [],
+    );
+  });
+
+  it("supports revoking and safely replacing pending invitation links", async () => {
+    const first = await createOrganizationInvitation(db, {
+      id: "invitation-replaced",
+      organizationId: projectId,
+      initialProjectId: projectId,
+      emailNormalized: "replace-invite@example.com",
+      role: "member",
+      tokenHash: "2".repeat(64),
+      invitedByUserId: "owner",
+      expiresAt: atMinute(100),
+      createdAt: atMinute(40),
+    });
+    expect(first.outcome).toBe("created");
+    const replacement = await createOrganizationInvitation(db, {
+      id: "invitation-replacement",
+      organizationId: projectId,
+      initialProjectId: projectId,
+      emailNormalized: "replace-invite@example.com",
+      role: "admin",
+      tokenHash: "3".repeat(64),
+      invitedByUserId: "owner",
+      expiresAt: atMinute(110),
+      createdAt: atMinute(41),
+    });
+    expect(replacement).toMatchObject({
+      outcome: "created",
+      invitation: { id: "invitation-replacement", role: "admin" },
+    });
+    await expect(
+      getOrganizationInvitationByTokenHash(db, "2".repeat(64)),
+    ).resolves.toMatchObject({ revoked_at: atMinute(41) });
+    await expect(
+      revokeOrganizationInvitation(
+        db,
+        projectId,
+        "invitation-replacement",
+        atMinute(42),
+      ),
+    ).resolves.toBe(true);
+    await expect(
+      acceptOrganizationInvitation(db, {
+        tokenHash: "3".repeat(64),
+        userId: "owner",
+        emailNormalized: "replace-invite@example.com",
+        acceptedAt: atMinute(43),
+      }),
+    ).resolves.toEqual({ outcome: "revoked" });
   });
 
   it("deletes a personal account, its sole-member organization, and auth data", async () => {

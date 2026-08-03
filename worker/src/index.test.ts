@@ -8,6 +8,7 @@ import worker, {
   issueUpdateInputSchema,
   issueExecutionPreferencesSchema,
   organizationLogoInputSchema,
+  organizationInvitationInputSchema,
   organizationMemberRoleInputSchema,
   organizationUpdateInputSchema,
   projectIconInputSchema,
@@ -96,6 +97,25 @@ describe("Worker HTTP contract", () => {
         username: "jay",
         name: "Jay",
         image: "data:image/svg+xml;base64,aA==",
+      }),
+    ).toThrow();
+  });
+
+  it("normalizes invitation emails and requires a starting project", () => {
+    expect(
+      organizationInvitationInputSchema.parse({
+        email: "  New.Person@Example.COM ",
+        role: "member",
+        initialProjectId: "11111111-1111-4111-8111-111111111111",
+      }),
+    ).toEqual({
+      email: "new.person@example.com",
+      role: "member",
+      initialProjectId: "11111111-1111-4111-8111-111111111111",
+    });
+    expect(() =>
+      organizationInvitationInputSchema.parse({
+        email: "new.person@example.com",
       }),
     ).toThrow();
   });
@@ -638,6 +658,19 @@ describe("Worker HTTP contract", () => {
 
     expect(page).toContain("<h1>데스크톱 연결 승인</h1>");
     expect(page).not.toContain("<h1>Companion 로그인 승인</h1>");
+  });
+
+  it("forces Google account selection when switching invitation accounts", async () => {
+    const response = await worker.fetch(
+      new Request(
+        "https://briar-api.example/device?user_code=F65P9NQN&client=web&switch_account=1",
+      ),
+      {} as never,
+    );
+    const page = await response.text();
+
+    expect(page).toContain("switchAccount=params.get('switch_account')==='1'");
+    expect(page).toContain("additionalParams:{prompt:'select_account'}");
   });
 
   it("serves issue links that open the exact issue in the Briar app", async () => {

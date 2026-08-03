@@ -144,7 +144,7 @@ export function LoginScreen({
   );
 }
 
-function GoogleIcon() {
+export function GoogleIcon() {
   return (
     <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
       <path fill="#4285F4" d="M21.35 12.18c0-.64-.06-1.25-.16-1.84H12v3.48h5.25a4.5 4.5 0 0 1-1.95 2.95v2.26h3.16c1.85-1.7 2.89-4.22 2.89-6.85Z" />
