@@ -146,10 +146,11 @@ fn tray_icon_image() -> Result<Image<'static>, String> {
 fn build_menu(app: &AppHandle, snapshot: &StatusTraySnapshot) -> Result<Menu<tauri::Wry>, String> {
     let mut owned_items = Vec::new();
 
-    let running_header = MenuItemBuilder::with_id("status-tray:running-header", &snapshot.running_label)
-        .enabled(false)
-        .build(app)
-        .map_err(|error| format!("Status tray header failed: {error}"))?;
+    let running_header =
+        MenuItemBuilder::with_id("status-tray:running-header", &snapshot.running_label)
+            .enabled(false)
+            .build(app)
+            .map_err(|error| format!("Status tray header failed: {error}"))?;
     owned_items.push(running_header);
 
     let visible = snapshot.items.iter().take(MAX_VISIBLE_RUNS);
