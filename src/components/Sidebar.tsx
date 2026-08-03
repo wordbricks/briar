@@ -14,6 +14,7 @@ import {
   Plus,
   Settings,
   Languages,
+  Lightbulb,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -43,6 +44,7 @@ export function Sidebar({
   onAddProject,
   onAgentSessionOpen,
   onAgentsOpen,
+  onIdeasOpen = () => undefined,
   onScheduleOpen,
   onInboxOpen,
   onIssuesOpen,
@@ -66,6 +68,7 @@ export function Sidebar({
   activePage:
     | "issues"
     | "agents"
+    | "ideas"
     | "schedule"
     | "inbox"
     | "project-settings"
@@ -80,6 +83,7 @@ export function Sidebar({
   onAddProject: () => void;
   onAgentSessionOpen: (sessionId: string) => void;
   onAgentsOpen: () => void;
+  onIdeasOpen?: () => void;
   onScheduleOpen: () => void;
   onInboxOpen: () => void;
   onIssuesOpen: () => void;
@@ -659,6 +663,24 @@ export function Sidebar({
                       >
                         <Plus aria-hidden="true" size={16} strokeWidth={1.7} />
                       </button>
+                    </div>
+                    <div className="sidebar-agent-navigation">
+                      <a
+                        aria-current={
+                          isActive && activePage === "ideas" ? "page" : undefined
+                        }
+                        className={`sidebar-project-view${
+                          isActive && activePage === "ideas" ? " active" : ""
+                        }`}
+                        href="#ideas"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          openProjectPage(onIdeasOpen);
+                        }}
+                      >
+                        <Lightbulb size={14} strokeWidth={1.7} />
+                        <span>{t("sidebar.ideas")}</span>
+                      </a>
                     </div>
                     <div className="sidebar-agent-navigation">
                       <a

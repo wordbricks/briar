@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  allocateAnalysisWorktree,
   allocateIssueWorktree,
   assertPathWithinRoot,
   compactWorktreeArtifacts,
@@ -18,6 +19,7 @@ import {
   parseWorktreeList,
   qualifyBaseRef,
   refreshRemoteBase,
+  removeAnalysisWorktree,
   removeIssueWorktree,
   resolveBaseRef,
   samePath,
@@ -474,6 +476,39 @@ describe("allocation", () => {
       git,
     });
     expect(worktree.branch).toBe("briar/fix-login-redirect-3f6b9c21-2");
+  });
+});
+
+describe("read-only analysis allocation", () => {
+  it("uses a detached latest-remote checkout and removes it without a branch", async () => {
+    const root = await temporaryDirectory("briar-analysis-root-");
+    const { git, calls } = fakeGit((gitArgs) => {
+      if (gitArgs[0] === "remote") return ok("origin\n");
+      if (gitArgs[0] === "symbolic-ref") return ok("refs/remotes/origin/main\n");
+      if (gitArgs[0] === "rev-parse" && gitArgs[1] === "--verify") return ok("base-sha\n");
+      if (gitArgs[0] === "rev-parse") return ok("base-sha\n");
+      if (gitArgs[0] === "-c") return ok();
+      return ok();
+    });
+    const worktree = await allocateAnalysisWorktree({
+      repositoryPath: "/repo",
+      projectId: "project-1",
+      workId: "abababab-abab-4bab-8bab-abababababab",
+      settings: { root, branchPrefix: "unused" },
+      git,
+    });
+
+    expect(worktree.path).toBe(
+      join(root, "project-1", "analysis", "idea-abababab-abab-4bab-8bab-abababababab"),
+    );
+    expect(worktree).toMatchObject({ baseRef: "origin/main", baseSha: "base-sha" });
+    expect(calls).toContainEqual([
+      "worktree", "add", "--detach", worktree.path, "refs/remotes/origin/main",
+    ]);
+    expect(calls.some((args) => args.includes("-b"))).toBe(false);
+
+    await removeAnalysisWorktree({ repositoryPath: "/repo", path: worktree.path, git });
+    expect(calls).toContainEqual(["worktree", "remove", "--force", worktree.path]);
   });
 });
 

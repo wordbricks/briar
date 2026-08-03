@@ -1,4 +1,4 @@
-import { Bot, Inbox, ListTodo, Plus, Search } from "lucide-react";
+import { Bot, Inbox, Lightbulb, ListTodo, Plus, Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,7 @@ export type CompanionStatusFilter =
 type CompanionDestination =
   | CompanionStatusFilter
   | "agents"
+  | "ideas"
   | "inbox"
   | "search";
 
@@ -20,6 +21,7 @@ export function CompanionBottomNavigation({
   activeDestination,
   onCreate,
   onAgentsOpen,
+  onIdeasOpen = () => undefined,
   onInboxOpen,
   onSearchOpen,
   onStatusChange,
@@ -28,6 +30,7 @@ export function CompanionBottomNavigation({
   activeDestination: CompanionDestination;
   onCreate?: () => void;
   onAgentsOpen: () => void;
+  onIdeasOpen?: () => void;
   onInboxOpen: () => void;
   onSearchOpen: () => void;
   onStatusChange: (status: CompanionStatusFilter) => void;
@@ -42,6 +45,7 @@ export function CompanionBottomNavigation({
   }> = [
     { icon: ListTodo, label: t("companion.navTasks"), value: "all" },
     { icon: Bot, label: t("companion.navAgents"), value: "agents" },
+    { icon: Lightbulb, label: t("companion.navIdeas"), value: "ideas" },
     { icon: Search, label: t("companion.navSearch"), value: "search" },
     {
       count: unreadInboxCount,
@@ -55,7 +59,7 @@ export function CompanionBottomNavigation({
     <div className="companion-bottom-chrome border-t border-border bg-card/95 backdrop-blur">
       <nav
         aria-label={t("sidebar.mainMenu")}
-        className="companion-bottom-nav grid grid-cols-4 gap-1 px-2"
+        className="companion-bottom-nav grid grid-cols-5 gap-1 px-2"
       >
         {destinations.map((destination) => {
           const Icon = destination.icon;
@@ -70,6 +74,7 @@ export function CompanionBottomNavigation({
               key={destination.value}
               onClick={() => {
                 if (destination.value === "agents") onAgentsOpen();
+                else if (destination.value === "ideas") onIdeasOpen();
                 else if (destination.value === "inbox") onInboxOpen();
                 else if (destination.value === "search") onSearchOpen();
                 else onStatusChange(destination.value);

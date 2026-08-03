@@ -110,6 +110,13 @@ export type AllocateWorktreeOptions = {
   baseRef?: string;
 };
 
+export type AnalysisWorktree = {
+  path: string;
+  baseRef: string;
+  baseSha: string;
+  warning?: string;
+};
+
 export function defaultWorktreeRoot(home: string): string {
   return join(home, "briar", "workspaces");
 }
@@ -561,6 +568,90 @@ export async function allocateIssueWorktree(
   throw new Error(
     `"${baseName}" 이름으로 사용할 수 있는 워크트리 경로를 찾지 못했습니다.`,
   );
+}
+
+/**
+ * Create a short-lived detached checkout for read-only repository analysis.
+ * Unlike issue worktrees it has no branch and copies no ignored files, so
+ * provider context cannot accidentally include local secrets.
+ */
+export async function allocateAnalysisWorktree(input: {
+  repositoryPath: string;
+  projectId: string;
+  workId: string;
+  settings: WorktreeSettings;
+  git: GitRunner;
+}): Promise<AnalysisWorktree> {
+  if (!/^[0-9a-f-]{36}$/iu.test(input.workId)) {
+    throw new Error("분석 work ID가 올바르지 않습니다.");
+  }
+  const baseRef = resolveBaseRef(input.git, input.repositoryPath);
+  if (!baseRef) {
+    throw new Error(
+      "기준 브랜치를 찾지 못했습니다. origin/HEAD 또는 main/master 중 하나가 필요합니다.",
+    );
+  }
+  const remotes = gitOrThrow(input.git, ["remote"], {
+    cwd: input.repositoryPath,
+    message: "원격 목록을 읽지 못했습니다.",
+  })
+    .split(/\r?\n/u)
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const remoteBase = parseRemoteTrackingBase(baseRef, remotes);
+  const warning = remoteBase
+    ? refreshRemoteBase(input.git, input.repositoryPath, remoteBase).warning
+    : undefined;
+  const baseRefResolved = qualifyBaseRef(baseRef, (ref) =>
+    refExistsIn(input.git, input.repositoryPath, ref),
+  );
+  const root = join(
+    projectWorktreeRoot(input.settings.root, input.projectId),
+    "analysis",
+  );
+  const path = assertPathWithinRoot(join(root, `idea-${input.workId}`), root);
+  await mkdir(root, { recursive: true, mode: 0o700 });
+  if (await pathExists(path)) {
+    input.git(["worktree", "remove", "--force", path], {
+      cwd: input.repositoryPath,
+      timeoutMs: WORKTREE_ADD_TIMEOUT_MS,
+    });
+    await rm(path, { recursive: true, force: true });
+  }
+  gitOrThrow(
+    input.git,
+    ["worktree", "add", "--detach", path, baseRefResolved],
+    {
+      cwd: input.repositoryPath,
+      timeoutMs: WORKTREE_ADD_TIMEOUT_MS,
+      message: "최신 원격 기준 분석 워크트리를 만들지 못했습니다.",
+    },
+  );
+  return {
+    path,
+    baseRef,
+    baseSha: gitOrThrow(input.git, ["rev-parse", "HEAD"], {
+      cwd: path,
+      message: "분석 워크트리의 HEAD를 읽지 못했습니다.",
+    }),
+    ...(warning ? { warning } : {}),
+  };
+}
+
+export async function removeAnalysisWorktree(input: {
+  repositoryPath: string;
+  path: string;
+  git: GitRunner;
+}) {
+  const removed = input.git(["worktree", "remove", "--force", input.path], {
+    cwd: input.repositoryPath,
+    timeoutMs: WORKTREE_ADD_TIMEOUT_MS,
+  });
+  if (removed.exitCode !== 0) {
+    throw new Error(
+      `분석 워크트리를 정리하지 못했습니다: ${removed.stderr.trim()}`,
+    );
+  }
 }
 
 export type RemoveWorktreeResult = {

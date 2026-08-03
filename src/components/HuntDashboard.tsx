@@ -198,6 +198,7 @@ export function HuntDashboard({
   onRetryRun,
   onCancelRun,
   onCompanionAgentsOpen,
+  onCompanionIdeasOpen,
   onCompanionInboxOpen,
   onCompanionSearchOpen,
   onCompanionStatusChange,
@@ -257,6 +258,7 @@ export function HuntDashboard({
   onRetryRun: (runId: string) => Promise<unknown>;
   onCancelRun: (runId: string) => Promise<unknown>;
   onCompanionAgentsOpen?: () => void;
+  onCompanionIdeasOpen?: () => void;
   onCompanionInboxOpen?: () => void;
   onCompanionSearchOpen?: () => void;
   onCompanionStatusChange?: (status: CompanionStatusFilter) => void;
@@ -1008,6 +1010,7 @@ export function HuntDashboard({
           activeDestination={companionSearchMode ? "search" : status}
           onCreate={() => setIsIssueDialogOpen(true)}
           onAgentsOpen={() => onCompanionAgentsOpen?.()}
+          onIdeasOpen={() => onCompanionIdeasOpen?.()}
           onInboxOpen={() => onCompanionInboxOpen?.()}
           onSearchOpen={() => onCompanionSearchOpen?.()}
           onStatusChange={setStatus}

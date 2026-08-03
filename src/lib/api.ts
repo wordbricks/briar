@@ -13,6 +13,13 @@ import {
 import type { AgentProvider, ModelEffort } from "./project-llm";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import type {
+  IdeaDetail,
+  IdeaIssuePlanItem,
+  IdeaProvider,
+  IdeaStatus,
+  IdeaSummary,
+} from "./ideas-contract";
+import type {
   LinearImportConnectResult,
   LinearImportResult,
   LinearImportStatesResult,
@@ -1092,6 +1099,118 @@ export async function createIssue(
     status: "backlog" | "queued";
     attachments: IssueAttachment[];
   }>(`/projects/${projectId}/issues`, token, { method: "POST", body: form });
+}
+
+export async function listIdeas(token: string, projectId: string) {
+  return request<{ ideas: IdeaSummary[] }>(`/projects/${projectId}/ideas`, token);
+}
+
+export async function createIdea(
+  token: string,
+  projectId: string,
+  input: { provider: IdeaProvider; model: string | null },
+) {
+  return request<{ idea: IdeaDetail }>(`/projects/${projectId}/ideas`, token, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function loadIdea(token: string, projectId: string, ideaId: string) {
+  return request<{ idea: IdeaDetail }>(
+    `/projects/${projectId}/ideas/${ideaId}`,
+    token,
+  );
+}
+
+export async function updateIdea(
+  token: string,
+  projectId: string,
+  ideaId: string,
+  input: {
+    expectedVersion: number;
+    title?: string;
+    documentMarkdown?: string;
+    status?: Extract<IdeaStatus, "refining" | "ready" | "archived">;
+    provider?: IdeaProvider;
+    model?: string | null;
+  },
+) {
+  return request<{ idea: IdeaDetail }>(
+    `/projects/${projectId}/ideas/${ideaId}`,
+    token,
+    { method: "PATCH", body: JSON.stringify(input) },
+  );
+}
+
+export async function deleteIdea(token: string, projectId: string, ideaId: string) {
+  await request<void>(`/projects/${projectId}/ideas/${ideaId}`, token, {
+    method: "DELETE",
+  });
+}
+
+export async function sendIdeaMessage(
+  token: string,
+  projectId: string,
+  ideaId: string,
+  body: string,
+) {
+  return request<{ idea: IdeaDetail }>(
+    `/projects/${projectId}/ideas/${ideaId}/messages`,
+    token,
+    { method: "POST", body: JSON.stringify({ body }) },
+  );
+}
+
+export async function generateIdeaPlan(
+  token: string,
+  projectId: string,
+  ideaId: string,
+) {
+  return request<{ idea: IdeaDetail }>(
+    `/projects/${projectId}/ideas/${ideaId}/plan`,
+    token,
+    { method: "POST", body: "{}" },
+  );
+}
+
+export async function retryIdeaJob(
+  token: string,
+  projectId: string,
+  ideaId: string,
+  jobId: string,
+) {
+  return request<{ idea: IdeaDetail }>(
+    `/projects/${projectId}/ideas/${ideaId}/jobs/${jobId}/retry`,
+    token,
+    { method: "POST", body: "{}" },
+  );
+}
+
+export async function updateIdeaPlan(
+  token: string,
+  projectId: string,
+  ideaId: string,
+  input: { expectedVersion: number; items: IdeaIssuePlanItem[] },
+) {
+  return request<{ idea: IdeaDetail }>(
+    `/projects/${projectId}/ideas/${ideaId}/plan`,
+    token,
+    { method: "PATCH", body: JSON.stringify(input) },
+  );
+}
+
+export async function convertIdeaPlan(
+  token: string,
+  projectId: string,
+  ideaId: string,
+  planVersion: number,
+) {
+  return request<{ runIds: string[] }>(
+    `/projects/${projectId}/ideas/${ideaId}/convert`,
+    token,
+    { method: "POST", body: JSON.stringify({ planVersion }) },
+  );
 }
 
 export async function updateIssue(
