@@ -3,10 +3,15 @@ import SwiftUI
 struct CompanionRootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("companion-appearance") private var appearance = CompanionAppearance.system.rawValue
+    @AppStorage("companion-locale") private var localeRaw = CompanionLocale.ko.rawValue
     @StateObject private var session: SessionStore
     @StateObject private var companion: CompanionStore
     @StateObject private var dashboard: DashboardStore
     @StateObject private var ideas: IdeasStore
+    @StateObject private var agents: AgentsStore
+    @StateObject private var inbox: InboxStore
+    @StateObject private var notifications: LocalNotificationService
+    @StateObject private var navigation = CompanionNavigationModel()
     @State private var signingIn = false
     @State private var authError: String?
     @State private var projectSelectionComplete = false
@@ -35,8 +40,15 @@ struct CompanionRootView: View {
         _companion = StateObject(wrappedValue: CompanionStore(api: api))
         _dashboard = StateObject(wrappedValue: DashboardStore(api: api))
         _ideas = StateObject(wrappedValue: IdeasStore(api: api))
+        _agents = StateObject(wrappedValue: AgentsStore(api: api))
+        _inbox = StateObject(wrappedValue: InboxStore())
+        _notifications = StateObject(wrappedValue: LocalNotificationService())
         authorization = DeviceAuthorizationService(api: api)
         self.presenter = presenter
+    }
+
+    private var locale: CompanionLocale {
+        CompanionLocale(rawValue: localeRaw) ?? .ko
     }
 
     var body: some View {
@@ -51,13 +63,20 @@ struct CompanionRootView: View {
                 ProjectSelectionView(
                     projects: companion.projects,
                     selectedProjectID: $companion.selectedProjectID,
-                    continueAction: { projectSelectionComplete = true },
+                    continueAction: {
+                        projectSelectionComplete = true
+                        applyPendingProjectIfNeeded()
+                    },
                     signOut: signOut
                 )
             } else if let token = session.token,
                       let projectID = companion.selectedProjectID,
                       let project = companion.projects.first(where: { $0.id == projectID }) {
                 CompanionShellView(
+                    navigation: navigation,
+                    agents: agents,
+                    inbox: inbox,
+                    notifications: notifications,
                     project: project,
                     snapshot: dashboard.snapshot,
                     isRefreshing: dashboard.isRefreshing,
@@ -65,6 +84,7 @@ struct CompanionRootView: View {
                     token: token,
                     api: api,
                     ideas: ideas,
+                    user: companion.user,
                     refresh: { await dashboard.refresh(forceSnapshot: true) },
                     changeProject: { projectSelectionComplete = false },
                     signOut: signOut
@@ -79,12 +99,14 @@ struct CompanionRootView: View {
                 companion.clear()
                 dashboard.select(projectID: nil, token: nil)
                 ideas.select(projectID: nil, token: nil)
+                agents.select(projectID: nil, token: nil, locale: locale.agentLocale.rawValue)
                 projectSelectionComplete = false
                 return
             }
             do {
                 try await companion.load(token: token)
                 projectSelectionComplete = false
+                applyPendingProjectIfNeeded()
             } catch let MobileAPIError.httpStatus(status, _) where status == 401 {
                 try? session.signOut()
             } catch {
@@ -92,27 +114,52 @@ struct CompanionRootView: View {
             }
         }
         .onChange(of: projectSelectionComplete, initial: true) { _, complete in
-            dashboard.select(
-                projectID: complete ? companion.selectedProjectID : nil,
-                token: complete ? session.token : nil
-            )
-            ideas.select(
-                projectID: complete ? companion.selectedProjectID : nil,
-                token: complete ? session.token : nil
-            )
+            updateProjectScopedStores(active: complete)
         }
-        .onChange(of: companion.selectedProjectID) { _, projectID in
+        .onChange(of: companion.selectedProjectID) { _, _ in
             guard projectSelectionComplete else { return }
-            dashboard.select(projectID: projectID, token: session.token)
-            ideas.select(projectID: projectID, token: session.token)
+            updateProjectScopedStores(active: true)
+        }
+        .onChange(of: localeRaw) { _, _ in
+            guard projectSelectionComplete else { return }
+            updateProjectScopedStores(active: true)
+        }
+        .onChange(of: dashboard.snapshot) { _, snapshot in
+            guard let project = currentProject else { return }
+            inbox.update(snapshot: snapshot, sessions: agents.sessions, project: project)
+            Task { await notifications.process(messages: inbox.messages) }
+        }
+        .onChange(of: agents.sessions) { _, sessions in
+            guard let project = currentProject else { return }
+            inbox.update(snapshot: dashboard.snapshot, sessions: sessions, project: project)
+            Task { await notifications.process(messages: inbox.messages) }
         }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
-            case .active: dashboard.applicationDidBecomeActive()
-            case .background: dashboard.applicationDidEnterBackground()
+            case .active:
+                dashboard.applicationDidBecomeActive()
+                agents.applicationDidBecomeActive()
+            case .background:
+                dashboard.applicationDidEnterBackground()
+                agents.applicationDidEnterBackground()
             default: break
             }
         }
+        .onChange(of: navigation.pendingProjectID) { _, projectID in
+            guard let projectID else { return }
+            applyPendingProjectIfNeeded()
+            if companion.selectedProjectID == projectID {
+                navigation.pendingProjectID = nil
+            }
+        }
+        .onOpenURL { url in
+            handleIncomingURL(url)
+        }
+    }
+
+    private var currentProject: ProjectsResponse.Project? {
+        guard let projectID = companion.selectedProjectID else { return nil }
+        return companion.projects.first(where: { $0.id == projectID })
     }
 
     private var recoveryView: some View {
@@ -128,6 +175,37 @@ struct CompanionRootView: View {
             .accessibilityIdentifier("account-retry-button")
             Button("로그아웃", role: .destructive) { signOut() }
         }
+    }
+
+    private func updateProjectScopedStores(active: Bool) {
+        let projectID = active ? companion.selectedProjectID : nil
+        let token = active ? session.token : nil
+        dashboard.select(projectID: projectID, token: token)
+        ideas.select(projectID: projectID, token: token)
+        agents.select(
+            projectID: projectID,
+            token: token,
+            locale: locale.agentLocale.rawValue
+        )
+    }
+
+    private func applyPendingProjectIfNeeded() {
+        guard let pending = navigation.pendingProjectID else { return }
+        if companion.projects.contains(where: { $0.id == pending }) {
+            companion.selectedProjectID = pending
+            if session.token != nil {
+                projectSelectionComplete = true
+            }
+            navigation.pendingProjectID = nil
+        }
+    }
+
+    private func handleIncomingURL(_ url: URL) {
+        // Device auth callback is handled by ASWebAuthenticationSession.
+        if url.host == "auth-complete" { return }
+        guard let target = BriarLinkParser.parse(url) else { return }
+        navigation.open(target)
+        applyPendingProjectIfNeeded()
     }
 
     private func signIn() async {
@@ -147,8 +225,10 @@ struct CompanionRootView: View {
     private func signOut() {
         dashboard.select(projectID: nil, token: nil)
         ideas.select(projectID: nil, token: nil)
+        agents.select(projectID: nil, token: nil, locale: locale.agentLocale.rawValue)
         companion.clear()
         projectSelectionComplete = false
+        Task { await AppBadgeService.sync(count: 0) }
         try? session.signOut()
     }
 }

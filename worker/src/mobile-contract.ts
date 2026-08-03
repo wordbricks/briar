@@ -351,6 +351,79 @@ export const mobileAgentReplyResponseSchema = z.object({
 });
 export const mobileResultReviewSchema = mobileDashboardRunSchema.shape.resultReviews.unwrap().element;
 
+export const mobileProjectAgentSchema = z.object({
+  id: z.uuid(),
+  projectId: z.uuid(),
+  name: z.string(),
+  avatar: z.string().nullable(),
+  codexPet: z.object({
+    slug: z.string(),
+    name: z.string(),
+    author: z.string(),
+    license: z.string(),
+    spriteVersion: z.number().int(),
+    spriteSheetUrl: z.string().nullable().optional(),
+  }).nullable().optional(),
+  provider: mobileProviderSchema,
+  model: z.string().nullable(),
+  responsibility: z.string(),
+  skill: z.string(),
+  calendarColor: z.string(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+});
+
+export const mobileProjectAgentsResponseSchema = z.object({
+  agents: z.array(mobileProjectAgentSchema),
+});
+
+export const mobileProjectAgentSessionSchema = z.object({
+  id: z.string(),
+  projectId: z.uuid(),
+  dispatchGroupId: z.string().optional(),
+  agentId: z.uuid().nullable().optional(),
+  sessionType: z.enum(["task", "dispatch"]).optional(),
+  trigger: z.enum(["manual", "scheduled"]).nullable().optional(),
+  scheduleId: z.string().nullable().optional(),
+  scheduleRunId: z.string().nullable().optional(),
+  parentSessionId: z.string().nullable().optional(),
+  request: z.string().nullable().optional(),
+  status: z.enum(["running", "completed", "failed", "skipped", "interrupted"]),
+  issues: z.array(z.object({
+    runId: z.string(),
+    runNumber: z.number().int(),
+    sourceKey: z.string(),
+    title: z.string(),
+    outcome: z.enum(["pending", "completed", "blocked", "failed", "skipped"]),
+    summary: z.string().nullable(),
+  })),
+  startedAt: z.string(),
+  completedAt: z.string().nullable(),
+  conversationId: z.string().nullable().optional(),
+  workspaceRoot: z.null().optional(),
+  summary: z.string().nullable().optional(),
+  error: z.string().nullable().optional(),
+  events: z.array(z.object({
+    id: z.string(),
+    type: z.enum([
+      "started",
+      "completed",
+      "failed",
+      "skipped",
+      "interrupted",
+      "stopped",
+    ]),
+    occurredAt: z.string(),
+  })).optional(),
+  dispatchEvents: z.array(z.unknown()).optional(),
+  workers: z.array(z.unknown()).optional(),
+  updatedAt: z.string().optional(),
+});
+
+export const mobileProjectAgentSessionsResponseSchema = z.object({
+  sessions: z.array(mobileProjectAgentSessionSchema),
+});
+
 export const mobileOperationSchemas = {
   getHealth: { response: mobileHealthResponseSchema },
   beginDeviceAuthorization: {
@@ -386,6 +459,8 @@ export const mobileOperationSchemas = {
   completeResultReview: { response: mobileResultReviewSchema },
   createIssueMessage: { request: mobileCreateMessageRequestSchema, response: mobileCreateMessageResponseSchema },
   getIssueAgentReply: { response: mobileAgentReplyResponseSchema },
+  listProjectAgents: { response: mobileProjectAgentsResponseSchema },
+  listProjectAgentSessions: { response: mobileProjectAgentSessionsResponseSchema },
 } as const;
 
 export function isMobileClientId(value: string) {

@@ -1,5 +1,8 @@
 {
-  "mobileClientIds": ["briar-mobile", "briar-android"],
+  "mobileClientIds": [
+    "briar-mobile",
+    "briar-android"
+  ],
   "operations": {
     "getHealth": {
       "method": "GET",
@@ -104,12 +107,32 @@
             "workflow": {
               "version": 1,
               "stages": [
-                { "id": "analyzing", "label": "Analyze", "required": true },
-                { "id": "implementing", "label": "Implement", "required": true },
-                { "id": "local_qa", "label": "Local QA", "required": true }
+                {
+                  "id": "analyzing",
+                  "label": "Analyze",
+                  "required": true
+                },
+                {
+                  "id": "implementing",
+                  "label": "Implement",
+                  "required": true
+                },
+                {
+                  "id": "local_qa",
+                  "label": "Local QA",
+                  "required": true
+                }
               ],
-              "execution": { "stopAfterStage": "local_qa" },
-              "completion": { "requiredStages": ["analyzing", "implementing", "local_qa"] }
+              "execution": {
+                "stopAfterStage": "local_qa"
+              },
+              "completion": {
+                "requiredStages": [
+                  "analyzing",
+                  "implementing",
+                  "local_qa"
+                ]
+              }
             },
             "progress": 45,
             "detail": "Implementing",
@@ -272,74 +295,321 @@
       }
     },
     "createIssue": {
-      "method": "POST", "path": "/projects/{projectId}/issues", "status": 200,
-      "request": { "title": "Native write flow", "description": "Create and run", "priority": 2, "status": "queued" },
-      "response": { "runId": "33333333-3333-4333-8333-333333333333", "sourceKey": "briar-issue:fixture", "stage": "queued", "status": "queued", "attachments": [] }
+      "method": "POST",
+      "path": "/projects/{projectId}/issues",
+      "status": 200,
+      "request": {
+        "title": "Native write flow",
+        "description": "Create and run",
+        "priority": 2,
+        "status": "queued"
+      },
+      "response": {
+        "runId": "33333333-3333-4333-8333-333333333333",
+        "sourceKey": "briar-issue:fixture",
+        "stage": "queued",
+        "status": "queued",
+        "attachments": []
+      }
     },
     "updateIssue": {
-      "method": "PATCH", "path": "/projects/{projectId}/runs/{runId}", "status": 200,
-      "request": { "title": "Updated native flow", "description": null, "priority": null },
-      "response": { "runId": "33333333-3333-4333-8333-333333333333", "title": "Updated native flow", "description": null, "priority": null }
+      "method": "PATCH",
+      "path": "/projects/{projectId}/runs/{runId}",
+      "status": 200,
+      "request": {
+        "title": "Updated native flow",
+        "description": null,
+        "priority": null
+      },
+      "response": {
+        "runId": "33333333-3333-4333-8333-333333333333",
+        "title": "Updated native flow",
+        "description": null,
+        "priority": null
+      }
     },
     "deleteIssue": {
-      "method": "DELETE", "path": "/projects/{projectId}/runs/{runId}", "status": 200,
+      "method": "DELETE",
+      "path": "/projects/{projectId}/runs/{runId}",
+      "status": 200,
       "response": null
     },
     "updateIssuePreferences": {
-      "method": "PUT", "path": "/projects/{projectId}/runs/{runId}/preferences", "status": 200,
-      "request": { "provider": "codex", "model": "gpt-5.6-sol", "effort": "high" },
-      "response": { "runId": "33333333-3333-4333-8333-333333333333", "provider": "codex", "model": "gpt-5.6-sol", "effort": "high" }
+      "method": "PUT",
+      "path": "/projects/{projectId}/runs/{runId}/preferences",
+      "status": 200,
+      "request": {
+        "provider": "codex",
+        "model": "gpt-5.6-sol",
+        "effort": "high"
+      },
+      "response": {
+        "runId": "33333333-3333-4333-8333-333333333333",
+        "provider": "codex",
+        "model": "gpt-5.6-sol",
+        "effort": "high"
+      }
     },
     "addIssueDependency": {
-      "method": "PUT", "path": "/projects/{projectId}/runs/{runId}/dependencies/{prerequisiteRunId}", "status": 200,
-      "response": { "prerequisiteRunId": "44444444-4444-4444-8444-444444444444", "dependentRunId": "33333333-3333-4333-8333-333333333333", "outcome": "created" }
+      "method": "PUT",
+      "path": "/projects/{projectId}/runs/{runId}/dependencies/{prerequisiteRunId}",
+      "status": 200,
+      "response": {
+        "prerequisiteRunId": "44444444-4444-4444-8444-444444444444",
+        "dependentRunId": "33333333-3333-4333-8333-333333333333",
+        "outcome": "created"
+      }
     },
     "removeIssueDependency": {
-      "method": "DELETE", "path": "/projects/{projectId}/runs/{runId}/dependencies/{prerequisiteRunId}", "status": 200,
+      "method": "DELETE",
+      "path": "/projects/{projectId}/runs/{runId}/dependencies/{prerequisiteRunId}",
+      "status": 200,
       "response": null
     },
     "moveRun": {
-      "method": "PUT", "path": "/projects/{projectId}/runs/{runId}/status", "status": 200,
-      "request": { "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "status": "queued", "workflowStage": null },
-      "response": { "runId": "33333333-3333-4333-8333-333333333333", "outcome": "moved", "status": "queued", "workflowStage": null }
+      "method": "PUT",
+      "path": "/projects/{projectId}/runs/{runId}/status",
+      "status": 200,
+      "request": {
+        "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "status": "queued",
+        "workflowStage": null
+      },
+      "response": {
+        "runId": "33333333-3333-4333-8333-333333333333",
+        "outcome": "moved",
+        "status": "queued",
+        "workflowStage": null
+      }
     },
     "retryRun": {
-      "method": "POST", "path": "/projects/{projectId}/runs/{runId}/retry", "status": 200,
-      "request": { "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "reason": null },
-      "response": { "runId": "33333333-3333-4333-8333-333333333333", "outcome": "retried", "attempt": 2, "stage": "queued" }
+      "method": "POST",
+      "path": "/projects/{projectId}/runs/{runId}/retry",
+      "status": 200,
+      "request": {
+        "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "reason": null
+      },
+      "response": {
+        "runId": "33333333-3333-4333-8333-333333333333",
+        "outcome": "retried",
+        "attempt": 2,
+        "stage": "queued"
+      }
     },
     "cancelRun": {
-      "method": "POST", "path": "/projects/{projectId}/runs/{runId}/cancel", "status": 200,
-      "request": { "requestId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "reason": "Stopped on mobile" },
-      "response": { "runId": "33333333-3333-4333-8333-333333333333", "outcome": "cancelled", "attempt": 1, "stage": "cancelled" }
+      "method": "POST",
+      "path": "/projects/{projectId}/runs/{runId}/cancel",
+      "status": 200,
+      "request": {
+        "requestId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "reason": "Stopped on mobile"
+      },
+      "response": {
+        "runId": "33333333-3333-4333-8333-333333333333",
+        "outcome": "cancelled",
+        "attempt": 1,
+        "stage": "cancelled"
+      }
     },
     "dispatchRun": {
-      "method": "POST", "path": "/projects/{projectId}/runs/{runId}/dispatch", "status": 200,
-      "request": { "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "provider": "codex", "model": "gpt-5.6-sol", "effort": "high", "persistPreferences": true, "workerId": null },
-      "response": { "runId": "33333333-3333-4333-8333-333333333333", "agentId": null, "provider": "codex", "model": "gpt-5.6-sol", "effort": "high", "requestedWorkerId": null, "requestedByUserId": "fixture-user", "dispatchMode": "any", "dispatchedAt": "2026-08-02T01:00:00.000Z", "outcome": "dispatched" }
+      "method": "POST",
+      "path": "/projects/{projectId}/runs/{runId}/dispatch",
+      "status": 200,
+      "request": {
+        "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "provider": "codex",
+        "model": "gpt-5.6-sol",
+        "effort": "high",
+        "persistPreferences": true,
+        "workerId": null
+      },
+      "response": {
+        "runId": "33333333-3333-4333-8333-333333333333",
+        "agentId": null,
+        "provider": "codex",
+        "model": "gpt-5.6-sol",
+        "effort": "high",
+        "requestedWorkerId": null,
+        "requestedByUserId": "fixture-user",
+        "dispatchMode": "any",
+        "dispatchedAt": "2026-08-02T01:00:00.000Z",
+        "outcome": "dispatched"
+      }
     },
     "reassignRun": {
-      "method": "POST", "path": "/projects/{projectId}/runs/{runId}/reassign", "status": 200,
-      "request": { "requestId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "provider": "codex", "model": null, "effort": null, "persistPreferences": true, "workerId": "worker-1" },
-      "response": { "runId": "33333333-3333-4333-8333-333333333333", "agentId": null, "provider": "codex", "model": null, "effort": null, "requestedWorkerId": "worker-1", "requestedByUserId": "fixture-user", "dispatchMode": "specific", "dispatchedAt": "2026-08-02T01:00:00.000Z", "outcome": "dispatched" }
+      "method": "POST",
+      "path": "/projects/{projectId}/runs/{runId}/reassign",
+      "status": 200,
+      "request": {
+        "requestId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "provider": "codex",
+        "model": null,
+        "effort": null,
+        "persistPreferences": true,
+        "workerId": "worker-1"
+      },
+      "response": {
+        "runId": "33333333-3333-4333-8333-333333333333",
+        "agentId": null,
+        "provider": "codex",
+        "model": null,
+        "effort": null,
+        "requestedWorkerId": "worker-1",
+        "requestedByUserId": "fixture-user",
+        "dispatchMode": "specific",
+        "dispatchedAt": "2026-08-02T01:00:00.000Z",
+        "outcome": "dispatched"
+      }
     },
     "completeResultReview": {
-      "method": "POST", "path": "/projects/{projectId}/runs/{runId}/result-reviews", "status": 200,
-      "response": { "userId": "fixture-user", "name": "Briar User", "username": "briar_user", "image": null, "completedAt": "2026-08-02T01:01:00.000Z" }
+      "method": "POST",
+      "path": "/projects/{projectId}/runs/{runId}/result-reviews",
+      "status": 200,
+      "response": {
+        "userId": "fixture-user",
+        "name": "Briar User",
+        "username": "briar_user",
+        "image": null,
+        "completedAt": "2026-08-02T01:01:00.000Z"
+      }
     },
     "createIssueMessage": {
-      "method": "POST", "path": "/projects/{projectId}/runs/{runId}/messages", "status": 200,
-      "request": { "body": "@Briar please review", "parentMessageId": null, "mentionedUserIds": [], "agentConversationId": null },
+      "method": "POST",
+      "path": "/projects/{projectId}/runs/{runId}/messages",
+      "status": 200,
+      "request": {
+        "body": "@Briar please review",
+        "parentMessageId": null,
+        "mentionedUserIds": [],
+        "agentConversationId": null
+      },
       "response": {
-        "message": { "id": "99999999-9999-4999-8999-999999999999", "runId": "33333333-3333-4333-8333-333333333333", "parentMessageId": null, "body": "@Briar please review", "author": { "id": "fixture-user", "name": "Briar User", "image": null, "provider": null }, "replyCount": 0, "createdAt": "2026-08-02T01:00:00.000Z", "updatedAt": "2026-08-02T01:00:00.000Z" },
-        "agentReply": { "id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc", "triggerMessageId": "99999999-9999-4999-8999-999999999999", "status": "queued", "error": null }
+        "message": {
+          "id": "99999999-9999-4999-8999-999999999999",
+          "runId": "33333333-3333-4333-8333-333333333333",
+          "parentMessageId": null,
+          "body": "@Briar please review",
+          "author": {
+            "id": "fixture-user",
+            "name": "Briar User",
+            "image": null,
+            "provider": null
+          },
+          "replyCount": 0,
+          "createdAt": "2026-08-02T01:00:00.000Z",
+          "updatedAt": "2026-08-02T01:00:00.000Z"
+        },
+        "agentReply": {
+          "id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+          "triggerMessageId": "99999999-9999-4999-8999-999999999999",
+          "status": "queued",
+          "error": null
+        }
       }
     },
     "getIssueAgentReply": {
-      "method": "GET", "path": "/projects/{projectId}/runs/{runId}/messages/{triggerMessageId}/agent-reply", "status": 200,
+      "method": "GET",
+      "path": "/projects/{projectId}/runs/{runId}/messages/{triggerMessageId}/agent-reply",
+      "status": 200,
       "response": {
-        "agentReply": { "id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc", "triggerMessageId": "99999999-9999-4999-8999-999999999999", "status": "completed", "error": null },
-        "message": { "id": "dddddddd-dddd-4ddd-8ddd-dddddddddddd", "runId": "33333333-3333-4333-8333-333333333333", "parentMessageId": "99999999-9999-4999-8999-999999999999", "body": "Reviewed from the worker", "author": { "id": null, "name": "Briar · Codex", "image": null, "provider": "codex" }, "replyCount": 0, "createdAt": "2026-08-02T01:01:00.000Z", "updatedAt": "2026-08-02T01:01:00.000Z" }
+        "agentReply": {
+          "id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+          "triggerMessageId": "99999999-9999-4999-8999-999999999999",
+          "status": "completed",
+          "error": null
+        },
+        "message": {
+          "id": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+          "runId": "33333333-3333-4333-8333-333333333333",
+          "parentMessageId": "99999999-9999-4999-8999-999999999999",
+          "body": "Reviewed from the worker",
+          "author": {
+            "id": null,
+            "name": "Briar \u00b7 Codex",
+            "image": null,
+            "provider": "codex"
+          },
+          "replyCount": 0,
+          "createdAt": "2026-08-02T01:01:00.000Z",
+          "updatedAt": "2026-08-02T01:01:00.000Z"
+        }
+      }
+    },
+    "listProjectAgents": {
+      "method": "GET",
+      "path": "/projects/{projectId}/agents",
+      "status": 200,
+      "response": {
+        "agents": [
+          {
+            "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "projectId": "11111111-1111-4111-8111-111111111111",
+            "name": "Auto Hunt agent",
+            "avatar": null,
+            "codexPet": null,
+            "provider": "codex",
+            "model": "gpt-5.4",
+            "responsibility": "Perform Auto Hunt for every queued issue.",
+            "skill": "# Auto Hunt agent\n\n## Responsibility\n\nPerform Auto Hunt for every queued issue.",
+            "calendarColor": "#3275d5",
+            "createdAt": "2026-08-02T01:00:00.000Z",
+            "updatedAt": "2026-08-02T01:00:00.000Z"
+          }
+        ]
+      }
+    },
+    "listProjectAgentSessions": {
+      "method": "GET",
+      "path": "/projects/{projectId}/agent-sessions",
+      "status": 200,
+      "response": {
+        "sessions": [
+          {
+            "id": "session-fixture-1",
+            "projectId": "11111111-1111-4111-8111-111111111111",
+            "dispatchGroupId": "dispatch-fixture-1",
+            "agentId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "sessionType": "task",
+            "trigger": "manual",
+            "scheduleId": null,
+            "scheduleRunId": null,
+            "parentSessionId": null,
+            "request": "Complete the mobile companion agents inbox work",
+            "status": "completed",
+            "issues": [
+              {
+                "runId": "33333333-3333-4333-8333-333333333333",
+                "runNumber": 3832,
+                "sourceKey": "briar-issue:fixture",
+                "title": "iOS Native Companion \uc77d\uae30 \uacbd\ud5d8",
+                "outcome": "completed",
+                "summary": "Session finished successfully."
+              }
+            ],
+            "startedAt": "2026-08-02T01:00:00.000Z",
+            "completedAt": "2026-08-02T01:05:00.000Z",
+            "conversationId": null,
+            "workspaceRoot": null,
+            "summary": "Completed the queued issue.",
+            "error": null,
+            "events": [
+              {
+                "id": "event-1",
+                "type": "started",
+                "occurredAt": "2026-08-02T01:00:00.000Z"
+              },
+              {
+                "id": "event-2",
+                "type": "completed",
+                "occurredAt": "2026-08-02T01:05:00.000Z"
+              }
+            ],
+            "dispatchEvents": [],
+            "workers": [],
+            "updatedAt": "2026-08-02T01:05:00.000Z"
+          }
+        ]
       }
     }
   }

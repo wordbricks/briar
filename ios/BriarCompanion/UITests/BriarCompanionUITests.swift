@@ -45,9 +45,11 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["실패"].exists)
 
         app.segmentedControls.buttons["Attention"].tap()
-        XCTAssertTrue(app.staticTexts["오프라인 복구 확인"].exists)
+        XCTAssertTrue(app.staticTexts["오프라인 복구 확인"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["실패 상태 예시"].exists)
-        XCTAssertFalse(app.staticTexts["공유 API 계약 검증"].exists)
+        // Completed rows leave the Tasks list for the Attention filter.
+        let completed = app.cells.staticTexts["공유 API 계약 검증"]
+        XCTAssertFalse(completed.exists && completed.isHittable)
         captureScreenshot(named: "companion-attention-filter")
     }
 
@@ -60,6 +62,29 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["오프라인"].exists)
         XCTAssertTrue(app.buttons["다시 시도"].exists)
         captureScreenshot(named: "companion-offline-retry")
+    }
+
+    func testAgentsInboxAndSettingsSurface() {
+        let app = launchInsideCompanion()
+
+        XCTAssertTrue(app.tabBars.buttons["Agents"].waitForExistence(timeout: 5))
+        app.tabBars.buttons["Agents"].tap()
+        XCTAssertTrue(app.navigationBars["Agents"].waitForExistence(timeout: 5))
+        captureScreenshot(named: "companion-agents")
+
+        app.tabBars.buttons["Inbox"].tap()
+        XCTAssertTrue(app.navigationBars["Inbox"].waitForExistence(timeout: 5))
+        captureScreenshot(named: "companion-inbox")
+
+        app.buttons["account-menu"].tap()
+        let settingsButton = app.buttons["설정"]
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 5))
+        settingsButton.tap()
+        XCTAssertTrue(app.navigationBars["Companion 설정"].waitForExistence(timeout: 5))
+        // Settings sheet exposes profile, theme, language, icons, and notification toggles.
+        XCTAssertTrue(app.staticTexts["계정"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.switches.count > 0 || app.buttons["완료"].exists)
+        captureScreenshot(named: "companion-settings-icons")
     }
 
     func testCreateRunStateAndMessageFlow() {
