@@ -21,6 +21,8 @@
     "mobile:ci": "bash scripts/ci-mobile.sh",
     "ios:native:project": "xcodegen generate --spec ios/BriarCompanion/project.yml --project ios/BriarCompanion",
     "ios:native:test": "xcodebuild -project ios/BriarCompanion/BriarCompanion.xcodeproj -scheme BriarCompanion-Dev -destination 'platform=iOS Simulator,name=Briar iPhone 17 Pro' CODE_SIGNING_ALLOWED=NO test",
+    "ios:release:verify": "bun run scripts/ios-release-config.ts verify",
+    "ios:release": "bash scripts/release-ios.sh",
     "release:macos:candidate": "bash scripts/release-macos-candidate.sh",
     "release:macos:production": "bash scripts/release-macos-production.sh",
     "qa:release-updater": "bash scripts/qa-production-updater-build.sh",

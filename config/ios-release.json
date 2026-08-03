@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "defaultImplementation": "tauri",
+  "bundleIdentifier": "app.briar.companion",
+  "rollback": {
+    "implementation": "tauri",
+    "preserveSourceThroughVersion": "1.3.0"
+  },
+  "nativeStabilization": null
+}

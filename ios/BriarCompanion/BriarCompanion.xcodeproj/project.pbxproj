@@ -23,6 +23,7 @@
 		8C3ACBC240C3C93066779D21 /* CompanionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE917D55AAB7F8525B5D6FA0 /* CompanionStore.swift */; };
 		8CC0C5797E179B5BF4797415 /* AppSystemServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = B941ED81ECF5145E9F9BE24C /* AppSystemServices.swift */; };
 		8F3D3B8B9C201AD8938E12AA /* AttachmentPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF612FD7D34E422E51B3A302 /* AttachmentPreview.swift */; };
+		961364D88DD32DFC08E17902 /* companion-v1.json in Resources */ = {isa = PBXBuildFile; fileRef = 103364D43F1C60B4A073F711 /* companion-v1.json */; };
 		967C64C6A88A080B5711C4CA /* CompanionReadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B5F0E3F338DC5E3C1A397CA /* CompanionReadTests.swift */; };
 		A2E278A9A475BB7D7F2FCA36 /* BriarCompanionUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CA08856EAF2B67E13727846 /* BriarCompanionUITests.swift */; };
 		A2FAECA169C615CCCCBC17E7 /* AgentModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61217A3C52F459A88E333CD1 /* AgentModels.swift */; };
@@ -40,7 +41,6 @@
 		EEE6E17CFBF66C47153E1380 /* DashboardSyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AA73A269C0859E5CC863982 /* DashboardSyncTests.swift */; };
 		F132013FB482B8BFC9068619 /* DashboardModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34368CFC402513DE2753ABCA /* DashboardModels.swift */; };
 		F1EB7DA39B3DD9F56913BB5F /* SessionStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 216793AD86019D1D7BDF5133 /* SessionStoreTests.swift */; };
-		F62349744FCE6C53B8B67EB4 /* companion-v1.json in Resources */ = {isa = PBXBuildFile; fileRef = 38A49EDFF3D26A6BABD57162 /* companion-v1.json */; };
 		F6D6ABEF34F204D22C2A6831 /* IdeasStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA6366545076711FE431BE9D /* IdeasStore.swift */; };
 		FF669BA01DFF156210336EE4 /* IssueMutationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 729B823EA515249BC7C460F2 /* IssueMutationStore.swift */; };
 /* End PBXBuildFile section */
@@ -66,13 +66,13 @@
 		06B1392F6B2DCAD8B6D47B10 /* CompanionSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionSettingsView.swift; sourceTree = "<group>"; };
 		0C3D7B1D017C131E8DD36044 /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
 		0CA08856EAF2B67E13727846 /* BriarCompanionUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BriarCompanionUITests.swift; sourceTree = "<group>"; };
+		103364D43F1C60B4A073F711 /* companion-v1.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "companion-v1.json"; sourceTree = "<group>"; };
 		2034C52B05B2B54DF7F3F3E5 /* BriarCompanionTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = BriarCompanionTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		216793AD86019D1D7BDF5133 /* SessionStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStoreTests.swift; sourceTree = "<group>"; };
 		2A26E7B294AE842A63FE02C2 /* BriarCompanionUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = BriarCompanionUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		2E62D7E372C571DC891CC649 /* IdeasModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdeasModels.swift; sourceTree = "<group>"; };
 		34368CFC402513DE2753ABCA /* DashboardModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardModels.swift; sourceTree = "<group>"; };
 		38415BB3EE4DDCA4212DB1F9 /* CompanionLocale.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionLocale.swift; sourceTree = "<group>"; };
-		38A49EDFF3D26A6BABD57162 /* companion-v1.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "companion-v1.json"; sourceTree = "<group>"; };
 		3D2CC4C3D7F505A0B3A0C564 /* CompanionRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionRootView.swift; sourceTree = "<group>"; };
 		48888E3E40EC72372BEEB40F /* BriarCompanion.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = BriarCompanion.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5004E20D26F2AC91C541EE9A /* BriarCompanionApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BriarCompanionApp.swift; sourceTree = "<group>"; };
@@ -121,6 +121,14 @@
 			path = Tests;
 			sourceTree = "<group>";
 		};
+		29511B94380555908675796D /* fixtures */ = {
+			isa = PBXGroup;
+			children = (
+				103364D43F1C60B4A073F711 /* companion-v1.json */,
+			);
+			path = fixtures;
+			sourceTree = "<group>";
+		};
 		4BCD825065EC73B0BFB812A0 /* Products */ = {
 			isa = PBXGroup;
 			children = (
@@ -167,24 +175,24 @@
 			path = App;
 			sourceTree = "<group>";
 		};
+		8544397DF57599DC2F7CBFBE /* ios-native-6-6-품질-게이트-testflight와-프로덕션-전-e9637958 */ = {
+			isa = PBXGroup;
+			children = (
+				E61259EEBAF5856BB6ED7411 /* contracts */,
+			);
+			name = "ios-native-6-6-품질-게이트-testflight와-프로덕션-전-e9637958";
+			path = ../..;
+			sourceTree = "<group>";
+		};
 		995DC18713CA2D81749A5F1C = {
 			isa = PBXGroup;
 			children = (
 				61C931BA8B64C4D161851EBE /* App */,
-				9A5896C8332A34DBA556DFD5 /* ios-native-5-6-agents-inbox-설정과-ios-시스템-25bbf746 */,
+				8544397DF57599DC2F7CBFBE /* ios-native-6-6-품질-게이트-testflight와-프로덕션-전-e9637958 */,
 				199D6281C5C9968DA1B0EF3F /* Tests */,
 				9E47CF88E04EB2D5307A8187 /* UITests */,
 				4BCD825065EC73B0BFB812A0 /* Products */,
 			);
-			sourceTree = "<group>";
-		};
-		9A5896C8332A34DBA556DFD5 /* ios-native-5-6-agents-inbox-설정과-ios-시스템-25bbf746 */ = {
-			isa = PBXGroup;
-			children = (
-				AE4FEA8DC50FBE1A71D34445 /* contracts */,
-			);
-			name = "ios-native-5-6-agents-inbox-설정과-ios-시스템-25bbf746";
-			path = ../..;
 			sourceTree = "<group>";
 		};
 		9E47CF88E04EB2D5307A8187 /* UITests */ = {
@@ -195,28 +203,20 @@
 			path = UITests;
 			sourceTree = "<group>";
 		};
-		AE4FEA8DC50FBE1A71D34445 /* contracts */ = {
+		E1786C18125ED36217FFAEB1 /* mobile */ = {
 			isa = PBXGroup;
 			children = (
-				BEB662BF5816920CA8250FDF /* mobile */,
-			);
-			path = contracts;
-			sourceTree = "<group>";
-		};
-		B27FC3B9294581A8D2096231 /* fixtures */ = {
-			isa = PBXGroup;
-			children = (
-				38A49EDFF3D26A6BABD57162 /* companion-v1.json */,
-			);
-			path = fixtures;
-			sourceTree = "<group>";
-		};
-		BEB662BF5816920CA8250FDF /* mobile */ = {
-			isa = PBXGroup;
-			children = (
-				B27FC3B9294581A8D2096231 /* fixtures */,
+				29511B94380555908675796D /* fixtures */,
 			);
 			path = mobile;
+			sourceTree = "<group>";
+		};
+		E61259EEBAF5856BB6ED7411 /* contracts */ = {
+			isa = PBXGroup;
+			children = (
+				E1786C18125ED36217FFAEB1 /* mobile */,
+			);
+			path = contracts;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -287,15 +287,10 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					3103E544D112793914C23EE0 = {
-						DevelopmentTeam = "";
 						TestTargetID = 50FDB7409FB1516E4B62DC3E;
 					};
 					50FDB7409FB1516E4B62DC3E = {
-						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
-					};
-					C17083C87E9DA9038DCFCC7C = {
-						DevelopmentTeam = "";
 					};
 				};
 			};
@@ -325,7 +320,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				F62349744FCE6C53B8B67EB4 /* companion-v1.json in Resources */,
+				961364D88DD32DFC08E17902 /* companion-v1.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -411,7 +406,27 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		0824A37841628619B542B035 /* Debug */ = {
+		0204B8C810950BC84A16B60E /* Dev Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				BRIAR_DISPLAY_NAME = "Briar Native Dev";
+				CODE_SIGN_ENTITLEMENTS = App/BriarCompanion.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.briar.companion.native.dev;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = "Dev Debug";
+		};
+		3CD34B162E8A29A5173DEE0A /* Dev Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -445,8 +460,85 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.2.52;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = "Dev Release";
+		};
+		53E702094CC86BF50DA29FD0 /* Production */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.briar.companion.native.dev.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = BriarCompanion;
+			};
+			name = Production;
+		};
+		5F91A5790D3E18C15EAA4AA1 /* Dev Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = "";
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
@@ -464,6 +556,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.2.52;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -475,44 +568,9 @@
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
-			name = Debug;
+			name = "Dev Debug";
 		};
-		2963B71C35E1357E1C67217E /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = App/BriarCompanion.entitlements;
-				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CODE_SIGN_STYLE = Automatic;
-				INFOPLIST_FILE = App/Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				PRODUCT_BUNDLE_IDENTIFIER = app.briar.companion.native.dev;
-				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
-		2F1B4DDB4379D8E3D03AA941 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				GENERATE_INFOPLIST_FILE = YES;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@loader_path/Frameworks",
-				);
-				PRODUCT_BUNDLE_IDENTIFIER = app.briar.companion.native.dev.tests;
-				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BriarCompanion.app/BriarCompanion";
-			};
-			name = Release;
-		};
-		3679245F8FD897894BC3D9DC /* Release */ = {
+		75495C33D385183BEB82EA46 /* Dev Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
@@ -527,9 +585,117 @@
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = BriarCompanion;
 			};
-			name = Release;
+			name = "Dev Release";
 		};
-		6722C5FD73F7F07481F48BF0 /* Release */ = {
+		82E2541415B140784D59D037 /* Production */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.briar.companion.native.dev.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BriarCompanion.app/BriarCompanion";
+			};
+			name = Production;
+		};
+		B2CD1439C7355D1BAAF46780 /* Dev Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.briar.companion.native.dev.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = BriarCompanion;
+			};
+			name = "Dev Debug";
+		};
+		B6255E92BDA44A0623664DBB /* Dev Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				BRIAR_DISPLAY_NAME = "Briar Native Dev";
+				CODE_SIGN_ENTITLEMENTS = App/BriarCompanion.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.briar.companion.native.dev;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = "Dev Release";
+		};
+		CC2EE43518E7937450DFB8DC /* Production */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				BRIAR_DISPLAY_NAME = "Briar Companion";
+				CODE_SIGN_ENTITLEMENTS = App/BriarCompanion.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = QFJZ2V3829;
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.briar.companion;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Production;
+		};
+		E41BAF0D87E51C74BF9AC12A /* Dev Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.briar.companion.native.dev.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BriarCompanion.app/BriarCompanion";
+			};
+			name = "Dev Release";
+		};
+		E4DAC76360DA801B59DEF5F3 /* Dev Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.briar.companion.native.dev.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BriarCompanion.app/BriarCompanion";
+			};
+			name = "Dev Debug";
+		};
+		E8050984E8F368A6E668FC45 /* Production */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -563,8 +729,8 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = "";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
@@ -576,6 +742,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.2.52;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -586,59 +753,7 @@
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
-			name = Release;
-		};
-		75C01F3233684D1EA016585A /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = App/BriarCompanion.entitlements;
-				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CODE_SIGN_STYLE = Automatic;
-				INFOPLIST_FILE = App/Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				PRODUCT_BUNDLE_IDENTIFIER = app.briar.companion.native.dev;
-				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Release;
-		};
-		A5121A32E23E3411F7A43410 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				GENERATE_INFOPLIST_FILE = YES;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@loader_path/Frameworks",
-				);
-				PRODUCT_BUNDLE_IDENTIFIER = app.briar.companion.native.dev.tests;
-				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BriarCompanion.app/BriarCompanion";
-			};
-			name = Debug;
-		};
-		BCA9FB002900280239918593 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				GENERATE_INFOPLIST_FILE = YES;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@loader_path/Frameworks",
-				);
-				PRODUCT_BUNDLE_IDENTIFIER = app.briar.companion.native.dev.uitests;
-				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = BriarCompanion;
-			};
-			name = Debug;
+			name = Production;
 		};
 /* End XCBuildConfiguration section */
 
@@ -646,38 +761,42 @@
 		0A75B9A4C54902275B1CB937 /* Build configuration list for PBXProject "BriarCompanion" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				0824A37841628619B542B035 /* Debug */,
-				6722C5FD73F7F07481F48BF0 /* Release */,
+				5F91A5790D3E18C15EAA4AA1 /* Dev Debug */,
+				3CD34B162E8A29A5173DEE0A /* Dev Release */,
+				E8050984E8F368A6E668FC45 /* Production */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Debug;
+			defaultConfigurationName = "Dev Debug";
 		};
 		11943E4C78C03C52B687FB41 /* Build configuration list for PBXNativeTarget "BriarCompanionUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				BCA9FB002900280239918593 /* Debug */,
-				3679245F8FD897894BC3D9DC /* Release */,
+				B2CD1439C7355D1BAAF46780 /* Dev Debug */,
+				75495C33D385183BEB82EA46 /* Dev Release */,
+				53E702094CC86BF50DA29FD0 /* Production */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Debug;
+			defaultConfigurationName = "Dev Debug";
 		};
 		2754A17E99FB95431FDC398D /* Build configuration list for PBXNativeTarget "BriarCompanionTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				A5121A32E23E3411F7A43410 /* Debug */,
-				2F1B4DDB4379D8E3D03AA941 /* Release */,
+				E4DAC76360DA801B59DEF5F3 /* Dev Debug */,
+				E41BAF0D87E51C74BF9AC12A /* Dev Release */,
+				82E2541415B140784D59D037 /* Production */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Debug;
+			defaultConfigurationName = "Dev Debug";
 		};
 		6C41B154F41823676BD3A907 /* Build configuration list for PBXNativeTarget "BriarCompanion" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				2963B71C35E1357E1C67217E /* Debug */,
-				75C01F3233684D1EA016585A /* Release */,
+				0204B8C810950BC84A16B60E /* Dev Debug */,
+				B6255E92BDA44A0623664DBB /* Dev Release */,
+				CC2EE43518E7937450DFB8DC /* Production */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Debug;
+			defaultConfigurationName = "Dev Debug";
 		};
 /* End XCConfigurationList section */
 	};
