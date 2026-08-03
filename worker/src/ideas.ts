@@ -11,8 +11,8 @@ import {
 } from "../../src/lib/ideas-contract";
 import {
   isRepositoryWorkflowPending,
-  normalizeAutoHuntWorkflow,
 } from "../../src/lib/auto-hunt-contract";
+import { workflowSnapshotForRun } from "./workflow-policy";
 
 type IdeaRow = {
   id: string;
@@ -879,7 +879,7 @@ export async function convertIdeaPlanToIssues(
     }>();
   if (!lock) return { outcome: "not_ready" as const, runIds: [] };
   try {
-    const [plan, settings, project, generated] = await Promise.all([
+    const [plan, settings, project, generated, workflow] = await Promise.all([
       db
         .prepare(
           `select * from briar_idea_issue_plans
@@ -889,11 +889,11 @@ export async function convertIdeaPlanToIssues(
         .first<IdeaPlanRow>(),
       db
         .prepare(
-          `select github_repository, workflow_json from briar_project_settings
+          `select github_repository from briar_project_settings
            where project_id = ?`,
         )
         .bind(input.projectId)
-        .first<{ github_repository: string | null; workflow_json: string }>(),
+        .first<{ github_repository: string | null }>(),
       db
         .prepare(`select name from briar_projects where id = ?`)
         .bind(input.projectId)
@@ -913,6 +913,7 @@ export async function convertIdeaPlanToIssues(
           status: string;
           claim_token_hash: string | null;
         }>(),
+      workflowSnapshotForRun(db, input.projectId, input.authorUserId),
     ]);
     if (!plan || !settings || !project) {
       return { outcome: "not_found" as const, runIds: [] };
@@ -950,7 +951,6 @@ export async function convertIdeaPlanToIssues(
         return { outcome: "active_issues" as const, runIds: [] };
       }
     }
-    const workflow = normalizeAutoHuntWorkflow(JSON.parse(settings.workflow_json));
     if (isRepositoryWorkflowPending(workflow)) {
       return { outcome: "workflow_pending" as const, runIds: [] };
     }

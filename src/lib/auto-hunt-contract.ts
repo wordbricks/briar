@@ -68,6 +68,114 @@ export type AutoHuntWorkflowCheckpoint = {
   position: AutoHuntWorkflowCheckpointPosition;
 };
 
+export type AutoHuntCheckpointPolicy = {
+  projectMandatory: AutoHuntWorkflowCheckpoint[];
+  userDefaults: AutoHuntWorkflowCheckpoint[];
+  effective: AutoHuntWorkflowCheckpoint[];
+};
+
+const checkpointBoundaryId = (
+  checkpoint: Pick<AutoHuntWorkflowCheckpoint, "stage" | "position">,
+) => `${checkpoint.stage}:${checkpoint.position}`;
+
+export const checkpointKeyForBoundary = (
+  owner: "project" | "user",
+  checkpoint: Pick<AutoHuntWorkflowCheckpoint, "stage" | "position">,
+) => `${owner}-${checkpoint.position}-${checkpoint.stage}`;
+
+export function canonicalizeCheckpointSet(
+  workflow: AutoHuntWorkflow,
+  checkpoints: AutoHuntWorkflowCheckpoint[],
+  owner: "project" | "user",
+) {
+  const normalized = normalizeAutoHuntWorkflow(workflow);
+  const stageOrder = new Map(
+    normalized.stages.map((stage, index) => [stage.id, index]),
+  );
+  const boundaries = new Set<string>();
+  const keys = new Set<string>();
+  const result = checkpoints.map((checkpoint) => {
+    if (!stageOrder.has(checkpoint.stage)) {
+      throw new AutoHuntWorkflowValidationError([
+        `checkpoint '${checkpoint.key}' references unknown stage '${checkpoint.stage}'`,
+      ]);
+    }
+    if (!autoHuntWorkflowCheckpointPositions.includes(checkpoint.position)) {
+      throw new AutoHuntWorkflowValidationError([
+        `checkpoint '${checkpoint.key}' has invalid position '${checkpoint.position}'`,
+      ]);
+    }
+    const boundary = checkpointBoundaryId(checkpoint);
+    if (boundaries.has(boundary)) {
+      throw new AutoHuntWorkflowValidationError([
+        `checkpoint boundary '${boundary}' is duplicated`,
+      ]);
+    }
+    boundaries.add(boundary);
+    const key = checkpoint.key.trim() || checkpointKeyForBoundary(owner, checkpoint);
+    if (!autoHuntWorkflowCheckpointKeyPattern.test(key) || keys.has(key)) {
+      throw new AutoHuntWorkflowValidationError([
+        `checkpoint key '${key}' is invalid or duplicated`,
+      ]);
+    }
+    keys.add(key);
+    return { key, stage: checkpoint.stage, position: checkpoint.position };
+  });
+  return result.sort((left, right) => {
+    const stageComparison =
+      (stageOrder.get(left.stage) ?? 0) - (stageOrder.get(right.stage) ?? 0);
+    if (stageComparison !== 0) return stageComparison;
+    return left.position === right.position
+      ? left.key.localeCompare(right.key)
+      : left.position === "before"
+        ? -1
+        : 1;
+  });
+}
+
+export function resolveCheckpointPolicy(
+  workflow: AutoHuntWorkflow,
+  projectMandatory: AutoHuntWorkflowCheckpoint[],
+  userDefaults: AutoHuntWorkflowCheckpoint[],
+): AutoHuntCheckpointPolicy {
+  const mandatory = canonicalizeCheckpointSet(
+    workflow,
+    projectMandatory,
+    "project",
+  );
+  const defaults = canonicalizeCheckpointSet(workflow, userDefaults, "user");
+  const mandatoryBoundaries = new Set(mandatory.map(checkpointBoundaryId));
+  const effective = canonicalizeCheckpointSet(
+    workflow,
+    [
+      ...mandatory,
+      ...defaults.filter(
+        (checkpoint) => !mandatoryBoundaries.has(checkpointBoundaryId(checkpoint)),
+      ),
+    ],
+    "project",
+  );
+  return { projectMandatory: mandatory, userDefaults: defaults, effective };
+}
+
+export function workflowWithEffectiveCheckpoints(
+  workflow: AutoHuntWorkflow,
+  projectMandatory: AutoHuntWorkflowCheckpoint[],
+  userDefaults: AutoHuntWorkflowCheckpoint[],
+) {
+  const normalized = normalizeAutoHuntWorkflow(workflow);
+  const policy = resolveCheckpointPolicy(
+    normalized,
+    projectMandatory,
+    userDefaults,
+  );
+  return normalizeAutoHuntWorkflow({
+    ...normalized,
+    version: 2,
+    execution: { checkpoints: policy.effective },
+  });
+}
+
 export const autoHuntRequirementKinds = [
   "executable",
   "xcode",

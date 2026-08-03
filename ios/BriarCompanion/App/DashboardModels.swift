@@ -7,6 +7,8 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
     let status: Status
     let workflowStage: String?
     let workflow: AutoHuntWorkflow?
+    let pausedAt: Date?
+    let checkpoint: WorkflowCheckpoint?
     let progress: Double?
     let detail: String?
     let priority: Int?
@@ -40,6 +42,8 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         status: Status,
         workflowStage: String? = nil,
         workflow: AutoHuntWorkflow? = nil,
+        pausedAt: Date? = nil,
+        checkpoint: WorkflowCheckpoint? = nil,
         progress: Double? = nil,
         detail: String? = nil,
         priority: Int? = nil,
@@ -72,6 +76,8 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         self.status = status
         self.workflowStage = workflowStage
         self.workflow = workflow
+        self.pausedAt = pausedAt
+        self.checkpoint = checkpoint
         self.progress = progress
         self.detail = detail
         self.priority = priority
@@ -103,6 +109,7 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         case backlog
         case queued
         case running
+        case paused
         case blocked
         case failed
         case completed
@@ -113,6 +120,7 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
             case .backlog: "대기"
             case .queued: "실행 대기"
             case .running: "진행 중"
+            case .paused: "검토 대기"
             case .blocked: "확인 필요"
             case .failed: "실패"
             case .completed: "완료"
@@ -120,9 +128,24 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
             }
         }
 
-        var needsAttention: Bool { self == .blocked || self == .failed }
+        var needsAttention: Bool { self == .paused || self == .blocked || self == .failed }
         var isActive: Bool { self != .completed && self != .cancelled }
     }
+}
+
+struct WorkflowCheckpoint: Codable, Equatable, Sendable {
+    let key: String
+    let stage: String
+    let stageLabel: String
+    let position: Position
+    let attempt: Int
+    let revision: Int
+    let reachedAt: Date?
+    let nextStage: String?
+    let nextStageLabel: String?
+    let terminalReviewOnly: Bool
+
+    enum Position: String, Codable, Sendable { case before, after }
 }
 
 struct AutoHuntWorkflow: Codable, Equatable, Sendable {

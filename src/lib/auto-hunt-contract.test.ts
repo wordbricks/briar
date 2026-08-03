@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   AutoHuntWorkflowValidationError,
+  canonicalizeCheckpointSet,
   cloneAutoHuntWorkflow,
   normalizeAutoHuntWorkflow,
+  resolveCheckpointPolicy,
+  workflowWithEffectiveCheckpoints,
   type AutoHuntWorkflowInput,
 } from "./auto-hunt-contract";
 
@@ -192,5 +195,74 @@ describe("Auto Hunt workflow v2 contract", () => {
       execution: { pauseAfterStage: "implementing", stopAfterStage: "pr_open" },
       completion: { requiredStages: stages.map((stage) => stage.id) },
     })).toThrow(AutoHuntWorkflowValidationError);
+  });
+
+  it("combines project mandatory and user defaults with project ownership winning", () => {
+    const workflow = normalizeAutoHuntWorkflow(v2([]));
+    const policy = resolveCheckpointPolicy(
+      workflow,
+      [
+        { key: "project-before-pr", stage: "pr_open", position: "before" },
+        { key: "project-after-production", stage: "production_qa", position: "after" },
+      ],
+      [
+        { key: "user-before-implement", stage: "implementing", position: "before" },
+        { key: "user-before-pr", stage: "pr_open", position: "before" },
+      ],
+    );
+
+    expect(policy.projectMandatory.map((checkpoint) => checkpoint.key)).toEqual([
+      "project-before-pr",
+      "project-after-production",
+    ]);
+    expect(policy.userDefaults.map((checkpoint) => checkpoint.key)).toEqual([
+      "user-before-implement",
+      "user-before-pr",
+    ]);
+    expect(policy.effective).toEqual([
+      { key: "user-before-implement", stage: "implementing", position: "before" },
+      { key: "project-before-pr", stage: "pr_open", position: "before" },
+      { key: "project-after-production", stage: "production_qa", position: "after" },
+    ]);
+  });
+
+  it("supports mandatory-only, user-only, and fully automatic policies", () => {
+    const workflow = normalizeAutoHuntWorkflow(v2([]));
+    const project = [{ key: "project-pr", stage: "pr_open", position: "after" as const }];
+    const user = [{ key: "user-production", stage: "production_qa", position: "before" as const }];
+
+    expect(resolveCheckpointPolicy(workflow, project, []).effective).toEqual(project);
+    expect(resolveCheckpointPolicy(workflow, [], user).effective).toEqual(user);
+    expect(resolveCheckpointPolicy(workflow, [], []).effective).toEqual([]);
+  });
+
+  it("writes a new effective snapshot without mutating the project workflow", () => {
+    const workflow = normalizeAutoHuntWorkflow(v2([
+      { key: "legacy-pr", stage: "pr_open", position: "after" },
+    ]));
+    const before = JSON.stringify(workflow);
+    const snapshot = workflowWithEffectiveCheckpoints(
+      workflow,
+      [{ key: "project-production", stage: "production_qa", position: "before" }],
+      [{ key: "user-implement", stage: "implementing", position: "after" }],
+    );
+
+    expect(JSON.stringify(workflow)).toBe(before);
+    expect(snapshot.execution.checkpoints.map((checkpoint) => checkpoint.key)).toEqual([
+      "user-implement",
+      "project-production",
+    ]);
+  });
+
+  it("rejects unknown and duplicate policy boundaries before persistence", () => {
+    const workflow = normalizeAutoHuntWorkflow(v2([]));
+
+    expect(() => canonicalizeCheckpointSet(workflow, [
+      { key: "unknown", stage: "missing", position: "after" },
+    ], "project")).toThrow(AutoHuntWorkflowValidationError);
+    expect(() => canonicalizeCheckpointSet(workflow, [
+      { key: "first", stage: "pr_open", position: "after" },
+      { key: "second", stage: "pr_open", position: "after" },
+    ], "user")).toThrow(AutoHuntWorkflowValidationError);
   });
 });

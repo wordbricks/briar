@@ -830,6 +830,35 @@ body { overflow: hidden; font-synthesis: none; }
 .project-settings-workflow-pause strong { color:#534565; font-size:var(--text-2xs); }
 .project-settings-workflow-pause small { color:#877d9b; font-size:var(--text-2xs); line-height:1.4; }
 .project-settings-workflow-pause > .select-menu { min-width:210px; }
+.project-settings-checkpoints { margin-top:14px; overflow:hidden; border:1px solid #dcd5ef; border-radius:12px; background:#fbfaff; }
+.project-settings-checkpoints > header { padding:13px 14px; border-bottom:1px solid #e6e0f1; background:#f7f4ff; }
+.project-settings-checkpoints > header > span { display:flex; align-items:flex-start; gap:9px; color:#6b4fc1; }
+.project-settings-checkpoints > header > span > span { display:grid; gap:3px; }
+.project-settings-checkpoints header strong { color:#534565; font-size:var(--text-xs); }
+.project-settings-checkpoints header small { color:#877d9b; font-size:var(--text-2xs); line-height:1.4; }
+.project-settings-checkpoint-grid { display:grid; }
+.checkpoint-grid-header,.checkpoint-grid-row { display:grid; grid-template-columns:minmax(150px,1fr) minmax(210px,1.2fr) minmax(210px,1.2fr); align-items:center; }
+.checkpoint-grid-header { min-height:34px; padding:0 14px; color:#786d88; background:#f2eef8; font-size:var(--text-2xs); }
+.checkpoint-grid-row { min-height:54px; padding:8px 14px; border-top:1px solid #eee9f4; }
+.checkpoint-stage { display:grid; gap:2px; }
+.checkpoint-stage strong { color:#40364d; font-size:var(--text-xs); }
+.checkpoint-stage small { color:#988da5; font-size:var(--text-2xs); }
+.checkpoint-options { display:flex; flex-wrap:wrap; gap:7px; }
+.checkpoint-options label { min-height:28px; padding:4px 8px; display:inline-flex; align-items:center; gap:5px; border:1px solid #ded7e8; border-radius:8px; color:#665b72; background:#fff; font-size:var(--text-2xs); cursor:pointer; }
+.checkpoint-options label:has(input:checked) { color:#5c40ae; border-color:#b9a9e5; background:#f2edff; }
+.checkpoint-options label.locked { color:#735aa9; border-style:dashed; cursor:not-allowed; }
+.checkpoint-options input { accent-color:#6b4fc1; }
+.project-settings-checkpoints > footer { padding:10px 14px; color:#746a80; border-top:1px solid #e6e0f1; background:#faf8fd; font-size:var(--text-2xs); }
+.checkpoint-resume-context { padding:9px 11px; display:grid; gap:3px; border:1px solid #ded5f2; border-radius:9px; color:#6a5797; background:#f8f4ff; }
+.checkpoint-resume-context span { font-size:var(--text-2xs); font-weight:700; text-transform:uppercase; letter-spacing:.03em; }
+.checkpoint-resume-context strong { color:#4f416c; font-size:var(--text-xs); line-height:1.4; }
+@media (max-width: 760px) {
+  .checkpoint-grid-header { display:none; }
+  .checkpoint-grid-row { grid-template-columns:1fr; gap:8px; }
+  .checkpoint-options::before { width:90px; color:#8b8097; font-size:var(--text-2xs); }
+  .checkpoint-options:nth-child(2)::before { content:"Project"; }
+  .checkpoint-options:nth-child(3)::before { content:"My defaults"; }
+}
 .project-workflow-contract { margin-top:17px; overflow:hidden; border:1px solid #ddd9e9; border-radius:12px; background:#fbfaff; }
 .project-workflow-repository { min-width:0; min-height:38px; padding:0 13px; display:flex; align-items:center; gap:9px; border-bottom:1px solid #e4e0ed; background:#f4f1fa; }
 .project-workflow-repository > span:first-child { color:#827b8d; font-size:var(--text-2xs); }

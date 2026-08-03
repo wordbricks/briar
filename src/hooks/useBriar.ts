@@ -45,6 +45,7 @@ import {
   updateOrganizationLogo as updateRemoteOrganizationLogo,
   updateProjectIcon as updateRemoteProjectIcon,
   updateProjectSettings,
+  updateCheckpointPolicy,
   waitForIssueAgentReply,
   type DeviceClientId,
 } from "../lib/api";
@@ -355,6 +356,7 @@ export function useBriar(options: UseBriarOptions = {}) {
   const pollLoginNow = useRef<(() => void) | null>(null);
   const loginAttempt = useRef(0);
   const workflowGenerationAttempts = useRef(new Set<string>());
+  const resumeRequestIds = useRef(new Map<string, string>());
   const dashboardRef = useRef<DashboardPayload | null>(
     demoMode ? demoDashboard : null,
   );
@@ -1681,34 +1683,36 @@ export function useBriar(options: UseBriarOptions = {}) {
     [dashboard, persistProjectWorkflow, token],
   );
 
-  const updateWorkflowPauseAfterStage = useCallback(
-    async (projectId: string, pauseAfterStage: string) => {
-      if (demoMode) {
-        throw new Error("워크플로우 수정은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
-      }
+  const saveCheckpointPolicy = useCallback(
+    async (
+      projectId: string,
+      scope: "project" | "user",
+      checkpoints: NonNullable<
+        ProjectSettings["checkpointPolicy"]
+      >["projectMandatory"],
+      expectedRevision: number,
+    ) => {
       if (!token) throw new Error("로그인이 필요합니다.");
       if (!dashboard || dashboard.project.id !== projectId) {
-        throw new Error("워크플로우를 갱신할 프로젝트 설정이 없습니다.");
+        throw new Error("체크포인트를 저장할 프로젝트 설정이 없습니다.");
       }
-      const previousWorkflow = dashboard.settings.workflow;
-      if (!previousWorkflow.stages.some((stage) => stage.id === pauseAfterStage)) {
-        throw new Error("일시정지 단계가 현재 워크플로우에 없습니다.");
-      }
-      const nextWorkflow = {
-        ...previousWorkflow,
-        // Keep this existing single-pause control on the v1 compatibility
-        // input path. The API and local desktop writer normalize it to the
-        // canonical v2 checkpoint representation before persisting it.
-        version: 1 as const,
-        execution: { pauseAfterStage },
-      };
-      return persistProjectWorkflow(
-        projectId,
-        previousWorkflow,
-        nextWorkflow,
-      );
+      const result = await updateCheckpointPolicy(token, projectId, {
+        scope,
+        checkpoints,
+        expectedRevision,
+      });
+      setDashboard((current) => current?.project.id === projectId
+        ? {
+            ...current,
+            settings: {
+              ...current.settings,
+              checkpointPolicy: result.checkpointPolicy,
+            },
+          }
+        : current);
+      return result.checkpointPolicy;
     },
-    [dashboard, persistProjectWorkflow, token],
+    [dashboard, token],
   );
 
   useEffect(() => {
@@ -2697,7 +2701,39 @@ export function useBriar(options: UseBriarOptions = {}) {
           return;
         }
         if (!token) throw new Error("로그인이 필요합니다.");
-        await resumeHuntRun(token, activeProjectId, runId);
+        const run = dashboard.runs.find((candidate) => candidate.id === runId);
+        const checkpoint = run?.checkpoint;
+        if (!checkpoint) {
+          throw new Error(
+            "이 앱 버전에서는 현재 대기 지점을 안전하게 확인할 수 없습니다. 새로고침하거나 앱을 업데이트해 주세요.",
+          );
+        }
+        const identity = `${runId}:${checkpoint.key}:${checkpoint.attempt}:${checkpoint.revision}`;
+        const requestId = resumeRequestIds.current.get(identity) ?? crypto.randomUUID();
+        resumeRequestIds.current.set(identity, requestId);
+        try {
+          await resumeHuntRun(
+            token,
+            activeProjectId,
+            runId,
+            {
+              key: checkpoint.key,
+              attempt: checkpoint.attempt,
+              revision: checkpoint.revision,
+            },
+            requestId,
+          );
+          resumeRequestIds.current.delete(identity);
+        } catch (caught) {
+          if (isApiErrorStatus(caught, 409)) {
+            resumeRequestIds.current.delete(identity);
+            await refresh("snapshot");
+            throw new Error(
+              "대기 지점이 이미 변경되었습니다. 최신 상태를 다시 불러왔습니다.",
+            );
+          }
+          throw caught;
+        }
         await refresh("snapshot");
       } catch (caught) {
         const message = caught instanceof Error ? caught.message : String(caught);
@@ -2885,7 +2921,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     regenerateWorkflow,
     reviseWorkflow,
     resumeRun,
-    updateWorkflowPauseAfterStage,
+    saveCheckpointPolicy,
     updateAccountProfile,
     saveVelenIntegration,
     saveLinearIntegration,

@@ -185,6 +185,24 @@ struct RunRecoveryResponse: Codable, Sendable {
     let stage: String
 }
 
+struct ResumeRunRequest: Codable, Sendable {
+    let requestId: UUID
+    let checkpointKey: String
+    let attempt: Int
+    let revision: Int
+}
+
+struct ResumeRunResponse: Codable, Sendable {
+    let runId: UUID
+    let outcome: String
+    let workflowStage: String?
+    let startStage: String?
+    let checkpointKey: String?
+    let attempt: Int?
+    let revision: Int?
+    let terminalReviewOnly: Bool
+}
+
 struct DispatchRunRequest: Codable, Sendable {
     let provider: AgentProvider
     let model: String?

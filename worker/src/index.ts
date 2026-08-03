@@ -1,11 +1,13 @@
 import { z } from "zod";
 import briarIconPng from "../../src/assets/app-icons/aubergine-riso.png";
 import {
+  AutoHuntWorkflowValidationError,
   autoHuntEvidenceTypeMaxLength,
   autoHuntEvidenceTypePattern,
   autoHuntPersistedRunStatuses,
   autoHuntRequirementKinds,
   autoHuntSources,
+  canonicalizeCheckpointSet,
   cloneAutoHuntWorkflow,
   isRepositoryWorkflowPending,
   normalizeAutoHuntWorkflow,
@@ -177,6 +179,8 @@ import {
   updateProjectAgent,
   updateProjectAgentSchedule,
   updateProjectSettings,
+  updateProjectMandatoryCheckpoints,
+  updateUserWorkflowCheckpointDefaults,
   updateOrganization,
   updateOrganizationLogo,
   updateOrganizationMemberRole,
@@ -209,6 +213,11 @@ import {
   type RunEvidenceImageInput,
   type RunEvidenceImageRow,
 } from "./db";
+import {
+  assertStoredCheckpointPoliciesCompatible,
+  checkpointPolicyJson,
+  loadWorkflowCheckpointPolicy,
+} from "./workflow-policy";
 import {
   codexPetSpriteSheetObjectKey,
   fetchCodexPet,
@@ -332,6 +341,13 @@ const workflowStageIdSchema = z
   .string()
   .trim()
   .regex(/^[a-z][a-z0-9_-]{0,63}$/u);
+const workflowCheckpointSchema = z
+  .object({
+    key: workflowStageIdSchema,
+    stage: workflowStageIdSchema,
+    position: z.enum(["before", "after"]),
+  })
+  .strict();
 const evidenceTypeSchema = z
   .string()
   .trim()
@@ -1537,6 +1553,14 @@ const projectSettingsSchema = z
     }
   });
 
+const checkpointPolicyInputSchema = z
+  .object({
+    scope: z.enum(["project", "user"]),
+    checkpoints: z.array(workflowCheckpointSchema).max(100),
+    expectedRevision: z.number().int().nonnegative(),
+  })
+  .strict();
+
 async function readJson(
   request: Request,
   maxBytes = 262_144,
@@ -1635,6 +1659,7 @@ async function createIssueWithAttachments(input: {
   detail: string;
   context: Record<string, unknown>;
   issueId?: string;
+  createdByUserId?: string | null;
 }) {
   const settings = await getProjectSettings(input.db, input.project.id);
   const issueStorageId = input.issueId ?? crypto.randomUUID();
@@ -1706,6 +1731,7 @@ async function createIssueWithAttachments(input: {
         issueId: issueStorageId,
         attachmentCount: storedAttachments.length,
       },
+      createdByUserId: input.createdByUserId,
     });
     await createIssueAttachments(
       input.db,
@@ -2893,7 +2919,10 @@ const publicOrganizationInvitationJson = (
 const canManageOrganization = (role: OrganizationRole | null) =>
   role === "owner" || role === "admin";
 
-const settingsJson = (row: ProjectSettingsRow | null) => ({
+const settingsJson = (
+  row: ProjectSettingsRow | null,
+  checkpointPolicy?: ReturnType<typeof checkpointPolicyJson>,
+) => ({
   velenOrg: row?.velen_org ?? null,
   dataSource: row?.data_source ?? null,
   linear: {
@@ -2905,6 +2934,7 @@ const settingsJson = (row: ProjectSettingsRow | null) => ({
   workflow: row?.workflow_json
     ? normalizeAutoHuntWorkflow(JSON.parse(row.workflow_json))
     : cloneAutoHuntWorkflow(),
+  ...(checkpointPolicy ? { checkpointPolicy } : {}),
 });
 
 const parseJsonArray = (value: string) => {
@@ -3100,6 +3130,21 @@ function dashboardRunJson(
   const waitingOnPrerequisiteCount = prerequisites.filter(
     (dependency) => dependency.prerequisite_status !== "completed",
   ).length;
+  const waitingCheckpoint = run.waiting_checkpoint_key
+    ? workflow.execution.checkpoints.find(
+        (checkpoint) => checkpoint.key === run.waiting_checkpoint_key,
+      ) ?? null
+    : null;
+  const checkpointStageIndex = waitingCheckpoint
+    ? workflow.stages.findIndex((stage) => stage.id === waitingCheckpoint.stage)
+    : -1;
+  const nextStage = waitingCheckpoint?.position === "before"
+    ? workflow.stages[checkpointStageIndex]
+    : workflow.stages[checkpointStageIndex + 1];
+  const terminalReviewOnly = Boolean(
+    waitingCheckpoint?.position === "after" &&
+      checkpointStageIndex === workflow.stages.length - 1,
+  );
   return {
     id: run.id,
     runNumber: run.run_number,
@@ -3121,6 +3166,22 @@ function dashboardRunJson(
       ? {
           key: run.waiting_checkpoint_key,
           revision: run.waiting_checkpoint_revision ?? run.current_revision,
+        }
+      : null,
+    checkpoint: waitingCheckpoint
+      ? {
+          key: waitingCheckpoint.key,
+          stage: waitingCheckpoint.stage,
+          stageLabel:
+            workflow.stages[checkpointStageIndex]?.label ?? waitingCheckpoint.stage,
+          position: waitingCheckpoint.position,
+          attempt: run.current_attempt,
+          revision:
+            run.waiting_checkpoint_revision ?? run.current_revision,
+          reachedAt: run.paused_at,
+          nextStage: nextStage?.id ?? null,
+          nextStageLabel: nextStage?.label ?? null,
+          terminalReviewOnly,
         }
       : null,
     detail: run.detail,
@@ -4526,6 +4587,61 @@ async function route(
   }
 
   const settingsMatch = pathname.match(/^\/projects\/([0-9a-f-]+)\/settings$/u);
+  const checkpointPolicyMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/checkpoint-policy$/u,
+  );
+  if (checkpointPolicyMatch && ["GET", "PUT"].includes(request.method)) {
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, checkpointPolicyMatch[1], session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    if (request.method === "GET") {
+      return json({
+        checkpointPolicy: checkpointPolicyJson(
+          await loadWorkflowCheckpointPolicy(db, project.id, session.user.id),
+        ),
+      });
+    }
+    const input = checkpointPolicyInputSchema.parse(await readJson(request));
+    if (input.scope === "project" && !canManageOrganization(project.member_role)) {
+      throw new HttpError(403, "Organization admin access required");
+    }
+    const current = await loadWorkflowCheckpointPolicy(
+      db,
+      project.id,
+      session.user.id,
+    );
+    const checkpoints = canonicalizeCheckpointSet(
+      current.workflow,
+      input.checkpoints,
+      input.scope,
+    );
+    const updated = input.scope === "project"
+      ? await updateProjectMandatoryCheckpoints(
+          db,
+          project.id,
+          checkpoints,
+          input.expectedRevision,
+        )
+      : await updateUserWorkflowCheckpointDefaults(
+          db,
+          project.id,
+          session.user.id,
+          checkpoints,
+          input.expectedRevision,
+        );
+    if (!updated) {
+      throw new HttpError(
+        409,
+        "Checkpoint policy changed; reload before saving",
+        "CHECKPOINT_POLICY_CONFLICT",
+      );
+    }
+    return json({
+      checkpointPolicy: checkpointPolicyJson(
+        await loadWorkflowCheckpointPolicy(db, project.id, session.user.id),
+      ),
+    });
+  }
   const storageMetricsMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/storage-metrics$/u,
   );
@@ -4542,8 +4658,12 @@ async function route(
     const session = await requireSession(auth, request);
     const project = await getProject(db, settingsMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
+    const [settings, policy] = await Promise.all([
+      getProjectSettings(db, project.id),
+      loadWorkflowCheckpointPolicy(db, project.id, session.user.id),
+    ]);
     return json({
-      settings: settingsJson(await getProjectSettings(db, project.id)),
+      settings: settingsJson(settings, checkpointPolicyJson(policy)),
     });
   }
   if (settingsMatch && request.method === "PUT") {
@@ -4554,6 +4674,11 @@ async function route(
       throw new HttpError(403, "Organization admin access required");
     }
     const input = projectSettingsSchema.parse(await readJson(request));
+    await assertStoredCheckpointPoliciesCompatible(
+      db,
+      project.id,
+      input.workflow,
+    );
     const settings = await updateProjectSettings(db, project.id, {
       velenOrg: input.velenOrg ?? null,
       dataSource: input.dataSource ?? null,
@@ -4561,7 +4686,12 @@ async function route(
       githubRepository: input.githubRepository ?? null,
       workflow: input.workflow,
     });
-    return json({ settings: settingsJson(settings) });
+    const policy = await loadWorkflowCheckpointPolicy(
+      db,
+      project.id,
+      session.user.id,
+    );
+    return json({ settings: settingsJson(settings, checkpointPolicyJson(policy)) });
   }
 
   const executionPolicyMatch = pathname.match(
@@ -5313,6 +5443,7 @@ async function route(
     const metadata = metadataChanged
       ? await Promise.all([
           getProjectSettings(db, project.id),
+          loadWorkflowCheckpointPolicy(db, project.id, session.user.id),
           getProjectExecutionWorkerPolicy(db, project.id),
           listOrganizationMembers(db, project.organization_id),
         ])
@@ -5347,9 +5478,12 @@ async function route(
       ...(metadata
         ? {
             project: projectJson(project),
-            settings: settingsJson(metadata[0]),
-            executionPolicy: metadata[1],
-            members: metadata[2].map(organizationMemberJson),
+            settings: settingsJson(
+              metadata[0],
+              checkpointPolicyJson(metadata[1]),
+            ),
+            executionPolicy: metadata[2],
+            members: metadata[3].map(organizationMemberJson),
           }
         : {}),
       ...(conversationNotifications
@@ -5377,6 +5511,7 @@ async function route(
     const [
       runs,
       settings,
+      checkpointPolicy,
       attachments,
       dependencies,
       resultReviews,
@@ -5389,6 +5524,7 @@ async function route(
       await Promise.all([
         listDashboardRuns(db, project.id),
         getProjectSettings(db, project.id),
+        loadWorkflowCheckpointPolicy(db, project.id, session.user.id),
         listIssueAttachments(db, project.id),
         listIssueDependencies(db, project.id),
         listIssueResultReviews(db, project.id),
@@ -5432,7 +5568,7 @@ async function route(
     }
     return json({
       project: projectJson(project),
-      settings: settingsJson(settings),
+      settings: settingsJson(settings, checkpointPolicyJson(checkpointPolicy)),
       runs: runs.map((run) =>
         dashboardRunJson(
           run,
@@ -5798,6 +5934,7 @@ async function route(
       detail,
       context: { origin: "briar-app" },
       issueId,
+      createdByUserId: session.user.id,
     });
     return json(
       {
@@ -7590,6 +7727,13 @@ export default {
       }
       if (error instanceof z.ZodError) {
         return json({ message: "Invalid request", issues: error.issues }, 400);
+      }
+      if (error instanceof AutoHuntWorkflowValidationError) {
+        return json({
+          message: "Invalid checkpoint policy",
+          code: "INVALID_CHECKPOINT_POLICY",
+          issues: error.issues,
+        }, 400);
       }
       console.error(
         JSON.stringify({

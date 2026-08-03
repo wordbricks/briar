@@ -43,4 +43,16 @@ describe("D1 migrations", () => {
     expect(sql).toMatch(/create\s+unique\s+index\s+briar_run_checkpoint_waiting_unique_idx[\s\S]*where\s+state\s*=\s*'waiting'/iu);
     expect(sql).not.toMatch(/\bupdate\s+briar_(project_settings|hunt_runs)\b/iu);
   });
+
+  it("adds checkpoint policy storage without rewriting workflow snapshots", async () => {
+    const sql = await readFile(
+      resolve("migrations", "0060_workflow_checkpoint_policies.sql"),
+      "utf8",
+    );
+
+    expect(sql).toMatch(/add\s+column\s+mandatory_checkpoints_json/iu);
+    expect(sql).toMatch(/add\s+column\s+checkpoint_policy_revision/iu);
+    expect(sql).toMatch(/create\s+table\s+briar_user_workflow_checkpoint_defaults/iu);
+    expect(sql).not.toMatch(/\bupdate\s+briar_(project_settings|hunt_runs)\b/iu);
+  });
 });

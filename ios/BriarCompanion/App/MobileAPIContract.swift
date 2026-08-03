@@ -69,6 +69,10 @@ enum MobileAPIContract {
             "\(run(projectID: projectID, runID: runID))/\(action)"
         }
 
+        static func runResume(projectID: UUID, runID: UUID) -> String {
+            "\(run(projectID: projectID, runID: runID))/resume"
+        }
+
         static func runResultReviews(projectID: UUID, runID: UUID) -> String {
             "\(run(projectID: projectID, runID: runID))/result-reviews"
         }

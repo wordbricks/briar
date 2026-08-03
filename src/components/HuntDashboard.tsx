@@ -3376,9 +3376,37 @@ export function RunPage({
                               <strong id={`${detailTabsId}-paused-title`}>
                                 {t("status.paused")}
                               </strong>
-                              <small>{t("run.pausedDescription")}</small>
+                              <small>
+                                {run.checkpoint
+                                  ? t(
+                                      run.checkpoint.position === "before"
+                                        ? "run.checkpointBefore"
+                                        : "run.checkpointAfter",
+                                      { stage: run.checkpoint.stageLabel },
+                                    )
+                                  : t("run.pausedDescription")}
+                              </small>
                             </span>
                           </div>
+                          {run.checkpoint ? (
+                            <div className="checkpoint-resume-context">
+                              <span>
+                                {t("run.checkpointRevision", {
+                                  revision: run.checkpoint.revision,
+                                })}
+                              </span>
+                              <strong>
+                                {run.checkpoint.terminalReviewOnly
+                                  ? t("run.checkpointTerminalReview")
+                                  : t("run.checkpointNextStage", {
+                                      stage:
+                                        run.checkpoint.nextStageLabel ??
+                                        run.checkpoint.nextStage ??
+                                        run.checkpoint.stageLabel,
+                                    })}
+                              </strong>
+                            </div>
+                          ) : null}
                           <div className="recovery-actions">
                             <button
                               disabled={isRecovering}

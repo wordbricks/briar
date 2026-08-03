@@ -1164,10 +1164,12 @@ export function App() {
             onReviseWorkflow={(requestedChange) =>
               briar.reviseWorkflow(activeProject.id, requestedChange)
             }
-            onUpdateWorkflowPauseAfterStage={(pauseAfterStage) =>
-              briar.updateWorkflowPauseAfterStage(
+            onSaveCheckpointPolicy={(scope, checkpoints, expectedRevision) =>
+              briar.saveCheckpointPolicy(
                 activeProject.id,
-                pauseAfterStage,
+                scope,
+                checkpoints,
+                expectedRevision,
               )
             }
             onUpdateVelenOrg={(org) =>

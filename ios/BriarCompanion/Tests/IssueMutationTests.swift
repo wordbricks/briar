@@ -95,6 +95,41 @@ final class IssueMutationTests: XCTestCase {
         XCTAssertEqual(requestIDs[0], requestIDs[1])
     }
 
+    func testResumeSendsExactCheckpointIdentityAndReusesRequestIDAfterFailure() async throws {
+        let recorder = MutationAPIRecorder(failuresRemaining: 1)
+        let store = IssueMutationStore(
+            api: recorder,
+            projectID: Self.projectID,
+            token: "token"
+        )
+        let checkpoint = WorkflowCheckpoint(
+            key: "user-before-production_qa",
+            stage: "production_qa",
+            stageLabel: "Production QA",
+            position: .before,
+            attempt: 2,
+            revision: 3,
+            reachedAt: nil,
+            nextStage: "production_qa",
+            nextStageLabel: "Production QA",
+            terminalReviewOnly: false
+        )
+
+        do {
+            try await store.resume(runID: Self.runID, checkpoint: checkpoint)
+            XCTFail("The first transport attempt must fail")
+        } catch MobileAPIError.invalidRequest {
+            // Expected.
+        }
+        try await store.resume(runID: Self.runID, checkpoint: checkpoint)
+
+        let requests = await recorder.resumeRequests()
+        XCTAssertEqual(requests.map { $0.checkpointKey }, [checkpoint.key, checkpoint.key])
+        XCTAssertEqual(requests.map { $0.attempt }, [2, 2])
+        XCTAssertEqual(requests.map { $0.revision }, [3, 3])
+        XCTAssertEqual(requests[0].requestID, requests[1].requestID)
+    }
+
     func testAgentReplyPollingReturnsTheCompletedReply() async throws {
         let recorder = AgentReplyAPIRecorder()
         let store = IssueMutationStore(
@@ -151,6 +186,7 @@ private actor MutationAPIRecorder: MobileAPIClientProtocol {
     private var recordedRequestIDs: [String] = []
     private let delay: Duration
     private var failuresRemaining: Int
+    private var recordedResumeRequests: [(requestID: String, checkpointKey: String, attempt: Int, revision: Int)] = []
 
     init(delay: Duration = .zero, failuresRemaining: Int = 0) {
         self.delay = delay
@@ -162,6 +198,10 @@ private actor MutationAPIRecorder: MobileAPIClientProtocol {
     func lastRequestID() -> String? { recordedRequestID }
 
     func allRequestIDs() -> [String] { recordedRequestIDs }
+
+    func resumeRequests() -> [(requestID: String, checkpointKey: String, attempt: Int, revision: Int)] {
+        recordedResumeRequests
+    }
 
     func send<Response: Decodable & Sendable>(
         _ path: String,
@@ -177,6 +217,13 @@ private actor MutationAPIRecorder: MobileAPIClientProtocol {
            ) as? [String: Any] {
             recordedRequestID = object["requestId"] as? String
             if let recordedRequestID { recordedRequestIDs.append(recordedRequestID) }
+            if path.hasSuffix("/resume"),
+               let requestID = object["requestId"] as? String,
+               let checkpointKey = object["checkpointKey"] as? String,
+               let attempt = object["attempt"] as? Int,
+               let revision = object["revision"] as? Int {
+                recordedResumeRequests.append((requestID, checkpointKey, attempt, revision))
+            }
         }
         if delay != .zero { try await Task.sleep(for: delay) }
         if failuresRemaining > 0 {
@@ -188,6 +235,8 @@ private actor MutationAPIRecorder: MobileAPIClientProtocol {
             payload = #"{"runId":"33333333-3333-4333-8333-333333333333","sourceKey":"briar-issue:test","stage":"queued","status":"queued","attachments":[]}"#
         } else if path.hasSuffix("/status") {
             payload = #"{"runId":"33333333-3333-4333-8333-333333333333","outcome":"moved","status":"queued","workflowStage":null}"#
+        } else if path.hasSuffix("/resume") {
+            payload = #"{"runId":"33333333-3333-4333-8333-333333333333","outcome":"approved","workflowStage":"production_qa","startStage":"production_qa","checkpointKey":"user-before-production_qa","attempt":2,"revision":3,"terminalReviewOnly":false}"#
         } else {
             throw MobileAPIError.invalidRequest
         }
