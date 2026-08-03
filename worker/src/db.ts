@@ -2485,6 +2485,52 @@ export async function listIssueMessages(
   return result.results;
 }
 
+export async function listIssueThreadMessages(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  messageId: string,
+) {
+  const result = await db
+    .prepare(
+      `select message.id, message.run_id, message.parent_message_id,
+              message.author_user_id, message.author_agent_provider,
+              author.name as author_name,
+              author.image as author_image, message.body,
+              (select count(*) from briar_issue_messages reply
+               where reply.parent_message_id = message.id) as reply_count,
+              message.created_at, message.updated_at
+       from briar_issue_messages message
+       left join "user" author on author.id = message.author_user_id
+       where message.project_id = ? and message.run_id = ?
+         and message.id in (
+           with recursive thread_path(id, parent_message_id) as (
+             select message.id, message.parent_message_id
+             from briar_issue_messages message
+             where message.project_id = ? and message.run_id = ?
+               and message.id = ?
+             union all
+             select parent.id, parent.parent_message_id
+             from briar_issue_messages parent
+             join thread_path path on parent.id = path.parent_message_id
+           ),
+           thread_messages(id) as (
+             select id from thread_path where parent_message_id is null
+             union all
+             select message.id
+             from briar_issue_messages message
+             join thread_messages thread on message.parent_message_id = thread.id
+             where message.project_id = ? and message.run_id = ?
+           )
+           select id from thread_messages
+         )
+       order by message.created_at, message.id`,
+    )
+    .bind(projectId, runId, projectId, runId, messageId, projectId, runId)
+    .all<IssueMessageRow>();
+  return result.results;
+}
+
 export async function createIssueMessage(
   db: D1Database,
   input: {
@@ -2511,7 +2557,6 @@ export async function createIssueMessage(
          on parent.id = ?
         and parent.project_id = run.project_id
         and parent.run_id = run.id
-        and parent.parent_message_id is null
        where run.id = ? and run.project_id = ?
          and (? is null or parent.id is not null)`,
     )
@@ -2586,7 +2631,7 @@ export async function enqueueIssueAgentReply(
         and trigger.run_id = run.id
        join briar_issue_messages parent
          on parent.id = ? and parent.project_id = run.project_id
-        and parent.run_id = run.id and parent.parent_message_id is null
+        and parent.run_id = run.id
        left join briar_project_agents agent
          on agent.id = run.agent_id and agent.project_id = run.project_id
        where run.id = ? and run.project_id = ?

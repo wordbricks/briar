@@ -4745,9 +4745,9 @@ function IssueConversation({
 }) {
   const { localeTag, t } = useI18n();
   const [messages, setMessages] = useState<IssueMessage[]>([]);
-  const [activeReplyRootId, setActiveReplyRootId] = useState<string | null>(
-    null,
-  );
+  const [activeReplyMessageId, setActiveReplyMessageId] = useState<
+    string | null
+  >(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [agentReplyStates, setAgentReplyStates] = useState<
@@ -4774,7 +4774,7 @@ function IssueConversation({
   }, [loadMessages, run.id]);
 
   const roots = messages.filter((message) => message.parentMessageId === null);
-  const repliesByRootId = useMemo(() => {
+  const repliesByParentId = useMemo(() => {
     const grouped = new Map<string, IssueMessage[]>();
     for (const message of messages) {
       if (!message.parentMessageId) continue;
@@ -4858,6 +4858,49 @@ function IssueConversation({
       });
   };
 
+  const renderMessageGroup = (message: IssueMessage) => {
+    const replies = repliesByParentId.get(message.id) ?? [];
+    const replyComposerId = `issue-reply-composer-${message.id}`;
+    const isReplying = activeReplyMessageId === message.id;
+    return (
+      <div className="issue-message-group" key={message.id}>
+        <IssueMessageItem
+          isReplying={isReplying}
+          localeTag={localeTag}
+          message={message}
+          onReply={() =>
+            setActiveReplyMessageId((current) =>
+              current === message.id ? null : message.id,
+            )
+          }
+          replyComposerId={replyComposerId}
+        />
+        {replies.length > 0 && (
+          <div
+            aria-label={t("run.replies", { count: replies.length })}
+            className="issue-message-replies"
+          >
+            {replies.map((reply) => renderMessageGroup(reply))}
+          </div>
+        )}
+        <AgentReplyState state={agentReplyStates[message.id]} />
+        {isReplying && (
+          <div className="issue-inline-reply-composer" id={replyComposerId}>
+            <MessageComposer
+              autoFocus
+              compact
+              mentionMembers={mentionMembers}
+              onSubmit={(body, mentionedUserIds) =>
+                sendMessage(body, message.id, mentionedUserIds)
+              }
+              placeholder={t("run.threadPlaceholder")}
+            />
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <section className="issue-conversation" aria-label={t("run.messages")}>
       <header className="issue-conversation-header">
@@ -4885,54 +4928,7 @@ function IssueConversation({
         ) : roots.length === 0 ? (
           <p className="issue-message-empty">{t("run.messagesEmpty")}</p>
         ) : (
-          roots.map((message) => {
-            const replies = repliesByRootId.get(message.id) ?? [];
-            const replyComposerId = `issue-reply-composer-${message.id}`;
-            const isReplying = activeReplyRootId === message.id;
-            return (
-              <div className="issue-message-group" key={message.id}>
-                <IssueMessageItem
-                  isReplying={isReplying}
-                  localeTag={localeTag}
-                  message={message}
-                  onReply={() =>
-                    setActiveReplyRootId((current) =>
-                      current === message.id ? null : message.id,
-                    )
-                  }
-                  replyComposerId={replyComposerId}
-                />
-                {replies.length > 0 && (
-                  <div
-                    aria-label={t("run.replies", { count: replies.length })}
-                    className="issue-message-replies"
-                  >
-                    {replies.map((reply) => (
-                      <IssueMessageItem
-                        key={reply.id}
-                        localeTag={localeTag}
-                        message={reply}
-                      />
-                    ))}
-                  </div>
-                )}
-                <AgentReplyState state={agentReplyStates[message.id]} />
-                {isReplying && (
-                  <div className="issue-inline-reply-composer" id={replyComposerId}>
-                    <MessageComposer
-                      autoFocus
-                      compact
-                      mentionMembers={mentionMembers}
-                      onSubmit={(body, mentionedUserIds) =>
-                        sendMessage(body, message.id, mentionedUserIds)
-                      }
-                      placeholder={t("run.threadPlaceholder")}
-                    />
-                  </div>
-                )}
-              </div>
-            );
-          })
+          roots.map((message) => renderMessageGroup(message))
         )}
       </div>
       <MessageComposer

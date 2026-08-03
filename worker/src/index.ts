@@ -52,7 +52,7 @@ import {
   canonicalizeIssueAttachmentReferences,
   isIssueAttachmentReference,
 } from "../../src/lib/issue-markdown";
-import { mentionsBriar } from "../../src/lib/briar-mention";
+import { shouldBriarReply } from "../../src/lib/issue-reply-decision";
 import {
   isWorkerEmoji,
   isWorkerLogoDataUrl,
@@ -132,6 +132,7 @@ import {
   listIssueDependencies,
   listIssueConversationNotifications,
   listIssueMessages,
+  listIssueThreadMessages,
   listIssueResultReviews,
   listAllRunEvidenceImages,
   listEvidenceImagesForEvidence,
@@ -5167,7 +5168,23 @@ async function route(
       );
     }
     const agentReply =
-      !agentProvider && mentionsBriar(input.body)
+      !agentProvider && shouldBriarReply(
+        (input.parentMessageId
+          ? await listIssueThreadMessages(
+              db,
+              project.id,
+              issueMessagesMatch[2],
+              input.parentMessageId,
+            )
+          : []
+        ).map((threadMessage) => ({
+          id: threadMessage.id,
+          parentMessageId: threadMessage.parent_message_id,
+          body: threadMessage.body,
+          author: { provider: threadMessage.author_agent_provider },
+        })),
+        { body: input.body, parentMessageId: input.parentMessageId ?? null },
+      )
         ? await enqueueIssueAgentReply(db, {
             id: crypto.randomUUID(),
             projectId: project.id,

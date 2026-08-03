@@ -591,21 +591,24 @@ const messagesCandidate = async (
 ): Promise<ArchiveCandidate | null> => {
   const thread = await db
     .prepare(
-      `select run.id, run.project_id, root.id as root_id
-       from briar_hunt_runs run
-       join briar_issue_messages root
-         on root.run_id = run.id and root.parent_message_id is null
+      `with recursive thread_messages(root_id, message_id, run_id, updated_at) as (
+         select root.id, root.id, root.run_id, root.updated_at
+         from briar_issue_messages root
+         join briar_hunt_runs run on run.id = root.run_id
+         where root.parent_message_id is null
+           and run.status = 'completed' and run.completed_at <= ?
+         union all
+         select thread.root_id, message.id, message.run_id, message.updated_at
+         from briar_issue_messages message
+         join thread_messages thread on message.parent_message_id = thread.message_id
+       )
+       select run.id, run.project_id, thread.root_id
+       from thread_messages thread
+       join briar_hunt_runs run on run.id = thread.run_id
        where run.status = 'completed' and run.completed_at <= ?
-         and root.updated_at <= ?
-         and not exists (
-           select 1 from briar_issue_messages reply
-           where reply.parent_message_id = root.id and reply.updated_at > ?
-         )
-         and 1 + (
-           select count(*) from briar_issue_messages reply
-           where reply.parent_message_id = root.id
-         ) <= ?
-       order by run.completed_at, run.id, root.created_at, root.id limit 1`,
+       group by run.id, run.project_id, thread.root_id
+       having max(thread.updated_at) <= ? and count(*) <= ?
+       order by run.completed_at, run.id, thread.root_id limit 1`,
     )
     .bind(cutoff, cutoff, cutoff, rowLimit)
     .first<{ id: string; project_id: string; root_id: string }>();
@@ -621,10 +624,19 @@ const messagesCandidate = async (
               message.created_at, message.updated_at
        from briar_issue_messages message
        left join "user" author on author.id = message.author_user_id
-       where message.id = ? or message.parent_message_id = ?
+       where message.id in (
+         with recursive thread_messages(id) as (
+           select ?
+           union
+           select reply.id
+           from briar_issue_messages reply
+           join thread_messages thread on reply.parent_message_id = thread.id
+         )
+         select id from thread_messages
+       )
        order by message.created_at, message.id`,
     )
-    .bind(thread.root_id, thread.root_id)
+    .bind(thread.root_id)
     .all<IssueMessageRow>();
   const rows = result.results ?? [];
   if (rows.length === 0) return null;
