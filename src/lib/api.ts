@@ -45,6 +45,8 @@ import type {
   ProjectAgentSchedule,
   ProjectAgentScheduleRun,
   Organization,
+  OrganizationInvitation,
+  OrganizationInvitationPreview,
   OrganizationMember,
   ProjectSettings,
   RunEvidence,
@@ -321,6 +323,7 @@ export type DeviceClientId =
 
 export async function beginDeviceAuthorization(
   clientId: DeviceClientId = "briar-desktop",
+  options: { forceAccountSelection?: boolean } = {},
 ): Promise<DeviceAuthorization> {
   const response = await request<{
     device_code: string;
@@ -342,6 +345,9 @@ export async function beginDeviceAuthorization(
     clientVerificationUrl.searchParams.set("client", "mobile");
   } else if (clientId === "briar-web") {
     clientVerificationUrl.searchParams.set("client", "web");
+  }
+  if (options.forceAccountSelection) {
+    clientVerificationUrl.searchParams.set("switch_account", "1");
   }
   return {
     deviceCode: response.device_code,
@@ -487,6 +493,71 @@ export async function loadOrganizationMembers(
     token,
   );
   return result.members;
+}
+
+export async function loadOrganizationInvitations(
+  token: string,
+  organizationId: string,
+) {
+  const result = await request<{ invitations: OrganizationInvitation[] }>(
+    `/organizations/${organizationId}/invitations`,
+    token,
+  );
+  return result.invitations;
+}
+
+export async function createOrganizationInvitation(
+  token: string,
+  organizationId: string,
+  input: {
+    email: string;
+    role: "admin" | "member";
+    initialProjectId: string;
+  },
+) {
+  const result = await request<{
+    invitation: OrganizationInvitation;
+    invitePath: string;
+  }>(`/organizations/${organizationId}/invitations`, token, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  const appOrigin = webAppOrigin || "https://briar.wordbricks.ai";
+  return {
+    invitation: result.invitation,
+    inviteUrl: new URL(result.invitePath, appOrigin).toString(),
+  };
+}
+
+export async function revokeOrganizationInvitation(
+  token: string,
+  organizationId: string,
+  invitationId: string,
+) {
+  return request<void>(
+    `/organizations/${organizationId}/invitations/${invitationId}`,
+    token,
+    { method: "DELETE" },
+  );
+}
+
+export async function loadOrganizationInvitation(token: string) {
+  return request<{ invitation: OrganizationInvitationPreview }>(
+    `/invitations/${encodeURIComponent(token)}`,
+    null,
+  );
+}
+
+export async function acceptOrganizationInvitation(
+  sessionToken: string,
+  invitationToken: string,
+) {
+  return request<{
+    invitation: OrganizationInvitation;
+    alreadyAccepted: boolean;
+  }>(`/invitations/${encodeURIComponent(invitationToken)}`, sessionToken, {
+    method: "POST",
+  });
 }
 
 export async function loadOrganizationExecutionWorkers(
