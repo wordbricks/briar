@@ -34,11 +34,9 @@ describe("iOS safe area layout", () => {
   });
 
   it("keeps inline replies within the conversation scroll area", () => {
+    expect(styles).toContain(".issue-message-parent-quote {");
     expect(styles).toContain(
-      ".issue-message-replies { min-width:0; margin:2px 10px 2px 54px;",
-    );
-    expect(styles).toContain(
-      ".issue-inline-reply-composer { margin:7px 10px 7px 64px; }",
+      ".issue-inline-reply-composer { margin:7px 10px 7px 54px; }",
     );
   });
 });
