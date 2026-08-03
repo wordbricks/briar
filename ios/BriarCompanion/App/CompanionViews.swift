@@ -96,8 +96,8 @@ struct CompanionShellView: View {
                         }
                     }
                     Section("접근 권한") {
-                        Label("읽기 전용", systemImage: "eye")
-                        Text("작업 생성, 상태 변경, 메시지 작성 기능은 제공하지 않습니다.")
+                        Label("읽기·쓰기", systemImage: "pencil.and.list.clipboard")
+                        Text("이슈 작성, 실행 제어, 결과 검수와 대화를 지원합니다.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -134,6 +134,8 @@ struct CompanionShellView: View {
 
 struct TaskListView: View {
     @State private var filter = TaskFilter.all
+    @State private var showingCreateIssue = false
+    @StateObject private var mutations: IssueMutationStore
 
     let project: ProjectsResponse.Project
     let snapshot: DashboardSnapshot?
@@ -142,6 +144,30 @@ struct TaskListView: View {
     let token: String
     let api: any MobileAPIClientProtocol
     let refresh: () async -> Void
+
+    @MainActor
+    init(
+        project: ProjectsResponse.Project,
+        snapshot: DashboardSnapshot?,
+        isRefreshing: Bool,
+        errorMessage: String?,
+        token: String,
+        api: any MobileAPIClientProtocol,
+        refresh: @escaping () async -> Void
+    ) {
+        self.project = project
+        self.snapshot = snapshot
+        self.isRefreshing = isRefreshing
+        self.errorMessage = errorMessage
+        self.token = token
+        self.api = api
+        self.refresh = refresh
+        _mutations = StateObject(wrappedValue: IssueMutationStore(
+            api: api,
+            projectID: project.id,
+            token: token
+        ))
+    }
 
     private var runs: [DashboardRun] {
         (snapshot?.runs ?? []).filter(filter.includes)
@@ -183,7 +209,16 @@ struct TaskListView: View {
                     } else {
                         ForEach(runs) { run in
                             NavigationLink {
-                                RunDetailView(run: run, projectID: project.id, token: token, api: api)
+                                RunDetailView(
+                                    run: run,
+                                    projectID: project.id,
+                                    token: token,
+                                    api: api,
+                                    allRuns: snapshot?.runs ?? [],
+                                    workers: snapshot?.workers ?? [],
+                                    providers: snapshot?.organizationProviders ?? [],
+                                    refresh: refresh
+                                )
                             } label: {
                                 RunRow(run: run)
                             }
@@ -206,6 +241,18 @@ struct TaskListView: View {
                 }
                 .accessibilityIdentifier("task-list")
             }
+        }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button { showingCreateIssue = true } label: {
+                    Image(systemName: "plus")
+                }
+                .accessibilityLabel("새 이슈")
+                .accessibilityIdentifier("create-issue-button")
+            }
+        }
+        .sheet(isPresented: $showingCreateIssue) {
+            CreateIssueSheet(mutations: mutations, refresh: refresh)
         }
     }
 }
@@ -428,25 +475,66 @@ struct OfflineStateView: View {
 }
 
 struct RunDetailView: View {
+    @Environment(\.dismiss) private var dismiss
     let run: DashboardRun
     @StateObject private var detail: RunDetailStore
+    @StateObject private var mutations: IssueMutationStore
     @State private var previewFile: PreviewFile?
     @State private var previewError: String?
+    @State private var actionError: String?
+    @State private var showingEdit = false
+    @State private var showingDispatch = false
+    @State private var reassigning = false
+    @State private var confirmingDelete = false
+    @State private var localStatus: DashboardRun.Status
+    @State private var localWorkflowStage: String?
+    @State private var dependencyIDs: Set<UUID>
+    @State private var preferences: IssueExecutionPreferences
+    @State private var messageText = ""
+    @State private var replyTo: IssueMessage?
+    @State private var reviewCompleted = false
+
+    private let allRuns: [DashboardRun]
+    private let workers: [DashboardWorker]
+    private let providers: [AgentProvider]
+    private let refresh: () async -> Void
 
     @MainActor
     init(
         run: DashboardRun,
         projectID: UUID,
         token: String,
-        api: any MobileAPIClientProtocol
+        api: any MobileAPIClientProtocol,
+        allRuns: [DashboardRun] = [],
+        workers: [DashboardWorker] = [],
+        providers: [AgentProvider] = [],
+        refresh: @escaping () async -> Void = {}
     ) {
         self.run = run
+        self.allRuns = allRuns
+        self.workers = workers
+        self.providers = providers
+        self.refresh = refresh
         _detail = StateObject(wrappedValue: RunDetailStore(
             api: api,
             projectID: projectID,
             runID: run.id,
             token: token
         ))
+        _mutations = StateObject(wrappedValue: IssueMutationStore(
+            api: api,
+            projectID: projectID,
+            token: token
+        ))
+        _localStatus = State(initialValue: run.status)
+        _localWorkflowStage = State(initialValue: run.workflowStage)
+        _dependencyIDs = State(initialValue: Set((run.prerequisites ?? []).map(\.id)))
+        _preferences = State(initialValue: IssueExecutionPreferences(
+            provider: run.preferredProvider,
+            model: run.preferredModel,
+            effort: run.preferredEffort
+        ))
+        _reviewCompleted = State(initialValue: !(run.resultReviews ?? []).isEmpty)
     }
 
     var body: some View {
@@ -454,7 +542,7 @@ struct RunDetailView: View {
             Section {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
-                        StatusBadge(status: run.status)
+                        StatusBadge(status: localStatus)
                         if let runNumber = run.runNumber { Text("#\(runNumber)") }
                         Spacer()
                         Text(run.updatedAt, style: .relative)
@@ -518,6 +606,98 @@ struct RunDetailView: View {
                                 }
                             } icon: {
                                 Image(systemName: attachment.contentType.hasPrefix("image/") ? "photo" : "doc")
+                            }
+                        }
+                    }
+                }
+            }
+
+            Section("실행 제어") {
+                Picker("상태 이동", selection: placementBinding) {
+                    ForEach(availablePlacements) { placement in
+                        Text(placement.label).tag(placement)
+                    }
+                }
+                .disabled(mutations.isActive("move-\(run.id)"))
+                .accessibilityIdentifier("run-status-picker")
+                if localStatus == .backlog || localStatus == .queued {
+                    Button("바로 처리") {
+                        reassigning = false
+                        showingDispatch = true
+                    }
+                    .disabled((run.waitingOnPrerequisiteCount ?? 0) > 0)
+                    .accessibilityIdentifier("process-now-button")
+                }
+                if localStatus == .running {
+                    Button("Worker 다시 배정") {
+                        reassigning = true
+                        showingDispatch = true
+                    }
+                }
+                if localStatus == .blocked || localStatus == .failed {
+                    Button("재시도") { Task { await recover(action: "retry") } }
+                        .accessibilityIdentifier("retry-run-button")
+                }
+                if localStatus != .completed && localStatus != .cancelled {
+                    Button("실행 취소", role: .destructive) {
+                        Task { await recover(action: "cancel") }
+                    }
+                    .accessibilityIdentifier("cancel-run-button")
+                }
+                if localStatus == .completed && !reviewCompleted {
+                    Button("결과 검수 완료") { Task { await completeReview() } }
+                        .accessibilityIdentifier("complete-review-button")
+                } else if reviewCompleted {
+                    Label("결과 검수 완료", systemImage: "checkmark.seal.fill")
+                        .foregroundStyle(.green)
+                }
+            }
+
+            Section("실행 설정") {
+                Picker("프로바이더", selection: $preferences.provider) {
+                    Text("기본값").tag(AgentProvider?.none)
+                    ForEach(providers.isEmpty ? AgentProvider.allCases : providers) {
+                        Text($0.displayName).tag(AgentProvider?.some($0))
+                    }
+                }
+                Picker("모델", selection: $preferences.model) {
+                    Text("기본값").tag(String?.none)
+                    ForEach(preferences.provider?.models ?? [], id: \.self) {
+                        Text($0).tag(String?.some($0))
+                    }
+                }
+                Picker("Effort", selection: $preferences.effort) {
+                    Text("기본값").tag(ModelEffort?.none)
+                    ForEach(preferences.provider?.efforts ?? []) {
+                        Text($0.rawValue).tag(ModelEffort?.some($0))
+                    }
+                }
+                .disabled(preferences.model == nil)
+                Button("실행 설정 저장") { Task { await savePreferences() } }
+                    .disabled(
+                        mutations.isActive("preferences-\(run.id)") || !preferences.isValid
+                    )
+            }
+
+            if localStatus == .backlog || localStatus == .queued {
+                Section("의존성") {
+                    let candidates = allRuns.filter {
+                        $0.id != run.id && !($0.status == .cancelled)
+                    }
+                    if candidates.isEmpty {
+                        Text("추가할 수 있는 선행 이슈가 없습니다.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(candidates) { candidate in
+                            Toggle(isOn: dependencyBinding(candidate.id)) {
+                                VStack(alignment: .leading) {
+                                    Text(candidate.title)
+                                    if let number = candidate.runNumber {
+                                        Text("#\(number) · \(candidate.status.displayName)")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
                             }
                         }
                     }
@@ -595,19 +775,63 @@ struct RunDetailView: View {
                                     .foregroundStyle(.secondary)
                             }
                             MarkdownText(markdown: message.body)
+                            Button("답글") { replyTo = message }
+                                .font(.caption)
                         }
                     }
                 }
             }
 
-            Section("읽기 전용") {
-                Label("이 화면에서는 작업이나 메시지를 변경할 수 없습니다.", systemImage: "lock")
-                    .foregroundStyle(.secondary)
+            Section(replyTo == nil ? "메시지 보내기" : "\(replyTo?.author.name ?? "")에게 답글") {
+                TextField("메시지 또는 @Briar 질문", text: $messageText, axis: .vertical)
+                    .lineLimit(2...6)
+                    .accessibilityIdentifier("issue-message-field")
+                HStack {
+                    if replyTo != nil { Button("답글 취소") { replyTo = nil } }
+                    Spacer()
+                    Button("보내기") { Task { await sendMessage() } }
+                        .disabled(
+                            messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                                mutations.isActive("message-\(run.id)")
+                        )
+                        .accessibilityIdentifier("issue-message-send")
+                }
+            }
+
+            if let actionError {
+                Section {
+                    Label(actionError, systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(.red)
+                }
             }
         }
         .navigationTitle(run.title)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    Button("수정") { showingEdit = true }
+                    Button("삭제", role: .destructive) { confirmingDelete = true }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+                .accessibilityIdentifier("issue-actions-menu")
+            }
+        }
         .task { await detail.load() }
         .refreshable { await detail.load() }
+        .onChange(of: run.status) { _, status in localStatus = status }
+        .onChange(of: run.workflowStage) { _, stage in localWorkflowStage = stage }
+        .onChange(of: run.prerequisites) { _, prerequisites in
+            dependencyIDs = Set((prerequisites ?? []).map(\.id))
+        }
+        .onChange(of: preferences.provider) { oldProvider, provider in
+            guard oldProvider != provider else { return }
+            preferences.model = nil
+            preferences.effort = nil
+        }
+        .onChange(of: preferences.model) { _, model in
+            if model == nil { preferences.effort = nil }
+        }
         .sheet(item: $previewFile) { file in
             QuickLookPreview(fileURL: file.url)
                 .ignoresSafeArea()
@@ -620,6 +844,25 @@ struct RunDetailView: View {
         } message: {
             Text(previewError ?? "")
         }
+        .alert("이슈를 삭제할까요?", isPresented: $confirmingDelete) {
+            Button("삭제", role: .destructive) { Task { await deleteIssue() } }
+            Button("취소", role: .cancel) {}
+        } message: {
+            Text("활동 기록, 대화와 첨부가 영구적으로 삭제됩니다.")
+        }
+        .sheet(isPresented: $showingEdit) {
+            EditIssueSheet(run: run, mutations: mutations, refresh: refresh)
+        }
+        .sheet(isPresented: $showingDispatch) {
+            DispatchIssueSheet(
+                run: run,
+                reassign: reassigning,
+                providers: providers,
+                workers: workers,
+                mutations: mutations,
+                refresh: refresh
+            )
+        }
         .accessibilityIdentifier("run-detail")
     }
 
@@ -629,6 +872,159 @@ struct RunDetailView: View {
         } catch {
             previewError = CompanionStore.message(for: error)
         }
+    }
+
+    private var availablePlacements: [RunPlacement] {
+        let statuses = DashboardRun.Status.allCases
+            .filter { $0 != .running }
+            .map { RunPlacement(status: $0, workflowStage: nil, label: $0.displayName) }
+        var stages = (run.workflow?.stages ?? []).map {
+            RunPlacement(status: .running, workflowStage: $0.id, label: $0.label)
+        }
+        if localStatus == .running,
+           let localWorkflowStage,
+           !stages.contains(where: { $0.workflowStage == localWorkflowStage }) {
+            stages.insert(RunPlacement(
+                status: .running,
+                workflowStage: localWorkflowStage,
+                label: localWorkflowStage
+            ), at: 0)
+        }
+        return statuses + stages
+    }
+
+    private var placementBinding: Binding<RunPlacement> {
+        Binding(
+            get: {
+                availablePlacements.first {
+                    $0.status == localStatus && $0.workflowStage == localWorkflowStage
+                } ?? RunPlacement(
+                    status: localStatus,
+                    workflowStage: localWorkflowStage,
+                    label: localWorkflowStage ?? localStatus.displayName
+                )
+            },
+            set: { placement in
+                guard placement.status != localStatus ||
+                        placement.workflowStage != localWorkflowStage else { return }
+                Task { await move(to: placement.status, workflowStage: placement.workflowStage) }
+            }
+        )
+    }
+
+    private func move(to status: DashboardRun.Status, workflowStage: String?) async {
+        do {
+            try await mutations.move(
+                runID: run.id,
+                status: status,
+                workflowStage: workflowStage
+            )
+            localStatus = status
+            localWorkflowStage = workflowStage
+            actionError = nil
+            await refresh()
+        } catch { actionError = error.localizedDescription }
+    }
+
+    private func recover(action: String) async {
+        do {
+            try await mutations.recover(runID: run.id, action: action)
+            localStatus = action == "retry" ? .queued : .cancelled
+            localWorkflowStage = nil
+            actionError = nil
+            await refresh()
+        } catch { actionError = error.localizedDescription }
+    }
+
+    private func savePreferences() async {
+        do {
+            _ = try await mutations.savePreferences(runID: run.id, preferences: preferences)
+            actionError = nil
+            await refresh()
+        } catch { actionError = error.localizedDescription }
+    }
+
+    private func dependencyBinding(_ prerequisiteID: UUID) -> Binding<Bool> {
+        Binding(
+            get: { dependencyIDs.contains(prerequisiteID) },
+            set: { enabled in
+                Task {
+                    do {
+                        try await mutations.setDependency(
+                            runID: run.id,
+                            prerequisiteID: prerequisiteID,
+                            enabled: enabled
+                        )
+                        if enabled {
+                            dependencyIDs.insert(prerequisiteID)
+                        } else {
+                            dependencyIDs.remove(prerequisiteID)
+                        }
+                        actionError = nil
+                        await refresh()
+                    } catch { actionError = error.localizedDescription }
+                }
+            }
+        )
+    }
+
+    private func completeReview() async {
+        do {
+            _ = try await mutations.completeReview(runID: run.id)
+            reviewCompleted = true
+            actionError = nil
+            await refresh()
+        } catch { actionError = error.localizedDescription }
+    }
+
+    private func sendMessage() async {
+        do {
+            let sent = try await mutations.sendMessage(
+                runID: run.id,
+                body: messageText,
+                parentMessageID: replyTo?.id
+            )
+            detail.appendMessages(sent)
+            messageText = ""
+            replyTo = nil
+            actionError = nil
+            await refresh()
+        } catch {
+            actionError = error.localizedDescription
+            if case IssueMutationError.agentReplyTimedOut = error {
+                messageText = ""
+                replyTo = nil
+                await detail.load()
+                await refresh()
+            } else if case IssueMutationError.agentReplyPollingFailed = error {
+                messageText = ""
+                replyTo = nil
+                await detail.load()
+                await refresh()
+            } else if case IssueMutationError.agentReplyFailed = error {
+                messageText = ""
+                replyTo = nil
+                await detail.load()
+                await refresh()
+            }
+        }
+    }
+
+    private func deleteIssue() async {
+        do {
+            try await mutations.deleteIssue(runID: run.id)
+            actionError = nil
+            await refresh()
+            dismiss()
+        } catch { actionError = error.localizedDescription }
+    }
+
+    private struct RunPlacement: Hashable, Identifiable {
+        let status: DashboardRun.Status
+        let workflowStage: String?
+        let label: String
+
+        var id: String { "\(status.rawValue):\(workflowStage ?? "none")" }
     }
 }
 
