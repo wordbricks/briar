@@ -115,6 +115,98 @@
           }
         }
       }
+    },
+    "/projects/{projectId}/runs/{runId}/events": {
+      "get": {
+        "operationId": "listRunEvents",
+        "parameters": [
+          { "$ref": "#/components/parameters/ProjectId" },
+          { "$ref": "#/components/parameters/RunId" }
+        ],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Read-only run event history",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RunEventsResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/projects/{projectId}/runs/{runId}/messages": {
+      "get": {
+        "operationId": "listIssueMessages",
+        "parameters": [
+          { "$ref": "#/components/parameters/ProjectId" },
+          { "$ref": "#/components/parameters/RunId" }
+        ],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Read-only issue conversation",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IssueMessagesResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/projects/{projectId}/runs/{runId}/evidence": {
+      "get": {
+        "operationId": "listRunEvidence",
+        "parameters": [
+          { "$ref": "#/components/parameters/ProjectId" },
+          { "$ref": "#/components/parameters/RunId" }
+        ],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Read-only run evidence",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RunEvidenceResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/projects/{projectId}/runs/{runId}/attachments/{attachmentId}": {
+      "get": {
+        "operationId": "downloadIssueAttachment",
+        "parameters": [
+          { "$ref": "#/components/parameters/ProjectId" },
+          { "$ref": "#/components/parameters/RunId" },
+          { "name": "attachmentId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Attachment bytes for native preview",
+            "content": { "application/octet-stream": { "schema": { "type": "string", "contentEncoding": "binary" } } }
+          },
+          "401": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/projects/{projectId}/runs/{runId}/evidence/images/{imageId}": {
+      "get": {
+        "operationId": "downloadEvidenceImage",
+        "parameters": [
+          { "$ref": "#/components/parameters/ProjectId" },
+          { "$ref": "#/components/parameters/RunId" },
+          { "name": "imageId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Evidence image bytes for native preview",
+            "content": { "application/octet-stream": { "schema": { "type": "string", "contentEncoding": "binary" } } }
+          },
+          "401": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      }
     }
   },
   "components": {
@@ -130,6 +222,12 @@
     "parameters": {
       "ProjectId": {
         "name": "projectId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "RunId": {
+        "name": "runId",
         "in": "path",
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
@@ -237,15 +335,50 @@
         "properties": { "projects": { "type": "array", "items": { "$ref": "#/components/schemas/Project" } } },
         "additionalProperties": true
       },
+      "IssueAttachment": {
+        "type": "object",
+        "required": ["id", "filename", "contentType", "byteSize", "url"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "filename": { "type": "string" },
+          "contentType": { "type": "string" },
+          "byteSize": { "type": "integer", "minimum": 0 },
+          "url": { "type": "string" }
+        },
+        "additionalProperties": true
+      },
+      "MessageAuthor": {
+        "type": "object",
+        "required": ["id", "name", "image", "provider"],
+        "properties": {
+          "id": { "type": ["string", "null"] },
+          "name": { "type": "string" },
+          "image": { "type": ["string", "null"] },
+          "provider": { "type": ["string", "null"] }
+        },
+        "additionalProperties": true
+      },
       "DashboardRun": {
         "type": "object",
         "required": ["id", "title", "status", "updatedAt"],
         "properties": {
           "id": { "type": "string", "format": "uuid" },
+          "runNumber": { "type": "integer", "minimum": 1 },
           "title": { "type": "string" },
           "status": { "type": "string", "enum": ["backlog", "queued", "running", "blocked", "failed", "completed", "cancelled"] },
+          "workflowStage": { "type": ["string", "null"] },
+          "progress": { "type": "number", "minimum": 0, "maximum": 100 },
           "detail": { "type": ["string", "null"] },
-          "updatedAt": { "type": "string", "format": "date-time" }
+          "issueDescription": { "type": ["string", "null"] },
+          "attachments": { "type": "array", "items": { "$ref": "#/components/schemas/IssueAttachment" } },
+          "resultSummary": { "type": ["string", "null"] },
+          "structuredResult": { "type": ["object", "null"], "additionalProperties": true },
+          "resultReviews": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+          "pullRequestUrls": { "type": "array", "items": { "type": "string", "format": "uri" } },
+          "branch": { "type": ["string", "null"] },
+          "commitSha": { "type": ["string", "null"] },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "completedAt": { "type": ["string", "null"], "format": "date-time" }
         },
         "additionalProperties": true
       },
@@ -255,6 +388,8 @@
         "properties": {
           "project": { "$ref": "#/components/schemas/Project" },
           "runs": { "type": "array", "items": { "$ref": "#/components/schemas/DashboardRun" } },
+          "workers": { "type": "array", "items": { "$ref": "#/components/schemas/DashboardWorker" } },
+          "conversationNotifications": { "type": "array", "items": { "$ref": "#/components/schemas/ConversationNotification" } },
           "cursor": { "type": "integer", "minimum": 0 },
           "generatedAt": { "type": "string", "format": "date-time" }
         },
@@ -269,6 +404,8 @@
           "runs": { "type": "array", "items": { "$ref": "#/components/schemas/DashboardRun" } },
           "deletedRunIds": { "type": "array", "items": { "type": "string", "format": "uuid" } },
           "project": { "$ref": "#/components/schemas/Project" },
+          "workers": { "type": "array", "items": { "$ref": "#/components/schemas/DashboardWorker" } },
+          "conversationNotifications": { "type": "array", "items": { "$ref": "#/components/schemas/ConversationNotification" } },
           "generatedAt": { "type": "string", "format": "date-time" }
         },
         "additionalProperties": true
@@ -279,6 +416,111 @@
         "properties": {
           "code": { "const": "dashboard_cursor_expired" },
           "message": { "type": "string" }
+        },
+        "additionalProperties": true
+      },
+      "DashboardWorker": {
+        "type": "object",
+        "required": ["id", "label", "readiness", "readinessDetail", "activeSessions", "availableSessions"],
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "readiness": { "type": "string" },
+          "readinessDetail": { "type": ["string", "null"] },
+          "activeSessions": { "type": "integer", "minimum": 0 },
+          "availableSessions": { "type": "integer", "minimum": 0 }
+        },
+        "additionalProperties": true
+      },
+      "ConversationNotification": {
+        "type": "object",
+        "required": ["id", "runId", "runTitle", "rootMessageId", "body", "author", "reason", "createdAt"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "runId": { "type": "string", "format": "uuid" },
+          "runTitle": { "type": "string" },
+          "rootMessageId": { "type": "string", "format": "uuid" },
+          "body": { "type": "string" },
+          "author": { "$ref": "#/components/schemas/MessageAuthor" },
+          "reason": { "type": "string", "enum": ["mention", "thread_reply"] },
+          "createdAt": { "type": "string", "format": "date-time" }
+        },
+        "additionalProperties": true
+      },
+      "RunEventsResponse": {
+        "type": "object",
+        "required": ["events"],
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id", "status", "workflowStage", "detail", "actor", "occurredAt"],
+              "properties": {
+                "id": { "type": "string", "format": "uuid" },
+                "status": { "type": "string", "enum": ["backlog", "queued", "running", "blocked", "failed", "completed", "cancelled"] },
+                "workflowStage": { "type": ["string", "null"] },
+                "detail": { "type": ["string", "null"] },
+                "actor": { "type": "string" },
+                "occurredAt": { "type": "string", "format": "date-time" }
+              },
+              "additionalProperties": true
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "IssueMessagesResponse": {
+        "type": "object",
+        "required": ["messages"],
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id", "runId", "parentMessageId", "body", "author", "replyCount", "createdAt", "updatedAt"],
+              "properties": {
+                "id": { "type": "string", "format": "uuid" },
+                "runId": { "type": "string", "format": "uuid" },
+                "parentMessageId": { "type": ["string", "null"], "format": "uuid" },
+                "body": { "type": "string" },
+                "author": { "$ref": "#/components/schemas/MessageAuthor" },
+                "replyCount": { "type": "integer", "minimum": 0 },
+                "createdAt": { "type": "string", "format": "date-time" },
+                "updatedAt": { "type": "string", "format": "date-time" }
+              },
+              "additionalProperties": true
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "RunEvidenceResponse": {
+        "type": "object",
+        "required": ["evidence"],
+        "properties": {
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["key", "attempt", "revision", "stage", "type", "status", "detail", "url", "actor", "observedAt", "canonical"],
+              "properties": {
+                "key": { "type": "string" },
+                "attempt": { "type": "integer", "minimum": 1 },
+                "revision": { "type": "integer", "minimum": 1 },
+                "stage": { "type": "string" },
+                "type": { "type": "string" },
+                "status": { "type": "string", "enum": ["pending", "passed", "failed", "skipped"] },
+                "detail": { "type": ["string", "null"] },
+                "url": { "type": ["string", "null"], "format": "uri" },
+                "actor": { "type": "string" },
+                "observedAt": { "type": "string", "format": "date-time" },
+                "images": { "type": "array", "items": { "$ref": "#/components/schemas/IssueAttachment" } },
+                "canonical": { "type": "boolean" }
+              },
+              "additionalProperties": true
+            }
+          }
         },
         "additionalProperties": true
       },

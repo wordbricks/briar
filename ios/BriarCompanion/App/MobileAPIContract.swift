@@ -1,7 +1,7 @@
 import Foundation
 
 enum MobileAPIContract {
-    static let version = "1.0.0"
+    static let version = "1.1.0"
     static let iOSClientID = "briar-mobile"
     static let androidClientID = "briar-android"
 
@@ -20,28 +20,23 @@ enum MobileAPIContract {
             "\(dashboard(projectID: projectID))/delta?cursor=\(cursor)"
         }
 
-        static func ideas(projectID: UUID) -> String {
-            "/projects/\(projectID.uuidString.lowercased())/ideas"
+        static func ideas(projectID: UUID) -> String { "/projects/\(projectID.uuidString.lowercased())/ideas" }
+        static func idea(projectID: UUID, ideaID: UUID) -> String { "\(ideas(projectID: projectID))/\(ideaID.uuidString.lowercased())" }
+        static func ideaMessages(projectID: UUID, ideaID: UUID) -> String { "\(idea(projectID: projectID, ideaID: ideaID))/messages" }
+        static func ideaPlan(projectID: UUID, ideaID: UUID) -> String { "\(idea(projectID: projectID, ideaID: ideaID))/plan" }
+        static func ideaConvert(projectID: UUID, ideaID: UUID) -> String { "\(idea(projectID: projectID, ideaID: ideaID))/convert" }
+        static func ideaJobRetry(projectID: UUID, ideaID: UUID, jobID: UUID) -> String { "\(idea(projectID: projectID, ideaID: ideaID))/jobs/\(jobID.uuidString.lowercased())/retry" }
+
+        static func runEvents(projectID: UUID, runID: UUID) -> String {
+            "/projects/\(projectID.uuidString.lowercased())/runs/\(runID.uuidString.lowercased())/events"
         }
 
-        static func idea(projectID: UUID, ideaID: UUID) -> String {
-            "\(ideas(projectID: projectID))/\(ideaID.uuidString.lowercased())"
+        static func runMessages(projectID: UUID, runID: UUID) -> String {
+            "/projects/\(projectID.uuidString.lowercased())/runs/\(runID.uuidString.lowercased())/messages"
         }
 
-        static func ideaMessages(projectID: UUID, ideaID: UUID) -> String {
-            "\(idea(projectID: projectID, ideaID: ideaID))/messages"
-        }
-
-        static func ideaPlan(projectID: UUID, ideaID: UUID) -> String {
-            "\(idea(projectID: projectID, ideaID: ideaID))/plan"
-        }
-
-        static func ideaConvert(projectID: UUID, ideaID: UUID) -> String {
-            "\(idea(projectID: projectID, ideaID: ideaID))/convert"
-        }
-
-        static func ideaJobRetry(projectID: UUID, ideaID: UUID, jobID: UUID) -> String {
-            "\(idea(projectID: projectID, ideaID: ideaID))/jobs/\(jobID.uuidString.lowercased())/retry"
+        static func runEvidence(projectID: UUID, runID: UUID) -> String {
+            "/projects/\(projectID.uuidString.lowercased())/runs/\(runID.uuidString.lowercased())/evidence"
         }
     }
 }
@@ -188,6 +183,14 @@ protocol MobileAPIClientProtocol: Sendable {
         body: (any Encodable & Sendable)?,
         as responseType: Response.Type
     ) async throws -> Response
+
+    func download(_ path: String, token: String, to destination: URL) async throws -> URL
+}
+
+extension MobileAPIClientProtocol {
+    func download(_ path: String, token: String, to destination: URL) async throws -> URL {
+        throw MobileAPIError.invalidDownload
+    }
 }
 
 struct MobileAPIClient: MobileAPIClientProtocol, Sendable {
