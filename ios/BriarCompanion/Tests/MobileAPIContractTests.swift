@@ -40,6 +40,7 @@ final class MobileAPIContractTests: XCTestCase {
         let evidence: RunEvidenceResponse = try decodeResponse("listRunEvidence")
         let agents: ProjectAgentsResponse = try decodeResponse("listProjectAgents")
         let sessions: ProjectAgentSessionsResponse = try decodeResponse("listProjectAgentSessions")
+        let resume: ResumeRunResponse = try decodeResponse("resumeRun")
 
         XCTAssertTrue(health.ok)
         XCTAssertEqual(device.userCode, "BRIAR123")
@@ -63,6 +64,9 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(evidence.evidence.first?.images?.first?.filename, "companion.png")
         XCTAssertEqual(agents.agents.first?.name, "Auto Hunt agent")
         XCTAssertEqual(sessions.sessions.first?.id, "session-fixture-1")
+        XCTAssertEqual(resume.checkpointKey, "user-before-production_qa")
+        XCTAssertEqual(resume.attempt, 2)
+        XCTAssertEqual(resume.revision, 3)
     }
 
     func testEndpointPathsMatchOpenAPISubset() {
@@ -92,6 +96,10 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(
             MobileAPIContract.Endpoint.runEvidence(projectID: projectID, runID: runID),
             "/projects/11111111-1111-4111-8111-111111111111/runs/33333333-3333-4333-8333-333333333333/evidence"
+        )
+        XCTAssertEqual(
+            MobileAPIContract.Endpoint.runResume(projectID: projectID, runID: runID),
+            "/projects/11111111-1111-4111-8111-111111111111/runs/33333333-3333-4333-8333-333333333333/resume"
         )
         XCTAssertEqual(
             MobileAPIContract.Endpoint.projectAgents(projectID: projectID, locale: "en"),

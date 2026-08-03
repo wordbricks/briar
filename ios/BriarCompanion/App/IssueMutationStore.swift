@@ -213,6 +213,25 @@ final class IssueMutationStore: ObservableObject {
         }
     }
 
+    func resume(runID: UUID, checkpoint: WorkflowCheckpoint) async throws {
+        try await perform("resume-\(runID)") {
+            let idempotencyKey = "resume-\(runID)-\(checkpoint.key)-\(checkpoint.attempt)-\(checkpoint.revision)"
+            let _: ResumeRunResponse = try await api.send(
+                MobileAPIContract.Endpoint.runResume(projectID: projectID, runID: runID),
+                method: "POST",
+                token: token,
+                body: ResumeRunRequest(
+                    requestId: idempotencyID(for: idempotencyKey),
+                    checkpointKey: checkpoint.key,
+                    attempt: checkpoint.attempt,
+                    revision: checkpoint.revision
+                ),
+                as: ResumeRunResponse.self
+            )
+            pendingRequestIDs.removeValue(forKey: idempotencyKey)
+        }
+    }
+
     func completeReview(runID: UUID) async throws -> ResultReview {
         try await perform("review-\(runID)") {
             try await api.send(

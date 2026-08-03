@@ -404,6 +404,27 @@
         "stage": "cancelled"
       }
     },
+    "resumeRun": {
+      "method": "POST",
+      "path": "/projects/{projectId}/runs/{runId}/resume",
+      "status": 200,
+      "request": {
+        "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "checkpointKey": "user-before-production_qa",
+        "attempt": 2,
+        "revision": 3
+      },
+      "response": {
+        "runId": "33333333-3333-4333-8333-333333333333",
+        "outcome": "approved",
+        "workflowStage": "production_qa",
+        "startStage": "production_qa",
+        "checkpointKey": "user-before-production_qa",
+        "attempt": 2,
+        "revision": 3,
+        "terminalReviewOnly": false
+      }
+    },
     "dispatchRun": {
       "method": "POST",
       "path": "/projects/{projectId}/runs/{runId}/dispatch",

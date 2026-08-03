@@ -16,7 +16,7 @@
 | 이슈 대화 및 첨부 | 제공 | 제공 | 제공 | 메시지·답글 전송과 Agent reply polling, 인증 다운로드·Quick Look, multipart 이미지·영상 업로드를 공유 |
 | 이슈 생성·편집·삭제와 draft | 제공 | 제공 | 제공 | 제목·설명·우선순위·backlog/queued, 5개/파일당 20MB/전체 25MB 제한, 성공 전 draft 보존 |
 | 의존성·실행 설정 | 제공 | 제공 | 제공 | 선행 이슈 DAG와 provider/model/effort 설정을 dashboard 및 공통 쓰기 API로 사용 |
-| 실행·복구·검수 제어 | 제공 | 제공 | 제공 | 상태 이동, 즉시 실행, Worker 선택·재할당, retry/cancel, 결과 review와 requestId 멱등성을 공유 |
+| 실행·복구·검수 제어 | 제공 | 제공 | 제공 | 상태 이동, 즉시 실행, Worker 선택·재할당, retry/cancel, 결과 review를 공유한다. `paused` run은 표시된 checkpoint key·attempt·revision과 동일 requestId로만 resume하며 stale 409는 새 snapshot을 불러온다. |
 | 아이디어 문서·대화·이슈 계획 | 제공 | 제공 | 제공 | D1 아이디어 계약, 온라인 실행 워커, 모바일 대화/문서 전환 UI를 공유 |
 | 알림 및 딥 링크 | 제공 | 제공 | 제공 | `briar-companion` 딥링크와 Universal Link(`/open/issues`, `/open/sessions`), Inbox 분류·읽음, polling 로컬 알림, app badge |
 | Agent·Session 목록/상세 | 제공 | 제공 | 제공 | `GET /projects/{id}/agents`, `GET /projects/{id}/agent-sessions` 원격 snapshot 동기화 |

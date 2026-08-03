@@ -302,6 +302,7 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    readonly code?: string,
   ) {
     super(message);
     this.name = "ApiError";
@@ -336,6 +337,7 @@ async function request<T>(
         body?.error_description ??
         body?.error ??
         `Briar API 요청 실패 (${response.status})`,
+      body?.code,
     );
   }
   if (response.status === 204) return undefined as T;
@@ -1567,6 +1569,7 @@ export async function resumeHuntRun(
     attempt: number;
     revision: number;
   },
+  requestId: string = crypto.randomUUID(),
 ) {
   return request<HuntResumeResult>(
     `/projects/${projectId}/runs/${runId}/resume`,
@@ -1574,7 +1577,7 @@ export async function resumeHuntRun(
     {
       method: "POST",
       body: JSON.stringify({
-        requestId: crypto.randomUUID(),
+        requestId,
         ...(checkpoint
           ? {
               checkpointKey: checkpoint.key,
@@ -1585,6 +1588,25 @@ export async function resumeHuntRun(
       }),
     },
   );
+}
+
+export async function updateCheckpointPolicy(
+  token: string,
+  projectId: string,
+  input: {
+    scope: "project" | "user";
+    checkpoints: NonNullable<
+      ProjectSettings["checkpointPolicy"]
+    >["projectMandatory"];
+    expectedRevision: number;
+  },
+) {
+  return request<{
+    checkpointPolicy: NonNullable<ProjectSettings["checkpointPolicy"]>;
+  }>(`/projects/${projectId}/checkpoint-policy`, token, {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
 }
 
 async function recoverHuntRun(

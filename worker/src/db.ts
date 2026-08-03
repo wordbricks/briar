@@ -34,6 +34,7 @@ import {
   type ProjectAgentScheduleNotificationLevel,
   type ProjectAgentScheduleRecurrence,
 } from "../../src/lib/project-agent-schedule";
+import { workflowSnapshotForRun } from "./workflow-policy";
 
 type ProjectAgentProvider = "codex" | "claude" | "grok" | "opencode";
 type ModelEffort = "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
@@ -121,6 +122,8 @@ export type ProjectSettingsRow = {
   linear_team_key: string | null;
   github_repository: string | null;
   workflow_json: string;
+  mandatory_checkpoints_json: string | null;
+  checkpoint_policy_revision: number;
   created_at: string;
   updated_at: string;
 };
@@ -506,6 +509,7 @@ export type HuntEventInput = {
   stagingQaDetail: string | null;
   productionQaDetail: string | null;
   context: Record<string, unknown> | null;
+  createdByUserId?: string | null;
 };
 
 export type ProjectSettingsInput = {
@@ -3587,12 +3591,70 @@ export async function getProjectSettings(db: D1Database, projectId: string) {
     .prepare(
       `select project_id, velen_org, data_source, linear_enabled,
               linear_source, linear_team_key, github_repository, workflow_json,
+              mandatory_checkpoints_json, checkpoint_policy_revision,
               created_at, updated_at
        from briar_project_settings
        where project_id = ?`,
     )
     .bind(projectId)
     .first<ProjectSettingsRow>();
+}
+
+export async function updateProjectMandatoryCheckpoints(
+  db: D1Database,
+  projectId: string,
+  checkpoints: AutoHuntWorkflowCheckpoint[],
+  expectedRevision: number,
+) {
+  const updatedAt = new Date().toISOString();
+  const result = await db
+    .prepare(
+      `update briar_project_settings
+       set mandatory_checkpoints_json = ?,
+           checkpoint_policy_revision = checkpoint_policy_revision + 1,
+           updated_at = ?
+       where project_id = ? and checkpoint_policy_revision = ?`,
+    )
+    .bind(stableJson(checkpoints), updatedAt, projectId, expectedRevision)
+    .run();
+  // Dashboard sync triggers may add their own row changes to D1 metadata.
+  // The guarded settings row changed iff the total is non-zero.
+  return (result.meta.changes ?? 0) > 0;
+}
+
+export async function updateUserWorkflowCheckpointDefaults(
+  db: D1Database,
+  projectId: string,
+  userId: string,
+  checkpoints: AutoHuntWorkflowCheckpoint[],
+  expectedRevision: number,
+) {
+  const updatedAt = new Date().toISOString();
+  const result = expectedRevision === 0
+    ? await db
+        .prepare(
+          `insert into briar_user_workflow_checkpoint_defaults (
+             project_id, user_id, checkpoints_json, revision, created_at, updated_at
+           ) values (?, ?, ?, 1, ?, ?)
+           on conflict(project_id, user_id) do nothing`,
+        )
+        .bind(projectId, userId, stableJson(checkpoints), updatedAt, updatedAt)
+        .run()
+    : await db
+        .prepare(
+          `update briar_user_workflow_checkpoint_defaults
+           set checkpoints_json = ?, revision = revision + 1, updated_at = ?
+           where project_id = ? and user_id = ? and revision = ?`,
+        )
+        .bind(
+          stableJson(checkpoints),
+          updatedAt,
+          projectId,
+          userId,
+          expectedRevision,
+        )
+        .run();
+  return (result.meta.changes ?? 0) > 0;
 }
 
 export async function updateProjectSettings(
@@ -5082,7 +5144,13 @@ export async function recordHuntEvent(
   const existingRun = await loadRunForIdentity(db, projectId, normalizedInput);
   const workflowSnapshot = existingRun
     ? parseWorkflow(existingRun.workflow_snapshot_json)
-    : parseWorkflow((await getProjectSettings(db, projectId))?.workflow_json);
+    : parseWorkflow(
+        stableJson(await workflowSnapshotForRun(
+          db,
+          projectId,
+          normalizedInput.createdByUserId,
+        )),
+      );
   const pauseRank = workflowPauseIndex(workflowSnapshot);
   const requestedRank = normalizedInput.workflowStage
     ? workflowSnapshot.stages.findIndex(

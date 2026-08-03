@@ -18,7 +18,7 @@ describe("ProjectSettings", () => {
     const onAnalyzeWorkflowRequirements = vi.fn(async () => undefined);
     const onRegenerateWorkflow = vi.fn(async () => undefined);
     const onReviseWorkflow = vi.fn(async () => undefined);
-    const onUpdateWorkflowPauseAfterStage = vi.fn(async () => undefined);
+    const onSaveCheckpointPolicy = vi.fn(async () => undefined);
     const onUpdateLinear = vi.fn(
       async (linear: ProjectSettingsData["linear"]) => linear,
     );
@@ -75,6 +75,27 @@ describe("ProjectSettings", () => {
                   reason: "Runs repository validation.",
                 }],
               },
+              checkpointPolicy: {
+                availableBoundaries: demoDashboard.settings.workflow.stages.flatMap(
+                  (stage) => ([
+                    { stage: stage.id, stageLabel: stage.label, position: "before" as const },
+                    { stage: stage.id, stageLabel: stage.label, position: "after" as const },
+                  ]),
+                ),
+                projectMandatory: [{
+                  key: "legacy-after-local_qa",
+                  stage: "local_qa",
+                  position: "after",
+                }],
+                userDefaults: [],
+                effective: [{
+                  key: "legacy-after-local_qa",
+                  stage: "local_qa",
+                  position: "after",
+                }],
+                projectRevision: 1,
+                userRevision: 0,
+              },
             },
           }}
           githubRepository="wordbricks/briar"
@@ -116,7 +137,7 @@ describe("ProjectSettings", () => {
           onDelete={async () => undefined}
           onRegenerateWorkflow={onRegenerateWorkflow}
           onReviseWorkflow={onReviseWorkflow}
-          onUpdateWorkflowPauseAfterStage={onUpdateWorkflowPauseAfterStage}
+          onSaveCheckpointPolicy={onSaveCheckpointPolicy}
           onUpdateVelenOrg={async (org) => org}
           onUpdateLinear={onUpdateLinear}
           onConnectLinearImport={onConnectLinearImport}
@@ -198,19 +219,26 @@ describe("ProjectSettings", () => {
       "정상",
     );
     expect(container.querySelector(".project-workflow-contract")?.textContent).toContain(
-      "일시정지 단계Local validation",
+      "자동화 확인 지점실행 순서에 따라 확인 지점 1개에서 대기합니다.",
     );
     expect(container.querySelector(".project-workflow-contract pre")).toBeNull();
     expect(container.querySelectorAll(".project-workflow-stage")).toHaveLength(3);
-    const pauseTrigger = container.querySelector<HTMLButtonElement>(
-      ".project-settings-workflow-pause .select-menu-trigger",
+    const implementingBefore = container.querySelector<HTMLInputElement>(
+      'input[aria-label="Implement before project"]',
     );
-    await act(async () => pauseTrigger?.click());
-    const implementingPause = Array.from(
-      document.body.querySelectorAll<HTMLButtonElement>(".select-menu-option"),
-    ).find((option) => option.textContent?.includes("Implement"));
-    await act(async () => implementingPause?.click());
-    expect(onUpdateWorkflowPauseAfterStage).toHaveBeenCalledWith("implementing");
+    const mandatoryUserBoundary = container.querySelector<HTMLInputElement>(
+      'input[aria-label="Local validation after user"]',
+    );
+    expect(mandatoryUserBoundary?.checked).toBe(true);
+    expect(mandatoryUserBoundary?.disabled).toBe(true);
+    await act(async () => implementingBefore?.click());
+    expect(onSaveCheckpointPolicy).toHaveBeenCalledWith(
+      "project",
+      expect.arrayContaining([
+        expect.objectContaining({ stage: "implementing", position: "before" }),
+      ]),
+      1,
+    );
     expect(
       container.querySelector(".project-workflow-contract")?.getAttribute("aria-label"),
     ).toBe("Auto Hunt 워크플로 다이어그램");

@@ -4,6 +4,7 @@ import {
   type AutoHuntRunStatus,
   type AutoHuntSource,
   type AutoHuntWorkflow,
+  type AutoHuntWorkflowCheckpoint,
   type AutoHuntWorkflowStageId,
 } from "./lib/auto-hunt-contract";
 import type { StructuredAgentResult } from "./lib/agent-result";
@@ -157,6 +158,18 @@ export type HuntRun = {
   progress: number;
   pausedAt?: string | null;
   waitingCheckpoint?: { key: string; revision: number } | null;
+  checkpoint?: {
+    key: string;
+    stage: string;
+    stageLabel: string;
+    position: "before" | "after";
+    attempt: number;
+    revision: number;
+    reachedAt: string | null;
+    nextStage: string | null;
+    nextStageLabel: string | null;
+    terminalReviewOnly: boolean;
+  } | null;
   detail: string | null;
   priority: number | null;
   repository: string;
@@ -427,6 +440,18 @@ export type ProjectSettings = {
   };
   githubRepository: string | null;
   workflow: AutoHuntWorkflow;
+  checkpointPolicy?: {
+    availableBoundaries: Array<{
+      stage: string;
+      stageLabel: string;
+      position: "before" | "after";
+    }>;
+    projectMandatory: AutoHuntWorkflowCheckpoint[];
+    userDefaults: AutoHuntWorkflowCheckpoint[];
+    effective: AutoHuntWorkflowCheckpoint[];
+    projectRevision: number;
+    userRevision: number;
+  };
 };
 
 export type DashboardPayload = {

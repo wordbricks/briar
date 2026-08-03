@@ -111,7 +111,7 @@ export function ProjectSettings({
   onDelete,
   onRegenerateWorkflow,
   onReviseWorkflow,
-  onUpdateWorkflowPauseAfterStage,
+  onSaveCheckpointPolicy,
   onUpdateVelenOrg,
   onUpdateLinear,
   onConnectLinearImport,
@@ -137,7 +137,13 @@ export function ProjectSettings({
   onDelete: () => Promise<unknown>;
   onRegenerateWorkflow: () => Promise<unknown>;
   onReviseWorkflow: (requestedChange: string) => Promise<unknown>;
-  onUpdateWorkflowPauseAfterStage?: (pauseAfterStage: string) => Promise<unknown>;
+  onSaveCheckpointPolicy?: (
+    scope: "project" | "user",
+    checkpoints: NonNullable<
+      ProjectSettingsData["checkpointPolicy"]
+    >["projectMandatory"],
+    expectedRevision: number,
+  ) => Promise<unknown>;
   onUpdateVelenOrg: (org: string | null) => Promise<string | null>;
   onUpdateLinear: (
     linear: ProjectSettingsData["linear"],
@@ -243,6 +249,11 @@ export function ProjectSettings({
   const workflowJson = workflowContract
     ? JSON.stringify(workflowContract, null, 2)
     : "";
+  const checkpointPolicy = dashboard?.settings.checkpointPolicy;
+  const projectMandatory = checkpointPolicy?.projectMandatory ??
+    workflowContract?.execution.checkpoints ?? [];
+  const userDefaults = checkpointPolicy?.userDefaults ?? [];
+  const effectiveCheckpoints = checkpointPolicy?.effective ?? projectMandatory;
   const requirementHealth = new Map(
     (health?.requirements ?? []).map((requirement) => [
       requirement.id,
@@ -469,20 +480,36 @@ export function ProjectSettings({
     }
   };
 
-  const updateWorkflowPause = async (pauseAfterStage: string) => {
-    if (
-      !onUpdateWorkflowPauseAfterStage ||
-      pauseAfterStage === workflowContract?.execution.pauseAfterStage
-    ) {
-      return;
-    }
+  const updateCheckpointBoundary = async (
+    scope: "project" | "user",
+    stage: string,
+    position: "before" | "after",
+    enabled: boolean,
+  ) => {
+    if (!onSaveCheckpointPolicy || !checkpointPolicy) return;
+    const current = scope === "project" ? projectMandatory : userDefaults;
+    const boundary = (checkpoint: { stage: string; position: string }) =>
+      checkpoint.stage === stage && checkpoint.position === position;
+    const next = enabled
+      ? [
+          ...current,
+          {
+            key: `${scope}-${position}-${stage}`,
+            stage,
+            position,
+          },
+        ]
+      : current.filter((checkpoint) => !boundary(checkpoint));
     setIsUpdatingWorkflowPause(true);
     setWorkflowError(null);
-    setWorkflowRegenerated(false);
-    setWorkflowRequirementsAnalyzed(false);
-    setWorkflowRevised(false);
     try {
-      await onUpdateWorkflowPauseAfterStage(pauseAfterStage);
+      await onSaveCheckpointPolicy(
+        scope,
+        next,
+        scope === "project"
+          ? checkpointPolicy.projectRevision
+          : checkpointPolicy.userRevision,
+      );
     } catch (caught) {
       setWorkflowError(caught instanceof Error ? caught.message : String(caught));
     } finally {
@@ -1365,33 +1392,76 @@ export function ProjectSettings({
             </div>
             {workflowContract ? (
               <>
-                <div className="project-settings-workflow-pause">
-                  <span>
-                    <Flag size={16} strokeWidth={1.8} />
+                <section className="project-settings-checkpoints">
+                  <header>
                     <span>
-                      <strong>{t("settings.workflowPauseAfterStage")}</strong>
-                      <small>{t("settings.workflowPauseAfterStageDescription")}</small>
+                      <Flag size={16} strokeWidth={1.8} />
+                      <span>
+                        <strong>{t("settings.workflowCheckpoints")}</strong>
+                        <small>{t("settings.workflowCheckpointsDescription")}</small>
+                      </span>
                     </span>
-                  </span>
-                  <SelectMenu
-                    disabled={
-                      isAnalyzingWorkflowRequirements ||
-                      isRegeneratingWorkflow ||
-                      isRevisingWorkflow ||
-                      isUpdatingWorkflowPause ||
-                      !onUpdateWorkflowPauseAfterStage
-                    }
-                    label={t("settings.workflowPauseAfterStage")}
-                    onValueChange={(value) => void updateWorkflowPause(value)}
-                    options={workflowContract.stages.map((stage) => ({
-                      description: stage.id,
-                      label: stage.label,
-                      value: stage.id,
-                    }))}
-                    size="small"
-                    value={workflowContract.execution.pauseAfterStage ?? ""}
-                  />
-                </div>
+                  </header>
+                  <div className="project-settings-checkpoint-grid" role="table">
+                    <div className="checkpoint-grid-header" role="row">
+                      <strong role="columnheader">{t("settings.workflowStage")}</strong>
+                      <strong role="columnheader">{t("settings.workflowProjectMandatory")}</strong>
+                      <strong role="columnheader">{t("settings.workflowMyDefaults")}</strong>
+                    </div>
+                    {workflowContract.stages.map((stage) => (
+                      <div className="checkpoint-grid-row" key={stage.id} role="row">
+                        <span className="checkpoint-stage" role="cell">
+                          <strong>{stage.label}</strong>
+                          <small>{stage.id}</small>
+                        </span>
+                        {(["project", "user"] as const).map((scope) => (
+                          <span className="checkpoint-options" key={scope} role="cell">
+                            {(["before", "after"] as const).map((position) => {
+                              const mandatory = projectMandatory.some((checkpoint) =>
+                                checkpoint.stage === stage.id && checkpoint.position === position);
+                              const selected = (scope === "project" ? projectMandatory : userDefaults)
+                                .some((checkpoint) => checkpoint.stage === stage.id && checkpoint.position === position);
+                              const locked = scope === "user" && mandatory;
+                              return (
+                                <label className={locked ? "locked" : ""} key={position}>
+                                  <input
+                                    aria-label={`${stage.label} ${position} ${scope}`}
+                                    checked={locked || selected}
+                                    disabled={
+                                      isUpdatingWorkflowPause ||
+                                      !onSaveCheckpointPolicy ||
+                                      !checkpointPolicy ||
+                                      locked ||
+                                      (scope === "project" && project.role === "member")
+                                    }
+                                    onChange={(event) => void updateCheckpointBoundary(
+                                      scope,
+                                      stage.id,
+                                      position,
+                                      event.currentTarget.checked,
+                                    )}
+                                    type="checkbox"
+                                  />
+                                  {position === "before"
+                                    ? t("settings.workflowBefore")
+                                    : t("settings.workflowAfter")}
+                                  {locked ? <ShieldCheck aria-hidden="true" size={12} /> : null}
+                                </label>
+                              );
+                            })}
+                          </span>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                  <footer>
+                    {effectiveCheckpoints.length === 0
+                      ? t("settings.workflowNoCheckpoints")
+                      : t("settings.workflowCheckpointCount", {
+                          count: effectiveCheckpoints.length,
+                        })}
+                  </footer>
+                </section>
                 <div
                   aria-label={t("settings.workflowDiagram")}
                   className="project-workflow-contract"
@@ -1476,12 +1546,18 @@ export function ProjectSettings({
                           </header>
                           <strong>{stage.label}</strong>
                           <code>{stage.id}</code>
-                          {stage.id ===
-                          workflowContract.execution.pauseAfterStage ? (
-                            <span className="project-workflow-pause-badge">
-                              {t("settings.workflowPausesHere")}
-                            </span>
-                          ) : null}
+                          {effectiveCheckpoints
+                            .filter((checkpoint) => checkpoint.stage === stage.id)
+                            .map((checkpoint) => (
+                              <span
+                                className="project-workflow-pause-badge"
+                                key={checkpoint.key}
+                              >
+                                {checkpoint.position === "before"
+                                  ? t("settings.workflowBefore")
+                                  : t("settings.workflowAfter")}
+                              </span>
+                            ))}
                           {stage.evidence?.length ? (
                             <div className="project-workflow-stage-detail">
                               <span>{t("settings.workflowEvidence")}</span>
@@ -1532,14 +1608,13 @@ export function ProjectSettings({
                     <div className="project-workflow-pause-summary">
                       <Flag size={18} strokeWidth={1.8} />
                       <span>
-                        <small>{t("settings.workflowPauseAfterStage")}</small>
+                        <small>{t("settings.workflowCheckpoints")}</small>
                         <strong>
-                          {workflowContract.stages.find(
-                            (stage) =>
-                              stage.id ===
-                              workflowContract.execution.pauseAfterStage,
-                          )?.label ??
-                            workflowContract.execution.pauseAfterStage}
+                          {effectiveCheckpoints.length === 0
+                            ? t("settings.workflowNoCheckpoints")
+                            : t("settings.workflowCheckpointCount", {
+                                count: effectiveCheckpoints.length,
+                              })}
                         </strong>
                       </span>
                     </div>

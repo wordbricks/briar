@@ -603,6 +603,24 @@
         }
       }
     },
+    "/projects/{projectId}/runs/{runId}/resume": {
+      "post": {
+        "operationId": "resumeRun",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Exact checkpoint approved idempotently"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/projects/{projectId}/runs/{runId}/dispatch": {
       "post": {
         "operationId": "dispatchRun",
@@ -1113,6 +1131,21 @@
           "status": { "type": "string", "enum": ["backlog", "queued", "running", "paused", "blocked", "failed", "completed", "cancelled"] },
           "workflowStage": { "type": ["string", "null"] },
           "pausedAt": { "type": ["string", "null"], "format": "date-time" },
+          "checkpoint": {
+            "type": ["object", "null"],
+            "properties": {
+              "key": { "type": "string" },
+              "stage": { "type": "string" },
+              "stageLabel": { "type": "string" },
+              "position": { "type": "string", "enum": ["before", "after"] },
+              "attempt": { "type": "integer", "minimum": 1 },
+              "revision": { "type": "integer", "minimum": 1 },
+              "reachedAt": { "type": ["string", "null"], "format": "date-time" },
+              "nextStage": { "type": ["string", "null"] },
+              "nextStageLabel": { "type": ["string", "null"] },
+              "terminalReviewOnly": { "type": "boolean" }
+            }
+          },
           "workflow": { "type": "object", "additionalProperties": true },
           "progress": { "type": "number", "minimum": 0, "maximum": 100 },
           "detail": { "type": ["string", "null"] },

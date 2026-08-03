@@ -99,8 +99,20 @@ export const mobileDashboardRunSchema = z.object({
   ]),
   workflowStage: z.string().nullable().optional(),
   pausedAt: z.iso.datetime().nullable().optional(),
+  checkpoint: z.object({
+    key: z.string().min(1),
+    stage: z.string().min(1),
+    stageLabel: z.string().min(1),
+    position: z.enum(["before", "after"]),
+    attempt: z.number().int().positive(),
+    revision: z.number().int().positive(),
+    reachedAt: z.iso.datetime().nullable(),
+    nextStage: z.string().nullable(),
+    nextStageLabel: z.string().nullable(),
+    terminalReviewOnly: z.boolean(),
+  }).nullable().optional(),
   workflow: z.object({
-    version: z.literal(1),
+    version: z.union([z.literal(1), z.literal(2)]),
     stages: z.array(z.object({
       id: z.string().min(1),
       label: z.string().min(1),
@@ -320,6 +332,21 @@ export const mobileRecoveryResponseSchema = z.object({
   attempt: z.number().int().positive(),
   stage: z.enum(["queued", "cancelled"]),
 });
+export const mobileResumeRequestSchema = requestIdSchema.extend({
+  checkpointKey: z.string().min(1),
+  attempt: z.number().int().positive(),
+  revision: z.number().int().positive(),
+});
+export const mobileResumeResponseSchema = z.object({
+  runId: z.uuid(),
+  outcome: z.enum(["approved", "already_approved", "resumed", "already_resumed"]),
+  workflowStage: z.string().nullable(),
+  startStage: z.string().nullable(),
+  checkpointKey: z.string().nullable(),
+  attempt: z.number().int().positive().nullable(),
+  revision: z.number().int().positive().nullable(),
+  terminalReviewOnly: z.boolean(),
+});
 export const mobileDispatchRequestSchema = requestIdSchema.extend({
   provider: mobileProviderSchema,
   model: z.string().nullable(),
@@ -465,6 +492,7 @@ export const mobileOperationSchemas = {
   moveRun: { request: mobileMoveRunRequestSchema, response: mobileMoveRunResponseSchema },
   retryRun: { request: mobileRecoveryRequestSchema, response: mobileRecoveryResponseSchema },
   cancelRun: { request: mobileRecoveryRequestSchema, response: mobileRecoveryResponseSchema },
+  resumeRun: { request: mobileResumeRequestSchema, response: mobileResumeResponseSchema },
   dispatchRun: { request: mobileDispatchRequestSchema, response: mobileDispatchResponseSchema },
   reassignRun: { request: mobileDispatchRequestSchema, response: mobileDispatchResponseSchema },
   completeResultReview: { response: mobileResultReviewSchema },

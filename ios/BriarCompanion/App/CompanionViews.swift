@@ -477,6 +477,42 @@ struct RunDetailView: View {
                 Section("설명") { MarkdownText(markdown: description) }
             }
 
+            if localStatus == .paused, let checkpoint = run.checkpoint {
+                Section("검토 대기") {
+                    Label {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(checkpoint.position == .before
+                                ? "\(checkpoint.stageLabel) 시작 전 확인"
+                                : "\(checkpoint.stageLabel) 완료 후 확인")
+                                .font(.headline)
+                            Text("리비전 \(checkpoint.revision)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(checkpoint.terminalReviewOnly
+                                ? "마지막 단계를 반복하지 않고 최종 검토 후 완료합니다."
+                                : "재개 후 \(checkpoint.nextStageLabel ?? checkpoint.nextStage ?? checkpoint.stageLabel)부터 자동 진행합니다.")
+                                .font(.subheadline)
+                        }
+                    } icon: {
+                        Image(systemName: "pause.circle.fill")
+                            .foregroundStyle(.purple)
+                    }
+                    Button {
+                        Task { await resume(checkpoint: checkpoint) }
+                    } label: {
+                        if mutations.isActive("resume-\(run.id)") {
+                            ProgressView().frame(maxWidth: .infinity)
+                        } else {
+                            Label("자동화 재개", systemImage: "play.fill")
+                                .frame(maxWidth: .infinity)
+                        }
+                    }
+                    .disabled(mutations.isActive("resume-\(run.id)"))
+                    .accessibilityLabel("\(checkpoint.stageLabel) 체크포인트 승인 후 자동화 재개")
+                    .accessibilityIdentifier("resume-run-button")
+                }
+            }
+
             if let summary = run.structuredResult?.summary ?? run.resultSummary, !summary.isEmpty {
                 Section("결과") {
                     MarkdownText(markdown: summary)
@@ -822,7 +858,7 @@ struct RunDetailView: View {
 
     private var availablePlacements: [RunPlacement] {
         let statuses = DashboardRun.Status.allCases
-            .filter { $0 != .running }
+            .filter { $0 != .running && $0 != .paused }
             .map { RunPlacement(status: $0, workflowStage: nil, label: $0.displayName) }
         var stages = (run.workflow?.stages ?? []).map {
             RunPlacement(status: .running, workflowStage: $0.id, label: $0.label)
@@ -880,6 +916,20 @@ struct RunDetailView: View {
             actionError = nil
             await refresh()
         } catch { actionError = error.localizedDescription }
+    }
+
+    private func resume(checkpoint: WorkflowCheckpoint) async {
+        do {
+            try await mutations.resume(runID: run.id, checkpoint: checkpoint)
+            localStatus = .queued
+            actionError = nil
+            await refresh()
+        } catch let error as MobileAPIError where error.statusCode == 409 {
+            actionError = "대기 지점이 이미 변경되었습니다. 최신 상태를 다시 불러왔습니다."
+            await refresh()
+        } catch {
+            actionError = error.localizedDescription
+        }
     }
 
     private func savePreferences() async {

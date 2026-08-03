@@ -2664,7 +2664,7 @@ describe("HuntDashboard", () => {
 
   it("distinguishes a paused review checkpoint from an error recovery state", () => {
     const pausedRun = {
-      ...demoDashboard.runs[0],
+      ...demoDashboard.runs[1],
       status: "paused" as const,
     };
     const markup = renderToStaticMarkup(
@@ -2690,6 +2690,9 @@ describe("HuntDashboard", () => {
 
     expect(markup).toContain('class="recovery-panel paused"');
     expect(markup).toContain("검토 대기");
+    expect(markup).toContain("Local validation 완료 후 확인");
+    expect(markup).toContain("리비전 1");
+    expect(markup).toContain("마지막 단계를 반복하지 않고 최종 검토 후 완료합니다");
     expect(markup).toContain("다음 단계 재개");
     expect(markup).toContain('class="run-page-property-badge amber"');
   });
