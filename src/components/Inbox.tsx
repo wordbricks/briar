@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import { SelectMenu } from "./SelectMenu";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
+import { autoHuntWorkflowStageCatalog } from "../lib/auto-hunt-contract";
 import type { Project } from "../types";
 import {
   classifyInboxMessage,
@@ -53,6 +54,9 @@ const defaultInboxFilters = new Set<InboxCategory>([
   "action_required",
   "important",
 ]);
+const builtInWorkflowStageIds = new Set<string>(
+  autoHuntWorkflowStageCatalog.map((stage) => stage.id),
+);
 
 export function pageInboxMessages<T>(
   messages: readonly T[],
@@ -514,7 +518,11 @@ function issueStatusLabel(
   message: InboxIssueMessage,
 ) {
   if (message.status === "running" && message.workflowStage) {
-    return t(`stage.${message.workflowStage}` as MessageKey);
+    if (message.workflowStageLabel) return message.workflowStageLabel;
+    if (builtInWorkflowStageIds.has(message.workflowStage)) {
+      return t(`stage.${message.workflowStage}` as MessageKey);
+    }
+    return message.workflowStage;
   }
   return t(`status.${message.status}` as MessageKey);
 }

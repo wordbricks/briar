@@ -19,7 +19,7 @@ const interpolate = (message: string, variables?: Variables) =>
   );
 
 const translate = (locale: Locale): Translate => (key, variables) =>
-  interpolate(resources[locale][key] ?? ko[key], variables);
+  interpolate(resources[locale][key] ?? ko[key] ?? key, variables);
 
 const defaultValue = {
   locale: "ko" as Locale,

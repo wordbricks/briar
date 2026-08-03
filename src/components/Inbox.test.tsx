@@ -185,6 +185,39 @@ describe("Inbox", () => {
     expect(row?.querySelector(".inbox-next-action")).toBeNull();
   });
 
+  it("renders configured labels for custom workflow stages", async () => {
+    const message = issue("merged", "Merge the release", {
+      status: "running",
+      workflowStage: "merged",
+      workflowStageLabel: "Merge to main",
+    });
+
+    await act(async () =>
+      root.render(
+        <I18nProvider>
+          <Inbox
+            isSidebarOpen
+            messages={[message]}
+            onMarkAllRead={vi.fn()}
+            onMarkRead={vi.fn()}
+            onOpen={vi.fn()}
+            projects={projects}
+            unreadCount={1}
+          />
+        </I18nProvider>,
+      ),
+    );
+
+    const activityFilter = [...container.querySelectorAll(".inbox-filter")].find(
+      (button) => button.textContent?.includes("최근 활동"),
+    );
+    await act(async () =>
+      (activityFilter as HTMLButtonElement | undefined)?.click(),
+    );
+
+    expect(container.textContent).toContain("Merge to main");
+  });
+
   it("filters messages and category counts by project", async () => {
     const messages = [
       issue("briar-urgent", "Briar deployment failed", {
