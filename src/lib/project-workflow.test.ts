@@ -137,6 +137,58 @@ describe("project workflow generator", () => {
     );
   });
 
+  it("uses the current workflow as the baseline when regenerating", async () => {
+    const currentWorkflow = {
+      version: 1 as const,
+      requirements: [],
+      stages: [
+        {
+          id: "implementing",
+          label: "Implement",
+          required: true,
+          evidence: ["diff"],
+          checks: [],
+        },
+        {
+          id: "local_qa",
+          label: "Local validation",
+          required: true,
+          evidence: ["test"],
+          checks: ["bun run test"],
+        },
+      ],
+      execution: { stopAfterStage: "local_qa" },
+      completion: { requiredStages: ["implementing", "local_qa"] },
+    };
+    chatWithProjectLlm.mockResolvedValue({
+      conversationId: "briar:project-1:thread-regenerate",
+      workspaceRoot: "/repo",
+      message: JSON.stringify(currentWorkflow),
+    });
+
+    await expect(
+      generateProjectWorkflow("project-1", currentWorkflow),
+    ).resolves.toMatchObject({
+      stages: [{ id: "implementing" }, { id: "local_qa" }],
+      execution: { stopAfterStage: "local_qa" },
+      completion: { requiredStages: ["implementing", "local_qa"] },
+    });
+
+    expect(chatWithProjectLlm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId: "project-1",
+        message: expect.stringContaining("current_workflow_json"),
+        instructions: expect.stringContaining(
+          "preserve it as much as possible",
+        ),
+        workspaceMode: "latestRemoteBase",
+      }),
+    );
+    expect(chatWithProjectLlm.mock.calls[0]?.[0].message).toContain(
+      JSON.stringify(currentWorkflow, null, 2),
+    );
+  });
+
   it("rejects a workflow whose required stages contradict the stage contract", async () => {
     chatWithProjectLlm.mockResolvedValue({
       conversationId: "briar:project-1:thread-1",
@@ -256,6 +308,9 @@ describe("project workflow generator", () => {
         instructions: expect.stringContaining("existing workflow"),
         workspaceMode: "latestRemoteBase",
       }),
+    );
+    expect(chatWithProjectLlm.mock.calls[0]?.[0].instructions).toContain(
+      "Preserve all unrelated",
     );
     expect(chatWithProjectLlm.mock.calls[0]?.[0].message).toContain(
       JSON.stringify(currentWorkflow, null, 2),
