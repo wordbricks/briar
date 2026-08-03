@@ -417,6 +417,11 @@
 		0204B8C810950BC84A16B60E /* Dev Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = (
+					AppIconGray,
+					AppIconPink,
+					AppIconGreen,
+				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				BRIAR_DISPLAY_NAME = "Briar Native Dev";
 				CODE_SIGN_ENTITLEMENTS = App/BriarCompanion.entitlements;
@@ -634,6 +639,11 @@
 		B6255E92BDA44A0623664DBB /* Dev Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = (
+					AppIconGray,
+					AppIconPink,
+					AppIconGreen,
+				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				BRIAR_DISPLAY_NAME = "Briar Native Dev";
 				CODE_SIGN_ENTITLEMENTS = App/BriarCompanion.entitlements;
@@ -654,6 +664,11 @@
 		CC2EE43518E7937450DFB8DC /* Production */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = (
+					AppIconGray,
+					AppIconPink,
+					AppIconGreen,
+				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				BRIAR_DISPLAY_NAME = "Briar Companion";
 				CODE_SIGN_ENTITLEMENTS = App/BriarCompanion.entitlements;
