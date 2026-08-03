@@ -38,6 +38,8 @@ final class MobileAPIContractTests: XCTestCase {
         let events: RunEventsResponse = try decodeResponse("listRunEvents")
         let messages: IssueMessagesResponse = try decodeResponse("listIssueMessages")
         let evidence: RunEvidenceResponse = try decodeResponse("listRunEvidence")
+        let agents: ProjectAgentsResponse = try decodeResponse("listProjectAgents")
+        let sessions: ProjectAgentSessionsResponse = try decodeResponse("listProjectAgentSessions")
 
         XCTAssertTrue(health.ok)
         XCTAssertEqual(device.userCode, "BRIAR123")
@@ -59,6 +61,8 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(messages.messages.first?.author.name, "Briar User")
         XCTAssertEqual(evidence.evidence.first?.status, .passed)
         XCTAssertEqual(evidence.evidence.first?.images?.first?.filename, "companion.png")
+        XCTAssertEqual(agents.agents.first?.name, "Auto Hunt agent")
+        XCTAssertEqual(sessions.sessions.first?.id, "session-fixture-1")
     }
 
     func testEndpointPathsMatchOpenAPISubset() {
@@ -88,6 +92,14 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(
             MobileAPIContract.Endpoint.runEvidence(projectID: projectID, runID: runID),
             "/projects/11111111-1111-4111-8111-111111111111/runs/33333333-3333-4333-8333-333333333333/evidence"
+        )
+        XCTAssertEqual(
+            MobileAPIContract.Endpoint.projectAgents(projectID: projectID, locale: "en"),
+            "/projects/11111111-1111-4111-8111-111111111111/agents?locale=en"
+        )
+        XCTAssertEqual(
+            MobileAPIContract.Endpoint.projectAgentSessions(projectID: projectID),
+            "/projects/11111111-1111-4111-8111-111111111111/agent-sessions"
         )
     }
 

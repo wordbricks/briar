@@ -457,21 +457,31 @@ describe("worker service definitions", () => {
   });
 
   it("runs a packaged CLI with the bundled runtime on macOS", () => {
-    const definition = serviceDefinition({
-      ...input,
-      platform: "darwin",
-      runtimeBinary: "/Applications/Briar.app/Contents/MacOS/bun",
-      cliScript: "/Users/dev/.local/share/briar/briar.js",
-    });
-    expect(definition.contents).toContain(
-      "<string>/Applications/Briar.app/Contents/MacOS/bun</string>",
-    );
-    expect(definition.contents).toContain(
-      "<string>/Users/dev/.local/share/briar/briar.js</string>",
-    );
-    expect(definition.contents).toContain(
-      "<string>/Users/dev/.local/bin/briar</string>",
-    );
+    const previousCli = process.env.BRIAR_CLI;
+    delete process.env.BRIAR_CLI;
+    try {
+      const definition = serviceDefinition({
+        ...input,
+        platform: "darwin",
+        runtimeBinary: "/Applications/Briar.app/Contents/MacOS/bun",
+        cliScript: "/Users/dev/.local/share/briar/briar.js",
+      });
+      expect(definition.contents).toContain(
+        "<string>/Applications/Briar.app/Contents/MacOS/bun</string>",
+      );
+      expect(definition.contents).toContain(
+        "<string>/Users/dev/.local/share/briar/briar.js</string>",
+      );
+      expect(definition.contents).toContain(
+        "<string>/Users/dev/.local/bin/briar</string>",
+      );
+    } finally {
+      if (previousCli === undefined) {
+        delete process.env.BRIAR_CLI;
+      } else {
+        process.env.BRIAR_CLI = previousCli;
+      }
+    }
   });
 
   it("inherits the installer PATH when no service PATH is provided", () => {
