@@ -200,13 +200,49 @@ const createExecution = (
 };
 
 const cloneCanonicalWorkflow = (workflow: AutoHuntWorkflow): AutoHuntWorkflowV2 => {
-  const normalized = normalizeAutoHuntWorkflow(
-    JSON.parse(JSON.stringify(workflow)) as AutoHuntWorkflowInput,
-  );
-  // Normalizing a v1 snapshot intentionally exposes a non-enumerable legacy
-  // projection to old readers. Clone once more through JSON so this helper's
-  // contract is always a plain, canonical v2 object.
-  return JSON.parse(JSON.stringify(normalized)) as AutoHuntWorkflowV2;
+  const normalized = normalizeAutoHuntWorkflow({
+    version: workflow.version,
+    requirements: workflow.requirements?.map((requirement) => ({
+      ...requirement,
+    })),
+    stages: workflow.stages.map((stage) => ({
+      ...stage,
+      ...(stage.evidence ? { evidence: [...stage.evidence] } : {}),
+      ...(stage.checks ? { checks: [...stage.checks] } : {}),
+    })),
+    execution: workflow.version === 1
+      ? {
+          pauseAfterStage: workflow.execution.pauseAfterStage,
+          stopAfterStage: workflow.execution.stopAfterStage,
+        }
+      : {
+          checkpoints: workflow.execution.checkpoints?.map((checkpoint) => ({
+            ...checkpoint,
+          })),
+        },
+    completion: {
+      requiredStages: [...workflow.completion.requiredStages],
+    },
+  });
+  return {
+    version: 2,
+    requirements: normalized.requirements.map((requirement) => ({
+      ...requirement,
+    })),
+    stages: normalized.stages.map((stage) => ({
+      ...stage,
+      ...(stage.evidence ? { evidence: [...stage.evidence] } : {}),
+      ...(stage.checks ? { checks: [...stage.checks] } : {}),
+    })),
+    execution: {
+      checkpoints: (normalized.execution.checkpoints ?? []).map((checkpoint) => ({
+        ...checkpoint,
+      })),
+    },
+    completion: {
+      requiredStages: [...normalized.completion.requiredStages],
+    },
+  };
 };
 
 /**

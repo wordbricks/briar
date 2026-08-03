@@ -21,6 +21,50 @@ const v2 = (checkpoints: unknown[]) => ({
 }) as AutoHuntWorkflowInput;
 
 describe("Auto Hunt workflow v2 contract", () => {
+  it("clones a compatibility workflow without relying on execution.toJSON", () => {
+    const workflow = normalizeAutoHuntWorkflow({
+      version: 1,
+      stages: [
+        { id: "analyzing", label: "Analyze", required: true },
+        { id: "local_qa", label: "Validate", required: true },
+      ],
+    });
+    Object.defineProperty(workflow.execution, "toJSON", {
+      configurable: true,
+      value: undefined,
+    });
+
+    expect(cloneAutoHuntWorkflow(workflow)).toEqual({
+      version: 2,
+      requirements: [],
+      stages: [
+        {
+          id: "analyzing",
+          label: "Analyze",
+          required: true,
+          evidence: ["repository"],
+        },
+        {
+          id: "local_qa",
+          label: "Validate",
+          required: true,
+          evidence: ["test"],
+          checks: ["bun run test", "bun run build"],
+        },
+      ],
+      execution: {
+        checkpoints: [
+          {
+            key: "legacy-after-local_qa",
+            stage: "local_qa",
+            position: "after",
+          },
+        ],
+      },
+      completion: { requiredStages: ["analyzing", "local_qa"] },
+    });
+  });
+
   it("accepts zero checkpoints and writes only the canonical v2 shape", () => {
     const workflow = normalizeAutoHuntWorkflow(v2([]));
 
