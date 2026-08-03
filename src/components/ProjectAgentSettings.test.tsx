@@ -13,7 +13,7 @@ beforeAll(() => {
   ).IS_REACT_ACT_ENVIRONMENT = true;
 });
 describe("ProjectAgentSettings", () => {
-  it("keeps agent settings focused on the agent profile", async () => {
+  it("edits the agent provider and model with the profile", async () => {
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
@@ -31,7 +31,11 @@ describe("ProjectAgentSettings", () => {
       createdAt: "2026-07-26T00:00:00.000Z",
       updatedAt: "2026-07-26T00:00:00.000Z",
     };
-    const onSave = vi.fn(async () => agent);
+    const onSave = vi.fn(async (input) => ({
+      ...agent,
+      ...input,
+      name: input.name ?? "Codex Agent",
+    }));
     const onDelete = vi.fn(async () => undefined);
 
     await act(async () => {
@@ -82,7 +86,11 @@ describe("ProjectAgentSettings", () => {
     expect(container.textContent).toContain("Codex Pet에서 선택");
     expect(
       container.querySelector(".project-agent-settings-fields .native-select"),
-    ).toBeNull();
+    ).not.toBeNull();
+    expect(
+      container.querySelectorAll(".project-agent-settings-fields .native-select"),
+    ).toHaveLength(2);
+    expect(container.textContent).toContain("실행 설정");
     expect(container.textContent).not.toContain("프로젝트 실행 기본값");
     expect(container.querySelector("#project-runtime-provider")).toBeNull();
     expect(container.textContent).toContain("에이전트 삭제");
@@ -91,6 +99,44 @@ describe("ProjectAgentSettings", () => {
         'input[aria-label="캘린더 색상"]',
       )?.value,
     ).toBe("#3275d5");
+
+    const [providerTrigger] = Array.from(
+      container.querySelectorAll<HTMLButtonElement>(
+        ".project-agent-settings-fields .native-select button",
+      ),
+    );
+    await act(async () => providerTrigger?.click());
+    await act(async () => {
+      document
+        .querySelector<HTMLButtonElement>(
+          '.select-menu-option[data-value="claude"]',
+        )
+        ?.click();
+    });
+    const [, modelTrigger] = Array.from(
+      container.querySelectorAll<HTMLButtonElement>(
+        ".project-agent-settings-fields .native-select button",
+      ),
+    );
+    await act(async () => modelTrigger?.click());
+    await act(async () => {
+      document
+        .querySelector<HTMLButtonElement>(
+          '.select-menu-option[data-value="opus"]',
+        )
+        ?.click();
+    });
+    await act(async () => {
+      container
+        .querySelector<HTMLFormElement>("form.project-agent-settings-card")
+        ?.dispatchEvent(
+          new Event("submit", { bubbles: true, cancelable: true }),
+        );
+      await Promise.resolve();
+    });
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: "claude", model: "opus" }),
+    );
 
     await act(async () => {
       Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
