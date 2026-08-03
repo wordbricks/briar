@@ -36,13 +36,18 @@ describe("issue conversation layout", () => {
     expect(composerRule).toContain("overflow:visible");
   });
 
-  it("nests replies below their root message", () => {
-    const repliesRule = firstRule(".issue-message-replies");
+  it("keeps replies at the same visual level as root messages", () => {
+    const parentQuoteRule = firstRule(".issue-message-parent-quote");
     const composerRule = firstRule(".issue-inline-reply-composer");
+    const agentStateRule = firstRule(
+      ".issue-message-group > .issue-agent-reply-state",
+    );
 
-    expect(repliesRule).toContain("margin:2px 10px 2px 54px");
-    expect(repliesRule).toContain("border-left:1px solid var(--border)");
-    expect(composerRule).toContain("margin:7px 10px 7px 64px");
+    expect(styles).not.toContain(".issue-message-replies");
+    expect(parentQuoteRule).toContain("display:flex");
+    expect(parentQuoteRule).toContain("border-radius:8px");
+    expect(composerRule).toContain("margin:7px 10px 7px 54px");
+    expect(agentStateRule).toContain("margin-left:54px");
   });
 
   it("keeps hover actions out of the message flow", () => {
