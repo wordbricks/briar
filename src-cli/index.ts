@@ -71,7 +71,11 @@ import {
   healthyWorkerProviders,
   inspectWorkerProviderHealth,
 } from "./provider-health";
-import { getSkillGuide, skillGuides } from "./skill-guides";
+import {
+  configureBrowserSkillGuide,
+  getSkillGuide,
+  skillGuides,
+} from "./skill-guides";
 import {
   briarIssueUrl,
   ensureBriarIssueLinkInGithubPullRequest,
@@ -218,6 +222,18 @@ const configSchema = z
         opencode: z.boolean().default(true),
       })
       .default({ codex: true, claude: true, grok: true, opencode: true }),
+    appSettings: z
+      .object({
+        preventSleepWhileRunning: z.boolean().default(false),
+        browserAutomationProvider: z
+          .enum(["ego-browser", "agent-browser"])
+          .default("ego-browser"),
+      })
+      .passthrough()
+      .default({
+        preventSleepWhileRunning: false,
+        browserAutomationProvider: "ego-browser",
+      }),
     workerDeviceIdentity: z
       .string()
       .regex(/^briar_device_[0-9a-f]{64}$/u)
@@ -269,6 +285,10 @@ async function loadConfig(): Promise<Config> {
       return {
         apiUrl: defaultApiUrl,
         agentProviders: { codex: true, claude: true, grok: true, opencode: true },
+        appSettings: {
+          preventSleepWhileRunning: false,
+          browserAutomationProvider: "ego-browser",
+        },
         projects: [],
       };
     }
@@ -3069,7 +3089,7 @@ function listSkillGuides() {
   );
 }
 
-function showSkillGuide() {
+async function showSkillGuide() {
   const topic = args[2];
   if (!topic || topic === "--help") {
     console.log("Usage: briar skills get <topic> [--json]");
@@ -3083,13 +3103,19 @@ function showSkillGuide() {
         .join(", ")}`,
     );
   }
+  const markdown = topic === "browser"
+    ? configureBrowserSkillGuide(
+        guide.markdown,
+        (await loadConfig()).appSettings.browserAutomationProvider,
+      )
+    : guide.markdown;
   if (has("--json")) {
     console.log(
       JSON.stringify(
         {
           name: guide.name,
           version: cliVersion,
-          markdown: guide.markdown,
+          markdown,
         },
         null,
         2,
@@ -3098,7 +3124,7 @@ function showSkillGuide() {
     return;
   }
   process.stdout.write(
-    guide.markdown.endsWith("\n") ? guide.markdown : `${guide.markdown}\n`,
+    markdown.endsWith("\n") ? markdown : `${markdown}\n`,
   );
 }
 

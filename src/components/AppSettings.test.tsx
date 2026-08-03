@@ -22,7 +22,10 @@ import { ThemeProvider, themeStorageKey } from "../theme";
 import { AppSettings } from "./AppSettings";
 import {
   inspectAgentBrowser,
+  inspectEgoBrowser,
   installAgentBrowser,
+  loadBrowserAutomationSettings,
+  updateBrowserAutomationSettings,
 } from "../lib/agent-browser";
 
 vi.mock("../lib/initial-onboarding", () => ({
@@ -46,7 +49,10 @@ vi.mock("../lib/app-runtime-settings", () => ({
 
 vi.mock("../lib/agent-browser", () => ({
   inspectAgentBrowser: vi.fn(),
+  inspectEgoBrowser: vi.fn(),
   installAgentBrowser: vi.fn(),
+  loadBrowserAutomationSettings: vi.fn(),
+  updateBrowserAutomationSettings: vi.fn(),
 }));
 
 const readiness: RepositoryReadiness = {
@@ -106,7 +112,10 @@ describe("AppSettings", () => {
     vi.mocked(loadAppRuntimeSettings).mockReset();
     vi.mocked(updateAppRuntimeSettings).mockReset();
     vi.mocked(inspectAgentBrowser).mockReset();
+    vi.mocked(inspectEgoBrowser).mockReset();
     vi.mocked(installAgentBrowser).mockReset();
+    vi.mocked(loadBrowserAutomationSettings).mockReset();
+    vi.mocked(updateBrowserAutomationSettings).mockReset();
     window.localStorage.clear();
     window.localStorage.setItem("briar.locale.v1", "en");
     (
@@ -157,7 +166,19 @@ describe("AppSettings", () => {
     container.remove();
   });
 
-  it("checks and installs agent-browser from Browser settings", async () => {
+  it("checks ego (lite) and installs agent-browser from Browser settings", async () => {
+    vi.mocked(loadBrowserAutomationSettings).mockResolvedValue({
+      provider: "ego-browser",
+    });
+    vi.mocked(updateBrowserAutomationSettings).mockResolvedValue({
+      provider: "agent-browser",
+    });
+    vi.mocked(inspectEgoBrowser).mockResolvedValue({
+      supported: true,
+      installed: false,
+      browserReady: false,
+      version: null,
+    });
     vi.mocked(inspectAgentBrowser).mockResolvedValue({
       supported: true,
       installed: false,
@@ -193,7 +214,25 @@ describe("AppSettings", () => {
     });
 
     expect(inspectAgentBrowser).toHaveBeenCalledOnce();
+    expect(inspectEgoBrowser).toHaveBeenCalledOnce();
+    expect(
+      container
+        .querySelector<HTMLAnchorElement>('[aria-label="Download ego (lite)"]')
+        ?.getAttribute("href"),
+    ).toBe("https://lite.ego.app/download?auto=1");
     expect(container.textContent).toContain("Not installed or not available on PATH.");
+
+    const agentBrowserChoice = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Select agent-browser for browser automation"]',
+    );
+    expect(agentBrowserChoice?.getAttribute("aria-checked")).toBe("false");
+
+    await act(async () => agentBrowserChoice?.click());
+
+    expect(updateBrowserAutomationSettings).toHaveBeenCalledWith({
+      provider: "agent-browser",
+    });
+    expect(agentBrowserChoice?.getAttribute("aria-checked")).toBe("true");
 
     await act(async () => {
       container

@@ -407,6 +407,15 @@ struct AgentBrowserStatus {
     version: Option<String>,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct EgoBrowserStatus {
+    supported: bool,
+    installed: bool,
+    browser_ready: bool,
+    version: Option<String>,
+}
+
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct RepositoryReadiness {
@@ -508,6 +517,22 @@ struct LocalExecutionWorkerStatus {
 struct StoredAppRuntimeSettings {
     #[serde(default)]
     prevent_sleep_while_running: bool,
+    #[serde(default)]
+    browser_automation_provider: BrowserAutomationProvider,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+enum BrowserAutomationProvider {
+    #[default]
+    EgoBrowser,
+    AgentBrowser,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BrowserAutomationSettings {
+    provider: BrowserAutomationProvider,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
@@ -515,6 +540,12 @@ struct StoredAppRuntimeSettings {
 struct AppRuntimeSettings {
     prevent_sleep_while_running: bool,
     prevent_sleep_supported: bool,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AppRuntimeSettingsUpdate {
+    prevent_sleep_while_running: bool,
 }
 
 impl From<StoredAppRuntimeSettings> for AppRuntimeSettings {
@@ -1327,6 +1358,43 @@ fn inspect_agent_browser_sync(home: &Path) -> AgentBrowserStatus {
 async fn inspect_agent_browser(app: tauri::AppHandle) -> Result<AgentBrowserStatus, String> {
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
     tauri::async_runtime::spawn_blocking(move || inspect_agent_browser_sync(&home))
+        .await
+        .map_err(|error| error.to_string())
+}
+
+fn inspect_ego_browser_sync(home: &Path) -> EgoBrowserStatus {
+    #[cfg(target_os = "macos")]
+    {
+        let installed = Path::new("/Applications/ego lite.app").is_dir()
+            || home.join("Applications/ego lite.app").is_dir();
+        let execution_path = cli_execution_path(home).unwrap_or_default();
+        let cli = inspect_cli(
+            which::which_in("ego-browser", Some(execution_path), home)
+                .map_err(|_| "ego-browser가 설치되지 않았습니다.".to_string()),
+        );
+        EgoBrowserStatus {
+            supported: true,
+            installed,
+            browser_ready: installed && cli.installed,
+            version: cli.version,
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = home;
+        EgoBrowserStatus {
+            supported: false,
+            installed: false,
+            browser_ready: false,
+            version: None,
+        }
+    }
+}
+
+#[tauri::command]
+async fn inspect_ego_browser(app: tauri::AppHandle) -> Result<EgoBrowserStatus, String> {
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || inspect_ego_browser_sync(&home))
         .await
         .map_err(|error| error.to_string())
 }
@@ -2927,10 +2995,31 @@ fn app_runtime_settings_from(config_path: &Path) -> Result<StoredAppRuntimeSetti
 
 fn update_app_runtime_settings_at(
     config_path: &Path,
-    settings: StoredAppRuntimeSettings,
+    settings: AppRuntimeSettingsUpdate,
 ) -> Result<StoredAppRuntimeSettings, String> {
     let mut config = read_cli_config(config_path)?;
-    config.app_settings = settings;
+    config.app_settings.prevent_sleep_while_running = settings.prevent_sleep_while_running;
+    let saved = config.app_settings;
+    write_cli_config(config_path, &config)?;
+    Ok(saved)
+}
+
+fn browser_automation_settings_from(
+    config_path: &Path,
+) -> Result<BrowserAutomationSettings, String> {
+    Ok(BrowserAutomationSettings {
+        provider: read_cli_config(config_path)?
+            .app_settings
+            .browser_automation_provider,
+    })
+}
+
+fn update_browser_automation_settings_at(
+    config_path: &Path,
+    settings: BrowserAutomationSettings,
+) -> Result<BrowserAutomationSettings, String> {
+    let mut config = read_cli_config(config_path)?;
+    config.app_settings.browser_automation_provider = settings.provider;
     write_cli_config(config_path, &config)?;
     Ok(settings)
 }
@@ -5672,6 +5761,16 @@ async fn load_app_runtime_settings(app: tauri::AppHandle) -> Result<AppRuntimeSe
 }
 
 #[tauri::command]
+async fn load_browser_automation_settings(
+    app: tauri::AppHandle,
+) -> Result<BrowserAutomationSettings, String> {
+    let config_path = cli_config_path(&app)?;
+    tauri::async_runtime::spawn_blocking(move || browser_automation_settings_from(&config_path))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
 async fn load_agent_usage(
     app: tauri::AppHandle,
 ) -> Result<agent_usage::AgentUsageSnapshot, String> {
@@ -5696,7 +5795,7 @@ async fn update_app_provider_settings(
 async fn update_app_runtime_settings(
     app: tauri::AppHandle,
     sleep_prevention: tauri::State<'_, SleepPreventionState>,
-    settings: StoredAppRuntimeSettings,
+    settings: AppRuntimeSettingsUpdate,
 ) -> Result<AppRuntimeSettings, String> {
     let config_path = cli_config_path(&app)?;
     let saved = tauri::async_runtime::spawn_blocking(move || {
@@ -5706,6 +5805,19 @@ async fn update_app_runtime_settings(
     .map_err(|error| error.to_string())??;
     sleep_prevention.set_enabled(saved.prevent_sleep_while_running)?;
     Ok(saved.into())
+}
+
+#[tauri::command]
+async fn update_browser_automation_settings(
+    app: tauri::AppHandle,
+    settings: BrowserAutomationSettings,
+) -> Result<BrowserAutomationSettings, String> {
+    let config_path = cli_config_path(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        update_browser_automation_settings_at(&config_path, settings)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -6299,6 +6411,7 @@ pub fn run() {
             set_main_window_onboarding_mode,
             inspect_onboarding_prerequisites,
             inspect_agent_browser,
+            inspect_ego_browser,
             open_agent_provider_login,
             install_onboarding_prerequisite,
             install_agent_browser,
@@ -6325,9 +6438,11 @@ pub fn run() {
             load_auto_hunt_dispatch,
             load_app_provider_settings,
             load_app_runtime_settings,
+            load_browser_automation_settings,
             load_agent_usage,
             update_app_provider_settings,
             update_app_runtime_settings,
+            update_browser_automation_settings,
             load_project_llm_settings,
             update_project_llm_settings,
             load_project_sandbox_settings,
@@ -7512,10 +7627,12 @@ branch refs/heads/briar/second-11111111
                 .expect("legacy provider settings should load")
                 .codex
         );
-        assert!(
-            !app_runtime_settings_from(&config_path)
-                .expect("legacy runtime settings should load")
-                .prevent_sleep_while_running
+        let legacy_runtime_settings =
+            app_runtime_settings_from(&config_path).expect("legacy runtime settings should load");
+        assert!(!legacy_runtime_settings.prevent_sleep_while_running);
+        assert_eq!(
+            legacy_runtime_settings.browser_automation_provider,
+            BrowserAutomationProvider::EgoBrowser
         );
         update_app_provider_settings_at(
             &config_path,
@@ -7527,13 +7644,20 @@ branch refs/heads/briar/second-11111111
             },
         )
         .expect("provider settings should save");
+        update_browser_automation_settings_at(
+            &config_path,
+            BrowserAutomationSettings {
+                provider: BrowserAutomationProvider::AgentBrowser,
+            },
+        )
+        .expect("browser automation settings should save");
         update_app_runtime_settings_at(
             &config_path,
-            StoredAppRuntimeSettings {
+            AppRuntimeSettingsUpdate {
                 prevent_sleep_while_running: true,
             },
         )
-        .expect("runtime settings should save");
+        .expect("runtime settings should preserve browser automation settings");
         update_project_llm_settings_at(
             &config_path,
             "project-1",
@@ -7554,6 +7678,10 @@ branch refs/heads/briar/second-11111111
         assert_eq!(saved["agentProviders"]["codex"], false);
         assert_eq!(saved["agentProviders"]["claude"], true);
         assert_eq!(saved["appSettings"]["preventSleepWhileRunning"], true);
+        assert_eq!(
+            saved["appSettings"]["browserAutomationProvider"],
+            "agent-browser"
+        );
         assert_eq!(saved["projects"][0]["llm"]["provider"], "claude");
         assert_eq!(saved["projects"][0]["llm"]["model"], "sonnet");
         assert_eq!(saved["projects"][0]["llm"]["effort"], "high");

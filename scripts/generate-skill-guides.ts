@@ -11,7 +11,7 @@ const sources = [
   },
   {
     name: "browser",
-    description: "Verify interfaces and capture result evidence with agent-browser.",
+    description: "Verify interfaces and capture result evidence with an agent browser.",
     path: resolve(root, "src-cli/guides/browser.md"),
   },
 ];
