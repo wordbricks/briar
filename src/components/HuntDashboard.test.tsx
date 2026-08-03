@@ -2046,7 +2046,8 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
-  it("shows replies inline and writes a reply below its root message", async () => {
+  it("shows replies at the same level and writes a reply below its message", async () => {
+    const createdAt = "2026-08-03T10:00:00.000Z";
     const rootMessage: IssueMessage = {
       id: "message-root",
       runId: demoDashboard.runs[0].id,
@@ -2054,8 +2055,8 @@ describe("HuntDashboard", () => {
       body: "원문 메시지",
       author: { id: "jay", name: "Jay", image: null, provider: null },
       replyCount: 1,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt,
+      updatedAt: createdAt,
     };
     const reply: IssueMessage = {
       ...rootMessage,
@@ -2063,11 +2064,15 @@ describe("HuntDashboard", () => {
       parentMessageId: rootMessage.id,
       body: "기존 답글",
       replyCount: 0,
+      createdAt: "2026-08-03T10:01:00.000Z",
+      updatedAt: "2026-08-03T10:01:00.000Z",
     };
     const sentReply: IssueMessage = {
       ...reply,
       id: "message-new-reply",
       body: "새 답글",
+      createdAt: "2026-08-03T10:02:00.000Z",
+      updatedAt: "2026-08-03T10:02:00.000Z",
     };
     const agentReply: IssueMessage = {
       ...sentReply,
@@ -2079,6 +2084,8 @@ describe("HuntDashboard", () => {
         image: null,
         provider: "codex",
       },
+      createdAt: "2026-08-03T10:03:00.000Z",
+      updatedAt: "2026-08-03T10:03:00.000Z",
     };
     let resolveAgentReply: (message: IssueMessage) => void = () => undefined;
     const pendingAgentReply = new Promise<IssueMessage>((resolve) => {
@@ -2109,17 +2116,20 @@ describe("HuntDashboard", () => {
       );
     });
 
-    const messageGroup = container.querySelector<HTMLElement>(
-      ".issue-message-group",
+    const messageGroups = Array.from(
+      container.querySelectorAll<HTMLElement>(".issue-message-group"),
     );
-    const inlineReplies = messageGroup?.querySelector<HTMLElement>(
-      ".issue-message-replies",
-    );
-    expect(inlineReplies?.textContent).toContain("기존 답글");
+    expect(messageGroups).toHaveLength(2);
+    expect(container.querySelector(".issue-message-replies")).toBeNull();
     expect(container.querySelector(".issue-thread-drawer")).toBeNull();
     expect(container.querySelector(".issue-thread-summary")).toBeNull();
+    const replyGroup = messageGroups[1];
+    expect(replyGroup.querySelector(".issue-message-parent-quote")?.textContent)
+      .toContain("원문 메시지");
+    expect(replyGroup.textContent).toContain("기존 답글");
 
-    const replyButton = messageGroup?.querySelector<HTMLButtonElement>(
+    const messageGroup = messageGroups[0];
+    const replyButton = messageGroup.querySelector<HTMLButtonElement>(
       ".issue-reply-trigger",
     );
     expect(replyButton?.getAttribute("title")).toBe("답글 작성");
@@ -2127,7 +2137,7 @@ describe("HuntDashboard", () => {
     await act(async () => replyButton?.click());
     expect(replyButton?.getAttribute("aria-expanded")).toBe("true");
 
-    const replyComposer = messageGroup?.querySelector<HTMLElement>(
+    const replyComposer = messageGroup.querySelector<HTMLElement>(
       ".issue-inline-reply-composer .issue-message-composer",
     );
     const replyTextarea = replyComposer?.querySelector<HTMLTextAreaElement>(
@@ -2167,26 +2177,31 @@ describe("HuntDashboard", () => {
     });
     expect(messageList.scrollTop).toBe(480);
     expect(
-      messageGroup?.querySelector(":scope > .issue-agent-reply-state")?.textContent,
+      messageGroup.querySelector(":scope > .issue-agent-reply-state")?.textContent,
     ).toContain("Briar가 답변을 작성하고 있습니다");
-    expect(inlineReplies?.textContent).toContain(sentReply.body);
+    expect(messageList.textContent).toContain(sentReply.body);
+    expect(
+      Array.from(
+        container.querySelectorAll(".issue-message-parent-quote"),
+      ).some((quote) => quote.textContent?.includes("원문 메시지")),
+    ).toBe(true);
 
     await act(async () => {
       resolveAgentReply(agentReply);
       await pendingAgentReply;
     });
-    expect(inlineReplies?.textContent).toContain(agentReply.body);
+    expect(messageList.textContent).toContain(agentReply.body);
     expect(
-      messageGroup?.querySelector(":scope > .issue-agent-reply-state"),
+      messageGroup.querySelector(":scope > .issue-agent-reply-state"),
     ).toBeNull();
 
     await act(async () => replyButton?.click());
-    expect(messageGroup?.querySelector(".issue-inline-reply-composer")).toBeNull();
+    expect(messageGroup.querySelector(".issue-inline-reply-composer")).toBeNull();
     await act(async () => root.unmount());
     container.remove();
   });
 
-  it("renders nested replies and sends a reply to the nested message", async () => {
+  it("renders replies flat and sends a reply to any message", async () => {
     const rootMessage: IssueMessage = {
       id: "message-root",
       runId: demoDashboard.runs[0].id,
@@ -2194,8 +2209,8 @@ describe("HuntDashboard", () => {
       body: "원문 메시지",
       author: { id: "jay", name: "Jay", image: null, provider: null },
       replyCount: 1,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: "2026-08-03T10:00:00.000Z",
+      updatedAt: "2026-08-03T10:00:00.000Z",
     };
     const reply: IssueMessage = {
       ...rootMessage,
@@ -2203,6 +2218,8 @@ describe("HuntDashboard", () => {
       parentMessageId: rootMessage.id,
       body: "기존 답글",
       replyCount: 1,
+      createdAt: "2026-08-03T10:01:00.000Z",
+      updatedAt: "2026-08-03T10:01:00.000Z",
     };
     const nestedReply: IssueMessage = {
       ...rootMessage,
@@ -2210,6 +2227,8 @@ describe("HuntDashboard", () => {
       parentMessageId: reply.id,
       body: "기존 대댓글",
       replyCount: 0,
+      createdAt: "2026-08-03T10:02:00.000Z",
+      updatedAt: "2026-08-03T10:02:00.000Z",
     };
     let sentParentId: string | null | undefined;
     const container = document.createElement("div");
@@ -2242,18 +2261,20 @@ describe("HuntDashboard", () => {
         container.querySelectorAll<HTMLElement>(".issue-message-group"),
       ).find((group) =>
         group
-          .querySelector(":scope > .issue-message")
+          .querySelector(":scope > .issue-message > div > p")
           ?.textContent?.includes(body),
       );
     const replyGroup = groupByBody("기존 답글");
     const nestedGroup = groupByBody("기존 대댓글");
+    expect(container.querySelectorAll(".issue-message-group")).toHaveLength(3);
+    expect(container.querySelector(".issue-message-replies")).toBeNull();
     expect(replyGroup).not.toBeUndefined();
     expect(nestedGroup).not.toBeUndefined();
+    expect(replyGroup?.querySelector(".issue-message-parent-quote")?.textContent)
+      .toContain("원문 메시지");
     expect(
-      replyGroup?.querySelector(":scope > .issue-message-replies")
-        ?.textContent,
-    ).toContain("기존 대댓글");
-    expect(nestedGroup?.querySelector(".issue-message-replies")).toBeNull();
+      nestedGroup?.querySelector(".issue-message-parent-quote")?.textContent,
+    ).toContain("기존 답글");
 
     const nestedReplyButton = nestedGroup?.querySelector<HTMLButtonElement>(
       ".issue-reply-trigger",
@@ -2411,9 +2432,14 @@ describe("HuntDashboard", () => {
     ).toContain(agentMessage.body);
     expect(
       container.querySelector(
-        '.issue-message-replies .issue-message-avatar.agent[aria-label="Briar · Codex"]',
+        '.issue-message-list .issue-message-avatar.agent[aria-label="Briar · Codex"]',
       ),
     ).not.toBeNull();
+    expect(
+      Array.from(
+        container.querySelectorAll(".issue-message-parent-quote"),
+      ).some((quote) => quote.textContent?.includes(userMessage.body)),
+    ).toBe(true);
     await act(async () => root.unmount());
     container.remove();
   });

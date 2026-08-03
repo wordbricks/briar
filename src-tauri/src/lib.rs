@@ -1069,6 +1069,57 @@ fn inspect_cli(binary: Result<PathBuf, String>) -> OnboardingPrerequisiteStatus 
     }
 }
 
+fn agent_browser_output(
+    home: &Path,
+    binary: &Path,
+    arguments: &[&str],
+) -> Result<std::process::Output, String> {
+    #[cfg(target_os = "macos")]
+    let mut command = {
+        let bun = bundled_bun_binary().ok_or_else(|| {
+            "앱에 포함된 agent-browser용 Bun 런타임을 찾지 못했습니다. Briar를 다시 설치하세요."
+                .to_string()
+        })?;
+        let mut command = Command::new(bun);
+        command.arg(binary);
+        command
+    };
+    #[cfg(not(target_os = "macos"))]
+    let mut command = Command::new(binary);
+
+    command
+        .args(arguments)
+        .env("PATH", cli_execution_path(home)?)
+        .env("HOME", home)
+        .output()
+        .map_err(|error| format!("agent-browser를 실행하지 못했습니다: {error}"))
+}
+
+fn inspect_agent_browser_cli(
+    home: &Path,
+    binary: Result<PathBuf, String>,
+) -> OnboardingPrerequisiteStatus {
+    let Ok(binary) = binary else {
+        return OnboardingPrerequisiteStatus {
+            installed: false,
+            version: None,
+            authenticated: false,
+        };
+    };
+    let version = agent_browser_output(home, &binary, &["--version"])
+        .ok()
+        .filter(|output| output.status.success())
+        .and_then(|output| {
+            parse_cli_version(&output.stdout).or_else(|| parse_cli_version(&output.stderr))
+        });
+    let installed = version.is_some();
+    OnboardingPrerequisiteStatus {
+        installed,
+        version,
+        authenticated: installed,
+    }
+}
+
 fn inspect_onboarding_prerequisites_sync(home: &Path) -> OnboardingPrerequisites {
     let execution_path = cli_execution_path(home).unwrap_or_default();
     let mut codex = inspect_cli(agent::codex_binary(home, &execution_path));
@@ -1352,16 +1403,11 @@ fn inspect_agent_browser_sync(home: &Path) -> AgentBrowserStatus {
             which::which_in("agent-browser", Some(execution_path), home)
                 .map_err(|_| "agent-browser가 설치되지 않았습니다.".to_string())
         });
-        let status = inspect_cli(binary.clone());
+        let status = inspect_agent_browser_cli(home, binary.clone());
         let browser_ready = binary
             .ok()
             .and_then(|binary| {
-                Command::new(binary)
-                    .args(["doctor", "--offline", "--quick"])
-                    .env("PATH", cli_execution_path(home).ok()?)
-                    .env("HOME", home)
-                    .output()
-                    .ok()
+                agent_browser_output(home, &binary, &["doctor", "--offline", "--quick"]).ok()
             })
             .is_some_and(|output| output.status.success());
         AgentBrowserStatus {
@@ -1441,14 +1487,9 @@ async fn install_agent_browser(app: tauri::AppHandle) -> Result<AgentBrowserStat
                     "설치는 완료됐지만 agent-browser를 찾지 못했습니다. Briar를 다시 열어 주세요."
                         .to_string()
                 })?;
-            let output = Command::new(binary)
-                .arg("install")
-                .env("PATH", execution_path)
-                .env("HOME", &home)
-                .output()
-                .map_err(|error| {
-                    format!("agent-browser용 Chrome 설치를 시작하지 못했습니다: {error}")
-                })?;
+            let output = agent_browser_output(&home, &binary, &["install"]).map_err(|error| {
+                format!("agent-browser용 Chrome 설치를 시작하지 못했습니다: {error}")
+            })?;
             if !output.status.success() {
                 let stderr = String::from_utf8_lossy(&output.stderr);
                 let stdout = String::from_utf8_lossy(&output.stdout);
@@ -7100,6 +7141,35 @@ mod tests {
             .and_then(|value| value.strip_prefix("bun@"))
             .expect("packageManager should pin Bun");
         assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), expected);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn runs_agent_browser_with_bundled_bun_instead_of_mise_node() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let home = tempfile::tempdir().expect("fixture home should exist");
+        let shims = home.path().join(".local/share/mise/shims");
+        fs::create_dir_all(&shims).expect("mise shim directory should exist");
+        let node = shims.join("node");
+        fs::write(&node, "#!/bin/sh\nexit 99\n").expect("broken Node shim should be written");
+        fs::set_permissions(&node, fs::Permissions::from_mode(0o700))
+            .expect("broken Node shim should be executable");
+        let agent_browser = home.path().join("agent-browser.js");
+        fs::write(
+            &agent_browser,
+            "#!/usr/bin/env node\nconsole.log('agent-browser fixture');\n",
+        )
+        .expect("agent-browser fixture should be written");
+
+        let output = agent_browser_output(home.path(), &agent_browser, &["--version"])
+            .expect("bundled Bun should run agent-browser");
+
+        assert!(output.status.success());
+        assert_eq!(
+            String::from_utf8_lossy(&output.stdout).trim(),
+            "agent-browser fixture"
+        );
     }
 
     #[test]
