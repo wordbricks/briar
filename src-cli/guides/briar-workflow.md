@@ -305,7 +305,7 @@ screen and capture the finished state. Attach one or more useful screenshots to 
 relevant passed evidence record with repeated `--image` arguments. Prefer screenshots that
 show the completed experience and the changed area clearly; avoid duplicate or incidental
 screens. Before browser-based verification or capture, run `briar skills get browser`, read the
-returned guide completely, and follow its standalone `agent-browser` workflow. Do not treat an
+returned guide completely, and follow its supported standalone browser workflow. Do not treat an
 unavailable in-app browser integration as proof that browser automation is unavailable. These
 images appear with the result evidence on the issue detail page. If the
 available environment cannot render the interface or capture a screenshot, state the reason

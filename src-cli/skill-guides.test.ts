@@ -1,6 +1,10 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import { getSkillGuide, skillGuides } from "./skill-guides";
+import {
+  configureBrowserSkillGuide,
+  getSkillGuide,
+  skillGuides,
+} from "./skill-guides";
 
 describe("bundled skill guides", () => {
   it("lists canonical guides deterministically", () => {
@@ -11,7 +15,7 @@ describe("bundled skill guides", () => {
       },
       {
         name: "browser",
-        description: "Verify interfaces and capture result evidence with agent-browser.",
+        description: "Verify interfaces and capture result evidence with an agent browser.",
       },
     ]);
   });
@@ -42,13 +46,29 @@ describe("bundled skill guides", () => {
     expect(getSkillGuide("missing")).toBeNull();
   });
 
-  it("serves the agent-browser guide", () => {
+  it("serves the browser automation guide", () => {
     const guide = getSkillGuide("browser");
-    expect(guide?.markdown).toContain("# Browser Automation with agent-browser");
+    expect(guide?.markdown).toContain("# Browser Automation");
+    expect(guide?.markdown).toContain("ego-browser nodejs");
     expect(guide?.markdown).toContain("agent-browser skills get core --full");
+    expect(guide?.markdown).toContain("{{BROWSER_AUTOMATION_PROVIDER}}");
     expect(guide?.markdown).toContain("Briar Settings → Browser");
     expect(guide?.markdown).toContain("briar run evidence add");
     expect(guide?.markdown).toContain("--image");
+  });
+
+  it("binds the configured browser without adding a fallback", () => {
+    const guide = getSkillGuide("browser");
+    const configured = configureBrowserSkillGuide(
+      guide?.markdown ?? "",
+      "agent-browser",
+    );
+
+    expect(configured).toContain(
+      "selected **`agent-browser`** in **Briar Settings → Browser**",
+    );
+    expect(configured).toContain("Never switch to the other browser tool automatically");
+    expect(configured).not.toContain("{{BROWSER_AUTOMATION_PROVIDER}}");
   });
 
   it("keeps the installed skill as a discovery stub", async () => {
