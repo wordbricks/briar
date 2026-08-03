@@ -99,6 +99,42 @@ describe("Inbox messages", () => {
     });
   });
 
+  it("preserves configured labels for custom workflow stages", () => {
+    const run = demoDashboard.runs[0];
+    const workflow = {
+      ...run.workflow,
+      stages: [
+        ...run.workflow.stages,
+        {
+          id: "merged",
+          label: "Merge to main",
+          required: true,
+        },
+      ],
+    };
+    const [message] = buildCurrentInboxMessages(
+      {
+        ...demoDashboard,
+        runs: [
+          {
+            ...run,
+            status: "running",
+            workflowStage: "merged",
+            workflow,
+          },
+        ],
+      },
+      [],
+      [project],
+    );
+
+    expect(message).toMatchObject({
+      kind: "issue",
+      workflowStage: "merged",
+      workflowStageLabel: "Merge to main",
+    });
+  });
+
   it("creates session messages only for completed and failed sessions", () => {
     const messages = buildCurrentInboxMessages(
       null,
