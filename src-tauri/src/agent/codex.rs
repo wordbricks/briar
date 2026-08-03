@@ -228,6 +228,7 @@ impl AutoHuntCliEnvironment {
         api_url: &str,
         bun_binary: &Path,
         velen_binary: Option<&Path>,
+        agent_browser_binary: Option<&Path>,
     ) -> Result<Self, String> {
         let include_velen = velen_binary.is_some();
         let briar_entry = home.join(".local/share/briar/briar.js");
@@ -273,6 +274,12 @@ impl AutoHuntCliEnvironment {
                 &[],
             )?;
         }
+        #[cfg(target_os = "macos")]
+        if let Some(agent_browser_binary) = agent_browser_binary {
+            write_agent_browser_wrapper(&wrapper_directory, bun_binary, agent_browser_binary)?;
+        }
+        #[cfg(not(target_os = "macos"))]
+        let _ = agent_browser_binary;
         let briar_binary = wrapper_directory.join("briar");
         let mut paths = vec![wrapper_directory];
         paths.extend(env::split_paths(execution_path));
@@ -324,6 +331,7 @@ impl AutoHuntCliEnvironment {
             api_url,
             &bun_binary,
             velen_binary.as_deref(),
+            None,
         )
     }
 
@@ -344,6 +352,13 @@ impl AutoHuntCliEnvironment {
         } else {
             None
         };
+        #[cfg(target_os = "macos")]
+        let agent_browser = runner
+            .resolve_binary("agent-browser")
+            .ok()
+            .map(PathBuf::from);
+        #[cfg(not(target_os = "macos"))]
+        let agent_browser: Option<PathBuf> = None;
         Self::prepare_with_binaries(
             home,
             execution_path,
@@ -351,6 +366,7 @@ impl AutoHuntCliEnvironment {
             api_url,
             &bun,
             velen.as_deref(),
+            agent_browser.as_deref(),
         )
     }
 
@@ -510,6 +526,25 @@ fn write_cli_wrapper(
         .map_err(|error| format!("{name} CLI 래퍼를 만들지 못했습니다: {error}"))?;
     fs::set_permissions(&wrapper, fs::Permissions::from_mode(0o700))
         .map_err(|error| format!("{name} CLI 래퍼 권한을 설정하지 못했습니다: {error}"))
+}
+
+#[cfg(target_os = "macos")]
+fn write_agent_browser_wrapper(
+    directory: &Path,
+    bun_binary: &Path,
+    agent_browser_binary: &Path,
+) -> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+    let wrapper = directory.join("agent-browser");
+    let contents = format!(
+        "#!/bin/sh\nexec {} {} \"$@\"\n",
+        shell_quote(bun_binary.as_os_str()),
+        shell_quote(agent_browser_binary.as_os_str()),
+    );
+    fs::write(&wrapper, contents)
+        .map_err(|error| format!("agent-browser CLI 래퍼를 만들지 못했습니다: {error}"))?;
+    fs::set_permissions(&wrapper, fs::Permissions::from_mode(0o700))
+        .map_err(|error| format!("agent-browser CLI 래퍼 권한을 설정하지 못했습니다: {error}"))
 }
 
 #[cfg(windows)]
@@ -2108,18 +2143,34 @@ mod tests {
     #[cfg(target_os = "macos")]
     #[test]
     fn prepares_local_auto_hunt_with_the_bundled_bun() {
+        use std::os::unix::fs::PermissionsExt;
+
         let fixture = tempfile::tempdir().expect("fixture directory should exist");
         let home = fixture.path().join("source-home");
         let briar_entry = home.join(".local/share/briar/briar.js");
+        let binary_directory = fixture.path().join("source-bin");
         create_secure_directory(
             briar_entry
                 .parent()
                 .expect("Briar entry should have a parent"),
         )
         .expect("Briar library directory should exist");
+        create_secure_directory(&binary_directory).expect("binary directory should exist");
         fs::write(&briar_entry, "process.exit(0);").expect("Briar fixture entry should be written");
-        let runner: Arc<dyn CommandRunner> =
-            Arc::new(crate::host::LocalRunner::new(OsString::new(), home.clone()));
+        let agent_browser = binary_directory.join("agent-browser");
+        fs::write(
+            &agent_browser,
+            "#!/usr/bin/env node\nconsole.log('agent-browser fixture');\n",
+        )
+        .expect("agent-browser fixture should be written");
+        fs::set_permissions(&agent_browser, fs::Permissions::from_mode(0o700))
+            .expect("agent-browser fixture should be executable");
+        let source_path =
+            env::join_paths([binary_directory]).expect("fixture execution path should be valid");
+        let runner: Arc<dyn CommandRunner> = Arc::new(crate::host::LocalRunner::new(
+            source_path.clone(),
+            home.clone(),
+        ));
         let bundled_bun = runner
             .resolve_binary("bun")
             .expect("bundled Bun should resolve");
@@ -2127,7 +2178,7 @@ mod tests {
         let cli_environment = AutoHuntCliEnvironment::prepare_local(
             runner,
             &home,
-            OsStr::new(""),
+            &source_path,
             fixture.path(),
             "project-local",
             "http://127.0.0.1:8788",
@@ -2149,6 +2200,26 @@ mod tests {
             .expect("Briar wrapper should execute")
             .status
             .success());
+
+        let agent_browser_wrapper = which::which_in(
+            "agent-browser",
+            Some(cli_environment.execution_path()),
+            fixture.path(),
+        )
+        .expect("agent-browser wrapper should be first on PATH");
+        assert_ne!(agent_browser_wrapper, agent_browser);
+        let wrapper_contents = fs::read_to_string(&agent_browser_wrapper)
+            .expect("agent-browser wrapper should be readable");
+        assert!(wrapper_contents.contains(&bundled_bun));
+        assert!(wrapper_contents.contains(&agent_browser.to_string_lossy().into_owned()));
+        let output = Command::new(agent_browser_wrapper)
+            .output()
+            .expect("agent-browser wrapper should execute");
+        assert!(output.status.success());
+        assert_eq!(
+            String::from_utf8_lossy(&output.stdout).trim(),
+            "agent-browser fixture"
+        );
     }
 
     #[test]
