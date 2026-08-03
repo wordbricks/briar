@@ -25,6 +25,11 @@ export type StatusTrayOpenRunPayload = {
   runId: string;
 };
 
+export type StatusTrayProjectRuns = {
+  project: { id: string; name: string };
+  runs: readonly HuntRun[];
+};
+
 export const STATUS_TRAY_OPEN_RUN_EVENT = "status-tray-open-run";
 
 export function statusLabelForRun(
@@ -36,30 +41,37 @@ export function statusLabelForRun(
 }
 
 export function buildStatusTrayItems(
-  runs: readonly HuntRun[],
-  project: { id: string; name: string } | null | undefined,
+  projectRuns: readonly StatusTrayProjectRuns[],
   options?: {
     localizeStatus?: (fallback: string, run: HuntRun) => string;
     untitledTitle?: string;
   },
 ): StatusTrayRunItem[] {
-  if (!project) return [];
   const untitledTitle = options?.untitledTitle ?? "Untitled issue";
-  return runs
-    .filter((run) => run.status === "running")
-    .slice()
-    .sort((left, right) => {
-      const leftAt = Date.parse(left.updatedAt || left.startedAt || left.lastEventAt);
-      const rightAt = Date.parse(right.updatedAt || right.startedAt || right.lastEventAt);
-      return (Number.isFinite(rightAt) ? rightAt : 0) - (Number.isFinite(leftAt) ? leftAt : 0);
-    })
-    .map((run) => ({
-      projectId: project.id,
-      runId: run.id,
-      title: run.title?.trim() || untitledTitle,
-      statusLabel: statusLabelForRun(run, options?.localizeStatus),
-      projectName: project.name,
-    }));
+  return projectRuns.flatMap(({ project, runs }) =>
+    runs
+      .filter((run) => run.status === "running")
+      .slice()
+      .sort((left, right) => {
+        const leftAt = Date.parse(
+          left.updatedAt || left.startedAt || left.lastEventAt,
+        );
+        const rightAt = Date.parse(
+          right.updatedAt || right.startedAt || right.lastEventAt,
+        );
+        return (
+          (Number.isFinite(rightAt) ? rightAt : 0) -
+          (Number.isFinite(leftAt) ? leftAt : 0)
+        );
+      })
+      .map((run) => ({
+        projectId: project.id,
+        runId: run.id,
+        title: run.title?.trim() || untitledTitle,
+        statusLabel: statusLabelForRun(run, options?.localizeStatus),
+        projectName: project.name,
+      })),
+  );
 }
 
 export function buildStatusTraySnapshot(
