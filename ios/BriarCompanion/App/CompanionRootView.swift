@@ -10,6 +10,7 @@ struct CompanionRootView: View {
 
     private let authorization: DeviceAuthorizationService
     private let presenter: any WebAuthenticationPresenting
+    private let api: any MobileAPIClientProtocol
 
     @MainActor
     init(
@@ -22,6 +23,7 @@ struct CompanionRootView: View {
         _dashboard = StateObject(wrappedValue: DashboardStore(api: api))
         authorization = DeviceAuthorizationService(api: api)
         self.presenter = presenter
+        self.api = api
     }
 
     var body: some View {
@@ -100,34 +102,34 @@ struct CompanionRootView: View {
     }
 
     private func dashboardView(token: String) -> some View {
-        NavigationStack {
-            DashboardContentView(
+        Group {
+            if companion.projects.isEmpty {
+                ContentUnavailableView {
+                    Label("프로젝트 없음", systemImage: "folder")
+                } description: {
+                    Text("이 계정에서 볼 수 있는 프로젝트가 없습니다.")
+                } actions: {
+                    Button("로그아웃", role: .destructive) {
+                        companion.clear()
+                        try? session.signOut()
+                    }
+                }
+            } else {
+                CompanionShellView(
                 projects: companion.projects,
                 selectedProjectID: $companion.selectedProjectID,
                 snapshot: dashboard.snapshot,
                 isRefreshing: dashboard.isRefreshing,
                 errorMessage: dashboard.errorMessage,
+                token: token,
+                api: api,
                 refresh: { await dashboard.refresh(forceSnapshot: true) },
                 signOut: {
                     dashboard.select(projectID: nil, token: nil)
                     companion.clear()
                     try? session.signOut()
                 }
-            )
-            .navigationTitle("Dashboard")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Menu {
-                        Text(companion.user?.email ?? "")
-                        Button("로그아웃", role: .destructive) {
-                            dashboard.select(projectID: nil, token: nil)
-                            companion.clear()
-                            try? session.signOut()
-                        }
-                    } label: {
-                        Image(systemName: "person.crop.circle")
-                    }
-                }
+                )
             }
         }
     }

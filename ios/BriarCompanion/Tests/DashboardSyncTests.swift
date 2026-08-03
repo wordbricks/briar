@@ -57,11 +57,13 @@ final class DashboardSyncTests: XCTestCase {
         async let two: Void = store.refresh(forceSnapshot: true)
         _ = await (one, two)
 
-        XCTAssertEqual(await api.requestCount(), 1)
+        let firstRequestCount = await api.requestCount()
+        XCTAssertEqual(firstRequestCount, 1)
         await store.refresh()
         XCTAssertEqual(store.snapshot?.cursor, 50)
         XCTAssertEqual(store.snapshot?.runs.first?.title, "Recovered")
-        XCTAssertEqual(await api.requestCount(), 3)
+        let recoveredRequestCount = await api.requestCount()
+        XCTAssertEqual(recoveredRequestCount, 3)
         store.applicationDidEnterBackground()
     }
 

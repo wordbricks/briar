@@ -1,7 +1,7 @@
 import Foundation
 
 enum MobileAPIContract {
-    static let version = "1.0.0"
+    static let version = "1.1.0"
     static let iOSClientID = "briar-mobile"
     static let androidClientID = "briar-android"
 
@@ -18,6 +18,18 @@ enum MobileAPIContract {
 
         static func dashboardDelta(projectID: UUID, cursor: Int) -> String {
             "\(dashboard(projectID: projectID))/delta?cursor=\(cursor)"
+        }
+
+        static func runEvents(projectID: UUID, runID: UUID) -> String {
+            "/projects/\(projectID.uuidString.lowercased())/runs/\(runID.uuidString.lowercased())/events"
+        }
+
+        static func runEvidence(projectID: UUID, runID: UUID) -> String {
+            "/projects/\(projectID.uuidString.lowercased())/runs/\(runID.uuidString.lowercased())/evidence"
+        }
+
+        static func runMessages(projectID: UUID, runID: UUID) -> String {
+            "/projects/\(projectID.uuidString.lowercased())/runs/\(runID.uuidString.lowercased())/messages"
         }
     }
 }
@@ -164,6 +176,14 @@ protocol MobileAPIClientProtocol: Sendable {
         body: (any Encodable & Sendable)?,
         as responseType: Response.Type
     ) async throws -> Response
+
+    func download(_ path: String, token: String) async throws -> Data
+}
+
+extension MobileAPIClientProtocol {
+    func download(_ path: String, token: String) async throws -> Data {
+        throw MobileAPIError.invalidDownload
+    }
 }
 
 struct MobileAPIClient: MobileAPIClientProtocol, Sendable {
@@ -255,6 +275,15 @@ struct MobileAPIClient: MobileAPIClientProtocol, Sendable {
             throw MobileAPIError.invalidDownload
         }
         return destination
+    }
+
+    func download(_ path: String, token: String) async throws -> Data {
+        guard let url = endpointURL(path) else { throw MobileAPIError.invalidRequest }
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await session.data(for: request)
+        try validate(response: response, data: data)
+        return data
     }
 
     private func endpointURL(_ path: String) -> URL? {

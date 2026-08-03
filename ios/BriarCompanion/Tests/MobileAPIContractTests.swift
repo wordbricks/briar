@@ -17,7 +17,7 @@ final class MobileAPIContractTests: XCTestCase {
     }
 
     func testClientIDsAndContractVersionAreStable() {
-        XCTAssertEqual(MobileAPIContract.version, "1.0.0")
+        XCTAssertEqual(MobileAPIContract.version, "1.1.0")
         XCTAssertEqual(MobileAPIContract.iOSClientID, "briar-mobile")
         XCTAssertEqual(MobileAPIContract.androidClientID, "briar-android")
         XCTAssertEqual(DeviceCodeRequest(), DeviceCodeRequest(clientID: "briar-mobile"))
@@ -35,6 +35,9 @@ final class MobileAPIContractTests: XCTestCase {
         let projects: ProjectsResponse = try decodeResponse("listProjects")
         let snapshot: DashboardSnapshot = try decodeResponse("getDashboardSnapshot")
         let delta: DashboardDelta = try decodeResponse("getDashboardDelta")
+        let events: RunEventsResponse = try decodeResponse("listRunEvents")
+        let evidence: RunEvidenceResponse = try decodeResponse("listRunEvidence")
+        let messages: IssueMessagesResponse = try decodeResponse("listIssueMessages")
 
         XCTAssertTrue(health.ok)
         XCTAssertEqual(device.userCode, "BRIAR123")
@@ -44,8 +47,13 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(projects.projects.first?.role, .owner)
         XCTAssertEqual(snapshot.cursor, 41)
         XCTAssertEqual(snapshot.runs.first?.status, .running)
+        XCTAssertEqual(snapshot.runs.first?.attachments.first?.filename, "companion.png")
         XCTAssertEqual(delta.cursor, 42)
         XCTAssertEqual(delta.runs.first?.status, .completed)
+        XCTAssertEqual(delta.runs.first?.resultReviews.first?.name, "Briar User")
+        XCTAssertEqual(events.events.first?.workflowStage, "implementing")
+        XCTAssertEqual(evidence.evidence.first?.status, .passed)
+        XCTAssertEqual(messages.messages.first?.author.name, "Briar User")
     }
 
     func testEndpointPathsMatchOpenAPISubset() {
@@ -62,6 +70,19 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(
             MobileAPIContract.Endpoint.dashboardDelta(projectID: projectID, cursor: 41),
             "/projects/11111111-1111-4111-8111-111111111111/dashboard/delta?cursor=41"
+        )
+        let runID = UUID(uuidString: "33333333-3333-4333-8333-333333333333")!
+        XCTAssertEqual(
+            MobileAPIContract.Endpoint.runEvents(projectID: projectID, runID: runID),
+            "/projects/11111111-1111-4111-8111-111111111111/runs/33333333-3333-4333-8333-333333333333/events"
+        )
+        XCTAssertEqual(
+            MobileAPIContract.Endpoint.runEvidence(projectID: projectID, runID: runID),
+            "/projects/11111111-1111-4111-8111-111111111111/runs/33333333-3333-4333-8333-333333333333/evidence"
+        )
+        XCTAssertEqual(
+            MobileAPIContract.Endpoint.runMessages(projectID: projectID, runID: runID),
+            "/projects/11111111-1111-4111-8111-111111111111/runs/33333333-3333-4333-8333-333333333333/messages"
         )
     }
 

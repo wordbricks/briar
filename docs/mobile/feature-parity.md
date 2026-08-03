@@ -4,17 +4,24 @@
 
 | 사용자 기능 | 기존 Tauri iOS | 기존 Tauri Android | 네이티브 SwiftUI iOS | 공유 계약/결정 |
 | --- | --- | --- | --- | --- |
-| 앱 실행 및 독립 설치 | 제공 | 제공 | 기반 | 개발 앱은 기존 iOS 앱과 다른 bundle ID 사용 |
+| 앱 실행 및 독립 설치 | 제공 | 제공 | 제공 | 개발 앱은 기존 iOS 앱과 다른 bundle ID 사용, Tasks/Agents/Search/Inbox 탭 셸 제공 |
 | Device Authorization 로그인 | 제공 (`briar-mobile`) | 제공 (`briar-android`) | 제공 | `ASWebAuthenticationSession`, device code 시작/폴링과 4개 종료·대기 오류를 사용 |
 | 현재 사용자 조회 | 제공 | 제공 | 제공 | `GET /me`, bearer token, `401` 시 Keychain을 비우고 재로그인 |
 | 프로젝트 목록 조회 | 제공 | 제공 | 제공 | 사용자·조직·프로젝트 저장소가 선택 상태를 관리 |
-| 이슈 목록 및 상세 | 제공 | 제공 | 계획 | 다음 계약 확장 전에는 네이티브 앱에서 호출하지 않음 |
+| 이슈 목록 및 상세 | 제공 | 제공 | 제공 | All/Active/Attention/Completed 필터, 로컬 검색, Markdown 설명, 상태 이벤트와 결과 리뷰를 읽기 전용으로 제공 |
 | 실행 진행 상황 | 제공 | 제공 | 제공 | snapshot/delta 공유 계약, 15초 polling, foreground·오프라인 복귀, cursor 만료 시 snapshot 복구 |
-| 이슈 대화 및 첨부 | 제공 | 제공 | 계획 | 메시지/첨부 생명주기를 이후 단계에서 추가 |
+| 이슈 대화 및 첨부 | 제공 | 제공 | 제공 | 인증된 GET 경로로 메시지·첨부·증빙 이미지를 지연 로드하고 Quick Look 미리보기 제공; 작성 기능 없음 |
 | 알림 및 딥 링크 | 제공 | 제공 | 계획 | 플랫폼별 권한·복구 동작을 별도 ADR에서 정의 |
-| 앱 설정/테마 | 제공 | 제공 | 계획 | 로컬 설정은 플랫폼별 저장, 서버 설정만 계약화 |
+| 앱 설정/테마 | 제공 | 제공 | 제공 | system/light/dark 선택을 기기에 저장하며 서버 데이터는 변경하지 않음 |
 | App/Unit/UI 자동 검증 | 해당 없음 | 해당 없음 | 기반 | SwiftUI 3개 target과 개발 scheme을 명시적 `mobile:ci`에서 실행 |
 | 기존 릴리스 회귀 빌드 | 제공 | 제공 | 제공 | Tauri iOS/Android 빌드를 명시적 `mobile:ci`에서 검사 |
+
+## 읽기 전용 경계
+
+- SwiftUI 앱은 dashboard snapshot/delta로 최대 200개 작업을 동기화하고 필터와 검색은 기기에서 수행한다.
+- 선택한 작업의 이벤트, 증빙, 메시지만 기존 프로젝트 권한 검사를 거치는 GET 경로로 불러온다.
+- 이슈 생성·편집·삭제, 재시도·취소, 메시지 작성, 결과 리뷰 완료 같은 쓰기 동작은 네이티브 iOS 화면에 노출하지 않는다.
+- Tauri Android Companion은 같은 사용자 흐름을 이미 제공하며, 1.1 공유 fixture와 Worker 계약 테스트가 두 모바일 client ID의 상세 읽기 형식을 함께 고정한다.
 
 ## 병합 기준
 

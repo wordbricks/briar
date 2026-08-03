@@ -68,8 +68,19 @@ export const mobileProjectsResponseSchema = z.object({
   })),
 });
 
+export const mobileIssueAttachmentSchema = z.object({
+  id: z.uuid(),
+  filename: z.string(),
+  contentType: z.string(),
+  byteSize: z.number().int().nonnegative(),
+  url: z.string().startsWith("/projects/"),
+});
+
 export const mobileDashboardRunSchema = z.object({
   id: z.uuid(),
+  runNumber: z.number().int().positive(),
+  currentAttempt: z.number().int().positive(),
+  currentRevision: z.number().int().positive(),
   title: z.string(),
   status: z.enum([
     "backlog",
@@ -80,7 +91,25 @@ export const mobileDashboardRunSchema = z.object({
     "completed",
     "cancelled",
   ]),
+  workflowStage: z.string().nullable(),
   detail: z.string().nullable().optional(),
+  issueDescription: z.string().nullable(),
+  attachments: z.array(mobileIssueAttachmentSchema),
+  resultSummary: z.string().nullable(),
+  structuredResult: z.object({
+    summary: z.string(),
+    outcome: z.string(),
+    humanActionRequired: z.boolean(),
+    nextAction: z.string().nullable(),
+  }).nullable(),
+  resultReviews: z.array(z.object({
+    userId: z.string(),
+    name: z.string(),
+    username: z.string().nullable(),
+    image: z.string().nullable(),
+    completedAt: z.iso.datetime(),
+  })),
+  pullRequestUrls: z.array(z.url()),
   updatedAt: z.iso.datetime(),
 });
 
@@ -107,6 +136,67 @@ export const mobileDashboardCursorExpiredSchema = z.object({
   message: z.string(),
 });
 
+export const mobileRunEventsResponseSchema = z.object({
+  runId: z.uuid(),
+  eventCount: z.number().int().nonnegative(),
+  events: z.array(z.object({
+    id: z.uuid(),
+    attempt: z.number().int().positive(),
+    revision: z.number().int().positive(),
+    status: mobileDashboardRunSchema.shape.status,
+    workflowStage: z.string().nullable(),
+    detail: z.string().nullable(),
+    actor: z.string(),
+    occurredAt: z.iso.datetime(),
+  })),
+});
+
+export const mobileRunEvidenceResponseSchema = z.object({
+  runId: z.uuid(),
+  attempt: z.number().int().positive(),
+  revision: z.number().int().positive(),
+  evidence: z.array(z.object({
+    key: z.string(),
+    attempt: z.number().int().positive(),
+    revision: z.number().int().positive(),
+    stage: z.string(),
+    type: z.string(),
+    status: z.enum(["pending", "passed", "failed", "skipped"]),
+    detail: z.string().nullable(),
+    command: z.string().nullable(),
+    url: z.url().nullable(),
+    actor: z.string(),
+    observedAt: z.iso.datetime(),
+    images: z.array(z.object({
+      id: z.uuid(),
+      filename: z.string(),
+      contentType: z.string(),
+      byteSize: z.number().int().nonnegative(),
+      url: z.string().startsWith("/projects/"),
+    })),
+    requiredRevision: z.number().int().positive(),
+    canonical: z.boolean(),
+  })),
+});
+
+export const mobileIssueMessagesResponseSchema = z.object({
+  messages: z.array(z.object({
+    id: z.uuid(),
+    runId: z.uuid(),
+    parentMessageId: z.uuid().nullable(),
+    body: z.string(),
+    author: z.object({
+      id: z.string().nullable(),
+      name: z.string(),
+      image: z.string().nullable(),
+      provider: z.string().nullable(),
+    }),
+    replyCount: z.number().int().nonnegative(),
+    createdAt: z.iso.datetime(),
+    updatedAt: z.iso.datetime(),
+  })),
+});
+
 export const mobileOperationSchemas = {
   getHealth: { response: mobileHealthResponseSchema },
   beginDeviceAuthorization: {
@@ -125,6 +215,9 @@ export const mobileOperationSchemas = {
     response: mobileDashboardDeltaSchema,
     errorResponse: mobileDashboardCursorExpiredSchema,
   },
+  listRunEvents: { response: mobileRunEventsResponseSchema },
+  listRunEvidence: { response: mobileRunEvidenceResponseSchema },
+  listIssueMessages: { response: mobileIssueMessagesResponseSchema },
 } as const;
 
 export function isMobileClientId(value: string) {

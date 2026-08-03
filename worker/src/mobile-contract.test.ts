@@ -25,12 +25,14 @@ const openapi = JSON.parse(readFileSync(
   "utf8",
 )) as {
   openapi: string;
+  info: { version: string };
   paths: Record<string, Record<string, { operationId: string }>>;
 };
 
 describe("Companion mobile API contract", () => {
   it("keeps the OpenAPI subset and Worker fixture operation map aligned", () => {
     expect(openapi.openapi).toBe("3.1.0");
+    expect(openapi.info.version).toBe("1.1.0");
     expect(fixture.mobileClientIds).toEqual([...mobileClientIds]);
     expect(Object.keys(fixture.operations).sort()).toEqual(
       Object.keys(mobileOperationSchemas).sort(),
