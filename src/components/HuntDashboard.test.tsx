@@ -911,7 +911,7 @@ describe("HuntDashboard", () => {
         { id: "analyzing", label: "Analyze", required: true },
         { id: "security_review", label: "Security review", required: true },
       ],
-      execution: { stopAfterStage: "security_review" },
+      execution: { pauseAfterStage: "security_review" },
       completion: { requiredStages: ["analyzing", "security_review"] },
     };
     const customDashboard = {

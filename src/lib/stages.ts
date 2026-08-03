@@ -19,6 +19,7 @@ const statusMeta: Record<
   backlog: { label: "백로그", tone: "slate" },
   queued: { label: "대기", tone: "slate" },
   running: { label: "진행 중", tone: "violet" },
+  paused: { label: "검토 대기", tone: "amber" },
   blocked: { label: "차단", tone: "rose" },
   failed: { label: "실패", tone: "red" },
   completed: { label: "완료", tone: "emerald" },

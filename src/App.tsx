@@ -1067,10 +1067,10 @@ export function App() {
             onReviseWorkflow={(requestedChange) =>
               briar.reviseWorkflow(activeProject.id, requestedChange)
             }
-            onUpdateWorkflowStopAfterStage={(stopAfterStage) =>
-              briar.updateWorkflowStopAfterStage(
+            onUpdateWorkflowPauseAfterStage={(pauseAfterStage) =>
+              briar.updateWorkflowPauseAfterStage(
                 activeProject.id,
-                stopAfterStage,
+                pauseAfterStage,
               )
             }
             onUpdateVelenOrg={(org) =>
@@ -1176,6 +1176,7 @@ export function App() {
             onProcessIssueNow={processIssueNow}
             onRetryRun={briar.retryRun}
             onCancelRun={briar.cancelRun}
+            onResumeRun={briar.resumeRun}
             onRequestedRunOpen={() => setRequestedRunId(null)}
             onSendIssueMessage={sendIssueMessage}
             processingIssueIds={processingIssueIds}
@@ -1252,6 +1253,7 @@ export function App() {
                       prerequisiteRunId,
                     )}
                   onRetry={() => briar.retryRun(inboxDetailRun.id)}
+                  onResume={() => briar.resumeRun(inboxDetailRun.id)}
                   onSendIssueMessage={(input) =>
                     sendIssueMessage(inboxDetailRun.id, input)}
                   onUpdateIssue={(input) =>
@@ -1536,6 +1538,7 @@ export function App() {
             onRequestedRunOpen={() => setRequestedRunId(null)}
             onRetryRun={briar.retryRun}
             onCancelRun={briar.cancelRun}
+            onResumeRun={briar.resumeRun}
             onSendIssueMessage={sendIssueMessage}
             processingIssueIds={processingIssueIds}
             projects={activeOrganizationProjects}

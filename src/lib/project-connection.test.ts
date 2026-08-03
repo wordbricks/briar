@@ -63,7 +63,7 @@ describe("local project connection", () => {
       stages: [
         { id: "implementing", label: "Implement", required: true },
       ],
-      execution: { stopAfterStage: "implementing" },
+      execution: { pauseAfterStage: "implementing" },
       completion: { requiredStages: ["implementing"] },
     };
 
@@ -87,7 +87,7 @@ describe("local project connection", () => {
         { id: "implementing", label: "Implement", required: true },
         { id: "local_qa", label: "Local QA", required: true },
       ],
-      execution: { stopAfterStage: "local_qa" },
+      execution: { pauseAfterStage: "local_qa" },
       completion: { requiredStages: ["implementing", "local_qa"] },
     };
     const generateWorkflow = vi.fn();

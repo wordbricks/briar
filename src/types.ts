@@ -155,6 +155,7 @@ export type HuntRun = {
   workflowStage: AutoHuntWorkflowStageId | null;
   workflow: AutoHuntWorkflow;
   progress: number;
+  pausedAt?: string | null;
   detail: string | null;
   priority: number | null;
   repository: string;
@@ -273,7 +274,7 @@ export type OrganizationExecutionWorker = {
 };
 
 export type HuntRunPlacement = {
-  status: HuntStatus;
+  status: Exclude<HuntStatus, "paused">;
   workflowStage: AutoHuntWorkflowStageId | null;
 };
 

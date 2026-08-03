@@ -108,7 +108,7 @@
                 { "id": "implementing", "label": "Implement", "required": true },
                 { "id": "local_qa", "label": "Local QA", "required": true }
               ],
-              "execution": { "stopAfterStage": "local_qa" },
+              "execution": { "pauseAfterStage": "local_qa" },
               "completion": { "requiredStages": ["analyzing", "implementing", "local_qa"] }
             },
             "progress": 45,

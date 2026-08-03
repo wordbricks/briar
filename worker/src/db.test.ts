@@ -64,6 +64,7 @@ import {
   recordHuntEvent,
   recordRunEvidence,
   recordQaResult,
+  resumeHuntRun,
   removeOrganizationMember,
   renewProjectAgentScheduleRunLease,
   updateProjectSettings,
@@ -575,6 +576,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await executeSql(
       db,
       await readFile(resolve("migrations/0054_run_execution_metrics.sql"), "utf8"),
+    );
+    await executeSql(
+      db,
+      await readFile(resolve("migrations/0057_workflow_pause_after_stage.sql"), "utf8"),
     );
   }, 30_000);
 
@@ -1477,7 +1482,20 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       "production_qa:production",
     ]);
     await expect(
-      recordHuntEvent(db, projectId, event("completed", 11)),
+      resumeHuntRun(db, projectId, {
+        runId,
+        requestId: "11111111-1111-4111-8111-111111111111",
+        actor: "vitest",
+        occurredAt: atMinute(10.8),
+      }),
+    ).resolves.toEqual({ outcome: "resumed", workflowStage: "production_qa" });
+    await recordHuntEvent(db, projectId, event("production_qa", 11));
+    await expect(getHuntRunForProject(db, projectId, runId)).resolves.toMatchObject({
+      status: "running",
+      paused_at: null,
+    });
+    await expect(
+      recordHuntEvent(db, projectId, event("completed", 11.5)),
     ).rejects.toThrow("result summary");
     const completion = event("completed", 12, {
       resultSummary: "Production verified",
@@ -1521,7 +1539,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     });
   });
 
-  it("enforces the execution stop stage for events, evidence, and completion", async () => {
+  it("pauses at the configured stage and resumes through every completion stage", async () => {
     await updateProjectSettings(db, projectId, {
       velenOrg: null,
       dataSource: null,
@@ -1544,14 +1562,22 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         actor: "vitest",
         occurredAt: atMinute(13.5),
       }),
-    ).rejects.toThrow("Workflow stops after stage: pr_open");
+    ).rejects.toThrow("Workflow is paused after stage: pr_open");
     await recordHuntEvent(db, projectId, event("analyzing", 14, common));
     await recordHuntEvent(db, projectId, event("implementing", 15, common));
     await recordHuntEvent(db, projectId, event("pr_open", 16, common));
 
+    const paused = await getHuntRunForProject(db, projectId, runId);
+    expect(paused).toMatchObject({
+      status: "running",
+      paused_at: atMinute(16),
+      claim_token_hash: null,
+      claimed_by: null,
+    });
+
     await expect(
       recordHuntEvent(db, projectId, event("staging_qa", 17, common)),
-    ).rejects.toThrow("Workflow stops after stage: pr_open");
+    ).rejects.toThrow("Run is paused; resume it before recording a later workflow stage");
     await expect(
       recordRunEvidence(db, projectId, {
         runId,
@@ -1566,12 +1592,35 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         actor: "vitest",
         observedAt: atMinute(17.1),
       }),
-    ).rejects.toThrow("Workflow stops after stage: pr_open");
+    ).rejects.toThrow("Run is paused; resume it before recording later-stage evidence");
 
+    await expect(
+      recordHuntEvent(
+        db,
+        projectId,
+        event("completed", 17.2, {
+          ...common,
+          resultSummary: "Too early",
+        }),
+      ),
+    ).rejects.toThrow("staging_qa");
+
+    await expect(
+      resumeHuntRun(db, projectId, {
+        runId,
+        requestId: "99999999-9999-4999-8999-999999999995",
+        actor: "vitest",
+        occurredAt: atMinute(17.3),
+      }),
+    ).resolves.toEqual({ outcome: "resumed", workflowStage: "staging_qa" });
+    await recordHuntEvent(db, projectId, event("staging_qa", 18, common));
+    await recordHuntEvent(db, projectId, event("production_qa", 19, common));
     for (const [stage, type, minute] of [
       ["analyzing", "repository", 17.2],
       ["implementing", "diff", 17.3],
       ["pr_open", "pull_request", 17.4],
+      ["staging_qa", "staging", 19.1],
+      ["production_qa", "production", 19.2],
     ] as const) {
       await recordRunEvidence(db, projectId, {
         runId,
@@ -1591,9 +1640,9 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       recordHuntEvent(
         db,
         projectId,
-        event("completed", 18, {
+        event("completed", 20, {
           ...common,
-          resultSummary: "Pull request opened",
+          resultSummary: "All workflow stages verified",
         }),
       ),
     ).resolves.toBe(runId);
@@ -1793,8 +1842,9 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       current_attempt: 1,
       current_revision: 2,
       workflow_stage: "implementing",
-      claimed_by: "revision-agent",
-      claim_token_hash: "b".repeat(64),
+      status: "queued",
+      claimed_by: null,
+      claim_token_hash: null,
     });
     for (const [stage, minute] of [
       ["implementing", 14.2],
@@ -1843,6 +1893,14 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         observedAt: atMinute(minute),
       });
     }
+    await expect(
+      resumeHuntRun(db, projectId, {
+        runId,
+        requestId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaab",
+        actor: "vitest",
+        occurredAt: atMinute(14.85),
+      }),
+    ).resolves.toEqual({ outcome: "resumed", workflowStage: "local_qa" });
     await expect(
       recordHuntEvent(
         db,
@@ -2427,6 +2485,14 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         observedAt: atMinute(minute),
       });
     }
+    await expect(
+      resumeHuntRun(db, projectId, {
+        runId,
+        requestId: "22222222-2222-4222-8222-222222222222",
+        actor: "vitest",
+        occurredAt: atMinute(33.6),
+      }),
+    ).resolves.toEqual({ outcome: "resumed", workflowStage: "local_qa" });
     await recordHuntEvent(
       db,
       projectId,
@@ -3074,6 +3140,24 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
   });
 
   it("moves a run freely across workflow and terminal states with an audit trail", async () => {
+    const manualWorkflow = normalizeAutoHuntWorkflow({
+      version: 1,
+      stages: [
+        { id: "analyzing", label: "Analyze", required: false },
+        { id: "implementing", label: "Implement", required: false },
+        { id: "local_qa", label: "Local QA", required: false },
+        { id: "manual_pause", label: "Manual pause", required: false },
+      ],
+      execution: { pauseAfterStage: "manual_pause" },
+      completion: { requiredStages: [] },
+    });
+    await updateProjectSettings(db, projectId, {
+      velenOrg: null,
+      dataSource: null,
+      linear: { enabled: false, source: null, teamKey: null },
+      githubRepository: "example/repository",
+      workflow: manualWorkflow,
+    });
     const sourceKey = "manual-move-run";
     const runId = await recordHuntEvent(
       db,
@@ -3158,6 +3242,11 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         atMinute(74),
       ),
     ).rejects.toBeInstanceOf(HuntClaimError);
+
+    await db
+      .prepare("update briar_hunt_runs set result_summary = ? where id = ?")
+      .bind("Manually verified", runId)
+      .run();
 
     expect(
       await moveHuntRun(db, projectId, {
@@ -3262,6 +3351,14 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     // This suite intentionally retains the legacy `kind` column for earlier
     // compatibility tests. Production removed it in migration 0028.
     await db.prepare("alter table briar_project_agents drop column kind").run();
+    // Migration 0055 predates the pause checkpoint. Exercise the historical
+    // rebuild against the pre-0057 shape, then restore the current column for
+    // the tests that follow it.
+    const pausedRuns = await db
+      .prepare("select count(*) as count from briar_hunt_runs where paused_at is not null")
+      .first<{ count: number }>();
+    expect(pausedRuns?.count ?? 0).toBe(0);
+    await db.prepare("alter table briar_hunt_runs drop column paused_at").run();
     const protectedTables = [
       "briar_hunt_runs",
       "briar_issue_messages",
@@ -3322,6 +3419,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       )
       .all();
     expect(backupTables.results).toEqual([]);
+    await db.prepare("alter table briar_hunt_runs add column paused_at text").run();
   });
 
   it("updates an idea through chat and atomically creates an acyclic issue plan", async () => {

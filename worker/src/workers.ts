@@ -1373,18 +1373,22 @@ export async function dispatchHuntRun(
 
   const run = await db
     .prepare(
-      `select id, status, current_attempt, claim_token_hash, worker_id
+      `select id, status, paused_at, current_attempt, claim_token_hash, worker_id
        from briar_hunt_runs where id = ? and project_id = ?`,
     )
     .bind(input.runId, projectId)
     .first<{
       id: string;
       status: string;
+      paused_at: string | null;
       current_attempt: number;
       claim_token_hash: string | null;
       worker_id: string | null;
-    }>();
+  }>();
   if (!run) return null;
+  if (run.paused_at) {
+    throw new WorkerConflictError("Run is paused; resume it before dispatching");
+  }
   const active = ![
     "backlog",
     "queued",

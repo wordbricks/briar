@@ -197,6 +197,7 @@ export function HuntDashboard({
   onProcessIssueNow,
   onRetryRun,
   onCancelRun,
+  onResumeRun = async () => undefined,
   onCompanionAgentsOpen,
   onCompanionIdeasOpen,
   onCompanionInboxOpen,
@@ -257,6 +258,7 @@ export function HuntDashboard({
   onProcessIssueNow?: (run: HuntRun) => void;
   onRetryRun: (runId: string) => Promise<unknown>;
   onCancelRun: (runId: string) => Promise<unknown>;
+  onResumeRun?: (runId: string) => Promise<unknown>;
   onCompanionAgentsOpen?: () => void;
   onCompanionIdeasOpen?: () => void;
   onCompanionInboxOpen?: () => void;
@@ -391,7 +393,7 @@ export function HuntDashboard({
   const deletingRunFromMenu =
     runs.find((run) => run.id === deletingRunFromMenuId) ?? null;
   const activeCount = runs.filter((run) => !["completed", "cancelled"].includes(run.status)).length;
-  const attentionCount = runs.filter((run) => ["blocked", "failed"].includes(run.status)).length;
+  const attentionCount = runs.filter((run) => ["paused", "blocked", "failed"].includes(run.status)).length;
   const completedCount = runs.filter((run) =>
     ["completed", "cancelled"].includes(run.status)
   ).length;
@@ -403,7 +405,7 @@ export function HuntDashboard({
     return runs.filter((run) => {
       if (source !== "all" && run.source !== source) return false;
       if (status === "active" && ["completed", "cancelled"].includes(run.status)) return false;
-      if (status === "attention" && !["blocked", "failed"].includes(run.status)) return false;
+      if (status === "attention" && !["paused", "blocked", "failed"].includes(run.status)) return false;
       if (
         status === "completed" &&
         !["completed", "cancelled"].includes(run.status)
@@ -419,7 +421,7 @@ export function HuntDashboard({
       const agent = run.agentId ? agentById.get(run.agentId) : null;
       if (!agent) continue;
       performedAgents.set(run.id, agent);
-      if (!["backlog", "queued", "completed", "cancelled", "blocked", "failed"].includes(run.status)) {
+      if (!["backlog", "queued", "completed", "cancelled", "paused", "blocked", "failed"].includes(run.status)) {
         activeAgents.set(run.id, agent);
       }
     }
@@ -501,6 +503,13 @@ export function HuntDashboard({
         placement: { status: "running" as const, workflowStage: stage.id },
       })),
       {
+        id: "status:paused",
+        label: t("status.paused"),
+        tone: "amber",
+        // Paused runs are resumed from the detail page, not moved by drag/drop.
+        placement: { status: "queued" as const, workflowStage: null },
+      },
+      {
         id: "status:blocked",
         label: t("status.blocked"),
         tone: "rose",
@@ -530,7 +539,7 @@ export function HuntDashboard({
         return !["status:completed", "status:cancelled"].includes(column.id);
       }
       if (status === "attention") {
-        return ["status:blocked", "status:failed"].includes(column.id);
+        return ["status:paused", "status:blocked", "status:failed"].includes(column.id);
       }
       if (status === "completed") {
         return ["status:completed", "status:cancelled"].includes(column.id);
@@ -643,6 +652,7 @@ export function HuntDashboard({
             onProcessIssueNow ? () => onProcessIssueNow(selected) : undefined
           }
           onRetry={() => onRetryRun(selected.id)}
+          onResume={() => onResumeRun(selected.id)}
           onSendIssueMessage={(input) => onSendIssueMessage(selected.id, input)}
           onUpdateIssue={(input) => onUpdateIssue(selected.id, input)}
           onUpdateIssuePreferences={(input) =>
@@ -912,6 +922,7 @@ export function HuntDashboard({
                 suppressCardClickRef.current = true;
                 clearKanbanDragState();
                 const run = runs.find((candidate) => candidate.id === runId);
+                if (column.id === "status:paused") return;
                 if (!run || placementMatchesRun(run, column.placement)) return;
                 void onMoveRun(run.id, column.placement).catch(() => undefined);
               }}
@@ -928,7 +939,7 @@ export function HuntDashboard({
                       agentAssociationsByRunId.activeAgents.get(run.id) ?? null
                     }
                     assignedWorker={
-                      ["completed", "cancelled", "blocked", "failed"].includes(
+                      ["completed", "cancelled", "paused", "blocked", "failed"].includes(
                         run.status,
                       )
                         ? null
@@ -2202,7 +2213,7 @@ function IssueContextMenu({
     Date.parse(run.leaseExpiresAt!) > Date.now();
   const canReassign =
     Boolean(run.workerId || run.requestedWorkerId) &&
-    !["completed", "cancelled"].includes(run.status);
+    !["completed", "cancelled", "paused"].includes(run.status);
   const processNowDisabled =
     !onProcessNow ||
     run.executionReadiness === "waiting" ||
@@ -2713,6 +2724,7 @@ export function RunPage({
   onMove,
   onProcessNow,
   onRetry,
+  onResume = async () => undefined,
   onRemoveDependency,
   onSendIssueMessage,
   onUpdateIssue,
@@ -2746,6 +2758,7 @@ export function RunPage({
   onMove: (placement: HuntRunPlacement) => Promise<unknown>;
   onProcessNow?: () => void;
   onRetry: () => Promise<unknown>;
+  onResume?: () => Promise<unknown>;
   onRemoveDependency?: (prerequisiteRunId: string) => Promise<unknown>;
   onSendIssueMessage: (input: {
     body: string;
@@ -2763,17 +2776,17 @@ export function RunPage({
   const { localeTag, t } = useI18n();
   const meta = runMeta(run.status, run.workflowStage, run.workflow);
   const label = localizeStatus(t, run.status, run.workflowStage, meta.label);
-  const needsAttention = ["blocked", "failed"].includes(run.status);
+  const needsAttention = ["paused", "blocked", "failed"].includes(run.status);
   const canCancelRemoteExecution =
     Boolean(run.workerId) &&
-    !["completed", "cancelled", "blocked", "failed"].includes(run.status);
+    !["completed", "cancelled", "paused", "blocked", "failed"].includes(run.status);
   const isClaimed =
     run.status === "queued" &&
     Boolean(run.leaseExpiresAt) &&
     Date.parse(run.leaseExpiresAt!) > Date.now();
   const canReassign =
     Boolean(run.workerId || run.requestedWorkerId) &&
-    !["completed", "cancelled"].includes(run.status);
+    !["completed", "cancelled", "paused"].includes(run.status);
   const processNowDisabled =
     !onProcessNow ||
     run.executionReadiness === "waiting" ||
@@ -3304,6 +3317,36 @@ export function RunPage({
                       id={`${detailTabsId}-description-panel`}
                       role="tabpanel"
                     >
+                      {run.status === "paused" ? (
+                        <section
+                          aria-labelledby={`${detailTabsId}-paused-title`}
+                          className="recovery-panel"
+                          role="status"
+                        >
+                          <div>
+                            <Clock3 aria-hidden="true" size={16} />
+                            <span>
+                              <strong id={`${detailTabsId}-paused-title`}>
+                                {t("status.paused")}
+                              </strong>
+                              <small>{t("run.pausedDescription")}</small>
+                            </span>
+                          </div>
+                          <div className="recovery-actions">
+                            <button
+                              disabled={isRecovering}
+                              onClick={() => void runAction(onResume)}
+                              type="button"
+                            >
+                              <RotateCcw
+                                className={isRecovering ? "spin" : ""}
+                                size={14}
+                              />
+                              {t("run.resume")}
+                            </button>
+                          </div>
+                        </section>
+                      ) : null}
                       {run.status === "blocked" ? (
                         <section
                           aria-labelledby={`${detailTabsId}-blocked-title`}
@@ -3415,7 +3458,7 @@ export function RunPage({
                           onLoadAttachment={onLoadAttachment}
                         />
                       )}
-                      {needsAttention && run.status !== "blocked" ? (
+                      {needsAttention && !["blocked", "paused"].includes(run.status) ? (
                         <div className="recovery-panel">
                           <div>
                             <CircleAlert size={16} />
@@ -5452,7 +5495,7 @@ function placementForId(value: string): HuntRunPlacement | null {
     ].includes(status)
   ) return null;
   return {
-    status: status as Exclude<HuntRun["status"], "running">,
+    status: status as HuntRunPlacement["status"],
     workflowStage: null,
   };
 }

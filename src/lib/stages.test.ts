@@ -18,7 +18,7 @@ describe("Auto Hunt workflows", () => {
     expect(repositoryWorkflowBootstrap.completion.requiredStages).toEqual([
       "repository_workflow_pending",
     ]);
-    expect(repositoryWorkflowBootstrap.execution.stopAfterStage).toBe(
+    expect(repositoryWorkflowBootstrap.execution.pauseAfterStage).toBe(
       "repository_workflow_pending",
     );
   });
@@ -51,10 +51,10 @@ describe("Auto Hunt workflows", () => {
       "implementing",
       "local_qa",
     ]);
-    expect(workflow.execution).toEqual({ stopAfterStage: "local_qa" });
+    expect(workflow.execution).toEqual({ pauseAfterStage: "local_qa" });
   });
 
-  it("keeps repository-defined stage ids and execution requirements", () => {
+  it("keeps repository-defined stage ids and normalizes the legacy pause key", () => {
     const workflow = normalizeAutoHuntWorkflow({
       version: 1,
       stages: [
@@ -100,7 +100,7 @@ describe("Auto Hunt workflows", () => {
       release: { enabled: false },
     });
 
-    expect(workflow.execution.stopAfterStage).toBe("pr_open");
+    expect(workflow.execution.pauseAfterStage).toBe("pr_open");
     expect(workflow).not.toHaveProperty("release");
   });
 

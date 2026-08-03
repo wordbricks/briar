@@ -1,6 +1,6 @@
 import {
-  autoHuntRunStatuses,
-  type AutoHuntRunStatus,
+  autoHuntPersistedRunStatuses,
+  type AutoHuntPersistedRunStatus,
   type AutoHuntWorkflowStageId,
 } from "./auto-hunt-contract";
 
@@ -22,7 +22,7 @@ export type LinearWorkflowStateSummary = {
 };
 
 export type LinearImportPlacement = {
-  status: AutoHuntRunStatus;
+  status: AutoHuntPersistedRunStatus;
   workflowStage: AutoHuntWorkflowStageId | null;
 };
 
@@ -49,7 +49,7 @@ export type LinearImportResult = {
   truncated: boolean;
 };
 
-const statusSet = new Set<string>(autoHuntRunStatuses);
+const statusSet = new Set<string>(autoHuntPersistedRunStatuses);
 
 export function placementKey(placement: LinearImportPlacement): string {
   if (placement.status === "running" && placement.workflowStage) {
@@ -67,7 +67,7 @@ export function parsePlacementKey(value: string): LinearImportPlacement | null {
   if (value.startsWith("status:")) {
     const status = value.slice("status:".length).trim();
     if (!statusSet.has(status)) return null;
-    return { status: status as AutoHuntRunStatus, workflowStage: null };
+    return { status: status as AutoHuntPersistedRunStatus, workflowStage: null };
   }
   return null;
 }

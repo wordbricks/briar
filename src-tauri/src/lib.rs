@@ -232,8 +232,8 @@ struct WorkflowCompletionConfig {
 #[derive(Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct WorkflowExecutionConfig {
-    #[serde(default)]
-    stop_after_stage: String,
+    #[serde(default, alias = "stopAfterStage")]
+    pause_after_stage: String,
 }
 
 #[derive(Serialize)]
@@ -255,7 +255,7 @@ fn repository_workflow_bootstrap() -> WorkflowConfig {
             checks: Vec::new(),
         }],
         execution: WorkflowExecutionConfig {
-            stop_after_stage: "repository_workflow_pending".to_string(),
+            pause_after_stage: "repository_workflow_pending".to_string(),
         },
         completion: WorkflowCompletionConfig {
             required_stages: vec!["repository_workflow_pending".to_string()],
@@ -1522,11 +1522,11 @@ fn cli_execution_path(home: &Path) -> Result<OsString, String> {
     cli_execution_path_with_runtime(home, runtime_directories)
 }
 
-fn workflow_stop_index(workflow: &WorkflowConfig) -> Option<usize> {
+fn workflow_pause_index(workflow: &WorkflowConfig) -> Option<usize> {
     workflow
         .stages
         .iter()
-        .position(|stage| stage.id == workflow.execution.stop_after_stage)
+        .position(|stage| stage.id == workflow.execution.pause_after_stage)
         .or_else(|| {
             workflow
                 .completion
@@ -1544,15 +1544,14 @@ fn workflow_stop_index(workflow: &WorkflowConfig) -> Option<usize> {
 }
 
 fn normalize_workflow_execution(mut workflow: WorkflowConfig) -> WorkflowConfig {
-    if let Some(stop_index) = workflow_stop_index(&workflow) {
-        workflow.execution.stop_after_stage = workflow.stages[stop_index].id.clone();
+    if let Some(pause_index) = workflow_pause_index(&workflow) {
+        workflow.execution.pause_after_stage = workflow.stages[pause_index].id.clone();
     }
     workflow
 }
 
 fn workflow_requires_github(workflow: &WorkflowConfig) -> bool {
-    let stop_index = workflow_stop_index(workflow).unwrap_or_default();
-    workflow.stages.iter().take(stop_index + 1).any(|stage| {
+    workflow.stages.iter().any(|stage| {
         stage.id == "pr_open"
             || stage
                 .evidence
@@ -3310,8 +3309,8 @@ fn validate_generated_workflow(workflow: &WorkflowConfig) -> Result<(), String> 
     if completion != required {
         return Err("생성된 워크플로우의 필수 단계와 완료 조건이 일치하지 않습니다.".to_string());
     }
-    if !ids.contains(workflow.execution.stop_after_stage.as_str()) {
-        return Err("생성된 워크플로우의 실행 종료 단계가 올바르지 않습니다.".to_string());
+    if !ids.contains(workflow.execution.pause_after_stage.as_str()) {
+        return Err("생성된 워크플로우의 일시정지 단계가 올바르지 않습니다.".to_string());
     }
     Ok(())
 }
@@ -7651,7 +7650,7 @@ branch refs/heads/briar/second-11111111
         )
         .expect("saved config should be valid json");
         assert_eq!(
-            saved["projects"][0]["autoHunt"]["workflow"]["execution"]["stopAfterStage"],
+            saved["projects"][0]["autoHunt"]["workflow"]["execution"]["pauseAfterStage"],
             "implementing"
         );
 
@@ -7872,7 +7871,7 @@ branch refs/heads/briar/second-11111111
             checks: vec!["cargo test".to_string()],
         }];
         workflow.completion.required_stages = vec!["repository_qa".to_string()];
-        workflow.execution.stop_after_stage = "repository_qa".to_string();
+        workflow.execution.pause_after_stage = "repository_qa".to_string();
 
         update_project_workflow_at(&config_path, "project-1", workflow)
             .expect("workflow should save");
@@ -7889,7 +7888,7 @@ branch refs/heads/briar/second-11111111
             .expect("runtime workflow should load");
         assert!(runtime_workflow.contains("repository_qa"));
         assert!(runtime_workflow.contains("cargo test"));
-        assert!(runtime_workflow.contains("stopAfterStage"));
+        assert!(runtime_workflow.contains("pauseAfterStage"));
         assert!(!runtime_workflow.contains("\"release\""));
 
         fs::remove_dir_all(directory).expect("test config directory should be removed");
@@ -8020,8 +8019,10 @@ branch refs/heads/briar/second-11111111
             evidence: vec!["pull_request".to_string()],
             checks: Vec::new(),
         });
-        assert!(!workflow_requires_github(&workflow));
-        workflow.execution.stop_after_stage = "pr_open".to_string();
+        // The pause checkpoint is not an execution boundary. Later stages
+        // still determine which repository tools the worker needs.
+        assert!(workflow_requires_github(&workflow));
+        workflow.execution.pause_after_stage = "pr_open".to_string();
         assert!(workflow_requires_github(&workflow));
         assert_eq!(
             github_repository_from_remote("git@github.com:wordbricks/briar.git"),

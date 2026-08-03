@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { HuntEventInput } from "./db";
-import { deleteIssue, recordHuntEvent } from "./db";
+import { deleteIssue, recordHuntEvent, resumeHuntRun } from "./db";
 import {
   type ArchiveBucket,
   archiveCompletedLogs,
@@ -181,7 +181,6 @@ describe("D1 to R2 log archives", () => {
       ["queued", "queued", 0],
       ["analyzing", "running", 1],
       ["implementing", "running", 2],
-      ["completed", "completed", 3],
     ] as const) {
       await recordHuntEvent(db, projectId, event("large-run", stage, status, minute));
     }
@@ -189,6 +188,13 @@ describe("D1 to R2 log archives", () => {
       .prepare(`select id from briar_hunt_runs where source_key = ?`)
       .bind("large-run")
       .first<string>("id")) ?? "";
+    await resumeHuntRun(db, projectId, {
+      runId,
+      requestId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      actor: "archive-test",
+      occurredAt: new Date(Date.parse(oldTime) + 3 * 60_000).toISOString(),
+    });
+    await recordHuntEvent(db, projectId, event("large-run", "completed", "completed", 3));
     await db
       .prepare(`update briar_hunt_runs set completed_at = ? where id = ?`)
       .bind(oldTime, runId)
@@ -370,10 +376,16 @@ describe("D1 to R2 log archives", () => {
     await recordHuntEvent(db, projectId, event("failure-run", "queued", "queued", 10));
     await recordHuntEvent(db, projectId, event("failure-run", "analyzing", "running", 11));
     await recordHuntEvent(db, projectId, event("failure-run", "implementing", "running", 12));
-    await recordHuntEvent(db, projectId, event("failure-run", "completed", "completed", 13));
     secondRunId = (await db
       .prepare(`select id from briar_hunt_runs where source_key = 'failure-run'`)
       .first<string>("id")) ?? "";
+    await resumeHuntRun(db, projectId, {
+      runId: secondRunId,
+      requestId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      actor: "archive-test",
+      occurredAt: new Date(Date.parse(oldTime) + 13 * 60_000).toISOString(),
+    });
+    await recordHuntEvent(db, projectId, event("failure-run", "completed", "completed", 13));
     expect(secondRunId).toBeTruthy();
     await db
       .prepare(`update briar_hunt_runs set completed_at = ? where id = ?`)
@@ -407,7 +419,7 @@ describe("D1 to R2 log archives", () => {
         .prepare(`select count(*) as count from briar_hunt_events where run_id = ?`)
         .bind(secondRunId)
         .first<number>("count"),
-    ).toBe(4);
+    ).toBe(5);
 
     await bucket.delete(
       (await db
