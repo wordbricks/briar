@@ -159,19 +159,53 @@ describe("ProjectAgentSessionDetail", () => {
     expect(onIssueOpen).toHaveBeenCalledWith("run-42");
   });
 
-  it("shows readable worker progress in a scroll region without an execution log", async () => {
+  it("merges readable worker progress into the chronological execution log", async () => {
     const container = await mount(session);
-    const progress = container.querySelector(".auto-hunt-worker-progress");
+    const progress = container.querySelector(".auto-hunt-agent-messages");
 
     expect(progress).not.toBeNull();
-    expect(progress?.getAttribute("role")).toBe("region");
-    expect(progress?.getAttribute("tabindex")).toBe("0");
+    expect(progress?.getAttribute("role")).toBe("log");
     expect(progress?.textContent).toContain(
       "원인을 확인하고 화면을 수정하고 있습니다.",
     );
     expect(progress?.textContent).not.toContain("[commentary]");
-    expect(container.querySelector(".auto-hunt-app-server-section")).toBeNull();
-    expect(container.textContent).not.toContain("수행 로그");
+    expect(
+      container.querySelector(".auto-hunt-app-server-section"),
+    ).not.toBeNull();
+    expect(container.textContent).toContain("수행 로그");
+    expect(container.textContent).toContain("단계 진행");
+    expect(container.textContent).toContain("1/3 완료");
+    expect(container.textContent).toContain("세션 정보");
+    expect(container.textContent).toContain("session-1");
+    expect(container.textContent).toContain("산출물");
+  });
+
+  it("exports the visible session request and execution log", async () => {
+    const createObjectURL = vi.fn(() => "blob:session-log");
+    const revokeObjectURL = vi.fn();
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: createObjectURL,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: revokeObjectURL,
+    });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => undefined);
+    const container = await mount(session);
+    const exportButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent?.includes("로그 내보내기"));
+
+    await act(async () => exportButton?.click());
+
+    expect(createObjectURL).toHaveBeenCalledOnce();
+    expect(click).toHaveBeenCalledOnce();
+    expect((click.mock.contexts[0] as HTMLAnchorElement).download).toBe(
+      "briar-session-session-1.txt",
+    );
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:session-log");
+    click.mockRestore();
   });
 
   it("shows live execution messages for a task session", async () => {

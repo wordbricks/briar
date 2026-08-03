@@ -179,11 +179,33 @@ struct AutoHuntConfig {
 #[serde(rename_all = "camelCase")]
 struct WorkflowConfig {
     version: u8,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    requirements: Vec<WorkflowRequirementConfig>,
     stages: Vec<WorkflowStageConfig>,
     #[serde(default)]
     execution: WorkflowExecutionConfig,
     #[serde(default)]
     completion: WorkflowCompletionConfig,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WorkflowRequirementConfig {
+    id: String,
+    label: String,
+    kind: WorkflowRequirementKind,
+    tool: String,
+    reason: String,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum WorkflowRequirementKind {
+    Executable,
+    Xcode,
+    IosSimulator,
+    AndroidSdk,
+    AndroidEmulator,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -222,6 +244,7 @@ struct ConnectedLocalProject {
 fn repository_workflow_bootstrap() -> WorkflowConfig {
     WorkflowConfig {
         version: 1,
+        requirements: Vec::new(),
         stages: vec![WorkflowStageConfig {
             id: "repository_workflow_pending".to_string(),
             label: "Repository workflow pending".to_string(),
@@ -428,7 +451,20 @@ struct AutoHuntHealth {
     velen_authenticated: bool,
     velen_email: Option<String>,
     velen_healthy: bool,
+    requirements: Vec<WorkflowRequirementHealth>,
     issues: Vec<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WorkflowRequirementHealth {
+    id: String,
+    label: String,
+    kind: WorkflowRequirementKind,
+    tool: String,
+    reason: String,
+    healthy: bool,
+    detail: String,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -1387,11 +1423,22 @@ fn cli_execution_path_with_runtime(
         home.join(".mise/shims"),
         home.join(".nodenv/shims"),
         home.join(".nodenv/bin"),
+        home.join("Library/Android/sdk/platform-tools"),
+        home.join("Library/Android/sdk/emulator"),
+        home.join("Android/Sdk/platform-tools"),
+        home.join("Android/Sdk/emulator"),
         PathBuf::from("/opt/homebrew/bin"),
         PathBuf::from("/usr/local/bin"),
         PathBuf::from("/usr/bin"),
         PathBuf::from("/bin"),
     ]);
+    for variable in ["ANDROID_HOME", "ANDROID_SDK_ROOT"] {
+        if let Some(sdk_root) = env::var_os(variable) {
+            let sdk_root = PathBuf::from(sdk_root);
+            paths.push(sdk_root.join("platform-tools"));
+            paths.push(sdk_root.join("emulator"));
+        }
+    }
     if let Some(existing) = env::var_os("PATH") {
         paths.extend(env::split_paths(&existing));
     }
@@ -3119,6 +3166,35 @@ fn validate_generated_workflow(workflow: &WorkflowConfig) -> Result<(), String> 
     if workflow.version != 1 || workflow.stages.is_empty() || workflow.stages.len() > 30 {
         return Err("생성된 워크플로우 버전 또는 단계 수가 올바르지 않습니다.".to_string());
     }
+    if workflow.requirements.len() > 30 {
+        return Err("생성된 워크플로우 도구 요구사항 수가 올바르지 않습니다.".to_string());
+    }
+    let valid_tool = |tool: &str| {
+        !tool.is_empty()
+            && tool.len() <= 80
+            && tool
+                .chars()
+                .all(|character| character.is_ascii_alphanumeric() || "_.+-".contains(character))
+    };
+    let mut requirement_ids = BTreeSet::new();
+    for requirement in &workflow.requirements {
+        let expected_tool = match requirement.kind {
+            WorkflowRequirementKind::Executable => None,
+            WorkflowRequirementKind::Xcode => Some("xcodebuild"),
+            WorkflowRequirementKind::IosSimulator => Some("xcrun"),
+            WorkflowRequirementKind::AndroidSdk => Some("adb"),
+            WorkflowRequirementKind::AndroidEmulator => Some("emulator"),
+        };
+        if requirement.id.trim().is_empty()
+            || requirement.label.trim().is_empty()
+            || requirement.reason.trim().is_empty()
+            || !valid_tool(requirement.tool.trim())
+            || expected_tool.is_some_and(|tool| requirement.tool != tool)
+            || !requirement_ids.insert(requirement.id.as_str())
+        {
+            return Err("생성된 워크플로우 도구 요구사항이 올바르지 않습니다.".to_string());
+        }
+    }
     let mut ids = BTreeSet::new();
     for stage in &workflow.stages {
         if stage.id.trim().is_empty()
@@ -3525,6 +3601,138 @@ fn read_trimmed_file_on(runner: &dyn host::CommandRunner, path: &Path) -> Option
         .filter(|value| !value.is_empty())
 }
 
+fn first_output_line(output: &host::CommandOutput) -> String {
+    output
+        .stdout
+        .lines()
+        .chain(output.stderr.lines())
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .unwrap_or("준비됨")
+        .to_string()
+}
+
+fn inspect_workflow_requirements(
+    runner: &dyn host::CommandRunner,
+    configured: &[WorkflowRequirementConfig],
+) -> Vec<WorkflowRequirementHealth> {
+    configured
+        .iter()
+        .map(|requirement| {
+            let result = match requirement.kind {
+                WorkflowRequirementKind::Executable => runner
+                    .resolve_binary(&requirement.tool)
+                    .map(|path| (true, path)),
+                WorkflowRequirementKind::Xcode => runner
+                    .resolve_binary("xcodebuild")
+                    .and_then(|binary| {
+                        runner
+                            .run(&host::CommandSpec::new(binary).args(["-version"]))
+                            .map_err(|error| error.to_string())
+                    })
+                    .map(|output| {
+                        let healthy = output.success();
+                        let detail = if healthy {
+                            first_output_line(&output)
+                        } else {
+                            output.failure_message()
+                        };
+                        (healthy, detail)
+                    }),
+                WorkflowRequirementKind::IosSimulator => runner
+                    .resolve_binary("xcrun")
+                    .and_then(|binary| {
+                        runner
+                            .run(&host::CommandSpec::new(binary).args([
+                                "simctl",
+                                "list",
+                                "devices",
+                                "available",
+                                "--json",
+                            ]))
+                            .map_err(|error| error.to_string())
+                    })
+                    .map(|output| {
+                        if !output.success() {
+                            return (false, output.failure_message());
+                        }
+                        let count = serde_json::from_str::<serde_json::Value>(&output.stdout)
+                            .ok()
+                            .and_then(|value| value.get("devices").cloned())
+                            .and_then(|devices| devices.as_object().cloned())
+                            .map(|devices| {
+                                devices
+                                    .values()
+                                    .filter_map(|devices| devices.as_array())
+                                    .map(Vec::len)
+                                    .sum::<usize>()
+                            })
+                            .unwrap_or_default();
+                        (
+                            count > 0,
+                            if count > 0 {
+                                format!("사용 가능한 시뮬레이터 {count}개")
+                            } else {
+                                "사용 가능한 iOS 시뮬레이터가 없습니다.".to_string()
+                            },
+                        )
+                    }),
+                WorkflowRequirementKind::AndroidSdk => runner
+                    .resolve_binary("adb")
+                    .and_then(|binary| {
+                        runner
+                            .run(&host::CommandSpec::new(binary).args(["version"]))
+                            .map_err(|error| error.to_string())
+                    })
+                    .map(|output| {
+                        let healthy = output.success();
+                        let detail = if healthy {
+                            first_output_line(&output)
+                        } else {
+                            output.failure_message()
+                        };
+                        (healthy, detail)
+                    }),
+                WorkflowRequirementKind::AndroidEmulator => runner
+                    .resolve_binary("emulator")
+                    .and_then(|binary| {
+                        runner
+                            .run(&host::CommandSpec::new(binary).args(["-list-avds"]))
+                            .map_err(|error| error.to_string())
+                    })
+                    .map(|output| {
+                        if !output.success() {
+                            return (false, output.failure_message());
+                        }
+                        let count = output
+                            .stdout
+                            .lines()
+                            .filter(|line| !line.trim().is_empty())
+                            .count();
+                        (
+                            count > 0,
+                            if count > 0 {
+                                format!("설치된 Android 가상 기기 {count}개")
+                            } else {
+                                "설치된 Android 가상 기기(AVD)가 없습니다.".to_string()
+                            },
+                        )
+                    }),
+            };
+            let (healthy, detail) = result.unwrap_or_else(|error| (false, error));
+            WorkflowRequirementHealth {
+                id: requirement.id.clone(),
+                label: requirement.label.clone(),
+                kind: requirement.kind.clone(),
+                tool: requirement.tool.clone(),
+                reason: requirement.reason.clone(),
+                healthy,
+                detail,
+            }
+        })
+        .collect()
+}
+
 fn auto_hunt_health_sync(
     config_path: &Path,
     resource_directory: &Path,
@@ -3627,6 +3835,21 @@ fn auto_hunt_health_sync_with(
     } else {
         (false, None, true)
     };
+    let requirements = project
+        .auto_hunt
+        .as_ref()
+        .and_then(|auto_hunt| auto_hunt.workflow.as_ref())
+        .map(|workflow| inspect_workflow_requirements(runner.as_ref(), &workflow.requirements))
+        .unwrap_or_default();
+    for requirement in requirements
+        .iter()
+        .filter(|requirement| !requirement.healthy)
+    {
+        issues.push(format!(
+            "{} 준비 필요: {}",
+            requirement.label, requirement.detail
+        ));
+    }
 
     Ok(AutoHuntHealth {
         project_id: project.id.clone(),
@@ -3648,6 +3871,7 @@ fn auto_hunt_health_sync_with(
         velen_authenticated,
         velen_email,
         velen_healthy,
+        requirements,
         issues,
     })
 }
@@ -7154,6 +7378,7 @@ branch refs/heads/briar/second-11111111
         let config_path = test_config_path("empty-workflow-boundary");
         let workflow = WorkflowConfig {
             version: 1,
+            requirements: Vec::new(),
             stages: vec![
                 WorkflowStageConfig {
                     id: "analyzing".to_string(),
@@ -7791,6 +8016,36 @@ branch refs/heads/briar/second-11111111
         assert!(without_velen.healthy);
         assert!(without_velen.velen_healthy);
         assert!(without_velen.velen_org.is_none());
+
+        let mut config = read_cli_config(&config_path).expect("config should be readable");
+        config.projects[0]
+            .auto_hunt
+            .as_mut()
+            .and_then(|auto_hunt| auto_hunt.workflow.as_mut())
+            .expect("workflow should exist")
+            .requirements = vec![WorkflowRequirementConfig {
+            id: "custom_tool".to_string(),
+            label: "Custom Tool".to_string(),
+            kind: WorkflowRequirementKind::Executable,
+            tool: "briar-tool-that-does-not-exist".to_string(),
+            reason: "Runs repository validation.".to_string(),
+        }];
+        write_cli_config(&config_path, &config).expect("workflow requirement should save");
+        let missing_tool = auto_hunt_health_sync_with(
+            &config_path,
+            &resources,
+            &home,
+            "11111111-1111-4111-8111-111111111111",
+            &no_inspect,
+        )
+        .expect("tool requirement health should be readable");
+        assert!(!missing_tool.healthy);
+        assert_eq!(missing_tool.requirements.len(), 1);
+        assert!(!missing_tool.requirements[0].healthy);
+        assert!(missing_tool
+            .issues
+            .iter()
+            .any(|issue| issue.contains("Custom Tool")));
 
         fs::remove_dir_all(home).expect("test home should be removed");
     }

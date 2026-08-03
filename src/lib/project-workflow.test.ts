@@ -7,6 +7,7 @@ const { chatWithProjectLlm } = vi.hoisted(() => ({
 vi.mock("./project-llm", () => ({ chatWithProjectLlm }));
 
 import {
+  analyzeProjectWorkflowRequirements,
   generateProjectWorkflow,
   reviseProjectWorkflow,
 } from "./project-workflow";
@@ -20,6 +21,13 @@ describe("project workflow generator", () => {
       workspaceRoot: "/repo",
       message: JSON.stringify({
         version: 1,
+        requirements: [{
+          id: "bun",
+          label: "Bun",
+          kind: "executable",
+          tool: "bun",
+          reason: "Runs the repository test scripts.",
+        }],
         stages: [
           {
             id: "analyzing",
@@ -51,6 +59,7 @@ describe("project workflow generator", () => {
     });
 
     await expect(generateProjectWorkflow("project-1")).resolves.toMatchObject({
+      requirements: [{ id: "bun", tool: "bun" }],
       execution: { stopAfterStage: "local_qa" },
       stages: [
         { id: "analyzing" },
@@ -70,12 +79,71 @@ describe("project workflow generator", () => {
     );
   });
 
+  it("regenerates only tool requirements for an existing workflow", async () => {
+    const currentWorkflow = {
+      version: 1 as const,
+      requirements: [],
+      stages: [
+        {
+          id: "implementing",
+          label: "Implement",
+          required: true,
+          evidence: ["diff"],
+          checks: [],
+        },
+        {
+          id: "local_qa",
+          label: "Local validation",
+          required: true,
+          evidence: ["test"],
+          checks: ["bun run test"],
+        },
+      ],
+      execution: { stopAfterStage: "local_qa" },
+      completion: { requiredStages: ["implementing", "local_qa"] },
+    };
+    chatWithProjectLlm.mockResolvedValue({
+      conversationId: "briar:project-1:thread-tools",
+      workspaceRoot: "/repo",
+      message: JSON.stringify({
+        requirements: [{
+          id: "bun",
+          label: "Bun",
+          kind: "executable",
+          tool: "bun",
+          reason: "Runs repository validation.",
+        }],
+      }),
+    });
+
+    const result = await analyzeProjectWorkflowRequirements(
+      "project-1",
+      currentWorkflow,
+    );
+
+    expect(result.requirements).toEqual([
+      expect.objectContaining({ id: "bun", tool: "bun" }),
+    ]);
+    expect(result.stages).toEqual(currentWorkflow.stages);
+    expect(result.execution).toEqual(currentWorkflow.execution);
+    expect(result.completion).toEqual(currentWorkflow.completion);
+    expect(chatWithProjectLlm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId: "project-1",
+        message: expect.stringContaining("current_workflow_json"),
+        outputSchema: expect.objectContaining({ type: "object" }),
+        workspaceMode: "latestRemoteBase",
+      }),
+    );
+  });
+
   it("rejects a workflow whose required stages contradict the stage contract", async () => {
     chatWithProjectLlm.mockResolvedValue({
       conversationId: "briar:project-1:thread-1",
       workspaceRoot: "/repo",
       message: JSON.stringify({
         version: 1,
+        requirements: [],
         stages: [
           {
             id: "analyzing",
@@ -101,6 +169,7 @@ describe("project workflow generator", () => {
       workspaceRoot: "/repo",
       message: JSON.stringify({
         version: 1,
+        requirements: [],
         stages: [
           {
             id: "implementing",
@@ -123,6 +192,7 @@ describe("project workflow generator", () => {
   it("revises the current workflow using the repository and natural-language request", async () => {
     const currentWorkflow = {
       version: 1 as const,
+      requirements: [],
       stages: [
         {
           id: "implementing",

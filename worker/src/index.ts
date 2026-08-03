@@ -3,6 +3,7 @@ import briarIconPng from "../../src/assets/app-icons/aubergine-riso.png";
 import {
   autoHuntEvidenceTypeMaxLength,
   autoHuntEvidenceTypePattern,
+  autoHuntRequirementKinds,
   autoHuntRunStatuses,
   autoHuntSources,
   isRepositoryWorkflowPending,
@@ -298,6 +299,18 @@ const evidenceTypeSchema = z
 const workflowSchema = z
   .object({
     version: z.literal(1),
+    requirements: z
+      .array(
+        z.object({
+          id: workflowStageIdSchema,
+          label: z.string().trim().min(1).max(80),
+          kind: z.enum(autoHuntRequirementKinds),
+          tool: z.string().trim().regex(/^[a-zA-Z0-9_.+-]+$/u).max(80),
+          reason: z.string().trim().min(1).max(200),
+        }).strict(),
+      )
+      .max(30)
+      .optional(),
     stages: z
       .array(
         z

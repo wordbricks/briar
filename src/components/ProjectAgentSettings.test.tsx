@@ -54,6 +54,24 @@ describe("ProjectAgentSettings", () => {
     });
 
     expect(
+      container.querySelector(
+        ".page-header.app-page-header.project-agents-heading.project-agent-settings-heading",
+      ),
+    ).not.toBeNull();
+    expect(
+      container.querySelector(
+        ".project-agent-detail-title .project-agent-settings-back",
+      ),
+    ).not.toBeNull();
+    expect(
+      container.querySelector(".project-agents-scroll.project-agent-settings-scroll"),
+    ).not.toBeNull();
+    expect(
+      container.querySelector(
+        ".project-agents-body.project-agent-settings-body",
+      ),
+    ).not.toBeNull();
+    expect(
       container.querySelector<HTMLInputElement>(
         '.project-agent-settings-fields input[placeholder="예: Jay 자동 사냥 에이전트"]',
       )?.value,

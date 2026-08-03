@@ -68,7 +68,7 @@ import {
   type ApprovalPolicy,
   type ModelEffort,
 } from "../lib/project-llm";
-import type { VelenInspection } from "../lib/project-connection";
+import type { AutoHuntHealth, VelenInspection } from "../lib/project-connection";
 import type {
   LinearImportConnectResult,
   LinearImportResult,
@@ -101,11 +101,13 @@ export type ProjectSettingsSection =
 export function ProjectSettings({
   dashboard,
   githubRepository,
+  health,
   isDeleting,
   isSidebarOpen,
   initialSection,
   navigationSidebar,
   onBack,
+  onAnalyzeWorkflowRequirements,
   onDelete,
   onRegenerateWorkflow,
   onReviseWorkflow,
@@ -117,6 +119,7 @@ export function ProjectSettings({
   onImportLinearIssues,
   onIconChange,
   onRefreshVelen,
+  onRefreshHealth,
   project,
   repositoryConnected,
   sessionToken = null,
@@ -124,11 +127,13 @@ export function ProjectSettings({
 }: {
   dashboard: DashboardPayload | null;
   githubRepository: string | null;
+  health?: AutoHuntHealth | null;
   isDeleting: boolean;
   isSidebarOpen: boolean;
   initialSection?: ProjectSettingsSection;
   navigationSidebar?: ReactNode;
   onBack: () => void;
+  onAnalyzeWorkflowRequirements: () => Promise<unknown>;
   onDelete: () => Promise<unknown>;
   onRegenerateWorkflow: () => Promise<unknown>;
   onReviseWorkflow: (requestedChange: string) => Promise<unknown>;
@@ -149,6 +154,7 @@ export function ProjectSettings({
   }) => Promise<LinearImportResult>;
   onIconChange: (projectId: string, icon: string | null) => Promise<unknown>;
   onRefreshVelen: (org?: string | null) => Promise<VelenInspection | null>;
+  onRefreshHealth?: () => Promise<AutoHuntHealth | null>;
   project: Project;
   repositoryConnected: boolean;
   sessionToken?: string | null;
@@ -160,6 +166,8 @@ export function ProjectSettings({
   const [isConfirming, setIsConfirming] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [workflowCopied, setWorkflowCopied] = useState(false);
+  const [isAnalyzingWorkflowRequirements, setIsAnalyzingWorkflowRequirements] =
+    useState(false);
   const [isRegeneratingWorkflow, setIsRegeneratingWorkflow] = useState(false);
   const [isRevisingWorkflow, setIsRevisingWorkflow] = useState(false);
   const [isUpdatingWorkflowBoundary, setIsUpdatingWorkflowBoundary] =
@@ -167,6 +175,8 @@ export function ProjectSettings({
   const [workflowRevisionRequest, setWorkflowRevisionRequest] = useState("");
   const [workflowError, setWorkflowError] = useState<string | null>(null);
   const [workflowRegenerated, setWorkflowRegenerated] = useState(false);
+  const [workflowRequirementsAnalyzed, setWorkflowRequirementsAnalyzed] =
+    useState(false);
   const [workflowRevised, setWorkflowRevised] = useState(false);
   const [runtimeProvider, setRuntimeProvider] = useState<AgentProvider>(
     defaultProjectLlmSettings.provider,
@@ -224,6 +234,7 @@ export function ProjectSettings({
   const workflowContract = workflow
     ? {
         version: workflow.version,
+        requirements: workflow.requirements ?? [],
         stages: workflow.stages,
         execution: workflow.execution,
         completion: workflow.completion,
@@ -232,6 +243,12 @@ export function ProjectSettings({
   const workflowJson = workflowContract
     ? JSON.stringify(workflowContract, null, 2)
     : "";
+  const requirementHealth = new Map(
+    (health?.requirements ?? []).map((requirement) => [
+      requirement.id,
+      requirement,
+    ]),
+  );
   const runtimeChanged =
     runtimeProvider !== savedRuntime.provider ||
     runtimeModel !== savedRuntime.model ||
@@ -405,6 +422,7 @@ export function ProjectSettings({
     setIsRegeneratingWorkflow(true);
     setWorkflowError(null);
     setWorkflowRegenerated(false);
+    setWorkflowRequirementsAnalyzed(false);
     setWorkflowRevised(false);
     try {
       await onRegenerateWorkflow();
@@ -416,12 +434,29 @@ export function ProjectSettings({
     }
   };
 
+  const analyzeWorkflowRequirements = async () => {
+    setIsAnalyzingWorkflowRequirements(true);
+    setWorkflowError(null);
+    setWorkflowRegenerated(false);
+    setWorkflowRequirementsAnalyzed(false);
+    setWorkflowRevised(false);
+    try {
+      await onAnalyzeWorkflowRequirements();
+      setWorkflowRequirementsAnalyzed(true);
+    } catch (caught) {
+      setWorkflowError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setIsAnalyzingWorkflowRequirements(false);
+    }
+  };
+
   const reviseWorkflow = async () => {
     const requestedChange = workflowRevisionRequest.trim();
     if (!requestedChange) return;
     setIsRevisingWorkflow(true);
     setWorkflowError(null);
     setWorkflowRegenerated(false);
+    setWorkflowRequirementsAnalyzed(false);
     setWorkflowRevised(false);
     try {
       await onReviseWorkflow(requestedChange);
@@ -444,6 +479,7 @@ export function ProjectSettings({
     setIsUpdatingWorkflowBoundary(true);
     setWorkflowError(null);
     setWorkflowRegenerated(false);
+    setWorkflowRequirementsAnalyzed(false);
     setWorkflowRevised(false);
     try {
       await onUpdateWorkflowStopAfterStage(stopAfterStage);
@@ -1200,6 +1236,26 @@ export function ProjectSettings({
               <div className="project-settings-automation-actions">
                 <button
                   disabled={
+                    isAnalyzingWorkflowRequirements ||
+                    isRegeneratingWorkflow ||
+                    isRevisingWorkflow ||
+                    !workflowContract
+                  }
+                  onClick={() => void analyzeWorkflowRequirements()}
+                  type="button"
+                >
+                  {isAnalyzingWorkflowRequirements ? (
+                    <LoaderCircle className="spin" size={14} />
+                  ) : (
+                    <Cpu size={14} />
+                  )}
+                  {isAnalyzingWorkflowRequirements
+                    ? t("settings.analyzingWorkflowRequirements")
+                    : t("settings.analyzeWorkflowRequirements")}
+                </button>
+                <button
+                  disabled={
+                    isAnalyzingWorkflowRequirements ||
                     isRegeneratingWorkflow ||
                     isRevisingWorkflow ||
                     !workflowContract
@@ -1249,6 +1305,7 @@ export function ProjectSettings({
               <Textarea
                 aria-label={t("settings.workflowRevisionLabel")}
                 disabled={
+                  isAnalyzingWorkflowRequirements ||
                   isRegeneratingWorkflow ||
                   isRevisingWorkflow ||
                   !workflowContract
@@ -1266,6 +1323,7 @@ export function ProjectSettings({
                 <small>{t("settings.workflowRevisionDescription")}</small>
                 <button
                   disabled={
+                    isAnalyzingWorkflowRequirements ||
                     isRegeneratingWorkflow ||
                     isRevisingWorkflow ||
                     !workflowContract ||
@@ -1290,6 +1348,12 @@ export function ProjectSettings({
                   <Check size={13} />{t("settings.workflowRegenerated")}
                 </p>
               ) : null}
+              {workflowRequirementsAnalyzed ? (
+                <p className="project-settings-workflow-success">
+                  <Check size={13} />
+                  {t("settings.workflowRequirementsAnalyzed")}
+                </p>
+              ) : null}
               {workflowRevised ? (
                 <p className="project-settings-workflow-success">
                   <Check size={13} />{t("settings.workflowRevised")}
@@ -1311,6 +1375,7 @@ export function ProjectSettings({
                   </span>
                   <SelectMenu
                     disabled={
+                      isAnalyzingWorkflowRequirements ||
                       isRegeneratingWorkflow ||
                       isRevisingWorkflow ||
                       isUpdatingWorkflowBoundary ||
@@ -1339,6 +1404,59 @@ export function ProjectSettings({
                     v{workflowContract.version}
                   </span>
                 </div>
+                <section className="project-workflow-requirements">
+                  <header>
+                    <span>
+                      <Cpu size={16} strokeWidth={1.8} />
+                      <span>
+                        <strong>{t("settings.workflowRequirements")}</strong>
+                        <small>{t("settings.workflowRequirementsDescription")}</small>
+                      </span>
+                    </span>
+                    {onRefreshHealth ? (
+                      <button
+                        aria-label={t("health.recheck")}
+                        onClick={() => void onRefreshHealth()}
+                        type="button"
+                      >
+                        <RefreshCw size={13} />
+                      </button>
+                    ) : null}
+                  </header>
+                  {workflowContract.requirements.length ? (
+                    <ul>
+                      {workflowContract.requirements.map((requirement) => {
+                        const status = requirementHealth.get(requirement.id);
+                        return (
+                          <li key={requirement.id}>
+                            <i className={status?.healthy ? "ok" : "warning"}>
+                              {status?.healthy ? (
+                                <CheckCircle2 size={15} />
+                              ) : (
+                                <CircleAlert size={15} />
+                              )}
+                            </i>
+                            <span>
+                              <strong>{requirement.label}</strong>
+                              <small>{requirement.reason}</small>
+                              <code>{requirement.tool}</code>
+                            </span>
+                            <em>
+                              {status
+                                ? status.healthy
+                                  ? t("common.healthy")
+                                  : t("common.checkNeeded")
+                                : t("health.notChecked")}
+                            </em>
+                            {status?.detail ? <p>{status.detail}</p> : null}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <p>{t("health.noWorkflowRequirements")}</p>
+                  )}
+                </section>
                 <div className="project-workflow-diagram">
                   <ol className="project-workflow-stages">
                     {workflowContract.stages.map((stage, index) => (

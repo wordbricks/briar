@@ -17,6 +17,11 @@ import {
 import { projectAgentAvatarFromCodexPet } from "../lib/codex-pets";
 import type { Project, ProjectAgent, UpdateProjectAgentInput } from "../types";
 import { CodexPetAttribution, CodexPetPicker } from "./CodexPetPicker";
+import {
+  ErrorBanner,
+  MainContent,
+  PageHeader,
+} from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -27,6 +32,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Typography } from "@/components/ui/typography";
 
 export function ProjectAgentSettings({
@@ -122,231 +129,289 @@ export function ProjectAgentSettings({
   };
 
   return (
-    <main
-      className="main-content project-agent-settings-page"
+    <MainContent
+      className="project-agent-settings-page"
       id="project-agent-settings"
     >
-      <header
-        className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`}
-        data-tauri-drag-region
-      />
-      <div className="project-agent-settings-scroll">
-        <section
-          aria-labelledby="project-agent-settings-title"
-          className="project-agent-settings-content"
-        >
-          <button
-            className="auto-hunt-session-back project-agent-settings-back"
-            onClick={onBack}
+      <PageHeader
+        action={
+          <Button
+            className="project-agent-create project-agent-settings-save"
+            disabled={
+              profileSaving || !responsibility.trim() || !profileChanged
+            }
+            onClick={() => void saveProfile()}
             type="button"
           >
-            <ArrowLeft size={16} />
-            {t("agents.back")}
-          </button>
-          <header className="project-agent-settings-heading">
-            <p className="eyebrow">
-              <Bot size={13} />
-              {t("agents.settingsEyebrow")}
-            </p>
-            <h1 id="project-agent-settings-title">
-              {t("agents.settingsTitle")}
-            </h1>
-            <p>
-              {t("agents.settingsDescription", {
-                name: agent.name,
-                project: project.name,
-              })}
-            </p>
-          </header>
-
-          <form
-            className="project-agent-settings-card"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void saveProfile();
-            }}
-          >
+            {profileSaving ? (
+              <LoaderCircle className="spin" size={14} />
+            ) : !profileChanged ? (
+              <Check size={14} />
+            ) : (
+              <Save size={14} />
+            )}
+            {profileSaving
+              ? t("agents.updating")
+              : !profileChanged
+                ? t("common.saved")
+                : t("agents.saveProfile")}
+          </Button>
+        }
+        className={`app-page-header project-agents-heading project-agent-settings-heading${isSidebarOpen ? "" : " sidebar-closed"}`}
+        data-tauri-drag-region
+        title={
+          <span className="project-agent-detail-title">
+            <Button
+              aria-label={t("agents.back")}
+              className="project-agent-detail-back project-agent-settings-back"
+              onClick={onBack}
+              size="icon"
+              type="button"
+              variant="ghost"
+            >
+              <ArrowLeft aria-hidden="true" size={16} />
+            </Button>
+            <span>{t("agents.settingsTitle")}</span>
+          </span>
+        }
+        titleId="project-agent-settings-title"
+      />
+      <div className="project-agents-scroll project-agent-settings-scroll">
+        <section
+          aria-labelledby="project-agent-settings-title"
+          className="project-agents-content project-agent-settings-content"
+        >
+          <div className="project-agents-body project-agent-settings-body">
             <header>
-              <span className="project-agent-settings-card-icon">
-                <Bot size={18} strokeWidth={1.8} />
-              </span>
-              <span>
-                <strong>{t("agents.profileTitle")}</strong>
-                <small>{t("agents.profileDescription")}</small>
-              </span>
-            </header>
-
-            <div className="project-agent-settings-fields">
-              <div className="project-agent-avatar-field">
-                <span>{t("agents.avatar")}</span>
-                <div>
-                  <span className="project-agent-avatar-preview">
-                    {avatar ? (
-                      <img alt="" src={avatar} />
-                    ) : (
-                      <Bot aria-hidden="true" size={26} />
-                    )}
-                  </span>
-                  <span className="project-agent-avatar-actions">
-                    <label className="project-agent-avatar-upload">
-                      <ImagePlus size={14} />
-                      {t(
-                        avatar ? "agents.replaceAvatar" : "agents.uploadAvatar",
-                      )}
-                      <input
-                        accept={projectAgentAvatarAccept}
-                        aria-label={t("agents.uploadAvatar")}
-                        disabled={profileSaving}
-                        onChange={(event) => {
-                          const file = event.currentTarget.files?.[0];
-                          event.currentTarget.value = "";
-                          if (!file) return;
-                          setProfileError(null);
-                          void projectAgentAvatarFromFile(file)
-                            .then((nextAvatar) => {
-                              setAvatar(nextAvatar);
-                              setCodexPet(null);
-                            })
-                            .catch(() =>
-                              setProfileError(t("agents.avatarUploadFailed")),
-                            );
-                        }}
-                        type="file"
-                      />
-                    </label>
-                    {avatar ? (
-                      <button
-                        className="project-agent-avatar-remove"
-                        disabled={profileSaving}
-                        onClick={() => {
-                          setAvatar(null);
-                          setCodexPet(null);
-                          setProfileError(null);
-                        }}
-                        type="button"
-                      >
-                        <Trash2 size={13} />
-                        {t("agents.removeAvatar")}
-                      </button>
-                    ) : null}
-                    <small>{t("agents.avatarHint")}</small>
-                  </span>
-                </div>
-                <div className="project-agent-codex-pet-row">
-                  <CodexPetPicker
-                    disabled={profileSaving}
-                    onSelect={async (pet) => {
-                      setProfileError(null);
-                      const nextAvatar =
-                        await projectAgentAvatarFromCodexPet(pet);
-                      setAvatar(nextAvatar);
-                      setCodexPet({
-                        slug: pet.slug,
-                        name: pet.name,
-                        author: pet.author,
-                        license: pet.license,
-                        spriteVersion: pet.spriteVersion,
-                        spriteSheetUrl: null,
-                      });
-                    }}
-                  />
-                  {codexPet ? <CodexPetAttribution pet={codexPet} /> : null}
-                </div>
+              <div>
+                <Typography as="strong" variant="body">
+                  {t("agents.profileTitle")}
+                </Typography>
+                <Typography as="span" tone="muted" variant="caption">
+                  {t("agents.settingsDescription", {
+                    name: agent.name,
+                    project: project.name,
+                  })}
+                </Typography>
               </div>
-              <label>
-                <span>{t("agents.name")}</span>
-                <input
-                  maxLength={100}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder={t("agents.namePlaceholder")}
-                  value={name}
-                />
-              </label>
-              <label>
-                <span>{t("agents.responsibility")}</span>
-                <textarea
-                  maxLength={2_000}
-                  onChange={(event) => setResponsibility(event.target.value)}
-                  placeholder={t("agents.responsibilityPlaceholder")}
-                  required
-                  rows={6}
-                  value={responsibility}
-                />
-                <small>{t("agents.responsibilityHint")}</small>
-              </label>
-              <label className="project-agent-color-field">
-                <span>{t("agents.calendarColor")}</span>
-                <div>
-                  <input
-                    aria-label={t("agents.calendarColor")}
-                    onChange={(event) => setCalendarColor(event.target.value)}
-                    type="color"
-                    value={calendarColor}
-                  />
-                  <code>{calendarColor.toUpperCase()}</code>
-                </div>
-                <small>{t("agents.calendarColorHint")}</small>
-              </label>
-            </div>
+            </header>
 
             {profileError ? (
-              <p className="project-agent-settings-error" role="alert">
-                <CircleAlert size={14} />
+              <ErrorBanner className="project-agent-settings-error mb-4" icon={<CircleAlert size={14} />}>
                 {profileError}
-              </p>
+              </ErrorBanner>
             ) : null}
-            <footer>
-              <button
-                className="project-agent-settings-save"
-                disabled={
-                  profileSaving || !responsibility.trim() || !profileChanged
-                }
-                type="submit"
-              >
-                {profileSaving ? (
-                  <LoaderCircle className="spin" size={14} />
-                ) : !profileChanged ? (
-                  <Check size={14} />
-                ) : (
-                  <Save size={14} />
-                )}
-                {profileSaving
-                  ? t("agents.updating")
-                  : !profileChanged
-                    ? t("common.saved")
-                    : t("agents.saveProfile")}
-              </button>
-            </footer>
-          </form>
 
-          <section className="project-agent-settings-card danger">
-            <header>
-              <span className="project-agent-settings-card-icon">
-                <Trash2 size={18} strokeWidth={1.8} />
-              </span>
-              <span>
-                <strong>{t("agents.dangerTitle")}</strong>
-                <small>{t("agents.dangerDescription")}</small>
-              </span>
-            </header>
-            {isDeleteDisabled ? (
-              <p className="project-agent-settings-delete-blocked">
-                <CircleAlert size={14} />
-                {t("agents.deleteBlocked")}
-              </p>
-            ) : null}
-            <footer>
-              <Button
-                disabled={isDeleteDisabled}
-                onClick={() => setIsDeleteDialogOpen(true)}
-                type="button"
-                variant="destructive"
-              >
-                <Trash2 size={15} />
-                {t("agents.deleteAgent")}
-              </Button>
-            </footer>
-          </section>
+            <form
+              className="project-agent-settings-card"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void saveProfile();
+              }}
+            >
+              <header>
+                <span className="project-agent-settings-card-icon">
+                  <Bot size={18} strokeWidth={1.8} />
+                </span>
+                <span>
+                  <Typography as="strong" variant="body">
+                    {t("agents.profileTitle")}
+                  </Typography>
+                  <Typography as="small" tone="muted" variant="caption">
+                    {t("agents.profileDescription")}
+                  </Typography>
+                </span>
+              </header>
+
+              <div className="project-agent-settings-fields">
+                <div className="project-agent-avatar-field">
+                  <Label>{t("agents.avatar")}</Label>
+                  <div>
+                    <span className="project-agent-avatar-preview">
+                      {avatar ? (
+                        <img alt="" src={avatar} />
+                      ) : (
+                        <Bot aria-hidden="true" size={26} />
+                      )}
+                    </span>
+                    <span className="project-agent-avatar-actions">
+                      <label className="project-agent-avatar-upload">
+                        <ImagePlus size={14} />
+                        {t(
+                          avatar
+                            ? "agents.replaceAvatar"
+                            : "agents.uploadAvatar",
+                        )}
+                        <input
+                          accept={projectAgentAvatarAccept}
+                          aria-label={t("agents.uploadAvatar")}
+                          disabled={profileSaving}
+                          onChange={(event) => {
+                            const file = event.currentTarget.files?.[0];
+                            event.currentTarget.value = "";
+                            if (!file) return;
+                            setProfileError(null);
+                            void projectAgentAvatarFromFile(file)
+                              .then((nextAvatar) => {
+                                setAvatar(nextAvatar);
+                                setCodexPet(null);
+                              })
+                              .catch(() =>
+                                setProfileError(t("agents.avatarUploadFailed")),
+                              );
+                          }}
+                          type="file"
+                        />
+                      </label>
+                      {avatar ? (
+                        <Button
+                          className="project-agent-avatar-remove"
+                          disabled={profileSaving}
+                          onClick={() => {
+                            setAvatar(null);
+                            setCodexPet(null);
+                            setProfileError(null);
+                          }}
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                        >
+                          <Trash2 size={13} />
+                          {t("agents.removeAvatar")}
+                        </Button>
+                      ) : null}
+                      <Typography as="small" tone="muted" variant="caption">
+                        {t("agents.avatarHint")}
+                      </Typography>
+                    </span>
+                  </div>
+                  <div className="project-agent-codex-pet-row">
+                    <CodexPetPicker
+                      disabled={profileSaving}
+                      onSelect={async (pet) => {
+                        setProfileError(null);
+                        const nextAvatar =
+                          await projectAgentAvatarFromCodexPet(pet);
+                        setAvatar(nextAvatar);
+                        setCodexPet({
+                          slug: pet.slug,
+                          name: pet.name,
+                          author: pet.author,
+                          license: pet.license,
+                          spriteVersion: pet.spriteVersion,
+                          spriteSheetUrl: null,
+                        });
+                      }}
+                    />
+                    {codexPet ? <CodexPetAttribution pet={codexPet} /> : null}
+                  </div>
+                </div>
+                <div className="project-agent-settings-field">
+                  <Label htmlFor="project-agent-settings-name">
+                    {t("agents.name")}
+                  </Label>
+                  <Input
+                    id="project-agent-settings-name"
+                    maxLength={100}
+                    onChange={(event) => setName(event.target.value)}
+                    placeholder={t("agents.namePlaceholder")}
+                    value={name}
+                  />
+                </div>
+                <div className="project-agent-settings-field">
+                  <Label htmlFor="project-agent-settings-responsibility">
+                    {t("agents.responsibility")}
+                  </Label>
+                  <Textarea
+                    id="project-agent-settings-responsibility"
+                    maxLength={2_000}
+                    onChange={(event) => setResponsibility(event.target.value)}
+                    placeholder={t("agents.responsibilityPlaceholder")}
+                    required
+                    rows={6}
+                    value={responsibility}
+                  />
+                  <Typography as="small" tone="muted" variant="caption">
+                    {t("agents.responsibilityHint")}
+                  </Typography>
+                </div>
+                <div className="project-agent-color-field project-agent-settings-field">
+                  <Label htmlFor="project-agent-settings-color">
+                    {t("agents.calendarColor")}
+                  </Label>
+                  <div>
+                    <input
+                      aria-label={t("agents.calendarColor")}
+                      id="project-agent-settings-color"
+                      onChange={(event) => setCalendarColor(event.target.value)}
+                      type="color"
+                      value={calendarColor}
+                    />
+                    <code>{calendarColor.toUpperCase()}</code>
+                  </div>
+                  <Typography as="small" tone="muted" variant="caption">
+                    {t("agents.calendarColorHint")}
+                  </Typography>
+                </div>
+              </div>
+
+              <footer>
+                <Button
+                  className="project-agent-settings-save"
+                  disabled={
+                    profileSaving || !responsibility.trim() || !profileChanged
+                  }
+                  type="submit"
+                >
+                  {profileSaving ? (
+                    <LoaderCircle className="spin" size={14} />
+                  ) : !profileChanged ? (
+                    <Check size={14} />
+                  ) : (
+                    <Save size={14} />
+                  )}
+                  {profileSaving
+                    ? t("agents.updating")
+                    : !profileChanged
+                      ? t("common.saved")
+                      : t("agents.saveProfile")}
+                </Button>
+              </footer>
+            </form>
+
+            <section className="project-agent-settings-card danger">
+              <header>
+                <span className="project-agent-settings-card-icon">
+                  <Trash2 size={18} strokeWidth={1.8} />
+                </span>
+                <span>
+                  <Typography as="strong" variant="body">
+                    {t("agents.dangerTitle")}
+                  </Typography>
+                  <Typography as="small" tone="muted" variant="caption">
+                    {t("agents.dangerDescription")}
+                  </Typography>
+                </span>
+              </header>
+              {isDeleteDisabled ? (
+                <p className="project-agent-settings-delete-blocked">
+                  <CircleAlert size={14} />
+                  {t("agents.deleteBlocked")}
+                </p>
+              ) : null}
+              <footer>
+                <Button
+                  disabled={isDeleteDisabled}
+                  onClick={() => setIsDeleteDialogOpen(true)}
+                  type="button"
+                  variant="destructive"
+                >
+                  <Trash2 size={15} />
+                  {t("agents.deleteAgent")}
+                </Button>
+              </footer>
+            </section>
+          </div>
         </section>
       </div>
       <Dialog
@@ -403,6 +468,6 @@ export function ProjectAgentSettings({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </main>
+    </MainContent>
   );
 }

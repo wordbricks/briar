@@ -27,6 +27,15 @@ const health: AutoHuntHealth = {
   velenAuthenticated: true,
   velenEmail: "jay@example.com",
   velenHealthy: true,
+  requirements: [{
+    id: "ios_simulator",
+    label: "iOS Simulator",
+    kind: "ios_simulator",
+    tool: "xcrun",
+    reason: "Runs the iOS validation suite.",
+    healthy: false,
+    detail: "사용 가능한 iOS 시뮬레이터가 없습니다.",
+  }],
   issues: ["Briar CLI 버전이 앱 번들과 다릅니다."],
 };
 
@@ -75,6 +84,8 @@ describe("ConnectionHealth", () => {
     expect(trigger?.getAttribute("aria-expanded")).toBe("true");
     expect(container.querySelector('[role="dialog"]')).not.toBeNull();
     expect(container.textContent).toContain("Briar CLI");
+    expect(container.textContent).toContain("iOS Simulator");
+    expect(container.textContent).toContain("사용 가능한 iOS 시뮬레이터가 없습니다.");
     expect(container.textContent).toContain("CLI·스킬 복구");
     expect(container.textContent).toContain("Briar CLI 버전이 앱 번들과 다릅니다.");
 

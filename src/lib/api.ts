@@ -2,6 +2,7 @@ import { z } from "zod";
 import { structuredAgentResultSchema } from "./agent-result";
 import { validateIssueAttachments } from "./issue-attachments";
 import {
+  autoHuntRequirementKinds,
   normalizeAutoHuntWorkflow,
   type AutoHuntWorkflow,
 } from "./auto-hunt-contract";
@@ -189,6 +190,13 @@ const projectAgentScheduleSchema = z.object({
 const autoHuntWorkflowSchema: z.ZodType<AutoHuntWorkflow> = z
   .object({
     version: z.literal(1),
+    requirements: z.array(z.object({
+      id: z.string(),
+      label: z.string(),
+      kind: z.enum(autoHuntRequirementKinds),
+      tool: z.string(),
+      reason: z.string(),
+    })).optional(),
     stages: z.array(
       z.object({
         id: z.string(),
