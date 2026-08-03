@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   addIssueDependency,
+  beginDeviceAuthorization,
   claimProjectAgentScheduleRun,
   completeProjectAgentScheduleRun,
   completeIssueResultReview,
   createIssueMessage,
+  createOrganizationInvitation,
   createProjectAgent,
   createProjectAgentSchedule,
   deleteAccount,
@@ -39,6 +41,75 @@ afterEach(() => {
 });
 
 describe("API errors", () => {
+  it("requests explicit Google account selection for an account switch", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              device_code: "device-code",
+              user_code: "USER-CODE",
+              verification_uri_complete:
+                "https://briar-api.example/device?user_code=USER-CODE",
+            }),
+            { headers: { "Content-Type": "application/json" } },
+          ),
+      ),
+    );
+
+    await expect(
+      beginDeviceAuthorization("briar-web", {
+        forceAccountSelection: true,
+      }),
+    ).resolves.toMatchObject({
+      verificationUrl:
+        "https://briar-api.example/device?user_code=USER-CODE&client=web&switch_account=1",
+    });
+  });
+
+  it("builds a shareable web invitation URL from the server path", async () => {
+    const invitation = {
+      id: "invitation-1",
+      organizationId: "organization-1",
+      organizationName: "Briar",
+      initialProjectId: "project-1",
+      initialProjectName: "Website",
+      email: "invitee@example.com",
+      emailHint: "i***@example.com",
+      role: "member" as const,
+      status: "pending" as const,
+      expiresAt: "2026-08-10T00:00:00.000Z",
+      acceptedAt: null,
+      createdAt: "2026-08-03T00:00:00.000Z",
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              invitation,
+              invitePath: "/app/invitations/briar_invite_example",
+            }),
+            { status: 201, headers: { "Content-Type": "application/json" } },
+          ),
+      ),
+    );
+
+    await expect(
+      createOrganizationInvitation("token", "organization-1", {
+        email: invitation.email,
+        initialProjectId: invitation.initialProjectId,
+        role: invitation.role,
+      }),
+    ).resolves.toEqual({
+      invitation,
+      inviteUrl:
+        "https://briar.wordbricks.ai/app/invitations/briar_invite_example",
+    });
+  });
+
   it("updates the signed-in account profile", async () => {
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) =>
       new Response(
