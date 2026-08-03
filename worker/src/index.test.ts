@@ -19,10 +19,29 @@ import worker, {
   runEvidenceInputSchema,
   runReworkInputSchema,
   transcriptSchema,
+  workflowStageLifecycleInputSchema,
   workerSettingsSchema,
 } from "./index";
 
 describe("Worker HTTP contract", () => {
+  it("validates idempotent workflow stage lifecycle requests", () => {
+    expect(
+      workflowStageLifecycleInputSchema.parse({
+        requestId: "11111111-1111-4111-8111-111111111111",
+        attempt: 2,
+        revision: 3,
+        actor: "briar-workflow",
+      }),
+    ).toMatchObject({ attempt: 2, revision: 3 });
+    expect(() =>
+      workflowStageLifecycleInputSchema.parse({
+        requestId: "not-a-uuid",
+        attempt: 0,
+        actor: "",
+      }),
+    ).toThrow();
+  });
+
   it("accepts Worker execution metrics only with a run attempt", () => {
     const metrics = {
       inputTokens: 1_000,

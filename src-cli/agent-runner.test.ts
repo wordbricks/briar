@@ -84,6 +84,8 @@ describe("detached Agent runner", () => {
     expect(prompt).toContain("absolute path in `$BRIAR_CLI`");
     expect(prompt).toContain("instead of the bare `briar` command");
     expect(prompt).toContain("structured blocked result");
+    expect(prompt).toContain("briar run stage start");
+    expect(prompt).toContain("briar run stage complete");
     expect(prompt).toContain("original problem and the specific data");
     expect(prompt).toContain("key implementation approach");
     expect(prompt).toContain("before-and-after operational or user impact");
@@ -106,6 +108,27 @@ describe("detached Agent runner", () => {
       model: "gpt-5",
       effort: "high",
     });
+  });
+
+  it("prevents terminal-stage replay after the final checkpoint resumes", () => {
+    const prompt = detachedAgentPrompt({
+      agent,
+      snapshot: {
+        sourceKey: "BRIAR-99",
+        title: "Finish terminal review",
+      },
+      workspacePath: "/worktree",
+      startStage: null,
+      resumeContext: {
+        checkpointKey: "after-production",
+        position: "after",
+        revision: 4,
+        terminalReviewOnly: true,
+      },
+    });
+
+    expect(prompt).toContain("Do not execute the terminal stage again");
+    expect(prompt).toContain("record only terminal completion");
   });
 
   it("uses the same noninteractive contract for standalone providers", () => {

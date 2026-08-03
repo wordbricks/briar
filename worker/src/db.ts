@@ -15,6 +15,7 @@ import {
   type AutoHuntSource,
   type DashboardStage,
   type AutoHuntWorkflow,
+  type AutoHuntWorkflowCheckpoint,
   type AutoHuntWorkflowCheckpointPosition,
   type AutoHuntWorkflowStageId,
 } from "../../src/lib/auto-hunt-contract";
@@ -1058,6 +1059,253 @@ export async function completeWorkflowStage(
   };
 }
 
+export type WorkflowStageLifecycleCheckpoint = {
+  key: string;
+  stage: AutoHuntWorkflowStageId;
+  position: AutoHuntWorkflowCheckpointPosition;
+  revision: number;
+};
+
+export type WorkflowStageLifecycleResult = {
+  outcome:
+    | "started"
+    | "completed"
+    | "already_started"
+    | "already_completed"
+    | "paused"
+    | "not_found";
+  attempt: number | null;
+  revision: number | null;
+  stage: AutoHuntWorkflowStageId;
+  checkpoint: WorkflowStageLifecycleCheckpoint | null;
+};
+
+const lifecycleCheckpoint = (
+  checkpoint: AutoHuntWorkflowCheckpoint,
+  revision: number,
+): WorkflowStageLifecycleCheckpoint => ({
+  key: checkpoint.key,
+  stage: checkpoint.stage,
+  position: checkpoint.position,
+  revision,
+});
+
+const pauseAtWorkflowCheckpoint = async (
+  db: D1Database,
+  projectId: string,
+  input: WorkflowProgressInput & {
+    checkpoint: AutoHuntWorkflowCheckpoint;
+    reachedAt: string;
+  },
+) => {
+  const reached = await reachWorkflowCheckpoint(db, projectId, {
+    runId: input.runId,
+    attempt: input.attempt,
+    revision: input.revision,
+    checkpointKey: input.checkpoint.key,
+    reachedAt: input.reachedAt,
+  });
+  if (!["waiting", "already_waiting"].includes(reached.outcome)) {
+    throw new HuntTransitionError(
+      `Checkpoint ${input.checkpoint.key} changed while pausing the workflow`,
+    );
+  }
+  return lifecycleCheckpoint(input.checkpoint, reached.revision!);
+};
+
+export async function assertWorkflowStageEvidence(
+  db: D1Database,
+  projectId: string,
+  input: WorkflowProgressInput & { stageId: AutoHuntWorkflowStageId },
+) {
+  const initialized = await ensureWorkflowProgress(db, projectId, input);
+  if (!initialized) throw new HuntTransitionError("Run does not exist");
+  const { run, workflow, attempt, revision } = initialized;
+  const stage = workflow.stages.find((candidate) => candidate.id === input.stageId);
+  if (!stage) {
+    throw new HuntTransitionError(
+      `Workflow stage is not configured for this run: ${input.stageId}`,
+    );
+  }
+  const requiredEvidence = stage.evidence ?? [];
+  if (requiredEvidence.length === 0) return;
+  const requirement = await db
+    .prepare(
+      `select required_revision from briar_run_stage_revisions
+       where run_id = ? and attempt = ? and workflow_stage = ?`,
+    )
+    .bind(run.id, attempt, input.stageId)
+    .first<{ required_revision: number }>();
+  const minimumRevision = requirement?.required_revision ?? 1;
+  const result = await db
+    .prepare(
+      `select evidence_type from briar_run_evidence
+       where run_id = ? and attempt = ? and workflow_stage = ?
+         and revision >= ? and revision <= ?
+         and status in ('passed', 'skipped')`,
+    )
+    .bind(run.id, attempt, input.stageId, minimumRevision, revision)
+    .all<{ evidence_type: string }>();
+  const accepted = new Set(result.results.map((item) => item.evidence_type));
+  const missing = requiredEvidence.filter((type) => !accepted.has(type));
+  if (missing.length > 0) {
+    throw new HuntTransitionError(
+      `Stage ${input.stageId} requires evidence: ${missing.join(", ")}`,
+    );
+  }
+}
+
+export async function startWorkflowStageLifecycle(
+  db: D1Database,
+  projectId: string,
+  input: WorkflowProgressInput & {
+    stageId: AutoHuntWorkflowStageId;
+    startedAt: string;
+  },
+): Promise<WorkflowStageLifecycleResult> {
+  const initialized = await ensureWorkflowProgress(db, projectId, input);
+  if (!initialized) {
+    return {
+      outcome: "not_found",
+      attempt: null,
+      revision: null,
+      stage: input.stageId,
+      checkpoint: null,
+    };
+  }
+  const { workflow, attempt, revision } = initialized;
+  const progress = await getWorkflowProgress(db, projectId, input.runId, {
+    attempt,
+    revision,
+  });
+  if (!progress) throw new HuntTransitionError("Workflow progress is unavailable");
+  const stageRank = workflowStageRank(workflow, input.stageId);
+  const blockingCheckpoint = workflow.execution.checkpoints.find((checkpoint) => {
+    const row = workflowCheckpointRow(progress, checkpoint.key);
+    const checkpointRank = workflowStageRank(workflow, checkpoint.stage);
+    return row && ["pending", "waiting"].includes(row.state) &&
+      (checkpointRank < stageRank ||
+        (checkpointRank === stageRank && checkpoint.position === "before"));
+  });
+  const blockingProgress = blockingCheckpoint
+    ? workflowCheckpointRow(progress, blockingCheckpoint.key)
+    : null;
+  if (blockingCheckpoint && blockingProgress) {
+    const checkpoint = blockingProgress.state === "waiting"
+      ? lifecycleCheckpoint(blockingCheckpoint, revision)
+      : await pauseAtWorkflowCheckpoint(db, projectId, {
+          runId: input.runId,
+          attempt,
+          revision,
+          checkpoint: blockingCheckpoint,
+          reachedAt: input.startedAt,
+        });
+    return {
+      outcome: "paused",
+      attempt,
+      revision,
+      stage: input.stageId,
+      checkpoint,
+    };
+  }
+  const prior = workflowStageRow(progress, input.stageId);
+  const started = await startWorkflowStage(db, projectId, {
+    ...input,
+    attempt,
+    revision,
+  });
+  return {
+    outcome: prior?.state === "completed" || prior?.state === "skipped"
+      ? "already_completed"
+      : started.outcome === "already_running"
+        ? "already_started"
+        : started.outcome === "not_found"
+          ? "not_found"
+          : "started",
+    attempt,
+    revision,
+    stage: input.stageId,
+    checkpoint: null,
+  };
+}
+
+export async function completeWorkflowStageLifecycle(
+  db: D1Database,
+  projectId: string,
+  input: WorkflowProgressInput & {
+    stageId: AutoHuntWorkflowStageId;
+    finishedAt: string;
+  },
+): Promise<WorkflowStageLifecycleResult> {
+  const initialized = await ensureWorkflowProgress(db, projectId, input);
+  if (!initialized) {
+    return {
+      outcome: "not_found",
+      attempt: null,
+      revision: null,
+      stage: input.stageId,
+      checkpoint: null,
+    };
+  }
+  const { workflow, attempt, revision } = initialized;
+  const progress = await getWorkflowProgress(db, projectId, input.runId, {
+    attempt,
+    revision,
+  });
+  if (!progress) throw new HuntTransitionError("Workflow progress is unavailable");
+  const prior = workflowStageRow(progress, input.stageId);
+  if (prior?.state !== "completed" && prior?.state !== "skipped") {
+    await assertWorkflowStageEvidence(db, projectId, {
+      runId: input.runId,
+      attempt,
+      revision,
+      stageId: input.stageId,
+    });
+  }
+  const completed = await completeWorkflowStage(db, projectId, {
+    ...input,
+    attempt,
+    revision,
+  });
+  const updated = await getWorkflowProgress(db, projectId, input.runId, {
+    attempt,
+    revision,
+  });
+  const after = workflowCheckpointAt(workflow, input.stageId, "after");
+  const afterProgress = after && updated
+    ? workflowCheckpointRow(updated, after.key)
+    : null;
+  if (after && afterProgress && ["pending", "waiting"].includes(afterProgress.state)) {
+    const checkpoint = afterProgress.state === "waiting"
+      ? lifecycleCheckpoint(after, revision)
+      : await pauseAtWorkflowCheckpoint(db, projectId, {
+          runId: input.runId,
+          attempt,
+          revision,
+          checkpoint: after,
+          reachedAt: input.finishedAt,
+        });
+    return {
+      outcome: "paused",
+      attempt,
+      revision,
+      stage: input.stageId,
+      checkpoint,
+    };
+  }
+  return {
+    outcome: prior?.state === "completed" || prior?.state === "skipped"
+      ? "already_completed"
+      : completed.outcome === "not_found"
+        ? "not_found"
+        : "completed",
+    attempt,
+    revision,
+    stage: input.stageId,
+    checkpoint: null,
+  };
+}
+
 export async function skipWorkflowStage(
   db: D1Database,
   projectId: string,
@@ -1278,6 +1526,7 @@ export async function resumeWorkflowCheckpoint(
   attempt: number | null;
   revision: number | null;
   nextStage: AutoHuntWorkflowStageId | null;
+  terminalReviewOnly: boolean;
 }> {
   const run = await getHuntRunForProject(db, projectId, input.runId);
   if (!run) {
@@ -1287,6 +1536,7 @@ export async function resumeWorkflowCheckpoint(
       attempt: null,
       revision: null,
       nextStage: null,
+      terminalReviewOnly: false,
     };
   }
   const priorRequest = await db
@@ -1302,6 +1552,11 @@ export async function resumeWorkflowCheckpoint(
     const index = workflow.execution.checkpoints.findIndex(
       (checkpoint) => checkpoint.key === priorRequest.checkpoint_key,
     );
+    const configured = index >= 0
+      ? workflow.execution.checkpoints[index]
+      : null;
+    const terminalReviewOnly = configured?.position === "after" &&
+      configured.stage === workflow.stages.at(-1)?.id;
     return {
       outcome:
         priorRequest.checkpoint_key === input.checkpointKey
@@ -1310,13 +1565,13 @@ export async function resumeWorkflowCheckpoint(
       checkpointKey: priorRequest.checkpoint_key,
       attempt: priorRequest.attempt,
       revision: priorRequest.revision,
-      nextStage:
-        index >= 0
-          ? workflow.execution.checkpoints[index]?.position === "before"
-            ? workflow.execution.checkpoints[index]?.stage ?? null
-            : workflow.stages[workflowStageRank(workflow, priorRequest.stage_id) + 1]?.id ??
-              priorRequest.stage_id
-          : null,
+      nextStage: terminalReviewOnly
+        ? null
+        : configured?.position === "before"
+          ? configured.stage
+          : workflow.stages[workflowStageRank(workflow, priorRequest.stage_id) + 1]?.id ??
+            null,
+      terminalReviewOnly,
     };
   }
   if (
@@ -1329,6 +1584,7 @@ export async function resumeWorkflowCheckpoint(
       attempt: run.current_attempt,
       revision: run.current_revision,
       nextStage: null,
+      terminalReviewOnly: false,
     };
   }
   const initialized = await ensureWorkflowProgress(db, projectId, input);
@@ -1339,6 +1595,7 @@ export async function resumeWorkflowCheckpoint(
       attempt: null,
       revision: null,
       nextStage: null,
+      terminalReviewOnly: false,
     };
   }
   const { workflow, attempt, revision } = initialized;
@@ -1355,6 +1612,7 @@ export async function resumeWorkflowCheckpoint(
       attempt,
       revision,
       nextStage: null,
+      terminalReviewOnly: false,
     };
   }
   if (
@@ -1367,11 +1625,16 @@ export async function resumeWorkflowCheckpoint(
       attempt,
       revision,
       nextStage: null,
+      terminalReviewOnly: false,
     };
   }
-  const nextStage = configured.position === "before"
-    ? configured.stage
-    : workflow.stages[workflowStageRank(workflow, configured.stage) + 1]?.id ?? configured.stage;
+  const terminalReviewOnly = configured.position === "after" &&
+    configured.stage === workflow.stages.at(-1)?.id;
+  const nextStage = terminalReviewOnly
+    ? null
+    : configured.position === "before"
+      ? configured.stage
+      : workflow.stages[workflowStageRank(workflow, configured.stage) + 1]?.id ?? null;
   const results = await db.batch([
     db
       .prepare(
@@ -1418,6 +1681,7 @@ export async function resumeWorkflowCheckpoint(
       attempt,
       revision,
       nextStage,
+      terminalReviewOnly,
     };
   }
   return {
@@ -1426,6 +1690,7 @@ export async function resumeWorkflowCheckpoint(
     attempt,
     revision,
     nextStage,
+    terminalReviewOnly,
   };
 }
 
@@ -1477,17 +1742,22 @@ export async function assertWorkflowRunCompletion(
       : [],
   );
   if (requiredEvidence.length > 0) {
+    const revisionRequirements = await loadStageRevisionRequirements(db, run);
     const evidence = await db
       .prepare(
-        `select workflow_stage, evidence_type
+        `select workflow_stage, evidence_type, revision
          from briar_run_evidence
-         where run_id = ? and attempt = ? and revision = ?
+         where run_id = ? and attempt = ? and revision <= ?
            and status in ('passed', 'skipped')`,
       )
       .bind(run.id, attempt, revision)
-      .all<{ workflow_stage: string; evidence_type: string }>();
+      .all<{ workflow_stage: string; evidence_type: string; revision: number }>();
     const accepted = new Set(
-      evidence.results.map((item) => `${item.workflow_stage}:${item.evidence_type}`),
+      evidence.results
+        .filter((item) =>
+          item.revision >= (revisionRequirements.get(item.workflow_stage) ?? 1)
+        )
+        .map((item) => `${item.workflow_stage}:${item.evidence_type}`),
     );
     const missingEvidence = requiredEvidence
       .filter((item) => !accepted.has(`${item.stage}:${item.type}`))
@@ -4596,34 +4866,37 @@ const assertRunCompletionEligible = async (
   trackerState: string | null,
 ) => {
   const workflow = parseWorkflow(run.workflow_snapshot_json);
-  if (await workflowProgressAvailable(db, run.id)) {
+  const hasWorkflowProgress = await workflowProgressAvailable(db, run.id);
+  if (hasWorkflowProgress) {
     await assertWorkflowRunCompletion(db, projectId, run.id);
   }
   const requiredStages = requiredWorkflowStages(workflow);
   const revisionRequirements = await loadStageRevisionRequirements(db, run);
-  const completedStages = await db
-    .prepare(
-      `select workflow_stage, revision from briar_hunt_events
-       where run_id = ? and attempt = ? and workflow_stage is not null`,
-    )
-    .bind(run.id, run.current_attempt)
-    .all<{ workflow_stage: AutoHuntWorkflowStageId; revision: number }>();
-  const completedStageIds = new Set(
-    completedStages.results
-      .filter(
-        (event) =>
-          event.revision >=
-          (revisionRequirements.get(event.workflow_stage) ?? 1),
+  if (!hasWorkflowProgress) {
+    const completedStages = await db
+      .prepare(
+        `select workflow_stage, revision from briar_hunt_events
+         where run_id = ? and attempt = ? and workflow_stage is not null`,
       )
-      .map((event) => event.workflow_stage),
-  );
-  const missingStages = requiredStages.filter(
-    (stage) => !completedStageIds.has(stage),
-  );
-  if (missingStages.length > 0) {
-    throw new HuntTransitionError(
-      `Run completion requires workflow stages: ${missingStages.join(", ")}`,
+      .bind(run.id, run.current_attempt)
+      .all<{ workflow_stage: AutoHuntWorkflowStageId; revision: number }>();
+    const completedStageIds = new Set(
+      completedStages.results
+        .filter(
+          (event) =>
+            event.revision >=
+            (revisionRequirements.get(event.workflow_stage) ?? 1),
+        )
+        .map((event) => event.workflow_stage),
     );
+    const missingStages = requiredStages.filter(
+      (stage) => !completedStageIds.has(stage),
+    );
+    if (missingStages.length > 0) {
+      throw new HuntTransitionError(
+        `Run completion requires workflow stages: ${missingStages.join(", ")}`,
+      );
+    }
   }
   const requiredEvidence = workflow.stages.flatMap((stage) =>
     requiredStages.includes(stage.id)
@@ -4859,6 +5132,29 @@ export async function recordHuntEvent(
   }
   const eventAttempt = existingRun?.current_attempt ?? 1;
   const eventRevision = existingRun?.current_revision ?? 1;
+  if (
+    existingRun &&
+    normalizedInput.status === "running" &&
+    normalizedInput.workflowStage &&
+    await workflowProgressAvailable(db, existingRun.id)
+  ) {
+    const progress = await getWorkflowProgress(db, projectId, existingRun.id, {
+      attempt: eventAttempt,
+      revision: eventRevision,
+    });
+    const lifecycleStage = progress
+      ? workflowStageRow(progress, normalizedInput.workflowStage)
+      : null;
+    if (
+      progress?.waitingCheckpoint ||
+      !lifecycleStage ||
+      !["running", "completed", "skipped"].includes(lifecycleStage.state)
+    ) {
+      throw new HuntTransitionError(
+        `Stage ${normalizedInput.workflowStage} must be started through the workflow lifecycle before recording status events`,
+      );
+    }
+  }
   const storedEventKey = await scopedRunKey(
     normalizedInput.eventKey,
     eventAttempt,
