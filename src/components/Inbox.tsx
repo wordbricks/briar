@@ -1,4 +1,11 @@
-import { useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   AtSign,
   BellRing,
@@ -28,6 +35,12 @@ import {
   type InboxMessageWithReadState,
 } from "../hooks/useInbox";
 
+/** Number of filtered inbox rows revealed per page while scrolling. */
+export const INBOX_PAGE_SIZE = 50;
+
+/** Distance from the bottom of the scroll container that triggers the next page. */
+const INBOX_LOAD_MORE_THRESHOLD_PX = 240;
+
 const inboxFilters = [
   "urgent",
   "action_required",
@@ -40,6 +53,23 @@ const defaultInboxFilters = new Set<InboxCategory>([
   "action_required",
   "important",
 ]);
+
+export function pageInboxMessages<T>(
+  messages: readonly T[],
+  visibleCount: number,
+): T[] {
+  return messages.slice(0, Math.max(0, visibleCount));
+}
+
+export function nextInboxVisibleCount(
+  currentVisibleCount: number,
+  totalCount: number,
+  pageSize = INBOX_PAGE_SIZE,
+): number {
+  if (totalCount <= 0) return 0;
+  if (currentVisibleCount >= totalCount) return totalCount;
+  return Math.min(currentVisibleCount + pageSize, totalCount);
+}
 
 export function Inbox({
   companionMode = false,
@@ -65,6 +95,8 @@ export function Inbox({
     () => new Set(defaultInboxFilters),
   );
   const [selectedProjectId, setSelectedProjectId] = useState("all");
+  const [visibleCount, setVisibleCount] = useState(INBOX_PAGE_SIZE);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
   const projectOptions = useMemo(
     () => [
       { label: t("inbox.allProjects"), value: "all" },
@@ -107,6 +139,62 @@ export function Inbox({
       ),
     [activeFilters, projectMessages],
   );
+  const filterKey = useMemo(
+    () =>
+      `${effectiveProjectId}:${[...activeFilters].sort().join(",")}`,
+    [activeFilters, effectiveProjectId],
+  );
+  const visibleMessages = useMemo(
+    () => pageInboxMessages(filteredMessages, visibleCount),
+    [filteredMessages, visibleCount],
+  );
+  const hasMore = visibleMessages.length < filteredMessages.length;
+
+  useEffect(() => {
+    setVisibleCount(INBOX_PAGE_SIZE);
+  }, [filterKey]);
+
+  useEffect(() => {
+    setVisibleCount((current) => {
+      if (filteredMessages.length === 0) return INBOX_PAGE_SIZE;
+      if (current > filteredMessages.length) return filteredMessages.length;
+      return current < INBOX_PAGE_SIZE
+        ? Math.min(INBOX_PAGE_SIZE, filteredMessages.length)
+        : current;
+    });
+  }, [filteredMessages.length]);
+
+  const loadMore = useCallback(() => {
+    setVisibleCount((current) =>
+      nextInboxVisibleCount(current, filteredMessages.length),
+    );
+  }, [filteredMessages.length]);
+
+  const maybeLoadMoreFromScroll = useCallback(
+    (element: HTMLDivElement) => {
+      if (!hasMore) return;
+      const remaining =
+        element.scrollHeight - element.scrollTop - element.clientHeight;
+      if (remaining <= INBOX_LOAD_MORE_THRESHOLD_PX) {
+        loadMore();
+      }
+    },
+    [hasMore, loadMore],
+  );
+
+  // When the viewport is taller than the first page, keep loading until the
+  // list either fills the scroll area or runs out of messages. Skip when the
+  // element has not been laid out yet (common in unit tests).
+  useLayoutEffect(() => {
+    const element = scrollRef.current;
+    if (!element || !hasMore || element.clientHeight <= 0) return;
+    if (
+      element.scrollHeight <=
+      element.clientHeight + INBOX_LOAD_MORE_THRESHOLD_PX
+    ) {
+      loadMore();
+    }
+  }, [hasMore, loadMore, visibleMessages.length]);
 
   const toggleFilter = (category: InboxCategory) => {
     setActiveFilters((current) => {
@@ -139,7 +227,13 @@ export function Inbox({
   );
 
   const inboxContent = (
-    <div className="inbox-scroll min-h-0 flex-1 overflow-auto">
+    <div
+      className="inbox-scroll min-h-0 flex-1 overflow-auto"
+      data-has-more={hasMore ? "true" : "false"}
+      data-visible-count={visibleMessages.length}
+      onScroll={(event) => maybeLoadMoreFromScroll(event.currentTarget)}
+      ref={scrollRef}
+    >
       <section className="inbox-content" aria-labelledby="inbox-title">
         {companionMode ? pageHeader : null}
 
@@ -202,7 +296,7 @@ export function Inbox({
             />
           ) : (
             <div className="inbox-list">
-              {filteredMessages.map((message) => (
+              {visibleMessages.map((message) => (
                 <InboxMessageRow
                   category={classifyInboxMessage(message)}
                   key={message.id}
@@ -213,6 +307,13 @@ export function Inbox({
                   t={t}
                 />
               ))}
+              {hasMore ? (
+                <div
+                  aria-hidden="true"
+                  className="inbox-load-more-sentinel"
+                  data-testid="inbox-load-more-sentinel"
+                />
+              ) : null}
             </div>
           )}
         </section>
