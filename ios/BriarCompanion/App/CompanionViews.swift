@@ -689,6 +689,21 @@ struct RunDetailView: View {
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
+                            if let parent = detail.messages.first(where: {
+                                $0.id == message.parentMessageId
+                            }) {
+                                HStack(alignment: .top, spacing: 6) {
+                                    Image(systemName: "arrowshape.turn.up.left")
+                                        .font(.caption2)
+                                    Text(parent.body)
+                                        .font(.caption)
+                                        .lineLimit(2)
+                                }
+                                .foregroundStyle(.secondary)
+                                .padding(8)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                            }
                             MarkdownText(markdown: message.body)
                             Button("답글") { replyTo = message }
                                 .font(.caption)
