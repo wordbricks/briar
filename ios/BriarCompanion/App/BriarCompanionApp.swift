@@ -12,6 +12,7 @@ struct BriarCompanionApp: App {
                 CompanionRootView(api: MobileAPIClient(baseURL: Self.apiBaseURL))
             }
         }
+        .handlesExternalEvents(matching: Set(arrayLiteral: "*"))
     }
 
     private static var apiBaseURL: URL {
@@ -26,6 +27,10 @@ private struct UITestCompanionFlow: View {
     @State private var selectedProjectID: UUID?
     @State private var projectSelected = false
     @State private var createdRunStatus: DashboardRun.Status?
+    @StateObject private var navigation = CompanionNavigationModel()
+    @StateObject private var agents: AgentsStore
+    @StateObject private var inbox = InboxStore()
+    @StateObject private var notifications = LocalNotificationService()
 
     let offline: Bool
     private let api = UITestAPIClient()
@@ -42,6 +47,7 @@ private struct UITestCompanionFlow: View {
     init(offline: Bool) {
         self.offline = offline
         _selectedProjectID = State(initialValue: project.id)
+        _agents = StateObject(wrappedValue: AgentsStore(api: UITestAPIClient()))
     }
 
     var body: some View {
@@ -64,6 +70,10 @@ private struct UITestCompanionFlow: View {
             )
         } else {
             CompanionShellView(
+                navigation: navigation,
+                agents: agents,
+                inbox: inbox,
+                notifications: notifications,
                 project: project,
                 snapshot: snapshot,
                 isRefreshing: false,
@@ -71,6 +81,13 @@ private struct UITestCompanionFlow: View {
                 token: "ui-test-token",
                 api: api,
                 ideas: IdeasStore(api: api),
+                user: CurrentUserResponse.User(
+                    id: "fixture-user",
+                    username: "briar_user",
+                    name: "Briar User",
+                    email: "user@example.com",
+                    image: nil
+                ),
                 refresh: { await refreshSnapshot() },
                 changeProject: { projectSelected = false },
                 signOut: {
@@ -78,6 +95,10 @@ private struct UITestCompanionFlow: View {
                     signedIn = false
                 }
             )
+            .task {
+                agents.select(projectID: project.id, token: "ui-test-token", locale: "ko")
+                inbox.update(snapshot: snapshot, sessions: agents.sessions, project: project)
+            }
         }
     }
 
@@ -199,6 +220,14 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
             payload = #"{"messages":[]}"#
         } else if path.hasSuffix("/evidence") {
             payload = #"{"evidence":[]}"#
+        } else if path.contains("/agents") {
+            payload = ##"""
+            {"agents":[{"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","projectId":"11111111-1111-4111-8111-111111111111","name":"Auto Hunt agent","avatar":null,"codexPet":null,"provider":"codex","model":"gpt-5.4","responsibility":"Perform Auto Hunt for every queued issue.","skill":"# Auto Hunt agent","calendarColor":"#3275d5","createdAt":"2026-08-02T01:00:00Z","updatedAt":"2026-08-02T01:00:00Z"}]}
+            """##
+        } else if path.contains("/agent-sessions") {
+            payload = ##"""
+            {"sessions":[{"id":"session-fixture-1","projectId":"11111111-1111-4111-8111-111111111111","dispatchGroupId":"dispatch-1","agentId":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","sessionType":"task","trigger":"manual","scheduleId":null,"scheduleRunId":null,"parentSessionId":null,"request":"Complete native inbox work","status":"completed","issues":[{"runId":"33333333-3333-4333-8333-333333333333","runNumber":3832,"sourceKey":"briar-issue:ui-test","title":"iOS Native Companion","outcome":"completed","summary":"Done"}],"startedAt":"2026-08-02T01:00:00Z","completedAt":"2026-08-02T01:05:00Z","conversationId":null,"workspaceRoot":null,"summary":"Completed","error":null,"events":[{"id":"event-1","type":"started","occurredAt":"2026-08-02T01:00:00Z"},{"id":"event-2","type":"completed","occurredAt":"2026-08-02T01:05:00Z"}],"dispatchEvents":[],"workers":[],"updatedAt":"2026-08-02T01:05:00Z"}]}
+            """##
         } else {
             throw MobileAPIError.invalidRequest
         }

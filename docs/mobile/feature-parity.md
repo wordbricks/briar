@@ -18,7 +18,10 @@
 | 의존성·실행 설정 | 제공 | 제공 | 제공 | 선행 이슈 DAG와 provider/model/effort 설정을 dashboard 및 공통 쓰기 API로 사용 |
 | 실행·복구·검수 제어 | 제공 | 제공 | 제공 | 상태 이동, 즉시 실행, Worker 선택·재할당, retry/cancel, 결과 review와 requestId 멱등성을 공유 |
 | 아이디어 문서·대화·이슈 계획 | 제공 | 제공 | 제공 | D1 아이디어 계약, 온라인 실행 워커, 모바일 대화/문서 전환 UI를 공유 |
-| 알림 및 딥 링크 | 제공 | 제공 | 계획 | 플랫폼별 권한·복구 동작을 별도 ADR에서 정의 |
+| 알림 및 딥 링크 | 제공 | 제공 | 제공 | `briar-companion` 딥링크와 Universal Link(`/open/issues`, `/open/sessions`), Inbox 분류·읽음, polling 로컬 알림, app badge |
+| Agent·Session 목록/상세 | 제공 | 제공 | 제공 | `GET /projects/{id}/agents`, `GET /projects/{id}/agent-sessions` 원격 snapshot 동기화 |
+| 대체 앱 아이콘 | 제공 | 제공 | 제공 | purple/gray/pink/green alternate icons |
+| 공유·클립보드 링크 | 제공 | 제공 | 제공 | Share Sheet와 이슈/세션 HTTPS 링크 복사 |
 | 앱 설정/테마 | 제공 | 제공 | 제공 | system/light/dark를 로컬 저장하고 읽기 전용 권한 경계를 설정 화면에 명시 |
 | 쓰기 요청 안전장치 | 제공 | 제공 | 제공 | 실행 단위 requestId와 진행 중 action gate로 재전송과 중복 탭을 방지하고 성공 후 snapshot을 갱신 |
 | App/Unit/UI 자동 검증 | 해당 없음 | 해당 없음 | 제공 | 로그인→프로젝트→검색→상세, 대표 상태 필터, 오프라인 재시도 UI 테스트 포함 |

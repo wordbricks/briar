@@ -8,6 +8,58 @@
 	<string>Briar Native Dev</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIcons</key>
+	<dict>
+		<key>CFBundleAlternateIcons</key>
+		<dict>
+			<key>AppIconGray</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>AppIconGray</string>
+			</dict>
+			<key>AppIconGreen</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>AppIconGreen</string>
+			</dict>
+			<key>AppIconPink</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>AppIconPink</string>
+			</dict>
+		</dict>
+		<key>CFBundlePrimaryIcon</key>
+		<dict>
+			<key>CFBundleIconName</key>
+			<string>AppIcon</string>
+		</dict>
+	</dict>
+	<key>CFBundleIcons~ipad</key>
+	<dict>
+		<key>CFBundleAlternateIcons</key>
+		<dict>
+			<key>AppIconGray</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>AppIconGray</string>
+			</dict>
+			<key>AppIconGreen</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>AppIconGreen</string>
+			</dict>
+			<key>AppIconPink</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>AppIconPink</string>
+			</dict>
+		</dict>
+		<key>CFBundlePrimaryIcon</key>
+		<dict>
+			<key>CFBundleIconName</key>
+			<string>AppIcon</string>
+		</dict>
+	</dict>
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
@@ -40,6 +92,10 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations</key>

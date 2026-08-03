@@ -5,7 +5,11 @@
     "version": "1.0.0",
     "description": "Additive subset shared by native iOS (briar-mobile) and Android (briar-android) Companion clients."
   },
-  "servers": [{ "url": "https://briar-api.wbai.workers.dev" }],
+  "servers": [
+    {
+      "url": "https://briar-api.wbai.workers.dev"
+    }
+  ],
   "paths": {
     "/health": {
       "get": {
@@ -13,7 +17,13 @@
         "responses": {
           "200": {
             "description": "Worker is available",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HealthResponse" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -23,14 +33,28 @@
         "operationId": "beginDeviceAuthorization",
         "requestBody": {
           "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DeviceCodeRequest" } } }
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceCodeRequest"
+              }
+            }
+          }
         },
         "responses": {
           "200": {
             "description": "Device authorization started",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DeviceCodeResponse" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceCodeResponse"
+                }
+              }
+            }
           },
-          "400": { "$ref": "#/components/responses/Error" }
+          "400": {
+            "$ref": "#/components/responses/Error"
+          }
         }
       }
     },
@@ -39,16 +63,34 @@
         "operationId": "pollDeviceToken",
         "requestBody": {
           "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DeviceTokenRequest" } } }
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceTokenRequest"
+              }
+            }
+          }
         },
         "responses": {
           "200": {
             "description": "Access token issued",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DeviceTokenResponse" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceTokenResponse"
+                }
+              }
+            }
           },
           "400": {
             "description": "Polling state or terminal authorization error",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DeviceTokenError" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceTokenError"
+                }
+              }
+            }
           }
         }
       }
@@ -56,41 +98,83 @@
     "/me": {
       "get": {
         "operationId": "getCurrentUser",
-        "security": [{ "bearerAuth": [] }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Authenticated user",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CurrentUserResponse" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentUserResponse"
+                }
+              }
+            }
           },
-          "401": { "$ref": "#/components/responses/Error" }
+          "401": {
+            "$ref": "#/components/responses/Error"
+          }
         }
       }
     },
     "/projects": {
       "get": {
         "operationId": "listProjects",
-        "security": [{ "bearerAuth": [] }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Projects visible to the authenticated user",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProjectsResponse" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectsResponse"
+                }
+              }
+            }
           },
-          "401": { "$ref": "#/components/responses/Error" }
+          "401": {
+            "$ref": "#/components/responses/Error"
+          }
         }
       }
     },
     "/projects/{projectId}/dashboard": {
       "get": {
         "operationId": "getDashboardSnapshot",
-        "parameters": [{ "$ref": "#/components/parameters/ProjectId" }],
-        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Current project dashboard and synchronization cursor",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DashboardSnapshot" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardSnapshot"
+                }
+              }
+            }
           },
-          "401": { "$ref": "#/components/responses/Error" },
-          "404": { "$ref": "#/components/responses/Error" }
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
         }
       }
     },
@@ -98,20 +182,50 @@
       "get": {
         "operationId": "getDashboardDelta",
         "parameters": [
-          { "$ref": "#/components/parameters/ProjectId" },
-          { "name": "cursor", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 0 } }
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
         ],
-        "security": [{ "bearerAuth": [] }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Dashboard changes after the supplied cursor",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DashboardDelta" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardDelta"
+                }
+              }
+            }
           },
-          "401": { "$ref": "#/components/responses/Error" },
-          "404": { "$ref": "#/components/responses/Error" },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
           "410": {
             "description": "Cursor retention window expired; request a new snapshot",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CursorExpiredError" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorExpiredError"
+                }
+              }
+            }
           }
         }
       }
@@ -120,17 +234,35 @@
       "get": {
         "operationId": "listRunEvents",
         "parameters": [
-          { "$ref": "#/components/parameters/ProjectId" },
-          { "$ref": "#/components/parameters/RunId" }
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          },
+          {
+            "$ref": "#/components/parameters/RunId"
+          }
         ],
-        "security": [{ "bearerAuth": [] }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Read-only run event history",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RunEventsResponse" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunEventsResponse"
+                }
+              }
+            }
           },
-          "401": { "$ref": "#/components/responses/Error" },
-          "404": { "$ref": "#/components/responses/Error" }
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
         }
       }
     },
@@ -138,30 +270,62 @@
       "get": {
         "operationId": "listIssueMessages",
         "parameters": [
-          { "$ref": "#/components/parameters/ProjectId" },
-          { "$ref": "#/components/parameters/RunId" }
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          },
+          {
+            "$ref": "#/components/parameters/RunId"
+          }
         ],
-        "security": [{ "bearerAuth": [] }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Read-only issue conversation",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IssueMessagesResponse" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueMessagesResponse"
+                }
+              }
+            }
           },
-          "401": { "$ref": "#/components/responses/Error" },
-          "404": { "$ref": "#/components/responses/Error" }
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
         }
       },
       "post": {
         "operationId": "createIssueMessage",
         "parameters": [
-          { "$ref": "#/components/parameters/ProjectId" },
-          { "$ref": "#/components/parameters/RunId" }
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          },
+          {
+            "$ref": "#/components/parameters/RunId"
+          }
         ],
-        "security": [{ "bearerAuth": [] }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "responses": {
-          "200": { "description": "Message created and optional Agent reply queued" },
-          "400": { "$ref": "#/components/responses/Error" },
-          "404": { "$ref": "#/components/responses/Error" }
+          "200": {
+            "description": "Message created and optional Agent reply queued"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
         }
       }
     },
@@ -169,17 +333,35 @@
       "get": {
         "operationId": "listRunEvidence",
         "parameters": [
-          { "$ref": "#/components/parameters/ProjectId" },
-          { "$ref": "#/components/parameters/RunId" }
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          },
+          {
+            "$ref": "#/components/parameters/RunId"
+          }
         ],
-        "security": [{ "bearerAuth": [] }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Read-only run evidence",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RunEvidenceResponse" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunEvidenceResponse"
+                }
+              }
+            }
           },
-          "401": { "$ref": "#/components/responses/Error" },
-          "404": { "$ref": "#/components/responses/Error" }
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
         }
       }
     },
@@ -187,18 +369,45 @@
       "get": {
         "operationId": "downloadIssueAttachment",
         "parameters": [
-          { "$ref": "#/components/parameters/ProjectId" },
-          { "$ref": "#/components/parameters/RunId" },
-          { "name": "attachmentId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          },
+          {
+            "$ref": "#/components/parameters/RunId"
+          },
+          {
+            "name": "attachmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
         ],
-        "security": [{ "bearerAuth": [] }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Attachment bytes for native preview",
-            "content": { "application/octet-stream": { "schema": { "type": "string", "contentEncoding": "binary" } } }
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "contentEncoding": "binary"
+                }
+              }
+            }
           },
-          "401": { "$ref": "#/components/responses/Error" },
-          "404": { "$ref": "#/components/responses/Error" }
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
         }
       }
     },
@@ -206,65 +415,351 @@
       "get": {
         "operationId": "downloadEvidenceImage",
         "parameters": [
-          { "$ref": "#/components/parameters/ProjectId" },
-          { "$ref": "#/components/parameters/RunId" },
-          { "name": "imageId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          },
+          {
+            "$ref": "#/components/parameters/RunId"
+          },
+          {
+            "name": "imageId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
         ],
-        "security": [{ "bearerAuth": [] }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Evidence image bytes for native preview",
-            "content": { "application/octet-stream": { "schema": { "type": "string", "contentEncoding": "binary" } } }
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "contentEncoding": "binary"
+                }
+              }
+            }
           },
-          "401": { "$ref": "#/components/responses/Error" },
-          "404": { "$ref": "#/components/responses/Error" }
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
         }
       }
     },
     "/projects/{projectId}/issues": {
-      "post": { "operationId": "createIssue", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Issue created" }, "400": { "$ref": "#/components/responses/Error" } } }
+      "post": {
+        "operationId": "createIssue",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Issue created"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
     },
     "/projects/{projectId}/runs/{runId}": {
-      "patch": { "operationId": "updateIssue", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Issue updated" }, "409": { "$ref": "#/components/responses/Error" } } },
-      "delete": { "operationId": "deleteIssue", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Issue deleted" }, "409": { "$ref": "#/components/responses/Error" } } }
+      "patch": {
+        "operationId": "updateIssue",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Issue updated"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteIssue",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Issue deleted"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
     },
     "/projects/{projectId}/runs/{runId}/preferences": {
-      "put": { "operationId": "updateIssuePreferences", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Execution preferences updated" } } }
+      "put": {
+        "operationId": "updateIssuePreferences",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Execution preferences updated"
+          }
+        }
+      }
     },
     "/projects/{projectId}/runs/{runId}/dependencies/{prerequisiteRunId}": {
-      "put": { "operationId": "addIssueDependency", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Dependency added" }, "409": { "$ref": "#/components/responses/Error" } } },
-      "delete": { "operationId": "removeIssueDependency", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Dependency removed" } } }
+      "put": {
+        "operationId": "addIssueDependency",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dependency added"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "removeIssueDependency",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dependency removed"
+          }
+        }
+      }
     },
     "/projects/{projectId}/runs/{runId}/status": {
-      "put": { "operationId": "moveRun", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Run status moved idempotently" }, "409": { "$ref": "#/components/responses/Error" } } }
+      "put": {
+        "operationId": "moveRun",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Run status moved idempotently"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
     },
     "/projects/{projectId}/runs/{runId}/retry": {
-      "post": { "operationId": "retryRun", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Run retried idempotently" } } }
+      "post": {
+        "operationId": "retryRun",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Run retried idempotently"
+          }
+        }
+      }
     },
     "/projects/{projectId}/runs/{runId}/cancel": {
-      "post": { "operationId": "cancelRun", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Run cancelled idempotently" } } }
+      "post": {
+        "operationId": "cancelRun",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Run cancelled idempotently"
+          }
+        }
+      }
     },
     "/projects/{projectId}/runs/{runId}/dispatch": {
-      "post": { "operationId": "dispatchRun", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Run dispatched idempotently" } } }
+      "post": {
+        "operationId": "dispatchRun",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Run dispatched idempotently"
+          }
+        }
+      }
     },
     "/projects/{projectId}/runs/{runId}/reassign": {
-      "post": { "operationId": "reassignRun", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Run reassigned idempotently" } } }
+      "post": {
+        "operationId": "reassignRun",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Run reassigned idempotently"
+          }
+        }
+      }
     },
     "/projects/{projectId}/runs/{runId}/result-reviews": {
-      "post": { "operationId": "completeResultReview", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Result review completed" } } }
+      "post": {
+        "operationId": "completeResultReview",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Result review completed"
+          }
+        }
+      }
     },
     "/projects/{projectId}/runs/{runId}/messages/{triggerMessageId}/agent-reply": {
-      "get": { "operationId": "getIssueAgentReply", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Current Agent reply status and completed message" } } }
+      "get": {
+        "operationId": "getIssueAgentReply",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current Agent reply status and completed message"
+          }
+        }
+      }
+    },
+    "/projects/{projectId}/agents": {
+      "get": {
+        "operationId": "listProjectAgents",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          },
+          {
+            "name": "locale",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ko",
+                "en",
+                "zh"
+              ]
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Project agents visible to the authenticated user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectAgentsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/projects/{projectId}/agent-sessions": {
+      "get": {
+        "operationId": "listProjectAgentSessions",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Remote agent session snapshots for the project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectAgentSessionsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
     }
   },
   "components": {
     "securitySchemes": {
-      "bearerAuth": { "type": "http", "scheme": "bearer" }
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
     },
     "responses": {
       "Error": {
         "description": "Request failed",
-        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
       }
     },
     "parameters": {
@@ -272,143 +767,345 @@
         "name": "projectId",
         "in": "path",
         "required": true,
-        "schema": { "type": "string", "format": "uuid" }
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
       },
       "RunId": {
         "name": "runId",
         "in": "path",
         "required": true,
-        "schema": { "type": "string", "format": "uuid" }
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
       }
     },
     "schemas": {
-      "MobileClientId": { "type": "string", "enum": ["briar-mobile", "briar-android"] },
+      "MobileClientId": {
+        "type": "string",
+        "enum": [
+          "briar-mobile",
+          "briar-android"
+        ]
+      },
       "HealthResponse": {
         "type": "object",
-        "required": ["ok", "service", "database", "updates"],
+        "required": [
+          "ok",
+          "service",
+          "database",
+          "updates"
+        ],
         "properties": {
-          "ok": { "const": true },
-          "service": { "const": "briar-api" },
-          "database": { "type": "string" },
-          "updates": { "type": "string" }
+          "ok": {
+            "const": true
+          },
+          "service": {
+            "const": "briar-api"
+          },
+          "database": {
+            "type": "string"
+          },
+          "updates": {
+            "type": "string"
+          }
         },
         "additionalProperties": true
       },
       "DeviceCodeRequest": {
         "type": "object",
-        "required": ["client_id", "scope"],
+        "required": [
+          "client_id",
+          "scope"
+        ],
         "properties": {
-          "client_id": { "$ref": "#/components/schemas/MobileClientId" },
-          "scope": { "const": "openid profile email" }
+          "client_id": {
+            "$ref": "#/components/schemas/MobileClientId"
+          },
+          "scope": {
+            "const": "openid profile email"
+          }
         },
         "additionalProperties": false
       },
       "DeviceCodeResponse": {
         "type": "object",
-        "required": ["device_code", "user_code", "verification_uri"],
+        "required": [
+          "device_code",
+          "user_code",
+          "verification_uri"
+        ],
         "properties": {
-          "device_code": { "type": "string", "minLength": 1 },
-          "user_code": { "type": "string", "minLength": 1 },
-          "verification_uri": { "type": "string", "format": "uri" },
-          "verification_uri_complete": { "type": "string", "format": "uri" },
-          "expires_in": { "type": "integer", "minimum": 1 },
-          "interval": { "type": "integer", "minimum": 1, "default": 5 }
+          "device_code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "user_code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "verification_uri": {
+            "type": "string",
+            "format": "uri"
+          },
+          "verification_uri_complete": {
+            "type": "string",
+            "format": "uri"
+          },
+          "expires_in": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "interval": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 5
+          }
         },
         "additionalProperties": true
       },
       "DeviceTokenRequest": {
         "type": "object",
-        "required": ["grant_type", "device_code", "client_id"],
+        "required": [
+          "grant_type",
+          "device_code",
+          "client_id"
+        ],
         "properties": {
-          "grant_type": { "const": "urn:ietf:params:oauth:grant-type:device_code" },
-          "device_code": { "type": "string", "minLength": 1 },
-          "client_id": { "$ref": "#/components/schemas/MobileClientId" }
+          "grant_type": {
+            "const": "urn:ietf:params:oauth:grant-type:device_code"
+          },
+          "device_code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "client_id": {
+            "$ref": "#/components/schemas/MobileClientId"
+          }
         },
         "additionalProperties": false
       },
       "DeviceTokenResponse": {
         "type": "object",
-        "required": ["access_token"],
+        "required": [
+          "access_token"
+        ],
         "properties": {
-          "access_token": { "type": "string", "minLength": 1 },
-          "token_type": { "type": "string" },
-          "expires_in": { "type": "integer", "minimum": 1 }
+          "access_token": {
+            "type": "string",
+            "minLength": 1
+          },
+          "token_type": {
+            "type": "string"
+          },
+          "expires_in": {
+            "type": "integer",
+            "minimum": 1
+          }
         },
         "additionalProperties": true
       },
       "DeviceTokenError": {
         "type": "object",
-        "required": ["error"],
+        "required": [
+          "error"
+        ],
         "properties": {
-          "error": { "type": "string", "enum": ["authorization_pending", "slow_down", "access_denied", "expired_token"] },
-          "error_description": { "type": "string" }
+          "error": {
+            "type": "string",
+            "enum": [
+              "authorization_pending",
+              "slow_down",
+              "access_denied",
+              "expired_token"
+            ]
+          },
+          "error_description": {
+            "type": "string"
+          }
         },
         "additionalProperties": true
       },
       "User": {
         "type": "object",
-        "required": ["id", "name", "email"],
+        "required": [
+          "id",
+          "name",
+          "email"
+        ],
         "properties": {
-          "id": { "type": "string" },
-          "username": { "type": ["string", "null"] },
-          "name": { "type": "string" },
-          "email": { "type": "string", "format": "email" },
-          "image": { "type": ["string", "null"] }
+          "id": {
+            "type": "string"
+          },
+          "username": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "image": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
         },
         "additionalProperties": true
       },
       "CurrentUserResponse": {
         "type": "object",
-        "required": ["user"],
-        "properties": { "user": { "$ref": "#/components/schemas/User" } },
+        "required": [
+          "user"
+        ],
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
         "additionalProperties": true
       },
       "Project": {
         "type": "object",
-        "required": ["id", "name", "icon", "organizationId", "organizationName", "role", "createdAt"],
+        "required": [
+          "id",
+          "name",
+          "icon",
+          "organizationId",
+          "organizationName",
+          "role",
+          "createdAt"
+        ],
         "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "name": { "type": "string" },
-          "icon": { "type": ["string", "null"] },
-          "organizationId": { "type": "string", "format": "uuid" },
-          "organizationName": { "type": "string" },
-          "role": { "type": "string", "enum": ["owner", "admin", "member"] },
-          "createdAt": { "type": "string", "format": "date-time" }
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationName": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "admin",
+              "member"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
         },
         "additionalProperties": true
       },
       "ProjectsResponse": {
         "type": "object",
-        "required": ["projects"],
-        "properties": { "projects": { "type": "array", "items": { "$ref": "#/components/schemas/Project" } } },
+        "required": [
+          "projects"
+        ],
+        "properties": {
+          "projects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Project"
+            }
+          }
+        },
         "additionalProperties": true
       },
       "IssueAttachment": {
         "type": "object",
-        "required": ["id", "filename", "contentType", "byteSize", "url"],
+        "required": [
+          "id",
+          "filename",
+          "contentType",
+          "byteSize",
+          "url"
+        ],
         "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "filename": { "type": "string" },
-          "contentType": { "type": "string" },
-          "byteSize": { "type": "integer", "minimum": 0 },
-          "url": { "type": "string" }
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "byteSize": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "url": {
+            "type": "string"
+          }
         },
         "additionalProperties": true
       },
       "MessageAuthor": {
         "type": "object",
-        "required": ["id", "name", "image", "provider"],
+        "required": [
+          "id",
+          "name",
+          "image",
+          "provider"
+        ],
         "properties": {
-          "id": { "type": ["string", "null"] },
-          "name": { "type": "string" },
-          "image": { "type": ["string", "null"] },
-          "provider": { "type": ["string", "null"] }
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "image": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "provider": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
         },
         "additionalProperties": true
       },
       "DashboardRun": {
         "type": "object",
-        "required": ["id", "title", "status", "updatedAt"],
+        "required": [
+          "id",
+          "title",
+          "status",
+          "updatedAt"
+        ],
         "properties": {
           "id": { "type": "string", "format": "uuid" },
           "runNumber": { "type": "integer", "minimum": 1 },
@@ -447,82 +1144,260 @@
       },
       "DashboardSnapshot": {
         "type": "object",
-        "required": ["project", "runs", "generatedAt"],
+        "required": [
+          "project",
+          "runs",
+          "generatedAt"
+        ],
         "properties": {
-          "project": { "$ref": "#/components/schemas/Project" },
-          "runs": { "type": "array", "items": { "$ref": "#/components/schemas/DashboardRun" } },
-          "workers": { "type": "array", "items": { "$ref": "#/components/schemas/DashboardWorker" } },
-          "organizationProviders": { "type": "array", "items": { "type": "string", "enum": ["codex", "claude", "grok", "opencode"] } },
-          "conversationNotifications": { "type": "array", "items": { "$ref": "#/components/schemas/ConversationNotification" } },
-          "cursor": { "type": "integer", "minimum": 0 },
-          "generatedAt": { "type": "string", "format": "date-time" }
+          "project": {
+            "$ref": "#/components/schemas/Project"
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardRun"
+            }
+          },
+          "workers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardWorker"
+            }
+          },
+          "organizationProviders": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "codex",
+                "claude",
+                "grok",
+                "opencode"
+              ]
+            }
+          },
+          "conversationNotifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConversationNotification"
+            }
+          },
+          "cursor": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
         },
         "additionalProperties": true
       },
       "DashboardDelta": {
         "type": "object",
-        "required": ["cursor", "hasMore", "runs", "deletedRunIds", "generatedAt"],
+        "required": [
+          "cursor",
+          "hasMore",
+          "runs",
+          "deletedRunIds",
+          "generatedAt"
+        ],
         "properties": {
-          "cursor": { "type": "integer", "minimum": 0 },
-          "hasMore": { "type": "boolean" },
-          "runs": { "type": "array", "items": { "$ref": "#/components/schemas/DashboardRun" } },
-          "deletedRunIds": { "type": "array", "items": { "type": "string", "format": "uuid" } },
-          "project": { "$ref": "#/components/schemas/Project" },
-          "workers": { "type": "array", "items": { "$ref": "#/components/schemas/DashboardWorker" } },
-          "organizationProviders": { "type": "array", "items": { "type": "string", "enum": ["codex", "claude", "grok", "opencode"] } },
-          "conversationNotifications": { "type": "array", "items": { "$ref": "#/components/schemas/ConversationNotification" } },
-          "generatedAt": { "type": "string", "format": "date-time" }
+          "cursor": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardRun"
+            }
+          },
+          "deletedRunIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "project": {
+            "$ref": "#/components/schemas/Project"
+          },
+          "workers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardWorker"
+            }
+          },
+          "organizationProviders": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "codex",
+                "claude",
+                "grok",
+                "opencode"
+              ]
+            }
+          },
+          "conversationNotifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConversationNotification"
+            }
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
         },
         "additionalProperties": true
       },
       "CursorExpiredError": {
         "type": "object",
-        "required": ["code", "message"],
+        "required": [
+          "code",
+          "message"
+        ],
         "properties": {
-          "code": { "const": "dashboard_cursor_expired" },
-          "message": { "type": "string" }
+          "code": {
+            "const": "dashboard_cursor_expired"
+          },
+          "message": {
+            "type": "string"
+          }
         },
         "additionalProperties": true
       },
       "DashboardWorker": {
         "type": "object",
-        "required": ["id", "label", "readiness", "readinessDetail", "activeSessions", "availableSessions"],
+        "required": [
+          "id",
+          "label",
+          "readiness",
+          "readinessDetail",
+          "activeSessions",
+          "availableSessions"
+        ],
         "properties": {
-          "id": { "type": "string" },
-          "label": { "type": "string" },
-          "agentProvider": { "type": "string", "enum": ["codex", "claude", "grok", "opencode"] },
-          "providers": { "type": "array", "items": { "type": "string", "enum": ["codex", "claude", "grok", "opencode"] } },
-          "readiness": { "type": "string" },
-          "readinessDetail": { "type": ["string", "null"] },
-          "activeSessions": { "type": "integer", "minimum": 0 },
-          "availableSessions": { "type": "integer", "minimum": 0 }
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "agentProvider": {
+            "type": "string",
+            "enum": [
+              "codex",
+              "claude",
+              "grok",
+              "opencode"
+            ]
+          },
+          "providers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "codex",
+                "claude",
+                "grok",
+                "opencode"
+              ]
+            }
+          },
+          "readiness": {
+            "type": "string"
+          },
+          "readinessDetail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "activeSessions": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "availableSessions": {
+            "type": "integer",
+            "minimum": 0
+          }
         },
         "additionalProperties": true
       },
       "ConversationNotification": {
         "type": "object",
-        "required": ["id", "runId", "runTitle", "rootMessageId", "body", "author", "reason", "createdAt"],
+        "required": [
+          "id",
+          "runId",
+          "runTitle",
+          "rootMessageId",
+          "body",
+          "author",
+          "reason",
+          "createdAt"
+        ],
         "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "runId": { "type": "string", "format": "uuid" },
-          "runTitle": { "type": "string" },
-          "rootMessageId": { "type": "string", "format": "uuid" },
-          "body": { "type": "string" },
-          "author": { "$ref": "#/components/schemas/MessageAuthor" },
-          "reason": { "type": "string", "enum": ["mention", "thread_reply"] },
-          "createdAt": { "type": "string", "format": "date-time" }
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "runTitle": {
+            "type": "string"
+          },
+          "rootMessageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "body": {
+            "type": "string"
+          },
+          "author": {
+            "$ref": "#/components/schemas/MessageAuthor"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "mention",
+              "thread_reply"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
         },
         "additionalProperties": true
       },
       "RunEventsResponse": {
         "type": "object",
-        "required": ["events"],
+        "required": [
+          "events"
+        ],
         "properties": {
           "events": {
             "type": "array",
             "items": {
               "type": "object",
-              "required": ["id", "status", "workflowStage", "detail", "actor", "occurredAt"],
+              "required": [
+                "id",
+                "status",
+                "workflowStage",
+                "detail",
+                "actor",
+                "occurredAt"
+              ],
               "properties": {
                 "id": { "type": "string", "format": "uuid" },
                 "status": { "type": "string", "enum": ["backlog", "queued", "running", "paused", "blocked", "failed", "completed", "cancelled"] },
@@ -539,22 +1414,58 @@
       },
       "IssueMessagesResponse": {
         "type": "object",
-        "required": ["messages"],
+        "required": [
+          "messages"
+        ],
         "properties": {
           "messages": {
             "type": "array",
             "items": {
               "type": "object",
-              "required": ["id", "runId", "parentMessageId", "body", "author", "replyCount", "createdAt", "updatedAt"],
+              "required": [
+                "id",
+                "runId",
+                "parentMessageId",
+                "body",
+                "author",
+                "replyCount",
+                "createdAt",
+                "updatedAt"
+              ],
               "properties": {
-                "id": { "type": "string", "format": "uuid" },
-                "runId": { "type": "string", "format": "uuid" },
-                "parentMessageId": { "type": ["string", "null"], "format": "uuid" },
-                "body": { "type": "string" },
-                "author": { "$ref": "#/components/schemas/MessageAuthor" },
-                "replyCount": { "type": "integer", "minimum": 0 },
-                "createdAt": { "type": "string", "format": "date-time" },
-                "updatedAt": { "type": "string", "format": "date-time" }
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "runId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "parentMessageId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "body": {
+                  "type": "string"
+                },
+                "author": {
+                  "$ref": "#/components/schemas/MessageAuthor"
+                },
+                "replyCount": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
               },
               "additionalProperties": true
             }
@@ -564,26 +1475,83 @@
       },
       "RunEvidenceResponse": {
         "type": "object",
-        "required": ["evidence"],
+        "required": [
+          "evidence"
+        ],
         "properties": {
           "evidence": {
             "type": "array",
             "items": {
               "type": "object",
-              "required": ["key", "attempt", "revision", "stage", "type", "status", "detail", "url", "actor", "observedAt", "canonical"],
+              "required": [
+                "key",
+                "attempt",
+                "revision",
+                "stage",
+                "type",
+                "status",
+                "detail",
+                "url",
+                "actor",
+                "observedAt",
+                "canonical"
+              ],
               "properties": {
-                "key": { "type": "string" },
-                "attempt": { "type": "integer", "minimum": 1 },
-                "revision": { "type": "integer", "minimum": 1 },
-                "stage": { "type": "string" },
-                "type": { "type": "string" },
-                "status": { "type": "string", "enum": ["pending", "passed", "failed", "skipped"] },
-                "detail": { "type": ["string", "null"] },
-                "url": { "type": ["string", "null"], "format": "uri" },
-                "actor": { "type": "string" },
-                "observedAt": { "type": "string", "format": "date-time" },
-                "images": { "type": "array", "items": { "$ref": "#/components/schemas/IssueAttachment" } },
-                "canonical": { "type": "boolean" }
+                "key": {
+                  "type": "string"
+                },
+                "attempt": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "revision": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "stage": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "passed",
+                    "failed",
+                    "skipped"
+                  ]
+                },
+                "detail": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "url": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uri"
+                },
+                "actor": {
+                  "type": "string"
+                },
+                "observedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "images": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/IssueAttachment"
+                  }
+                },
+                "canonical": {
+                  "type": "boolean"
+                }
               },
               "additionalProperties": true
             }
@@ -593,8 +1561,316 @@
       },
       "ErrorResponse": {
         "type": "object",
-        "required": ["message"],
-        "properties": { "message": { "type": "string" } },
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "ProjectAgent": {
+        "type": "object",
+        "required": [
+          "id",
+          "projectId",
+          "name",
+          "avatar",
+          "provider",
+          "model",
+          "responsibility",
+          "skill",
+          "calendarColor",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "projectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "avatar": {
+            "type": "string",
+            "nullable": true
+          },
+          "codexPet": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "slug": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "author": {
+                "type": "string"
+              },
+              "license": {
+                "type": "string"
+              },
+              "spriteVersion": {
+                "type": "integer"
+              },
+              "spriteSheetUrl": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "additionalProperties": true
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "codex",
+              "claude",
+              "grok",
+              "opencode"
+            ]
+          },
+          "model": {
+            "type": "string",
+            "nullable": true
+          },
+          "responsibility": {
+            "type": "string"
+          },
+          "skill": {
+            "type": "string"
+          },
+          "calendarColor": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": true
+      },
+      "ProjectAgentsResponse": {
+        "type": "object",
+        "required": [
+          "agents"
+        ],
+        "properties": {
+          "agents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectAgent"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "ProjectAgentSessionIssue": {
+        "type": "object",
+        "required": [
+          "runId",
+          "runNumber",
+          "sourceKey",
+          "title",
+          "outcome",
+          "summary"
+        ],
+        "properties": {
+          "runId": {
+            "type": "string"
+          },
+          "runNumber": {
+            "type": "integer"
+          },
+          "sourceKey": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "completed",
+              "blocked",
+              "failed",
+              "skipped"
+            ]
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": true
+      },
+      "ProjectAgentSessionEvent": {
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "occurredAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "started",
+              "completed",
+              "failed",
+              "skipped",
+              "interrupted",
+              "stopped"
+            ]
+          },
+          "occurredAt": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "ProjectAgentSession": {
+        "type": "object",
+        "required": [
+          "id",
+          "projectId",
+          "status",
+          "issues",
+          "startedAt",
+          "completedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "dispatchGroupId": {
+            "type": "string"
+          },
+          "agentId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "sessionType": {
+            "type": "string",
+            "enum": [
+              "task",
+              "dispatch"
+            ]
+          },
+          "trigger": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "scheduled"
+            ],
+            "nullable": true
+          },
+          "scheduleId": {
+            "type": "string",
+            "nullable": true
+          },
+          "scheduleRunId": {
+            "type": "string",
+            "nullable": true
+          },
+          "parentSessionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "request": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "completed",
+              "failed",
+              "skipped",
+              "interrupted"
+            ]
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectAgentSessionIssue"
+            }
+          },
+          "startedAt": {
+            "type": "string"
+          },
+          "completedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "conversationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "workspaceRoot": {
+            "type": "string",
+            "nullable": true
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectAgentSessionEvent"
+            }
+          },
+          "dispatchEvents": {
+            "type": "array"
+          },
+          "workers": {
+            "type": "array"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "ProjectAgentSessionsResponse": {
+        "type": "object",
+        "required": [
+          "sessions"
+        ],
+        "properties": {
+          "sessions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectAgentSession"
+            }
+          }
+        },
         "additionalProperties": true
       }
     }

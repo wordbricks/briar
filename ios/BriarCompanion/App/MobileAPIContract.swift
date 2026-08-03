@@ -76,6 +76,14 @@ enum MobileAPIContract {
         static func runAgentReply(projectID: UUID, runID: UUID, triggerMessageID: UUID) -> String {
             "\(runMessages(projectID: projectID, runID: runID))/\(triggerMessageID.uuidString.lowercased())/agent-reply"
         }
+
+        static func projectAgents(projectID: UUID, locale: String) -> String {
+            "/projects/\(projectID.uuidString.lowercased())/agents?locale=\(locale)"
+        }
+
+        static func projectAgentSessions(projectID: UUID) -> String {
+            "/projects/\(projectID.uuidString.lowercased())/agent-sessions"
+        }
     }
 }
 

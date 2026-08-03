@@ -2,8 +2,14 @@ import SwiftUI
 
 struct CompanionShellView: View {
     @AppStorage("companion-appearance") private var appearance = CompanionAppearance.system.rawValue
-    @State private var selectedTab = Tab.tasks
+    @AppStorage("companion-locale") private var localeRaw = CompanionLocale.ko.rawValue
     @State private var showingSettings = false
+    @State private var taskPath = NavigationPath()
+
+    @ObservedObject var navigation: CompanionNavigationModel
+    @ObservedObject var agents: AgentsStore
+    @ObservedObject var inbox: InboxStore
+    @ObservedObject var notifications: LocalNotificationService
 
     let project: ProjectsResponse.Project
     let snapshot: DashboardSnapshot?
@@ -12,21 +18,14 @@ struct CompanionShellView: View {
     let token: String
     let api: any MobileAPIClientProtocol
     let ideas: IdeasStore
+    let user: CurrentUserResponse.User?
     let refresh: () async -> Void
     let changeProject: () -> Void
     let signOut: () -> Void
 
-    enum Tab: Hashable {
-        case tasks
-        case agents
-        case search
-        case inbox
-        case ideas
-    }
-
     var body: some View {
-        TabView(selection: $selectedTab) {
-            NavigationStack {
+        TabView(selection: $navigation.selectedTab) {
+            NavigationStack(path: $taskPath) {
                 TaskListView(
                     project: project,
                     snapshot: snapshot,
@@ -38,17 +37,39 @@ struct CompanionShellView: View {
                 )
                 .navigationTitle("Tasks")
                 .toolbar { companionToolbar }
+                .navigationDestination(for: UUID.self) { runID in
+                    if let run = snapshot?.runs.first(where: { $0.id == runID }) {
+                        RunDetailView(
+                            run: run,
+                            projectID: project.id,
+                            token: token,
+                            api: api,
+                            allRuns: snapshot?.runs ?? [],
+                            workers: snapshot?.workers ?? [],
+                            providers: snapshot?.organizationProviders ?? [],
+                            refresh: refresh
+                        )
+                    } else {
+                        ContentUnavailableView("이슈를 찾을 수 없음", systemImage: "checklist")
+                    }
+                }
             }
             .tabItem { Label("Tasks", systemImage: "checklist") }
-            .tag(Tab.tasks)
+            .tag(CompanionNavigationModel.Tab.tasks)
 
-            NavigationStack {
-                AgentsView(snapshot: snapshot, refresh: refresh)
-                    .navigationTitle("Agents")
-                    .toolbar { companionToolbar }
-            }
+            AgentsHomeView(
+                agents: agents,
+                navigation: navigation,
+                project: project,
+                token: token,
+                api: api,
+                snapshot: snapshot,
+                refreshDashboard: refresh
+            )
+            .toolbar { companionToolbar }
             .tabItem { Label("Agents", systemImage: "cpu") }
-            .tag(Tab.agents)
+            .tag(CompanionNavigationModel.Tab.agents)
+            .badge(agents.sessions.filter { $0.status == .running }.count)
 
             NavigationStack {
                 TaskSearchView(
@@ -61,21 +82,23 @@ struct CompanionShellView: View {
                 .toolbar { companionToolbar }
             }
             .tabItem { Label("Search", systemImage: "magnifyingglass") }
-            .tag(Tab.search)
+            .tag(CompanionNavigationModel.Tab.search)
 
             NavigationStack {
-                InboxView(
+                InboxHomeView(
+                    inbox: inbox,
+                    navigation: navigation,
                     project: project,
                     snapshot: snapshot,
                     token: token,
                     api: api,
                     refresh: refresh
                 )
-                .navigationTitle("Inbox")
                 .toolbar { companionToolbar }
             }
             .tabItem { Label("Inbox", systemImage: "tray") }
-            .tag(Tab.inbox)
+            .tag(CompanionNavigationModel.Tab.inbox)
+            .badge(inbox.unreadCount)
 
             NavigationStack {
                 IdeasNativeView(store: ideas, projectID: project.id, token: token)
@@ -83,33 +106,28 @@ struct CompanionShellView: View {
                     .toolbar { companionToolbar }
             }
             .tabItem { Label("아이디어", systemImage: "lightbulb") }
-            .tag(Tab.ideas)
+            .tag(CompanionNavigationModel.Tab.ideas)
         }
         .sheet(isPresented: $showingSettings) {
-            NavigationStack {
-                Form {
-                    Section("테마") {
-                        Picker("화면 모드", selection: $appearance) {
-                            ForEach(CompanionAppearance.allCases) { option in
-                                Text(option.title).tag(option.rawValue)
-                            }
-                        }
-                    }
-                    Section("접근 권한") {
-                        Label("읽기·쓰기", systemImage: "pencil.and.list.clipboard")
-                        Text("이슈 작성, 실행 제어, 결과 검수와 대화를 지원합니다.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .navigationTitle("Companion 설정")
-                .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("완료") { showingSettings = false }
-                    }
-                }
+            CompanionSettingsView(
+                appearance: $appearance,
+                localeRaw: $localeRaw,
+                notifications: notifications,
+                user: user,
+                onDismiss: { showingSettings = false }
+            )
+            .presentationDetents([.large, .medium])
+        }
+        .onChange(of: navigation.pathIssueToken) { _, _ in
+            if let runID = navigation.consumePendingIssue() {
+                taskPath.append(runID)
             }
-            .presentationDetents([.medium])
+        }
+        .task(id: navigation.pathIssueToken) {
+            if let runID = navigation.pendingIssueID {
+                _ = navigation.consumePendingIssue()
+                taskPath.append(runID)
+            }
         }
     }
 
@@ -121,13 +139,14 @@ struct CompanionShellView: View {
         ToolbarItem(placement: .primaryAction) {
             Menu {
                 Button("프로젝트 변경", action: changeProject)
-                Button("테마 및 권한") { showingSettings = true }
+                Button("설정") { showingSettings = true }
                 Divider()
                 Button("로그아웃", role: .destructive, action: signOut)
             } label: {
                 Image(systemName: "person.crop.circle")
             }
             .accessibilityLabel("계정 메뉴")
+            .accessibilityIdentifier("account-menu")
         }
     }
 }
@@ -349,113 +368,6 @@ struct TaskSearchView: View {
     }
 }
 
-struct AgentsView: View {
-    let snapshot: DashboardSnapshot?
-    let refresh: () async -> Void
-
-    var body: some View {
-        List {
-            if let workers = snapshot?.workers, !workers.isEmpty {
-                ForEach(workers) { worker in
-                    HStack(spacing: 12) {
-                        Image(systemName: "cpu")
-                            .foregroundStyle(worker.readiness == "available" ? Color.green : Color.secondary)
-                        VStack(alignment: .leading) {
-                            Text(worker.label).font(.headline)
-                            Text(worker.readinessDetail ?? worker.readiness)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Text("\(worker.activeSessions) 실행 중")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            } else {
-                ContentUnavailableView(
-                    "표시할 Agent 없음",
-                    systemImage: "cpu",
-                    description: Text("연결된 실행 Agent가 여기에 읽기 전용으로 표시됩니다.")
-                )
-            }
-        }
-        .refreshable { await refresh() }
-    }
-}
-
-struct InboxView: View {
-    private static let pageSize = 50
-
-    let project: ProjectsResponse.Project
-    let snapshot: DashboardSnapshot?
-    let token: String
-    let api: any MobileAPIClientProtocol
-    let refresh: () async -> Void
-
-    @State private var visibleCount = InboxView.pageSize
-
-    private var notifications: [ConversationNotification] {
-        snapshot?.conversationNotifications ?? []
-    }
-
-    private var visibleNotifications: [ConversationNotification] {
-        Array(notifications.prefix(visibleCount))
-    }
-
-    private var hasMore: Bool {
-        visibleNotifications.count < notifications.count
-    }
-
-    var body: some View {
-        List {
-            if !visibleNotifications.isEmpty {
-                ForEach(visibleNotifications) { notification in
-                    if let run = snapshot?.runs.first(where: { $0.id == notification.runId }) {
-                        NavigationLink {
-                            RunDetailView(run: run, projectID: project.id, token: token, api: api)
-                        } label: {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(notification.runTitle).font(.headline)
-                                Text(notification.body).lineLimit(3)
-                                HStack {
-                                    Text(notification.author.name)
-                                    Spacer()
-                                    Text(notification.createdAt, style: .relative)
-                                }
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            }
-                        }
-                        .onAppear {
-                            guard hasMore, notification.id == visibleNotifications.last?.id else {
-                                return
-                            }
-                            visibleCount = min(
-                                visibleCount + Self.pageSize,
-                                notifications.count
-                            )
-                        }
-                    }
-                }
-            } else {
-                ContentUnavailableView(
-                    "새 알림 없음",
-                    systemImage: "tray",
-                    description: Text("멘션과 대화 답글을 이곳에서 확인할 수 있습니다.")
-                )
-            }
-        }
-        .refreshable {
-            visibleCount = Self.pageSize
-            await refresh()
-        }
-        .onChange(of: notifications.map(\.id)) { _, _ in
-            visibleCount = Self.pageSize
-        }
-    }
-}
-
 struct OfflineStateView: View {
     let message: String
     let refresh: () async -> Void
@@ -493,7 +405,9 @@ struct RunDetailView: View {
     @State private var messageText = ""
     @State private var replyTo: IssueMessage?
     @State private var reviewCompleted = false
+    @State private var linkCopied = false
 
+    private let projectID: UUID
     private let allRuns: [DashboardRun]
     private let workers: [DashboardWorker]
     private let providers: [AgentProvider]
@@ -511,6 +425,7 @@ struct RunDetailView: View {
         refresh: @escaping () async -> Void = {}
     ) {
         self.run = run
+        self.projectID = projectID
         self.allRuns = allRuns
         self.workers = workers
         self.providers = providers
@@ -809,6 +724,22 @@ struct RunDetailView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
+                    let shareURL = BriarShareLinks.issueShareURL(
+                        projectID: projectID,
+                        runID: run.id,
+                        origin: BriarShareLinks.defaultOrigin
+                    )
+                    ShareLink(item: shareURL) {
+                        Label("이슈 공유", systemImage: "square.and.arrow.up")
+                    }
+                    Button {
+                        ClipboardService.copy(shareURL.absoluteString)
+                        linkCopied = true
+                    } label: {
+                        Label(linkCopied ? "링크 복사됨" : "링크 복사", systemImage: "doc.on.doc")
+                    }
+                    .accessibilityIdentifier("issue-copy-link")
+                    Divider()
                     Button("수정") { showingEdit = true }
                     Button("삭제", role: .destructive) { confirmingDelete = true }
                 } label: {
