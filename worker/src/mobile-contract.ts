@@ -97,10 +97,33 @@ export const mobileDashboardRunSchema = z.object({
     "cancelled",
   ]),
   workflowStage: z.string().nullable().optional(),
+  workflow: z.object({
+    version: z.literal(1),
+    stages: z.array(z.object({
+      id: z.string().min(1),
+      label: z.string().min(1),
+      required: z.boolean(),
+    }).passthrough()),
+  }).passthrough().optional(),
   progress: z.number().min(0).max(100).optional(),
   detail: z.string().nullable().optional(),
+  priority: z.number().int().min(1).max(4).nullable().optional(),
   issueDescription: z.string().nullable().optional(),
   attachments: z.array(mobileIssueAttachmentSchema).optional(),
+  prerequisites: z.array(z.object({
+    id: z.uuid(),
+    runNumber: z.number().int().positive(),
+    title: z.string(),
+    status: z.enum(["backlog", "queued", "running", "blocked", "failed", "completed", "cancelled"]),
+  })).optional(),
+  dependents: z.array(z.object({
+    id: z.uuid(),
+    runNumber: z.number().int().positive(),
+    title: z.string(),
+    status: z.enum(["backlog", "queued", "running", "blocked", "failed", "completed", "cancelled"]),
+  })).optional(),
+  executionReadiness: z.enum(["ready", "waiting"]).optional(),
+  waitingOnPrerequisiteCount: z.number().int().nonnegative().optional(),
   resultSummary: z.string().nullable().optional(),
   structuredResult: z.object({
     summary: z.string(),
@@ -122,6 +145,14 @@ export const mobileDashboardRunSchema = z.object({
   pullRequestUrls: z.array(z.url()).optional(),
   branch: z.string().nullable().optional(),
   commitSha: z.string().nullable().optional(),
+  preferredProvider: z.enum(["codex", "claude", "grok", "opencode"]).nullable().optional(),
+  preferredModel: z.string().nullable().optional(),
+  preferredEffort: z.enum(["low", "medium", "high", "xhigh", "max", "ultra"]).nullable().optional(),
+  requestedProvider: z.enum(["codex", "claude", "grok", "opencode"]).nullable().optional(),
+  requestedModel: z.string().nullable().optional(),
+  requestedEffort: z.enum(["low", "medium", "high", "xhigh", "max", "ultra"]).nullable().optional(),
+  requestedWorkerId: z.string().nullable().optional(),
+  workerId: z.string().nullable().optional(),
   updatedAt: z.iso.datetime(),
   completedAt: z.iso.datetime().nullable().optional(),
 });
@@ -129,6 +160,8 @@ export const mobileDashboardRunSchema = z.object({
 export const mobileDashboardWorkerSchema = z.object({
   id: z.string(),
   label: z.string(),
+  agentProvider: z.enum(["codex", "claude", "grok", "opencode"]).optional(),
+  providers: z.array(z.enum(["codex", "claude", "grok", "opencode"])).optional(),
   readiness: z.string(),
   readinessDetail: z.string().nullable(),
   activeSessions: z.number().int().nonnegative(),
@@ -152,6 +185,7 @@ export const mobileDashboardSnapshotSchema = z.object({
   project: mobileDashboardProjectSchema,
   runs: z.array(mobileDashboardRunSchema),
   workers: z.array(mobileDashboardWorkerSchema).optional(),
+  organizationProviders: z.array(z.enum(["codex", "claude", "grok", "opencode"])).optional(),
   conversationNotifications: z.array(mobileConversationNotificationSchema).optional(),
   cursor: z.number().int().nonnegative().optional(),
   generatedAt: z.iso.datetime(),
@@ -164,6 +198,7 @@ export const mobileDashboardDeltaSchema = z.object({
   deletedRunIds: z.array(z.uuid()),
   project: mobileDashboardProjectSchema.optional(),
   workers: z.array(mobileDashboardWorkerSchema).optional(),
+  organizationProviders: z.array(z.enum(["codex", "claude", "grok", "opencode"])).optional(),
   conversationNotifications: z.array(mobileConversationNotificationSchema).optional(),
   generatedAt: z.iso.datetime(),
 });
@@ -220,6 +255,102 @@ export const mobileDashboardCursorExpiredSchema = z.object({
   message: z.string(),
 });
 
+const mobileRunStatusSchema = mobileDashboardRunSchema.shape.status;
+const mobileProviderSchema = z.enum(["codex", "claude", "grok", "opencode"]);
+const mobileEffortSchema = z.enum(["low", "medium", "high", "xhigh", "max", "ultra"]);
+const requestIdSchema = z.object({ requestId: z.uuid() });
+
+export const mobileCreateIssueRequestSchema = z.object({
+  title: z.string().trim().min(1).max(300),
+  description: z.string().max(100_000).nullable(),
+  priority: z.number().int().min(1).max(4).nullable(),
+  status: z.enum(["backlog", "queued"]),
+}).strict();
+export const mobileCreateIssueResponseSchema = z.object({
+  runId: z.uuid(),
+  sourceKey: z.string(),
+  stage: z.literal("queued"),
+  status: z.enum(["backlog", "queued"]),
+  attachments: z.array(mobileIssueAttachmentSchema),
+});
+export const mobileUpdateIssueRequestSchema = mobileCreateIssueRequestSchema
+  .omit({ status: true });
+export const mobileUpdateIssueResponseSchema = z.object({
+  runId: z.uuid(),
+  title: z.string(),
+  description: z.string().nullable(),
+  priority: z.number().int().min(1).max(4).nullable(),
+});
+export const mobilePreferencesSchema = z.object({
+  provider: mobileProviderSchema.nullable(),
+  model: z.string().nullable(),
+  effort: mobileEffortSchema.nullable(),
+}).strict();
+export const mobilePreferencesResponseSchema = mobilePreferencesSchema.extend({ runId: z.uuid() });
+export const mobileDependencyResponseSchema = z.object({
+  prerequisiteRunId: z.uuid(),
+  dependentRunId: z.uuid(),
+  outcome: z.enum(["created", "already_exists"]),
+});
+export const mobileMoveRunRequestSchema = requestIdSchema.extend({
+  status: mobileRunStatusSchema,
+  workflowStage: z.string().nullable(),
+});
+export const mobileMoveRunResponseSchema = z.object({
+  runId: z.uuid(),
+  outcome: z.enum(["moved", "unchanged", "already_moved"]),
+  status: mobileRunStatusSchema,
+  workflowStage: z.string().nullable(),
+});
+export const mobileRecoveryRequestSchema = requestIdSchema.extend({ reason: z.string().nullable() });
+export const mobileRecoveryResponseSchema = z.object({
+  runId: z.uuid(),
+  outcome: z.string(),
+  attempt: z.number().int().positive(),
+  stage: z.enum(["queued", "cancelled"]),
+});
+export const mobileDispatchRequestSchema = requestIdSchema.extend({
+  provider: mobileProviderSchema,
+  model: z.string().nullable(),
+  effort: mobileEffortSchema.nullable(),
+  persistPreferences: z.boolean(),
+  workerId: z.string().nullable(),
+});
+export const mobileDispatchResponseSchema = z.object({
+  runId: z.uuid(),
+  agentId: z.uuid().nullable(),
+  provider: mobileProviderSchema,
+  model: z.string().nullable(),
+  effort: mobileEffortSchema.nullable(),
+  requestedWorkerId: z.string().nullable(),
+  requestedByUserId: z.string(),
+  dispatchMode: z.enum(["any", "specific"]),
+  dispatchedAt: z.iso.datetime(),
+  outcome: z.enum(["dispatched", "already_dispatched"]),
+});
+export const mobileIssueMessageSchema = mobileIssueMessagesResponseSchema.shape.messages.element;
+export const mobileCreateMessageRequestSchema = z.object({
+  body: z.string().trim().min(1).max(10_000),
+  parentMessageId: z.uuid().nullable(),
+  mentionedUserIds: z.array(z.string()),
+  agentConversationId: z.string().nullable(),
+}).strict();
+const mobileAgentReplySchema = z.object({
+  id: z.uuid(),
+  triggerMessageId: z.uuid(),
+  status: z.enum(["queued", "running", "completed", "failed"]),
+  error: z.string().nullable(),
+});
+export const mobileCreateMessageResponseSchema = z.object({
+  message: mobileIssueMessageSchema,
+  agentReply: mobileAgentReplySchema.nullable(),
+});
+export const mobileAgentReplyResponseSchema = z.object({
+  agentReply: mobileAgentReplySchema,
+  message: mobileIssueMessageSchema.nullable(),
+});
+export const mobileResultReviewSchema = mobileDashboardRunSchema.shape.resultReviews.unwrap().element;
+
 export const mobileOperationSchemas = {
   getHealth: { response: mobileHealthResponseSchema },
   beginDeviceAuthorization: {
@@ -241,6 +372,20 @@ export const mobileOperationSchemas = {
   listRunEvents: { response: mobileRunEventsResponseSchema },
   listIssueMessages: { response: mobileIssueMessagesResponseSchema },
   listRunEvidence: { response: mobileRunEvidenceResponseSchema },
+  createIssue: { request: mobileCreateIssueRequestSchema, response: mobileCreateIssueResponseSchema },
+  updateIssue: { request: mobileUpdateIssueRequestSchema, response: mobileUpdateIssueResponseSchema },
+  deleteIssue: { response: z.null() },
+  updateIssuePreferences: { request: mobilePreferencesSchema, response: mobilePreferencesResponseSchema },
+  addIssueDependency: { response: mobileDependencyResponseSchema },
+  removeIssueDependency: { response: z.null() },
+  moveRun: { request: mobileMoveRunRequestSchema, response: mobileMoveRunResponseSchema },
+  retryRun: { request: mobileRecoveryRequestSchema, response: mobileRecoveryResponseSchema },
+  cancelRun: { request: mobileRecoveryRequestSchema, response: mobileRecoveryResponseSchema },
+  dispatchRun: { request: mobileDispatchRequestSchema, response: mobileDispatchResponseSchema },
+  reassignRun: { request: mobileDispatchRequestSchema, response: mobileDispatchResponseSchema },
+  completeResultReview: { response: mobileResultReviewSchema },
+  createIssueMessage: { request: mobileCreateMessageRequestSchema, response: mobileCreateMessageResponseSchema },
+  getIssueAgentReply: { response: mobileAgentReplyResponseSchema },
 } as const;
 
 export function isMobileClientId(value: string) {
