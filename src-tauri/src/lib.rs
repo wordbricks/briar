@@ -5,6 +5,8 @@ mod host;
 #[cfg(target_os = "macos")]
 mod macos_inbox_notifications;
 mod planned_update_recovery;
+#[cfg(desktop)]
+mod status_tray;
 
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use serde::{Deserialize, Serialize};
@@ -6191,6 +6193,76 @@ fn show_main_window(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn sync_status_tray(
+    app: tauri::AppHandle,
+    snapshot: StatusTraySnapshotCommand,
+) -> Result<(), String> {
+    #[cfg(all(desktop, target_os = "macos"))]
+    {
+        status_tray::sync_snapshot(&app, snapshot.into())
+    }
+    #[cfg(not(all(desktop, target_os = "macos")))]
+    {
+        let _ = (app, snapshot);
+        Ok(())
+    }
+}
+
+/// Command payload shared with the frontend; converted to the tray module type
+/// only on macOS desktop where the tray is installed.
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StatusTraySnapshotCommand {
+    running_label: String,
+    empty_label: String,
+    open_label: String,
+    quit_label: String,
+    #[serde(default = "default_status_tray_more_label")]
+    more_label: String,
+    #[serde(default)]
+    items: Vec<StatusTrayRunItemCommand>,
+}
+
+fn default_status_tray_more_label() -> String {
+    "+{count} more in Briar".to_string()
+}
+
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StatusTrayRunItemCommand {
+    project_id: String,
+    run_id: String,
+    title: String,
+    status_label: String,
+    #[serde(default)]
+    project_name: String,
+}
+
+#[cfg(all(desktop, target_os = "macos"))]
+impl From<StatusTraySnapshotCommand> for status_tray::StatusTraySnapshot {
+    fn from(value: StatusTraySnapshotCommand) -> Self {
+        Self {
+            running_label: value.running_label,
+            empty_label: value.empty_label,
+            open_label: value.open_label,
+            quit_label: value.quit_label,
+            more_label: value.more_label,
+            items: value
+                .items
+                .into_iter()
+                .map(|item| status_tray::StatusTrayRunItem {
+                    project_id: item.project_id,
+                    run_id: item.run_id,
+                    title: item.title,
+                    status_label: item.status_label,
+                    project_name: item.project_name,
+                })
+                .collect(),
+        }
+    }
+}
+
+#[tauri::command]
 fn reveal_main_window(app: tauri::AppHandle) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
@@ -6288,7 +6360,7 @@ fn prepare_launch_intro(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[cfg(desktop)]
-fn request_exit_confirmation(app: &AppHandle) {
+pub(crate) fn request_exit_confirmation(app: &AppHandle) {
     let state = app.state::<ExitConfirmationState>();
     if !state.try_open_prompt() {
         return;
@@ -6332,6 +6404,7 @@ pub fn run() {
     #[cfg(desktop)]
     let builder = builder
         .manage(ExitConfirmationState::default())
+        .manage(status_tray::StatusTrayState::default())
         .on_window_event(|window, event| {
             if window.label() == "main" {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -6352,6 +6425,10 @@ pub fn run() {
         .setup(|_app| {
             #[cfg(target_os = "macos")]
             macos_inbox_notifications::install(_app.handle());
+            #[cfg(target_os = "macos")]
+            if let Err(error) = status_tray::install(_app.handle()) {
+                eprintln!("Status tray install failed: {error}");
+            }
             #[cfg(desktop)]
             {
                 if let Ok(config_path) = cli_config_path(_app.handle()) {
@@ -6463,7 +6540,8 @@ pub fn run() {
             inspect_execution_workers,
             show_inbox_notification,
             request_inbox_notification_permission,
-            drain_pending_inbox_notification_opens
+            drain_pending_inbox_notification_opens,
+            sync_status_tray
         ])
         .build(tauri::generate_context!())
         .expect("error while building Briar");

@@ -57,6 +57,13 @@ import {
 } from "./lib/initial-onboarding";
 import { syncAppBadgeCount } from "./lib/app-badge";
 import {
+  buildStatusTrayItems,
+  buildStatusTraySnapshot,
+  listenForStatusTrayOpenRun,
+  syncStatusTray,
+} from "./lib/status-tray";
+import type { MessageKey } from "./i18n/messages";
+import {
   inboxNotificationTarget,
   type InboxNotificationTarget,
 } from "./lib/inbox-notifications";
@@ -183,7 +190,59 @@ export function App() {
   const mobilePlatform = getMobilePlatform() ?? "android";
   const previewsLaunchIntro = isLaunchIntroPreview();
   const runsOnDesktopTauri = isDesktopTauri();
+  const runsOnMacDesktop = isMacDesktopTauri();
   const runsOnWeb = isWebApp();
+  useEffect(() => {
+    if (!runsOnMacDesktop) return;
+    const project = briar.dashboard?.project
+      ? {
+          id: briar.dashboard.project.id,
+          name: briar.dashboard.project.name,
+        }
+      : briar.activeProjectId
+        ? {
+            id: briar.activeProjectId,
+            name:
+              briar.projects.find((project) => project.id === briar.activeProjectId)
+                ?.name ?? "",
+          }
+        : null;
+    const items = buildStatusTrayItems(briar.dashboard?.runs ?? [], project, {
+      untitledTitle: t("statusTray.untitledIssue"),
+      localizeStatus: (fallback, run) => {
+        if (run.status === "running" && run.workflowStage) {
+          const stageKey = `stage.${run.workflowStage}` as MessageKey;
+          const localized = t(stageKey);
+          if (localized && localized !== stageKey) return localized;
+          const configured = run.workflow.stages.find(
+            (stage) => stage.id === run.workflowStage,
+          );
+          return configured?.label ?? fallback;
+        }
+        const statusKey = `status.${run.status}` as MessageKey;
+        const localized = t(statusKey);
+        return localized && localized !== statusKey ? localized : fallback;
+      },
+    });
+    const snapshot = buildStatusTraySnapshot(items, {
+      runningLabel: t("statusTray.running"),
+      emptyLabel: t("statusTray.empty"),
+      openLabel: t("statusTray.openBriar"),
+      quitLabel: t("statusTray.quitBriar"),
+      moreLabel: t("statusTray.more"),
+    });
+    void syncStatusTray(snapshot).catch(() => {
+      // Tray bridge may be unavailable outside the packaged macOS app.
+    });
+  }, [
+    briar.activeProjectId,
+    briar.dashboard?.project,
+    briar.dashboard?.runs,
+    briar.projects,
+    locale,
+    runsOnMacDesktop,
+    t,
+  ]);
   useEffect(() => {
     if (!runsOnDesktopTauri) return;
     void import("@tauri-apps/api/core")
@@ -252,6 +311,16 @@ export function App() {
     () => listenForBriarLinks(setPendingBriarLink),
     [],
   );
+  useEffect(() => {
+    if (!runsOnMacDesktop) return;
+    return listenForStatusTrayOpenRun((payload) => {
+      setPendingBriarLink({
+        kind: "issue",
+        projectId: payload.projectId,
+        runId: payload.runId,
+      });
+    });
+  }, [runsOnMacDesktop]);
   useEffect(() => {
     if (!pendingBriarLink || !briar.user || briar.loading) return;
     if (
