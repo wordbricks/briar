@@ -49,7 +49,7 @@ final class CoreAPITests: XCTestCase {
         URLProtocolStub.handler = { request in
             XCTAssertEqual(request.httpMethod, "POST")
             XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer token")
-            let body = String(decoding: request.httpBody ?? Data(), as: UTF8.self)
+            let body = String(decoding: try request.bodyData(), as: UTF8.self)
             XCTAssertTrue(body.contains("name=\"title\""))
             XCTAssertTrue(body.contains("filename=\"note.txt\""))
             XCTAssertTrue(body.contains("hello"))
@@ -75,6 +75,27 @@ final class CoreAPITests: XCTestCase {
 }
 
 private struct UploadResponse: Codable { let ok: Bool }
+
+private extension URLRequest {
+    func bodyData() throws -> Data {
+        if let httpBody { return httpBody }
+        guard let httpBodyStream else { return Data() }
+
+        httpBodyStream.open()
+        defer { httpBodyStream.close() }
+        var body = Data()
+        let bufferSize = 4_096
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+        defer { buffer.deallocate() }
+        while httpBodyStream.hasBytesAvailable {
+            let count = httpBodyStream.read(buffer, maxLength: bufferSize)
+            if count < 0 { throw httpBodyStream.streamError ?? URLError(.cannotDecodeContentData) }
+            if count == 0 { break }
+            body.append(buffer, count: count)
+        }
+        return body
+    }
+}
 
 private final class URLProtocolStub: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) static var handler: ((URLRequest) throws -> (HTTPURLResponse, Data))?

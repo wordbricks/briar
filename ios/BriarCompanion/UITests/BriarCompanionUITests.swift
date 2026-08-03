@@ -33,6 +33,7 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["run-detail"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.navigationBars["iOS Native Companion 읽기 경험"].exists)
         XCTAssertTrue(app.staticTexts["읽기 전용"].exists)
+        captureScreenshot(named: "companion-search-detail")
     }
 
     func testRepresentativeRunStatesAndFilters() {
@@ -47,6 +48,7 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["오프라인 복구 확인"].exists)
         XCTAssertTrue(app.staticTexts["실패 상태 예시"].exists)
         XCTAssertFalse(app.staticTexts["공유 API 계약 검증"].exists)
+        captureScreenshot(named: "companion-attention-filter")
     }
 
     func testOfflineErrorAndRetryScreen() {
@@ -56,7 +58,8 @@ final class BriarCompanionUITests: XCTestCase {
 
         XCTAssertTrue(app.descendants(matching: .any)["offline-state"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["오프라인"].exists)
-        XCTAssertTrue(app.buttons["dashboard-retry-button"].exists)
+        XCTAssertTrue(app.buttons["다시 시도"].exists)
+        captureScreenshot(named: "companion-offline-retry")
     }
 
     private func launchInsideCompanion() -> XCUIApplication {
@@ -69,5 +72,12 @@ final class BriarCompanionUITests: XCTestCase {
         app.buttons["project-continue-button"].tap()
         XCTAssertTrue(app.navigationBars["Tasks"].waitForExistence(timeout: 5))
         return app
+    }
+
+    private func captureScreenshot(named name: String) {
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 }
