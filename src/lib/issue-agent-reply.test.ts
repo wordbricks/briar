@@ -80,6 +80,126 @@ describe("issue agent replies", () => {
     ).toBe(true);
   });
 
+  it("applies the same continuation rule to worker-row shaped messages", () => {
+    const thread = [
+      {
+        id: "thread-root",
+        parentMessageId: null,
+        body: "첫 질문",
+        author: { provider: null },
+      },
+      {
+        id: "agent-reply",
+        parentMessageId: "thread-root",
+        body: "현재 진행 중입니다.",
+        author: { provider: "codex" },
+      },
+    ];
+
+    expect(
+      shouldBriarReply(thread, {
+        body: "이어서 질문",
+        parentMessageId: "thread-root",
+      }),
+    ).toBe(true);
+    expect(
+      shouldBriarReply([thread[0]], {
+        body: "이어서 질문",
+        parentMessageId: "thread-root",
+      }),
+    ).toBe(false);
+    expect(
+      shouldBriarReply(thread, {
+        body: "별도의 새 메시지",
+        parentMessageId: null,
+      }),
+    ).toBe(false);
+  });
+
+  it("continues replying to a nested reply when an ancestor is agent-authored", () => {
+    const thread = [
+      {
+        id: "thread-root",
+        parentMessageId: null,
+        body: "첫 질문",
+        author: { provider: null },
+      },
+      {
+        id: "agent-reply",
+        parentMessageId: "thread-root",
+        body: "현재 진행 중입니다.",
+        author: { provider: "codex" },
+      },
+      {
+        id: "nested-reply",
+        parentMessageId: "agent-reply",
+        body: "자세히 알려줘",
+        author: { provider: null },
+      },
+    ];
+
+    expect(
+      shouldBriarReply(thread, {
+        body: "대댓글에 이어서 질문",
+        parentMessageId: "nested-reply",
+      }),
+    ).toBe(true);
+  });
+
+  it("does not reply to a nested reply when no ancestor participated", () => {
+    const thread = [
+      {
+        id: "thread-root",
+        parentMessageId: null,
+        body: "첫 질문",
+        author: { provider: null },
+      },
+      {
+        id: "reply-1",
+        parentMessageId: "thread-root",
+        body: "동료 답변",
+        author: { provider: null },
+      },
+      {
+        id: "nested-reply",
+        parentMessageId: "reply-1",
+        body: "동료 대댓글",
+        author: { provider: null },
+      },
+    ];
+
+    expect(
+      shouldBriarReply(thread, {
+        body: "동료 대댓글에 이어서",
+        parentMessageId: "nested-reply",
+      }),
+    ).toBe(false);
+  });
+
+  it("continues replying to a nested reply whose parent is agent-authored", () => {
+    const thread = [
+      {
+        id: "thread-root",
+        parentMessageId: null,
+        body: "첫 질문",
+        author: { provider: null },
+      },
+      {
+        id: "agent-reply",
+        parentMessageId: "thread-root",
+        body: "현재 진행 중입니다.",
+        author: { provider: "grok" },
+      },
+    ];
+
+    expect(
+      shouldBriarReply(thread, {
+        body: "답변의 대댓글",
+        parentMessageId: "agent-reply",
+      }),
+    ).toBe(true);
+  });
+
   it("recognizes a standalone @briar mention without matching email-like text", () => {
     expect(mentionsBriar("@briar 이 변경을 설명해 줘")).toBe(true);
     expect(mentionsBriar("Could you check this, @BRIAR?")).toBe(true);

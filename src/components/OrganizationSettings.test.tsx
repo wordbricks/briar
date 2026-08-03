@@ -4,10 +4,12 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  addOrganizationMember,
+  createOrganizationInvitation,
   loadOrganizationExecutionWorkers,
+  loadOrganizationInvitations,
   loadOrganizationMembers,
   removeOrganizationMember,
+  revokeOrganizationInvitation,
   updateOrganizationMemberRole,
 } from "../lib/api";
 import { organizationLogoFromFile } from "../lib/organization-logo";
@@ -15,11 +17,13 @@ import type { OrganizationMember } from "../types";
 import { OrganizationSettings } from "./OrganizationSettings";
 
 vi.mock("../lib/api", () => ({
-  addOrganizationMember: vi.fn(),
+  createOrganizationInvitation: vi.fn(),
   disableOrganizationExecutionWorker: vi.fn(),
   loadOrganizationExecutionWorkers: vi.fn(),
+  loadOrganizationInvitations: vi.fn(),
   loadOrganizationMembers: vi.fn(),
   removeOrganizationMember: vi.fn(),
+  revokeOrganizationInvitation: vi.fn(),
   updateOrganizationMemberRole: vi.fn(),
   updateOrganizationExecutionWorkerConcurrency: vi.fn(),
 }));
@@ -68,7 +72,26 @@ describe("OrganizationSettings", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(loadOrganizationMembers).mockResolvedValue(members);
-    vi.mocked(addOrganizationMember).mockResolvedValue({ members });
+    vi.mocked(loadOrganizationInvitations).mockResolvedValue([]);
+    vi.mocked(createOrganizationInvitation).mockResolvedValue({
+      invitation: {
+        id: "invitation-1",
+        organizationId: "organization-1",
+        organizationName: "Wordbricks",
+        initialProjectId: "project-1",
+        initialProjectName: "Briar",
+        email: "new@wordbricks.ai",
+        emailHint: "n***@wordbricks.ai",
+        role: "member",
+        status: "pending",
+        expiresAt: "2026-08-10T00:00:00Z",
+        acceptedAt: null,
+        createdAt: "2026-08-03T00:00:00Z",
+      },
+      inviteUrl:
+        "https://briar.wordbricks.ai/app/invitations/briar_invite_example",
+    });
+    vi.mocked(revokeOrganizationInvitation).mockResolvedValue(undefined);
     vi.mocked(removeOrganizationMember).mockResolvedValue(undefined);
     vi.mocked(updateOrganizationMemberRole).mockResolvedValue({
       members: members.map((member) =>
@@ -110,6 +133,14 @@ describe("OrganizationSettings", () => {
           onBack={() => undefined}
           onLogoChange={vi.fn()}
           onRename={vi.fn()}
+          projects={[
+            {
+              id: "project-1",
+              name: "Briar",
+              organizationId: "organization-1",
+              createdAt: "2026-08-03T00:00:00Z",
+            },
+          ]}
           token="token"
         />,
       );
@@ -151,11 +182,16 @@ describe("OrganizationSettings", () => {
         ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     });
 
-    expect(addOrganizationMember).toHaveBeenCalledWith(
+    expect(createOrganizationInvitation).toHaveBeenCalledWith(
       "token",
       "organization-1",
-      { email: "new@wordbricks.ai", role: "member" },
+      {
+        email: "new@wordbricks.ai",
+        initialProjectId: "project-1",
+        role: "member",
+      },
     );
+    expect(dialog?.textContent).toContain("초대 링크가 준비되었습니다.");
 
     await act(async () => root.unmount());
     container.remove();

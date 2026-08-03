@@ -2103,6 +2103,106 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
+  it("renders nested replies and sends a reply to the nested message", async () => {
+    const rootMessage: IssueMessage = {
+      id: "message-root",
+      runId: demoDashboard.runs[0].id,
+      parentMessageId: null,
+      body: "원문 메시지",
+      author: { id: "jay", name: "Jay", image: null, provider: null },
+      replyCount: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    const reply: IssueMessage = {
+      ...rootMessage,
+      id: "message-reply",
+      parentMessageId: rootMessage.id,
+      body: "기존 답글",
+      replyCount: 1,
+    };
+    const nestedReply: IssueMessage = {
+      ...rootMessage,
+      id: "message-nested-reply",
+      parentMessageId: reply.id,
+      body: "기존 대댓글",
+      replyCount: 0,
+    };
+    let sentParentId: string | null | undefined;
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => [rootMessage, reply, nestedReply]}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async (input) => {
+            sentParentId = input.parentMessageId;
+            return { message: nestedReply, agentReply: null };
+          }}
+          run={demoDashboard.runs[0]}
+        />,
+      );
+    });
+
+    const groupByBody = (body: string) =>
+      Array.from(
+        container.querySelectorAll<HTMLElement>(".issue-message-group"),
+      ).find((group) =>
+        group
+          .querySelector(":scope > .issue-message")
+          ?.textContent?.includes(body),
+      );
+    const replyGroup = groupByBody("기존 답글");
+    const nestedGroup = groupByBody("기존 대댓글");
+    expect(replyGroup).not.toBeUndefined();
+    expect(nestedGroup).not.toBeUndefined();
+    expect(
+      replyGroup?.querySelector(":scope > .issue-message-replies")
+        ?.textContent,
+    ).toContain("기존 대댓글");
+    expect(nestedGroup?.querySelector(".issue-message-replies")).toBeNull();
+
+    const nestedReplyButton = nestedGroup?.querySelector<HTMLButtonElement>(
+      ".issue-reply-trigger",
+    );
+    expect(nestedReplyButton?.getAttribute("title")).toBe("답글 작성");
+    await act(async () => nestedReplyButton?.click());
+    const nestedComposer = nestedGroup?.querySelector<HTMLElement>(
+      ".issue-inline-reply-composer .issue-message-composer textarea",
+    ) as HTMLTextAreaElement | null;
+    expect(nestedComposer?.placeholder).toBe("답장 남기기…");
+
+    await act(async () => {
+      if (!nestedComposer) return;
+      Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )?.set?.call(nestedComposer, "대댓글에 이어서");
+      nestedComposer.dispatchEvent(new Event("input", { bubbles: true }));
+      nestedComposer.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          bubbles: true,
+          cancelable: true,
+          key: "Enter",
+        }),
+      );
+      await Promise.resolve();
+    });
+    expect(sentParentId).toBe(nestedReply.id);
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("inserts @briar and places the provider reply below its comment", async () => {
     const createdAt = new Date().toISOString();
     const userMessage: IssueMessage = {

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  acceptOrganizationInvitation as acceptRemoteOrganizationInvitation,
   addIssueDependency,
   beginDeviceAuthorization,
   cancelHuntRun,
@@ -136,6 +137,7 @@ import type {
 } from "../types";
 
 export type UseBriarOptions = {
+  deferDefaultOrganization?: boolean;
   startScheduledAgentSession?: (
     run: ClaimedProjectAgentScheduleRun,
   ) => string | null;
@@ -285,6 +287,7 @@ async function readConnectedProjectIds() {
 
 export function useBriar(options: UseBriarOptions = {}) {
   const {
+    deferDefaultOrganization = false,
     startScheduledAgentSession,
     startScheduledAgentWorkerDispatch,
     settleScheduledAgentSession,
@@ -536,15 +539,17 @@ export function useBriar(options: UseBriarOptions = {}) {
 
       let nextOrganizations: Organization[];
       try {
-        nextOrganizations = await ensureDefaultOrganization(
-          result.token,
-          result.user,
-          result.organizations,
-          {
-            createOrganization: createRemoteOrganization,
-            loadOrganizations,
-          },
-        );
+        nextOrganizations = deferDefaultOrganization
+          ? result.organizations
+          : await ensureDefaultOrganization(
+              result.token,
+              result.user,
+              result.organizations,
+              {
+                createOrganization: createRemoteOrganization,
+                loadOrganizations,
+              },
+            );
       } catch (caught) {
         if (!cancelled) scheduleRetry(caught);
         return;
@@ -768,13 +773,18 @@ export function useBriar(options: UseBriarOptions = {}) {
     };
   }, [connectedProjectIds, projects]);
 
-  const login = useCallback(async () => {
+  const login = useCallback(async (
+    options: { forceAccountSelection?: boolean } = {},
+  ) => {
     const attempt = ++loginAttempt.current;
     clearLoginTimer();
     setLoading(true);
     setError(null);
     try {
-      const authorization = await beginDeviceAuthorization(deviceClientId);
+      const authorization = await beginDeviceAuthorization(
+        deviceClientId,
+        options,
+      );
       if (attempt !== loginAttempt.current) return;
       setLoginCode(authorization.userCode);
       const authorizationPresentation = await openAuthorization(
@@ -799,15 +809,17 @@ export function useBriar(options: UseBriarOptions = {}) {
                 loadProjects(nextToken),
                 loadOrganizations(nextToken),
               ]);
-            const nextOrganizations = await ensureDefaultOrganization(
-              nextToken,
-              nextUser,
-              loadedOrganizations,
-              {
-                createOrganization: createRemoteOrganization,
-                loadOrganizations,
-              },
-            );
+            const nextOrganizations = deferDefaultOrganization
+              ? loadedOrganizations
+              : await ensureDefaultOrganization(
+                  nextToken,
+                  nextUser,
+                  loadedOrganizations,
+                  {
+                    createOrganization: createRemoteOrganization,
+                    loadOrganizations,
+                  },
+                );
             const nextConnectedProjectIds = remoteMode
               ? null
               : await readConnectedProjectIds();
@@ -867,7 +879,39 @@ export function useBriar(options: UseBriarOptions = {}) {
       setLoading(false);
       pollLoginNow.current = null;
     }
-  }, [clearLoginTimer]);
+  }, [clearLoginTimer, deferDefaultOrganization]);
+
+  const acceptInvitation = useCallback(
+    async (invitationToken: string) => {
+      if (!token) throw new Error("로그인이 필요합니다.");
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await acceptRemoteOrganizationInvitation(
+          token,
+          invitationToken,
+        );
+        const [nextOrganizations, nextProjects] = await Promise.all([
+          loadOrganizations(token),
+          loadProjects(token),
+        ]);
+        setOrganizations(nextOrganizations);
+        setProjects(nextProjects);
+        setActiveOrganizationId(result.invitation.organizationId);
+        setActiveProjectId(result.invitation.initialProjectId);
+        setDashboard(null);
+        setHealth(null);
+        setHealthError(null);
+        return result;
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : String(caught));
+        throw caught;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [token],
+  );
 
   const logout = useCallback(async () => {
     cancelLogin();
@@ -2725,6 +2769,7 @@ export function useBriar(options: UseBriarOptions = {}) {
   );
 
   return {
+    acceptInvitation,
     activeOrganizationId,
     activeProjectId,
     addOrganization,

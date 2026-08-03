@@ -8,6 +8,7 @@ import {
   createIssueDependency,
   createIssueMessage,
   enqueueIssueAgentReply,
+  listIssueThreadMessages,
   recordHuntEvent,
   updateHuntRunExecutionMetrics,
   type HuntEventInput,
@@ -144,7 +145,7 @@ describe("detached execution workers", () => {
       "migrations/0047_project_icon_browser_formats.sql",
       "migrations/0048_issue_dependencies.sql",
       "migrations/0054_run_execution_metrics.sql",
-      "migrations/0057_workflow_pause_after_stage.sql",
+      "migrations/0058_workflow_pause_after_stage.sql",
     ]) {
       await executeSql(db, await readFile(resolve(migration), "utf8"));
     }
@@ -552,6 +553,71 @@ describe("detached execution workers", () => {
       preferred_worker_id: null,
       claimed_worker_id: worker.worker.id,
     });
+  });
+
+  it("lists a thread root, replies, and nested replies for continuation decisions", async () => {
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      queuedEvent("thread-context", 2),
+    );
+    await createIssueMessage(db, {
+      id: "aaaaaaaa-1111-4aaa-8aaa-aaaaaaaaaaaa",
+      projectId,
+      runId,
+      parentMessageId: null,
+      authorUserId: "owner",
+      authorAgentProvider: null,
+      body: "첫 질문",
+      createdAt: atMinute(2),
+    });
+    await createIssueMessage(db, {
+      id: "bbbbbbbb-2222-4bbb-8bbb-bbbbbbbbbbbb",
+      projectId,
+      runId,
+      parentMessageId: "aaaaaaaa-1111-4aaa-8aaa-aaaaaaaaaaaa",
+      authorUserId: null,
+      authorAgentProvider: "codex",
+      body: "Briar의 답변",
+      createdAt: atMinute(3),
+    });
+    await createIssueMessage(db, {
+      id: "cccccccc-3333-4ccc-8ccc-cccccccccccc",
+      projectId,
+      runId,
+      parentMessageId: "aaaaaaaa-1111-4aaa-8aaa-aaaaaaaaaaaa",
+      authorUserId: "owner",
+      authorAgentProvider: null,
+      body: "이어서 질문",
+      createdAt: atMinute(4),
+    });
+    await createIssueMessage(db, {
+      id: "dddddddd-4444-4ddd-8ddd-dddddddddddd",
+      projectId,
+      runId,
+      parentMessageId: "bbbbbbbb-2222-4bbb-8bbb-bbbbbbbbbbbb",
+      authorUserId: "owner",
+      authorAgentProvider: null,
+      body: "Briar 답변에 대한 대댓글",
+      createdAt: atMinute(5),
+    });
+
+    const thread = await listIssueThreadMessages(
+      db,
+      projectId,
+      runId,
+      "aaaaaaaa-1111-4aaa-8aaa-aaaaaaaaaaaa",
+    );
+
+    expect(thread.map((message) => message.id)).toEqual([
+      "aaaaaaaa-1111-4aaa-8aaa-aaaaaaaaaaaa",
+      "bbbbbbbb-2222-4bbb-8bbb-bbbbbbbbbbbb",
+      "cccccccc-3333-4ccc-8ccc-cccccccccccc",
+      "dddddddd-4444-4ddd-8ddd-dddddddddddd",
+    ]);
+    expect(
+      thread.map((message) => message.author_agent_provider),
+    ).toContain("codex");
   });
 
   it("registers a worker and adopts the same machine on restart", async () => {

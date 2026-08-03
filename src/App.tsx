@@ -16,6 +16,7 @@ import { Inbox } from "./components/Inbox";
 import { InboxDetailPanel } from "./components/InboxDetailPanel";
 import { Ideas } from "./components/Ideas";
 import { InitialOnboarding } from "./components/InitialOnboarding";
+import { InvitationOnboarding } from "./components/InvitationOnboarding";
 import { LaunchIntro } from "./components/LaunchIntro";
 import { LoginScreen } from "./components/LoginScreen";
 import { OrganizationSettings } from "./components/OrganizationSettings";
@@ -55,6 +56,10 @@ import {
   hasCompletedInitialOnboarding,
   markInitialOnboardingComplete,
 } from "./lib/initial-onboarding";
+import {
+  leaveOrganizationInvitationRoute,
+  loadOrganizationInvitationToken,
+} from "./lib/organization-invitation";
 import { syncAppBadgeCount } from "./lib/app-badge";
 import {
   buildStatusTrayItems,
@@ -125,8 +130,13 @@ type AgentAutoHuntOptions = {
 export function App() {
   const { locale, t } = useI18n();
   const autoHunt = useAutoHuntSessions();
+  const [invitationToken, setInvitationToken] = useState(
+    loadOrganizationInvitationToken,
+  );
+  const [acceptingInvitation, setAcceptingInvitation] = useState(false);
   const plannedUpdateRecoveryRef = useRef<Promise<void> | null>(null);
   const scheduleSessionOptions = useMemo<UseBriarOptions>(() => ({
+    deferDefaultOrganization: invitationToken !== null,
     startScheduledAgentSession: (run) =>
       autoHunt.startTaskSession(run.projectId, run.agent.id, {
         request: run.scheduleName,
@@ -155,6 +165,7 @@ export function App() {
     autoHunt.settleTaskSession,
     autoHunt.startTaskSession,
     autoHunt.startWorkerDispatchSession,
+    invitationToken,
   ]);
   const briar = useBriar(scheduleSessionOptions);
   useEffect(() => {
@@ -776,6 +787,41 @@ export function App() {
 
   if (briar.restoringSession) {
     content = <SessionLoadingScreen />;
+  } else if (invitationToken) {
+    content = (
+      <InvitationOnboarding
+        accepting={acceptingInvitation}
+        error={briar.error}
+        loading={briar.loading}
+        loginCode={briar.loginCode}
+        onAccept={async () => {
+          setAcceptingInvitation(true);
+          try {
+            await briar.acceptInvitation(invitationToken);
+            leaveOrganizationInvitationRoute();
+            setInvitationToken(null);
+            setRequestedRunId(null);
+            setRequestedSessionId(null);
+            resetNavigation("issues");
+            setIsIssueDialogOpen(true);
+          } finally {
+            setAcceptingInvitation(false);
+          }
+        }}
+        onCancelLogin={briar.cancelLogin}
+        onLeave={() => {
+          leaveOrganizationInvitationRoute();
+          window.location.reload();
+        }}
+        onLogin={() => void briar.login()}
+        onSwitchAccount={async () => {
+          await briar.logout();
+          await briar.login({ forceAccountSelection: true });
+        }}
+        token={invitationToken}
+        user={briar.user}
+      />
+    );
   } else if (shouldShowInitialOnboarding) {
     content = (
       <InitialOnboarding

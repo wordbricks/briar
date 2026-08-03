@@ -393,6 +393,29 @@ export type OrganizationMember = {
   createdAt: string;
 };
 
+export type OrganizationInvitationStatus =
+  "pending" | "accepted" | "expired" | "revoked";
+
+export type OrganizationInvitation = {
+  id: string;
+  organizationId: string;
+  organizationName: string;
+  initialProjectId: string;
+  initialProjectName: string;
+  email: string;
+  emailHint: string;
+  role: "admin" | "member";
+  status: OrganizationInvitationStatus;
+  expiresAt: string;
+  acceptedAt: string | null;
+  createdAt: string;
+};
+
+export type OrganizationInvitationPreview = Omit<
+  OrganizationInvitation,
+  "email"
+>;
+
 export type ProjectSettings = {
   velenOrg: string | null;
   dataSource: string | null;

@@ -318,4 +318,24 @@ mod tests {
         );
         assert_eq!(parse_run_menu_id("status-tray:open-briar"), None);
     }
+
+    #[test]
+    fn tray_icon_is_a_large_filled_template() {
+        let image = tray_icon_image().expect("tray icon should decode");
+        assert_eq!((image.width(), image.height()), (32, 32));
+
+        let alpha = image
+            .rgba()
+            .chunks_exact(4)
+            .map(|pixel| pixel[3])
+            .collect::<Vec<_>>();
+        let opaque_pixels = alpha.iter().filter(|value| **value >= 240).count();
+        let center_alpha = alpha[16 * image.width() as usize + 16];
+
+        assert!(
+            opaque_pixels >= 350,
+            "tray icon should use a filled silhouette, found {opaque_pixels} opaque pixels"
+        );
+        assert_eq!(center_alpha, 255, "tray icon center should be filled");
+    }
 }

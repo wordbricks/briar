@@ -61,6 +61,23 @@ export type OrganizationMemberRow = {
   created_at: string;
 };
 
+export type OrganizationInvitationRow = {
+  id: string;
+  organization_id: string;
+  organization_name: string;
+  initial_project_id: string;
+  initial_project_name: string;
+  email_normalized: string;
+  role: Exclude<OrganizationRole, "owner">;
+  invited_by_user_id: string | null;
+  expires_at: string;
+  accepted_at: string | null;
+  accepted_by_user_id: string | null;
+  revoked_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type AccountDeletionPlan = {
   blockedOrganizations: Array<{ id: string; name: string }>;
   organizationIds: string[];
@@ -856,6 +873,236 @@ export async function addOrganizationMember(
     .bind(organizationId, user.id, role, now, now)
     .run();
   return user.id;
+}
+
+const organizationInvitationSelect = `
+  select invitation.id, invitation.organization_id,
+         organization.name as organization_name,
+         invitation.initial_project_id,
+         project.name as initial_project_name,
+         invitation.email_normalized, invitation.role,
+         invitation.invited_by_user_id, invitation.expires_at,
+         invitation.accepted_at, invitation.accepted_by_user_id,
+         invitation.revoked_at, invitation.created_at, invitation.updated_at
+  from briar_organization_invitations invitation
+  join briar_organizations organization
+    on organization.id = invitation.organization_id
+  join briar_projects project
+    on project.id = invitation.initial_project_id
+   and project.organization_id = invitation.organization_id`;
+
+export async function createOrganizationInvitation(
+  db: D1Database,
+  input: {
+    id: string;
+    organizationId: string;
+    initialProjectId: string;
+    emailNormalized: string;
+    role: Exclude<OrganizationRole, "owner">;
+    tokenHash: string;
+    invitedByUserId: string;
+    expiresAt: string;
+    createdAt: string;
+  },
+) {
+  const [project, existingMember] = await Promise.all([
+    db
+      .prepare(
+        `select id from briar_projects
+         where id = ? and organization_id = ?`,
+      )
+      .bind(input.initialProjectId, input.organizationId)
+      .first<{ id: string }>(),
+    db
+      .prepare(
+        `select member.user_id
+         from briar_organization_members member
+         join "user" on "user".id = member.user_id
+         where member.organization_id = ? and lower("user".email) = ?`,
+      )
+      .bind(input.organizationId, input.emailNormalized)
+      .first<{ user_id: string }>(),
+  ]);
+  if (!project) return { outcome: "project_not_found" as const };
+  if (existingMember) return { outcome: "already_member" as const };
+
+  await db.batch([
+    db
+      .prepare(
+        `update briar_organization_invitations
+         set revoked_at = ?, updated_at = ?
+         where organization_id = ? and email_normalized = ?
+           and accepted_at is null and revoked_at is null`,
+      )
+      .bind(
+        input.createdAt,
+        input.createdAt,
+        input.organizationId,
+        input.emailNormalized,
+      ),
+    db
+      .prepare(
+        `insert into briar_organization_invitations (
+           id, organization_id, initial_project_id, email_normalized, role,
+           token_hash, invited_by_user_id, expires_at, accepted_at,
+           accepted_by_user_id, revoked_at, created_at, updated_at
+         ) values (?, ?, ?, ?, ?, ?, ?, ?, null, null, null, ?, ?)`,
+      )
+      .bind(
+        input.id,
+        input.organizationId,
+        input.initialProjectId,
+        input.emailNormalized,
+        input.role,
+        input.tokenHash,
+        input.invitedByUserId,
+        input.expiresAt,
+        input.createdAt,
+        input.createdAt,
+      ),
+  ]);
+  const invitation = await getOrganizationInvitationById(db, input.id);
+  return invitation
+    ? { outcome: "created" as const, invitation }
+    : { outcome: "project_not_found" as const };
+}
+
+export async function listOrganizationInvitations(
+  db: D1Database,
+  organizationId: string,
+) {
+  const result = await db
+    .prepare(
+      `${organizationInvitationSelect}
+       where invitation.organization_id = ?
+         and invitation.accepted_at is null
+         and invitation.revoked_at is null
+       order by invitation.created_at desc, invitation.id`,
+    )
+    .bind(organizationId)
+    .all<OrganizationInvitationRow>();
+  return result.results;
+}
+
+export async function getOrganizationInvitationById(
+  db: D1Database,
+  invitationId: string,
+) {
+  return db
+    .prepare(
+      `${organizationInvitationSelect}
+       where invitation.id = ?`,
+    )
+    .bind(invitationId)
+    .first<OrganizationInvitationRow>();
+}
+
+export async function getOrganizationInvitationByTokenHash(
+  db: D1Database,
+  tokenHash: string,
+) {
+  return db
+    .prepare(
+      `${organizationInvitationSelect}
+       where invitation.token_hash = ?`,
+    )
+    .bind(tokenHash)
+    .first<OrganizationInvitationRow>();
+}
+
+export async function revokeOrganizationInvitation(
+  db: D1Database,
+  organizationId: string,
+  invitationId: string,
+  revokedAt: string,
+) {
+  const result = await db
+    .prepare(
+      `update briar_organization_invitations
+       set revoked_at = ?, updated_at = ?
+       where id = ? and organization_id = ?
+         and accepted_at is null and revoked_at is null`,
+    )
+    .bind(revokedAt, revokedAt, invitationId, organizationId)
+    .run();
+  return result.meta.changes > 0;
+}
+
+export type AcceptOrganizationInvitationOutcome =
+  | { outcome: "invalid" }
+  | { outcome: "expired" }
+  | { outcome: "revoked" }
+  | { outcome: "email_mismatch" }
+  | {
+      outcome: "accepted" | "already_accepted";
+      invitation: OrganizationInvitationRow;
+    };
+
+export async function acceptOrganizationInvitation(
+  db: D1Database,
+  input: {
+    tokenHash: string;
+    userId: string;
+    emailNormalized: string;
+    acceptedAt: string;
+  },
+): Promise<AcceptOrganizationInvitationOutcome> {
+  const invitation = await getOrganizationInvitationByTokenHash(
+    db,
+    input.tokenHash,
+  );
+  if (!invitation) return { outcome: "invalid" };
+  if (invitation.revoked_at) return { outcome: "revoked" };
+  if (invitation.expires_at <= input.acceptedAt) return { outcome: "expired" };
+  if (invitation.email_normalized !== input.emailNormalized) {
+    return { outcome: "email_mismatch" };
+  }
+  if (invitation.accepted_at) {
+    return invitation.accepted_by_user_id === input.userId
+      ? { outcome: "already_accepted", invitation }
+      : { outcome: "invalid" };
+  }
+
+  await db.batch([
+    db
+      .prepare(
+        `insert into briar_organization_members (
+           organization_id, user_id, role, created_at, updated_at
+         ) values (?, ?, ?, ?, ?)
+         on conflict(organization_id, user_id) do update set
+           role = excluded.role, updated_at = excluded.updated_at
+         where briar_organization_members.role != 'owner'`,
+      )
+      .bind(
+        invitation.organization_id,
+        input.userId,
+        invitation.role,
+        input.acceptedAt,
+        input.acceptedAt,
+      ),
+    db
+      .prepare(
+        `update briar_organization_invitations
+         set accepted_at = ?, accepted_by_user_id = ?, updated_at = ?
+         where token_hash = ? and accepted_at is null and revoked_at is null
+           and expires_at > ?`,
+      )
+      .bind(
+        input.acceptedAt,
+        input.userId,
+        input.acceptedAt,
+        input.tokenHash,
+        input.acceptedAt,
+      ),
+  ]);
+  const accepted = await getOrganizationInvitationByTokenHash(
+    db,
+    input.tokenHash,
+  );
+  if (!accepted?.accepted_at || accepted.accepted_by_user_id !== input.userId) {
+    return { outcome: "invalid" };
+  }
+  return { outcome: "accepted", invitation: accepted };
 }
 
 export async function updateOrganizationMemberRole(
@@ -2492,6 +2739,52 @@ export async function listIssueMessages(
   return result.results;
 }
 
+export async function listIssueThreadMessages(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  messageId: string,
+) {
+  const result = await db
+    .prepare(
+      `select message.id, message.run_id, message.parent_message_id,
+              message.author_user_id, message.author_agent_provider,
+              author.name as author_name,
+              author.image as author_image, message.body,
+              (select count(*) from briar_issue_messages reply
+               where reply.parent_message_id = message.id) as reply_count,
+              message.created_at, message.updated_at
+       from briar_issue_messages message
+       left join "user" author on author.id = message.author_user_id
+       where message.project_id = ? and message.run_id = ?
+         and message.id in (
+           with recursive thread_path(id, parent_message_id) as (
+             select message.id, message.parent_message_id
+             from briar_issue_messages message
+             where message.project_id = ? and message.run_id = ?
+               and message.id = ?
+             union all
+             select parent.id, parent.parent_message_id
+             from briar_issue_messages parent
+             join thread_path path on parent.id = path.parent_message_id
+           ),
+           thread_messages(id) as (
+             select id from thread_path where parent_message_id is null
+             union all
+             select message.id
+             from briar_issue_messages message
+             join thread_messages thread on message.parent_message_id = thread.id
+             where message.project_id = ? and message.run_id = ?
+           )
+           select id from thread_messages
+         )
+       order by message.created_at, message.id`,
+    )
+    .bind(projectId, runId, projectId, runId, messageId, projectId, runId)
+    .all<IssueMessageRow>();
+  return result.results;
+}
+
 export async function createIssueMessage(
   db: D1Database,
   input: {
@@ -2518,7 +2811,6 @@ export async function createIssueMessage(
          on parent.id = ?
         and parent.project_id = run.project_id
         and parent.run_id = run.id
-        and parent.parent_message_id is null
        where run.id = ? and run.project_id = ?
          and (? is null or parent.id is not null)`,
     )
@@ -2593,7 +2885,7 @@ export async function enqueueIssueAgentReply(
         and trigger.run_id = run.id
        join briar_issue_messages parent
          on parent.id = ? and parent.project_id = run.project_id
-        and parent.run_id = run.id and parent.parent_message_id is null
+        and parent.run_id = run.id
        left join briar_project_agents agent
          on agent.id = run.agent_id and agent.project_id = run.project_id
        where run.id = ? and run.project_id = ?

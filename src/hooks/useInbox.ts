@@ -4,10 +4,16 @@ import {
   type AutoHuntSession,
 } from "./useAutoHuntSessions";
 import type { DashboardPayload, HuntStatus, Project } from "../types";
-import type { AutoHuntWorkflowStageId } from "../lib/auto-hunt-contract";
+import {
+  autoHuntWorkflowStageCatalog,
+  type AutoHuntWorkflowStageId,
+} from "../lib/auto-hunt-contract";
 import type { StructuredAgentResult } from "../lib/agent-result";
 
 const storagePrefix = "briar.inbox.v1";
+const builtInWorkflowStageIds = new Set<string>(
+  autoHuntWorkflowStageCatalog.map((stage) => stage.id),
+);
 
 export type InboxIssueMessage = {
   id: string;
@@ -21,6 +27,8 @@ export type InboxIssueMessage = {
   runNumber: number;
   status: HuntStatus;
   workflowStage: AutoHuntWorkflowStageId | null;
+  /** Configured label for custom workflow stages; absent in older stored messages. */
+  workflowStageLabel?: string | null;
   priority: number | null;
   structuredResult: StructuredAgentResult | null;
 };
@@ -102,6 +110,15 @@ export function buildCurrentInboxMessages(
         runNumber: run.runNumber,
         status: run.status,
         workflowStage: run.workflowStage,
+        ...(run.workflowStage &&
+        !builtInWorkflowStageIds.has(run.workflowStage)
+          ? {
+              workflowStageLabel:
+                run.workflow.stages.find(
+                  (stage) => stage.id === run.workflowStage,
+                )?.label ?? run.workflowStage,
+            }
+          : {}),
         priority: run.priority,
         structuredResult: run.structuredResult,
       });

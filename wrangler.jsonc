@@ -35,6 +35,7 @@
       "/app/*",
       "/api/*",
       "/me",
+      "/invitations*",
       "/organizations*",
       "/projects*",
       "/workers*",

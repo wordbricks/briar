@@ -53,7 +53,7 @@ import {
   canonicalizeIssueAttachmentReferences,
   isIssueAttachmentReference,
 } from "../../src/lib/issue-markdown";
-import { mentionsBriar } from "../../src/lib/briar-mention";
+import { shouldBriarReply } from "../../src/lib/issue-reply-decision";
 import {
   isWorkerEmoji,
   isWorkerLogoDataUrl,
@@ -83,6 +83,7 @@ import {
   readArchivedTranscript,
 } from "./archive";
 import {
+  acceptOrganizationInvitation,
   addOrganizationMember,
   assertQueuedHuntClaim,
   claimNextIssueAgentReply,
@@ -98,6 +99,7 @@ import {
   createIssueAttachments,
   createRunEvidenceImages,
   createOrganization,
+  createOrganizationInvitation,
   createProjectAgent,
   createProjectAgentSchedule,
   createProject,
@@ -120,6 +122,7 @@ import {
   getIssueAttachment,
   getRunEvidenceImage,
   getOrganizationRole,
+  getOrganizationInvitationByTokenHash,
   getSlackInstallation,
   isOrganizationHandleAvailable,
   getProject,
@@ -133,6 +136,7 @@ import {
   listIssueDependencies,
   listIssueConversationNotifications,
   listIssueMessages,
+  listIssueThreadMessages,
   listIssueResultReviews,
   listAllRunEvidenceImages,
   listEvidenceImagesForEvidence,
@@ -143,6 +147,7 @@ import {
   listRunEvidenceImages,
   listRunStageRevisions,
   listOrganizationMembers,
+  listOrganizationInvitations,
   listOrganizationProjects,
   listOrganizations,
   listProjects,
@@ -160,6 +165,7 @@ import {
   recordHuntEvent,
   recordRunEvidence,
   removeOrganizationMember,
+  revokeOrganizationInvitation,
   renewProjectAgentScheduleRunLease,
   renewIssueAgentReplyLease,
   rollbackNewAppIssue,
@@ -192,6 +198,7 @@ import {
   type ProjectAgentScheduleRow,
   type ProjectSettingsRow,
   type OrganizationMemberRow,
+  type OrganizationInvitationRow,
   type OrganizationRole,
   type OrganizationRow,
   type RunEvidenceRow,
@@ -301,6 +308,7 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
 };
 const accountDeletionFreshAgeMs = 24 * 60 * 60 * 1_000;
+const organizationInvitationTtlMs = 7 * 24 * 60 * 60 * 1_000;
 
 const json = (body: unknown, status = 200) =>
   Response.json(body, { status, headers: corsHeaders });
@@ -852,6 +860,13 @@ const organizationMemberInputSchema = z.object({
   email: z.string().trim().email().max(320),
   role: z.enum(["admin", "member"]).default("member"),
 });
+export const organizationInvitationInputSchema = z
+  .object({
+    email: z.string().trim().toLowerCase().email().max(320),
+    role: z.enum(["admin", "member"]).default("member"),
+    initialProjectId: z.string().uuid(),
+  })
+  .strict();
 export const organizationMemberRoleInputSchema = z
   .object({
     role: z.enum(["admin", "member"]),
@@ -1735,10 +1750,11 @@ const devicePage = (
 *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#08090b;color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.card{width:min(390px,calc(100vw - 32px));padding:30px;border:1px solid #282a30;border-radius:14px;background:#111318;box-shadow:0 30px 100px #0008}.brand{display:flex;align-items:center;gap:10px;font-weight:750;font-size:20px}.brand img{width:26px;height:26px;display:block;border-radius:6px}.eyebrow{margin-top:32px;color:#8979cf;font:500 10px monospace;letter-spacing:1px}.code{margin:18px 0;padding:15px;border:1px solid #332e49;border-radius:8px;background:#171420;text-align:center;font:600 26px monospace;letter-spacing:4px}.copy{color:#838792;font-size:12px;line-height:1.6}.actions{display:grid;gap:8px;margin-top:22px}button{height:42px;border:1px solid #34363d;border-radius:8px;background:#f4f4f5;color:#18191d;font-weight:650;cursor:pointer}button.secondary{background:#191b20;color:#aaaeb8}.status{min-height:18px;margin-top:12px;color:#777b86;font-size:11px;text-align:center}</style></head>
 <body><main class="card"><div class="brand"><img src="/brand/briar-icon.png" alt="">briar</div><p class="eyebrow">${copy.eyebrow}</p><h1>${copy.title}</h1><p class="copy">${copy.description}</p><div class="code" id="code">--------</div><div class="actions"><button id="google">Google로 로그인</button><button id="approve" hidden>${copy.approve}</button><button id="deny" class="secondary" hidden>거절</button></div><div class="status" id="status"></div></main>
 <script>
-const base=${JSON.stringify(apiOrigin)};const mobileCompanion=${JSON.stringify(mobileCompanion)};const webApp=${JSON.stringify(webApp)};const returnUrl='briar-companion://auth-complete';const params=new URLSearchParams(location.search);const code=(params.get('user_code')||'').replace(/-/g,'').toUpperCase();const callbackParams=new URLSearchParams({user_code:code});if(mobileCompanion)callbackParams.set('client','mobile');if(webApp)callbackParams.set('client','web');const callbackUrl=base+'/device?'+callbackParams.toString();document.querySelector('#code').textContent=code||'코드 없음';const status=document.querySelector('#status');const google=document.querySelector('#google');const approve=document.querySelector('#approve');const deny=document.querySelector('#deny');
+const base=${JSON.stringify(apiOrigin)};const mobileCompanion=${JSON.stringify(mobileCompanion)};const webApp=${JSON.stringify(webApp)};const returnUrl='briar-companion://auth-complete';const params=new URLSearchParams(location.search);const switchAccount=params.get('switch_account')==='1';const code=(params.get('user_code')||'').replace(/-/g,'').toUpperCase();const callbackParams=new URLSearchParams({user_code:code});if(mobileCompanion)callbackParams.set('client','mobile');if(webApp)callbackParams.set('client','web');const callbackUrl=base+'/device?'+callbackParams.toString();document.querySelector('#code').textContent=code||'코드 없음';const status=document.querySelector('#status');const google=document.querySelector('#google');const approve=document.querySelector('#approve');const deny=document.querySelector('#deny');
 async function api(path,options={}){const response=await fetch(base+'/api/auth'+path,{credentials:'include',headers:{'content-type':'application/json'},...options});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.message||data.error_description||'요청에 실패했습니다.');return data}
-async function boot(){if(!code){status.textContent='유효한 기기 코드가 없습니다.';google.hidden=true;return}const session=await api('/get-session').catch(()=>null);if(!session?.user){status.textContent='먼저 Google 계정으로 로그인하세요.';return}google.hidden=true;await api('/device?user_code='+encodeURIComponent(code));approve.hidden=false;deny.hidden=false;status.textContent=session.user.email+' 계정으로 연결합니다.'}
-google.onclick=async()=>{status.textContent='Google 로그인 페이지를 여는 중…';try{const data=await api('/sign-in/social',{method:'POST',body:JSON.stringify({provider:'google',callbackURL:callbackUrl})});location.href=data.url}catch(error){status.textContent=error.message}};
+async function beginGoogle(){status.textContent='Google 로그인 페이지를 여는 중…';try{const data=await api('/sign-in/social',{method:'POST',body:JSON.stringify({provider:'google',callbackURL:callbackUrl,...(switchAccount?{additionalParams:{prompt:'select_account'}}:{})})});location.href=data.url}catch(error){status.textContent=error.message}}
+async function boot(){if(!code){status.textContent='유효한 기기 코드가 없습니다.';google.hidden=true;return}if(switchAccount){google.hidden=true;await beginGoogle();return}const session=await api('/get-session').catch(()=>null);if(!session?.user){status.textContent='먼저 Google 계정으로 로그인하세요.';return}google.hidden=true;await api('/device?user_code='+encodeURIComponent(code));approve.hidden=false;deny.hidden=false;status.textContent=session.user.email+' 계정으로 연결합니다.'}
+google.onclick=beginGoogle;
 approve.onclick=async()=>{try{await api('/device/approve',{method:'POST',body:JSON.stringify({userCode:code})});approve.hidden=true;deny.hidden=true;if(mobileCompanion){status.textContent='승인되었습니다. Briar Companion으로 돌아갑니다…';window.setTimeout(()=>location.replace(returnUrl),250)}else if(webApp){status.textContent='승인되었습니다. Briar 웹 탭으로 돌아가세요.';window.setTimeout(()=>window.close(),800)}else{status.textContent='승인되었습니다. Briar 앱으로 돌아가세요.'}}catch(error){status.textContent=error.message}};
 deny.onclick=async()=>{try{await api('/device/deny',{method:'POST',body:JSON.stringify({userCode:code})});status.textContent='요청을 거절했습니다.'}catch(error){status.textContent=error.message}};void boot();
 </script></body></html>`,
@@ -2785,6 +2801,50 @@ const organizationMemberJson = (row: OrganizationMemberRow) => ({
   createdAt: row.created_at,
 });
 
+const organizationInvitationStatus = (
+  row: OrganizationInvitationRow,
+  observedAt: string,
+) =>
+  row.revoked_at
+    ? "revoked"
+    : row.accepted_at
+      ? "accepted"
+      : row.expires_at <= observedAt
+        ? "expired"
+        : "pending";
+
+const maskInvitationEmail = (email: string) => {
+  const [local = "", domain = ""] = email.split("@");
+  return `${local.slice(0, 1) || "*"}***@${domain}`;
+};
+
+const organizationInvitationJson = (
+  row: OrganizationInvitationRow,
+  observedAt = new Date().toISOString(),
+) => ({
+  id: row.id,
+  organizationId: row.organization_id,
+  organizationName: row.organization_name,
+  initialProjectId: row.initial_project_id,
+  initialProjectName: row.initial_project_name,
+  email: row.email_normalized,
+  emailHint: maskInvitationEmail(row.email_normalized),
+  role: row.role,
+  status: organizationInvitationStatus(row, observedAt),
+  expiresAt: row.expires_at,
+  acceptedAt: row.accepted_at,
+  createdAt: row.created_at,
+});
+
+const publicOrganizationInvitationJson = (
+  row: OrganizationInvitationRow,
+  observedAt = new Date().toISOString(),
+) => {
+  const invitation = organizationInvitationJson(row, observedAt);
+  const { email: _email, ...publicInvitation } = invitation;
+  return publicInvitation;
+};
+
 const canManageOrganization = (role: OrganizationRole | null) =>
   role === "owner" || role === "admin";
 
@@ -3590,6 +3650,61 @@ async function route(
     return json({ status: "completed" });
   }
 
+  const publicInvitationMatch = pathname.match(
+    /^\/invitations\/(briar_invite_[0-9a-f]{64})$/u,
+  );
+  if (publicInvitationMatch && request.method === "GET") {
+    const observedAt = new Date().toISOString();
+    const invitation = await getOrganizationInvitationByTokenHash(
+      db,
+      await sha256(publicInvitationMatch[1]),
+    );
+    if (!invitation) throw new HttpError(404, "Invitation not found");
+    return json({
+      invitation: publicOrganizationInvitationJson(invitation, observedAt),
+    });
+  }
+  if (publicInvitationMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const acceptedAt = new Date().toISOString();
+    const result = await acceptOrganizationInvitation(db, {
+      tokenHash: await sha256(publicInvitationMatch[1]),
+      userId: session.user.id,
+      emailNormalized: session.user.email.trim().toLowerCase(),
+      acceptedAt,
+    });
+    if (result.outcome === "email_mismatch") {
+      return json(
+        {
+          code: "INVITATION_EMAIL_MISMATCH",
+          message:
+            "Sign in with the Google account that matches this invitation",
+          signedInEmail: session.user.email,
+        },
+        409,
+      );
+    }
+    if (result.outcome === "expired") {
+      return json(
+        { code: "INVITATION_EXPIRED", message: "Invitation expired" },
+        410,
+      );
+    }
+    if (result.outcome === "revoked") {
+      return json(
+        { code: "INVITATION_REVOKED", message: "Invitation revoked" },
+        410,
+      );
+    }
+    if (result.outcome === "invalid") {
+      throw new HttpError(404, "Invitation not found");
+    }
+    return json({
+      invitation: organizationInvitationJson(result.invitation, acceptedAt),
+      alreadyAccepted: result.outcome === "already_accepted",
+    });
+  }
+
   if (pathname === "/organizations" && request.method === "GET") {
     const session = await requireSession(auth, request);
     const organizations = await listOrganizations(db, session.user.id);
@@ -3676,6 +3791,87 @@ async function route(
     );
     if (!organization) throw new HttpError(404, "Organization not found");
     return json({ organization: organizationJson(organization) });
+  }
+
+  const organizationInvitationsMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/invitations$/u,
+  );
+  if (organizationInvitationsMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const organizationId = organizationInvitationsMatch[1];
+    const role = await getOrganizationRole(db, organizationId, session.user.id);
+    if (!canManageOrganization(role)) {
+      throw new HttpError(403, "Organization admin access required");
+    }
+    const invitations = await listOrganizationInvitations(db, organizationId);
+    const observedAt = new Date().toISOString();
+    return json({
+      invitations: invitations.map((invitation) =>
+        organizationInvitationJson(invitation, observedAt),
+      ),
+    });
+  }
+  if (organizationInvitationsMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const organizationId = organizationInvitationsMatch[1];
+    const role = await getOrganizationRole(db, organizationId, session.user.id);
+    if (!canManageOrganization(role)) {
+      throw new HttpError(403, "Organization admin access required");
+    }
+    const input = organizationInvitationInputSchema.parse(
+      await readJson(request),
+    );
+    const token = `briar_invite_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
+    const createdAt = new Date().toISOString();
+    const result = await createOrganizationInvitation(db, {
+      id: crypto.randomUUID(),
+      organizationId,
+      initialProjectId: input.initialProjectId,
+      emailNormalized: input.email,
+      role: input.role,
+      tokenHash: await sha256(token),
+      invitedByUserId: session.user.id,
+      expiresAt: new Date(
+        Date.now() + organizationInvitationTtlMs,
+      ).toISOString(),
+      createdAt,
+    });
+    if (result.outcome === "project_not_found") {
+      throw new HttpError(404, "Invitation project not found");
+    }
+    if (result.outcome === "already_member") {
+      throw new HttpError(
+        409,
+        "A member with that email already belongs to this organization",
+      );
+    }
+    return json(
+      {
+        invitation: organizationInvitationJson(result.invitation, createdAt),
+        invitePath: `/app/invitations/${token}`,
+      },
+      201,
+    );
+  }
+
+  const organizationInvitationMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/invitations\/([0-9a-f-]+)$/u,
+  );
+  if (organizationInvitationMatch && request.method === "DELETE") {
+    const session = await requireSession(auth, request);
+    const organizationId = organizationInvitationMatch[1];
+    const role = await getOrganizationRole(db, organizationId, session.user.id);
+    if (!canManageOrganization(role)) {
+      throw new HttpError(403, "Organization admin access required");
+    }
+    const revoked = await revokeOrganizationInvitation(
+      db,
+      organizationId,
+      organizationInvitationMatch[2],
+      new Date().toISOString(),
+    );
+    if (!revoked) throw new HttpError(404, "Pending invitation not found");
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   const organizationMembersMatch = pathname.match(
@@ -5209,7 +5405,23 @@ async function route(
       );
     }
     const agentReply =
-      !agentProvider && mentionsBriar(input.body)
+      !agentProvider && shouldBriarReply(
+        (input.parentMessageId
+          ? await listIssueThreadMessages(
+              db,
+              project.id,
+              issueMessagesMatch[2],
+              input.parentMessageId,
+            )
+          : []
+        ).map((threadMessage) => ({
+          id: threadMessage.id,
+          parentMessageId: threadMessage.parent_message_id,
+          body: threadMessage.body,
+          author: { provider: threadMessage.author_agent_provider },
+        })),
+        { body: input.body, parentMessageId: input.parentMessageId ?? null },
+      )
         ? await enqueueIssueAgentReply(db, {
             id: crypto.randomUUID(),
             projectId: project.id,
