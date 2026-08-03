@@ -6199,7 +6199,7 @@ fn sync_status_tray(
 ) -> Result<(), String> {
     #[cfg(all(desktop, target_os = "macos"))]
     {
-        return status_tray::sync_snapshot(&app, snapshot.into());
+        status_tray::sync_snapshot(&app, snapshot.into())
     }
     #[cfg(not(all(desktop, target_os = "macos")))]
     {
