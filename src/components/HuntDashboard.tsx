@@ -89,6 +89,12 @@ import {
 import { ProjectAgentAvatar } from "./ProjectAgentAvatar";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import { useMobileBackHandler } from "../hooks/useMobileNavigation";
+import { useProjectAgentWorkerEvents } from "../hooks/useProjectAgentWorkerEvents";
+import {
+  agentMessagesFromAppServerEvents,
+  naturalLanguageFromAgentMessage,
+  type AutoHuntAgentMessage,
+} from "../lib/auto-hunt-agent";
 import { eventMeta, runMeta } from "../lib/stages";
 import {
   formatExecutionDuration,
@@ -666,6 +672,7 @@ export function HuntDashboard({
           run={selected}
           isProcessing={processingIssueIds.has(selected.id)}
           availableRuns={dashboard!.runs}
+          token={token}
         />
         {createIssueDialog}
       </>
@@ -2732,6 +2739,7 @@ export function RunPage({
   performedAgentName = null,
   projectId = "",
   run,
+  token = null,
 }: {
   availableProviders?: AgentProvider[];
   availableRuns?: HuntRun[];
@@ -2772,6 +2780,7 @@ export function RunPage({
   performedAgentName?: string | null;
   projectId?: string;
   run: HuntRun;
+  token?: string | null;
 }) {
   const { localeTag, t } = useI18n();
   const meta = runMeta(run.status, run.workflowStage, run.workflow);
@@ -2810,8 +2819,33 @@ export function RunPage({
     null,
   );
   const [activeDetailTab, setActiveDetailTab] = useState<
-    "description" | "result" | "statusHistory" | "evidence" | "conversation"
+    | "description"
+    | "result"
+    | "agentActivity"
+    | "statusHistory"
+    | "evidence"
+    | "conversation"
   >(() => run.status === "completed" ? "result" : "description");
+  const hasWorkerExecution = Boolean(run.workerId);
+  const workerExecutionIsLive = ![
+    "completed",
+    "cancelled",
+    "paused",
+    "blocked",
+    "failed",
+  ].includes(run.status);
+  const workerEvents = useProjectAgentWorkerEvents(
+    token,
+    projectId,
+    hasWorkerExecution ? [run.id] : [],
+    workerExecutionIsLive,
+  );
+  const agentActivity = useMemo(
+    () => agentMessagesFromAppServerEvents(workerEvents.events),
+    [workerEvents.events],
+  );
+  const activityProvider = workerEvents.events.find((event) => event.provider)
+    ?.provider ?? run.requestedProvider ?? run.preferredProvider ?? null;
   const [runEvents, setRunEvents] = useState<HuntEvent[]>([]);
   const [runEventsLoading, setRunEventsLoading] = useState(true);
   const [runEventsLoadError, setRunEventsLoadError] = useState<string | null>(
@@ -3274,6 +3308,16 @@ export function RunPage({
                     {t("run.evidence")}
                   </button>
                   <button
+                    aria-controls={`${detailTabsId}-agent-activity-panel`}
+                    aria-selected={activeDetailTab === "agentActivity"}
+                    id={`${detailTabsId}-agent-activity-tab`}
+                    onClick={() => setActiveDetailTab("agentActivity")}
+                    role="tab"
+                    type="button"
+                  >
+                    {t("run.agentActivity")}
+                  </button>
+                  <button
                     aria-controls={`${detailTabsId}-status-history-panel`}
                     aria-selected={activeDetailTab === "statusHistory"}
                     id={`${detailTabsId}-status-history-tab`}
@@ -3303,6 +3347,8 @@ export function RunPage({
                       ? "run.issue"
                       : activeDetailTab === "result"
                         ? "run.result"
+                      : activeDetailTab === "agentActivity"
+                        ? "run.agentActivity"
                       : activeDetailTab === "statusHistory"
                           ? "run.status"
                           : "run.evidence",
@@ -3656,6 +3702,16 @@ export function RunPage({
                         onLoadImage={onLoadRunEvidenceImage}
                       />
                     </div>
+                  ) : activeDetailTab === "agentActivity" ? (
+                    <IssueAgentActivityPanel
+                      activity={agentActivity}
+                      error={workerEvents.error}
+                      id={`${detailTabsId}-agent-activity-panel`}
+                      isLive={workerExecutionIsLive && hasWorkerExecution}
+                      labelledBy={`${detailTabsId}-agent-activity-tab`}
+                      loading={workerEvents.isLoading}
+                      provider={activityProvider}
+                    />
                   ) : activeDetailTab === "statusHistory" ? (
                     <IssueStatusHistoryPanel
                       events={runEvents}
@@ -4355,6 +4411,103 @@ function IssueStatusHistoryPanel({
         </div>
       ) : (
         <p className="issue-activity-empty">{t("run.activityEmpty")}</p>
+      )}
+    </div>
+  );
+}
+
+function IssueAgentActivityPanel({
+  activity,
+  error,
+  id,
+  isLive,
+  labelledBy,
+  loading,
+  provider,
+}: {
+  activity: AutoHuntAgentMessage[];
+  error: string | null;
+  id: string;
+  isLive: boolean;
+  labelledBy: string;
+  loading: boolean;
+  provider: AgentProvider | null;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <div
+      aria-labelledby={labelledBy}
+      className="issue-agent-activity-panel"
+      id={id}
+      role="tabpanel"
+    >
+      <header>
+        <div>
+          <strong>{t("run.agentActivity")}</strong>
+          <p>{t("run.agentActivityDescription")}</p>
+        </div>
+        <span className="auto-hunt-event-count">
+          {isLive ? (
+            <i>
+              <span />
+              {t("autoHunt.live")}
+            </i>
+          ) : null}
+          {provider ? providerDisplayName(provider) : null}
+          {t("autoHunt.eventCount", { count: activity.length })}
+        </span>
+      </header>
+      {error ? (
+        <div className="auto-hunt-event-state error" role="alert">
+          <CircleAlert size={14} />
+          {t("run.agentActivityLoadFailed")}
+        </div>
+      ) : loading ? (
+        <div className="auto-hunt-event-state">
+          <LoaderCircle className="spin" size={14} />
+          {t("run.agentActivityLoading")}
+        </div>
+      ) : activity.length === 0 ? (
+        <div className="auto-hunt-event-state">
+          {t("run.agentActivityEmpty")}
+        </div>
+      ) : (
+        <div
+          aria-live="polite"
+          className="auto-hunt-agent-messages"
+          role="log"
+        >
+          {activity.map((message) => (
+            <article
+              className={`auto-hunt-agent-message${message.isComplete ? "" : " running"}`}
+              key={message.id}
+            >
+              <header>
+                <span aria-hidden="true"><Bot size={14} /></span>
+                <strong>
+                  {message.phase === "final_answer" || message.phase === "final"
+                    ? t("autoHunt.agentMessage.final")
+                    : t("autoHunt.agentMessage.commentary")}
+                </strong>
+                {!message.isComplete ? (
+                  <small className="auto-hunt-message-streaming">
+                    <LoaderCircle className="spin" size={11} />
+                    {t("autoHunt.agentMessage.streaming")}
+                  </small>
+                ) : null}
+                <time dateTime={new Date(message.updatedAtMs).toISOString()}>
+                  {relativeTime(new Date(message.updatedAtMs).toISOString(), t)}
+                </time>
+              </header>
+              <p>
+                {message.text
+                  ? naturalLanguageFromAgentMessage(message.text)
+                  : t("autoHunt.agentMessage.writing")}
+              </p>
+            </article>
+          ))}
+        </div>
       )}
     </div>
   );
