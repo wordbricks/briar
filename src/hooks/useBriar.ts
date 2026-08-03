@@ -88,6 +88,7 @@ import {
   generateProjectWorkflow,
   reviseProjectWorkflow,
 } from "../lib/project-workflow";
+import { shouldSyncSharedWorkflow } from "../lib/shared-workflow-sync";
 import {
   clearSessionToken,
   readSessionToken,
@@ -680,6 +681,9 @@ export function useBriar(options: UseBriarOptions = {}) {
     token,
   ]);
 
+  const lastSyncedSharedWorkflowKey = useRef<string | null>(null);
+  const lastSyncedProjectId = useRef<string | null>(null);
+
   const refreshHealth = useCallback(async () => {
     if (
       demoMode ||
@@ -692,8 +696,38 @@ export function useBriar(options: UseBriarOptions = {}) {
       setHealthError(null);
       return null;
     }
+    if (lastSyncedProjectId.current !== activeProjectId) {
+      lastSyncedProjectId.current = activeProjectId;
+      lastSyncedSharedWorkflowKey.current = null;
+    }
     setHealthLoading(true);
     try {
+      // Project workflow tools are shared via project settings. Mirror them
+      // into the local config so this worker machine can probe readiness.
+      const sharedWorkflow =
+        dashboardRef.current?.project.id === activeProjectId
+          ? dashboardRef.current.settings.workflow
+          : null;
+      const syncPlan = shouldSyncSharedWorkflow({
+        connectedLocally: true,
+        sharedWorkflow,
+        lastSyncedKey: lastSyncedSharedWorkflowKey.current,
+        projectId: activeProjectId,
+      });
+      if (syncPlan.sync && sharedWorkflow) {
+        try {
+          await updateLocalProjectWorkflow(activeProjectId, sharedWorkflow);
+          lastSyncedSharedWorkflowKey.current = syncPlan.key;
+        } catch (syncError) {
+          console.warn(
+            "Failed to mirror shared project workflow for tool checks",
+            syncError,
+          );
+        }
+      } else if (syncPlan.key) {
+        lastSyncedSharedWorkflowKey.current = syncPlan.key;
+      }
+
       const result = await loadAutoHuntHealth(activeProjectId);
       setHealth(result);
       setHealthError(null);
@@ -711,6 +745,34 @@ export function useBriar(options: UseBriarOptions = {}) {
   useEffect(() => {
     void refreshHealth();
   }, [refreshHealth]);
+
+  // Dashboard settings are the source of shared workflow tools. When they
+  // arrive or change, re-run health so Project Settings and the connection
+  // panel stop showing "Not checked" / empty tool lists. Depend on content,
+  // not object identity, so dashboard snapshot polling does not re-probe
+  // every cycle.
+  const sharedWorkflowSyncKey = dashboard?.settings.workflow
+    ? `${dashboard.project.id}:${JSON.stringify(dashboard.settings.workflow)}`
+    : null;
+  useEffect(() => {
+    if (
+      demoMode ||
+      remoteMode ||
+      !dashboard?.project.id ||
+      !sharedWorkflowSyncKey ||
+      !isProjectConnectedLocally(connectedProjectIds, dashboard.project.id)
+    ) {
+      return;
+    }
+    if (dashboard.project.id !== activeProjectId) return;
+    void refreshHealth();
+  }, [
+    activeProjectId,
+    connectedProjectIds,
+    dashboard?.project.id,
+    refreshHealth,
+    sharedWorkflowSyncKey,
+  ]);
 
   const refreshProjectReadiness = useCallback(async (projectId: string) => {
     if (demoMode || remoteMode) return null;
