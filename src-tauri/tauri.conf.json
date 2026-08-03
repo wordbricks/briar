@@ -57,6 +57,7 @@
     ],
     "resources": {
       "../dist-cli/briar.js": "cli/briar.js",
+      "../dist-agent/codex-runner.js": "agent/codex-runner.js",
       "../dist-agent/claude-runner.js": "agent/claude-runner.js",
       "../dist-agent/grok-runner.js": "agent/grok-runner.js",
       "../dist-agent/opencode-runner.js": "agent/opencode-runner.js",

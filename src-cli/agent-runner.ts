@@ -94,29 +94,75 @@ export function parseDetachedJsonResult(text: string): unknown {
 export function issueReplyTextFromPayload(payload: unknown): string | null {
   if (!payload || typeof payload !== "object") return null;
   const record = payload as Record<string, unknown>;
-  if (record.type === "result" && typeof record.message === "string") {
-    return record.message.trim() || null;
-  }
-  const event =
-    record.event && typeof record.event === "object"
-      ? (record.event as Record<string, unknown>)
-      : null;
-  if (
-    event?.type === "messageCompleted" &&
-    typeof event.text === "string"
-  ) {
-    return event.text.trim() || null;
-  }
-  const item =
-    record.item && typeof record.item === "object"
-      ? (record.item as Record<string, unknown>)
-      : null;
-  if (
-    record.type === "item.completed" &&
-    item?.type === "agent_message" &&
-    typeof item.text === "string"
-  ) {
-    return item.text.trim() || null;
+  const candidates = [
+    record,
+    ...(record.raw && typeof record.raw === "object"
+      ? [record.raw as Record<string, unknown>]
+      : []),
+  ];
+  for (const candidate of candidates) {
+    if (candidate.type === "result" && typeof candidate.message === "string") {
+      return candidate.message.trim() || null;
+    }
+    const event =
+      candidate.event && typeof candidate.event === "object"
+        ? (candidate.event as Record<string, unknown>)
+        : null;
+    if (
+      event?.type === "messageCompleted" &&
+      typeof event.text === "string"
+    ) {
+      return event.text.trim() || null;
+    }
+    const item =
+      candidate.item && typeof candidate.item === "object"
+        ? (candidate.item as Record<string, unknown>)
+        : null;
+    if (
+      candidate.type === "item.completed" &&
+      item?.type === "agent_message" &&
+      typeof item.text === "string"
+    ) {
+      return item.text.trim() || null;
+    }
+    if (candidate.method === "item/completed") {
+      const params =
+        candidate.params && typeof candidate.params === "object"
+          ? (candidate.params as Record<string, unknown>)
+          : null;
+      const appServerItem =
+        params?.item && typeof params.item === "object"
+          ? (params.item as Record<string, unknown>)
+          : null;
+      if (
+        appServerItem?.type === "agentMessage" &&
+        typeof appServerItem.text === "string"
+      ) {
+        return appServerItem.text.trim() || null;
+      }
+    }
+    if (candidate.method === "turn/completed") {
+      const params =
+        candidate.params && typeof candidate.params === "object"
+          ? (candidate.params as Record<string, unknown>)
+          : null;
+      const turn =
+        params?.turn && typeof params.turn === "object"
+          ? (params.turn as Record<string, unknown>)
+          : null;
+      const items = Array.isArray(turn?.items) ? turn.items : [];
+      const messages = items.filter(
+        (item): item is Record<string, unknown> =>
+          Boolean(item) && typeof item === "object" && !Array.isArray(item) &&
+          (item as Record<string, unknown>).type === "agentMessage" &&
+          typeof (item as Record<string, unknown>).text === "string",
+      );
+      const finalMessage =
+        messages.find((item) => item.phase === "final_answer") ?? messages.at(-1);
+      if (finalMessage && typeof finalMessage.text === "string") {
+        return finalMessage.text.trim() || null;
+      }
+    }
   }
   return null;
 }
@@ -129,30 +175,6 @@ export function detachedProviderRequest(input: {
   readOnly?: boolean;
   agentBinary: string;
 }) {
-  if (input.agent.provider === "codex") {
-    return {
-      kind: "direct" as const,
-      arguments: [
-        "exec",
-        "--json",
-        "--skip-git-repo-check",
-        "--sandbox",
-        input.readOnly
-          ? "read-only"
-          : input.fullAccess
-            ? "danger-full-access"
-            : "workspace-write",
-        "-c",
-        'approval_policy="never"',
-        ...(input.agent.model ? ["--model", input.agent.model] : []),
-        ...(input.agent.effort
-          ? ["-c", `model_reasoning_effort="${input.agent.effort}"`]
-          : []),
-        input.prompt,
-      ],
-      request: null,
-    };
-  }
   return {
     kind: "runner" as const,
     arguments: [] as string[],
@@ -172,11 +194,54 @@ export function detachedProviderRequest(input: {
           ? "dangerFullAccess"
           : "workspaceWrite",
       networkAccess: true,
-      ...(input.agent.provider === "claude"
-        ? { claudeBinary: input.agentBinary }
-        : input.agent.provider === "grok"
-          ? { grokBinary: input.agentBinary }
-          : { opencodeBinary: input.agentBinary }),
+      ...(input.agent.provider === "codex"
+        ? { codexBinary: input.agentBinary }
+        : input.agent.provider === "claude"
+          ? { claudeBinary: input.agentBinary }
+          : input.agent.provider === "grok"
+            ? { grokBinary: input.agentBinary }
+            : { opencodeBinary: input.agentBinary }),
+    },
+  };
+}
+
+export function detachedPayloadDirection(
+  payload: unknown,
+): "client" | "server" {
+  if (!payload || typeof payload !== "object") return "server";
+  const direction = (payload as Record<string, unknown>).direction;
+  return direction === "client" ? "client" : "server";
+}
+
+export function detachedTranscriptPayload(payload: unknown, rawLine: string) {
+  const bounded = boundedTranscriptPayload(payload, rawLine);
+  if (!bounded || typeof bounded !== "object") return bounded;
+  const record = bounded as Record<string, unknown>;
+  const original =
+    payload && typeof payload === "object"
+      ? (payload as Record<string, unknown>)
+      : null;
+  if (
+    record.type === "truncated" &&
+    original?.type === "event" &&
+    original.event &&
+    typeof original.event === "object"
+  ) {
+    return {
+      ...record,
+      type: "event",
+      ...(original.direction === "client" ? { direction: "client" } : {}),
+      event: original.event,
+    };
+  }
+  if (record.type !== "session" || typeof record.sessionId !== "string") {
+    return bounded;
+  }
+  return {
+    ...record,
+    event: {
+      type: "conversationStarted",
+      conversationId: record.sessionId,
     },
   };
 }

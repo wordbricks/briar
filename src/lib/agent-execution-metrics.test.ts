@@ -49,6 +49,33 @@ describe("agent execution metrics", () => {
     });
   });
 
+  it("normalizes Codex App Server turn usage from the raw RPC event", () => {
+    expect(
+      agentExecutionTokenUsageFromPayload("codex", {
+        type: "event",
+        raw: {
+          method: "turn/completed",
+          params: {
+            turn: {
+              usage: {
+                input_tokens: 900,
+                cached_input_tokens: 700,
+                output_tokens: 180,
+              },
+            },
+          },
+        },
+      }),
+    ).toEqual({
+      inputTokens: 900,
+      outputTokens: 180,
+      cacheReadTokens: 700,
+      cacheWriteTokens: null,
+      reasoningOutputTokens: null,
+      totalTokens: 1_080,
+    });
+  });
+
   it("records duration even when a provider does not report tokens", () => {
     expect(agentExecutionMetrics(90_499, null)).toEqual({
       inputTokens: null,

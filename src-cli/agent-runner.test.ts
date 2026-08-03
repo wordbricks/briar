@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   boundedTranscriptPayload,
   detachedAgentPrompt,
+  detachedPayloadDirection,
   detachedIssueReplyPrompt,
   detachedProviderRequest,
+  detachedTranscriptPayload,
   issueReplyTextFromPayload,
 } from "./agent-runner";
 
@@ -97,9 +99,13 @@ describe("detached Agent runner", () => {
     expect(prompt).toContain("briar run evidence add --image");
     expect(prompt).toContain("issue detail page");
     expect(prompt).not.toContain("claimToken");
-    expect(launch.arguments).toContain("workspace-write");
-    expect(launch.arguments).toContain("gpt-5");
-    expect(launch.arguments).toContain('model_reasoning_effort="high"');
+    expect(launch.kind).toBe("runner");
+    expect(launch.request).toMatchObject({
+      sandboxMode: "workspaceWrite",
+      codexBinary: "/bin/codex",
+      model: "gpt-5",
+      effort: "high",
+    });
   });
 
   it("uses the same noninteractive contract for standalone providers", () => {
@@ -140,8 +146,11 @@ describe("detached Agent runner", () => {
     expect(prompt).toContain("worktree is unavailable");
     expect(prompt).toContain("Fixed the retry race.");
     expect(prompt).toContain("@briar what changed?");
-    expect(launch.arguments).toContain("read-only");
-    expect(launch.arguments).not.toContain("workspace-write");
+    expect(launch.kind).toBe("runner");
+    expect(launch.request).toMatchObject({
+      sandboxMode: "readOnly",
+      codexBinary: "/bin/codex",
+    });
   });
 
   it("extracts final replies from every detached provider event shape", () => {
@@ -160,6 +169,33 @@ describe("detached Agent runner", () => {
         item: { type: "agent_message", text: "Codex reply" },
       }),
     ).toBe("Codex reply");
+    expect(
+      issueReplyTextFromPayload({
+        type: "event",
+        raw: {
+          method: "item/completed",
+          params: {
+            item: { type: "agentMessage", phase: "final_answer", text: "App Server reply" },
+          },
+        },
+      }),
+    ).toBe("App Server reply");
+    expect(
+      issueReplyTextFromPayload({
+        type: "event",
+        raw: {
+          method: "turn/completed",
+          params: {
+            turn: {
+              items: [
+                { type: "agentMessage", phase: "commentary", text: "Working" },
+                { type: "agentMessage", phase: "final_answer", text: "Final App Server reply" },
+              ],
+            },
+          },
+        },
+      }),
+    ).toBe("Final App Server reply");
   });
 
   it("bounds untrusted transcript payloads", () => {
@@ -169,5 +205,40 @@ describe("detached Agent runner", () => {
     expect(
       boundedTranscriptPayload({ message: "x".repeat(40_000) }, "x".repeat(40_000)),
     ).toMatchObject({ type: "truncated", originalBytes: 40_000 });
+  });
+
+  it("preserves runner event directions and exposes session starts", () => {
+    const clientEvent = { type: "event", direction: "client", raw: {} };
+    expect(detachedPayloadDirection(clientEvent)).toBe("client");
+    expect(detachedPayloadDirection({ type: "event", raw: {} })).toBe("server");
+    expect(
+      detachedTranscriptPayload(
+        { type: "session", sessionId: "thread-1" },
+        '{"type":"session","sessionId":"thread-1"}',
+      ),
+    ).toEqual({
+      type: "session",
+      sessionId: "thread-1",
+      event: { type: "conversationStarted", conversationId: "thread-1" },
+    });
+    expect(
+      detachedTranscriptPayload(
+        {
+          type: "event",
+          direction: "server",
+          event: {
+            type: "messageCompleted",
+            id: "message-1",
+            phase: "final_answer",
+            text: "Done",
+          },
+          raw: { text: "x".repeat(40_000) },
+        },
+        "x".repeat(40_000),
+      ),
+    ).toMatchObject({
+      type: "event",
+      event: { type: "messageCompleted", id: "message-1" },
+    });
   });
 });

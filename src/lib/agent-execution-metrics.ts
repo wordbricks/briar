@@ -39,12 +39,19 @@ const usageCandidates = (payload: unknown) => {
   const root = asRecord(payload);
   if (!root) return [];
   const raw = asRecord(root.raw);
+  const rawParams = asRecord(raw?.params);
+  const rawTurn = asRecord(rawParams?.turn);
   const result = asRecord(root.result);
   const event = asRecord(root.event);
   const params = asRecord(root.params);
+  const turn = asRecord(params?.turn);
   const tokenUsage = asRecord(root.tokenUsage) ?? asRecord(params?.tokenUsage);
   return [
     asRecord(root.usage),
+    asRecord(params?.usage),
+    asRecord(turn?.usage),
+    asRecord(rawParams?.usage),
+    asRecord(rawTurn?.usage),
     asRecord(raw?.usage),
     asRecord(asRecord(raw?.result)?.usage),
     asRecord(result?.usage),

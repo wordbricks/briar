@@ -3549,6 +3549,11 @@ fn install_auto_hunt_assets(resource_directory: &Path, home: &Path) -> Result<()
 
     let cli_source = bundled_path(resource_directory, "cli/briar.js", "dist-cli/briar.js");
     let launcher_source = bundled_path(resource_directory, "cli/briar", "scripts/briar-launcher");
+    let codex_runner_source = bundled_path(
+        resource_directory,
+        "agent/codex-runner.js",
+        "dist-agent/codex-runner.js",
+    );
     let claude_runner_source = bundled_path(
         resource_directory,
         "agent/claude-runner.js",
@@ -3567,7 +3572,8 @@ fn install_auto_hunt_assets(resource_directory: &Path, home: &Path) -> Result<()
     if !cli_source.is_file() || !launcher_source.is_file() {
         return Err("Briar CLI 번들을 찾지 못했습니다.".to_string());
     }
-    if !claude_runner_source.is_file()
+    if !codex_runner_source.is_file()
+        || !claude_runner_source.is_file()
         || !grok_runner_source.is_file()
         || !opencode_runner_source.is_file()
     {
@@ -3581,6 +3587,8 @@ fn install_auto_hunt_assets(resource_directory: &Path, home: &Path) -> Result<()
         .map_err(|error| format!("Briar CLI를 설치하지 못했습니다: {error}"))?;
     let agent_directory = library_directory.join("agent");
     fs::create_dir_all(&agent_directory).map_err(|error| error.to_string())?;
+    fs::copy(codex_runner_source, agent_directory.join("codex-runner.js"))
+        .map_err(|error| format!("Codex runner를 설치하지 못했습니다: {error}"))?;
     fs::copy(
         claude_runner_source,
         agent_directory.join("claude-runner.js"),
@@ -3628,8 +3636,10 @@ fn auto_hunt_assets_are_current(resource_directory: &Path, home: &Path) -> bool 
     let cli_directory = home.join(".local").join("share").join("briar");
     let cli_current = home.join(".local").join("bin").join("briar").is_file()
         && cli_directory.join("briar.js").is_file()
+        && cli_directory.join("agent/codex-runner.js").is_file()
         && cli_directory.join("agent/claude-runner.js").is_file()
         && cli_directory.join("agent/grok-runner.js").is_file()
+        && cli_directory.join("agent/opencode-runner.js").is_file()
         && read_trimmed_file(&cli_directory.join("VERSION")).as_deref()
             == Some(env!("CARGO_PKG_VERSION"));
     if !cli_current {
@@ -8264,6 +8274,14 @@ branch refs/heads/briar/second-11111111
 
         assert!(home.join(".local/bin/briar").is_file());
         assert!(home.join(".local/share/briar/briar.js").is_file());
+        for runner in [
+            "codex-runner.js",
+            "claude-runner.js",
+            "grok-runner.js",
+            "opencode-runner.js",
+        ] {
+            assert!(home.join(".local/share/briar/agent").join(runner).is_file());
+        }
         assert_eq!(
             read_trimmed_file(&home.join(".local/share/briar/VERSION")),
             Some(env!("CARGO_PKG_VERSION").to_string())

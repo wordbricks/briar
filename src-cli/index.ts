@@ -29,11 +29,12 @@ import {
   ideaTurnResultSchema,
 } from "../src/lib/ideas-contract";
 import {
-  boundedTranscriptPayload,
   detachedAgentPrompt,
   detachedIdeaPrompt,
   detachedIssueReplyPrompt,
   detachedProviderRequest,
+  detachedPayloadDirection,
+  detachedTranscriptPayload,
   issueReplyTextFromPayload,
   parseDetachedJsonResult,
 } from "./agent-runner";
@@ -1972,7 +1973,8 @@ async function runClaimedIssueInRuntime(
       }
       tokenUsage =
         agentExecutionTokenUsageFromPayload(provider, payload) ?? tokenUsage;
-      payload = boundedTranscriptPayload(payload, line);
+      const direction = detachedPayloadDirection(payload);
+      payload = detachedTranscriptPayload(payload, line);
       if (
         runnerRequest &&
         payload &&
@@ -1986,7 +1988,13 @@ async function runClaimedIssueInRuntime(
           `${JSON.stringify({
             type: "approvalResponse",
             id: payload.id,
-            approved: true,
+            approved:
+              !(
+                typeof runnerRequest === "object" &&
+                runnerRequest !== null &&
+                "sandboxMode" in runnerRequest &&
+                runnerRequest.sandboxMode === "readOnly"
+              ),
           })}\n`,
         );
       }
@@ -2015,7 +2023,7 @@ async function runClaimedIssueInRuntime(
             runId: issue.runId,
             workerId: activeProject.executionWorker?.workerId,
             agentProvider: provider,
-            events: [{ sequence, direction: "server", payload }],
+            events: [{ sequence, direction, payload }],
           }),
         });
       } catch (error) {
@@ -2265,6 +2273,28 @@ async function runClaimedIssueReply(
       }
       const candidate = issueReplyTextFromPayload(payload);
       if (candidate) replyBody = candidate;
+      const direction = detachedPayloadDirection(payload);
+      const bounded = detachedTranscriptPayload(payload, line);
+      if (
+        runnerRequest &&
+        payload &&
+        typeof payload === "object" &&
+        "type" in payload &&
+        (payload as { type?: string }).type === "approval" &&
+        "id" in payload &&
+        typeof payload.id === "string"
+      ) {
+        child.stdin.write(
+          `${JSON.stringify({
+            type: "approvalResponse",
+            id: payload.id,
+            approved: !(
+              "sandboxMode" in runnerRequest &&
+              runnerRequest.sandboxMode === "readOnly"
+            ),
+          })}\n`,
+        );
+      }
       if (
         payload &&
         typeof payload === "object" &&
@@ -2275,7 +2305,6 @@ async function runClaimedIssueReply(
           (payload as { message?: unknown }).message ?? "Agent failed",
         );
       }
-      const bounded = boundedTranscriptPayload(payload, line);
       try {
         await request(config.apiUrl, "/transcripts", workerToken, {
           method: "POST",
@@ -2285,7 +2314,7 @@ async function runClaimedIssueReply(
             runId: issue.runId,
             workerId: registered.workerId,
             agentProvider: provider,
-            events: [{ sequence, direction: "server", payload: bounded }],
+            events: [{ sequence, direction, payload: bounded }],
           }),
         });
       } catch {
@@ -2463,6 +2492,28 @@ async function runClaimedIdea(
         }
         const candidate = issueReplyTextFromPayload(payload);
         if (candidate) resultText = candidate;
+        const direction = detachedPayloadDirection(payload);
+        const bounded = detachedTranscriptPayload(payload, line);
+        if (
+          launch.request &&
+          payload &&
+          typeof payload === "object" &&
+          "type" in payload &&
+          (payload as { type?: string }).type === "approval" &&
+          "id" in payload &&
+          typeof payload.id === "string"
+        ) {
+          child.stdin.write(
+            `${JSON.stringify({
+              type: "approvalResponse",
+              id: payload.id,
+              approved: !(
+                "sandboxMode" in launch.request &&
+                launch.request.sandboxMode === "readOnly"
+              ),
+            })}\n`,
+          );
+        }
         if (
           payload &&
           typeof payload === "object" &&
@@ -2480,12 +2531,12 @@ async function runClaimedIdea(
               projectId: project.id,
               sessionId: `idea-${idea.workId}`,
               runId: null,
-              workerId: registered.workerId,
-              agentProvider: idea.provider,
-              events: [{
+                workerId: registered.workerId,
+                agentProvider: idea.provider,
+                events: [{
                 sequence,
-                direction: "server",
-                payload: boundedTranscriptPayload(payload, line),
+                direction,
+                payload: bounded,
               }],
             }),
           });

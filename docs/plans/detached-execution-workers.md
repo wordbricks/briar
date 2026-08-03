@@ -165,17 +165,15 @@ contain no agent token and use restrictive permissions.
 
 ## Agent launcher
 
-The desktop launcher is currently implemented in Rust while the detached
-worker is TypeScript. Extract the provider contract into `src-agent/`:
+The desktop launcher remains provider-specific in Rust, while detached workers
+use the bundled runners in `src-agent/`. All four supported providers now use
+the same detached runner envelope; detached Codex specifically uses the same
+App Server JSON-RPC handshake, normalized Agent events, approval decisions,
+and terminal result handling as the desktop Codex backend. Transcript upload
+preserves client/server direction and normalized session/message events.
 
-1. shared runtime instructions, output schema, and sandbox-home construction;
-2. standalone Claude and Grok runner integration;
-3. standalone Codex app-server client;
-4. make both desktop and CLI invoke the same provider runners;
-5. golden transcript tests for desktop and detached execution.
-
-Ship detached execution only after all supported providers follow the same
-contract.
+Heartbeat and execution-timeout improvements remain a separate follow-up so
+the provider transport change can be observed independently.
 
 Detached workers cannot wait for interactive approvals. A project whose policy
 requires a prompt is ineligible until the worker owner chooses a noninteractive

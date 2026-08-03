@@ -298,8 +298,8 @@ export function agentMessagesFromAppServerEvents(
       continue;
     }
 
-    // Detached Codex workers stream JSONL directly from `codex exec` rather
-    // than through the App Server RPC envelope used by saved-Agent turns.
+    // Keep decoding the legacy detached Codex JSONL shape for transcripts
+    // written before detached workers moved to the shared App Server runner.
     const directType = string(event.message.type);
     const directItem = record(event.message.item);
     if (
