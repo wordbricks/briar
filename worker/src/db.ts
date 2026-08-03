@@ -1,10 +1,13 @@
 import {
   isTerminalTrackerState,
   isRepositoryWorkflowPending,
+  cloneAutoHuntWorkflow,
   normalizeAutoHuntWorkflow,
   requiredWorkflowStages,
   repositoryWorkflowBootstrap,
+  workflowCheckpointAt,
   workflowPauseIndex,
+  workflowPauseStage,
   type AutoHuntQaEnvironment,
   type AutoHuntQaStatus,
   type AutoHuntPersistedRunStatus,
@@ -12,6 +15,7 @@ import {
   type AutoHuntSource,
   type DashboardStage,
   type AutoHuntWorkflow,
+  type AutoHuntWorkflowCheckpointPosition,
   type AutoHuntWorkflowStageId,
 } from "../../src/lib/auto-hunt-contract";
 import type { StructuredAgentResult } from "../../src/lib/agent-result";
@@ -236,6 +240,8 @@ export type HuntRunRow = {
   lease_expires_at: string | null;
   claim_attempts: number;
   paused_at: string | null;
+  waiting_checkpoint_key: string | null;
+  waiting_checkpoint_revision: number | null;
   agent_id: string | null;
   preferred_agent_provider: ProjectAgentProvider | null;
   preferred_agent_model: string | null;
@@ -325,6 +331,51 @@ export type RunEvidenceRow = {
   actor: string;
   observed_at: string;
   recorded_at: string;
+};
+
+export type WorkflowStageProgressState =
+  | "pending"
+  | "running"
+  | "completed"
+  | "skipped";
+
+export type WorkflowCheckpointProgressState =
+  | "pending"
+  | "waiting"
+  | "approved"
+  | "invalidated";
+
+export type WorkflowStageProgressRow = {
+  run_id: string;
+  attempt: number;
+  revision: number;
+  stage_id: AutoHuntWorkflowStageId;
+  state: WorkflowStageProgressState;
+  started_at: string | null;
+  finished_at: string | null;
+};
+
+export type WorkflowCheckpointProgressRow = {
+  run_id: string;
+  attempt: number;
+  revision: number;
+  checkpoint_key: string;
+  stage_id: AutoHuntWorkflowStageId;
+  position: AutoHuntWorkflowCheckpointPosition;
+  state: WorkflowCheckpointProgressState;
+  reached_at: string | null;
+  approved_at: string | null;
+  approved_by: string | null;
+  approved_request_id: string | null;
+};
+
+export type WorkflowProgress = {
+  runId: string;
+  attempt: number;
+  revision: number;
+  stages: WorkflowStageProgressRow[];
+  checkpoints: WorkflowCheckpointProgressRow[];
+  waitingCheckpoint: WorkflowCheckpointProgressRow | null;
 };
 
 export type RunEvidenceImageRow = {
@@ -568,7 +619,7 @@ export async function listDashboardChanges(
 
 const stableJson = (value: unknown) => JSON.stringify(value);
 const parseWorkflow = (value: string | null | undefined) => {
-  if (!value) return structuredClone(repositoryWorkflowBootstrap);
+  if (!value) return cloneAutoHuntWorkflow();
   return normalizeAutoHuntWorkflow(JSON.parse(value) as AutoHuntWorkflow);
 };
 const normalizedUrls = (urls: string[]) => [...new Set(urls)].sort();
@@ -579,6 +630,876 @@ const parseUrls = (value: string | null | undefined) => {
     ? parsed.filter((item): item is string => typeof item === "string")
     : [];
 };
+
+type WorkflowProgressIdentity = {
+  attempt?: number;
+  revision?: number;
+};
+
+type WorkflowProgressInput = WorkflowProgressIdentity & {
+  runId: string;
+};
+
+const resolveWorkflowProgressIdentity = (
+  run: HuntRunRow,
+  input: WorkflowProgressIdentity,
+) => {
+  const attempt = input.attempt ?? run.current_attempt;
+  const revision = input.revision ?? run.current_revision;
+  if (attempt !== run.current_attempt || revision !== run.current_revision) {
+    throw new HuntTransitionError(
+      `Workflow progress identity is stale (current attempt ${run.current_attempt}, revision ${run.current_revision})`,
+    );
+  }
+  return { attempt, revision };
+};
+
+const workflowProgressRows = async (
+  db: D1Database,
+  run: HuntRunRow,
+  attempt: number,
+  revision: number,
+) => {
+  const [stageResult, checkpointResult] = await Promise.all([
+    db
+      .prepare(
+        `select run_id, attempt, revision, stage_id, state, started_at, finished_at
+         from briar_run_stage_progress
+         where run_id = ? and attempt = ? and revision = ?`,
+      )
+      .bind(run.id, attempt, revision)
+      .all<WorkflowStageProgressRow>(),
+    db
+      .prepare(
+        `select run_id, attempt, revision, checkpoint_key, stage_id, position,
+                state, reached_at, approved_at, approved_by, approved_request_id
+         from briar_run_checkpoint_progress
+         where run_id = ? and attempt = ? and revision = ?`,
+      )
+      .bind(run.id, attempt, revision)
+      .all<WorkflowCheckpointProgressRow>(),
+  ]);
+  const workflow = parseWorkflow(run.workflow_snapshot_json);
+  const stageOrder = new Map(workflow.stages.map((stage, index) => [stage.id, index]));
+  const checkpointOrder = new Map(
+    workflow.execution.checkpoints.map((checkpoint, index) => [checkpoint.key, index]),
+  );
+  const stages = [...stageResult.results].sort(
+    (left, right) =>
+      (stageOrder.get(left.stage_id) ?? Number.MAX_SAFE_INTEGER) -
+      (stageOrder.get(right.stage_id) ?? Number.MAX_SAFE_INTEGER),
+  );
+  const checkpoints = [...checkpointResult.results].sort(
+    (left, right) =>
+      (checkpointOrder.get(left.checkpoint_key) ?? Number.MAX_SAFE_INTEGER) -
+      (checkpointOrder.get(right.checkpoint_key) ?? Number.MAX_SAFE_INTEGER),
+  );
+  return { stages, checkpoints };
+};
+
+const workflowProgressAvailable = async (db: D1Database, runId: string) => {
+  try {
+    const row = await db
+      .prepare(
+        `select 1 as present from briar_run_stage_progress where run_id = ? limit 1`,
+      )
+      .bind(runId)
+      .first<{ present: number }>();
+    return Boolean(row);
+  } catch {
+    // Existing app/CLI/worker deployments may be running before migration
+    // 0059. Their v1 event lifecycle remains the compatibility path.
+    return false;
+  }
+};
+
+const ensureWorkflowProgress = async (
+  db: D1Database,
+  projectId: string,
+  input: WorkflowProgressInput,
+) => {
+  const run = await getHuntRunForProject(db, projectId, input.runId);
+  if (!run) return null;
+  const { attempt, revision } = resolveWorkflowProgressIdentity(run, input);
+  const workflow = parseWorkflow(run.workflow_snapshot_json);
+  const targetRank = run.workflow_stage
+    ? workflowStageRank(workflow, run.workflow_stage)
+    : -1;
+  let previousRevision: number | null = null;
+  if (revision > 1 && targetRank >= 0) {
+    const previous = await db
+      .prepare(
+        `select max(revision) as revision
+         from briar_run_stage_progress
+         where run_id = ? and attempt = ? and revision < ?`,
+      )
+      .bind(run.id, attempt, revision)
+      .first<{ revision: number | null }>();
+    previousRevision = previous?.revision ?? null;
+  }
+  const statements = [
+    ...(previousRevision === null
+      ? []
+      : workflow.stages
+          .slice(0, targetRank)
+          .map((stage) =>
+            db
+              .prepare(
+                `insert into briar_run_stage_progress (
+                   run_id, attempt, revision, stage_id, state, started_at, finished_at
+                 )
+                 select run_id, attempt, ?, stage_id, state, started_at, finished_at
+                 from briar_run_stage_progress
+                 where run_id = ? and attempt = ? and revision = ?
+                   and stage_id = ? and state in ('completed', 'skipped')
+                 on conflict(run_id, attempt, revision, stage_id) do nothing`,
+              )
+              .bind(revision, run.id, attempt, previousRevision, stage.id),
+          )),
+    ...workflow.stages.map((stage) =>
+      db
+        .prepare(
+          `insert into briar_run_stage_progress (
+             run_id, attempt, revision, stage_id, state, started_at, finished_at
+           ) values (?, ?, ?, ?, 'pending', null, null)
+           on conflict(run_id, attempt, revision, stage_id) do nothing`,
+        )
+        .bind(run.id, attempt, revision, stage.id),
+    ),
+    ...workflow.execution.checkpoints.map((checkpoint) =>
+      db
+        .prepare(
+          `insert into briar_run_checkpoint_progress (
+             run_id, attempt, revision, checkpoint_key, stage_id, position,
+             state, reached_at, approved_at, approved_by, approved_request_id
+           ) values (?, ?, ?, ?, ?, ?, ?, null, null, null, null)
+           on conflict(run_id, attempt, revision, checkpoint_key) do nothing`,
+        )
+        .bind(
+          run.id,
+          attempt,
+          revision,
+          checkpoint.key,
+          checkpoint.stage,
+          checkpoint.position,
+          targetRank >= 0 && workflowStageRank(workflow, checkpoint.stage) < targetRank
+            ? "invalidated"
+            : "pending",
+        ),
+    ),
+  ];
+  if (statements.length > 0) await db.batch(statements);
+  return { run, workflow, attempt, revision };
+};
+
+export async function initializeWorkflowProgress(
+  db: D1Database,
+  projectId: string,
+  input: WorkflowProgressInput,
+) {
+  const initialized = await ensureWorkflowProgress(db, projectId, input);
+  if (!initialized) return null;
+  return getWorkflowProgress(db, projectId, input.runId, {
+    attempt: initialized.attempt,
+    revision: initialized.revision,
+  });
+}
+
+export async function getWorkflowProgress(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  identity: WorkflowProgressIdentity = {},
+): Promise<WorkflowProgress | null> {
+  const run = await getHuntRunForProject(db, projectId, runId);
+  if (!run) return null;
+  const { attempt, revision } = resolveWorkflowProgressIdentity(run, identity);
+  const rows = await workflowProgressRows(db, run, attempt, revision);
+  return {
+    runId: run.id,
+    attempt,
+    revision,
+    stages: rows.stages,
+    checkpoints: rows.checkpoints,
+    waitingCheckpoint:
+      rows.checkpoints.find((checkpoint) => checkpoint.state === "waiting") ?? null,
+  };
+}
+
+export const listWorkflowProgress = getWorkflowProgress;
+
+const workflowStageRow = (
+  progress: WorkflowProgress,
+  stageId: AutoHuntWorkflowStageId,
+) => progress.stages.find((stage) => stage.stage_id === stageId) ?? null;
+
+const workflowCheckpointRow = (
+  progress: WorkflowProgress,
+  checkpointKey: string,
+) => progress.checkpoints.find((checkpoint) => checkpoint.checkpoint_key === checkpointKey) ?? null;
+
+const workflowStageRank = (
+  workflow: AutoHuntWorkflow,
+  stageId: AutoHuntWorkflowStageId,
+) => workflow.stages.findIndex((stage) => stage.id === stageId);
+
+const assertStageBeforeCheckpointApproved = (
+  progress: WorkflowProgress,
+  workflow: AutoHuntWorkflow,
+  stageId: AutoHuntWorkflowStageId,
+) => {
+  const checkpoint = workflowCheckpointAt(workflow, stageId, "before");
+  if (!checkpoint) return;
+  const row = workflowCheckpointRow(progress, checkpoint.key);
+  if (!row || row.state !== "approved") {
+    throw new HuntTransitionError(
+      `Stage ${stageId} is waiting for before checkpoint ${checkpoint.key}`,
+    );
+  }
+};
+
+const assertEarlierWorkflowCheckpointsResolved = (
+  progress: WorkflowProgress,
+  workflow: AutoHuntWorkflow,
+  stageId: AutoHuntWorkflowStageId,
+) => {
+  const stageRank = workflowStageRank(workflow, stageId);
+  const unresolved = progress.checkpoints.find((checkpoint) => {
+    const checkpointRank = workflowStageRank(workflow, checkpoint.stage_id);
+    const isBeforeCurrentStage =
+      checkpointRank < stageRank ||
+      (checkpointRank === stageRank && checkpoint.position === "before");
+    return isBeforeCurrentStage &&
+      checkpoint.state !== "approved" &&
+      checkpoint.state !== "invalidated";
+  });
+  if (unresolved) {
+    throw new HuntTransitionError(
+      `Stage ${stageId} is blocked by checkpoint ${unresolved.checkpoint_key}`,
+    );
+  }
+};
+
+export type WorkflowStageTransitionOutcome =
+  | "started"
+  | "already_running"
+  | "completed"
+  | "skipped"
+  | "not_found";
+
+export async function startWorkflowStage(
+  db: D1Database,
+  projectId: string,
+  input: WorkflowProgressInput & {
+    stageId: AutoHuntWorkflowStageId;
+    startedAt: string;
+  },
+): Promise<{
+  outcome: WorkflowStageTransitionOutcome;
+  stage: WorkflowStageProgressRow | null;
+}> {
+  const initialized = await ensureWorkflowProgress(db, projectId, input);
+  if (!initialized) return { outcome: "not_found", stage: null };
+  const { run, workflow, attempt, revision } = initialized;
+  const rank = workflowStageRank(workflow, input.stageId);
+  if (rank < 0) {
+    throw new HuntTransitionError(
+      `Workflow stage is not configured for this run: ${input.stageId}`,
+    );
+  }
+  const progress = await getWorkflowProgress(db, projectId, run.id, {
+    attempt,
+    revision,
+  });
+  if (!progress) return { outcome: "not_found", stage: null };
+  const row = workflowStageRow(progress, input.stageId);
+  if (!row) throw new HuntTransitionError(`Missing stage progress: ${input.stageId}`);
+  if (row.state === "completed") return { outcome: "completed", stage: row };
+  if (row.state === "skipped") return { outcome: "skipped", stage: row };
+  if (row.state === "running") return { outcome: "already_running", stage: row };
+  const currentRank = run.workflow_stage
+    ? workflowStageRank(workflow, run.workflow_stage)
+    : -1;
+  if (currentRank > rank) {
+    throw new HuntTransitionError(
+      `Stage ${input.stageId} cannot start after the run moved to a later stage`,
+    );
+  }
+  if (progress.waitingCheckpoint) {
+    throw new HuntTransitionError(
+      `Run is waiting for checkpoint ${progress.waitingCheckpoint.checkpoint_key}`,
+    );
+  }
+  if (run.paused_at) {
+    throw new HuntTransitionError("Run is paused; resume it before starting a stage");
+  }
+  assertStageBeforeCheckpointApproved(progress, workflow, input.stageId);
+  assertEarlierWorkflowCheckpointsResolved(progress, workflow, input.stageId);
+
+  const previousStages = progress.stages.filter(
+    (stage) => workflowStageRank(workflow, stage.stage_id) < rank,
+  );
+  const hasIncompletePreviousStage = previousStages.some(
+    (stage) => stage.state !== "completed" && stage.state !== "skipped",
+  );
+  // A reworked run is deliberately positioned at its target stage by
+  // reworkHuntRun. It must not revisit earlier stage/checkpoint boundaries.
+  if (hasIncompletePreviousStage) {
+    throw new HuntTransitionError(
+      `Stage ${input.stageId} cannot start before earlier stages are complete`,
+    );
+  }
+  const results = await db.batch([
+    db
+      .prepare(
+        `update briar_run_stage_progress
+         set state = 'running', started_at = ?, finished_at = null
+         where run_id = ? and attempt = ? and revision = ? and stage_id = ?
+           and state = 'pending'`,
+      )
+      .bind(input.startedAt, run.id, attempt, revision, input.stageId),
+    db
+      .prepare(
+        `update briar_hunt_runs
+         set stage = ?, status = 'running', workflow_stage = ?, updated_at = max(updated_at, ?)
+         where id = ? and project_id = ? and current_attempt = ?
+           and current_revision = ? and paused_at is null`,
+      )
+      .bind(
+        dashboardStageFor("running", input.stageId),
+        input.stageId,
+        input.startedAt,
+        run.id,
+        projectId,
+        attempt,
+        revision,
+      ),
+  ]);
+  if ((results[0]?.meta.changes ?? 0) === 0) {
+    const current = await getWorkflowProgress(db, projectId, run.id, {
+      attempt,
+      revision,
+    });
+    const currentRow = current ? workflowStageRow(current, input.stageId) : null;
+    if (currentRow?.state === "running") return { outcome: "already_running", stage: currentRow };
+    if (currentRow?.state === "completed") return { outcome: "completed", stage: currentRow };
+    throw new HuntTransitionError("Stage progress changed while starting the stage");
+  }
+  if ((results[1]?.meta.changes ?? 0) === 0) {
+    throw new HuntTransitionError("Run changed while starting the stage");
+  }
+  const updated = await getWorkflowProgress(db, projectId, run.id, { attempt, revision });
+  return {
+    outcome: "started",
+    stage: updated ? workflowStageRow(updated, input.stageId) : null,
+  };
+}
+
+export async function completeWorkflowStage(
+  db: D1Database,
+  projectId: string,
+  input: WorkflowProgressInput & {
+    stageId: AutoHuntWorkflowStageId;
+    finishedAt: string;
+  },
+): Promise<{
+  outcome: WorkflowStageTransitionOutcome;
+  stage: WorkflowStageProgressRow | null;
+}> {
+  const initialized = await ensureWorkflowProgress(db, projectId, input);
+  if (!initialized) return { outcome: "not_found", stage: null };
+  const { run, workflow, attempt, revision } = initialized;
+  const progress = await getWorkflowProgress(db, projectId, run.id, { attempt, revision });
+  if (!progress) throw new HuntTransitionError("Workflow progress is unavailable");
+  const row = progress ? workflowStageRow(progress, input.stageId) : null;
+  if (!row) throw new HuntTransitionError(`Missing stage progress: ${input.stageId}`);
+  if (row.state === "completed") return { outcome: "completed", stage: row };
+  const rank = workflowStageRank(workflow, input.stageId);
+  if (rank < 0) throw new HuntTransitionError(`Missing stage: ${input.stageId}`);
+  const currentRank = run.workflow_stage
+    ? workflowStageRank(workflow, run.workflow_stage)
+    : -1;
+  if (currentRank > rank) {
+    throw new HuntTransitionError(
+      `Stage ${input.stageId} cannot complete after the run moved to a later stage`,
+    );
+  }
+  assertStageBeforeCheckpointApproved(progress, workflow, input.stageId);
+  assertEarlierWorkflowCheckpointsResolved(progress, workflow, input.stageId);
+  const previousStages = progress.stages.filter(
+    (stage) => workflowStageRank(workflow, stage.stage_id) < rank,
+  );
+  if (previousStages.some((stage) => stage.state !== "completed" && stage.state !== "skipped")) {
+    throw new HuntTransitionError(
+      `Stage ${input.stageId} cannot complete before earlier stages are complete`,
+    );
+  }
+  if (row.state !== "running") {
+    throw new HuntTransitionError(
+      `Stage ${input.stageId} must be running before it can complete`,
+    );
+  }
+  const result = await db
+    .prepare(
+      `update briar_run_stage_progress
+       set state = 'completed', finished_at = ?
+       where run_id = ? and attempt = ? and revision = ? and stage_id = ?
+         and state = 'running'`,
+    )
+    .bind(input.finishedAt, run.id, attempt, revision, input.stageId)
+    .run();
+  if (result.meta.changes === 0) {
+    throw new HuntTransitionError("Stage progress changed while completing the stage");
+  }
+  const updated = await getWorkflowProgress(db, projectId, run.id, { attempt, revision });
+  return {
+    outcome: "completed",
+    stage: updated ? workflowStageRow(updated, input.stageId) : null,
+  };
+}
+
+export async function skipWorkflowStage(
+  db: D1Database,
+  projectId: string,
+  input: WorkflowProgressInput & {
+    stageId: AutoHuntWorkflowStageId;
+    finishedAt: string;
+  },
+): Promise<{
+  outcome: WorkflowStageTransitionOutcome;
+  stage: WorkflowStageProgressRow | null;
+}> {
+  const initialized = await ensureWorkflowProgress(db, projectId, input);
+  if (!initialized) return { outcome: "not_found", stage: null };
+  const { run, workflow, attempt, revision } = initialized;
+  const stage = workflow.stages.find((candidate) => candidate.id === input.stageId);
+  if (!stage) throw new HuntTransitionError(`Missing stage: ${input.stageId}`);
+  if (stage.required) {
+    throw new HuntTransitionError(`Required stage cannot be skipped: ${input.stageId}`);
+  }
+  const progress = await getWorkflowProgress(db, projectId, run.id, { attempt, revision });
+  if (!progress) throw new HuntTransitionError("Workflow progress is unavailable");
+  const row = progress ? workflowStageRow(progress, input.stageId) : null;
+  if (!row) throw new HuntTransitionError(`Missing stage progress: ${input.stageId}`);
+  if (row.state === "skipped") return { outcome: "skipped", stage: row };
+  if (row.state === "completed") return { outcome: "completed", stage: row };
+  const rank = workflowStageRank(workflow, input.stageId);
+  const currentRank = run.workflow_stage
+    ? workflowStageRank(workflow, run.workflow_stage)
+    : -1;
+  if (currentRank > rank) {
+    throw new HuntTransitionError(
+      `Stage ${input.stageId} cannot be skipped after the run moved to a later stage`,
+    );
+  }
+  assertEarlierWorkflowCheckpointsResolved(progress, workflow, input.stageId);
+  const previousStages = progress.stages.filter(
+    (stageProgress) => workflowStageRank(workflow, stageProgress.stage_id) < rank,
+  );
+  if (previousStages.some((stageProgress) =>
+    stageProgress.state !== "completed" && stageProgress.state !== "skipped"
+  )) {
+    throw new HuntTransitionError(
+      `Stage ${input.stageId} cannot be skipped before earlier stages are complete`,
+    );
+  }
+  const result = await db
+    .prepare(
+      `update briar_run_stage_progress
+       set state = 'skipped', finished_at = ?
+       where run_id = ? and attempt = ? and revision = ? and stage_id = ?
+         and state in ('pending', 'running')`,
+    )
+    .bind(input.finishedAt, run.id, attempt, revision, input.stageId)
+    .run();
+  if (result.meta.changes === 0) {
+    throw new HuntTransitionError("Stage progress changed while skipping the stage");
+  }
+  const updated = await getWorkflowProgress(db, projectId, run.id, { attempt, revision });
+  return {
+    outcome: "skipped",
+    stage: updated ? workflowStageRow(updated, input.stageId) : null,
+  };
+}
+
+export type WorkflowCheckpointTransitionOutcome =
+  | "waiting"
+  | "already_waiting"
+  | "approved"
+  | "already_approved"
+  | "invalidated"
+  | "conflict"
+  | "not_found";
+
+const checkpointTransitionConflict = (
+  checkpointKey: string,
+  attempt: number,
+  revision: number,
+): { outcome: "conflict"; checkpointKey: string; attempt: number; revision: number } => ({
+  outcome: "conflict",
+  checkpointKey,
+  attempt,
+  revision,
+});
+
+export async function reachWorkflowCheckpoint(
+  db: D1Database,
+  projectId: string,
+  input: WorkflowProgressInput & {
+    checkpointKey: string;
+    reachedAt: string;
+  },
+): Promise<{
+  outcome: WorkflowCheckpointTransitionOutcome;
+  checkpointKey: string;
+  attempt: number | null;
+  revision: number | null;
+}> {
+  const run = await getHuntRunForProject(db, projectId, input.runId);
+  if (!run) {
+    return { outcome: "not_found", checkpointKey: input.checkpointKey, attempt: null, revision: null };
+  }
+  if (
+    (input.attempt !== undefined && input.attempt !== run.current_attempt) ||
+    (input.revision !== undefined && input.revision !== run.current_revision)
+  ) {
+    return checkpointTransitionConflict(input.checkpointKey, run.current_attempt, run.current_revision);
+  }
+  const initialized = await ensureWorkflowProgress(db, projectId, input);
+  if (!initialized) return { outcome: "not_found", checkpointKey: input.checkpointKey, attempt: null, revision: null };
+  const { workflow, attempt, revision } = initialized;
+  const configured = workflow.execution.checkpoints.find(
+    (checkpoint) => checkpoint.key === input.checkpointKey,
+  );
+  if (!configured) throw new HuntTransitionError(`Unknown checkpoint: ${input.checkpointKey}`);
+  const progress = await getWorkflowProgress(db, projectId, run.id, { attempt, revision });
+  if (!progress) throw new HuntTransitionError("Workflow progress is unavailable");
+  const current = workflowCheckpointRow(progress, input.checkpointKey);
+  if (!current) throw new HuntTransitionError(`Missing checkpoint progress: ${input.checkpointKey}`);
+  if (current.state === "waiting") {
+    return { outcome: "already_waiting", checkpointKey: current.checkpoint_key, attempt, revision };
+  }
+  if (current.state === "approved") {
+    return { outcome: "already_approved", checkpointKey: current.checkpoint_key, attempt, revision };
+  }
+  if (current.state === "invalidated") {
+    return checkpointTransitionConflict(input.checkpointKey, attempt, revision);
+  }
+  if (progress.waitingCheckpoint) {
+    return checkpointTransitionConflict(
+      progress.waitingCheckpoint.checkpoint_key,
+      attempt,
+      revision,
+    );
+  }
+  const stage = workflowStageRow(progress, configured.stage);
+  if (!stage) throw new HuntTransitionError(`Missing stage progress: ${configured.stage}`);
+  if (configured.position === "before" && stage.state !== "pending") {
+    throw new HuntTransitionError(
+      `Before checkpoint ${configured.key} requires stage ${configured.stage} to be pending`,
+    );
+  }
+  if (configured.position === "after" && stage.state !== "completed") {
+    throw new HuntTransitionError(
+      `After checkpoint ${configured.key} requires stage ${configured.stage} to be completed`,
+    );
+  }
+  const checkpointIndex = workflow.execution.checkpoints.findIndex(
+    (checkpoint) => checkpoint.key === configured.key,
+  );
+  const unresolvedEarlier = progress.checkpoints
+    .slice(0, checkpointIndex)
+    .some((checkpoint) => checkpoint.state !== "approved" && checkpoint.state !== "invalidated");
+  if (unresolvedEarlier) {
+    throw new HuntTransitionError(
+      `Checkpoint ${configured.key} cannot be reached before earlier checkpoints are approved`,
+    );
+  }
+  try {
+    const results = await db.batch([
+      db
+        .prepare(
+          `update briar_run_checkpoint_progress
+           set state = 'waiting', reached_at = ?, approved_at = null,
+               approved_by = null, approved_request_id = null
+           where run_id = ? and attempt = ? and revision = ?
+             and checkpoint_key = ? and state = 'pending'`,
+        )
+        .bind(input.reachedAt, run.id, attempt, revision, configured.key),
+      db
+      .prepare(
+        `update briar_hunt_runs
+           set paused_at = ?, workflow_stage = ?, stage = ?,
+               waiting_checkpoint_key = ?,
+               waiting_checkpoint_revision = ?, claim_token_hash = null,
+               claimed_by = null, claimed_at = null, lease_expires_at = null,
+               updated_at = max(updated_at, ?)
+           where id = ? and project_id = ? and current_attempt = ?
+             and current_revision = ? and paused_at is null
+             and waiting_checkpoint_key is null`,
+        )
+        .bind(
+          input.reachedAt,
+          configured.stage,
+          dashboardStageFor("running", configured.stage),
+          configured.key,
+          revision,
+          input.reachedAt,
+          run.id,
+          projectId,
+          attempt,
+          revision,
+        ),
+    ]);
+    if ((results[0]?.meta.changes ?? 0) === 0 || (results[1]?.meta.changes ?? 0) === 0) {
+      return checkpointTransitionConflict(configured.key, attempt, revision);
+    }
+  } catch (error) {
+    if (String(error).toLowerCase().includes("unique")) {
+      return checkpointTransitionConflict(configured.key, attempt, revision);
+    }
+    throw error;
+  }
+  return { outcome: "waiting", checkpointKey: configured.key, attempt, revision };
+}
+
+export async function resumeWorkflowCheckpoint(
+  db: D1Database,
+  projectId: string,
+  input: WorkflowProgressInput & {
+    checkpointKey: string;
+    requestId: string;
+    actor: string;
+    approvedAt: string;
+  },
+): Promise<{
+  outcome: "approved" | "already_approved" | "conflict" | "not_found";
+  checkpointKey: string;
+  attempt: number | null;
+  revision: number | null;
+  nextStage: AutoHuntWorkflowStageId | null;
+}> {
+  const run = await getHuntRunForProject(db, projectId, input.runId);
+  if (!run) {
+    return {
+      outcome: "not_found",
+      checkpointKey: input.checkpointKey,
+      attempt: null,
+      revision: null,
+      nextStage: null,
+    };
+  }
+  const priorRequest = await db
+    .prepare(
+      `select checkpoint_key, attempt, revision, stage_id, position
+       from briar_run_checkpoint_progress
+       where run_id = ? and approved_request_id = ? limit 1`,
+    )
+    .bind(run.id, input.requestId)
+    .first<WorkflowCheckpointProgressRow>();
+  if (priorRequest) {
+    const workflow = parseWorkflow(run.workflow_snapshot_json);
+    const index = workflow.execution.checkpoints.findIndex(
+      (checkpoint) => checkpoint.key === priorRequest.checkpoint_key,
+    );
+    return {
+      outcome:
+        priorRequest.checkpoint_key === input.checkpointKey
+          ? "already_approved"
+          : "conflict",
+      checkpointKey: priorRequest.checkpoint_key,
+      attempt: priorRequest.attempt,
+      revision: priorRequest.revision,
+      nextStage:
+        index >= 0
+          ? workflow.execution.checkpoints[index]?.position === "before"
+            ? workflow.execution.checkpoints[index]?.stage ?? null
+            : workflow.stages[workflowStageRank(workflow, priorRequest.stage_id) + 1]?.id ??
+              priorRequest.stage_id
+          : null,
+    };
+  }
+  if (
+    input.attempt !== run.current_attempt ||
+    input.revision !== run.current_revision
+  ) {
+    return {
+      outcome: "conflict",
+      checkpointKey: input.checkpointKey,
+      attempt: run.current_attempt,
+      revision: run.current_revision,
+      nextStage: null,
+    };
+  }
+  const initialized = await ensureWorkflowProgress(db, projectId, input);
+  if (!initialized) {
+    return {
+      outcome: "not_found",
+      checkpointKey: input.checkpointKey,
+      attempt: null,
+      revision: null,
+      nextStage: null,
+    };
+  }
+  const { workflow, attempt, revision } = initialized;
+  const configured = workflow.execution.checkpoints.find(
+    (checkpoint) => checkpoint.key === input.checkpointKey,
+  );
+  if (!configured) throw new HuntTransitionError(`Unknown checkpoint: ${input.checkpointKey}`);
+  const progress = await getWorkflowProgress(db, projectId, run.id, { attempt, revision });
+  const current = progress ? workflowCheckpointRow(progress, configured.key) : null;
+  if (!current || current.state !== "waiting") {
+    return {
+      outcome: "conflict",
+      checkpointKey: input.checkpointKey,
+      attempt,
+      revision,
+      nextStage: null,
+    };
+  }
+  if (
+    run.waiting_checkpoint_key !== configured.key ||
+    run.waiting_checkpoint_revision !== revision
+  ) {
+    return {
+      outcome: "conflict",
+      checkpointKey: input.checkpointKey,
+      attempt,
+      revision,
+      nextStage: null,
+    };
+  }
+  const nextStage = configured.position === "before"
+    ? configured.stage
+    : workflow.stages[workflowStageRank(workflow, configured.stage) + 1]?.id ?? configured.stage;
+  const results = await db.batch([
+    db
+      .prepare(
+        `update briar_run_checkpoint_progress
+         set state = 'approved', approved_at = ?, approved_by = ?,
+             approved_request_id = ?
+         where run_id = ? and attempt = ? and revision = ?
+           and checkpoint_key = ? and state = 'waiting'`,
+      )
+      .bind(
+        input.approvedAt,
+        input.actor,
+        input.requestId,
+        run.id,
+        attempt,
+        revision,
+        configured.key,
+      ),
+    db
+      .prepare(
+        `update briar_hunt_runs
+         set status = 'queued', stage = 'queued', paused_at = null,
+             waiting_checkpoint_key = null, waiting_checkpoint_revision = null,
+             claim_token_hash = null, claimed_by = null, claimed_at = null,
+             lease_expires_at = null, completed_at = null, updated_at = ?
+         where id = ? and project_id = ? and current_attempt = ?
+           and current_revision = ? and waiting_checkpoint_key = ?
+           and waiting_checkpoint_revision = ? and paused_at is not null`,
+      )
+      .bind(
+        input.approvedAt,
+        run.id,
+        projectId,
+        attempt,
+        revision,
+        configured.key,
+        revision,
+      ),
+  ]);
+  if ((results[0]?.meta.changes ?? 0) === 0 || (results[1]?.meta.changes ?? 0) === 0) {
+    return {
+      outcome: "conflict",
+      checkpointKey: configured.key,
+      attempt,
+      revision,
+      nextStage,
+    };
+  }
+  return {
+    outcome: "approved",
+    checkpointKey: configured.key,
+    attempt,
+    revision,
+    nextStage,
+  };
+}
+
+export async function assertWorkflowRunCompletion(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+) {
+  const initialized = await ensureWorkflowProgress(db, projectId, { runId });
+  if (!initialized) throw new HuntTransitionError("Run does not exist");
+  const { run, workflow, attempt, revision } = initialized;
+  const progress = await getWorkflowProgress(db, projectId, run.id, { attempt, revision });
+  if (!progress) throw new HuntTransitionError("Workflow progress is unavailable");
+  if (progress.waitingCheckpoint) {
+    throw new HuntTransitionError(
+      `Run is waiting for checkpoint ${progress.waitingCheckpoint.checkpoint_key}; resume it before completion`,
+    );
+  }
+  const terminal = workflow.stages.at(-1);
+  const terminalProgress = terminal ? workflowStageRow(progress, terminal.id) : null;
+  if (!terminal || terminalProgress?.state !== "completed") {
+    throw new HuntTransitionError(
+      `Run completion requires the terminal stage ${terminal?.id ?? "none"} to be completed`,
+    );
+  }
+  const terminalAfterCheckpoint = terminal
+    ? workflowCheckpointAt(workflow, terminal.id, "after")
+    : null;
+  if (terminalAfterCheckpoint) {
+    const checkpoint = workflowCheckpointRow(progress, terminalAfterCheckpoint.key);
+    if (checkpoint?.state !== "approved") {
+      throw new HuntTransitionError(
+        `Run completion requires terminal checkpoint ${terminalAfterCheckpoint.key} to be approved`,
+      );
+    }
+  }
+  const requiredStages = requiredWorkflowStages(workflow);
+  const missingStages = requiredStages.filter(
+    (stageId) => workflowStageRow(progress, stageId)?.state !== "completed",
+  );
+  if (missingStages.length > 0) {
+    throw new HuntTransitionError(
+      `Run completion requires workflow stages: ${missingStages.join(", ")}`,
+    );
+  }
+  const requiredEvidence = workflow.stages.flatMap((stage) =>
+    requiredStages.includes(stage.id)
+      ? (stage.evidence ?? []).map((type) => ({ stage: stage.id, type }))
+      : [],
+  );
+  if (requiredEvidence.length > 0) {
+    const evidence = await db
+      .prepare(
+        `select workflow_stage, evidence_type
+         from briar_run_evidence
+         where run_id = ? and attempt = ? and revision = ?
+           and status in ('passed', 'skipped')`,
+      )
+      .bind(run.id, attempt, revision)
+      .all<{ workflow_stage: string; evidence_type: string }>();
+    const accepted = new Set(
+      evidence.results.map((item) => `${item.workflow_stage}:${item.evidence_type}`),
+    );
+    const missingEvidence = requiredEvidence
+      .filter((item) => !accepted.has(`${item.stage}:${item.type}`))
+      .map((item) => `${item.stage}:${item.type}`);
+    if (missingEvidence.length > 0) {
+      throw new HuntTransitionError(
+        `Run completion requires evidence: ${missingEvidence.join(", ")}`,
+      );
+    }
+  }
+  return progress;
+}
 
 export async function listOrganizations(db: D1Database, userId: string) {
   const result = await db
@@ -1484,7 +2405,7 @@ export async function createProject(
       )
       .bind(
         project.id,
-        stableJson(repositoryWorkflowBootstrap),
+        stableJson(cloneAutoHuntWorkflow()),
         createdAt,
         createdAt,
       ),
@@ -2445,30 +3366,7 @@ export async function updateProjectSettings(
 export async function listDashboardRuns(db: D1Database, projectId: string) {
   const runs = await db
     .prepare(
-      `select run.id, run.run_number, run.source, run.source_key, run.title,
-              run.stage, run.status, run.workflow_stage,
-              run.workflow_snapshot_json, run.detail, run.priority,
-              run.repository, run.branch,
-              run.commit_sha, run.tracker_provider, run.tracker_issue_id,
-              run.tracker_issue_identifier, run.tracker_issue_url,
-              run.tracker_issue_state, run.issue_description,
-              run.result_summary, run.structured_result_json,
-              run.execution_metrics_json,
-              run.pull_request_urls, run.target_sha,
-              run.source_created_at, run.staging_qa_status,
-              run.production_qa_status, run.staging_qa_detail,
-              run.production_qa_detail, run.context_json,
-              run.current_attempt, run.claimed_by, run.claimed_at,
-              run.current_revision, run.lease_expires_at, run.claim_attempts,
-              run.agent_id, run.preferred_agent_provider,
-              run.preferred_agent_model, run.preferred_agent_effort,
-              run.requested_agent_provider, run.requested_agent_model,
-              run.requested_agent_effort, run.requested_worker_id,
-              run.requested_by_user_id, run.dispatch_mode,
-              run.dispatch_request_id, run.dispatched_at, run.worker_id,
-              run.paused_at,
-              run.started_at,
-              run.updated_at, run.completed_at, run.last_event_at,
+      `select run.*,
               run.event_count + coalesce((
                 select sum(archive.row_count)
                 from briar_log_archives archive
@@ -3698,6 +4596,9 @@ const assertRunCompletionEligible = async (
   trackerState: string | null,
 ) => {
   const workflow = parseWorkflow(run.workflow_snapshot_json);
+  if (await workflowProgressAvailable(db, run.id)) {
+    await assertWorkflowRunCompletion(db, projectId, run.id);
+  }
   const requiredStages = requiredWorkflowStages(workflow);
   const revisionRequirements = await loadStageRevisionRequirements(db, run);
   const completedStages = await db
@@ -3831,7 +4732,7 @@ const assertStageTransition = async (
   }
   if (nextRank > pauseRank && currentRank <= pauseRank) {
     throw new HuntTransitionError(
-      `Workflow is paused after stage: ${workflow.execution.pauseAfterStage}`,
+      `Workflow is paused after stage: ${workflowPauseStage(workflow)}`,
     );
   }
   const floorRank = currentRank;
@@ -3952,7 +4853,7 @@ export async function recordHuntEvent(
     }
     if (requestedRank > pauseRank && currentRank <= pauseRank) {
       throw new HuntTransitionError(
-        `Workflow is paused after stage: ${workflowSnapshot.execution.pauseAfterStage}`,
+        `Workflow is paused after stage: ${workflowPauseStage(workflowSnapshot)}`,
       );
     }
   }
@@ -4451,7 +5352,7 @@ export async function recordRunEvidence(
     throw new HuntTransitionError(
       run.paused_at
         ? "Run is paused; resume it before recording later-stage evidence"
-        : `Workflow is paused after stage: ${workflow.execution.pauseAfterStage}`,
+        : `Workflow is paused after stage: ${workflowPauseStage(workflow)}`,
     );
   }
   const metadataJson = input.metadata ? stableJson(input.metadata) : null;
@@ -4778,17 +5679,10 @@ export async function reworkHuntRun(
   }
 
   const nextRevision = run.current_revision + 1;
-  const wasPaused = Boolean(run.paused_at);
-  const targetStatus: AutoHuntPersistedRunStatus = wasPaused
-    ? "queued"
-    : "running";
-  const targetDashboardStage = wasPaused
-    ? "queued"
-    : dashboardStageFor("running", input.workflowStage);
-  const claimReset = wasPaused
-    ? `claim_token_hash = null, claimed_by = null,
-             claimed_at = null, lease_expires_at = null,`
-    : "";
+  const targetStatus: AutoHuntPersistedRunStatus = "queued";
+  const targetDashboardStage: DashboardStage = "queued";
+  const claimReset = `claim_token_hash = null, claimed_by = null,
+             claimed_at = null, lease_expires_at = null,`;
   const recordedAt = new Date().toISOString();
   const eventId = crypto.randomUUID();
   const invalidatedStages = workflow.stages.slice(targetRank).map((stage) => stage.id);
@@ -4899,6 +5793,33 @@ export async function reworkHuntRun(
     throw new HuntTransitionError(
       "Auto Hunt run changed while rework was being recorded",
     );
+  }
+
+  // Progress rows are additive to the legacy event lifecycle. When the
+  // migration is present, make the old revision's approvals visibly unusable;
+  // the revision identity still prevents reuse even if this compatibility
+  // cleanup races a legacy deployment.
+  try {
+    await db
+      .prepare(
+        `update briar_run_checkpoint_progress
+         set state = 'invalidated'
+         where run_id = ? and attempt = ? and revision = ?
+           and state in ('pending', 'waiting', 'approved')`,
+      )
+      .bind(run.id, run.current_attempt, run.current_revision)
+      .run();
+    await db
+      .prepare(
+        `update briar_hunt_runs
+         set waiting_checkpoint_key = null,
+             waiting_checkpoint_revision = null
+         where id = ? and project_id = ?`,
+      )
+      .bind(run.id, projectId)
+      .run();
+  } catch {
+    // Migration 0059 may not yet be installed on a v1 worker.
   }
 
   return {
@@ -5145,7 +6066,7 @@ export async function moveHuntRun(
     }
     if (targetRank > pauseRank && currentRank <= pauseRank) {
       throw new HuntTransitionError(
-        `Workflow is paused after stage: ${workflow.execution.pauseAfterStage}`,
+        `Workflow is paused after stage: ${workflowPauseStage(workflow)}`,
       );
     }
   } else if (input.workflowStage !== null) {

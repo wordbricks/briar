@@ -156,6 +156,7 @@ export type HuntRun = {
   workflow: AutoHuntWorkflow;
   progress: number;
   pausedAt?: string | null;
+  waitingCheckpoint?: { key: string; revision: number } | null;
   detail: string | null;
   priority: number | null;
   repository: string;

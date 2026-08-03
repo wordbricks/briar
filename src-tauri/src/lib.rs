@@ -222,6 +222,21 @@ struct WorkflowStageConfig {
     checks: Vec<String>,
 }
 
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WorkflowCheckpointConfig {
+    key: String,
+    stage: String,
+    position: WorkflowCheckpointPosition,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+enum WorkflowCheckpointPosition {
+    Before,
+    After,
+}
+
 #[derive(Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct WorkflowCompletionConfig {
@@ -232,8 +247,14 @@ struct WorkflowCompletionConfig {
 #[derive(Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct WorkflowExecutionConfig {
-    #[serde(default, alias = "stopAfterStage")]
+    #[serde(default)]
+    checkpoints: Vec<WorkflowCheckpointConfig>,
+    // These fields are read-only compatibility inputs. They are deliberately
+    // never serialized after the local config is normalized to v2.
+    #[serde(default, skip_serializing)]
     pause_after_stage: String,
+    #[serde(default, alias = "stopAfterStage", skip_serializing)]
+    stop_after_stage: String,
 }
 
 #[derive(Serialize)]
@@ -245,7 +266,7 @@ struct ConnectedLocalProject {
 
 fn repository_workflow_bootstrap() -> WorkflowConfig {
     WorkflowConfig {
-        version: 1,
+        version: 2,
         requirements: Vec::new(),
         stages: vec![WorkflowStageConfig {
             id: "repository_workflow_pending".to_string(),
@@ -255,7 +276,13 @@ fn repository_workflow_bootstrap() -> WorkflowConfig {
             checks: Vec::new(),
         }],
         execution: WorkflowExecutionConfig {
-            pause_after_stage: "repository_workflow_pending".to_string(),
+            checkpoints: vec![WorkflowCheckpointConfig {
+                key: "legacy-after-repository_workflow_pending".to_string(),
+                stage: "repository_workflow_pending".to_string(),
+                position: WorkflowCheckpointPosition::After,
+            }],
+            pause_after_stage: String::new(),
+            stop_after_stage: String::new(),
         },
         completion: WorkflowCompletionConfig {
             required_stages: vec!["repository_workflow_pending".to_string()],
@@ -1563,31 +1590,78 @@ fn cli_execution_path(home: &Path) -> Result<OsString, String> {
     cli_execution_path_with_runtime(home, runtime_directories)
 }
 
-fn workflow_pause_index(workflow: &WorkflowConfig) -> Option<usize> {
-    workflow
-        .stages
-        .iter()
-        .position(|stage| stage.id == workflow.execution.pause_after_stage)
-        .or_else(|| {
-            workflow
-                .completion
-                .required_stages
-                .iter()
-                .rev()
-                .find_map(|required| {
-                    workflow
-                        .stages
-                        .iter()
-                        .position(|stage| &stage.id == required)
-                })
-        })
-        .or_else(|| workflow.stages.len().checked_sub(1))
+fn validate_workflow_compatibility(workflow: &WorkflowConfig) -> Result<(), String> {
+    let pause_stage = workflow.execution.pause_after_stage.trim();
+    let stop_stage = workflow.execution.stop_after_stage.trim();
+    if !pause_stage.is_empty() && !stop_stage.is_empty() && pause_stage != stop_stage {
+        return Err(
+            "워크플로우의 pauseAfterStage와 stopAfterStage가 서로 다른 단계를 가리킵니다."
+                .to_string(),
+        );
+    }
+    if workflow.version == 2 && (!pause_stage.is_empty() || !stop_stage.is_empty()) {
+        return Err(
+            "v2 워크플로우는 pauseAfterStage/stopAfterStage 대신 checkpoints를 사용해야 합니다."
+                .to_string(),
+        );
+    }
+    if let Some(stage) = [pause_stage, stop_stage]
+        .into_iter()
+        .find(|stage| !stage.is_empty())
+    {
+        if !workflow
+            .stages
+            .iter()
+            .any(|candidate| candidate.id == stage)
+        {
+            return Err(format!(
+                "워크플로우의 legacy 실행 단계 '{stage}'를 찾을 수 없습니다."
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn normalize_workflow_execution(mut workflow: WorkflowConfig) -> WorkflowConfig {
-    if let Some(pause_index) = workflow_pause_index(&workflow) {
-        workflow.execution.pause_after_stage = workflow.stages[pause_index].id.clone();
+    let legacy_stage = if !workflow.execution.pause_after_stage.trim().is_empty() {
+        Some(workflow.execution.pause_after_stage.trim().to_string())
+    } else if !workflow.execution.stop_after_stage.trim().is_empty() {
+        Some(workflow.execution.stop_after_stage.trim().to_string())
+    } else {
+        None
+    };
+    if workflow.version == 1 {
+        let fallback = legacy_stage
+            .or_else(|| workflow.completion.required_stages.last().cloned())
+            .or_else(|| workflow.stages.last().map(|stage| stage.id.clone()));
+        workflow.execution.checkpoints.clear();
+        if let Some(stage) = fallback {
+            workflow
+                .execution
+                .checkpoints
+                .push(WorkflowCheckpointConfig {
+                    key: format!("legacy-after-{stage}"),
+                    stage,
+                    position: WorkflowCheckpointPosition::After,
+                });
+        }
+        workflow.version = 2;
     }
+    workflow.execution.pause_after_stage.clear();
+    workflow.execution.stop_after_stage.clear();
+    workflow.execution.checkpoints.sort_by_key(|checkpoint| {
+        (
+            workflow
+                .stages
+                .iter()
+                .position(|stage| stage.id == checkpoint.stage)
+                .unwrap_or(usize::MAX),
+            match checkpoint.position {
+                WorkflowCheckpointPosition::Before => 0,
+                WorkflowCheckpointPosition::After => 1,
+            },
+        )
+    });
     workflow
 }
 
@@ -3172,6 +3246,8 @@ fn update_project_workflow_at(
     project_id: &str,
     workflow: WorkflowConfig,
 ) -> Result<WorkflowConfig, String> {
+    validate_workflow_compatibility(&workflow)?;
+    let workflow = normalize_workflow_execution(workflow);
     validate_generated_workflow(&workflow)?;
     let contents = fs::read_to_string(config_path)
         .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
@@ -3294,7 +3370,7 @@ fn update_project_velen_org_at(
 }
 
 fn validate_generated_workflow(workflow: &WorkflowConfig) -> Result<(), String> {
-    if workflow.version != 1 || workflow.stages.is_empty() || workflow.stages.len() > 30 {
+    if workflow.version != 2 || workflow.stages.is_empty() || workflow.stages.len() > 30 {
         return Err("생성된 워크플로우 버전 또는 단계 수가 올바르지 않습니다.".to_string());
     }
     if workflow.requirements.len() > 30 {
@@ -3329,6 +3405,17 @@ fn validate_generated_workflow(workflow: &WorkflowConfig) -> Result<(), String> 
     let mut ids = BTreeSet::new();
     for stage in &workflow.stages {
         if stage.id.trim().is_empty()
+            || stage.id.len() > 64
+            || !stage.id.chars().enumerate().all(|(index, character)| {
+                if index == 0 {
+                    character.is_ascii_lowercase()
+                } else {
+                    character.is_ascii_lowercase()
+                        || character.is_ascii_digit()
+                        || character == '_'
+                        || character == '-'
+                }
+            })
             || stage.label.trim().is_empty()
             || !ids.insert(stage.id.as_str())
         {
@@ -3350,8 +3437,53 @@ fn validate_generated_workflow(workflow: &WorkflowConfig) -> Result<(), String> 
     if completion != required {
         return Err("생성된 워크플로우의 필수 단계와 완료 조건이 일치하지 않습니다.".to_string());
     }
-    if !ids.contains(workflow.execution.pause_after_stage.as_str()) {
-        return Err("생성된 워크플로우의 일시정지 단계가 올바르지 않습니다.".to_string());
+    let mut checkpoint_keys = BTreeSet::new();
+    let mut checkpoint_boundaries = BTreeSet::new();
+    for checkpoint in &workflow.execution.checkpoints {
+        if checkpoint.key.is_empty()
+            || checkpoint.key.len() > 64
+            || !checkpoint
+                .key
+                .chars()
+                .enumerate()
+                .all(|(index, character)| {
+                    if index == 0 {
+                        character.is_ascii_lowercase()
+                    } else {
+                        character.is_ascii_lowercase()
+                            || character.is_ascii_digit()
+                            || character == '_'
+                            || character == '-'
+                    }
+                })
+            || !ids.contains(checkpoint.stage.as_str())
+            || !checkpoint_keys.insert(checkpoint.key.as_str())
+            || !checkpoint_boundaries
+                .insert(format!("{}:{:?}", checkpoint.stage, checkpoint.position))
+        {
+            return Err("생성된 워크플로우 checkpoint가 올바르지 않습니다.".to_string());
+        }
+    }
+    let expected_order = workflow
+        .execution
+        .checkpoints
+        .iter()
+        .map(|checkpoint| {
+            (
+                workflow
+                    .stages
+                    .iter()
+                    .position(|stage| stage.id == checkpoint.stage)
+                    .unwrap_or(usize::MAX),
+                match checkpoint.position {
+                    WorkflowCheckpointPosition::Before => 0,
+                    WorkflowCheckpointPosition::After => 1,
+                },
+            )
+        })
+        .collect::<Vec<_>>();
+    if expected_order.windows(2).any(|pair| pair[0] > pair[1]) {
+        return Err("생성된 워크플로우 checkpoint 순서가 canonical하지 않습니다.".to_string());
     }
     Ok(())
 }
@@ -4570,6 +4702,7 @@ fn project_auto_hunt_workflow_json(config_path: &Path, project_id: &str) -> Resu
     {
         return Err("저장소 기반 워크플로우가 생성되지 않았습니다.".to_string());
     }
+    validate_workflow_compatibility(workflow)?;
     serde_json::to_string_pretty(&normalize_workflow_execution(workflow.clone()))
         .map_err(|error| format!("프로젝트 워크플로우를 직렬화하지 못했습니다: {error}"))
 }
@@ -5985,6 +6118,7 @@ async fn connect_local_project(
         let runner = host::LocalRunner::new(cli_execution_path(&home)?, home.clone());
         let root = git_repository_root(Path::new(&repository_path))?;
         let remote = repository_remote(&root);
+        validate_workflow_compatibility(&auto_hunt.workflow)?;
         auto_hunt.workflow = normalize_workflow_execution(auto_hunt.workflow);
         let workflow = auto_hunt.workflow.clone();
         let root_string = root
@@ -7720,9 +7854,12 @@ branch refs/heads/briar/second-11111111
         )
         .expect("saved config should be valid json");
         assert_eq!(
-            saved["projects"][0]["autoHunt"]["workflow"]["execution"]["pauseAfterStage"],
-            "implementing"
+            saved["projects"][0]["autoHunt"]["workflow"]["execution"]["checkpoints"][0]["key"],
+            "legacy-after-implementing"
         );
+        assert!(saved["projects"][0]["autoHunt"]["workflow"]["execution"]
+            .get("pauseAfterStage")
+            .is_none());
 
         fs::remove_dir_all(
             config_path
@@ -7933,6 +8070,7 @@ branch refs/heads/briar/second-11111111
         .expect("test config should be written");
 
         let mut workflow = repository_workflow_bootstrap();
+        workflow.version = 1;
         workflow.stages = vec![WorkflowStageConfig {
             id: "repository_qa".to_string(),
             label: "Repository QA".to_string(),
@@ -7958,7 +8096,8 @@ branch refs/heads/briar/second-11111111
             .expect("runtime workflow should load");
         assert!(runtime_workflow.contains("repository_qa"));
         assert!(runtime_workflow.contains("cargo test"));
-        assert!(runtime_workflow.contains("pauseAfterStage"));
+        assert!(runtime_workflow.contains("\"checkpoints\""));
+        assert!(!runtime_workflow.contains("pauseAfterStage"));
         assert!(!runtime_workflow.contains("\"release\""));
 
         fs::remove_dir_all(directory).expect("test config directory should be removed");

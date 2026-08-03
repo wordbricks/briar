@@ -6,10 +6,10 @@ import {
   autoHuntPersistedRunStatuses,
   autoHuntRequirementKinds,
   autoHuntSources,
+  cloneAutoHuntWorkflow,
   isRepositoryWorkflowPending,
   normalizeAutoHuntWorkflow,
   progressForAutoHuntRun,
-  repositoryWorkflowBootstrap,
   type AutoHuntPersistedRunStatus,
   type AutoHuntRunStatus,
   type DashboardStage,
@@ -160,6 +160,7 @@ import {
   planAccountDeletion,
   issueProjectAgentToken,
   recoverHuntRun,
+  resumeWorkflowCheckpoint,
   resumeHuntRun,
   reworkHuntRun,
   recordHuntEvent,
@@ -335,7 +336,7 @@ const evidenceTypeSchema = z
   .regex(autoHuntEvidenceTypePattern);
 const workflowSchema = z
   .object({
-    version: z.literal(1),
+    version: z.union([z.literal(1), z.literal(2)]),
     requirements: z
       .array(
         z.object({
@@ -376,16 +377,22 @@ const workflowSchema = z
       .optional(),
     execution: z
       .object({
+        checkpoints: z
+          .array(
+            z
+              .object({
+                key: workflowStageIdSchema,
+                stage: workflowStageIdSchema,
+                position: z.enum(["before", "after"]),
+              })
+              .strict(),
+          )
+          .max(100)
+          .optional(),
         pauseAfterStage: z.string().trim().max(64).optional(),
         stopAfterStage: z.string().trim().max(64).optional(),
       })
       .strict()
-      .refine(
-        (execution) =>
-          execution.pauseAfterStage !== undefined ||
-          execution.stopAfterStage !== undefined,
-        "Workflow pause stage is required",
-      )
       .optional(),
     /** Read compatibility for workflows stored before an explicit pause stage. */
     release: z.object({ enabled: z.boolean() }).strict().optional(),
@@ -1413,13 +1420,39 @@ const recoveryAgentInputSchema = recoveryUserInputSchema.extend({
   actor: z.string().trim().min(1).max(128),
 });
 
-const resumeUserInputSchema = z
-  .object({ requestId: z.string().uuid() })
-  .strict();
+const resumeInputShape = z.object({
+  requestId: z.string().uuid(),
+  checkpointKey: workflowStageIdSchema.optional(),
+  attempt: z.number().int().positive().optional(),
+  revision: z.number().int().positive().optional(),
+}).strict();
 
-const resumeAgentInputSchema = resumeUserInputSchema.extend({
-  actor: z.string().trim().min(1).max(128),
-});
+const validateResumeInput = (input: {
+  checkpointKey?: string;
+  attempt?: number;
+  revision?: number;
+}, context: z.RefinementCtx) => {
+  const hasIdentity = input.checkpointKey !== undefined ||
+    input.attempt !== undefined || input.revision !== undefined;
+  if (hasIdentity &&
+    (input.checkpointKey === undefined ||
+      input.attempt === undefined ||
+      input.revision === undefined)) {
+    context.addIssue({
+      code: "custom",
+      message: "checkpointKey, attempt, and revision must be supplied together",
+      path: ["checkpointKey"],
+    });
+  }
+};
+
+const resumeUserInputSchema = resumeInputShape
+  .superRefine(validateResumeInput);
+
+const resumeAgentInputSchema = resumeInputShape
+  .extend({ actor: z.string().trim().min(1).max(128) })
+  .superRefine(validateResumeInput)
+  .strict();
 
 export const runReworkInputSchema = z
   .object({
@@ -1471,7 +1504,7 @@ const projectSettingsSchema = z
       })
       .strict(),
     githubRepository: nullableTrimmed(300),
-    workflow: workflowSchema.default(repositoryWorkflowBootstrap),
+    workflow: workflowSchema.default(cloneAutoHuntWorkflow()),
   })
   .strict()
   .superRefine((input, context) => {
@@ -2859,7 +2892,7 @@ const settingsJson = (row: ProjectSettingsRow | null) => ({
   githubRepository: row?.github_repository ?? null,
   workflow: row?.workflow_json
     ? normalizeAutoHuntWorkflow(JSON.parse(row.workflow_json))
-    : structuredClone(repositoryWorkflowBootstrap),
+    : cloneAutoHuntWorkflow(),
 });
 
 const parseJsonArray = (value: string) => {
@@ -3072,6 +3105,12 @@ function dashboardRunJson(
       workflow,
     ),
     pausedAt: run.paused_at,
+    waitingCheckpoint: run.waiting_checkpoint_key
+      ? {
+          key: run.waiting_checkpoint_key,
+          revision: run.waiting_checkpoint_revision ?? run.current_revision,
+        }
+      : null,
     detail: run.detail,
     priority: run.priority,
     repository: run.repository,
@@ -4910,7 +4949,7 @@ async function route(
     const settings = await getProjectSettings(db, project.id);
     const workflow = settings?.workflow_json
       ? normalizeAutoHuntWorkflow(JSON.parse(settings.workflow_json))
-      : structuredClone(repositoryWorkflowBootstrap);
+      : cloneAutoHuntWorkflow();
     const firstStageId = workflow.stages[0]?.id ?? null;
     const workflowStageIds = new Set(workflow.stages.map((stage) => stage.id));
 
@@ -5867,19 +5906,33 @@ async function route(
     const project = await getProject(db, resumeRunMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
     const input = resumeUserInputSchema.parse(await readJson(request));
-    const result = await resumeHuntRun(db, project.id, {
-      runId: resumeRunMatch[2],
-      requestId: input.requestId,
-      actor: `briar-app:${session.user.id}`,
-      occurredAt: new Date().toISOString(),
-    });
+    const result = input.checkpointKey
+      ? await resumeWorkflowCheckpoint(db, project.id, {
+          runId: resumeRunMatch[2],
+          checkpointKey: input.checkpointKey,
+          attempt: input.attempt,
+          revision: input.revision,
+          requestId: input.requestId,
+          actor: `briar-app:${session.user.id}`,
+          approvedAt: new Date().toISOString(),
+        })
+      : await resumeHuntRun(db, project.id, {
+          runId: resumeRunMatch[2],
+          requestId: input.requestId,
+          actor: `briar-app:${session.user.id}`,
+          occurredAt: new Date().toISOString(),
+        });
     if (result.outcome === "not_found") {
       throw new HttpError(404, "Run not found");
     }
-    if (result.outcome === "ineligible") {
+    if (result.outcome === "ineligible" || result.outcome === "conflict") {
       throw new HttpError(409, "Only paused runs can be resumed");
     }
-    return json({ runId: resumeRunMatch[2], ...result });
+    return json({
+      runId: resumeRunMatch[2],
+      ...result,
+      ...( "nextStage" in result ? { workflowStage: result.nextStage } : {}),
+    });
   }
 
   const moveRunMatch = pathname.match(
@@ -6814,19 +6867,33 @@ async function route(
       agentResumeMatch[1],
     );
     const input = resumeAgentInputSchema.parse(await readJson(request));
-    const result = await resumeHuntRun(db, projectId, {
-      runId: agentResumeMatch[1],
-      requestId: input.requestId,
-      actor: input.actor,
-      occurredAt: new Date().toISOString(),
-    });
+    const result = input.checkpointKey
+      ? await resumeWorkflowCheckpoint(db, projectId, {
+          runId: agentResumeMatch[1],
+          checkpointKey: input.checkpointKey,
+          attempt: input.attempt,
+          revision: input.revision,
+          requestId: input.requestId,
+          actor: input.actor,
+          approvedAt: new Date().toISOString(),
+        })
+      : await resumeHuntRun(db, projectId, {
+          runId: agentResumeMatch[1],
+          requestId: input.requestId,
+          actor: input.actor,
+          occurredAt: new Date().toISOString(),
+        });
     if (result.outcome === "not_found") {
       throw new HttpError(404, "Run not found");
     }
-    if (result.outcome === "ineligible") {
+    if (result.outcome === "ineligible" || result.outcome === "conflict") {
       throw new HttpError(409, "Only paused runs can be resumed");
     }
-    return json({ runId: agentResumeMatch[1], ...result });
+    return json({
+      runId: agentResumeMatch[1],
+      ...result,
+      ...( "nextStage" in result ? { workflowStage: result.nextStage } : {}),
+    });
   }
 
   const reworkMatch = pathname.match(/^\/runs\/([0-9a-f-]+)\/rework$/u);

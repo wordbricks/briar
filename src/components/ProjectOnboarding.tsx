@@ -35,6 +35,7 @@ import { Logo } from "./Logo";
 import {
   isRepositoryWorkflowPending,
   normalizeAutoHuntWorkflow,
+  repositoryWorkflowBootstrap,
 } from "../lib/auto-hunt-contract";
 import { useI18n } from "../i18n";
 
@@ -90,10 +91,11 @@ export function ProjectOnboarding({
   const [showWorkflowDetails, setShowWorkflowDetails] = useState(false);
   const [firstProjectStep, setFirstProjectStep] =
     useState<FirstProjectStep>("purpose");
-  const initialWorkflow = normalizeAutoHuntWorkflow(connection?.workflow);
+  const initialWorkflow = connection?.workflow ?? repositoryWorkflowBootstrap;
+  const normalizedInitialWorkflow = normalizeAutoHuntWorkflow(initialWorkflow);
   const reusesExistingWorkflow =
     Boolean(connection?.workflow) &&
-    !isRepositoryWorkflowPending(initialWorkflow);
+    !isRepositoryWorkflowPending(normalizedInitialWorkflow);
   const showPurposeStep =
     !canCancel && !connection && firstProjectStep === "purpose";
 
