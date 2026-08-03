@@ -338,16 +338,32 @@ struct AgentsView: View {
 }
 
 struct InboxView: View {
+    private static let pageSize = 50
+
     let project: ProjectsResponse.Project
     let snapshot: DashboardSnapshot?
     let token: String
     let api: any MobileAPIClientProtocol
     let refresh: () async -> Void
 
+    @State private var visibleCount = InboxView.pageSize
+
+    private var notifications: [ConversationNotification] {
+        snapshot?.conversationNotifications ?? []
+    }
+
+    private var visibleNotifications: [ConversationNotification] {
+        Array(notifications.prefix(visibleCount))
+    }
+
+    private var hasMore: Bool {
+        visibleNotifications.count < notifications.count
+    }
+
     var body: some View {
         List {
-            if let notifications = snapshot?.conversationNotifications, !notifications.isEmpty {
-                ForEach(notifications) { notification in
+            if !visibleNotifications.isEmpty {
+                ForEach(visibleNotifications) { notification in
                     if let run = snapshot?.runs.first(where: { $0.id == notification.runId }) {
                         NavigationLink {
                             RunDetailView(run: run, projectID: project.id, token: token, api: api)
@@ -364,6 +380,15 @@ struct InboxView: View {
                                 .foregroundStyle(.secondary)
                             }
                         }
+                        .onAppear {
+                            guard hasMore, notification.id == visibleNotifications.last?.id else {
+                                return
+                            }
+                            visibleCount = min(
+                                visibleCount + Self.pageSize,
+                                notifications.count
+                            )
+                        }
                     }
                 }
             } else {
@@ -374,7 +399,13 @@ struct InboxView: View {
                 )
             }
         }
-        .refreshable { await refresh() }
+        .refreshable {
+            visibleCount = Self.pageSize
+            await refresh()
+        }
+        .onChange(of: notifications.map(\.id)) { _, _ in
+            visibleCount = Self.pageSize
+        }
     }
 }
 

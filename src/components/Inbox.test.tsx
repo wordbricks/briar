@@ -6,7 +6,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { InboxMessageWithReadState } from "../hooks/useInbox";
 import { I18nProvider } from "../i18n";
 import type { Project } from "../types";
-import { Inbox } from "./Inbox";
+import {
+  Inbox,
+  INBOX_PAGE_SIZE,
+  nextInboxVisibleCount,
+  pageInboxMessages,
+} from "./Inbox";
 
 const projects: Project[] = [
   { id: "project-1", name: "Briar", createdAt: "2026-07-01T00:00:00.000Z" },
@@ -332,5 +337,163 @@ describe("Inbox", () => {
     );
     expect(container.textContent).toContain("@owner 확인해 주세요.");
     expect(container.textContent).toContain("재현 절차를 추가했습니다.");
+  });
+
+  it("pages helper functions reveal 50 items at a time", () => {
+    const items = Array.from({ length: 120 }, (_, index) => index + 1);
+    expect(pageInboxMessages(items, INBOX_PAGE_SIZE)).toHaveLength(50);
+    expect(pageInboxMessages(items, INBOX_PAGE_SIZE)[0]).toBe(1);
+    expect(pageInboxMessages(items, INBOX_PAGE_SIZE).at(-1)).toBe(50);
+    expect(nextInboxVisibleCount(50, 120)).toBe(100);
+    expect(nextInboxVisibleCount(100, 120)).toBe(120);
+    expect(nextInboxVisibleCount(120, 120)).toBe(120);
+  });
+
+  it("renders the first 50 filtered messages and loads more on scroll", async () => {
+    const messages = Array.from({ length: 120 }, (_, index) =>
+      issue(`urgent-${index}`, `Urgent issue ${index}`, {
+        status: "failed",
+        priority: 1,
+        occurredAt: new Date(Date.UTC(2026, 6, 28, 8, index)).toISOString(),
+      }),
+    );
+
+    await act(async () =>
+      root.render(
+        <I18nProvider>
+          <Inbox
+            isSidebarOpen
+            messages={messages}
+            onMarkAllRead={vi.fn()}
+            onMarkRead={vi.fn()}
+            onOpen={vi.fn()}
+            projects={projects}
+            unreadCount={120}
+          />
+        </I18nProvider>,
+      ),
+    );
+
+    const scroll = container.querySelector<HTMLDivElement>(".inbox-scroll");
+    expect(scroll).not.toBeNull();
+    expect(scroll?.getAttribute("data-visible-count")).toBe("50");
+    expect(scroll?.getAttribute("data-has-more")).toBe("true");
+    expect(container.querySelectorAll(".inbox-message")).toHaveLength(50);
+    expect(container.textContent).toContain("Urgent issue 0");
+    expect(container.textContent).toContain("Urgent issue 49");
+    expect(container.textContent).not.toContain("Urgent issue 50");
+    expect(
+      container.querySelector('[data-testid="inbox-load-more-sentinel"]'),
+    ).not.toBeNull();
+
+    Object.defineProperty(scroll!, "scrollHeight", {
+      configurable: true,
+      value: 4_000,
+    });
+    Object.defineProperty(scroll!, "clientHeight", {
+      configurable: true,
+      value: 600,
+    });
+    Object.defineProperty(scroll!, "scrollTop", {
+      configurable: true,
+      value: 3_500,
+      writable: true,
+    });
+
+    await act(async () => {
+      scroll!.dispatchEvent(new Event("scroll", { bubbles: true }));
+    });
+
+    expect(scroll?.getAttribute("data-visible-count")).toBe("100");
+    expect(container.querySelectorAll(".inbox-message")).toHaveLength(100);
+    expect(container.textContent).toContain("Urgent issue 99");
+    expect(container.textContent).not.toContain("Urgent issue 100");
+
+    Object.defineProperty(scroll!, "scrollTop", {
+      configurable: true,
+      value: 3_500,
+      writable: true,
+    });
+    await act(async () => {
+      scroll!.dispatchEvent(new Event("scroll", { bubbles: true }));
+    });
+
+    expect(scroll?.getAttribute("data-visible-count")).toBe("120");
+    expect(scroll?.getAttribute("data-has-more")).toBe("false");
+    expect(container.querySelectorAll(".inbox-message")).toHaveLength(120);
+    expect(
+      container.querySelector('[data-testid="inbox-load-more-sentinel"]'),
+    ).toBeNull();
+  });
+
+  it("resets the visible page when filters change", async () => {
+    const messages = [
+      ...Array.from({ length: 60 }, (_, index) =>
+        issue(`urgent-${index}`, `Urgent issue ${index}`, {
+          status: "failed",
+          priority: 1,
+        }),
+      ),
+      ...Array.from({ length: 60 }, (_, index) =>
+        issue(`important-${index}`, `Important issue ${index}`, {
+          priority: 2,
+          structuredResult: {
+            summary: "Important update.",
+            outcome: "completed",
+            importance: "important",
+            urgency: "normal",
+            impact: "project",
+            humanActionRequired: false,
+            nextAction: null,
+            dueAt: null,
+          },
+        }),
+      ),
+    ];
+
+    await act(async () =>
+      root.render(
+        <I18nProvider>
+          <Inbox
+            isSidebarOpen
+            messages={messages}
+            onMarkAllRead={vi.fn()}
+            onMarkRead={vi.fn()}
+            onOpen={vi.fn()}
+            projects={projects}
+            unreadCount={120}
+          />
+        </I18nProvider>,
+      ),
+    );
+
+    const scroll = container.querySelector<HTMLDivElement>(".inbox-scroll");
+    Object.defineProperty(scroll!, "scrollHeight", {
+      configurable: true,
+      value: 4_000,
+    });
+    Object.defineProperty(scroll!, "clientHeight", {
+      configurable: true,
+      value: 600,
+    });
+    Object.defineProperty(scroll!, "scrollTop", {
+      configurable: true,
+      value: 3_500,
+      writable: true,
+    });
+    await act(async () => {
+      scroll!.dispatchEvent(new Event("scroll", { bubbles: true }));
+    });
+    expect(scroll?.getAttribute("data-visible-count")).toBe("100");
+
+    const urgentFilter = [...container.querySelectorAll(".inbox-filter")].find(
+      (button) => button.textContent?.includes("긴급"),
+    ) as HTMLButtonElement | undefined;
+    await act(async () => urgentFilter?.click());
+
+    expect(scroll?.getAttribute("data-visible-count")).toBe("50");
+    expect(container.querySelectorAll(".inbox-message")).toHaveLength(50);
+    expect(container.textContent).toContain("Important issue 0");
+    expect(container.textContent).not.toContain("Urgent issue 0");
   });
 });
