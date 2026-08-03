@@ -4,7 +4,6 @@ import {
   copyIssueId,
   copyIssueShareLink,
   copySessionShareLink,
-  issueIdFromSourceKey,
   issueDeepLinkUrl,
   issueShareUrl,
   parseBriarLink,
@@ -165,18 +164,16 @@ describe("issue links", () => {
     );
   });
 
-  it("copies a Briar issue ID without its source-key prefix", async () => {
+  it("copies the displayed AH issue ID", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
       value: { writeText },
     });
 
-    expect(issueIdFromSourceKey(`briar-issue:${runId}`)).toBe(runId);
-    expect(issueIdFromSourceKey("BRIAR-42")).toBe("BRIAR-42");
-    await copyIssueId(`briar-issue:${runId}`);
+    await copyIssueId(42);
 
-    expect(writeText).toHaveBeenCalledWith(runId);
+    expect(writeText).toHaveBeenCalledWith("AH-42");
   });
 
   it("uses native sharing when the WebView supports it", async () => {

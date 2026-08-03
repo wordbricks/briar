@@ -3013,7 +3013,7 @@ export function RunPage({
   const copyId = async () => {
     setCopyStatus(null);
     try {
-      await copyIssueId(run.sourceKey);
+      await copyIssueId(run.runNumber);
       setCopyStatus("id-copied");
     } catch {
       setCopyStatus("id-error");

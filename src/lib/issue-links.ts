@@ -3,7 +3,6 @@ const issueLinkPathPattern =
 const sessionLinkPathPattern =
   /^\/open\/sessions\/([0-9a-f-]{36})\/([0-9a-f-]{36})\/?$/iu;
 const issueDeepLinkScheme = "briar-companion:";
-const briarIssueSourceKeyPrefix = "briar-issue:";
 
 export type IssueLinkTarget = {
   projectId: string;
@@ -130,14 +129,8 @@ async function copyText(value: string): Promise<void> {
   if (!copied) throw new Error("Unable to copy text");
 }
 
-export function issueIdFromSourceKey(sourceKey: string): string {
-  return sourceKey.startsWith(briarIssueSourceKeyPrefix)
-    ? sourceKey.slice(briarIssueSourceKeyPrefix.length)
-    : sourceKey;
-}
-
-export async function copyIssueId(sourceKey: string): Promise<void> {
-  await copyText(issueIdFromSourceKey(sourceKey));
+export async function copyIssueId(runNumber: number): Promise<void> {
+  await copyText(`AH-${runNumber}`);
 }
 
 export async function copyIssueShareLink(input: {
