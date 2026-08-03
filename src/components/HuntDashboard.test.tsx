@@ -2553,6 +2553,38 @@ describe("HuntDashboard", () => {
     expect(markup).toContain('aria-expanded="false" class="run-page-properties-toggle"');
   });
 
+  it("distinguishes a paused review checkpoint from an error recovery state", () => {
+    const pausedRun = {
+      ...demoDashboard.runs[0],
+      status: "paused" as const,
+    };
+    const markup = renderToStaticMarkup(
+      <TooltipProvider>
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          run={pausedRun}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(markup).toContain('class="recovery-panel paused"');
+    expect(markup).toContain("검토 대기");
+    expect(markup).toContain("다음 단계 재개");
+    expect(markup).toContain('class="run-page-property-badge amber"');
+  });
+
   it("does not show an error-like status banner for queued remote work", () => {
     const queuedRemoteRun = {
       ...demoDashboard.runs[0],
