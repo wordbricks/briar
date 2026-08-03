@@ -1543,21 +1543,46 @@ export type HuntRecoveryResult = {
 
 export type HuntResumeResult = {
   runId: string;
-  outcome: "resumed" | "already_resumed" | "not_found" | "ineligible";
+  outcome:
+    | "resumed"
+    | "already_resumed"
+    | "approved"
+    | "already_approved"
+    | "not_found"
+    | "ineligible";
   workflowStage: string | null;
+  startStage: string | null;
+  checkpointKey: string | null;
+  attempt: number | null;
+  revision: number | null;
+  terminalReviewOnly: boolean;
 };
 
 export async function resumeHuntRun(
   token: string,
   projectId: string,
   runId: string,
+  checkpoint?: {
+    key: string;
+    attempt: number;
+    revision: number;
+  },
 ) {
   return request<HuntResumeResult>(
     `/projects/${projectId}/runs/${runId}/resume`,
     token,
     {
       method: "POST",
-      body: JSON.stringify({ requestId: crypto.randomUUID() }),
+      body: JSON.stringify({
+        requestId: crypto.randomUUID(),
+        ...(checkpoint
+          ? {
+              checkpointKey: checkpoint.key,
+              attempt: checkpoint.attempt,
+              revision: checkpoint.revision,
+            }
+          : {}),
+      }),
     },
   );
 }

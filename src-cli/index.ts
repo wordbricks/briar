@@ -880,6 +880,7 @@ const queuedIssueSchema = z.object({
   runId: z.string().uuid(),
   runNumber: z.number().int().positive(),
   currentAttempt: z.number().int().positive(),
+  currentRevision: z.number().int().positive(),
   source: z.enum(autoHuntSources),
   sourceKey: z.string().min(1),
   title: z.string().min(1),
@@ -890,6 +891,15 @@ const queuedIssueSchema = z.object({
   context: z.record(z.string(), z.unknown()).nullable(),
   workflow: workflowConfigSchema,
   workflowStage: z.string().nullable(),
+  startStage: z.string().nullable(),
+  resumeContext: z
+    .object({
+      checkpointKey: workflowStageIdSchema,
+      position: z.enum(["before", "after"]),
+      revision: z.number().int().positive(),
+      terminalReviewOnly: z.boolean(),
+    })
+    .nullable(),
   attachments: z.array(queuedAttachmentSchema).max(5).default([]),
   messages: z.array(queuedIssueMessageSchema).default([]),
   claimToken: z.string().startsWith("briar_claim_"),
@@ -1638,16 +1648,36 @@ async function resumeRun() {
   const input = {
     requestId: value("--request-id") ?? crypto.randomUUID(),
     actor: value("--actor") ?? "briar-workflow",
+    checkpointKey: value("--checkpoint"),
+    attempt: value("--attempt") ? Number(value("--attempt")) : undefined,
+    revision: value("--revision") ? Number(value("--revision")) : undefined,
   };
   z.object({
     requestId: z.string().uuid(),
     actor: z.string().min(1).max(128),
+    checkpointKey: workflowStageIdSchema.optional(),
+    attempt: z.number().int().positive().optional(),
+    revision: z.number().int().positive().optional(),
+  }).superRefine((candidate, context) => {
+    const supplied = [
+      candidate.checkpointKey,
+      candidate.attempt,
+      candidate.revision,
+    ].filter((item) => item !== undefined).length;
+    if (supplied !== 0 && supplied !== 3) {
+      context.addIssue({
+        code: "custom",
+        message: "--checkpoint, --attempt, and --revision must be supplied together",
+      });
+    }
   }).parse(input);
   z.string().uuid().parse(runId);
   const result = await request<{
     runId: string;
     outcome: string;
     workflowStage: string | null;
+    startStage: string | null;
+    terminalReviewOnly: boolean;
   }>(
     config.apiUrl,
     `/runs/${runId}/resume`,
@@ -1655,6 +1685,63 @@ async function resumeRun() {
     { method: "POST", body: JSON.stringify(input) },
   );
   if (project.activeClaim?.runId === runId) {
+    config.projects = config.projects.map((candidate) =>
+      candidate.id === project.id
+        ? { ...candidate, activeClaim: undefined }
+        : candidate,
+    );
+    await saveConfig(config);
+  }
+  console.log(JSON.stringify(result));
+}
+
+async function transitionWorkflowStage(action: "start" | "complete") {
+  const config = await loadConfig();
+  const project = await currentProject(config);
+  const runId = value("--run") ?? project.activeClaim?.runId;
+  if (!runId) throw new Error("--run is required when there is no active claim");
+  const stage = required("--stage");
+  const input = {
+    requestId: value("--request-id") ?? crypto.randomUUID(),
+    actor: value("--actor") ?? "briar-workflow",
+    attempt: value("--attempt") ? Number(value("--attempt")) : undefined,
+    revision: value("--revision") ? Number(value("--revision")) : undefined,
+  };
+  z.object({
+    requestId: z.string().uuid(),
+    actor: z.string().min(1).max(128),
+    attempt: z.number().int().positive().optional(),
+    revision: z.number().int().positive().optional(),
+  }).parse(input);
+  z.string().uuid().parse(runId);
+  workflowStageIdSchema.parse(stage);
+  const result = await request<{
+    runId: string;
+    requestId: string;
+    outcome: "started" | "completed" | "already_started" | "already_completed" | "paused";
+    attempt: number;
+    revision: number;
+    stage: string;
+    checkpoint: {
+      key: string;
+      stage: string;
+      position: "before" | "after";
+      revision: number;
+    } | null;
+  }>(
+    config.apiUrl,
+    `/runs/${runId}/stages/${stage}/${action}`,
+    executionToken(project),
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+      headers:
+        project.activeClaim?.runId === runId && project.activeClaim.token
+          ? { "X-Briar-Claim-Token": project.activeClaim.token }
+          : undefined,
+    },
+  );
+  if (result.outcome === "paused" && project.activeClaim?.runId === runId) {
     config.projects = config.projects.map((candidate) =>
       candidate.id === project.id
         ? { ...candidate, activeClaim: undefined }
@@ -1862,6 +1949,8 @@ async function runClaimedIssueInRuntime(
     snapshot: {
       runId: issue.runId,
       runNumber: issue.runNumber,
+      currentAttempt: issue.currentAttempt,
+      currentRevision: issue.currentRevision,
       source: issue.source,
       sourceKey: issue.sourceKey,
       title: issue.title,
@@ -1874,11 +1963,15 @@ async function runClaimedIssueInRuntime(
       priority: issue.priority,
       sourceCreatedAt: issue.sourceCreatedAt,
       context: issue.context,
+      workflow: issue.workflow,
+      startStage: issue.startStage,
+      resumeContext: issue.resumeContext,
       attachments,
       conversation: issue.messages,
     },
     workspacePath: workspace.path,
-    resumeStage: issue.workflowStage,
+    startStage: issue.startStage,
+    resumeContext: issue.resumeContext,
   });
   const fullAccess = activeProject.autoHunt?.sandbox?.fullAccess ?? true;
   const sessionId = `detached-${issue.runId}`;
@@ -3369,6 +3462,8 @@ const usage = `Briar CLI
     [--workflow-stage <configured-stage>] --event-key <retry-stable-key>
   briar run complete [--run <uuid>] --event-key <retry-stable-key>
     --structured-result-file <path>
+  briar run stage <start|complete> [--run <uuid>] --stage <configured-stage>
+    [--attempt <n>] [--revision <n>] [--request-id <uuid>]
   briar run evidence add [--run <uuid>] --key <retry-stable-key>
     --stage <configured-stage> --type <type>
     --status <pending|passed|failed|skipped>
@@ -3377,7 +3472,8 @@ const usage = `Briar CLI
   briar run evidence list [--run <uuid>]
   briar run rework [--run <uuid>] --to <earlier-stage> --reason <text>
     [--request-id <uuid>]
-  briar run resume [--run <uuid>] [--request-id <uuid>]
+  briar run resume [--run <uuid>] [--checkpoint <key> --attempt <n> --revision <n>]
+    [--request-id <uuid>]
   briar run retry [--run <uuid>] [--request-id <uuid>] [--reason <text>]
   briar run cancel [--run <uuid>] [--request-id <uuid>] [--reason <text>]
   briar worker register [--project <uuid>] [--label <text>]
@@ -3447,6 +3543,12 @@ async function main() {
   }
   if (args[0] === "run" && args[1] === "complete") {
     return addRunEvent("completed");
+  }
+  if (
+    args[0] === "run" && args[1] === "stage" &&
+    (args[2] === "start" || args[2] === "complete")
+  ) {
+    return transitionWorkflowStage(args[2]);
   }
   if (args[0] === "run" && args[1] === "evidence" && args[2] === "add") {
     return addRunEvidence();

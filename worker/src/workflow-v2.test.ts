@@ -9,6 +9,7 @@ import {
 import type { HuntEventInput } from "./db";
 import {
   assertWorkflowRunCompletion,
+  completeWorkflowStageLifecycle,
   completeWorkflowStage,
   createOrganization,
   createProject,
@@ -19,6 +20,7 @@ import {
   recordHuntEvent,
   reworkHuntRun,
   resumeWorkflowCheckpoint,
+  startWorkflowStageLifecycle,
   startWorkflowStage,
   HuntTransitionError,
 } from "./db";
@@ -453,5 +455,262 @@ describe("workflow v2 D1 persistence and transitions", () => {
       checkpointKey: "approve-pr",
       reachedAt: at(42),
     })).outcome).toBe("waiting");
+  });
+
+  it("orchestrates sequential before/after checkpoints and never replays the terminal stage", async () => {
+    const workflow = normalizeAutoHuntWorkflow({
+      version: 2,
+      requirements: [],
+      stages: [
+        { id: "implementing", label: "Implement", required: true, evidence: [] },
+        { id: "pr_open", label: "Open PR", required: true, evidence: [] },
+        { id: "production_qa", label: "Production QA", required: true, evidence: [] },
+      ],
+      execution: {
+        checkpoints: [
+          { key: "before-pr", stage: "pr_open", position: "before" },
+          { key: "after-pr", stage: "pr_open", position: "after" },
+          { key: "after-production", stage: "production_qa", position: "after" },
+        ],
+      },
+      completion: {
+        requiredStages: ["implementing", "pr_open", "production_qa"],
+      },
+    });
+    await db
+      .prepare(`update briar_project_settings set workflow_json = ? where project_id = ?`)
+      .bind(JSON.stringify(workflow), projectId)
+      .run();
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("lifecycle-orchestration", "lifecycle-orchestration:queued", at(50)),
+    );
+    const identity = { runId, attempt: 1, revision: 1 };
+
+    expect((await startWorkflowStageLifecycle(db, projectId, {
+      ...identity,
+      stageId: "implementing",
+      startedAt: at(51),
+    })).outcome).toBe("started");
+    expect((await completeWorkflowStageLifecycle(db, projectId, {
+      ...identity,
+      stageId: "implementing",
+      finishedAt: at(52),
+    })).outcome).toBe("completed");
+
+    const before = await startWorkflowStageLifecycle(db, projectId, {
+      ...identity,
+      stageId: "pr_open",
+      startedAt: at(53),
+    });
+    expect(before).toMatchObject({
+      outcome: "paused",
+      checkpoint: { key: "before-pr", position: "before" },
+    });
+    const resumedBefore = await resumeWorkflowCheckpoint(db, projectId, {
+      ...identity,
+      checkpointKey: "before-pr",
+      requestId: "55555555-5555-4555-8555-555555555555",
+      actor: "pm",
+      approvedAt: at(54),
+    });
+    expect(resumedBefore).toMatchObject({
+      outcome: "approved",
+      nextStage: "pr_open",
+      terminalReviewOnly: false,
+    });
+
+    expect((await startWorkflowStageLifecycle(db, projectId, {
+      ...identity,
+      stageId: "pr_open",
+      startedAt: at(55),
+    })).outcome).toBe("started");
+    const after = await completeWorkflowStageLifecycle(db, projectId, {
+      ...identity,
+      stageId: "pr_open",
+      finishedAt: at(56),
+    });
+    expect(after).toMatchObject({
+      outcome: "paused",
+      checkpoint: { key: "after-pr", position: "after" },
+    });
+    expect(await resumeWorkflowCheckpoint(db, projectId, {
+      ...identity,
+      checkpointKey: "after-pr",
+      requestId: "66666666-6666-4666-8666-666666666666",
+      actor: "pm",
+      approvedAt: at(57),
+    })).toMatchObject({
+      nextStage: "production_qa",
+      terminalReviewOnly: false,
+    });
+
+    expect((await startWorkflowStageLifecycle(db, projectId, {
+      ...identity,
+      stageId: "production_qa",
+      startedAt: at(58),
+    })).outcome).toBe("started");
+    const terminalPause = await completeWorkflowStageLifecycle(db, projectId, {
+      ...identity,
+      stageId: "production_qa",
+      finishedAt: at(59),
+    });
+    expect(terminalPause).toMatchObject({
+      outcome: "paused",
+      checkpoint: { key: "after-production", position: "after" },
+    });
+    const terminalResume = await resumeWorkflowCheckpoint(db, projectId, {
+      ...identity,
+      checkpointKey: "after-production",
+      requestId: "77777777-7777-4777-8777-777777777777",
+      actor: "pm",
+      approvedAt: at(60),
+    });
+    expect(terminalResume).toMatchObject({
+      outcome: "approved",
+      nextStage: null,
+      terminalReviewOnly: true,
+    });
+    expect((await completeWorkflowStageLifecycle(db, projectId, {
+      ...identity,
+      stageId: "production_qa",
+      finishedAt: at(61),
+    })).outcome).toBe("already_completed");
+    await expect(assertWorkflowRunCompletion(db, projectId, runId)).resolves.toMatchObject({
+      runId,
+    });
+  });
+
+  it("requires configured evidence before completing a stage", async () => {
+    const workflow = normalizeAutoHuntWorkflow({
+      version: 2,
+      requirements: [],
+      stages: [
+        {
+          id: "implementing",
+          label: "Implement",
+          required: true,
+          evidence: ["diff"],
+        },
+      ],
+      execution: { checkpoints: [] },
+      completion: { requiredStages: ["implementing"] },
+    });
+    await db
+      .prepare(`update briar_project_settings set workflow_json = ? where project_id = ?`)
+      .bind(JSON.stringify(workflow), projectId)
+      .run();
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("lifecycle-evidence", "lifecycle-evidence:queued", at(70)),
+    );
+    const identity = { runId, attempt: 1, revision: 1 };
+    await startWorkflowStageLifecycle(db, projectId, {
+      ...identity,
+      stageId: "implementing",
+      startedAt: at(71),
+    });
+    await expect(completeWorkflowStageLifecycle(db, projectId, {
+      ...identity,
+      stageId: "implementing",
+      finishedAt: at(72),
+    })).rejects.toThrow(/requires evidence: diff/u);
+    expect((await getWorkflowProgress(db, projectId, runId))?.stages[0]?.state)
+      .toBe("running");
+  });
+
+  it("recovers a crash between stage completion and its after checkpoint", async () => {
+    const workflow = normalizeAutoHuntWorkflow({
+      version: 2,
+      requirements: [],
+      stages: [
+        { id: "implementing", label: "Implement", required: true, evidence: [] },
+        { id: "pr_open", label: "Open PR", required: true, evidence: [] },
+      ],
+      execution: {
+        checkpoints: [
+          { key: "after-implementation", stage: "implementing", position: "after" },
+        ],
+      },
+      completion: { requiredStages: ["implementing", "pr_open"] },
+    });
+    await db
+      .prepare(`update briar_project_settings set workflow_json = ? where project_id = ?`)
+      .bind(JSON.stringify(workflow), projectId)
+      .run();
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("checkpoint-crash-recovery", "checkpoint-crash-recovery:queued", at(80)),
+    );
+    const identity = { runId, attempt: 1, revision: 1 };
+    await startWorkflowStage(db, projectId, {
+      ...identity,
+      stageId: "implementing",
+      startedAt: at(81),
+    });
+    // Simulate a process exit after the stage row committed but before the
+    // lifecycle wrapper reached the after-stage checkpoint.
+    await completeWorkflowStage(db, projectId, {
+      ...identity,
+      stageId: "implementing",
+      finishedAt: at(82),
+    });
+    expect(await startWorkflowStageLifecycle(db, projectId, {
+      ...identity,
+      stageId: "pr_open",
+      startedAt: at(83),
+    })).toMatchObject({
+      outcome: "paused",
+      checkpoint: { key: "after-implementation", position: "after" },
+    });
+  });
+
+  it("does not let status events bypass lifecycle state", async () => {
+    const workflow = normalizeAutoHuntWorkflow({
+      version: 2,
+      requirements: [],
+      stages: [
+        { id: "implementing", label: "Implement", required: true, evidence: [] },
+      ],
+      execution: { checkpoints: [] },
+      completion: { requiredStages: ["implementing"] },
+    });
+    await db
+      .prepare(`update briar_project_settings set workflow_json = ? where project_id = ?`)
+      .bind(JSON.stringify(workflow), projectId)
+      .run();
+    const sourceKey = "lifecycle-event-guard";
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event(sourceKey, `${sourceKey}:queued`, at(90)),
+    );
+    await initializeWorkflowProgress(db, projectId, { runId });
+    await expect(recordHuntEvent(
+      db,
+      projectId,
+      event(sourceKey, `${sourceKey}:running-before-start`, at(91), {
+        status: "running",
+        workflowStage: "implementing",
+      }),
+    )).rejects.toThrow(/must be started through the workflow lifecycle/u);
+    await startWorkflowStageLifecycle(db, projectId, {
+      runId,
+      attempt: 1,
+      revision: 1,
+      stageId: "implementing",
+      startedAt: at(92),
+    });
+    await expect(recordHuntEvent(
+      db,
+      projectId,
+      event(sourceKey, `${sourceKey}:running-after-start`, at(93), {
+        status: "running",
+        workflowStage: "implementing",
+      }),
+    )).resolves.toBe(runId);
   });
 });

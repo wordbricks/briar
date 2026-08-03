@@ -131,6 +131,7 @@ import {
   getHuntRunForProject,
   HuntClaimError,
   HuntTransitionError,
+  initializeWorkflowProgress,
   importLinearHuntRuns,
   listIssueAttachments,
   listIssueDependencies,
@@ -160,6 +161,7 @@ import {
   planAccountDeletion,
   issueProjectAgentToken,
   recoverHuntRun,
+  completeWorkflowStageLifecycle,
   resumeWorkflowCheckpoint,
   resumeHuntRun,
   reworkHuntRun,
@@ -170,6 +172,7 @@ import {
   renewProjectAgentScheduleRunLease,
   renewIssueAgentReplyLease,
   rollbackNewAppIssue,
+  startWorkflowStageLifecycle,
   releaseSlackEvent,
   updateProjectAgent,
   updateProjectAgentSchedule,
@@ -318,6 +321,7 @@ class HttpError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    readonly code?: string,
   ) {
     super(message);
   }
@@ -1454,6 +1458,15 @@ const resumeAgentInputSchema = resumeInputShape
   .superRefine(validateResumeInput)
   .strict();
 
+export const workflowStageLifecycleInputSchema = z
+  .object({
+    requestId: z.string().uuid(),
+    attempt: z.number().int().positive().optional(),
+    revision: z.number().int().positive().optional(),
+    actor: z.string().trim().min(1).max(128),
+  })
+  .strict();
+
 export const runReworkInputSchema = z
   .object({
     requestId: z.string().uuid(),
@@ -2019,7 +2032,6 @@ async function requireActiveWorkerRunClaim(
   runId: string,
 ) {
   const projectId = await requireRunExecutionProject(db, request, runId);
-  if (!bearerToken(request).startsWith("briar_worker_")) return projectId;
   const claimToken = request.headers.get("x-briar-claim-token");
   if (!claimToken?.startsWith("briar_claim_")) {
     throw new HttpError(409, "Active claim token is required");
@@ -3187,6 +3199,143 @@ function dashboardRunJson(
     completedAt: run.completed_at,
     lastEventAt: run.last_event_at,
     eventCount: run.event_count,
+  };
+}
+
+async function claimWorkflowContext(
+  db: D1Database,
+  projectId: string,
+  run: NonNullable<Awaited<ReturnType<typeof getHuntRunForProject>>>,
+) {
+  const rawWorkflow = JSON.parse(run.workflow_snapshot_json) as { version?: number };
+  const workflow = normalizeAutoHuntWorkflow(rawWorkflow);
+  const terminalStage = workflow.stages.at(-1)?.id ?? null;
+  if (rawWorkflow.version !== 2) {
+    const terminalResume = terminalStage && run.workflow_stage === terminalStage
+      ? await db
+          .prepare(
+            `select 1 as present from briar_hunt_events
+             where run_id = ? and event_key like 'workflow:resume:%'
+               and workflow_stage = ? order by recorded_at desc limit 1`,
+          )
+          .bind(run.id, terminalStage)
+          .first<{ present: number }>()
+      : null;
+    return {
+      startStage: terminalResume
+        ? null
+        : run.workflow_stage ?? workflow.stages.at(0)?.id ?? null,
+      resumeContext: terminalResume
+        ? {
+            checkpointKey: `legacy-after-${terminalStage}`,
+            position: "after" as const,
+            revision: run.current_revision,
+            terminalReviewOnly: true,
+          }
+        : null,
+    };
+  }
+
+  const progress = await initializeWorkflowProgress(db, projectId, {
+    runId: run.id,
+    attempt: run.current_attempt,
+    revision: run.current_revision,
+  });
+  if (!progress) return { startStage: null, resumeContext: null };
+  const latestApproval = [...progress.checkpoints]
+    .filter((checkpoint) => checkpoint.state === "approved" && checkpoint.approved_at)
+    .sort((left, right) =>
+      (right.approved_at ?? "").localeCompare(left.approved_at ?? "")
+    )[0] ?? null;
+  const terminalReviewOnly = latestApproval?.position === "after" &&
+    latestApproval.stage_id === terminalStage &&
+    progress.stages.every((stage) =>
+      stage.state === "completed" || stage.state === "skipped"
+    );
+  const startStage = terminalReviewOnly
+    ? null
+    : progress.stages.find((stage) => stage.state === "running")?.stage_id ??
+      progress.stages.find((stage) => stage.state === "pending")?.stage_id ??
+      null;
+  return {
+    startStage,
+    resumeContext: latestApproval
+      ? {
+          checkpointKey: latestApproval.checkpoint_key,
+          position: latestApproval.position,
+          revision: latestApproval.revision,
+          terminalReviewOnly,
+        }
+      : null,
+  };
+}
+
+async function resumeRunWithCheckpointIdentity(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  input: z.infer<typeof resumeUserInputSchema>,
+  actor: string,
+) {
+  const run = await getHuntRunForProject(db, projectId, runId);
+  if (!run) {
+    return {
+      outcome: "not_found" as const,
+      checkpointKey: null,
+      attempt: null,
+      revision: null,
+      nextStage: null,
+      terminalReviewOnly: false,
+    };
+  }
+  if (input.checkpointKey) {
+    return resumeWorkflowCheckpoint(db, projectId, {
+      runId,
+      checkpointKey: input.checkpointKey,
+      attempt: input.attempt!,
+      revision: input.revision!,
+      requestId: input.requestId,
+      actor,
+      approvedAt: new Date().toISOString(),
+    });
+  }
+  if (run.waiting_checkpoint_key) {
+    const rawWorkflow = JSON.parse(run.workflow_snapshot_json) as { version?: number };
+    if (rawWorkflow.version === 2) {
+      throw new HttpError(
+        400,
+        "checkpointKey, attempt, and revision are required for workflow v2",
+        "CHECKPOINT_IDENTITY_REQUIRED",
+      );
+    }
+    return resumeWorkflowCheckpoint(db, projectId, {
+      runId,
+      checkpointKey: run.waiting_checkpoint_key,
+      attempt: run.current_attempt,
+      revision: run.waiting_checkpoint_revision ?? run.current_revision,
+      requestId: input.requestId,
+      actor,
+      approvedAt: new Date().toISOString(),
+    });
+  }
+  const legacy = await resumeHuntRun(db, projectId, {
+    runId,
+    requestId: input.requestId,
+    actor,
+    occurredAt: new Date().toISOString(),
+  });
+  const workflow = normalizeAutoHuntWorkflow(
+    JSON.parse(run.workflow_snapshot_json),
+  );
+  const terminalReviewOnly = legacy.outcome !== "not_found" &&
+    run.workflow_stage === workflow.stages.at(-1)?.id;
+  return {
+    ...legacy,
+    checkpointKey: null,
+    attempt: run.current_attempt,
+    revision: run.current_revision,
+    nextStage: terminalReviewOnly ? null : legacy.workflowStage,
+    terminalReviewOnly,
   };
 }
 
@@ -5906,32 +6055,28 @@ async function route(
     const project = await getProject(db, resumeRunMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
     const input = resumeUserInputSchema.parse(await readJson(request));
-    const result = input.checkpointKey
-      ? await resumeWorkflowCheckpoint(db, project.id, {
-          runId: resumeRunMatch[2],
-          checkpointKey: input.checkpointKey,
-          attempt: input.attempt,
-          revision: input.revision,
-          requestId: input.requestId,
-          actor: `briar-app:${session.user.id}`,
-          approvedAt: new Date().toISOString(),
-        })
-      : await resumeHuntRun(db, project.id, {
-          runId: resumeRunMatch[2],
-          requestId: input.requestId,
-          actor: `briar-app:${session.user.id}`,
-          occurredAt: new Date().toISOString(),
-        });
+    const result = await resumeRunWithCheckpointIdentity(
+      db,
+      project.id,
+      resumeRunMatch[2],
+      input,
+      `briar-app:${session.user.id}`,
+    );
     if (result.outcome === "not_found") {
       throw new HttpError(404, "Run not found");
     }
     if (result.outcome === "ineligible" || result.outcome === "conflict") {
-      throw new HttpError(409, "Only paused runs can be resumed");
+      throw new HttpError(
+        409,
+        "The paused checkpoint changed before it could be resumed",
+        "CHECKPOINT_CONFLICT",
+      );
     }
     return json({
       runId: resumeRunMatch[2],
       ...result,
-      ...( "nextStage" in result ? { workflowStage: result.nextStage } : {}),
+      workflowStage: result.nextStage,
+      startStage: result.nextStage,
     });
   }
 
@@ -6778,6 +6923,9 @@ async function route(
           listIssueMessagesWithArchive(db, env.ARCHIVES, projectId, run.id),
         ])
       : [[], []];
+    const workflowContext = run
+      ? await claimWorkflowContext(db, projectId, run)
+      : { startStage: null, resumeContext: null };
     return json({
       work: run
         ? {
@@ -6794,6 +6942,8 @@ async function route(
             sourceCreatedAt: run.source_created_at,
             context: parseJsonObject(run.context_json),
             workflowStage: run.workflow_stage,
+            startStage: workflowContext.startStage,
+            resumeContext: workflowContext.resumeContext,
             workflow: normalizeAutoHuntWorkflow(
               JSON.parse(run.workflow_snapshot_json),
             ),
@@ -6860,6 +7010,51 @@ async function route(
   const agentResumeMatch = pathname.match(
     /^\/runs\/([0-9a-f-]+)\/resume$/u,
   );
+  const agentStageLifecycleMatch = pathname.match(
+    /^\/runs\/([0-9a-f-]+)\/stages\/([a-z][a-z0-9_-]{0,63})\/(start|complete)$/u,
+  );
+  if (agentStageLifecycleMatch && request.method === "POST") {
+    const projectId = await requireActiveWorkerRunClaim(
+      db,
+      request,
+      agentStageLifecycleMatch[1],
+    );
+    const input = workflowStageLifecycleInputSchema.parse(await readJson(request));
+    try {
+      const common = {
+        runId: agentStageLifecycleMatch[1],
+        stageId: agentStageLifecycleMatch[2],
+        attempt: input.attempt,
+        revision: input.revision,
+      };
+      const result = agentStageLifecycleMatch[3] === "start"
+        ? await startWorkflowStageLifecycle(db, projectId, {
+            ...common,
+            startedAt: new Date().toISOString(),
+          })
+        : await completeWorkflowStageLifecycle(db, projectId, {
+            ...common,
+            finishedAt: new Date().toISOString(),
+          });
+      if (result.outcome === "not_found") {
+        throw new HttpError(404, "Run not found", "RUN_NOT_FOUND");
+      }
+      return json({
+        runId: agentStageLifecycleMatch[1],
+        requestId: input.requestId,
+        ...result,
+      });
+    } catch (error) {
+      if (error instanceof HuntTransitionError) {
+        throw new HttpError(
+          409,
+          error.message,
+          "WORKFLOW_STAGE_CONFLICT",
+        );
+      }
+      throw error;
+    }
+  }
   if (agentResumeMatch && request.method === "POST") {
     const projectId = await requireRunExecutionProject(
       db,
@@ -6867,32 +7062,28 @@ async function route(
       agentResumeMatch[1],
     );
     const input = resumeAgentInputSchema.parse(await readJson(request));
-    const result = input.checkpointKey
-      ? await resumeWorkflowCheckpoint(db, projectId, {
-          runId: agentResumeMatch[1],
-          checkpointKey: input.checkpointKey,
-          attempt: input.attempt,
-          revision: input.revision,
-          requestId: input.requestId,
-          actor: input.actor,
-          approvedAt: new Date().toISOString(),
-        })
-      : await resumeHuntRun(db, projectId, {
-          runId: agentResumeMatch[1],
-          requestId: input.requestId,
-          actor: input.actor,
-          occurredAt: new Date().toISOString(),
-        });
+    const result = await resumeRunWithCheckpointIdentity(
+      db,
+      projectId,
+      agentResumeMatch[1],
+      input,
+      input.actor,
+    );
     if (result.outcome === "not_found") {
       throw new HttpError(404, "Run not found");
     }
     if (result.outcome === "ineligible" || result.outcome === "conflict") {
-      throw new HttpError(409, "Only paused runs can be resumed");
+      throw new HttpError(
+        409,
+        "The paused checkpoint changed before it could be resumed",
+        "CHECKPOINT_CONFLICT",
+      );
     }
     return json({
       runId: agentResumeMatch[1],
       ...result,
-      ...( "nextStage" in result ? { workflowStage: result.nextStage } : {}),
+      workflowStage: result.nextStage,
+      startStage: result.nextStage,
     });
   }
 
@@ -7383,7 +7574,13 @@ export default {
       return await route(request, auth, env.DB, env.ATTACHMENTS, env);
     } catch (error) {
       if (error instanceof HttpError) {
-        return json({ message: error.message }, error.status);
+        return json(
+          {
+            message: error.message,
+            ...(error.code ? { code: error.code } : {}),
+          },
+          error.status,
+        );
       }
       if (error instanceof WorkerConflictError) {
         return json({ message: error.message }, 409);
