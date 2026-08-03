@@ -6,6 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import { demoDashboard, demoRunEvents } from "../lib/demo-data";
+import * as api from "../lib/api";
 import type {
   ExecutionWorker,
   HuntRun,
@@ -1314,7 +1315,7 @@ describe("HuntDashboard", () => {
     const conversationPanel = container.querySelector<HTMLElement>(
       ".issue-conversation-tab-panel",
     );
-    expect(tabs).toHaveLength(5);
+    expect(tabs).toHaveLength(6);
     expect(conversationTab).not.toBeNull();
     expect(conversationPanel?.hidden).toBe(true);
     expect(conversationTab?.getAttribute("aria-controls")).toBe(
@@ -1334,6 +1335,88 @@ describe("HuntDashboard", () => {
     expect(conversationPanel?.querySelector(".issue-conversation")).not.toBeNull();
 
     await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("shows durable Worker provider output in the issue LLM activity tab", async () => {
+    const run: HuntRun = {
+      ...demoDashboard.runs[0],
+      status: "completed",
+      workerId: "worker-1",
+    };
+    const loadTranscript = vi
+      .spyOn(api, "loadProjectAgentTranscript")
+      .mockResolvedValue({
+        session: {
+          sessionId: `detached-${run.id}`,
+          runId: run.id,
+          workerId: "worker-1",
+          agentProvider: "codex",
+          startedAt: "2026-08-03T12:00:00.000Z",
+          lastEventAt: "2026-08-03T12:00:01.000Z",
+          eventCount: 1,
+        },
+        events: [{
+          sequence: 1,
+          direction: "server",
+          message: {
+            type: "item.completed",
+            item: {
+              id: "message-1",
+              type: "agent_message",
+              phase: "commentary",
+              text: "저장소 구조를 확인하고 있습니다.",
+            },
+          },
+          recordedAt: "2026-08-03T12:00:01.000Z",
+        }],
+      });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          projectId={demoDashboard.project.id}
+          run={run}
+          token="session-token"
+        />,
+      );
+      await Promise.resolve();
+    });
+
+    const activityTab = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
+    ).find((tab) => tab.textContent === "LLM 활동");
+    await act(async () => activityTab?.click());
+
+    expect(loadTranscript).toHaveBeenCalledWith(
+      "session-token",
+      demoDashboard.project.id,
+      `detached-${run.id}`,
+      0,
+    );
+    expect(container.querySelector(".issue-agent-activity-panel")?.textContent)
+      .toContain("저장소 구조를 확인하고 있습니다.");
+    expect(container.querySelector(".issue-agent-activity-panel")?.textContent)
+      .toContain("Codex");
+
+    await act(async () => root.unmount());
+    loadTranscript.mockRestore();
     container.remove();
   });
 

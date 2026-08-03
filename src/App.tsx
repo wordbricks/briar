@@ -1316,6 +1316,7 @@ export function App() {
                   }
                   projectId={inboxDetailTarget.projectId}
                   run={inboxDetailRun}
+                  token={briar.token}
                 />
               ) : inboxDetailSession ? (
                 <ProjectAgentSessionDetail
