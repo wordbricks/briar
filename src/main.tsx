@@ -8,6 +8,7 @@ import { NativeLaunchIntro } from "./components/NativeLaunchIntro";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { I18nProvider } from "./i18n";
 import { installAppZoomShortcuts } from "./lib/app-zoom";
+import { installExternalLinkHandler } from "./lib/external-links";
 import { isNativeLaunchIntroWindow } from "./lib/launch-intro";
 import { initializeTheme, ThemeProvider } from "./theme";
 import "./styles/globals.css";
@@ -15,6 +16,7 @@ import "./styles.css";
 import "./styles/dark.css";
 
 initializeTheme();
+installExternalLinkHandler();
 const nativeLaunchIntro = isNativeLaunchIntroWindow();
 if (nativeLaunchIntro) {
   document.documentElement.classList.add("launch-intro-document");
