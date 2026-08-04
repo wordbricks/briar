@@ -73,10 +73,10 @@ import {
   useRef,
   useState,
   type ComponentProps,
-  type DragEvent,
   type ReactElement,
   type FormEvent,
   type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from "react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
@@ -169,6 +169,17 @@ type KanbanColumn = {
   placement: HuntRunPlacement;
   runs: HuntRun[];
 };
+
+type KanbanPointerDrag = {
+  active: boolean;
+  pointerId: number;
+  startX: number;
+  startY: number;
+};
+
+const kanbanPointerDragThreshold = 6;
+const kanbanAutoScrollEdge = 72;
+const kanbanAutoScrollInterval = 16;
 
 export function HuntDashboard({
   agents = [],
@@ -344,15 +355,83 @@ export function HuntDashboard({
   );
   const [draggedRunId, setDraggedRunId] = useState<string | null>(null);
   const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null);
-  // Keep a ref so dragover/drop can authorize the transfer before React re-renders.
-  const draggedRunIdRef = useRef<string | null>(null);
   const suppressCardClickRef = useRef(false);
+  const kanbanBoardRef = useRef<HTMLDivElement>(null);
+  const pointerDragRef = useRef<KanbanPointerDrag | null>(null);
+  const pointerDragPositionRef = useRef({ x: 0, y: 0 });
+  const pointerDragPreviewRef = useRef<HTMLElement | null>(null);
+  const pointerAutoScrollRef = useRef<number | null>(null);
+
+  const stopKanbanAutoScroll = useCallback(() => {
+    if (pointerAutoScrollRef.current === null) return;
+    window.clearInterval(pointerAutoScrollRef.current);
+    pointerAutoScrollRef.current = null;
+  }, []);
 
   const clearKanbanDragState = useCallback(() => {
-    draggedRunIdRef.current = null;
+    stopKanbanAutoScroll();
+    pointerDragRef.current = null;
+    pointerDragPreviewRef.current?.remove();
+    pointerDragPreviewRef.current = null;
     setDraggedRunId(null);
     setDragOverColumnId(null);
-  }, []);
+  }, [stopKanbanAutoScroll]);
+
+  const kanbanColumnIdAtPoint = useCallback(
+    (clientX: number, clientY: number) => {
+      const target = document.elementFromPoint(clientX, clientY);
+      return (
+        target
+          ?.closest<HTMLElement>("[data-kanban-column-id]")
+          ?.dataset.kanbanColumnId ?? null
+      );
+    },
+    [],
+  );
+
+  const updateKanbanPointerDrag = useCallback(
+    (clientX: number, clientY: number) => {
+      pointerDragPositionRef.current = { x: clientX, y: clientY };
+      if (pointerDragPreviewRef.current) {
+        pointerDragPreviewRef.current.style.transform =
+          `translate3d(${clientX + 14}px, ${clientY + 14}px, 0)`;
+      }
+      const columnId = kanbanColumnIdAtPoint(clientX, clientY);
+      setDragOverColumnId(columnId === "status:paused" ? null : columnId);
+    },
+    [kanbanColumnIdAtPoint],
+  );
+
+  const startKanbanAutoScroll = useCallback(() => {
+    if (pointerAutoScrollRef.current !== null) return;
+    pointerAutoScrollRef.current = window.setInterval(() => {
+      const board = kanbanBoardRef.current;
+      const drag = pointerDragRef.current;
+      if (!board || !drag?.active) return;
+      const rect = board.getBoundingClientRect();
+      const { x, y } = pointerDragPositionRef.current;
+      if (y < rect.top || y > rect.bottom) return;
+      const edge = Math.min(kanbanAutoScrollEdge, rect.width / 4);
+      const leftDistance = x - rect.left;
+      const rightDistance = rect.right - x;
+      const delta = leftDistance < edge
+        ? -Math.ceil((edge - Math.max(0, leftDistance)) / 5)
+        : rightDistance < edge
+          ? Math.ceil((edge - Math.max(0, rightDistance)) / 5)
+          : 0;
+      if (!delta) return;
+      const previousScrollLeft = board.scrollLeft;
+      board.scrollLeft += delta;
+      if (board.scrollLeft !== previousScrollLeft) {
+        updateKanbanPointerDrag(x, y);
+      }
+    }, kanbanAutoScrollInterval);
+  }, [updateKanbanPointerDrag]);
+
+  useEffect(() => () => {
+    stopKanbanAutoScroll();
+    pointerDragPreviewRef.current?.remove();
+  }, [stopKanbanAutoScroll]);
 
   useEffect(() => {
     if (noProject) return;
@@ -898,7 +977,11 @@ export function HuntDashboard({
             processingIssueIds={processingIssueIds}
             updatingIssueId={updatingIssueId}
           />
-        ) : <div aria-label={t("dashboard.kanbanBoard")} className="kanban-board">
+        ) : <div
+          aria-label={t("dashboard.kanbanBoard")}
+          className="kanban-board"
+          ref={kanbanBoardRef}
+        >
           {kanbanColumns.length === 0 ? (
             <div className="companion-no-runs">
               <Bot size={22} />
@@ -909,41 +992,8 @@ export function HuntDashboard({
             <section
               aria-label={column.label}
               className={`kanban-column ${column.tone}${dragOverColumnId === column.id ? " drag-over" : ""}`}
+              data-kanban-column-id={column.id}
               key={column.id}
-              onDragEnter={(event) => {
-                if (!draggedRunIdRef.current) return;
-                event.preventDefault();
-                setDragOverColumnId(column.id);
-              }}
-              onDragOver={(event) => {
-                if (!draggedRunIdRef.current) return;
-                event.preventDefault();
-                event.dataTransfer.dropEffect = "move";
-                if (dragOverColumnId !== column.id) {
-                  setDragOverColumnId(column.id);
-                }
-              }}
-              onDragLeave={(event) => {
-                if (
-                  event.currentTarget.contains(event.relatedTarget as Node | null)
-                ) return;
-                setDragOverColumnId((current) =>
-                  current === column.id ? null : current
-                );
-              }}
-              onDrop={(event) => {
-                event.preventDefault();
-                const runId =
-                  draggedRunIdRef.current ||
-                  draggedRunId ||
-                  event.dataTransfer.getData("text/plain");
-                suppressCardClickRef.current = true;
-                clearKanbanDragState();
-                const run = runs.find((candidate) => candidate.id === runId);
-                if (column.id === "status:paused") return;
-                if (!run || placementMatchesRun(run, column.placement)) return;
-                void onMoveRun(run.id, column.placement).catch(() => undefined);
-              }}
             >
               <header>
                 <span><i aria-hidden="true" />{column.label}</span>
@@ -974,21 +1024,88 @@ export function HuntDashboard({
                       setContextDeleteError(null);
                       setDeletingRunFromMenuId(run.id);
                     }}
-                    onDragEnd={() => {
-                      // A completed drag should not also open the issue page.
-                      suppressCardClickRef.current = true;
-                      clearKanbanDragState();
+                    onPointerCancel={(event) => {
+                      if (
+                        pointerDragRef.current?.pointerId === event.pointerId
+                      ) {
+                        clearKanbanDragState();
+                      }
                     }}
-                    onDragStart={(event) => {
-                      event.dataTransfer.effectAllowed = "move";
-                      event.dataTransfer.setData("text/plain", run.id);
-                      event.dataTransfer.setData(
-                        "application/x-briar-run-id",
-                        run.id,
+                    onPointerDown={(event) => {
+                      if (
+                        companionMode ||
+                        recoveringRunId === run.id ||
+                        event.pointerType === "touch" ||
+                        !event.isPrimary ||
+                        event.button !== 0 ||
+                        (event.target as Element).closest?.(
+                          "a, button, input, select, textarea",
+                        )
+                      ) return;
+                      pointerDragRef.current = {
+                        active: false,
+                        pointerId: event.pointerId,
+                        startX: event.clientX,
+                        startY: event.clientY,
+                      };
+                      event.currentTarget.setPointerCapture?.(event.pointerId);
+                    }}
+                    onPointerMove={(event) => {
+                      const drag = pointerDragRef.current;
+                      if (!drag || drag.pointerId !== event.pointerId) return;
+                      if (!drag.active) {
+                        const distance = Math.hypot(
+                          event.clientX - drag.startX,
+                          event.clientY - drag.startY,
+                        );
+                        if (distance < kanbanPointerDragThreshold) return;
+                        drag.active = true;
+                        suppressCardClickRef.current = false;
+                        const preview = event.currentTarget.cloneNode(
+                          true,
+                        ) as HTMLElement;
+                        preview.setAttribute("aria-hidden", "true");
+                        preview.classList.add(
+                          "kanban-card-drag-preview",
+                          "dragging",
+                        );
+                        preview.removeAttribute("draggable");
+                        preview.style.width =
+                          `${event.currentTarget.getBoundingClientRect().width}px`;
+                        document.body.append(preview);
+                        pointerDragPreviewRef.current = preview;
+                        setDraggedRunId(run.id);
+                        startKanbanAutoScroll();
+                      }
+                      event.preventDefault();
+                      updateKanbanPointerDrag(event.clientX, event.clientY);
+                    }}
+                    onPointerUp={(event) => {
+                      const drag = pointerDragRef.current;
+                      if (!drag || drag.pointerId !== event.pointerId) return;
+                      if (!drag.active) {
+                        pointerDragRef.current = null;
+                        return;
+                      }
+                      event.preventDefault();
+                      event.stopPropagation();
+                      suppressCardClickRef.current = true;
+                      const columnId = kanbanColumnIdAtPoint(
+                        event.clientX,
+                        event.clientY,
                       );
-                      draggedRunIdRef.current = run.id;
-                      suppressCardClickRef.current = false;
-                      setDraggedRunId(run.id);
+                      const targetColumn = kanbanColumns.find(
+                        (candidate) => candidate.id === columnId,
+                      );
+                      clearKanbanDragState();
+                      if (
+                        !targetColumn ||
+                        targetColumn.id === "status:paused" ||
+                        placementMatchesRun(run, targetColumn.placement)
+                      ) return;
+                      void onMoveRun(run.id, targetColumn.placement).catch(
+                        () => undefined,
+                      );
                     }}
                     onEdit={() => setEditingRunId(run.id)}
                     onMove={(placement) =>
@@ -1963,8 +2080,10 @@ function KanbanCard({
   isMoving,
   isProcessing,
   onDelete,
-  onDragEnd,
-  onDragStart,
+  onPointerCancel,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
   onEdit,
   onMove,
   run,
@@ -1984,8 +2103,10 @@ function KanbanCard({
   isMoving: boolean;
   isProcessing: boolean;
   onDelete: () => void;
-  onDragEnd: () => void;
-  onDragStart: (event: DragEvent<HTMLElement>) => void;
+  onPointerCancel: (event: ReactPointerEvent<HTMLElement>) => void;
+  onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
+  onPointerMove: (event: ReactPointerEvent<HTMLElement>) => void;
+  onPointerUp: (event: ReactPointerEvent<HTMLElement>) => void;
   onEdit: () => void;
   onMove: (placement: HuntRunPlacement) => void;
   run: HuntRun;
@@ -2027,15 +2148,17 @@ function KanbanCard({
         aria-label={t("run.details", { title: run.title })}
         aria-disabled={isMoving}
         className={`kanban-card ${meta.tone}${isMoving ? " moving" : ""}${isDragging ? " dragging" : ""}${activeAgent || assignedWorker ? " has-assignees" : ""}${activeAgent && assignedWorker ? " has-multiple-assignees" : ""}`}
-        draggable={!isMoving}
-        onDragEnd={onDragEnd}
-        onDragStart={onDragStart}
+        draggable={false}
         onClick={onOpen}
         onKeyDown={(event) => {
           if (event.key !== "Enter" && event.key !== " ") return;
           event.preventDefault();
           onOpen();
         }}
+        onPointerCancel={onPointerCancel}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
         role="button"
         tabIndex={0}
       >
