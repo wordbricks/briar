@@ -20,7 +20,7 @@ describe("project workflow generator", () => {
       conversationId: "briar:project-1:thread-1",
       workspaceRoot: "/repo",
       message: JSON.stringify({
-        version: 1,
+        version: 2,
         requirements: [{
           id: "bun",
           label: "Bun",
@@ -51,16 +51,30 @@ describe("project workflow generator", () => {
             checks: ["bun run test"],
           },
         ],
-        execution: { pauseAfterStage: "local_qa" },
+        execution: {
+          checkpoints: [{
+            key: "human_review",
+            stage: "local_qa",
+            position: "after",
+          }],
+        },
         completion: {
           requiredStages: ["analyzing", "implementing", "local_qa"],
         },
       }),
     });
 
-    await expect(generateProjectWorkflow("project-1")).resolves.toMatchObject({
+    const workflow = await generateProjectWorkflow("project-1");
+    expect(workflow).toMatchObject({
       requirements: [{ id: "bun", tool: "bun" }],
-      execution: { pauseAfterStage: "local_qa" },
+      version: 2,
+      execution: {
+        checkpoints: [{
+          key: "human_review",
+          stage: "local_qa",
+          position: "after",
+        }],
+      },
       stages: [
         { id: "analyzing" },
         { id: "implementing" },
@@ -70,6 +84,16 @@ describe("project workflow generator", () => {
         },
       ],
     });
+    expect(JSON.parse(JSON.stringify(workflow))).toMatchObject({
+      version: 2,
+      execution: {
+        checkpoints: [{
+          key: "human_review",
+          stage: "local_qa",
+          position: "after",
+        }],
+      },
+    });
     expect(chatWithProjectLlm).toHaveBeenCalledWith(
       expect.objectContaining({
         projectId: "project-1",
@@ -77,11 +101,14 @@ describe("project workflow generator", () => {
         workspaceMode: "latestRemoteBase",
       }),
     );
+    expect(chatWithProjectLlm.mock.calls[0]?.[0].outputSchema).toMatchObject({
+      properties: { version: { enum: [2] } },
+    });
   });
 
   it("regenerates only tool requirements for an existing workflow", async () => {
     const currentWorkflow = {
-      version: 1 as const,
+      version: 2 as const,
       requirements: [],
       stages: [
         {
@@ -99,7 +126,13 @@ describe("project workflow generator", () => {
           checks: ["bun run test"],
         },
       ],
-      execution: { pauseAfterStage: "local_qa" },
+      execution: {
+        checkpoints: [{
+          key: "human_review",
+          stage: "local_qa",
+          position: "after" as const,
+        }],
+      },
       completion: { requiredStages: ["implementing", "local_qa"] },
     };
     chatWithProjectLlm.mockResolvedValue({
@@ -139,7 +172,7 @@ describe("project workflow generator", () => {
 
   it("uses the current workflow as the baseline when regenerating", async () => {
     const currentWorkflow = {
-      version: 1 as const,
+      version: 2 as const,
       requirements: [],
       stages: [
         {
@@ -157,7 +190,13 @@ describe("project workflow generator", () => {
           checks: ["bun run test"],
         },
       ],
-      execution: { pauseAfterStage: "local_qa" },
+      execution: {
+        checkpoints: [{
+          key: "human_review",
+          stage: "local_qa",
+          position: "after" as const,
+        }],
+      },
       completion: { requiredStages: ["implementing", "local_qa"] },
     };
     chatWithProjectLlm.mockResolvedValue({
@@ -170,7 +209,13 @@ describe("project workflow generator", () => {
       generateProjectWorkflow("project-1", currentWorkflow),
     ).resolves.toMatchObject({
       stages: [{ id: "implementing" }, { id: "local_qa" }],
-      execution: { pauseAfterStage: "local_qa" },
+      execution: {
+        checkpoints: [{
+          key: "human_review",
+          stage: "local_qa",
+          position: "after",
+        }],
+      },
       completion: { requiredStages: ["implementing", "local_qa"] },
     });
 
@@ -194,7 +239,7 @@ describe("project workflow generator", () => {
       conversationId: "briar:project-1:thread-1",
       workspaceRoot: "/repo",
       message: JSON.stringify({
-        version: 1,
+        version: 2,
         requirements: [],
         stages: [
           {
@@ -205,8 +250,38 @@ describe("project workflow generator", () => {
             checks: [],
           },
         ],
-        execution: { pauseAfterStage: "analyzing" },
+        execution: {
+          checkpoints: [{
+            key: "human_review",
+            stage: "analyzing",
+            position: "after",
+          }],
+        },
         completion: { requiredStages: [] },
+      }),
+    });
+
+    await expect(generateProjectWorkflow("project-1")).rejects.toThrow(
+      "실행 계약",
+    );
+  });
+
+  it("rejects legacy v1 output from the workflow agent", async () => {
+    chatWithProjectLlm.mockResolvedValue({
+      conversationId: "briar:project-1:thread-legacy",
+      workspaceRoot: "/repo",
+      message: JSON.stringify({
+        version: 1,
+        requirements: [],
+        stages: [{
+          id: "implementing",
+          label: "Implement",
+          required: true,
+          evidence: ["diff"],
+          checks: [],
+        }],
+        execution: { pauseAfterStage: "implementing" },
+        completion: { requiredStages: ["implementing"] },
       }),
     });
 
@@ -220,7 +295,7 @@ describe("project workflow generator", () => {
       conversationId: "briar:project-1:thread-1",
       workspaceRoot: "/repo",
       message: JSON.stringify({
-        version: 1,
+        version: 2,
         requirements: [],
         stages: [
           {
@@ -231,7 +306,13 @@ describe("project workflow generator", () => {
             checks: [],
           },
         ],
-        execution: { pauseAfterStage: "production_qa" },
+        execution: {
+          checkpoints: [{
+            key: "human_review",
+            stage: "production_qa",
+            position: "after",
+          }],
+        },
         completion: { requiredStages: ["implementing"] },
       }),
     });
@@ -243,7 +324,7 @@ describe("project workflow generator", () => {
 
   it("revises the current workflow using the repository and natural-language request", async () => {
     const currentWorkflow = {
-      version: 1 as const,
+      version: 2 as const,
       requirements: [],
       stages: [
         {
@@ -261,7 +342,13 @@ describe("project workflow generator", () => {
           checks: [],
         },
       ],
-      execution: { pauseAfterStage: "pr_open" },
+      execution: {
+        checkpoints: [{
+          key: "human_review",
+          stage: "pr_open",
+          position: "after" as const,
+        }],
+      },
       completion: { requiredStages: ["implementing", "pr_open"] },
     };
     const revisedWorkflow = {
@@ -279,7 +366,13 @@ describe("project workflow generator", () => {
       completion: {
         requiredStages: ["implementing", "pr_open", "merged"],
       },
-      execution: { pauseAfterStage: "merged" },
+      execution: {
+        checkpoints: [{
+          key: "human_review",
+          stage: "merged",
+          position: "after" as const,
+        }],
+      },
     };
     chatWithProjectLlm.mockResolvedValue({
       conversationId: "briar:project-1:thread-2",
