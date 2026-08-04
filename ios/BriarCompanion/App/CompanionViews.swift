@@ -108,7 +108,7 @@ struct CompanionShellView: View {
                     api: api,
                     refresh: refresh
                 )
-                .toolbar { companionToolbar() }
+                .toolbar { companionToolbar(showsProjectMenu: true) }
             }
             .tabItem { Label("Inbox", systemImage: "tray") }
             .tag(CompanionNavigationModel.Tab.inbox)
