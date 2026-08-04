@@ -21,6 +21,7 @@ export function CompanionHeader({
   onRefresh,
   onSettings,
   organizations,
+  pageTitle,
   projects,
   user,
 }: {
@@ -33,6 +34,7 @@ export function CompanionHeader({
   onRefresh: () => void;
   onSettings: () => void;
   organizations: Organization[];
+  pageTitle?: string | null;
   projects: Project[];
   user: SessionUser;
 }) {
@@ -74,9 +76,6 @@ export function CompanionHeader({
   return (
     <header className="companion-header">
       <div className="companion-workspace">
-        <div className="companion-workspace-mark">
-          <Logo compact />
-        </div>
         <div className="companion-project-picker">
           <SelectMenu
             className="companion-project-select"
@@ -91,92 +90,97 @@ export function CompanionHeader({
           />
         </div>
       </div>
-      <div className="companion-header-actions">
-        <button
-          aria-label={t("dashboard.refresh")}
-          disabled={loading}
-          onClick={onRefresh}
-          type="button"
-        >
-          <RefreshCw className={loading ? "spin" : ""} size={19} />
-        </button>
-        <div className="companion-account-menu" ref={accountMenuRef}>
+      <div className="companion-header-trailing">
+        {pageTitle ? (
+          <h1 className="companion-page-title">{pageTitle}</h1>
+        ) : null}
+        <div className="companion-header-actions">
           <button
-            aria-controls="companion-account-popover"
-            aria-expanded={isAccountMenuOpen}
-            aria-haspopup="menu"
-            aria-label={t("account.menu")}
-            className="companion-account-button"
-            onClick={() => setIsAccountMenuOpen((open) => !open)}
-            ref={accountTriggerRef}
-            title={user.email}
+            aria-label={t("dashboard.refresh")}
+            disabled={loading}
+            onClick={onRefresh}
             type="button"
           >
-            {user.image ? (
-              <img alt="" src={user.image} />
-            ) : (
-              <span>{avatarInitial}</span>
-            )}
-            <i aria-hidden="true" />
+            <RefreshCw className={loading ? "spin" : ""} size={19} />
           </button>
-          {isAccountMenuOpen ? (
-            <div
+          <div className="companion-account-menu" ref={accountMenuRef}>
+            <button
+              aria-controls="companion-account-popover"
+              aria-expanded={isAccountMenuOpen}
+              aria-haspopup="menu"
               aria-label={t("account.menu")}
-              className="companion-account-popover"
-              id="companion-account-popover"
-              role="menu"
+              className="companion-account-button"
+              onClick={() => setIsAccountMenuOpen((open) => !open)}
+              ref={accountTriggerRef}
+              title={user.email}
+              type="button"
             >
-              <div className="companion-account-identity">
-                <strong>{user.name || user.email}</strong>
-                <small>{user.email}</small>
-              </div>
-              <div className="companion-account-separator" role="separator" />
-              <button
-                onClick={() => {
-                  setIsAccountMenuOpen(false);
-                  onSettings();
-                }}
-                role="menuitem"
-                type="button"
-              >
-                <Settings aria-hidden="true" size={18} strokeWidth={1.8} />
-                <span>{t("account.settings")}</span>
-              </button>
-              <div className="companion-account-separator" role="separator" />
+              {user.image ? (
+                <img alt="" src={user.image} />
+              ) : (
+                <span>{avatarInitial}</span>
+              )}
+              <i aria-hidden="true" />
+            </button>
+            {isAccountMenuOpen ? (
               <div
-                aria-label={t("sidebar.organizationList")}
-                className="companion-organization-options"
-                role="group"
+                aria-label={t("account.menu")}
+                className="companion-account-popover"
+                id="companion-account-popover"
+                role="menu"
               >
-                <span>{t("sidebar.switchOrganization")}</span>
-                {organizations.map((organization) => (
-                  <button
-                    aria-checked={organization.id === activeOrganizationId}
-                    key={organization.id}
-                    onClick={() => selectOrganization(organization.id)}
-                    role="menuitemradio"
-                    type="button"
-                  >
-                    <Building2 aria-hidden="true" size={17} strokeWidth={1.8} />
-                    <span>{organization.name}</span>
-                    {organization.id === activeOrganizationId ? (
-                      <Check aria-hidden="true" size={17} strokeWidth={2} />
-                    ) : null}
-                  </button>
-                ))}
+                <div className="companion-account-identity">
+                  <strong>{user.name || user.email}</strong>
+                  <small>{user.email}</small>
+                </div>
+                <div className="companion-account-separator" role="separator" />
+                <button
+                  onClick={() => {
+                    setIsAccountMenuOpen(false);
+                    onSettings();
+                  }}
+                  role="menuitem"
+                  type="button"
+                >
+                  <Settings aria-hidden="true" size={18} strokeWidth={1.8} />
+                  <span>{t("account.settings")}</span>
+                </button>
+                <div className="companion-account-separator" role="separator" />
+                <div
+                  aria-label={t("sidebar.organizationList")}
+                  className="companion-organization-options"
+                  role="group"
+                >
+                  <span>{t("sidebar.switchOrganization")}</span>
+                  {organizations.map((organization) => (
+                    <button
+                      aria-checked={organization.id === activeOrganizationId}
+                      key={organization.id}
+                      onClick={() => selectOrganization(organization.id)}
+                      role="menuitemradio"
+                      type="button"
+                    >
+                      <Building2 aria-hidden="true" size={17} strokeWidth={1.8} />
+                      <span>{organization.name}</span>
+                      {organization.id === activeOrganizationId ? (
+                        <Check aria-hidden="true" size={17} strokeWidth={2} />
+                      ) : null}
+                    </button>
+                  ))}
+                </div>
+                <div className="companion-account-separator" role="separator" />
+                <button
+                  className="companion-account-logout"
+                  onClick={onLogout}
+                  role="menuitem"
+                  type="button"
+                >
+                  <LogOut aria-hidden="true" size={18} strokeWidth={1.8} />
+                  <span>{t("account.logout")}</span>
+                </button>
               </div>
-              <div className="companion-account-separator" role="separator" />
-              <button
-                className="companion-account-logout"
-                onClick={onLogout}
-                role="menuitem"
-                type="button"
-              >
-                <LogOut aria-hidden="true" size={18} strokeWidth={1.8} />
-                <span>{t("account.logout")}</span>
-              </button>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
         </div>
       </div>
     </header>

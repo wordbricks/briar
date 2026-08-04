@@ -56,14 +56,19 @@ describe("CompanionHeader", () => {
         onRefresh={() => undefined}
         onSettings={() => undefined}
         organizations={organizations}
+        pageTitle="Tasks"
         projects={projects}
         user={user}
       />,
     );
 
     expect(markup).toContain('class="companion-workspace"');
+    expect(markup).not.toContain("companion-workspace-mark");
     expect(markup).toContain('aria-label="현재 프로젝트"');
     expect(markup).toContain('<span class="select-menu-value">Briar</span>');
+    expect(markup).toContain('class="companion-header-trailing"');
+    expect(markup).toContain('class="companion-page-title"');
+    expect(markup).toContain(">Tasks</h1>");
     expect(markup).toContain('class="companion-header-actions"');
     expect(markup).toContain('class="companion-account-button"');
     expect(markup).toContain('aria-label="계정 메뉴"');

@@ -43,6 +43,15 @@ private struct UITestCompanionFlow: View {
         role: .owner,
         createdAt: Date(timeIntervalSince1970: 1_775_260_800)
     )
+    private let alternateProject = ProjectsResponse.Project(
+        id: UUID(uuidString: "88888888-8888-4888-8888-888888888888")!,
+        name: "Briar Mobile",
+        icon: nil,
+        organizationId: UUID(uuidString: "22222222-2222-4222-8222-222222222222")!,
+        organizationName: "Wordbricks",
+        role: .owner,
+        createdAt: Date(timeIntervalSince1970: 1_775_260_900)
+    )
 
     init(offline: Bool) {
         self.offline = offline
@@ -58,12 +67,13 @@ private struct UITestCompanionFlow: View {
                     refresh: {}
                 )
                 .navigationTitle("Tasks")
+                .navigationBarTitleDisplayMode(.inline)
             }
         } else if !signedIn {
             CompanionLoginView(signingIn: false, errorMessage: nil) { signedIn = true }
         } else if !projectSelected {
             ProjectSelectionView(
-                projects: [project],
+                projects: [project, alternateProject],
                 selectedProjectID: $selectedProjectID,
                 continueAction: { projectSelected = true },
                 signOut: { signedIn = false }
@@ -74,7 +84,8 @@ private struct UITestCompanionFlow: View {
                 agents: agents,
                 inbox: inbox,
                 notifications: notifications,
-                project: project,
+                projects: [project, alternateProject],
+                project: selectedProject,
                 snapshot: snapshot,
                 isRefreshing: false,
                 errorMessage: nil,
@@ -89,17 +100,21 @@ private struct UITestCompanionFlow: View {
                     image: nil
                 ),
                 refresh: { await refreshSnapshot() },
-                changeProject: { projectSelected = false },
+                selectProject: { selectedProjectID = $0 },
                 signOut: {
                     projectSelected = false
                     signedIn = false
                 }
             )
             .task {
-                agents.select(projectID: project.id, token: "ui-test-token", locale: "ko")
-                inbox.update(snapshot: snapshot, sessions: agents.sessions, project: project)
+                agents.select(projectID: selectedProject.id, token: "ui-test-token", locale: "ko")
+                inbox.update(snapshot: snapshot, sessions: agents.sessions, project: selectedProject)
             }
         }
+    }
+
+    private var selectedProject: ProjectsResponse.Project {
+        [project, alternateProject].first(where: { $0.id == selectedProjectID }) ?? project
     }
 
     private var snapshot: DashboardSnapshot {
@@ -159,7 +174,7 @@ private struct UITestCompanionFlow: View {
             ), at: 0)
         }
         return DashboardSnapshot(
-            project: project,
+            project: selectedProject,
             runs: runs,
             workers: [DashboardWorker(
                 id: "worker-1",
@@ -213,7 +228,7 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
         } else if path.hasSuffix("/result-reviews") {
             payload = #"{"userId":"fixture-user","name":"Briar User","username":"briar_user","image":null,"completedAt":"2026-08-02T01:01:00Z"}"#
         } else if path.hasSuffix("/messages") && method == "POST" {
-            payload = #"{"message":{"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","runId":"77777777-7777-4777-8777-777777777777","parentMessageId":null,"body":"모바일에서 확인했습니다","author":{"id":"fixture-user","name":"Briar User","image":null,"provider":null},"replyCount":0,"createdAt":"2026-08-02T01:02:00Z","updatedAt":"2026-08-02T01:02:00Z"},"agentReply":null}"#
+            payload = #"{"message":{"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","runId":"77777777-7777-4777-8777-777777777777","parentMessageId":null,"body":"모바일에서 확인했습니다","author":{"id":"fixture-user","name":"Briar User","image":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==","provider":null},"replyCount":0,"createdAt":"2026-08-02T01:02:00Z","updatedAt":"2026-08-02T01:02:00Z"},"agentReply":null}"#
         } else if path.hasSuffix("/events") {
             payload = #"{"events":[]}"#
         } else if path.hasSuffix("/messages") {
@@ -222,7 +237,7 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
             payload = #"{"evidence":[]}"#
         } else if path.contains("/agents") {
             payload = ##"""
-            {"agents":[{"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","projectId":"11111111-1111-4111-8111-111111111111","name":"Auto Hunt agent","avatar":null,"codexPet":null,"provider":"codex","model":"gpt-5.4","responsibility":"Perform Auto Hunt for every queued issue.","skill":"# Auto Hunt agent","calendarColor":"#3275d5","createdAt":"2026-08-02T01:00:00Z","updatedAt":"2026-08-02T01:00:00Z"}]}
+            {"agents":[{"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","projectId":"11111111-1111-4111-8111-111111111111","name":"Auto Hunt agent","avatar":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==","codexPet":null,"provider":"codex","model":"gpt-5.4","responsibility":"Perform Auto Hunt for every queued issue.","skill":"# Auto Hunt agent","calendarColor":"#3275d5","createdAt":"2026-08-02T01:00:00Z","updatedAt":"2026-08-02T01:00:00Z"}]}
             """##
         } else if path.contains("/agent-sessions") {
             payload = ##"""

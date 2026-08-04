@@ -16,6 +16,8 @@ final class AgentsInboxSystemTests: XCTestCase {
         XCTAssertEqual(agents.agents.count, 1)
         XCTAssertEqual(agents.agents.first?.name, "Auto Hunt agent")
         XCTAssertEqual(agents.agents.first?.provider, .codex)
+        XCTAssertNotNil(agents.agents.first?.avatar)
+        XCTAssertNotNil(ProfileImageSource.uiImage(from: agents.agents.first?.avatar))
 
         let sessionsPayload = try XCTUnwrap(operations["listProjectAgentSessions"]?["response"])
         let sessionsData = try JSONSerialization.data(withJSONObject: sessionsPayload)
