@@ -172,6 +172,12 @@ final class AgentsInboxSystemTests: XCTestCase {
             project: project
         )
         XCTAssertEqual(messages.count, 4)
+        // Newest first: mention (120) > blocked issue (100) > failed session (80) > completed (50)
+        XCTAssertEqual(messages.map(\.occurredAt), messages.map(\.occurredAt).sorted(by: >))
+        XCTAssertEqual(messages.map(\.kind), [.conversation, .issue, .session, .issue])
+        XCTAssertEqual(messages.map(\.title)[1], "Needs help")
+        XCTAssertEqual(messages.map(\.title)[3], "Done")
+
         let blockedMessage = try XCTUnwrap(
             messages.first { $0.kind == .issue && $0.title == "Needs help" }
         )
@@ -188,6 +194,10 @@ final class AgentsInboxSystemTests: XCTestCase {
             let store = InboxStore(defaults: defaults)
             store.update(snapshot: snapshot, sessions: [session], project: project)
             XCTAssertEqual(store.unreadCount, 4)
+            // Store keeps a single chronological list for the mobile feed.
+            XCTAssertEqual(store.messages.map(\.id), messages.map(\.id))
+            XCTAssertEqual(store.messages(in: .urgent).count, 1)
+            XCTAssertEqual(store.messages(in: .actionRequired).count, 2)
             store.markRead(id: blockedMessage.id)
             XCTAssertEqual(store.unreadCount, 3)
             store.markAllRead()
