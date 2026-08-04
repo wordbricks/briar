@@ -69,6 +69,10 @@ describe("CompanionHeader", () => {
     expect(markup).toContain('class="companion-header-trailing"');
     expect(markup).toContain('class="companion-page-title"');
     expect(markup).toContain(">Tasks</h1>");
+    // Title sits in the leading workspace area (header empty space), not beside actions.
+    expect(markup.indexOf('class="companion-page-title"')).toBeLessThan(
+      markup.indexOf('class="companion-header-trailing"'),
+    );
     expect(markup).toContain('class="companion-header-actions"');
     expect(markup).toContain('class="companion-account-button"');
     expect(markup).toContain('aria-label="계정 메뉴"');

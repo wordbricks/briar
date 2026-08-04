@@ -3385,7 +3385,8 @@ button.issue-message-state { width:100%; cursor:pointer; }
 }
 .companion-page-title {
   margin: 0;
-  max-width: min(36vw, 160px);
+  flex: 0 1 auto;
+  max-width: min(40vw, 180px);
   overflow: hidden;
   color: #2e2f2b;
   font-size: var(--text-lg);
@@ -3393,6 +3394,9 @@ button.issue-message-state { width:100%; cursor:pointer; }
   letter-spacing: -.03em;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.companion-workspace .companion-page-title {
+  flex: 0 0 auto;
 }
 .platform-android .companion-page-title {
   font-size: var(--text-md);
@@ -3787,8 +3791,29 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .companion-no-runs { min-height: 150px; padding: 24px 16px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 9px; color:var(--muted-foreground); text-align: center; }
 .companion-no-runs strong { color: #484944; font-size:var(--text-base); }
 .companion-no-runs span { max-width: 280px; font-size:var(--text-xs); line-height: 1.6; }
-.companion-shell .companion-inbox .inbox-scroll { min-height:100%; padding:20px max(16px,env(safe-area-inset-right)) calc(108px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left)); overflow:visible; }
+.companion-shell .companion-inbox .inbox-scroll { min-height:100%; padding:12px max(16px,env(safe-area-inset-right)) calc(108px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left)); overflow:visible; }
 .companion-shell .inbox-content { width:100%; }
+.companion-shell .inbox-companion-actions {
+  min-height:40px;
+  margin:0 0 8px;
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+}
+.companion-shell .inbox-companion-actions > button {
+  height:34px;
+  padding:0 11px;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  border:1px solid #dcd7ed;
+  border-radius:9px;
+  color:#624da8;
+  background:#f7f4ff;
+  cursor:pointer;
+  font-size:var(--text-2xs);
+  font-weight:600;
+}
 .companion-shell .inbox-heading { min-height:48px; align-items:center; gap:12px; padding:0 max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left)); }
 .companion-shell .inbox-heading h1 { font-size:var(--text-lg); font-weight:650; letter-spacing:-.02em; line-height:1.25; }
 .companion-shell .inbox-heading > div > p:last-child { display:none; }

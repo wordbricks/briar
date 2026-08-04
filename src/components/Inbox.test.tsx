@@ -372,6 +372,79 @@ describe("Inbox", () => {
     expect(container.textContent).toContain("재현 절차를 추가했습니다.");
   });
 
+  it("companion mode shows a chronological feed without category filters or page title", async () => {
+    const messages = [
+      issue("activity", "Routine dependency update", {
+        occurredAt: "2026-07-28T12:00:00.000Z",
+        structuredResult: {
+          summary: "Routine maintenance completed.",
+          outcome: "completed",
+          importance: "routine",
+          urgency: "normal",
+          impact: "issue",
+          humanActionRequired: false,
+          nextAction: null,
+          dueAt: null,
+        },
+      }),
+      issue("urgent", "Production is blocked", {
+        status: "failed",
+        priority: 1,
+        occurredAt: "2026-07-28T10:00:00.000Z",
+      }),
+      issue("action", "Release scope decision", {
+        occurredAt: "2026-07-28T11:00:00.000Z",
+        structuredResult: {
+          summary: "A release decision is required.",
+          outcome: "partial",
+          importance: "important",
+          urgency: "time_sensitive",
+          impact: "project",
+          humanActionRequired: true,
+          nextAction: "Choose the release scope.",
+          dueAt: null,
+        },
+      }),
+    ];
+
+    await act(async () =>
+      root.render(
+        <I18nProvider>
+          <Inbox
+            companionMode
+            isSidebarOpen
+            messages={messages}
+            onMarkAllRead={vi.fn()}
+            onMarkRead={vi.fn()}
+            onOpen={vi.fn()}
+            projects={projects}
+            unreadCount={3}
+          />
+        </I18nProvider>,
+      ),
+    );
+
+    expect(container.querySelector("#inbox-title")).toBeNull();
+    expect(container.querySelector(".inbox-heading")).toBeNull();
+    expect(container.querySelector(".inbox-filters")).toBeNull();
+    expect(container.querySelector(".inbox-section")).toBeNull();
+    expect(container.querySelectorAll(".inbox-message")).toHaveLength(3);
+    expect(container.textContent).toContain("Routine dependency update");
+    expect(container.textContent).toContain("Production is blocked");
+    expect(container.textContent).toContain("Release scope decision");
+    expect(container.textContent).toContain("모두 읽음");
+
+    const titles = [...container.querySelectorAll(".inbox-message-copy > strong")].map(
+      (node) => node.textContent,
+    );
+    // Input order is preserved (useInbox already sorts newest-first before render).
+    expect(titles).toEqual([
+      "Routine dependency update",
+      "Production is blocked",
+      "Release scope decision",
+    ]);
+  });
+
   it("pages helper functions reveal 50 items at a time", () => {
     const items = Array.from({ length: 120 }, (_, index) => index + 1);
     expect(pageInboxMessages(items, INBOX_PAGE_SIZE)).toHaveLength(50);
