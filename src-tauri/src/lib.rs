@@ -33,6 +33,7 @@ const SESSION_FILE_NAME: &str = "session.json";
 const AUTO_HUNT_EVENT_DIRECTORY: &str = "auto-hunt-sessions";
 const AUTO_HUNT_APP_SERVER_EVENT: &str = "auto-hunt-app-server-event";
 const AUTO_HUNT_DISPATCH_EVENT: &str = "auto-hunt-dispatch-event";
+const PROJECT_LLM_PROGRESS_EVENT: &str = "project-llm-progress";
 const PROJECT_AGENT_SCHEDULE_POLL_EVENT: &str = "project-agent-schedule-poll";
 #[cfg(all(desktop, not(target_os = "macos")))]
 const INBOX_NOTIFICATION_OPEN_EVENT: &str = "inbox-notification-open";
@@ -93,6 +94,15 @@ struct InboxNotificationTarget {
     project_id: String,
     target_id: String,
     kind: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ProjectLlmProgressPayload {
+    request_id: String,
+    project_id: String,
+    provider: agent::AgentProviderKind,
+    event: agent::AgentEvent,
 }
 
 #[derive(Default)]
@@ -4178,6 +4188,32 @@ async fn project_llm_chat(
         "dist-agent/opencode-runner.js",
     );
     let approval_app = app.clone();
+    let progress_project_id = project_id.clone();
+    let progress_event_sink = request
+        .progress_id
+        .clone()
+        .filter(|request_id| !request_id.trim().is_empty())
+        .map(|request_id| {
+            let progress_app = app.clone();
+            Arc::new(move |provider_event: agent::AgentProviderEvent| {
+                if provider_event.direction != agent::AgentEventDirection::Server {
+                    return Ok(());
+                }
+                let Some(event) = provider_event.event else {
+                    return Ok(());
+                };
+                let _ = progress_app.emit(
+                    PROJECT_LLM_PROGRESS_EVENT,
+                    ProjectLlmProgressPayload {
+                        request_id: request_id.clone(),
+                        project_id: progress_project_id.clone(),
+                        provider: provider_event.provider,
+                        event,
+                    },
+                );
+                Ok(())
+            }) as agent::AgentEventSink
+        });
     tauri::async_runtime::spawn_blocking(move || {
         let (runner, connected_workspace) =
             connected_project_runtime(&config_path, &project_id, &home)?;
@@ -4294,6 +4330,7 @@ async fn project_llm_chat(
                 settings.approval_policy,
                 model,
                 effort,
+                progress_event_sink,
             ),
             request,
             &approve,
@@ -4661,6 +4698,7 @@ fn project_chat_execution(
     approval_policy: agent::ApprovalPolicy,
     model: Option<String>,
     effort: Option<agent::ModelEffort>,
+    event_sink: Option<agent::AgentEventSink>,
 ) -> agent::ChatExecution {
     agent::ChatExecution {
         approval_policy: if full_access {
@@ -4676,7 +4714,7 @@ fn project_chat_execution(
         network_access: full_access,
         model,
         effort,
-        event_sink: None,
+        event_sink,
         environment: Vec::new(),
         // Project chat runs in the checkout only; Auto Hunt widens this.
         workspace_write_roots: Vec::new(),
@@ -7208,6 +7246,7 @@ branch refs/heads/briar/second-11111111
             agent::ApprovalPolicy::OnRequest,
             Some("model".to_string()),
             Some(agent::ModelEffort::High),
+            None,
         );
 
         assert_eq!(execution.approval_policy, agent::ApprovalPolicy::Never);
@@ -7219,7 +7258,8 @@ branch refs/heads/briar/second-11111111
 
     #[test]
     fn ordinary_project_chat_stays_read_only() {
-        let execution = project_chat_execution(false, agent::ApprovalPolicy::OnRequest, None, None);
+        let execution =
+            project_chat_execution(false, agent::ApprovalPolicy::OnRequest, None, None, None);
 
         assert_eq!(execution.approval_policy, agent::ApprovalPolicy::OnRequest);
         assert_eq!(execution.sandbox_mode, agent::SandboxMode::ReadOnly);

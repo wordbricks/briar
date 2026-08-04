@@ -2394,6 +2394,10 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .onboarding-process-icon.error { color:#aa4553; background:#fff0f2; }
 .onboarding-process h1 { max-width:520px; }
 .onboarding-process > p { max-width:520px; margin:12px 0 0; color:var(--muted-foreground); font-size:var(--text-xs); line-height:1.7; }
+.onboarding-provider-progress { width:min(520px,100%); min-height:76px; margin-top:18px; padding:12px 14px; display:grid; gap:7px; border:1px solid #ddd7ed; border-radius:12px; background:#faf8ff; text-align:left; box-shadow:0 1px 2px rgba(49,39,82,.04); }
+.onboarding-provider-progress > span { display:flex; align-items:center; gap:7px; color:#67568d; font-size:var(--text-2xs); font-weight:700; }
+.onboarding-provider-progress > span i { width:7px; height:7px; flex:0 0 auto; border-radius:50%; background:#735ac5; animation:auto-hunt-live-pulse 1.6s ease-in-out infinite; }
+.onboarding-provider-progress > p { max-height:88px; margin:0; overflow-y:auto; color:#4d4957; font-size:var(--text-xs); line-height:1.6; overflow-wrap:anywhere; white-space:pre-wrap; }
 .onboarding-process .onboarding-process-error { padding:13px 15px; border:1px solid #efd1d6; border-radius:11px; color:#9f3f4d; background:#fff7f8; text-align:left; }
 .onboarding-process .pulse { animation:health-pulse 1.2s ease-in-out infinite; }
 .onboarding-secondary-actions { margin-top:22px; display:flex; align-items:center; justify-content:center; gap:10px; }
