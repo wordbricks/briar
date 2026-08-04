@@ -1364,7 +1364,7 @@ describe("HuntDashboard", () => {
             item: {
               id: "message-1",
               type: "agent_message",
-              phase: "commentary",
+              phase: "final_answer",
               text: "저장소 구조를 확인하고 있습니다.",
             },
           },
@@ -1414,6 +1414,12 @@ describe("HuntDashboard", () => {
       .toContain("저장소 구조를 확인하고 있습니다.");
     expect(container.querySelector(".issue-agent-activity-panel")?.textContent)
       .toContain("Codex");
+    const messageHeader = container.querySelector(
+      ".issue-agent-activity-panel .auto-hunt-agent-message > header",
+    );
+    expect(messageHeader?.querySelector("strong")?.textContent).toBe("Codex");
+    expect(messageHeader?.querySelector("svg")).not.toBeNull();
+    expect(messageHeader?.textContent).not.toContain("최종 메시지");
 
     await act(async () => root.unmount());
     loadTranscript.mockRestore();
