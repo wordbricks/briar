@@ -17,6 +17,7 @@ import {
   getHuntRunForProject,
   getWorkflowProgress,
   initializeWorkflowProgress,
+  listHuntRunEvents,
   reachWorkflowCheckpoint,
   recordHuntEvent,
   reworkHuntRun,
@@ -148,7 +149,10 @@ describe("workflow v2 D1 persistence and transitions", () => {
       .filter((name) => /^\d+_.*\.sql$/u.test(name))
       .sort();
     for (const name of migrationNames) {
-      if (name === "0059_workflow_v2_progress.sql") continue;
+      if ([
+        "0059_workflow_v2_progress.sql",
+        "0061_workflow_stage_status_events.sql",
+      ].includes(name)) continue;
       await executeMigration(db, await readFile(resolve("migrations", name), "utf8"));
     }
 
@@ -204,6 +208,37 @@ describe("workflow v2 D1 persistence and transitions", () => {
       db,
       await readFile(resolve("migrations", "0059_workflow_v2_progress.sql"), "utf8"),
     );
+    await db
+      .prepare(
+        `insert into briar_run_stage_progress (
+           run_id, attempt, revision, stage_id, state, started_at, finished_at
+         ) values (?, 1, 1, 'implementing', 'completed', ?, ?)`,
+      )
+      .bind(legacyRunId, at(3), at(4))
+      .run();
+    await executeMigration(
+      db,
+      await readFile(
+        resolve("migrations", "0061_workflow_stage_status_events.sql"),
+        "utf8",
+      ),
+    );
+    const backfilled = await db
+      .prepare(
+        `select event_count, last_event_at from briar_hunt_runs where id = ?`,
+      )
+      .bind(legacyRunId)
+      .first<{ event_count: number; last_event_at: string }>();
+    expect(backfilled).toEqual({ event_count: 2, last_event_at: at(3) });
+    expect(
+      await db
+        .prepare(
+          `select workflow_stage from briar_hunt_events
+           where run_id = ? and event_key = 'workflow:stage-start:1:1:implementing'`,
+        )
+        .bind(legacyRunId)
+        .first<string>("workflow_stage"),
+    ).toBe("implementing");
 
     const afterSettings = await db
       .prepare(`select workflow_json from briar_project_settings where project_id = ?`)
@@ -656,6 +691,50 @@ describe("workflow v2 D1 persistence and transitions", () => {
     })).rejects.toThrow(/requires evidence: diff/u);
     expect((await getWorkflowProgress(db, projectId, runId))?.stages[0]?.state)
       .toBe("running");
+  });
+
+  it("records lifecycle stage starts in the issue status history", async () => {
+    const workflow = normalizeAutoHuntWorkflow({
+      version: 2,
+      requirements: [],
+      stages: [
+        { id: "staging_qa", label: "Stage QA", required: true, evidence: [] },
+      ],
+      execution: { checkpoints: [] },
+      completion: { requiredStages: ["staging_qa"] },
+    });
+    await db
+      .prepare(`update briar_project_settings set workflow_json = ? where project_id = ?`)
+      .bind(JSON.stringify(workflow), projectId)
+      .run();
+    const sourceKey = "lifecycle-status-history";
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event(sourceKey, `${sourceKey}:queued`, at(75)),
+    );
+
+    await startWorkflowStageLifecycle(db, projectId, {
+      runId,
+      attempt: 1,
+      revision: 1,
+      stageId: "staging_qa",
+      startedAt: at(76),
+      actor: "briar-worker:test",
+    });
+
+    const events = await listHuntRunEvents(db, projectId, runId);
+    expect(events.map((item) => item.workflow_stage)).toEqual([
+      "staging_qa",
+      null,
+    ]);
+    expect(events[0]).toMatchObject({
+      event_key: "workflow:stage-start:1:1:staging_qa",
+      status: "running",
+      actor: "briar-worker:test",
+      detail: "Stage QA 단계를 시작했습니다.",
+    });
+    expect((await getHuntRunForProject(db, projectId, runId))?.event_count).toBe(2);
   });
 
   it("recovers a crash between stage completion and its after checkpoint", async () => {

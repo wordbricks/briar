@@ -7161,6 +7161,7 @@ async function route(
         stageId: agentStageLifecycleMatch[2],
         attempt: input.attempt,
         revision: input.revision,
+        actor: input.actor,
       };
       const result = agentStageLifecycleMatch[3] === "start"
         ? await startWorkflowStageLifecycle(db, projectId, {

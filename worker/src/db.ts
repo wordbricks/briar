@@ -899,6 +899,7 @@ export async function startWorkflowStage(
   input: WorkflowProgressInput & {
     stageId: AutoHuntWorkflowStageId;
     startedAt: string;
+    actor?: string;
   },
 ): Promise<{
   outcome: WorkflowStageTransitionOutcome;
@@ -955,6 +956,10 @@ export async function startWorkflowStage(
       `Stage ${input.stageId} cannot start before earlier stages are complete`,
     );
   }
+  const eventId = crypto.randomUUID();
+  const eventKey = `workflow:stage-start:${attempt}:${revision}:${input.stageId}`;
+  const stageLabel = workflow.stages[rank]?.label ?? input.stageId;
+  const recordedAt = new Date().toISOString();
   const results = await db.batch([
     db
       .prepare(
@@ -966,15 +971,56 @@ export async function startWorkflowStage(
       .bind(input.startedAt, run.id, attempt, revision, input.stageId),
     db
       .prepare(
+        `insert into briar_hunt_events (
+           id, run_id, event_key, attempt, revision, stage, status,
+           workflow_stage, detail, actor, branch, commit_sha, qa_status,
+           tracker_issue_state, pull_request_urls, target_sha,
+           occurred_at, recorded_at
+         )
+         select ?, id, ?, ?, ?, ?, 'running', ?, ?, ?, branch, commit_sha,
+                null, tracker_issue_state, pull_request_urls, target_sha, ?, ?
+         from briar_hunt_runs
+         where id = ? and project_id = ? and current_attempt = ?
+           and current_revision = ? and paused_at is null
+           and exists (
+             select 1 from briar_run_stage_progress
+             where run_id = briar_hunt_runs.id and attempt = ? and revision = ?
+               and stage_id = ? and state = 'running'
+           )
+         on conflict(run_id, event_key) do nothing`,
+      )
+      .bind(
+        eventId,
+        eventKey,
+        attempt,
+        revision,
+        dashboardStageFor("running", input.stageId),
+        input.stageId,
+        `${stageLabel} 단계를 시작했습니다.`,
+        input.actor ?? "briar-workflow",
+        input.startedAt,
+        recordedAt,
+        run.id,
+        projectId,
+        attempt,
+        revision,
+        attempt,
+        revision,
+        input.stageId,
+      ),
+    db
+      .prepare(
         `update briar_hunt_runs
          set stage = ?, status = 'running', workflow_stage = ?,
-             resume_requested_at = null, updated_at = max(updated_at, ?)
+             resume_requested_at = null, last_event_at = max(last_event_at, ?),
+             updated_at = max(updated_at, ?)
          where id = ? and project_id = ? and current_attempt = ?
            and current_revision = ? and paused_at is null`,
       )
       .bind(
         dashboardStageFor("running", input.stageId),
         input.stageId,
+        input.startedAt,
         input.startedAt,
         run.id,
         projectId,
@@ -992,7 +1038,7 @@ export async function startWorkflowStage(
     if (currentRow?.state === "completed") return { outcome: "completed", stage: currentRow };
     throw new HuntTransitionError("Stage progress changed while starting the stage");
   }
-  if ((results[1]?.meta.changes ?? 0) === 0) {
+  if ((results[2]?.meta.changes ?? 0) === 0) {
     throw new HuntTransitionError("Run changed while starting the stage");
   }
   const updated = await getWorkflowProgress(db, projectId, run.id, { attempt, revision });
@@ -1167,6 +1213,7 @@ export async function startWorkflowStageLifecycle(
   input: WorkflowProgressInput & {
     stageId: AutoHuntWorkflowStageId;
     startedAt: string;
+    actor?: string;
   },
 ): Promise<WorkflowStageLifecycleResult> {
   const initialized = await ensureWorkflowProgress(db, projectId, input);
