@@ -78,6 +78,7 @@ describe("Sidebar", () => {
     expect(markup).toContain('class="sidebar-issue-add"');
     expect(markup).toContain('aria-label="이슈 만들기"');
     expect(markup).toContain("에이전트");
+    expect(markup).not.toContain("아이디어");
     expect(markup).toContain("스케줄");
     expect(markup).toContain("받은 편지함");
     expect(markup).not.toContain('href="#auto-hunt"');
@@ -88,6 +89,15 @@ describe("Sidebar", () => {
     expect(markup).toContain('class="sidebar-project-toggle"');
     expect(markup).toContain('id="project-views-project-1"');
     expect(markup).not.toContain("<select");
+  });
+
+  it("shows Ideas when the feature flag is enabled", () => {
+    const markup = renderToStaticMarkup(
+      <Sidebar {...sidebarProps} ideasEnabled />,
+    );
+
+    expect(markup).toContain('href="#ideas"');
+    expect(markup).toContain("아이디어");
   });
 
   it("shows a saved project icon in the project hierarchy", () => {
