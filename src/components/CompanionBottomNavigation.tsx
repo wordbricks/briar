@@ -1,6 +1,7 @@
 import { Bot, Inbox, Lightbulb, ListTodo, Plus, Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { featureFlags } from "@/lib/feature-flags";
 import { cn } from "@/lib/utils";
 import { useI18n } from "../i18n";
 
@@ -19,6 +20,7 @@ type CompanionDestination =
 
 export function CompanionBottomNavigation({
   activeDestination,
+  ideasEnabled = featureFlags.ideas,
   onCreate,
   onAgentsOpen,
   onIdeasOpen = () => undefined,
@@ -28,6 +30,7 @@ export function CompanionBottomNavigation({
   unreadInboxCount,
 }: {
   activeDestination: CompanionDestination;
+  ideasEnabled?: boolean;
   onCreate?: () => void;
   onAgentsOpen: () => void;
   onIdeasOpen?: () => void;
@@ -45,7 +48,9 @@ export function CompanionBottomNavigation({
   }> = [
     { icon: ListTodo, label: t("companion.navTasks"), value: "all" },
     { icon: Bot, label: t("companion.navAgents"), value: "agents" },
-    { icon: Lightbulb, label: t("companion.navIdeas"), value: "ideas" },
+    ...(ideasEnabled
+      ? [{ icon: Lightbulb, label: t("companion.navIdeas"), value: "ideas" as const }]
+      : []),
     { icon: Search, label: t("companion.navSearch"), value: "search" },
     {
       count: unreadInboxCount,
@@ -59,7 +64,10 @@ export function CompanionBottomNavigation({
     <div className="companion-bottom-chrome border-t border-border bg-card/95 backdrop-blur">
       <nav
         aria-label={t("sidebar.mainMenu")}
-        className="companion-bottom-nav grid grid-cols-5 gap-1 px-2"
+        className={cn(
+          "companion-bottom-nav grid gap-1 px-2",
+          ideasEnabled ? "grid-cols-5" : "grid-cols-4",
+        )}
       >
         {destinations.map((destination) => {
           const Icon = destination.icon;
