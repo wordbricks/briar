@@ -692,6 +692,8 @@ describe("HuntDashboard", () => {
     );
 
     expect(markup).not.toContain("queue-panel");
+    expect(markup).not.toMatch(/<h2[^>]*>작업 대기열<\/h2>/);
+    expect(markup).toContain("개 작업");
     expect(markup).toContain('aria-label="이슈 만들기"');
     expect(markup).toContain("companion-bottom-nav");
     expect(markup).toContain("companion-fab");

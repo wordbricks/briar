@@ -84,7 +84,6 @@ struct CreateIssueSheet: View {
                     }
                 }
             }
-            .navigationTitle("새 이슈")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("취소") {
