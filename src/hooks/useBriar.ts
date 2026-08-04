@@ -70,7 +70,6 @@ import {
   pickGitRepository,
   repairAutoHunt,
   resolveProjectConnectionWorkflow,
-  updateLocalProjectLinear,
   updateLocalProjectVelenOrg,
   updateLocalProjectWorkflow,
   type AutoHuntHealth,
@@ -1863,15 +1862,21 @@ export function useBriar(options: UseBriarOptions = {}) {
         throw new Error("Velen 연결을 저장할 프로젝트 설정이 없습니다.");
       }
       const normalized = org?.trim() || null;
-      if (!normalized && dashboard.settings.linear.enabled) {
-        throw new Error("Linear 연결을 먼저 끈 뒤 Velen 연결을 해제하세요.");
-      }
       if (demoMode) {
         setDashboard((current) =>
           current?.project.id === projectId
             ? {
                 ...current,
-                settings: { ...current.settings, velenOrg: normalized },
+                settings: {
+                  ...current.settings,
+                  velenOrg: normalized,
+                  ...(normalized
+                    ? {}
+                    : {
+                        dataSource: null,
+                        linear: { enabled: false, source: null, teamKey: null },
+                      }),
+                },
               }
             : current,
         );
@@ -1887,7 +1892,12 @@ export function useBriar(options: UseBriarOptions = {}) {
         const result = await updateProjectSettings(token, projectId, {
           ...dashboard.settings,
           velenOrg: local,
-          ...(local ? {} : { dataSource: null }),
+          ...(local
+            ? {}
+            : {
+                dataSource: null,
+                linear: { enabled: false, source: null, teamKey: null },
+              }),
         });
         setDashboard((current) =>
           current?.project.id === projectId
@@ -1906,69 +1916,6 @@ export function useBriar(options: UseBriarOptions = {}) {
               : String(rollbackError);
             throw new Error(
               `Velen 연결 저장에 실패했고 로컬 설정도 복구하지 못했습니다: ${cause} (${rollback})`,
-            );
-          }
-        }
-        throw caught;
-      }
-    },
-    [dashboard, token],
-  );
-
-  const saveLinearIntegration = useCallback(
-    async (projectId: string, linear: ProjectSettings["linear"]) => {
-      if (!dashboard || dashboard.project.id !== projectId) {
-        throw new Error("Linear 연결을 저장할 프로젝트 설정이 없습니다.");
-      }
-      const normalized: ProjectSettings["linear"] = linear.enabled
-        ? {
-            enabled: true,
-            source: linear.source?.trim() || null,
-            teamKey: linear.teamKey?.trim() || null,
-          }
-        : { enabled: false, source: null, teamKey: null };
-      if (normalized.enabled && !normalized.source) {
-        throw new Error("Linear 소스를 선택하세요.");
-      }
-      if (demoMode) {
-        setDashboard((current) =>
-          current?.project.id === projectId
-            ? {
-                ...current,
-                settings: { ...current.settings, linear: normalized },
-              }
-            : current,
-        );
-        return normalized;
-      }
-      if (!token) throw new Error("로그인이 필요합니다.");
-
-      const previous = dashboard.settings.linear;
-      const local = remoteMode
-        ? normalized
-        : await updateLocalProjectLinear(projectId, normalized);
-      try {
-        const result = await updateProjectSettings(token, projectId, {
-          ...dashboard.settings,
-          linear: local,
-        });
-        setDashboard((current) =>
-          current?.project.id === projectId
-            ? { ...current, settings: result.settings }
-            : current,
-        );
-        return result.settings.linear;
-      } catch (caught) {
-        if (!remoteMode) {
-          try {
-            await updateLocalProjectLinear(projectId, previous);
-          } catch (rollbackError) {
-            const cause = caught instanceof Error ? caught.message : String(caught);
-            const rollback = rollbackError instanceof Error
-              ? rollbackError.message
-              : String(rollbackError);
-            throw new Error(
-              `Linear 연결 저장에 실패했고 로컬 설정도 복구하지 못했습니다: ${cause} (${rollback})`,
             );
           }
         }
@@ -2924,7 +2871,6 @@ export function useBriar(options: UseBriarOptions = {}) {
     saveCheckpointPolicy,
     updateAccountProfile,
     saveVelenIntegration,
-    saveLinearIntegration,
     connectLinearForImport,
     loadLinearStatesForImport,
     runLinearIssueImport,

@@ -13,7 +13,6 @@ import {
   FolderGit2,
   GitBranch,
   ImagePlus,
-  Link2,
   LoaderCircle,
   Plug,
   RefreshCw,
@@ -45,7 +44,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Typography } from "@/components/ui/typography";
@@ -113,7 +111,6 @@ export function ProjectSettings({
   onReviseWorkflow,
   onSaveCheckpointPolicy,
   onUpdateVelenOrg,
-  onUpdateLinear,
   onConnectLinearImport,
   onLoadLinearImportStates,
   onImportLinearIssues,
@@ -145,9 +142,6 @@ export function ProjectSettings({
     expectedRevision: number,
   ) => Promise<unknown>;
   onUpdateVelenOrg: (org: string | null) => Promise<string | null>;
-  onUpdateLinear: (
-    linear: ProjectSettingsData["linear"],
-  ) => Promise<ProjectSettingsData["linear"]>;
   onConnectLinearImport: (apiKey: string) => Promise<LinearImportConnectResult>;
   onLoadLinearImportStates: (input: {
     apiKey: string;
@@ -212,23 +206,6 @@ export function ProjectSettings({
   useEffect(() => {
     if (initialSection) setActiveSection(initialSection);
   }, [initialSection]);
-  const [linear, setLinear] = useState<ProjectSettingsData["linear"]>(
-    () => dashboard?.settings.linear ?? {
-      enabled: false,
-      source: null,
-      teamKey: null,
-    },
-  );
-  const [savedLinear, setSavedLinear] = useState<ProjectSettingsData["linear"]>(
-    () => dashboard?.settings.linear ?? {
-      enabled: false,
-      source: null,
-      teamKey: null,
-    },
-  );
-  const [linearLoading, setLinearLoading] = useState(false);
-  const [linearSaving, setLinearSaving] = useState(false);
-  const [linearError, setLinearError] = useState<string | null>(null);
   const [velenOrg, setVelenOrg] = useState(
     () => dashboard?.settings.velenOrg ?? "",
   );
@@ -370,17 +347,6 @@ export function ProjectSettings({
   };
 
   useEffect(() => {
-    const next = dashboard?.settings.linear ?? {
-      enabled: false,
-      source: null,
-      teamKey: null,
-    };
-    setLinear(next);
-    setSavedLinear(next);
-    setLinearError(null);
-  }, [dashboard?.settings.linear, project.id]);
-
-  useEffect(() => {
     setVelenOrg(dashboard?.settings.velenOrg ?? "");
     setVelenError(null);
   }, [dashboard?.settings.velenOrg, project.id]);
@@ -517,13 +483,6 @@ export function ProjectSettings({
     }
   };
 
-  const linearSources = (velen?.sources ?? []).filter(
-    (source) => source.provider === "linear" && source.status === "active",
-  );
-  const selectedLinearSourceAvailable = linearSources.some(
-    (source) => source.sourceRef === linear.source,
-  );
-  const linearChanged = JSON.stringify(linear) !== JSON.stringify(savedLinear);
   const savedVelenOrg = dashboard?.settings.velenOrg ?? "";
   const velenChanged = velenOrg !== savedVelenOrg;
   const refreshVelen = async () => {
@@ -556,19 +515,6 @@ export function ProjectSettings({
       setVelenError(caught instanceof Error ? caught.message : String(caught));
     } finally {
       setVelenSaving(false);
-    }
-  };
-  const saveLinear = async () => {
-    setLinearSaving(true);
-    setLinearError(null);
-    try {
-      const saved = await onUpdateLinear(linear);
-      setLinear(saved);
-      setSavedLinear(saved);
-    } catch (caught) {
-      setLinearError(caught instanceof Error ? caught.message : String(caught));
-    } finally {
-      setLinearSaving(false);
     }
   };
   const navigationItems = [
@@ -775,19 +721,19 @@ export function ProjectSettings({
 
 
           <section
-            className="project-settings-linear"
+            className="project-settings-integration"
             data-project-integration="velen"
             hidden={activeSection !== "integrations"}
           >
             <header>
-              <span className="project-settings-linear-icon">
+              <span className="project-settings-integration-icon">
                 <Database size={18} strokeWidth={1.8} />
               </span>
               <span>
                 <strong>{t("settings.velenTitle")}</strong>
                 <small>{t("settings.velenDescription")}</small>
               </span>
-              <div className="project-settings-linear-actions">
+              <div className="project-settings-integration-actions">
                 <button
                   aria-label={t("settings.velenRefresh")}
                   disabled={velenLoading || velenSaving}
@@ -799,7 +745,7 @@ export function ProjectSettings({
               </div>
             </header>
 
-            <div className="project-settings-linear-fields">
+            <div className="project-settings-integration-fields">
               <label>
                 <span>{t("settings.velenOrg")}</span>
                 <SelectMenu
@@ -830,23 +776,20 @@ export function ProjectSettings({
             </div>
 
             {velenError ? (
-              <p className="project-settings-linear-error" role="alert">
+              <p className="project-settings-velen-error" role="alert">
                 <AlertTriangle size={13} /> {velenError}
               </p>
             ) : null}
 
             <footer>
               <p>
-                {!velenOrg && linear.enabled
-                  ? t("settings.velenDisconnectLinearFirst")
-                  : t("settings.velenOptional")}
+                {t("settings.velenOptional")}
               </p>
               <button
                 disabled={
                   velenLoading ||
                   velenSaving ||
-                  !velenChanged ||
-                  (!velenOrg && linear.enabled)
+                  !velenChanged
                 }
                 onClick={() => void saveVelen()}
                 type="button"
@@ -863,154 +806,6 @@ export function ProjectSettings({
                     : t("common.save")}
               </button>
             </footer>
-          </section>
-
-          <section
-            className="project-settings-linear"
-            data-project-integration="linear"
-            hidden={activeSection !== "issue-import"}
-          >
-            <header>
-              <span className="project-settings-linear-icon">
-                <Link2 size={18} strokeWidth={1.8} />
-              </span>
-              <span>
-                <strong>{t("settings.linearTitle")}</strong>
-                <small>{t("settings.linearDescription")}</small>
-              </span>
-              <div className="project-settings-linear-actions">
-                <button
-                  aria-label={t("settings.linearRefresh")}
-                  disabled={linearLoading || linearSaving || !dashboard?.settings.velenOrg}
-                  onClick={() => {
-                    const org = dashboard?.settings.velenOrg;
-                    if (!org) return;
-                    setLinearLoading(true);
-                    setLinearError(null);
-                    void onRefreshVelen(org)
-                      .then((inspection) => {
-                        if (!inspection) setLinearError(t("settings.linearLoadFailed"));
-                      })
-                      .catch((caught) => {
-                        setLinearError(
-                          caught instanceof Error ? caught.message : String(caught),
-                        );
-                      })
-                      .finally(() => setLinearLoading(false));
-                  }}
-                  type="button"
-                >
-                  <RefreshCw className={linearLoading ? "spin" : undefined} size={14} />
-                </button>
-                <label className="project-settings-toggle flex items-center gap-2">
-                  <Switch
-                    checked={linear.enabled}
-                    disabled={
-                      linearLoading ||
-                      linearSaving ||
-                      !dashboard?.settings.velenOrg
-                    }
-                    onCheckedChange={(enabled) => {
-                      setLinear((current) => {
-                        const source = current.source ?? linearSources[0]?.sourceRef ?? null;
-                        return { ...current, enabled, source };
-                      });
-                    }}
-                  />
-                  <span className="text-xs font-medium text-muted-foreground">
-                    {t(linear.enabled ? "settings.linearOn" : "settings.linearOff")}
-                  </span>
-                </label>
-              </div>
-            </header>
-
-            {linear.enabled ? (
-              <div className="project-settings-linear-fields">
-                <label>
-                  <span>{t("settings.linearSource")}</span>
-                  <SelectMenu
-                    disabled={linearLoading || linearSaving}
-                    label={t("settings.linearSource")}
-                    onValueChange={(value) => {
-                      const source = value || null;
-                      setLinear((current) => ({ ...current, source }));
-                    }}
-                    options={[
-                      {
-                        label: t("settings.linearSelectSource"),
-                        value: "",
-                      },
-                      ...(linear.source && !selectedLinearSourceAvailable
-                        ? [{
-                            disabled: true,
-                            label: `${linear.source} · ${t("settings.linearUnavailable")}`,
-                            value: linear.source,
-                          }]
-                        : []),
-                      ...linearSources.map((source) => ({
-                        label: source.sourceKey,
-                        value: source.sourceRef,
-                      })),
-                    ]}
-                    size="small"
-                    value={linear.source ?? ""}
-                  />
-                </label>
-                <label>
-                  <span>
-                    {t("settings.linearTeam")} <small>{t("common.optional")}</small>
-                  </span>
-                  <Input
-                    aria-label={t("settings.linearTeam")}
-                    disabled={linearSaving}
-                    onChange={(event) => {
-                      const teamKey = event.currentTarget.value;
-                      setLinear((current) => ({ ...current, teamKey }));
-                    }}
-                    placeholder={t("settings.linearTeamExample")}
-                    value={linear.teamKey ?? ""}
-                  />
-                </label>
-              </div>
-            ) : (
-              <p className="project-settings-linear-disabled">
-                {t("settings.linearDisabledDescription")}
-              </p>
-            )}
-
-            <footer>
-              <p>
-                {t("settings.linearVelenSource", {
-                  org: dashboard?.settings.velenOrg ?? "—",
-                })}
-              </p>
-              <button
-                disabled={
-                  linearLoading ||
-                  linearSaving ||
-                  !linearChanged ||
-                  (linear.enabled && (!linear.source || !selectedLinearSourceAvailable))
-                }
-                onClick={() => void saveLinear()}
-                type="button"
-              >
-                {linearSaving ? (
-                  <LoaderCircle className="spin" size={14} />
-                ) : !linearChanged ? (
-                  <Check size={14} />
-                ) : null}
-                {linearSaving
-                  ? t("common.saving")
-                  : !linearChanged
-                    ? t("common.saved")
-                    : t("common.save")}
-              </button>
-            </footer>
-            {linearError ? (
-              <p className="project-settings-linear-error" role="alert">
-                {linearError}
-              </p>
-            ) : null}
           </section>
 
           <div
