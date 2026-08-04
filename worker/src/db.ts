@@ -6076,6 +6076,11 @@ export async function reworkHuntRun(
     actor: string;
     reason: string;
     occurredAt: string;
+    checkpoint?: {
+      key: string;
+      attempt: number;
+      revision: number;
+    };
   },
 ): Promise<{
   outcome: HuntReworkOutcome;
@@ -6112,9 +6117,23 @@ export async function reworkHuntRun(
     };
   }
 
+  if (
+    input.checkpoint &&
+    (!run.paused_at ||
+      run.waiting_checkpoint_key !== input.checkpoint.key ||
+      run.current_attempt !== input.checkpoint.attempt ||
+      (run.waiting_checkpoint_revision ?? run.current_revision) !==
+        input.checkpoint.revision)
+  ) {
+    throw new HuntTransitionError(
+      "The paused checkpoint changed before rework could be requested",
+    );
+  }
+
   if (run.status !== "running" || !run.workflow_stage) {
     throw new HuntTransitionError("Only a running workflow stage can be reworked");
   }
+  const isPaused = Boolean(run.paused_at);
   const workflow = parseWorkflow(run.workflow_snapshot_json);
   const currentRank = workflow.stages.findIndex(
     (stage) => stage.id === run.workflow_stage,
@@ -6127,9 +6146,13 @@ export async function reworkHuntRun(
       `Workflow stage is not configured for this run: ${input.workflowStage}`,
     );
   }
-  if (currentRank < 0 || targetRank >= currentRank) {
+  if (
+    currentRank < 0 ||
+    targetRank > currentRank ||
+    (!isPaused && targetRank === currentRank)
+  ) {
     throw new HuntTransitionError(
-      `Rework target ${input.workflowStage} must precede ${run.workflow_stage}`,
+      `Rework target ${input.workflowStage} must not follow ${run.workflow_stage}`,
     );
   }
 

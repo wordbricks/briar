@@ -24,6 +24,7 @@ import {
   loadRunEvents,
   loadSession,
   removeIssueDependency,
+  reworkPausedHuntRun,
   updateProjectAgent,
   updateProjectAgentSchedule,
   updateOrganizationMemberRole,
@@ -41,6 +42,50 @@ afterEach(() => {
 });
 
 describe("API errors", () => {
+  it("requests paused rework with exact checkpoint identity and feedback", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          runId: "run-1",
+          outcome: "reworked",
+          attempt: 1,
+          revision: 2,
+          workflowStage: "local_qa",
+        }),
+        { headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      reworkPausedHuntRun(
+        "token",
+        "project-1",
+        "run-1",
+        {
+          workflowStage: "local_qa",
+          reason: "결과 탭의 문구를 수정하고 다시 검증해 주세요.",
+          checkpoint: { key: "after-local-qa", attempt: 1, revision: 1 },
+        },
+        "11111111-1111-4111-8111-111111111111",
+      ),
+    ).resolves.toMatchObject({ outcome: "reworked", revision: 2 });
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/projects/project-1/runs/run-1/rework"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          requestId: "11111111-1111-4111-8111-111111111111",
+          workflowStage: "local_qa",
+          reason: "결과 탭의 문구를 수정하고 다시 검증해 주세요.",
+          checkpointKey: "after-local-qa",
+          attempt: 1,
+          revision: 1,
+        }),
+      }),
+    );
+  });
+
   it("requests explicit Google account selection for an account switch", async () => {
     vi.stubGlobal(
       "fetch",

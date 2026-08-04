@@ -32,17 +32,23 @@ describe("issue detail dark mode", () => {
 
   it("keeps recovery states legible without a light-only alert card", () => {
     const recoveryRule = firstRule(".recovery-panel");
-    const pausedRecoveryRule = firstRule(".recovery-panel.paused");
+    const pausedResultRule = firstRule(".paused-result-card");
 
     expect(recoveryRule).toContain("var(--destructive)");
     expect(recoveryRule).toContain("var(--card)");
-    expect(pausedRecoveryRule).toContain("var(--warning)");
-    expect(pausedRecoveryRule).toContain("var(--card)");
-    expect(firstRule(".recovery-panel.paused > div:first-child")).toContain(
-      "color:var(--warning)",
-    );
+    expect(pausedResultRule).toContain("var(--warning)");
+    expect(pausedResultRule).toContain("var(--card)");
     expect(firstRule(".recovery-panel strong")).toContain(
       "color:var(--foreground)",
+    );
+  });
+
+  it("keeps result summaries visibly scannable as lists", () => {
+    expect(firstRule(".completed-issue-summary ul")).toContain(
+      "list-style:disc",
+    );
+    expect(firstRule(".completed-issue-summary ol")).toContain(
+      "list-style:decimal",
     );
   });
 
