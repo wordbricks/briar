@@ -6476,16 +6476,12 @@ export async function moveHuntRun(
       "Run is paused; resume it before completing the workflow",
     );
   }
-  if (input.status === "completed") {
-    await assertRunCompletionEligible(
-      db,
-      projectId,
-      run,
-      run.result_summary,
-      run.tracker_provider,
-      run.tracker_issue_state,
-    );
-  }
+  // Manual board/list moves are an operator override. They must not apply the
+  // agent completion gate (required stages, evidence, result summary, Linear).
+  // That gate still applies to `recordHuntEvent` / `briar run complete`, which
+  // is the path workers use. Applying it to drag-and-drop left a raw English
+  // error banner on the issue list when `merged:merge_commit` (or other
+  // evidence) was missing.
 
   const targetStage = dashboardStageFor(input.status, targetWorkflowStage);
   const currentRank = run.workflow_stage
