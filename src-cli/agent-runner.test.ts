@@ -8,6 +8,7 @@ import {
   detachedTranscriptSequence,
   detachedTranscriptPayload,
   issueReplyTextFromPayload,
+  shouldPersistDetachedTranscriptPayload,
 } from "./agent-runner";
 
 const agent = {
@@ -277,5 +278,31 @@ describe("detached Agent runner", () => {
       type: "event",
       event: { type: "messageCompleted", id: "message-1" },
     });
+  });
+
+  it("keeps streaming message deltas ephemeral", () => {
+    expect(
+      shouldPersistDetachedTranscriptPayload({
+        type: "event",
+        event: { type: "messageDelta", id: "message-1", delta: "hello" },
+      }),
+    ).toBe(false);
+    expect(
+      shouldPersistDetachedTranscriptPayload({
+        type: "messageDelta",
+        id: "message-1",
+        delta: "hello",
+      }),
+    ).toBe(false);
+    expect(
+      shouldPersistDetachedTranscriptPayload({
+        type: "event",
+        event: {
+          type: "messageCompleted",
+          id: "message-1",
+          text: "hello",
+        },
+      }),
+    ).toBe(true);
   });
 });
