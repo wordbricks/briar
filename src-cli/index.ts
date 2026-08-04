@@ -38,6 +38,7 @@ import {
   detachedTranscriptPayload,
   issueReplyTextFromPayload,
   parseDetachedJsonResult,
+  shouldPersistDetachedTranscriptPayload,
 } from "./agent-runner";
 import {
   inspectWorkflowRequirements,
@@ -898,6 +899,7 @@ const queuedIssueSchema = z.object({
   repository: z.string().min(1),
   sourceCreatedAt: z.string().datetime({ offset: true }).nullable(),
   context: z.record(z.string(), z.unknown()).nullable(),
+  reviewFeedback: z.string().nullable().default(null),
   workflow: workflowConfigSchema,
   workflowStage: z.string().nullable(),
   startStage: z.string().nullable(),
@@ -1971,6 +1973,7 @@ async function runClaimedIssueInRuntime(
       priority: issue.priority,
       sourceCreatedAt: issue.sourceCreatedAt,
       context: issue.context,
+      reviewFeedback: issue.reviewFeedback,
       workflow: issue.workflow,
       startStage: issue.startStage,
       resumeContext: issue.resumeContext,
@@ -2115,28 +2118,30 @@ async function runClaimedIssueInRuntime(
       ) {
         completed = true;
       }
-      try {
-        await request(config.apiUrl, "/transcripts", workerToken, {
-          method: "POST",
-          body: JSON.stringify({
-            projectId: project.id,
-            sessionId,
-            runId: issue.runId,
-            workerId: activeProject.executionWorker?.workerId,
-            agentProvider: provider,
-            events: [{
-              sequence: detachedTranscriptSequence(issue.claimAttempts, sequence),
-              direction,
-              payload,
-            }],
-          }),
-        });
-      } catch (error) {
-        console.error(
-          `transcript upload failed for ${issue.sourceKey}: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
+      if (shouldPersistDetachedTranscriptPayload(payload)) {
+        try {
+          await request(config.apiUrl, "/transcripts", workerToken, {
+            method: "POST",
+            body: JSON.stringify({
+              projectId: project.id,
+              sessionId,
+              runId: issue.runId,
+              workerId: activeProject.executionWorker?.workerId,
+              agentProvider: provider,
+              events: [{
+                sequence: detachedTranscriptSequence(issue.claimAttempts, sequence),
+                direction,
+                payload,
+              }],
+            }),
+          });
+        } catch (error) {
+          console.error(
+            `transcript upload failed for ${issue.sourceKey}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        }
       }
     }
     const exitCode = await exitPromise;
@@ -2410,20 +2415,22 @@ async function runClaimedIssueReply(
           (payload as { message?: unknown }).message ?? "Agent failed",
         );
       }
-      try {
-        await request(config.apiUrl, "/transcripts", workerToken, {
-          method: "POST",
-          body: JSON.stringify({
-            projectId: project.id,
-            sessionId: `reply-${issue.workId}`,
-            runId: issue.runId,
-            workerId: registered.workerId,
-            agentProvider: provider,
-            events: [{ sequence, direction, payload: bounded }],
-          }),
-        });
-      } catch {
-        // The durable reply result is more important than optional transcript data.
+      if (shouldPersistDetachedTranscriptPayload(bounded)) {
+        try {
+          await request(config.apiUrl, "/transcripts", workerToken, {
+            method: "POST",
+            body: JSON.stringify({
+              projectId: project.id,
+              sessionId: `reply-${issue.workId}`,
+              runId: issue.runId,
+              workerId: registered.workerId,
+              agentProvider: provider,
+              events: [{ sequence, direction, payload: bounded }],
+            }),
+          });
+        } catch {
+          // The durable reply result is more important than optional transcript data.
+        }
       }
     }
     const exitCode = await exitPromise;
@@ -2629,24 +2636,26 @@ async function runClaimedIdea(
             (payload as { message?: unknown }).message ?? "Agent failed",
           );
         }
-        try {
-          await request(config.apiUrl, "/transcripts", workerToken, {
-            method: "POST",
-            body: JSON.stringify({
-              projectId: project.id,
-              sessionId: `idea-${idea.workId}`,
-              runId: null,
+        if (shouldPersistDetachedTranscriptPayload(bounded)) {
+          try {
+            await request(config.apiUrl, "/transcripts", workerToken, {
+              method: "POST",
+              body: JSON.stringify({
+                projectId: project.id,
+                sessionId: `idea-${idea.workId}`,
+                runId: null,
                 workerId: registered.workerId,
                 agentProvider: idea.provider,
                 events: [{
-                sequence,
-                direction,
-                payload: bounded,
-              }],
-            }),
-          });
-        } catch {
-          // The durable idea result is more important than optional diagnostics.
+                  sequence,
+                  direction,
+                  payload: bounded,
+                }],
+              }),
+            });
+          } catch {
+            // The durable idea result is more important than optional diagnostics.
+          }
         }
       }
       const exitCode = await exitPromise;

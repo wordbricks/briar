@@ -11,6 +11,7 @@ import worker, {
   organizationInvitationInputSchema,
   organizationMemberRoleInputSchema,
   organizationUpdateInputSchema,
+  pausedRunReworkInputSchema,
   projectIconInputSchema,
   projectAgentSessionInputSchema,
   projectAgentScheduleInputSchema,
@@ -432,6 +433,33 @@ describe("Worker HTTP contract", () => {
     ).toThrow();
   });
 
+  it("requires exact checkpoint identity for paused run rework", () => {
+    expect(
+      pausedRunReworkInputSchema.parse({
+        requestId: "11111111-1111-4111-8111-111111111111",
+        workflowStage: "local_qa",
+        reason: "Keep the result in the Result tab and verify the revised copy.",
+        checkpointKey: "after-local-qa",
+        attempt: 2,
+        revision: 3,
+      }),
+    ).toMatchObject({
+      workflowStage: "local_qa",
+      checkpointKey: "after-local-qa",
+      attempt: 2,
+      revision: 3,
+    });
+    expect(() =>
+      pausedRunReworkInputSchema.parse({
+        requestId: "11111111-1111-4111-8111-111111111111",
+        workflowStage: "local_qa",
+        reason: "Apply review feedback",
+        checkpointKey: "after-local-qa",
+        attempt: 2,
+      }),
+    ).toThrow();
+  });
+
   it("normalizes recurring agent schedule input", () => {
     expect(
       projectAgentScheduleInputSchema.parse({
@@ -548,11 +576,13 @@ describe("Worker HTTP contract", () => {
         title: "  Updated issue  ",
         description: null,
         priority: 1,
+        assigneeUserId: "member-1",
       }),
     ).toEqual({
       title: "Updated issue",
       description: null,
       priority: 1,
+      assigneeUserId: "member-1",
     });
     expect(() =>
       issueUpdateInputSchema.parse({

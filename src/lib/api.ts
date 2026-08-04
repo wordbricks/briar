@@ -1189,6 +1189,7 @@ export async function createIssue(
       sourceKey: string;
       stage: "queued";
       status: "backlog" | "queued";
+      assigneeUserId: string | null;
       attachments: IssueAttachment[];
     }>(`/projects/${projectId}/issues`, token, {
       method: "POST",
@@ -1201,6 +1202,7 @@ export async function createIssue(
   form.set("title", input.title);
   form.set("description", input.description ?? "");
   form.set("priority", input.priority === null ? "" : String(input.priority));
+  form.set("assigneeUserId", input.assigneeUserId ?? "");
   form.set("status", input.status);
   if (input.attachmentReferences?.length) {
     form.set(
@@ -1216,6 +1218,7 @@ export async function createIssue(
     sourceKey: string;
     stage: "queued";
     status: "backlog" | "queued";
+    assigneeUserId: string | null;
     attachments: IssueAttachment[];
   }>(`/projects/${projectId}/issues`, token, { method: "POST", body: form });
 }
@@ -1343,6 +1346,7 @@ export async function updateIssue(
     title: string;
     description: string | null;
     priority: number | null;
+    assigneeUserId: string | null;
   }>(`/projects/${projectId}/runs/${runId}`, token, {
     method: "PATCH",
     body: JSON.stringify(input),
@@ -1592,6 +1596,46 @@ export async function resumeHuntRun(
               revision: checkpoint.revision,
             }
           : {}),
+      }),
+    },
+  );
+}
+
+export type HuntReworkResult = {
+  runId: string;
+  outcome: "reworked" | "already_reworked";
+  attempt: number;
+  revision: number;
+  workflowStage: string;
+};
+
+export async function reworkPausedHuntRun(
+  token: string,
+  projectId: string,
+  runId: string,
+  input: {
+    workflowStage: string;
+    reason: string;
+    checkpoint: {
+      key: string;
+      attempt: number;
+      revision: number;
+    };
+  },
+  requestId: string = crypto.randomUUID(),
+) {
+  return request<HuntReworkResult>(
+    `/projects/${projectId}/runs/${runId}/rework`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        requestId,
+        workflowStage: input.workflowStage,
+        reason: input.reason,
+        checkpointKey: input.checkpoint.key,
+        attempt: input.checkpoint.attempt,
+        revision: input.checkpoint.revision,
       }),
     },
   );

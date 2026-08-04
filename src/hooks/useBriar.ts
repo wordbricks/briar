@@ -36,6 +36,7 @@ import {
   pollDeviceToken,
   renewProjectAgentScheduleRun,
   retryHuntRun,
+  reworkPausedHuntRun,
   resumeHuntRun,
   removeIssueDependency,
   updateIssue,
@@ -356,6 +357,7 @@ export function useBriar(options: UseBriarOptions = {}) {
   const loginAttempt = useRef(0);
   const workflowGenerationAttempts = useRef(new Set<string>());
   const resumeRequestIds = useRef(new Map<string, string>());
+  const reworkRequestIds = useRef(new Map<string, string>());
   const dashboardRef = useRef<DashboardPayload | null>(
     demoMode ? demoDashboard : null,
   );
@@ -1038,6 +1040,12 @@ export function useBriar(options: UseBriarOptions = {}) {
     setProjectConnection(null);
   }, []);
 
+  const finishProjectCreation = useCallback(() => {
+    setError(null);
+    setIsCreatingProject(false);
+    setProjectConnection(null);
+  }, []);
+
   const selectProject = useCallback(
     (projectId: string) => {
       const project = projects.find((candidate) => candidate.id === projectId);
@@ -1467,13 +1475,19 @@ export function useBriar(options: UseBriarOptions = {}) {
               },
         );
       }
-      setProjectConnection(null);
-      setIsCreatingProject(false);
+      setProjectConnection((current) =>
+        current?.project.id === connection.project.id
+          ? { ...current, project: connectedProject, workflow: generatedWorkflow }
+          : current,
+      );
       setError(null);
       void refreshHealth();
       await refreshProjectReadiness(connection.project.id);
 
-      return connected.repositoryPath;
+      return {
+        repositoryPath: connected.repositoryPath,
+        workflow: generatedWorkflow,
+      };
     } catch (caught) {
       let message = caught instanceof Error ? caught.message : String(caught);
       if (connectedLocally) {
@@ -1989,6 +2003,7 @@ export function useBriar(options: UseBriarOptions = {}) {
             progress: input.status === "backlog" ? 0 : 5,
             detail,
             priority: input.priority,
+            assigneeUserId: input.assigneeUserId ?? null,
             repository:
               targetDashboard.settings.githubRepository ?? project.name,
             branch: null,
@@ -2084,6 +2099,10 @@ export function useBriar(options: UseBriarOptions = {}) {
                           title: input.title.trim(),
                           issueDescription: input.description,
                           priority: input.priority,
+                          assigneeUserId:
+                            input.assigneeUserId === undefined
+                              ? run.assigneeUserId ?? null
+                              : input.assigneeUserId,
                           updatedAt,
                         }
                       : run,
@@ -2096,6 +2115,7 @@ export function useBriar(options: UseBriarOptions = {}) {
             title: input.title.trim(),
             description: input.description,
             priority: input.priority,
+            assigneeUserId: input.assigneeUserId ?? null,
           };
         }
         if (!token) throw new Error("로그인이 필요합니다.");
@@ -2690,6 +2710,137 @@ export function useBriar(options: UseBriarOptions = {}) {
     [activeProjectId, dashboard, demoMode, refresh, token],
   );
 
+  const reworkRun = useCallback(
+    async (
+      runId: string,
+      input: { workflowStage: string; reason: string },
+    ) => {
+      if (!activeProjectId || !dashboard) {
+        throw new Error("재작업할 Auto Hunt 작업이 없습니다.");
+      }
+      const reason = input.reason.trim();
+      if (!reason) throw new Error("수정할 내용을 입력해 주세요.");
+      setRecoveringRunId(runId);
+      setRecoveryError(null);
+      try {
+        const run = dashboard.runs.find((candidate) => candidate.id === runId);
+        const checkpoint = run?.checkpoint;
+        if (!run || !checkpoint) {
+          throw new Error(
+            "현재 대기 지점을 안전하게 확인할 수 없습니다. 새로고침한 뒤 다시 시도해 주세요.",
+          );
+        }
+        if (demoMode) {
+          const occurredAt = new Date().toISOString();
+          const nextRevision = run.currentRevision + 1;
+          const nextEvent: HuntEvent = {
+            id: crypto.randomUUID(),
+            attempt: run.currentAttempt,
+            revision: nextRevision,
+            status: "queued",
+            workflowStage: input.workflowStage,
+            detail: reason,
+            actor: "briar-app",
+            qaStatus: null,
+            trackerState: run.tracker?.state ?? null,
+            pullRequestUrls: run.pullRequestUrls,
+            targetSha: null,
+            occurredAt,
+            recordedAt: occurredAt,
+          };
+          runEventsByRun.current[run.id] = [
+            nextEvent,
+            ...(runEventsByRun.current[run.id] ?? []),
+          ];
+          setDashboard((current) =>
+            current
+              ? {
+                  ...current,
+                  runs: current.runs.map((candidate) =>
+                    candidate.id === run.id
+                      ? {
+                          ...candidate,
+                          status: "queued",
+                          workflowStage: input.workflowStage,
+                          currentRevision: nextRevision,
+                          pausedAt: null,
+                          waitingCheckpoint: null,
+                          checkpoint: null,
+                          progress: progressForAutoHuntRun(
+                            "queued",
+                            input.workflowStage,
+                            candidate.workflow,
+                          ),
+                          detail: reason,
+                          resultSummary: null,
+                          structuredResult: null,
+                          commitSha: null,
+                          targetSha: null,
+                          claimedBy: null,
+                          claimedAt: null,
+                          leaseExpiresAt: null,
+                          updatedAt: occurredAt,
+                          lastEventAt: occurredAt,
+                          eventCount: candidate.eventCount + 1,
+                        }
+                      : candidate,
+                  ),
+                }
+              : current,
+          );
+          return;
+        }
+        if (!token) throw new Error("로그인이 필요합니다.");
+        const identity = [
+          runId,
+          checkpoint.key,
+          checkpoint.attempt,
+          checkpoint.revision,
+          input.workflowStage,
+          reason,
+        ].join(":");
+        const requestId =
+          reworkRequestIds.current.get(identity) ?? crypto.randomUUID();
+        reworkRequestIds.current.set(identity, requestId);
+        try {
+          await reworkPausedHuntRun(
+            token,
+            activeProjectId,
+            runId,
+            {
+              workflowStage: input.workflowStage,
+              reason,
+              checkpoint: {
+                key: checkpoint.key,
+                attempt: checkpoint.attempt,
+                revision: checkpoint.revision,
+              },
+            },
+            requestId,
+          );
+          reworkRequestIds.current.delete(identity);
+        } catch (caught) {
+          if (isApiErrorStatus(caught, 409)) {
+            reworkRequestIds.current.delete(identity);
+            await refresh("snapshot");
+            throw new Error(
+              "대기 지점이 이미 변경되었습니다. 최신 상태를 다시 불러왔습니다.",
+            );
+          }
+          throw caught;
+        }
+        await refresh("snapshot");
+      } catch (caught) {
+        const message = caught instanceof Error ? caught.message : String(caught);
+        setRecoveryError(message);
+        throw caught;
+      } finally {
+        setRecoveringRunId(null);
+      }
+    },
+    [activeProjectId, dashboard, demoMode, refresh, token],
+  );
+
   const moveRun = useCallback(
     async (runId: string, placement: HuntRunPlacement) => {
       if (!activeProjectId || !dashboard) {
@@ -2846,6 +2997,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     health,
     healthError,
     healthLoading,
+    finishProjectCreation,
     isCreatingProject,
     isCreatingIssue,
     updatingIssueId,
@@ -2863,6 +3015,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     renameOrganization,
     analyzeWorkflowRequirements,
     regenerateWorkflow,
+    reworkRun,
     reviseWorkflow,
     resumeRun,
     saveCheckpointPolicy,

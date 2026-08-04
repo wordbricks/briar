@@ -217,6 +217,7 @@ export function HuntDashboard({
   onMoveRun,
   onProcessIssueNow,
   onRetryRun,
+  onReworkRun,
   onCancelRun,
   onResumeRun = async () => undefined,
   onCompanionAgentsOpen,
@@ -278,6 +279,10 @@ export function HuntDashboard({
   onMoveRun: (runId: string, placement: HuntRunPlacement) => Promise<unknown>;
   onProcessIssueNow?: (run: HuntRun) => void;
   onRetryRun: (runId: string) => Promise<unknown>;
+  onReworkRun?: (
+    runId: string,
+    input: { workflowStage: string; reason: string },
+  ) => Promise<unknown>;
   onCancelRun: (runId: string) => Promise<unknown>;
   onResumeRun?: (runId: string) => Promise<unknown>;
   onCompanionAgentsOpen?: () => void;
@@ -719,6 +724,7 @@ export function HuntDashboard({
             ? [dashboard.project]
             : []
       }
+      members={dashboard?.members ?? []}
     />
   ) : null;
 
@@ -794,6 +800,11 @@ export function HuntDashboard({
             onProcessIssueNow ? () => onProcessIssueNow(selected) : undefined
           }
           onRetry={() => onRetryRun(selected.id)}
+          onRework={
+            onReworkRun
+              ? (input) => onReworkRun(selected.id, input)
+              : undefined
+          }
           onResume={() => onResumeRun(selected.id)}
           onSendIssueMessage={(input) => onSendIssueMessage(selected.id, input)}
           onUpdateIssue={(input) => onUpdateIssue(selected.id, input)}
@@ -1028,6 +1039,7 @@ export function HuntDashboard({
               )
             }
             runs={filtered}
+            members={dashboard?.members ?? []}
             processingIssueIds={processingIssueIds}
             updatingIssueId={updatingIssueId}
           />
@@ -1078,6 +1090,11 @@ export function HuntDashboard({
                     availableProviders={availableProviders}
                     activeAgent={
                       agentAssociationsByRunId.activeAgents.get(run.id) ?? null
+                    }
+                    assignee={
+                      dashboard?.members?.find(
+                        (member) => member.userId === run.assigneeUserId,
+                      ) ?? null
                     }
                     assignedWorker={
                       ["completed", "cancelled", "paused", "blocked", "failed"].includes(
@@ -1247,6 +1264,7 @@ export function HuntDashboard({
             setEditingRunId(null);
           }}
           run={editingRun}
+          members={dashboard?.members ?? []}
         />
       )}
       <Dialog
@@ -1324,11 +1342,13 @@ export function HuntDashboard({
 
 export function EditIssueDialog({
   isSubmitting,
+  members = [],
   onClose,
   onUpdate,
   run,
 }: {
   isSubmitting: boolean;
+  members?: OrganizationMember[];
   onClose: () => void;
   onUpdate: (input: UpdateIssueInput) => Promise<unknown>;
   run: HuntRun;
@@ -1338,6 +1358,9 @@ export function EditIssueDialog({
   const [description, setDescription] = useState(run.issueDescription ?? "");
   const [priority, setPriority] = useState(
     run.priority === null ? "" : String(run.priority),
+  );
+  const [assigneeUserId, setAssigneeUserId] = useState(
+    run.assigneeUserId ?? "",
   );
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -1378,6 +1401,7 @@ export function EditIssueDialog({
             title: title.trim(),
             description: description.trim() || null,
             priority: priority ? Number(priority) : null,
+            assigneeUserId: assigneeUserId || null,
           }).catch((error) =>
             setSubmitError(error instanceof Error ? error.message : String(error)),
           );
@@ -1427,6 +1451,19 @@ export function EditIssueDialog({
           </div>
           <div className="issue-metadata-bar">
             <NativeSelect
+              className="issue-assignee-select"
+              label={t("issue.assignee")}
+              onValueChange={setAssigneeUserId}
+              options={[
+                { label: t("run.unassigned"), value: "" },
+                ...members.map((member) => ({
+                  label: member.name,
+                  value: member.userId,
+                })),
+              ]}
+              value={assigneeUserId}
+            />
+            <NativeSelect
               className="issue-priority-select"
               label={t("issue.priority")}
               onValueChange={setPriority}
@@ -1473,6 +1510,7 @@ export function CreateIssueDialog({
   isSubmitting,
   onClose,
   onCreate,
+  members = [],
   projects,
 }: {
   compactHeader?: boolean;
@@ -1480,6 +1518,7 @@ export function CreateIssueDialog({
   isSubmitting: boolean;
   onClose: () => void;
   onCreate: (projectId: string, input: CreateIssueInput) => Promise<void>;
+  members?: OrganizationMember[];
   projects: Project[];
 }) {
   const { t } = useI18n();
@@ -1497,6 +1536,9 @@ export function CreateIssueDialog({
     initialDraft?.status ?? "queued",
   );
   const [priority, setPriority] = useState(initialDraft?.priority ?? "2");
+  const [assigneeUserId, setAssigneeUserId] = useState(
+    initialDraft?.assigneeUserId ?? "",
+  );
   const [projectId, setProjectId] = useState(() =>
     projects.some((project) => project.id === initialDraft?.projectId)
       ? initialDraft!.projectId
@@ -1525,8 +1567,17 @@ export function CreateIssueDialog({
       projectId,
       status,
       title,
+      assigneeUserId: assigneeUserId || null,
     });
-  }, [attachments, description, priority, projectId, status, title]);
+  }, [
+    assigneeUserId,
+    attachments,
+    description,
+    priority,
+    projectId,
+    status,
+    title,
+  ]);
 
   const closeWithDraft = useCallback(() => {
     persistDraft();
@@ -1740,6 +1791,7 @@ export function CreateIssueDialog({
               title: title.trim(),
               description: description.trim() || null,
               priority: Number(priority),
+              assigneeUserId: assigneeUserId || null,
               status,
               attachments: attachments.map(({ file }) => file),
               ...(attachments.length > 0
@@ -1849,6 +1901,19 @@ export function CreateIssueDialog({
             )}
           </div>
           <div className="issue-metadata-bar">
+            <NativeSelect
+              className="issue-assignee-select"
+              label={t("issue.assignee")}
+              onValueChange={setAssigneeUserId}
+              options={[
+                { label: t("run.unassigned"), value: "" },
+                ...members.map((member) => ({
+                  label: member.name,
+                  value: member.userId,
+                })),
+              ]}
+              value={assigneeUserId}
+            />
             <NativeSelect
               className="issue-status-select"
               label={t("dashboard.status")}
@@ -2149,6 +2214,7 @@ function SelectedAttachment({
 function KanbanCard({
   availableProviders,
   activeAgent,
+  assignee,
   assignedWorker,
   contextMenuDisabled,
   deletingIssueId,
@@ -2172,6 +2238,7 @@ function KanbanCard({
 }: {
   availableProviders: AgentProvider[];
   activeAgent: ProjectAgent | null;
+  assignee: OrganizationMember | null;
   assignedWorker: ExecutionWorker | null;
   contextMenuDisabled: boolean;
   deletingIssueId: string | null;
@@ -2223,7 +2290,7 @@ function KanbanCard({
       <div
         aria-label={t("run.details", { title: run.title })}
         aria-disabled={isMoving}
-        className={`kanban-card ${meta.tone}${isMoving ? " moving" : ""}${isDragging ? " dragging" : ""}${activeAgent || assignedWorker ? " has-assignees" : ""}${activeAgent && assignedWorker ? " has-multiple-assignees" : ""}`}
+        className={`kanban-card ${meta.tone}${isMoving ? " moving" : ""}${isDragging ? " dragging" : ""}${assignee || activeAgent || assignedWorker ? " has-assignees" : ""}${[assignee, activeAgent, assignedWorker].filter(Boolean).length > 1 ? " has-multiple-assignees" : ""}`}
         draggable={false}
         onClick={onOpen}
         onKeyDown={(event) => {
@@ -2238,8 +2305,17 @@ function KanbanCard({
         role="button"
         tabIndex={0}
       >
-        {(activeAgent || assignedWorker) && (
+        {(assignee || activeAgent || assignedWorker) && (
           <span className="kanban-card-assignee-badges">
+            {assignee && (
+              <span
+                aria-label={`${t("issue.assignee")}: ${assignee.name}`}
+                className="kanban-card-person-badge"
+                title={`${t("issue.assignee")}: ${assignee.name}`}
+              >
+                <IssueAssigneeAvatar member={assignee} />
+              </span>
+            )}
             {assignedWorker && (
               <span
                 aria-label={t("run.workerAssigned", {
@@ -2778,6 +2854,7 @@ function IssueList({
   onProcessIssueNow,
   onPriorityChange,
   onPreferencesChange,
+  members,
   runs,
   processingIssueIds,
   updatingIssueId,
@@ -2794,6 +2871,7 @@ function IssueList({
     run: HuntRun,
     preferences: IssueExecutionPreferences,
   ) => void;
+  members: OrganizationMember[];
   runs: HuntRun[];
   processingIssueIds: ReadonlySet<string>;
   updatingIssueId: string | null;
@@ -2821,6 +2899,9 @@ function IssueList({
             <span>{t("dashboard.emptyDescription")}</span>
           </div>
         ) : runs.map((run) => {
+          const assignee = members.find(
+            (member) => member.userId === run.assigneeUserId,
+          );
           const meta = runMeta(
             run.status,
             run.workflowStage,
@@ -2877,7 +2958,10 @@ function IssueList({
               >
                 <span className="issue-list-task" role="cell">
                   <span className="issue-list-task-kicker">
-                    <small>AH-{run.runNumber} · {run.sourceKey}</small>
+                    <small>
+                      AH-{run.runNumber} · {run.sourceKey}
+                      {assignee ? ` · ${assignee.name}` : ""}
+                    </small>
                     <PullRequestIconLink urls={run.pullRequestUrls} />
                   </span>
                   <strong>{run.title}</strong>
@@ -2942,6 +3026,7 @@ export function RunPage({
   onOpenFullPage,
   onProcessNow,
   onRetry,
+  onRework,
   onResume = async () => undefined,
   onRemoveDependency,
   onSendIssueMessage,
@@ -2980,6 +3065,10 @@ export function RunPage({
   onOpenFullPage?: () => void;
   onProcessNow?: () => void;
   onRetry: () => Promise<unknown>;
+  onRework?: (input: {
+    workflowStage: string;
+    reason: string;
+  }) => Promise<unknown>;
   onResume?: () => Promise<unknown>;
   onRemoveDependency?: (prerequisiteRunId: string) => Promise<unknown>;
   onSendIssueMessage: (input: {
@@ -3021,6 +3110,9 @@ export function RunPage({
   const priorityLabel = run.priority === null
     ? t("run.notSet")
     : t(`issue.priority${run.priority}` as MessageKey);
+  const assignee = mentionMembers.find(
+    (member) => member.userId === run.assigneeUserId,
+  ) ?? null;
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -3034,6 +3126,11 @@ export function RunPage({
   const [resultReviewError, setResultReviewError] = useState<string | null>(
     null,
   );
+  const [isReworkFormOpen, setIsReworkFormOpen] = useState(false);
+  const [reworkStage, setReworkStage] = useState("");
+  const [reworkFeedback, setReworkFeedback] = useState("");
+  const [reworkError, setReworkError] = useState<string | null>(null);
+  const [isSubmittingRework, setIsSubmittingRework] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState<
     | "description"
     | "result"
@@ -3041,7 +3138,10 @@ export function RunPage({
     | "statusHistory"
     | "evidence"
     | "conversation"
-  >(() => run.status === "completed" ? "result" : "description");
+  >(() =>
+    ["completed", "paused"].includes(run.status)
+      ? "result"
+      : "description");
   const hasWorkerExecution = Boolean(run.workerId);
   const workerExecutionIsLive = ![
     "completed",
@@ -3112,12 +3212,19 @@ export function RunPage({
   );
   const detailTabsId = useId();
   useEffect(() => {
-    setActiveDetailTab(run.status === "completed" ? "result" : "description");
+    setActiveDetailTab(
+      ["completed", "paused"].includes(run.status) ? "result" : "description",
+    );
     setIsPropertiesOpen(false);
     setRunEvents([]);
     setIsCompletingResultReview(false);
     setResultReviewError(null);
-  }, [run.id]);
+    setIsReworkFormOpen(false);
+    setReworkStage("");
+    setReworkFeedback("");
+    setReworkError(null);
+    setIsSubmittingRework(false);
+  }, [run.id, run.status]);
   useEffect(() => {
     void loadRunEvents();
   }, [loadRunEvents, run.eventCount, run.id]);
@@ -3157,6 +3264,49 @@ export function RunPage({
     run.resultSummary?.trim() ||
     (run.status === "completed" ? run.detail?.trim() : null) ||
     null;
+  const pausedResultItems =
+    run.status === "paused"
+      ? Array.from(
+          new Set(
+            [
+              run.detail?.trim() || null,
+              run.checkpoint
+                ? t(
+                    run.checkpoint.position === "before"
+                      ? "run.checkpointBefore"
+                      : "run.checkpointAfter",
+                    { stage: run.checkpoint.stageLabel },
+                  )
+                : t("run.pausedDescription"),
+              run.checkpoint
+                ? run.checkpoint.terminalReviewOnly
+                  ? t("run.checkpointTerminalReview")
+                  : t("run.checkpointNextStage", {
+                      stage:
+                        run.checkpoint.nextStageLabel ??
+                        run.checkpoint.nextStage ??
+                        run.checkpoint.stageLabel,
+                    })
+                : null,
+            ].filter((item): item is string => Boolean(item)),
+          ),
+        )
+      : [];
+  const pausedPartialSummary =
+    run.status === "paused" && run.structuredResult?.outcome === "partial"
+      ? completionSummary
+      : null;
+  const currentWorkflowStageIndex = run.workflow.stages.findIndex(
+    (stage) => stage.id === run.workflowStage,
+  );
+  const reworkStageOptions = currentWorkflowStageIndex >= 0
+    ? run.workflow.stages
+        .slice(0, currentWorkflowStageIndex + 1)
+        .map((stage) => ({
+          label: localizeWorkflowStage(t, stage.id, stage.label),
+          value: stage.id,
+        }))
+    : [];
   const resultReviews = run.resultReviews ?? [];
   const currentUserHasReviewed = Boolean(
     currentUserId &&
@@ -3285,6 +3435,31 @@ export function RunPage({
       setIsCompletingResultReview(false);
     }
   };
+  const openReworkForm = () => {
+    setReworkStage(
+      reworkStageOptions.at(-1)?.value ?? reworkStageOptions[0]?.value ?? "",
+    );
+    setReworkFeedback("");
+    setReworkError(null);
+    setIsReworkFormOpen(true);
+  };
+  const submitRework = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const reason = reworkFeedback.trim();
+    if (!onRework || !reworkStage || !reason) return;
+    setIsSubmittingRework(true);
+    setReworkError(null);
+    try {
+      await onRework({ workflowStage: reworkStage, reason });
+      setIsReworkFormOpen(false);
+    } catch (caught) {
+      setReworkError(
+        caught instanceof Error ? caught.message : t("run.reworkFailed"),
+      );
+    } finally {
+      setIsSubmittingRework(false);
+    }
+  };
   const shareIssue = async () => {
     setCopyStatus(null);
     try {
@@ -3331,7 +3506,7 @@ export function RunPage({
       </span>
       <span className="run-page-property-badge worker" title={t("run.assignee")}>
         <UserRound aria-hidden="true" size={13} />
-        {run.claimedBy ?? t("run.unassigned")}
+        {assignee?.name ?? t("run.unassigned")}
       </span>
       <span className="run-page-property-badge agent" title={t("run.agent")}>
         <Bot aria-hidden="true" size={13} />
@@ -3627,64 +3802,6 @@ export function RunPage({
                       id={`${detailTabsId}-description-panel`}
                       role="tabpanel"
                     >
-                      {run.status === "paused" ? (
-                        <section
-                          aria-labelledby={`${detailTabsId}-paused-title`}
-                          className="recovery-panel paused"
-                          role="status"
-                        >
-                          <div>
-                            <Clock3 aria-hidden="true" size={16} />
-                            <span>
-                              <strong id={`${detailTabsId}-paused-title`}>
-                                {t("status.paused")}
-                              </strong>
-                              <small>
-                                {run.checkpoint
-                                  ? t(
-                                      run.checkpoint.position === "before"
-                                        ? "run.checkpointBefore"
-                                        : "run.checkpointAfter",
-                                      { stage: run.checkpoint.stageLabel },
-                                    )
-                                  : t("run.pausedDescription")}
-                              </small>
-                            </span>
-                          </div>
-                          {run.checkpoint ? (
-                            <div className="checkpoint-resume-context">
-                              <span>
-                                {t("run.checkpointRevision", {
-                                  revision: run.checkpoint.revision,
-                                })}
-                              </span>
-                              <strong>
-                                {run.checkpoint.terminalReviewOnly
-                                  ? t("run.checkpointTerminalReview")
-                                  : t("run.checkpointNextStage", {
-                                      stage:
-                                        run.checkpoint.nextStageLabel ??
-                                        run.checkpoint.nextStage ??
-                                        run.checkpoint.stageLabel,
-                                    })}
-                              </strong>
-                            </div>
-                          ) : null}
-                          <div className="recovery-actions">
-                            <button
-                              disabled={isRecovering || Boolean(run.resumeRequestedAt)}
-                              onClick={() => void runAction(onResume)}
-                              type="button"
-                            >
-                              <RotateCcw
-                                className={isRecovering || run.resumeRequestedAt ? "spin" : ""}
-                                size={14}
-                              />
-                              {t(run.resumeRequestedAt ? "issue.processNowRunning" : "run.resume")}
-                            </button>
-                          </div>
-                        </section>
-                      ) : null}
                       {run.status === "blocked" ? (
                         <section
                           aria-labelledby={`${detailTabsId}-blocked-title`}
@@ -3871,7 +3988,177 @@ export function RunPage({
                       id={`${detailTabsId}-result-panel`}
                       role="tabpanel"
                     >
-                      {completionSummary ? (
+                      {run.status === "paused" ? (
+                        <section
+                          aria-labelledby={`${detailTabsId}-paused-result-title`}
+                          className="completed-issue-card paused-result-card"
+                          role="status"
+                        >
+                          <div className="completed-issue-card-heading">
+                            <span className={`status-pill ${meta.tone}`}>
+                              {label}
+                            </span>
+                            <strong id={`${detailTabsId}-paused-result-title`}>
+                              {t("run.partialResult")}
+                            </strong>
+                            <small>
+                              {t("run.attempt", { count: run.currentAttempt })} ·{" "}
+                              {run.checkpoint
+                                ? t("run.checkpointRevision", {
+                                    revision: run.checkpoint.revision,
+                                  })
+                                : t("run.revision", {
+                                    count: run.currentRevision,
+                                  })}
+                            </small>
+                          </div>
+                          {executionMetricsPanel}
+                          <div className="completed-issue-summary paused-result-summary">
+                            {pausedPartialSummary ? (
+                              <ReactMarkdown
+                                remarkPlugins={[remarkGfm]}
+                                skipHtml
+                              >
+                                {pausedPartialSummary}
+                              </ReactMarkdown>
+                            ) : (
+                              <ul>
+                                {pausedResultItems.map((item) => (
+                                  <li key={item}>{item}</li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                          {run.pullRequestUrls.length > 0 ? (
+                            <div className="run-result-links">
+                              {run.pullRequestUrls.map((url, index) => {
+                                const pullRequestLabel = pullRequestDisplayName(url, index);
+                                return (
+                                  <a
+                                    href={url}
+                                    key={url}
+                                    rel="noreferrer"
+                                    target="_blank"
+                                  >
+                                    <GitPullRequest aria-hidden="true" size={14} />
+                                    {pullRequestLabel}
+                                    <ArrowUp aria-hidden="true" size={13} />
+                                  </a>
+                                );
+                              })}
+                            </div>
+                          ) : null}
+                          <div className="paused-result-actions">
+                            <button
+                              className="paused-result-resume"
+                              disabled={isRecovering}
+                              onClick={() => void runAction(onResume)}
+                              type="button"
+                            >
+                              <RotateCcw
+                                aria-hidden="true"
+                                className={isRecovering ? "spin" : ""}
+                                size={14}
+                              />
+                              {t("run.resume")}
+                            </button>
+                            {onRework && reworkStageOptions.length > 0 ? (
+                              <button
+                                aria-expanded={isReworkFormOpen}
+                                className="paused-result-rework"
+                                disabled={isRecovering || isSubmittingRework}
+                                onClick={() =>
+                                  isReworkFormOpen
+                                    ? setIsReworkFormOpen(false)
+                                    : openReworkForm()}
+                                type="button"
+                              >
+                                <GitFork aria-hidden="true" size={14} />
+                                {t("run.requestRework")}
+                              </button>
+                            ) : null}
+                            <button
+                              onClick={() => setActiveDetailTab("evidence")}
+                              type="button"
+                            >
+                              <ImageIcon aria-hidden="true" size={14} />
+                              {t("run.viewResultEvidence")}
+                            </button>
+                          </div>
+                          {isReworkFormOpen ? (
+                            <form
+                              className="paused-rework-form"
+                              onSubmit={(event) => void submitRework(event)}
+                            >
+                              <div className="paused-rework-heading">
+                                <strong>{t("run.reworkTitle")}</strong>
+                                <p>{t("run.reworkDescription")}</p>
+                              </div>
+                              <label>
+                                <span>{t("run.reworkStage")}</span>
+                                <SelectMenu
+                                  disabled={isSubmittingRework}
+                                  label={t("run.reworkStage")}
+                                  onValueChange={setReworkStage}
+                                  options={reworkStageOptions}
+                                  size="small"
+                                  value={reworkStage}
+                                />
+                              </label>
+                              <label>
+                                <span>{t("run.reworkFeedback")}</span>
+                                <textarea
+                                  autoFocus
+                                  disabled={isSubmittingRework}
+                                  maxLength={4_000}
+                                  onChange={(event) =>
+                                    setReworkFeedback(event.target.value)}
+                                  placeholder={t("run.reworkFeedbackPlaceholder")}
+                                  rows={4}
+                                  value={reworkFeedback}
+                                />
+                              </label>
+                              {reworkError ? (
+                                <p className="paused-rework-error" role="alert">
+                                  {reworkError}
+                                </p>
+                              ) : null}
+                              <div className="paused-rework-submit-actions">
+                                <button
+                                  disabled={isSubmittingRework}
+                                  onClick={() => setIsReworkFormOpen(false)}
+                                  type="button"
+                                >
+                                  {t("common.cancel")}
+                                </button>
+                                <button
+                                  disabled={
+                                    isSubmittingRework ||
+                                    !reworkStage ||
+                                    !reworkFeedback.trim()
+                                  }
+                                  type="submit"
+                                >
+                                  {isSubmittingRework ? (
+                                    <LoaderCircle
+                                      aria-hidden="true"
+                                      className="spin"
+                                      size={14}
+                                    />
+                                  ) : (
+                                    <GitFork aria-hidden="true" size={14} />
+                                  )}
+                                  {t(
+                                    isSubmittingRework
+                                      ? "run.reworkSubmitting"
+                                      : "run.reworkSubmit",
+                                  )}
+                                </button>
+                              </div>
+                            </form>
+                          ) : null}
+                        </section>
+                      ) : completionSummary ? (
                         <section
                           aria-labelledby={`${detailTabsId}-result-title`}
                           className="completed-issue-card"
@@ -4219,12 +4506,12 @@ export function RunPage({
                     </span>
                   </label>
                   <div
-                    aria-label={`${t("run.assignee")}: ${run.claimedBy ?? t("run.unassigned")}`}
+                    aria-label={`${t("issue.assignee")}: ${assignee?.name ?? t("run.unassigned")}`}
                     className="run-property"
-                    title={t("run.assignee")}
+                    title={t("issue.assignee")}
                   >
                     <span className="run-property-icon assignee"><UserRound size={15} /></span>
-                    <span className="run-property-copy"><strong>{run.claimedBy ?? t("run.unassigned")}</strong></span>
+                    <span className="run-property-copy"><strong>{assignee?.name ?? t("run.unassigned")}</strong></span>
                   </div>
                   <div
                     aria-label={`${t("run.agent")}: ${performedAgentName ?? t("run.unassigned")}`}
@@ -4346,6 +4633,7 @@ export function RunPage({
             setIsEditDialogOpen(false);
           }}
           run={run}
+          members={mentionMembers}
         />
       )}
       <Dialog
@@ -5015,6 +5303,16 @@ function RunEvidencePanel({
         </div>
       )}
     </div>
+  );
+}
+
+function IssueAssigneeAvatar({ member }: { member: OrganizationMember }) {
+  return member.image ? (
+    <img alt="" className="issue-assignee-avatar" src={member.image} />
+  ) : (
+    <span aria-hidden="true" className="issue-assignee-avatar fallback">
+      {member.name.trim().charAt(0).toUpperCase() || "?"}
+    </span>
   );
 }
 

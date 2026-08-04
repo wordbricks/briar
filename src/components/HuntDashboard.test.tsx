@@ -813,7 +813,7 @@ describe("HuntDashboard", () => {
     expect(markup).toContain(">GG<");
     expect(markup).toContain("대기");
     expect(markup).toContain("프로젝트");
-    expect(markup).not.toContain("담당자");
+    expect(markup).toContain("담당자");
     expect(markup).not.toContain("라벨");
     expect(markup).toContain('aria-haspopup="listbox" aria-label="프로젝트"');
     expect(markup).toContain('aria-haspopup="listbox" aria-label="상태"');
@@ -832,6 +832,7 @@ describe("HuntDashboard", () => {
           title: string;
           description: string | null;
           priority: number | null;
+          assigneeUserId?: string | null;
         }
       | undefined;
     const container = document.createElement("div");
@@ -840,6 +841,16 @@ describe("HuntDashboard", () => {
       root.render(
         <EditIssueDialog
           isSubmitting={false}
+          members={[
+            {
+              userId: "user-1",
+              name: "Kim",
+              email: "kim@example.com",
+              image: null,
+              role: "member",
+              createdAt: "2026-07-01T00:00:00.000Z",
+            },
+          ]}
           onClose={() => undefined}
           onUpdate={async (input) => {
             updated = input;
@@ -868,6 +879,20 @@ describe("HuntDashboard", () => {
       description?.dispatchEvent(new Event("input", { bubbles: true }));
     });
     await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(
+          ".issue-assignee-select .select-menu-trigger",
+        )
+        ?.click();
+    });
+    await act(async () => {
+      document
+        .querySelector<HTMLButtonElement>(
+          '[role="option"][data-value="user-1"]',
+        )
+        ?.click();
+    });
+    await act(async () => {
       container.querySelector("form")?.dispatchEvent(
         new Event("submit", { bubbles: true, cancelable: true }),
       );
@@ -878,6 +903,7 @@ describe("HuntDashboard", () => {
       title: "수정된 이슈",
       description: "수정된 설명",
       priority: 3,
+      assigneeUserId: "user-1",
     });
     await act(async () => root.unmount());
   });
@@ -2882,7 +2908,7 @@ describe("HuntDashboard", () => {
     expect(markup).toContain('aria-expanded="false" class="run-page-properties-toggle"');
   });
 
-  it("distinguishes a paused review checkpoint from an error recovery state", () => {
+  it("shows a concise paused checkpoint summary in the result tab", () => {
     const pausedRun = {
       ...demoDashboard.runs[1],
       status: "paused" as const,
@@ -2908,13 +2934,80 @@ describe("HuntDashboard", () => {
       </TooltipProvider>,
     );
 
-    expect(markup).toContain('class="recovery-panel paused"');
+    expect(markup).toContain(
+      'class="completed-issue-card paused-result-card"',
+    );
     expect(markup).toContain("검토 대기");
-    expect(markup).toContain("Local validation 완료 후 확인");
+    expect(markup).toContain("부분 작업 결과");
+    expect(markup).toContain("작업 상세 패널을 결과 중심 구조로 정리했습니다");
+    expect(markup).toContain("컴포넌트 회귀 테스트와 로컬 빌드를 통과했습니다");
     expect(markup).toContain("리비전 1");
-    expect(markup).toContain("마지막 단계를 반복하지 않고 최종 검토 후 완료합니다");
-    expect(markup).toContain("다음 단계 재개");
+    expect(markup).toContain('<div class="completed-issue-summary paused-result-summary"><h2>구현</h2>');
+    expect(markup.match(/<li>/g)).toHaveLength(3);
+    expect(markup).toContain("승인하고 계속");
+    expect(markup).toContain("증빙 자세히 보기");
     expect(markup).toContain('class="run-page-property-badge amber"');
+    expect(markup).toContain('class="run-result-panel"');
+    expect(markup).not.toContain('class="recovery-panel paused"');
+    expect(markup).not.toContain('class="issue-description-markdown"');
+  });
+
+  it("submits paused review feedback as an explicit rework request", async () => {
+    const onRework = vi.fn(async () => undefined);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <TooltipProvider>
+        <RunPage
+          error={null}
+          isRecovering={false}
+          isSidebarOpen
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onRework={onRework}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          run={{ ...demoDashboard.runs[1], status: "paused" as const }}
+        />
+      </TooltipProvider>,
+    ));
+
+    const openButton = container.querySelector<HTMLButtonElement>(
+      ".paused-result-rework",
+    );
+    expect(openButton?.textContent).toContain("수정 요청");
+    await act(async () => openButton?.click());
+    const textarea = container.querySelector<HTMLTextAreaElement>(
+      ".paused-rework-form textarea",
+    );
+    expect(textarea).not.toBeNull();
+    await act(async () => {
+      if (!textarea) return;
+      Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )?.set?.call(textarea, "결과 요약을 더 짧게 만들고 모바일 화면도 다시 확인해 주세요.");
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const form = container.querySelector<HTMLFormElement>(".paused-rework-form");
+    await act(async () => {
+      form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      await Promise.resolve();
+    });
+    expect(onRework).toHaveBeenCalledWith({
+      workflowStage: "local_qa",
+      reason: "결과 요약을 더 짧게 만들고 모바일 화면도 다시 확인해 주세요.",
+    });
+
+    await act(async () => root.unmount());
+    container.remove();
   });
 
   it("does not show an error-like status banner for queued remote work", () => {

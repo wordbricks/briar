@@ -48,6 +48,16 @@ describe("CreateIssueDialog attachments", () => {
         <CreateIssueDialog
           {...projectProps}
           isSubmitting={false}
+          members={[
+            {
+              userId: "user-1",
+              name: "Kim",
+              email: "kim@example.com",
+              image: null,
+              role: "member",
+              createdAt: "2026-07-01T00:00:00.000Z",
+            },
+          ]}
           onClose={() => undefined}
           onCreate={async () => undefined}
         />,
@@ -108,6 +118,16 @@ describe("CreateIssueDialog attachments", () => {
         <CreateIssueDialog
           {...projectProps}
           isSubmitting={false}
+          members={[
+            {
+              userId: "user-1",
+              name: "Kim",
+              email: "kim@example.com",
+              image: null,
+              role: "member",
+              createdAt: "2026-07-01T00:00:00.000Z",
+            },
+          ]}
           onClose={() => undefined}
           onCreate={onCreate}
         />,
@@ -306,6 +326,7 @@ describe("CreateIssueDialog attachments", () => {
     expect(onCreate).toHaveBeenCalledWith(
       "project-1",
       {
+        assigneeUserId: null,
         attachments: [],
         description: null,
         priority: 2,
@@ -429,6 +450,16 @@ describe("CreateIssueDialog attachments", () => {
         <CreateIssueDialog
           {...projectProps}
           isSubmitting={false}
+          members={[
+            {
+              userId: "user-1",
+              name: "Kim",
+              email: "kim@example.com",
+              image: null,
+              role: "member",
+              createdAt: "2026-07-01T00:00:00.000Z",
+            },
+          ]}
           onClose={() => undefined}
           onCreate={onCreate}
         />,
@@ -458,6 +489,20 @@ describe("CreateIssueDialog attachments", () => {
         ?.click();
     });
     await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(
+          ".issue-assignee-select .select-menu-trigger",
+        )
+        ?.click();
+    });
+    await act(async () => {
+      document
+        .querySelector<HTMLButtonElement>(
+          '[role="option"][data-value="user-1"]',
+        )
+        ?.click();
+    });
+    await act(async () => {
       container.querySelector<HTMLFormElement>("form")?.requestSubmit();
     });
 
@@ -467,6 +512,7 @@ describe("CreateIssueDialog attachments", () => {
         attachments: [],
         description: null,
         priority: 2,
+        assigneeUserId: "user-1",
         status: "backlog",
         title: "Backlog issue",
       },
@@ -620,6 +666,7 @@ describe("CreateIssueDialog attachments", () => {
     expect(onClose).toHaveBeenCalledOnce();
     expect(JSON.parse(window.localStorage.getItem(createIssueDraftStorageKey)!))
       .toEqual({
+        assigneeUserId: null,
         description: "Keep this description",
         priority: "4",
         projectId: "project-2",

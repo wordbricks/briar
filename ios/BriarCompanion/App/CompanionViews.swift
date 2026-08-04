@@ -58,6 +58,7 @@ struct CompanionShellView: View {
                             allRuns: snapshot?.runs ?? [],
                             workers: snapshot?.workers ?? [],
                             providers: snapshot?.organizationProviders ?? [],
+                            members: snapshot?.members ?? [],
                             refresh: refresh
                         )
                     } else {
@@ -86,6 +87,7 @@ struct CompanionShellView: View {
                 TaskSearchView(
                     project: project,
                     runs: snapshot?.runs ?? [],
+                    members: snapshot?.members ?? [],
                     token: token,
                     api: api
                 )
@@ -293,10 +295,16 @@ struct TaskListView: View {
                                     allRuns: snapshot?.runs ?? [],
                                     workers: snapshot?.workers ?? [],
                                     providers: snapshot?.organizationProviders ?? [],
+                                    members: snapshot?.members ?? [],
                                     refresh: refresh
                                 )
                             } label: {
-                                RunRow(run: run)
+                                RunRow(
+                                    run: run,
+                                    assignee: snapshot?.members?.first {
+                                        $0.userId == run.assigneeUserId
+                                    }
+                                )
                             }
                             .accessibilityIdentifier("task-row-\(run.id.uuidString)")
                         }
@@ -328,13 +336,23 @@ struct TaskListView: View {
             }
         }
         .sheet(isPresented: $showingCreateIssue) {
-            CreateIssueSheet(mutations: mutations, refresh: refresh)
+            CreateIssueSheet(
+                mutations: mutations,
+                members: snapshot?.members ?? [],
+                refresh: refresh
+            )
         }
     }
 }
 
 struct RunRow: View {
     let run: DashboardRun
+    let assignee: OrganizationMember?
+
+    init(run: DashboardRun, assignee: OrganizationMember? = nil) {
+        self.run = run
+        self.assignee = assignee
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
@@ -356,6 +374,7 @@ struct RunRow: View {
                 if let workflowStage = run.workflowStage {
                     Text(workflowStage)
                 }
+                if let assignee { Label(assignee.name, systemImage: "person") }
                 Text(run.updatedAt, style: .relative)
             }
             .font(.caption)
@@ -393,6 +412,7 @@ struct TaskSearchView: View {
 
     let project: ProjectsResponse.Project
     let runs: [DashboardRun]
+    let members: [OrganizationMember]
     let token: String
     let api: any MobileAPIClientProtocol
 
@@ -411,9 +431,18 @@ struct TaskSearchView: View {
             } else {
                 ForEach(results) { run in
                     NavigationLink {
-                        RunDetailView(run: run, projectID: project.id, token: token, api: api)
+                        RunDetailView(
+                            run: run,
+                            projectID: project.id,
+                            token: token,
+                            api: api,
+                            members: members
+                        )
                     } label: {
-                        RunRow(run: run)
+                        RunRow(
+                            run: run,
+                            assignee: members.first { $0.userId == run.assigneeUserId }
+                        )
                     }
                     .accessibilityIdentifier("search-result-\(run.id.uuidString)")
                 }
@@ -468,6 +497,7 @@ struct RunDetailView: View {
     private let allRuns: [DashboardRun]
     private let workers: [DashboardWorker]
     private let providers: [AgentProvider]
+    private let members: [OrganizationMember]
     private let refresh: () async -> Void
 
     @MainActor
@@ -479,6 +509,7 @@ struct RunDetailView: View {
         allRuns: [DashboardRun] = [],
         workers: [DashboardWorker] = [],
         providers: [AgentProvider] = [],
+        members: [OrganizationMember] = [],
         refresh: @escaping () async -> Void = {}
     ) {
         self.run = run
@@ -486,6 +517,7 @@ struct RunDetailView: View {
         self.allRuns = allRuns
         self.workers = workers
         self.providers = providers
+        self.members = members
         self.refresh = refresh
         _detail = StateObject(wrappedValue: RunDetailStore(
             api: api,
@@ -527,6 +559,10 @@ struct RunDetailView: View {
                     if let progress = run.progress {
                         ProgressView(value: progress, total: 100)
                     }
+                    LabeledContent(
+                        "담당자",
+                        value: members.first { $0.userId == run.assigneeUserId }?.name ?? "미배정"
+                    )
                 }
             }
 
@@ -898,7 +934,12 @@ struct RunDetailView: View {
             Text("활동 기록, 대화와 첨부가 영구적으로 삭제됩니다.")
         }
         .sheet(isPresented: $showingEdit) {
-            EditIssueSheet(run: run, mutations: mutations, refresh: refresh)
+            EditIssueSheet(
+                run: run,
+                members: members,
+                mutations: mutations,
+                refresh: refresh
+            )
         }
         .sheet(isPresented: $showingDispatch) {
             DispatchIssueSheet(

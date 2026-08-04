@@ -41,6 +41,7 @@ export type CreateIssueInput = {
   title: string;
   description: string | null;
   priority: number | null;
+  assigneeUserId?: string | null;
   status: "backlog" | "queued";
   attachments: File[];
   attachmentReferences?: string[];
@@ -50,6 +51,7 @@ export type UpdateIssueInput = {
   title: string;
   description: string | null;
   priority: number | null;
+  assigneeUserId?: string | null;
 };
 
 export type IssueExecutionPreferences = {
@@ -173,6 +175,7 @@ export type HuntRun = {
   } | null;
   detail: string | null;
   priority: number | null;
+  assigneeUserId?: string | null;
   repository: string;
   branch: string | null;
   commitSha: string | null;

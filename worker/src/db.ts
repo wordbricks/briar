@@ -216,6 +216,7 @@ export type HuntRunRow = {
   workflow_snapshot_json: string;
   detail: string | null;
   priority: number | null;
+  assignee_user_id: string | null;
   repository: string;
   branch: string | null;
   commit_sha: string | null;
@@ -501,6 +502,7 @@ export type HuntEventInput = {
   commitSha: string | null;
   tracker: TrackerInput;
   issueDescription: string | null;
+  assigneeUserId?: string | null;
   resultSummary: string | null;
   structuredResult: StructuredAgentResult | null;
   pullRequestUrls: string[];
@@ -2379,14 +2381,30 @@ export async function removeOrganizationMember(
   organizationId: string,
   userId: string,
 ) {
-  const result = await db
-    .prepare(
-      `delete from briar_organization_members
-     where organization_id = ? and user_id = ? and role != 'owner'`,
-    )
-    .bind(organizationId, userId)
-    .run();
-  return result.meta.changes > 0;
+  const updatedAt = new Date().toISOString();
+  const results = await db.batch([
+    db
+      .prepare(
+        `update briar_hunt_runs
+         set assignee_user_id = null, updated_at = ?
+         where assignee_user_id = ?
+           and project_id in (
+             select id from briar_projects where organization_id = ?
+           )
+           and exists (
+             select 1 from briar_organization_members
+             where organization_id = ? and user_id = ? and role != 'owner'
+           )`,
+      )
+      .bind(updatedAt, userId, organizationId, organizationId, userId),
+    db
+      .prepare(
+        `delete from briar_organization_members
+         where organization_id = ? and user_id = ? and role != 'owner'`,
+      )
+      .bind(organizationId, userId),
+  ]);
+  return (results[1]?.meta.changes ?? 0) > 0;
 }
 
 export async function createSlackOAuthState(
@@ -5365,6 +5383,7 @@ export async function recordHuntEvent(
         `insert into briar_hunt_runs (
            id, project_id, source, source_key, title, stage, status,
            workflow_stage, workflow_snapshot_json, detail, priority,
+           assignee_user_id,
            repository, branch, commit_sha, tracker_provider,
            tracker_issue_id, tracker_issue_identifier, tracker_issue_url,
            tracker_issue_state, issue_description, result_summary,
@@ -5373,7 +5392,7 @@ export async function recordHuntEvent(
            staging_qa_status, production_qa_status, staging_qa_detail,
            production_qa_detail, context_json, started_at, completed_at,
            last_event_at, created_at, updated_at
-         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          on conflict(project_id, source, source_key) do nothing`,
       )
       .bind(
@@ -5388,6 +5407,7 @@ export async function recordHuntEvent(
         stableJson(workflowSnapshot),
         normalizedInput.detail,
         normalizedInput.priority,
+        normalizedInput.assigneeUserId ?? null,
         normalizedInput.repository,
         normalizedInput.branch,
         normalizedInput.commitSha,
@@ -6076,6 +6096,11 @@ export async function reworkHuntRun(
     actor: string;
     reason: string;
     occurredAt: string;
+    checkpoint?: {
+      key: string;
+      attempt: number;
+      revision: number;
+    };
   },
 ): Promise<{
   outcome: HuntReworkOutcome;
@@ -6112,9 +6137,23 @@ export async function reworkHuntRun(
     };
   }
 
+  if (
+    input.checkpoint &&
+    (!run.paused_at ||
+      run.waiting_checkpoint_key !== input.checkpoint.key ||
+      run.current_attempt !== input.checkpoint.attempt ||
+      (run.waiting_checkpoint_revision ?? run.current_revision) !==
+        input.checkpoint.revision)
+  ) {
+    throw new HuntTransitionError(
+      "The paused checkpoint changed before rework could be requested",
+    );
+  }
+
   if (run.status !== "running" || !run.workflow_stage) {
     throw new HuntTransitionError("Only a running workflow stage can be reworked");
   }
+  const isPaused = Boolean(run.paused_at);
   const workflow = parseWorkflow(run.workflow_snapshot_json);
   const currentRank = workflow.stages.findIndex(
     (stage) => stage.id === run.workflow_stage,
@@ -6127,9 +6166,13 @@ export async function reworkHuntRun(
       `Workflow stage is not configured for this run: ${input.workflowStage}`,
     );
   }
-  if (currentRank < 0 || targetRank >= currentRank) {
+  if (
+    currentRank < 0 ||
+    targetRank > currentRank ||
+    (!isPaused && targetRank === currentRank)
+  ) {
     throw new HuntTransitionError(
-      `Rework target ${input.workflowStage} must precede ${run.workflow_stage}`,
+      `Rework target ${input.workflowStage} must not follow ${run.workflow_stage}`,
     );
   }
 
@@ -7080,13 +7123,16 @@ export async function updateIssue(
     title: string;
     description: string | null;
     priority: number | null;
+    assigneeUserId?: string | null;
     updatedAt: string;
   },
 ) {
   return db
     .prepare(
       `update briar_hunt_runs
-       set title = ?, issue_description = ?, priority = ?, updated_at = ?
+       set title = ?, issue_description = ?, priority = ?,
+           assignee_user_id = case when ? = 1 then ? else assignee_user_id end,
+           updated_at = ?
        where id = ? and project_id = ?
        returning *`,
     )
@@ -7094,6 +7140,8 @@ export async function updateIssue(
       input.title,
       input.description,
       input.priority,
+      input.assigneeUserId === undefined ? 0 : 1,
+      input.assigneeUserId ?? null,
       input.updatedAt,
       runId,
       projectId,

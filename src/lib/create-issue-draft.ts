@@ -6,6 +6,7 @@ export type CreateIssueDraft = {
   status: "backlog" | "queued";
   priority: "1" | "2" | "3" | "4";
   projectId: string;
+  assigneeUserId?: string | null;
 };
 
 function isCreateIssueDraft(value: unknown): value is CreateIssueDraft {
@@ -21,7 +22,10 @@ function isCreateIssueDraft(value: unknown): value is CreateIssueDraft {
       draft.priority === "2" ||
       draft.priority === "3" ||
       draft.priority === "4") &&
-    typeof draft.projectId === "string"
+    typeof draft.projectId === "string" &&
+    (draft.assigneeUserId === undefined ||
+      draft.assigneeUserId === null ||
+      typeof draft.assigneeUserId === "string")
   );
 }
 

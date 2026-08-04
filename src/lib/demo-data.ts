@@ -169,6 +169,19 @@ const runSeeds: DemoRunSeed[] = [
     },
     progress: 90,
     detail: "Local validation 완료 후 최종 검토를 기다리고 있습니다.",
+    resultSummary:
+      "## 구현\n\n- 작업 상세 패널을 결과 중심 구조로 정리했습니다.\n- 일시정지 시점까지 완료한 구현과 검증 내용을 결과 탭에서 확인할 수 있습니다.\n\n## 검증\n\n- 컴포넌트 회귀 테스트와 로컬 빌드를 통과했습니다.",
+    structuredResult: {
+      summary:
+        "## 구현\n\n- 작업 상세 패널을 결과 중심 구조로 정리했습니다.\n- 일시정지 시점까지 완료한 구현과 검증 내용을 결과 탭에서 확인할 수 있습니다.\n\n## 검증\n\n- 컴포넌트 회귀 테스트와 로컬 빌드를 통과했습니다.",
+      outcome: "partial",
+      importance: "important",
+      urgency: "normal",
+      impact: "issue",
+      humanActionRequired: true,
+      nextAction: "부분 결과를 검토한 뒤 승인하거나 수정 요청을 남겨 주세요.",
+      dueAt: null,
+    },
     repository: "wordbricks/briar",
     branch: "feat/hunt-details",
     commitSha: "c49b012",
@@ -301,6 +314,16 @@ export const demoDashboard: DashboardPayload = {
     },
   },
   runs,
+  members: [
+    {
+      userId: "demo-user",
+      name: "Jay",
+      email: "demo@briar.local",
+      image: null,
+      role: "owner",
+      createdAt: ago(3_000),
+    },
+  ],
   organizationProviders: ["codex", "claude", "grok", "opencode"],
   generatedAt: new Date().toISOString(),
 };

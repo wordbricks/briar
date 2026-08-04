@@ -103,12 +103,14 @@ struct IssueDraft: Codable, Equatable, Sendable {
     var title = ""
     var description = ""
     var priority: Int?
+    var assigneeUserId: String? = nil
     var status: DashboardRun.Status = .queued
 
     var isEmpty: Bool {
         title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
             description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-            priority == nil
+            priority == nil &&
+            assigneeUserId == nil
     }
 }
 
@@ -116,6 +118,7 @@ struct CreateIssueRequest: Codable, Sendable {
     let title: String
     let description: String?
     let priority: Int?
+    let assigneeUserId: String?
     let status: DashboardRun.Status
 }
 
@@ -125,12 +128,14 @@ struct CreateIssueResponse: Codable, Sendable {
     let stage: String
     let status: DashboardRun.Status
     let attachments: [IssueAttachment]
+    let assigneeUserId: String?
 }
 
 struct UpdateIssueRequest: Codable, Sendable {
     let title: String
     let description: String?
     let priority: Int?
+    let assigneeUserId: String?
 }
 
 struct UpdateIssueResponse: Codable, Sendable {
@@ -138,6 +143,7 @@ struct UpdateIssueResponse: Codable, Sendable {
     let title: String
     let description: String?
     let priority: Int?
+    let assigneeUserId: String?
 }
 
 struct IssueExecutionPreferences: Codable, Equatable, Sendable {

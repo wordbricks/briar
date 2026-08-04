@@ -33,6 +33,7 @@ describe("issue multipart input", () => {
       title: "Screenshot issue",
       description: "Please inspect the attachment",
       priority: 2,
+      assigneeUserId: null,
       status: "backlog",
     });
     expect(result.attachments).toHaveLength(1);

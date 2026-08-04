@@ -909,17 +909,24 @@ export function App() {
         error={briar.error}
         loading={briar.loading}
         onCancel={briar.cancelProjectCreation}
-        onConnect={async (settings, repositoryPath) => {
-          const connected = await briar.connectProject(settings, repositoryPath);
-          if (connected) {
-            setRequestedRunId(null);
-            setRequestedSessionId(null);
-            resetNavigation("issues");
-          }
-          return connected;
+        onAnalyzeRequirements={async (projectId) => {
+          const workflow = await briar.analyzeWorkflowRequirements(projectId);
+          const health = await briar.refreshHealth();
+          return {
+            workflow,
+            requirements: health?.requirements ?? [],
+          };
         }}
+        onConnect={briar.connectProject}
         onCreate={briar.addProject}
+        onFinish={() => {
+          briar.finishProjectCreation();
+          setRequestedRunId(null);
+          setRequestedSessionId(null);
+          resetNavigation("issues");
+        }}
         onLogout={() => void briar.logout()}
+        onReviseWorkflow={briar.reviseWorkflow}
         onSkip={() => {
           markProjectOnboardingDeferred(briar.user!.id);
           setDeferredProjectOnboardingUserId(briar.user!.id);
@@ -928,7 +935,6 @@ export function App() {
         }}
         onRepositorySelect={briar.selectProjectRepository}
         onRepositoryInspect={briar.inspectProjectRepository}
-        onWorkspaceCreate={briar.createProjectRepository}
         user={briar.user}
       />
     );
@@ -1272,6 +1278,7 @@ export function App() {
             onMoveRun={briar.moveRun}
             onProcessIssueNow={processIssueNow}
             onRetryRun={briar.retryRun}
+            onReworkRun={briar.reworkRun}
             onCancelRun={briar.cancelRun}
             onResumeRun={briar.resumeRun}
             onRequestedRunOpen={() => setRequestedRunId(null)}
@@ -1356,6 +1363,8 @@ export function App() {
                       prerequisiteRunId,
                     )}
                   onRetry={() => briar.retryRun(inboxDetailRun.id)}
+                  onRework={(input) =>
+                    briar.reworkRun(inboxDetailRun.id, input)}
                   onResume={() => briar.resumeRun(inboxDetailRun.id)}
                   onSendIssueMessage={(input) =>
                     sendIssueMessage(inboxDetailRun.id, input)}
@@ -1641,6 +1650,7 @@ export function App() {
             onProcessIssueNow={processIssueNow}
             onRequestedRunOpen={() => setRequestedRunId(null)}
             onRetryRun={briar.retryRun}
+            onReworkRun={briar.reworkRun}
             onCancelRun={briar.cancelRun}
             onResumeRun={briar.resumeRun}
             onSendIssueMessage={sendIssueMessage}
