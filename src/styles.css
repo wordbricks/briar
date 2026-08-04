@@ -2398,7 +2398,9 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .onboarding-provider-progress > span { display:flex; align-items:center; gap:7px; color:#67568d; font-size:var(--text-2xs); font-weight:700; }
 .onboarding-provider-progress > span i { width:7px; height:7px; flex:0 0 auto; border-radius:50%; background:#735ac5; animation:auto-hunt-live-pulse 1.6s ease-in-out infinite; }
 .onboarding-provider-progress > p { max-height:88px; margin:0; overflow-y:auto; color:#4d4957; font-size:var(--text-xs); line-height:1.6; overflow-wrap:anywhere; white-space:pre-wrap; }
-.onboarding-process .onboarding-process-error { padding:13px 15px; border:1px solid #efd1d6; border-radius:11px; color:#9f3f4d; background:#fff7f8; text-align:left; }
+.onboarding-process .onboarding-process-error { width:min(520px,100%); margin-top:12px; padding:13px 15px; border:1px solid #efd1d6; border-radius:11px; color:#9f3f4d; background:#fff7f8; text-align:left; }
+.onboarding-process-error p { margin:0; }
+.onboarding-process-error ul { margin:9px 0 0; padding:9px 0 0 18px; border-top:1px solid #efd1d6; display:grid; gap:5px; font:400 var(--text-2xs)/1.55 "DM Mono",monospace; }
 .onboarding-process .pulse { animation:health-pulse 1.2s ease-in-out infinite; }
 .onboarding-secondary-actions { margin-top:22px; display:flex; align-items:center; justify-content:center; gap:10px; }
 .onboarding-secondary-actions button { min-height:38px; padding:0 14px; display:flex; align-items:center; gap:7px; border:1px solid var(--border); border-radius:9px; color:var(--foreground); background:var(--card); cursor:pointer; font-size:var(--text-xs); font-weight:650; }

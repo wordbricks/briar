@@ -337,6 +337,15 @@ class HttpError extends Error {
   }
 }
 
+class ProjectWorkflowInputError extends Error {
+  readonly code = "INVALID_PROJECT_WORKFLOW";
+
+  constructor(readonly issues: readonly unknown[]) {
+    super("Invalid project workflow");
+    this.name = "ProjectWorkflowInputError";
+  }
+}
+
 const runStatusSchema = z.enum(autoHuntPersistedRunStatuses);
 const workflowStageIdSchema = z
   .string()
@@ -1571,6 +1580,23 @@ const projectSettingsSchema = z
       });
     }
   });
+
+export function parseProjectSettingsInput(value: unknown) {
+  try {
+    return projectSettingsSchema.parse(value);
+  } catch (error) {
+    if (
+      error instanceof z.ZodError &&
+      error.issues.some((issue) => issue.path[0] === "workflow")
+    ) {
+      throw new ProjectWorkflowInputError(error.issues);
+    }
+    if (error instanceof AutoHuntWorkflowValidationError) {
+      throw new ProjectWorkflowInputError(error.issues);
+    }
+    throw error;
+  }
+}
 
 const checkpointPolicyInputSchema = z
   .object({
@@ -4706,7 +4732,7 @@ async function route(
     if (!canManageOrganization(project.member_role)) {
       throw new HttpError(403, "Organization admin access required");
     }
-    const input = projectSettingsSchema.parse(await readJson(request));
+    const input = parseProjectSettingsInput(await readJson(request));
     const currentSettings = await getProjectSettings(db, project.id);
     if (
       !isStoredWorkflowUnchanged(
@@ -7826,6 +7852,13 @@ export default {
       }
       if (error instanceof z.ZodError) {
         return json({ message: "Invalid request", issues: error.issues }, 400);
+      }
+      if (error instanceof ProjectWorkflowInputError) {
+        return json({
+          message: error.message,
+          code: error.code,
+          issues: error.issues,
+        }, 400);
       }
       if (error instanceof AutoHuntWorkflowValidationError) {
         return json({

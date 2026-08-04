@@ -303,6 +303,7 @@ export class ApiError extends Error {
     readonly status: number,
     message: string,
     readonly code?: string,
+    readonly issues?: readonly unknown[],
   ) {
     super(message);
     this.name = "ApiError";
@@ -311,6 +312,24 @@ export class ApiError extends Error {
 
 export function isApiErrorStatus(error: unknown, status: number) {
   return error instanceof ApiError && error.status === status;
+}
+
+export function apiErrorIssueMessages(error: unknown) {
+  if (!(error instanceof ApiError) || !error.issues) return [];
+  return error.issues.flatMap((issue) => {
+    if (typeof issue === "string") return [issue];
+    if (!issue || typeof issue !== "object") return [];
+    const candidate = issue as { message?: unknown; path?: unknown };
+    if (typeof candidate.message !== "string") return [];
+    const path = Array.isArray(candidate.path)
+      ? candidate.path
+          .filter((part) =>
+            typeof part === "string" || typeof part === "number"
+          )
+          .join(".")
+      : "";
+    return [path ? `${path}: ${candidate.message}` : candidate.message];
+  });
 }
 
 async function request<T>(
@@ -338,6 +357,7 @@ async function request<T>(
         body?.error ??
         `Briar API 요청 실패 (${response.status})`,
       body?.code,
+      Array.isArray(body?.issues) ? body.issues : undefined,
     );
   }
   if (response.status === 204) return undefined as T;
