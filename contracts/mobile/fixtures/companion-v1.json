@@ -61,7 +61,7 @@
           "username": "briar_user",
           "name": "Briar User",
           "email": "user@example.com",
-          "image": null
+          "image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
         }
       }
     },
@@ -123,8 +123,16 @@
                   "required": true
                 }
               ],
-              "execution": { "pauseAfterStage": "local_qa" },
-              "completion": { "requiredStages": ["analyzing", "implementing", "local_qa"] }
+              "execution": {
+                "pauseAfterStage": "local_qa"
+              },
+              "completion": {
+                "requiredStages": [
+                  "analyzing",
+                  "implementing",
+                  "local_qa"
+                ]
+              }
             },
             "progress": 45,
             "detail": "Implementing",
@@ -256,7 +264,7 @@
             "author": {
               "id": "fixture-user",
               "name": "Briar User",
-              "image": null,
+              "image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
               "provider": null
             },
             "replyCount": 0,
@@ -554,7 +562,7 @@
           "body": "Reviewed from the worker",
           "author": {
             "id": null,
-            "name": "Briar \u00b7 Codex",
+            "name": "Briar · Codex",
             "image": null,
             "provider": "codex"
           },
@@ -574,7 +582,7 @@
             "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
             "projectId": "11111111-1111-4111-8111-111111111111",
             "name": "Auto Hunt agent",
-            "avatar": null,
+            "avatar": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
             "codexPet": null,
             "provider": "codex",
             "model": "gpt-5.4",
@@ -610,7 +618,7 @@
                 "runId": "33333333-3333-4333-8333-333333333333",
                 "runNumber": 3832,
                 "sourceKey": "briar-issue:fixture",
-                "title": "iOS Native Companion \uc77d\uae30 \uacbd\ud5d8",
+                "title": "iOS Native Companion 읽기 경험",
                 "outcome": "completed",
                 "summary": "Session finished successfully."
               }

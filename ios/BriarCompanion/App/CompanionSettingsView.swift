@@ -20,6 +20,27 @@ struct CompanionSettingsView: View {
             Form {
                 if let user {
                     Section(L10n.text(.settingsAccount, locale: locale)) {
+                        HStack(spacing: 14) {
+                            ProfileImageView(
+                                image: user.image,
+                                name: user.name,
+                                systemImage: "person.fill",
+                                size: 56
+                            )
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(user.name).font(.headline)
+                                if let username = user.username, !username.isEmpty {
+                                    Text("@\(username)")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Text(user.email)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                        .accessibilityIdentifier("account-profile-photo")
                         LabeledContent("이름", value: user.name)
                         if let username = user.username, !username.isEmpty {
                             LabeledContent("사용자명", value: username)

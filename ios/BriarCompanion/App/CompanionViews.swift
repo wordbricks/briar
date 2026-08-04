@@ -156,7 +156,12 @@ struct CompanionShellView: View {
                 Divider()
                 Button("로그아웃", role: .destructive, action: signOut)
             } label: {
-                Image(systemName: "person.crop.circle")
+                ProfileImageView(
+                    image: user?.image,
+                    name: user?.name,
+                    systemImage: "person.fill",
+                    size: 28
+                )
             }
             .accessibilityLabel("계정 메뉴")
             .accessibilityIdentifier("account-menu")
@@ -583,14 +588,20 @@ struct RunDetailView: View {
             if let reviews = run.resultReviews, !reviews.isEmpty {
                 Section("결과 리뷰") {
                     ForEach(reviews) { review in
-                        Label {
+                        HStack(spacing: 12) {
+                            ProfileImageView(
+                                image: review.image,
+                                name: review.name,
+                                systemImage: "checkmark.seal.fill",
+                                size: 32
+                            )
                             VStack(alignment: .leading) {
                                 Text(review.name)
                                 Text(review.completedAt, format: .dateTime)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
-                        } icon: {
+                            Spacer()
                             Image(systemName: "checkmark.seal.fill").foregroundStyle(.green)
                         }
                     }
@@ -772,32 +783,41 @@ struct RunDetailView: View {
             if !detail.messages.isEmpty {
                 Section("메시지") {
                     ForEach(detail.messages) { message in
-                        VStack(alignment: .leading, spacing: 5) {
-                            HStack {
-                                Text(message.author.name).font(.headline)
-                                Spacer()
-                                Text(message.createdAt, style: .relative)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            if let parent = detail.messages.first(where: {
-                                $0.id == message.parentMessageId
-                            }) {
-                                HStack(alignment: .top, spacing: 6) {
-                                    Image(systemName: "arrowshape.turn.up.left")
-                                        .font(.caption2)
-                                    Text(parent.body)
+                        HStack(alignment: .top, spacing: 10) {
+                            ProfileImageView(
+                                image: message.author.image,
+                                name: message.author.name,
+                                systemImage: message.author.provider == nil ? "person.fill" : "cpu",
+                                size: 34,
+                                cornerRadius: 9
+                            )
+                            VStack(alignment: .leading, spacing: 5) {
+                                HStack {
+                                    Text(message.author.name).font(.headline)
+                                    Spacer()
+                                    Text(message.createdAt, style: .relative)
                                         .font(.caption)
-                                        .lineLimit(2)
+                                        .foregroundStyle(.secondary)
                                 }
-                                .foregroundStyle(.secondary)
-                                .padding(8)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                                if let parent = detail.messages.first(where: {
+                                    $0.id == message.parentMessageId
+                                }) {
+                                    HStack(alignment: .top, spacing: 6) {
+                                        Image(systemName: "arrowshape.turn.up.left")
+                                            .font(.caption2)
+                                        Text(parent.body)
+                                            .font(.caption)
+                                            .lineLimit(2)
+                                    }
+                                    .foregroundStyle(.secondary)
+                                    .padding(8)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                                }
+                                MarkdownText(markdown: message.body)
+                                Button("답글") { replyTo = message }
+                                    .font(.caption)
                             }
-                            MarkdownText(markdown: message.body)
-                            Button("답글") { replyTo = message }
-                                .font(.caption)
                         }
                     }
                 }
