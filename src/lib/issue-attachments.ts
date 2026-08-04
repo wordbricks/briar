@@ -9,7 +9,9 @@ export const issueAttachmentMimeTypes = [
   "video/quicktime",
 ] as const;
 
-export const issueAttachmentAccept = issueAttachmentMimeTypes.join(",");
+// Wildcard media hints open the native photo picker on mobile platforms. The
+// exact allowlist below remains authoritative when the selected files return.
+export const issueAttachmentAccept = "image/*,video/*";
 export const maxIssueAttachmentCount = 5;
 export const maxIssueAttachmentBytes = 20 * 1024 * 1024;
 export const maxIssueAttachmentTotalBytes = 25 * 1024 * 1024;
