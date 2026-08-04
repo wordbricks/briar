@@ -22,6 +22,7 @@ import type {
   WorkflowRequirementHealth,
 } from "../lib/project-connection";
 import {
+  isRepositoryWorkflowPending,
   repositoryWorkflowBootstrap,
   type AutoHuntWorkflow,
 } from "../lib/auto-hunt-contract";
@@ -241,6 +242,26 @@ export function ProjectOnboarding({
       } catch {
         return;
       }
+    }
+    if (
+      connection?.workflow &&
+      !isRepositoryWorkflowPending(connection.workflow)
+    ) {
+      const settings: LocalAutoHuntConfig = {
+        velenOrg: null,
+        linearEnabled: false,
+        linearSource: null,
+        linearTeam: null,
+        githubRepository: repositoryReadiness.githubRepository ?? null,
+        workflow: connection.workflow,
+      };
+      try {
+        await onConnect(settings, repositoryPath);
+        onFinish();
+      } catch {
+        // The connection error is surfaced by the parent on this repository step.
+      }
+      return;
     }
     setWorkflowError(null);
     setPhase("workflow-loading");

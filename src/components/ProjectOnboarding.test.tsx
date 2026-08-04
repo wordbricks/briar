@@ -67,6 +67,11 @@ const connection = {
   workflow: repositoryWorkflowBootstrap,
 };
 
+const existingWorkflowConnection = {
+  ...connection,
+  workflow: generatedWorkflow,
+};
+
 const baseProps = {
   connection: null,
   error: null,
@@ -190,6 +195,42 @@ describe("ProjectOnboarding", () => {
     expect(container.textContent).toContain("bun test");
     expect(container.querySelector("#onboarding-workflow-revision")).toBeTruthy();
     expect(container.textContent).toContain("나중에 언제든 다시 수정");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("finishes reconnection without workflow setup or tool analysis when a workflow already exists", async () => {
+    const { container, root } = mountOnboarding();
+    const onConnect = vi.fn().mockResolvedValue({
+      repositoryPath: readiness.repositoryPath,
+      workflow: generatedWorkflow,
+    });
+    const onFinish = vi.fn();
+    const onAnalyzeRequirements = vi.fn();
+
+    await act(async () => root.render(
+      <ProjectOnboarding
+        {...baseProps}
+        connection={existingWorkflowConnection}
+        onAnalyzeRequirements={onAnalyzeRequirements}
+        onConnect={onConnect}
+        onFinish={onFinish}
+      />,
+    ));
+    await selectValidRepository(container);
+    await act(async () => buttonWithText(container, "다음")?.click());
+
+    expect(onConnect).toHaveBeenCalledWith(
+      expect.objectContaining({ workflow: generatedWorkflow }),
+      readiness.repositoryPath,
+    );
+    expect(onFinish).toHaveBeenCalledOnce();
+    expect(onAnalyzeRequirements).not.toHaveBeenCalled();
+    expect(container.textContent).not.toContain("워크플로우를 만들고 있어요");
+    expect(container.textContent).not.toContain("워크플로우를 확인해 주세요");
+    expect(container.textContent).not.toContain("필요한 개발 도구를 확인하고 있어요");
+    expect(container.textContent).not.toContain("로컬 개발 환경을 확인해 주세요");
 
     await act(async () => root.unmount());
     container.remove();

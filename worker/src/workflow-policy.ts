@@ -27,6 +27,18 @@ const parseCheckpoints = (value: string | null | undefined) => {
   return Array.isArray(parsed) ? parsed as AutoHuntWorkflowCheckpoint[] : [];
 };
 
+export function isStoredWorkflowUnchanged(
+  storedWorkflowJson: string | null | undefined,
+  workflowInput: AutoHuntWorkflowInput | null | undefined,
+) {
+  if (!storedWorkflowJson) return false;
+  const storedWorkflow = normalizeAutoHuntWorkflow(
+    JSON.parse(storedWorkflowJson),
+  );
+  const nextWorkflow = normalizeAutoHuntWorkflow(workflowInput);
+  return JSON.stringify(storedWorkflow) === JSON.stringify(nextWorkflow);
+}
+
 export async function loadWorkflowCheckpointPolicy(
   db: D1Database,
   projectId: string,
