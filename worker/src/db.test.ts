@@ -3683,13 +3683,21 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     // This suite intentionally retains the legacy `kind` column for earlier
     // compatibility tests. Production removed it in migration 0028.
     await db.prepare("alter table briar_project_agents drop column kind").run();
-    // Migration 0055 predates the pause checkpoint. Exercise the historical
-    // rebuild against the pre-0057 shape, then restore the current column for
-    // the tests that follow it.
+    // Migration 0055 predates the pause checkpoint and resume request marker.
+    // Exercise the historical rebuild against that earlier shape, then restore
+    // the current columns for the tests that follow it.
     const pausedRuns = await db
       .prepare("select count(*) as count from briar_hunt_runs where paused_at is not null")
       .first<{ count: number }>();
     expect(pausedRuns?.count ?? 0).toBe(0);
+    const resumeRequestedRuns = await db
+      .prepare(
+        "select count(*) as count from briar_hunt_runs where resume_requested_at is not null",
+      )
+      .first<{ count: number }>();
+    expect(resumeRequestedRuns?.count ?? 0).toBe(0);
+    await db.prepare("drop index briar_hunt_runs_resume_requested_idx").run();
+    await db.prepare("alter table briar_hunt_runs drop column resume_requested_at").run();
     await db.prepare("alter table briar_hunt_runs drop column paused_at").run();
     const protectedTables = [
       "briar_hunt_runs",
@@ -3752,6 +3760,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       .all();
     expect(backupTables.results).toEqual([]);
     await db.prepare("alter table briar_hunt_runs add column paused_at text").run();
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0061_resume_requested_state.sql"),
+        "utf8",
+      ),
+    );
   });
 
   it("updates an idea through chat and atomically creates an acyclic issue plan", async () => {
