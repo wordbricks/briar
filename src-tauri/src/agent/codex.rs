@@ -249,7 +249,9 @@ impl AutoHuntCliEnvironment {
         create_secure_directory(&wrapper_directory)?;
         copy_secure_tree(&home.join(".config/briar"), &sandbox_config.join("briar"))?;
         if include_velen {
-            copy_secure_tree(&home.join(".config/velen"), &sandbox_config.join("velen"))?;
+            // Velen is optional execution context. A missing or unreadable Velen
+            // configuration must not prevent repository-only issue processing.
+            let _ = copy_secure_tree(&home.join(".config/velen"), &sandbox_config.join("velen"));
         }
         write_cli_wrapper(
             &wrapper_directory,
@@ -317,10 +319,7 @@ impl AutoHuntCliEnvironment {
         let bun_binary = which::which_in("bun", Some(execution_path), workspace)
             .map_err(|_| "Briar CLI 실행에 필요한 Bun을 찾지 못했습니다.".to_string())?;
         let velen_binary = if include_velen {
-            Some(
-                which::which_in("velen", Some(execution_path), workspace)
-                    .map_err(|_| "이 프로젝트에 설정된 Velen CLI를 찾지 못했습니다.".to_string())?,
-            )
+            which::which_in("velen", Some(execution_path), workspace).ok()
         } else {
             None
         };
@@ -348,7 +347,7 @@ impl AutoHuntCliEnvironment {
             "Briar CLI 실행에 필요한 번들 Bun 런타임을 찾지 못했습니다.".to_string()
         })?);
         let velen = if include_velen {
-            Some(PathBuf::from(runner.resolve_binary("velen")?))
+            runner.resolve_binary("velen").ok().map(PathBuf::from)
         } else {
             None
         };
@@ -2125,6 +2124,54 @@ mod tests {
             false,
         )
         .expect("Velen-free CLI environment should be prepared");
+
+        assert!(which::which_in(
+            "briar",
+            Some(cli_environment.execution_path()),
+            fixture.path(),
+        )
+        .is_ok());
+        assert!(which::which_in(
+            "velen",
+            Some(cli_environment.execution_path()),
+            fixture.path(),
+        )
+        .is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn prepares_auto_hunt_when_configured_velen_is_unavailable() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let fixture = tempfile::tempdir().expect("fixture directory should exist");
+        let home = fixture.path().join("source-home");
+        let binary_directory = fixture.path().join("source-bin");
+        let briar_entry = home.join(".local/share/briar/briar.js");
+        create_secure_directory(&binary_directory).expect("binary directory should exist");
+        create_secure_directory(
+            briar_entry
+                .parent()
+                .expect("Briar entry should have a parent"),
+        )
+        .expect("Briar library directory should exist");
+        fs::write(&briar_entry, "fixture").expect("Briar fixture entry should be written");
+        let bun = binary_directory.join("bun");
+        fs::write(&bun, "#!/bin/sh\nexit 0\n").expect("fake Bun should be written");
+        fs::set_permissions(&bun, fs::Permissions::from_mode(0o700))
+            .expect("fake Bun should be executable");
+        let source_path =
+            env::join_paths([binary_directory]).expect("fixture execution path should be valid");
+
+        let cli_environment = AutoHuntCliEnvironment::prepare(
+            &home,
+            &source_path,
+            fixture.path(),
+            "project-local",
+            "http://127.0.0.1:8788",
+            true,
+        )
+        .expect("missing configured Velen should not block the CLI environment");
 
         assert!(which::which_in(
             "briar",

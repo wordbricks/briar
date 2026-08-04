@@ -813,7 +813,13 @@ async function configureProject() {
 async function projectDoctor() {
   const config = await loadConfig();
   const project = await currentProject(config);
-  const velen = ensureConfiguredVelen(project);
+  let velen: ReturnType<typeof ensureConfiguredVelen> = null;
+  let velenError: string | null = null;
+  try {
+    velen = ensureConfiguredVelen(project);
+  } catch (error) {
+    velenError = error instanceof Error ? error.message : String(error);
+  }
   console.log(
     JSON.stringify({
       ok: true,
@@ -835,6 +841,8 @@ async function projectDoctor() {
         // true is the default; false opts into checkout/worktree-confined writes.
         fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
       },
+      velenHealthy: velenError === null,
+      velenError,
       requestIds: [velen?.auth.requestId, velen?.org.requestId, velen?.linear?.requestId].filter(
         Boolean,
       ),
@@ -958,7 +966,6 @@ async function claimWork() {
   const project = await currentProject(config);
   const runId = value("--run");
   if (runId) z.string().uuid().parse(runId);
-  ensureConfiguredVelen(project);
   if (
     project.activeClaim &&
     !project.activeClaim.finished &&
@@ -2943,7 +2950,6 @@ async function workerCommand() {
   if (!project) {
     throw new Error("이 컴퓨터에 연결된 프로젝트를 찾지 못했습니다.");
   }
-  ensureConfiguredVelen(project);
   const registered = project.executionWorker;
   if (!registered) {
     throw new Error(
