@@ -161,3 +161,26 @@ been closed in a separate reviewed change.
 The release build passed all 337 frontend tests and the release frontend
 configuration check. Xcode Organizer performed the final Wordbricks
 distribution signing and App Store Connect upload.
+
+## 2026-08-05 — 1.2.67
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.67`
+- App Store Connect build: `1`
+- App Store Connect build ID: `b1b0b9e3-e5e2-4e9f-98b5-7de79a222d1b`
+- Source commit: `595da30367eb12f8554d5078cbabab0e44351810`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- TestFlight state: `IN_BETA_TESTING`
+- Internal group: `wordbricks` (`hasAccessToAllBuilds=true`)
+- Automatic tester notification: enabled
+- Delivery UUID: `b1b0b9e3-e5e2-4e9f-98b5-7de79a222d1b`
+- IPA SHA-256: `17ab7c5db88c603969927306e04908cfd1dae4e58426ee2764942fe462d3e7ef`
+
+The shared Companion API contract, iPhone unit/UI suite, iPad VoiceOver and
+largest Dynamic Type layout suite, Production static analysis and unsigned
+build, session/download/log security checks, Tauri iOS simulator build, and
+Tauri Android debug build all passed. The signed archive was verified for its
+App Store profile, production entitlements, bundle identity, and compiled
+primary and alternate app icons before upload.
