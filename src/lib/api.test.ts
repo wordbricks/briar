@@ -34,6 +34,7 @@ import {
   updateAccountProfile,
   updateIssue,
   updateIssueExecutionPreferences,
+  updateProjectSettings,
   upsertProjectAgentSession,
   waitForIssueAgentReply,
 } from "./api";
@@ -42,6 +43,36 @@ import { demoDashboard, demoRunEvents } from "./demo-data";
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe("Project settings", () => {
+  it("omits read-only checkpoint policy when updating project settings", async () => {
+    const fetchMock = vi.fn(async (
+      _input: RequestInfo | URL,
+      _init?: RequestInit,
+    ) =>
+      new Response(JSON.stringify({ settings: demoDashboard.settings }), {
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await updateProjectSettings(
+      "token",
+      "project-1",
+      demoDashboard.settings,
+    );
+
+    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    expect(body).not.toHaveProperty("checkpointPolicy");
+    expect(body).toEqual({
+      velenOrg: demoDashboard.settings.velenOrg,
+      dataSource: demoDashboard.settings.dataSource,
+      linear: demoDashboard.settings.linear,
+      githubRepository: demoDashboard.settings.githubRepository,
+      workflow: demoDashboard.settings.workflow,
+    });
+  });
 });
 
 describe("API errors", () => {

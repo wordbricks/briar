@@ -1846,10 +1846,17 @@ export async function updateProjectSettings(
   projectId: string,
   settings: ProjectSettings,
 ) {
+  const writableSettings = {
+    velenOrg: settings.velenOrg,
+    dataSource: settings.dataSource,
+    linear: settings.linear,
+    githubRepository: settings.githubRepository,
+    workflow: settings.workflow,
+  };
   const result = await request<{ settings: ProjectSettings }>(
     `/projects/${projectId}/settings`,
     token,
-    { method: "PUT", body: JSON.stringify(settings) },
+    { method: "PUT", body: JSON.stringify(writableSettings) },
   );
   return {
     ...result,
