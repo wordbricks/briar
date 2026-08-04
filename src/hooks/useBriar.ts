@@ -17,6 +17,7 @@ import {
   deleteIssue as deleteRemoteIssue,
   deleteProject as deleteRemoteProject,
   dispatchHuntRun,
+  errorWithMessage,
   importLinearIssues,
   isApiErrorStatus,
   isApiConfigured,
@@ -1512,7 +1513,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         }
       }
       setError(message);
-      throw new Error(message);
+      throw errorWithMessage(caught, message);
     } finally {
       setLoading(false);
     }
