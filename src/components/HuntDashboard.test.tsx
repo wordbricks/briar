@@ -2803,6 +2803,10 @@ describe("HuntDashboard", () => {
         totalTokens: 1_250,
         durationMs: 90_000,
       },
+      preferredProvider: null,
+      preferredModel: null,
+      requestedProvider: "grok" as const,
+      requestedModel: "grok-4.5",
     };
     const markup = renderToStaticMarkup(
       <RunPage
@@ -2837,11 +2841,61 @@ describe("HuntDashboard", () => {
     expect(markup).toContain('class="run-result-metrics"');
     expect(markup).toContain("소요 시간");
     expect(markup).toContain("1m 30s");
+    expect(markup).toContain("프로바이더");
+    expect(markup).toContain("Grok");
+    expect(markup).toContain("모델");
+    expect(markup).toContain("grok-4.5");
     expect(markup).toContain("전체 토큰");
     expect(markup).toContain("1,250");
     expect(markup).toContain("캐시");
     expect(markup).toContain("추론");
     expect(markup).not.toContain('class="issue-description-markdown"');
+  });
+
+  it("prefers issue preferred provider/model over requested values in result metrics", () => {
+    const completedRun = {
+      ...demoDashboard.runs[0],
+      status: "completed" as const,
+      resultSummary: "프로바이더 우선순위를 검증합니다.",
+      executionMetrics: {
+        inputTokens: 10,
+        outputTokens: 5,
+        cacheReadTokens: null,
+        cacheWriteTokens: null,
+        reasoningOutputTokens: null,
+        totalTokens: 15,
+        durationMs: 12_000,
+      },
+      preferredProvider: "claude" as const,
+      preferredModel: "opus",
+      requestedProvider: "grok" as const,
+      requestedModel: "grok-4.5",
+    };
+    const markup = renderToStaticMarkup(
+      <RunPage
+        isSidebarOpen
+        error={null}
+        isRecovering={false}
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => []}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }}
+        run={completedRun}
+      />,
+    );
+
+    expect(markup).toContain("프로바이더");
+    expect(markup).toContain("Claude");
+    expect(markup).toContain("모델");
+    expect(markup).toContain("Claude Opus");
+    expect(markup).not.toContain("Grok");
+    expect(markup).not.toContain("grok-4.5");
   });
 
   it("shows result reviewers in the result and properties panels and records the current member", async () => {
