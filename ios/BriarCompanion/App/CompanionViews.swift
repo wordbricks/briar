@@ -478,6 +478,28 @@ struct OfflineStateView: View {
     }
 }
 
+private enum RunDetailTab: String, CaseIterable, Identifiable {
+    case issue
+    case control
+    case conversation
+    case result
+    case logs
+    case status
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .issue: "이슈"
+        case .control: "제어"
+        case .conversation: "대화"
+        case .result: "결과"
+        case .logs: "로그"
+        case .status: "상태"
+        }
+    }
+}
+
 struct RunDetailView: View {
     @Environment(\.dismiss) private var dismiss
     let run: DashboardRun
@@ -498,6 +520,7 @@ struct RunDetailView: View {
     @State private var replyTo: IssueMessage?
     @State private var reviewCompleted = false
     @State private var linkCopied = false
+    @State private var selectedTab = RunDetailTab.issue
 
     private let projectID: UUID
     private let allRuns: [DashboardRun]
@@ -548,395 +571,23 @@ struct RunDetailView: View {
     }
 
     var body: some View {
-        List {
-            Section {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack {
-                        StatusBadge(status: localStatus)
-                        if let runNumber = run.runNumber { Text("#\(runNumber)") }
-                        Spacer()
-                        Text(run.updatedAt, style: .relative)
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    if let detailText = run.detail, !detailText.isEmpty {
-                        Text(detailText).foregroundStyle(.secondary)
-                    }
-                    if let progress = run.progress {
-                        ProgressView(value: progress, total: 100)
-                    }
-                    LabeledContent(
-                        "담당자",
-                        value: members.first { $0.userId == run.assigneeUserId }?.name ?? "미배정"
-                    )
+        VStack(spacing: 0) {
+            Picker("이슈 상세 탭", selection: $selectedTab) {
+                ForEach(RunDetailTab.allCases) { tab in
+                    Text(tab.title)
+                        .tag(tab)
+                        .accessibilityIdentifier("run-detail-tab-\(tab.rawValue)")
                 }
             }
+            .pickerStyle(.segmented)
+            .controlSize(.small)
+            .padding(.horizontal)
+            .padding(.vertical, 10)
+            .background(Color(uiColor: .systemGroupedBackground))
+            .accessibilityIdentifier("run-detail-tabs")
 
-            if let description = run.issueDescription, !description.isEmpty {
-                Section("설명") { MarkdownText(markdown: description) }
-            }
-
-            if localStatus == .paused, run.resumeRequestedAt != nil {
-                Section("검토 대기") {
-                    Label("일시정지 상태를 유지하며 워커를 재할당하고 있습니다.",
-                          systemImage: "arrow.triangle.2.circlepath")
-                        .foregroundStyle(.secondary)
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                }
-            } else if localStatus == .paused, let checkpoint = run.checkpoint {
-                Section("검토 대기") {
-                    Label {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(checkpoint.position == .before
-                                ? "\(checkpoint.stageLabel) 시작 전 확인"
-                                : "\(checkpoint.stageLabel) 완료 후 확인")
-                                .font(.headline)
-                            Text("리비전 \(checkpoint.revision)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text(checkpoint.terminalReviewOnly
-                                ? "마지막 단계를 반복하지 않고 최종 검토 후 완료합니다."
-                                : "재개 후 \(checkpoint.nextStageLabel ?? checkpoint.nextStage ?? checkpoint.stageLabel)부터 자동 진행합니다.")
-                                .font(.subheadline)
-                        }
-                    } icon: {
-                        Image(systemName: "pause.circle.fill")
-                            .foregroundStyle(.purple)
-                    }
-                    Button {
-                        Task { await resume(checkpoint: checkpoint) }
-                    } label: {
-                        if mutations.isActive("resume-\(run.id)") {
-                            ProgressView().frame(maxWidth: .infinity)
-                        } else {
-                            Label("자동화 재개", systemImage: "play.fill")
-                                .frame(maxWidth: .infinity)
-                        }
-                    }
-                    .disabled(mutations.isActive("resume-\(run.id)"))
-                    .accessibilityLabel("\(checkpoint.stageLabel) 체크포인트 승인 후 자동화 재개")
-                    .accessibilityIdentifier("resume-run-button")
-                }
-            }
-
-            if let summary = run.structuredResult?.summary ?? run.resultSummary, !summary.isEmpty {
-                Section("결과") {
-                    MarkdownText(markdown: summary)
-                    if let result = run.structuredResult {
-                        LabeledContent("결과 상태", value: result.outcome)
-                        if let nextAction = result.nextAction, !nextAction.isEmpty {
-                            LabeledContent("다음 조치", value: nextAction)
-                        }
-                    }
-                }
-            }
-
-            if let reviews = run.resultReviews, !reviews.isEmpty {
-                Section("결과 리뷰") {
-                    ForEach(reviews) { review in
-                        HStack(spacing: 12) {
-                            ProfileImageView(
-                                image: review.image,
-                                name: review.name,
-                                systemImage: "checkmark.seal.fill",
-                                size: 32
-                            )
-                            VStack(alignment: .leading) {
-                                Text(review.name)
-                                Text(review.completedAt, format: .dateTime)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Image(systemName: "checkmark.seal.fill").foregroundStyle(.green)
-                        }
-                    }
-                }
-            }
-
-            if let attachments = run.attachments, !attachments.isEmpty {
-                Section("첨부") {
-                    ForEach(attachments) { attachment in
-                        if attachment.contentType.hasPrefix("image/") {
-                            AuthenticatedImagePreview(
-                                sourceID: attachment.url,
-                                filename: attachment.filename,
-                                detail: ByteCountFormatter.string(
-                                    fromByteCount: Int64(attachment.byteSize),
-                                    countStyle: .file
-                                ),
-                                accessibilityID: "issue-attachment-image-\(attachment.id.uuidString.lowercased())",
-                                load: {
-                                    try await detail.download(
-                                        path: attachment.url,
-                                        filename: attachment.filename
-                                    )
-                                },
-                                open: { previewFile = PreviewFile(url: $0) }
-                            )
-                        } else {
-                            Button {
-                                Task { await open(path: attachment.url, filename: attachment.filename) }
-                            } label: {
-                                Label {
-                                    VStack(alignment: .leading) {
-                                        Text(attachment.filename)
-                                        Text(ByteCountFormatter.string(fromByteCount: Int64(attachment.byteSize), countStyle: .file))
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                } icon: {
-                                    Image(systemName: "doc")
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            Section("실행 제어") {
-                Picker("상태 이동", selection: placementBinding) {
-                    ForEach(availablePlacements) { placement in
-                        Text(placement.label).tag(placement)
-                    }
-                }
-                .disabled(mutations.isActive("move-\(run.id)"))
-                .accessibilityIdentifier("run-status-picker")
-                if localStatus == .backlog || localStatus == .queued {
-                    Button("바로 처리") {
-                        reassigning = false
-                        showingDispatch = true
-                    }
-                    .disabled((run.waitingOnPrerequisiteCount ?? 0) > 0)
-                    .accessibilityIdentifier("process-now-button")
-                }
-                if localStatus == .running {
-                    Button("Worker 다시 배정") {
-                        reassigning = true
-                        showingDispatch = true
-                    }
-                }
-                if localStatus == .blocked || localStatus == .failed {
-                    Button("재시도") { Task { await recover(action: "retry") } }
-                        .accessibilityIdentifier("retry-run-button")
-                }
-                if localStatus != .completed && localStatus != .cancelled {
-                    Button("실행 취소", role: .destructive) {
-                        Task { await recover(action: "cancel") }
-                    }
-                    .accessibilityIdentifier("cancel-run-button")
-                }
-                if localStatus == .completed && !reviewCompleted {
-                    Button("결과 검수 완료") { Task { await completeReview() } }
-                        .accessibilityIdentifier("complete-review-button")
-                } else if reviewCompleted {
-                    Label("결과 검수 완료", systemImage: "checkmark.seal.fill")
-                        .foregroundStyle(.green)
-                }
-            }
-
-            Section("실행 설정") {
-                Picker("프로바이더", selection: providerSelection) {
-                    Text("기본값").tag(AgentProvider?.none)
-                    ForEach(providers.isEmpty ? AgentProvider.allCases : providers) {
-                        Text($0.displayName).tag(AgentProvider?.some($0))
-                    }
-                }
-                .disabled(mutations.isActive("preferences-\(run.id)"))
-                .accessibilityIdentifier("execution-provider-picker")
-                Picker("모델", selection: modelSelection) {
-                    Text("기본값").tag(String?.none)
-                    ForEach(preferences.provider?.models ?? [], id: \.self) {
-                        Text($0).tag(String?.some($0))
-                    }
-                }
-                .disabled(
-                    preferences.provider == nil ||
-                        mutations.isActive("preferences-\(run.id)")
-                )
-                .accessibilityIdentifier("execution-model-picker")
-                Picker("Effort", selection: effortSelection) {
-                    Text("기본값").tag(ModelEffort?.none)
-                    ForEach(preferences.provider?.efforts ?? []) {
-                        Text($0.rawValue).tag(ModelEffort?.some($0))
-                    }
-                }
-                .disabled(
-                    preferences.model == nil ||
-                        mutations.isActive("preferences-\(run.id)")
-                )
-                .accessibilityIdentifier("execution-effort-picker")
-            }
-
-            if localStatus == .backlog || localStatus == .queued {
-                Section("의존성") {
-                    let candidates = allRuns.filter {
-                        $0.id != run.id && !($0.status == .cancelled)
-                    }
-                    if candidates.isEmpty {
-                        Text("추가할 수 있는 선행 이슈가 없습니다.")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(candidates) { candidate in
-                            Toggle(isOn: dependencyBinding(candidate.id)) {
-                                VStack(alignment: .leading) {
-                                    Text(candidate.title)
-                                    if let number = candidate.runNumber {
-                                        Text("#\(number) · \(candidate.status.displayName)")
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if detail.loading && detail.events.isEmpty {
-                Section { ProgressView("상세 기록을 불러오는 중…") }
-            }
-
-            if let error = detail.errorMessage {
-                Section {
-                    Label(error, systemImage: "wifi.exclamationmark")
-                        .foregroundStyle(.orange)
-                    Button("상세 다시 시도") { Task { await detail.load() } }
-                }
-            }
-
-            if !detail.events.isEmpty {
-                Section("이벤트") {
-                    ForEach(detail.events) { event in
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                StatusBadge(status: event.status)
-                                if let stage = event.workflowStage { Text(stage).font(.caption) }
-                                Spacer()
-                                Text(event.occurredAt, style: .relative).font(.caption)
-                            }
-                            if let eventDetail = event.detail, !eventDetail.isEmpty {
-                                Text(eventDetail).font(.subheadline)
-                            }
-                            Text(event.actor).font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            }
-
-            if !detail.evidence.isEmpty {
-                Section("증빙") {
-                    ForEach(detail.evidence) { evidence in
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Image(systemName: evidence.status == .passed ? "checkmark.circle.fill" : "circle")
-                                    .foregroundStyle(evidence.status == .passed ? Color.green : Color.secondary)
-                                Text(evidence.type).font(.headline)
-                                if !evidence.canonical { Text("이전 버전").font(.caption2) }
-                            }
-                            if let evidenceDetail = evidence.detail, !evidenceDetail.isEmpty {
-                                Text(evidenceDetail).font(.subheadline)
-                            }
-                            ForEach(evidence.images ?? []) { image in
-                                if image.contentType.hasPrefix("image/") {
-                                    AuthenticatedImagePreview(
-                                        sourceID: image.url,
-                                        filename: image.filename,
-                                        detail: ByteCountFormatter.string(
-                                            fromByteCount: Int64(image.byteSize),
-                                            countStyle: .file
-                                        ),
-                                        accessibilityID: "evidence-image-\(image.id.uuidString.lowercased())",
-                                        load: {
-                                            try await detail.download(
-                                                path: image.url,
-                                                filename: image.filename
-                                            )
-                                        },
-                                        open: { previewFile = PreviewFile(url: $0) }
-                                    )
-                                } else {
-                                    Button {
-                                        Task { await open(path: image.url, filename: image.filename) }
-                                    } label: {
-                                        Label(image.filename, systemImage: "doc")
-                                    }
-                                }
-                            }
-                            if let url = evidence.url {
-                                Link("연결된 결과 열기", destination: url)
-                            }
-                        }
-                    }
-                }
-            }
-
-            if !detail.messages.isEmpty {
-                Section("메시지") {
-                    ForEach(detail.messages) { message in
-                        HStack(alignment: .top, spacing: 10) {
-                            ProfileImageView(
-                                image: message.author.image,
-                                name: message.author.name,
-                                systemImage: message.author.provider == nil ? "person.fill" : "cpu",
-                                size: 34,
-                                cornerRadius: 9
-                            )
-                            VStack(alignment: .leading, spacing: 5) {
-                                HStack {
-                                    Text(message.author.name).font(.headline)
-                                    Spacer()
-                                    Text(message.createdAt, style: .relative)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                if let parent = detail.messages.first(where: {
-                                    $0.id == message.parentMessageId
-                                }) {
-                                    HStack(alignment: .top, spacing: 6) {
-                                        Image(systemName: "arrowshape.turn.up.left")
-                                            .font(.caption2)
-                                        Text(parent.body)
-                                            .font(.caption)
-                                            .lineLimit(2)
-                                    }
-                                    .foregroundStyle(.secondary)
-                                    .padding(8)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
-                                }
-                                MarkdownText(markdown: message.body)
-                                Button("답글") { replyTo = message }
-                                    .font(.caption)
-                            }
-                        }
-                    }
-                }
-            }
-
-            Section(replyTo == nil ? "메시지 보내기" : "\(replyTo?.author.name ?? "")에게 답글") {
-                TextField("메시지 또는 @Briar 질문", text: $messageText, axis: .vertical)
-                    .lineLimit(2...6)
-                    .accessibilityIdentifier("issue-message-field")
-                HStack {
-                    if replyTo != nil { Button("답글 취소") { replyTo = nil } }
-                    Spacer()
-                    Button("보내기") { Task { await sendMessage() } }
-                        .disabled(
-                            messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-                                mutations.isActive("message-\(run.id)")
-                        )
-                        .accessibilityIdentifier("issue-message-send")
-                }
-            }
-
-            if let actionError {
-                Section {
-                    Label(actionError, systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(.red)
-                }
-            }
+            List { selectedTabContent }
+            .accessibilityIdentifier("run-detail-\(selectedTab.rawValue)-panel")
         }
         .navigationTitle(run.title)
         .toolbar {
@@ -1010,6 +661,459 @@ struct RunDetailView: View {
             )
         }
         .accessibilityIdentifier("run-detail")
+    }
+
+    @ViewBuilder
+    private var selectedTabContent: some View {
+        switch selectedTab {
+        case .issue: issueTabContent
+        case .control: controlTabContent
+        case .conversation: conversationTabContent
+        case .result: resultTabContent
+        case .logs: logsTabContent
+        case .status: statusTabContent
+        }
+
+        if let actionError {
+            Section {
+                Label(actionError, systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.red)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var issueTabContent: some View {
+        if let description = run.issueDescription, !description.isEmpty {
+            Section("설명") { MarkdownText(markdown: description) }
+        }
+
+        if let attachments = run.attachments, !attachments.isEmpty {
+            Section("첨부") {
+                ForEach(attachments) { attachment in
+                    if attachment.contentType.hasPrefix("image/") {
+                        AuthenticatedImagePreview(
+                            sourceID: attachment.url,
+                            filename: attachment.filename,
+                            detail: ByteCountFormatter.string(
+                                fromByteCount: Int64(attachment.byteSize),
+                                countStyle: .file
+                            ),
+                            accessibilityID: "issue-attachment-image-\(attachment.id.uuidString.lowercased())",
+                            load: {
+                                try await detail.download(
+                                    path: attachment.url,
+                                    filename: attachment.filename
+                                )
+                            },
+                            open: { previewFile = PreviewFile(url: $0) }
+                        )
+                    } else {
+                        Button {
+                            Task { await open(path: attachment.url, filename: attachment.filename) }
+                        } label: {
+                            Label {
+                                VStack(alignment: .leading) {
+                                    Text(attachment.filename)
+                                    Text(ByteCountFormatter.string(
+                                        fromByteCount: Int64(attachment.byteSize),
+                                        countStyle: .file
+                                    ))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                }
+                            } icon: {
+                                Image(systemName: "doc")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if run.issueDescription?.isEmpty != false, run.attachments?.isEmpty != false {
+            Section { ContentUnavailableView("이슈 내용 없음", systemImage: "doc.text") }
+        }
+    }
+
+    @ViewBuilder
+    private var controlTabContent: some View {
+        if localStatus == .paused, run.resumeRequestedAt != nil {
+            Section("검토 대기") {
+                Label("일시정지 상태를 유지하며 워커를 재할당하고 있습니다.",
+                      systemImage: "arrow.triangle.2.circlepath")
+                    .foregroundStyle(.secondary)
+                ProgressView().frame(maxWidth: .infinity)
+            }
+        } else if localStatus == .paused, let checkpoint = run.checkpoint {
+            checkpointControl(checkpoint)
+        }
+
+        Section("실행 제어") {
+            Picker("상태 이동", selection: placementBinding) {
+                ForEach(availablePlacements) { placement in
+                    Text(placement.label).tag(placement)
+                }
+            }
+            .disabled(mutations.isActive("move-\(run.id)"))
+            .accessibilityIdentifier("run-status-picker")
+
+            if localStatus == .backlog || localStatus == .queued {
+                Button("바로 처리") {
+                    reassigning = false
+                    showingDispatch = true
+                }
+                .disabled((run.waitingOnPrerequisiteCount ?? 0) > 0)
+                .accessibilityIdentifier("process-now-button")
+            }
+            if localStatus == .running {
+                Button("Worker 다시 배정") {
+                    reassigning = true
+                    showingDispatch = true
+                }
+            }
+            if localStatus == .blocked || localStatus == .failed {
+                Button("재시도") { Task { await recover(action: "retry") } }
+                    .accessibilityIdentifier("retry-run-button")
+            }
+            if localStatus != .completed && localStatus != .cancelled {
+                Button("실행 취소", role: .destructive) {
+                    Task { await recover(action: "cancel") }
+                }
+                .accessibilityIdentifier("cancel-run-button")
+            }
+            if localStatus == .completed && !reviewCompleted {
+                Button("결과 검수 완료") { Task { await completeReview() } }
+                    .accessibilityIdentifier("complete-review-button")
+            } else if reviewCompleted {
+                Label("결과 검수 완료", systemImage: "checkmark.seal.fill")
+                    .foregroundStyle(.green)
+            }
+        }
+
+        Section("실행 설정") {
+            Picker("프로바이더", selection: providerSelection) {
+                Text("기본값").tag(AgentProvider?.none)
+                ForEach(providers.isEmpty ? AgentProvider.allCases : providers) {
+                    Text($0.displayName).tag(AgentProvider?.some($0))
+                }
+            }
+            .disabled(mutations.isActive("preferences-\(run.id)"))
+            .accessibilityIdentifier("execution-provider-picker")
+            Picker("모델", selection: modelSelection) {
+                Text("기본값").tag(String?.none)
+                ForEach(preferences.provider?.models ?? [], id: \.self) {
+                    Text($0).tag(String?.some($0))
+                }
+            }
+            .disabled(
+                preferences.provider == nil ||
+                    mutations.isActive("preferences-\(run.id)")
+            )
+            .accessibilityIdentifier("execution-model-picker")
+            Picker("Effort", selection: effortSelection) {
+                Text("기본값").tag(ModelEffort?.none)
+                ForEach(preferences.provider?.efforts ?? []) {
+                    Text($0.rawValue).tag(ModelEffort?.some($0))
+                }
+            }
+            .disabled(
+                preferences.model == nil ||
+                    mutations.isActive("preferences-\(run.id)")
+            )
+            .accessibilityIdentifier("execution-effort-picker")
+        }
+
+        if localStatus == .backlog || localStatus == .queued {
+            dependenciesControl
+        }
+    }
+
+    private func checkpointControl(_ checkpoint: WorkflowCheckpoint) -> some View {
+        Section("검토 대기") {
+            Label {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(checkpoint.position == .before
+                         ? "\(checkpoint.stageLabel) 시작 전 확인"
+                         : "\(checkpoint.stageLabel) 완료 후 확인")
+                        .font(.headline)
+                    Text("리비전 \(checkpoint.revision)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(checkpoint.terminalReviewOnly
+                         ? "마지막 단계를 반복하지 않고 최종 검토 후 완료합니다."
+                         : "재개 후 \(checkpoint.nextStageLabel ?? checkpoint.nextStage ?? checkpoint.stageLabel)부터 자동 진행합니다.")
+                        .font(.subheadline)
+                }
+            } icon: {
+                Image(systemName: "pause.circle.fill").foregroundStyle(.purple)
+            }
+            Button {
+                Task { await resume(checkpoint: checkpoint) }
+            } label: {
+                if mutations.isActive("resume-\(run.id)") {
+                    ProgressView().frame(maxWidth: .infinity)
+                } else {
+                    Label("자동화 재개", systemImage: "play.fill")
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .disabled(mutations.isActive("resume-\(run.id)"))
+            .accessibilityLabel("\(checkpoint.stageLabel) 체크포인트 승인 후 자동화 재개")
+            .accessibilityIdentifier("resume-run-button")
+        }
+    }
+
+    @ViewBuilder
+    private var dependenciesControl: some View {
+        Section("의존성") {
+            let candidates = allRuns.filter { $0.id != run.id && $0.status != .cancelled }
+            if candidates.isEmpty {
+                Text("추가할 수 있는 선행 이슈가 없습니다.")
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(candidates) { candidate in
+                    Toggle(isOn: dependencyBinding(candidate.id)) {
+                        VStack(alignment: .leading) {
+                            Text(candidate.title)
+                            if let number = candidate.runNumber {
+                                Text("#\(number) · \(candidate.status.displayName)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var conversationTabContent: some View {
+        detailLoadingContent
+
+        if detail.messages.isEmpty, !detail.loading, detail.errorMessage == nil {
+            Section {
+                ContentUnavailableView("대화 없음", systemImage: "bubble.left.and.bubble.right")
+            }
+        } else if !detail.messages.isEmpty {
+            Section("대화") {
+                ForEach(detail.messages) { message in messageRow(message) }
+            }
+        }
+
+        Section(replyTo == nil ? "메시지 보내기" : "\(replyTo?.author.name ?? "")에게 답글") {
+            TextField("메시지 또는 @Briar 질문", text: $messageText, axis: .vertical)
+                .lineLimit(2...6)
+                .accessibilityIdentifier("issue-message-field")
+            HStack {
+                if replyTo != nil { Button("답글 취소") { replyTo = nil } }
+                Spacer()
+                Button("보내기") { Task { await sendMessage() } }
+                    .disabled(
+                        messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                            mutations.isActive("message-\(run.id)")
+                    )
+                    .accessibilityIdentifier("issue-message-send")
+            }
+        }
+    }
+
+    private func messageRow(_ message: IssueMessage) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            ProfileImageView(
+                image: message.author.image,
+                name: message.author.name,
+                systemImage: message.author.provider == nil ? "person.fill" : "cpu",
+                size: 34,
+                cornerRadius: 9
+            )
+            VStack(alignment: .leading, spacing: 5) {
+                HStack {
+                    Text(message.author.name).font(.headline)
+                    Spacer()
+                    Text(message.createdAt, style: .relative)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if let parent = detail.messages.first(where: { $0.id == message.parentMessageId }) {
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: "arrowshape.turn.up.left").font(.caption2)
+                        Text(parent.body).font(.caption).lineLimit(2)
+                    }
+                    .foregroundStyle(.secondary)
+                    .padding(8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                }
+                MarkdownText(markdown: message.body)
+                Button("답글") { replyTo = message }.font(.caption)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var resultTabContent: some View {
+        detailLoadingContent
+
+        if let summary = run.structuredResult?.summary ?? run.resultSummary, !summary.isEmpty {
+            Section("결과") {
+                MarkdownText(markdown: summary)
+                if let result = run.structuredResult {
+                    LabeledContent("결과 상태", value: result.outcome)
+                    if let nextAction = result.nextAction, !nextAction.isEmpty {
+                        LabeledContent("다음 조치", value: nextAction)
+                    }
+                }
+            }
+        }
+
+        if let reviews = run.resultReviews, !reviews.isEmpty {
+            Section("결과 리뷰") {
+                ForEach(reviews) { review in
+                    HStack(spacing: 12) {
+                        ProfileImageView(
+                            image: review.image,
+                            name: review.name,
+                            systemImage: "checkmark.seal.fill",
+                            size: 32
+                        )
+                        VStack(alignment: .leading) {
+                            Text(review.name)
+                            Text(review.completedAt, format: .dateTime)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: "checkmark.seal.fill").foregroundStyle(.green)
+                    }
+                }
+            }
+        }
+
+        if !detail.evidence.isEmpty {
+            Section("증빙") {
+                ForEach(detail.evidence) { evidence in evidenceRow(evidence) }
+            }
+        }
+
+        if resultIsEmpty, !detail.loading, detail.errorMessage == nil {
+            Section { ContentUnavailableView("결과 없음", systemImage: "checkmark.seal") }
+        }
+    }
+
+    private var resultIsEmpty: Bool {
+        let summary = run.structuredResult?.summary ?? run.resultSummary
+        return summary?.isEmpty != false &&
+            run.resultReviews?.isEmpty != false &&
+            detail.evidence.isEmpty
+    }
+
+    private func evidenceRow(_ evidence: RunEvidence) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                let passed = evidence.status == .passed
+                Image(systemName: passed ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(passed ? Color.green : Color.secondary)
+                Text(evidence.type).font(.headline)
+                if !evidence.canonical { Text("이전 버전").font(.caption2) }
+            }
+            if let evidenceDetail = evidence.detail, !evidenceDetail.isEmpty {
+                Text(evidenceDetail).font(.subheadline)
+            }
+            ForEach(evidence.images ?? []) { image in
+                if image.contentType.hasPrefix("image/") {
+                    AuthenticatedImagePreview(
+                        sourceID: image.url,
+                        filename: image.filename,
+                        detail: ByteCountFormatter.string(
+                            fromByteCount: Int64(image.byteSize),
+                            countStyle: .file
+                        ),
+                        accessibilityID: "evidence-image-\(image.id.uuidString.lowercased())",
+                        load: {
+                            try await detail.download(
+                                path: image.url,
+                                filename: image.filename
+                            )
+                        },
+                        open: { previewFile = PreviewFile(url: $0) }
+                    )
+                } else {
+                    Button {
+                        Task { await open(path: image.url, filename: image.filename) }
+                    } label: {
+                        Label(image.filename, systemImage: "doc")
+                    }
+                }
+            }
+            if let url = evidence.url {
+                Link("연결된 결과 열기", destination: url)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var logsTabContent: some View {
+        detailLoadingContent
+        if detail.events.isEmpty, !detail.loading, detail.errorMessage == nil {
+            Section { ContentUnavailableView("로그 없음", systemImage: "text.alignleft") }
+        } else if !detail.events.isEmpty {
+            Section("실행 로그") {
+                ForEach(detail.events) { event in
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            StatusBadge(status: event.status)
+                            if let stage = event.workflowStage { Text(stage).font(.caption) }
+                            Spacer()
+                            Text(event.occurredAt, style: .relative).font(.caption)
+                        }
+                        if let eventDetail = event.detail, !eventDetail.isEmpty {
+                            Text(eventDetail).font(.subheadline)
+                        }
+                        Text(event.actor).font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var detailLoadingContent: some View {
+        if detail.loading {
+            Section { ProgressView("상세 기록을 불러오는 중…") }
+        }
+        if let error = detail.errorMessage {
+            Section {
+                Label(error, systemImage: "wifi.exclamationmark").foregroundStyle(.orange)
+                Button("상세 다시 시도") { Task { await detail.load() } }
+            }
+        }
+    }
+
+    private var statusTabContent: some View {
+        Section("현재 상태") {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    StatusBadge(status: localStatus)
+                    if let runNumber = run.runNumber { Text("#\(runNumber)") }
+                    Spacer()
+                    Text(run.updatedAt, style: .relative)
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                if let detailText = run.detail, !detailText.isEmpty {
+                    Text(detailText).foregroundStyle(.secondary)
+                }
+                if let progress = run.progress {
+                    ProgressView(value: progress, total: 100)
+                }
+                LabeledContent(
+                    "담당자",
+                    value: members.first { $0.userId == run.assigneeUserId }?.name ?? "미배정"
+                )
+            }
+        }
     }
 
     private func open(path: String, filename: String) async {
