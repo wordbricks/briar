@@ -46,9 +46,11 @@ struct AgentsHomeView: View {
                     } else {
                         ForEach(sessions.prefix(30)) { session in
                             NavigationLink(value: AgentRoute.session(session.id)) {
+                                let agent = session.agentId.flatMap { agents.agent(id: $0) }
                                 SessionRow(
                                     session: session,
-                                    agentName: session.agentId.flatMap { agents.agent(id: $0)?.name }
+                                    agentName: agent?.name,
+                                    agentAvatar: agent?.avatar
                                 )
                             }
                             .accessibilityIdentifier("session-row-\(session.id)")
@@ -141,9 +143,20 @@ private struct AgentRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Circle()
-                .fill(Color(hex: agent.calendarColor) ?? .accentColor)
-                .frame(width: 12, height: 12)
+            ZStack(alignment: .bottomTrailing) {
+                ProfileImageView(
+                    image: agent.avatar,
+                    name: agent.name,
+                    systemImage: "cpu",
+                    size: 40,
+                    cornerRadius: 10
+                )
+                Circle()
+                    .fill(Color(hex: agent.calendarColor) ?? .accentColor)
+                    .frame(width: 10, height: 10)
+                    .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 1.5))
+                    .offset(x: 2, y: 2)
+            }
             VStack(alignment: .leading, spacing: 4) {
                 Text(agent.name).font(.headline)
                 Text(agent.responsibility)
@@ -168,27 +181,39 @@ private struct AgentRow: View {
 private struct SessionRow: View {
     let session: ProjectAgentSession
     let agentName: String?
+    var agentAvatar: String? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(session.title)
-                    .font(.headline)
-                    .lineLimit(2)
-                Spacer()
-                Text(session.status.displayName)
-                    .font(.caption)
-                    .foregroundStyle(session.requiresAttention ? Color.orange : Color.secondary)
+        HStack(alignment: .top, spacing: 10) {
+            if agentName != nil || agentAvatar != nil {
+                ProfileImageView(
+                    image: agentAvatar,
+                    name: agentName,
+                    systemImage: "cpu",
+                    size: 28,
+                    cornerRadius: 8
+                )
             }
-            HStack {
-                if let agentName {
-                    Text(agentName)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(session.title)
+                        .font(.headline)
+                        .lineLimit(2)
+                    Spacer()
+                    Text(session.status.displayName)
+                        .font(.caption)
+                        .foregroundStyle(session.requiresAttention ? Color.orange : Color.secondary)
                 }
-                Spacer()
-                Text(session.displayTimestamp, style: .relative)
+                HStack {
+                    if let agentName {
+                        Text(agentName)
+                    }
+                    Spacer()
+                    Text(session.displayTimestamp, style: .relative)
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
-            .font(.caption)
-            .foregroundStyle(.secondary)
         }
         .padding(.vertical, 2)
     }
@@ -201,6 +226,30 @@ struct AgentDetailView: View {
 
     var body: some View {
         List {
+            Section("프로필") {
+                HStack(spacing: 14) {
+                    ProfileImageView(
+                        image: agent.avatar,
+                        name: agent.name,
+                        systemImage: "cpu",
+                        size: 64,
+                        cornerRadius: 16
+                    )
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(agent.name).font(.title3.weight(.semibold))
+                        Text(agent.provider.rawValue.uppercased() + (agent.model.map { " · \($0)" } ?? ""))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        if agent.avatar == nil {
+                            Text("등록된 프로필 사진 없음")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
+                .accessibilityIdentifier("agent-profile-photo")
+            }
             Section("개요") {
                 LabeledContent("Provider", value: agent.provider.rawValue)
                 if let model = agent.model {
@@ -248,7 +297,19 @@ struct SessionDetailView: View {
             Section("상태") {
                 LabeledContent("상태", value: session.status.displayName)
                 if let agent {
-                    LabeledContent("Agent", value: agent.name)
+                    HStack {
+                        Text("Agent")
+                        Spacer()
+                        ProfileImageView(
+                            image: agent.avatar,
+                            name: agent.name,
+                            systemImage: "cpu",
+                            size: 24,
+                            cornerRadius: 6
+                        )
+                        Text(agent.name)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 if let trigger = session.trigger {
                     LabeledContent("트리거", value: trigger.rawValue)
