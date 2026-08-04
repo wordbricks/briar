@@ -128,6 +128,13 @@ private struct UITestCompanionFlow: View {
                 progress: 45,
                 detail: "앱 셸과 작업 상세를 구현하는 중",
                 issueDescription: "## 목표\n로그인부터 상세까지 안전하게 읽습니다.",
+                attachments: [IssueAttachment(
+                    id: UUID(uuidString: "aaaaaaaa-1111-4111-8111-111111111111")!,
+                    filename: "issue-design.png",
+                    contentType: "image/png",
+                    byteSize: 68,
+                    url: "/ui-test/issue-design.png"
+                )],
                 resultSummary: nil,
                 updatedAt: Date(timeIntervalSince1970: 1_775_264_400)
             ),
@@ -234,7 +241,7 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
         } else if path.hasSuffix("/messages") {
             payload = #"{"messages":[]}"#
         } else if path.hasSuffix("/evidence") {
-            payload = #"{"evidence":[]}"#
+            payload = #"{"evidence":[{"key":"ui-test:evidence:image","attempt":1,"revision":1,"stage":"reviewing","type":"review findings","status":"passed","detail":"완성 화면","url":null,"actor":"codex","observedAt":"2026-08-02T01:03:00Z","images":[{"id":"bbbbbbbb-2222-4222-8222-222222222222","filename":"result-screen.png","contentType":"image/png","byteSize":68,"url":"/ui-test/result-screen.png"}],"canonical":true}]}"#
         } else if path.contains("/agents") {
             payload = ##"""
             {"agents":[{"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","projectId":"11111111-1111-4111-8111-111111111111","name":"Auto Hunt agent","avatar":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==","codexPet":null,"provider":"codex","model":"gpt-5.4","responsibility":"Perform Auto Hunt for every queued issue.","skill":"# Auto Hunt agent","calendarColor":"#3275d5","createdAt":"2026-08-02T01:00:00Z","updatedAt":"2026-08-02T01:00:00Z"}]}
@@ -255,4 +262,15 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
         token: String?,
         body: (any Encodable & Sendable)?
     ) async throws {}
+
+    func download(_ path: String, token: String, to destination: URL) async throws -> URL {
+        guard path.hasPrefix("/ui-test/") else { throw MobileAPIError.invalidDownload }
+        let png = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")!
+        try FileManager.default.createDirectory(
+            at: destination.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try png.write(to: destination, options: .atomic)
+        return destination
+    }
 }
