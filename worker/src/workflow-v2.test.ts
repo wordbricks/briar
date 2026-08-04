@@ -829,4 +829,86 @@ describe("workflow v2 D1 persistence and transitions", () => {
       }),
     )).resolves.toBe(runId);
   });
+
+  it("reworks a paused current stage only for the exact checkpoint revision", async () => {
+    const workflow = normalizeAutoHuntWorkflow({
+      version: 2,
+      requirements: [],
+      stages: [
+        { id: "implementing", label: "Implement", required: true, evidence: [] },
+      ],
+      execution: {
+        checkpoints: [
+          { key: "review-implementation", stage: "implementing", position: "after" },
+        ],
+      },
+      completion: { requiredStages: ["implementing"] },
+    });
+    await db
+      .prepare(`update briar_project_settings set workflow_json = ? where project_id = ?`)
+      .bind(JSON.stringify(workflow), projectId)
+      .run();
+    const sourceKey = "paused-current-stage-rework";
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event(sourceKey, `${sourceKey}:queued`, at(100)),
+    );
+    const identity = { runId, attempt: 1, revision: 1 };
+    expect((await startWorkflowStageLifecycle(db, projectId, {
+      ...identity,
+      stageId: "implementing",
+      startedAt: at(101),
+    })).outcome).toBe("started");
+    expect(await completeWorkflowStageLifecycle(db, projectId, {
+      ...identity,
+      stageId: "implementing",
+      finishedAt: at(102),
+    })).toMatchObject({
+      outcome: "paused",
+      checkpoint: { key: "review-implementation" },
+    });
+
+    await expect(reworkHuntRun(db, projectId, {
+      runId,
+      workflowStage: "implementing",
+      requestId: "88888888-8888-4888-8888-888888888888",
+      actor: "pm",
+      reason: "Revise the copy and rerun the UI checks.",
+      occurredAt: at(103),
+      checkpoint: {
+        key: "stale-checkpoint",
+        attempt: 1,
+        revision: 1,
+      },
+    })).rejects.toThrow(/checkpoint changed/u);
+
+    await expect(reworkHuntRun(db, projectId, {
+      runId,
+      workflowStage: "implementing",
+      requestId: "99999999-9999-4999-8999-999999999999",
+      actor: "pm",
+      reason: "Revise the copy and rerun the UI checks.",
+      occurredAt: at(104),
+      checkpoint: {
+        key: "review-implementation",
+        attempt: 1,
+        revision: 1,
+      },
+    })).resolves.toEqual({
+      outcome: "reworked",
+      attempt: 1,
+      revision: 2,
+      workflowStage: "implementing",
+    });
+    expect(await getHuntRunForProject(db, projectId, runId)).toMatchObject({
+      current_attempt: 1,
+      current_revision: 2,
+      status: "queued",
+      workflow_stage: "implementing",
+      detail: "Revise the copy and rerun the UI checks.",
+      paused_at: null,
+      waiting_checkpoint_key: null,
+    });
+  });
 });

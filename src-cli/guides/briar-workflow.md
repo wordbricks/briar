@@ -10,7 +10,7 @@ This is the version-matched workflow guide embedded in the Briar CLI. Use the sa
 - Follow repository-local instructions and the run's workflow snapshot.
 - Treat the workflow as repository-derived; never replace it with generic stage templates.
 - Start and complete stages in configured order with `briar run stage start|complete`. These lifecycle commands enforce checkpoint boundaries; status events do not replace them.
-- A checkpoint is a pause, not a completion boundary. When a stage command returns `paused`, the claim and worker lease have been released. Stop immediately and wait for a new worker pass after human resume.
+- A checkpoint is a pause, not a completion boundary. Immediately before a lifecycle command that will reach a configured checkpoint, record a concise `partial` structured result describing work and verification completed so far. When the stage command returns `paused`, the claim and worker lease have been released. Stop immediately and wait for a new worker pass after human resume or rework.
 - Never invent PR, CI, deployment, or production work absent from the workflow.
 - Event and evidence keys are idempotency keys. Reuse a key only for an identical retry.
 - Record `completed` only after required stages, required evidence, and a structured result exist.
@@ -348,7 +348,9 @@ Completion requires:
 
 ### When the run is paused
 
-When `briar run stage start|complete` reaches a configured checkpoint, Briar marks the run `paused`, releases the worker claim, and waits for human review. Do not record completion or keep the worker alive. The dashboard sends the displayed checkpoint key, attempt, and revision. An authorized operator can do the same:
+Immediately before running `briar run stage start|complete` when that command will reach a configured checkpoint, record a running event with `--structured-result-file`. Set `outcome` to `partial`, write `summary` in the issue's language with short Markdown headings and bullet points for work and verification completed so far, set `humanActionRequired` to `true`, and state that the reviewer should approve or request changes in `nextAction`. Use a stable revision-specific event key. This makes the partial result available in the Result tab during review.
+
+When the lifecycle command reaches the checkpoint, Briar marks the run `paused`, releases the worker claim, and waits for human review. Do not record completion or keep the worker alive. The dashboard sends the displayed checkpoint key, attempt, and revision. An authorized operator can do the same:
 
 ```sh
 briar run resume --run '<run-id>' \
@@ -358,6 +360,8 @@ briar run resume --run '<run-id>' \
 ```
 
 Resume approves only that exact checkpoint revision and queues a new worker while preserving the attempt, revision, branch, commit, and evidence. A `before` checkpoint resumes at its stage; an `after` checkpoint resumes at the next stage. Resuming an `after` checkpoint on the terminal stage sets `terminalReviewOnly`, so the next worker completes the run without repeating deployment or QA. A stale checkpoint identity is a conflict and must be refreshed, never guessed.
+
+If the reviewer requests rework, Briar increments the revision, preserves the workspace and attempt, invalidates downstream revision evidence, and queues the selected current-or-earlier stage. The next claim's durable snapshot includes `reviewFeedback`; treat it as required acceptance criteria and explicitly verify it before reaching the next checkpoint.
 
 ### When work is blocked
 

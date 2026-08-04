@@ -1272,6 +1272,7 @@ export function App() {
             onMoveRun={briar.moveRun}
             onProcessIssueNow={processIssueNow}
             onRetryRun={briar.retryRun}
+            onReworkRun={briar.reworkRun}
             onCancelRun={briar.cancelRun}
             onResumeRun={briar.resumeRun}
             onRequestedRunOpen={() => setRequestedRunId(null)}
@@ -1356,6 +1357,8 @@ export function App() {
                       prerequisiteRunId,
                     )}
                   onRetry={() => briar.retryRun(inboxDetailRun.id)}
+                  onRework={(input) =>
+                    briar.reworkRun(inboxDetailRun.id, input)}
                   onResume={() => briar.resumeRun(inboxDetailRun.id)}
                   onSendIssueMessage={(input) =>
                     sendIssueMessage(inboxDetailRun.id, input)}
@@ -1641,6 +1644,7 @@ export function App() {
             onProcessIssueNow={processIssueNow}
             onRequestedRunOpen={() => setRequestedRunId(null)}
             onRetryRun={briar.retryRun}
+            onReworkRun={briar.reworkRun}
             onCancelRun={briar.cancelRun}
             onResumeRun={briar.resumeRun}
             onSendIssueMessage={sendIssueMessage}
