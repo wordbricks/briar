@@ -822,7 +822,7 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("native-select issue-priority-select");
     expect(markup).toContain('type="file"');
     expect(markup).toContain('aria-label="이미지 또는 영상 첨부"');
-    expect(markup).toContain("video/quicktime");
+    expect(markup).toContain('accept="image/*,video/*"');
     expect(markup).toContain("Enter로 등록");
   });
 

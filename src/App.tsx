@@ -62,6 +62,7 @@ import {
 } from "./lib/organization-invitation";
 import { syncAppBadgeCount } from "./lib/app-badge";
 import { DASHBOARD_POLL_INTERVAL_MS } from "./lib/dashboard-polling";
+import { featureFlags } from "./lib/feature-flags";
 import {
   buildStatusTrayItems,
   buildStatusTraySnapshot,
@@ -1227,7 +1228,7 @@ export function App() {
             project={activeProject}
             token={briar.token}
           />
-        ) : activePage === "ideas" && activeProject ? (
+        ) : activePage === "ideas" && featureFlags.ideas && activeProject ? (
           <Ideas
             isSidebarOpen={isSidebarOpen}
             onIssuesCreated={(runIds) => {
@@ -1532,7 +1533,7 @@ export function App() {
               unreadInboxCount={inbox.unreadCount}
             />
           </>
-        ) : companionPage === "ideas" && activeProject ? (
+        ) : companionPage === "ideas" && featureFlags.ideas && activeProject ? (
           <>
             <Ideas
               isSidebarOpen

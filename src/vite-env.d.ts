@@ -6,6 +6,7 @@ interface ImportMetaEnv {
   readonly VITE_BRIAR_DEMO?: string;
   readonly VITE_BRIAR_WEB?: string;
   readonly VITE_BRIAR_INTRO_PREVIEW?: string;
+  readonly VITE_BRIAR_FEATURE_IDEAS?: string;
 }
 
 interface ImportMeta {

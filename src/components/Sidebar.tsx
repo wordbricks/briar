@@ -22,6 +22,7 @@ import {
   type AutoHuntSession,
 } from "../hooks/useAutoHuntSessions";
 import { useI18n, type Locale } from "../i18n";
+import { featureFlags } from "../lib/feature-flags";
 import { isProjectConnectedLocally } from "../lib/local-project-connection";
 import type { RepositoryReadiness } from "../lib/project-connection";
 import type {
@@ -40,6 +41,7 @@ export function Sidebar({
   activeProjectId,
   agents,
   connectedProjectIds,
+  ideasEnabled = featureFlags.ideas,
   isOpen,
   onAddProject,
   onAgentSessionOpen,
@@ -79,6 +81,7 @@ export function Sidebar({
   activeProjectId: string | null;
   agents: ProjectAgent[];
   connectedProjectIds: string[] | null;
+  ideasEnabled?: boolean;
   isOpen: boolean;
   onAddProject: () => void;
   onAgentSessionOpen: (sessionId: string) => void;
@@ -664,24 +667,26 @@ export function Sidebar({
                         <Plus aria-hidden="true" size={16} strokeWidth={1.7} />
                       </button>
                     </div>
-                    <div className="sidebar-agent-navigation">
-                      <a
-                        aria-current={
-                          isActive && activePage === "ideas" ? "page" : undefined
-                        }
-                        className={`sidebar-project-view${
-                          isActive && activePage === "ideas" ? " active" : ""
-                        }`}
-                        href="#ideas"
-                        onClick={(event) => {
-                          event.preventDefault();
-                          openProjectPage(onIdeasOpen);
-                        }}
-                      >
-                        <Lightbulb size={14} strokeWidth={1.7} />
-                        <span>{t("sidebar.ideas")}</span>
-                      </a>
-                    </div>
+                    {ideasEnabled ? (
+                      <div className="sidebar-agent-navigation">
+                        <a
+                          aria-current={
+                            isActive && activePage === "ideas" ? "page" : undefined
+                          }
+                          className={`sidebar-project-view${
+                            isActive && activePage === "ideas" ? " active" : ""
+                          }`}
+                          href="#ideas"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            openProjectPage(onIdeasOpen);
+                          }}
+                        >
+                          <Lightbulb size={14} strokeWidth={1.7} />
+                          <span>{t("sidebar.ideas")}</span>
+                        </a>
+                      </div>
+                    ) : null}
                     <div className="sidebar-agent-navigation">
                       <a
                         aria-current={
