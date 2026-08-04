@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   apiErrorIssueMessages,
+  ApiError,
   addIssueDependency,
   beginDeviceAuthorization,
   claimProjectAgentScheduleRun,
@@ -14,6 +15,7 @@ import {
   deleteProjectAgent,
   deleteIssue,
   dispatchHuntRun,
+  errorWithMessage,
   deleteProjectAgentSchedule,
   loadDashboard,
   loadDashboardDelta,
@@ -43,6 +45,24 @@ afterEach(() => {
 });
 
 describe("API errors", () => {
+  it("preserves API validation metadata when adding context to an error", () => {
+    const original = new ApiError(
+      400,
+      "Invalid project workflow",
+      "INVALID_PROJECT_WORKFLOW",
+      ["version 2 execution.checkpoints is required"],
+    );
+
+    expect(errorWithMessage(original, `${original.message} (cleanup failed)`))
+      .toMatchObject({
+        name: "ApiError",
+        status: 400,
+        message: "Invalid project workflow (cleanup failed)",
+        code: "INVALID_PROJECT_WORKFLOW",
+        issues: ["version 2 execution.checkpoints is required"],
+      });
+  });
+
   it("requests paused rework with exact checkpoint identity and feedback", async () => {
     const fetchMock = vi.fn(async () =>
       new Response(
