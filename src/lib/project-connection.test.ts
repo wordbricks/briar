@@ -100,7 +100,7 @@ describe("local project connection", () => {
       ),
     ).resolves.toEqual({
       workflow: existingWorkflow,
-      shouldPersistProjectSettings: true,
+      shouldPersistProjectSettings: false,
     });
     expect(generateWorkflow).not.toHaveBeenCalled();
   });
