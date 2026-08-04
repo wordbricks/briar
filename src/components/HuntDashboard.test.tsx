@@ -285,6 +285,59 @@ describe("HuntDashboard", () => {
     expect(markup).toContain(`src="${dashboardAgent.avatar}"`);
   });
 
+  it("shows the source as a card badge without an attachment badge", () => {
+    const run = {
+      ...demoDashboard.runs[0],
+      attachments: [
+        {
+          id: "attachment-1",
+          filename: "screenshot.png",
+          contentType: "image/png",
+          byteSize: 1_024,
+          url: "/attachments/attachment-1",
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    };
+    const markup = renderToStaticMarkup(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={{ ...demoDashboard, runs: [run] }}
+      />,
+    );
+
+    expect(markup).toContain('class="kanban-source"');
+    expect(markup).toContain('class="source-dot issue"');
+    expect(markup).not.toContain("lucide-paperclip");
+    expect(markup).not.toContain("screenshot.png");
+    expect(markup).not.toContain("attachment-1");
+  });
+
+  it("stacks the human assignee avatar with the active agent badge", () => {
+    const assignee = demoDashboard.members?.[0];
+    if (!assignee) throw new Error("Demo assignee is required");
+    const run = {
+      ...demoDashboard.runs[0],
+      assigneeUserId: assignee.userId,
+    };
+    const markup = renderToStaticMarkup(
+      <HuntDashboard
+        {...dashboardProps}
+        agents={[dashboardAgent]}
+        dashboard={{ ...demoDashboard, runs: [run] }}
+        sessions={[dashboardAgentSession(run)]}
+      />,
+    );
+
+    expect(markup).toContain(
+      "kanban-card violet has-assignees has-multiple-assignees",
+    );
+    expect(markup).toContain('class="kanban-card-person-badge"');
+    expect(markup).toContain('aria-label="담당자: Jay"');
+    expect(markup).toContain('class="issue-assignee-avatar fallback"');
+    expect(markup).toContain('class="kanban-card-agent-badge"');
+  });
+
   it("stacks the assigned worker icon with the active agent avatar", () => {
     const run = {
       ...demoDashboard.runs[0],

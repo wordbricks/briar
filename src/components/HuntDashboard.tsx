@@ -2343,7 +2343,6 @@ function KanbanCard({
         )}
         <span className="kanban-card-kicker">
           <small>AH-{run.runNumber}</small>
-          <i><span className={`source-dot ${run.source}`} />{t(`source.${run.source}` as MessageKey)}</i>
         </span>
         <span className="kanban-card-copy">
           <strong>{run.title}</strong>
@@ -2355,13 +2354,16 @@ function KanbanCard({
         </span>
         <span className="kanban-card-badges">
           <i className={`status-pill ${meta.tone}`}>{run.status === "running" && <LoaderCircle className="spin" size={11} />}{label}</i>
+          <i className="kanban-source">
+            <span className={`source-dot ${run.source}`} />
+            {t(`source.${run.source}` as MessageKey)}
+          </i>
           {run.executionReadiness === "waiting" && (
             <i>{t("issue.waitingOnPrerequisites", {
               count: run.waitingOnPrerequisiteCount ?? 0,
             })}</i>
           )}
           {run.priority !== null && <i className="kanban-priority">P{run.priority}</i>}
-          {(run.attachments ?? []).length > 0 && <i><Paperclip size={11} />{run.attachments.length}</i>}
         </span>
         <span className="kanban-card-footer">
           <small>{isClaimed ? t("run.assigned", { agent: run.claimedBy ?? "agent" }) : relativeTime(run.updatedAt, t)}</small>
