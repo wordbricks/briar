@@ -569,6 +569,28 @@ describe("CreateIssueDialog attachments", () => {
     await act(async () => root.unmount());
   });
 
+  it("removes the redundant title in the mobile companion header", async () => {
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <CreateIssueDialog
+          {...projectProps}
+          compactHeader
+          isSubmitting={false}
+          onClose={() => undefined}
+          onCreate={async () => undefined}
+        />,
+      );
+    });
+
+    expect(container.querySelector(".issue-dialog-context > strong")).toBeNull();
+    expect(
+      container.querySelector(".issue-project-context .select-menu-trigger"),
+    ).not.toBeNull();
+
+    await act(async () => root.unmount());
+  });
+
   it("restores a draft after the backdrop closes the dialog", async () => {
     const onClose = vi.fn();
     const root = createRoot(container);

@@ -20,6 +20,7 @@ struct CompanionShellView: View {
     @ObservedObject var inbox: InboxStore
     @ObservedObject var notifications: LocalNotificationService
 
+    let projects: [ProjectsResponse.Project]
     let project: ProjectsResponse.Project
     let snapshot: DashboardSnapshot?
     let isRefreshing: Bool
@@ -29,7 +30,7 @@ struct CompanionShellView: View {
     let ideas: IdeasStore
     let user: CurrentUserResponse.User?
     let refresh: () async -> Void
-    let changeProject: () -> Void
+    let selectProject: (UUID) -> Void
     let signOut: () -> Void
 
     var body: some View {
@@ -44,8 +45,10 @@ struct CompanionShellView: View {
                     api: api,
                     refresh: refresh
                 )
+                .id(project.id)
                 .navigationTitle("Tasks")
-                .toolbar { companionToolbar }
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { companionToolbar(showsProjectMenu: true) }
                 .navigationDestination(for: UUID.self) { runID in
                     if let run = snapshot?.runs.first(where: { $0.id == runID }) {
                         RunDetailView(
@@ -76,7 +79,7 @@ struct CompanionShellView: View {
                 snapshot: snapshot,
                 refreshDashboard: refresh
             )
-            .toolbar { companionToolbar }
+            .toolbar { companionToolbar() }
             .tabItem { Label("Agents", systemImage: "cpu") }
             .tag(CompanionNavigationModel.Tab.agents)
             .badge(agents.sessions.filter { $0.status == .running }.count)
@@ -90,7 +93,7 @@ struct CompanionShellView: View {
                     api: api
                 )
                 .navigationTitle("Search")
-                .toolbar { companionToolbar }
+                .toolbar { companionToolbar() }
             }
             .tabItem { Label("Search", systemImage: "magnifyingglass") }
             .tag(CompanionNavigationModel.Tab.search)
@@ -105,7 +108,7 @@ struct CompanionShellView: View {
                     api: api,
                     refresh: refresh
                 )
-                .toolbar { companionToolbar }
+                .toolbar { companionToolbar() }
             }
             .tabItem { Label("Inbox", systemImage: "tray") }
             .tag(CompanionNavigationModel.Tab.inbox)
@@ -115,7 +118,7 @@ struct CompanionShellView: View {
                 NavigationStack {
                     IdeasNativeView(store: ideas, projectID: project.id, token: token)
                         .navigationTitle("아이디어")
-                        .toolbar { companionToolbar }
+                        .toolbar { companionToolbar() }
                 }
                 .tabItem { Label("아이디어", systemImage: "lightbulb") }
                 .tag(CompanionNavigationModel.Tab.ideas)
@@ -136,6 +139,9 @@ struct CompanionShellView: View {
                 taskPath.append(runID)
             }
         }
+        .onChange(of: project.id) { _, _ in
+            taskPath = NavigationPath()
+        }
         .task(id: navigation.pathIssueToken) {
             if let runID = navigation.pendingIssueID {
                 _ = navigation.consumePendingIssue()
@@ -145,13 +151,54 @@ struct CompanionShellView: View {
     }
 
     @ToolbarContentBuilder
-    private var companionToolbar: some ToolbarContent {
-        ToolbarItem(placement: .automatic) {
-            Text(project.name).font(.subheadline.weight(.semibold))
+    private func companionToolbar(
+        showsProjectMenu: Bool = false
+    ) -> some ToolbarContent {
+        if showsProjectMenu {
+            ToolbarItem(placement: .topBarLeading) {
+                Menu {
+                    ForEach(
+                        projects.sorted {
+                            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+                        },
+                        id: \.id
+                    ) { candidate in
+                        Button {
+                            selectProject(candidate.id)
+                        } label: {
+                            if candidate.id == project.id {
+                                Label(
+                                    "\(candidate.name) · \(candidate.organizationName)",
+                                    systemImage: "checkmark"
+                                )
+                            } else {
+                                Text("\(candidate.name) · \(candidate.organizationName)")
+                            }
+                        }
+                        .accessibilityIdentifier(
+                            "project-option-\(candidate.id.uuidString.lowercased())"
+                        )
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(project.name)
+                            .font(.subheadline.weight(.semibold))
+                            .lineLimit(1)
+                        Image(systemName: "chevron.down")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .accessibilityLabel("프로젝트, \(project.name)")
+                .accessibilityIdentifier("project-menu")
+            }
+        } else {
+            ToolbarItem(placement: .automatic) {
+                Text(project.name).font(.subheadline.weight(.semibold))
+            }
         }
         ToolbarItem(placement: .primaryAction) {
             Menu {
-                Button("프로젝트 변경", action: changeProject)
                 Button("설정") { showingSettings = true }
                 Divider()
                 Button("로그아웃", role: .destructive, action: signOut)
