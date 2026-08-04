@@ -83,6 +83,10 @@
   background: var(--muted);
 }
 
+.dark .kanban-checkpoint-marker > strong {
+  border-color: var(--background);
+}
+
 .dark .kanban-card,
 .dark .issue-list-body,
 .dark .issue-list-row,

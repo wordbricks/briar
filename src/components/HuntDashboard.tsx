@@ -168,6 +168,7 @@ type KanbanColumn = {
   tone: string;
   placement: HuntRunPlacement;
   runs: HuntRun[];
+  checkpointsBefore: string[];
 };
 
 type KanbanPointerDrag = {
@@ -571,6 +572,12 @@ export function HuntDashboard({
   const kanbanColumns = useMemo<KanbanColumn[]>(() => {
     const workflow = dashboard?.settings.workflow;
     const workflowStages = workflow?.stages ?? [];
+    const stageLabels = new Map(
+      workflowStages.map((stage) => [
+        stage.id,
+        localizeWorkflowStage(t, stage.id, stage.label),
+      ]),
+    );
     const definitions = [
       {
         id: "status:backlog",
@@ -586,7 +593,7 @@ export function HuntDashboard({
       },
       ...workflowStages.map((stage) => ({
         id: `stage:${stage.id}`,
-        label: localizeWorkflowStage(t, stage.id, stage.label),
+        label: stageLabels.get(stage.id) ?? stage.label,
         tone: runMeta("running", stage.id, workflow).tone,
         placement: { status: "running" as const, workflowStage: stage.id },
       })),
@@ -622,6 +629,39 @@ export function HuntDashboard({
         placement: { status: "cancelled" as const, workflowStage: null },
       },
     ];
+    const checkpointsByBoundary = new Map<string, string[]>();
+    const checkpointPolicy = dashboard?.settings.checkpointPolicy;
+    const legacyPauseStage = workflow?.execution.pauseAfterStage ??
+      workflow?.execution.stopAfterStage;
+    const effectiveCheckpoints = checkpointPolicy
+      ? checkpointPolicy.effective
+      : workflow?.execution.checkpoints?.length
+        ? workflow.execution.checkpoints
+        : legacyPauseStage
+          ? [{
+              key: `legacy-after-${legacyPauseStage}`,
+              stage: legacyPauseStage,
+              position: "after" as const,
+            }]
+          : [];
+    for (const checkpoint of effectiveCheckpoints) {
+      const stageColumnIndex = definitions.findIndex(
+        (column) => column.id === `stage:${checkpoint.stage}`,
+      );
+      if (stageColumnIndex < 0) continue;
+      const boundaryColumn = definitions[
+        stageColumnIndex + (checkpoint.position === "after" ? 1 : 0)
+      ];
+      const stageLabel = stageLabels.get(checkpoint.stage) ?? checkpoint.stage;
+      const label = checkpoint.position === "before"
+        ? t("run.checkpointBefore", { stage: stageLabel })
+        : t("run.checkpointAfter", { stage: stageLabel });
+      if (!boundaryColumn) continue;
+      checkpointsByBoundary.set(boundaryColumn.id, [
+        ...(checkpointsByBoundary.get(boundaryColumn.id) ?? []),
+        label,
+      ]);
+    }
     const visibleDefinitions = definitions.filter((column) => {
       if (status === "active") {
         return !["status:completed", "status:cancelled"].includes(column.id);
@@ -634,6 +674,9 @@ export function HuntDashboard({
       }
       return true;
     });
+    const showsWorkflowStages = visibleDefinitions.some((column) =>
+      column.id.startsWith("stage:")
+    );
     const grouped = new Map(
       visibleDefinitions.map((column) => [column.id, [] as HuntRun[]]),
     );
@@ -644,11 +687,21 @@ export function HuntDashboard({
     const columns = visibleDefinitions.map((column) => ({
       ...column,
       runs: grouped.get(column.id) ?? [],
+      checkpointsBefore: showsWorkflowStages
+        ? checkpointsByBoundary.get(column.id) ?? []
+        : [],
     }));
     return companionMode
       ? columns.filter((column) => column.runs.length > 0)
       : columns;
-  }, [companionMode, dashboard?.settings.workflow, filtered, status, t]);
+  }, [
+    companionMode,
+    dashboard?.settings.checkpointPolicy,
+    dashboard?.settings.workflow,
+    filtered,
+    status,
+    t,
+  ]);
   const createIssueDialog = isIssueDialogOpen ? (
     <CreateIssueDialog
       defaultProjectId={dashboard?.project.id}
@@ -989,12 +1042,31 @@ export function HuntDashboard({
               <span>{t("dashboard.emptyDescription")}</span>
             </div>
           ) : kanbanColumns.map((column) => (
-            <section
-              aria-label={column.label}
-              className={`kanban-column ${column.tone}${dragOverColumnId === column.id ? " drag-over" : ""}`}
-              data-kanban-column-id={column.id}
-              key={column.id}
-            >
+            <div className="kanban-column-shell" key={column.id}>
+              {!companionMode && column.checkpointsBefore.length > 0 ? (
+                <span
+                  aria-label={`${t("settings.workflowCheckpoints")}: ${column.checkpointsBefore.join(", ")}`}
+                  className="kanban-checkpoint-marker"
+                  data-checkpoint-count={column.checkpointsBefore.length}
+                  role="img"
+                  tabIndex={0}
+                  title={column.checkpointsBefore.join(" · ")}
+                >
+                  <svg aria-hidden="true" viewBox="0 0 12 10">
+                    <path d="M2 0C1.2 0 .7.8 1.1 1.5l4.1 7.4c.35.65 1.25.65 1.6 0l4.1-7.4C11.3.8 10.8 0 10 0Z" />
+                  </svg>
+                  {column.checkpointsBefore.length > 1 ? (
+                    <strong aria-hidden="true">
+                      {column.checkpointsBefore.length}
+                    </strong>
+                  ) : null}
+                </span>
+              ) : null}
+              <section
+                aria-label={column.label}
+                className={`kanban-column ${column.tone}${dragOverColumnId === column.id ? " drag-over" : ""}`}
+                data-kanban-column-id={column.id}
+              >
               <header>
                 <span><i aria-hidden="true" />{column.label}</span>
                 <strong>{column.runs.length}</strong>
@@ -1147,7 +1219,8 @@ export function HuntDashboard({
                   </div>
                 )}
               </div>
-            </section>
+              </section>
+            </div>
           ))}
         </div>}
       </div>
