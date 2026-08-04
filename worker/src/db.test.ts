@@ -642,6 +642,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         "utf8",
       ),
     );
+    await executeSql(
+      db,
+      await readFile(resolve("migrations/0062_issue_assignees.sql"), "utf8"),
+    );
   }, 30_000);
 
   afterAll(async () => {
@@ -2094,9 +2098,20 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await expect(
       updateOrganizationMemberRole(db, projectId, "owner", "member"),
     ).resolves.toBe(false);
+    const assignedRunId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 13, {
+        sourceKey: "member-assignment",
+        assigneeUserId: "member",
+      }),
+    );
     await expect(
       removeOrganizationMember(db, projectId, "member"),
     ).resolves.toBe(true);
+    await expect(
+      getHuntRunForProject(db, projectId, assignedRunId),
+    ).resolves.toMatchObject({ assignee_user_id: null });
     await expect(
       findProjectIdByAgentTokenHash(db, memberTokenHash),
     ).resolves.toBeNull();
@@ -2804,6 +2819,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         title: "Original title",
         issueDescription: "Original description",
         priority: 3,
+        assigneeUserId: "owner",
       }),
     );
 
@@ -2820,11 +2836,21 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         title: "Updated title",
         issue_description: null,
         priority: 1,
+        assignee_user_id: "owner",
         status: "cancelled",
         workflow_stage: null,
         updated_at: atMinute(19),
       }),
     );
+
+    const unassigned = await updateIssue(db, projectId, runId, {
+      title: "Updated title",
+      description: null,
+      priority: 1,
+      assigneeUserId: null,
+      updatedAt: atMinute(20),
+    });
+    expect(unassigned?.assignee_user_id).toBeNull();
   });
 
   it("records one result review per member and publishes a dashboard delta", async () => {
@@ -3683,9 +3709,9 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     // This suite intentionally retains the legacy `kind` column for earlier
     // compatibility tests. Production removed it in migration 0028.
     await db.prepare("alter table briar_project_agents drop column kind").run();
-    // Migration 0055 predates the pause checkpoint and resume request marker.
-    // Exercise the historical rebuild against that earlier shape, then restore
-    // the current columns for the tests that follow it.
+    // Migration 0055 predates the pause checkpoint, resume request marker, and
+    // human issue assignee. Exercise the historical rebuild against that
+    // earlier shape, then restore the current columns for the tests that follow.
     const pausedRuns = await db
       .prepare("select count(*) as count from briar_hunt_runs where paused_at is not null")
       .first<{ count: number }>();
@@ -3696,6 +3722,14 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       )
       .first<{ count: number }>();
     expect(resumeRequestedRuns?.count ?? 0).toBe(0);
+    const assignedRuns = await db
+      .prepare(
+        "select count(*) as count from briar_hunt_runs where assignee_user_id is not null",
+      )
+      .first<{ count: number }>();
+    expect(assignedRuns?.count ?? 0).toBe(0);
+    await db.prepare("drop index briar_hunt_runs_assignee_idx").run();
+    await db.prepare("alter table briar_hunt_runs drop column assignee_user_id").run();
     await db.prepare("drop index briar_hunt_runs_resume_requested_idx").run();
     await db.prepare("alter table briar_hunt_runs drop column resume_requested_at").run();
     await db.prepare("alter table briar_hunt_runs drop column paused_at").run();
@@ -3766,6 +3800,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         resolve("migrations/0061_resume_requested_state.sql"),
         "utf8",
       ),
+    );
+    await executeSql(
+      db,
+      await readFile(resolve("migrations/0062_issue_assignees.sql"), "utf8"),
     );
   });
 

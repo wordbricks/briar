@@ -576,11 +576,13 @@ describe("Worker HTTP contract", () => {
         title: "  Updated issue  ",
         description: null,
         priority: 1,
+        assigneeUserId: "member-1",
       }),
     ).toEqual({
       title: "Updated issue",
       description: null,
       priority: 1,
+      assigneeUserId: "member-1",
     });
     expect(() =>
       issueUpdateInputSchema.parse({

@@ -46,6 +46,7 @@ final class IssueMutationStore: ObservableObject {
                         title: title,
                         description: description.isEmpty ? nil : description,
                         priority: draft.priority,
+                        assigneeUserId: draft.assigneeUserId,
                         status: draft.status
                     ),
                     as: CreateIssueResponse.self
@@ -57,6 +58,7 @@ final class IssueMutationStore: ObservableObject {
                     "title": title,
                     "description": description,
                     "priority": draft.priority.map(String.init) ?? "",
+                    "assigneeUserId": draft.assigneeUserId ?? "",
                     "status": draft.status.rawValue,
                 ],
                 files: attachments.map {
@@ -85,7 +87,8 @@ final class IssueMutationStore: ObservableObject {
                 body: UpdateIssueRequest(
                     title: title,
                     description: description.isEmpty ? nil : description,
-                    priority: draft.priority
+                    priority: draft.priority,
+                    assigneeUserId: draft.assigneeUserId
                 ),
                 as: UpdateIssueResponse.self
             )

@@ -723,6 +723,7 @@ export function HuntDashboard({
             ? [dashboard.project]
             : []
       }
+      members={dashboard?.members ?? []}
     />
   ) : null;
 
@@ -1037,6 +1038,7 @@ export function HuntDashboard({
               )
             }
             runs={filtered}
+            members={dashboard?.members ?? []}
             processingIssueIds={processingIssueIds}
             updatingIssueId={updatingIssueId}
           />
@@ -1087,6 +1089,11 @@ export function HuntDashboard({
                     availableProviders={availableProviders}
                     activeAgent={
                       agentAssociationsByRunId.activeAgents.get(run.id) ?? null
+                    }
+                    assignee={
+                      dashboard?.members?.find(
+                        (member) => member.userId === run.assigneeUserId,
+                      ) ?? null
                     }
                     assignedWorker={
                       ["completed", "cancelled", "paused", "blocked", "failed"].includes(
@@ -1256,6 +1263,7 @@ export function HuntDashboard({
             setEditingRunId(null);
           }}
           run={editingRun}
+          members={dashboard?.members ?? []}
         />
       )}
       <Dialog
@@ -1333,11 +1341,13 @@ export function HuntDashboard({
 
 export function EditIssueDialog({
   isSubmitting,
+  members = [],
   onClose,
   onUpdate,
   run,
 }: {
   isSubmitting: boolean;
+  members?: OrganizationMember[];
   onClose: () => void;
   onUpdate: (input: UpdateIssueInput) => Promise<unknown>;
   run: HuntRun;
@@ -1347,6 +1357,9 @@ export function EditIssueDialog({
   const [description, setDescription] = useState(run.issueDescription ?? "");
   const [priority, setPriority] = useState(
     run.priority === null ? "" : String(run.priority),
+  );
+  const [assigneeUserId, setAssigneeUserId] = useState(
+    run.assigneeUserId ?? "",
   );
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -1387,6 +1400,7 @@ export function EditIssueDialog({
             title: title.trim(),
             description: description.trim() || null,
             priority: priority ? Number(priority) : null,
+            assigneeUserId: assigneeUserId || null,
           }).catch((error) =>
             setSubmitError(error instanceof Error ? error.message : String(error)),
           );
@@ -1436,6 +1450,19 @@ export function EditIssueDialog({
           </div>
           <div className="issue-metadata-bar">
             <NativeSelect
+              className="issue-assignee-select"
+              label={t("issue.assignee")}
+              onValueChange={setAssigneeUserId}
+              options={[
+                { label: t("run.unassigned"), value: "" },
+                ...members.map((member) => ({
+                  label: member.name,
+                  value: member.userId,
+                })),
+              ]}
+              value={assigneeUserId}
+            />
+            <NativeSelect
               className="issue-priority-select"
               label={t("issue.priority")}
               onValueChange={setPriority}
@@ -1481,12 +1508,14 @@ export function CreateIssueDialog({
   isSubmitting,
   onClose,
   onCreate,
+  members = [],
   projects,
 }: {
   defaultProjectId?: string;
   isSubmitting: boolean;
   onClose: () => void;
   onCreate: (projectId: string, input: CreateIssueInput) => Promise<void>;
+  members?: OrganizationMember[];
   projects: Project[];
 }) {
   const { t } = useI18n();
@@ -1504,6 +1533,9 @@ export function CreateIssueDialog({
     initialDraft?.status ?? "queued",
   );
   const [priority, setPriority] = useState(initialDraft?.priority ?? "2");
+  const [assigneeUserId, setAssigneeUserId] = useState(
+    initialDraft?.assigneeUserId ?? "",
+  );
   const [projectId, setProjectId] = useState(() =>
     projects.some((project) => project.id === initialDraft?.projectId)
       ? initialDraft!.projectId
@@ -1532,8 +1564,17 @@ export function CreateIssueDialog({
       projectId,
       status,
       title,
+      assigneeUserId: assigneeUserId || null,
     });
-  }, [attachments, description, priority, projectId, status, title]);
+  }, [
+    assigneeUserId,
+    attachments,
+    description,
+    priority,
+    projectId,
+    status,
+    title,
+  ]);
 
   const closeWithDraft = useCallback(() => {
     persistDraft();
@@ -1747,6 +1788,7 @@ export function CreateIssueDialog({
               title: title.trim(),
               description: description.trim() || null,
               priority: Number(priority),
+              assigneeUserId: assigneeUserId || null,
               status,
               attachments: attachments.map(({ file }) => file),
               ...(attachments.length > 0
@@ -1856,6 +1898,19 @@ export function CreateIssueDialog({
             )}
           </div>
           <div className="issue-metadata-bar">
+            <NativeSelect
+              className="issue-assignee-select"
+              label={t("issue.assignee")}
+              onValueChange={setAssigneeUserId}
+              options={[
+                { label: t("run.unassigned"), value: "" },
+                ...members.map((member) => ({
+                  label: member.name,
+                  value: member.userId,
+                })),
+              ]}
+              value={assigneeUserId}
+            />
             <NativeSelect
               className="issue-status-select"
               label={t("dashboard.status")}
@@ -2156,6 +2211,7 @@ function SelectedAttachment({
 function KanbanCard({
   availableProviders,
   activeAgent,
+  assignee,
   assignedWorker,
   contextMenuDisabled,
   deletingIssueId,
@@ -2179,6 +2235,7 @@ function KanbanCard({
 }: {
   availableProviders: AgentProvider[];
   activeAgent: ProjectAgent | null;
+  assignee: OrganizationMember | null;
   assignedWorker: ExecutionWorker | null;
   contextMenuDisabled: boolean;
   deletingIssueId: string | null;
@@ -2230,7 +2287,7 @@ function KanbanCard({
       <div
         aria-label={t("run.details", { title: run.title })}
         aria-disabled={isMoving}
-        className={`kanban-card ${meta.tone}${isMoving ? " moving" : ""}${isDragging ? " dragging" : ""}${activeAgent || assignedWorker ? " has-assignees" : ""}${activeAgent && assignedWorker ? " has-multiple-assignees" : ""}`}
+        className={`kanban-card ${meta.tone}${isMoving ? " moving" : ""}${isDragging ? " dragging" : ""}${assignee || activeAgent || assignedWorker ? " has-assignees" : ""}${[assignee, activeAgent, assignedWorker].filter(Boolean).length > 1 ? " has-multiple-assignees" : ""}`}
         draggable={false}
         onClick={onOpen}
         onKeyDown={(event) => {
@@ -2245,8 +2302,17 @@ function KanbanCard({
         role="button"
         tabIndex={0}
       >
-        {(activeAgent || assignedWorker) && (
+        {(assignee || activeAgent || assignedWorker) && (
           <span className="kanban-card-assignee-badges">
+            {assignee && (
+              <span
+                aria-label={`${t("issue.assignee")}: ${assignee.name}`}
+                className="kanban-card-person-badge"
+                title={`${t("issue.assignee")}: ${assignee.name}`}
+              >
+                <IssueAssigneeAvatar member={assignee} />
+              </span>
+            )}
             {assignedWorker && (
               <span
                 aria-label={t("run.workerAssigned", {
@@ -2785,6 +2851,7 @@ function IssueList({
   onProcessIssueNow,
   onPriorityChange,
   onPreferencesChange,
+  members,
   runs,
   processingIssueIds,
   updatingIssueId,
@@ -2801,6 +2868,7 @@ function IssueList({
     run: HuntRun,
     preferences: IssueExecutionPreferences,
   ) => void;
+  members: OrganizationMember[];
   runs: HuntRun[];
   processingIssueIds: ReadonlySet<string>;
   updatingIssueId: string | null;
@@ -2828,6 +2896,9 @@ function IssueList({
             <span>{t("dashboard.emptyDescription")}</span>
           </div>
         ) : runs.map((run) => {
+          const assignee = members.find(
+            (member) => member.userId === run.assigneeUserId,
+          );
           const meta = runMeta(
             run.status,
             run.workflowStage,
@@ -2884,7 +2955,10 @@ function IssueList({
               >
                 <span className="issue-list-task" role="cell">
                   <span className="issue-list-task-kicker">
-                    <small>AH-{run.runNumber} · {run.sourceKey}</small>
+                    <small>
+                      AH-{run.runNumber} · {run.sourceKey}
+                      {assignee ? ` · ${assignee.name}` : ""}
+                    </small>
                     <PullRequestIconLink urls={run.pullRequestUrls} />
                   </span>
                   <strong>{run.title}</strong>
@@ -3033,6 +3107,9 @@ export function RunPage({
   const priorityLabel = run.priority === null
     ? t("run.notSet")
     : t(`issue.priority${run.priority}` as MessageKey);
+  const assignee = mentionMembers.find(
+    (member) => member.userId === run.assigneeUserId,
+  ) ?? null;
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -3426,7 +3503,7 @@ export function RunPage({
       </span>
       <span className="run-page-property-badge worker" title={t("run.assignee")}>
         <UserRound aria-hidden="true" size={13} />
-        {run.claimedBy ?? t("run.unassigned")}
+        {assignee?.name ?? t("run.unassigned")}
       </span>
       <span className="run-page-property-badge agent" title={t("run.agent")}>
         <Bot aria-hidden="true" size={13} />
@@ -4426,12 +4503,12 @@ export function RunPage({
                     </span>
                   </label>
                   <div
-                    aria-label={`${t("run.assignee")}: ${run.claimedBy ?? t("run.unassigned")}`}
+                    aria-label={`${t("issue.assignee")}: ${assignee?.name ?? t("run.unassigned")}`}
                     className="run-property"
-                    title={t("run.assignee")}
+                    title={t("issue.assignee")}
                   >
                     <span className="run-property-icon assignee"><UserRound size={15} /></span>
-                    <span className="run-property-copy"><strong>{run.claimedBy ?? t("run.unassigned")}</strong></span>
+                    <span className="run-property-copy"><strong>{assignee?.name ?? t("run.unassigned")}</strong></span>
                   </div>
                   <div
                     aria-label={`${t("run.agent")}: ${performedAgentName ?? t("run.unassigned")}`}
@@ -4553,6 +4630,7 @@ export function RunPage({
             setIsEditDialogOpen(false);
           }}
           run={run}
+          members={mentionMembers}
         />
       )}
       <Dialog
@@ -5222,6 +5300,16 @@ function RunEvidencePanel({
         </div>
       )}
     </div>
+  );
+}
+
+function IssueAssigneeAvatar({ member }: { member: OrganizationMember }) {
+  return member.image ? (
+    <img alt="" className="issue-assignee-avatar" src={member.image} />
+  ) : (
+    <span aria-hidden="true" className="issue-assignee-avatar fallback">
+      {member.name.trim().charAt(0).toUpperCase() || "?"}
+    </span>
   );
 }
 

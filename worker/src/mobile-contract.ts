@@ -83,6 +83,15 @@ export const mobileMessageAuthorSchema = z.object({
   provider: z.string().nullable(),
 });
 
+export const mobileOrganizationMemberSchema = z.object({
+  userId: z.string(),
+  name: z.string(),
+  email: z.email(),
+  image: z.string().nullable(),
+  role: z.enum(["owner", "admin", "member"]),
+  createdAt: z.iso.datetime(),
+});
+
 export const mobileDashboardRunSchema = z.object({
   id: z.uuid(),
   runNumber: z.number().int().positive().optional(),
@@ -123,6 +132,7 @@ export const mobileDashboardRunSchema = z.object({
   progress: z.number().min(0).max(100).optional(),
   detail: z.string().nullable().optional(),
   priority: z.number().int().min(1).max(4).nullable().optional(),
+  assigneeUserId: z.string().nullable().optional(),
   issueDescription: z.string().nullable().optional(),
   attachments: z.array(mobileIssueAttachmentSchema).optional(),
   prerequisites: z.array(z.object({
@@ -201,6 +211,7 @@ export const mobileDashboardSnapshotSchema = z.object({
   runs: z.array(mobileDashboardRunSchema),
   workers: z.array(mobileDashboardWorkerSchema).optional(),
   organizationProviders: z.array(z.enum(["codex", "claude", "grok", "opencode"])).optional(),
+  members: z.array(mobileOrganizationMemberSchema).optional(),
   conversationNotifications: z.array(mobileConversationNotificationSchema).optional(),
   cursor: z.number().int().nonnegative().optional(),
   generatedAt: z.iso.datetime(),
@@ -214,6 +225,7 @@ export const mobileDashboardDeltaSchema = z.object({
   project: mobileDashboardProjectSchema.optional(),
   workers: z.array(mobileDashboardWorkerSchema).optional(),
   organizationProviders: z.array(z.enum(["codex", "claude", "grok", "opencode"])).optional(),
+  members: z.array(mobileOrganizationMemberSchema).optional(),
   conversationNotifications: z.array(mobileConversationNotificationSchema).optional(),
   generatedAt: z.iso.datetime(),
 });
@@ -288,6 +300,7 @@ export const mobileCreateIssueRequestSchema = z.object({
   title: z.string().trim().min(1).max(300),
   description: z.string().max(100_000).nullable(),
   priority: z.number().int().min(1).max(4).nullable(),
+  assigneeUserId: z.string().nullable(),
   status: z.enum(["backlog", "queued"]),
 }).strict();
 export const mobileCreateIssueResponseSchema = z.object({
@@ -295,6 +308,7 @@ export const mobileCreateIssueResponseSchema = z.object({
   sourceKey: z.string(),
   stage: z.literal("queued"),
   status: z.enum(["backlog", "queued"]),
+  assigneeUserId: z.string().nullable(),
   attachments: z.array(mobileIssueAttachmentSchema),
 });
 export const mobileUpdateIssueRequestSchema = mobileCreateIssueRequestSchema
@@ -304,6 +318,7 @@ export const mobileUpdateIssueResponseSchema = z.object({
   title: z.string(),
   description: z.string().nullable(),
   priority: z.number().int().min(1).max(4).nullable(),
+  assigneeUserId: z.string().nullable(),
 });
 export const mobilePreferencesSchema = z.object({
   provider: mobileProviderSchema.nullable(),
