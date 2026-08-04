@@ -115,6 +115,7 @@ final class BriarCompanionUITests: XCTestCase {
         app.buttons["create-issue-button"].tap()
         let title = app.textFields["create-issue-title"]
         XCTAssertTrue(title.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.navigationBars["새 이슈"].exists)
         title.tap()
         title.typeText("모바일 쓰기 흐름 확인")
         let submit = app.buttons["create-issue-submit"]
@@ -149,7 +150,8 @@ final class BriarCompanionUITests: XCTestCase {
         app.buttons["login-button"].tap()
         XCTAssertTrue(app.buttons["project-continue-button"].waitForExistence(timeout: 5))
         app.buttons["project-continue-button"].tap()
-        XCTAssertTrue(app.navigationBars["Tasks"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["project-switcher"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.navigationBars["Tasks"].exists)
         return app
     }
 

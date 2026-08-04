@@ -10,8 +10,10 @@ struct CompanionShellView: View {
     @ObservedObject var agents: AgentsStore
     @ObservedObject var inbox: InboxStore
     @ObservedObject var notifications: LocalNotificationService
+    @Binding var selectedProjectID: UUID?
 
     let project: ProjectsResponse.Project
+    let projects: [ProjectsResponse.Project]
     let snapshot: DashboardSnapshot?
     let isRefreshing: Bool
     let errorMessage: String?
@@ -20,7 +22,6 @@ struct CompanionShellView: View {
     let ideas: IdeasStore
     let user: CurrentUserResponse.User?
     let refresh: () async -> Void
-    let changeProject: () -> Void
     let signOut: () -> Void
 
     var body: some View {
@@ -35,7 +36,8 @@ struct CompanionShellView: View {
                     api: api,
                     refresh: refresh
                 )
-                .navigationTitle("Tasks")
+                .id(project.id)
+                .navigationBarTitleDisplayMode(.inline)
                 .toolbar { companionToolbar }
                 .navigationDestination(for: UUID.self) { runID in
                     if let run = snapshot?.runs.first(where: { $0.id == runID }) {
@@ -129,16 +131,26 @@ struct CompanionShellView: View {
                 taskPath.append(runID)
             }
         }
+        .onChange(of: selectedProjectID) { _, _ in
+            taskPath = NavigationPath()
+        }
     }
 
     @ToolbarContentBuilder
     private var companionToolbar: some ToolbarContent {
-        ToolbarItem(placement: .automatic) {
-            Text(project.name).font(.subheadline.weight(.semibold))
+        ToolbarItem(placement: .principal) {
+            Picker("프로젝트", selection: $selectedProjectID) {
+                ForEach(projects, id: \.id) { candidate in
+                    Text(candidate.name).tag(Optional(candidate.id))
+                }
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .accessibilityLabel("프로젝트")
+            .accessibilityIdentifier("project-switcher")
         }
         ToolbarItem(placement: .primaryAction) {
             Menu {
-                Button("프로젝트 변경", action: changeProject)
                 Button("설정") { showingSettings = true }
                 Divider()
                 Button("로그아웃", role: .destructive, action: signOut)

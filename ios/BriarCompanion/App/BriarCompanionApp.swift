@@ -57,7 +57,7 @@ private struct UITestCompanionFlow: View {
                     message: "네트워크에 연결할 수 없습니다. 연결되면 다시 시도합니다.",
                     refresh: {}
                 )
-                .navigationTitle("Tasks")
+                .navigationBarTitleDisplayMode(.inline)
             }
         } else if !signedIn {
             CompanionLoginView(signingIn: false, errorMessage: nil) { signedIn = true }
@@ -74,7 +74,9 @@ private struct UITestCompanionFlow: View {
                 agents: agents,
                 inbox: inbox,
                 notifications: notifications,
+                selectedProjectID: $selectedProjectID,
                 project: project,
+                projects: [project],
                 snapshot: snapshot,
                 isRefreshing: false,
                 errorMessage: nil,
@@ -89,7 +91,6 @@ private struct UITestCompanionFlow: View {
                     image: nil
                 ),
                 refresh: { await refreshSnapshot() },
-                changeProject: { projectSelected = false },
                 signOut: {
                     projectSelected = false
                     signedIn = false

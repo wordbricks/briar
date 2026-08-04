@@ -711,6 +711,7 @@ export function HuntDashboard({
         await onCreateIssue(projectId, input);
         setIsIssueDialogOpen(false);
       }}
+      showsTitle={!companionMode}
       projects={
         projects.length > 0
           ? projects
@@ -1472,12 +1473,14 @@ export function CreateIssueDialog({
   onClose,
   onCreate,
   projects,
+  showsTitle = true,
 }: {
   defaultProjectId?: string;
   isSubmitting: boolean;
   onClose: () => void;
   onCreate: (projectId: string, input: CreateIssueInput) => Promise<void>;
   projects: Project[];
+  showsTitle?: boolean;
 }) {
   const { t } = useI18n();
   const [initialDraft] = useState(() => {
@@ -1759,10 +1762,10 @@ export function CreateIssueDialog({
       >
         <header>
           <div className="issue-dialog-context">
-            <strong>{t("issue.newIssue")}</strong>
+            {showsTitle && <strong>{t("issue.newIssue")}</strong>}
             {projects.length > 0 && (
               <>
-                <span aria-hidden="true">/</span>
+                {showsTitle && <span aria-hidden="true">/</span>}
                 <SelectMenu
                   className="issue-project-context"
                   disabled={isSubmitting}

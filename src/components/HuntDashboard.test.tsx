@@ -824,6 +824,30 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("Enter로 등록");
   });
 
+  it("removes the redundant new issue heading in the mobile companion", () => {
+    const markup = renderToStaticMarkup(
+      <CreateIssueDialog
+        defaultProjectId="project-1"
+        isSubmitting={false}
+        onClose={() => undefined}
+        onCreate={async () => undefined}
+        projects={[
+          {
+            id: "project-1",
+            name: "Briar",
+            organizationId: "organization-1",
+            createdAt: "2026-07-01T00:00:00.000Z",
+          },
+        ]}
+        showsTitle={false}
+      />,
+    );
+
+    expect(markup).not.toContain("<strong>새 이슈</strong>");
+    expect(markup).not.toContain('<span aria-hidden="true">/</span>');
+    expect(markup).toContain('aria-haspopup="listbox" aria-label="프로젝트"');
+  });
+
   it("edits an issue title, description, and priority", async () => {
     let updated:
       | {
