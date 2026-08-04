@@ -917,7 +917,11 @@ describe("HuntDashboard", () => {
     };
     const customDashboard = {
       ...demoDashboard,
-      settings: { ...demoDashboard.settings, workflow: customWorkflow },
+      settings: {
+        ...demoDashboard.settings,
+        workflow: customWorkflow,
+        checkpointPolicy: undefined,
+      },
       runs: [{
         ...demoDashboard.runs[0],
         status: "running" as const,
@@ -943,6 +947,117 @@ describe("HuntDashboard", () => {
     expect(markup).toContain('aria-label="차단"');
     expect(markup).toContain('aria-label="실패"');
     expect(markup).toContain('aria-label="취소"');
+    expect(markup).toContain("Security review 완료 후 확인");
+    expect(markup).toContain('data-checkpoint-count="1"');
+  });
+
+  it("marks effective pause checkpoints at their kanban boundaries", () => {
+    const workflow = {
+      version: 2 as const,
+      requirements: [],
+      stages: [
+        { id: "analyzing", label: "Analyze", required: true },
+        { id: "security_review", label: "Security review", required: true },
+      ],
+      execution: { checkpoints: [] },
+      completion: { requiredStages: ["analyzing", "security_review"] },
+    };
+    const dashboard = {
+      ...demoDashboard,
+      settings: {
+        ...demoDashboard.settings,
+        workflow,
+        checkpointPolicy: {
+          availableBoundaries: [],
+          projectMandatory: [{
+            key: "project-after-analyzing",
+            stage: "analyzing",
+            position: "after" as const,
+          }],
+          userDefaults: [{
+            key: "user-before-security-review",
+            stage: "security_review",
+            position: "before" as const,
+          }],
+          effective: [
+            {
+              key: "project-after-analyzing",
+              stage: "analyzing",
+              position: "after" as const,
+            },
+            {
+              key: "user-before-security-review",
+              stage: "security_review",
+              position: "before" as const,
+            },
+          ],
+          projectRevision: 1,
+          userRevision: 1,
+        },
+      },
+      runs: [],
+    };
+
+    const markup = renderToStaticMarkup(
+      <HuntDashboard {...dashboardProps} dashboard={dashboard} />,
+    );
+
+    expect(markup.match(/class="kanban-checkpoint-marker"/g)).toHaveLength(1);
+    expect(markup).toContain('data-checkpoint-count="2"');
+    expect(markup).toContain("분석 완료 후 확인");
+    expect(markup).toContain("Security review 시작 전 확인");
+  });
+
+  it("updates kanban pause markers when checkpoint settings change", async () => {
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    const checkpointPolicy = {
+      ...demoDashboard.settings.checkpointPolicy!,
+      projectMandatory: [],
+      userDefaults: [],
+      effective: [],
+    };
+    const dashboard = {
+      ...demoDashboard,
+      settings: { ...demoDashboard.settings, checkpointPolicy },
+    };
+
+    await act(async () => root.render(
+      <HuntDashboard {...dashboardProps} dashboard={dashboard} />,
+    ));
+    expect(container.querySelector(".kanban-checkpoint-marker")).toBeNull();
+
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={{
+          ...dashboard,
+          settings: {
+            ...dashboard.settings,
+            checkpointPolicy: {
+              ...checkpointPolicy,
+              effective: [{
+                key: "user-before-implementing",
+                stage: "implementing",
+                position: "before",
+              }],
+              userDefaults: [{
+                key: "user-before-implementing",
+                stage: "implementing",
+                position: "before",
+              }],
+            },
+          },
+        }}
+      />,
+    ));
+    expect(
+      container.querySelector(".kanban-checkpoint-marker")?.getAttribute(
+        "aria-label",
+      ),
+    ).toContain("구현 시작 전 확인");
+
+    await act(async () => root.unmount());
   });
 
   it("changes issue status when a kanban card is pointer-dragged onto another column", async () => {

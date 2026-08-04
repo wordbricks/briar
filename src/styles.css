@@ -1034,7 +1034,13 @@ body { overflow: hidden; font-synthesis: none; }
 .worker-readiness-check { margin-left:auto; flex:0 0 auto; color:#6550b3; opacity:0; }
 .worker-readiness-row[aria-pressed="true"] .worker-readiness-check { opacity:1; }
 .kanban-board { min-width:0; min-height:0; flex:1; padding:12px; display:grid; grid-auto-flow:column; grid-auto-columns:minmax(286px,1fr); align-items:stretch; gap:10px; overflow:auto; background:#f7f7f4; scrollbar-gutter:stable; }
+.kanban-column-shell { min-width:0; height:100%; position:relative; }
 .kanban-column { min-width:0; height:100%; display:flex; flex-direction:column; overflow:hidden; border:1px solid #e5e6e0; border-radius:13px; background:#f1f1ee; transition:border-color .14s ease,background-color .14s ease,box-shadow .14s ease; }.kanban-column.drag-over { border-color:#8d78d3; background:#f2effc; box-shadow:inset 0 0 0 2px rgba(113,88,198,.12); }.kanban-column > header { min-height:45px; padding:0 12px; display:flex; align-items:center; justify-content:space-between; }.kanban-column > header > span { min-width:0; display:flex; align-items:center; gap:7px; overflow:hidden; color:#595b55; font-size:var(--text-xs); font-weight:600; text-overflow:ellipsis; white-space:nowrap; }.kanban-column > header i { width:10px; height:10px; flex:0 0 10px; border:2px solid #a5a7a0; border-radius:50%; }.kanban-column > header strong { min-width:20px; color:#979991; font:500 var(--text-2xs) "DM Mono",monospace; text-align:right; }.kanban-column.violet > header i { border-color:#8167d6; background:#eee9ff; }.kanban-column.indigo > header i,.kanban-column.blue > header i { border-color:#58a0d1; background:#e8f4ff; }.kanban-column.amber > header i,.kanban-column.orange > header i { border-color:#d79a41; background:#fff3d9; }.kanban-column.rose > header i,.kanban-column.red > header i { border-color:#d65f72; background:#fff0f2; }.kanban-column.emerald > header i { border-color:#43a47f; background:#e8f7f1; }.kanban-column > div { min-height:0; flex:1; padding:10px; display:grid; grid-auto-rows:max-content; align-content:start; gap:10px; overflow-y:auto; }
+.kanban-checkpoint-marker { width:16px; height:14px; position:absolute; z-index:4; top:-6px; left:-5px; display:flex; align-items:flex-start; justify-content:center; color:#fff; cursor:help; transform:translateX(-50%); filter:drop-shadow(0 1px 1px rgba(110,42,55,.22)); }
+.kanban-checkpoint-marker > svg { width:12px; height:10px; overflow:visible; fill:#d95269; }
+.kanban-checkpoint-marker > strong { min-width:10px; height:10px; padding:0 2px; position:absolute; top:-3px; right:-2px; display:grid; place-items:center; border:1px solid #f7f7f4; border-radius:999px; color:#fff; background:#a93347; font:700 7px/1 "DM Mono",monospace; }
+.kanban-checkpoint-marker:focus-visible { outline:2px solid #8a3142; outline-offset:1px; border-radius:3px; }
+@media (max-width:760px) { .kanban-column-shell { height:auto; } }
 .kanban-column > div { scrollbar-width:thin; scrollbar-color:rgba(82,83,77,.18) transparent; }
 .kanban-column > div::-webkit-scrollbar { width:6px; }
 .kanban-column > div::-webkit-scrollbar-track { background:transparent; }
@@ -3509,6 +3515,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .companion-shell .status-tabs { min-height: 44px; padding: 2px max(12px, env(safe-area-inset-right)) 2px max(12px, env(safe-area-inset-left)); gap: 0; overflow-x: auto; scrollbar-width: none; }
 .companion-shell .status-tabs button { height: 40px; padding: 0 9px; border-radius: 8px; }
 .companion-shell .kanban-board { padding: 0 max(16px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); display: grid; grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: minmax(0,1fr); gap: 14px; overflow: visible; background: transparent; }
+.companion-shell .kanban-column-shell { height:auto; }
 .platform-ios.companion-shell .kanban-board { padding-bottom: 10px; }
 .companion-shell .kanban-column { min-width: 0; height: auto; overflow: visible; border: 0; border-radius: 0; background: transparent; }
 .companion-shell .kanban-column > header { min-height: 36px; padding: 0; border-bottom: 1px solid #dedfd9; }
