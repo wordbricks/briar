@@ -2290,7 +2290,7 @@ function KanbanCard({
       <div
         aria-label={t("run.details", { title: run.title })}
         aria-disabled={isMoving}
-        className={`kanban-card ${meta.tone}${isMoving ? " moving" : ""}${isDragging ? " dragging" : ""}${assignee || activeAgent || assignedWorker ? " has-assignees" : ""}${[assignee, activeAgent, assignedWorker].filter(Boolean).length > 1 ? " has-multiple-assignees" : ""}`}
+        className={`kanban-card ${meta.tone}${isMoving ? " moving" : ""}${isDragging ? " dragging" : ""}${activeAgent || assignedWorker ? " has-assignees" : ""}${[activeAgent, assignedWorker].filter(Boolean).length > 1 ? " has-multiple-assignees" : ""}`}
         draggable={false}
         onClick={onOpen}
         onKeyDown={(event) => {
@@ -2305,17 +2305,8 @@ function KanbanCard({
         role="button"
         tabIndex={0}
       >
-        {(assignee || activeAgent || assignedWorker) && (
+        {(activeAgent || assignedWorker) && (
           <span className="kanban-card-assignee-badges">
-            {assignee && (
-              <span
-                aria-label={`${t("issue.assignee")}: ${assignee.name}`}
-                className="kanban-card-person-badge"
-                title={`${t("issue.assignee")}: ${assignee.name}`}
-              >
-                <IssueAssigneeAvatar member={assignee} />
-              </span>
-            )}
             {assignedWorker && (
               <span
                 aria-label={t("run.workerAssigned", {
@@ -2367,6 +2358,15 @@ function KanbanCard({
             })}</i>
           )}
           {run.priority !== null && <i className="kanban-priority">P{run.priority}</i>}
+          {assignee && (
+            <i
+              aria-label={`${t("issue.assignee")}: ${assignee.name}`}
+              className="kanban-assignee"
+              title={`${t("issue.assignee")}: ${assignee.name}`}
+            >
+              <IssueAssigneeAvatar member={assignee} />
+            </i>
+          )}
         </span>
         <span className="kanban-card-footer">
           <small>{isClaimed ? t("run.assigned", { agent: run.claimedBy ?? "agent" }) : relativeTime(run.updatedAt, t)}</small>

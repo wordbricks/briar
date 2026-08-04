@@ -1050,6 +1050,8 @@ body { overflow: hidden; font-synthesis: none; }
 .kanban-card.has-multiple-assignees .kanban-card-kicker { padding-right:61px; }
 .issue-assignee-avatar { width:100%; height:100%; display:block; object-fit:cover; border-radius:inherit; }
 .issue-assignee-avatar.fallback { display:grid; place-items:center; color:#fff; background:#7662b7; font-size:13px; font-weight:700; }
+.kanban-card-badges .kanban-assignee { width:22px; min-width:22px; height:22px; min-height:22px; padding:2px; overflow:hidden; justify-content:center; box-sizing:border-box; }
+.kanban-assignee .issue-assignee-avatar { width:16px; height:16px; border-radius:50%; font-size:9px; }
 .kanban-card-kicker,.kanban-card-copy,.kanban-card-badges,.kanban-card-footer { flex-shrink:0; }
 .kanban-card-copy { min-width:0; display:grid; gap:3px; }
 .kanban-card-copy > strong { color:var(--foreground); font-size:var(--text-xs); line-height:1.45; overflow-wrap:anywhere; white-space:pre-wrap; }

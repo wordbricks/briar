@@ -313,12 +313,13 @@ describe("HuntDashboard", () => {
     expect(markup).not.toContain("attachment-1");
   });
 
-  it("stacks the human assignee avatar with the active agent badge", () => {
+  it("shows the human assignee avatar with the source and priority badges", () => {
     const assignee = demoDashboard.members?.[0];
     if (!assignee) throw new Error("Demo assignee is required");
     const run = {
       ...demoDashboard.runs[0],
       assigneeUserId: assignee.userId,
+      priority: 2,
     };
     const markup = renderToStaticMarkup(
       <HuntDashboard
@@ -329,13 +330,30 @@ describe("HuntDashboard", () => {
       />,
     );
 
-    expect(markup).toContain(
-      "kanban-card violet has-assignees has-multiple-assignees",
-    );
-    expect(markup).toContain('class="kanban-card-person-badge"');
+    const container = document.createElement("div");
+    container.innerHTML = markup;
+    const card = container.querySelector(".kanban-card");
+
+    expect(card?.classList.contains("has-assignees")).toBe(true);
+    expect(card?.classList.contains("has-multiple-assignees")).toBe(false);
+    expect(
+      card?.querySelector(
+        ".kanban-card-badges .kanban-assignee .issue-assignee-avatar",
+      ),
+    ).not.toBeNull();
+    expect(
+      card?.querySelector(".kanban-card-badges .kanban-source"),
+    ).not.toBeNull();
+    expect(
+      card?.querySelector(".kanban-card-badges .kanban-priority"),
+    ).not.toBeNull();
+    expect(
+      card?.querySelector(".kanban-card-assignee-badges .kanban-card-person-badge"),
+    ).toBeNull();
+    expect(
+      card?.querySelector(".kanban-card-assignee-badges .kanban-card-agent-badge"),
+    ).not.toBeNull();
     expect(markup).toContain('aria-label="담당자: Jay"');
-    expect(markup).toContain('class="issue-assignee-avatar fallback"');
-    expect(markup).toContain('class="kanban-card-agent-badge"');
   });
 
   it("stacks the assigned worker icon with the active agent avatar", () => {
