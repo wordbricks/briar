@@ -2986,6 +2986,8 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("부분 작업 결과");
     expect(markup).toContain("작업 상세 패널을 결과 중심 구조로 정리했습니다");
     expect(markup).toContain("컴포넌트 회귀 테스트와 로컬 빌드를 통과했습니다");
+    expect(markup).toContain("검토 전 작업");
+    expect(markup).toContain("작업 결과");
     expect(markup).toContain("리비전 1");
     expect(markup).toContain('<div class="completed-issue-summary paused-result-summary"><h2>구현</h2>');
     expect(markup.match(/<li>/g)).toHaveLength(3);
@@ -2995,6 +2997,104 @@ describe("HuntDashboard", () => {
     expect(markup).toContain('class="run-result-panel"');
     expect(markup).not.toContain('class="recovery-panel paused"');
     expect(markup).not.toContain('class="issue-description-markdown"');
+  });
+
+  it("shows the work completed before a paused review in chronological order", async () => {
+    const pausedRun = {
+      ...demoDashboard.runs[1],
+      status: "paused" as const,
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <TooltipProvider>
+          <RunPage
+            isSidebarOpen
+            error={null}
+            isRecovering={false}
+            onBack={() => undefined}
+            onCancel={async () => undefined}
+            onLoadAttachment={async () => new Blob()}
+            onLoadIssueMessages={async () => []}
+            onLoadRunEvents={async () => demoRunEvents[pausedRun.id] ?? []}
+            onLoadRunEvidence={async () => []}
+            onMove={async () => undefined}
+            onRetry={async () => undefined}
+            onSendIssueMessage={async () => {
+              throw new Error("not implemented in this test");
+            }}
+            run={pausedRun}
+          />
+        </TooltipProvider>,
+      );
+      await Promise.resolve();
+    });
+
+    const reviewWork = container.querySelector(".paused-review-work");
+    expect(reviewWork?.textContent).toContain("상세 패널 구현");
+    expect(reviewWork?.textContent).toContain("로컬 검증 실행");
+    expect(reviewWork?.textContent).toContain("기록 2개");
+    expect(reviewWork?.textContent?.indexOf("상세 패널 구현")).toBeLessThan(
+      reviewWork?.textContent?.indexOf("로컬 검증 실행") ?? -1,
+    );
+    expect(container.querySelector(".paused-review-result")?.textContent).toContain(
+      "컴포넌트 회귀 테스트와 로컬 빌드를 통과했습니다",
+    );
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("keeps the resume button spinning until the paused run actually resumes", async () => {
+    const onResume = vi.fn(async () => undefined);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <TooltipProvider>
+          <RunPage
+            isSidebarOpen
+            error={null}
+            isRecovering={false}
+            onBack={() => undefined}
+            onCancel={async () => undefined}
+            onLoadAttachment={async () => new Blob()}
+            onLoadIssueMessages={async () => []}
+            onLoadRunEvidence={async () => []}
+            onMove={async () => undefined}
+            onResume={onResume}
+            onRetry={async () => undefined}
+            onSendIssueMessage={async () => {
+              throw new Error("not implemented in this test");
+            }}
+            run={{ ...demoDashboard.runs[1], status: "paused" as const }}
+          />
+        </TooltipProvider>,
+      );
+    });
+
+    const resumeButton = container.querySelector<HTMLButtonElement>(
+      ".paused-result-resume",
+    );
+    expect(resumeButton?.disabled).toBe(false);
+    expect(resumeButton?.querySelector(".spin")).toBeNull();
+
+    await act(async () => {
+      resumeButton?.click();
+      await Promise.resolve();
+    });
+
+    expect(onResume).toHaveBeenCalledOnce();
+    expect(resumeButton?.disabled).toBe(true);
+    expect(resumeButton?.querySelector(".spin")).not.toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
   });
 
   it("submits paused review feedback as an explicit rework request", async () => {

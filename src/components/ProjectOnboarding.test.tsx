@@ -6,6 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "../lib/api";
 import { repositoryWorkflowBootstrap } from "../lib/auto-hunt-contract";
+import type { ProjectLlmProgress } from "../lib/project-llm";
 import { ProjectOnboarding } from "./ProjectOnboarding";
 
 const generatedWorkflow = {
@@ -168,10 +169,18 @@ describe("ProjectOnboarding", () => {
       repositoryPath: string;
       workflow: typeof generatedWorkflow;
     }) => void) | undefined;
-    const onConnect = vi.fn(() => new Promise<{
-      repositoryPath: string;
-      workflow: typeof generatedWorkflow;
-    }>((resolve) => { resolveConnection = resolve; }));
+    let reportProgress: ((progress: ProjectLlmProgress) => void) | undefined;
+    const onConnect = vi.fn((
+      _settings: unknown,
+      _repositoryPath: string,
+      onProgress?: (progress: ProjectLlmProgress) => void,
+    ) => {
+      reportProgress = onProgress;
+      return new Promise<{
+        repositoryPath: string;
+        workflow: typeof generatedWorkflow;
+      }>((resolve) => { resolveConnection = resolve; });
+    });
 
     await act(async () => root.render(
       <ProjectOnboarding
@@ -184,7 +193,30 @@ describe("ProjectOnboarding", () => {
     await act(async () => buttonWithText(container, "다음")?.click());
 
     expect(container.textContent).toContain("워크플로우를 만들고 있어요");
+    expect(container.textContent).toContain("LLM 프로바이더의 첫 메시지를 기다리고 있습니다");
     expect(onConnect).toHaveBeenCalledOnce();
+
+    await act(async () => reportProgress?.({
+      provider: "codex",
+      messageId: "message-1",
+      phase: "commentary",
+      message: "저장소 구조를 분석하고 있습니다.",
+    }));
+    const providerProgress = container.querySelector(
+      ".onboarding-provider-progress",
+    );
+    expect(providerProgress?.getAttribute("role")).toBe("status");
+    expect(providerProgress?.textContent).toContain("Codex");
+    expect(providerProgress?.textContent).toContain("저장소 구조를 분석하고 있습니다.");
+
+    await act(async () => reportProgress?.({
+      provider: "codex",
+      messageId: "message-2",
+      phase: "commentary",
+      message: "검증 명령을 확인하고 있습니다.",
+    }));
+    expect(providerProgress?.textContent).toContain("검증 명령을 확인하고 있습니다.");
+    expect(providerProgress?.textContent).not.toContain("저장소 구조를 분석하고 있습니다.");
 
     await act(async () => resolveConnection?.({
       repositoryPath: readiness.repositoryPath,

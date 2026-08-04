@@ -114,7 +114,10 @@ import {
 } from "../lib/auto-hunt-contract";
 import { isMobileCompanion, isWebApp } from "../lib/platform";
 import { canonicalizeIssueAttachmentReferences } from "../lib/issue-markdown";
-import { runProjectAgent } from "../lib/project-llm";
+import {
+  runProjectAgent,
+  type ProjectLlmProgress,
+} from "../lib/project-llm";
 import { executeScheduledProjectAgent } from "../lib/project-agent-schedule-execution";
 import { startProjectAgentSchedulePolling } from "../lib/project-agent-schedule-runner";
 import type {
@@ -1382,6 +1385,7 @@ export function useBriar(options: UseBriarOptions = {}) {
   const connectProject = useCallback(async (
     autoHunt: LocalAutoHuntConfig,
     repositoryPath: string,
+    onWorkflowProgress?: (progress: ProjectLlmProgress) => void,
   ) => {
     if (!projectConnection) throw new Error("연결할 프로젝트가 없습니다.");
     if (!repositoryPath) throw new Error("연결할 Git 저장소를 선택하세요.");
@@ -1417,7 +1421,11 @@ export function useBriar(options: UseBriarOptions = {}) {
       } = await resolveProjectConnectionWorkflow(
         connection.project.role,
         connection.workflow,
-        () => generateProjectWorkflow(connection.project.id),
+        () => generateProjectWorkflow(
+          connection.project.id,
+          undefined,
+          onWorkflowProgress,
+        ),
       );
       await updateLocalProjectWorkflow(
         connection.project.id,

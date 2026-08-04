@@ -3120,6 +3120,7 @@ export function RunPage({
   const [isPropertiesOpen, setIsPropertiesOpen] = useState(false);
   const [isCompletingResultReview, setIsCompletingResultReview] =
     useState(false);
+  const [isResumePending, setIsResumePending] = useState(false);
   const [resultReviewError, setResultReviewError] = useState<string | null>(
     null,
   );
@@ -3215,6 +3216,7 @@ export function RunPage({
     setIsPropertiesOpen(false);
     setRunEvents([]);
     setIsCompletingResultReview(false);
+    setIsResumePending(false);
     setResultReviewError(null);
     setIsReworkFormOpen(false);
     setReworkStage("");
@@ -3293,6 +3295,22 @@ export function RunPage({
     run.status === "paused" && run.structuredResult?.outcome === "partial"
       ? completionSummary
       : null;
+  const pausedReviewEvents = (() => {
+    if (run.status !== "paused") return [];
+    const reviewAttempt = run.checkpoint?.attempt ?? run.currentAttempt;
+    const reviewRevision = run.checkpoint?.revision ?? run.currentRevision;
+    const eventsBeforePause = runEvents.filter((event) => event.status !== "paused");
+    const currentReviewEvents = eventsBeforePause.filter(
+      (event) =>
+        event.attempt === reviewAttempt && event.revision === reviewRevision,
+    );
+    return [...(currentReviewEvents.length > 0
+      ? currentReviewEvents
+      : eventsBeforePause)].sort(
+      (left, right) =>
+        Date.parse(left.occurredAt) - Date.parse(right.occurredAt),
+    );
+  })();
   const currentWorkflowStageIndex = run.workflow.stages.findIndex(
     (stage) => stage.id === run.workflowStage,
   );
@@ -3420,6 +3438,19 @@ export function RunPage({
       // The hook exposes the actionable error on this page.
     }
   };
+  const resumePausedRun = async () => {
+    if (isResumePending || isRecovering || run.resumeRequestedAt) return;
+    setIsResumePending(true);
+    try {
+      await onResume();
+      setConfirmCancel(false);
+    } catch {
+      setIsResumePending(false);
+      // The hook exposes the actionable error on this page.
+    }
+  };
+  const resumeIsPending =
+    isResumePending || isRecovering || Boolean(run.resumeRequestedAt);
   const completeResultReview = async () => {
     if (!onCompleteResultReview || currentUserHasReviewed) return;
     setIsCompletingResultReview(true);
@@ -4014,21 +4045,104 @@ export function RunPage({
                             </small>
                           </div>
                           {executionMetricsPanel}
-                          <div className="completed-issue-summary paused-result-summary">
-                            {pausedPartialSummary ? (
-                              <ReactMarkdown
-                                remarkPlugins={[remarkGfm]}
-                                skipHtml
-                              >
-                                {pausedPartialSummary}
-                              </ReactMarkdown>
-                            ) : (
-                              <ul>
-                                {pausedResultItems.map((item) => (
-                                  <li key={item}>{item}</li>
-                                ))}
-                              </ul>
-                            )}
+                          <div className="paused-review-content">
+                            <section
+                              aria-busy={runEventsLoading}
+                              className="paused-review-section paused-review-work"
+                            >
+                              <header>
+                                <div>
+                                  <strong>{t("run.reviewWorkHistory")}</strong>
+                                  <p>{t("run.reviewWorkHistoryDescription")}</p>
+                                </div>
+                                {!runEventsLoading && !runEventsLoadError ? (
+                                  <small>
+                                    {t("run.activityCount", {
+                                      count: pausedReviewEvents.length,
+                                    })}
+                                  </small>
+                                ) : null}
+                              </header>
+                              {runEventsLoading ? (
+                                <div className="paused-review-state">
+                                  <LoaderCircle className="spin" size={15} />
+                                  {t("run.activityLoading")}
+                                </div>
+                              ) : runEventsLoadError ? (
+                                <button
+                                  className="paused-review-state error"
+                                  onClick={() => void loadRunEvents()}
+                                  type="button"
+                                >
+                                  <CircleAlert size={14} />
+                                  <span>{runEventsLoadError}</span>
+                                  <RefreshCw size={13} />
+                                </button>
+                              ) : pausedReviewEvents.length > 0 ? (
+                                <div className="paused-review-timeline">
+                                  {pausedReviewEvents.map((event) => {
+                                    const display = eventMeta(
+                                      event.status,
+                                      event.workflowStage,
+                                      run.workflow,
+                                    );
+                                    return (
+                                      <div className="paused-review-event" key={event.id}>
+                                        <i className={display.tone} />
+                                        <div>
+                                          <strong>
+                                            {localizeEvent(
+                                              t,
+                                              event.status,
+                                              event.workflowStage,
+                                              display.label,
+                                            )}
+                                          </strong>
+                                          {event.detail ? <p>{event.detail}</p> : null}
+                                          <small>
+                                            {event.actor} · {relativeTime(event.occurredAt, t)}
+                                          </small>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ) : (
+                                <p className="paused-review-empty">
+                                  {t("run.activityEmpty")}
+                                </p>
+                              )}
+                            </section>
+                            <section className="paused-review-section paused-review-result">
+                              <header>
+                                <div>
+                                  <strong>{t("run.reviewWorkResult")}</strong>
+                                  <p>{t("run.reviewWorkResultDescription")}</p>
+                                </div>
+                              </header>
+                              <div className="completed-issue-summary paused-result-summary">
+                                {pausedPartialSummary ? (
+                                  <ReactMarkdown
+                                    remarkPlugins={[remarkGfm]}
+                                    skipHtml
+                                  >
+                                    {pausedPartialSummary}
+                                  </ReactMarkdown>
+                                ) : (
+                                  <ul>
+                                    {pausedResultItems.map((item) => (
+                                      <li key={item}>{item}</li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+                              {run.structuredResult?.nextAction ? (
+                                <div className="completed-issue-next-action">
+                                  <strong>{t("run.resultNextAction")}</strong>
+                                  <span>{run.structuredResult.nextAction}</span>
+                                </div>
+                              ) : null}
+                            </section>
                           </div>
                           {run.pullRequestUrls.length > 0 ? (
                             <div className="run-result-links">
@@ -4052,15 +4166,19 @@ export function RunPage({
                           <div className="paused-result-actions">
                             <button
                               className="paused-result-resume"
-                              disabled={isRecovering}
-                              onClick={() => void runAction(onResume)}
+                              disabled={resumeIsPending}
+                              onClick={() => void resumePausedRun()}
                               type="button"
                             >
-                              <RotateCcw
-                                aria-hidden="true"
-                                className={isRecovering ? "spin" : ""}
-                                size={14}
-                              />
+                              {resumeIsPending ? (
+                                <LoaderCircle
+                                  aria-hidden="true"
+                                  className="spin"
+                                  size={14}
+                                />
+                              ) : (
+                                <RotateCcw aria-hidden="true" size={14} />
+                              )}
                               {t("run.resume")}
                             </button>
                             {onRework && reworkStageOptions.length > 0 ? (

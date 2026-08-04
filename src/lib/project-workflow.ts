@@ -6,7 +6,11 @@ import {
   normalizeAutoHuntWorkflow,
   type AutoHuntWorkflow,
 } from "./auto-hunt-contract";
-import { chatWithProjectLlm, type JsonSchema } from "./project-llm";
+import {
+  chatWithProjectLlm,
+  type JsonSchema,
+  type ProjectLlmProgress,
+} from "./project-llm";
 
 const evidenceTypeSchema = z
   .string()
@@ -300,6 +304,7 @@ const parseGeneratedWorkflow = (message: string): AutoHuntWorkflow => {
 export async function generateProjectWorkflow(
   projectId: string,
   currentWorkflow?: AutoHuntWorkflow,
+  onProgress?: (progress: ProjectLlmProgress) => void,
 ): Promise<AutoHuntWorkflow> {
   const regenerationInstructions = currentWorkflow
     ? `${workflowInstructions}
@@ -324,6 +329,7 @@ ${JSON.stringify(currentWorkflow, null, 2)}
     instructions: regenerationInstructions,
     outputSchema: workflowOutputSchema,
     workspaceMode: "latestRemoteBase",
+    ...(onProgress ? { onProgress } : {}),
   });
   return parseGeneratedWorkflow(response.message);
 }
