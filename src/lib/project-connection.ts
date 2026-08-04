@@ -251,20 +251,6 @@ export async function updateLocalProjectWorkflow(
   });
 }
 
-export async function updateLocalProjectLinear(
-  projectId: string,
-  linear: ProjectSettings["linear"],
-) {
-  if (!isTauri()) {
-    throw new Error("Linear 연결 갱신은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
-  }
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<ProjectSettings["linear"]>("update_local_project_linear", {
-    projectId,
-    linear,
-  });
-}
-
 export async function updateLocalProjectVelenOrg(
   projectId: string,
   org: string | null,

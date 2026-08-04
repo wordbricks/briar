@@ -5,7 +5,6 @@ import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
 import { demoDashboard } from "../lib/demo-data";
 import { projectIconFromFile } from "../lib/project-icon";
-import type { ProjectSettings as ProjectSettingsData } from "../types";
 import { ProjectSettings } from "./ProjectSettings";
 
 vi.mock("../lib/project-icon", () => ({
@@ -19,9 +18,6 @@ describe("ProjectSettings", () => {
     const onRegenerateWorkflow = vi.fn(async () => undefined);
     const onReviseWorkflow = vi.fn(async () => undefined);
     const onSaveCheckpointPolicy = vi.fn(async () => undefined);
-    const onUpdateLinear = vi.fn(
-      async (linear: ProjectSettingsData["linear"]) => linear,
-    );
     const onConnectLinearImport = vi.fn(async () => ({
       viewer: {
         name: "Demo",
@@ -139,7 +135,6 @@ describe("ProjectSettings", () => {
           onReviseWorkflow={onReviseWorkflow}
           onSaveCheckpointPolicy={onSaveCheckpointPolicy}
           onUpdateVelenOrg={async (org) => org}
-          onUpdateLinear={onUpdateLinear}
           onConnectLinearImport={onConnectLinearImport}
           onLoadLinearImportStates={onLoadLinearImportStates}
           onImportLinearIssues={onImportLinearIssues}
@@ -363,40 +358,12 @@ describe("ProjectSettings", () => {
     expect(velenSection?.textContent).toContain(
       "Velen 연결",
     );
-    expect(
-      container.querySelector<HTMLElement>(
-        '[data-project-integration="linear"]',
-      )?.hidden,
-    ).toBe(true);
-
     await openSection("issue-import");
     expect(velenSection?.hidden).toBe(true);
-    expect(container.textContent).toContain("Linear 연결");
-    const linearSection = container.querySelector<HTMLElement>(
-      '[data-project-integration="linear"]',
-    );
-    expect(linearSection?.hidden).toBe(false);
-    const linearTeam = linearSection?.querySelector<HTMLInputElement>(
-      'input[aria-label="팀 키"]',
-    );
-    await act(async () => {
-      if (!linearTeam) return;
-      const setter = Object.getOwnPropertyDescriptor(
-        HTMLInputElement.prototype,
-        "value",
-      )?.set;
-      setter?.call(linearTeam, "BRIAR");
-      linearTeam.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    const linearSave = linearSection?.querySelector<HTMLButtonElement>(
-      ":scope > footer button",
-    );
-    await act(async () => linearSave?.click());
-    expect(onUpdateLinear).toHaveBeenCalledWith({
-      enabled: true,
-      source: "linear://linear-wordbricks",
-      teamKey: "BRIAR",
-    });
+    expect(container.textContent).toContain("Linear 이슈 가져오기");
+    expect(
+      container.querySelector('[data-project-integration="linear"]'),
+    ).toBeNull();
 
     await openSection("general");
     expect(container.querySelector(".project-settings-card")?.textContent).toContain(
@@ -442,7 +409,6 @@ describe("ProjectSettings", () => {
           onRegenerateWorkflow={async () => undefined}
           onReviseWorkflow={async () => undefined}
           onUpdateVelenOrg={async (org) => org}
-          onUpdateLinear={async (linear) => linear}
           onConnectLinearImport={async () => ({
             viewer: { name: "Demo", email: null, organizationName: "Demo" },
             teams: [],

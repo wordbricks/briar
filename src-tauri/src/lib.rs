@@ -3267,65 +3267,6 @@ fn update_project_workflow_at(
     Ok(workflow)
 }
 
-fn update_project_linear_at(
-    config_path: &Path,
-    project_id: &str,
-    mut linear: StoredLinearConfig,
-    inspect_velen: &dyn Fn(Option<String>) -> Result<VelenInspection, String>,
-) -> Result<StoredLinearConfig, String> {
-    let contents = fs::read_to_string(config_path)
-        .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
-    let mut config = serde_json::from_str::<CliConfig>(&contents)
-        .map_err(|error| format!("Briar 로컬 설정이 손상되었습니다: {error}"))?;
-    let project = config
-        .projects
-        .iter_mut()
-        .find(|project| project.id == project_id)
-        .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
-    let auto_hunt = project
-        .auto_hunt
-        .as_mut()
-        .ok_or_else(|| "이 프로젝트에 Auto Hunt 설정이 없습니다.".to_string())?;
-
-    if linear.enabled {
-        let source = linear
-            .source
-            .as_deref()
-            .map(str::trim)
-            .filter(|source| !source.is_empty())
-            .ok_or_else(|| "Linear 소스를 선택하세요.".to_string())?;
-        let org = auto_hunt
-            .velen_org
-            .as_deref()
-            .map(str::trim)
-            .filter(|org| !org.is_empty())
-            .ok_or_else(|| "Linear 연결에 사용할 Velen 조직이 없습니다.".to_string())?;
-        let inspection = inspect_velen(Some(org.to_string()))?;
-        let selected = inspection
-            .sources
-            .iter()
-            .find(|candidate| {
-                candidate.provider == "linear"
-                    && candidate.status == "active"
-                    && (candidate.source_ref == source || candidate.source_key == source)
-            })
-            .ok_or_else(|| "선택한 Linear 소스를 Velen에서 사용할 수 없습니다.".to_string())?;
-        linear.source = Some(selected.source_ref.clone());
-        linear.team_key = linear
-            .team_key
-            .take()
-            .map(|team_key| team_key.trim().to_string())
-            .filter(|team_key| !team_key.is_empty());
-    } else {
-        linear.source = None;
-        linear.team_key = None;
-    }
-
-    auto_hunt.linear = Some(linear.clone());
-    write_cli_config(config_path, &config)?;
-    Ok(linear)
-}
-
 fn update_project_velen_org_at(
     config_path: &Path,
     project_id: &str,
@@ -3349,14 +3290,6 @@ fn update_project_velen_org_at(
         .map(|org| org.trim().to_string())
         .filter(|org| !org.is_empty());
 
-    if org.is_none()
-        && auto_hunt
-            .linear
-            .as_ref()
-            .is_some_and(|linear| linear.enabled)
-    {
-        return Err("Linear 연결을 먼저 끈 뒤 Velen 연결을 해제하세요.".to_string());
-    }
     if let Some(org) = org.as_ref() {
         inspect_velen(Some(org.clone()))?;
     }
@@ -3364,6 +3297,12 @@ fn update_project_velen_org_at(
     auto_hunt.velen_org = org.clone();
     if org.is_none() {
         auto_hunt.data_source = None;
+        auto_hunt.linear = Some(StoredLinearConfig {
+            enabled: false,
+            source: None,
+            team_key: None,
+            extra: BTreeMap::new(),
+        });
     }
     write_cli_config(config_path, &config)?;
     Ok(org)
@@ -6074,20 +6013,6 @@ async fn update_local_project_workflow(
 }
 
 #[tauri::command]
-async fn update_local_project_linear(
-    app: tauri::AppHandle,
-    project_id: String,
-    linear: StoredLinearConfig,
-) -> Result<StoredLinearConfig, String> {
-    let config_path = cli_config_path(&app)?;
-    tauri::async_runtime::spawn_blocking(move || {
-        update_project_linear_at(&config_path, &project_id, linear, &inspect_velen_sync)
-    })
-    .await
-    .map_err(|error| error.to_string())?
-}
-
-#[tauri::command]
 async fn update_local_project_velen_org(
     app: tauri::AppHandle,
     project_id: String,
@@ -6717,7 +6642,6 @@ pub fn run() {
             load_project_sandbox_settings,
             update_project_sandbox_settings,
             update_local_project_workflow,
-            update_local_project_linear,
             update_local_project_velen_org,
             project_repository_readiness,
             install_project_github_cli,
@@ -8132,12 +8056,22 @@ branch refs/heads/briar/second-11111111
     }
 
     #[test]
-    fn updates_the_connected_project_linear_source_locally() {
+    fn resolves_the_workspace_git_root() {
+        let root = git_repository_root(Path::new(env!("CARGO_MANIFEST_DIR")))
+            .expect("workspace should be a git repository");
+        assert_eq!(
+            root,
+            Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap()
+        );
+    }
+
+    #[test]
+    fn disconnecting_velen_clears_legacy_linear_settings() {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("clock should be after unix epoch")
             .as_nanos();
-        let directory = std::env::temp_dir().join(format!("briar-linear-update-test-{unique}"));
+        let directory = std::env::temp_dir().join(format!("briar-velen-disconnect-test-{unique}"));
         let config_path = directory.join("config.json");
         fs::create_dir_all(&directory).expect("test config directory should be created");
         fs::write(
@@ -8150,99 +8084,39 @@ branch refs/heads/briar/second-11111111
     "agentToken": "briar_agent_test",
     "autoHunt": {
       "velenOrg": "wordbricks",
-      "linear": {"enabled": false},
-      "customAutoHuntSetting": true
+      "dataSource": "postgres://wordbricks",
+      "linear": {
+        "enabled": true,
+        "source": "linear://wordbricks",
+        "teamKey": "BRIAR"
+      }
     }
   }]
 }"#,
         )
         .expect("test config should be written");
-        let inspect = |org: Option<String>| {
-            assert_eq!(org.as_deref(), Some("wordbricks"));
-            Ok(VelenInspection {
-                authenticated: true,
-                email: Some("jay@example.com".to_string()),
-                current_org: Some("wordbricks".to_string()),
-                organizations: Vec::new(),
-                sources: vec![VelenSource {
-                    source_key: "linear-wordbricks".to_string(),
-                    source_ref: "linear://linear-wordbricks".to_string(),
-                    provider: "linear".to_string(),
-                    status: "active".to_string(),
-                }],
-            })
-        };
 
-        let saved_linear = update_project_linear_at(
-            &config_path,
-            "project-1",
-            StoredLinearConfig {
-                enabled: true,
-                source: Some("linear-wordbricks".to_string()),
-                team_key: Some(" BRIAR ".to_string()),
-                extra: BTreeMap::new(),
-            },
-            &inspect,
-        )
-        .expect("Linear settings should save");
+        let inspect = |_org: Option<String>| -> Result<VelenInspection, String> {
+            panic!("disconnecting Velen should not inspect a source")
+        };
         assert_eq!(
-            saved_linear.source.as_deref(),
-            Some("linear://linear-wordbricks")
+            update_project_velen_org_at(&config_path, "project-1", None, &inspect)
+                .expect("Velen should disconnect"),
+            None
         );
-        assert_eq!(saved_linear.team_key.as_deref(), Some("BRIAR"));
 
         let saved: serde_json::Value = serde_json::from_str(
             &fs::read_to_string(&config_path).expect("saved config should be readable"),
         )
         .expect("saved config should be json");
+        assert!(saved["projects"][0]["autoHunt"]["velenOrg"].is_null());
+        assert!(saved["projects"][0]["autoHunt"]["dataSource"].is_null());
         assert_eq!(
-            saved["projects"][0]["autoHunt"]["linear"]["source"],
-            "linear://linear-wordbricks"
+            saved["projects"][0]["autoHunt"]["linear"],
+            serde_json::json!({"enabled": false})
         );
-        assert_eq!(
-            saved["projects"][0]["autoHunt"]["linear"]["teamKey"],
-            "BRIAR"
-        );
-        assert_eq!(
-            saved["projects"][0]["autoHunt"]["customAutoHuntSetting"],
-            true
-        );
-
-        assert!(update_project_velen_org_at(&config_path, "project-1", None, &inspect,).is_err());
-        update_project_linear_at(
-            &config_path,
-            "project-1",
-            StoredLinearConfig {
-                enabled: false,
-                source: None,
-                team_key: None,
-                extra: BTreeMap::new(),
-            },
-            &inspect,
-        )
-        .expect("Linear should disconnect");
-        assert_eq!(
-            update_project_velen_org_at(&config_path, "project-1", None, &inspect)
-                .expect("optional Velen should disconnect"),
-            None
-        );
-        let disconnected: serde_json::Value = serde_json::from_str(
-            &fs::read_to_string(&config_path).expect("disconnected config should be readable"),
-        )
-        .expect("disconnected config should be json");
-        assert!(disconnected["projects"][0]["autoHunt"]["velenOrg"].is_null());
 
         fs::remove_dir_all(directory).expect("test config directory should be removed");
-    }
-
-    #[test]
-    fn resolves_the_workspace_git_root() {
-        let root = git_repository_root(Path::new(env!("CARGO_MANIFEST_DIR")))
-            .expect("workspace should be a git repository");
-        assert_eq!(
-            root,
-            Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap()
-        );
     }
 
     #[test]
