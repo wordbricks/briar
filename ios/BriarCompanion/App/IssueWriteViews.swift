@@ -1,11 +1,14 @@
+import PhotosUI
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 
 struct CreateIssueSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var draft: IssueDraft
     @State private var attachments: [PendingIssueAttachment] = []
-    @State private var showingImporter = false
+    @State private var selectedPhotoItems: [PhotosPickerItem] = []
+    @State private var isLoadingPhotos = false
     @State private var errorMessage: String?
 
     @ObservedObject var mutations: IssueMutationStore
@@ -74,12 +77,22 @@ struct CreateIssueSheet: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    Button {
-                        showingImporter = true
-                    } label: {
-                        Label("이미지·영상 선택", systemImage: "paperclip")
+                    PhotosPicker(
+                        selection: $selectedPhotoItems,
+                        maxSelectionCount: max(
+                            1,
+                            PendingIssueAttachment.maximumCount - attachments.count
+                        ),
+                        selectionBehavior: .ordered,
+                        matching: .any(of: [.images, .videos]),
+                        preferredItemEncoding: .compatible
+                    ) {
+                        Label("이미지·영상 선택", systemImage: "photo.on.rectangle")
                     }
-                    .disabled(attachments.count >= PendingIssueAttachment.maximumCount)
+                    .disabled(
+                        isLoadingPhotos ||
+                            attachments.count >= PendingIssueAttachment.maximumCount
+                    )
                     .accessibilityIdentifier("create-issue-attachment")
                 } header: {
                     Text("첨부 \(attachments.count)/5")
@@ -112,29 +125,55 @@ struct CreateIssueSheet: View {
             }
             .interactiveDismissDisabled(!draft.isEmpty || !attachments.isEmpty)
             .onChange(of: draft) { _, value in persistence.save(value) }
-            .fileImporter(
-                isPresented: $showingImporter,
-                allowedContentTypes: [.image, .movie],
-                allowsMultipleSelection: true,
-                onCompletion: importFiles
-            )
+            .onChange(of: selectedPhotoItems) { _, items in
+                guard !items.isEmpty else { return }
+                Task { await importPhotos(items) }
+            }
         }
     }
 
-    private func importFiles(_ result: Result<[URL], Error>) {
+    @MainActor
+    private func importPhotos(_ items: [PhotosPickerItem]) async {
+        isLoadingPhotos = true
+        defer {
+            isLoadingPhotos = false
+            selectedPhotoItems = []
+        }
+
         do {
-            let urls = try result.get()
             var loaded = attachments
-            for url in urls.prefix(PendingIssueAttachment.maximumCount - loaded.count) {
-                let accessing = url.startAccessingSecurityScopedResource()
-                defer { if accessing { url.stopAccessingSecurityScopedResource() } }
-                let data = try Data(contentsOf: url, options: .mappedIfSafe)
-                let contentType = (try? url.resourceValues(forKeys: [.contentTypeKey]).contentType)?
-                    .preferredMIMEType ?? "application/octet-stream"
+            for item in items.prefix(PendingIssueAttachment.maximumCount - loaded.count) {
+                guard let data = try await item.loadTransferable(type: Data.self) else {
+                    throw PhotoImportError.unreadable
+                }
+                let supportedType = item.supportedContentTypes.first(where: { contentType in
+                    guard let mimeType = contentType.preferredMIMEType else { return false }
+                    return PendingIssueAttachment.allowedContentTypes.contains(mimeType)
+                })
+                let contentType: String
+                let fileExtension: String
+                let kind: String
+                let attachmentData: Data
+                if let supportedType, let mimeType = supportedType.preferredMIMEType {
+                    contentType = mimeType
+                    fileExtension = supportedType.preferredFilenameExtension ?? "bin"
+                    kind = supportedType.conforms(to: .movie) ? "video" : "image"
+                    attachmentData = data
+                } else if item.supportedContentTypes.contains(where: { $0.conforms(to: .image) }),
+                          let jpegData = UIImage(data: data)?.jpegData(compressionQuality: 0.9) {
+                    // The Photos picker can return HEIC/HEIF even when compatible encoding is
+                    // requested. Convert those photos to the server-supported JPEG format.
+                    contentType = "image/jpeg"
+                    fileExtension = "jpg"
+                    kind = "image"
+                    attachmentData = jpegData
+                } else {
+                    throw PhotoImportError.unsupported
+                }
                 loaded.append(PendingIssueAttachment(
-                    filename: url.lastPathComponent,
+                    filename: "\(kind)-\(UUID().uuidString).\(fileExtension)",
                     contentType: contentType,
-                    data: data
+                    data: attachmentData
                 ))
             }
             if let message = PendingIssueAttachment.validationMessage(for: loaded) {
@@ -144,7 +183,9 @@ struct CreateIssueSheet: View {
                 errorMessage = nil
             }
         } catch {
-            errorMessage = "첨부 파일을 읽지 못했습니다."
+            errorMessage = error is PhotoImportError
+                ? error.localizedDescription
+                : "사진 앱에서 선택한 항목을 읽지 못했습니다."
         }
     }
 
@@ -156,6 +197,20 @@ struct CreateIssueSheet: View {
             dismiss()
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private enum PhotoImportError: LocalizedError {
+    case unreadable
+    case unsupported
+
+    var errorDescription: String? {
+        switch self {
+        case .unreadable:
+            "사진 앱에서 선택한 항목을 읽지 못했습니다."
+        case .unsupported:
+            "선택한 이미지·영상 형식을 첨부할 수 없습니다."
         }
     }
 }

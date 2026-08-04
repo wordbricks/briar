@@ -1,5 +1,14 @@
 import SwiftUI
 
+private enum BriarFeatureFlags {
+    static let ideas: Bool = {
+        let value = ProcessInfo.processInfo.environment["BRIAR_FEATURE_IDEAS"]
+            ?? Bundle.main.object(forInfoDictionaryKey: "BriarFeatureIdeas") as? String
+        let normalized = value?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return normalized == "true" || normalized == "yes" || normalized == "1"
+    }()
+}
+
 struct CompanionShellView: View {
     @AppStorage("companion-appearance") private var appearance = CompanionAppearance.system.rawValue
     @AppStorage("companion-locale") private var localeRaw = CompanionLocale.ko.rawValue
@@ -102,13 +111,15 @@ struct CompanionShellView: View {
             .tag(CompanionNavigationModel.Tab.inbox)
             .badge(inbox.unreadCount)
 
-            NavigationStack {
-                IdeasNativeView(store: ideas, projectID: project.id, token: token)
-                    .navigationTitle("아이디어")
-                    .toolbar { companionToolbar }
+            if BriarFeatureFlags.ideas {
+                NavigationStack {
+                    IdeasNativeView(store: ideas, projectID: project.id, token: token)
+                        .navigationTitle("아이디어")
+                        .toolbar { companionToolbar }
+                }
+                .tabItem { Label("아이디어", systemImage: "lightbulb") }
+                .tag(CompanionNavigationModel.Tab.ideas)
             }
-            .tabItem { Label("아이디어", systemImage: "lightbulb") }
-            .tag(CompanionNavigationModel.Tab.ideas)
         }
         .sheet(isPresented: $showingSettings) {
             CompanionSettingsView(

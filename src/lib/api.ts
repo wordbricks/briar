@@ -1601,6 +1601,46 @@ export async function resumeHuntRun(
   );
 }
 
+export type HuntReworkResult = {
+  runId: string;
+  outcome: "reworked" | "already_reworked";
+  attempt: number;
+  revision: number;
+  workflowStage: string;
+};
+
+export async function reworkPausedHuntRun(
+  token: string,
+  projectId: string,
+  runId: string,
+  input: {
+    workflowStage: string;
+    reason: string;
+    checkpoint: {
+      key: string;
+      attempt: number;
+      revision: number;
+    };
+  },
+  requestId: string = crypto.randomUUID(),
+) {
+  return request<HuntReworkResult>(
+    `/projects/${projectId}/runs/${runId}/rework`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        requestId,
+        workflowStage: input.workflowStage,
+        reason: input.reason,
+        checkpointKey: input.checkpoint.key,
+        attempt: input.checkpoint.attempt,
+        revision: input.checkpoint.revision,
+      }),
+    },
+  );
+}
+
 export async function updateCheckpointPolicy(
   token: string,
   projectId: string,

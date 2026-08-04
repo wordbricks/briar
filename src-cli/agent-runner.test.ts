@@ -64,6 +64,7 @@ describe("detached Agent runner", () => {
             body: "The mobile layout is the acceptance criterion.",
           },
         ],
+        reviewFeedback: "Keep the summary concise and verify the mobile layout.",
       },
       workspacePath: "/worktree",
     });
@@ -108,6 +109,11 @@ describe("detached Agent runner", () => {
     expect(prompt).toContain("never invent them");
     expect(prompt).toContain("briar run evidence add --image");
     expect(prompt).toContain("issue detail page");
+    expect(prompt).toContain("outcome is `partial`");
+    expect(prompt).toContain("short Markdown headings and bullet points");
+    expect(prompt).toContain("reviewFeedback");
+    expect(prompt).toContain("Keep the summary concise and verify the mobile layout.");
+    expect(prompt).toContain("required acceptance criteria");
     expect(prompt).not.toContain("claimToken");
     expect(launch.kind).toBe("runner");
     expect(launch.request).toMatchObject({

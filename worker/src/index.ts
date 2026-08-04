@@ -1499,6 +1499,17 @@ export const runReworkInputSchema = z
   })
   .strict();
 
+export const pausedRunReworkInputSchema = z
+  .object({
+    requestId: z.string().uuid(),
+    workflowStage: workflowStageIdSchema,
+    reason: z.string().trim().min(1).max(4_000),
+    checkpointKey: workflowStageIdSchema,
+    attempt: z.number().int().positive(),
+    revision: z.number().int().positive(),
+  })
+  .strict();
+
 const moveRunInputSchema = z
   .object({
     requestId: z.string().uuid(),
@@ -6248,6 +6259,40 @@ async function route(
     });
   }
 
+  const pausedReworkMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/rework$/u,
+  );
+  if (pausedReworkMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, pausedReworkMatch[1], session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    const input = pausedRunReworkInputSchema.parse(await readJson(request));
+    try {
+      const result = await reworkHuntRun(db, project.id, {
+        runId: pausedReworkMatch[2],
+        workflowStage: input.workflowStage,
+        requestId: input.requestId,
+        actor: `briar-app:${session.user.id}`,
+        reason: input.reason,
+        occurredAt: new Date().toISOString(),
+        checkpoint: {
+          key: input.checkpointKey,
+          attempt: input.attempt,
+          revision: input.revision,
+        },
+      });
+      if (result.outcome === "not_found") {
+        throw new HttpError(404, "Run not found");
+      }
+      return json({ runId: pausedReworkMatch[2], ...result });
+    } catch (error) {
+      if (error instanceof HuntTransitionError) {
+        throw new HttpError(409, error.message, "CHECKPOINT_CONFLICT");
+      }
+      throw error;
+    }
+  }
+
   const moveRunMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/status$/u,
   );
@@ -7085,12 +7130,24 @@ async function route(
     const executionEffort = run?.preferred_agent_provider
       ? run.preferred_agent_effort
       : (run?.requested_agent_effort ?? null);
-    const [attachments, messages] = run
+    const [attachments, messages, reworkFeedbackEvent] = run
       ? await Promise.all([
           listIssueAttachments(db, projectId, run.id),
           listIssueMessagesWithArchive(db, env.ARCHIVES, projectId, run.id),
+          run.current_revision > 1
+            ? db
+                .prepare(
+                  `select detail from briar_hunt_events
+                   where run_id = ? and revision = ?
+                     and event_key like 'workflow:rework:%'
+                   order by recorded_at desc, id desc
+                   limit 1`,
+                )
+                .bind(run.id, run.current_revision)
+                .first<{ detail: string | null }>()
+            : null,
         ])
-      : [[], []];
+      : [[], [], null];
     const workflowContext = run
       ? await claimWorkflowContext(db, projectId, run)
       : { startStage: null, resumeContext: null };
@@ -7109,6 +7166,7 @@ async function route(
             repository: run.repository,
             sourceCreatedAt: run.source_created_at,
             context: parseJsonObject(run.context_json),
+            reviewFeedback: reworkFeedbackEvent?.detail ?? null,
             workflowStage: run.workflow_stage,
             startStage: workflowContext.startStage,
             resumeContext: workflowContext.resumeContext,

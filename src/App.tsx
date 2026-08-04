@@ -62,6 +62,7 @@ import {
 } from "./lib/organization-invitation";
 import { syncAppBadgeCount } from "./lib/app-badge";
 import { DASHBOARD_POLL_INTERVAL_MS } from "./lib/dashboard-polling";
+import { featureFlags } from "./lib/feature-flags";
 import {
   buildStatusTrayItems,
   buildStatusTraySnapshot,
@@ -1227,7 +1228,7 @@ export function App() {
             project={activeProject}
             token={briar.token}
           />
-        ) : activePage === "ideas" && activeProject ? (
+        ) : activePage === "ideas" && featureFlags.ideas && activeProject ? (
           <Ideas
             isSidebarOpen={isSidebarOpen}
             onIssuesCreated={(runIds) => {
@@ -1271,6 +1272,7 @@ export function App() {
             onMoveRun={briar.moveRun}
             onProcessIssueNow={processIssueNow}
             onRetryRun={briar.retryRun}
+            onReworkRun={briar.reworkRun}
             onCancelRun={briar.cancelRun}
             onResumeRun={briar.resumeRun}
             onRequestedRunOpen={() => setRequestedRunId(null)}
@@ -1355,6 +1357,8 @@ export function App() {
                       prerequisiteRunId,
                     )}
                   onRetry={() => briar.retryRun(inboxDetailRun.id)}
+                  onRework={(input) =>
+                    briar.reworkRun(inboxDetailRun.id, input)}
                   onResume={() => briar.resumeRun(inboxDetailRun.id)}
                   onSendIssueMessage={(input) =>
                     sendIssueMessage(inboxDetailRun.id, input)}
@@ -1532,7 +1536,7 @@ export function App() {
               unreadInboxCount={inbox.unreadCount}
             />
           </>
-        ) : companionPage === "ideas" && activeProject ? (
+        ) : companionPage === "ideas" && featureFlags.ideas && activeProject ? (
           <>
             <Ideas
               isSidebarOpen
@@ -1640,6 +1644,7 @@ export function App() {
             onProcessIssueNow={processIssueNow}
             onRequestedRunOpen={() => setRequestedRunId(null)}
             onRetryRun={briar.retryRun}
+            onReworkRun={briar.reworkRun}
             onCancelRun={briar.cancelRun}
             onResumeRun={briar.resumeRun}
             onSendIssueMessage={sendIssueMessage}
