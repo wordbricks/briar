@@ -658,18 +658,37 @@ struct RunDetailView: View {
             if let attachments = run.attachments, !attachments.isEmpty {
                 Section("첨부") {
                     ForEach(attachments) { attachment in
-                        Button {
-                            Task { await open(path: attachment.url, filename: attachment.filename) }
-                        } label: {
-                            Label {
-                                VStack(alignment: .leading) {
-                                    Text(attachment.filename)
-                                    Text(ByteCountFormatter.string(fromByteCount: Int64(attachment.byteSize), countStyle: .file))
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                        if attachment.contentType.hasPrefix("image/") {
+                            AuthenticatedImagePreview(
+                                sourceID: attachment.url,
+                                filename: attachment.filename,
+                                detail: ByteCountFormatter.string(
+                                    fromByteCount: Int64(attachment.byteSize),
+                                    countStyle: .file
+                                ),
+                                accessibilityID: "issue-attachment-image-\(attachment.id.uuidString.lowercased())",
+                                load: {
+                                    try await detail.download(
+                                        path: attachment.url,
+                                        filename: attachment.filename
+                                    )
+                                },
+                                open: { previewFile = PreviewFile(url: $0) }
+                            )
+                        } else {
+                            Button {
+                                Task { await open(path: attachment.url, filename: attachment.filename) }
+                            } label: {
+                                Label {
+                                    VStack(alignment: .leading) {
+                                        Text(attachment.filename)
+                                        Text(ByteCountFormatter.string(fromByteCount: Int64(attachment.byteSize), countStyle: .file))
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                } icon: {
+                                    Image(systemName: "doc")
                                 }
-                            } icon: {
-                                Image(systemName: attachment.contentType.hasPrefix("image/") ? "photo" : "doc")
                             }
                         }
                     }
@@ -813,10 +832,29 @@ struct RunDetailView: View {
                                 Text(evidenceDetail).font(.subheadline)
                             }
                             ForEach(evidence.images ?? []) { image in
-                                Button {
-                                    Task { await open(path: image.url, filename: image.filename) }
-                                } label: {
-                                    Label(image.filename, systemImage: "photo")
+                                if image.contentType.hasPrefix("image/") {
+                                    AuthenticatedImagePreview(
+                                        sourceID: image.url,
+                                        filename: image.filename,
+                                        detail: ByteCountFormatter.string(
+                                            fromByteCount: Int64(image.byteSize),
+                                            countStyle: .file
+                                        ),
+                                        accessibilityID: "evidence-image-\(image.id.uuidString.lowercased())",
+                                        load: {
+                                            try await detail.download(
+                                                path: image.url,
+                                                filename: image.filename
+                                            )
+                                        },
+                                        open: { previewFile = PreviewFile(url: $0) }
+                                    )
+                                } else {
+                                    Button {
+                                        Task { await open(path: image.url, filename: image.filename) }
+                                    } label: {
+                                        Label(image.filename, systemImage: "doc")
+                                    }
                                 }
                             }
                             if let url = evidence.url {

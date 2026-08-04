@@ -44,6 +44,9 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["run-detail"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.navigationBars["iOS Native Companion 읽기 경험"].exists)
         XCTAssertTrue(app.buttons["issue-actions-menu"].exists)
+        XCTAssertTrue(app.buttons[
+            "issue-attachment-image-aaaaaaaa-1111-4111-8111-111111111111"
+        ].waitForExistence(timeout: 5))
         captureScreenshot(named: "companion-search-detail")
     }
 

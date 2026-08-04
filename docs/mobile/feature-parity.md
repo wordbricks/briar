@@ -12,8 +12,8 @@
 | 작업 목록·상태 필터·검색 | 제공 | 제공 | 제공 | All/Active/Attention/Completed 필터와 제목·설명·진행·결과 통합 검색 |
 | 이슈 설명 및 결과 상세 | 제공 | 제공 | 제공 | dashboard snapshot/delta의 Markdown 설명, structured result, 리뷰 필드를 읽기 전용으로 사용 |
 | 실행 진행 상황 | 제공 | 제공 | 제공 | snapshot/delta 공유 계약, 15초 polling, foreground·오프라인 복귀, cursor 만료 시 snapshot 복구 |
-| 이벤트 및 증빙 | 제공 | 제공 | 제공 | 인증된 GET 경로만 사용하며 증빙 이미지도 기기 임시 미리보기로 다운로드 |
-| 이슈 대화 및 첨부 | 제공 | 제공 | 제공 | 메시지·답글 전송과 Agent reply polling, 인증 다운로드·Quick Look, multipart 이미지·영상 업로드를 공유 |
+| 이벤트 및 증빙 | 제공 | 제공 | 제공 | 인증된 GET 경로만 사용하며 증빙 이미지는 Android/Tauri와 네이티브 iOS 상세 화면에 바로 표시하고, 원본 확대용 임시 파일로도 다운로드 |
+| 이슈 대화 및 첨부 | 제공 | 제공 | 제공 | 이미지 첨부는 Android/Tauri와 네이티브 iOS 상세 화면에 바로 표시하고 탭하면 원본을 확대하며, 비이미지 파일은 기존 미리보기 동작을 유지. 메시지·답글, Agent reply polling, multipart 이미지·영상 업로드를 공유 |
 | 이슈 생성·편집·삭제와 draft | 제공 | 제공 | 제공 | 제목·설명·우선순위·backlog/queued, 5개/파일당 20MB/전체 25MB 제한, 성공 전 draft 보존 |
 | 의존성·실행 설정 | 제공 | 제공 | 제공 | 선행 이슈 DAG와 provider/model/effort 설정을 dashboard 및 공통 쓰기 API로 사용 |
 | 실행·복구·검수 제어 | 제공 | 제공 | 제공 | 상태 이동, 즉시 실행, Worker 선택·재할당, retry/cancel, 결과 review를 공유한다. `paused` run은 표시된 checkpoint key·attempt·revision과 동일 requestId로만 resume하며 stale 409는 새 snapshot을 불러온다. |
