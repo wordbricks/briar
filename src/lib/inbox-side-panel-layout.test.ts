@@ -56,6 +56,9 @@ describe("inbox side panel layout", () => {
     expect(app).toContain("setInboxDetailTarget(target);");
     expect(app).toContain("<InboxDetailPanel");
     expect(app).toContain("<RunPage");
+    expect(app).toContain("onOpenFullPage={() => {");
+    expect(app).toContain("setRequestedRunId(inboxDetailRun.id);");
+    expect(app).toContain('navigateToPage("issues");');
     expect(app).toContain("<ProjectAgentSessionDetail");
     expect(app).toContain("inbox.markRead(message.id);");
   });

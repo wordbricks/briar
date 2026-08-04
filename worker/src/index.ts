@@ -4897,9 +4897,6 @@ async function route(
       project.id,
       projectAgentScheduleMatch[2],
     );
-    if (result === "not_found") {
-      throw new HttpError(404, "Project agent schedule not found");
-    }
     if (result === "running") {
       throw new HttpError(409, "A schedule run is currently active");
     }
