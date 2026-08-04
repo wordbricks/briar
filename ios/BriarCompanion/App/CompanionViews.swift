@@ -477,7 +477,15 @@ struct RunDetailView: View {
                 Section("설명") { MarkdownText(markdown: description) }
             }
 
-            if localStatus == .paused, let checkpoint = run.checkpoint {
+            if localStatus == .paused, run.resumeRequestedAt != nil {
+                Section("검토 대기") {
+                    Label("일시정지 상태를 유지하며 워커를 재할당하고 있습니다.",
+                          systemImage: "arrow.triangle.2.circlepath")
+                        .foregroundStyle(.secondary)
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                }
+            } else if localStatus == .paused, let checkpoint = run.checkpoint {
                 Section("검토 대기") {
                     Label {
                         VStack(alignment: .leading, spacing: 4) {
@@ -921,7 +929,6 @@ struct RunDetailView: View {
     private func resume(checkpoint: WorkflowCheckpoint) async {
         do {
             try await mutations.resume(runID: run.id, checkpoint: checkpoint)
-            localStatus = .queued
             actionError = nil
             await refresh()
         } catch let error as MobileAPIError where error.statusCode == 409 {

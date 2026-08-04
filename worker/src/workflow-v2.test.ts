@@ -9,6 +9,7 @@ import {
 import type { HuntEventInput } from "./db";
 import {
   assertWorkflowRunCompletion,
+  claimNextQueuedHuntRun,
   completeWorkflowStageLifecycle,
   completeWorkflowStage,
   createOrganization,
@@ -124,6 +125,22 @@ describe("workflow v2 D1 persistence and transitions", () => {
   let projectId: string;
   let v2RunId: string;
   let snapshotsBeforeMigration: { settings: string; run: string };
+
+  const claimResumedRun = async (runId: string, minute: number) => {
+    const claimed = await claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: "f".repeat(64),
+      claimedBy: "resume-worker",
+      claimedAt: at(minute),
+      leaseExpiresAt: at(minute + 10),
+      runId,
+    });
+    expect(claimed).toMatchObject({
+      id: runId,
+      status: "running",
+      paused_at: null,
+      resume_requested_at: expect.any(String),
+    });
+  };
 
   beforeAll(async () => {
     db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
@@ -312,6 +329,13 @@ describe("workflow v2 D1 persistence and transitions", () => {
       approvedAt: at(19),
     });
     expect(approved.outcome).toBe("approved");
+    expect(await getHuntRunForProject(db, projectId, v2RunId)).toMatchObject({
+      status: "running",
+      stage: "pr_open",
+      workflow_stage: "pr_open",
+      paused_at: at(16),
+      resume_requested_at: at(19),
+    });
     const duplicate = await resumeWorkflowCheckpoint(db, projectId, {
       ...identity,
       checkpointKey: "approve-pr",
@@ -321,6 +345,7 @@ describe("workflow v2 D1 persistence and transitions", () => {
     });
     expect(duplicate.outcome).toBe("already_approved");
     expect(duplicate.nextStage).toBe("pr_open");
+    await claimResumedRun(v2RunId, 20.5);
 
     expect((await startWorkflowStage(db, projectId, {
       ...identity,
@@ -355,6 +380,14 @@ describe("workflow v2 D1 persistence and transitions", () => {
       approvedAt: at(25),
     });
     expect(afterApproved.nextStage).toBe("staging_qa");
+    expect(await getHuntRunForProject(db, projectId, v2RunId)).toMatchObject({
+      status: "running",
+      stage: "staging_qa",
+      workflow_stage: "staging_qa",
+      paused_at: at(23),
+      resume_requested_at: at(25),
+    });
+    await claimResumedRun(v2RunId, 25.5);
     expect((await startWorkflowStage(db, projectId, {
       ...identity,
       stageId: "staging_qa",
@@ -387,6 +420,7 @@ describe("workflow v2 D1 persistence and transitions", () => {
       approvedAt: at(29),
     });
     expect(approved.outcome).toBe("approved");
+    await claimResumedRun(v2RunId, 29.5);
     expect((await startWorkflowStage(db, projectId, {
       ...identity,
       stageId: "production_qa",
@@ -520,6 +554,7 @@ describe("workflow v2 D1 persistence and transitions", () => {
       nextStage: "pr_open",
       terminalReviewOnly: false,
     });
+    await claimResumedRun(runId, 54.5);
 
     expect((await startWorkflowStageLifecycle(db, projectId, {
       ...identity,
@@ -545,6 +580,7 @@ describe("workflow v2 D1 persistence and transitions", () => {
       nextStage: "production_qa",
       terminalReviewOnly: false,
     });
+    await claimResumedRun(runId, 57.5);
 
     expect((await startWorkflowStageLifecycle(db, projectId, {
       ...identity,
@@ -572,6 +608,7 @@ describe("workflow v2 D1 persistence and transitions", () => {
       nextStage: null,
       terminalReviewOnly: true,
     });
+    await claimResumedRun(runId, 60.5);
     expect((await completeWorkflowStageLifecycle(db, projectId, {
       ...identity,
       stageId: "production_qa",

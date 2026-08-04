@@ -3,7 +3,12 @@ import { resolve } from "node:path";
 import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { HuntEventInput } from "./db";
-import { deleteIssue, recordHuntEvent, resumeHuntRun } from "./db";
+import {
+  claimNextQueuedHuntRun,
+  deleteIssue,
+  recordHuntEvent,
+  resumeHuntRun,
+} from "./db";
 import {
   type ArchiveBucket,
   archiveCompletedLogs,
@@ -193,6 +198,13 @@ describe("D1 to R2 log archives", () => {
       requestId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       actor: "archive-test",
       occurredAt: new Date(Date.parse(oldTime) + 3 * 60_000).toISOString(),
+    });
+    await claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: "a".repeat(64),
+      claimedBy: "archive-worker",
+      claimedAt: new Date(Date.parse(oldTime) + 3.1 * 60_000).toISOString(),
+      leaseExpiresAt: new Date(Date.parse(oldTime) + 8 * 60_000).toISOString(),
+      runId,
     });
     await recordHuntEvent(db, projectId, event("large-run", "completed", "completed", 3));
     await db
@@ -384,6 +396,13 @@ describe("D1 to R2 log archives", () => {
       requestId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
       actor: "archive-test",
       occurredAt: new Date(Date.parse(oldTime) + 13 * 60_000).toISOString(),
+    });
+    await claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: "b".repeat(64),
+      claimedBy: "archive-worker",
+      claimedAt: new Date(Date.parse(oldTime) + 13.1 * 60_000).toISOString(),
+      leaseExpiresAt: new Date(Date.parse(oldTime) + 18 * 60_000).toISOString(),
+      runId: secondRunId,
     });
     await recordHuntEvent(db, projectId, event("failure-run", "completed", "completed", 13));
     expect(secondRunId).toBeTruthy();

@@ -248,6 +248,22 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
   });
   let db: D1Database;
 
+  const claimResumedRun = async (runId: string, minute: number) => {
+    const claimed = await claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: "e".repeat(64),
+      claimedBy: "resume-worker",
+      claimedAt: atMinute(minute),
+      leaseExpiresAt: atMinute(minute + 10),
+      runId,
+    });
+    expect(claimed).toMatchObject({
+      id: runId,
+      status: "running",
+      paused_at: null,
+      resume_requested_at: expect.any(String),
+    });
+  };
+
   beforeAll(async () => {
     db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
     for (const migration of [
@@ -616,6 +632,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db,
       await readFile(
         resolve("migrations/0060_workflow_checkpoint_policies.sql"),
+        "utf8",
+      ),
+    );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0061_resume_requested_state.sql"),
         "utf8",
       ),
     );
@@ -1533,6 +1556,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         occurredAt: atMinute(10.8),
       }),
     ).resolves.toEqual({ outcome: "resumed", workflowStage: "production_qa" });
+    await claimResumedRun(runId, 10.9);
     await recordHuntEvent(db, projectId, event("production_qa", 11));
     await expect(getHuntRunForProject(db, projectId, runId)).resolves.toMatchObject({
       status: "running",
@@ -1668,6 +1692,14 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         occurredAt: atMinute(17.3),
       }),
     ).resolves.toEqual({ outcome: "resumed", workflowStage: "staging_qa" });
+    await expect(getHuntRunForProject(db, projectId, runId)).resolves.toMatchObject({
+      status: "running",
+      stage: "staging_qa",
+      workflow_stage: "staging_qa",
+      paused_at: atMinute(16),
+      resume_requested_at: atMinute(17.3),
+    });
+    await claimResumedRun(runId, 17.5);
     await recordHuntEvent(db, projectId, event("staging_qa", 18, common));
     await recordHuntEvent(db, projectId, event("production_qa", 19, common));
     for (const [stage, type, minute] of [
@@ -1962,6 +1994,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         occurredAt: atMinute(14.85),
       }),
     ).resolves.toEqual({ outcome: "resumed", workflowStage: "local_qa" });
+    await claimResumedRun(runId, 14.87);
     await expect(
       recordHuntEvent(
         db,
@@ -2700,6 +2733,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         occurredAt: atMinute(33.6),
       }),
     ).resolves.toEqual({ outcome: "resumed", workflowStage: "local_qa" });
+    await claimResumedRun(runId, 33.7);
     await recordHuntEvent(
       db,
       projectId,

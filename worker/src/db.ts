@@ -244,6 +244,7 @@ export type HuntRunRow = {
   lease_expires_at: string | null;
   claim_attempts: number;
   paused_at: string | null;
+  resume_requested_at: string | null;
   waiting_checkpoint_key: string | null;
   waiting_checkpoint_revision: number | null;
   agent_id: string | null;
@@ -966,7 +967,8 @@ export async function startWorkflowStage(
     db
       .prepare(
         `update briar_hunt_runs
-         set stage = ?, status = 'running', workflow_stage = ?, updated_at = max(updated_at, ?)
+         set stage = ?, status = 'running', workflow_stage = ?,
+             resume_requested_at = null, updated_at = max(updated_at, ?)
          where id = ? and project_id = ? and current_attempt = ?
            and current_revision = ? and paused_at is null`,
       )
@@ -1483,7 +1485,8 @@ export async function reachWorkflowCheckpoint(
         `update briar_hunt_runs
            set paused_at = ?, workflow_stage = ?, stage = ?,
                waiting_checkpoint_key = ?,
-               waiting_checkpoint_revision = ?, claim_token_hash = null,
+               waiting_checkpoint_revision = ?, resume_requested_at = null,
+               claim_token_hash = null,
                claimed_by = null, claimed_at = null, lease_expires_at = null,
                updated_at = max(updated_at, ?)
            where id = ? and project_id = ? and current_attempt = ?
@@ -1639,6 +1642,8 @@ export async function resumeWorkflowCheckpoint(
     : configured.position === "before"
       ? configured.stage
       : workflow.stages[workflowStageRank(workflow, configured.stage) + 1]?.id ?? null;
+  const resumedWorkflowStage = nextStage ?? configured.stage;
+  const resumedStage = dashboardStageFor("running", resumedWorkflowStage);
   const results = await db.batch([
     db
       .prepare(
@@ -1660,15 +1665,20 @@ export async function resumeWorkflowCheckpoint(
     db
       .prepare(
         `update briar_hunt_runs
-         set status = 'queued', stage = 'queued', paused_at = null,
+         set status = 'running', stage = ?, workflow_stage = ?,
+             resume_requested_at = ?,
              waiting_checkpoint_key = null, waiting_checkpoint_revision = null,
              claim_token_hash = null, claimed_by = null, claimed_at = null,
              lease_expires_at = null, completed_at = null, updated_at = ?
          where id = ? and project_id = ? and current_attempt = ?
            and current_revision = ? and waiting_checkpoint_key = ?
-           and waiting_checkpoint_revision = ? and paused_at is not null`,
+           and waiting_checkpoint_revision = ? and paused_at is not null
+           and resume_requested_at is null`,
       )
       .bind(
+        resumedStage,
+        resumedWorkflowStage,
+        input.approvedAt,
         input.approvedAt,
         run.id,
         projectId,
@@ -4519,7 +4529,14 @@ export async function getNextQueuedHuntRun(db: D1Database, projectId: string) {
     .prepare(
       `select run.*
        from briar_hunt_runs run
-       where run.project_id = ? and run.status = 'queued'
+       where run.project_id = ?
+         and (
+           run.status = 'queued'
+           or (
+             run.status = 'running' and run.paused_at is not null
+             and run.resume_requested_at is not null
+           )
+         )
          and not exists (
            select 1
            from briar_issue_dependencies dependency
@@ -4530,6 +4547,7 @@ export async function getNextQueuedHuntRun(db: D1Database, projectId: string) {
              and prerequisite.status != 'completed'
          )
        order by
+         case when run.resume_requested_at is not null then 0 else 1 end,
          case when run.priority is null then 1 else 0 end,
          run.priority asc,
          coalesce(run.source_created_at, run.started_at) asc,
@@ -4564,10 +4582,20 @@ export async function claimNextQueuedHuntRun(
       `update briar_hunt_runs
        set claim_token_hash = ?, claimed_by = ?, claimed_at = ?,
            lease_expires_at = ?, claim_attempts = claim_attempts + 1,
-           worker_id = coalesce(?, worker_id), updated_at = ?
+           worker_id = coalesce(?, worker_id),
+           paused_at = case
+             when resume_requested_at is not null then null else paused_at end,
+           updated_at = ?
        where id = (
          select id from briar_hunt_runs
-         where project_id = ? and status = 'queued'
+         where project_id = ?
+           and (
+             status = 'queued'
+             or (
+               status = 'running' and paused_at is not null
+               and resume_requested_at is not null
+             )
+           )
            and (lease_expires_at is null or lease_expires_at <= ?)
            and (? is null or id = ?)
            and not exists (
@@ -4666,6 +4694,7 @@ export async function claimNextQueuedHuntRun(
              ), 0)
            )
          order by
+           case when resume_requested_at is not null then 0 else 1 end,
            case when priority is null then 1 else 0 end,
            priority asc,
            coalesce(source_created_at, started_at) asc,
@@ -5166,10 +5195,11 @@ export async function recordHuntEvent(
     normalizedInput.status === "running" &&
     requestedRank === pauseRank &&
     !existingRun?.paused_at &&
-    // A final-stage pause is resumed with that same stage in the queue so a
-    // worker can perform the last review before recording completion. Do not
-    // immediately create the same checkpoint again on its first progress event.
-    !(existingRun?.status === "queued" && currentRank === pauseRank);
+    // A final-stage pause resumes at that same stage so a replacement worker can
+    // perform the last review before recording completion. The resume marker
+    // prevents recreating the same checkpoint on its first progress event.
+    !(existingRun?.status === "queued" && currentRank === pauseRank) &&
+    !existingRun?.resume_requested_at;
   if (!existingRun && isRepositoryWorkflowPending(workflowSnapshot)) {
     throw new HuntTransitionError(
       "Repository workflow has not been generated for this project",
@@ -5413,6 +5443,10 @@ export async function recordHuntEvent(
              staging_qa_detail = case when ? >= last_event_at then coalesce(?, staging_qa_detail) else staging_qa_detail end,
              production_qa_detail = case when ? >= last_event_at then coalesce(?, production_qa_detail) else production_qa_detail end,
              context_json = case when ? >= last_event_at then coalesce(?, context_json) else context_json end,
+             resume_requested_at = case
+               when ? >= last_event_at and paused_at is null then null
+               else resume_requested_at
+             end,
              completed_at = case
                when ? < last_event_at then completed_at
                when ? in ('completed', 'cancelled') then ?
@@ -5480,6 +5514,7 @@ export async function recordHuntEvent(
         normalizedInput.occurredAt,
         normalizedInput.context ? stableJson(normalizedInput.context) : null,
         normalizedInput.occurredAt,
+        normalizedInput.occurredAt,
         normalizedInput.status,
         normalizedInput.occurredAt,
         normalizedInput.status,
@@ -5494,7 +5529,8 @@ export async function recordHuntEvent(
           db
             .prepare(
               `update briar_hunt_runs
-               set paused_at = ?, claim_token_hash = null, claimed_by = null,
+               set paused_at = ?, resume_requested_at = null,
+                   claim_token_hash = null, claimed_by = null,
                    claimed_at = null, lease_expires_at = null,
                    updated_at = max(updated_at, ?)
                where id = ? and current_attempt = ? and last_event_at <= ?
@@ -5570,6 +5606,12 @@ export async function resumeHuntRun(
       workflowStage: existingEvent.workflow_stage,
     };
   }
+  if (run.resume_requested_at) {
+    return {
+      outcome: "already_resumed",
+      workflowStage: run.workflow_stage,
+    };
+  }
   if (run.status !== "running" || !run.paused_at || !run.workflow_stage) {
     return {
       outcome: "ineligible",
@@ -5589,9 +5631,9 @@ export async function resumeHuntRun(
   // when the pause checkpoint is the final configured stage: the resumed
   // worker must record the terminal completion after reviewing the existing
   // final-stage evidence.
-  const targetStatus: AutoHuntPersistedRunStatus = "queued";
-  const targetStage: DashboardStage = "queued";
   const targetWorkflowStage = nextStage ?? run.workflow_stage;
+  const targetStage = dashboardStageFor("running", targetWorkflowStage);
+  const eventStatus: AutoHuntPersistedRunStatus = "running";
   const detail = nextStage
     ? `사용자가 ${workflow.stages[currentRank]?.label ?? run.workflow_stage} 이후 워크플로우를 재개했습니다.`
     : "사용자가 마지막 일시정지 지점에서 완료 검토를 재개했습니다.";
@@ -5612,6 +5654,7 @@ export async function resumeHuntRun(
          from briar_hunt_runs
          where id = ? and project_id = ? and status = 'running'
            and paused_at is not null and workflow_stage = ?
+           and resume_requested_at is null
            and last_event_at = ?
          on conflict(run_id, event_key) do nothing`,
       )
@@ -5619,7 +5662,7 @@ export async function resumeHuntRun(
         eventId,
         eventKey,
         targetStage,
-        targetStatus,
+        eventStatus,
         targetWorkflowStage,
         detail,
         input.actor,
@@ -5633,12 +5676,13 @@ export async function resumeHuntRun(
     db
       .prepare(
         `update briar_hunt_runs
-         set stage = ?, status = ?, workflow_stage = ?, detail = ?,
-             paused_at = null, claim_token_hash = null, claimed_by = null,
+         set stage = ?, status = 'running', workflow_stage = ?, detail = ?,
+             resume_requested_at = ?, claim_token_hash = null, claimed_by = null,
              claimed_at = null, lease_expires_at = null, completed_at = null,
              last_event_at = ?, updated_at = ?
          where id = ? and project_id = ? and status = 'running'
            and paused_at is not null and workflow_stage = ?
+           and resume_requested_at is null
            and last_event_at = ?
            and exists (
              select 1 from briar_hunt_events
@@ -5647,9 +5691,9 @@ export async function resumeHuntRun(
       )
       .bind(
         targetStage,
-        targetStatus,
         targetWorkflowStage,
         detail,
+        input.occurredAt,
         input.occurredAt,
         recordedAt,
         run.id,
@@ -6061,7 +6105,8 @@ export async function reworkHuntRun(
              staging_qa_status = null, production_qa_status = null,
              staging_qa_detail = null, production_qa_detail = null,
              ${claimReset}
-             paused_at = null, completed_at = null, last_event_at = ?, updated_at = ?
+             paused_at = null, resume_requested_at = null,
+             completed_at = null, last_event_at = ?, updated_at = ?
          where id = ? and project_id = ? and status = 'running'
            and current_attempt = ? and current_revision = ?
            and last_event_at = ?`,
@@ -6278,7 +6323,7 @@ export async function recoverHuntRun(
                  production_qa_status = null, staging_qa_detail = null,
                  production_qa_detail = null, claim_token_hash = null,
                  claimed_by = null, claimed_at = null, lease_expires_at = null,
-                 paused_at = null,
+                 paused_at = null, resume_requested_at = null,
                  completed_at = null, last_event_at = ?, updated_at = ?
              where id = ? and project_id = ? and status in ('blocked', 'failed')
                and current_attempt = ? and last_event_at = ?`,
@@ -6299,7 +6344,7 @@ export async function recoverHuntRun(
              set stage = 'cancelled', status = 'cancelled', detail = ?,
                  claim_token_hash = null,
                  claimed_by = null, claimed_at = null, lease_expires_at = null,
-                 paused_at = null,
+                 paused_at = null, resume_requested_at = null,
                  completed_at = ?, last_event_at = ?, updated_at = ?
              where id = ? and project_id = ?
                and status not in ('completed', 'cancelled')
@@ -6574,7 +6619,8 @@ export async function moveHuntRun(
              staging_qa_detail = case when ? then null else staging_qa_detail end,
              production_qa_detail = case when ? then null else production_qa_detail end,
              claim_token_hash = null, claimed_by = null, claimed_at = null,
-             lease_expires_at = null, paused_at = null, completed_at = ?, last_event_at = ?,
+             lease_expires_at = null, paused_at = null,
+             resume_requested_at = null, completed_at = ?, last_event_at = ?,
              updated_at = ?
          where id = ? and project_id = ? and current_attempt = ?
            and last_event_at = ?

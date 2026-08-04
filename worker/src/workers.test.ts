@@ -147,6 +147,7 @@ describe("detached execution workers", () => {
       "migrations/0054_run_execution_metrics.sql",
       "migrations/0058_workflow_pause_after_stage.sql",
       "migrations/0060_workflow_checkpoint_policies.sql",
+      "migrations/0061_resume_requested_state.sql",
     ]) {
       await executeSql(db, await readFile(resolve(migration), "utf8"));
     }
@@ -1667,6 +1668,63 @@ describe("detached execution workers", () => {
       .run();
     const blocked = await reapStalledHuntRuns(db, projectId, atMinute(60));
     expect(blocked[0].outcome).toBe("blocked");
+  });
+
+  it("keeps a resumed run paused while replacing a stalled worker", async () => {
+    await register("resume-stall");
+    await recordHuntEvent(db, projectId, queuedEvent("issue-resume-stall", 1));
+    const claimed = await claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: "f".repeat(64),
+      claimedBy: "worker-resume-stall",
+      claimedAt: atMinute(2),
+      leaseExpiresAt: leaseExpiryFrom(atMinute(2)),
+    });
+    await db
+      .prepare(
+        `update briar_hunt_runs
+         set status = 'running', stage = 'implementing', paused_at = null,
+             resume_requested_at = ?, worker_id = ?
+         where id = ?`,
+      )
+      .bind(atMinute(3), "worker-resume-stall", claimed!.id)
+      .run();
+
+    const reaped = await reapStalledHuntRuns(db, projectId, atMinute(40));
+    expect(reaped[0]).toMatchObject({
+      runId: claimed!.id,
+      outcome: "requeued",
+    });
+
+    const paused = await db
+      .prepare(
+        `select status, stage, paused_at, resume_requested_at, claim_token_hash
+         from briar_hunt_runs where id = ?`,
+      )
+      .bind(claimed!.id)
+      .first<{
+        status: string;
+        stage: string;
+        paused_at: string | null;
+        resume_requested_at: string | null;
+        claim_token_hash: string | null;
+      }>();
+    expect(paused).toEqual({
+      status: "running",
+      stage: "implementing",
+      paused_at: atMinute(3),
+      resume_requested_at: atMinute(3),
+      claim_token_hash: null,
+    });
+
+    const replacementClaim = await claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: "a".repeat(64),
+      claimedBy: "worker-replacement",
+      claimedAt: atMinute(41),
+      leaseExpiresAt: leaseExpiryFrom(atMinute(41)),
+    });
+    expect(replacementClaim?.id).toBe(claimed!.id);
+    expect(replacementClaim?.paused_at).toBeNull();
+    expect(replacementClaim?.stage).toBe("implementing");
   });
 
   it("counts only runs under a live lease", async () => {
