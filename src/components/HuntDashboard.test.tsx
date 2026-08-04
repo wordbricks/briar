@@ -1338,7 +1338,7 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
-  it("shows durable Worker provider output in the issue LLM activity tab", async () => {
+  it("shows durable Worker provider output in the issue work log tab", async () => {
     const run: HuntRun = {
       ...demoDashboard.runs[0],
       status: "completed",
@@ -1401,7 +1401,7 @@ describe("HuntDashboard", () => {
 
     const activityTab = Array.from(
       container.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
-    ).find((tab) => tab.textContent === "LLM 활동");
+    ).find((tab) => tab.textContent === "작업 로그");
     await act(async () => activityTab?.click());
 
     expect(loadTranscript).toHaveBeenCalledWith(
