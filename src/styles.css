@@ -1214,6 +1214,8 @@ body { overflow: hidden; font-synthesis: none; }
 .run-result-metrics > div { min-width:92px; padding:8px 10px; display:grid; gap:3px; border:1px solid var(--border); border-radius:8px; background:color-mix(in srgb,var(--card) 82%,transparent); }
 .run-result-metrics dt { color:var(--muted-foreground); font-size:var(--text-3xs); font-weight:650; }
 .run-result-metrics dd { margin:0; color:var(--foreground); font:650 var(--text-xs) "DM Mono",monospace; }
+.run-result-metrics-provider { display:inline-flex; align-items:center; gap:6px; font-family:inherit; }
+.run-result-metrics-provider span { font:650 var(--text-xs) "DM Mono",monospace; }
 .completed-issue-summary { min-width:0; margin-top:12px; color:var(--foreground); font-size:var(--text-xs); line-height:1.65; overflow-wrap:anywhere; }
 .completed-issue-summary > :first-child { margin-top:0; }
 .completed-issue-summary > :last-child { margin-bottom:0; }

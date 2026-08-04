@@ -670,6 +670,14 @@ export function HuntDashboard({
             agentAssociationsByRunId.performedAgents.get(selected.id)?.name ??
             null
           }
+          performedAgentProvider={
+            agentAssociationsByRunId.performedAgents.get(selected.id)?.provider ??
+            null
+          }
+          performedAgentModel={
+            agentAssociationsByRunId.performedAgents.get(selected.id)?.model ??
+            null
+          }
           projectId={dashboard!.project.id}
           run={selected}
           isProcessing={processingIssueIds.has(selected.id)}
@@ -2739,6 +2747,8 @@ export function RunPage({
   onUpdateIssue,
   onUpdateIssuePreferences = async () => undefined,
   performedAgentName = null,
+  performedAgentProvider = null,
+  performedAgentModel = null,
   projectId = "",
   run,
   token = null,
@@ -2780,6 +2790,8 @@ export function RunPage({
     input: IssueExecutionPreferences,
   ) => Promise<unknown>;
   performedAgentName?: string | null;
+  performedAgentProvider?: AgentProvider | null;
+  performedAgentModel?: string | null;
   projectId?: string;
   run: HuntRun;
   token?: string | null;
@@ -2951,44 +2963,79 @@ export function RunPage({
     ? (executionMetrics.cacheReadTokens ?? 0) +
       (executionMetrics.cacheWriteTokens ?? 0)
     : 0;
-  const executionMetricsPanel = executionMetrics ? (
+  // Mirror claim-time execution selection: preferred → requested → agent → live activity.
+  const executionProvider =
+    run.preferredProvider ??
+    run.requestedProvider ??
+    performedAgentProvider ??
+    activityProvider ??
+    null;
+  const executionModel =
+    run.preferredProvider != null
+      ? run.preferredModel ?? null
+      : run.requestedProvider != null
+        ? run.requestedModel ?? null
+        : performedAgentModel ?? null;
+  const executionMetricsPanel =
+    executionMetrics || executionProvider ? (
     <dl className="run-result-metrics" aria-label={t("run.resultMetrics")}>
-      <div>
-        <dt>{t("run.metricsDuration")}</dt>
-        <dd>{formatExecutionDuration(executionMetrics.durationMs)}</dd>
-      </div>
-      {executionMetrics.totalTokens === null ? (
+      {executionMetrics ? (
         <div>
-          <dt>{t("run.metricsTotalTokens")}</dt>
-          <dd>{t("run.metricsTokensUnavailable")}</dd>
+          <dt>{t("run.metricsDuration")}</dt>
+          <dd>{formatExecutionDuration(executionMetrics.durationMs)}</dd>
         </div>
-      ) : (
+      ) : null}
+      {executionProvider ? (
         <div>
-          <dt>{t("run.metricsTotalTokens")}</dt>
-          <dd title={new Intl.NumberFormat(localeTag).format(executionMetrics.totalTokens)}>
-            {formatExecutionTokens(executionMetrics.totalTokens, localeTag)}
+          <dt>{t("run.metricsProvider")}</dt>
+          <dd className="run-result-metrics-provider">
+            <AgentProviderIcon provider={executionProvider} size={13} />
+            <span>{providerDisplayName(executionProvider)}</span>
           </dd>
         </div>
-      )}
-      {executionMetrics.inputTokens !== null ? (
+      ) : null}
+      {executionProvider && executionModel ? (
+        <div>
+          <dt>{t("run.metricsModel")}</dt>
+          <dd title={executionModel}>
+            {modelDisplayName(executionProvider, executionModel)}
+          </dd>
+        </div>
+      ) : null}
+      {executionMetrics ? (
+        executionMetrics.totalTokens === null ? (
+          <div>
+            <dt>{t("run.metricsTotalTokens")}</dt>
+            <dd>{t("run.metricsTokensUnavailable")}</dd>
+          </div>
+        ) : (
+          <div>
+            <dt>{t("run.metricsTotalTokens")}</dt>
+            <dd title={new Intl.NumberFormat(localeTag).format(executionMetrics.totalTokens)}>
+              {formatExecutionTokens(executionMetrics.totalTokens, localeTag)}
+            </dd>
+          </div>
+        )
+      ) : null}
+      {executionMetrics?.inputTokens != null ? (
         <div>
           <dt>{t("run.metricsInputTokens")}</dt>
           <dd>{formatExecutionTokens(executionMetrics.inputTokens, localeTag)}</dd>
         </div>
       ) : null}
-      {executionMetrics.outputTokens !== null ? (
+      {executionMetrics?.outputTokens != null ? (
         <div>
           <dt>{t("run.metricsOutputTokens")}</dt>
           <dd>{formatExecutionTokens(executionMetrics.outputTokens, localeTag)}</dd>
         </div>
       ) : null}
-      {cacheTokens > 0 ? (
+      {executionMetrics && cacheTokens > 0 ? (
         <div>
           <dt>{t("run.metricsCacheTokens")}</dt>
           <dd>{formatExecutionTokens(cacheTokens, localeTag)}</dd>
         </div>
       ) : null}
-      {(executionMetrics.reasoningOutputTokens ?? 0) > 0 ? (
+      {executionMetrics && (executionMetrics.reasoningOutputTokens ?? 0) > 0 ? (
         <div>
           <dt>{t("run.metricsReasoningTokens")}</dt>
           <dd>
