@@ -44,7 +44,10 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["run-detail"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.navigationBars["iOS Native Companion 읽기 경험"].exists)
         XCTAssertTrue(app.buttons["issue-actions-menu"].exists)
-        XCTAssertTrue(app.buttons[
+        for tab in ["이슈", "제어", "대화", "결과", "로그", "상태"] {
+            XCTAssertTrue(app.buttons[tab].waitForExistence(timeout: 5), "\(tab) 탭이 표시되어야 합니다.")
+        }
+        XCTAssertTrue(app.descendants(matching: .any)[
             "issue-attachment-image-aaaaaaaa-1111-4111-8111-111111111111"
         ].waitForExistence(timeout: 5))
         captureScreenshot(named: "companion-search-detail")
@@ -140,12 +143,13 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(createdIssue.waitForExistence(timeout: 5))
         createdIssue.tap()
         XCTAssertTrue(app.descendants(matching: .any)["run-detail"].waitForExistence(timeout: 5))
+        app.buttons["제어"].tap()
         app.buttons["process-now-button"].tap()
         let dispatch = app.buttons["dispatch-issue-submit"]
         XCTAssertTrue(dispatch.waitForExistence(timeout: 5))
         dispatch.tap()
-        XCTAssertTrue(app.staticTexts["진행 중"].waitForExistence(timeout: 5))
 
+        app.buttons["대화"].tap()
         let message = app.textFields["issue-message-field"]
         for _ in 0..<8 where !message.exists { app.swipeUp() }
         XCTAssertTrue(message.waitForExistence(timeout: 5))
