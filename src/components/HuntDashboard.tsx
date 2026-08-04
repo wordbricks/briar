@@ -3471,15 +3471,15 @@ export function RunPage({
                           ) : null}
                           <div className="recovery-actions">
                             <button
-                              disabled={isRecovering}
+                              disabled={isRecovering || Boolean(run.resumeRequestedAt)}
                               onClick={() => void runAction(onResume)}
                               type="button"
                             >
                               <RotateCcw
-                                className={isRecovering ? "spin" : ""}
+                                className={isRecovering || run.resumeRequestedAt ? "spin" : ""}
                                 size={14}
                               />
-                              {t("run.resume")}
+                              {t(run.resumeRequestedAt ? "issue.processNowRunning" : "run.resume")}
                             </button>
                           </div>
                         </section>

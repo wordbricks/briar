@@ -1131,6 +1131,7 @@
           "status": { "type": "string", "enum": ["backlog", "queued", "running", "paused", "blocked", "failed", "completed", "cancelled"] },
           "workflowStage": { "type": ["string", "null"] },
           "pausedAt": { "type": ["string", "null"], "format": "date-time" },
+          "resumeRequestedAt": { "type": ["string", "null"], "format": "date-time" },
           "checkpoint": {
             "type": ["object", "null"],
             "properties": {

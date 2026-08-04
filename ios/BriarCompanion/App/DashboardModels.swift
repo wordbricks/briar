@@ -8,6 +8,7 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
     let workflowStage: String?
     let workflow: AutoHuntWorkflow?
     let pausedAt: Date?
+    let resumeRequestedAt: Date?
     let checkpoint: WorkflowCheckpoint?
     let progress: Double?
     let detail: String?
@@ -43,6 +44,7 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         workflowStage: String? = nil,
         workflow: AutoHuntWorkflow? = nil,
         pausedAt: Date? = nil,
+        resumeRequestedAt: Date? = nil,
         checkpoint: WorkflowCheckpoint? = nil,
         progress: Double? = nil,
         detail: String? = nil,
@@ -77,6 +79,7 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         self.workflowStage = workflowStage
         self.workflow = workflow
         self.pausedAt = pausedAt
+        self.resumeRequestedAt = resumeRequestedAt
         self.checkpoint = checkpoint
         self.progress = progress
         self.detail = detail

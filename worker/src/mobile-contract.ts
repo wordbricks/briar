@@ -99,6 +99,7 @@ export const mobileDashboardRunSchema = z.object({
   ]),
   workflowStage: z.string().nullable().optional(),
   pausedAt: z.iso.datetime().nullable().optional(),
+  resumeRequestedAt: z.iso.datetime().nullable().optional(),
   checkpoint: z.object({
     key: z.string().min(1),
     stage: z.string().min(1),

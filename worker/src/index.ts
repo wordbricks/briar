@@ -3162,6 +3162,7 @@ function dashboardRunJson(
       workflow,
     ),
     pausedAt: run.paused_at,
+    resumeRequestedAt: run.resume_requested_at,
     waitingCheckpoint: run.waiting_checkpoint_key
       ? {
           key: run.waiting_checkpoint_key,

@@ -1427,7 +1427,7 @@ export async function dispatchHuntRun(
            current_attempt = ?, current_revision = 1,
            worker_id = null, claim_token_hash = null, claimed_by = null,
            claimed_at = null, lease_expires_at = null, completed_at = null,
-           execution_metrics_json = null,
+           resume_requested_at = null, execution_metrics_json = null,
            detail = ?, last_event_at = ?, updated_at = ?
        where id = ? and project_id = ?
          and status not in ('completed', 'cancelled')`,
@@ -1626,6 +1626,7 @@ export async function reapStalledHuntRuns(
   const stalled = await db
     .prepare(
       `select run.id, run.worker_id, run.claim_attempts, run.agent_id,
+              run.resume_requested_at,
               project.organization_id
        from briar_hunt_runs run
        join briar_projects project on project.id = run.project_id
@@ -1644,17 +1645,20 @@ export async function reapStalledHuntRuns(
       worker_id: string | null;
       claim_attempts: number;
       agent_id: string | null;
+      resume_requested_at: string | null;
       organization_id: string;
     }>();
 
   const reaped: ReapedRun[] = [];
   for (const run of stalled.results ?? []) {
     const blocked = run.claim_attempts >= MAX_CLAIM_ATTEMPTS;
+    const awaitingResumeClaim = !blocked && run.resume_requested_at !== null;
     await db
       .prepare(
         `update briar_hunt_runs
          set status = ?,
-             stage = ?,
+             stage = case when ? then stage else ? end,
+             paused_at = ?,
              claim_token_hash = null,
              claimed_by = null,
              claimed_at = null,
@@ -1665,11 +1669,15 @@ export async function reapStalledHuntRuns(
          where id = ? and project_id = ?`,
       )
       .bind(
+        blocked ? "blocked" : awaitingResumeClaim ? "running" : "queued",
+        awaitingResumeClaim ? 1 : 0,
         blocked ? "blocked" : "queued",
-        blocked ? "blocked" : "queued",
+        awaitingResumeClaim ? run.resume_requested_at : null,
         blocked
           ? "워커가 응답하지 않아 재시도 한도를 넘었습니다."
-          : "워커가 응답하지 않아 대기열로 돌아갔습니다.",
+          : awaitingResumeClaim
+            ? "워커가 응답하지 않아 일시정지 상태에서 다른 워커를 기다리고 있습니다."
+            : "워커가 응답하지 않아 대기열로 돌아갔습니다.",
         observedAt,
         observedAt,
         run.id,

@@ -2599,10 +2599,7 @@ export function useBriar(options: UseBriarOptions = {}) {
                     const workflowStage =
                       run.workflow.stages[currentIndex + 1]?.id ??
                       run.workflowStage;
-                    const status =
-                      currentIndex + 1 < run.workflow.stages.length
-                        ? "queued"
-                        : "running";
+                    const status = "running";
                     const nextEvent: HuntEvent = {
                       id: crypto.randomUUID(),
                       attempt: run.currentAttempt,
