@@ -101,7 +101,31 @@ export type ProjectLlmChatInput = {
     | "issueContext";
   workspaceRunId?: string | null;
   workspaceBranch?: string | null;
+  onProgress?: (progress: ProjectLlmProgress) => void;
 };
+
+export type ProjectLlmProgress = {
+  provider: AgentProvider;
+  messageId: string;
+  phase: string | null;
+  message: string;
+};
+
+type ProjectLlmProviderEvent =
+  | { type: "conversationStarted"; conversationId: string }
+  | { type: "messageStarted"; id: string; phase: string | null; text: string }
+  | { type: "messageDelta"; id: string; delta: string }
+  | { type: "messageCompleted"; id: string; phase: string | null; text: string }
+  | { type: "turnCompleted"; status: string };
+
+type ProjectLlmProgressPayload = {
+  requestId: string;
+  projectId: string;
+  provider: AgentProvider;
+  event: ProjectLlmProviderEvent;
+};
+
+export const projectLlmProgressEvent = "project-llm-progress";
 
 export type ProjectLlmChatResponse = {
   conversationId: string;
@@ -205,19 +229,67 @@ export async function chatWithProjectLlm(
     throw new Error("프로젝트 LLM은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
   }
   const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<ProjectLlmChatResponse>("project_llm_chat", {
-    projectId: input.projectId,
-    fullAccess: input.fullAccess ?? false,
-    workspaceMode: input.workspaceMode ?? "connected",
-    workspaceRunId: input.workspaceRunId ?? null,
-    workspaceBranch: input.workspaceBranch ?? null,
-    request: {
-      message: input.message,
-      conversationId: input.conversationId ?? null,
-      instructions: input.instructions ?? null,
-      outputSchema: input.outputSchema ?? null,
-    },
-  });
+  const progressId = input.onProgress
+    ? globalThis.crypto?.randomUUID?.() ??
+      `project-llm-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    : null;
+  let unlisten: (() => void) | undefined;
+
+  if (progressId && input.onProgress) {
+    const { listen } = await import("@tauri-apps/api/event");
+    const messages = new Map<string, string>();
+    const phases = new Map<string, string | null>();
+    unlisten = await listen<ProjectLlmProgressPayload>(
+      projectLlmProgressEvent,
+      ({ payload }) => {
+        if (
+          payload.requestId !== progressId ||
+          payload.projectId !== input.projectId
+        ) {
+          return;
+        }
+        const { event } = payload;
+        if (event.type === "messageStarted") {
+          messages.set(event.id, event.text);
+          phases.set(event.id, event.phase);
+        } else if (event.type === "messageDelta") {
+          messages.set(event.id, `${messages.get(event.id) ?? ""}${event.delta}`);
+        } else if (event.type === "messageCompleted") {
+          messages.set(event.id, event.text || messages.get(event.id) || "");
+          phases.set(event.id, event.phase);
+        } else {
+          return;
+        }
+        const message = messages.get(event.id)?.trim();
+        if (!message) return;
+        input.onProgress?.({
+          provider: payload.provider,
+          messageId: event.id,
+          phase: phases.get(event.id) ?? null,
+          message,
+        });
+      },
+    );
+  }
+
+  try {
+    return await invoke<ProjectLlmChatResponse>("project_llm_chat", {
+      projectId: input.projectId,
+      fullAccess: input.fullAccess ?? false,
+      workspaceMode: input.workspaceMode ?? "connected",
+      workspaceRunId: input.workspaceRunId ?? null,
+      workspaceBranch: input.workspaceBranch ?? null,
+      request: {
+        message: input.message,
+        progressId,
+        conversationId: input.conversationId ?? null,
+        instructions: input.instructions ?? null,
+        outputSchema: input.outputSchema ?? null,
+      },
+    });
+  } finally {
+    unlisten?.();
+  }
 }
 
 /**

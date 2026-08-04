@@ -780,6 +780,7 @@ pub(crate) fn run_project_agent_with(
             execution.clone(),
             ProjectLlmRequest {
                 message,
+                progress_id: None,
                 conversation_id,
                 instructions: Some(instructions.clone()),
                 output_schema: Some(project_agent_run_output_schema()),
@@ -995,6 +996,7 @@ pub(crate) fn start_auto_hunt_worker_with(
         },
         ProjectLlmRequest {
             message,
+            progress_id: None,
             conversation_id: None,
             instructions: Some(auto_hunt_worker_instructions(
                 &request.agent_name,
@@ -1062,6 +1064,7 @@ pub(crate) fn summarize_auto_hunt_dispatch_with(
         },
         ProjectLlmRequest {
             message,
+            progress_id: None,
             conversation_id: request.coordinator_conversation_id.clone(),
             instructions: Some(format!(
                 "Act as the coordinator for project agent `{}`. Your workers were created and monitored by the Briar host runtime. Report their completed, blocked, failed, or cancelled outcomes concisely. Never run commands, claim work, edit files, or invent evidence. Return only the required JSON.",
@@ -2831,6 +2834,7 @@ printf '%s\n' '{"method":"turn/completed","params":{"threadId":"thread-1","turn"
             },
             ProjectLlmRequest {
                 message: "Summarize the repository".to_string(),
+                progress_id: None,
                 conversation_id: None,
                 instructions: None,
                 output_schema: None,
