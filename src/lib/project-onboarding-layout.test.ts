@@ -25,15 +25,15 @@ describe("project onboarding layout", () => {
     );
   });
 
-  it("uses the compact, cardless layout from the repository setup design", () => {
+  it("uses a three-step card layout for repository setup", () => {
     expect(styles).toMatch(
-      /\.repository-connect-card \{[^}]*width:min\(470px,[^}]*border:0;[^}]*background:transparent;[^}]*box-shadow:none;/u,
+      /\.project-onboarding-card \{[^}]*width:min\(700px,/u,
     );
     expect(styles).toMatch(
-      /\.repository-connect-panel \{[^}]*overflow:hidden;[^}]*border:1px solid #dedede;[^}]*border-radius:12px;/u,
+      /\.project-onboarding-progress \{[^}]*grid-template-columns:repeat\(3,1fr\);/u,
     );
     expect(styles).toMatch(
-      /\.repository-connect-progress \{[^}]*grid-template-columns:1fr 1fr;/u,
+      /\.onboarding-process \{[^}]*min-height:430px;[^}]*align-items:center;/u,
     );
   });
 });
