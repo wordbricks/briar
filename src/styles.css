@@ -2358,6 +2358,51 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .repository-readiness strong { color:#4b4d47; font-size:var(--text-2xs); }
 .repository-readiness small { overflow:hidden; color:var(--muted-foreground); font:400 var(--text-2xs)/1.3 "DM Mono",monospace; text-overflow:ellipsis; white-space:nowrap; }
 .repository-readiness-error { margin:10px 1px 0; display:flex; align-items:center; gap:6px; color:#a34854; font-size:var(--text-2xs); line-height:1.5; }
+.project-onboarding-shell { background:#f7f7f3; }
+.project-onboarding-card { width:min(700px,calc(100vw - 48px)); }
+.project-onboarding-progress { margin:9px 0 28px; display:grid; grid-template-columns:repeat(3,1fr); gap:7px; }
+.project-onboarding-progress span { height:3px; border-radius:999px; background:#e1e1dc; }
+.project-onboarding-progress span.active { background:#5d47aa; }
+.onboarding-process { min-height:430px; display:flex; align-items:center; justify-content:center; flex-direction:column; text-align:center; }
+.onboarding-process-icon { width:54px; height:54px; margin-bottom:24px; display:grid; place-items:center; border-radius:17px; color:#654db5; background:#eee9ff; }
+.onboarding-process-icon.error { color:#aa4553; background:#fff0f2; }
+.onboarding-process h1 { max-width:520px; }
+.onboarding-process > p { max-width:520px; margin:12px 0 0; color:var(--muted-foreground); font-size:var(--text-xs); line-height:1.7; }
+.onboarding-process .onboarding-process-error { padding:13px 15px; border:1px solid #efd1d6; border-radius:11px; color:#9f3f4d; background:#fff7f8; text-align:left; }
+.onboarding-process .pulse { animation:health-pulse 1.2s ease-in-out infinite; }
+.onboarding-secondary-actions { margin-top:22px; display:flex; align-items:center; justify-content:center; gap:10px; }
+.onboarding-secondary-actions button { min-height:38px; padding:0 14px; display:flex; align-items:center; gap:7px; border:1px solid var(--border); border-radius:9px; color:var(--foreground); background:var(--card); cursor:pointer; font-size:var(--text-xs); font-weight:650; }
+.onboarding-secondary-actions button:first-child { border-color:#654db5; color:#fff; background:#654db5; }
+.onboarding-review { display:block; }
+.onboarding-workflow-stages { margin:0 0 18px; padding:0; display:grid; gap:8px; list-style:none; }
+.onboarding-workflow-stages li { padding:12px 14px; display:grid; grid-template-columns:28px minmax(0,1fr); align-items:start; gap:10px; border:1px solid var(--border); border-radius:12px; background:#fbfbf8; }
+.onboarding-workflow-stages li > span { width:26px; height:26px; display:grid; place-items:center; border-radius:8px; color:#604aa9; background:#eee9ff; font:650 var(--text-2xs)/1 "DM Mono",monospace; }
+.onboarding-workflow-stages li > div { min-width:0; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:3px 10px; }
+.onboarding-workflow-stages strong { font-size:var(--text-xs); }
+.onboarding-workflow-stages small { color:var(--muted-foreground); font-size:var(--text-2xs); }
+.onboarding-workflow-stages code { grid-column:1 / -1; overflow:hidden; color:#777080; font:400 var(--text-2xs)/1.5 "DM Mono",monospace; text-overflow:ellipsis; white-space:nowrap; }
+.onboarding-workflow-revision { margin-bottom:14px; padding:14px; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; border:1px solid #dcd5ef; border-radius:13px; background:#f8f5ff; }
+.onboarding-workflow-revision label { grid-column:1 / -1; color:#54456f; font-size:var(--text-2xs); font-weight:700; }
+.onboarding-workflow-revision textarea { min-width:0; resize:vertical; padding:10px 11px; border:1px solid #d8d1e8; border-radius:9px; color:var(--foreground); background:var(--card); font:inherit; font-size:var(--text-xs); line-height:1.55; }
+.onboarding-workflow-revision button { align-self:end; min-height:38px; padding:0 12px; display:flex; align-items:center; gap:6px; border:0; border-radius:9px; color:#fff; background:#654db5; cursor:pointer; font-size:var(--text-2xs); font-weight:700; }
+.onboarding-workflow-revision button:disabled { opacity:.55; cursor:not-allowed; }
+.onboarding-inline-error { margin:0 0 12px; color:#a34854; font-size:var(--text-2xs); }
+.onboarding-dimmed-note { margin:9px 0 0; color:#a2a29c; font-size:var(--text-2xs); text-align:center; }
+.onboarding-tool-list { margin:0; padding:0; display:grid; gap:8px; list-style:none; }
+.onboarding-tool-list li { padding:12px; display:grid; grid-template-columns:30px minmax(0,1fr) auto; align-items:center; gap:9px; border:1px solid var(--border); border-radius:12px; background:#fbfbf8; }
+.onboarding-tool-list li > i { width:30px; height:30px; display:grid; place-items:center; border-radius:9px; font-style:normal; }
+.onboarding-tool-list li > i.ready { color:#33886d; background:#e7f6f0; }
+.onboarding-tool-list li > i.warning { color:#af6e20; background:#fff4df; }
+.onboarding-tool-list li > span { min-width:0; display:grid; gap:2px; }
+.onboarding-tool-list strong { font-size:var(--text-xs); }
+.onboarding-tool-list small { color:var(--muted-foreground); font-size:var(--text-2xs); line-height:1.45; }
+.onboarding-tool-list code { color:#82798f; font:400 var(--text-2xs) "DM Mono",monospace; }
+.onboarding-tool-list em { padding:4px 7px; border-radius:7px; color:#8a5d24; background:#fff0d7; font-size:var(--text-2xs); font-style:normal; white-space:nowrap; }
+.onboarding-tool-list li:has(> i.ready) em { color:#347c65; background:#e7f6f0; }
+.onboarding-tool-list li > p { margin:0; grid-column:2 / -1; color:var(--muted-foreground); font-size:var(--text-2xs); }
+.onboarding-tool-warning { margin:13px 0 0; padding:11px 12px; display:flex; align-items:flex-start; gap:7px; border-radius:10px; color:#895a20; background:#fff7e9; font-size:var(--text-2xs); line-height:1.55; }
+.onboarding-tool-warning svg { flex:0 0 auto; margin-top:1px; }
+.onboarding-no-tools { padding:16px; display:flex; align-items:center; justify-content:center; gap:8px; border:1px solid #cfe6dc; border-radius:12px; color:#347c65; background:#f2faf6; font-size:var(--text-xs); }
 .repository-setup-backdrop { z-index:45; }
 .repository-setup-dialog { width:min(540px,calc(100vw - 32px)); overflow:hidden; border:1px solid rgba(53,55,49,.13); border-radius:20px; background:rgba(255,255,255,.96); box-shadow:0 26px 80px rgba(31,34,27,.23); backdrop-filter:blur(24px) saturate(145%); -webkit-backdrop-filter:blur(24px) saturate(145%); transform-origin:center; animation:repository-setup-in .18s cubic-bezier(.2,.8,.2,1); }
 @keyframes repository-setup-in { from { opacity:0; transform:translateY(7px) scale(.985); } }

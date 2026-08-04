@@ -216,6 +216,7 @@ import {
 import {
   assertStoredCheckpointPoliciesCompatible,
   checkpointPolicyJson,
+  isStoredWorkflowUnchanged,
   loadWorkflowCheckpointPolicy,
 } from "./workflow-policy";
 import {
@@ -4706,11 +4707,19 @@ async function route(
       throw new HttpError(403, "Organization admin access required");
     }
     const input = projectSettingsSchema.parse(await readJson(request));
-    await assertStoredCheckpointPoliciesCompatible(
-      db,
-      project.id,
-      input.workflow,
-    );
+    const currentSettings = await getProjectSettings(db, project.id);
+    if (
+      !isStoredWorkflowUnchanged(
+        currentSettings?.workflow_json,
+        input.workflow,
+      )
+    ) {
+      await assertStoredCheckpointPoliciesCompatible(
+        db,
+        project.id,
+        input.workflow,
+      );
+    }
     const settings = await updateProjectSettings(db, project.id, {
       velenOrg: input.velenOrg ?? null,
       dataSource: input.dataSource ?? null,

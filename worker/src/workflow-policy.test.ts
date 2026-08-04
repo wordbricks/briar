@@ -13,6 +13,7 @@ import {
 } from "./db";
 import {
   assertStoredCheckpointPoliciesCompatible,
+  isStoredWorkflowUnchanged,
   loadWorkflowCheckpointPolicy,
 } from "./workflow-policy";
 
@@ -122,6 +123,32 @@ describe("workflow checkpoint policy persistence", () => {
   }, 30_000);
 
   afterAll(async () => miniflare.dispose());
+
+  it("treats a normalized workflow resubmission as unchanged", () => {
+    const workflow = {
+      version: 2,
+      requirements: [],
+      stages: [
+        { id: "implementing", label: "Implement", required: true },
+      ],
+      execution: { checkpoints: [] },
+      completion: { requiredStages: ["implementing"] },
+    };
+
+    expect(isStoredWorkflowUnchanged(JSON.stringify(workflow), workflow)).toBe(
+      true,
+    );
+    expect(
+      isStoredWorkflowUnchanged(JSON.stringify(workflow), {
+        ...workflow,
+        stages: [
+          ...workflow.stages,
+          { id: "local_qa", label: "Local QA", required: true },
+        ],
+        completion: { requiredStages: ["implementing", "local_qa"] },
+      }),
+    ).toBe(false);
+  });
 
   it("uses revision CAS and freezes the effective policy into each new run", async () => {
     const mandatory = [

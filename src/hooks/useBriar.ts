@@ -1040,6 +1040,12 @@ export function useBriar(options: UseBriarOptions = {}) {
     setProjectConnection(null);
   }, []);
 
+  const finishProjectCreation = useCallback(() => {
+    setError(null);
+    setIsCreatingProject(false);
+    setProjectConnection(null);
+  }, []);
+
   const selectProject = useCallback(
     (projectId: string) => {
       const project = projects.find((candidate) => candidate.id === projectId);
@@ -1469,13 +1475,19 @@ export function useBriar(options: UseBriarOptions = {}) {
               },
         );
       }
-      setProjectConnection(null);
-      setIsCreatingProject(false);
+      setProjectConnection((current) =>
+        current?.project.id === connection.project.id
+          ? { ...current, project: connectedProject, workflow: generatedWorkflow }
+          : current,
+      );
       setError(null);
       void refreshHealth();
       await refreshProjectReadiness(connection.project.id);
 
-      return connected.repositoryPath;
+      return {
+        repositoryPath: connected.repositoryPath,
+        workflow: generatedWorkflow,
+      };
     } catch (caught) {
       let message = caught instanceof Error ? caught.message : String(caught);
       if (connectedLocally) {
@@ -2985,6 +2997,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     health,
     healthError,
     healthLoading,
+    finishProjectCreation,
     isCreatingProject,
     isCreatingIssue,
     updatingIssueId,

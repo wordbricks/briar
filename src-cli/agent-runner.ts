@@ -243,6 +243,21 @@ export function detachedPayloadDirection(
   return direction === "client" ? "client" : "server";
 }
 
+/**
+ * Provider runners already accumulate streaming message deltas and emit the
+ * complete text in `messageCompleted`. Keep deltas ephemeral so one visible
+ * message consumes one durable transcript event instead of hundreds.
+ */
+export function shouldPersistDetachedTranscriptPayload(payload: unknown) {
+  if (!payload || typeof payload !== "object") return true;
+  const record = payload as Record<string, unknown>;
+  const event =
+    record.type === "event" && record.event && typeof record.event === "object"
+      ? (record.event as Record<string, unknown>)
+      : record;
+  return event.type !== "messageDelta";
+}
+
 export function detachedTranscriptPayload(payload: unknown, rawLine: string) {
   const bounded = boundedTranscriptPayload(payload, rawLine);
   if (!bounded || typeof bounded !== "object") return bounded;

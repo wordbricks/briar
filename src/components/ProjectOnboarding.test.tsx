@@ -4,41 +4,94 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import { repositoryWorkflowBootstrap } from "../lib/auto-hunt-contract";
 import { ProjectOnboarding } from "./ProjectOnboarding";
+
+const generatedWorkflow = {
+  version: 2 as const,
+  requirements: [
+    {
+      id: "bun",
+      label: "Bun",
+      kind: "executable" as const,
+      tool: "bun",
+      reason: "프로젝트 테스트와 빌드 실행",
+    },
+  ],
+  stages: [
+    {
+      id: "implementing",
+      label: "구현",
+      required: true,
+      evidence: ["diff"],
+    },
+    {
+      id: "local_qa",
+      label: "로컬 검증",
+      required: true,
+      evidence: ["test"],
+      checks: ["bun test"],
+    },
+  ],
+  execution: { checkpoints: [] },
+  completion: { requiredStages: ["implementing", "local_qa"] },
+};
+
+const readiness = {
+  repositoryPath: "/Users/jay/git/briar",
+  gitInstalled: true,
+  gitVersion: "git version 2.50.1",
+  repositoryHealthy: true,
+  remote: "git@github.com:wordbricks/briar.git",
+  remoteReachable: true,
+  pushAccess: true,
+  requiresGithub: false,
+  githubRepository: "wordbricks/briar",
+  ghInstalled: true,
+  ghVersion: "gh version 2.76.1",
+  ghAuthenticated: true,
+  ghAccount: "jay",
+  githubWriteAccess: true,
+  gitReady: true,
+  prReady: true,
+  issues: [],
+};
+
+const connection = {
+  project: {
+    id: "project-1",
+    name: "Briar",
+    createdAt: "2026-07-22T00:00:00Z",
+  },
+  agentToken: "token",
+  workflow: repositoryWorkflowBootstrap,
+};
+
+const existingWorkflowConnection = {
+  ...connection,
+  workflow: generatedWorkflow,
+};
 
 const baseProps = {
   connection: null,
   error: null,
   loading: false,
+  onAnalyzeRequirements: async () => ({
+    workflow: generatedWorkflow,
+    requirements: [],
+  }),
   onCancel: () => undefined,
-  onConnect: async () => undefined,
+  onConnect: async () => ({
+    repositoryPath: readiness.repositoryPath,
+    workflow: generatedWorkflow,
+  }),
   onCreate: async () => undefined,
+  onFinish: () => undefined,
   onLogout: () => undefined,
+  onReviseWorkflow: async () => generatedWorkflow,
   onSkip: () => undefined,
-  onRepositorySelect: async () => null,
-  onRepositoryInspect: async (repositoryPath: string) => ({
-    repositoryPath,
-    gitInstalled: true,
-    gitVersion: "git version 2.50.1",
-    repositoryHealthy: true,
-    remote: "git@github.com:wordbricks/briar.git",
-    remoteReachable: true,
-    pushAccess: true,
-    requiresGithub: false,
-    githubRepository: "wordbricks/briar",
-    ghInstalled: true,
-    ghVersion: "gh version 2.76.1",
-    ghAuthenticated: true,
-    ghAccount: "jay",
-    githubWriteAccess: true,
-    gitReady: true,
-    prReady: true,
-    issues: [],
-  }),
-  onWorkspaceCreate: async (name: string) => ({
-    repositoryPath: `/Users/jay/Briar/${name}`,
-    created: true,
-  }),
+  onRepositorySelect: async () => readiness.repositoryPath,
+  onRepositoryInspect: async () => readiness,
   user: { id: "user-1", name: "Jay", email: "jay@example.com" },
 };
 
@@ -51,353 +104,235 @@ function mountOnboarding() {
 }
 
 function buttonWithText(container: HTMLElement, label: string) {
-  return Array.from(
-    container.querySelectorAll<HTMLButtonElement>("button"),
-  ).find((button) => button.textContent?.trim().startsWith(label));
+  return Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find(
+    (button) => button.textContent?.trim().startsWith(label),
+  );
 }
 
-function typeInto(input: HTMLInputElement, value: string) {
-  const setValue = Object.getOwnPropertyDescriptor(
-    HTMLInputElement.prototype,
-    "value",
-  )?.set;
+function typeInto(input: HTMLInputElement | HTMLTextAreaElement, value: string) {
+  const prototype = input instanceof HTMLTextAreaElement
+    ? HTMLTextAreaElement.prototype
+    : HTMLInputElement.prototype;
+  const setValue = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
   setValue?.call(input, value);
   input.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
+async function selectValidRepository(container: HTMLElement) {
+  await act(async () => {
+    buttonWithText(container, "저장소 선택")?.click();
+  });
+}
+
 describe("ProjectOnboarding", () => {
-  it("shows a cancellable new-project flow for an existing workspace", () => {
-    const markup = renderToStaticMarkup(
-      <ProjectOnboarding {...baseProps} canCancel />,
-    );
-
-    expect(markup).toContain("프로젝트 추가");
-    expect(markup).toContain("대시보드로 돌아가기");
-  });
-
-  it("shows the two-step repository connection experience", () => {
-    const markup = renderToStaticMarkup(
-      <ProjectOnboarding
-        {...baseProps}
-        connection={{
-          project: { id: "project-1", name: "Briar", createdAt: "2026-07-22T00:00:00Z" },
-          agentToken: "token",
-        }}
-      />,
-    );
-
-    expect(markup).toContain("2 / 2단계");
-    expect(markup).toContain("Briar에 저장소 연결");
-    expect(markup).toContain("Auto Hunt 워크플로");
-    expect(markup).toContain("준비됨");
-    expect(markup).toContain("로컬 Git 저장소");
-    expect(markup).toContain("필수");
-    expect(markup).toContain("폴더 선택…");
-    expect(markup).toContain("최근 저장소");
-    expect(markup).toContain("저장소 연결");
-    expect(markup).toContain("나중에 하기");
-    expect(markup).toContain('aria-expanded="false"');
-  });
-
-  it("does not show repository analysis or workflow generation when reconnecting", () => {
-    const markup = renderToStaticMarkup(
-      <ProjectOnboarding
-        {...baseProps}
-        connection={{
-          project: { id: "project-1", name: "Briar", createdAt: "2026-07-22T00:00:00Z" },
-          agentToken: "token",
-          workflow: {
-            version: 1,
-            stages: [
-              { id: "implementing", label: "구현", required: true },
-              { id: "local_qa", label: "로컬 검증", required: true },
-            ],
-            execution: { pauseAfterStage: "local_qa" },
-            completion: { requiredStages: ["implementing", "local_qa"] },
-          },
-        }}
-        loading
-      />,
-    );
-
-    expect(markup).toContain("Auto Hunt 워크플로");
-    expect(markup).toContain("저장 중");
-    expect(markup).toContain("단계별 증거");
-  });
-
-  it("lets users review the configured workflow or skip connection", async () => {
-    const { container, root } = mountOnboarding();
-    const onSkip = vi.fn();
-
-    await act(async () => root.render(
-      <ProjectOnboarding
-        {...baseProps}
-        connection={{
-          project: { id: "project-1", name: "Briar", createdAt: "2026-07-22T00:00:00Z" },
-          agentToken: "token",
-          workflow: {
-            version: 1,
-            stages: [
-              { id: "implementing", label: "구현", required: true },
-              { id: "local_qa", label: "로컬 검증", required: true },
-            ],
-            execution: { pauseAfterStage: "local_qa" },
-            completion: { requiredStages: ["implementing", "local_qa"] },
-          },
-        }}
-        onSkip={onSkip}
-      />,
-    ));
-
-    const review = buttonWithText(container, "워크플로 확인");
-    expect(review?.getAttribute("aria-expanded")).toBe("false");
-    await act(async () => review?.click());
-    expect(review?.getAttribute("aria-expanded")).toBe("true");
-    expect(container.textContent).toContain("1. 구현");
-    expect(container.textContent).toContain("2. 로컬 검증");
-
-    await act(async () => buttonWithText(container, "나중에 하기")?.click());
-    expect(onSkip).toHaveBeenCalledOnce();
-
-    await act(async () => root.unmount());
-    container.remove();
-  });
-
-  it("asks first-time users how they want to use Briar", () => {
+  it("keeps the first-project purpose choice", () => {
     const markup = renderToStaticMarkup(<ProjectOnboarding {...baseProps} />);
 
     expect(markup).toContain("Briar를 어떻게 사용하고 싶으세요?");
     expect(markup).toContain("개발 프로젝트 진행하기");
-    expect(markup).toContain("작업 흐름 둘러보기");
-    expect(markup).not.toContain("기존 저장소 연결");
-    expect(markup).not.toContain("대시보드로 돌아가기");
+    expect(markup).toContain("프로젝트 없이 시작");
   });
 
-  it("lets first-time users continue without creating a project", async () => {
-    const { container, root } = mountOnboarding();
-    const onCreate = vi.fn().mockResolvedValue(undefined);
-    const onSkip = vi.fn();
-
-    await act(async () =>
-      root.render(
-        <ProjectOnboarding
-          {...baseProps}
-          onCreate={onCreate}
-          onSkip={onSkip}
-        />,
-      ),
-    );
-
-    const skip = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="프로젝트 없이 시작"]',
-    );
-    await act(async () => skip?.click());
-
-    expect(onSkip).toHaveBeenCalledOnce();
-    expect(onCreate).not.toHaveBeenCalled();
-
-    await act(async () => root.unmount());
-    container.remove();
-  });
-
-  it("opens project setup from the purpose choice and lets users go back", async () => {
-    const { container, root } = mountOnboarding();
-
-    await act(async () =>
-      root.render(<ProjectOnboarding {...baseProps} />),
-    );
-
-    const setUpProject = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="프로젝트 설정하기"]',
-    );
-    await act(async () => setUpProject?.click());
-
-    expect(container.textContent).toContain("프로젝트 만들기");
-    expect(container.textContent).toContain("기존 저장소 연결");
-    expect(buttonWithText(container, "목적 다시 선택")).toBeTruthy();
-
-    await act(async () =>
-      buttonWithText(container, "목적 다시 선택")?.click(),
-    );
-
-    expect(container.textContent).toContain(
-      "Briar를 어떻게 사용하고 싶으세요?",
-    );
-    expect(container.textContent).not.toContain("기존 저장소 연결");
-
-    await act(async () => root.unmount());
-    container.remove();
-  });
-
-  it("offers both an existing repository and a from-scratch start", () => {
+  it("only offers an existing repository and makes it required", () => {
     const markup = renderToStaticMarkup(
       <ProjectOnboarding {...baseProps} canCancel />,
     );
 
-    expect(markup).toContain("기존 저장소 연결");
-    expect(markup).toContain("처음부터 시작");
-    expect(markup).toContain("저장소 선택");
-    expect(markup).not.toContain("나중에 만들기");
+    expect(markup).toContain("로컬 Git 저장소");
+    expect(markup).toContain("저장소 연결은 프로젝트 생성에 필수");
+    expect(markup).not.toContain("처음부터 시작");
+    expect(markup).not.toContain("나중에 하기");
+    expect(markup).not.toContain("Auto Hunt 워크플로");
   });
 
-  it("names a project after the repository it connects", async () => {
+  it("shows Next only after validating a Git repository", async () => {
     const { container, root } = mountOnboarding();
-    const onRepositorySelect = vi.fn().mockResolvedValue("/Users/jay/git/briar");
-    const onRepositoryInspect = vi.fn(baseProps.onRepositoryInspect);
-    const onCreate = vi.fn().mockResolvedValue(undefined);
+    await act(async () => root.render(<ProjectOnboarding {...baseProps} canCancel />));
 
-    await act(async () => root.render(
-      <ProjectOnboarding
-        {...baseProps}
-        canCancel
-        onCreate={onCreate}
-        onRepositoryInspect={onRepositoryInspect}
-        onRepositorySelect={onRepositorySelect}
-      />,
-    ));
+    expect(buttonWithText(container, "다음")).toBeUndefined();
+    await selectValidRepository(container);
 
-    const create = buttonWithText(container, "프로젝트 만들기");
-    expect(create?.disabled).toBe(true);
-
-    const select = container.querySelector<HTMLButtonElement>(
-      ".repository-setup .setup-repository-action",
-    );
-    await act(async () => select?.click());
-
-    const nameInput = container.querySelector<HTMLInputElement>(
-      'input[aria-label="프로젝트 이름"]',
-    );
-    expect(onRepositoryInspect).toHaveBeenCalledWith(
-      "/Users/jay/git/briar",
-      expect.objectContaining({ version: 1 }),
-    );
-    expect(nameInput?.value).toBe("briar");
-    expect(create?.disabled).toBe(false);
-
-    await act(async () => create?.click());
-    expect(onCreate).toHaveBeenCalledWith({ name: "briar" });
+    expect(
+      container.querySelector<HTMLInputElement>('input[aria-label="프로젝트 이름"]')?.value,
+    ).toBe("briar");
+    expect(buttonWithText(container, "다음")?.disabled).toBe(false);
 
     await act(async () => root.unmount());
     container.remove();
   });
 
-  it("creates a Briar-managed repository when starting from scratch", async () => {
+  it("shows workflow generation and then a natural-language review", async () => {
     const { container, root } = mountOnboarding();
-    const onWorkspaceCreate = vi.fn().mockResolvedValue({
-      repositoryPath: "/Users/jay/Briar/atlas",
-      created: true,
-    });
-    const onRepositoryInspect = vi.fn(baseProps.onRepositoryInspect);
-    const onCreate = vi.fn().mockResolvedValue(undefined);
+    let resolveConnection: ((value: {
+      repositoryPath: string;
+      workflow: typeof generatedWorkflow;
+    }) => void) | undefined;
+    const onConnect = vi.fn(() => new Promise<{
+      repositoryPath: string;
+      workflow: typeof generatedWorkflow;
+    }>((resolve) => { resolveConnection = resolve; }));
 
     await act(async () => root.render(
       <ProjectOnboarding
         {...baseProps}
-        canCancel
-        onCreate={onCreate}
-        onRepositoryInspect={onRepositoryInspect}
-        onWorkspaceCreate={onWorkspaceCreate}
-      />,
-    ));
-
-    await act(async () => buttonWithText(container, "처음부터 시작")?.click());
-    expect(container.querySelector(".repository-setup")).toBeNull();
-
-    const nameInput = container.querySelector<HTMLInputElement>(
-      'input[aria-label="프로젝트 이름"]',
-    );
-    await act(async () => typeInto(nameInput!, "atlas"));
-
-    await act(async () => buttonWithText(container, "프로젝트 만들기")?.click());
-
-    expect(onWorkspaceCreate).toHaveBeenCalledWith("atlas");
-    expect(onRepositoryInspect).toHaveBeenCalledWith(
-      "/Users/jay/Briar/atlas",
-      expect.objectContaining({ version: 1 }),
-    );
-    expect(onCreate).toHaveBeenCalledWith({ name: "atlas" });
-
-    await act(async () => root.unmount());
-    container.remove();
-  });
-
-  it("keeps a failed repository creation on the create step", async () => {
-    const { container, root } = mountOnboarding();
-    const onWorkspaceCreate = vi
-      .fn()
-      .mockRejectedValue(new Error("Briar 폴더가 이미 있습니다."));
-    const onCreate = vi.fn().mockResolvedValue(undefined);
-
-    await act(async () => root.render(
-      <ProjectOnboarding
-        {...baseProps}
-        canCancel
-        onCreate={onCreate}
-        onWorkspaceCreate={onWorkspaceCreate}
-      />,
-    ));
-
-    await act(async () => buttonWithText(container, "처음부터 시작")?.click());
-    const nameInput = container.querySelector<HTMLInputElement>(
-      'input[aria-label="프로젝트 이름"]',
-    );
-    await act(async () => typeInto(nameInput!, "atlas"));
-    await act(async () => buttonWithText(container, "프로젝트 만들기")?.click());
-
-    expect(onCreate).not.toHaveBeenCalled();
-    expect(container.textContent).toContain("Briar 폴더가 이미 있습니다.");
-
-    await act(async () => root.unmount());
-    container.remove();
-  });
-
-  it("selects a repository from its card before confirming the connection", async () => {
-    const { container, root } = mountOnboarding();
-    const onConnect = vi.fn().mockResolvedValue("/Users/jay/git/briar");
-    const onRepositorySelect = vi.fn().mockResolvedValue("/Users/jay/git/briar");
-    const onRepositoryInspect = vi.fn(baseProps.onRepositoryInspect);
-
-    await act(async () => root.render(
-      <ProjectOnboarding
-        {...baseProps}
-        connection={{
-          project: { id: "project-1", name: "Briar", createdAt: "2026-07-22T00:00:00Z" },
-          agentToken: "token",
-        }}
+        connection={connection}
         onConnect={onConnect}
-        onRepositorySelect={onRepositorySelect}
-        onRepositoryInspect={onRepositoryInspect}
       />,
     ));
+    await selectValidRepository(container);
+    await act(async () => buttonWithText(container, "다음")?.click());
 
-    const confirm = Array.from(
-      container.querySelectorAll<HTMLButtonElement>("button"),
-    ).find((button) => button.textContent?.trim() === "저장소 연결");
-    expect(confirm?.disabled).toBe(true);
+    expect(container.textContent).toContain("워크플로우를 만들고 있어요");
+    expect(onConnect).toHaveBeenCalledOnce();
 
-    const select = container.querySelector<HTMLButtonElement>(
-      ".repository-connect-choose",
-    );
-    await act(async () => select?.click());
+    await act(async () => resolveConnection?.({
+      repositoryPath: readiness.repositoryPath,
+      workflow: generatedWorkflow,
+    }));
 
-    expect(onRepositorySelect).toHaveBeenCalledOnce();
-    expect(onRepositoryInspect).toHaveBeenCalledWith(
-      "/Users/jay/git/briar",
-      expect.objectContaining({ version: 1 }),
-    );
-    expect(container.textContent).toContain("/Users/jay/git/briar");
-    expect(container.textContent).toContain("push 권한 확인됨");
-    expect(confirm?.disabled).toBe(false);
+    expect(container.textContent).toContain("워크플로우를 확인해 주세요");
+    expect(container.textContent).toContain("구현");
+    expect(container.textContent).toContain("bun test");
+    expect(container.querySelector("#onboarding-workflow-revision")).toBeTruthy();
+    expect(container.textContent).toContain("나중에 언제든 다시 수정");
 
-    await act(async () => confirm?.click());
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("finishes reconnection without workflow setup or tool analysis when a workflow already exists", async () => {
+    const { container, root } = mountOnboarding();
+    const onConnect = vi.fn().mockResolvedValue({
+      repositoryPath: readiness.repositoryPath,
+      workflow: generatedWorkflow,
+    });
+    const onFinish = vi.fn();
+    const onAnalyzeRequirements = vi.fn();
+
+    await act(async () => root.render(
+      <ProjectOnboarding
+        {...baseProps}
+        connection={existingWorkflowConnection}
+        onAnalyzeRequirements={onAnalyzeRequirements}
+        onConnect={onConnect}
+        onFinish={onFinish}
+      />,
+    ));
+    await selectValidRepository(container);
+    await act(async () => buttonWithText(container, "다음")?.click());
+
     expect(onConnect).toHaveBeenCalledWith(
-      expect.objectContaining({
-        velenOrg: null,
-        linearEnabled: false,
-        githubRepository: "wordbricks/briar",
-      }),
-      "/Users/jay/git/briar",
+      expect.objectContaining({ workflow: generatedWorkflow }),
+      readiness.repositoryPath,
     );
+    expect(onFinish).toHaveBeenCalledOnce();
+    expect(onAnalyzeRequirements).not.toHaveBeenCalled();
+    expect(container.textContent).not.toContain("워크플로우를 만들고 있어요");
+    expect(container.textContent).not.toContain("워크플로우를 확인해 주세요");
+    expect(container.textContent).not.toContain("필요한 개발 도구를 확인하고 있어요");
+    expect(container.textContent).not.toContain("로컬 개발 환경을 확인해 주세요");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("shows retry and repository-back actions after generation fails", async () => {
+    const { container, root } = mountOnboarding();
+    const onConnect = vi.fn().mockRejectedValue(new Error("분석 서버 연결 실패"));
+
+    await act(async () => root.render(
+      <ProjectOnboarding {...baseProps} connection={connection} onConnect={onConnect} />,
+    ));
+    await selectValidRepository(container);
+    await act(async () => buttonWithText(container, "다음")?.click());
+
+    expect(container.textContent).toContain("분석 서버 연결 실패");
+    expect(buttonWithText(container, "다시 시도하기")).toBeTruthy();
+    expect(buttonWithText(container, "저장소 선택으로 돌아가기")).toBeTruthy();
+
+    await act(async () =>
+      buttonWithText(container, "저장소 선택으로 돌아가기")?.click(),
+    );
+    expect(container.textContent).toContain("로컬 Git 저장소");
+    await act(async () => buttonWithText(container, "다음")?.click());
+    expect(onConnect).toHaveBeenCalledTimes(2);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("revises the generated workflow from natural language", async () => {
+    const { container, root } = mountOnboarding();
+    const onReviseWorkflow = vi.fn().mockResolvedValue({
+      ...generatedWorkflow,
+      stages: generatedWorkflow.stages.map((stage) =>
+        stage.id === "local_qa"
+          ? { ...stage, checks: ["bun test", "bun run build"] }
+          : stage,
+      ),
+    });
+
+    await act(async () => root.render(
+      <ProjectOnboarding
+        {...baseProps}
+        connection={connection}
+        onReviseWorkflow={onReviseWorkflow}
+      />,
+    ));
+    await selectValidRepository(container);
+    await act(async () => buttonWithText(container, "다음")?.click());
+    await act(async () => Promise.resolve());
+
+    const revision = container.querySelector<HTMLTextAreaElement>(
+      "#onboarding-workflow-revision",
+    );
+    await act(async () => typeInto(revision!, "빌드도 실행해줘"));
+    await act(async () => buttonWithText(container, "워크플로우 수정")?.click());
+
+    expect(onReviseWorkflow).toHaveBeenCalledWith("project-1", "빌드도 실행해줘");
+    expect(container.textContent).toContain("bun run build");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("shows missing tools but still allows confirmation", async () => {
+    const { container, root } = mountOnboarding();
+    const onFinish = vi.fn();
+    const onAnalyzeRequirements = vi.fn().mockResolvedValue({
+      workflow: generatedWorkflow,
+      requirements: [
+        {
+          id: "bun",
+          label: "Bun",
+          kind: "executable",
+          tool: "bun",
+          reason: "프로젝트 테스트와 빌드 실행",
+          healthy: false,
+          detail: "bun 실행 파일을 찾지 못했습니다.",
+        },
+      ],
+    });
+
+    await act(async () => root.render(
+      <ProjectOnboarding
+        {...baseProps}
+        connection={connection}
+        onAnalyzeRequirements={onAnalyzeRequirements}
+        onFinish={onFinish}
+      />,
+    ));
+    await selectValidRepository(container);
+    await act(async () => buttonWithText(container, "다음")?.click());
+    await act(async () => Promise.resolve());
+    await act(async () => buttonWithText(container, "다음")?.click());
+
+    expect(container.textContent).toContain("설치 안 됨");
+    expect(container.textContent).toContain("일부 자동화가 진행되지 않을 수 있습니다");
+    expect(buttonWithText(container, "확인")?.disabled).toBe(false);
+
+    await act(async () => buttonWithText(container, "확인")?.click());
+    expect(onFinish).toHaveBeenCalledOnce();
 
     await act(async () => root.unmount());
     container.remove();
