@@ -34,6 +34,7 @@ import {
   detachedIssueReplyPrompt,
   detachedProviderRequest,
   detachedPayloadDirection,
+  detachedTranscriptSequence,
   detachedTranscriptPayload,
   issueReplyTextFromPayload,
   parseDetachedJsonResult,
@@ -2123,7 +2124,11 @@ async function runClaimedIssueInRuntime(
             runId: issue.runId,
             workerId: activeProject.executionWorker?.workerId,
             agentProvider: provider,
-            events: [{ sequence, direction, payload }],
+            events: [{
+              sequence: detachedTranscriptSequence(issue.claimAttempts, sequence),
+              direction,
+              payload,
+            }],
           }),
         });
       } catch (error) {
@@ -2153,7 +2158,7 @@ async function runClaimedIssueInRuntime(
           executionMetrics,
           events: [
             {
-              sequence,
+              sequence: detachedTranscriptSequence(issue.claimAttempts, sequence),
               direction: "server",
               payload: { type: "execution.metrics", executionMetrics },
             },

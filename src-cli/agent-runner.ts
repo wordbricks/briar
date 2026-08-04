@@ -1,5 +1,26 @@
 import { Buffer } from "node:buffer";
 
+// A detached run keeps one durable transcript session across retries and
+// checkpoint resumes. Each claim gets its own sequence range so a new worker
+// process starting at local sequence 1 cannot collide with earlier output.
+const detachedTranscriptClaimStride = 10_000;
+
+export function detachedTranscriptSequence(
+  claimAttempt: number,
+  localSequence: number,
+) {
+  if (
+    !Number.isSafeInteger(claimAttempt) ||
+    claimAttempt < 1 ||
+    !Number.isSafeInteger(localSequence) ||
+    localSequence < 1 ||
+    localSequence >= detachedTranscriptClaimStride
+  ) {
+    throw new Error("Detached transcript sequence is out of range");
+  }
+  return (claimAttempt - 1) * detachedTranscriptClaimStride + localSequence;
+}
+
 export type DetachedAgent = {
   id: string;
   name: string;
