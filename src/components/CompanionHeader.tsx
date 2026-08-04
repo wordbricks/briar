@@ -76,6 +76,9 @@ export function CompanionHeader({
   return (
     <header className="companion-header">
       <div className="companion-workspace">
+        {pageTitle ? (
+          <h1 className="companion-page-title">{pageTitle}</h1>
+        ) : null}
         <div className="companion-project-picker">
           <SelectMenu
             className="companion-project-select"
@@ -91,9 +94,6 @@ export function CompanionHeader({
         </div>
       </div>
       <div className="companion-header-trailing">
-        {pageTitle ? (
-          <h1 className="companion-page-title">{pageTitle}</h1>
-        ) : null}
         <div className="companion-header-actions">
           <button
             aria-label={t("dashboard.refresh")}

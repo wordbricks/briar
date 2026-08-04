@@ -11,8 +11,6 @@ struct InboxHomeView: View {
     let api: any MobileAPIClientProtocol
     let refresh: () async -> Void
 
-    @State private var expandedActivity = true
-
     private var locale: CompanionLocale {
         CompanionLocale(rawValue: localeRaw) ?? .ko
     }
@@ -40,42 +38,16 @@ struct InboxHomeView: View {
                     description: Text("멘션, 이슈 변경, 완료된 세션이 이곳에 표시됩니다.")
                 )
             } else {
-                ForEach(InboxCategory.allCases) { category in
-                    let items = inbox.messages(in: category)
-                    if !items.isEmpty {
-                        if category == .activity {
-                            Section {
-                                if expandedActivity {
-                                    ForEach(items) { message in
-                                        inboxRow(message)
-                                    }
-                                }
-                            } header: {
-                                Button {
-                                    expandedActivity.toggle()
-                                } label: {
-                                    HStack {
-                                        Text(category.title)
-                                        Spacer()
-                                        Text(expandedActivity ? "숨기기" : "\(items.count)")
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        } else {
-                            Section(category.title) {
-                                ForEach(items) { message in
-                                    inboxRow(message)
-                                }
-                            }
-                        }
+                // Single chronological feed: newest first, no urgency sections.
+                Section {
+                    ForEach(inbox.messages) { message in
+                        inboxRow(message)
                     }
                 }
             }
         }
         .navigationTitle("Inbox")
+        .navigationBarTitleDisplayMode(.inline)
         .refreshable { await refresh() }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {

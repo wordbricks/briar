@@ -95,8 +95,14 @@ export function Inbox({
   unreadCount: number;
 }) {
   const { localeTag, t } = useI18n();
+  // Mobile companion shows one chronological feed; desktop keeps category filters.
   const [activeFilters, setActiveFilters] = useState<Set<InboxCategory>>(
-    () => new Set(defaultInboxFilters),
+    () =>
+      new Set(
+        companionMode
+          ? (inboxFilters as readonly InboxCategory[])
+          : defaultInboxFilters,
+      ),
   );
   const [selectedProjectId, setSelectedProjectId] = useState("all");
   const [visibleCount, setVisibleCount] = useState(INBOX_PAGE_SIZE);
@@ -136,17 +142,19 @@ export function Inbox({
       ),
     [projectMessages],
   );
-  const filteredMessages = useMemo(
-    () =>
-      projectMessages.filter((message) =>
-        activeFilters.has(classifyInboxMessage(message)),
-      ),
-    [activeFilters, projectMessages],
-  );
+  const filteredMessages = useMemo(() => {
+    // Companion: all categories, newest-first order already provided by useInbox.
+    if (companionMode) return projectMessages;
+    return projectMessages.filter((message) =>
+      activeFilters.has(classifyInboxMessage(message)),
+    );
+  }, [activeFilters, companionMode, projectMessages]);
   const filterKey = useMemo(
     () =>
-      `${effectiveProjectId}:${[...activeFilters].sort().join(",")}`,
-    [activeFilters, effectiveProjectId],
+      companionMode
+        ? `${effectiveProjectId}:companion-chronological`
+        : `${effectiveProjectId}:${[...activeFilters].sort().join(",")}`,
+    [activeFilters, companionMode, effectiveProjectId],
   );
   const visibleMessages = useMemo(
     () => pageInboxMessages(filteredMessages, visibleCount),
@@ -209,22 +217,23 @@ export function Inbox({
     });
   };
 
-  const pageHeader = (
+  const markAllReadAction =
+    unreadCount > 0 ? (
+      <Button onClick={onMarkAllRead} type="button" variant="soft">
+        <Check size={14} />
+        {t("inbox.markAllRead")}
+      </Button>
+    ) : null;
+
+  const pageHeader = companionMode ? null : (
     <PageHeader
-      action={
-        unreadCount > 0 ? (
-          <Button onClick={onMarkAllRead} type="button" variant="soft">
-            <Check size={14} />
-            {t("inbox.markAllRead")}
-          </Button>
-        ) : null
-      }
+      action={markAllReadAction}
       className={cn(
         "inbox-heading",
-        companionMode ? null : "app-page-header",
-        !companionMode && !isSidebarOpen && "sidebar-closed",
+        "app-page-header",
+        !isSidebarOpen && "sidebar-closed",
       )}
-      data-tauri-drag-region={companionMode ? undefined : true}
+      data-tauri-drag-region
       title={t("inbox.title")}
       titleId="inbox-title"
     />
@@ -238,51 +247,59 @@ export function Inbox({
       onScroll={(event) => maybeLoadMoreFromScroll(event.currentTarget)}
       ref={scrollRef}
     >
-      <section className="inbox-content" aria-labelledby="inbox-title">
-        {companionMode ? pageHeader : null}
+      <section
+        className="inbox-content"
+        aria-labelledby={companionMode ? undefined : "inbox-title"}
+        aria-label={companionMode ? t("inbox.title") : undefined}
+      >
+        {companionMode && markAllReadAction ? (
+          <div className="inbox-companion-actions">{markAllReadAction}</div>
+        ) : null}
 
         <section
           aria-label={t("inbox.messages")}
           className="inbox-panel rounded-none border-0 bg-card"
         >
-          <header className="inbox-filter-bar">
-            <div className="inbox-filter-controls">
-              <SelectMenu
-                className="inbox-project-filter"
-                label={t("inbox.projectFilter")}
-                onValueChange={setSelectedProjectId}
-                options={projectOptions}
-                size="small"
-                value={effectiveProjectId}
-              />
-              <div
-                aria-label={t("inbox.filters")}
-                className="inbox-filters"
-                role="group"
-              >
-                {inboxFilters.map((category) => (
-                  <button
-                    aria-pressed={activeFilters.has(category)}
-                    className={cn("inbox-filter", category)}
-                    key={category}
-                    onClick={() => toggleFilter(category)}
-                    type="button"
-                  >
-                    <FilterIcon category={category} />
-                    <span>
-                      {t(`inbox.category.${category}` as MessageKey)}
-                    </span>
-                    <span className="inbox-filter-count">
-                      {categoryCounts[category]}
-                    </span>
-                  </button>
-                ))}
+          {companionMode ? null : (
+            <header className="inbox-filter-bar">
+              <div className="inbox-filter-controls">
+                <SelectMenu
+                  className="inbox-project-filter"
+                  label={t("inbox.projectFilter")}
+                  onValueChange={setSelectedProjectId}
+                  options={projectOptions}
+                  size="small"
+                  value={effectiveProjectId}
+                />
+                <div
+                  aria-label={t("inbox.filters")}
+                  className="inbox-filters"
+                  role="group"
+                >
+                  {inboxFilters.map((category) => (
+                    <button
+                      aria-pressed={activeFilters.has(category)}
+                      className={cn("inbox-filter", category)}
+                      key={category}
+                      onClick={() => toggleFilter(category)}
+                      type="button"
+                    >
+                      <FilterIcon category={category} />
+                      <span>
+                        {t(`inbox.category.${category}` as MessageKey)}
+                      </span>
+                      <span className="inbox-filter-count">
+                        {categoryCounts[category]}
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-            <Typography as="span" tone="muted" variant="caption">
-              {t("inbox.filteredCount", { count: filteredMessages.length })}
-            </Typography>
-          </header>
+              <Typography as="span" tone="muted" variant="caption">
+                {t("inbox.filteredCount", { count: filteredMessages.length })}
+              </Typography>
+            </header>
+          )}
 
           {messages.length === 0 ? (
             <EmptyState

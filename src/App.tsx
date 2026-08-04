@@ -1497,7 +1497,9 @@ export function App() {
           pageTitle={
             companionPage === "issues" && !requestedCompanionSession
               ? t("companion.navTasks")
-              : null
+              : companionPage === "inbox"
+                ? t("inbox.title")
+                : null
           }
           projects={briar.projects}
           user={briar.user}

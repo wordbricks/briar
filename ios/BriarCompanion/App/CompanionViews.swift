@@ -108,7 +108,7 @@ struct CompanionShellView: View {
                     api: api,
                     refresh: refresh
                 )
-                .toolbar { companionToolbar() }
+                .toolbar { companionToolbar(showsProjectMenu: true) }
             }
             .tabItem { Label("Inbox", systemImage: "tray") }
             .tag(CompanionNavigationModel.Tab.inbox)
@@ -737,29 +737,36 @@ struct RunDetailView: View {
             }
 
             Section("실행 설정") {
-                Picker("프로바이더", selection: $preferences.provider) {
+                Picker("프로바이더", selection: providerSelection) {
                     Text("기본값").tag(AgentProvider?.none)
                     ForEach(providers.isEmpty ? AgentProvider.allCases : providers) {
                         Text($0.displayName).tag(AgentProvider?.some($0))
                     }
                 }
-                Picker("모델", selection: $preferences.model) {
+                .disabled(mutations.isActive("preferences-\(run.id)"))
+                .accessibilityIdentifier("execution-provider-picker")
+                Picker("모델", selection: modelSelection) {
                     Text("기본값").tag(String?.none)
                     ForEach(preferences.provider?.models ?? [], id: \.self) {
                         Text($0).tag(String?.some($0))
                     }
                 }
-                Picker("Effort", selection: $preferences.effort) {
+                .disabled(
+                    preferences.provider == nil ||
+                        mutations.isActive("preferences-\(run.id)")
+                )
+                .accessibilityIdentifier("execution-model-picker")
+                Picker("Effort", selection: effortSelection) {
                     Text("기본값").tag(ModelEffort?.none)
                     ForEach(preferences.provider?.efforts ?? []) {
                         Text($0.rawValue).tag(ModelEffort?.some($0))
                     }
                 }
-                .disabled(preferences.model == nil)
-                Button("실행 설정 저장") { Task { await savePreferences() } }
-                    .disabled(
-                        mutations.isActive("preferences-\(run.id)") || !preferences.isValid
-                    )
+                .disabled(
+                    preferences.model == nil ||
+                        mutations.isActive("preferences-\(run.id)")
+                )
+                .accessibilityIdentifier("execution-effort-picker")
             }
 
             if localStatus == .backlog || localStatus == .queued {
@@ -966,14 +973,6 @@ struct RunDetailView: View {
         .onChange(of: run.prerequisites) { _, prerequisites in
             dependencyIDs = Set((prerequisites ?? []).map(\.id))
         }
-        .onChange(of: preferences.provider) { oldProvider, provider in
-            guard oldProvider != provider else { return }
-            preferences.model = nil
-            preferences.effort = nil
-        }
-        .onChange(of: preferences.model) { _, model in
-            if model == nil { preferences.effort = nil }
-        }
         .sheet(item: $previewFile) { file in
             QuickLookPreview(fileURL: file.url)
                 .ignoresSafeArea()
@@ -1096,12 +1095,73 @@ struct RunDetailView: View {
         }
     }
 
-    private func savePreferences() async {
+    /// Provider change clears model/effort (same cascade as web/Android) and saves immediately.
+    private var providerSelection: Binding<AgentProvider?> {
+        Binding(
+            get: { preferences.provider },
+            set: { newProvider in
+                guard newProvider != preferences.provider else { return }
+                let next = IssueExecutionPreferences(
+                    provider: newProvider,
+                    model: nil,
+                    effort: nil
+                )
+                preferences = next
+                Task { await savePreferences(next) }
+            }
+        )
+    }
+
+    /// Model change clears effort and saves immediately.
+    private var modelSelection: Binding<String?> {
+        Binding(
+            get: { preferences.model },
+            set: { newModel in
+                guard let provider = preferences.provider else { return }
+                guard newModel != preferences.model else { return }
+                let next = IssueExecutionPreferences(
+                    provider: provider,
+                    model: newModel,
+                    effort: nil
+                )
+                preferences = next
+                Task { await savePreferences(next) }
+            }
+        )
+    }
+
+    /// Effort change saves immediately without altering provider/model.
+    private var effortSelection: Binding<ModelEffort?> {
+        Binding(
+            get: { preferences.effort },
+            set: { newEffort in
+                guard let provider = preferences.provider, let model = preferences.model else {
+                    return
+                }
+                guard newEffort != preferences.effort else { return }
+                let next = IssueExecutionPreferences(
+                    provider: provider,
+                    model: model,
+                    effort: newEffort
+                )
+                preferences = next
+                Task { await savePreferences(next) }
+            }
+        )
+    }
+
+    private func savePreferences(_ next: IssueExecutionPreferences? = nil) async {
+        let payload = next ?? preferences
+        guard payload.isValid else { return }
         do {
-            _ = try await mutations.savePreferences(runID: run.id, preferences: preferences)
+            _ = try await mutations.savePreferences(runID: run.id, preferences: payload)
             actionError = nil
             await refresh()
-        } catch { actionError = error.localizedDescription }
+        } catch IssueMutationError.duplicateAction {
+            // Pickers are disabled while a save is active; ignore rare races.
+        } catch {
+            actionError = error.localizedDescription
+        }
     }
 
     private func dependencyBinding(_ prerequisiteID: UUID) -> Binding<Bool> {
