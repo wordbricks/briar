@@ -3041,8 +3041,10 @@ export function RunPage({
     setRunEvents([]);
     setIsCompletingResultReview(false);
     setResultReviewError(null);
+  }, [run.id]);
+  useEffect(() => {
     void loadRunEvents();
-  }, [loadRunEvents, run.id]);
+  }, [loadRunEvents, run.eventCount, run.id]);
   const placementOptions = [
     { label: t("status.backlog"), value: "status:backlog" },
     { label: t("status.queued"), value: "status:queued" },

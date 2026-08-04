@@ -1247,6 +1247,56 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
+  it("refreshes status history when the open issue records a new event", async () => {
+    const run = demoDashboard.runs[0];
+    const events = demoRunEvents[run.id];
+    const queuedEvent = events.at(-1)!;
+    const onLoadRunEvents = vi
+      .fn<() => Promise<typeof events>>()
+      .mockResolvedValueOnce([queuedEvent])
+      .mockResolvedValueOnce(events);
+    const initialDashboard = {
+      ...demoDashboard,
+      runs: [{ ...run, eventCount: 1 }, ...demoDashboard.runs.slice(1)],
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={initialDashboard}
+        onLoadRunEvents={onLoadRunEvents}
+        requestedRunId={run.id}
+      />,
+    ));
+    expect(onLoadRunEvents).toHaveBeenCalledTimes(1);
+    const statusHistoryTab = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
+    ).find((button) => button.textContent === "상태");
+    await act(async () => statusHistoryTab?.click());
+    expect(
+      container.querySelectorAll(".issue-status-history-panel .timeline-event"),
+    ).toHaveLength(1);
+
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={demoDashboard}
+        onLoadRunEvents={onLoadRunEvents}
+        requestedRunId={run.id}
+      />,
+    ));
+    expect(onLoadRunEvents).toHaveBeenCalledTimes(2);
+    expect(
+      container.querySelectorAll(".issue-status-history-panel .timeline-event"),
+    ).toHaveLength(events.length);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("returns from issue details when the issue list is requested", async () => {
     const container = document.createElement("div");
     document.body.append(container);
