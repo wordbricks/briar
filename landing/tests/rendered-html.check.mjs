@@ -129,8 +129,12 @@ test("server-renders the localized tutorial with captured product screens", asyn
   assert.match(html, /첫 이슈부터/);
   assert.match(html, /검증된 결과까지/);
   assert.match(html, /요청을 실행 가능한 이슈로 만드세요/);
+  assert.match(html, /Auto Hunt agent가 대기 이슈를 자동으로 처리하게 하세요/);
+  assert.match(html, /이슈 상세에서 깔끔하게 정리된 결과를 확인하세요/);
   assert.match(html, /완료라는 말보다 근거를 확인하세요/);
   assert.match(html, /\/tutorial\/01-create-issue\.webp/);
+  assert.match(html, /\/tutorial\/07-run-auto-hunt\.webp/);
+  assert.match(html, /\/tutorial\/08-result\.webp/);
   assert.match(html, /\/tutorial\/04-evidence\.webp/);
   assert.match(html, /\/tutorial\/06-schedule\.webp/);
 });
