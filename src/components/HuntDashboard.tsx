@@ -3511,6 +3511,28 @@ export function RunPage({
       </span>
     </div>
   );
+  const processNowButton = (
+    <Button
+      className="run-page-process-now"
+      disabled={processNowDisabled}
+      onClick={onProcessNow}
+      size="sm"
+      type="button"
+    >
+      {isProcessing ? (
+        <LoaderCircle aria-hidden="true" className="spin" size={15} />
+      ) : (
+        <Bot aria-hidden="true" size={15} />
+      )}
+      {t(
+        isProcessing
+          ? "issue.processNowRunning"
+          : canReassign
+            ? "worker.reassign"
+            : "issue.processNow",
+      )}
+    </Button>
+  );
   return (
     <MainContent className="run-page-shell" id="issue-detail">
       {!companionMode && (
@@ -3541,6 +3563,7 @@ export function RunPage({
           </strong>
           <div className="run-page-titlebar-actions">
             {compactProperties}
+            {processNowButton}
             {copyStatus ? (
               <span
                 aria-live="polite"
@@ -3670,26 +3693,7 @@ export function RunPage({
                 </div>
                 <div className="run-page-companion-actions">
                   {compactProperties}
-                  <Button
-                    className="run-page-process-now"
-                    disabled={processNowDisabled}
-                    onClick={onProcessNow}
-                    size="sm"
-                    type="button"
-                  >
-                    {isProcessing ? (
-                      <LoaderCircle aria-hidden="true" className="spin" size={15} />
-                    ) : (
-                      <Bot aria-hidden="true" size={15} />
-                    )}
-                    {t(
-                      isProcessing
-                        ? "issue.processNowRunning"
-                        : canReassign
-                          ? "worker.reassign"
-                          : "issue.processNow",
-                    )}
-                  </Button>
+                  {processNowButton}
                   <button
                     aria-controls="run-properties-panel"
                     aria-expanded={isPropertiesOpen}

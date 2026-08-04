@@ -1091,7 +1091,16 @@ body { overflow: hidden; font-synthesis: none; }
 .run-page-description { max-width:900px; max-height:3.2em; margin:0; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; white-space:pre-wrap; color:var(--muted-foreground); font-size:var(--text-xs); line-height:1.6; }
 .run-page-shell .run-page-window-title { flex:1 1 auto; }
 .run-page-titlebar-actions { min-width:0; margin-left:auto; display:flex; align-items:center; gap:6px; }
+.run-page-titlebar-actions .run-page-process-now {
+  height: 30px;
+  min-height: 30px;
+  flex: 0 0 auto;
+  padding: 0 10px;
+  gap: 6px;
+  white-space: nowrap;
+}
 .run-page-companion-actions { min-width:0; display:flex; align-items:center; gap:8px; }
+.run-page-process-now { gap: 6px; }
 .run-page-property-badges { min-width:0; display:flex; align-items:center; gap:6px; }
 .run-page-property-badge { max-width:150px; height:28px; padding:0 9px; display:inline-flex; align-items:center; gap:5px; overflow:hidden; border:1px solid var(--border); border-radius:999px; color:var(--foreground); background:var(--card); font-size:var(--text-2xs); font-weight:600; line-height:1; text-overflow:ellipsis; white-space:nowrap; }
 .run-page-property-badge svg { flex:0 0 auto; color:var(--muted-foreground); }

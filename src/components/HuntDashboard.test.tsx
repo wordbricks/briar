@@ -646,6 +646,12 @@ describe("HuntDashboard", () => {
     expect(titlebarActions?.firstElementChild?.classList).toContain(
       "run-page-property-badges",
     );
+    const processNow = titlebarActions?.querySelector<HTMLButtonElement>(
+      ".run-page-process-now",
+    );
+    expect(processNow).not.toBeNull();
+    expect(processNow?.textContent).toContain("바로 처리");
+    expect(processNow?.disabled).toBe(true);
     expect(
       titlebarActions?.querySelector(".run-page-properties-toggle"),
     ).not.toBeNull();
@@ -677,6 +683,47 @@ describe("HuntDashboard", () => {
     await act(async () => confirmButton?.click());
     expect(onDeleteIssue).toHaveBeenCalledWith(demoDashboard.runs[0].id);
     expect(container.querySelector(".run-page")).toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("starts a queued issue from the issue detail process-now button", async () => {
+    const onProcessIssueNow = vi.fn();
+    const queuedRun = {
+      ...demoDashboard.runs[0],
+      status: "queued" as const,
+      workflowStage: null,
+      progress: 0,
+      claimedBy: null,
+      claimedAt: null,
+      leaseExpiresAt: null,
+      workerId: null,
+      requestedWorkerId: null,
+      executionReadiness: "ready" as const,
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={{ ...demoDashboard, runs: [queuedRun] }}
+        onProcessIssueNow={onProcessIssueNow}
+      />,
+    ));
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".kanban-card")?.click();
+    });
+
+    const processNow = container.querySelector<HTMLButtonElement>(
+      ".run-page-titlebar-actions .run-page-process-now",
+    );
+    expect(processNow).not.toBeNull();
+    expect(processNow?.disabled).toBe(false);
+    expect(processNow?.textContent).toContain("바로 처리하기");
+    await act(async () => processNow?.click());
+    expect(onProcessIssueNow).toHaveBeenCalledWith(queuedRun);
 
     await act(async () => root.unmount());
     container.remove();
