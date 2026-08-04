@@ -377,6 +377,7 @@ ${JSON.stringify(currentWorkflow, null, 2)}
 export async function analyzeProjectWorkflowRequirements(
   projectId: string,
   currentWorkflow: AutoHuntWorkflow,
+  onProgress?: (progress: ProjectLlmProgress) => void,
 ): Promise<AutoHuntWorkflow> {
   const response = await chatWithProjectLlm({
     projectId,
@@ -388,6 +389,7 @@ ${JSON.stringify(currentWorkflow, null, 2)}
     instructions: workflowRequirementInstructions,
     outputSchema: workflowRequirementsOutputSchema,
     workspaceMode: "latestRemoteBase",
+    ...(onProgress ? { onProgress } : {}),
   });
   let parsed: unknown;
   try {

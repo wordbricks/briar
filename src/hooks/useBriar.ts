@@ -1657,7 +1657,10 @@ export function useBriar(options: UseBriarOptions = {}) {
   );
 
   const analyzeWorkflowRequirements = useCallback(
-    async (projectId: string) => {
+    async (
+      projectId: string,
+      onProgress?: (progress: ProjectLlmProgress) => void,
+    ) => {
       if (demoMode) {
         throw new Error("필요 도구 분석은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
       }
@@ -1670,6 +1673,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       const analyzedWorkflow = await analyzeProjectWorkflowRequirements(
         projectId,
         previousWorkflow,
+        onProgress,
       );
       return persistProjectWorkflow(
         projectId,

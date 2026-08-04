@@ -56,7 +56,10 @@ type Props = {
   connection: ProjectConnection | null;
   error: string | null;
   loading: boolean;
-  onAnalyzeRequirements: (projectId: string) => Promise<RequirementAnalysis>;
+  onAnalyzeRequirements: (
+    projectId: string,
+    onProgress?: (progress: ProjectLlmProgress) => void,
+  ) => Promise<RequirementAnalysis>;
   onCancel: () => void;
   onConnect: (
     settings: LocalAutoHuntConfig,
@@ -348,10 +351,14 @@ export function ProjectOnboarding({
 
   const analyzeRequirements = async () => {
     if (!connection || !workflow) return;
+    setWorkflowProgress(null);
     setPhase("tools-loading");
     setToolsError(null);
     try {
-      const result = await onAnalyzeRequirements(connection.project.id);
+      const result = await onAnalyzeRequirements(
+        connection.project.id,
+        setWorkflowProgress,
+      );
       setWorkflow(result.workflow);
       setRequirementHealth(result.requirements);
       setPhase("tools-review");
@@ -642,6 +649,23 @@ export function ProjectOnboarding({
                     <span className="onboarding-process-icon"><Cpu className="pulse" size={27} /></span>
                     <h1>{t("onboarding.analyzingToolsTitle")}</h1>
                     <p>{t("onboarding.analyzingToolsDescription")}</p>
+                    <div
+                      aria-atomic="true"
+                      aria-live="polite"
+                      className="onboarding-provider-progress"
+                      role="status"
+                    >
+                      <span>
+                        <i aria-hidden="true" />
+                        {workflowProgress
+                          ? providerNames[workflowProgress.provider]
+                          : t("onboarding.workflowProviderProgress")}
+                      </span>
+                      <p ref={workflowProgressMessage}>
+                        {workflowProgress?.message ??
+                          t("onboarding.workflowProviderWaiting")}
+                      </p>
+                    </div>
                   </>
                 )}
               </section>
