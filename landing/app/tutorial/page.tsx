@@ -13,16 +13,16 @@ const tutorialCopy = {
     metadata: {
       title: "Briar 튜토리얼 — 첫 이슈부터 검증된 결과까지",
       description:
-        "Briar에서 이슈를 만들고, 에이전트 작업을 관찰하고, 검증 증거를 확인하고, 반복 업무를 자동화하는 방법을 알아보세요.",
+        "Briar에서 이슈를 만들고, Auto Hunt agent로 자동 처리하고, 정리된 결과와 검증 증거를 확인하고, 반복 업무를 자동화하는 방법을 알아보세요.",
     },
-    eyebrow: "7분 제품 둘러보기",
+    eyebrow: "9분 제품 둘러보기",
     title: "첫 이슈부터\n검증된 결과까지.",
     description:
-      "Briar의 실제 화면을 따라 이슈를 작업으로 바꾸고, 에이전트의 진행을 관찰하고, 결과를 신뢰할 수 있는 근거까지 확인해 보세요.",
+      "Briar의 실제 화면을 따라 이슈를 만들고, Auto Hunt agent로 자동 처리하고, 정리된 결과와 검증 근거까지 확인해 보세요.",
     start: "튜토리얼 시작",
     openApp: "Briar 열기",
     captured:
-      "Briar v1.2.65 로컬 데모 환경에서 직접 캡처한 화면입니다.",
+      "Briar v1.2.67 로컬 데모 환경에서 직접 캡처한 화면입니다.",
     setupTitle: "시작하기 전에",
     setup: [
       ["Briar 실행", "웹 앱을 열거나 Mac 앱을 설치하고 로그인합니다."],
@@ -62,8 +62,23 @@ const tutorialCopy = {
         caption: "사람과 에이전트가 공유하는 하나의 작업 상태입니다.",
       },
       {
+        id: "run-auto-hunt",
+        label: "03 · EXECUTE",
+        nav: "자동사냥 실행하기",
+        title: "Auto Hunt agent가 대기 이슈를 자동으로 처리하게 하세요.",
+        description:
+          "Agents에서 Auto Hunt agent의 Run Task를 열면 대기 중인 이슈를 찾아 워크플로에 따라 분석, 구현, 검증하도록 실행할 수 있습니다. 에이전트는 각 이슈를 독립된 작업으로 처리하고 진행 상태를 보드에 기록합니다.",
+        bullets: [
+          "요청에 “Perform Auto Hunt for every queued issue.”가 들어 있는지 확인하고 Run Task를 누릅니다.",
+          "실행이 시작되면 Queued 이슈가 워크플로 단계로 이동하고 필요한 검증까지 이어집니다.",
+        ],
+        image: "/tutorial/07-run-auto-hunt.webp",
+        alt: "Briar Auto Hunt agent 작업 실행 대화상자",
+        caption: "Auto Hunt agent를 실행해 대기 이슈를 자동으로 처리합니다.",
+      },
+      {
         id: "collaborate",
-        label: "03 · COLLABORATE",
+        label: "04 · COLLABORATE",
         nav: "에이전트와 대화하기",
         title: "이슈 안에서 맥락을 이어가세요.",
         description:
@@ -77,8 +92,23 @@ const tutorialCopy = {
         caption: "작업 지시와 에이전트의 답변이 이슈에 계속 축적됩니다.",
       },
       {
+        id: "review-result",
+        label: "05 · RESULT",
+        nav: "정리된 결과 확인하기",
+        title: "이슈 상세에서 깔끔하게 정리된 결과를 확인하세요.",
+        description:
+          "작업이 끝나거나 검토 지점에 도달하면 Result 탭이 구현 내용, 실행 단계, 검증 결과, 다음 행동을 한눈에 볼 수 있도록 정리합니다. 긴 작업 로그를 전부 읽지 않아도 무엇이 바뀌었고 무엇을 확인해야 하는지 빠르게 판단할 수 있습니다.",
+        bullets: [
+          "Work result에서 구현 내용과 검증 요약을 먼저 읽습니다.",
+          "Next action을 확인한 뒤 승인하거나 수정 요청을 남기고, 필요하면 Evidence로 세부 근거를 엽니다.",
+        ],
+        image: "/tutorial/08-result.webp",
+        alt: "Briar 이슈 상세 Result 탭의 정리된 작업 결과",
+        caption: "구현, 검증, 다음 행동이 이슈 상세의 Result 탭에 구조화됩니다.",
+      },
+      {
         id: "review-evidence",
-        label: "04 · VERIFY",
+        label: "06 · VERIFY",
         nav: "검증 근거 확인하기",
         title: "완료라는 말보다 근거를 확인하세요.",
         description:
@@ -93,7 +123,7 @@ const tutorialCopy = {
       },
       {
         id: "create-agents",
-        label: "05 · AGENTS",
+        label: "07 · AGENTS",
         nav: "전문 에이전트 만들기",
         title: "반복되는 책임을 에이전트로 정의하세요.",
         description:
@@ -108,7 +138,7 @@ const tutorialCopy = {
       },
       {
         id: "schedule-agents",
-        label: "06 · AUTOMATE",
+        label: "08 · AUTOMATE",
         nav: "반복 실행 예약하기",
         title: "정기적인 에이전트 업무를 예약하세요.",
         description:
@@ -134,16 +164,16 @@ const tutorialCopy = {
     metadata: {
       title: "Briar tutorial — From first issue to verified result",
       description:
-        "Learn how to create issues, observe agent work, review evidence, and automate recurring work in Briar.",
+        "Learn how to create issues, process them with the Auto Hunt agent, review structured results and evidence, and automate recurring work in Briar.",
     },
-    eyebrow: "7-minute product tour",
+    eyebrow: "9-minute product tour",
     title: "From first issue\nto verified result.",
     description:
-      "Follow real Briar screens to turn an issue into work, observe agent progress, and inspect the evidence behind the result.",
+      "Follow real Briar screens to create an issue, process it with the Auto Hunt agent, and review a structured result with supporting evidence.",
     start: "Start the tutorial",
     openApp: "Open Briar",
     captured:
-      "Screens captured directly from a local Briar v1.2.65 demo environment.",
+      "Screens captured directly from a local Briar v1.2.67 demo environment.",
     setupTitle: "Before you begin",
     setup: [
       ["Open Briar", "Open the web app or install the Mac app and sign in."],
@@ -183,8 +213,23 @@ const tutorialCopy = {
         caption: "People and agents share one source of truth for task state.",
       },
       {
+        id: "run-auto-hunt",
+        label: "03 · EXECUTE",
+        nav: "Run Auto Hunt",
+        title: "Let the Auto Hunt agent process queued issues.",
+        description:
+          "Open Run Task for the Auto Hunt agent in Agents to find queued issues and move each one through analysis, implementation, and validation. Briar keeps every issue isolated and records its progress on the board.",
+        bullets: [
+          "Confirm the request says “Perform Auto Hunt for every queued issue.”, then choose Run Task.",
+          "Once the run starts, queued issues move through the workflow and continue into the required checks.",
+        ],
+        image: "/tutorial/07-run-auto-hunt.webp",
+        alt: "Briar Run Task dialog for the Auto Hunt agent",
+        caption: "Run the Auto Hunt agent to process queued issues automatically.",
+      },
+      {
         id: "collaborate",
-        label: "03 · COLLABORATE",
+        label: "04 · COLLABORATE",
         nav: "Talk with the agent",
         title: "Keep the context inside the issue.",
         description:
@@ -198,8 +243,23 @@ const tutorialCopy = {
         caption: "Instructions and agent responses accumulate on the issue.",
       },
       {
+        id: "review-result",
+        label: "05 · RESULT",
+        nav: "Review the result",
+        title: "Read a clean, structured result in the issue detail.",
+        description:
+          "When work finishes or reaches a review checkpoint, Result organizes the implementation, completed stages, validation summary, and next action in one view. You can understand what changed without reading the entire work log.",
+        bullets: [
+          "Start with Work result for the implementation and validation summary.",
+          "Use Next action to approve or request changes, then open Evidence when you need the supporting detail.",
+        ],
+        image: "/tutorial/08-result.webp",
+        alt: "Structured work result in the Briar issue detail Result tab",
+        caption: "Implementation, validation, and the next action stay structured in the Result tab.",
+      },
+      {
         id: "review-evidence",
-        label: "04 · VERIFY",
+        label: "06 · VERIFY",
         nav: "Review evidence",
         title: "Inspect the proof behind done.",
         description:
@@ -214,7 +274,7 @@ const tutorialCopy = {
       },
       {
         id: "create-agents",
-        label: "05 · AGENTS",
+        label: "07 · AGENTS",
         nav: "Create specialist agents",
         title: "Define recurring responsibilities as agents.",
         description:
@@ -229,7 +289,7 @@ const tutorialCopy = {
       },
       {
         id: "schedule-agents",
-        label: "06 · AUTOMATE",
+        label: "08 · AUTOMATE",
         nav: "Schedule recurring runs",
         title: "Schedule routine agent work.",
         description:
@@ -282,9 +342,9 @@ export default async function TutorialPage() {
           <nav aria-label={c.aria.mainMenu}>
             {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
             <a href="/">{t.backHome}</a>
-            <a href="#create-issue">{t.steps[0].nav}</a>
-            <a href="#review-evidence">{t.steps[3].nav}</a>
-            <a href="#schedule-agents">{t.steps[5].nav}</a>
+            <a href="#run-auto-hunt">{t.steps[2].nav}</a>
+            <a href="#review-result">{t.steps[4].nav}</a>
+            <a href="#schedule-agents">{t.steps[7].nav}</a>
           </nav>
           <div className="header-actions">
             <ThemeToggle
@@ -331,10 +391,10 @@ export default async function TutorialPage() {
             <img src="/tutorial/05-agents.webp" alt="" />
           </div>
           <div className="tutorial-stack-card stack-middle">
-            <img src="/tutorial/04-evidence.webp" alt="" />
+            <img src="/tutorial/08-result.webp" alt="" />
           </div>
           <div className="tutorial-stack-card stack-front">
-            <img src="/tutorial/02-task-board.webp" alt="" />
+            <img src="/tutorial/07-run-auto-hunt.webp" alt="" />
           </div>
         </div>
       </section>
@@ -397,7 +457,7 @@ export default async function TutorialPage() {
                   src={step.image}
                   alt={step.alt}
                   width="1036"
-                  height="729"
+                  height="730"
                   loading={index === 0 ? "eager" : "lazy"}
                 />
                 <figcaption>
