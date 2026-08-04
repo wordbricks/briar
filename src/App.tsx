@@ -1175,9 +1175,6 @@ export function App() {
             onUpdateVelenOrg={(org) =>
               briar.saveVelenIntegration(activeProject.id, org)
             }
-            onUpdateLinear={(linear) =>
-              briar.saveLinearIntegration(activeProject.id, linear)
-            }
             onConnectLinearImport={(apiKey) =>
               briar.connectLinearForImport(activeProject.id, apiKey)
             }
