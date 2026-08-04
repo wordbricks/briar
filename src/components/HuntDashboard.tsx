@@ -23,6 +23,7 @@ import {
   List,
   ListFilter,
   LoaderCircle,
+  Maximize2,
   MessageCircle,
   MoreHorizontal,
   Paperclip,
@@ -2739,6 +2740,7 @@ export function RunPage({
   onCompleteResultReview,
   mentionMembers = [],
   onMove,
+  onOpenFullPage,
   onProcessNow,
   onRetry,
   onResume = async () => undefined,
@@ -2776,6 +2778,7 @@ export function RunPage({
   onCompleteResultReview?: () => Promise<unknown>;
   mentionMembers?: OrganizationMember[];
   onMove: (placement: HuntRunPlacement) => Promise<unknown>;
+  onOpenFullPage?: () => void;
   onProcessNow?: () => void;
   onRetry: () => Promise<unknown>;
   onResume?: () => Promise<unknown>;
@@ -3181,6 +3184,17 @@ export function RunPage({
                         : "issue.shareFailed",
                 )}
               </span>
+            ) : null}
+            {onOpenFullPage ? (
+              <button
+                aria-label={t("inbox.openFullPage")}
+                className="run-page-link-copy run-page-open-full-page"
+                onClick={onOpenFullPage}
+                title={t("inbox.openFullPage")}
+                type="button"
+              >
+                <Maximize2 aria-hidden="true" size={16} />
+              </button>
             ) : null}
             <button
               aria-controls="run-properties-panel"

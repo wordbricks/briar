@@ -1339,6 +1339,12 @@ export function App() {
                     briar.completeResultReview(inboxDetailRun.id)}
                   onMove={(placement) =>
                     briar.moveRun(inboxDetailRun.id, placement)}
+                  onOpenFullPage={() => {
+                    setInboxDetailTarget(null);
+                    setRequestedSessionId(null);
+                    setRequestedRunId(inboxDetailRun.id);
+                    navigateToPage("issues");
+                  }}
                   onProcessNow={() => {
                     setInboxDetailTarget(null);
                     processIssueNow(inboxDetailRun);

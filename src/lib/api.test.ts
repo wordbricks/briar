@@ -1037,6 +1037,24 @@ describe("API errors", () => {
     );
   });
 
+  it("treats an already deleted agent schedule as a successful delete", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({ message: "Project agent schedule not found" }),
+        { status: 404, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      deleteProjectAgentSchedule(
+        "token",
+        "22222222-2222-4222-8222-222222222222",
+        "11111111-1111-4111-8111-111111111111",
+      ),
+    ).resolves.toBeUndefined();
+  });
+
   it("claims and completes a due agent schedule run", async () => {
     const claimToken = `briar_schedule_claim_${"a".repeat(64)}`;
     const structuredResult = {

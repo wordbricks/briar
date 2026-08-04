@@ -1017,11 +1017,18 @@ export async function deleteProjectAgentSchedule(
   projectId: string,
   scheduleId: string,
 ) {
-  return request<void>(
-    `/projects/${projectId}/agent-schedules/${scheduleId}`,
-    token,
-    { method: "DELETE" },
-  );
+  try {
+    return await request<void>(
+      `/projects/${projectId}/agent-schedules/${scheduleId}`,
+      token,
+      { method: "DELETE" },
+    );
+  } catch (error) {
+    // Deletion is idempotent: a stale client should still be able to remove an
+    // entry that was already deleted by another request or cascading cleanup.
+    if (isApiErrorStatus(error, 404)) return;
+    throw error;
+  }
 }
 
 export async function loadProjectAgentScheduleRuns(

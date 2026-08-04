@@ -1267,6 +1267,44 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
+  it("offers full-page navigation when issue details are shown in a side panel", async () => {
+    const onOpenFullPage = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <RunPage
+        isSidebarOpen
+        error={null}
+        isRecovering={false}
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => []}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onOpenFullPage={onOpenFullPage}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }}
+        run={demoDashboard.runs[0]}
+      />,
+    ));
+
+    const openFullPage = container.querySelector<HTMLButtonElement>(
+      ".run-page-open-full-page",
+    );
+    expect(openFullPage?.getAttribute("aria-label")).toBe(
+      "전체 페이지에서 열기",
+    );
+    await act(async () => openFullPage?.click());
+    expect(onOpenFullPage).toHaveBeenCalledTimes(1);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("keeps in-page issue navigation and adds conversation as a tab in companion mode", async () => {
     const container = document.createElement("div");
     document.body.append(container);
