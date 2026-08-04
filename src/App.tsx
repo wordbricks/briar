@@ -1175,9 +1175,6 @@ export function App() {
             onUpdateVelenOrg={(org) =>
               briar.saveVelenIntegration(activeProject.id, org)
             }
-            onUpdateLinear={(linear) =>
-              briar.saveLinearIntegration(activeProject.id, linear)
-            }
             onConnectLinearImport={(apiKey) =>
               briar.connectLinearForImport(activeProject.id, apiKey)
             }
@@ -1342,6 +1339,12 @@ export function App() {
                     briar.completeResultReview(inboxDetailRun.id)}
                   onMove={(placement) =>
                     briar.moveRun(inboxDetailRun.id, placement)}
+                  onOpenFullPage={() => {
+                    setInboxDetailTarget(null);
+                    setRequestedSessionId(null);
+                    setRequestedRunId(inboxDetailRun.id);
+                    navigateToPage("issues");
+                  }}
                   onProcessNow={() => {
                     setInboxDetailTarget(null);
                     processIssueNow(inboxDetailRun);

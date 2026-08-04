@@ -3588,6 +3588,97 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ).rejects.toBeInstanceOf(HuntTransitionError);
   });
 
+  it("allows manual complete without agent evidence required for run completion", async () => {
+    const strictWorkflow = normalizeAutoHuntWorkflow({
+      version: 2,
+      requirements: [],
+      stages: [
+        {
+          id: "implementing",
+          label: "Implement",
+          required: true,
+          evidence: ["diff"],
+        },
+        {
+          id: "merged",
+          label: "Merge",
+          required: true,
+          evidence: ["merge_commit"],
+        },
+      ],
+      execution: { checkpoints: [] },
+      completion: { requiredStages: ["implementing", "merged"] },
+    });
+    await updateProjectSettings(db, projectId, {
+      velenOrg: null,
+      dataSource: null,
+      linear: { enabled: false, source: null, teamKey: null },
+      githubRepository: "example/repository",
+      workflow: strictWorkflow,
+    });
+    const sourceKey = "manual-complete-without-evidence";
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 82, {
+        sourceKey,
+        eventKey: "move-complete-no-evidence:queued",
+      }),
+    );
+    await recordHuntEvent(
+      db,
+      projectId,
+      event("implementing", 83, {
+        sourceKey,
+        eventKey: "move-complete-no-evidence:implementing",
+      }),
+    );
+    await recordHuntEvent(
+      db,
+      projectId,
+      event("implementing", 84, {
+        sourceKey,
+        eventKey: "move-complete-no-evidence:merged",
+        status: "running",
+        workflowStage: "merged",
+      }),
+    );
+
+    // Agent completion still requires missing evidence.
+    await expect(
+      recordHuntEvent(
+        db,
+        projectId,
+        event("completed", 85, {
+          sourceKey,
+          eventKey: "move-complete-no-evidence:agent-complete",
+          resultSummary: "Should not complete without evidence",
+        }),
+      ),
+    ).rejects.toThrow(/requires evidence:.*merged:merge_commit/u);
+
+    // Manual board/list move is an operator override and must not surface that
+    // error on the issue list.
+    expect(
+      await moveHuntRun(db, projectId, {
+        runId,
+        status: "completed",
+        workflowStage: null,
+        requestId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        actor: "briar-app:test-user",
+        occurredAt: atMinute(86),
+      }),
+    ).toEqual({
+      outcome: "moved",
+      status: "completed",
+      workflowStage: "merged",
+    });
+    await expect(getHuntRunForProject(db, projectId, runId)).resolves.toMatchObject({
+      status: "completed",
+      workflow_stage: "merged",
+    });
+  });
+
   it("preserves related rows while migration 0055 rebuilds provider tables", async () => {
     // This suite intentionally retains the legacy `kind` column for earlier
     // compatibility tests. Production removed it in migration 0028.

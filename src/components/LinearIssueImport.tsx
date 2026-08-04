@@ -212,7 +212,7 @@ export function LinearIssueImport({
   return (
     <section className="project-settings-linear-import">
       <header>
-        <span className="project-settings-linear-icon">
+        <span className="project-settings-linear-import-icon">
           <Download size={18} strokeWidth={1.8} />
         </span>
         <span>
@@ -439,7 +439,7 @@ export function LinearIssueImport({
       ) : null}
 
       {error ? (
-        <p className="project-settings-linear-error" role="alert">
+        <p className="project-settings-linear-import-error" role="alert">
           {error}
         </p>
       ) : null}
