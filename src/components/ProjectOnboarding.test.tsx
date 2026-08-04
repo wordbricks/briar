@@ -411,4 +411,78 @@ describe("ProjectOnboarding", () => {
     await act(async () => root.unmount());
     container.remove();
   });
+
+  it("shows the latest LLM provider message while analyzing required tools", async () => {
+    const { container, root } = mountOnboarding();
+    let reportProgress: ((progress: ProjectLlmProgress) => void) | undefined;
+    let resolveAnalysis: ((value: {
+      workflow: typeof generatedWorkflow;
+      requirements: never[];
+    }) => void) | undefined;
+    const onAnalyzeRequirements = vi.fn((
+      _projectId: string,
+      onProgress?: (progress: ProjectLlmProgress) => void,
+    ) => {
+      reportProgress = onProgress;
+      return new Promise<{
+        workflow: typeof generatedWorkflow;
+        requirements: never[];
+      }>((resolve) => { resolveAnalysis = resolve; });
+    });
+
+    await act(async () => root.render(
+      <ProjectOnboarding
+        {...baseProps}
+        connection={connection}
+        onAnalyzeRequirements={onAnalyzeRequirements}
+      />,
+    ));
+    await selectValidRepository(container);
+    await act(async () => buttonWithText(container, "다음")?.click());
+    await act(async () => Promise.resolve());
+    await act(async () => buttonWithText(container, "다음")?.click());
+
+    expect(container.textContent).toContain("필요한 개발 도구를 확인하고 있어요");
+    expect(container.textContent).toContain("LLM 프로바이더의 첫 메시지를 기다리고 있습니다");
+    expect(onAnalyzeRequirements).toHaveBeenCalledWith(
+      "project-1",
+      expect.any(Function),
+    );
+
+    await act(async () => reportProgress?.({
+      provider: "codex",
+      messageId: "tools-message-1",
+      phase: "commentary",
+      message: "패키지 매니저와 테스트 도구를 확인하고 있습니다.",
+    }));
+    const providerProgress = container.querySelector(
+      ".onboarding-provider-progress",
+    );
+    expect(providerProgress?.textContent).toContain("Codex");
+    expect(providerProgress?.textContent).toContain(
+      "패키지 매니저와 테스트 도구를 확인하고 있습니다.",
+    );
+
+    await act(async () => reportProgress?.({
+      provider: "codex",
+      messageId: "tools-message-2",
+      phase: "commentary",
+      message: "로컬 실행 파일 요구 사항을 정리하고 있습니다.",
+    }));
+    expect(providerProgress?.textContent).toContain(
+      "로컬 실행 파일 요구 사항을 정리하고 있습니다.",
+    );
+    expect(providerProgress?.textContent).not.toContain(
+      "패키지 매니저와 테스트 도구를 확인하고 있습니다.",
+    );
+
+    await act(async () => resolveAnalysis?.({
+      workflow: generatedWorkflow,
+      requirements: [],
+    }));
+    expect(container.textContent).toContain("로컬 개발 환경을 확인해 주세요");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
 });

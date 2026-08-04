@@ -909,8 +909,11 @@ export function App() {
         error={briar.error}
         loading={briar.loading}
         onCancel={briar.cancelProjectCreation}
-        onAnalyzeRequirements={async (projectId) => {
-          const workflow = await briar.analyzeWorkflowRequirements(projectId);
+        onAnalyzeRequirements={async (projectId, onProgress) => {
+          const workflow = await briar.analyzeWorkflowRequirements(
+            projectId,
+            onProgress,
+          );
           const health = await briar.refreshHealth();
           return {
             workflow,

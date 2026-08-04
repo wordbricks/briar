@@ -149,9 +149,11 @@ describe("project workflow generator", () => {
       }),
     });
 
+    const onProgress = vi.fn();
     const result = await analyzeProjectWorkflowRequirements(
       "project-1",
       currentWorkflow,
+      onProgress,
     );
 
     expect(result.requirements).toEqual([
@@ -164,6 +166,7 @@ describe("project workflow generator", () => {
       expect.objectContaining({
         projectId: "project-1",
         message: expect.stringContaining("current_workflow_json"),
+        onProgress,
         outputSchema: expect.objectContaining({ type: "object" }),
         workspaceMode: "latestRemoteBase",
       }),
