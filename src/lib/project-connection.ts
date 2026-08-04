@@ -105,7 +105,7 @@ export async function resolveProjectConnectionWorkflow(
   ) {
     return {
       workflow: existingWorkflow,
-      shouldPersistProjectSettings: role !== "member",
+      shouldPersistProjectSettings: false,
     };
   }
   if (role === "member") {

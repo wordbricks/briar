@@ -251,8 +251,14 @@ describe("ProjectOnboarding", () => {
         onFinish={onFinish}
       />,
     ));
+
+    expect(container.textContent).toContain("저장소 재연결");
+    expect(container.textContent).toContain("이슈와 설정은 이미 계정에 저장되어 있습니다");
+    expect(container.textContent).not.toContain("프로젝트 설정 · 1/3");
+    expect(container.querySelector(".project-onboarding-progress")).toBeNull();
     await selectValidRepository(container);
-    await act(async () => buttonWithText(container, "다음")?.click());
+    expect(buttonWithText(container, "저장소 연결")).toBeTruthy();
+    await act(async () => buttonWithText(container, "저장소 연결")?.click());
 
     expect(onConnect).toHaveBeenCalledWith(
       expect.objectContaining({ workflow: generatedWorkflow }),

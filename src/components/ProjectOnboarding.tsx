@@ -367,6 +367,10 @@ export function ProjectOnboarding({
   const hasMissingTools = workflowRequirements.some(
     (requirement) => !healthById.get(requirement.id)?.healthy,
   );
+  const reconnectingExistingWorkflow = Boolean(
+    connection?.workflow &&
+    !isRepositoryWorkflowPending(connection.workflow),
+  );
   const currentStep: 1 | 2 | 3 =
     phase === "repository" ? 1 : phase.startsWith("workflow") ? 2 : 3;
 
@@ -444,8 +448,14 @@ export function ProjectOnboarding({
           </>
         ) : (
           <>
-            <p className="eyebrow">{t("onboarding.setupProgress", { step: currentStep })}</p>
-            <Progress current={currentStep} />
+            {reconnectingExistingWorkflow ? (
+              <p className="eyebrow">{t("health.reconnect")}</p>
+            ) : (
+              <>
+                <p className="eyebrow">{t("onboarding.setupProgress", { step: currentStep })}</p>
+                <Progress current={currentStep} />
+              </>
+            )}
 
             {phase === "repository" ? (
               <>
@@ -457,7 +467,11 @@ export function ProjectOnboarding({
                       ? t("onboarding.addProject")
                       : t("onboarding.createProject")}
                 </h1>
-                <p className="onboarding-copy">{t("onboarding.repositoryRequiredDescription")}</p>
+                <p className="onboarding-copy">
+                  {reconnectingExistingWorkflow
+                    ? t("onboarding.repositoryConnectAccountDescription")
+                    : t("onboarding.repositoryRequiredDescription")}
+                </p>
                 <form className="project-form" onSubmit={(event) => void continueFromRepository(event)}>
                   <section className={`setup-section repository-setup${repositoryPath ? " connected" : ""}`}>
                     <div className="setup-section-heading">
@@ -519,7 +533,14 @@ export function ProjectOnboarding({
                       disabled={loading || selectingRepository || (!connection && !name.trim())}
                       type="submit"
                     >
-                      {loading ? t("onboarding.creating") : t("onboarding.next")}<ArrowRight size={17} />
+                      {loading
+                        ? reconnectingExistingWorkflow
+                          ? t("onboarding.repositoryConnecting")
+                          : t("onboarding.creating")
+                        : reconnectingExistingWorkflow
+                          ? t("dashboard.connectRepository")
+                          : t("onboarding.next")}
+                      <ArrowRight size={17} />
                     </button>
                   ) : null}
                 </form>
