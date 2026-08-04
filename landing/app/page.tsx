@@ -361,6 +361,7 @@ export default async function Home() {
             <a href="#workflow">{c.nav.workflow}</a>
             <a href="#security">{c.nav.security}</a>
             <a href="#agents">{c.nav.agents}</a>
+            <a href="/tutorial">{c.nav.tutorial}</a>
           </nav>
           <div className="header-actions">
             <ThemeToggle
@@ -689,6 +690,7 @@ export default async function Home() {
               GitHub
             </a>
             <a href="#security">{c.footer.security}</a>
+            <a href="/tutorial">{c.nav.tutorial}</a>
             <a href="#top">{c.footer.backToTop}</a>
           </div>
         </div>

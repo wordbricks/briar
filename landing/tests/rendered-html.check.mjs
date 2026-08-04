@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-async function render({ acceptLanguage, cookie } = {}) {
+async function render({ acceptLanguage, cookie, path = "/" } = {}) {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
@@ -19,7 +19,7 @@ async function render({ acceptLanguage, cookie } = {}) {
   }
 
   return worker.fetch(
-    new Request("http://localhost/", {
+    new Request(`http://localhost${path}`, {
       headers: requestHeaders,
     }),
     {
@@ -116,4 +116,21 @@ test("saved language choice overrides the browser language", async () => {
   const html = await response.text();
   assert.match(html, /<html lang="ko">/i);
   assert.match(html, /이슈에서 PR까지/);
+});
+
+test("server-renders the localized tutorial with captured product screens", async () => {
+  const response = await render({
+    acceptLanguage: "ko-KR,ko;q=0.9",
+    path: "/tutorial",
+  });
+  assert.equal(response.status, 200);
+
+  const html = await response.text();
+  assert.match(html, /첫 이슈부터/);
+  assert.match(html, /검증된 결과까지/);
+  assert.match(html, /요청을 실행 가능한 이슈로 만드세요/);
+  assert.match(html, /완료라는 말보다 근거를 확인하세요/);
+  assert.match(html, /\/tutorial\/01-create-issue\.webp/);
+  assert.match(html, /\/tutorial\/04-evidence\.webp/);
+  assert.match(html, /\/tutorial\/06-schedule\.webp/);
 });
