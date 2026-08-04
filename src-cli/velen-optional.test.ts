@@ -43,7 +43,12 @@ async function writeCliConfig(configDirectory: string, velenOrg?: string) {
   );
 }
 
-function runDoctor(home: string, configDirectory?: string, worktreeHome?: string) {
+function runCli(
+  home: string,
+  command: string[],
+  configDirectory?: string,
+  worktreeHome?: string,
+) {
   const environment = { ...process.env };
   for (const name of [
     "BRIAR_AGENT_TOKEN",
@@ -57,7 +62,7 @@ function runDoctor(home: string, configDirectory?: string, worktreeHome?: string
   }
   return spawnSync(
     bunExecutable,
-    ["run", "src-cli/index.ts", "project", "doctor"],
+    ["run", "src-cli/index.ts", ...command],
     {
       cwd: process.cwd(),
       env: {
@@ -70,6 +75,10 @@ function runDoctor(home: string, configDirectory?: string, worktreeHome?: string
       encoding: "utf8",
     },
   );
+}
+
+function runDoctor(home: string, configDirectory?: string, worktreeHome?: string) {
+  return runCli(home, ["project", "doctor"], configDirectory, worktreeHome);
 }
 
 afterEach(async () => {
@@ -86,16 +95,32 @@ describe("optional Velen CLI preflight", () => {
     expect(JSON.parse(result.stdout)).toMatchObject({
       ok: true,
       velenOrg: null,
+      velenHealthy: true,
+      velenError: null,
       linearEnabled: false,
       requestIds: [],
     });
   });
 
-  it("still requires Velen when a project explicitly configures an organization", async () => {
+  it("reports unavailable configured Velen without failing doctor", async () => {
     const result = runDoctor(await cliHome("wordbricks"));
 
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      ok: true,
+      velenOrg: "wordbricks",
+      velenHealthy: false,
+      requestIds: [],
+    });
+    expect(JSON.parse(result.stdout).velenError).toContain("Velen CLI");
+  });
+
+  it("does not preflight configured Velen before starting an issue worker", async () => {
+    const result = runCli(await cliHome("wordbricks"), ["worker"]);
+
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain("Velen CLI");
+    expect(result.stderr).toContain("worker가 등록되지 않았습니다");
+    expect(result.stderr).not.toContain("Velen CLI");
   });
 
   it("uses an explicit Briar config home even when HOME points elsewhere", async () => {
