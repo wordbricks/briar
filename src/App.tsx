@@ -1494,6 +1494,11 @@ export function App() {
           onRefresh={() => void briar.refresh()}
           onSettings={() => setCompanionPage("settings")}
           organizations={briar.organizations}
+          pageTitle={
+            companionPage === "issues" && !requestedCompanionSession
+              ? t("companion.navTasks")
+              : null
+          }
           projects={briar.projects}
           user={briar.user}
         />

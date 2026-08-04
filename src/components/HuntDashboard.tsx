@@ -709,6 +709,7 @@ export function HuntDashboard({
   ]);
   const createIssueDialog = isIssueDialogOpen ? (
     <CreateIssueDialog
+      compactHeader={companionMode}
       defaultProjectId={dashboard?.project.id}
       isSubmitting={isCreatingIssue}
       onClose={() => setIsIssueDialogOpen(false)}
@@ -915,11 +916,11 @@ export function HuntDashboard({
           <div className="queue-header">
             <div className="queue-heading">
               <div className="queue-heading-copy">
-                <Typography as="h2" variant="heading">
-                  {companionSearchMode
-                    ? t("companion.navSearch")
-                    : t("dashboard.queue")}
-                </Typography>
+                {companionSearchMode ? (
+                  <Typography as="h2" variant="heading">
+                    {t("companion.navSearch")}
+                  </Typography>
+                ) : null}
                 <Typography as="span" tone="muted" variant="caption">
                   {t("dashboard.taskCount", { count: filtered.length })}
                 </Typography>
@@ -1504,6 +1505,7 @@ export function EditIssueDialog({
 }
 
 export function CreateIssueDialog({
+  compactHeader = false,
   defaultProjectId,
   isSubmitting,
   onClose,
@@ -1511,6 +1513,7 @@ export function CreateIssueDialog({
   members = [],
   projects,
 }: {
+  compactHeader?: boolean;
   defaultProjectId?: string;
   isSubmitting: boolean;
   onClose: () => void;
@@ -1811,10 +1814,10 @@ export function CreateIssueDialog({
       >
         <header>
           <div className="issue-dialog-context">
-            <strong>{t("issue.newIssue")}</strong>
+            {!compactHeader && <strong>{t("issue.newIssue")}</strong>}
             {projects.length > 0 && (
               <>
-                <span aria-hidden="true">/</span>
+                {!compactHeader && <span aria-hidden="true">/</span>}
                 <SelectMenu
                   className="issue-project-context"
                   disabled={isSubmitting}
