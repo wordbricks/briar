@@ -423,6 +423,7 @@ echo '{"type":"result","sessionId":"session-1","message":"done"}'
             },
             ProjectLlmRequest {
                 message: "hello".to_string(),
+                progress_id: None,
                 conversation_id: None,
                 instructions: None,
                 output_schema: None,

@@ -1,8 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { invoke } = vi.hoisted(() => ({ invoke: vi.fn() }));
+const { invoke, listen } = vi.hoisted(() => ({
+  invoke: vi.fn(),
+  listen: vi.fn(),
+}));
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
+vi.mock("@tauri-apps/api/event", () => ({ listen }));
 
 import {
   chatWithProjectLlm,
@@ -21,6 +25,7 @@ import {
 describe("project LLM gateway", () => {
   beforeEach(() => {
     invoke.mockReset();
+    listen.mockReset();
     vi.stubGlobal("window", { __TAURI_INTERNALS__: {} });
   });
 
@@ -72,6 +77,7 @@ describe("project LLM gateway", () => {
       workspaceBranch: null,
       request: {
         message: "Summarize this project",
+        progressId: null,
         conversationId: null,
         instructions: "Be concise",
         outputSchema: { type: "string" },
@@ -79,6 +85,89 @@ describe("project LLM gateway", () => {
     });
     expect(invoke.mock.calls[0]?.[1]).not.toHaveProperty("cwd");
     expect(invoke.mock.calls[0]?.[1]).not.toHaveProperty("workspaceRoot");
+  });
+
+  it("rolls provider message deltas into request-scoped progress updates", async () => {
+    let progressHandler:
+      | ((event: { payload: Record<string, unknown> }) => void)
+      | undefined;
+    const unlisten = vi.fn();
+    listen.mockImplementation(async (_event, handler) => {
+      progressHandler = handler;
+      return unlisten;
+    });
+    invoke.mockImplementation(async (_command, args) => {
+      const invocation = args as { request: { progressId: string } };
+      progressHandler?.({
+        payload: {
+          requestId: "another-request",
+          projectId: "project-1",
+          provider: "codex",
+          event: {
+            type: "messageCompleted",
+            id: "ignored",
+            phase: "commentary",
+            text: "ignore me",
+          },
+        },
+      });
+      progressHandler?.({
+        payload: {
+          requestId: invocation.request.progressId,
+          projectId: "project-1",
+          provider: "codex",
+          event: {
+            type: "messageStarted",
+            id: "message-1",
+            phase: "commentary",
+            text: "저장소 구조를",
+          },
+        },
+      });
+      progressHandler?.({
+        payload: {
+          requestId: invocation.request.progressId,
+          projectId: "project-1",
+          provider: "codex",
+          event: {
+            type: "messageDelta",
+            id: "message-1",
+            delta: " 분석하고 있습니다.",
+          },
+        },
+      });
+      return {
+        conversationId: "briar:project-1:thread-1",
+        message: "{}",
+        workspaceRoot: "/repo",
+      };
+    });
+    const onProgress = vi.fn();
+
+    await chatWithProjectLlm({
+      projectId: "project-1",
+      message: "Analyze",
+      onProgress,
+    });
+
+    expect(listen).toHaveBeenCalledWith(
+      "project-llm-progress",
+      expect.any(Function),
+    );
+    expect(onProgress).toHaveBeenNthCalledWith(1, {
+      provider: "codex",
+      messageId: "message-1",
+      phase: "commentary",
+      message: "저장소 구조를",
+    });
+    expect(onProgress).toHaveBeenNthCalledWith(2, {
+      provider: "codex",
+      messageId: "message-1",
+      phase: "commentary",
+      message: "저장소 구조를 분석하고 있습니다.",
+    });
+    expect(onProgress).toHaveBeenCalledTimes(2);
+    expect(unlisten).toHaveBeenCalledOnce();
   });
 
   it("forwards explicit unrestricted access to the native gateway", async () => {

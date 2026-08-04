@@ -27,6 +27,10 @@ import {
   type AutoHuntWorkflow,
 } from "../lib/auto-hunt-contract";
 import { repositoryProjectName } from "../lib/project-workspace";
+import type {
+  AgentProvider,
+  ProjectLlmProgress,
+} from "../lib/project-llm";
 import type { SessionUser } from "../types";
 import { useI18n } from "../i18n";
 import { Logo } from "./Logo";
@@ -51,6 +55,7 @@ type Props = {
   onConnect: (
     settings: LocalAutoHuntConfig,
     repositoryPath: string,
+    onProgress?: (progress: ProjectLlmProgress) => void,
   ) => Promise<PreparedProjectConnection>;
   onCreate: (input: { name: string }) => Promise<unknown>;
   onFinish: () => void;
@@ -75,6 +80,13 @@ type OnboardingPhase =
   | "workflow-review"
   | "tools-loading"
   | "tools-review";
+
+const providerNames: Record<AgentProvider, string> = {
+  codex: "Codex",
+  claude: "Claude",
+  grok: "Grok",
+  opencode: "OpenCode",
+};
 
 function Progress({ current }: { current: 1 | 2 | 3 }) {
   return (
@@ -139,6 +151,8 @@ export function ProjectOnboarding({
   const [selectingRepository, setSelectingRepository] = useState(false);
   const [workflow, setWorkflow] = useState<AutoHuntWorkflow | null>(null);
   const [workflowError, setWorkflowError] = useState<string | null>(null);
+  const [workflowProgress, setWorkflowProgress] =
+    useState<ProjectLlmProgress | null>(null);
   const [workflowRevision, setWorkflowRevision] = useState("");
   const [revisingWorkflow, setRevisingWorkflow] = useState(false);
   const [revisionError, setRevisionError] = useState<string | null>(null);
@@ -147,6 +161,8 @@ export function ProjectOnboarding({
     key: string;
     promise: Promise<PreparedProjectConnection>;
   } | null>(null);
+  const generationProgressKey = useRef<string | null>(null);
+  const workflowProgressMessage = useRef<HTMLParagraphElement | null>(null);
   const [requirementHealth, setRequirementHealth] = useState<
     WorkflowRequirementHealth[]
   >([]);
@@ -155,6 +171,11 @@ export function ProjectOnboarding({
   useEffect(() => {
     if (connection && !name) setName(connection.project.name);
   }, [connection, name]);
+
+  useEffect(() => {
+    const message = workflowProgressMessage.current;
+    if (message) message.scrollTop = message.scrollHeight;
+  }, [workflowProgress?.message]);
 
   useEffect(() => {
     if (
@@ -174,9 +195,15 @@ export function ProjectOnboarding({
       workflow: connection.workflow ?? repositoryWorkflowBootstrap,
     };
     if (generationRequest.current?.key !== key) {
+      generationProgressKey.current = key;
+      setWorkflowProgress(null);
       generationRequest.current = {
         key,
-        promise: onConnect(settings, repositoryPath),
+        promise: onConnect(settings, repositoryPath, (progress) => {
+          if (generationProgressKey.current === key) {
+            setWorkflowProgress(progress);
+          }
+        }),
       };
     }
     let active = true;
@@ -186,6 +213,7 @@ export function ProjectOnboarding({
         if (!active) return;
         setRepositoryPath(result.repositoryPath);
         setWorkflow(result.workflow);
+        generationProgressKey.current = null;
         setPhase("workflow-review");
       })
       .catch((caught) => {
@@ -268,14 +296,18 @@ export function ProjectOnboarding({
   };
 
   const retryWorkflowGeneration = () => {
+    generationProgressKey.current = null;
     generationRequest.current = null;
     setWorkflowError(null);
+    setWorkflowProgress(null);
     setGenerationAttempt((current) => current + 1);
   };
 
   const returnToRepository = () => {
+    generationProgressKey.current = null;
     generationRequest.current = null;
     setWorkflowError(null);
+    setWorkflowProgress(null);
     setGenerationAttempt((current) => current + 1);
     setPhase("repository");
   };
@@ -497,6 +529,23 @@ export function ProjectOnboarding({
                     <span className="onboarding-process-icon"><LoaderCircle className="spin" size={27} /></span>
                     <h1>{t("onboarding.generatingWorkflowTitle")}</h1>
                     <p>{t("onboarding.generatingWorkflowDescription")}</p>
+                    <div
+                      aria-atomic="true"
+                      aria-live="polite"
+                      className="onboarding-provider-progress"
+                      role="status"
+                    >
+                      <span>
+                        <i aria-hidden="true" />
+                        {workflowProgress
+                          ? providerNames[workflowProgress.provider]
+                          : t("onboarding.workflowProviderProgress")}
+                      </span>
+                      <p ref={workflowProgressMessage}>
+                        {workflowProgress?.message ??
+                          t("onboarding.workflowProviderWaiting")}
+                      </p>
+                    </div>
                   </>
                 )}
               </section>

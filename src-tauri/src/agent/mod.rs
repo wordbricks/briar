@@ -221,6 +221,8 @@ impl Default for ProjectLlmSettings {
 pub(crate) struct ProjectLlmRequest {
     pub(crate) message: String,
     #[serde(default)]
+    pub(crate) progress_id: Option<String>,
+    #[serde(default)]
     pub(crate) conversation_id: Option<String>,
     #[serde(default)]
     pub(crate) instructions: Option<String>,
@@ -646,6 +648,7 @@ mod tests {
     fn adds_the_briar_skill_instruction_to_every_request() {
         let request = ProjectLlmRequest {
             message: "Inspect the repository".to_string(),
+            progress_id: None,
             conversation_id: None,
             instructions: Some("Be concise.".to_string()),
             output_schema: None,
