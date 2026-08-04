@@ -4,6 +4,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import { ApiError } from "../lib/api";
 import { repositoryWorkflowBootstrap } from "../lib/auto-hunt-contract";
 import { ProjectOnboarding } from "./ProjectOnboarding";
 
@@ -256,6 +257,41 @@ describe("ProjectOnboarding", () => {
     expect(container.textContent).toContain("로컬 Git 저장소");
     await act(async () => buttonWithText(container, "다음")?.click());
     expect(onConnect).toHaveBeenCalledTimes(2);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("shows project workflow validation issues separately from generation errors", async () => {
+    const { container, root } = mountOnboarding();
+    const onConnect = vi.fn().mockRejectedValue(
+      new ApiError(
+        400,
+        "Invalid project workflow",
+        "INVALID_PROJECT_WORKFLOW",
+        [
+          "version 2 execution.checkpoints is required",
+          "completion.requiredStages must match stages marked required",
+        ],
+      ),
+    );
+
+    await act(async () => root.render(
+      <ProjectOnboarding {...baseProps} connection={connection} onConnect={onConnect} />,
+    ));
+    await selectValidRepository(container);
+    await act(async () => buttonWithText(container, "다음")?.click());
+
+    expect(container.textContent).toContain(
+      "생성된 워크플로우가 서버 검증을 통과하지 못했습니다.",
+    );
+    expect(container.textContent).toContain(
+      "version 2 execution.checkpoints is required",
+    );
+    expect(container.textContent).toContain(
+      "completion.requiredStages must match stages marked required",
+    );
+    expect(container.textContent).not.toContain("Invalid checkpoint policy");
 
     await act(async () => root.unmount());
     container.remove();

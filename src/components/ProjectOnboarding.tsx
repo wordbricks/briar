@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { ProjectConnection } from "../hooks/useBriar";
+import { ApiError, apiErrorIssueMessages } from "../lib/api";
 import type {
   LocalAutoHuntConfig,
   RepositoryReadiness,
@@ -39,6 +40,11 @@ type PreparedProjectConnection = {
 type RequirementAnalysis = {
   workflow: AutoHuntWorkflow;
   requirements: WorkflowRequirementHealth[];
+};
+
+type WorkflowFailure = {
+  message: string;
+  issues: string[];
 };
 
 type Props = {
@@ -138,7 +144,7 @@ export function ProjectOnboarding({
   const [repositoryError, setRepositoryError] = useState<string | null>(null);
   const [selectingRepository, setSelectingRepository] = useState(false);
   const [workflow, setWorkflow] = useState<AutoHuntWorkflow | null>(null);
-  const [workflowError, setWorkflowError] = useState<string | null>(null);
+  const [workflowError, setWorkflowError] = useState<WorkflowFailure | null>(null);
   const [workflowRevision, setWorkflowRevision] = useState("");
   const [revisingWorkflow, setRevisingWorkflow] = useState(false);
   const [revisionError, setRevisionError] = useState<string | null>(null);
@@ -190,9 +196,16 @@ export function ProjectOnboarding({
       })
       .catch((caught) => {
         if (!active) return;
-        setWorkflowError(
-          caught instanceof Error ? caught.message : String(caught),
-        );
+        setWorkflowError({
+          message:
+            caught instanceof ApiError &&
+              caught.code === "INVALID_PROJECT_WORKFLOW"
+              ? t("onboarding.workflowValidationFailed")
+              : caught instanceof Error
+                ? caught.message
+                : String(caught),
+          issues: apiErrorIssueMessages(caught),
+        });
       });
     return () => {
       active = false;
@@ -204,6 +217,7 @@ export function ProjectOnboarding({
     phase,
     repositoryPath,
     repositoryReadiness?.githubRepository,
+    t,
   ]);
 
   const selectRepository = async () => {
@@ -486,7 +500,16 @@ export function ProjectOnboarding({
                   <>
                     <span className="onboarding-process-icon error"><CircleAlert size={25} /></span>
                     <h1>{t("onboarding.workflowGenerationFailed")}</h1>
-                    <p className="onboarding-process-error" role="alert">{workflowError}</p>
+                    <div className="onboarding-process-error" role="alert">
+                      <p>{workflowError.message}</p>
+                      {workflowError.issues.length > 0 ? (
+                        <ul>
+                          {workflowError.issues.map((issue, index) => (
+                            <li key={`${index}:${issue}`}>{issue}</li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </div>
                     <div className="onboarding-secondary-actions">
                       <button onClick={retryWorkflowGeneration} type="button">{t("onboarding.retry")}<ArrowRight size={15} /></button>
                       <button onClick={returnToRepository} type="button"><ArrowLeft size={15} />{t("onboarding.returnToRepository")}</button>

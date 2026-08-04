@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  apiErrorIssueMessages,
   addIssueDependency,
   beginDeviceAuthorization,
   claimProjectAgentScheduleRun,
@@ -224,6 +225,43 @@ describe("API errors", () => {
       status: 401,
       message: "Unauthorized",
     });
+  });
+
+  it("preserves and formats structured API validation issues", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        return new Response(
+          JSON.stringify({
+            message: "Invalid project workflow",
+            code: "INVALID_PROJECT_WORKFLOW",
+            issues: [
+              "version 2 execution.checkpoints is required",
+              {
+                path: ["workflow", "completion", "requiredStages"],
+                message: "Required",
+              },
+            ],
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }),
+    );
+
+    const error = await loadSession("token").catch((caught) => caught);
+    expect(error).toMatchObject({
+      name: "ApiError",
+      status: 400,
+      code: "INVALID_PROJECT_WORKFLOW",
+      issues: expect.any(Array),
+    });
+    expect(apiErrorIssueMessages(error)).toEqual([
+      "version 2 execution.checkpoints is required",
+      "workflow.completion.requiredStages: Required",
+    ]);
   });
 
   it("updates an issue through its project-scoped run endpoint", async () => {
