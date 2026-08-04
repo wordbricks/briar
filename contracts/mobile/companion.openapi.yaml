@@ -1116,6 +1116,19 @@
         },
         "additionalProperties": true
       },
+      "OrganizationMember": {
+        "type": "object",
+        "required": ["userId", "name", "email", "image", "role", "createdAt"],
+        "properties": {
+          "userId": { "type": "string" },
+          "name": { "type": "string" },
+          "email": { "type": "string", "format": "email" },
+          "image": { "type": ["string", "null"] },
+          "role": { "type": "string", "enum": ["owner", "admin", "member"] },
+          "createdAt": { "type": "string", "format": "date-time" }
+        },
+        "additionalProperties": true
+      },
       "DashboardRun": {
         "type": "object",
         "required": [
@@ -1151,6 +1164,7 @@
           "progress": { "type": "number", "minimum": 0, "maximum": 100 },
           "detail": { "type": ["string", "null"] },
           "priority": { "type": ["integer", "null"], "minimum": 1, "maximum": 4 },
+          "assigneeUserId": { "type": ["string", "null"] },
           "issueDescription": { "type": ["string", "null"] },
           "attachments": { "type": "array", "items": { "$ref": "#/components/schemas/IssueAttachment" } },
           "prerequisites": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
@@ -1210,6 +1224,10 @@
                 "opencode"
               ]
             }
+          },
+          "members": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/OrganizationMember" }
           },
           "conversationNotifications": {
             "type": "array",
@@ -1278,6 +1296,10 @@
                 "opencode"
               ]
             }
+          },
+          "members": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/OrganizationMember" }
           },
           "conversationNotifications": {
             "type": "array",

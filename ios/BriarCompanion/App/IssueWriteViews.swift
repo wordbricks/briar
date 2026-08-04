@@ -9,15 +9,18 @@ struct CreateIssueSheet: View {
     @State private var errorMessage: String?
 
     @ObservedObject var mutations: IssueMutationStore
+    let members: [OrganizationMember]
     let persistence: IssueDraftPersistence
     let refresh: () async -> Void
 
     init(
         mutations: IssueMutationStore,
+        members: [OrganizationMember] = [],
         persistence: IssueDraftPersistence = IssueDraftPersistence(),
         refresh: @escaping () async -> Void
     ) {
         self.mutations = mutations
+        self.members = members
         self.persistence = persistence
         self.refresh = refresh
         _draft = State(initialValue: persistence.load())
@@ -34,6 +37,12 @@ struct CreateIssueSheet: View {
                         .accessibilityIdentifier("create-issue-description")
                 }
                 Section("속성") {
+                    Picker("담당자", selection: $draft.assigneeUserId) {
+                        Text("미배정").tag(String?.none)
+                        ForEach(members) { member in
+                            Text(member.name).tag(String?.some(member.userId))
+                        }
+                    }
                     Picker("우선순위", selection: $draft.priority) {
                         Text("없음").tag(Int?.none)
                         ForEach(1...4, id: \.self) { priority in
@@ -157,17 +166,25 @@ struct EditIssueSheet: View {
     @State private var errorMessage: String?
 
     let runID: UUID
+    let members: [OrganizationMember]
     @ObservedObject var mutations: IssueMutationStore
     let refresh: () async -> Void
 
-    init(run: DashboardRun, mutations: IssueMutationStore, refresh: @escaping () async -> Void) {
+    init(
+        run: DashboardRun,
+        members: [OrganizationMember] = [],
+        mutations: IssueMutationStore,
+        refresh: @escaping () async -> Void
+    ) {
         runID = run.id
+        self.members = members
         self.mutations = mutations
         self.refresh = refresh
         _draft = State(initialValue: IssueDraft(
             title: run.title,
             description: run.issueDescription ?? "",
             priority: run.priority,
+            assigneeUserId: run.assigneeUserId,
             status: run.status
         ))
     }
@@ -179,6 +196,12 @@ struct EditIssueSheet: View {
                     .accessibilityIdentifier("edit-issue-title")
                 TextField("설명", text: $draft.description, axis: .vertical)
                     .lineLimit(5...12)
+                Picker("담당자", selection: $draft.assigneeUserId) {
+                    Text("미배정").tag(String?.none)
+                    ForEach(members) { member in
+                        Text(member.name).tag(String?.some(member.userId))
+                    }
+                }
                 Picker("우선순위", selection: $draft.priority) {
                     Text("없음").tag(Int?.none)
                     ForEach(1...4, id: \.self) { Text("P\($0)").tag(Int?.some($0)) }

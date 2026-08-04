@@ -65,4 +65,17 @@ describe("D1 migrations", () => {
     expect(sql).toMatch(/add\s+column\s+resume_requested_at/iu);
     expect(sql).not.toMatch(/\bupdate\s+briar_hunt_runs\b/iu);
   });
+
+  it("adds optional issue assignees without rewriting existing runs", async () => {
+    const sql = await readFile(
+      resolve("migrations", "0062_issue_assignees.sql"),
+      "utf8",
+    );
+
+    expect(sql).toMatch(
+      /add\s+column\s+assignee_user_id\s+text\s+references\s+"user"\s*\(id\)\s+on\s+delete\s+set\s+null/iu,
+    );
+    expect(sql).toMatch(/briar_hunt_runs_assignee_idx/iu);
+    expect(sql).not.toMatch(/\bupdate\s+briar_hunt_runs\b/iu);
+  });
 });

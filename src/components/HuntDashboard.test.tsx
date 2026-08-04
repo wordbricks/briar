@@ -811,7 +811,7 @@ describe("HuntDashboard", () => {
     expect(markup).toContain(">GG<");
     expect(markup).toContain("대기");
     expect(markup).toContain("프로젝트");
-    expect(markup).not.toContain("담당자");
+    expect(markup).toContain("담당자");
     expect(markup).not.toContain("라벨");
     expect(markup).toContain('aria-haspopup="listbox" aria-label="프로젝트"');
     expect(markup).toContain('aria-haspopup="listbox" aria-label="상태"');
@@ -830,6 +830,7 @@ describe("HuntDashboard", () => {
           title: string;
           description: string | null;
           priority: number | null;
+          assigneeUserId?: string | null;
         }
       | undefined;
     const container = document.createElement("div");
@@ -838,6 +839,16 @@ describe("HuntDashboard", () => {
       root.render(
         <EditIssueDialog
           isSubmitting={false}
+          members={[
+            {
+              userId: "user-1",
+              name: "Kim",
+              email: "kim@example.com",
+              image: null,
+              role: "member",
+              createdAt: "2026-07-01T00:00:00.000Z",
+            },
+          ]}
           onClose={() => undefined}
           onUpdate={async (input) => {
             updated = input;
@@ -866,6 +877,20 @@ describe("HuntDashboard", () => {
       description?.dispatchEvent(new Event("input", { bubbles: true }));
     });
     await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(
+          ".issue-assignee-select .select-menu-trigger",
+        )
+        ?.click();
+    });
+    await act(async () => {
+      document
+        .querySelector<HTMLButtonElement>(
+          '[role="option"][data-value="user-1"]',
+        )
+        ?.click();
+    });
+    await act(async () => {
       container.querySelector("form")?.dispatchEvent(
         new Event("submit", { bubbles: true, cancelable: true }),
       );
@@ -876,6 +901,7 @@ describe("HuntDashboard", () => {
       title: "수정된 이슈",
       description: "수정된 설명",
       priority: 3,
+      assigneeUserId: "user-1",
     });
     await act(async () => root.unmount());
   });

@@ -911,6 +911,7 @@ const issueInputSchema = z
     title: z.string().trim().min(1).max(300),
     description: z.string().trim().max(100_000).nullable().optional(),
     priority: z.number().int().min(1).max(4).nullable().optional(),
+    assigneeUserId: z.string().trim().min(1).max(200).nullable().optional(),
     status: z.enum(["backlog", "queued"]).default("queued"),
   })
   .strict();
@@ -969,6 +970,7 @@ export const issueUpdateInputSchema = issueInputSchema
     title: true,
     description: true,
     priority: true,
+    assigneeUserId: true,
   })
   .required({
     title: true,
@@ -1157,6 +1159,7 @@ export async function readIssueRequest(request: Request) {
 
   const description = form.get("description");
   const priority = form.get("priority");
+  const assigneeUserId = form.get("assigneeUserId");
   const status = form.get("status");
   return {
     input: issueInputSchema.parse({
@@ -1167,6 +1170,10 @@ export async function readIssueRequest(request: Request) {
           : null,
       priority:
         typeof priority === "string" && priority ? Number(priority) : null,
+      assigneeUserId:
+        typeof assigneeUserId === "string" && assigneeUserId.trim()
+          ? assigneeUserId
+          : null,
       status: typeof status === "string" && status ? status : undefined,
     }),
     attachments,
@@ -1714,6 +1721,7 @@ async function createIssueWithAttachments(input: {
       repository: settings?.github_repository ?? input.project.name,
       detail: input.detail,
       priority: input.issue.priority ?? null,
+      assigneeUserId: input.issue.assigneeUserId ?? null,
       branch: null,
       commitSha: null,
       tracker: null,
@@ -1782,6 +1790,17 @@ async function createIssueWithAttachments(input: {
       }
     }
     throw error;
+  }
+}
+
+async function requireIssueAssigneeMembership(
+  db: D1Database,
+  organizationId: string,
+  assigneeUserId: string | null | undefined,
+) {
+  if (!assigneeUserId) return;
+  if (!(await getOrganizationRole(db, organizationId, assigneeUserId))) {
+    throw new HttpError(400, "Assignee must be a member of the project organization");
   }
 }
 
@@ -3187,6 +3206,7 @@ function dashboardRunJson(
       : null,
     detail: run.detail,
     priority: run.priority,
+    assigneeUserId: run.assignee_user_id,
     repository: run.repository,
     branch: run.branch,
     commitSha: run.commit_sha,
@@ -5914,6 +5934,11 @@ async function route(
     if (!project) throw new HttpError(404, "Project not found");
     const { input, attachments, attachmentReferences } =
       await readIssueRequest(request);
+    await requireIssueAssigneeMembership(
+      db,
+      project.organization_id,
+      input.assigneeUserId,
+    );
     const issueId = crypto.randomUUID();
     const sourceKey = `briar-issue:${issueId}`;
     const detail =
@@ -5940,6 +5965,7 @@ async function route(
         sourceKey,
         stage: "queued",
         status: input.status,
+        assigneeUserId: input.assigneeUserId ?? null,
         attachments: created.attachments.map(attachmentJson),
       },
       201,
@@ -6068,10 +6094,16 @@ async function route(
     const project = await getProject(db, issueUpdateMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
     const input = issueUpdateInputSchema.parse(await readJson(request));
+    await requireIssueAssigneeMembership(
+      db,
+      project.organization_id,
+      input.assigneeUserId,
+    );
     const run = await updateIssue(db, project.id, issueUpdateMatch[2], {
       title: input.title,
       description: input.description ?? null,
       priority: input.priority ?? null,
+      assigneeUserId: input.assigneeUserId,
       updatedAt: new Date().toISOString(),
     });
     if (!run) throw new HttpError(404, "Run not found");
@@ -6080,6 +6112,7 @@ async function route(
       title: run.title,
       description: run.issue_description,
       priority: run.priority,
+      assigneeUserId: run.assignee_user_id,
     });
   }
   if (issueUpdateMatch && request.method === "DELETE") {

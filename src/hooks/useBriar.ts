@@ -1989,6 +1989,7 @@ export function useBriar(options: UseBriarOptions = {}) {
             progress: input.status === "backlog" ? 0 : 5,
             detail,
             priority: input.priority,
+            assigneeUserId: input.assigneeUserId ?? null,
             repository:
               targetDashboard.settings.githubRepository ?? project.name,
             branch: null,
@@ -2084,6 +2085,10 @@ export function useBriar(options: UseBriarOptions = {}) {
                           title: input.title.trim(),
                           issueDescription: input.description,
                           priority: input.priority,
+                          assigneeUserId:
+                            input.assigneeUserId === undefined
+                              ? run.assigneeUserId ?? null
+                              : input.assigneeUserId,
                           updatedAt,
                         }
                       : run,
@@ -2096,6 +2101,7 @@ export function useBriar(options: UseBriarOptions = {}) {
             title: input.title.trim(),
             description: input.description,
             priority: input.priority,
+            assigneeUserId: input.assigneeUserId ?? null,
           };
         }
         if (!token) throw new Error("로그인이 필요합니다.");

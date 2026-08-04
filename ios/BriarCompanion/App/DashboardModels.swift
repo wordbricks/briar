@@ -13,6 +13,7 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
     let progress: Double?
     let detail: String?
     let priority: Int?
+    let assigneeUserId: String?
     let issueDescription: String?
     let attachments: [IssueAttachment]?
     let prerequisites: [IssueDependencyReference]?
@@ -49,6 +50,7 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         progress: Double? = nil,
         detail: String? = nil,
         priority: Int? = nil,
+        assigneeUserId: String? = nil,
         issueDescription: String? = nil,
         attachments: [IssueAttachment]? = nil,
         prerequisites: [IssueDependencyReference]? = nil,
@@ -84,6 +86,7 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         self.progress = progress
         self.detail = detail
         self.priority = priority
+        self.assigneeUserId = assigneeUserId
         self.issueDescription = issueDescription
         self.attachments = attachments
         self.prerequisites = prerequisites
@@ -233,11 +236,23 @@ struct ConversationNotification: Codable, Equatable, Identifiable, Sendable {
     let createdAt: Date
 }
 
+struct OrganizationMember: Codable, Equatable, Identifiable, Sendable {
+    let userId: String
+    let name: String
+    let email: String
+    let image: String?
+    let role: String
+    let createdAt: Date
+
+    var id: String { userId }
+}
+
 struct DashboardSnapshot: Codable, Equatable, Sendable {
     var project: ProjectsResponse.Project
     var runs: [DashboardRun]
     var workers: [DashboardWorker]?
     var organizationProviders: [AgentProvider]?
+    var members: [OrganizationMember]?
     var conversationNotifications: [ConversationNotification]?
     var cursor: Int?
     var generatedAt: Date
@@ -247,6 +262,7 @@ struct DashboardSnapshot: Codable, Equatable, Sendable {
         runs: [DashboardRun],
         workers: [DashboardWorker]? = nil,
         organizationProviders: [AgentProvider]? = nil,
+        members: [OrganizationMember]? = nil,
         conversationNotifications: [ConversationNotification]? = nil,
         cursor: Int?,
         generatedAt: Date
@@ -255,6 +271,7 @@ struct DashboardSnapshot: Codable, Equatable, Sendable {
         self.runs = runs
         self.workers = workers
         self.organizationProviders = organizationProviders
+        self.members = members
         self.conversationNotifications = conversationNotifications
         self.cursor = cursor
         self.generatedAt = generatedAt
@@ -269,6 +286,7 @@ struct DashboardDelta: Codable, Equatable, Sendable {
     let project: ProjectsResponse.Project?
     let workers: [DashboardWorker]?
     let organizationProviders: [AgentProvider]?
+    let members: [OrganizationMember]?
     let conversationNotifications: [ConversationNotification]?
     let generatedAt: Date
 
@@ -280,6 +298,7 @@ struct DashboardDelta: Codable, Equatable, Sendable {
         project: ProjectsResponse.Project?,
         workers: [DashboardWorker]? = nil,
         organizationProviders: [AgentProvider]? = nil,
+        members: [OrganizationMember]? = nil,
         conversationNotifications: [ConversationNotification]? = nil,
         generatedAt: Date
     ) {
@@ -290,6 +309,7 @@ struct DashboardDelta: Codable, Equatable, Sendable {
         self.project = project
         self.workers = workers
         self.organizationProviders = organizationProviders
+        self.members = members
         self.conversationNotifications = conversationNotifications
         self.generatedAt = generatedAt
     }
@@ -425,6 +445,7 @@ enum DashboardMerge {
             runs: Array(runs.prefix(200)),
             workers: delta.workers ?? snapshot.workers,
             organizationProviders: delta.organizationProviders ?? snapshot.organizationProviders,
+            members: delta.members ?? snapshot.members,
             conversationNotifications: delta.conversationNotifications ?? snapshot.conversationNotifications,
             cursor: delta.cursor,
             generatedAt: delta.generatedAt

@@ -301,6 +301,16 @@ export const demoDashboard: DashboardPayload = {
     },
   },
   runs,
+  members: [
+    {
+      userId: "demo-user",
+      name: "Jay",
+      email: "demo@briar.local",
+      image: null,
+      role: "owner",
+      createdAt: ago(3_000),
+    },
+  ],
   organizationProviders: ["codex", "claude", "grok", "opencode"],
   generatedAt: new Date().toISOString(),
 };

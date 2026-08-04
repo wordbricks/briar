@@ -128,6 +128,7 @@
             },
             "progress": 45,
             "detail": "Implementing",
+            "assigneeUserId": "fixture-user",
             "issueDescription": "## Goal\nRead the complete Companion task.",
             "attachments": [
               {
@@ -166,6 +167,16 @@
           }
         ],
         "conversationNotifications": [],
+        "members": [
+          {
+            "userId": "fixture-user",
+            "name": "Briar User",
+            "email": "user@example.com",
+            "image": null,
+            "role": "owner",
+            "createdAt": "2026-08-02T00:00:00.000Z"
+          }
+        ],
         "cursor": 41,
         "generatedAt": "2026-08-02T01:00:00.000Z"
       }
@@ -294,6 +305,7 @@
         "title": "Native write flow",
         "description": "Create and run",
         "priority": 2,
+        "assigneeUserId": "fixture-user",
         "status": "queued"
       },
       "response": {
@@ -301,6 +313,7 @@
         "sourceKey": "briar-issue:fixture",
         "stage": "queued",
         "status": "queued",
+        "assigneeUserId": "fixture-user",
         "attachments": []
       }
     },
@@ -311,13 +324,15 @@
       "request": {
         "title": "Updated native flow",
         "description": null,
-        "priority": null
+        "priority": null,
+        "assigneeUserId": null
       },
       "response": {
         "runId": "33333333-3333-4333-8333-333333333333",
         "title": "Updated native flow",
         "description": null,
-        "priority": null
+        "priority": null,
+        "assigneeUserId": null
       }
     },
     "deleteIssue": {
