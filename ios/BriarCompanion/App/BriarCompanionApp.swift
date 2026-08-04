@@ -43,6 +43,15 @@ private struct UITestCompanionFlow: View {
         role: .owner,
         createdAt: Date(timeIntervalSince1970: 1_775_260_800)
     )
+    private let alternateProject = ProjectsResponse.Project(
+        id: UUID(uuidString: "88888888-8888-4888-8888-888888888888")!,
+        name: "Briar Mobile",
+        icon: nil,
+        organizationId: UUID(uuidString: "22222222-2222-4222-8222-222222222222")!,
+        organizationName: "Wordbricks",
+        role: .owner,
+        createdAt: Date(timeIntervalSince1970: 1_775_260_900)
+    )
 
     init(offline: Bool) {
         self.offline = offline
@@ -74,9 +83,8 @@ private struct UITestCompanionFlow: View {
                 agents: agents,
                 inbox: inbox,
                 notifications: notifications,
-                selectedProjectID: $selectedProjectID,
-                project: project,
-                projects: [project],
+                projects: [project, alternateProject],
+                project: selectedProject,
                 snapshot: snapshot,
                 isRefreshing: false,
                 errorMessage: nil,
@@ -91,6 +99,7 @@ private struct UITestCompanionFlow: View {
                     image: nil
                 ),
                 refresh: { await refreshSnapshot() },
+                selectProject: { selectedProjectID = $0 },
                 signOut: {
                     projectSelected = false
                     signedIn = false
@@ -101,6 +110,10 @@ private struct UITestCompanionFlow: View {
                 inbox.update(snapshot: snapshot, sessions: agents.sessions, project: project)
             }
         }
+    }
+
+    private var selectedProject: ProjectsResponse.Project {
+        [project, alternateProject].first(where: { $0.id == selectedProjectID }) ?? project
     }
 
     private var snapshot: DashboardSnapshot {
@@ -160,7 +173,7 @@ private struct UITestCompanionFlow: View {
             ), at: 0)
         }
         return DashboardSnapshot(
-            project: project,
+            project: selectedProject,
             runs: runs,
             workers: [DashboardWorker(
                 id: "worker-1",

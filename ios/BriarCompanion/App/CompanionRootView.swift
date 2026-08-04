@@ -77,9 +77,8 @@ struct CompanionRootView: View {
                     agents: agents,
                     inbox: inbox,
                     notifications: notifications,
-                    selectedProjectID: $companion.selectedProjectID,
-                    project: project,
                     projects: companion.projects,
+                    project: project,
                     snapshot: dashboard.snapshot,
                     isRefreshing: dashboard.isRefreshing,
                     errorMessage: dashboard.errorMessage,
@@ -88,6 +87,7 @@ struct CompanionRootView: View {
                     ideas: ideas,
                     user: companion.user,
                     refresh: { await dashboard.refresh(forceSnapshot: true) },
+                    selectProject: { companion.selectedProjectID = $0 },
                     signOut: signOut
                 )
             } else {

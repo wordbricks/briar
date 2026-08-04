@@ -18,6 +18,17 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["project-picker"].exists)
         app.buttons["project-continue-button"].tap()
 
+        let projectMenu = app.buttons["project-menu"]
+        XCTAssertTrue(projectMenu.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.navigationBars["Tasks"].exists)
+        projectMenu.tap()
+        let alternateProject = app.buttons[
+            "project-option-88888888-8888-4888-8888-888888888888"
+        ]
+        XCTAssertTrue(alternateProject.waitForExistence(timeout: 5))
+        alternateProject.tap()
+        XCTAssertTrue(app.buttons["project-menu"].label.contains("Briar Mobile"))
+
         XCTAssertTrue(app.tabBars.buttons["Search"].waitForExistence(timeout: 5))
         app.tabBars.buttons["Search"].tap()
         let searchField = app.searchFields["작업 검색"]
@@ -150,7 +161,7 @@ final class BriarCompanionUITests: XCTestCase {
         app.buttons["login-button"].tap()
         XCTAssertTrue(app.buttons["project-continue-button"].waitForExistence(timeout: 5))
         app.buttons["project-continue-button"].tap()
-        XCTAssertTrue(app.buttons["project-switcher"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["project-menu"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.navigationBars["Tasks"].exists)
         return app
     }

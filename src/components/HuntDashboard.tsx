@@ -704,6 +704,7 @@ export function HuntDashboard({
   ]);
   const createIssueDialog = isIssueDialogOpen ? (
     <CreateIssueDialog
+      compactHeader={companionMode}
       defaultProjectId={dashboard?.project.id}
       isSubmitting={isCreatingIssue}
       onClose={() => setIsIssueDialogOpen(false)}
@@ -711,7 +712,6 @@ export function HuntDashboard({
         await onCreateIssue(projectId, input);
         setIsIssueDialogOpen(false);
       }}
-      showsTitle={!companionMode}
       projects={
         projects.length > 0
           ? projects
@@ -905,11 +905,11 @@ export function HuntDashboard({
           <div className="queue-header">
             <div className="queue-heading">
               <div className="queue-heading-copy">
-                <Typography as="h2" variant="heading">
-                  {companionSearchMode
-                    ? t("companion.navSearch")
-                    : t("dashboard.queue")}
-                </Typography>
+                {companionSearchMode ? (
+                  <Typography as="h2" variant="heading">
+                    {t("companion.navSearch")}
+                  </Typography>
+                ) : null}
                 <Typography as="span" tone="muted" variant="caption">
                   {t("dashboard.taskCount", { count: filtered.length })}
                 </Typography>
@@ -1468,19 +1468,19 @@ export function EditIssueDialog({
 }
 
 export function CreateIssueDialog({
+  compactHeader = false,
   defaultProjectId,
   isSubmitting,
   onClose,
   onCreate,
   projects,
-  showsTitle = true,
 }: {
+  compactHeader?: boolean;
   defaultProjectId?: string;
   isSubmitting: boolean;
   onClose: () => void;
   onCreate: (projectId: string, input: CreateIssueInput) => Promise<void>;
   projects: Project[];
-  showsTitle?: boolean;
 }) {
   const { t } = useI18n();
   const [initialDraft] = useState(() => {
@@ -1762,10 +1762,10 @@ export function CreateIssueDialog({
       >
         <header>
           <div className="issue-dialog-context">
-            {showsTitle && <strong>{t("issue.newIssue")}</strong>}
+            {!compactHeader && <strong>{t("issue.newIssue")}</strong>}
             {projects.length > 0 && (
               <>
-                {showsTitle && <span aria-hidden="true">/</span>}
+                {!compactHeader && <span aria-hidden="true">/</span>}
                 <SelectMenu
                   className="issue-project-context"
                   disabled={isSubmitting}
