@@ -82,6 +82,7 @@ import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { NativeSelect } from "./NativeSelect";
 import { SelectMenu } from "./SelectMenu";
+import { AgentProviderIcon } from "./AgentIcons";
 import { WorkerIcon } from "./WorkerIcon";
 import {
   CompanionBottomNavigation,
@@ -4513,11 +4514,17 @@ function IssueAgentActivityPanel({
               key={message.id}
             >
               <header>
-                <span aria-hidden="true"><Bot size={14} /></span>
+                <span aria-hidden="true">
+                  {provider
+                    ? <AgentProviderIcon provider={provider} size={14} />
+                    : <Bot size={14} />}
+                </span>
                 <strong>
-                  {message.phase === "final_answer" || message.phase === "final"
-                    ? t("autoHunt.agentMessage.final")
-                    : t("autoHunt.agentMessage.commentary")}
+                  {provider
+                    ? providerDisplayName(provider)
+                    : message.phase === "final_answer" || message.phase === "final"
+                      ? t("autoHunt.agentMessage.final")
+                      : t("autoHunt.agentMessage.commentary")}
                 </strong>
                 {!message.isComplete ? (
                   <small className="auto-hunt-message-streaming">
