@@ -27,6 +27,7 @@ export function useProjectAgentWorkerEvents(
     let timer: number | null = null;
     let hasLoadedEvents = false;
     const sequences = new Map<string, number>();
+    const receivedEventCounts = new Map<string, number>();
     setEvents([]);
     setError(null);
     setIsLoading(Boolean(token && runIds.length));
@@ -42,11 +43,15 @@ export function useProjectAgentWorkerEvents(
             sessionId,
             sequences.get(sessionId) ?? 0,
           );
+          const receivedEventCount =
+            (receivedEventCounts.get(sessionId) ?? 0) + transcript.events.length;
+          receivedEventCounts.set(sessionId, receivedEventCount);
           return {
             events: transcriptEvents(transcript),
-            hasMore: transcript.events.at(-1)?.sequence !== undefined &&
-              transcript.events.at(-1)!.sequence <
-                transcript.session.eventCount,
+            // Retry/resume claims deliberately use non-contiguous sequence
+            // ranges. Compare counts instead of the last sequence cursor when
+            // deciding whether another page remains.
+            hasMore: receivedEventCount < transcript.session.eventCount,
           };
         }),
       );

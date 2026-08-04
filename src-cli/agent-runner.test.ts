@@ -5,6 +5,7 @@ import {
   detachedPayloadDirection,
   detachedIssueReplyPrompt,
   detachedProviderRequest,
+  detachedTranscriptSequence,
   detachedTranscriptPayload,
   issueReplyTextFromPayload,
 } from "./agent-runner";
@@ -20,6 +21,13 @@ const agent = {
 };
 
 describe("detached Agent runner", () => {
+  it("appends retry and resume output in a distinct transcript sequence range", () => {
+    expect(detachedTranscriptSequence(1, 1)).toBe(1);
+    expect(detachedTranscriptSequence(1, 37)).toBe(37);
+    expect(detachedTranscriptSequence(2, 1)).toBe(10_001);
+    expect(detachedTranscriptSequence(3, 1)).toBe(20_001);
+  });
+
   it("builds a neutral issue prompt when no logical Agent is assigned", () => {
     const prompt = detachedAgentPrompt({
       agent: null,
