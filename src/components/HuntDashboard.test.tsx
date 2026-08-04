@@ -937,14 +937,15 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("Security review");
     expect(markup).toContain('class="kanban-card');
     expect(markup).toContain('class="kanban-card-copy"');
-    expect(markup).toContain('draggable="true"');
+    expect(markup).toContain('draggable="false"');
+    expect(markup).toContain('data-kanban-column-id="status:backlog"');
     expect(markup).toContain('aria-label="백로그"');
     expect(markup).toContain('aria-label="차단"');
     expect(markup).toContain('aria-label="실패"');
     expect(markup).toContain('aria-label="취소"');
   });
 
-  it("changes issue status when a kanban card is dragged onto another column", async () => {
+  it("changes issue status when a kanban card is pointer-dragged onto another column", async () => {
     const onMoveRun = vi.fn(async () => undefined);
     const queuedRun = {
       ...demoDashboard.runs[0],
@@ -973,65 +974,73 @@ describe("HuntDashboard", () => {
     const backlogColumn = container.querySelector<HTMLElement>(
       '[aria-label="백로그"]',
     );
-    expect(card?.getAttribute("draggable")).toBe("true");
+    expect(card?.getAttribute("draggable")).toBe("false");
     expect(backlogColumn).not.toBeNull();
 
-    const dataTransfer = {
-      dropEffect: "none",
-      effectAllowed: "all",
-      files: [] as File[],
-      types: ["text/plain", "application/x-briar-run-id"],
-      setData: vi.fn(),
-      getData: vi.fn((type: string) =>
-        type === "text/plain" || type === "application/x-briar-run-id"
-          ? queuedRun.id
-          : "",
-      ),
-      clearData: vi.fn(),
-      setDragImage: vi.fn(),
-    };
-
-    const fireDrag = (
+    const firePointer = (
       target: EventTarget | null,
       type: string,
-      options: { cancelable?: boolean } = {},
+      clientX: number,
+      clientY: number,
     ) => {
       const event = new Event(type, {
         bubbles: true,
-        cancelable: options.cancelable ?? true,
+        cancelable: true,
       });
-      Object.defineProperty(event, "dataTransfer", { value: dataTransfer });
+      Object.defineProperties(event, {
+        button: { value: 0 },
+        clientX: { value: clientX },
+        clientY: { value: clientY },
+        isPrimary: { value: true },
+        pointerId: { value: 1 },
+        pointerType: { value: "mouse" },
+      });
       target?.dispatchEvent(event);
       return event;
     };
 
+    const originalElementFromPoint = Object.getOwnPropertyDescriptor(
+      document,
+      "elementFromPoint",
+    );
+    Object.defineProperty(document, "elementFromPoint", {
+      configurable: true,
+      value: vi.fn(() => backlogColumn),
+    });
     await act(async () => {
-      fireDrag(card, "dragstart");
+      firePointer(card, "pointerdown", 120, 120);
+      firePointer(card, "pointermove", 140, 120);
     });
     expect(card?.className).toContain("dragging");
-    expect(dataTransfer.setData).toHaveBeenCalledWith(
-      "text/plain",
-      queuedRun.id,
-    );
+    expect(
+      document.body.querySelector(".kanban-card-drag-preview"),
+    ).not.toBeNull();
 
-    const overEvents: Event[] = [];
     await act(async () => {
-      overEvents.push(fireDrag(backlogColumn, "dragover"));
+      firePointer(card, "pointermove", 160, 120);
     });
-    expect(overEvents[0]?.defaultPrevented).toBe(true);
-    expect(dataTransfer.dropEffect).toBe("move");
     expect(
       container.querySelector('[aria-label="백로그"]')?.className,
     ).toContain("drag-over");
 
     await act(async () => {
-      fireDrag(backlogColumn, "drop");
+      firePointer(card, "pointerup", 160, 120);
     });
+    if (originalElementFromPoint) {
+      Object.defineProperty(
+        document,
+        "elementFromPoint",
+        originalElementFromPoint,
+      );
+    } else {
+      Reflect.deleteProperty(document, "elementFromPoint");
+    }
 
     expect(onMoveRun).toHaveBeenCalledWith(queuedRun.id, {
       status: "backlog",
       workflowStage: null,
     });
+    expect(document.body.querySelector(".kanban-card-drag-preview")).toBeNull();
 
     // Drop should not open the issue detail page.
     await act(async () => {
