@@ -218,6 +218,26 @@ export function slackHelpMessage() {
   ].join("\n");
 }
 
+/** Human-readable Briar issue key shown in the app and Slack confirmations. */
+export function formatBriarIssueKey(runNumber: number) {
+  return `AH-${runNumber}`;
+}
+
+export function buildSlackIssueCreatedMessage(input: {
+  title: string;
+  projectName: string;
+  statusLabel: string;
+  priorityLabel?: string;
+  runNumber: number;
+}) {
+  const priorityLabel = input.priorityLabel ?? "";
+  return [
+    `:white_check_mark: *${input.title}* 이슈를 만들었습니다.`,
+    `프로젝트: ${input.projectName} · ${input.statusLabel}${priorityLabel}`,
+    `이슈 ID: \`${formatBriarIssueKey(input.runNumber)}\``,
+  ].join("\n");
+}
+
 type SlackCreateIssueProject = {
   id: string;
   name: string;

@@ -2,10 +2,12 @@ import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildSlackCreateIssueModal,
+  buildSlackIssueCreatedMessage,
   callSlackApi,
   decryptSlackToken,
   downloadSlackIssueAttachments,
   encryptSlackToken,
+  formatBriarIssueKey,
   parseSlackCreateIssueSubmission,
   parseSlackIssueInstruction,
   slackCreateIssueBlocks,
@@ -278,6 +280,43 @@ describe("Slack integration", () => {
         constructor: SlackCreateIssueValidationError,
         blockId: slackCreateIssueBlocks.title,
       }),
+    );
+  });
+
+  it("formats human-readable issue keys for Slack confirmations", () => {
+    expect(formatBriarIssueKey(1231)).toBe("AH-1231");
+    expect(
+      buildSlackIssueCreatedMessage({
+        title: "로그인 버튼이 동작하지 않아요",
+        projectName: "Briar",
+        statusLabel: "작업 대기열",
+        priorityLabel: " · P2",
+        runNumber: 1231,
+      }),
+    ).toBe(
+      [
+        ":white_check_mark: *로그인 버튼이 동작하지 않아요* 이슈를 만들었습니다.",
+        "프로젝트: Briar · 작업 대기열 · P2",
+        "이슈 ID: `AH-1231`",
+      ].join("\n"),
+    );
+    expect(
+      buildSlackIssueCreatedMessage({
+        title: "Create from shortcut",
+        projectName: "First",
+        statusLabel: "작업 대기열",
+        runNumber: 42,
+      }),
+    ).toContain("이슈 ID: `AH-42`");
+    expect(
+      buildSlackIssueCreatedMessage({
+        title: "Create from shortcut",
+        projectName: "First",
+        statusLabel: "작업 대기열",
+        runNumber: 42,
+      }),
+    ).not.toMatch(
+      /이슈 ID: `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`/i,
     );
   });
 
