@@ -141,14 +141,26 @@ final class BriarCompanionUITests: XCTestCase {
 
         let createdIssue = app.staticTexts["모바일 쓰기 흐름 확인"]
         XCTAssertTrue(createdIssue.waitForExistence(timeout: 5))
-        createdIssue.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["run-detail"].waitForExistence(timeout: 5))
-        app.buttons["제어"].tap()
-        app.buttons["process-now-button"].tap()
+        let createdRow = app.descendants(matching: .any)[
+            "task-row-77777777-7777-4777-8777-777777777777"
+        ]
+        XCTAssertTrue(createdRow.waitForExistence(timeout: 5))
+        createdRow.swipeRight()
+        let shortcut = app.buttons[
+            "task-process-now-77777777-7777-4777-8777-777777777777"
+        ]
+        XCTAssertTrue(shortcut.waitForExistence(timeout: 5))
+        captureScreenshot(named: "companion-task-process-shortcut")
+        shortcut.tap()
         let dispatch = app.buttons["dispatch-issue-submit"]
         XCTAssertTrue(dispatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["바로 처리"].exists)
+        captureScreenshot(named: "companion-task-process-sheet")
         dispatch.tap()
 
+        XCTAssertTrue(createdIssue.waitForExistence(timeout: 5))
+        createdIssue.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["run-detail"].waitForExistence(timeout: 5))
         app.buttons["대화"].tap()
         let message = app.textFields["issue-message-field"]
         for _ in 0..<8 where !message.exists { app.swipeUp() }
