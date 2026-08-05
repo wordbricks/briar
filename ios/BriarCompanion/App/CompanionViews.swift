@@ -254,7 +254,9 @@ struct TaskListView: View {
     }
 
     private var runs: [DashboardRun] {
-        (snapshot?.runs ?? []).filter(filter.includes)
+        TaskOrdering.byMostRecentlyUpdated(
+            (snapshot?.runs ?? []).filter(filter.includes)
+        )
     }
 
     var body: some View {
