@@ -284,6 +284,7 @@ describe("HuntDashboard", () => {
     expect(markup).toContain('class="kanban-card-agent-badge"');
     expect(markup).toContain('aria-label="Briar Agent 할당"');
     expect(markup).toContain(`src="${dashboardAgent.avatar}"`);
+    expect(markup).toContain('class="kanban-card-provider-badge codex"');
   });
 
   it("shows the source as a card badge without an attachment badge", () => {
@@ -433,6 +434,7 @@ describe("HuntDashboard", () => {
     expect(markup).toContain('aria-label="배정된 Worker: Lemon Worker"');
     expect(markup).toContain("🍋");
     expect(markup).toContain('class="kanban-card-agent-badge"');
+    expect(markup).toContain('class="kanban-card-provider-badge codex"');
   });
 
   it("shows a specifically requested worker before it claims the issue", () => {

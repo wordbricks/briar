@@ -2673,6 +2673,15 @@ function KanbanCard({
                   isRunning
                   token={token}
                 />
+                <span
+                  aria-hidden="true"
+                  className={`kanban-card-provider-badge ${activeAgent.provider}`}
+                >
+                  <AgentProviderIcon
+                    provider={activeAgent.provider}
+                    size={11}
+                  />
+                </span>
               </span>
             )}
           </span>
