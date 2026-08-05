@@ -13,6 +13,7 @@ import {
   Columns3,
   Copy,
   CornerUpLeft,
+  Flower2,
   FolderGit2,
   GitCommitHorizontal,
   GitFork,
@@ -2369,7 +2370,12 @@ function KanbanCard({
           )}
         </span>
         <span className="kanban-card-badges">
-          <i className={`status-pill ${meta.tone}`}>{run.status === "running" && <LoaderCircle className="spin" size={11} />}{label}</i>
+          <RunStatusPill
+            label={label}
+            reviewed={hasResultReviews(run)}
+            status={run.status}
+            tone={meta.tone}
+          />
           <i className="kanban-source">
             <span className={`source-dot ${run.source}`} />
             {t(`source.${run.source}` as MessageKey)}
@@ -2994,12 +3000,12 @@ function IssueList({
                   )}
                 </span>
                 <span className="issue-list-status" role="cell">
-                  <i className={`status-pill ${meta.tone}`}>
-                    {run.status === "running" && (
-                      <LoaderCircle className="spin" size={11} />
-                    )}
-                    {label}
-                  </i>
+                  <RunStatusPill
+                    label={label}
+                    reviewed={hasResultReviews(run)}
+                    status={run.status}
+                    tone={meta.tone}
+                  />
                   <small>
                     <i className={`source-dot ${run.source}`} />
                     {t(`source.${run.source}` as MessageKey)}
@@ -3549,10 +3555,22 @@ export function RunPage({
       setCopyStatus("id-error");
     }
   };
+  const reviewed = hasResultReviews(run);
   const compactProperties = (
     <div className="run-page-property-badges" aria-label={t("run.properties")}>
-      <span className={`run-page-property-badge ${meta.tone}`} title={t("dashboard.status")}>
-        <Activity aria-hidden="true" size={13} />
+      <span
+        className={`run-page-property-badge ${meta.tone}${reviewed ? " reviewed" : ""}`}
+        title={
+          reviewed
+            ? `${t("dashboard.status")}: ${t("run.resultReviewed")}`
+            : t("dashboard.status")
+        }
+      >
+        {reviewed ? (
+          <Flower2 aria-hidden="true" className="status-pill-review-icon" size={13} />
+        ) : (
+          <Activity aria-hidden="true" size={13} />
+        )}
         {label}
       </span>
       <span className="run-page-property-badge priority" title={t("issue.priority")}>
@@ -4054,9 +4072,13 @@ export function RunPage({
                           role="status"
                         >
                           <div className="completed-issue-card-heading">
-                            <span className={`status-pill ${meta.tone}`}>
-                              {label}
-                            </span>
+                            <RunStatusPill
+                              as="span"
+                              label={label}
+                              reviewed={hasResultReviews(run)}
+                              status={run.status}
+                              tone={meta.tone}
+                            />
                             <strong id={`${detailTabsId}-paused-result-title`}>
                               {t("run.partialResult")}
                             </strong>
@@ -4310,9 +4332,13 @@ export function RunPage({
                           className="completed-issue-card"
                         >
                           <div className="completed-issue-card-heading">
-                            <span className={`status-pill ${meta.tone}`}>
-                              {label}
-                            </span>
+                            <RunStatusPill
+                              as="span"
+                              label={label}
+                              reviewed={hasResultReviews(run)}
+                              status={run.status}
+                              tone={meta.tone}
+                            />
                             <strong id={`${detailTabsId}-result-title`}>
                               {t("run.result")}
                             </strong>
@@ -6415,6 +6441,44 @@ function localizeWorkflowStage(t: Translate, stageId: string, fallback: string) 
 function localizeStatus(t: Translate, status: HuntRun["status"], workflowStage: string | null, fallback: string) {
   if (status === "running" && workflowStage && builtInStageIds.has(workflowStage)) return t(`stage.${workflowStage}` as MessageKey);
   return t(`status.${status}` as MessageKey) || fallback;
+}
+
+function hasResultReviews(run: Pick<HuntRun, "resultReviews">) {
+  return (run.resultReviews?.length ?? 0) > 0;
+}
+
+function RunStatusPill({
+  as = "i",
+  label,
+  reviewed = false,
+  status,
+  tone,
+}: {
+  as?: "i" | "span";
+  label: string;
+  reviewed?: boolean;
+  status: HuntRun["status"];
+  tone: string;
+}) {
+  const { t } = useI18n();
+  const Tag = as;
+  return (
+    <Tag
+      aria-label={reviewed ? `${label} · ${t("run.resultReviewed")}` : undefined}
+      className={`status-pill ${tone}${reviewed ? " reviewed" : ""}`}
+      title={reviewed ? t("run.resultReviewed") : undefined}
+    >
+      {status === "running" && <LoaderCircle className="spin" size={11} />}
+      {reviewed && (
+        <Flower2
+          aria-hidden="true"
+          className="status-pill-review-icon"
+          size={11}
+        />
+      )}
+      {label}
+    </Tag>
+  );
 }
 
 function localizeEvent(t: Translate, status: HuntRun["status"], workflowStage: string | null, fallback: string) {

@@ -367,7 +367,10 @@ struct RunRow: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(run.title).font(.headline)
                 Spacer(minLength: 8)
-                StatusBadge(status: run.status)
+                StatusBadge(
+                    status: run.status,
+                    reviewed: !(run.resultReviews ?? []).isEmpty
+                )
             }
             if let detail = run.detail, !detail.isEmpty {
                 Text(detail)
@@ -394,14 +397,27 @@ struct RunRow: View {
 
 struct StatusBadge: View {
     let status: DashboardRun.Status
+    var reviewed: Bool = false
 
     var body: some View {
-        Text(status.displayName)
-            .font(.caption2.weight(.bold))
-            .padding(.horizontal, 7)
-            .padding(.vertical, 4)
-            .foregroundStyle(color)
-            .background(color.opacity(0.12), in: Capsule())
+        HStack(spacing: 4) {
+            if reviewed {
+                Image(systemName: "camera.macro")
+                    .font(.caption2.weight(.bold))
+                    .accessibilityHidden(true)
+            }
+            Text(status.displayName)
+                .font(.caption2.weight(.bold))
+        }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 4)
+        .foregroundStyle(color)
+        .background(color.opacity(0.12), in: Capsule())
+        .accessibilityLabel(
+            reviewed
+                ? "\(status.displayName) · 검수 완료됨"
+                : status.displayName
+        )
     }
 
     private var color: Color {
@@ -1065,7 +1081,7 @@ struct RunDetailView: View {
                 ForEach(detail.events) { event in
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
-                            StatusBadge(status: event.status)
+                            StatusBadge(status: event.status, reviewed: false)
                             if let stage = event.workflowStage { Text(stage).font(.caption) }
                             Spacer()
                             Text(event.occurredAt, style: .relative).font(.caption)
@@ -1097,7 +1113,10 @@ struct RunDetailView: View {
         Section("현재 상태") {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    StatusBadge(status: localStatus)
+                    StatusBadge(
+                        status: localStatus,
+                        reviewed: !(run.resultReviews ?? []).isEmpty
+                    )
                     if let runNumber = run.runNumber { Text("#\(runNumber)") }
                     Spacer()
                     Text(run.updatedAt, style: .relative)
