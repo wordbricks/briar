@@ -420,7 +420,14 @@ struct RunRow: View {
                 if let workflowStage = run.workflowStage {
                     Text(workflowStage)
                 }
-                if let assignee { Label(assignee.name, systemImage: "person") }
+                if let assignee {
+                    ProfileImageView(
+                        image: assignee.image,
+                        name: assignee.name,
+                        size: 20
+                    )
+                    .accessibilityLabel(assignee.name)
+                }
                 Text(run.updatedAt, style: .relative)
             }
             .font(.caption)
