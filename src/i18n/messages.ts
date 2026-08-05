@@ -827,6 +827,7 @@ export const ko = {
   "worker.noneForProvider": "선택한 프로바이더를 실행할 준비된 Worker가 없습니다.",
   "worker.dispatch": "실행 배정",
   "worker.reassign": "다시 배정",
+  "worker.unassign": "Worker 배정 취소",
   "worker.readiness.available": "사용 가능",
   "worker.readiness.busy": "실행 중",
   "worker.readiness.offline": "오프라인",

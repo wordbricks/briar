@@ -284,6 +284,7 @@ import {
   countLeasedRuns,
   disableExecutionWorker,
   dispatchHuntRun,
+  unassignHuntRun,
   executionWorkerBindingById,
   executionWorkerBindingForProject,
   executionWorkerDeviceForBinding,
@@ -7410,6 +7411,24 @@ async function route(
     );
     if (!dispatched) throw new HttpError(404, "Run not found");
     return json(dispatched);
+  }
+
+  const unassignRunMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/unassign$/u,
+  );
+  if (unassignRunMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, unassignRunMatch[1], session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    const input = z.object({ requestId: z.string().uuid() }).strict().parse(await readJson(request));
+    const result = await unassignHuntRun(db, project.organization_id, project.id, {
+      runId: unassignRunMatch[2],
+      requestedByUserId: session.user.id,
+      requestId: input.requestId,
+      occurredAt: new Date().toISOString(),
+    });
+    if (!result) throw new HttpError(404, "Run not found");
+    return json(result);
   }
 
   const executionAuditMatch = pathname.match(

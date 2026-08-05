@@ -1137,6 +1137,7 @@ export async function auditExecutionEvent(
     action:
       | "dispatched"
       | "reassigned"
+      | "unassigned"
       | "claimed"
       | "lease_lost"
       | "cancelled"
@@ -1489,6 +1490,74 @@ export async function dispatchHuntRun(
     dispatchedAt: input.occurredAt,
     outcome: "dispatched",
   };
+}
+
+export async function unassignHuntRun(
+  db: D1Database,
+  organizationId: string,
+  projectId: string,
+  input: { runId: string; requestedByUserId: string; requestId: string; occurredAt: string },
+) {
+  const run = await db
+    .prepare(
+      `select id, status, current_attempt, claim_token_hash, worker_id, requested_worker_id
+       from briar_hunt_runs where id = ? and project_id = ?`,
+    )
+    .bind(input.runId, projectId)
+    .first<{
+      id: string;
+      status: string;
+      current_attempt: number;
+      claim_token_hash: string | null;
+      worker_id: string | null;
+      requested_worker_id: string | null;
+    }>();
+  if (!run) return null;
+  if (["completed", "cancelled"].includes(run.status)) {
+    throw new WorkerConflictError("Completed or cancelled runs cannot be unassigned");
+  }
+  if (!run.worker_id && !run.requested_worker_id) {
+    return { runId: input.runId, outcome: "not_assigned" as const };
+  }
+  const nextAttempt = run.claim_token_hash ? run.current_attempt + 1 : run.current_attempt;
+  const result = await db
+    .prepare(
+      `update briar_hunt_runs
+       set requested_worker_id = null, requested_by_user_id = null,
+           dispatch_mode = null, dispatch_request_id = null, dispatched_at = null,
+           worker_id = null, claim_token_hash = null, claimed_by = null,
+           claimed_at = null, lease_expires_at = null,
+           status = 'queued', stage = 'queued', workflow_stage = null,
+           current_attempt = ?, current_revision = 1, paused_at = null,
+           resume_requested_at = null, completed_at = null,
+           detail = ?, last_event_at = ?, updated_at = ?
+       where id = ? and project_id = ? and status not in ('completed', 'cancelled')
+         and (worker_id is not null or requested_worker_id is not null)`,
+    )
+    .bind(
+      nextAttempt,
+      "사용자가 Worker 배정을 취소했습니다.",
+      input.occurredAt,
+      input.occurredAt,
+      input.runId,
+      projectId,
+    )
+    .run();
+  if (result.meta.changes < 1) {
+    throw new WorkerConflictError("Worker assignment changed before it could be cancelled");
+  }
+  await auditExecutionEvent(db, {
+    organizationId,
+    projectId,
+    runId: input.runId,
+    workerId: run.worker_id,
+    actorUserId: input.requestedByUserId,
+    action: "unassigned",
+    requestId: input.requestId,
+    detail: { previousWorkerId: run.worker_id, previousRequestedWorkerId: run.requested_worker_id },
+    occurredAt: input.occurredAt,
+  });
+  return { runId: input.runId, outcome: "unassigned" as const };
 }
 
 export async function listExecutionAuditEvents(

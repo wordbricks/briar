@@ -1939,6 +1939,16 @@ export async function dispatchHuntRun(
   );
 }
 
+export async function unassignHuntRun(token: string, projectId: string, runId: string) {
+  return request<{
+    runId: string;
+    outcome: "unassigned" | "not_assigned";
+  }>(`/projects/${projectId}/runs/${runId}/unassign`, token, {
+    method: "POST",
+    body: JSON.stringify({ requestId: crypto.randomUUID() }),
+  });
+}
+
 export async function updateExecutionWorkerConcurrency(
   token: string,
   projectId: string,

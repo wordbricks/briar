@@ -358,6 +358,7 @@ export function HuntDashboard({
   onRetryRun,
   onReworkRun,
   onCancelRun,
+  onUnassignRun,
   onResumeRun = async () => undefined,
   onCompanionAgentsOpen,
   onCompanionIdeasOpen,
@@ -431,6 +432,7 @@ export function HuntDashboard({
     input: { workflowStage: string; reason: string },
   ) => Promise<unknown>;
   onCancelRun: (runId: string) => Promise<unknown>;
+  onUnassignRun?: (runId: string) => Promise<unknown>;
   onResumeRun?: (runId: string) => Promise<unknown>;
   onCompanionAgentsOpen?: () => void;
   onCompanionIdeasOpen?: () => void;
@@ -3377,6 +3379,7 @@ export function RunPage({
   onAddDependency,
   onAcceptIssueReworkProposal,
   onCancel,
+  onUnassignRun,
   onDelete,
   onTransfer,
   transferProjects = [],
@@ -3421,6 +3424,7 @@ export function RunPage({
     proposalId: string,
   ) => Promise<IssueReworkProposal>;
   onCancel: () => Promise<unknown>;
+  onUnassignRun?: (runId: string) => Promise<unknown>;
   onDelete?: () => Promise<unknown>;
   onTransfer?: (targetProjectId: string) => Promise<unknown>;
   transferProjects?: Project[];
@@ -3467,6 +3471,8 @@ export function RunPage({
   const canCancelRemoteExecution =
     Boolean(run.workerId) &&
     !["completed", "cancelled", "paused", "blocked", "failed"].includes(run.status);
+  const canUnassign = Boolean(onUnassignRun && (run.workerId || run.requestedWorkerId)) &&
+    !["completed", "cancelled"].includes(run.status);
   const isClaimed =
     run.status === "queued" &&
     Boolean(run.leaseExpiresAt) &&
@@ -4023,6 +4029,11 @@ export function RunPage({
                   ? () => void runAction(onCancel)
                   : undefined
               }
+              onUnassign={
+                canUnassign
+                  ? () => void runAction(() => onUnassignRun!(run.id))
+                  : undefined
+              }
               onDelete={onDelete ? () => setIsDeleteDialogOpen(true) : undefined}
               onTransfer={
                 onTransfer
@@ -4065,6 +4076,11 @@ export function RunPage({
                       onCancel={
                         canCancelRemoteExecution
                           ? () => void runAction(onCancel)
+                          : undefined
+                      }
+                      onUnassign={
+                        canUnassign
+                          ? () => void runAction(() => onUnassignRun!(run.id))
                           : undefined
                       }
                       onDelete={
@@ -5280,6 +5296,7 @@ export function RunPage({
 function IssueActionsMenu({
   disabled,
   onCancel,
+  onUnassign,
   onDelete,
   onTransfer,
   onEdit,
@@ -5287,6 +5304,7 @@ function IssueActionsMenu({
 }: {
   disabled: boolean;
   onCancel?: () => void;
+  onUnassign?: () => void;
   onDelete?: () => void;
   onTransfer?: () => void;
   onEdit?: () => void;
@@ -5349,6 +5367,15 @@ function IssueActionsMenu({
             >
               <X size={14} />
               {t("run.cancel")}
+            </DropdownMenu.Item>
+          ) : null}
+          {onUnassign ? (
+            <DropdownMenu.Item
+              className="run-page-actions-item"
+              onSelect={onUnassign}
+            >
+              <X size={14} />
+              {t("worker.unassign")}
             </DropdownMenu.Item>
           ) : null}
           {onDelete ? (
