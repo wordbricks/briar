@@ -73,6 +73,21 @@ describe("dark overlay layout", () => {
     ).toContain("border:1px solid var(--border)");
   });
 
+  it("keeps create-dialog assignee select content-sized, not full width", () => {
+    const metadataSelectSizing = firstRule(
+      ".issue-dialog .issue-status-select.select-menu,\n.issue-dialog .issue-assignee-select.select-menu,\n.issue-dialog .issue-priority-select.select-menu",
+    );
+    expect(metadataSelectSizing).toContain("width: auto");
+    expect(metadataSelectSizing).toContain("max-width: 180px");
+    expect(metadataSelectSizing).toContain("flex: 0 0 auto");
+    expect(
+      firstRule(".issue-dialog .issue-assignee-select.select-menu .select-menu-trigger"),
+    ).toContain("min-width: 104px");
+    expect(
+      firstRule(".issue-dialog .issue-assignee-select.select-menu .select-menu-trigger"),
+    ).toContain("max-width: 180px");
+  });
+
   it("uses semantic colors for context menus", () => {
     expect(firstRule(".issue-context-menu")).toContain("var(--popover)");
     expect(firstRule(".project-schedule-context-menu")).toContain(
