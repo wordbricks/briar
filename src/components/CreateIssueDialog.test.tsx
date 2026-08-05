@@ -286,6 +286,50 @@ describe("CreateIssueDialog attachments", () => {
     await act(async () => root.unmount());
   });
 
+  it("accepts a dropped image even when File.type is empty", async () => {
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <CreateIssueDialog
+          {...projectProps}
+          isSubmitting={false}
+          onClose={() => undefined}
+          onCreate={async () => undefined}
+        />,
+      );
+    });
+
+    const image = new File(["untyped image"], "from-finder.jpg", {
+      type: "",
+    });
+    const dataTransfer = {
+      dropEffect: "none",
+      files: [image],
+      types: ["Files"],
+    };
+    const dropEvent = new Event("drop", {
+      bubbles: true,
+      cancelable: true,
+    });
+    Object.defineProperty(dropEvent, "dataTransfer", {
+      value: dataTransfer,
+    });
+
+    await act(async () => {
+      container.querySelector("form")?.dispatchEvent(dropEvent);
+    });
+
+    expect(dropEvent.defaultPrevented).toBe(true);
+    expect(
+      container.querySelector<HTMLImageElement>(
+        ".issue-inline-attachment img",
+      )?.alt,
+    ).toBe("from-finder.jpg");
+    expect(container.querySelector(".issue-form-error")).toBeNull();
+
+    await act(async () => root.unmount());
+  });
+
   it("submits with Command+Enter when the title is present", async () => {
     const onCreate = vi.fn(async () => undefined);
     const root = createRoot(container);

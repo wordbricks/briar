@@ -104,9 +104,12 @@ import {
   formatExecutionTokens,
 } from "../lib/agent-execution-metrics";
 import {
+  dataTransferHasFiles,
+  filesFromDataTransfer,
   formatAttachmentBytes,
   issueAttachmentAccept,
   maxIssueAttachmentCount,
+  normalizeIssueAttachmentFile,
   validateIssueAttachments,
 } from "../lib/issue-attachments";
 import {
@@ -1629,7 +1632,7 @@ export function CreateIssueDialog({
   ) => {
     if (selected.length === 0) return;
     const added = selected.map((file) => ({
-      file,
+      file: normalizeIssueAttachmentFile(file),
       reference: crypto.randomUUID(),
     }));
     const next = [...attachments, ...added];
@@ -1714,13 +1717,13 @@ export function CreateIssueDialog({
           isDraggingAttachments ? " is-dragging-attachments" : ""
         }`}
         onDragEnter={(event) => {
-          if (!Array.from(event.dataTransfer.types).includes("Files")) return;
+          if (!dataTransferHasFiles(event.dataTransfer)) return;
           event.preventDefault();
           attachmentDragDepthRef.current += 1;
           if (!isSubmitting) setIsDraggingAttachments(true);
         }}
         onDragLeave={(event) => {
-          if (!Array.from(event.dataTransfer.types).includes("Files")) return;
+          if (!dataTransferHasFiles(event.dataTransfer)) return;
           event.preventDefault();
           attachmentDragDepthRef.current = Math.max(
             0,
@@ -1731,17 +1734,17 @@ export function CreateIssueDialog({
           }
         }}
         onDragOver={(event) => {
-          if (!Array.from(event.dataTransfer.types).includes("Files")) return;
+          if (!dataTransferHasFiles(event.dataTransfer)) return;
           event.preventDefault();
           if (!isSubmitting) event.dataTransfer.dropEffect = "copy";
         }}
         onDrop={(event) => {
-          if (!Array.from(event.dataTransfer.types).includes("Files")) return;
+          if (!dataTransferHasFiles(event.dataTransfer)) return;
           event.preventDefault();
           attachmentDragDepthRef.current = 0;
           setIsDraggingAttachments(false);
           if (!isSubmitting) {
-            addAttachments(Array.from(event.dataTransfer.files), true);
+            addAttachments(filesFromDataTransfer(event.dataTransfer), true);
           }
         }}
         onKeyDown={(event) => {
