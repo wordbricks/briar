@@ -79,14 +79,11 @@ final class BriarCompanionUITests: XCTestCase {
         completed.tap()
         XCTAssertTrue(app.descendants(matching: .any)["run-detail"].waitForExistence(timeout: 5))
         // Completed issues should land on the Result tab (Android React parity).
-        let resultPanel = app.descendants(matching: .any)["run-detail-result-panel"]
+        let resultTab = app.buttons["run-detail-tab-result"]
         XCTAssertTrue(
-            resultPanel.waitForExistence(timeout: 5),
+            resultTab.waitForExistence(timeout: 5) && resultTab.isSelected,
             "완료된 이슈는 결과 탭이 먼저 보여야 합니다."
         )
-        let resultTab = app.buttons["run-detail-tab-result"]
-        XCTAssertTrue(resultTab.waitForExistence(timeout: 5))
-        XCTAssertTrue(resultTab.isSelected || resultPanel.exists)
         XCTAssertTrue(app.staticTexts["공유 계약이 검증되었습니다."].waitForExistence(timeout: 5))
         captureScreenshot(named: "companion-completed-result-tab")
     }
