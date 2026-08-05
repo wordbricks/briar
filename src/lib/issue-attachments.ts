@@ -45,6 +45,17 @@ export function issueAttachmentMimeTypeFromName(name: string): string | null {
   return mimeTypesByExtension[extension] ?? null;
 }
 
+/** True when content type or filename indicates an image preview is appropriate. */
+export function isIssueAttachmentImage(
+  contentType: string | null | undefined,
+  filename: string,
+): boolean {
+  const normalizedType = contentType?.trim().toLowerCase() ?? "";
+  if (normalizedType.startsWith("image/")) return true;
+  const inferred = issueAttachmentMimeTypeFromName(filename);
+  return inferred?.startsWith("image/") ?? false;
+}
+
 /**
  * OS file drops sometimes arrive with an empty MIME type even for valid media.
  * Fill in a supported type from the extension so validation and previews work.

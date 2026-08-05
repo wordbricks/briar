@@ -708,55 +708,81 @@ struct RunDetailView: View {
 
     @ViewBuilder
     private var issueTabContent: some View {
-        if let description = run.issueDescription, !description.isEmpty {
-            Section("설명") { MarkdownText(markdown: description) }
+        let attachments = run.attachments ?? []
+        let embeddedReferences = IssueAttachmentMedia.embeddedReferences(in: run.issueDescription)
+        let remainingAttachments = attachments.filter {
+            !embeddedReferences.contains($0.id.uuidString.lowercased())
         }
 
-        if let attachments = run.attachments, !attachments.isEmpty {
-            Section("첨부") {
-                ForEach(attachments) { attachment in
-                    if attachment.contentType.hasPrefix("image/") {
-                        AuthenticatedImagePreview(
-                            sourceID: attachment.url,
-                            filename: attachment.filename,
-                            detail: ByteCountFormatter.string(
-                                fromByteCount: Int64(attachment.byteSize),
-                                countStyle: .file
-                            ),
-                            accessibilityID: "issue-attachment-image-\(attachment.id.uuidString.lowercased())",
-                            load: {
-                                try await detail.download(
-                                    path: attachment.url,
-                                    filename: attachment.filename
-                                )
-                            },
-                            open: { previewFile = PreviewFile(url: $0) }
+        if let description = run.issueDescription, !description.isEmpty {
+            Section("설명") {
+                IssueDescriptionView(
+                    markdown: description,
+                    attachments: attachments,
+                    download: { attachment in
+                        try await detail.download(
+                            path: attachment.url,
+                            filename: attachment.filename
                         )
-                    } else {
-                        Button {
-                            Task { await open(path: attachment.url, filename: attachment.filename) }
-                        } label: {
-                            Label {
-                                VStack(alignment: .leading) {
-                                    Text(attachment.filename)
-                                    Text(ByteCountFormatter.string(
-                                        fromByteCount: Int64(attachment.byteSize),
-                                        countStyle: .file
-                                    ))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                }
-                            } icon: {
-                                Image(systemName: "doc")
-                            }
-                        }
-                    }
+                    },
+                    open: { previewFile = PreviewFile(url: $0) }
+                )
+            }
+        }
+
+        if !remainingAttachments.isEmpty {
+            Section("첨부") {
+                ForEach(remainingAttachments) { attachment in
+                    attachmentRow(attachment)
                 }
             }
         }
 
-        if run.issueDescription?.isEmpty != false, run.attachments?.isEmpty != false {
+        if run.issueDescription?.isEmpty != false, attachments.isEmpty {
             Section { ContentUnavailableView("이슈 내용 없음", systemImage: "doc.text") }
+        }
+    }
+
+    @ViewBuilder
+    private func attachmentRow(_ attachment: IssueAttachment) -> some View {
+        if IssueAttachmentMedia.isImage(
+            contentType: attachment.contentType,
+            filename: attachment.filename
+        ) {
+            AuthenticatedImagePreview(
+                sourceID: attachment.url,
+                filename: attachment.filename,
+                detail: ByteCountFormatter.string(
+                    fromByteCount: Int64(attachment.byteSize),
+                    countStyle: .file
+                ),
+                accessibilityID: "issue-attachment-image-\(attachment.id.uuidString.lowercased())",
+                load: {
+                    try await detail.download(
+                        path: attachment.url,
+                        filename: attachment.filename
+                    )
+                },
+                open: { previewFile = PreviewFile(url: $0) }
+            )
+        } else {
+            Button {
+                Task { await open(path: attachment.url, filename: attachment.filename) }
+            } label: {
+                Label {
+                    VStack(alignment: .leading) {
+                        Text(attachment.filename)
+                        Text(ByteCountFormatter.string(
+                            fromByteCount: Int64(attachment.byteSize),
+                            countStyle: .file
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                } icon: {
+                    Image(systemName: "doc")
+                }
+            }
         }
     }
 
@@ -1111,7 +1137,10 @@ struct RunDetailView: View {
                 Text(evidenceDetail).font(.subheadline)
             }
             ForEach(evidence.images ?? []) { image in
-                if image.contentType.hasPrefix("image/") {
+                if IssueAttachmentMedia.isImage(
+                    contentType: image.contentType,
+                    filename: image.filename
+                ) {
                     AuthenticatedImagePreview(
                         sourceID: image.url,
                         filename: image.filename,
@@ -1534,6 +1563,58 @@ struct MarkdownText: View {
                 .textSelection(.enabled)
         } else {
             Text(markdown).textSelection(.enabled)
+        }
+    }
+}
+
+/// Renders issue description markdown and loads `briar-attachment://` images with auth.
+struct IssueDescriptionView: View {
+    let markdown: String
+    let attachments: [IssueAttachment]
+    let download: @MainActor (IssueAttachment) async throws -> URL
+    let open: @MainActor (URL) -> Void
+
+    var body: some View {
+        let blocks = IdentifiedIssueDescriptionBlock.parse(markdown)
+        if blocks.isEmpty {
+            MarkdownText(markdown: markdown)
+        } else {
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(blocks) { item in
+                    switch item.block {
+                    case let .markdown(text):
+                        MarkdownText(markdown: text)
+                    case let .attachment(reference, alt):
+                        if let attachment = attachments.first(where: {
+                            $0.id.uuidString.lowercased() == reference.lowercased()
+                        }),
+                        IssueAttachmentMedia.isImage(
+                            contentType: attachment.contentType,
+                            filename: attachment.filename
+                        ) {
+                            AuthenticatedImagePreview(
+                                sourceID: attachment.url,
+                                filename: alt.isEmpty ? attachment.filename : alt,
+                                detail: ByteCountFormatter.string(
+                                    fromByteCount: Int64(attachment.byteSize),
+                                    countStyle: .file
+                                ),
+                                accessibilityID: "issue-inline-image-\(attachment.id.uuidString.lowercased())",
+                                load: { try await download(attachment) },
+                                open: open
+                            )
+                        } else {
+                            Label {
+                                Text(alt.isEmpty ? "첨부 이미지" : alt)
+                            } icon: {
+                                Image(systemName: "photo.badge.exclamationmark")
+                            }
+                            .foregroundStyle(.secondary)
+                            .accessibilityLabel("\(alt.isEmpty ? "첨부 이미지" : alt) 이미지를 불러올 수 없음")
+                        }
+                    }
+                }
+            }
         }
     }
 }
