@@ -671,7 +671,9 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
   });
 
   it("transfers an issue to another project with children and a source tombstone", async () => {
-    const targetProjectId = "22222222-2222-4222-8222-222222222222";
+    const targetProjectId = "55555555-5555-4555-8555-555555555555";
+    const attachmentId = "f1f1f1f1-f1f1-41f1-81f1-f1f1f1f1f1f1";
+    const messageId = "f2f2f2f2-f2f2-42f2-82f2-f2f2f2f2f2f2";
     await db
       .prepare(
         `update briar_project_settings set workflow_json = ? where project_id = ?`,
@@ -714,7 +716,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     );
     await createIssueAttachments(db, projectId, runId, [
       {
-        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        id: attachmentId,
         object_key: "issue-attachments/source/transfer.png",
         filename: "transfer.png",
         content_type: "image/png",
@@ -722,7 +724,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       },
     ]);
     await createIssueMessage(db, {
-      id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      id: messageId,
       projectId,
       runId,
       parentMessageId: null,
