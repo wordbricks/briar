@@ -117,6 +117,10 @@ import {
   validateIssueAttachments,
 } from "../lib/issue-attachments";
 import {
+  defaultIssueDetailTab,
+  type IssueDetailTab,
+} from "../lib/issue-detail-tab";
+import {
   clearCreateIssueDraft,
   loadCreateIssueDraft,
   saveCreateIssueDraft,
@@ -3490,17 +3494,9 @@ export function RunPage({
   const [reworkFeedback, setReworkFeedback] = useState("");
   const [reworkError, setReworkError] = useState<string | null>(null);
   const [isSubmittingRework, setIsSubmittingRework] = useState(false);
-  const [activeDetailTab, setActiveDetailTab] = useState<
-    | "description"
-    | "result"
-    | "agentActivity"
-    | "statusHistory"
-    | "evidence"
-    | "conversation"
-  >(() =>
-    ["completed", "paused"].includes(run.status)
-      ? "result"
-      : "description");
+  const [activeDetailTab, setActiveDetailTab] = useState<IssueDetailTab>(() =>
+    defaultIssueDetailTab(run.status),
+  );
   const hasWorkerExecution = Boolean(run.workerId);
   const workerExecutionIsLive = ![
     "completed",
@@ -3571,9 +3567,7 @@ export function RunPage({
   );
   const detailTabsId = useId();
   useEffect(() => {
-    setActiveDetailTab(
-      ["completed", "paused"].includes(run.status) ? "result" : "description",
-    );
+    setActiveDetailTab(defaultIssueDetailTab(run.status));
     setIsPropertiesOpen(false);
     setRunEvents([]);
     setIsCompletingResultReview(false);

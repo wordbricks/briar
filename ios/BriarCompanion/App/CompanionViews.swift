@@ -579,7 +579,7 @@ struct RunDetailView: View {
     @State private var replyTo: IssueMessage?
     @State private var reviewCompleted = false
     @State private var linkCopied = false
-    @State private var selectedTab = RunDetailTab.issue
+    @State private var selectedTab: RunDetailTab
 
     private var locale: CompanionLocale {
         CompanionLocale(rawValue: localeRaw) ?? .ko
@@ -647,6 +647,10 @@ struct RunDetailView: View {
                 (projects.first(where: { $0.id == projectID })?.organizationId == nil ||
                     $0.organizationId == projects.first(where: { $0.id == projectID })?.organizationId)
         })?.id)
+        // Match shared React RunPage: completed/paused open on Result.
+        _selectedTab = State(
+            initialValue: run.status.prefersResultDetailTab ? .result : .issue
+        )
     }
 
     var body: some View {
@@ -708,7 +712,11 @@ struct RunDetailView: View {
         )
         .task { await detail.load() }
         .refreshable { await detail.load() }
-        .onChange(of: run.status) { _, status in localStatus = status }
+        .onChange(of: run.status) { _, status in
+            localStatus = status
+            // Keep parity with shared React RunPage: status transitions reselect the default tab.
+            selectedTab = status.prefersResultDetailTab ? .result : .issue
+        }
         .onChange(of: run.workflowStage) { _, stage in localWorkflowStage = stage }
         .onChange(of: run.prerequisites) { _, prerequisites in
             dependencyIDs = Set((prerequisites ?? []).map(\.id))
