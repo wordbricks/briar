@@ -7245,3 +7245,51 @@ export async function deleteIssue(
     .first<{ id: string }>();
   return run ? "active" : "not_found";
 }
+
+export type InboxReadStateRow = {
+  message_id: string;
+  version: string;
+  updated_at: string;
+};
+
+export async function listInboxReadStates(
+  db: D1Database,
+  userId: string,
+): Promise<InboxReadStateRow[]> {
+  const result = await db
+    .prepare(
+      `select message_id, version, updated_at
+       from briar_inbox_read_states
+       where user_id = ?
+       order by updated_at desc, message_id`,
+    )
+    .bind(userId)
+    .all<InboxReadStateRow>();
+  return result.results ?? [];
+}
+
+export async function upsertInboxReadStates(
+  db: D1Database,
+  userId: string,
+  entries: ReadonlyArray<{ messageId: string; version: string }>,
+  updatedAt: string,
+): Promise<InboxReadStateRow[]> {
+  if (entries.length === 0) {
+    return listInboxReadStates(db, userId);
+  }
+
+  const statements = entries.map((entry) =>
+    db
+      .prepare(
+        `insert into briar_inbox_read_states (
+           user_id, message_id, version, updated_at
+         ) values (?, ?, ?, ?)
+         on conflict(user_id, message_id) do update set
+           version = excluded.version,
+           updated_at = excluded.updated_at`,
+      )
+      .bind(userId, entry.messageId, entry.version, updatedAt),
+  );
+  await db.batch(statements);
+  return listInboxReadStates(db, userId);
+}

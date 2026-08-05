@@ -6,8 +6,10 @@ import {
   classifyInboxMessage,
   filterInboxMessagesByOrganization,
   groupInboxMessages,
+  inboxReadVersionsToPush,
   isInboxMessageUnread,
   mergeInboxMessages,
+  mergeInboxReadVersions,
 } from "./useInbox";
 
 const project = demoDashboard.project;
@@ -289,6 +291,36 @@ describe("Inbox messages", () => {
     expect(
       isInboxMessageUnread(message, { [message.id]: "previous-version" }),
     ).toBe(true);
+  });
+
+  it("merges account-synced read versions with local-only entries", () => {
+    expect(
+      mergeInboxReadVersions(
+        { "issue:a": "local", "issue:b": "local-only" },
+        { "issue:a": "remote", "issue:c": "remote-only" },
+      ),
+    ).toEqual({
+      "issue:a": "remote",
+      "issue:b": "local-only",
+      "issue:c": "remote-only",
+    });
+
+    expect(
+      inboxReadVersionsToPush(
+        {
+          "issue:a": "local",
+          "issue:b": "local-only",
+          "issue:c": "same",
+        },
+        {
+          "issue:a": "remote",
+          "issue:c": "same",
+        },
+      ),
+    ).toEqual({
+      "issue:a": "local",
+      "issue:b": "local-only",
+    });
   });
 
   it("separates urgent, actionable, important, and routine updates", () => {

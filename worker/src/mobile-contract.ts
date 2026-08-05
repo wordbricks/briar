@@ -95,6 +95,8 @@ export const mobileOrganizationMemberSchema = z.object({
 export const mobileDashboardRunSchema = z.object({
   id: z.uuid(),
   runNumber: z.number().int().positive().optional(),
+  currentAttempt: z.number().int().positive().optional(),
+  currentRevision: z.number().int().positive().optional(),
   title: z.string(),
   status: z.enum([
     "backlog",
@@ -180,6 +182,12 @@ export const mobileDashboardRunSchema = z.object({
   workerId: z.string().nullable().optional(),
   updatedAt: z.iso.datetime(),
   completedAt: z.iso.datetime().nullable().optional(),
+  lastEventAt: z.iso.datetime().optional(),
+  eventCount: z.number().int().nonnegative().optional(),
+});
+
+export const mobileInboxReadStatesSchema = z.object({
+  readVersions: z.record(z.string().min(1), z.string().min(1)),
 });
 
 export const mobileDashboardWorkerSchema = z.object({
@@ -491,6 +499,11 @@ export const mobileOperationSchemas = {
   },
   getCurrentUser: { response: mobileCurrentUserResponseSchema },
   listProjects: { response: mobileProjectsResponseSchema },
+  getInboxReadStates: { response: mobileInboxReadStatesSchema },
+  putInboxReadStates: {
+    request: mobileInboxReadStatesSchema,
+    response: mobileInboxReadStatesSchema,
+  },
   getDashboardSnapshot: { response: mobileDashboardSnapshotSchema },
   getDashboardDelta: {
     response: mobileDashboardDeltaSchema,

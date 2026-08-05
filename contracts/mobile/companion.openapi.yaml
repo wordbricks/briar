@@ -120,6 +120,64 @@
         }
       }
     },
+    "/inbox/read-states": {
+      "get": {
+        "operationId": "getInboxReadStates",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Account inbox read versions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboxReadStates"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "put": {
+        "operationId": "putInboxReadStates",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InboxReadStates"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated account inbox read versions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboxReadStates"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/projects": {
       "get": {
         "operationId": "listProjects",
@@ -801,6 +859,19 @@
       }
     },
     "schemas": {
+    "InboxReadStates": {
+      "type": "object",
+      "required": ["readVersions"],
+      "properties": {
+        "readVersions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
       "MobileClientId": {
         "type": "string",
         "enum": [
@@ -1140,7 +1211,15 @@
         "properties": {
           "id": { "type": "string", "format": "uuid" },
           "runNumber": { "type": "integer", "minimum": 1 },
-          "title": { "type": "string" },
+                  "currentAttempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "currentRevision": {
+          "type": "integer",
+          "minimum": 1
+        },
+"title": { "type": "string" },
           "status": { "type": "string", "enum": ["backlog", "queued", "running", "paused", "blocked", "failed", "completed", "cancelled"] },
           "workflowStage": { "type": ["string", "null"] },
           "pausedAt": { "type": ["string", "null"], "format": "date-time" },
@@ -1185,7 +1264,15 @@
           "requestedEffort": { "type": ["string", "null"], "enum": ["low", "medium", "high", "xhigh", "max", "ultra", null] },
           "requestedWorkerId": { "type": ["string", "null"] },
           "workerId": { "type": ["string", "null"] },
-          "updatedAt": { "type": "string", "format": "date-time" },
+                  "lastEventAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "eventCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+"updatedAt": { "type": "string", "format": "date-time" },
           "completedAt": { "type": ["string", "null"], "format": "date-time" }
         },
         "additionalProperties": true
