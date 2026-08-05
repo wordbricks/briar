@@ -113,6 +113,98 @@ export type SlackOAuthStateRow = {
   created_at: string;
 };
 
+export type GithubConnectionStatus = "connected" | "disconnected";
+
+export type GithubConnectionRow = {
+  installation_id: number;
+  organization_id: string;
+  installation_account_id: number;
+  account_login: string;
+  account_avatar_url: string;
+  authorized_github_user_id: number;
+  authorized_github_user_login: string;
+  connected_by_user_id: string | null;
+  status: GithubConnectionStatus;
+  connected_at: string;
+  disconnected_at: string | null;
+  updated_at: string;
+};
+
+export type GithubConnectionRepositoryRow = {
+  installation_id: number;
+  repository_id: number;
+  owner: string;
+  name: string;
+  full_name: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type GithubOAuthStateRow = {
+  state_hash: string;
+  organization_id: string;
+  user_id: string;
+  pkce_verifier: string;
+  installation_id: number | null;
+  expires_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type GithubPullRequestState = "unknown" | "open" | "closed" | "merged";
+
+export type RunPullRequestRow = {
+  project_id: string;
+  run_id: string;
+  attempt: number;
+  revision: number;
+  revision_started_at: string;
+  url: string;
+  installation_id: number | null;
+  repository_id: number;
+  repository: string;
+  pull_request_id: number;
+  pull_request_node_id: string;
+  pull_request_number: number;
+  state: GithubPullRequestState;
+  draft: number | null;
+  head_sha: string | null;
+  base_sha: string | null;
+  merge_commit_sha: string | null;
+  opened_at: string | null;
+  closed_at: string | null;
+  merged_at: string | null;
+  provider_updated_at: string | null;
+  last_delivery_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type GithubPullRequestSyncInput = {
+  deliveryId: string;
+  installationId: number | null;
+  repositoryId: number;
+  repository: string;
+  pullRequestId: number;
+  pullRequestNodeId: string;
+  pullRequestNumber: number;
+  url: string;
+  state: Exclude<GithubPullRequestState, "unknown">;
+  draft: boolean;
+  headSha: string;
+  baseSha: string;
+  mergeCommitSha: string | null;
+  openedAt: string;
+  closedAt: string | null;
+  mergedAt: string | null;
+  providerUpdatedAt: string;
+  linkedIssues: Array<{ projectId: string; runId: string }>;
+  actor: string;
+  observedAt: string;
+  /** Restricts a connected installation to runs in its Briar organization. */
+  organizationId?: string | null;
+};
+
 export type ProjectSettingsRow = {
   project_id: string;
   velen_org: string | null;
@@ -337,6 +429,7 @@ export type RunEvidenceRow = {
   actor: string;
   observed_at: string;
   recorded_at: string;
+  github_association_started_at?: string | null;
 };
 
 export type WorkflowStageProgressState =
@@ -1575,6 +1668,7 @@ export async function resumeWorkflowCheckpoint(
     requestId: string;
     actor: string;
     approvedAt: string;
+    requireAllGithubPullRequestsMerged?: boolean;
   },
 ): Promise<{
   outcome: "approved" | "already_approved" | "conflict" | "not_found";
@@ -1693,6 +1787,99 @@ export async function resumeWorkflowCheckpoint(
       : workflow.stages[workflowStageRank(workflow, configured.stage) + 1]?.id ?? null;
   const resumedWorkflowStage = nextStage ?? configured.stage;
   const resumedStage = dashboardStageFor("running", resumedWorkflowStage);
+  const githubCheckpointMergeGuard = input.requireAllGithubPullRequestsMerged
+    ? `and exists (
+         select 1 from briar_run_pull_requests link
+         where link.run_id = briar_run_checkpoint_progress.run_id
+           and link.attempt = briar_run_checkpoint_progress.attempt
+           and link.revision = briar_run_checkpoint_progress.revision
+       )
+       and not exists (
+         select 1 from briar_run_pull_requests link
+         where link.run_id = briar_run_checkpoint_progress.run_id
+           and link.attempt = briar_run_checkpoint_progress.attempt
+           and link.revision = briar_run_checkpoint_progress.revision
+           and (link.state <> 'merged' or link.last_delivery_id is null)
+       )
+       and not exists (
+         select 1 from briar_run_evidence evidence
+         where evidence.run_id = briar_run_checkpoint_progress.run_id
+           and evidence.attempt = briar_run_checkpoint_progress.attempt
+           and evidence.revision = briar_run_checkpoint_progress.revision
+           and evidence.evidence_type = 'pull_request'
+           and evidence.status in ('pending', 'passed')
+           and not exists (
+             select 1 from briar_run_pull_requests link
+             where link.run_id = evidence.run_id
+               and link.attempt = evidence.attempt
+               and link.revision = evidence.revision
+               and link.repository_id = cast(json_extract(
+                 evidence.metadata_json,
+                 '$.githubPullRequest.repositoryId'
+               ) as integer)
+               and link.pull_request_id = cast(json_extract(
+                 evidence.metadata_json,
+                 '$.githubPullRequest.pullRequestId'
+               ) as integer)
+               and link.pull_request_node_id = json_extract(
+                 evidence.metadata_json,
+                 '$.githubPullRequest.pullRequestNodeId'
+               )
+               and link.pull_request_number = cast(json_extract(
+                 evidence.metadata_json,
+                 '$.githubPullRequest.pullRequestNumber'
+               ) as integer)
+           )
+       )`
+    : "";
+  const githubRunMergeGuard = input.requireAllGithubPullRequestsMerged
+    ? `and exists (
+         select 1 from briar_run_pull_requests link
+         where link.project_id = briar_hunt_runs.project_id
+           and link.run_id = briar_hunt_runs.id
+           and link.attempt = briar_hunt_runs.current_attempt
+           and link.revision = briar_hunt_runs.current_revision
+       )
+       and not exists (
+         select 1 from briar_run_pull_requests link
+         where link.project_id = briar_hunt_runs.project_id
+           and link.run_id = briar_hunt_runs.id
+           and link.attempt = briar_hunt_runs.current_attempt
+           and link.revision = briar_hunt_runs.current_revision
+           and (link.state <> 'merged' or link.last_delivery_id is null)
+       )
+       and not exists (
+         select 1 from briar_run_evidence evidence
+         where evidence.project_id = briar_hunt_runs.project_id
+           and evidence.run_id = briar_hunt_runs.id
+           and evidence.attempt = briar_hunt_runs.current_attempt
+           and evidence.revision = briar_hunt_runs.current_revision
+           and evidence.evidence_type = 'pull_request'
+           and evidence.status in ('pending', 'passed')
+           and not exists (
+             select 1 from briar_run_pull_requests link
+             where link.run_id = evidence.run_id
+               and link.attempt = evidence.attempt
+               and link.revision = evidence.revision
+               and link.repository_id = cast(json_extract(
+                 evidence.metadata_json,
+                 '$.githubPullRequest.repositoryId'
+               ) as integer)
+               and link.pull_request_id = cast(json_extract(
+                 evidence.metadata_json,
+                 '$.githubPullRequest.pullRequestId'
+               ) as integer)
+               and link.pull_request_node_id = json_extract(
+                 evidence.metadata_json,
+                 '$.githubPullRequest.pullRequestNodeId'
+               )
+               and link.pull_request_number = cast(json_extract(
+                 evidence.metadata_json,
+                 '$.githubPullRequest.pullRequestNumber'
+               ) as integer)
+           )
+       )`
+    : "";
   const results = await db.batch([
     db
       .prepare(
@@ -1700,7 +1887,8 @@ export async function resumeWorkflowCheckpoint(
          set state = 'approved', approved_at = ?, approved_by = ?,
              approved_request_id = ?
          where run_id = ? and attempt = ? and revision = ?
-           and checkpoint_key = ? and state = 'waiting'`,
+           and checkpoint_key = ? and state = 'waiting'
+           ${githubCheckpointMergeGuard}`,
       )
       .bind(
         input.approvedAt,
@@ -1718,11 +1906,13 @@ export async function resumeWorkflowCheckpoint(
              resume_requested_at = ?,
              waiting_checkpoint_key = null, waiting_checkpoint_revision = null,
              claim_token_hash = null, claimed_by = null, claimed_at = null,
-             lease_expires_at = null, completed_at = null, updated_at = ?
+             lease_expires_at = null, completed_at = null,
+             updated_at = max(updated_at, ?)
          where id = ? and project_id = ? and current_attempt = ?
            and current_revision = ? and waiting_checkpoint_key = ?
            and waiting_checkpoint_revision = ? and paused_at is not null
-           and resume_requested_at is null`,
+           and resume_requested_at is null
+           ${githubRunMergeGuard}`,
       )
       .bind(
         resumedStage,
@@ -2462,6 +2652,489 @@ export async function consumeSlackOAuthState(
   return deleted.meta.changes > 0 ? state : null;
 }
 
+export async function createGithubOAuthState(
+  db: D1Database,
+  input: {
+    stateHash: string;
+    organizationId: string;
+    userId: string;
+    pkceVerifier: string;
+    installationId?: number | null;
+    expiresAt: string;
+    createdAt: string;
+  },
+) {
+  await db.batch([
+    db
+      .prepare(`delete from briar_github_oauth_states where expires_at <= ?`)
+      .bind(input.createdAt),
+    db
+      .prepare(
+        `insert into briar_github_oauth_states (
+           state_hash, organization_id, user_id, pkce_verifier,
+           installation_id, expires_at, created_at, updated_at
+         ) values (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        input.stateHash,
+        input.organizationId,
+        input.userId,
+        input.pkceVerifier,
+        input.installationId ?? null,
+        input.expiresAt,
+        input.createdAt,
+        input.createdAt,
+      ),
+  ]);
+}
+
+export async function consumeGithubInstallState(
+  db: D1Database,
+  stateHash: string,
+  now: string,
+) {
+  const state = await db
+    .prepare(
+      `select state_hash, organization_id, user_id, pkce_verifier,
+              installation_id, expires_at, created_at, updated_at
+       from briar_github_oauth_states
+       where state_hash = ? and expires_at > ?
+         and installation_id is null`,
+    )
+    .bind(stateHash, now)
+    .first<GithubOAuthStateRow>();
+  if (!state) return null;
+  const deleted = await db
+    .prepare(`delete from briar_github_oauth_states where state_hash = ?`)
+    .bind(stateHash)
+    .run();
+  return (deleted.meta.changes ?? 0) > 0 ? state : null;
+}
+
+export async function consumeGithubOAuthState(
+  db: D1Database,
+  stateHash: string,
+  now: string,
+) {
+  const state = await db
+    .prepare(
+      `select state_hash, organization_id, user_id, pkce_verifier,
+              installation_id, expires_at, created_at, updated_at
+       from briar_github_oauth_states
+       where state_hash = ? and expires_at > ?
+         and installation_id is not null`,
+    )
+    .bind(stateHash, now)
+    .first<GithubOAuthStateRow>();
+  if (!state) return null;
+  const deleted = await db
+    .prepare(`delete from briar_github_oauth_states where state_hash = ?`)
+    .bind(stateHash)
+    .run();
+  return (deleted.meta.changes ?? 0) > 0 ? state : null;
+}
+
+export async function getGithubConnectionByInstallation(
+  db: D1Database,
+  installationId: number,
+) {
+  return db
+    .prepare(
+      `select installation_id, organization_id, installation_account_id,
+              account_login, account_avatar_url, authorized_github_user_id,
+              authorized_github_user_login, connected_by_user_id, status,
+              connected_at, disconnected_at, updated_at
+       from briar_github_connections
+       where installation_id = ?`,
+    )
+    .bind(installationId)
+    .first<GithubConnectionRow>();
+}
+
+export async function getGithubConnectionForOrganization(
+  db: D1Database,
+  organizationId: string,
+) {
+  return db
+    .prepare(
+      `select installation_id, organization_id, installation_account_id,
+              account_login, account_avatar_url, authorized_github_user_id,
+              authorized_github_user_login, connected_by_user_id, status,
+              connected_at, disconnected_at, updated_at
+       from briar_github_connections
+       where organization_id = ? and status = 'connected'
+       order by updated_at desc
+       limit 1`,
+    )
+    .bind(organizationId)
+    .first<GithubConnectionRow>();
+}
+
+export async function listGithubConnectionRepositories(
+  db: D1Database,
+  installationId: number,
+) {
+  const result = await db
+    .prepare(
+      `select installation_id, repository_id, owner, name, full_name,
+              created_at, updated_at
+       from briar_github_connection_repositories
+       where installation_id = ?
+       order by lower(full_name), repository_id`,
+    )
+    .bind(installationId)
+    .all<GithubConnectionRepositoryRow>();
+  return result.results;
+}
+
+export async function syncGithubConnectionRepositories(
+  db: D1Database,
+  input: {
+    installationId: number;
+    added: Array<{
+      id: number;
+      owner: string;
+      name: string;
+      fullName: string;
+    }>;
+    removedIds: number[];
+    observedAt: string;
+  },
+) {
+  const results = await db.batch([
+    db
+      .prepare(
+        `insert into briar_github_connection_repositories (
+           installation_id, repository_id, owner, name, full_name,
+           created_at, updated_at
+         )
+         select ?,
+                cast(json_extract(repository.value, '$.id') as integer),
+                json_extract(repository.value, '$.owner'),
+                json_extract(repository.value, '$.name'),
+                json_extract(repository.value, '$.fullName'),
+                ?, ?
+         from json_each(?) repository
+         where exists (
+           select 1 from briar_github_connections connection
+           where connection.installation_id = ?
+             and connection.status = 'connected'
+         )
+         on conflict(installation_id, repository_id) do update set
+           owner = excluded.owner,
+           name = excluded.name,
+           full_name = excluded.full_name,
+           updated_at = excluded.updated_at`,
+      )
+      .bind(
+        input.installationId,
+        input.observedAt,
+        input.observedAt,
+        JSON.stringify(input.added),
+        input.installationId,
+      ),
+    db
+      .prepare(
+        `delete from briar_github_connection_repositories
+         where installation_id = ? and repository_id in (
+           select cast(value as integer) from json_each(?)
+         ) and exists (
+           select 1 from briar_github_connections connection
+           where connection.installation_id = ?
+             and connection.status = 'connected'
+         )`,
+      )
+      .bind(
+        input.installationId,
+        JSON.stringify(input.removedIds),
+        input.installationId,
+      ),
+    db
+      .prepare(
+        `update briar_github_connections set updated_at = ?
+         where installation_id = ? and status = 'connected'`,
+      )
+      .bind(input.observedAt, input.installationId),
+  ]);
+  return (results[2]?.meta.changes ?? 0) > 0;
+}
+
+export async function connectGithubInstallation(
+  db: D1Database,
+  input: {
+    organizationId: string;
+    installationId: number;
+    installationAccountId: number;
+    accountLogin: string;
+    accountAvatarUrl: string;
+    authorizedGithubUserId: number;
+    authorizedGithubUserLogin: string;
+    connectedByUserId: string;
+    repositories: Array<{
+      id: number;
+      owner: string;
+      name: string;
+      fullName: string;
+    }>;
+    observedAt: string;
+  },
+) {
+  const statements = [
+    db
+      .prepare(
+        `insert into briar_github_connections (
+           installation_id, organization_id, installation_account_id,
+           account_login, account_avatar_url, authorized_github_user_id,
+           authorized_github_user_login, connected_by_user_id, status,
+           connected_at, disconnected_at, updated_at
+         )
+         select ?, ?, ?, ?, ?, ?, ?, ?, 'connected', ?, null, ?
+         where not exists (
+           select 1 from briar_github_connections active
+           where active.organization_id = ? and active.status = 'connected'
+             and active.installation_id <> ?
+         )
+         on conflict(installation_id) do update set
+           organization_id = excluded.organization_id,
+           installation_account_id = excluded.installation_account_id,
+           account_login = excluded.account_login,
+           account_avatar_url = excluded.account_avatar_url,
+           authorized_github_user_id = excluded.authorized_github_user_id,
+           authorized_github_user_login = excluded.authorized_github_user_login,
+           connected_by_user_id = excluded.connected_by_user_id,
+           status = 'connected',
+           connected_at = excluded.connected_at,
+           disconnected_at = null,
+           updated_at = excluded.updated_at
+         where briar_github_connections.status = 'disconnected'
+            or briar_github_connections.organization_id = excluded.organization_id`,
+      )
+      .bind(
+        input.installationId,
+        input.organizationId,
+        input.installationAccountId,
+        input.accountLogin,
+        input.accountAvatarUrl,
+        input.authorizedGithubUserId,
+        input.authorizedGithubUserLogin,
+        input.connectedByUserId,
+        input.observedAt,
+        input.observedAt,
+        input.organizationId,
+        input.installationId,
+      ),
+    db
+      .prepare(
+        `delete from briar_github_connection_repositories
+         where installation_id = ? and exists (
+           select 1 from briar_github_connections connection
+           where connection.installation_id = ?
+             and connection.organization_id = ?
+             and connection.status = 'connected'
+             and connection.updated_at = ?
+         )`,
+      )
+      .bind(
+        input.installationId,
+        input.installationId,
+        input.organizationId,
+        input.observedAt,
+      ),
+    db
+      .prepare(
+        `insert into briar_github_connection_repositories (
+           installation_id, repository_id, owner, name, full_name,
+           created_at, updated_at
+         )
+         select ?,
+                cast(json_extract(repository.value, '$.id') as integer),
+                json_extract(repository.value, '$.owner'),
+                json_extract(repository.value, '$.name'),
+                json_extract(repository.value, '$.fullName'),
+                ?, ?
+         from json_each(?) repository
+         where exists (
+           select 1 from briar_github_connections connection
+           where connection.installation_id = ?
+             and connection.organization_id = ?
+             and connection.status = 'connected'
+             and connection.updated_at = ?
+         )`,
+      )
+      .bind(
+        input.installationId,
+        input.observedAt,
+        input.observedAt,
+        JSON.stringify(input.repositories),
+        input.installationId,
+        input.organizationId,
+        input.observedAt,
+      ),
+  ];
+  await db.batch(statements);
+  const connection = await getGithubConnectionByInstallation(
+    db,
+    input.installationId,
+  );
+  if (
+    connection?.status === "connected" &&
+    connection.organization_id === input.organizationId
+  ) {
+    return { outcome: "connected" as const };
+  }
+  if (connection?.status === "connected") {
+    return { outcome: "installation_conflict" as const };
+  }
+  const activeForOrganization = await getGithubConnectionForOrganization(
+    db,
+    input.organizationId,
+  );
+  if (
+    activeForOrganization &&
+    activeForOrganization.installation_id !== input.installationId
+  ) {
+    return { outcome: "organization_conflict" as const };
+  }
+  throw new Error("GitHub connection could not be persisted");
+}
+
+export async function disconnectGithubInstallation(
+  db: D1Database,
+  organizationId: string,
+  observedAt: string,
+) {
+  const connection = await getGithubConnectionForOrganization(
+    db,
+    organizationId,
+  );
+  if (!connection) return false;
+  const results = await db.batch([
+    db
+      .prepare(
+        `update briar_github_connections
+         set status = 'disconnected', disconnected_at = ?, updated_at = ?
+         where organization_id = ? and installation_id = ?
+           and status = 'connected'`,
+      )
+      .bind(
+        observedAt,
+        observedAt,
+        organizationId,
+        connection.installation_id,
+      ),
+    db
+      .prepare(
+        `delete from briar_github_connection_repositories
+         where installation_id = ?`,
+      )
+      .bind(connection.installation_id),
+    db
+      .prepare(
+        `delete from briar_github_pull_requests where installation_id = ?`,
+      )
+      .bind(connection.installation_id),
+    db
+      .prepare(
+        `update briar_run_pull_requests
+         set state = 'unknown', draft = null, head_sha = null,
+             base_sha = null, merge_commit_sha = null, opened_at = null,
+             closed_at = null, merged_at = null, provider_updated_at = null,
+             last_delivery_id = null, updated_at = ?
+         where installation_id = ?`,
+      )
+      .bind(observedAt, connection.installation_id),
+  ]);
+  return (results[0]?.meta.changes ?? 0) > 0;
+}
+
+export async function disconnectGithubInstallationById(
+  db: D1Database,
+  installationId: number,
+  observedAt: string,
+) {
+  const results = await db.batch([
+    db
+      .prepare(
+        `update briar_github_connections
+         set status = 'disconnected', disconnected_at = ?, updated_at = ?
+         where installation_id = ? and status = 'connected'`,
+      )
+      .bind(observedAt, observedAt, installationId),
+    db
+      .prepare(
+        `delete from briar_github_connection_repositories
+         where installation_id = ?`,
+      )
+      .bind(installationId),
+    db
+      .prepare(
+        `delete from briar_github_pull_requests where installation_id = ?`,
+      )
+      .bind(installationId),
+    db
+      .prepare(
+        `update briar_run_pull_requests
+         set state = 'unknown', draft = null, head_sha = null,
+             base_sha = null, merge_commit_sha = null, opened_at = null,
+             closed_at = null, merged_at = null, provider_updated_at = null,
+             last_delivery_id = null, updated_at = ?
+         where installation_id = ?`,
+      )
+      .bind(observedAt, installationId),
+  ]);
+  return (results[0]?.meta.changes ?? 0) > 0;
+}
+
+export async function disconnectGithubInstallationsByAuthorizedUser(
+  db: D1Database,
+  githubUserId: number,
+  observedAt: string,
+) {
+  const connected = await db
+    .prepare(
+      `select installation_id
+       from briar_github_connections
+       where authorized_github_user_id = ? and status = 'connected'`,
+    )
+    .bind(githubUserId)
+    .all<{ installation_id: number }>();
+  if (connected.results.length === 0) return 0;
+  const installationIds = connected.results.map((row) => row.installation_id);
+  const placeholders = installationIds.map(() => "?").join(", ");
+  const results = await db.batch([
+    db
+      .prepare(
+        `update briar_github_connections
+         set status = 'disconnected', disconnected_at = ?, updated_at = ?
+         where authorized_github_user_id = ? and status = 'connected'`,
+      )
+      .bind(observedAt, observedAt, githubUserId),
+    db
+      .prepare(
+        `delete from briar_github_connection_repositories
+         where installation_id in (${placeholders})`,
+      )
+      .bind(...installationIds),
+    db
+      .prepare(
+        `delete from briar_github_pull_requests
+         where installation_id in (${placeholders})`,
+      )
+      .bind(...installationIds),
+    db
+      .prepare(
+        `update briar_run_pull_requests
+         set state = 'unknown', draft = null, head_sha = null,
+             base_sha = null, merge_commit_sha = null, opened_at = null,
+             closed_at = null, merged_at = null, provider_updated_at = null,
+             last_delivery_id = null, updated_at = ?
+         where installation_id in (${placeholders})`,
+      )
+      .bind(observedAt, ...installationIds),
+  ]);
+  return results[0]?.meta.changes ?? 0;
+}
+
 export async function upsertSlackInstallation(
   db: D1Database,
   input: {
@@ -2648,6 +3321,83 @@ export async function releaseSlackEvent(
     )
     .bind(teamId, eventId)
     .run();
+}
+
+export async function claimGithubDelivery(
+  db: D1Database,
+  input: {
+    deliveryId: string;
+    eventName: string;
+    action: string | null;
+    claimedAt: string;
+    staleBefore: string;
+  },
+) {
+  const retentionBefore = new Date(
+    Date.parse(input.claimedAt) - 30 * 24 * 60 * 60_000,
+  ).toISOString();
+  await db
+    .prepare(
+      `delete from briar_github_deliveries
+       where coalesce(completed_at, claimed_at) < ?`,
+    )
+    .bind(retentionBefore)
+    .run();
+  const result = await db
+    .prepare(
+      `insert into briar_github_deliveries (
+         delivery_id, event_name, action, status, claimed_at, completed_at
+       ) values (?, ?, ?, 'processing', ?, null)
+       on conflict(delivery_id) do update set
+         event_name = excluded.event_name,
+         action = excluded.action,
+         status = 'processing',
+         claimed_at = excluded.claimed_at,
+         completed_at = null
+       where briar_github_deliveries.status = 'processing'
+         and briar_github_deliveries.claimed_at < ?`,
+    )
+    .bind(
+      input.deliveryId,
+      input.eventName,
+      input.action,
+      input.claimedAt,
+      input.staleBefore,
+    )
+    .run();
+  return result.meta.changes > 0;
+}
+
+export async function completeGithubDelivery(
+  db: D1Database,
+  deliveryId: string,
+  claimedAt: string,
+  completedAt: string,
+) {
+  const result = await db
+    .prepare(
+      `update briar_github_deliveries
+       set status = 'completed', completed_at = ?
+       where delivery_id = ? and status = 'processing' and claimed_at = ?`,
+    )
+    .bind(completedAt, deliveryId, claimedAt)
+    .run();
+  return (result.meta.changes ?? 0) > 0;
+}
+
+export async function releaseGithubDelivery(
+  db: D1Database,
+  deliveryId: string,
+  claimedAt: string,
+) {
+  const result = await db
+    .prepare(
+      `delete from briar_github_deliveries
+       where delivery_id = ? and status = 'processing' and claimed_at = ?`,
+    )
+    .bind(deliveryId, claimedAt)
+    .run();
+  return (result.meta.changes ?? 0) > 0;
 }
 
 export async function listProjects(db: D1Database, userId: string) {
@@ -5368,6 +6118,12 @@ export async function recordHuntEvent(
       if (!sameEvent(existingEvent, normalizedInput)) {
         throw new EventKeyConflictError();
       }
+      if (
+        normalizedInput.status === "running" &&
+        normalizedInput.workflowStage === "pr_open"
+      ) {
+        await attemptGithubMergeAutoResume(db, projectId, existingRun.id);
+      }
       return existingRun.id;
     }
   }
@@ -5656,6 +6412,16 @@ export async function recordHuntEvent(
     }
   }
 
+  // A signed merge can arrive before a legacy/v1 run reaches its PR pause.
+  // Reconcile after the event is durable; retries also take this path through
+  // the duplicate-event branch above if a transient reconciliation fails.
+  if (
+    normalizedInput.status === "running" &&
+    normalizedInput.workflowStage === "pr_open"
+  ) {
+    await attemptGithubMergeAutoResume(db, projectId, runId);
+  }
+
   return runId;
 }
 
@@ -5673,6 +6439,7 @@ export async function resumeHuntRun(
     requestId: string;
     actor: string;
     occurredAt: string;
+    requireAllGithubPullRequestsMerged?: boolean;
   },
 ): Promise<{
   outcome: HuntResumeOutcome;
@@ -5728,6 +6495,54 @@ export async function resumeHuntRun(
     : "사용자가 마지막 일시정지 지점에서 완료 검토를 재개했습니다.";
   const eventId = crypto.randomUUID();
   const recordedAt = new Date().toISOString();
+  const githubRunMergeGuard = input.requireAllGithubPullRequestsMerged
+    ? `and exists (
+         select 1 from briar_run_pull_requests link
+         where link.project_id = briar_hunt_runs.project_id
+           and link.run_id = briar_hunt_runs.id
+           and link.attempt = briar_hunt_runs.current_attempt
+           and link.revision = briar_hunt_runs.current_revision
+       )
+       and not exists (
+         select 1 from briar_run_pull_requests link
+         where link.project_id = briar_hunt_runs.project_id
+           and link.run_id = briar_hunt_runs.id
+           and link.attempt = briar_hunt_runs.current_attempt
+           and link.revision = briar_hunt_runs.current_revision
+           and (link.state <> 'merged' or link.last_delivery_id is null)
+       )
+       and not exists (
+         select 1 from briar_run_evidence evidence
+         where evidence.project_id = briar_hunt_runs.project_id
+           and evidence.run_id = briar_hunt_runs.id
+           and evidence.attempt = briar_hunt_runs.current_attempt
+           and evidence.revision = briar_hunt_runs.current_revision
+           and evidence.evidence_type = 'pull_request'
+           and evidence.status in ('pending', 'passed')
+           and not exists (
+             select 1 from briar_run_pull_requests link
+             where link.run_id = evidence.run_id
+               and link.attempt = evidence.attempt
+               and link.revision = evidence.revision
+               and link.repository_id = cast(json_extract(
+                 evidence.metadata_json,
+                 '$.githubPullRequest.repositoryId'
+               ) as integer)
+               and link.pull_request_id = cast(json_extract(
+                 evidence.metadata_json,
+                 '$.githubPullRequest.pullRequestId'
+               ) as integer)
+               and link.pull_request_node_id = json_extract(
+                 evidence.metadata_json,
+                 '$.githubPullRequest.pullRequestNodeId'
+               )
+               and link.pull_request_number = cast(json_extract(
+                 evidence.metadata_json,
+                 '$.githubPullRequest.pullRequestNumber'
+               ) as integer)
+           )
+       )`
+    : "";
   const results = await db.batch([
     db
       .prepare(
@@ -5745,6 +6560,7 @@ export async function resumeHuntRun(
            and paused_at is not null and workflow_stage = ?
            and resume_requested_at is null
            and last_event_at = ?
+           ${githubRunMergeGuard}
          on conflict(run_id, event_key) do nothing`,
       )
       .bind(
@@ -5773,6 +6589,7 @@ export async function resumeHuntRun(
            and paused_at is not null and workflow_stage = ?
            and resume_requested_at is null
            and last_event_at = ?
+           ${githubRunMergeGuard}
            and exists (
              select 1 from briar_hunt_events
              where id = ? and run_id = briar_hunt_runs.id
@@ -5813,6 +6630,727 @@ export async function resumeHuntRun(
   return { outcome: "resumed", workflowStage: targetWorkflowStage };
 }
 
+const githubPullRequestStateRank: Record<GithubPullRequestState, number> = {
+  unknown: 0,
+  open: 1,
+  closed: 2,
+  merged: 3,
+};
+
+const githubPullRequestUrlTarget = (value: string) => {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "https:" || url.hostname.toLowerCase() !== "github.com") {
+    return null;
+  }
+  const match = url.pathname.match(
+    /^\/([^/]+)\/([^/]+)\/pull\/([1-9][0-9]*)\/?$/u,
+  );
+  return match
+    ? {
+        repository: `${match[1]}/${match[2]}`.toLowerCase(),
+        number: Number(match[3]),
+      }
+    : null;
+};
+
+type GithubPullRequestEvidenceIdentity = {
+  repositoryId: number;
+  repository: string;
+  pullRequestId: number;
+  pullRequestNodeId: string;
+  pullRequestNumber: number;
+};
+
+const githubPullRequestEvidenceIdentity = (
+  metadata: Record<string, unknown> | null,
+  target: { repository: string; number: number },
+): GithubPullRequestEvidenceIdentity | null => {
+  const value = metadata?.githubPullRequest;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const identity = value as Record<string, unknown>;
+  const repository = typeof identity.repository === "string"
+    ? identity.repository.trim().toLowerCase()
+    : "";
+  const repositoryId = identity.repositoryId;
+  const pullRequestId = identity.pullRequestId;
+  const pullRequestNodeId = identity.pullRequestNodeId;
+  const pullRequestNumber = identity.pullRequestNumber;
+  if (
+    !Number.isSafeInteger(repositoryId) || Number(repositoryId) <= 0 ||
+    !Number.isSafeInteger(pullRequestId) || Number(pullRequestId) <= 0 ||
+    !Number.isSafeInteger(pullRequestNumber) || Number(pullRequestNumber) <= 0 ||
+    repository !== target.repository ||
+    pullRequestNumber !== target.number ||
+    typeof pullRequestNodeId !== "string" ||
+    pullRequestNodeId.trim().length < 1 ||
+    pullRequestNodeId.trim().length > 200
+  ) return null;
+  return {
+    repositoryId: Number(repositoryId),
+    repository,
+    pullRequestId: Number(pullRequestId),
+    pullRequestNodeId: pullRequestNodeId.trim(),
+    pullRequestNumber: Number(pullRequestNumber),
+  };
+};
+
+const githubPullRequestSyncDetail = (input: GithubPullRequestSyncInput) => {
+  if (input.state === "merged") {
+    return `GitHub PR #${input.pullRequestNumber}이(가) merge되었습니다.`;
+  }
+  if (input.state === "closed") {
+    return `GitHub PR #${input.pullRequestNumber}이(가) merge 없이 닫혔습니다.`;
+  }
+  return input.draft
+    ? `GitHub PR #${input.pullRequestNumber}이(가) draft 상태입니다.`
+    : `GitHub PR #${input.pullRequestNumber}이(가) 열려 있습니다.`;
+};
+
+async function githubPullRequestLinksForEvent(
+  db: D1Database,
+  input: Pick<
+    GithubPullRequestSyncInput,
+    | "repositoryId"
+    | "repository"
+    | "pullRequestId"
+    | "pullRequestNodeId"
+    | "pullRequestNumber"
+    | "state"
+    | "mergedAt"
+    | "providerUpdatedAt"
+    | "linkedIssues"
+    | "organizationId"
+  >,
+) {
+  const linkedIssuesJson = stableJson(input.linkedIssues);
+  const result = await db
+    .prepare(
+      `select link.*
+       from briar_run_pull_requests link
+       join briar_hunt_runs run
+         on run.id = link.run_id and run.project_id = link.project_id
+       join briar_projects project on project.id = link.project_id
+       join briar_github_pull_requests snapshot
+         on snapshot.repository_id = link.repository_id
+        and snapshot.pull_request_number = link.pull_request_number
+        and snapshot.pull_request_id = link.pull_request_id
+        and snapshot.pull_request_node_id = link.pull_request_node_id
+       where unixepoch(snapshot.provider_updated_at) >=
+           unixepoch(link.revision_started_at)
+         and unixepoch(?) >= unixepoch(link.revision_started_at)
+         and (? is null or project.organization_id = ?)
+         and link.repository_id = ? and link.pull_request_number = ?
+         and link.pull_request_id = ? and link.pull_request_node_id = ?
+         and (
+           link.last_delivery_id is not null
+           or (
+             link.repository = ?
+             and (? is null or ? = 'merged')
+           )
+         )
+         and (? <> 'merged' or ? is not null)
+         and (
+           ? <> 'merged'
+           or exists (
+             select 1 from json_each(?) issue
+             where json_extract(issue.value, '$.projectId') = link.project_id
+               and json_extract(issue.value, '$.runId') = link.run_id
+           )
+         )
+         and (
+           ? <> 'merged'
+           or (
+             snapshot.updated_at >= link.created_at
+             and unixepoch(snapshot.merged_at) >= unixepoch(link.created_at)
+           )
+         )`,
+    )
+    .bind(
+      input.providerUpdatedAt,
+      input.organizationId ?? null,
+      input.organizationId ?? null,
+      input.repositoryId,
+      input.pullRequestNumber,
+      input.pullRequestId,
+      input.pullRequestNodeId,
+      input.repository,
+      input.mergedAt,
+      input.state,
+      input.state,
+      input.mergedAt,
+      input.state,
+      linkedIssuesJson,
+      input.state,
+    )
+    .all<RunPullRequestRow>();
+  return result.results;
+}
+
+async function recordGithubPullRequestSyncEvent(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  input: GithubPullRequestSyncInput,
+) {
+  const eventId = crypto.randomUUID();
+  const eventKey = `github:pull_request:${input.deliveryId}`;
+  const recordedAt = new Date().toISOString();
+  const results = await db.batch([
+    db
+      .prepare(
+        `insert into briar_hunt_events (
+           id, run_id, event_key, attempt, revision, stage, status,
+           workflow_stage, detail, actor, branch, commit_sha, qa_status,
+           tracker_issue_state, pull_request_urls, target_sha,
+           occurred_at, recorded_at
+         )
+         select ?, id, ?, current_attempt, current_revision, stage, status,
+                workflow_stage, ?, ?, branch, commit_sha, null,
+                tracker_issue_state, pull_request_urls, target_sha, ?, ?
+         from briar_hunt_runs
+         where id = ? and project_id = ?
+         on conflict(run_id, event_key) do nothing`,
+      )
+      .bind(
+        eventId,
+        eventKey,
+        githubPullRequestSyncDetail(input),
+        input.actor.slice(0, 128),
+        input.providerUpdatedAt,
+        recordedAt,
+        runId,
+        projectId,
+      ),
+    db
+      .prepare(
+        `update briar_hunt_runs
+         set last_event_at = max(last_event_at, ?),
+             updated_at = max(updated_at, ?)
+         where id = ? and project_id = ?
+           and exists (
+             select 1 from briar_hunt_events
+             where id = ? and run_id = briar_hunt_runs.id
+           )`,
+      )
+      .bind(
+        input.providerUpdatedAt,
+        input.observedAt,
+        runId,
+        projectId,
+        eventId,
+      ),
+  ]);
+  return (results[0]?.meta.changes ?? 0) > 0;
+}
+
+async function hasUnboundGithubPullRequestEvidence(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  attempt: number,
+  revision: number,
+) {
+  const row = await db
+    .prepare(
+      `select 1 as unbound
+       from briar_run_evidence evidence
+       where evidence.project_id = ? and evidence.run_id = ?
+         and evidence.attempt = ? and evidence.revision = ?
+         and evidence.evidence_type = 'pull_request'
+         and evidence.status in ('pending', 'passed')
+         and not exists (
+           select 1 from briar_run_pull_requests link
+           where link.run_id = evidence.run_id
+             and link.attempt = evidence.attempt
+             and link.revision = evidence.revision
+             and link.repository_id = cast(json_extract(
+               evidence.metadata_json,
+               '$.githubPullRequest.repositoryId'
+             ) as integer)
+             and link.pull_request_id = cast(json_extract(
+               evidence.metadata_json,
+               '$.githubPullRequest.pullRequestId'
+             ) as integer)
+             and link.pull_request_node_id = json_extract(
+               evidence.metadata_json,
+               '$.githubPullRequest.pullRequestNodeId'
+             )
+             and link.pull_request_number = cast(json_extract(
+               evidence.metadata_json,
+               '$.githubPullRequest.pullRequestNumber'
+             ) as integer)
+         )
+       limit 1`,
+    )
+    .bind(projectId, runId, attempt, revision)
+    .first<{ unbound: number }>();
+  return Boolean(row);
+}
+
+async function hasBlockedGithubConnectionForRun(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  attempt: number,
+  revision: number,
+) {
+  const row = await db
+    .prepare(
+      `select 1 as blocked
+       from briar_run_pull_requests link
+       join briar_projects project on project.id = link.project_id
+       where link.project_id = ? and link.run_id = ?
+         and link.attempt = ? and link.revision = ?
+         and link.installation_id is not null
+         and exists (
+           select 1 from briar_github_connections connection
+           where connection.installation_id = link.installation_id
+         )
+         and not exists (
+           select 1 from briar_github_connections connection
+           where connection.installation_id = link.installation_id
+             and connection.status = 'connected'
+             and connection.organization_id = project.organization_id
+         )
+       limit 1`,
+    )
+    .bind(projectId, runId, attempt, revision)
+    .first<{ blocked: number }>();
+  return Boolean(row);
+}
+
+export async function resumeRunAfterGithubMerge(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  actor = "github-webhook",
+) {
+  const run = await getHuntRunForProject(db, projectId, runId);
+  if (!run) return { outcome: "not_found" as const };
+  if (run.resume_requested_at) {
+    return { outcome: "already_resumed" as const };
+  }
+  if (
+    await hasBlockedGithubConnectionForRun(
+      db,
+      projectId,
+      run.id,
+      run.current_attempt,
+      run.current_revision,
+    )
+  ) {
+    return { outcome: "ineligible" as const };
+  }
+  if (
+    await hasUnboundGithubPullRequestEvidence(
+      db,
+      projectId,
+      run.id,
+      run.current_attempt,
+      run.current_revision,
+    )
+  ) {
+    return { outcome: "not_ready" as const };
+  }
+  const result = await db
+    .prepare(
+      `select * from briar_run_pull_requests
+       where project_id = ? and run_id = ? and attempt = ? and revision = ?
+       order by coalesce(merged_at, provider_updated_at, updated_at) desc, url`,
+    )
+    .bind(
+      projectId,
+      run.id,
+      run.current_attempt,
+      run.current_revision,
+    )
+    .all<RunPullRequestRow>();
+  const links = result.results;
+  if (
+    links.length === 0 ||
+    links.some((link) => link.state !== "merged" || !link.last_delivery_id)
+  ) {
+    return { outcome: "not_ready" as const };
+  }
+  const latest = links[0]!;
+  const approvedAt = latest.merged_at ?? latest.provider_updated_at ?? latest.updated_at;
+  const requestId = `github:${latest.last_delivery_id}`;
+  if (!run.waiting_checkpoint_key) {
+    if (
+      run.status === "running" &&
+      run.paused_at &&
+      run.workflow_stage === "pr_open"
+    ) {
+      const legacy = await resumeHuntRun(db, projectId, {
+        runId: run.id,
+        requestId,
+        actor,
+        occurredAt: approvedAt >= run.last_event_at
+          ? approvedAt
+          : run.last_event_at,
+        requireAllGithubPullRequestsMerged: true,
+      });
+      return { outcome: legacy.outcome };
+    }
+    return { outcome: "ineligible" as const };
+  }
+  const checkpoint = await db
+    .prepare(
+      `select checkpoint_key, attempt, revision
+       from briar_run_checkpoint_progress
+       where run_id = ? and attempt = ? and revision = ?
+         and checkpoint_key = ? and stage_id = 'pr_open'
+         and position = 'after' and state = 'waiting'`,
+    )
+    .bind(
+      run.id,
+      run.current_attempt,
+      run.current_revision,
+      run.waiting_checkpoint_key,
+    )
+    .first<Pick<
+      WorkflowCheckpointProgressRow,
+      "checkpoint_key" | "attempt" | "revision"
+    >>();
+  if (!checkpoint) return { outcome: "ineligible" as const };
+  const resumed = await resumeWorkflowCheckpoint(db, projectId, {
+    runId: run.id,
+    checkpointKey: checkpoint.checkpoint_key,
+    attempt: checkpoint.attempt,
+    revision: checkpoint.revision,
+    requestId,
+    actor,
+    approvedAt,
+    requireAllGithubPullRequestsMerged: true,
+  });
+  return {
+    outcome:
+      resumed.outcome === "approved"
+        ? ("resumed" as const)
+        : resumed.outcome === "already_approved"
+          ? ("already_resumed" as const)
+          : resumed.outcome,
+  };
+}
+
+export async function attemptGithubMergeAutoResume(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  actor = "github-webhook",
+) {
+  try {
+    return await resumeRunAfterGithubMerge(db, projectId, runId, actor);
+  } catch (error) {
+    console.error(JSON.stringify({
+      message: "GitHub merge auto-resume deferred",
+      projectId,
+      runId,
+      error: error instanceof Error ? error.message : String(error),
+    }));
+    return { outcome: "deferred" as const };
+  }
+}
+
+export async function reconcileGithubMergedRuns(
+  db: D1Database,
+  limit = 100,
+) {
+  const boundedLimit = Math.max(1, Math.min(Math.trunc(limit), 500));
+  const candidates = await db
+    .prepare(
+      `select run.project_id, run.id as run_id
+       from briar_hunt_runs run
+       where run.status = 'running'
+         and run.paused_at is not null
+         and run.resume_requested_at is null
+         and run.workflow_stage = 'pr_open'
+         and exists (
+           select 1 from briar_run_pull_requests link
+           where link.project_id = run.project_id and link.run_id = run.id
+             and link.attempt = run.current_attempt
+             and link.revision = run.current_revision
+         )
+         and not exists (
+           select 1 from briar_run_pull_requests link
+           where link.project_id = run.project_id and link.run_id = run.id
+             and link.attempt = run.current_attempt
+             and link.revision = run.current_revision
+             and (link.state <> 'merged' or link.last_delivery_id is null)
+         )
+         and not exists (
+           select 1
+           from briar_run_pull_requests link
+           join briar_projects project on project.id = link.project_id
+           where link.project_id = run.project_id and link.run_id = run.id
+             and link.attempt = run.current_attempt
+             and link.revision = run.current_revision
+             and link.installation_id is not null
+             and exists (
+               select 1 from briar_github_connections connection
+               where connection.installation_id = link.installation_id
+             )
+             and not exists (
+               select 1 from briar_github_connections connection
+               where connection.installation_id = link.installation_id
+                 and connection.status = 'connected'
+                 and connection.organization_id = project.organization_id
+             )
+         )
+         and not exists (
+           select 1 from briar_run_evidence evidence
+           where evidence.project_id = run.project_id
+             and evidence.run_id = run.id
+             and evidence.attempt = run.current_attempt
+             and evidence.revision = run.current_revision
+             and evidence.evidence_type = 'pull_request'
+             and evidence.status in ('pending', 'passed')
+             and not exists (
+               select 1 from briar_run_pull_requests link
+               where link.run_id = evidence.run_id
+                 and link.attempt = evidence.attempt
+                 and link.revision = evidence.revision
+                 and link.repository_id = cast(json_extract(
+                   evidence.metadata_json,
+                   '$.githubPullRequest.repositoryId'
+                 ) as integer)
+                 and link.pull_request_id = cast(json_extract(
+                   evidence.metadata_json,
+                   '$.githubPullRequest.pullRequestId'
+                 ) as integer)
+                 and link.pull_request_node_id = json_extract(
+                   evidence.metadata_json,
+                   '$.githubPullRequest.pullRequestNodeId'
+                 )
+                 and link.pull_request_number = cast(json_extract(
+                   evidence.metadata_json,
+                   '$.githubPullRequest.pullRequestNumber'
+                 ) as integer)
+             )
+         )
+         and (
+           run.waiting_checkpoint_key is null
+           or exists (
+             select 1 from briar_run_checkpoint_progress checkpoint
+             where checkpoint.run_id = run.id
+               and checkpoint.attempt = run.current_attempt
+               and checkpoint.revision = run.current_revision
+               and checkpoint.checkpoint_key = run.waiting_checkpoint_key
+               and checkpoint.stage_id = 'pr_open'
+               and checkpoint.position = 'after'
+               and checkpoint.state = 'waiting'
+           )
+         )
+       order by run.paused_at, run.id
+       limit ?`,
+    )
+    .bind(boundedLimit)
+    .all<{ project_id: string; run_id: string }>();
+  const outcomes: string[] = [];
+  for (const candidate of candidates.results) {
+    const result = await attemptGithubMergeAutoResume(
+      db,
+      candidate.project_id,
+      candidate.run_id,
+    );
+    outcomes.push(result.outcome);
+  }
+  return {
+    examined: candidates.results.length,
+    resumed: outcomes.filter((outcome) => outcome === "resumed").length,
+    alreadyResumed: outcomes.filter((outcome) => outcome === "already_resumed")
+      .length,
+    deferred: outcomes.filter((outcome) => outcome === "deferred").length,
+  };
+}
+
+export async function syncGithubPullRequest(
+  db: D1Database,
+  rawInput: GithubPullRequestSyncInput,
+) {
+  const repository = rawInput.repository.toLowerCase();
+  const input = {
+    ...rawInput,
+    repository,
+    url: `https://github.com/${repository}/pull/${rawInput.pullRequestNumber}`,
+  };
+  await db
+    .prepare(
+      `insert into briar_github_pull_requests (
+         repository_id, pull_request_number, installation_id, repository,
+         pull_request_id, pull_request_node_id, url, state, draft,
+         head_sha, base_sha, merge_commit_sha, opened_at, closed_at, merged_at,
+         provider_updated_at, last_delivery_id, briar_issue_links_json,
+         created_at, updated_at
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       on conflict(repository_id, pull_request_number) do update set
+         installation_id = excluded.installation_id,
+         repository = excluded.repository,
+         pull_request_id = excluded.pull_request_id,
+         pull_request_node_id = excluded.pull_request_node_id,
+         url = excluded.url,
+         state = excluded.state,
+         draft = excluded.draft,
+         head_sha = excluded.head_sha,
+         base_sha = excluded.base_sha,
+         merge_commit_sha = excluded.merge_commit_sha,
+         opened_at = excluded.opened_at,
+         closed_at = excluded.closed_at,
+         merged_at = excluded.merged_at,
+         provider_updated_at = excluded.provider_updated_at,
+         last_delivery_id = excluded.last_delivery_id,
+         briar_issue_links_json = excluded.briar_issue_links_json,
+         updated_at = excluded.updated_at
+       where briar_github_pull_requests.state <> 'merged'
+         and (
+           excluded.state = 'merged'
+           or briar_github_pull_requests.provider_updated_at <
+             excluded.provider_updated_at
+           or (
+             briar_github_pull_requests.provider_updated_at =
+               excluded.provider_updated_at
+             and case briar_github_pull_requests.state
+                   when 'open' then 1 when 'closed' then 2 when 'merged' then 3
+                 end <=
+                 case excluded.state
+                   when 'open' then 1 when 'closed' then 2 when 'merged' then 3
+                 end
+           )
+         )`,
+    )
+    .bind(
+      input.repositoryId,
+      input.pullRequestNumber,
+      input.installationId,
+      input.repository,
+      input.pullRequestId,
+      input.pullRequestNodeId,
+      input.url,
+      input.state,
+      input.draft ? 1 : 0,
+      input.headSha,
+      input.baseSha,
+      input.mergeCommitSha,
+      input.openedAt,
+      input.closedAt,
+      input.mergedAt,
+      input.providerUpdatedAt,
+      input.deliveryId,
+      stableJson(input.linkedIssues),
+      input.observedAt,
+      input.observedAt,
+    )
+    .run();
+  // PR-body Briar links are deliberately not used as authorization. The
+  // active worker's pull_request evidence is the durable run/PR binding;
+  // repository and numeric provider identity then protect later renames.
+  const links = await githubPullRequestLinksForEvent(db, input);
+  const updatedRunIds = new Set<string>();
+  const matchedCurrentRuns = new Map<string, string>();
+  for (const link of links) {
+    const run = await getHuntRunForProject(db, link.project_id, link.run_id);
+    if (!run) continue;
+    if (
+      link.attempt === run.current_attempt &&
+      link.revision === run.current_revision
+    ) {
+      matchedCurrentRuns.set(link.run_id, link.project_id);
+    }
+    const result = await db
+      .prepare(
+        `update briar_run_pull_requests
+         set installation_id = ?, repository_id = ?, repository = ?, url = ?,
+             pull_request_id = ?, pull_request_node_id = ?,
+             pull_request_number = ?, state = ?, draft = ?,
+             head_sha = ?, base_sha = ?, merge_commit_sha = ?,
+             opened_at = ?, closed_at = ?, merged_at = ?,
+             provider_updated_at = ?, last_delivery_id = ?, updated_at = ?
+         where run_id = ? and project_id = ? and attempt = ? and revision = ?
+           and repository_id = ? and pull_request_number = ?
+           and state <> 'merged'
+           and (
+             ? = 'merged'
+             or provider_updated_at is null
+             or provider_updated_at < ?
+             or (
+               provider_updated_at = ?
+               and case state
+                     when 'unknown' then 0 when 'open' then 1
+                     when 'closed' then 2 when 'merged' then 3
+                   end <= ?
+             )
+           )`,
+      )
+      .bind(
+        input.installationId,
+        input.repositoryId,
+        input.repository,
+        input.url,
+        input.pullRequestId,
+        input.pullRequestNodeId,
+        input.pullRequestNumber,
+        input.state,
+        input.draft ? 1 : 0,
+        input.headSha,
+        input.baseSha,
+        input.mergeCommitSha,
+        input.openedAt,
+        input.closedAt,
+        input.mergedAt,
+        input.providerUpdatedAt,
+        input.deliveryId,
+        input.observedAt,
+        link.run_id,
+        link.project_id,
+        link.attempt,
+        link.revision,
+        link.repository_id,
+        link.pull_request_number,
+        input.state,
+        input.providerUpdatedAt,
+        input.providerUpdatedAt,
+        githubPullRequestStateRank[input.state],
+      )
+      .run();
+    if ((result.meta.changes ?? 0) > 0) {
+      updatedRunIds.add(link.run_id);
+    }
+  }
+
+  for (const runId of updatedRunIds) {
+    const projectId = matchedCurrentRuns.get(runId);
+    if (projectId) {
+      await recordGithubPullRequestSyncEvent(db, projectId, runId, input);
+    }
+  }
+
+  const resumeOutcomes: Array<{ runId: string; outcome: string }> = [];
+  if (input.state === "merged") {
+    for (const [runId, projectId] of matchedCurrentRuns) {
+      const resumed = await attemptGithubMergeAutoResume(
+        db,
+        projectId,
+        runId,
+        input.actor,
+      );
+      resumeOutcomes.push({ runId, outcome: resumed.outcome });
+    }
+  }
+  return {
+    matchedRunCount: new Set(links.map((link) => link.run_id)).size,
+    updatedRunCount: updatedRunIds.size,
+    resumedRunCount: resumeOutcomes.filter(
+      (result) => result.outcome === "resumed",
+    ).length,
+    resumeOutcomes,
+  };
+}
+
 export async function recordRunEvidence(
   db: D1Database,
   projectId: string,
@@ -5829,9 +7367,29 @@ export async function recordRunEvidence(
     actor: string;
     observedAt: string;
   },
+  fence?: { claimTokenHash: string; authenticatedAt: string },
 ) {
   const run = await getHuntRunForProject(db, projectId, input.runId);
   if (!run) return null;
+  const runFenceSql = `
+    and run.current_attempt = ? and run.current_revision = ?
+    and run.status = ? and run.workflow_stage is ?
+    and run.paused_at is ? and run.resume_requested_at is ?
+    ${
+    fence
+      ? "and run.claim_token_hash = ? and run.lease_expires_at > ?"
+      : "and run.claim_token_hash is ? and run.lease_expires_at is ?"
+  }`;
+  const runFenceBindings = (checkedAt: string) => [
+    run.current_attempt,
+    run.current_revision,
+    run.status,
+    run.workflow_stage ?? null,
+    run.paused_at ?? null,
+    run.resume_requested_at ?? null,
+    fence?.claimTokenHash ?? run.claim_token_hash ?? null,
+    fence ? checkedAt : run.lease_expires_at ?? null,
+  ];
   const workflow = parseWorkflow(run.workflow_snapshot_json);
   const evidenceStageRank = workflow.stages.findIndex(
     (stage) => stage.id === input.stage,
@@ -5852,6 +7410,44 @@ export async function recordRunEvidence(
         : `Workflow is paused after stage: ${workflowPauseStage(workflow)}`,
     );
   }
+  let verifiedGithubPullRequest: {
+    target: { repository: string; number: number };
+    identity: GithubPullRequestEvidenceIdentity;
+  } | null = null;
+  if (
+    input.type === "pull_request" &&
+    ["pending", "passed"].includes(input.status)
+  ) {
+    const target = input.url ? githubPullRequestUrlTarget(input.url) : null;
+    const settings = await db
+      .prepare(
+        `select github_repository
+         from briar_project_settings
+         where project_id = ?`,
+      )
+      .bind(projectId)
+      .first<{ github_repository: string | null }>();
+    const configuredRepository = settings?.github_repository
+      ?.trim()
+      .toLowerCase();
+    if (configuredRepository) {
+      if (!target || configuredRepository !== target.repository) {
+        throw new HuntTransitionError(
+          `Pull request evidence must use the project's configured GitHub repository: ${configuredRepository}`,
+        );
+      }
+      const identity = githubPullRequestEvidenceIdentity(
+        input.metadata,
+        target,
+      );
+      if (!identity) {
+        throw new HuntTransitionError(
+          "GitHub pull request evidence for the configured repository requires immutable repository and PR identity metadata; update and use the bundled Briar CLI",
+        );
+      }
+      verifiedGithubPullRequest = { target, identity };
+    }
+  }
   const metadataJson = input.metadata ? stableJson(input.metadata) : null;
   const storedEvidenceKey = await scopedEvidenceKey(
     input.evidenceKey,
@@ -5864,21 +7460,197 @@ export async function recordRunEvidence(
     )
     .bind(run.id, run.current_attempt, storedEvidenceKey)
     .first<RunEvidenceRow>();
-  const linkPullRequest = async (url: string | null, recordedAt: string) => {
-    if (input.type !== "pull_request" || !url) return;
-    await db
-      .prepare(
-        `update briar_hunt_runs
+  const revisionStartedAtSql = `coalesce((
+    select min(max(event.recorded_at, event.occurred_at))
+    from briar_hunt_events event
+    where event.run_id = run.id
+      and event.attempt = run.current_attempt
+      and event.revision = run.current_revision
+  ), run.created_at)`;
+  const linkPullRequest = async (
+    url: string | null,
+    recordedAt: string,
+    associationStartedAt: string,
+  ) => {
+    if (
+      input.type !== "pull_request" ||
+      !url ||
+      !["pending", "passed"].includes(input.status)
+    ) {
+      return;
+    }
+    const checkedAt = new Date().toISOString();
+    const statements: D1PreparedStatement[] = [
+      db.prepare(
+        `update briar_hunt_runs as run
          set pull_request_urls = json_insert(pull_request_urls, '$[#]', ?),
              updated_at = max(updated_at, ?)
-         where id = ? and project_id = ?
+         where run.id = ? and run.project_id = ?
            and not exists (
-             select 1 from json_each(pull_request_urls)
+             select 1 from json_each(run.pull_request_urls)
              where value = ?
-           )`,
+           )
+           ${runFenceSql}`,
+      ).bind(
+        url,
+        recordedAt,
+        run.id,
+        projectId,
+        url,
+        ...runFenceBindings(checkedAt),
+      ),
+    ];
+    if (verifiedGithubPullRequest) {
+      const { target, identity } = verifiedGithubPullRequest;
+      const canonicalUrl =
+        `https://github.com/${target.repository}/pull/${target.number}`;
+      statements.push(db.prepare(
+        `insert into briar_run_pull_requests (
+           project_id, run_id, attempt, revision, revision_started_at, url,
+           installation_id, repository_id, repository,
+           pull_request_id, pull_request_node_id, pull_request_number,
+           state, draft, head_sha, base_sha, merge_commit_sha,
+           opened_at, closed_at, merged_at, provider_updated_at,
+           last_delivery_id, created_at, updated_at
+         )
+         select run.project_id, run.id, run.current_attempt,
+                run.current_revision,
+                ${revisionStartedAtSql},
+                ?, snapshot.installation_id,
+                ?, ?, ?, ?, ?,
+                coalesce(snapshot.state, 'unknown'), snapshot.draft,
+                snapshot.head_sha, snapshot.base_sha,
+                snapshot.merge_commit_sha, snapshot.opened_at,
+                snapshot.closed_at, snapshot.merged_at,
+                snapshot.provider_updated_at, snapshot.last_delivery_id,
+                ?, ?
+         from briar_hunt_runs run
+         left join briar_github_pull_requests snapshot
+           on snapshot.repository_id = ?
+          and snapshot.pull_request_number = ?
+          and snapshot.pull_request_id = ?
+          and snapshot.pull_request_node_id = ?
+         and snapshot.repository = ?
+         and unixepoch(snapshot.provider_updated_at) >=
+            unixepoch(${revisionStartedAtSql})
+          and (
+            snapshot.installation_id is null
+            or not exists (
+              select 1 from briar_github_connections connection
+              where connection.installation_id = snapshot.installation_id
+            )
+            or exists (
+              select 1
+              from briar_github_connections connection
+              join briar_projects project
+                on project.organization_id = connection.organization_id
+              where connection.installation_id = snapshot.installation_id
+                and connection.status = 'connected'
+                and project.id = run.project_id
+            )
+          )
+          and (
+            (
+              snapshot.state in ('open', 'closed')
+              and snapshot.merged_at is null
+            )
+            or (
+              snapshot.state = 'merged'
+              and snapshot.merged_at is not null
+              and snapshot.updated_at >= ?
+              and unixepoch(snapshot.merged_at) >= unixepoch(?)
+              and exists (
+                select 1 from json_each(snapshot.briar_issue_links_json) issue
+                where json_extract(issue.value, '$.projectId') = run.project_id
+                  and json_extract(issue.value, '$.runId') = run.id
+              )
+            )
+          )
+         where run.id = ? and run.project_id = ?
+           ${runFenceSql}
+         on conflict(
+           run_id, attempt, revision, repository_id, pull_request_number
+         ) do update set
+           url = excluded.url,
+           installation_id = excluded.installation_id,
+           repository = excluded.repository,
+           pull_request_id = excluded.pull_request_id,
+           pull_request_node_id = excluded.pull_request_node_id,
+           state = excluded.state,
+           draft = excluded.draft,
+           head_sha = excluded.head_sha,
+           base_sha = excluded.base_sha,
+           merge_commit_sha = excluded.merge_commit_sha,
+           opened_at = excluded.opened_at,
+           closed_at = excluded.closed_at,
+           merged_at = excluded.merged_at,
+           provider_updated_at = excluded.provider_updated_at,
+           last_delivery_id = excluded.last_delivery_id,
+           updated_at = excluded.updated_at
+         where briar_run_pull_requests.state = 'unknown'
+           and excluded.last_delivery_id is not null`,
+      ).bind(
+        canonicalUrl,
+        identity.repositoryId,
+        identity.repository,
+        identity.pullRequestId,
+        identity.pullRequestNodeId,
+        identity.pullRequestNumber,
+        associationStartedAt,
+        recordedAt,
+        identity.repositoryId,
+        identity.pullRequestNumber,
+        identity.pullRequestId,
+        identity.pullRequestNodeId,
+        identity.repository,
+        associationStartedAt,
+        associationStartedAt,
+        run.id,
+        projectId,
+        ...runFenceBindings(checkedAt),
+      ));
+    }
+    await db.batch(statements);
+    const fencedRun = await db
+      .prepare(
+        `select 1 as active from briar_hunt_runs run
+         where run.id = ? and run.project_id = ?
+           ${runFenceSql}`,
       )
-      .bind(url, recordedAt, run.id, projectId, url)
-      .run();
+      .bind(
+        run.id,
+        projectId,
+        ...runFenceBindings(new Date().toISOString()),
+      )
+      .first<{ active: number }>();
+    if (!fencedRun) {
+      throw new HuntTransitionError(
+        "Run claim or revision changed while recording pull request evidence",
+      );
+    }
+    if (verifiedGithubPullRequest) {
+      const { identity } = verifiedGithubPullRequest;
+      const linked = await db
+        .prepare(
+          `select 1 as linked from briar_run_pull_requests
+           where project_id = ? and run_id = ? and attempt = ? and revision = ?
+             and repository_id = ? and pull_request_number = ?`,
+        )
+        .bind(
+          projectId,
+          run.id,
+          run.current_attempt,
+          run.current_revision,
+          identity.repositoryId,
+          identity.pullRequestNumber,
+        )
+        .first<{ linked: number }>();
+      if (!linked) {
+        throw new HuntTransitionError(
+          "Run claim or revision changed while recording pull request evidence",
+        );
+      }
+    }
   };
   if (existing) {
     const same =
@@ -5892,9 +7664,18 @@ export async function recordRunEvidence(
       existing.actor === input.actor &&
       existing.observed_at === input.observedAt;
     if (!same) throw new EventKeyConflictError();
-    await linkPullRequest(existing.url, existing.recorded_at);
+    await linkPullRequest(
+      existing.url,
+      existing.recorded_at,
+      existing.github_association_started_at ?? existing.recorded_at,
+    );
     return existing;
   }
+  const recordedAt = new Date().toISOString();
+  const githubAssociationStartedAt = input.type === "pull_request" &&
+      input.url && ["pending", "passed"].includes(input.status)
+    ? fence?.authenticatedAt ?? recordedAt
+    : null;
   const evidence: RunEvidenceRow = {
     id: crypto.randomUUID(),
     run_id: run.id,
@@ -5910,22 +7691,24 @@ export async function recordRunEvidence(
     metadata_json: metadataJson,
     actor: input.actor,
     observed_at: input.observedAt,
-    recorded_at: new Date().toISOString(),
+    recorded_at: recordedAt,
+    github_association_started_at: githubAssociationStartedAt,
   };
-  await db
+  const inserted = await db
     .prepare(
       `insert into briar_run_evidence (
          id, project_id, run_id, attempt, revision, evidence_key, workflow_stage,
          evidence_type, status, detail, command, url, metadata_json,
-         actor, observed_at, recorded_at
-       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         actor, observed_at, recorded_at, github_association_started_at
+       )
+       select ?, run.project_id, run.id, run.current_attempt,
+              run.current_revision, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+       from briar_hunt_runs run
+       where run.id = ? and run.project_id = ?
+         ${runFenceSql}`,
     )
     .bind(
       evidence.id,
-      projectId,
-      evidence.run_id,
-      evidence.attempt,
-      evidence.revision,
       evidence.evidence_key,
       evidence.workflow_stage,
       evidence.evidence_type,
@@ -5937,9 +7720,22 @@ export async function recordRunEvidence(
       evidence.actor,
       evidence.observed_at,
       evidence.recorded_at,
+      evidence.github_association_started_at,
+      run.id,
+      projectId,
+      ...runFenceBindings(evidence.recorded_at),
     )
     .run();
-  await linkPullRequest(evidence.url, evidence.recorded_at);
+  if ((inserted.meta.changes ?? 0) === 0) {
+    throw new HuntTransitionError(
+      "Run claim or revision changed while recording evidence",
+    );
+  }
+  await linkPullRequest(
+    evidence.url,
+    evidence.recorded_at,
+    evidence.github_association_started_at ?? evidence.recorded_at,
+  );
   return evidence;
 }
 

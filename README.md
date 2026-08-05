@@ -196,6 +196,11 @@ Worker secrets are managed with [dotenvx](https://dotenvx.com/). The encrypted `
 bunx dotenvx set BETTER_AUTH_SECRET 'new-value' -f .env.production --no-native --no-armor
 bunx dotenvx set GOOGLE_CLIENT_ID 'new-value' -f .env.production --no-native --no-armor
 bunx dotenvx set GOOGLE_CLIENT_SECRET 'new-value' -f .env.production --no-native --no-armor
+bunx dotenvx set GITHUB_APP_CLIENT_ID 'github-app-client-id' -f .env.production --no-native --no-armor
+bunx dotenvx set GITHUB_APP_CLIENT_SECRET 'github-app-client-secret' -f .env.production --no-native --no-armor
+bunx dotenvx set GITHUB_APP_SLUG 'github-app-slug' -f .env.production --no-native --no-armor
+bunx dotenvx set GITHUB_CALLBACK_ORIGIN 'https://<worker-domain>' -f .env.production --no-native --no-armor
+bunx dotenvx set GITHUB_WEBHOOK_SECRET 'same-value-configured-in-github-app' -f .env.production --no-native --no-armor
 bunx dotenvx set SLACK_CLIENT_ID 'new-value' -f .env.production --no-native --no-armor
 bunx dotenvx set SLACK_CLIENT_SECRET 'new-value' -f .env.production --no-native --no-armor
 bunx dotenvx set SLACK_SIGNING_SECRET 'new-value' -f .env.production --no-native --no-armor

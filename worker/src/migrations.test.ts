@@ -90,4 +90,40 @@ describe("D1 migrations", () => {
     expect(sql).toMatch(/briar_inbox_read_states_user_updated_idx/iu);
     expect(sql).not.toMatch(/\bupdate\s+briar_/iu);
   });
+
+  it("adds idempotent GitHub delivery and revision-scoped PR state", async () => {
+    const sql = await readFile(
+      resolve("migrations", "0063_github_pull_request_sync.sql"),
+      "utf8",
+    );
+
+    expect(sql).toMatch(/create\s+table\s+briar_github_deliveries/iu);
+    expect(sql).toMatch(
+      /alter\s+table\s+briar_run_evidence\s+add\s+column\s+github_association_started_at\s+text/iu,
+    );
+    expect(sql).toMatch(/delivery_id\s+text\s+primary\s+key/iu);
+    expect(sql).toMatch(/create\s+table\s+briar_github_pull_requests/iu);
+    expect(sql).not.toMatch(/url\s+text\s+not\s+null\s+unique/iu);
+    expect(sql).toMatch(/briar_github_pull_requests_url_idx/iu);
+    expect(sql).toMatch(/create\s+table\s+briar_run_pull_requests/iu);
+    expect(sql).toMatch(
+      /primary\s+key\s*\(\s*run_id,\s*attempt,\s*revision,\s*repository_id,\s*pull_request_number\s*\)/iu,
+    );
+    expect(sql).toMatch(/revision_started_at\s+text\s+not\s+null/iu);
+    expect(sql).not.toMatch(/insert\s+into\s+briar_run_pull_requests/iu);
+    expect(sql).not.toMatch(/\bupdate\s+briar_hunt_runs\b/iu);
+  });
+
+  it("stores verified GitHub connections without persisting OAuth tokens", async () => {
+    const sql = await readFile(
+      resolve("migrations", "0064_github_integration.sql"),
+      "utf8",
+    );
+
+    expect(sql).toMatch(/create\s+table\s+briar_github_connections/iu);
+    expect(sql).toMatch(/status\s+text\s+not\s+null[\s\S]*'disconnected'/iu);
+    expect(sql).toMatch(/create\s+table\s+briar_github_oauth_states/iu);
+    expect(sql).toMatch(/pkce_verifier\s+text\s+not\s+null/iu);
+    expect(sql).not.toMatch(/(?:access|refresh)_token/iu);
+  });
 });

@@ -46,6 +46,7 @@
       "/queue*",
       "/run-events",
       "/health",
+      "/github/*",
       "/slack/*",
       "/.well-known/*",
       "/open/*",
@@ -77,7 +78,7 @@
     }
   ],
   "triggers": {
-    "crons": ["17 */6 * * *"]
+    "crons": ["* * * * *", "17 */6 * * *"]
   },
   "secrets": {
     "required": [

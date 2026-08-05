@@ -23,7 +23,7 @@ function fixture(overrides: Partial<Record<string, string>> = {}) {
 }
 
 describe("encrypted environment verification", () => {
-  it("requires every Slack production secret to remain encrypted", () => {
+  it("requires integration production settings to remain encrypted", () => {
     expect(encryptedEnvPolicies[".env.production"]?.secrets).toEqual(
       expect.arrayContaining([
         "SLACK_CLIENT_ID",
@@ -32,6 +32,39 @@ describe("encrypted environment verification", () => {
         "SLACK_TOKEN_ENCRYPTION_KEY",
       ]),
     );
+    expect(encryptedEnvPolicies[".env.production"]?.optionalSecrets).toEqual(
+      expect.arrayContaining([
+        "GITHUB_APP_CLIENT_ID",
+        "GITHUB_APP_CLIENT_SECRET",
+        "GITHUB_APP_SLUG",
+        "GITHUB_CALLBACK_ORIGIN",
+        "GITHUB_WEBHOOK_SECRET",
+      ]),
+    );
+  });
+
+  it("allows an encrypted optional secret and rejects plaintext", () => {
+    const optionalPolicy = {
+      ...policy,
+      optionalSecrets: ["OPTIONAL_SECRET"],
+    } as const;
+    expect(() =>
+      verifyEncryptedEnv(".env.test", fixture(), optionalPolicy)
+    ).not.toThrow();
+    expect(() =>
+      verifyEncryptedEnv(
+        ".env.test",
+        `${fixture()}\nOPTIONAL_SECRET="encrypted:ghi789+/="`,
+        optionalPolicy,
+      )
+    ).not.toThrow();
+    expect(() =>
+      verifyEncryptedEnv(
+        ".env.test",
+        `${fixture()}\nOPTIONAL_SECRET="plaintext"`,
+        optionalPolicy,
+      )
+    ).toThrow("requires encrypted ciphertext for OPTIONAL_SECRET");
   });
 
   it("accepts a public key and encrypted secret values", () => {

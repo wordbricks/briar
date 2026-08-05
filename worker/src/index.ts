@@ -89,14 +89,21 @@ import {
   acceptOrganizationInvitation,
   addOrganizationMember,
   assertQueuedHuntClaim,
+  attemptGithubMergeAutoResume,
+  claimGithubDelivery,
   claimNextIssueAgentReply,
   claimDueProjectAgentScheduleRun,
   claimNextQueuedHuntRun,
   completeIssueAgentReply,
   completeIssueResultReview,
   completeProjectAgentScheduleRun,
+  completeGithubDelivery,
   completeSlackEvent,
+  connectGithubInstallation,
+  consumeGithubInstallState,
+  consumeGithubOAuthState,
   consumeSlackOAuthState,
+  createGithubOAuthState,
   createIssueMessage,
   createIssueDependency,
   createIssueAttachments,
@@ -110,6 +117,9 @@ import {
   claimSlackEvent,
   deleteAccountData,
   deleteSlackInstallation,
+  disconnectGithubInstallation,
+  disconnectGithubInstallationById,
+  disconnectGithubInstallationsByAuthorizedUser,
   deleteProjectAgent,
   deleteProjectAgentSchedule,
   deleteIssue,
@@ -126,6 +136,8 @@ import {
   getRunEvidenceImage,
   getOrganizationRole,
   getOrganizationInvitationByTokenHash,
+  getGithubConnectionByInstallation,
+  getGithubConnectionForOrganization,
   getSlackInstallation,
   isOrganizationHandleAvailable,
   getProject,
@@ -153,6 +165,7 @@ import {
   listRunStageRevisions,
   listOrganizationMembers,
   listOrganizationInvitations,
+  listGithubConnectionRepositories,
   listOrganizationProjects,
   listOrganizations,
   listProjects,
@@ -165,6 +178,7 @@ import {
   planAccountDeletion,
   issueProjectAgentToken,
   recoverHuntRun,
+  reconcileGithubMergedRuns,
   completeWorkflowStageLifecycle,
   resumeWorkflowCheckpoint,
   resumeHuntRun,
@@ -177,6 +191,7 @@ import {
   renewIssueAgentReplyLease,
   rollbackNewAppIssue,
   startWorkflowStageLifecycle,
+  releaseGithubDelivery,
   releaseSlackEvent,
   updateProjectAgent,
   updateProjectAgentSchedule,
@@ -195,6 +210,8 @@ import {
   upsertInboxReadStates,
   upsertProjectAgentSession,
   upsertSlackInstallation,
+  syncGithubPullRequest,
+  syncGithubConnectionRepositories,
   type HuntEventRow,
   type HuntRunRow,
   type IssueAttachmentInput,
@@ -217,6 +234,17 @@ import {
   type RunEvidenceImageInput,
   type RunEvidenceImageRow,
 } from "./db";
+import {
+  exchangeGithubOAuthCode,
+  githubOAuthStateTtlMs,
+  githubPkceChallenge,
+  githubSha256Hex,
+  parseGitHubWebhook,
+  parseGitHubWebhookHeaders,
+  randomGithubOAuthToken,
+  verifyGithubOAuthInstallation,
+  verifyGitHubWebhook,
+} from "./github";
 import {
   assertStoredCheckpointPoliciesCompatible,
   checkpointPolicyJson,
@@ -2226,6 +2254,8 @@ async function requireActiveWorkerRunClaim(
   if (!claimToken?.startsWith("briar_claim_")) {
     throw new HttpError(409, "Active claim token is required");
   }
+  const claimTokenHash = await sha256(claimToken);
+  const authenticatedAt = new Date().toISOString();
   const active = await db
     .prepare(
       `select id from briar_hunt_runs
@@ -2233,10 +2263,10 @@ async function requireActiveWorkerRunClaim(
          and lease_expires_at > ?
          and status not in ('completed', 'cancelled', 'blocked', 'failed')`,
     )
-    .bind(runId, projectId, await sha256(claimToken), new Date().toISOString())
+    .bind(runId, projectId, claimTokenHash, authenticatedAt)
     .first<{ id: string }>();
   if (!active) throw new HttpError(409, "Auto Hunt claim token is no longer active");
-  return projectId;
+  return { projectId, claimTokenHash, authenticatedAt };
 }
 
 async function requireProjectAccess(
@@ -2387,6 +2417,40 @@ const slackConfigAvailable = (env: Env) =>
 const slackOAuthRedirectUri = (origin: string) =>
   `${origin}/slack/oauth/callback`;
 
+const githubCallbackOrigin = (env: Env) => {
+  const value = env.GITHUB_CALLBACK_ORIGIN?.trim();
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    const isLocalhost = url.hostname === "localhost" ||
+      url.hostname === "127.0.0.1" || url.hostname === "[::1]";
+    if (
+      (url.protocol !== "https:" && !(isLocalhost && url.protocol === "http:")) ||
+      url.username || url.password || url.search || url.hash ||
+      (url.pathname !== "/" && url.pathname !== "")
+    ) {
+      return null;
+    }
+    return url.origin;
+  } catch {
+    return null;
+  }
+};
+
+const githubConfigAvailable = (env: Env) =>
+  Boolean(
+    env.GITHUB_WEBHOOK_SECRET?.trim() &&
+      env.GITHUB_APP_CLIENT_ID?.trim() &&
+      env.GITHUB_APP_CLIENT_SECRET?.trim() &&
+      /^[a-z0-9](?:[a-z0-9-]{0,198}[a-z0-9])?$/u.test(
+        env.GITHUB_APP_SLUG?.trim() ?? "",
+      ) &&
+      githubCallbackOrigin(env),
+  );
+
+const githubOAuthRedirectUri = (origin: string) =>
+  `${origin}/github/oauth/callback`;
+
 const escapeHtml = (value: string) =>
   value.replace(
     /[&<>"']/gu,
@@ -2407,11 +2471,23 @@ const html = (title: string, message: string, status = 200) =>
       status,
       headers: {
         "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-store",
+        "referrer-policy": "no-referrer",
         "content-security-policy":
           "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
       },
     },
   );
+
+const noStoreRedirect = (location: string) =>
+  new Response(null, {
+    status: 302,
+    headers: {
+      location,
+      "cache-control": "no-store",
+      "referrer-policy": "no-referrer",
+    },
+  });
 
 type SlackAppMentionEvent = {
   type: "app_mention";
@@ -2676,6 +2752,212 @@ async function handleSlackEventRequest(
     else await processing;
   }
   return json({ ok: true });
+}
+
+async function readVerifiedGithubBody(request: Request, env: Env) {
+  const maxBytes = 1_048_576;
+  const webhookSecret = env.GITHUB_WEBHOOK_SECRET?.trim();
+  if (!webhookSecret) {
+    throw new HttpError(503, "GitHub integration is not configured");
+  }
+  const contentLength = request.headers.get("content-length");
+  if (contentLength !== null) {
+    const declaredLength = Number(contentLength);
+    if (!Number.isSafeInteger(declaredLength) || declaredLength < 0) {
+      throw new HttpError(400, "Invalid GitHub webhook content length");
+    }
+    if (declaredLength > maxBytes) {
+      throw new HttpError(413, "GitHub webhook body is too large");
+    }
+  }
+  if (!request.body) {
+    throw new HttpError(400, "GitHub webhook body is required");
+  }
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => undefined);
+      throw new HttpError(413, "GitHub webhook body is too large");
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  if (bytes.byteLength > maxBytes) {
+    throw new HttpError(413, "GitHub webhook body is too large");
+  }
+  if (!(await verifyGitHubWebhook(bytes, request.headers, webhookSecret))) {
+    throw new HttpError(401, "Invalid GitHub webhook signature");
+  }
+  return bytes;
+}
+
+async function handleGithubWebhookRequest(request: Request, env: Env) {
+  const rawBody = await readVerifiedGithubBody(request, env);
+  const headers = parseGitHubWebhookHeaders(request.headers);
+  let payload: unknown;
+  try {
+    payload = JSON.parse(new TextDecoder().decode(rawBody));
+  } catch {
+    throw new HttpError(400, "Invalid GitHub webhook payload");
+  }
+  const event = parseGitHubWebhook(headers, payload);
+  const claimedAt = new Date().toISOString();
+  const staleBefore = new Date(Date.parse(claimedAt) - 5 * 60_000).toISOString();
+  const action = event.event === "ping" ? null : event.action;
+  const claimed = await claimGithubDelivery(env.DB, {
+    deliveryId: event.deliveryId,
+    eventName: event.event,
+    action,
+    claimedAt,
+    staleBefore,
+  });
+  if (!claimed) return json({ ok: true, duplicate: true });
+
+  try {
+    if (event.event === "ping") {
+      await completeGithubDelivery(
+        env.DB,
+        event.deliveryId,
+        claimedAt,
+        new Date().toISOString(),
+      );
+      return json({ ok: true, event: event.event });
+    }
+    if (event.event === "installation") {
+      if (event.action === "deleted" || event.action === "suspend") {
+        await disconnectGithubInstallationById(
+          env.DB,
+          event.installationId,
+          claimedAt,
+        );
+      }
+      await completeGithubDelivery(
+        env.DB,
+        event.deliveryId,
+        claimedAt,
+        new Date().toISOString(),
+      );
+      return json({ ok: true, event: event.event, action: event.action });
+    }
+    if (event.event === "installation_repositories") {
+      const updated = await syncGithubConnectionRepositories(env.DB, {
+        installationId: event.installationId,
+        added: event.added,
+        removedIds: event.removed.map((repository) => repository.id),
+        observedAt: claimedAt,
+      });
+      await completeGithubDelivery(
+        env.DB,
+        event.deliveryId,
+        claimedAt,
+        new Date().toISOString(),
+      );
+      return json({
+        ok: true,
+        event: event.event,
+        action: event.action,
+        updated,
+      });
+    }
+    if (event.event === "github_app_authorization") {
+      if (event.action === "revoked") {
+        await disconnectGithubInstallationsByAuthorizedUser(
+          env.DB,
+          event.githubUserId,
+          claimedAt,
+        );
+      }
+      await completeGithubDelivery(
+        env.DB,
+        event.deliveryId,
+        claimedAt,
+        new Date().toISOString(),
+      );
+      return json({ ok: true, event: event.event, action: event.action });
+    }
+
+    const connection = await getGithubConnectionByInstallation(
+      env.DB,
+      event.installationId,
+    );
+    if (connection?.status === "disconnected") {
+      await completeGithubDelivery(
+        env.DB,
+        event.deliveryId,
+        claimedAt,
+        new Date().toISOString(),
+      );
+      return json({
+        ok: true,
+        event: event.event,
+        ignored: true,
+        reason: "integration_disconnected",
+      });
+    }
+    if (event.event === "issues") {
+      // GitHub Issue mirroring is intentionally non-authoritative for the
+      // Briar workflow. Accept the signed delivery without moving a run.
+      await completeGithubDelivery(
+        env.DB,
+        event.deliveryId,
+        claimedAt,
+        new Date().toISOString(),
+      );
+      return json({ ok: true, event: event.event, matchedRunCount: 0 });
+    }
+
+    const result = await syncGithubPullRequest(env.DB, {
+      deliveryId: event.deliveryId,
+      installationId: event.installationId,
+      repositoryId: event.repositoryId,
+      repository: event.repositoryFullName,
+      pullRequestId: event.pullRequestId,
+      pullRequestNodeId: event.pullRequestNodeId,
+      pullRequestNumber: event.number,
+      url: event.htmlUrl,
+      state: event.state,
+      draft: event.draft,
+      headSha: event.headSha,
+      baseSha: event.baseSha,
+      mergeCommitSha: event.mergeCommitSha,
+      openedAt: event.createdAt,
+      closedAt: event.closedAt,
+      mergedAt: event.mergedAt,
+      providerUpdatedAt: event.providerUpdatedAt,
+      linkedIssues: event.briarIssueLinks,
+      actor: `github:${event.senderLogin}`,
+      observedAt: claimedAt,
+      organizationId: connection?.organization_id ?? null,
+    });
+    // The signed provider snapshot includes its exact Briar issue links. A PR
+    // evidence request that commits after this handler can consume that
+    // snapshot, so successful deliveries are safe to complete even when no
+    // run link was visible during this request.
+    await completeGithubDelivery(
+      env.DB,
+      event.deliveryId,
+      claimedAt,
+      new Date().toISOString(),
+    );
+    return json({
+      ok: true,
+      event: event.event,
+      ...result,
+    });
+  } catch (error) {
+    await releaseGithubDelivery(env.DB, event.deliveryId, claimedAt);
+    throw error;
+  }
 }
 
 const slackCommandMessage = (text: string) =>
@@ -3023,6 +3305,171 @@ async function handleSlackOAuthCallback(request: Request, env: Env) {
     return html(
       "Slack 연결 실패",
       "Slack 인증을 저장하지 못했습니다. Briar에서 다시 연결해 주세요.",
+      502,
+    );
+  }
+}
+
+async function handleGithubInstallCallback(request: Request, env: Env) {
+  const callbackOrigin = githubCallbackOrigin(env);
+  if (!githubConfigAvailable(env) || !callbackOrigin) {
+    return html(
+      "GitHub 연결 실패",
+      "Briar 서버의 GitHub App 환경 변수가 설정되지 않았습니다.",
+      503,
+    );
+  }
+  const url = new URL(request.url);
+  const state = url.searchParams.get("state");
+  const rawInstallationId = url.searchParams.get("installation_id");
+  const installationId = rawInstallationId && /^\d+$/u.test(rawInstallationId)
+    ? Number(rawInstallationId)
+    : Number.NaN;
+  if (!state || !Number.isSafeInteger(installationId) || installationId <= 0) {
+    return html(
+      "GitHub 연결 취소됨",
+      "GitHub App 설치가 완료되지 않았거나 유효하지 않은 응답입니다.",
+      400,
+    );
+  }
+
+  const installState = await consumeGithubInstallState(
+    env.DB,
+    await githubSha256Hex(state),
+    new Date().toISOString(),
+  );
+  if (!installState) {
+    return html(
+      "GitHub 연결 만료됨",
+      "설치 링크가 만료되었거나 이미 사용되었습니다. Briar에서 다시 연결해 주세요.",
+      400,
+    );
+  }
+
+  const oauthState = randomGithubOAuthToken();
+  const pkceVerifier = randomGithubOAuthToken();
+  const createdAt = new Date();
+  await createGithubOAuthState(env.DB, {
+    stateHash: await githubSha256Hex(oauthState),
+    organizationId: installState.organization_id,
+    userId: installState.user_id,
+    pkceVerifier,
+    installationId,
+    expiresAt: new Date(
+      createdAt.getTime() + githubOAuthStateTtlMs,
+    ).toISOString(),
+    createdAt: createdAt.toISOString(),
+  });
+  const authorizeUrl = new URL("https://github.com/login/oauth/authorize");
+  authorizeUrl.searchParams.set("client_id", env.GITHUB_APP_CLIENT_ID!);
+  authorizeUrl.searchParams.set(
+    "redirect_uri",
+    githubOAuthRedirectUri(callbackOrigin),
+  );
+  authorizeUrl.searchParams.set("state", oauthState);
+  authorizeUrl.searchParams.set(
+    "code_challenge",
+    await githubPkceChallenge(pkceVerifier),
+  );
+  authorizeUrl.searchParams.set("code_challenge_method", "S256");
+  authorizeUrl.searchParams.set("prompt", "select_account");
+  return noStoreRedirect(authorizeUrl.toString());
+}
+
+async function handleGithubOAuthCallback(request: Request, env: Env) {
+  const callbackOrigin = githubCallbackOrigin(env);
+  if (!githubConfigAvailable(env) || !callbackOrigin) {
+    return html(
+      "GitHub 연결 실패",
+      "Briar 서버의 GitHub App 환경 변수가 설정되지 않았습니다.",
+      503,
+    );
+  }
+  const url = new URL(request.url);
+  const state = url.searchParams.get("state");
+  const code = url.searchParams.get("code");
+  const oauthError = url.searchParams.get("error");
+  if (!state || oauthError || !code) {
+    return html(
+      "GitHub 연결 취소됨",
+      oauthError
+        ? `GitHub이 연결을 완료하지 않았습니다 (${oauthError}).`
+        : "유효하지 않은 OAuth 응답입니다.",
+      400,
+    );
+  }
+
+  const oauthState = await consumeGithubOAuthState(
+    env.DB,
+    await githubSha256Hex(state),
+    new Date().toISOString(),
+  );
+  if (!oauthState?.installation_id) {
+    return html(
+      "GitHub 연결 만료됨",
+      "인증 요청이 만료되었거나 이미 사용되었습니다. Briar에서 다시 연결해 주세요.",
+      400,
+    );
+  }
+  const role = await getOrganizationRole(
+    env.DB,
+    oauthState.organization_id,
+    oauthState.user_id,
+  );
+  if (!canManageOrganization(role)) {
+    return html(
+      "GitHub 연결 권한 없음",
+      "조직 관리자 권한이 없어 GitHub 연결을 완료할 수 없습니다.",
+      403,
+    );
+  }
+
+  try {
+    const authorization = await exchangeGithubOAuthCode({
+      clientId: env.GITHUB_APP_CLIENT_ID!,
+      clientSecret: env.GITHUB_APP_CLIENT_SECRET!,
+      code,
+      redirectUri: githubOAuthRedirectUri(callbackOrigin),
+      codeVerifier: oauthState.pkce_verifier,
+    });
+    const verified = await verifyGithubOAuthInstallation({
+      accessToken: authorization.access_token,
+      installationId: oauthState.installation_id,
+      appSlug: env.GITHUB_APP_SLUG!,
+    });
+    const result = await connectGithubInstallation(env.DB, {
+      organizationId: oauthState.organization_id,
+      installationId: verified.installation.id,
+      installationAccountId: verified.installation.accountId,
+      accountLogin: verified.installation.accountLogin,
+      accountAvatarUrl: verified.installation.accountAvatarUrl,
+      authorizedGithubUserId: verified.user.id,
+      authorizedGithubUserLogin: verified.user.login,
+      connectedByUserId: oauthState.user_id,
+      repositories: verified.repositories,
+      observedAt: new Date().toISOString(),
+    });
+    if (result.outcome !== "connected") {
+      return html(
+        "GitHub 연결 충돌",
+        result.outcome === "organization_conflict"
+          ? "이 Briar 조직에는 다른 GitHub 설치가 이미 연결되어 있습니다."
+          : "이 GitHub 설치는 다른 Briar 조직에 이미 연결되어 있습니다.",
+        409,
+      );
+    }
+    return html(
+      "GitHub 연결 완료",
+      `${verified.installation.accountLogin}의 GitHub 저장소가 Briar에 연결되었습니다. 이 창을 닫고 Briar로 돌아가세요.`,
+    );
+  } catch (error) {
+    console.error(JSON.stringify({
+      message: "GitHub OAuth callback failed",
+      error: error instanceof Error ? error.message : String(error),
+    }));
+    return html(
+      "GitHub 연결 실패",
+      "GitHub 설치를 확인하거나 연결 정보를 저장하지 못했습니다. Briar에서 다시 연결해 주세요.",
       502,
     );
   }
@@ -4536,6 +4983,97 @@ async function route(
       throw new HttpError(404, "Worker not found");
     }
     return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  const organizationGithubMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/integrations\/github$/u,
+  );
+  if (organizationGithubMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const organizationId = organizationGithubMatch[1];
+    const role = await getOrganizationRole(db, organizationId, session.user.id);
+    if (!role) throw new HttpError(404, "Organization not found");
+    const connection = await getGithubConnectionForOrganization(
+      db,
+      organizationId,
+    );
+    if (!connection) {
+      return json({
+        configured: githubConfigAvailable(env),
+        canManage: canManageOrganization(role),
+        connected: false,
+      });
+    }
+    const repositories = await listGithubConnectionRepositories(
+      db,
+      connection.installation_id,
+    );
+    return json({
+      configured: githubConfigAvailable(env),
+      canManage: canManageOrganization(role),
+      connected: true,
+      accountLogin: connection.account_login,
+      accountAvatarUrl: connection.account_avatar_url,
+      installationId: connection.installation_id,
+      repositories: repositories.map((repository) => ({
+        id: repository.repository_id,
+        owner: repository.owner,
+        name: repository.name,
+        fullName: repository.full_name,
+      })),
+      connectedAt: connection.connected_at,
+    });
+  }
+  if (organizationGithubMatch && request.method === "DELETE") {
+    const session = await requireSession(auth, request);
+    const organizationId = organizationGithubMatch[1];
+    const role = await getOrganizationRole(db, organizationId, session.user.id);
+    if (!canManageOrganization(role)) {
+      throw new HttpError(403, "Organization admin access required");
+    }
+    await disconnectGithubInstallation(
+      db,
+      organizationId,
+      new Date().toISOString(),
+    );
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  const organizationGithubInstallMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/integrations\/github\/install-url$/u,
+  );
+  if (organizationGithubInstallMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const organizationId = organizationGithubInstallMatch[1];
+    const role = await getOrganizationRole(db, organizationId, session.user.id);
+    if (!canManageOrganization(role)) {
+      throw new HttpError(403, "Organization admin access required");
+    }
+    if (!githubConfigAvailable(env)) {
+      throw new HttpError(503, "GitHub integration is not configured");
+    }
+    if (await getGithubConnectionForOrganization(db, organizationId)) {
+      throw new HttpError(409, "GitHub integration is already connected");
+    }
+    const state = randomGithubOAuthToken();
+    const createdAt = new Date();
+    await createGithubOAuthState(db, {
+      stateHash: await githubSha256Hex(state),
+      organizationId,
+      userId: session.user.id,
+      // This verifier is never disclosed or exchanged. The setup callback
+      // consumes this state and rotates to a fresh state and PKCE verifier.
+      pkceVerifier: randomGithubOAuthToken(),
+      expiresAt: new Date(
+        createdAt.getTime() + githubOAuthStateTtlMs,
+      ).toISOString(),
+      createdAt: createdAt.toISOString(),
+    });
+    const installUrl = new URL(
+      `https://github.com/apps/${env.GITHUB_APP_SLUG!}/installations/new`,
+    );
+    installUrl.searchParams.set("state", state);
+    return json({ installUrl: installUrl.toString() }, 201);
   }
 
   const organizationSlackMatch = pathname.match(
@@ -7491,7 +8029,7 @@ async function route(
     /^\/runs\/([0-9a-f-]+)\/stages\/([a-z][a-z0-9_-]{0,63})\/(start|complete)$/u,
   );
   if (agentStageLifecycleMatch && request.method === "POST") {
-    const projectId = await requireActiveWorkerRunClaim(
+    const { projectId } = await requireActiveWorkerRunClaim(
       db,
       request,
       agentStageLifecycleMatch[1],
@@ -7517,10 +8055,21 @@ async function route(
       if (result.outcome === "not_found") {
         throw new HttpError(404, "Run not found", "RUN_NOT_FOUND");
       }
+      const githubAutoResume =
+        result.outcome === "paused" &&
+          result.checkpoint?.stage === "pr_open" &&
+          result.checkpoint.position === "after"
+          ? await attemptGithubMergeAutoResume(
+              db,
+              projectId,
+              agentStageLifecycleMatch[1],
+            )
+          : null;
       return json({
         runId: agentStageLifecycleMatch[1],
         requestId: input.requestId,
         ...result,
+        ...(githubAutoResume ? { githubAutoResume } : {}),
       });
     } catch (error) {
       if (error instanceof HuntTransitionError) {
@@ -7644,11 +8193,12 @@ async function route(
     });
   }
   if (evidenceMatch && request.method === "POST") {
-    const projectId = await requireActiveWorkerRunClaim(
+    const { projectId, claimTokenHash, authenticatedAt } =
+      await requireActiveWorkerRunClaim(
       db,
       request,
       evidenceMatch[1],
-    );
+      );
     const { input: parsed, images } = await readRunEvidenceRequest(request);
     try {
       const evidence = await recordRunEvidence(db, projectId, {
@@ -7659,7 +8209,7 @@ async function route(
         url: parsed.url ?? null,
         metadata: parsed.metadata ?? null,
         observedAt: new Date(parsed.observedAt).toISOString(),
-      });
+      }, { claimTokenHash, authenticatedAt });
       if (!evidence) throw new HttpError(404, "Run not found");
       let storedImages = await listEvidenceImagesForEvidence(
         db,
@@ -7784,7 +8334,7 @@ async function route(
   if (pathname === "/run-events" && request.method === "POST") {
     const parsed = eventSchema.parse(await readJson(request));
     const projectId = parsed.runId
-      ? await requireActiveWorkerRunClaim(db, request, parsed.runId)
+      ? (await requireActiveWorkerRunClaim(db, request, parsed.runId)).projectId
       : await requireAgentProject(db, request);
     const run = parsed.runId
       ? await getHuntRunForProject(db, projectId, parsed.runId)
@@ -7891,9 +8441,29 @@ export default {
     ctx: ExecutionContext,
   ): Promise<void> {
     const observedAt = new Date(controller.scheduledTime).toISOString();
+    if (controller.cron === "* * * * *") {
+      ctx.waitUntil((async () => {
+        try {
+          const github = await reconcileGithubMergedRuns(env.DB);
+          console.log(JSON.stringify({
+            message: "GitHub merge reconciliation completed",
+            observedAt,
+            github,
+          }));
+        } catch (error) {
+          console.error(JSON.stringify({
+            message: "GitHub merge reconciliation failed",
+            observedAt,
+            error: error instanceof Error ? error.message : String(error),
+          }));
+          throw error;
+        }
+      })());
+      return;
+    }
     ctx.waitUntil((async () => {
       try {
-        const [archive, expired, cleanup] = await Promise.all([
+        const [archive, expired, cleanup, github] = await Promise.all([
           archiveCompletedLogs(env.DB, env.ARCHIVES, observedAt),
           expireArchives(env.DB, env.ARCHIVES, observedAt),
           processArchiveCleanupQueue(
@@ -7902,6 +8472,7 @@ export default {
             env.ATTACHMENTS,
             observedAt,
           ),
+          reconcileGithubMergedRuns(env.DB),
         ]);
         console.log(JSON.stringify({
           message: "log archive sweep completed",
@@ -7909,6 +8480,7 @@ export default {
           archive,
           expiredObjects: expired,
           cleanup,
+          github,
         }));
       } catch (error) {
         console.error(JSON.stringify({
@@ -7944,6 +8516,37 @@ export default {
         database: "cloudflare-d1",
         updates: "cloudflare-r2",
       }));
+    }
+    if (url.pathname === "/github/webhooks" && request.method === "POST") {
+      try {
+        return await handleGithubWebhookRequest(request, env);
+      } catch (error) {
+        if (error instanceof HttpError) {
+          return json({ message: error.message }, error.status);
+        }
+        if (error instanceof z.ZodError) {
+          return json({ message: "Invalid GitHub webhook", issues: error.issues }, 400);
+        }
+        console.error(
+          JSON.stringify({
+            message: "GitHub webhook request failed",
+            error: error instanceof Error ? error.message : String(error),
+          }),
+        );
+        return json({ message: "Internal server error" }, 500);
+      }
+    }
+    if (
+      url.pathname === "/github/install/callback" &&
+      request.method === "GET"
+    ) {
+      return handleGithubInstallCallback(request, env);
+    }
+    if (
+      url.pathname === "/github/oauth/callback" &&
+      request.method === "GET"
+    ) {
+      return handleGithubOAuthCallback(request, env);
     }
     if (url.pathname === "/slack/commands" && request.method === "POST") {
       try {

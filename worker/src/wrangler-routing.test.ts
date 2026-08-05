@@ -5,6 +5,7 @@ const config = JSON.parse(
   readFileSync(new URL("../../wrangler.jsonc", import.meta.url), "utf8"),
 ) as {
   assets?: { run_worker_first?: string[] };
+  triggers?: { crons?: string[] };
 };
 
 describe("Cloudflare Worker routing", () => {
@@ -16,7 +17,12 @@ describe("Cloudflare Worker routing", () => {
         "/issue-reply-claims*",
         "/queue*",
         "/run-events",
+        "/github/*",
       ]),
     );
+  });
+
+  it("sweeps deferred GitHub merge reconciliation every minute", () => {
+    expect(config.triggers?.crons).toContain("* * * * *");
   });
 });
