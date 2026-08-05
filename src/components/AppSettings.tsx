@@ -17,6 +17,7 @@ import {
   RefreshCw,
   Settings2,
   SlidersHorizontal,
+  SquareTerminal,
   UserRound,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
@@ -47,8 +48,11 @@ import { Typography } from "@/components/ui/typography";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "../i18n";
 import {
+  configureOpenCodeTerminalPath,
+  inspectOpenCodeTerminalPath,
   inspectOnboardingPrerequisites,
   installOnboardingPrerequisite,
+  type OpenCodeTerminalPathStatus,
   type OnboardingPrerequisites,
 } from "../lib/initial-onboarding";
 import {
@@ -188,6 +192,9 @@ export function AppSettings({
     useState<AgentProvider | null>(null);
   const [providerInstalling, setProviderInstalling] =
     useState<AgentProvider | null>(null);
+  const [openCodeTerminalPath, setOpenCodeTerminalPath] =
+    useState<OpenCodeTerminalPathStatus | null>(null);
+  const [terminalPathSaving, setTerminalPathSaving] = useState(false);
   const [providerError, setProviderError] = useState<string | null>(null);
   const [providersChecked, setProvidersChecked] = useState(false);
   const [providerUsage, setProviderUsage] =
@@ -219,16 +226,18 @@ export function AppSettings({
     setProvidersLoading(true);
     setProviderError(null);
     try {
-      const [statuses, settings, usage, models] = await Promise.all([
+      const [statuses, settings, usage, models, terminalPath] = await Promise.all([
         inspectOnboardingPrerequisites(),
         loadAppProviderSettings(),
         loadAgentUsage().catch(() => null),
         loadAgentProviderModels().catch(() => defaultAgentProviderModelCatalog),
+        inspectOpenCodeTerminalPath().catch(() => null),
       ]);
       setProviderStatuses(statuses);
       setProviderSettings(settings);
       setProviderUsage(usage);
       setProviderModels(models);
+      setOpenCodeTerminalPath(terminalPath);
       setProvidersChecked(true);
     } catch (caught) {
       setProviderError(
@@ -309,6 +318,11 @@ export function AppSettings({
     try {
       const statuses = await installOnboardingPrerequisite(provider);
       setProviderStatuses(statuses);
+      if (provider === "opencode") {
+        setOpenCodeTerminalPath(
+          await inspectOpenCodeTerminalPath().catch(() => null),
+        );
+      }
       setProviderUsage(await loadAgentUsage().catch(() => null));
       setProvidersChecked(true);
     } catch (caught) {
@@ -317,6 +331,21 @@ export function AppSettings({
       );
     } finally {
       setProviderInstalling(null);
+    }
+  };
+
+  const configureTerminalPath = async () => {
+    if (terminalPathSaving) return;
+    setTerminalPathSaving(true);
+    setProviderError(null);
+    try {
+      setOpenCodeTerminalPath(await configureOpenCodeTerminalPath());
+    } catch (caught) {
+      setProviderError(
+        caught instanceof Error ? caught.message : String(caught),
+      );
+    } finally {
+      setTerminalPathSaving(false);
     }
   };
 
@@ -870,7 +899,15 @@ export function AppSettings({
                     loading: providersLoading && !providerStatuses,
                     providerName: "OpenCode CLI",
                     t,
-                  })}
+                  }) +
+                    (providerStatuses?.opencode.installed &&
+                    openCodeTerminalPath?.supported
+                      ? ` ${t(
+                          openCodeTerminalPath.configured
+                            ? "appSettings.terminalPathReady"
+                            : "appSettings.terminalPathNeeded",
+                        )}`
+                      : "")}
                   disabled={
                     providerSaving !== null || providerInstalling !== null
                   }
@@ -935,6 +972,27 @@ export function AppSettings({
                       >
                         <Download />
                         {t("appSettings.install")}
+                      </Button>
+                    ) : openCodeTerminalPath?.supported &&
+                      !openCodeTerminalPath.configured ? (
+                      <Button
+                        aria-label={t("appSettings.configureTerminalPathLabel")}
+                        disabled={terminalPathSaving}
+                        onClick={() => void configureTerminalPath()}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        {terminalPathSaving ? (
+                          <LoaderCircle className="spin" />
+                        ) : (
+                          <SquareTerminal />
+                        )}
+                        {t(
+                          terminalPathSaving
+                            ? "appSettings.configuringTerminalPath"
+                            : "appSettings.configureTerminalPath",
+                        )}
                       </Button>
                     ) : providerSaving === "opencode" ? (
                       <LoaderCircle

@@ -11,6 +11,13 @@ export type OnboardingPrerequisites = Record<
   PrerequisiteStatus
 >;
 
+export type OpenCodeTerminalPathStatus = {
+  supported: boolean;
+  configured: boolean;
+  binaryPath: string | null;
+  configPath: string | null;
+};
+
 export const initialOnboardingStorageKey = "briar.initial-onboarding.seen.v1";
 
 const isTauri = () =>
@@ -57,5 +64,29 @@ export async function installOnboardingPrerequisite(
   return invoke<OnboardingPrerequisites>(
     "install_onboarding_prerequisite",
     { prerequisite },
+  );
+}
+
+export async function inspectOpenCodeTerminalPath() {
+  if (!isTauri()) {
+    throw new Error(
+      "OpenCode 터미널 PATH 확인은 Briar 데스크톱 앱에서 사용할 수 있습니다.",
+    );
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<OpenCodeTerminalPathStatus>(
+    "inspect_open_code_terminal_path",
+  );
+}
+
+export async function configureOpenCodeTerminalPath() {
+  if (!isTauri()) {
+    throw new Error(
+      "OpenCode 터미널 PATH 설정은 Briar 데스크톱 앱에서 사용할 수 있습니다.",
+    );
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<OpenCodeTerminalPathStatus>(
+    "configure_open_code_terminal_path",
   );
 }

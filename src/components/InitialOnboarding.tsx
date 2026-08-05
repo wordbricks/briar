@@ -3,14 +3,18 @@ import {
   Check,
   Download,
   LoaderCircle,
+  SquareTerminal,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import onboardingEveIssueUrl from "../assets/onboarding-eve-issue.png";
 import onboardingPrerequisitesUrl from "../assets/onboarding-prerequisites.png";
 import { useI18n } from "../i18n";
 import {
+  configureOpenCodeTerminalPath,
+  inspectOpenCodeTerminalPath,
   inspectOnboardingPrerequisites,
   installOnboardingPrerequisite,
+  type OpenCodeTerminalPathStatus,
   type OnboardingPrerequisites,
   type PrerequisiteId,
 } from "../lib/initial-onboarding";
@@ -40,14 +44,21 @@ export function InitialOnboarding({
     useState<OnboardingPrerequisites | null>(null);
   const [checking, setChecking] = useState(false);
   const [installing, setInstalling] = useState<PrerequisiteId | null>(null);
+  const [openCodeTerminalPath, setOpenCodeTerminalPath] =
+    useState<OpenCodeTerminalPathStatus | null>(null);
+  const [terminalPathSaving, setTerminalPathSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const checkPrerequisites = useCallback(async () => {
     setChecking(true);
     setError(null);
     try {
-      const inspected = await inspectOnboardingPrerequisites();
+      const [inspected, terminalPath] = await Promise.all([
+        inspectOnboardingPrerequisites(),
+        inspectOpenCodeTerminalPath().catch(() => null),
+      ]);
       setPrerequisites(inspected);
+      setOpenCodeTerminalPath(terminalPath);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
@@ -66,10 +77,28 @@ export function InitialOnboarding({
     try {
       const installed = await installOnboardingPrerequisite(prerequisite);
       setPrerequisites(installed);
+      if (prerequisite === "opencode") {
+        setOpenCodeTerminalPath(
+          await inspectOpenCodeTerminalPath().catch(() => null),
+        );
+      }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
       setInstalling(null);
+    }
+  };
+
+  const configureTerminalPath = async () => {
+    if (terminalPathSaving) return;
+    setTerminalPathSaving(true);
+    setError(null);
+    try {
+      setOpenCodeTerminalPath(await configureOpenCodeTerminalPath());
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setTerminalPathSaving(false);
     }
   };
 
@@ -83,7 +112,7 @@ export function InitialOnboarding({
     prerequisiteIds.every(
       (id) => prerequisites[id].installed && prerequisites[id].authenticated,
     );
-  const busy = checking || installing !== null;
+  const busy = checking || installing !== null || terminalPathSaving;
 
   const continueToLogin = () => {
     setStep("login");
@@ -154,6 +183,11 @@ export function InitialOnboarding({
                     const isReady =
                       status?.installed === true &&
                       status.authenticated === true;
+                    const needsTerminalPath =
+                      id === "opencode" &&
+                      isReady &&
+                      openCodeTerminalPath?.supported === true &&
+                      !openCodeTerminalPath.configured;
                     return (
                       <article
                         className={`initial-prerequisite-row${isReady ? " ready" : ""}`}
@@ -191,6 +225,24 @@ export function InitialOnboarding({
                             <LoaderCircle className="spin" size={16} />
                             {t("initialOnboarding.checking")}
                           </span>
+                        ) : needsTerminalPath ? (
+                          <button
+                            className="initial-prerequisite-install"
+                            disabled={busy}
+                            onClick={() => void configureTerminalPath()}
+                            type="button"
+                          >
+                            {terminalPathSaving ? (
+                              <LoaderCircle className="spin" size={14} />
+                            ) : (
+                              <SquareTerminal size={14} />
+                            )}
+                            {t(
+                              terminalPathSaving
+                                ? "appSettings.configuringTerminalPath"
+                                : "appSettings.configureTerminalPath",
+                            )}
+                          </button>
                         ) : isReady ? (
                           <span
                             className="initial-prerequisite-check checked"
