@@ -150,6 +150,7 @@ describe("detached execution workers", () => {
       "migrations/0061_resume_requested_state.sql",
       "migrations/0062_issue_assignees.sql",
       "migrations/0063_inbox_read_states.sql",
+      "migrations/0065_issue_rework_proposals.sql",
     ]) {
       await executeSql(db, await readFile(resolve(migration), "utf8"));
     }

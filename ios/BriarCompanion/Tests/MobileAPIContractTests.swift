@@ -41,6 +41,9 @@ final class MobileAPIContractTests: XCTestCase {
         let agents: ProjectAgentsResponse = try decodeResponse("listProjectAgents")
         let sessions: ProjectAgentSessionsResponse = try decodeResponse("listProjectAgentSessions")
         let resume: ResumeRunResponse = try decodeResponse("resumeRun")
+        let accepted: AcceptIssueReworkProposalResponse = try decodeResponse(
+            "acceptIssueReworkProposal"
+        )
 
         XCTAssertTrue(health.ok)
         XCTAssertEqual(device.userCode, "BRIAR123")
@@ -67,6 +70,8 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(resume.checkpointKey, "user-before-production_qa")
         XCTAssertEqual(resume.attempt, 2)
         XCTAssertEqual(resume.revision, 3)
+        XCTAssertEqual(accepted.proposal.status, .accepted)
+        XCTAssertEqual(accepted.revision, 2)
     }
 
     func testEndpointPathsMatchOpenAPISubset() {
@@ -100,6 +105,15 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(
             MobileAPIContract.Endpoint.runResume(projectID: projectID, runID: runID),
             "/projects/11111111-1111-4111-8111-111111111111/runs/33333333-3333-4333-8333-333333333333/resume"
+        )
+        let proposalID = UUID(uuidString: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee")!
+        XCTAssertEqual(
+            MobileAPIContract.Endpoint.acceptIssueReworkProposal(
+                projectID: projectID,
+                runID: runID,
+                proposalID: proposalID
+            ),
+            "/projects/11111111-1111-4111-8111-111111111111/runs/33333333-3333-4333-8333-333333333333/rework-proposals/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/accept"
         )
         XCTAssertEqual(
             MobileAPIContract.Endpoint.projectAgents(projectID: projectID, locale: "en"),

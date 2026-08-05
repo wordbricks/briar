@@ -3507,6 +3507,80 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
+  it("requires the user to accept an @briar rework proposal before revision", async () => {
+    const proposalId = "abababab-abab-4bab-8bab-abababababab";
+    const message: IssueMessage = {
+      id: "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd",
+      runId: demoDashboard.runs[1].id,
+      parentMessageId: null,
+      body: "D를 D′로 바꾸는 개정을 제안했습니다.",
+      author: {
+        id: null,
+        name: "Briar · Codex",
+        image: null,
+        provider: "codex",
+      },
+      replyCount: 0,
+      proposedAction: {
+        id: proposalId,
+        type: "request_issue_rework",
+        workflowStage: "local_qa",
+        reason: "D를 D′로 변경하고 영향받는 QA를 다시 확인합니다.",
+        status: "pending",
+        acceptedAt: null,
+        appliedRevision: null,
+      },
+      createdAt: "2026-08-05T01:00:00.000Z",
+      updatedAt: "2026-08-05T01:00:00.000Z",
+    };
+    const onAccept = vi.fn(async () => ({
+      ...message.proposedAction!,
+      status: "accepted" as const,
+      acceptedAt: "2026-08-05T01:01:00.000Z",
+      appliedRevision: 2,
+    }));
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <TooltipProvider>
+        <RunPage
+          error={null}
+          isRecovering={false}
+          isSidebarOpen
+          onAcceptIssueReworkProposal={onAccept}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => [message]}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          run={{ ...demoDashboard.runs[1], status: "completed" as const }}
+        />
+      </TooltipProvider>,
+    ));
+    await act(async () => { await Promise.resolve(); });
+
+    const acceptButton = container.querySelector<HTMLButtonElement>(
+      ".issue-rework-proposal-accept",
+    );
+    expect(acceptButton?.textContent).toContain("수락하고 개정 시작");
+    expect(onAccept).not.toHaveBeenCalled();
+    await act(async () => {
+      acceptButton?.click();
+      await Promise.resolve();
+    });
+    expect(onAccept).toHaveBeenCalledWith(proposalId);
+    expect(container.textContent).toContain("리비전 2 개정이 시작되었습니다.");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("does not show an error-like status banner for queued remote work", () => {
     const queuedRemoteRun = {
       ...demoDashboard.runs[0],

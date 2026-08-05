@@ -105,6 +105,7 @@ import {
   consumeSlackOAuthState,
   createGithubOAuthState,
   createIssueMessage,
+  createIssueReworkProposal,
   createIssueDependency,
   createIssueAttachments,
   createRunEvidenceImages,
@@ -133,6 +134,7 @@ import {
   getProjectAgent,
   getClaimedIssueAgentReply,
   getIssueAgentReplyJob,
+  getIssueReworkProposal,
   getIssueAttachment,
   getRunEvidenceImage,
   getOrganizationRole,
@@ -153,6 +155,7 @@ import {
   listIssueDependencies,
   listIssueConversationNotifications,
   listIssueMessages,
+  listIssueReworkProposals,
   listIssueThreadMessages,
   listIssueResultReviews,
   listInboxReadStates,
@@ -190,6 +193,7 @@ import {
   revokeOrganizationInvitation,
   renewProjectAgentScheduleRunLease,
   renewIssueAgentReplyLease,
+  acceptIssueReworkProposal,
   rollbackNewAppIssue,
   startWorkflowStageLifecycle,
   releaseGithubDelivery,
@@ -220,6 +224,7 @@ import {
   type IssueAgentReplyJobRow,
   type IssueConversationNotificationRow,
   type IssueMessageRow,
+  type IssueReworkProposalRow,
   type IssueResultReviewRow,
   type IssueDependencyRow,
   type ProjectRow,
@@ -1240,6 +1245,15 @@ const issueAgentReplyCompletionSchema = z
     workerId: z.string().trim().min(1).max(128),
     claimToken: z.string().startsWith("briar_reply_claim_"),
     body: z.string().trim().min(1).max(10_000).optional(),
+    proposedAction: z
+      .object({
+        type: z.literal("request_issue_rework"),
+        workflowStage: workflowStageIdSchema,
+        reason: z.string().trim().min(1).max(4_000),
+      })
+      .strict()
+      .nullable()
+      .optional(),
     error: z.string().trim().min(1).max(4_000).optional(),
   })
   .strict()
@@ -3697,9 +3711,20 @@ const evidenceImageJson = (image: RunEvidenceImageRow) => ({
   url: `/projects/${image.project_id}/runs/${image.run_id}/evidence/images/${image.id}`,
 });
 
+const issueReworkProposalJson = (proposal: IssueReworkProposalRow) => ({
+  id: proposal.id,
+  type: "request_issue_rework" as const,
+  workflowStage: proposal.workflow_stage,
+  reason: proposal.reason,
+  status: proposal.status,
+  acceptedAt: proposal.accepted_at,
+  appliedRevision: proposal.applied_revision,
+});
+
 const issueMessageJson = (
   message: IssueMessageRow,
   attachments: IssueAttachmentRow[] = [],
+  proposal: IssueReworkProposalRow | null = null,
 ) => ({
   id: message.id,
   runId: message.run_id,
@@ -3725,6 +3750,7 @@ const issueMessageJson = (
     provider: message.author_agent_provider,
   },
   replyCount: message.reply_count,
+  proposedAction: proposal ? issueReworkProposalJson(proposal) : null,
   createdAt: message.created_at,
   updatedAt: message.updated_at,
 });
@@ -6514,12 +6540,22 @@ async function route(
       issueMessagesMatch[2],
     );
     if (!run) throw new HttpError(404, "Run not found");
-    const [messages, attachments] = await Promise.all([
+    const [messages, attachments, proposals] = await Promise.all([
       listIssueMessagesWithArchive(db, env.ARCHIVES, project.id, run.id),
       listIssueAttachments(db, project.id, run.id),
+      listIssueReworkProposals(db, project.id, run.id),
     ]);
+    const proposalsByReply = new Map(
+      proposals.map((proposal) => [proposal.reply_message_id, proposal]),
+    );
     return json({
-      messages: messages.map((message) => issueMessageJson(message, attachments)),
+      messages: messages.map((message) =>
+        issueMessageJson(
+          message,
+          attachments,
+          proposalsByReply.get(message.id) ?? null,
+        )
+      ),
     });
   }
   if (issueMessagesMatch && request.method === "POST") {
@@ -6691,22 +6727,104 @@ async function route(
     if (!job || job.run_id !== issueAgentReplyStatusMatch[2]) {
       throw new HttpError(404, "Agent reply not found");
     }
-    const messages =
+    const [messages, proposals] =
       job.status === "completed"
-        ? await listIssueMessagesWithArchive(
-            db,
-            env.ARCHIVES,
-            project.id,
-            job.run_id,
-          )
-        : [];
+        ? await Promise.all([
+            listIssueMessagesWithArchive(
+              db,
+              env.ARCHIVES,
+              project.id,
+              job.run_id,
+            ),
+            listIssueReworkProposals(db, project.id, job.run_id),
+          ])
+        : [[], []];
     const reply = messages.find(
       (message) => message.id === job.reply_message_id,
     );
+    const proposal = proposals.find(
+      (candidate) => candidate.reply_message_id === job.reply_message_id,
+    ) ?? null;
     return json({
       agentReply: issueAgentReplyJson(job),
-      message: reply ? issueMessageJson(reply) : null,
+      message: reply ? issueMessageJson(reply, [], proposal) : null,
     });
+  }
+
+  const issueReworkProposalAcceptMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/rework-proposals\/([0-9a-f-]+)\/accept$/u,
+  );
+  if (issueReworkProposalAcceptMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      issueReworkProposalAcceptMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const proposal = await getIssueReworkProposal(
+      db,
+      project.id,
+      issueReworkProposalAcceptMatch[2],
+      issueReworkProposalAcceptMatch[3],
+    );
+    if (!proposal) throw new HttpError(404, "Rework proposal not found");
+    if (proposal.status === "accepted") {
+      return json({
+        proposal: issueReworkProposalJson(proposal),
+        outcome: "already_accepted",
+        attempt: proposal.expected_attempt,
+        revision: proposal.applied_revision,
+        workflowStage: proposal.workflow_stage,
+      });
+    }
+    const acceptedAt = new Date().toISOString();
+    try {
+      const rework = await reworkHuntRun(db, project.id, {
+        runId: proposal.run_id,
+        workflowStage: proposal.workflow_stage,
+        requestId: proposal.id,
+        actor: `briar-app:${session.user.id}`,
+        reason: proposal.reason,
+        occurredAt: acceptedAt,
+        completed: {
+          expectedAttempt: proposal.expected_attempt,
+          expectedRevision: proposal.expected_revision,
+        },
+      });
+      if (rework.outcome === "not_found" || rework.revision === null) {
+        throw new HttpError(404, "Run not found");
+      }
+      const accepted = await acceptIssueReworkProposal(db, {
+        projectId: project.id,
+        runId: proposal.run_id,
+        proposalId: proposal.id,
+        userId: session.user.id,
+        acceptedAt,
+        appliedRevision: rework.revision,
+      }) ?? await getIssueReworkProposal(
+        db,
+        project.id,
+        proposal.run_id,
+        proposal.id,
+      );
+      if (!accepted) throw new HttpError(409, "Rework proposal changed");
+      return json({
+        proposal: issueReworkProposalJson(accepted),
+        outcome:
+          rework.outcome === "already_reworked"
+            ? "already_accepted"
+            : "accepted",
+        attempt: rework.attempt,
+        revision: rework.revision,
+        workflowStage: rework.workflowStage,
+      });
+    } catch (error) {
+      if (error instanceof HuntTransitionError) {
+        throw new HttpError(409, error.message, "REWORK_PROPOSAL_CONFLICT");
+      }
+      throw error;
+    }
   }
 
   const projectRunEvidenceMatch = pathname.match(
@@ -7953,6 +8071,28 @@ async function route(
       ) ?? null;
     }
     if (!reply) throw new HttpError(409, "Agent reply could not be persisted");
+    let proposal: IssueReworkProposalRow | null = null;
+    if (input.proposedAction) {
+      proposal = await createIssueReworkProposal(db, {
+        id: crypto.randomUUID(),
+        projectId: input.projectId,
+        runId: job.run_id,
+        triggerMessageId: job.trigger_message_id,
+        replyMessageId: job.reply_message_id,
+        workflowStage: input.proposedAction.workflowStage,
+        reason: input.proposedAction.reason,
+        createdAt: observedAt,
+      });
+      if (!proposal) {
+        proposal = (await listIssueReworkProposals(
+          db,
+          input.projectId,
+          job.run_id,
+        )).find(
+          (candidate) => candidate.trigger_message_id === job.trigger_message_id,
+        ) ?? null;
+      }
+    }
     const completed = await completeIssueAgentReply(
       db,
       input.projectId,
@@ -7966,7 +8106,7 @@ async function route(
     if (!completed) throw new HttpError(409, "Reply claim is no longer active");
     return json({
       agentReply: issueAgentReplyJson(completed),
-      message: issueMessageJson(reply),
+      message: issueMessageJson(reply, [], proposal),
     });
   }
 

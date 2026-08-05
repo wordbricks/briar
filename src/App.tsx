@@ -1271,6 +1271,7 @@ export function App() {
             onDeleteIssue={briar.deleteIssue}
             onTransferIssue={briar.transferIssue}
             onAddIssueDependency={briar.addIssueDependency}
+            onAcceptIssueReworkProposal={briar.acceptReworkProposal}
             onRemoveIssueDependency={briar.removeIssueDependency}
             onUpdateIssue={briar.editIssue}
             onUpdateIssuePreferences={briar.editIssueExecutionPreferences}
@@ -1650,6 +1651,7 @@ export function App() {
             onDeleteIssue={briar.deleteIssue}
             onTransferIssue={briar.transferIssue}
             onAddIssueDependency={briar.addIssueDependency}
+            onAcceptIssueReworkProposal={briar.acceptReworkProposal}
             onRemoveIssueDependency={briar.removeIssueDependency}
             onUpdateIssue={briar.editIssue}
             onUpdateIssuePreferences={briar.editIssueExecutionPreferences}

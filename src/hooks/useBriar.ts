@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   acceptOrganizationInvitation as acceptRemoteOrganizationInvitation,
+  acceptIssueReworkProposal as acceptRemoteIssueReworkProposal,
   addIssueDependency,
   beginDeviceAuthorization,
   cancelHuntRun,
@@ -2588,6 +2589,35 @@ export function useBriar(options: UseBriarOptions = {}) {
     [activeProjectId, token],
   );
 
+  const acceptReworkProposal = useCallback(
+    async (runId: string, proposalId: string) => {
+      if (!activeProjectId || !dashboard) {
+        throw new Error("재작업할 Auto Hunt 작업이 없습니다.");
+      }
+      if (demoMode) {
+        throw new Error("데모에서는 재작업 제안을 수락할 수 없습니다.");
+      }
+      if (!token) throw new Error("로그인이 필요합니다.");
+      const result = await acceptRemoteIssueReworkProposal(
+        token,
+        activeProjectId,
+        runId,
+        proposalId,
+      );
+      issueMessagesByRun.current = {
+        ...issueMessagesByRun.current,
+        [runId]: (issueMessagesByRun.current[runId] ?? []).map((message) =>
+          message.proposedAction?.id === proposalId
+            ? { ...message, proposedAction: result.proposal }
+            : message,
+        ),
+      };
+      await refresh("snapshot");
+      return result.proposal;
+    },
+    [activeProjectId, dashboard, demoMode, refresh, token],
+  );
+
   const recoverRun = useCallback(
     async (runId: string, action: "retry" | "cancel") => {
       if (!activeProjectId || !dashboard) {
@@ -3126,6 +3156,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     readRunEvidence,
     readRunEvidenceImage,
     addIssueMessage,
+    acceptReworkProposal,
     setActiveOrganizationId: selectOrganization,
     setActiveProjectId: selectProject,
     selectProjectRepository,

@@ -208,6 +208,13 @@ eligible Worker may claim the reply and answer from the same server snapshot.
 An issue that has never been assigned has no preferred Worker, so any eligible
 Worker may claim its mention reply.
 
+For a completed run, a reply may attach a `request_issue_rework` proposal when
+the user's message explicitly asks to revise the result. Creating the proposal
+does not change the run. The issue conversation renders an approval button, and
+only an authenticated user click applies the rework. Acceptance keeps the same
+attempt, branch, pull request, prior events, and evidence, increments the
+revision, and invalidates evidence only from the selected workflow stage onward.
+
 Removal is conservative by design:
 
 1. It refuses while the worktree has uncommitted or untracked changes, before
