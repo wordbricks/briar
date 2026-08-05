@@ -339,6 +339,7 @@ import {
   slackBotScopes,
   slackCreateIssueBlocks,
   slackCreateIssueCallbackId,
+  slackCreateIssueShortcutCallbackId,
   SlackCreateIssueValidationError,
   slackEventClaimTtlMs,
   slackHelpMessage,
@@ -2964,38 +2965,49 @@ const slackCommandMessage = (text: string) =>
   Response.json({ response_type: "ephemeral", text });
 
 async function openSlackCreateIssueModal(
-  form: URLSearchParams,
-  env: Env,
-  teamId: string,
-  channelId: string,
-  triggerId: string,
-  responseUrl: string,
+  input: {
+    env: Env;
+    teamId: string;
+    userId: string;
+    channelId: string | null;
+    triggerId: string;
+    responseUrl: string | null;
+    initialTitle?: string;
+  },
 ) {
+  const { env, teamId, userId, channelId, triggerId, responseUrl } = input;
+  let token: string | null = null;
+  const notify = async (text: string) => {
+    if (responseUrl) {
+      await postSlackCommandResponse(responseUrl, text);
+    } else if (token) {
+      await callSlackApi("chat.postMessage", token, {
+        channel: userId,
+        text,
+      });
+    }
+  };
   try {
     const installation = await getSlackInstallation(env.DB, teamId);
     if (!installation) {
-      await postSlackCommandResponse(
-        responseUrl,
-        "이 Slack 워크스페이스가 Briar에 연결되어 있지 않습니다.",
-      );
+      await notify("이 Slack 워크스페이스가 Briar에 연결되어 있지 않습니다.");
       return;
     }
+    token = await decryptSlackToken(
+      installation.encrypted_bot_token,
+      installation.token_iv,
+      env.SLACK_TOKEN_ENCRYPTION_KEY,
+    );
     const projects = await listOrganizationProjects(
       env.DB,
       installation.organization_id,
     );
     if (projects.length === 0) {
-      await postSlackCommandResponse(
-        responseUrl,
+      await notify(
         "이슈를 만들 Briar 프로젝트가 없습니다. 먼저 프로젝트를 만들어 주세요.",
       );
       return;
     }
-    const token = await decryptSlackToken(
-      installation.encrypted_bot_token,
-      installation.token_iv,
-      env.SLACK_TOKEN_ENCRYPTION_KEY,
-    );
     await callSlackApi("views.open", token, {
       trigger_id: triggerId,
       view: buildSlackCreateIssueModal({
@@ -3003,7 +3015,7 @@ async function openSlackCreateIssueModal(
         defaultProjectId: installation.default_project_id,
         responseUrl,
         channelId,
-        initialTitle: form.get("text") ?? undefined,
+        initialTitle: input.initialTitle,
       }),
     });
   } catch (error) {
@@ -3015,8 +3027,7 @@ async function openSlackCreateIssueModal(
       }),
     );
     try {
-      await postSlackCommandResponse(
-        responseUrl,
+      await notify(
         "Briar 이슈 생성 화면을 열지 못했습니다. Slack 연결을 새로고침한 뒤 다시 시도해 주세요.",
       );
     } catch {
@@ -3036,20 +3047,22 @@ async function handleSlackCommandForm(
   }
   const teamId = form.get("team_id")?.trim() ?? "";
   const channelId = form.get("channel_id")?.trim() ?? "";
+  const userId = form.get("user_id")?.trim() ?? "";
   const triggerId = form.get("trigger_id")?.trim() ?? "";
   const responseUrl = form.get("response_url")?.trim() ?? "";
-  if (!teamId || !channelId || !triggerId || !responseUrl) {
+  if (!teamId || !userId || !channelId || !triggerId || !responseUrl) {
     return slackCommandMessage("Slack 명령 정보를 확인할 수 없습니다.");
   }
 
-  const processing = openSlackCreateIssueModal(
-    form,
+  const processing = openSlackCreateIssueModal({
     env,
     teamId,
+    userId,
     channelId,
     triggerId,
     responseUrl,
-  );
+    initialTitle: form.get("text") ?? undefined,
+  });
   if (ctx) ctx.waitUntil(processing);
   else await processing;
   return new Response(null);
@@ -3104,9 +3117,14 @@ async function processSlackCreateIssueSubmission(
       sourceKey,
       actor: `slack:${submission.userId}`,
       detail:
-        "Slack /create 명령으로 생성된 이슈가 Auto Hunt 처리를 기다리고 있습니다.",
+        submission.source === "shortcut"
+          ? "Slack Briar shortcut으로 생성된 이슈가 Auto Hunt 처리를 기다리고 있습니다."
+          : "Slack /create 명령으로 생성된 이슈가 Auto Hunt 처리를 기다리고 있습니다.",
       context: {
-        origin: "slack-command",
+        origin:
+          submission.source === "shortcut"
+            ? "slack-shortcut"
+            : "slack-command",
         slackTeamId: submission.teamId,
         slackChannelId: submission.channelId,
         slackUserId: submission.userId,
@@ -3120,10 +3138,15 @@ async function processSlackCreateIssueSubmission(
       new Date().toISOString(),
     );
     try {
-      await postSlackCommandResponse(
-        submission.responseUrl,
-        `:white_check_mark: *${submission.title}* 이슈를 만들었습니다.\n프로젝트: ${project.name} · 작업 대기열\n이슈 ID: \`${created.runId}\``,
-      );
+      const text = `:white_check_mark: *${submission.title}* 이슈를 만들었습니다.\n프로젝트: ${project.name} · 작업 대기열\n이슈 ID: \`${created.runId}\``;
+      if (submission.responseUrl) {
+        await postSlackCommandResponse(submission.responseUrl, text);
+      } else {
+        await callSlackApi("chat.postMessage", token, {
+          channel: submission.userId,
+          text,
+        });
+      }
     } catch (error) {
       console.error(
         JSON.stringify({
@@ -3146,10 +3169,16 @@ async function processSlackCreateIssueSubmission(
       }),
     );
     try {
-      await postSlackCommandResponse(
-        submission.responseUrl,
-        ":warning: 이슈를 만들지 못했습니다. 첨부파일 제한과 프로젝트 워크플로를 확인한 뒤 `/create`로 다시 시도해 주세요.",
-      );
+      const text =
+        ":warning: 이슈를 만들지 못했습니다. 첨부파일 제한과 프로젝트 워크플로를 확인한 뒤 다시 시도해 주세요.";
+      if (submission.responseUrl) {
+        await postSlackCommandResponse(submission.responseUrl, text);
+      } else {
+        await callSlackApi("chat.postMessage", token, {
+          channel: submission.userId,
+          text,
+        });
+      }
     } catch {
       // The command response URL is best-effort after the modal is acknowledged.
     }
@@ -3178,6 +3207,37 @@ async function handleSlackInteractionRequest(
     root?.view && typeof root.view === "object"
       ? (root.view as Record<string, unknown>)
       : null;
+  if (
+    root?.type === "shortcut" &&
+    root.callback_id === slackCreateIssueShortcutCallbackId
+  ) {
+    const team =
+      root.team && typeof root.team === "object"
+        ? (root.team as Record<string, unknown>)
+        : null;
+    const user =
+      root.user && typeof root.user === "object"
+        ? (root.user as Record<string, unknown>)
+        : null;
+    const teamId = typeof team?.id === "string" ? team.id.trim() : "";
+    const userId = typeof user?.id === "string" ? user.id.trim() : "";
+    const triggerId =
+      typeof root.trigger_id === "string" ? root.trigger_id.trim() : "";
+    if (!teamId || !userId || !triggerId) {
+      throw new HttpError(400, "Slack shortcut context is incomplete");
+    }
+    const processing = openSlackCreateIssueModal({
+      env,
+      teamId,
+      userId,
+      channelId: null,
+      triggerId,
+      responseUrl: null,
+    });
+    if (ctx) ctx.waitUntil(processing);
+    else await processing;
+    return new Response(null);
+  }
   if (
     root?.type !== "view_submission" ||
     view?.callback_id !== slackCreateIssueCallbackId

@@ -16,6 +16,8 @@ export const slackBotScopes = [
 export const slackOAuthStateTtlMs = 10 * 60_000;
 export const slackEventClaimTtlMs = 5 * 60_000;
 export const slackCreateIssueCallbackId = "briar_create_issue";
+export const slackCreateIssueShortcutCallbackId =
+  "briar_create_issue_shortcut";
 export const slackCreateIssueBlocks = {
   project: "briar_create_project",
   title: "briar_create_title",
@@ -222,8 +224,9 @@ type SlackCreateIssueProject = {
 };
 
 type SlackCreateIssueMetadata = {
-  responseUrl: string;
-  channelId: string;
+  source: "command" | "shortcut";
+  responseUrl: string | null;
+  channelId: string | null;
 };
 
 export type SlackCreateIssueSubmission = {
@@ -234,8 +237,9 @@ export type SlackCreateIssueSubmission = {
   title: string;
   description: string | null;
   fileIds: string[];
-  responseUrl: string;
-  channelId: string;
+  source: "command" | "shortcut";
+  responseUrl: string | null;
+  channelId: string | null;
 };
 
 export class SlackCreateIssueValidationError extends Error {
@@ -261,8 +265,8 @@ const slackOption = (project: SlackCreateIssueProject) => ({
 export function buildSlackCreateIssueModal(input: {
   projects: SlackCreateIssueProject[];
   defaultProjectId: string | null;
-  responseUrl: string;
-  channelId: string;
+  responseUrl: string | null;
+  channelId: string | null;
   initialTitle?: string;
 }) {
   const projects = input.projects.slice(0, 100);
@@ -277,6 +281,7 @@ export function buildSlackCreateIssueModal(input: {
     type: "modal",
     callback_id: slackCreateIssueCallbackId,
     private_metadata: JSON.stringify({
+      source: input.responseUrl ? "command" : "shortcut",
       responseUrl: input.responseUrl,
       channelId: input.channelId,
     } satisfies SlackCreateIssueMetadata),
@@ -456,9 +461,24 @@ export function parseSlackCreateIssueSubmission(
         : "";
   const userId = typeof user?.id === "string" ? user.id : "";
   const viewId = typeof view?.id === "string" ? view.id : "";
+  const source =
+    metadata.source === "shortcut" || metadata.responseUrl === null
+      ? "shortcut"
+      : "command";
+  const responseUrl =
+    metadata.responseUrl === null
+      ? null
+      : parseSlackResponseUrl(metadata.responseUrl);
   const channelId =
-    typeof metadata.channelId === "string" ? metadata.channelId : "";
-  if (!teamId || !userId || !viewId || !channelId) {
+    typeof metadata.channelId === "string" && metadata.channelId
+      ? metadata.channelId
+      : null;
+  if (
+    !teamId ||
+    !userId ||
+    !viewId ||
+    (source === "command" && (!responseUrl || !channelId))
+  ) {
     throw new Error("Slack modal context is incomplete");
   }
 
@@ -470,7 +490,8 @@ export function parseSlackCreateIssueSubmission(
     title,
     description,
     fileIds,
-    responseUrl: parseSlackResponseUrl(metadata.responseUrl),
+    source,
+    responseUrl,
     channelId,
   };
 }

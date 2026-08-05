@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildSlackCreateIssueModal,
@@ -8,6 +9,7 @@ import {
   parseSlackCreateIssueSubmission,
   parseSlackIssueInstruction,
   slackCreateIssueBlocks,
+  slackCreateIssueShortcutCallbackId,
   SlackCreateIssueValidationError,
   verifySlackRequest,
 } from "./slack";
@@ -15,6 +17,19 @@ import {
 describe("Slack integration", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it("registers the create-issue global shortcut in the Slack manifest", () => {
+    const manifest = readFileSync(
+      new URL("../../config/slack-app-manifest.yaml", import.meta.url),
+      "utf8",
+    );
+
+    expect(manifest).toContain("name: Create a Briar issue");
+    expect(manifest).toContain("type: global");
+    expect(manifest).toContain(
+      `callback_id: ${slackCreateIssueShortcutCallbackId}`,
+    );
   });
 
   it("verifies Slack signatures and rejects stale requests", async () => {
@@ -192,9 +207,49 @@ describe("Slack integration", () => {
       title: "Login is broken",
       description: "Safari OAuth",
       fileIds: ["F123", "F456"],
+      source: "command",
       responseUrl:
         "https://hooks.slack.com/commands/T123/B123/response-token",
       channelId: "C123",
+    });
+  });
+
+  it("parses a global shortcut modal submission without command context", () => {
+    const modal = buildSlackCreateIssueModal({
+      projects: [{ id: "project-1", name: "First" }],
+      defaultProjectId: "project-1",
+      responseUrl: null,
+      channelId: null,
+    });
+
+    expect(
+      parseSlackCreateIssueSubmission({
+        type: "view_submission",
+        team: { id: "T123" },
+        user: { id: "U123" },
+        view: {
+          id: "V123",
+          private_metadata: modal.private_metadata,
+          state: {
+            values: {
+              [slackCreateIssueBlocks.project]: {
+                project: {
+                  selected_option: { value: "project-1" },
+                },
+              },
+              [slackCreateIssueBlocks.title]: {
+                title: { value: "Create from shortcut" },
+              },
+            },
+          },
+        },
+      }),
+    ).toMatchObject({
+      teamId: "T123",
+      userId: "U123",
+      source: "shortcut",
+      responseUrl: null,
+      channelId: null,
     });
   });
 
