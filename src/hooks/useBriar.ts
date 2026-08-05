@@ -19,6 +19,7 @@ import {
   transferIssue as transferRemoteIssue,
   deleteProject as deleteRemoteProject,
   dispatchHuntRun,
+  unassignHuntRun,
   errorWithMessage,
   importLinearIssues,
   isApiErrorStatus,
@@ -3167,6 +3168,10 @@ export function useBriar(options: UseBriarOptions = {}) {
     repairHealth,
     retryRun: (runId: string) => recoverRun(runId, "retry"),
     cancelRun: (runId: string) => recoverRun(runId, "cancel"),
+    unassignRun: (projectId: string, runId: string) => {
+      if (!token) return Promise.reject(new Error("로그인이 필요합니다."));
+      return unassignHuntRun(token, projectId, runId).then(() => refresh());
+    },
     moveRun,
     startProjectCreation,
     token,

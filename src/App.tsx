@@ -1286,6 +1286,7 @@ export function App() {
             onRetryRun={briar.retryRun}
             onReworkRun={briar.reworkRun}
             onCancelRun={briar.cancelRun}
+            onUnassignRun={(runId) => briar.unassignRun(activeProject?.id ?? "", runId)}
             onResumeRun={briar.resumeRun}
             onRequestedRunOpen={() => setRequestedRunId(null)}
             onSendIssueMessage={sendIssueMessage}
@@ -1667,6 +1668,7 @@ export function App() {
             onRetryRun={briar.retryRun}
             onReworkRun={briar.reworkRun}
             onCancelRun={briar.cancelRun}
+            onUnassignRun={(runId) => briar.unassignRun(activeProject?.id ?? "", runId)}
             onResumeRun={briar.resumeRun}
             onSendIssueMessage={sendIssueMessage}
             processingIssueIds={processingIssueIds}
