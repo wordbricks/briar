@@ -289,7 +289,7 @@ function CompanionTaskSwipeAction({
         setIsDragging(true);
         setOffset(Math.min(
           companionSwipeActionWidth,
-          Math.max(0, gesture.origin + deltaX),
+          Math.max(0, gesture.origin - deltaX),
         ));
       }}
       onPointerUp={finishGesture}
@@ -310,7 +310,7 @@ function CompanionTaskSwipeAction({
       </button>
       <div
         className="companion-task-swipe-content"
-        style={{ transform: `translateX(${offset}px)` }}
+        style={{ transform: `translateX(${-offset}px)` }}
       >
         {children}
       </div>
