@@ -196,6 +196,42 @@ describe("agentMessagesFromAppServerEvents", () => {
       isComplete: true,
     }]);
   });
+
+  it("hides blank incomplete rows that only show the writing placeholder", () => {
+    expect(
+      agentMessagesFromAppServerEvents([
+        {
+          ...event(1, "opencode/stream"),
+          direction: "server",
+          provider: "opencode",
+          event: {
+            type: "messageStarted",
+            id: "msg_empty",
+            phase: "commentary",
+            text: "",
+          },
+        },
+        {
+          ...event(2, "opencode/stream"),
+          direction: "server",
+          provider: "opencode",
+          event: {
+            type: "messageStarted",
+            id: "msg_text",
+            phase: "commentary",
+            text: "OpenCode 진행 메시지",
+          },
+        },
+      ]),
+    ).toEqual([{
+      id: "msg_text",
+      phase: "commentary",
+      text: "OpenCode 진행 메시지",
+      startedAtMs: 2,
+      updatedAtMs: 2,
+      isComplete: false,
+    }]);
+  });
 });
 
 describe("naturalLanguageFromAgentMessage", () => {

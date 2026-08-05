@@ -365,7 +365,11 @@ export function agentMessagesFromAppServerEvents(
 
   return order
     .map((id) => messages.get(id))
-    .filter((message): message is AutoHuntAgentMessage => Boolean(message));
+    .filter((message): message is AutoHuntAgentMessage => Boolean(message))
+    // Empty bodies only produce the "writing…" placeholder. Hide them so
+    // providers that stream via ephemeral deltas cannot flood the work log
+    // with blank incomplete rows.
+    .filter((message) => message.text.trim().length > 0);
 }
 
 export function naturalLanguageFromAgentMessage(text: string): string {

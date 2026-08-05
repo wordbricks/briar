@@ -57,14 +57,25 @@ export type OpenCodeRunnerOutput =
 export type OpenCodeEventState = {
   messageRoles: Map<string, "user" | "assistant">;
   parts: Map<string, Part>;
+  /** Current text content for each text/reasoning part. */
+  partText: Map<string, string>;
+  /** Ordered part IDs that contribute text for each assistant message. */
+  messagePartOrder: Map<string, string[]>;
+  /** Last emitted agent-message text for each assistant message ID. */
   emittedText: Map<string, string>;
+  startedMessages: Set<string>;
+  completedMessages: Set<string>;
 };
 
 export function createOpenCodeEventState(): OpenCodeEventState {
   return {
     messageRoles: new Map(),
     parts: new Map(),
+    partText: new Map(),
+    messagePartOrder: new Map(),
     emittedText: new Map(),
+    startedMessages: new Set(),
+    completedMessages: new Set(),
   };
 }
 
@@ -206,72 +217,266 @@ function eventSessionId(event: Record<string, unknown>): string | undefined {
   return typeof sessionID === "string" ? sessionID : undefined;
 }
 
+function rememberMessagePart(state: OpenCodeEventState, messageId: string, partId: string) {
+  const order = state.messagePartOrder.get(messageId) ?? [];
+  if (!order.includes(partId)) {
+    order.push(partId);
+    state.messagePartOrder.set(messageId, order);
+  }
+}
+
+function messageText(state: OpenCodeEventState, messageId: string): string {
+  const order = state.messagePartOrder.get(messageId) ?? [];
+  return order
+    .map((partId) => state.partText.get(partId) ?? "")
+    .filter(Boolean)
+    .join("");
+}
+
+/**
+ * Convert accumulated OpenCode text into Briar agent events.
+ *
+ * Detached workers drop `messageDelta` from the durable transcript, so each
+ * visible work-log entry must land as `messageStarted` and especially
+ * `messageCompleted` with the full text under a stable message ID.
+ */
+function emitForMessageText(
+  state: OpenCodeEventState,
+  messageId: string,
+  options: { complete?: boolean; phase?: string | null } = {},
+): NormalizedAgentEvent | undefined {
+  if (state.completedMessages.has(messageId)) return undefined;
+  const text = messageText(state, messageId);
+  const previous = state.emittedText.get(messageId) ?? "";
+  const complete = Boolean(options.complete);
+  const phase = options.phase ?? "commentary";
+
+  if (!text) {
+    if (complete) {
+      // Empty complete messages are not useful in the work log.
+      state.completedMessages.add(messageId);
+    }
+    return undefined;
+  }
+
+  state.emittedText.set(messageId, text);
+
+  if (!state.startedMessages.has(messageId)) {
+    state.startedMessages.add(messageId);
+    if (complete) {
+      state.completedMessages.add(messageId);
+      return { type: "messageCompleted", id: messageId, phase, text };
+    }
+    return { type: "messageStarted", id: messageId, phase, text };
+  }
+
+  if (complete) {
+    state.completedMessages.add(messageId);
+    return { type: "messageCompleted", id: messageId, phase, text };
+  }
+
+  if (text.startsWith(previous) && text.length > previous.length) {
+    return {
+      type: "messageDelta",
+      id: messageId,
+      delta: text.slice(previous.length),
+    };
+  }
+
+  // Non-prefix snapshot updates still need a durable full-text event. Re-emit
+  // messageStarted so transcript consumers replace the visible body without
+  // inventing a second message id.
+  if (text !== previous) {
+    return { type: "messageStarted", id: messageId, phase, text };
+  }
+  return undefined;
+}
+
+function setPartText(
+  state: OpenCodeEventState,
+  messageId: string,
+  partId: string,
+  text: string,
+) {
+  rememberMessagePart(state, messageId, partId);
+  state.partText.set(partId, text);
+}
+
+function appendPartText(
+  state: OpenCodeEventState,
+  messageId: string,
+  partId: string,
+  delta: string,
+) {
+  rememberMessagePart(state, messageId, partId);
+  state.partText.set(partId, `${state.partText.get(partId) ?? ""}${delta}`);
+}
+
 /** Normalize the OpenCode events Briar needs while preserving every raw event. */
 export function normalizeOpenCodeEvent(
   raw: unknown,
   sessionId: string,
   state: OpenCodeEventState,
-): NormalizedAgentEvent | undefined {
-  if (!raw || typeof raw !== "object") return undefined;
+): NormalizedAgentEvent[] {
+  if (!raw || typeof raw !== "object") return [];
   const event = raw as Record<string, unknown>;
-  if (eventSessionId(event) !== sessionId) return undefined;
+  if (eventSessionId(event) !== sessionId) return [];
   const properties = event.properties as Record<string, unknown>;
 
   if (event.type === "message.updated") {
     const info = properties.info;
-    if (info && typeof info === "object") {
-      const message = info as { id?: unknown; role?: unknown };
-      if (
-        typeof message.id === "string" &&
-        (message.role === "user" || message.role === "assistant")
-      ) {
-        state.messageRoles.set(message.id, message.role);
-      }
+    if (!info || typeof info !== "object") return [];
+    const message = info as {
+      id?: unknown;
+      role?: unknown;
+      time?: { completed?: unknown };
+    };
+    if (
+      typeof message.id !== "string" ||
+      (message.role !== "user" && message.role !== "assistant")
+    ) {
+      return [];
     }
-    return undefined;
+    const wasAssistant = state.messageRoles.get(message.id) === "assistant";
+    state.messageRoles.set(message.id, message.role);
+    if (message.role !== "assistant") return [];
+
+    const events: NormalizedAgentEvent[] = [];
+    // Role can arrive after part text has already been buffered.
+    if (!wasAssistant && messageText(state, message.id)) {
+      const started = emitForMessageText(state, message.id);
+      if (started) events.push(started);
+    }
+
+    if (message.time?.completed != null) {
+      const completed = emitForMessageText(state, message.id, {
+        complete: true,
+        phase: "commentary",
+      });
+      if (completed) events.push(completed);
+    }
+    return events;
   }
 
   if (event.type === "message.part.updated") {
     const part = properties.part as Part | undefined;
-    if (!part?.id) return undefined;
+    if (!part?.id || !part.messageID) return [];
     state.parts.set(part.id, part);
-    if (state.messageRoles.get(part.messageID) !== "assistant") return undefined;
     const text = textFromPart(part);
-    if (text === undefined) return undefined;
-    const previous = state.emittedText.get(part.id);
-    state.emittedText.set(part.id, text);
-    if (previous === undefined) {
-      return {
-        type: "messageStarted",
-        id: part.id,
-        phase: "commentary",
-        text,
-      };
-    }
-    if (text.startsWith(previous) && text.length > previous.length) {
-      return { type: "messageDelta", id: part.id, delta: text.slice(previous.length) };
-    }
-    return undefined;
+    if (text === undefined) return [];
+    setPartText(state, part.messageID, part.id, text);
+    if (state.messageRoles.get(part.messageID) !== "assistant") return [];
+    // Completing on individual part end is wrong when an assistant message
+    // still has more text after tools. Only stream progress here; complete on
+    // message.time.completed, session.idle, or the final runner response.
+    const normalized = emitForMessageText(state, part.messageID);
+    return normalized ? [normalized] : [];
   }
 
   if (event.type === "message.part.delta") {
     const partID = properties.partID;
+    const messageID =
+      typeof properties.messageID === "string"
+        ? properties.messageID
+        : state.parts.get(typeof partID === "string" ? partID : "")?.messageID;
     const delta = properties.delta;
-    if (typeof partID !== "string" || typeof delta !== "string" || !delta) {
-      return undefined;
+    const field = properties.field;
+    if (
+      typeof partID !== "string" ||
+      typeof messageID !== "string" ||
+      typeof delta !== "string" ||
+      !delta
+    ) {
+      return [];
     }
-    const part = state.parts.get(partID);
-    if (!part || state.messageRoles.get(part.messageID) !== "assistant") {
-      return undefined;
+    // OpenCode streams text on field "text"; ignore tool-input and other fields.
+    if (typeof field === "string" && field !== "text") return [];
+    appendPartText(state, messageID, partID, delta);
+    if (state.messageRoles.get(messageID) !== "assistant") return [];
+    const normalized = emitForMessageText(state, messageID);
+    return normalized ? [normalized] : [];
+  }
+
+  if (event.type === "message.part.removed") {
+    const partID = properties.partID;
+    const messageID = properties.messageID;
+    if (typeof partID !== "string" || typeof messageID !== "string") {
+      return [];
     }
-    state.emittedText.set(partID, `${state.emittedText.get(partID) ?? ""}${delta}`);
-    return { type: "messageDelta", id: partID, delta };
+    state.parts.delete(partID);
+    state.partText.delete(partID);
+    const order = state.messagePartOrder.get(messageID);
+    if (order) {
+      state.messagePartOrder.set(
+        messageID,
+        order.filter((id) => id !== partID),
+      );
+    }
+    if (state.messageRoles.get(messageID) !== "assistant") return [];
+    const normalized = emitForMessageText(state, messageID);
+    return normalized ? [normalized] : [];
+  }
+
+  if (event.type === "session.idle") {
+    // Complete any open assistant messages when the session returns to idle so
+    // durable transcripts never leave "writing…" placeholders behind.
+    const events = completeOpenCodeMessages(state, { phase: "commentary" });
+    events.push({ type: "turnCompleted", status: "completed" });
+    return events;
   }
 
   if (event.type === "session.error") {
-    return { type: "turnCompleted", status: "failed" };
+    return [{ type: "turnCompleted", status: "failed" }];
   }
-  return undefined;
+  return [];
+}
+
+/**
+ * Finish any open assistant messages after OpenCode returns the final response.
+ * Prefer the response text when provided so the durable work log shows the
+ * same final body the runner reports as its result.
+ */
+export function completeOpenCodeMessages(
+  state: OpenCodeEventState,
+  options: {
+    messageId?: string | null;
+    text?: string | null;
+    phase?: string | null;
+  } = {},
+): NormalizedAgentEvent[] {
+  const events: NormalizedAgentEvent[] = [];
+  const phase = options.phase ?? "final";
+  if (options.messageId && options.text != null && options.text !== "") {
+    const messageId = options.messageId;
+    // Final runner text wins over any earlier idle/message completion so the
+    // durable work log shows the same body as the OpenCode result.
+    state.completedMessages.delete(messageId);
+    const previousParts = state.messagePartOrder.get(messageId) ?? [];
+    for (const partId of previousParts) {
+      state.partText.delete(partId);
+    }
+    const syntheticPartId = `${messageId}:result`;
+    state.messagePartOrder.set(messageId, [syntheticPartId]);
+    state.partText.set(syntheticPartId, options.text);
+    state.messageRoles.set(messageId, "assistant");
+    const completed = emitForMessageText(state, messageId, {
+      complete: true,
+      phase,
+    });
+    if (completed) events.push(completed);
+  }
+
+  for (const [messageId, role] of state.messageRoles) {
+    if (role !== "assistant" || state.completedMessages.has(messageId)) {
+      continue;
+    }
+    const completed = emitForMessageText(state, messageId, {
+      complete: true,
+      phase: "commentary",
+    });
+    if (completed) events.push(completed);
+  }
+  return events;
 }
 
 export function openCodePermissionInput(properties: Record<string, unknown>) {
