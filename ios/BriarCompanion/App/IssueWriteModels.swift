@@ -149,6 +149,17 @@ struct UpdateIssueResponse: Codable, Sendable {
     let assigneeUserId: String?
 }
 
+struct TransferIssueRequest: Codable, Sendable {
+    let targetProjectId: UUID
+}
+
+struct TransferIssueResponse: Codable, Sendable {
+    let runId: UUID
+    let sourceProjectId: UUID
+    let targetProjectId: UUID
+    let outcome: String
+}
+
 struct IssueExecutionPreferences: Codable, Equatable, Sendable {
     var provider: AgentProvider?
     var model: String?

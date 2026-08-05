@@ -23,6 +23,10 @@ enum MobileAPIContract {
             "/projects/\(projectID.uuidString.lowercased())/runs/\(runID.uuidString.lowercased())"
         }
 
+        static func runTransfer(projectID: UUID, runID: UUID) -> String {
+            "\(run(projectID: projectID, runID: runID))/transfer"
+        }
+
         static func dashboard(projectID: UUID) -> String {
             "/projects/\(projectID.uuidString.lowercased())/dashboard"
         }

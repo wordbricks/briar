@@ -123,6 +123,7 @@ import {
   deleteProjectAgent,
   deleteProjectAgentSchedule,
   deleteIssue,
+  transferIssue,
   deleteIssueDependency,
   deleteProject,
   EventKeyConflictError,
@@ -7058,6 +7059,70 @@ async function route(
       1_000,
     );
     return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  const issueTransferMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/transfer$/u,
+  );
+  if (issueTransferMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const sourceProject = await getProject(
+      db,
+      issueTransferMatch[1],
+      session.user.id,
+    );
+    if (!sourceProject) throw new HttpError(404, "Project not found");
+    const body = z
+      .object({
+        targetProjectId: z.string().uuid(),
+      })
+      .parse(await readJson(request));
+    if (body.targetProjectId === sourceProject.id) {
+      throw new HttpError(400, "Target project must be different");
+    }
+    const targetProject = await getProject(
+      db,
+      body.targetProjectId,
+      session.user.id,
+    );
+    if (!targetProject) throw new HttpError(404, "Target project not found");
+    if (targetProject.organization_id !== sourceProject.organization_id) {
+      throw new HttpError(
+        403,
+        "Issues can only be transferred within the same organization",
+      );
+    }
+    const outcome = await transferIssue(db, {
+      sourceProjectId: sourceProject.id,
+      targetProjectId: targetProject.id,
+      targetProjectName: targetProject.name,
+      runId: issueTransferMatch[2],
+      observedAt: new Date().toISOString(),
+    });
+    if (outcome === "not_found") {
+      throw new HttpError(404, "Run not found");
+    }
+    if (outcome === "active") {
+      throw new HttpError(
+        409,
+        "An active Auto Hunt issue cannot be transferred",
+      );
+    }
+    if (outcome === "same_project") {
+      throw new HttpError(400, "Target project must be different");
+    }
+    if (outcome === "source_key_conflict") {
+      throw new HttpError(
+        409,
+        "The target project already has an issue with the same source key",
+      );
+    }
+    return json({
+      runId: issueTransferMatch[2],
+      sourceProjectId: sourceProject.id,
+      targetProjectId: targetProject.id,
+      outcome: "transferred",
+    });
   }
 
   if (recoveryMatch && request.method === "POST") {

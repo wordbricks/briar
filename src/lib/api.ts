@@ -1554,6 +1554,29 @@ export async function deleteIssue(
   });
 }
 
+export type TransferIssueResult = {
+  runId: string;
+  sourceProjectId: string;
+  targetProjectId: string;
+  outcome: "transferred";
+};
+
+export async function transferIssue(
+  token: string,
+  projectId: string,
+  runId: string,
+  targetProjectId: string,
+) {
+  return request<TransferIssueResult>(
+    `/projects/${projectId}/runs/${runId}/transfer`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify({ targetProjectId }),
+    },
+  );
+}
+
 export async function loadIssueAttachment(
   token: string,
   attachment: IssueAttachment,

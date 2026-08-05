@@ -41,6 +41,7 @@ struct CompanionShellView: View {
             NavigationStack(path: $taskPath) {
                 TaskListView(
                     project: project,
+                    projects: projects,
                     snapshot: snapshot,
                     isRefreshing: isRefreshing,
                     errorMessage: errorMessage,
@@ -59,6 +60,7 @@ struct CompanionShellView: View {
                             projectID: project.id,
                             token: token,
                             api: api,
+                            projects: projects,
                             allRuns: snapshot?.runs ?? [],
                             workers: snapshot?.workers ?? [],
                             providers: snapshot?.organizationProviders ?? [],
@@ -225,6 +227,7 @@ struct TaskListView: View {
     @StateObject private var mutations: IssueMutationStore
 
     let project: ProjectsResponse.Project
+    let projects: [ProjectsResponse.Project]
     let snapshot: DashboardSnapshot?
     let isRefreshing: Bool
     let errorMessage: String?
@@ -235,6 +238,7 @@ struct TaskListView: View {
     @MainActor
     init(
         project: ProjectsResponse.Project,
+        projects: [ProjectsResponse.Project] = [],
         snapshot: DashboardSnapshot?,
         isRefreshing: Bool,
         errorMessage: String?,
@@ -243,6 +247,7 @@ struct TaskListView: View {
         refresh: @escaping () async -> Void
     ) {
         self.project = project
+        self.projects = projects
         self.snapshot = snapshot
         self.isRefreshing = isRefreshing
         self.errorMessage = errorMessage
@@ -303,6 +308,7 @@ struct TaskListView: View {
                                     projectID: project.id,
                                     token: token,
                                     api: api,
+                                    projects: projects,
                                     allRuns: snapshot?.runs ?? [],
                                     workers: snapshot?.workers ?? [],
                                     providers: snapshot?.organizationProviders ?? [],
@@ -534,6 +540,8 @@ struct RunDetailView: View {
     @State private var showingDispatch = false
     @State private var reassigning = false
     @State private var confirmingDelete = false
+    @State private var showingTransfer = false
+    @State private var transferTargetProjectID: UUID?
     @State private var localStatus: DashboardRun.Status
     @State private var localWorkflowStage: String?
     @State private var dependencyIDs: Set<UUID>
@@ -552,11 +560,20 @@ struct RunDetailView: View {
     }
 
     private let projectID: UUID
+    private let projects: [ProjectsResponse.Project]
     private let allRuns: [DashboardRun]
     private let workers: [DashboardWorker]
     private let providers: [AgentProvider]
     private let members: [OrganizationMember]
     private let refresh: () async -> Void
+
+    private var transferDestinations: [ProjectsResponse.Project] {
+        let currentOrganization = projects.first(where: { $0.id == projectID })?.organizationId
+        return projects.filter { project in
+            project.id != projectID &&
+                (currentOrganization == nil || project.organizationId == currentOrganization)
+        }
+    }
 
     @MainActor
     init(
@@ -564,6 +581,7 @@ struct RunDetailView: View {
         projectID: UUID,
         token: String,
         api: any MobileAPIClientProtocol,
+        projects: [ProjectsResponse.Project] = [],
         allRuns: [DashboardRun] = [],
         workers: [DashboardWorker] = [],
         providers: [AgentProvider] = [],
@@ -572,6 +590,7 @@ struct RunDetailView: View {
     ) {
         self.run = run
         self.projectID = projectID
+        self.projects = projects
         self.allRuns = allRuns
         self.workers = workers
         self.providers = providers
@@ -597,6 +616,11 @@ struct RunDetailView: View {
             effort: run.preferredEffort
         ))
         _reviewCompleted = State(initialValue: !(run.resultReviews ?? []).isEmpty)
+        _transferTargetProjectID = State(initialValue: projects.first(where: {
+            $0.id != projectID &&
+                (projects.first(where: { $0.id == projectID })?.organizationId == nil ||
+                    $0.organizationId == projects.first(where: { $0.id == projectID })?.organizationId)
+        })?.id)
     }
 
     var body: some View {
@@ -639,6 +663,12 @@ struct RunDetailView: View {
                     .accessibilityIdentifier("issue-copy-link")
                     Divider()
                     Button("수정") { showingEdit = true }
+                    if !transferDestinations.isEmpty {
+                        Button("다른 프로젝트로 이동") {
+                            transferTargetProjectID = transferDestinations.first?.id
+                            showingTransfer = true
+                        }
+                    }
                     Button("삭제", role: .destructive) { confirmingDelete = true }
                 } label: {
                     Image(systemName: "ellipsis.circle")
@@ -674,6 +704,21 @@ struct RunDetailView: View {
             Button("취소", role: .cancel) {}
         } message: {
             Text("활동 기록, 대화와 첨부가 영구적으로 삭제됩니다.")
+        }
+        .confirmationDialog(
+            "다른 프로젝트로 이동",
+            isPresented: $showingTransfer,
+            titleVisibility: .visible
+        ) {
+            ForEach(transferDestinations, id: \.id) { project in
+                Button(project.name) {
+                    transferTargetProjectID = project.id
+                    Task { await transferIssue(to: project.id) }
+                }
+            }
+            Button("취소", role: .cancel) {}
+        } message: {
+            Text("선택한 프로젝트로 이슈와 대화·첨부·활동 기록이 함께 이동합니다. 의존성은 해제됩니다.")
         }
         .sheet(isPresented: $showingEdit) {
             EditIssueSheet(
@@ -1547,6 +1592,18 @@ struct RunDetailView: View {
     private func deleteIssue() async {
         do {
             try await mutations.deleteIssue(runID: run.id)
+            actionError = nil
+            await refresh()
+            dismiss()
+        } catch { actionError = error.localizedDescription }
+    }
+
+    private func transferIssue(to targetProjectID: UUID) async {
+        do {
+            _ = try await mutations.transferIssue(
+                runID: run.id,
+                targetProjectID: targetProjectID
+            )
             actionError = nil
             await refresh()
             dismiss()
