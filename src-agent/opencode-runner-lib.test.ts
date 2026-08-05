@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildOpenCodePermissionRules,
   buildOpenCodePrompt,
+  completeOpenCodeMessages,
   createOpenCodeEventState,
   mapEffortToOpenCode,
   normalizeOpenCodeEvent,
@@ -84,14 +85,16 @@ describe("OpenCode runner helpers", () => {
 
   it("normalizes assistant part updates without replaying snapshots", () => {
     const state = createOpenCodeEventState();
-    normalizeOpenCodeEvent(
-      {
-        type: "message.updated",
-        properties: { sessionID: "ses_1", info: { id: "msg_1", role: "assistant" } },
-      },
-      "ses_1",
-      state,
-    );
+    expect(
+      normalizeOpenCodeEvent(
+        {
+          type: "message.updated",
+          properties: { sessionID: "ses_1", info: { id: "msg_1", role: "assistant" } },
+        },
+        "ses_1",
+        state,
+      ),
+    ).toEqual([]);
     const part = (text: string) => ({
       id: "part_1",
       sessionID: "ses_1",
@@ -105,7 +108,9 @@ describe("OpenCode runner helpers", () => {
         "ses_1",
         state,
       ),
-    ).toMatchObject({ type: "messageStarted", text: "Hi" });
+    ).toEqual([
+      { type: "messageStarted", id: "msg_1", phase: "commentary", text: "Hi" },
+    ]);
     expect(
       normalizeOpenCodeEvent(
         {
@@ -115,6 +120,215 @@ describe("OpenCode runner helpers", () => {
         "ses_1",
         state,
       ),
-    ).toEqual({ type: "messageDelta", id: "part_1", delta: " there" });
+    ).toEqual([{ type: "messageDelta", id: "msg_1", delta: " there" }]);
+  });
+
+  it("skips empty starts and completes durable text under the message id", () => {
+    const state = createOpenCodeEventState();
+    normalizeOpenCodeEvent(
+      {
+        type: "message.updated",
+        properties: { sessionID: "ses_1", info: { id: "msg_1", role: "assistant" } },
+      },
+      "ses_1",
+      state,
+    );
+
+    // Empty first snapshot must not create a blank "writing…" work-log row.
+    expect(
+      normalizeOpenCodeEvent(
+        {
+          type: "message.part.updated",
+          properties: {
+            sessionID: "ses_1",
+            part: {
+              id: "part_1",
+              sessionID: "ses_1",
+              messageID: "msg_1",
+              type: "text",
+              text: "",
+            },
+          },
+        },
+        "ses_1",
+        state,
+      ),
+    ).toEqual([]);
+
+    // Streaming deltas are ephemeral for detached transcripts, but still track text.
+    expect(
+      normalizeOpenCodeEvent(
+        {
+          type: "message.part.delta",
+          properties: {
+            sessionID: "ses_1",
+            messageID: "msg_1",
+            partID: "part_1",
+            field: "text",
+            delta: "저장소 구조를 확인합니다.",
+          },
+        },
+        "ses_1",
+        state,
+      ),
+    ).toEqual([
+      {
+        type: "messageStarted",
+        id: "msg_1",
+        phase: "commentary",
+        text: "저장소 구조를 확인합니다.",
+      },
+    ]);
+
+    expect(
+      normalizeOpenCodeEvent(
+        {
+          type: "message.part.delta",
+          properties: {
+            sessionID: "ses_1",
+            messageID: "msg_1",
+            partID: "part_1",
+            field: "text",
+            delta: " 다음 단계로 진행합니다.",
+          },
+        },
+        "ses_1",
+        state,
+      ),
+    ).toEqual([
+      {
+        type: "messageDelta",
+        id: "msg_1",
+        delta: " 다음 단계로 진행합니다.",
+      },
+    ]);
+
+    // Completing the assistant message must emit full text under the same id so
+    // durable work logs (which drop deltas) still show the body.
+    expect(
+      normalizeOpenCodeEvent(
+        {
+          type: "message.updated",
+          properties: {
+            sessionID: "ses_1",
+            info: {
+              id: "msg_1",
+              role: "assistant",
+              time: { created: 1, completed: 2 },
+            },
+          },
+        },
+        "ses_1",
+        state,
+      ),
+    ).toEqual([
+      {
+        type: "messageCompleted",
+        id: "msg_1",
+        phase: "commentary",
+        text: "저장소 구조를 확인합니다. 다음 단계로 진행합니다.",
+      },
+    ]);
+  });
+
+  it("buffers part text before the assistant role is known", () => {
+    const state = createOpenCodeEventState();
+    expect(
+      normalizeOpenCodeEvent(
+        {
+          type: "message.part.updated",
+          properties: {
+            sessionID: "ses_1",
+            part: {
+              id: "part_1",
+              sessionID: "ses_1",
+              messageID: "msg_1",
+              type: "text",
+              text: "먼저 분석합니다.",
+            },
+          },
+        },
+        "ses_1",
+        state,
+      ),
+    ).toEqual([]);
+
+    expect(
+      normalizeOpenCodeEvent(
+        {
+          type: "message.updated",
+          properties: {
+            sessionID: "ses_1",
+            info: { id: "msg_1", role: "assistant" },
+          },
+        },
+        "ses_1",
+        state,
+      ),
+    ).toEqual([
+      {
+        type: "messageStarted",
+        id: "msg_1",
+        phase: "commentary",
+        text: "먼저 분석합니다.",
+      },
+    ]);
+  });
+
+  it("completes open messages on session idle and final response text", () => {
+    const state = createOpenCodeEventState();
+    normalizeOpenCodeEvent(
+      {
+        type: "message.updated",
+        properties: { sessionID: "ses_1", info: { id: "msg_1", role: "assistant" } },
+      },
+      "ses_1",
+      state,
+    );
+    normalizeOpenCodeEvent(
+      {
+        type: "message.part.delta",
+        properties: {
+          sessionID: "ses_1",
+          messageID: "msg_1",
+          partID: "part_1",
+          field: "text",
+          delta: "부분 응답",
+        },
+      },
+      "ses_1",
+      state,
+    );
+
+    expect(
+      normalizeOpenCodeEvent(
+        { type: "session.idle", properties: { sessionID: "ses_1" } },
+        "ses_1",
+        state,
+      ),
+    ).toEqual([
+      {
+        type: "messageCompleted",
+        id: "msg_1",
+        phase: "commentary",
+        text: "부분 응답",
+      },
+      { type: "turnCompleted", status: "completed" },
+    ]);
+
+    expect(
+      completeOpenCodeMessages(state, {
+        messageId: "msg_1",
+        text: "최종 전체 응답",
+        phase: "final",
+      }),
+    ).toEqual([
+      {
+        type: "messageCompleted",
+        id: "msg_1",
+        phase: "final",
+        text: "최종 전체 응답",
+      },
+    ]);
   });
 });

@@ -11,6 +11,7 @@ import {
   approvedOpenCodeQuestionAnswers,
   buildOpenCodePermissionRules,
   buildOpenCodePrompt,
+  completeOpenCodeMessages,
   createOpenCodeEventState,
   isOpenCodeWritePermission,
   mapEffortToOpenCode,
@@ -226,8 +227,14 @@ async function main() {
     });
     const eventPump = (async () => {
       for await (const raw of subscription.stream) {
-        const normalized = normalizeOpenCodeEvent(raw, sessionId, eventState);
-        emit({ type: "event", raw, ...(normalized ? { event: normalized } : {}) });
+        const normalizedEvents = normalizeOpenCodeEvent(raw, sessionId, eventState);
+        if (normalizedEvents.length === 0) {
+          emit({ type: "event", raw });
+        } else {
+          for (const event of normalizedEvents) {
+            emit({ type: "event", raw, event });
+          }
+        }
         if (!raw || typeof raw !== "object") continue;
         const event = raw as { type?: unknown; properties?: unknown };
         const properties =
@@ -307,16 +314,17 @@ async function main() {
       );
     }
     const message = openCodeResponseText(response.data.parts);
-    emit({
-      type: "event",
-      raw: response.data,
-      event: {
-        type: "messageCompleted",
-        id: response.data.info.id,
-        phase: "final",
-        text: message,
-      },
-    });
+    for (const event of completeOpenCodeMessages(eventState, {
+      messageId: response.data.info.id,
+      text: message,
+      phase: "final",
+    })) {
+      emit({
+        type: "event",
+        raw: response.data,
+        event,
+      });
+    }
     emit({
       type: "event",
       raw: response.data.info,
