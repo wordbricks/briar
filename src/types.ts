@@ -95,6 +95,7 @@ export type IssueMessage = {
   runId: string;
   parentMessageId: string | null;
   body: string;
+  attachments?: IssueAttachment[];
   author: IssueMessageAuthor;
   replyCount: number;
   createdAt: string;

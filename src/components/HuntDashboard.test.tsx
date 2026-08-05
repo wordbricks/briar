@@ -313,7 +313,7 @@ describe("HuntDashboard", () => {
     expect(markup).not.toContain("attachment-1");
   });
 
-  it("shows a flower review icon on completed issue status pills when result reviews exist", () => {
+  it("shows a BadgeCheck review icon on completed issue status pills when result reviews exist", () => {
     const reviewed = {
       ...demoDashboard.runs[0],
       id: "reviewed-completed",
@@ -355,12 +355,12 @@ describe("HuntDashboard", () => {
     );
 
     expect(reviewedMarkup).toContain('class="status-pill emerald reviewed"');
-    expect(reviewedMarkup).toContain("lucide-flower2");
+    expect(reviewedMarkup).toContain("lucide-badge-check");
     expect(reviewedMarkup).toContain("status-pill-review-icon");
     expect(reviewedMarkup).toContain("검수 완료됨");
     expect(unreviewedMarkup).toContain('class="status-pill emerald"');
     expect(unreviewedMarkup).not.toContain("status-pill emerald reviewed");
-    expect(unreviewedMarkup).not.toContain("lucide-flower2");
+    expect(unreviewedMarkup).not.toContain("lucide-badge-check");
   });
 
   it("shows the human assignee avatar with the source and priority badges", () => {
@@ -2509,6 +2509,82 @@ describe("HuntDashboard", () => {
     });
     expect(messageList?.scrollTop).toBe(640);
 
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("pastes an image into the issue conversation and sends it without text", async () => {
+    const image = new File(["image"], "clipboard.png", { type: "image/png" });
+    const sentMessage: IssueMessage = {
+      id: "message-with-image",
+      runId: demoDashboard.runs[0].id,
+      parentMessageId: null,
+      body: "![clipboard.png](briar-attachment://stored-image)",
+      attachments: [{
+        id: "stored-image",
+        filename: image.name,
+        contentType: image.type,
+        byteSize: image.size,
+        url: "blob:stored-image",
+      }],
+      author: { id: "jay", name: "Jay", image: null, provider: null },
+      replyCount: 0,
+      createdAt: "2026-08-05T00:00:00.000Z",
+      updatedAt: "2026-08-05T00:00:00.000Z",
+    };
+    const onSendIssueMessage = vi.fn(async () => ({
+      message: sentMessage,
+      agentReply: null,
+    }));
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => image}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={onSendIssueMessage}
+          run={demoDashboard.runs[0]}
+        />,
+      );
+      await Promise.resolve();
+    });
+    const textarea = container.querySelector<HTMLTextAreaElement>(
+      ".issue-conversation > .issue-message-composer textarea",
+    );
+    const paste = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(paste, "clipboardData", {
+      value: {
+        files: [image],
+        items: [{ kind: "file", getAsFile: () => image }],
+        types: ["Files"],
+      },
+    });
+    await act(async () => textarea?.dispatchEvent(paste));
+    expect(container.querySelector(".issue-composer-attachment")?.textContent)
+      .toContain("clipboard.png");
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".issue-conversation > .issue-message-composer .issue-message-send",
+      )?.click();
+      await Promise.resolve();
+    });
+    expect(onSendIssueMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attachments: [image],
+        body: expect.stringContaining("briar-attachment://"),
+      }),
+    );
     await act(async () => root.unmount());
     container.remove();
   });

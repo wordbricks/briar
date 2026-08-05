@@ -349,6 +349,7 @@ struct IssueMessage: Codable, Equatable, Identifiable, Sendable {
     let runId: UUID
     let parentMessageId: UUID?
     let body: String
+    let attachments: [IssueAttachment]?
     let author: Author
     let replyCount: Int
     let createdAt: Date
