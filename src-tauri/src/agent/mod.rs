@@ -542,6 +542,14 @@ pub(crate) fn codex_binary(home: &Path, execution_path: &OsStr) -> Result<PathBu
     codex::codex_binary(home, execution_path)
 }
 
+pub(crate) fn codex_models(
+    runner: Arc<dyn CommandRunner>,
+    binary: &str,
+    workspace: &Path,
+) -> Result<Vec<(String, String, bool)>, String> {
+    codex::list_models(runner, binary, workspace)
+}
+
 pub(crate) fn claude_binary(home: &Path, execution_path: &OsStr) -> Result<PathBuf, String> {
     claude::claude_binary(home, execution_path)
 }

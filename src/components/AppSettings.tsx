@@ -3,6 +3,7 @@ import {
   Archive,
   Bell,
   Bot,
+  CircleCheck,
   ChevronDown,
   Download,
   Github,
@@ -52,9 +53,12 @@ import {
 } from "../lib/initial-onboarding";
 import {
   loadAppProviderSettings,
+  loadAgentProviderModels,
   updateAppProviderSettings,
   type AgentProvider,
+  type AgentProviderModelCatalogEntry,
   type AppProviderSettings,
+  defaultAgentProviderModelCatalog,
 } from "../lib/project-llm";
 import {
   loadAppRuntimeSettings,
@@ -190,6 +194,11 @@ export function AppSettings({
     useState<AgentUsageSnapshot | null>(null);
   const [providerLoginOpening, setProviderLoginOpening] =
     useState<AgentProvider | null>(null);
+  const [expandedProvider, setExpandedProvider] =
+    useState<AgentProvider | null>(null);
+  const [providerModels, setProviderModels] = useState(
+    defaultAgentProviderModelCatalog,
+  );
   const [runtimeSettings, setRuntimeSettings] =
     useState<AppRuntimeSettings | null>(null);
   const [runtimeSettingsLoading, setRuntimeSettingsLoading] = useState(false);
@@ -210,14 +219,16 @@ export function AppSettings({
     setProvidersLoading(true);
     setProviderError(null);
     try {
-      const [statuses, settings, usage] = await Promise.all([
+      const [statuses, settings, usage, models] = await Promise.all([
         inspectOnboardingPrerequisites(),
         loadAppProviderSettings(),
         loadAgentUsage().catch(() => null),
+        loadAgentProviderModels().catch(() => defaultAgentProviderModelCatalog),
       ]);
       setProviderStatuses(statuses);
       setProviderSettings(settings);
       setProviderUsage(usage);
+      setProviderModels(models);
       setProvidersChecked(true);
     } catch (caught) {
       setProviderError(
@@ -605,13 +616,31 @@ export function AppSettings({
                   disabled={
                     providerSaving !== null || providerInstalling !== null
                   }
+                  details={
+                    <ProviderDetails
+                      authenticated={providerStatuses?.codex.authenticated}
+                      installed={providerStatuses?.codex.installed}
+                      loading={providersLoading && !providerStatuses}
+                      loginOpening={providerLoginOpening === "codex"}
+                      models={providerModels.codex}
+                      onLogin={() => void openProviderLogin("codex")}
+                      providerName="Codex"
+                      usage={providerUsage?.codex}
+                    />
+                  }
+                  detailsId="provider-codex-details"
+                  detailsLabel={t("appSettings.toggleProviderDetails", { provider: "Codex" })}
                   enabled={providerSettings?.codex ?? false}
+                  expanded={expandedProvider === "codex"}
                   icon={
                     <ProviderIcon tone="codex">
                       <CodexIcon size={20} />
                     </ProviderIcon>
                   }
                   name="Codex"
+                  onExpandedChange={(expanded) =>
+                    setExpandedProvider(expanded ? "codex" : null)
+                  }
                   onToggle={(enabled) => void toggleProvider("codex", enabled)}
                   title={
                     <>
@@ -673,13 +702,31 @@ export function AppSettings({
                   disabled={
                     providerSaving !== null || providerInstalling !== null
                   }
+                  details={
+                    <ProviderDetails
+                      authenticated={providerStatuses?.claude.authenticated}
+                      installed={providerStatuses?.claude.installed}
+                      loading={providersLoading && !providerStatuses}
+                      loginOpening={providerLoginOpening === "claude"}
+                      models={providerModels.claude}
+                      onLogin={() => void openProviderLogin("claude")}
+                      providerName="Claude"
+                      usage={providerUsage?.claude}
+                    />
+                  }
+                  detailsId="provider-claude-details"
+                  detailsLabel={t("appSettings.toggleProviderDetails", { provider: "Claude" })}
                   enabled={providerSettings?.claude ?? false}
+                  expanded={expandedProvider === "claude"}
                   icon={
                     <ProviderIcon tone="claude">
                       <ClaudeIcon size={19} />
                     </ProviderIcon>
                   }
                   name="Claude"
+                  onExpandedChange={(expanded) =>
+                    setExpandedProvider(expanded ? "claude" : null)
+                  }
                   onToggle={(enabled) => void toggleProvider("claude", enabled)}
                   title={
                     <>
@@ -741,13 +788,31 @@ export function AppSettings({
                   disabled={
                     providerSaving !== null || providerInstalling !== null
                   }
+                  details={
+                    <ProviderDetails
+                      authenticated={providerStatuses?.grok.authenticated}
+                      installed={providerStatuses?.grok.installed}
+                      loading={providersLoading && !providerStatuses}
+                      loginOpening={providerLoginOpening === "grok"}
+                      models={providerModels.grok}
+                      onLogin={() => void openProviderLogin("grok")}
+                      providerName="Grok"
+                      usage={providerUsage?.grok}
+                    />
+                  }
+                  detailsId="provider-grok-details"
+                  detailsLabel={t("appSettings.toggleProviderDetails", { provider: "Grok" })}
                   enabled={providerSettings?.grok ?? false}
+                  expanded={expandedProvider === "grok"}
                   icon={
                     <ProviderIcon tone="grok">
                       <GrokIcon size={19} />
                     </ProviderIcon>
                   }
                   name="Grok"
+                  onExpandedChange={(expanded) =>
+                    setExpandedProvider(expanded ? "grok" : null)
+                  }
                   onToggle={(enabled) => void toggleProvider("grok", enabled)}
                   title={
                     <>
@@ -809,13 +874,30 @@ export function AppSettings({
                   disabled={
                     providerSaving !== null || providerInstalling !== null
                   }
+                  details={
+                    <ProviderDetails
+                      authenticated={providerStatuses?.opencode.authenticated}
+                      installed={providerStatuses?.opencode.installed}
+                      loading={providersLoading && !providerStatuses}
+                      loginOpening={providerLoginOpening === "opencode"}
+                      models={providerModels.opencode}
+                      onLogin={() => void openProviderLogin("opencode")}
+                      providerName="OpenCode"
+                    />
+                  }
+                  detailsId="provider-opencode-details"
+                  detailsLabel={t("appSettings.toggleProviderDetails", { provider: "OpenCode" })}
                   enabled={providerSettings?.opencode ?? false}
+                  expanded={expandedProvider === "opencode"}
                   icon={
                     <ProviderIcon tone="opencode">
                       <OpenCodeIcon size={19} />
                     </ProviderIcon>
                   }
                   name="OpenCode"
+                  onExpandedChange={(expanded) =>
+                    setExpandedProvider(expanded ? "opencode" : null)
+                  }
                   onToggle={(enabled) =>
                     void toggleProvider("opencode", enabled)
                   }
@@ -864,70 +946,6 @@ export function AppSettings({
                   }
                 />
               </SettingsCard>
-
-              <SettingsGroupHeading title={t("usage.accounts")} />
-              <SettingsCard>
-                {(
-                  [
-                    ["codex", <CodexIcon size={18} />],
-                    ["claude", <ClaudeIcon size={18} />],
-                    ["grok", <GrokIcon size={18} />],
-                  ] as const
-                ).map(([provider, icon]) => {
-                  const usage = providerUsage?.[provider] as
-                    | AgentUsageProvider
-                    | undefined;
-                  const installed = providerStatuses?.[provider].installed;
-                  return (
-                    <div className="provider-account-row" key={provider}>
-                      <ProviderIcon tone={provider}>{icon}</ProviderIcon>
-                      <div>
-                        <strong>
-                          {provider === "codex"
-                            ? "Codex"
-                            : provider === "claude"
-                              ? "Claude"
-                              : "Grok"}
-                        </strong>
-                        <span>
-                          {usage?.accountLabel ??
-                            (usage?.authenticated
-                              ? t("usage.systemAccount")
-                              : t("usage.signInRequired"))}
-                        </span>
-                        {usage?.error ? <small>{usage.error}</small> : null}
-                      </div>
-                      <span
-                        className={`provider-account-health ${usage?.status ?? "unavailable"}`}
-                      >
-                        {t(
-                          `usage.status.${usage?.status ?? "unavailable"}` as
-                            | "usage.status.ok"
-                            | "usage.status.error"
-                            | "usage.status.unavailable",
-                        )}
-                      </span>
-                      <button
-                        disabled={
-                          !installed ||
-                          providerLoginOpening !== null ||
-                          providerInstalling !== null
-                        }
-                        onClick={() => void openProviderLogin(provider)}
-                        type="button"
-                      >
-                        {providerLoginOpening === provider ? (
-                          <LoaderCircle className="spin" size={14} />
-                        ) : null}
-                        {usage?.authenticated
-                          ? t("usage.reauthenticate")
-                          : t("usage.signInAction")}
-                      </button>
-                    </div>
-                  );
-                })}
-              </SettingsCard>
-              <SettingsNote>{t("usage.accountsNote")}</SettingsNote>
 
               {providerError ? <SettingsAlert>{providerError}</SettingsAlert> : null}
               <SettingsNote>
@@ -1082,6 +1100,133 @@ export function AppSettings({
         </SettingsScroll>
       </SettingsMain>
     </SettingsShell>
+  );
+}
+
+function ProviderDetails({
+  authenticated,
+  installed,
+  loading,
+  loginOpening,
+  models,
+  onLogin,
+  providerName,
+  usage,
+}: {
+  authenticated?: boolean;
+  installed?: boolean;
+  loading: boolean;
+  loginOpening: boolean;
+  models: AgentProviderModelCatalogEntry;
+  onLogin: () => void;
+  providerName: string;
+  usage?: AgentUsageProvider;
+}) {
+  const { t } = useI18n();
+  const connected = Boolean(installed && authenticated);
+  const connectionLabel = loading
+    ? t("appSettings.checkingProviders")
+    : !installed
+      ? t("appSettings.providerCliNotInstalled")
+      : connected
+        ? usage?.accountLabel ?? t("usage.systemAccount")
+        : t("usage.signInRequired");
+
+  return (
+    <div className="grid gap-5 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+      <section aria-label={t("appSettings.accountConnection")} className="grid content-start gap-3">
+        <div>
+          <Typography as="h3" variant="bodySm" className="font-semibold">
+            {t("appSettings.accountConnection")}
+          </Typography>
+          <Typography as="p" tone="muted" variant="caption" className="mt-1">
+            {t("appSettings.accountConnectionDescription", { provider: providerName })}
+          </Typography>
+        </div>
+        <div className="flex min-w-0 items-center gap-3 rounded-lg border border-border/80 bg-card px-3 py-3">
+          {loading ? (
+            <LoaderCircle aria-hidden="true" className="spin shrink-0 text-muted-foreground" size={18} />
+          ) : (
+            <CircleCheck
+              aria-hidden="true"
+              className={connected ? "shrink-0 text-success" : "shrink-0 text-warning"}
+              size={18}
+            />
+          )}
+          <div className="min-w-0 flex-1">
+            <Typography as="strong" variant="bodySm">
+              {loading
+                ? t("appSettings.checkingProviders")
+                : connected
+                  ? t("appSettings.accountConnected")
+                  : t("appSettings.accountNotConnected")}
+            </Typography>
+            <Typography as="p" className="truncate" tone="muted" variant="caption">
+              {connectionLabel}
+            </Typography>
+          </div>
+          <Button
+            disabled={!installed || loginOpening}
+            onClick={onLogin}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            {loginOpening ? <LoaderCircle className="spin" /> : null}
+            {connected ? t("usage.reauthenticate") : t("usage.signInAction")}
+          </Button>
+        </div>
+        {usage?.error ? (
+          <Typography as="p" className="text-warning" variant="caption">
+            {usage.error}
+          </Typography>
+        ) : null}
+      </section>
+
+      <section aria-label={t("appSettings.supportedModels")} className="min-w-0">
+        <div className="flex items-center justify-between gap-3">
+          <Typography as="h3" variant="bodySm" className="font-semibold">
+            {t("appSettings.supportedModels")}
+          </Typography>
+          <Typography tone="muted" variant="caption">
+            {t("appSettings.modelCount", { count: models.models.length })}
+          </Typography>
+        </div>
+        {models.error ? (
+          <Typography as="p" className="mt-1 text-warning" variant="caption">
+            {t("appSettings.modelListFallback")}
+          </Typography>
+        ) : null}
+        {models.models.length > 0 ? (
+          <div className="mt-3 max-h-56 overflow-y-auto rounded-lg border border-border/80 bg-card">
+            {models.models.map((model) => (
+              <div
+                className="flex min-w-0 items-center gap-3 border-b border-border/70 px-3 py-2.5 last:border-b-0"
+                key={model.id}
+              >
+                <div className="min-w-0 flex-1">
+                  <Typography as="strong" className="block truncate" variant="bodySm">
+                    {model.label}
+                  </Typography>
+                  {model.label !== model.id ? (
+                    <code className="block truncate text-xs text-muted-foreground">{model.id}</code>
+                  ) : null}
+                </div>
+                {model.isDefault ? (
+                  <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
+                    {t("appSettings.defaultModel")}
+                  </span>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <Typography as="p" className="mt-3 rounded-lg border border-dashed border-border px-3 py-4" tone="muted" variant="bodySm">
+            {t("appSettings.noSupportedModels")}
+          </Typography>
+        )}
+      </section>
+    </div>
   );
 }
 
