@@ -86,6 +86,22 @@ describe("kanban card layout", () => {
     expect(multipleAssigneesKickerRule).toContain("padding-right:61px");
   });
 
+  it("fills the human assignee avatar to the badge without padding", () => {
+    const assigneeBadgeRule = firstRule(".kanban-card-badges .kanban-assignee");
+    const assigneeAvatarRule = firstRule(".kanban-assignee .issue-assignee-avatar");
+
+    expect(assigneeBadgeRule).toContain("width:22px");
+    expect(assigneeBadgeRule).toContain("height:22px");
+    expect(assigneeBadgeRule).toContain("padding:0");
+    expect(assigneeBadgeRule).not.toContain("padding:2px");
+    expect(assigneeBadgeRule).toContain("overflow:hidden");
+    expect(assigneeAvatarRule).toContain("width:100%");
+    expect(assigneeAvatarRule).toContain("height:100%");
+    expect(assigneeAvatarRule).toContain("border-radius:inherit");
+    expect(assigneeAvatarRule).not.toContain("width:16px");
+    expect(assigneeAvatarRule).not.toContain("border-radius:50%");
+  });
+
   it("truncates long assignee labels without widening the card", () => {
     const cardRule = firstRule(".kanban-card");
     const footerRule = ruleAfter(
