@@ -87,14 +87,21 @@ describe("kanban card layout", () => {
   });
 
   it("fills the human assignee avatar to the badge without padding", () => {
-    const assigneeBadgeRule = firstRule(".kanban-card-badges .kanban-assignee");
+    // Must beat `.kanban-card-badges > i:not(.status-pill)` (0,2,1) which sets
+    // padding:0 7px; a weaker `.kanban-card-badges .kanban-assignee` override
+    // loses and clips the avatar inside the fixed-size badge.
+    const assigneeBadgeRule = firstRule(".kanban-card-badges > i.kanban-assignee");
     const assigneeAvatarRule = firstRule(".kanban-assignee .issue-assignee-avatar");
+    const genericBadgeRule = firstRule(".kanban-card-badges > i:not(.status-pill)");
 
+    expect(styles).not.toContain(".kanban-card-badges .kanban-assignee {");
     expect(assigneeBadgeRule).toContain("width:22px");
     expect(assigneeBadgeRule).toContain("height:22px");
     expect(assigneeBadgeRule).toContain("padding:0");
+    expect(assigneeBadgeRule).not.toContain("padding:0 7px");
     expect(assigneeBadgeRule).not.toContain("padding:2px");
     expect(assigneeBadgeRule).toContain("overflow:hidden");
+    expect(genericBadgeRule).toContain("padding:0 7px");
     expect(assigneeAvatarRule).toContain("width:100%");
     expect(assigneeAvatarRule).toContain("height:100%");
     expect(assigneeAvatarRule).toContain("border-radius:inherit");
