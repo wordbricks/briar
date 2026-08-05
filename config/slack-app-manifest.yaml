@@ -6,6 +6,11 @@ features:
   bot_user:
     display_name: Briar
     always_online: false
+  shortcuts:
+    - name: Create a Briar issue
+      type: global
+      callback_id: briar_create_issue_shortcut
+      description: Create a new Briar issue
   slash_commands:
     - command: /create
       url: https://YOUR_BRIAR_API_HOST/slack/commands

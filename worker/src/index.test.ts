@@ -24,6 +24,7 @@ import worker, {
   workflowStageLifecycleInputSchema,
   workerSettingsSchema,
 } from "./index";
+import { slackCreateIssueShortcutCallbackId } from "./slack";
 
 describe("Worker HTTP contract", () => {
   it("classifies a malformed project workflow separately from checkpoint policy errors", () => {
@@ -1074,5 +1075,54 @@ describe("Worker HTTP contract", () => {
     }
     expect(waitUntil).toHaveBeenCalledTimes(2);
     expect(first).toHaveBeenCalledTimes(2);
+  });
+
+  it("acknowledges the Briar create-issue global shortcut immediately", async () => {
+    const signingSecret = "test-slack-signing-secret";
+    const pendingInstallation = new Promise<never>(() => {});
+    const first = vi.fn(() => pendingInstallation);
+    const bind = vi.fn(() => ({ first }));
+    const prepare = vi.fn(() => ({ bind }));
+    const waitUntil = vi.fn();
+    const env = {
+      DB: { prepare },
+      SLACK_SIGNING_SECRET: signingSecret,
+    } as never;
+    const ctx = {
+      waitUntil,
+      passThroughOnException: vi.fn(),
+    } as unknown as ExecutionContext;
+    const body = new URLSearchParams({
+      payload: JSON.stringify({
+        type: "shortcut",
+        callback_id: slackCreateIssueShortcutCallbackId,
+        trigger_id: "123.456.shortcut",
+        team: { id: "T123" },
+        user: { id: "U123" },
+      }),
+    }).toString();
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const signature = `v0=${createHmac("sha256", signingSecret)
+      .update(`v0:${timestamp}:${body}`)
+      .digest("hex")}`;
+
+    const response = await worker.fetch(
+      new Request("https://briar-api.example/slack/interactions", {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+          "x-slack-request-timestamp": timestamp,
+          "x-slack-signature": signature,
+        },
+        body,
+      }),
+      env,
+      ctx,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("");
+    expect(waitUntil).toHaveBeenCalledOnce();
+    expect(first).toHaveBeenCalledOnce();
   });
 });
