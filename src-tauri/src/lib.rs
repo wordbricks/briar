@@ -3770,10 +3770,20 @@ fn sync_auto_hunt_assets(resource_directory: &Path, home: &Path) -> Result<bool,
     Ok(true)
 }
 
+fn should_manage_installed_auto_hunt_assets() -> bool {
+    !cfg!(debug_assertions) && !cfg!(dev)
+}
+
 fn sync_auto_hunt_assets_and_restart_workers(
     resource_directory: &Path,
     home: &Path,
 ) -> Result<bool, String> {
+    // Development apps share the production bundle identifier and home
+    // directory. Letting one synchronize these global assets can restart the
+    // installed Worker that is currently running the development app itself.
+    if !should_manage_installed_auto_hunt_assets() {
+        return Ok(false);
+    }
     let updated = sync_auto_hunt_assets(resource_directory, home)?;
     if !updated {
         return Ok(false);
@@ -8265,6 +8275,25 @@ branch refs/heads/briar/second-11111111
             Some(env!("CARGO_PKG_VERSION").to_string())
         );
         fs::remove_dir_all(home).expect("test home should be removed");
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    fn development_builds_do_not_manage_installed_auto_hunt_assets() {
+        assert!(!should_manage_installed_auto_hunt_assets());
+
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be after unix epoch")
+            .as_nanos();
+        let home = std::env::temp_dir().join(format!("briar-dev-assets-test-{unique}"));
+        let resources = home.join("missing-resources");
+
+        assert!(
+            !sync_auto_hunt_assets_and_restart_workers(&resources, &home)
+                .expect("development asset synchronization should be skipped")
+        );
+        assert!(!home.join(".local/share/briar").exists());
     }
 
     #[cfg(unix)]
