@@ -37,6 +37,30 @@ final class IssueMutationTests: XCTestCase {
         XCTAssertTrue(persistence.load().isEmpty)
     }
 
+    func testCreateIssueDraftDefaultsToPriorityP2() {
+        let draft = IssueDraft()
+        XCTAssertEqual(draft.priority, IssueDraft.defaultPriority)
+        XCTAssertEqual(draft.priority, 2)
+        XCTAssertTrue(draft.isEmpty)
+
+        // A priority change alone is worth preserving as draft content.
+        var customized = IssueDraft()
+        customized.priority = 1
+        XCTAssertFalse(customized.isEmpty)
+
+        // Explicit "없음" is also a deliberate choice and should persist.
+        customized.priority = nil
+        XCTAssertFalse(customized.isEmpty)
+
+        let suite = "IssueMutationTests-default-priority-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let persistence = IssueDraftPersistence(defaults: defaults)
+        // Fresh load with no stored draft still returns the P2 default.
+        XCTAssertEqual(persistence.load().priority, 2)
+        XCTAssertTrue(persistence.load().isEmpty)
+    }
+
     func testDuplicateCreateTapSendsOnlyOneRequest() async throws {
         let recorder = MutationAPIRecorder(delay: .milliseconds(100))
         let store = IssueMutationStore(
