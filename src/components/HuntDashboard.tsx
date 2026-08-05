@@ -13,7 +13,6 @@ import {
   Columns3,
   Copy,
   CornerUpLeft,
-  Flower2,
   FolderGit2,
   GitCommitHorizontal,
   GitFork,
@@ -3571,7 +3570,7 @@ export function RunPage({
         }
       >
         {reviewed ? (
-          <Flower2 aria-hidden="true" className="status-pill-review-icon" size={13} />
+          <BadgeCheck aria-hidden="true" className="status-pill-review-icon" size={13} />
         ) : (
           <Activity aria-hidden="true" size={13} />
         )}
@@ -6604,7 +6603,7 @@ function RunStatusPill({
     >
       {status === "running" && <LoaderCircle className="spin" size={11} />}
       {reviewed && (
-        <Flower2
+        <BadgeCheck
           aria-hidden="true"
           className="status-pill-review-icon"
           size={11}
