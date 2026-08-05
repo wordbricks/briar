@@ -413,15 +413,24 @@ enum TaskFilter: String, CaseIterable, Identifiable {
     }
 }
 
+enum TaskOrdering {
+    /// Newest-updated first for the mobile Tasks list and search results.
+    static func byMostRecentlyUpdated(_ runs: [DashboardRun]) -> [DashboardRun] {
+        runs.sorted { $0.updatedAt > $1.updatedAt }
+    }
+}
+
 enum TaskSearch {
     static func results(in runs: [DashboardRun], query: String) -> [DashboardRun] {
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !needle.isEmpty else { return runs }
-        return runs.filter { run in
-            [run.title, run.detail, run.issueDescription, run.resultSummary]
-                .compactMap { $0 }
-                .contains { $0.localizedCaseInsensitiveContains(needle) }
-        }
+        guard !needle.isEmpty else { return TaskOrdering.byMostRecentlyUpdated(runs) }
+        return TaskOrdering.byMostRecentlyUpdated(
+            runs.filter { run in
+                [run.title, run.detail, run.issueDescription, run.resultSummary]
+                    .compactMap { $0 }
+                    .contains { $0.localizedCaseInsensitiveContains(needle) }
+            }
+        )
     }
 }
 
