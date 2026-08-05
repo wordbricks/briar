@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  dataTransferHasFiles,
+  filesFromDataTransfer,
+  issueAttachmentMimeTypeFromName,
   maxIssueAttachmentBytes,
+  normalizeIssueAttachmentFile,
   validateIssueAttachments,
 } from "./issue-attachments";
 
@@ -10,6 +14,15 @@ describe("issue attachment validation", () => {
       validateIssueAttachments([
         { name: "screen.png", size: 2_000, type: "image/png" },
         { name: "recording.mov", size: 3_000, type: "video/quicktime" },
+      ]),
+    ).toBeNull();
+  });
+
+  it("accepts dropped files that omit MIME type when the extension is known", () => {
+    expect(
+      validateIssueAttachments([
+        { name: "dropped.png", size: 2_000, type: "" },
+        { name: "clip.mov", size: 3_000, type: "" },
       ]),
     ).toBeNull();
   });
@@ -38,5 +51,40 @@ describe("issue attachment validation", () => {
         })),
       ),
     ).toContain("최대 5개");
+  });
+});
+
+describe("issue attachment drop helpers", () => {
+  it("infers MIME types from common image and video extensions", () => {
+    expect(issueAttachmentMimeTypeFromName("shot.JPG")).toBe("image/jpeg");
+    expect(issueAttachmentMimeTypeFromName("clip.m4v")).toBe("video/mp4");
+    expect(issueAttachmentMimeTypeFromName("notes.txt")).toBeNull();
+  });
+
+  it("fills empty File.type from the filename for supported media", () => {
+    const untyped = new File(["pixels"], "photo.webp", { type: "" });
+    const normalized = normalizeIssueAttachmentFile(untyped);
+    expect(normalized.type).toBe("image/webp");
+    expect(normalized.name).toBe("photo.webp");
+  });
+
+  it("reads files from DataTransfer items and types", () => {
+    const image = new File(["dropped"], "dropped.png", { type: "" });
+    const dataTransfer = {
+      files: [image],
+      items: [
+        {
+          kind: "file",
+          getAsFile: () => image,
+        },
+      ],
+      types: ["Files"],
+    } as unknown as DataTransfer;
+
+    expect(dataTransferHasFiles(dataTransfer)).toBe(true);
+    const files = filesFromDataTransfer(dataTransfer);
+    expect(files).toHaveLength(1);
+    expect(files[0]?.type).toBe("image/png");
+    expect(files[0]?.name).toBe("dropped.png");
   });
 });
