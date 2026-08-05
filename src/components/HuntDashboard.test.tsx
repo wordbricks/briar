@@ -313,6 +313,56 @@ describe("HuntDashboard", () => {
     expect(markup).not.toContain("attachment-1");
   });
 
+  it("shows a flower review icon on completed issue status pills when result reviews exist", () => {
+    const reviewed = {
+      ...demoDashboard.runs[0],
+      id: "reviewed-completed",
+      status: "completed" as const,
+      workflowStage: null,
+      progress: 100,
+      resultSummary: "작업 결과가 준비되었습니다.",
+      resultReviews: [
+        {
+          userId: "reviewer-1",
+          name: "민지 김",
+          username: "minji",
+          image: null,
+          completedAt: "2026-08-02T01:00:00.000Z",
+        },
+      ],
+    };
+    const unreviewed = {
+      ...demoDashboard.runs[0],
+      id: "unreviewed-completed",
+      status: "completed" as const,
+      workflowStage: null,
+      progress: 100,
+      resultSummary: "아직 검수 전입니다.",
+      resultReviews: [],
+    };
+
+    const reviewedMarkup = renderToStaticMarkup(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={{ ...demoDashboard, runs: [reviewed] }}
+      />,
+    );
+    const unreviewedMarkup = renderToStaticMarkup(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={{ ...demoDashboard, runs: [unreviewed] }}
+      />,
+    );
+
+    expect(reviewedMarkup).toContain('class="status-pill emerald reviewed"');
+    expect(reviewedMarkup).toContain("lucide-flower2");
+    expect(reviewedMarkup).toContain("status-pill-review-icon");
+    expect(reviewedMarkup).toContain("검수 완료됨");
+    expect(unreviewedMarkup).toContain('class="status-pill emerald"');
+    expect(unreviewedMarkup).not.toContain("status-pill emerald reviewed");
+    expect(unreviewedMarkup).not.toContain("lucide-flower2");
+  });
+
   it("shows the human assignee avatar with the source and priority badges", () => {
     const assignee = demoDashboard.members?.[0];
     if (!assignee) throw new Error("Demo assignee is required");
@@ -3483,6 +3533,17 @@ describe("HuntDashboard", () => {
     expect(container.querySelector(".run-result-review")?.textContent).toContain(
       "@minji",
     );
+    expect(
+      container.querySelector(".completed-issue-card-heading .status-pill.reviewed"),
+    ).not.toBeNull();
+    expect(
+      container.querySelector(
+        ".completed-issue-card-heading .status-pill-review-icon",
+      ),
+    ).not.toBeNull();
+    expect(
+      container.querySelector(".run-page-property-badge.reviewed"),
+    ).not.toBeNull();
     const reviewButton = container.querySelector<HTMLButtonElement>(
       ".run-result-review-complete",
     );
