@@ -130,12 +130,23 @@ struct CreateIssueSheet: View {
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("등록") { Task { await submit() } }
-                        .disabled(
-                            draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-                                mutations.isActive("create")
-                        )
-                        .accessibilityIdentifier("create-issue-submit")
+                    Button {
+                        Task { await submit() }
+                    } label: {
+                        if mutations.isActive("create") {
+                            ProgressView()
+                        } else {
+                            Text("등록")
+                        }
+                    }
+                    .disabled(
+                        draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                            mutations.isActive("create")
+                    )
+                    .accessibilityLabel(
+                        mutations.isActive("create") ? "등록 중" : "등록"
+                    )
+                    .accessibilityIdentifier("create-issue-submit")
                 }
             }
             .interactiveDismissDisabled(!draft.isEmpty || !attachments.isEmpty)
