@@ -2657,7 +2657,7 @@ function KanbanCard({
                   worker: assignedWorker.label,
                 })}
               >
-                <WorkerIcon icon={assignedWorker.icon} size={30} />
+                <WorkerIcon icon={assignedWorker.icon} size={18} />
               </span>
             )}
             {activeAgent && (
