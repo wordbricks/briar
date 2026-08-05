@@ -4469,6 +4469,7 @@ export function RunPage({
                   </div>
                 ) : null}
                 </div>
+                <IssueWorkflowProgress run={run} />
               </div>
               {!companionMode ? (
                 <IssueConversation
@@ -5054,6 +5055,82 @@ function IssueDependenciesPanel({
       </div>
       {error ? <p className="issue-dependency-error" role="alert">{error}</p> : null}
     </section>
+  );
+}
+
+type IssueWorkflowProgressState =
+  | "complete"
+  | "active"
+  | "paused"
+  | "blocked"
+  | "failed"
+  | "cancelled"
+  | "upcoming";
+
+function issueWorkflowProgressState(
+  run: HuntRun,
+  stageIndex: number,
+): IssueWorkflowProgressState {
+  if (run.status === "completed") return "complete";
+
+  const currentStageId = run.status === "paused"
+    ? run.checkpoint?.stage ?? run.workflowStage
+    : run.workflowStage;
+  const currentStageIndex = run.workflow.stages.findIndex(
+    (stage) => stage.id === currentStageId,
+  );
+
+  if (currentStageIndex < 0 || stageIndex > currentStageIndex) {
+    return "upcoming";
+  }
+  if (stageIndex < currentStageIndex) return "complete";
+
+  if (run.status === "running") return "active";
+  if (run.status === "paused") return "paused";
+  if (run.status === "blocked") return "blocked";
+  if (run.status === "failed") return "failed";
+  if (run.status === "cancelled") return "cancelled";
+  return "upcoming";
+}
+
+function IssueWorkflowProgress({ run }: { run: HuntRun }) {
+  const { t } = useI18n();
+  const stateLabels: Record<IssueWorkflowProgressState, string> = {
+    complete: t("status.completed"),
+    active: t("status.running"),
+    paused: t("status.paused"),
+    blocked: t("status.blocked"),
+    failed: t("status.failed"),
+    cancelled: t("status.cancelled"),
+    upcoming: t("status.queued"),
+  };
+
+  return (
+    <div className="issue-workflow-progress">
+      <ol aria-label={t("run.totalProgress")} aria-live="polite">
+        {run.workflow.stages.map((stage, index) => {
+          const state = issueWorkflowProgressState(run, index);
+          const label = localizeWorkflowStage(t, stage.id, stage.label);
+          const isCurrent = !["complete", "upcoming"].includes(state);
+          return (
+            <li
+              aria-current={isCurrent ? "step" : undefined}
+              aria-label={`${label}: ${stateLabels[state]}`}
+              data-reached={state !== "upcoming"}
+              data-state={state}
+              key={stage.id}
+            >
+              <span aria-hidden="true" className="issue-workflow-marker">
+                {state === "complete" ? <Check size={11} strokeWidth={3} /> : <i />}
+              </span>
+              <span aria-hidden="true" className="issue-workflow-label">
+                {label}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }
 
