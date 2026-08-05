@@ -111,12 +111,16 @@ final class IssueMutationTests: XCTestCase {
         // cancelled → backlog/queued is the reported iOS control-tab failure path.
         try await store.move(runID: Self.runID, status: .backlog, workflowStage: nil)
 
-        let body = await recorder.lastJSONBody()
-        XCTAssertEqual(body?["requestId"] as? String, requestID.uuidString)
-        XCTAssertEqual(body?["status"] as? String, "backlog")
+        let recordedBody = await recorder.lastJSONBodyData()
+        let bodyData = try XCTUnwrap(recordedBody)
+        let body = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: bodyData) as? [String: Any]
+        )
+        XCTAssertEqual(body["requestId"] as? String, requestID.uuidString)
+        XCTAssertEqual(body["status"] as? String, "backlog")
         // Server Zod requires the key; NSNull means JSON null (not key omission).
-        XCTAssertTrue(body?["workflowStage"] is NSNull)
-        XCTAssertTrue(body?.keys.contains("workflowStage") == true)
+        XCTAssertTrue(body["workflowStage"] is NSNull)
+        XCTAssertTrue(body.keys.contains("workflowStage"))
     }
 
     func testRunStatusRequestJSONIncludesExplicitNullWorkflowStage() throws {
@@ -310,7 +314,7 @@ private actor MutationAPIRecorder: MobileAPIClientProtocol {
     private var count = 0
     private var recordedRequestID: String?
     private var recordedRequestIDs: [String] = []
-    private var recordedJSONBody: [String: Any]?
+    private var recordedJSONBodyData: Data?
     private let delay: Duration
     private var failuresRemaining: Int
     private var recordedResumeRequests: [(requestID: String, checkpointKey: String, attempt: Int, revision: Int)] = []
@@ -326,7 +330,7 @@ private actor MutationAPIRecorder: MobileAPIClientProtocol {
 
     func allRequestIDs() -> [String] { recordedRequestIDs }
 
-    func lastJSONBody() -> [String: Any]? { recordedJSONBody }
+    func lastJSONBodyData() -> Data? { recordedJSONBodyData }
 
     func resumeRequests() -> [(requestID: String, checkpointKey: String, attempt: Int, revision: Int)] {
         recordedResumeRequests
@@ -340,11 +344,12 @@ private actor MutationAPIRecorder: MobileAPIClientProtocol {
         as responseType: Response.Type
     ) async throws -> Response {
         count += 1
-        if let body,
-           let object = try JSONSerialization.jsonObject(
-               with: JSONEncoder.mobileContract.encode(TestAnyEncodable(body))
-           ) as? [String: Any] {
-            recordedJSONBody = object
+        if let body {
+            let data = try JSONEncoder.mobileContract.encode(TestAnyEncodable(body))
+            recordedJSONBodyData = data
+            guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                throw MobileAPIError.invalidRequest
+            }
             recordedRequestID = object["requestId"] as? String
             if let recordedRequestID { recordedRequestIDs.append(recordedRequestID) }
             if path.hasSuffix("/resume"),
