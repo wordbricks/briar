@@ -7,6 +7,7 @@ import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import { useAutoHuntAppServerEvents } from "../hooks/useAutoHuntAppServerEvents";
 import { useProjectAgentWorkerEvents } from "../hooks/useProjectAgentWorkerEvents";
 import { ProjectAgentSessionDetail } from "./ProjectAgentSessionDetail";
+import { ToastProvider } from "./ui/toast";
 
 vi.mock("../hooks/useAutoHuntAppServerEvents", () => ({
   useAutoHuntAppServerEvents: vi.fn(() => ({
@@ -67,13 +68,15 @@ async function mount(
   mounted.push({ container, root });
   await act(async () => {
     root.render(
-      <ProjectAgentSessionDetail
-        isSidebarOpen={true}
-        onBack={vi.fn()}
-        onIssueOpen={onIssueOpen}
-        onStop={vi.fn().mockResolvedValue(true)}
-        session={session}
-      />,
+      <ToastProvider>
+        <ProjectAgentSessionDetail
+          isSidebarOpen={true}
+          onBack={vi.fn()}
+          onIssueOpen={onIssueOpen}
+          onStop={vi.fn().mockResolvedValue(true)}
+          session={session}
+        />
+      </ToastProvider>,
     );
   });
   return container;
@@ -127,9 +130,9 @@ describe("ProjectAgentSessionDetail", () => {
     expect(writeText).toHaveBeenCalledWith(
       "http://127.0.0.1:8787/open/sessions/project-1/session-1",
     );
-    expect(container.querySelector('[role="status"]')?.textContent).toBe(
-      "세션 링크가 복사되었습니다",
-    );
+    expect(document.body.querySelector('[data-testid="app-toast"]')?.textContent)
+      .toContain("세션 링크가 복사되었습니다");
+    expect(container.querySelector(".run-page-share-status")).toBeNull();
   });
 
   it("opens a target's linked issue", async () => {

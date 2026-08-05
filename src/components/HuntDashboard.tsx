@@ -58,6 +58,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { useToast } from "@/components/ui/toast";
 import {
   Tooltip,
   TooltipContent,
@@ -3147,13 +3148,11 @@ export function RunPage({
   const assignee = mentionMembers.find(
     (member) => member.userId === run.assigneeUserId,
   ) ?? null;
+  const { toast } = useToast();
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [copyStatus, setCopyStatus] = useState<
-    "link-copied" | "id-copied" | "link-error" | "id-error" | null
-  >(null);
   const [isPropertiesOpen, setIsPropertiesOpen] = useState(false);
   const [isCompletingResultReview, setIsCompletingResultReview] =
     useState(false);
@@ -3526,37 +3525,36 @@ export function RunPage({
     }
   };
   const shareIssue = async () => {
-    setCopyStatus(null);
     try {
       const result = await shareIssueLink({
         projectId,
         runId: run.id,
         title: run.title,
       });
-      if (result === "copied") setCopyStatus("link-copied");
+      if (result === "copied") {
+        toast(t("issue.linkCopied"), { tone: "success" });
+      }
     } catch {
-      setCopyStatus("link-error");
+      toast(t("issue.shareFailed"), { tone: "error" });
     }
   };
   const copyIssueLink = async () => {
-    setCopyStatus(null);
     try {
       await copyIssueShareLink({
         projectId,
         runId: run.id,
       });
-      setCopyStatus("link-copied");
+      toast(t("issue.linkCopied"), { tone: "success" });
     } catch {
-      setCopyStatus("link-error");
+      toast(t("issue.shareFailed"), { tone: "error" });
     }
   };
   const copyId = async () => {
-    setCopyStatus(null);
     try {
       await copyIssueId(run.runNumber);
-      setCopyStatus("id-copied");
+      toast(t("issue.idCopied"), { tone: "success" });
     } catch {
-      setCopyStatus("id-error");
+      toast(t("issue.copyIdFailed"), { tone: "error" });
     }
   };
   const reviewed = hasResultReviews(run);
@@ -3644,23 +3642,6 @@ export function RunPage({
           <div className="run-page-titlebar-actions">
             {compactProperties}
             {processNowButton}
-            {copyStatus ? (
-              <span
-                aria-live="polite"
-                className={`run-page-share-status${copyStatus.endsWith("error") ? " error" : ""}`}
-                role="status"
-              >
-                {t(
-                  copyStatus === "link-copied"
-                    ? "issue.linkCopied"
-                    : copyStatus === "id-copied"
-                      ? "issue.idCopied"
-                      : copyStatus === "id-error"
-                        ? "issue.copyIdFailed"
-                        : "issue.shareFailed",
-                )}
-              </span>
-            ) : null}
             {onOpenFullPage ? (
               <button
                 aria-label={t("inbox.openFullPage")}
@@ -3735,23 +3716,6 @@ export function RunPage({
                   <div className="run-page-title-row">
                     <small>AH-{run.runNumber}</small>
                     <h1 id="run-page-title">{run.title}</h1>
-                    {copyStatus ? (
-                      <span
-                        aria-live="polite"
-                        className={`run-page-share-status${copyStatus.endsWith("error") ? " error" : ""}`}
-                        role="status"
-                      >
-                        {t(
-                          copyStatus === "link-copied"
-                            ? "issue.linkCopied"
-                            : copyStatus === "id-copied"
-                              ? "issue.idCopied"
-                              : copyStatus === "id-error"
-                                ? "issue.copyIdFailed"
-                                : "issue.shareFailed",
-                        )}
-                      </span>
-                    ) : null}
                     <IssueActionsMenu
                       disabled={isUpdatingIssue || isDeletingIssue || isRecovering}
                       onCancel={

@@ -13,6 +13,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { MainContent, PageHeader } from "@/components/layout";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
 import type {
   AutoHuntSession,
   AutoHuntSessionIssueOutcome,
@@ -88,11 +89,9 @@ export function ProjectAgentSessionDetail({
   const agentMessagesRef = useRef<HTMLDivElement>(null);
   const latestExecutionEntry =
     executionLogEntries[executionLogEntries.length - 1];
+  const { toast } = useToast();
   const [isStopping, setIsStopping] = useState(false);
   const [stopError, setStopError] = useState<string | null>(null);
-  const [copyStatus, setCopyStatus] = useState<"copied" | "error" | null>(
-    null,
-  );
   const [nowMs, setNowMs] = useState(() => Date.now());
 
   useEffect(() => {
@@ -125,15 +124,14 @@ export function ProjectAgentSessionDetail({
   };
 
   const copySessionLink = async () => {
-    setCopyStatus(null);
     try {
       await copySessionShareLink({
         projectId: session.projectId,
         sessionId: session.id,
       });
-      setCopyStatus("copied");
+      toast(t("agents.sessionLinkCopied"), { tone: "success" });
     } catch {
-      setCopyStatus("error");
+      toast(t("agents.copySessionLinkFailed"), { tone: "error" });
     }
   };
 
@@ -192,19 +190,6 @@ export function ProjectAgentSessionDetail({
       <PageHeader
         action={
           <div className="auto-hunt-session-page-actions">
-            {copyStatus ? (
-              <span
-                aria-live="polite"
-                className={`run-page-share-status${copyStatus === "error" ? " error" : ""}`}
-                role="status"
-              >
-                {t(
-                  copyStatus === "copied"
-                    ? "agents.sessionLinkCopied"
-                    : "agents.copySessionLinkFailed",
-                )}
-              </span>
-            ) : null}
             <button
               aria-label={t("agents.copySessionLink")}
               className="run-page-link-copy auto-hunt-session-link-copy"

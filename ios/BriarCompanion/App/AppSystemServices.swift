@@ -256,3 +256,67 @@ enum ClipboardService {
         UIPasteboard.general.string = value
     }
 }
+
+struct CompanionToast: View {
+    let message: String
+
+    var body: some View {
+        Text(message)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.primary)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(.ultraThinMaterial, in: Capsule())
+            .overlay(
+                Capsule()
+                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.16), radius: 14, y: 6)
+            .accessibilityIdentifier("companion-toast")
+            .accessibilityAddTraits(.updatesFrequently)
+    }
+}
+
+struct CompanionToastModifier: ViewModifier {
+    @Binding var isPresented: Bool
+    let message: String
+    var duration: Duration = .seconds(2)
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(alignment: .bottom) {
+                if isPresented {
+                    CompanionToast(message: message)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 28)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .allowsHitTesting(false)
+                }
+            }
+            .animation(.easeOut(duration: 0.18), value: isPresented)
+            .onChange(of: isPresented) { _, presented in
+                guard presented else { return }
+                Task { @MainActor in
+                    try? await Task.sleep(for: duration)
+                    if isPresented {
+                        isPresented = false
+                    }
+                }
+            }
+    }
+}
+
+extension View {
+    func companionToast(
+        isPresented: Binding<Bool>,
+        message: String,
+        duration: Duration = .seconds(2)
+    ) -> some View {
+        modifier(CompanionToastModifier(
+            isPresented: isPresented,
+            message: message,
+            duration: duration
+        ))
+    }
+}
