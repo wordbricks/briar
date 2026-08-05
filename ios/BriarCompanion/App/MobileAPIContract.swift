@@ -286,6 +286,14 @@ protocol MobileAPIClientProtocol: Sendable {
 }
 
 extension MobileAPIClientProtocol {
+    func get<Response: Decodable & Sendable>(
+        _ path: String,
+        token: String? = nil,
+        as responseType: Response.Type = Response.self
+    ) async throws -> Response {
+        try await send(path, method: "GET", token: token, body: nil, as: responseType)
+    }
+
     func sendVoid(
         _ path: String,
         method: String,
@@ -544,9 +552,9 @@ extension JSONEncoder {
 
 extension ISO8601DateFormatter {
     /// Matches the fractional-second ISO timestamps used by desktop inbox versions.
-    static let mobileContract: ISO8601DateFormatter = {
+    static var mobileContract: ISO8601DateFormatter {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter
-    }()
+    }
 }
