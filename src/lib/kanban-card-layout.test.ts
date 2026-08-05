@@ -94,6 +94,15 @@ describe("kanban card layout", () => {
     expect(firstRule(".kanban-card-agent-badge .project-agent-avatar")).toContain(
       "border-radius:50%",
     );
+    expect(firstRule(".kanban-card-agent-badge")).toContain(
+      "position:relative",
+    );
+    expect(
+      firstRule(".kanban-card-provider-badge"),
+    ).toContain("position:absolute");
+    expect(firstRule(".kanban-card-provider-badge")).toContain(
+      "border-radius:50%",
+    );
     expect(firstRule(".kanban-card-worker-badge .worker-icon")).toContain(
       "border-radius:50%",
     );
