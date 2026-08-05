@@ -174,7 +174,21 @@ struct RequestIdentity: Codable, Sendable {
 struct RunStatusRequest: Codable, Sendable {
     let requestId: UUID
     let status: DashboardRun.Status
+    /// Required by the mobile contract as `string | null`. Must encode JSON `null`
+    /// for non-running placements; omitting the key fails server validation.
     let workflowStage: String?
+
+    enum CodingKeys: String, CodingKey {
+        case requestId, status, workflowStage
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(requestId, forKey: .requestId)
+        try container.encode(status, forKey: .status)
+        // Prefer encode(_:forKey:) over encodeIfPresent so nil becomes JSON null.
+        try container.encode(workflowStage, forKey: .workflowStage)
+    }
 }
 
 struct RunStatusResponse: Codable, Sendable {

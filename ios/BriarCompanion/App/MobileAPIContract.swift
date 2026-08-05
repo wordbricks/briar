@@ -222,7 +222,7 @@ struct ProjectsResponse: Codable, Equatable, Sendable {
     }
 }
 
-enum MobileAPIError: Error, Equatable {
+enum MobileAPIError: LocalizedError, Equatable {
     case invalidResponse
     case httpStatus(Int, String)
     case invalidRequest
@@ -231,6 +231,26 @@ enum MobileAPIError: Error, Equatable {
     var statusCode: Int? {
         guard case let .httpStatus(status, _) = self else { return nil }
         return status
+    }
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidResponse:
+            "서버 응답을 해석하지 못했습니다. 잠시 후 다시 시도해 주세요."
+        case let .httpStatus(status, message):
+            if status == 401 {
+                "세션이 만료되었습니다. 다시 로그인해 주세요."
+            } else {
+                let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+                return trimmed.isEmpty
+                    ? "요청에 실패했습니다. (HTTP \(status))"
+                    : trimmed
+            }
+        case .invalidRequest:
+            "요청을 준비하지 못했습니다. 입력값을 확인해 주세요."
+        case .invalidDownload:
+            "파일을 내려받지 못했습니다. 잠시 후 다시 시도해 주세요."
+        }
     }
 }
 

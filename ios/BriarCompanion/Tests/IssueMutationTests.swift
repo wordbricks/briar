@@ -74,6 +74,51 @@ final class IssueMutationTests: XCTestCase {
         XCTAssertEqual(recordedRequestID, requestID.uuidString)
     }
 
+    func testMoveRequestEncodesNullWorkflowStageForNonRunningStatus() async throws {
+        let recorder = MutationAPIRecorder()
+        let requestID = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!
+        let store = IssueMutationStore(
+            api: recorder,
+            projectID: Self.projectID,
+            token: "token",
+            requestID: { requestID }
+        )
+
+        // cancelled → backlog/queued is the reported iOS control-tab failure path.
+        try await store.move(runID: Self.runID, status: .backlog, workflowStage: nil)
+
+        let body = await recorder.lastJSONBody()
+        XCTAssertEqual(body?["requestId"] as? String, requestID.uuidString)
+        XCTAssertEqual(body?["status"] as? String, "backlog")
+        // Server Zod requires the key; NSNull means JSON null (not key omission).
+        XCTAssertTrue(body?["workflowStage"] is NSNull)
+        XCTAssertTrue(body?.keys.contains("workflowStage") == true)
+    }
+
+    func testRunStatusRequestJSONIncludesExplicitNullWorkflowStage() throws {
+        let request = RunStatusRequest(
+            requestId: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
+            status: .queued,
+            workflowStage: nil
+        )
+        let data = try JSONEncoder.mobileContract.encode(request)
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+        XCTAssertEqual(object["status"] as? String, "queued")
+        XCTAssertTrue(object["workflowStage"] is NSNull)
+
+        let withStage = RunStatusRequest(
+            requestId: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
+            status: .running,
+            workflowStage: "analyzing"
+        )
+        let staged = try JSONSerialization.jsonObject(
+            with: JSONEncoder.mobileContract.encode(withStage)
+        ) as? [String: Any]
+        XCTAssertEqual(staged?["workflowStage"] as? String, "analyzing")
+    }
+
     func testFailedMutationRetryReusesItsIdempotencyIdentifier() async throws {
         let recorder = MutationAPIRecorder(failuresRemaining: 1)
         let store = IssueMutationStore(
@@ -241,6 +286,7 @@ private actor MutationAPIRecorder: MobileAPIClientProtocol {
     private var count = 0
     private var recordedRequestID: String?
     private var recordedRequestIDs: [String] = []
+    private var recordedJSONBody: [String: Any]?
     private let delay: Duration
     private var failuresRemaining: Int
     private var recordedResumeRequests: [(requestID: String, checkpointKey: String, attempt: Int, revision: Int)] = []
@@ -255,6 +301,8 @@ private actor MutationAPIRecorder: MobileAPIClientProtocol {
     func lastRequestID() -> String? { recordedRequestID }
 
     func allRequestIDs() -> [String] { recordedRequestIDs }
+
+    func lastJSONBody() -> [String: Any]? { recordedJSONBody }
 
     func resumeRequests() -> [(requestID: String, checkpointKey: String, attempt: Int, revision: Int)] {
         recordedResumeRequests
@@ -272,6 +320,7 @@ private actor MutationAPIRecorder: MobileAPIClientProtocol {
            let object = try JSONSerialization.jsonObject(
                with: JSONEncoder.mobileContract.encode(TestAnyEncodable(body))
            ) as? [String: Any] {
+            recordedJSONBody = object
             recordedRequestID = object["requestId"] as? String
             if let recordedRequestID { recordedRequestIDs.append(recordedRequestID) }
             if path.hasSuffix("/resume"),
