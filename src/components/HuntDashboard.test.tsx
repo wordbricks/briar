@@ -313,7 +313,7 @@ describe("HuntDashboard", () => {
     expect(markup).not.toContain("attachment-1");
   });
 
-  it("shows a flower review icon on completed issue status pills when result reviews exist", () => {
+  it("shows a BadgeCheck review icon on completed issue status pills when result reviews exist", () => {
     const reviewed = {
       ...demoDashboard.runs[0],
       id: "reviewed-completed",
@@ -355,12 +355,12 @@ describe("HuntDashboard", () => {
     );
 
     expect(reviewedMarkup).toContain('class="status-pill emerald reviewed"');
-    expect(reviewedMarkup).toContain("lucide-flower2");
+    expect(reviewedMarkup).toContain("lucide-badge-check");
     expect(reviewedMarkup).toContain("status-pill-review-icon");
     expect(reviewedMarkup).toContain("검수 완료됨");
     expect(unreviewedMarkup).toContain('class="status-pill emerald"');
     expect(unreviewedMarkup).not.toContain("status-pill emerald reviewed");
-    expect(unreviewedMarkup).not.toContain("lucide-flower2");
+    expect(unreviewedMarkup).not.toContain("lucide-badge-check");
   });
 
   it("shows the human assignee avatar with the source and priority badges", () => {

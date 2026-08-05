@@ -402,7 +402,7 @@ struct StatusBadge: View {
     var body: some View {
         HStack(spacing: 4) {
             if reviewed {
-                Image(systemName: "camera.macro")
+                Image(systemName: "checkmark.seal.fill")
                     .font(.caption2.weight(.bold))
                     .accessibilityHidden(true)
             }
