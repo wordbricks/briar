@@ -54,6 +54,7 @@ import {
 import {
   canonicalizeIssueAttachmentReferences,
   isIssueAttachmentReference,
+  issueAttachmentReferences,
 } from "../../src/lib/issue-markdown";
 import { shouldBriarReply } from "../../src/lib/issue-reply-decision";
 import {
@@ -182,6 +183,7 @@ import {
   updateProjectSettings,
   updateProjectMandatoryCheckpoints,
   updateUserWorkflowCheckpointDefaults,
+  deleteIssueAttachments,
   updateOrganization,
   updateOrganizationLogo,
   updateOrganizationMemberRole,
@@ -1122,6 +1124,84 @@ const issueMessageInputSchema = z
       .optional(),
   })
   .strict();
+
+export async function readIssueMessageRequest(request: Request) {
+  const contentType = request.headers.get("content-type") ?? "";
+  if (!contentType.toLowerCase().startsWith("multipart/form-data;")) {
+    return {
+      input: issueMessageInputSchema.parse(await readJson(request, 16_384)),
+      attachments: [] as File[],
+      attachmentReferences: [] as string[],
+    };
+  }
+  const declaredLength = Number(request.headers.get("content-length") ?? "0");
+  if (!Number.isSafeInteger(declaredLength) || declaredLength <= 0) {
+    throw new HttpError(411, "Multipart Content-Length is required");
+  }
+  if (declaredLength > maxIssueMultipartBytes) {
+    throw new HttpError(413, "Message attachments exceed the 25MB total limit");
+  }
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    throw new HttpError(400, "Invalid multipart form data");
+  }
+  const rawAttachments = form.getAll("attachments");
+  if (rawAttachments.some((attachment) => !(attachment instanceof File))) {
+    throw new HttpError(400, "Attachments must be files");
+  }
+  const attachments = rawAttachments as File[];
+  const attachmentError = validateIssueAttachments(attachments);
+  if (attachmentError) throw new HttpError(400, attachmentError);
+  if (attachments.some((attachment) => !attachment.type.startsWith("image/"))) {
+    throw new HttpError(400, "Conversation attachments must be images");
+  }
+  const parseArray = (name: string) => {
+    const value = form.get(name);
+    if (typeof value !== "string" || !value) return [] as unknown[];
+    try {
+      const parsed: unknown = JSON.parse(value);
+      if (!Array.isArray(parsed)) throw new Error("not an array");
+      return parsed;
+    } catch {
+      throw new HttpError(400, `${name} is invalid`);
+    }
+  };
+  const attachmentReferences = parseArray("attachmentReferences");
+  if (
+    attachmentReferences.length !== attachments.length ||
+    !attachmentReferences.every(isIssueAttachmentReference)
+  ) {
+    throw new HttpError(400, "Attachment references are invalid");
+  }
+  const rawBody = form.get("body");
+  const bodyReferences = issueAttachmentReferences(
+    typeof rawBody === "string" ? rawBody : null,
+  );
+  if (!attachmentReferences.every((reference) => bodyReferences.has(String(reference)))) {
+    throw new HttpError(400, "Every message attachment must be referenced in the body");
+  }
+  const mentionedUserIds = parseArray("mentionedUserIds");
+  const parentMessageId = form.get("parentMessageId");
+  const agentConversationId = form.get("agentConversationId");
+  return {
+    input: issueMessageInputSchema.parse({
+      body: form.get("body"),
+      parentMessageId:
+        typeof parentMessageId === "string" && parentMessageId
+          ? parentMessageId
+          : null,
+      mentionedUserIds,
+      agentConversationId:
+        typeof agentConversationId === "string" && agentConversationId
+          ? agentConversationId
+          : null,
+    }),
+    attachments,
+    attachmentReferences: attachmentReferences as string[],
+  };
+}
 
 const issueAgentReplyCompletionSchema = z
   .object({
@@ -3081,11 +3161,19 @@ const evidenceImageJson = (image: RunEvidenceImageRow) => ({
   url: `/projects/${image.project_id}/runs/${image.run_id}/evidence/images/${image.id}`,
 });
 
-const issueMessageJson = (message: IssueMessageRow) => ({
+const issueMessageJson = (
+  message: IssueMessageRow,
+  attachments: IssueAttachmentRow[] = [],
+) => ({
   id: message.id,
   runId: message.run_id,
   parentMessageId: message.parent_message_id,
   body: message.body,
+  attachments: attachments
+    .filter((attachment) =>
+      issueAttachmentReferences(message.body).has(attachment.id),
+    )
+    .map(attachmentJson),
   author: {
     id: message.author_agent_provider ? null : message.author_user_id,
     name: message.author_agent_provider
@@ -3152,7 +3240,7 @@ const issueConversationNotificationJson = (
 });
 
 export const claimConversationJson = (messages: IssueMessageRow[]) =>
-  messages.map(issueMessageJson);
+  messages.map((message) => issueMessageJson(message));
 
 const listIssueMessagesWithArchive = async (
   db: D1Database,
@@ -5799,13 +5887,13 @@ async function route(
       issueMessagesMatch[2],
     );
     if (!run) throw new HttpError(404, "Run not found");
-    const messages = await listIssueMessagesWithArchive(
-      db,
-      env.ARCHIVES,
-      project.id,
-      run.id,
-    );
-    return json({ messages: messages.map(issueMessageJson) });
+    const [messages, attachments] = await Promise.all([
+      listIssueMessagesWithArchive(db, env.ARCHIVES, project.id, run.id),
+      listIssueAttachments(db, project.id, run.id),
+    ]);
+    return json({
+      messages: messages.map((message) => issueMessageJson(message, attachments)),
+    });
   }
   if (issueMessagesMatch && request.method === "POST") {
     const session = await requireSession(auth, request);
@@ -5815,9 +5903,28 @@ async function route(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
-    const input = issueMessageInputSchema.parse(
-      await readJson(request, 16_384),
-    );
+    const { input: rawInput, attachments, attachmentReferences } =
+      await readIssueMessageRequest(request);
+    const storedAttachments: Array<IssueAttachmentInput & { file: File }> =
+      attachments.map((file) => {
+        const id = crypto.randomUUID();
+        return {
+          id,
+          object_key: `issue-attachments/${project.id}/${issueMessagesMatch[2]}/${id}`,
+          filename: file.name.normalize("NFC").trim(),
+          content_type: file.type,
+          byte_size: file.size,
+          file,
+        };
+      });
+    const input = {
+      ...rawInput,
+      body: canonicalizeIssueAttachmentReferences(
+        rawInput.body,
+        attachmentReferences,
+        storedAttachments.map((attachment) => attachment.id),
+      ) ?? rawInput.body,
+    };
     const agentProvider = input.agentConversationId
       ? input.agentConversationId.startsWith(`briar:claude:${project.id}:`)
         ? "claude"
@@ -5834,17 +5941,59 @@ async function route(
       );
     }
     const createdAt = new Date().toISOString();
-    const message = await createIssueMessage(db, {
-      id: crypto.randomUUID(),
-      projectId: project.id,
-      runId: issueMessagesMatch[2],
-      parentMessageId: input.parentMessageId ?? null,
-      authorUserId: agentProvider ? null : session.user.id,
-      authorAgentProvider: agentProvider,
-      body: input.body,
-      mentionedUserIds: agentProvider ? [] : input.mentionedUserIds,
-      createdAt,
-    });
+    const uploadedKeys: string[] = [];
+    let message: IssueMessageRow | null = null;
+    try {
+      for (const attachment of storedAttachments) {
+        await attachmentsBucket.put(
+          attachment.object_key,
+          attachment.file.stream(),
+          {
+            httpMetadata: {
+              contentType: attachment.content_type,
+              contentDisposition: contentDisposition(attachment.filename),
+            },
+            customMetadata: {
+              attachmentId: attachment.id,
+              projectId: project.id,
+            },
+          },
+        );
+        uploadedKeys.push(attachment.object_key);
+      }
+      await createIssueAttachments(
+        db,
+        project.id,
+        issueMessagesMatch[2],
+        storedAttachments.map(({ file: _file, ...attachment }) => attachment),
+      );
+      message = await createIssueMessage(db, {
+        id: crypto.randomUUID(),
+        projectId: project.id,
+        runId: issueMessagesMatch[2],
+        parentMessageId: input.parentMessageId ?? null,
+        authorUserId: agentProvider ? null : session.user.id,
+        authorAgentProvider: agentProvider,
+        body: input.body,
+        mentionedUserIds: agentProvider ? [] : input.mentionedUserIds,
+        createdAt,
+      });
+      if (!message) throw new HttpError(
+        404,
+        input.parentMessageId ? "Thread message not found" : "Run not found",
+      );
+    } catch (error) {
+      await deleteIssueAttachments(
+        db,
+        project.id,
+        issueMessagesMatch[2],
+        storedAttachments.map((attachment) => attachment.id),
+      ).catch(() => undefined);
+      await Promise.all(
+        uploadedKeys.map((objectKey) => attachmentsBucket.delete(objectKey)),
+      ).catch(() => undefined);
+      throw error;
+    }
     if (!message) {
       throw new HttpError(
         404,
@@ -5881,7 +6030,15 @@ async function route(
         : null;
     return json(
       {
-        message: issueMessageJson(message),
+        message: issueMessageJson(
+          message,
+          storedAttachments.map(({ file: _file, ...attachment }) => ({
+            ...attachment,
+            project_id: project.id,
+            run_id: issueMessagesMatch[2],
+            created_at: createdAt,
+          })),
+        ),
         agentReply: agentReply ? issueAgentReplyJson(agentReply) : null,
       },
       201,

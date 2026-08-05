@@ -300,6 +300,8 @@ export function HuntDashboard({
       body: string;
       parentMessageId: string | null;
       mentionedUserIds?: string[];
+      attachments?: File[];
+      attachmentReferences?: string[];
     },
   ) => Promise<IssueMessageSendResult>;
   requestedRunId?: string | null;
@@ -3104,6 +3106,8 @@ export function RunPage({
     body: string;
     parentMessageId: string | null;
     mentionedUserIds?: string[];
+    attachments?: File[];
+    attachmentReferences?: string[];
   }) => Promise<IssueMessageSendResult>;
   onUpdateIssue?: (input: UpdateIssueInput) => Promise<unknown>;
   onUpdateIssuePreferences?: (
@@ -4492,6 +4496,7 @@ export function RunPage({
                   >
                     <IssueConversation
                       mentionMembers={mentionMembers}
+                      onLoadAttachment={onLoadAttachment}
                       onLoad={onLoadIssueMessages}
                       onSend={onSendIssueMessage}
                       run={run}
@@ -4503,6 +4508,7 @@ export function RunPage({
               {!companionMode ? (
                 <IssueConversation
                   mentionMembers={mentionMembers}
+                  onLoadAttachment={onLoadAttachment}
                   onLoad={onLoadIssueMessages}
                   onSend={onSendIssueMessage}
                   run={run}
@@ -5693,16 +5699,20 @@ function RunEvidenceImagePreview({
 
 function IssueConversation({
   mentionMembers,
+  onLoadAttachment,
   onLoad,
   onSend,
   run,
 }: {
   mentionMembers: OrganizationMember[];
+  onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onLoad: () => Promise<IssueMessage[]>;
   onSend: (input: {
     body: string;
     parentMessageId: string | null;
     mentionedUserIds?: string[];
+    attachments?: File[];
+    attachmentReferences?: string[];
   }) => Promise<IssueMessageSendResult>;
   run: HuntRun;
 }) {
@@ -5764,6 +5774,8 @@ function IssueConversation({
     body: string,
     parentMessageId: string | null,
     mentionedUserIds: string[],
+    attachments: File[],
+    attachmentReferences: string[],
   ) => {
     const appendMessage = (message: IssueMessage) =>
       setMessages((current) => [
@@ -5778,6 +5790,9 @@ function IssueConversation({
       body,
       parentMessageId,
       mentionedUserIds,
+      ...(attachments.length > 0
+        ? { attachments, attachmentReferences }
+        : {}),
     });
     appendMessage(result.message);
     if (!result.agentReply) return;
@@ -5863,6 +5878,7 @@ function IssueConversation({
                   isReplying={isReplying}
                   localeTag={localeTag}
                   message={message}
+                  onLoadAttachment={onLoadAttachment}
                   onReply={() =>
                     setActiveReplyMessageId((current) =>
                       current === message.id ? null : message.id,
@@ -5881,8 +5897,8 @@ function IssueConversation({
                       autoFocus
                       compact
                       mentionMembers={mentionMembers}
-                      onSubmit={(body, mentionedUserIds) =>
-                        sendMessage(body, message.id, mentionedUserIds)
+                      onSubmit={(body, mentionedUserIds, attachments, references) =>
+                        sendMessage(body, message.id, mentionedUserIds, attachments, references)
                       }
                       placeholder={t("run.threadPlaceholder")}
                     />
@@ -5895,8 +5911,8 @@ function IssueConversation({
       </div>
       <MessageComposer
         mentionMembers={mentionMembers}
-        onSubmit={(body, mentionedUserIds) =>
-          sendMessage(body, null, mentionedUserIds)
+        onSubmit={(body, mentionedUserIds, attachments, references) =>
+          sendMessage(body, null, mentionedUserIds, attachments, references)
         }
         placeholder={t("run.messagePlaceholder", { title: run.title })}
       />
@@ -5908,6 +5924,7 @@ function IssueMessageItem({
   isReplying = false,
   localeTag,
   message,
+  onLoadAttachment,
   onReply,
   parentMessage = null,
   replyComposerId,
@@ -5915,6 +5932,7 @@ function IssueMessageItem({
   isReplying?: boolean;
   localeTag: string;
   message: IssueMessage;
+  onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onReply?: () => void;
   parentMessage?: IssueMessage | null;
   replyComposerId?: string;
@@ -5936,7 +5954,27 @@ function IssueMessageItem({
             <span>{parentMessage.body}</span>
           </blockquote>
         ) : null}
-        <p>{message.body}</p>
+        {message.attachments?.length ? <div className="issue-message-body">
+          <ReactMarkdown
+            components={{
+              img: ({ alt = "", src }) => (
+                <IssueMarkdownImage
+                  alt={alt}
+                  attachments={message.attachments ?? []}
+                  onLoadAttachment={onLoadAttachment}
+                  src={src}
+                />
+              ),
+            }}
+            remarkPlugins={[remarkGfm]}
+            skipHtml
+            urlTransform={(url) =>
+              issueAttachmentReference(url) ? url : defaultUrlTransform(url)
+            }
+          >
+            {message.body}
+          </ReactMarkdown>
+        </div> : <p>{message.body}</p>}
       </div>
       {onReply && (
         <div
@@ -6022,7 +6060,12 @@ function MessageComposer({
   autoFocus?: boolean;
   compact?: boolean;
   mentionMembers: OrganizationMember[];
-  onSubmit: (body: string, mentionedUserIds: string[]) => Promise<void>;
+  onSubmit: (
+    body: string,
+    mentionedUserIds: string[],
+    attachments: File[],
+    attachmentReferences: string[],
+  ) => Promise<void>;
   placeholder: string;
 }) {
   const { t } = useI18n();
@@ -6035,7 +6078,11 @@ function MessageComposer({
   const [selectedMentions, setSelectedMentions] = useState<
     Record<string, string>
   >({});
+  const [attachments, setAttachments] = useState<
+    Array<{ file: File; reference: string }>
+  >([]);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const mentionListId = useId();
   const activeMention = issueMentionAtCaret(body, caret);
   const mentionSuggestions = activeMention
@@ -6069,46 +6116,63 @@ function MessageComposer({
     mentionSuggestions.length > 0;
   const submit = async (event?: FormEvent) => {
     event?.preventDefault();
-    const nextBody = body.trim();
-    if (!nextBody || sending) return;
+    const textBody = body.trim();
+    if ((!textBody && attachments.length === 0) || sending) return;
+    const attachmentMarkdown = attachments
+      .map(({ file, reference }) =>
+        issueAttachmentMarkdown(reference, file.name),
+      )
+      .join("\n\n");
+    const nextBody = [textBody, attachmentMarkdown].filter(Boolean).join("\n\n");
     const nextMentionedUserIds = Object.entries(selectedMentions)
       .filter(([, handle]) => mentionsIssueHandle(nextBody, handle))
       .map(([userId]) => userId);
     const previousMentions = selectedMentions;
+    const previousAttachments = attachments;
     setSending(true);
     setError(null);
     setBody("");
     setCaret(0);
     setMentionDismissed(false);
     setSelectedMentions({});
+    setAttachments([]);
     try {
-      await onSubmit(nextBody, nextMentionedUserIds);
+      await onSubmit(
+        nextBody,
+        nextMentionedUserIds,
+        previousAttachments.map(({ file }) => file),
+        previousAttachments.map(({ reference }) => reference),
+      );
     } catch (caught) {
       setBody(nextBody);
       setCaret(nextBody.length);
       setSelectedMentions(previousMentions);
+      setAttachments(previousAttachments);
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
       setSending(false);
     }
   };
-  const wrapSelection = (before: string, after = before) => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    const selectionStart = textarea.selectionStart;
-    const selectionEnd = textarea.selectionEnd;
-    setBody(
-      `${body.slice(0, selectionStart)}${before}${body.slice(
-        selectionStart,
-        selectionEnd,
-      )}${after}${body.slice(selectionEnd)}`,
+  const addImages = (selected: File[]) => {
+    if (selected.length === 0) return;
+    const normalized = selected.map(normalizeIssueAttachmentFile);
+    if (normalized.some((file) => !file.type.startsWith("image/"))) {
+      setError("대화에는 이미지만 첨부할 수 있습니다.");
+      return;
+    }
+    const next = [
+      ...attachments,
+      ...normalized.map((file) => ({ file, reference: crypto.randomUUID() })),
+    ];
+    const validationError = validateIssueAttachments(
+      next.map(({ file }) => file),
     );
-    requestAnimationFrame(() => {
-      textarea.focus();
-      const cursor = selectionEnd + before.length + after.length;
-      textarea.setSelectionRange(cursor, cursor);
-      setCaret(cursor);
-    });
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    setAttachments(next);
+    setError(null);
   };
   const completeMention = (suggestion: (typeof mentionSuggestions)[number]) => {
     const textarea = textareaRef.current;
@@ -6143,6 +6207,14 @@ function MessageComposer({
         }
       }}
       onFocus={() => setComposerFocused(true)}
+      onDragOver={(event) => {
+        if (dataTransferHasFiles(event.dataTransfer)) event.preventDefault();
+      }}
+      onDrop={(event) => {
+        if (!dataTransferHasFiles(event.dataTransfer)) return;
+        event.preventDefault();
+        addImages(filesFromDataTransfer(event.dataTransfer));
+      }}
       onSubmit={(event) => void submit(event)}
     >
       {showsMentionSuggestion && (
@@ -6175,6 +6247,23 @@ function MessageComposer({
               <strong>@{suggestion.handle}</strong>
               {suggestion.userId ? <small>{suggestion.name}</small> : null}
             </button>
+          ))}
+        </div>
+      )}
+      {attachments.length > 0 && (
+        <div className="issue-composer-attachments">
+          {attachments.map(({ file, reference }) => (
+            <MessageAttachmentPreview
+              file={file}
+              key={reference}
+              onRemove={() =>
+                setAttachments((current) =>
+                  current.filter((attachment) =>
+                    attachment.reference !== reference,
+                  ),
+                )
+              }
+            />
           ))}
         </div>
       )}
@@ -6215,6 +6304,14 @@ function MessageComposer({
             void submit();
           }
         }}
+        onPaste={(event) => {
+          const images = filesFromDataTransfer(event.clipboardData).filter(
+            (file) => file.type.startsWith("image/"),
+          );
+          if (images.length === 0) return;
+          event.preventDefault();
+          addImages(images);
+        }}
         onSelect={(event) => setCaret(event.currentTarget.selectionStart)}
         placeholder={placeholder}
         ref={textareaRef}
@@ -6223,17 +6320,30 @@ function MessageComposer({
       />
       <footer>
         <button
-          aria-label={t("run.formatLink")}
+          aria-label={t("issue.attachmentLabel")}
           className="issue-composer-link"
-          onClick={() => wrapSelection("[", "](https://)")}
+          disabled={sending || attachments.length >= maxIssueAttachmentCount}
+          onClick={() => attachmentInputRef.current?.click()}
           type="button"
         >
           <Paperclip size={18} />
         </button>
+        <input
+          accept="image/*"
+          className="issue-composer-file-input"
+          disabled={sending || attachments.length >= maxIssueAttachmentCount}
+          multiple
+          onChange={(event) => {
+            addImages(Array.from(event.currentTarget.files ?? []));
+            event.currentTarget.value = "";
+          }}
+          ref={attachmentInputRef}
+          type="file"
+        />
         <button
           aria-label={sending ? t("run.sendingMessage") : t("run.sendMessage")}
           className="issue-message-send"
-          disabled={!body.trim() || sending}
+          disabled={(!body.trim() && attachments.length === 0) || sending}
           type="submit"
         >
           {sending ? (
@@ -6250,6 +6360,30 @@ function MessageComposer({
         </p>
       )}
     </form>
+  );
+}
+
+function MessageAttachmentPreview({
+  file,
+  onRemove,
+}: {
+  file: File;
+  onRemove: () => void;
+}) {
+  const [source, setSource] = useState("");
+  useEffect(() => {
+    const objectUrl = URL.createObjectURL(file);
+    setSource(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [file]);
+  return (
+    <div className="issue-composer-attachment">
+      {source ? <img alt="" src={source} /> : null}
+      <span>{file.name}</span>
+      <button aria-label={`Remove ${file.name}`} onClick={onRemove} type="button">
+        <X aria-hidden="true" size={13} />
+      </button>
+    </div>
   );
 }
 

@@ -1452,7 +1452,9 @@ button.paused-review-state { width:100%; border:0; border-radius:8px; cursor:poi
 .issue-message > div > header { min-height:19px; display:flex; align-items:baseline; gap:7px; }
 .issue-message > div > header strong { overflow:hidden; color:var(--foreground); font-size:var(--text-xs); text-overflow:ellipsis; white-space:nowrap; }
 .issue-message > div > header time { color:var(--muted-foreground); font:500 var(--text-2xs) "DM Mono",monospace; }
-.issue-message > div > p { margin:2px 0 0; color:var(--foreground); font-size:var(--text-xs); line-height:1.65; overflow-wrap:anywhere; white-space:pre-wrap; }
+.issue-message-body { margin:2px 0 0; color:var(--foreground); font-size:var(--text-xs); line-height:1.65; overflow-wrap:anywhere; }
+.issue-message-body p { margin:0; white-space:pre-wrap; }
+.issue-message-body img { width:auto; max-width:100%; max-height:320px; margin-top:7px; display:block; object-fit:contain; border:1px solid var(--border); border-radius:9px; background:var(--muted); }
 .issue-message-parent-quote { margin:6px 0 0; padding:7px 9px; display:flex; align-items:flex-start; gap:7px; border:0; border-radius:8px; color:var(--muted-foreground); background:color-mix(in srgb,var(--muted) 88%,var(--card)); font-size:var(--text-2xs); line-height:1.45; }
 .issue-message-parent-quote svg { flex:0 0 auto; margin-top:1px; color:var(--muted-foreground); }
 .issue-message-parent-quote span { min-width:0; display:-webkit-box; overflow:hidden; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow-wrap:anywhere; white-space:pre-wrap; }
@@ -1481,11 +1483,17 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .issue-composer-mention-menu button:focus-visible { outline:2px solid #8b70dd; outline-offset:1px; }
 .issue-message-composer textarea { width:100%; min-height:68px; padding:18px 18px 6px; resize:none; border:0; outline:0; color:var(--foreground); background:transparent; font:400 var(--text-sm)/1.55 inherit; }
 .issue-message-composer textarea::placeholder { color:var(--muted-foreground); }
+.issue-composer-attachments { padding:10px 12px 0; display:flex; flex-wrap:wrap; gap:7px; }
+.issue-composer-attachment { max-width:180px; height:38px; padding:3px 5px 3px 3px; display:flex; align-items:center; gap:6px; border:1px solid var(--border); border-radius:9px; background:var(--muted); }
+.issue-composer-attachment img { width:30px; height:30px; flex:0 0 auto; border-radius:6px; object-fit:cover; }
+.issue-composer-attachment span { min-width:0; overflow:hidden; color:var(--foreground); font-size:var(--text-2xs); text-overflow:ellipsis; white-space:nowrap; }
+.issue-composer-attachment button { width:22px; height:22px; flex:0 0 auto; padding:0; display:grid; place-items:center; border:0; border-radius:6px; color:var(--muted-foreground); background:transparent; cursor:pointer; }
 .issue-message-composer footer { min-height:48px; padding:4px 12px 11px; display:flex; align-items:center; justify-content:flex-end; gap:5px; }
 .issue-message-composer footer button { width:32px; height:32px; padding:0; display:grid; place-items:center; border:0; border-radius:9px; color:var(--muted-foreground); background:transparent; cursor:pointer; transition:color .12s ease-out,background-color .12s ease-out,transform .1s ease-out; }
 .issue-message-composer footer button:hover { color:var(--foreground); background:var(--secondary); }
 .issue-message-composer footer button:active { transform:scale(.94); }
 .issue-message-composer footer button:focus-visible { outline:2px solid #8b70dd; outline-offset:1px; }
+.issue-composer-file-input { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
 .issue-message-composer footer .issue-message-send { color:var(--foreground); }
 .issue-message-composer footer .issue-message-send:disabled { color:var(--muted-foreground); background:transparent; cursor:default; transform:none; }
 .issue-composer-error { margin:0; padding:0 10px 8px; display:flex; align-items:center; gap:5px; color:#b13f54; font-size:var(--text-2xs); }

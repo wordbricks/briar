@@ -151,8 +151,65 @@ final class IssueMutationTests: XCTestCase {
         XCTAssertEqual(methods, ["POST", "GET"])
     }
 
+    func testConversationImageUsesMultipartUpload() async throws {
+        let recorder = MessageAttachmentAPIRecorder()
+        let store = IssueMutationStore(
+            api: recorder,
+            projectID: Self.projectID,
+            token: "token"
+        )
+        let attachment = PendingIssueAttachment(
+            filename: "clipboard.png",
+            contentType: "image/png",
+            data: Data([1, 2, 3])
+        )
+
+        let messages = try await store.sendMessage(
+            runID: Self.runID,
+            body: "",
+            parentMessageID: nil,
+            attachments: [attachment]
+        )
+
+        XCTAssertEqual(messages.first?.attachments?.first?.filename, "clipboard.png")
+        let upload = await recorder.recordedUpload()
+        XCTAssertEqual(upload?.files.map(\.filename), ["clipboard.png"])
+        XCTAssertTrue(upload?.fields["body"]?.contains("briar-attachment://") == true)
+    }
+
     private static let projectID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
     private static let runID = UUID(uuidString: "33333333-3333-4333-8333-333333333333")!
+}
+
+private actor MessageAttachmentAPIRecorder: MobileAPIClientProtocol {
+    private var upload: (fields: [String: String], files: [MultipartFile])?
+
+    func recordedUpload() -> (fields: [String: String], files: [MultipartFile])? { upload }
+
+    func send<Response: Decodable & Sendable>(
+        _ path: String,
+        method: String,
+        token: String?,
+        body: (any Encodable & Sendable)?,
+        as responseType: Response.Type
+    ) async throws -> Response {
+        throw MobileAPIError.invalidRequest
+    }
+
+    func upload<Response: Decodable & Sendable>(
+        _ path: String,
+        fields: [String: String],
+        files: [MultipartFile],
+        token: String,
+        as responseType: Response.Type
+    ) async throws -> Response {
+        upload = (fields, files)
+        let body = fields["body"] ?? ""
+        let payload = """
+        {"message":{"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","runId":"33333333-3333-4333-8333-333333333333","parentMessageId":null,"body":\(String(reflecting: body)),"attachments":[{"id":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","filename":"clipboard.png","contentType":"image/png","byteSize":3,"url":"/attachment"}],"author":{"id":"fixture-user","name":"Briar User","image":null,"provider":null},"replyCount":0,"createdAt":"2026-08-05T01:00:00Z","updatedAt":"2026-08-05T01:00:00Z"},"agentReply":null}
+        """
+        return try JSONDecoder.mobileContract.decode(Response.self, from: Data(payload.utf8))
+    }
 }
 
 private actor AgentReplyAPIRecorder: MobileAPIClientProtocol {

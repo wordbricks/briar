@@ -1548,8 +1548,36 @@ export async function createIssueMessage(
     parentMessageId: string | null;
     mentionedUserIds?: string[];
     agentConversationId?: string | null;
+    attachments?: File[];
+    attachmentReferences?: string[];
   },
 ) {
+  const attachments = input.attachments ?? [];
+  let body: BodyInit;
+  if (attachments.length > 0) {
+    const attachmentError = validateIssueAttachments(attachments);
+    if (attachmentError) throw new Error(attachmentError);
+    const form = new FormData();
+    form.set("body", input.body);
+    form.set("parentMessageId", input.parentMessageId ?? "");
+    form.set("mentionedUserIds", JSON.stringify(input.mentionedUserIds ?? []));
+    form.set("agentConversationId", input.agentConversationId ?? "");
+    form.set(
+      "attachmentReferences",
+      JSON.stringify(input.attachmentReferences ?? []),
+    );
+    for (const attachment of attachments) {
+      form.append("attachments", attachment, attachment.name);
+    }
+    body = form;
+  } else {
+    const {
+      attachments: _attachments,
+      attachmentReferences: _attachmentReferences,
+      ...message
+    } = input;
+    body = JSON.stringify(message);
+  }
   const result = await request<{
     message: IssueMessage;
     agentReply: {
@@ -1561,7 +1589,7 @@ export async function createIssueMessage(
   }>(
     `/projects/${projectId}/runs/${runId}/messages`,
     token,
-    { method: "POST", body: JSON.stringify(input) },
+    { method: "POST", body },
   );
   return result;
 }

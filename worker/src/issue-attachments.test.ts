@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { maxIssueMultipartBytes } from "../../src/lib/issue-attachments";
-import { readIssueRequest } from "./index";
+import { readIssueMessageRequest, readIssueRequest } from "./index";
 
 const issueRequest = (
   file: File,
@@ -98,5 +98,49 @@ describe("issue multipart input", () => {
         ),
       ),
     ).rejects.toThrow("Attachment references are invalid");
+  });
+});
+
+describe("issue conversation multipart input", () => {
+  const messageRequest = (file: File, reference = crypto.randomUUID()) => {
+    const form = new FormData();
+    form.set(
+      "body",
+      `확인해 주세요\n\n![${file.name}](briar-attachment://${reference})`,
+    );
+    form.set("parentMessageId", "");
+    form.set("mentionedUserIds", "[]");
+    form.set("agentConversationId", "");
+    form.set("attachmentReferences", JSON.stringify([reference]));
+    form.append("attachments", file, file.name);
+    return new Request("https://briar.example/projects/project/runs/run/messages", {
+      method: "POST",
+      headers: { "Content-Length": String(file.size + 2048) },
+      body: form,
+    });
+  };
+
+  it("parses pasted conversation images and their inline references", async () => {
+    const reference = crypto.randomUUID();
+    const result = await readIssueMessageRequest(
+      messageRequest(
+        new File(["image"], "clipboard.png", { type: "image/png" }),
+        reference,
+      ),
+    );
+
+    expect(result.input.body).toContain(`briar-attachment://${reference}`);
+    expect(result.attachments).toEqual([
+      expect.objectContaining({ name: "clipboard.png", type: "image/png" }),
+    ]);
+    expect(result.attachmentReferences).toEqual([reference]);
+  });
+
+  it("rejects videos in issue conversations", async () => {
+    await expect(
+      readIssueMessageRequest(
+        messageRequest(new File(["video"], "clip.mp4", { type: "video/mp4" })),
+      ),
+    ).rejects.toThrow("must be images");
   });
 });
