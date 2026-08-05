@@ -2520,7 +2520,7 @@ describe("HuntDashboard", () => {
       id: "message-loaded",
       runId: demoDashboard.runs[0].id,
       parentMessageId: null,
-      body: "기존 메시지",
+      body: "## 기존 메시지\n\n- 마크다운 항목",
       author: { id: "jay", name: "Jay", image: null, provider: null },
       replyCount: 0,
       createdAt,
@@ -2577,6 +2577,12 @@ describe("HuntDashboard", () => {
       await Promise.resolve();
     });
     expect(messageList?.scrollTop).toBe(640);
+    expect(messageList.querySelector(".issue-message-body h2")?.textContent).toBe(
+      "기존 메시지",
+    );
+    expect(messageList.querySelector(".issue-message-body li")?.textContent).toBe(
+      "마크다운 항목",
+    );
 
     const textarea = container.querySelector<HTMLTextAreaElement>(
       ".issue-message-composer textarea",
@@ -2898,7 +2904,7 @@ describe("HuntDashboard", () => {
         container.querySelectorAll<HTMLElement>(".issue-message-group"),
       ).find((group) =>
         group
-          .querySelector(":scope > .issue-message > div > p")
+          .querySelector(":scope > .issue-message > div > .issue-message-body")
           ?.textContent?.includes(body),
       );
     const replyGroup = groupByBody("기존 답글");

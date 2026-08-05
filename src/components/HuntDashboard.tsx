@@ -6435,7 +6435,7 @@ function IssueMessageItem({
             <span>{parentMessage.body}</span>
           </blockquote>
         ) : null}
-        {message.attachments?.length ? <div className="issue-message-body">
+        <div className="issue-message-body">
           <ReactMarkdown
             components={{
               img: ({ alt = "", src }) => (
@@ -6455,7 +6455,7 @@ function IssueMessageItem({
           >
             {message.body}
           </ReactMarkdown>
-        </div> : <p>{message.body}</p>}
+        </div>
       </div>
       {onReply && (
         <div

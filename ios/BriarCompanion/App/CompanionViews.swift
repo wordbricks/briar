@@ -1649,14 +1649,84 @@ struct MarkdownText: View {
     let markdown: String
 
     var body: some View {
-        if let attributed = try? AttributedString(
-            markdown: markdown,
-            options: .init(interpretedSyntax: .full)
-        ) {
-            Text(attributed)
-                .textSelection(.enabled)
-        } else {
-            Text(markdown).textSelection(.enabled)
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(Array(MarkdownDocument.parse(markdown).enumerated()), id: \.offset) { _, block in
+                switch block {
+                case let .heading(level, content):
+                    inlineText(content)
+                        .font(headingFont(level))
+                        .padding(.top, level == 1 ? 4 : 2)
+                case let .paragraph(content):
+                    inlineText(content)
+                case let .unorderedList(items):
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                Image(systemName: item.checked.map { $0 ? "checkmark.square.fill" : "square" } ?? "circle.fill")
+                                    .font(.system(size: item.checked == nil ? 5 : 14))
+                                    .foregroundStyle(item.checked == true ? Color.accentColor : Color.secondary)
+                                    .frame(width: 16)
+                                inlineText(item.content)
+                            }
+                        }
+                    }
+                    .padding(.leading, 2)
+                case let .orderedList(items):
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                Text("\(index + 1).")
+                                    .foregroundStyle(.secondary)
+                                    .frame(minWidth: 20, alignment: .trailing)
+                                inlineText(item)
+                            }
+                        }
+                    }
+                    .padding(.leading, 2)
+                case let .blockquote(content):
+                    HStack(alignment: .top, spacing: 10) {
+                        RoundedRectangle(cornerRadius: 1)
+                            .fill(Color.secondary.opacity(0.45))
+                            .frame(width: 3)
+                        inlineText(content).foregroundStyle(.secondary)
+                    }
+                case let .code(language, content):
+                    VStack(alignment: .leading, spacing: 6) {
+                        if let language, !language.isEmpty {
+                            Text(language.uppercased())
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                        ScrollView(.horizontal) {
+                            Text(content)
+                                .font(.system(.footnote, design: .monospaced))
+                                .textSelection(.enabled)
+                        }
+                    }
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+                case .divider:
+                    Divider()
+                }
+            }
+        }
+        .textSelection(.enabled)
+    }
+
+    private func inlineText(_ value: String) -> Text {
+        guard let attributed = try? AttributedString(
+            markdown: value,
+            options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+        ) else { return Text(value) }
+        return Text(attributed)
+    }
+
+    private func headingFont(_ level: Int) -> Font {
+        switch level {
+        case 1: .title2.bold()
+        case 2: .title3.bold()
+        default: .headline
         }
     }
 }
