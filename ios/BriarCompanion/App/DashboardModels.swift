@@ -355,6 +355,7 @@ struct IssueMessage: Codable, Equatable, Identifiable, Sendable {
     let attachments: [IssueAttachment]?
     let author: Author
     let replyCount: Int
+    var proposedAction: IssueReworkProposal? = nil
     let createdAt: Date
     let updatedAt: Date
 
@@ -364,6 +365,29 @@ struct IssueMessage: Codable, Equatable, Identifiable, Sendable {
         let image: String?
         let provider: String?
     }
+}
+
+struct IssueReworkProposal: Codable, Equatable, Identifiable, Sendable {
+    let id: UUID
+    let type: String
+    let workflowStage: String
+    let reason: String
+    let status: Status
+    let acceptedAt: Date?
+    let appliedRevision: Int?
+
+    enum Status: String, Codable, Sendable {
+        case pending
+        case accepted
+    }
+}
+
+struct AcceptIssueReworkProposalResponse: Codable, Equatable, Sendable {
+    let proposal: IssueReworkProposal
+    let outcome: String
+    let attempt: Int
+    let revision: Int
+    let workflowStage: String
 }
 
 struct RunEvidenceResponse: Codable, Equatable, Sendable {

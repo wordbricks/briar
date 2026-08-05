@@ -39,6 +39,7 @@ import {
   detachedTranscriptSequence,
   detachedTranscriptPayload,
   issueReplyTextFromPayload,
+  parseDetachedIssueReplyResult,
   parseDetachedJsonResult,
   shouldPersistDetachedTranscriptPayload,
 } from "./agent-runner";
@@ -2471,6 +2472,8 @@ async function runClaimedIssueReply(
       );
     }
     if (!replyBody) throw new Error("Agent returned an empty issue reply");
+    const result = parseDetachedIssueReplyResult(replyBody);
+    if (!result.reply) throw new Error("Agent returned an empty issue reply");
     await request(
       config.apiUrl,
       `/issue-reply-claims/${issue.workId}/complete`,
@@ -2481,7 +2484,8 @@ async function runClaimedIssueReply(
           projectId: project.id,
           workerId: registered.workerId,
           claimToken: issue.claimToken,
-          body: replyBody,
+          body: result.reply,
+          proposedAction: result.proposedAction,
         }),
       },
     );

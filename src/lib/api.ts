@@ -1731,6 +1731,25 @@ export async function waitForIssueAgentReply(
   );
 }
 
+export async function acceptIssueReworkProposal(
+  token: string,
+  projectId: string,
+  runId: string,
+  proposalId: string,
+) {
+  return request<{
+    proposal: NonNullable<IssueMessage["proposedAction"]>;
+    outcome: "accepted" | "already_accepted";
+    attempt: number;
+    revision: number;
+    workflowStage: string;
+  }>(
+    `/projects/${projectId}/runs/${runId}/rework-proposals/${proposalId}/accept`,
+    token,
+    { method: "POST", body: JSON.stringify({}) },
+  );
+}
+
 export type HuntRecoveryResult = {
   runId: string;
   outcome: "retried" | "cancelled" | "already_retried" | "already_cancelled";

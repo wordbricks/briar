@@ -646,6 +646,45 @@
         }
       }
     },
+    "/projects/{projectId}/runs/{runId}/rework-proposals/{proposalId}/accept": {
+      "post": {
+        "operationId": "acceptIssueReworkProposal",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          },
+          {
+            "$ref": "#/components/parameters/RunId"
+          },
+          {
+            "name": "proposalId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rework proposal accepted and revision queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptIssueReworkProposalResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/projects/{projectId}/runs/{runId}/cancel": {
       "post": {
         "operationId": "cancelRun",
@@ -1555,6 +1594,46 @@
         },
         "additionalProperties": true
       },
+      "IssueReworkProposal": {
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "workflowStage",
+          "reason",
+          "status",
+          "acceptedAt",
+          "appliedRevision"
+        ],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "type": { "type": "string", "enum": ["request_issue_rework"] },
+          "workflowStage": { "type": "string" },
+          "reason": { "type": "string" },
+          "status": { "type": "string", "enum": ["pending", "accepted"] },
+          "acceptedAt": { "type": ["string", "null"], "format": "date-time" },
+          "appliedRevision": { "type": ["integer", "null"], "minimum": 1 }
+        },
+        "additionalProperties": false
+      },
+      "AcceptIssueReworkProposalResponse": {
+        "type": "object",
+        "required": [
+          "proposal",
+          "outcome",
+          "attempt",
+          "revision",
+          "workflowStage"
+        ],
+        "properties": {
+          "proposal": { "$ref": "#/components/schemas/IssueReworkProposal" },
+          "outcome": { "type": "string", "enum": ["accepted", "already_accepted"] },
+          "attempt": { "type": "integer", "minimum": 1 },
+          "revision": { "type": "integer", "minimum": 1 },
+          "workflowStage": { "type": "string" }
+        },
+        "additionalProperties": false
+      },
       "IssueMessagesResponse": {
         "type": "object",
         "required": [
@@ -1600,6 +1679,12 @@
                 "replyCount": {
                   "type": "integer",
                   "minimum": 0
+                },
+                "proposedAction": {
+                  "oneOf": [
+                    { "$ref": "#/components/schemas/IssueReworkProposal" },
+                    { "type": "null" }
+                  ]
                 },
                 "createdAt": {
                   "type": "string",

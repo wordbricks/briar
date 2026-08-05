@@ -10,6 +10,7 @@ import {
   detachedTranscriptSequence,
   detachedTranscriptPayload,
   issueReplyTextFromPayload,
+  parseDetachedIssueReplyResult,
   shouldPersistDetachedTranscriptPayload,
 } from "./agent-runner";
 
@@ -218,10 +219,34 @@ describe("detached Agent runner", () => {
     expect(prompt).toContain("worktree is unavailable");
     expect(prompt).toContain("Fixed the retry race.");
     expect(prompt).toContain("@briar what changed?");
+    expect(prompt).toContain("request_issue_rework");
+    expect(prompt).toContain("confirmation button");
     expect(launch.kind).toBe("runner");
     expect(launch.request).toMatchObject({
       sandboxMode: "readOnly",
       codexBinary: "/bin/codex",
+    });
+  });
+
+  it("parses a proposed completed-run revision without executing it", () => {
+    expect(parseDetachedIssueReplyResult(JSON.stringify({
+      reply: "D를 D′로 바꾸는 개정을 제안했습니다. 수락이 필요합니다.",
+      proposedAction: {
+        type: "request_issue_rework",
+        workflowStage: "implementing",
+        reason: "D를 D′로 변경하고 영향받는 QA를 다시 확인한다.",
+      },
+    }))).toEqual({
+      reply: "D를 D′로 바꾸는 개정을 제안했습니다. 수락이 필요합니다.",
+      proposedAction: {
+        type: "request_issue_rework",
+        workflowStage: "implementing",
+        reason: "D를 D′로 변경하고 영향받는 QA를 다시 확인한다.",
+      },
+    });
+    expect(parseDetachedIssueReplyResult("plain fallback")).toEqual({
+      reply: "plain fallback",
+      proposedAction: null,
     });
   });
 

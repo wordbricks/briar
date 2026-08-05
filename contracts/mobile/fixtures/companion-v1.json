@@ -413,6 +413,26 @@
         "stage": "queued"
       }
     },
+    "acceptIssueReworkProposal": {
+      "method": "POST",
+      "path": "/projects/{projectId}/runs/{runId}/rework-proposals/{proposalId}/accept",
+      "status": 200,
+      "response": {
+        "proposal": {
+          "id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+          "type": "request_issue_rework",
+          "workflowStage": "implementing",
+          "reason": "Replace D with D' and verify the affected behavior.",
+          "status": "accepted",
+          "acceptedAt": "2026-08-02T01:02:00.000Z",
+          "appliedRevision": 2
+        },
+        "outcome": "accepted",
+        "attempt": 1,
+        "revision": 2,
+        "workflowStage": "implementing"
+      }
+    },
     "cancelRun": {
       "method": "POST",
       "path": "/projects/{projectId}/runs/{runId}/cancel",
@@ -570,6 +590,15 @@
             "provider": "codex"
           },
           "replyCount": 0,
+          "proposedAction": {
+            "id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+            "type": "request_issue_rework",
+            "workflowStage": "implementing",
+            "reason": "Replace D with D' and verify the affected behavior.",
+            "status": "pending",
+            "acceptedAt": null,
+            "appliedRevision": null
+          },
           "createdAt": "2026-08-02T01:01:00.000Z",
           "updatedAt": "2026-08-02T01:01:00.000Z"
         }

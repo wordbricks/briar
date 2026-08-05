@@ -1157,6 +1157,45 @@ struct RunDetailView: View {
                         open: { previewFile = PreviewFile(url: $0) }
                     )
                 }
+                if let proposal = message.proposedAction {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Briar 재작업 제안")
+                            .font(.subheadline.weight(.semibold))
+                        Text("\(proposal.workflowStage)부터 개정")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(proposal.reason)
+                            .font(.subheadline)
+                        if proposal.status == .accepted {
+                            Label(
+                                "리비전 \(proposal.appliedRevision.map(String.init) ?? "") 개정이 시작되었습니다.",
+                                systemImage: "checkmark.seal.fill"
+                            )
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.tint)
+                        } else {
+                            Button {
+                                Task { await acceptReworkProposal(proposal) }
+                            } label: {
+                                if mutations.isActive("rework-proposal-\(proposal.id)") {
+                                    ProgressView()
+                                } else {
+                                    Label("수락하고 개정 시작", systemImage: "play.fill")
+                                }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(mutations.isActive("rework-proposal-\(proposal.id)"))
+                            .accessibilityIdentifier("accept-rework-proposal-\(proposal.id.uuidString.lowercased())")
+                        }
+                    }
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.accentColor.opacity(0.25))
+                    }
+                }
                 Button("답글") { replyTo = message }.font(.caption)
             }
         }
@@ -1517,6 +1556,20 @@ struct RunDetailView: View {
             actionError = nil
             await refresh()
         } catch { actionError = error.localizedDescription }
+    }
+
+    private func acceptReworkProposal(_ proposal: IssueReworkProposal) async {
+        do {
+            let accepted = try await mutations.acceptReworkProposal(
+                runID: run.id,
+                proposalID: proposal.id
+            )
+            detail.updateReworkProposal(accepted)
+            actionError = nil
+            await refresh()
+        } catch {
+            actionError = error.localizedDescription
+        }
     }
 
     private func sendMessage() async {

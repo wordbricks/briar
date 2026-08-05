@@ -532,6 +532,24 @@ export type IssueAgentReplyJobRow = {
   completed_at: string | null;
 };
 
+export type IssueReworkProposalRow = {
+  id: string;
+  project_id: string;
+  run_id: string;
+  trigger_message_id: string;
+  reply_message_id: string;
+  workflow_stage: string;
+  reason: string;
+  expected_attempt: number;
+  expected_revision: number;
+  status: "pending" | "accepted";
+  accepted_by_user_id: string | null;
+  accepted_at: string | null;
+  applied_revision: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type IssueConversationNotificationRow = IssueMessageRow & {
   run_title: string;
   root_message_id: string;
@@ -5198,6 +5216,115 @@ export async function completeIssueAgentReply(
     .first<IssueAgentReplyJobRow>();
 }
 
+export async function createIssueReworkProposal(
+  db: D1Database,
+  input: {
+    id: string;
+    projectId: string;
+    runId: string;
+    triggerMessageId: string;
+    replyMessageId: string;
+    workflowStage: string;
+    reason: string;
+    createdAt: string;
+  },
+) {
+  return await db
+    .prepare(
+      `insert into briar_issue_rework_proposals (
+         id, project_id, run_id, trigger_message_id, reply_message_id,
+         workflow_stage, reason, expected_attempt, expected_revision,
+         created_at, updated_at
+       )
+       select ?, run.project_id, run.id, ?, ?, ?, ?,
+              run.current_attempt, run.current_revision, ?, ?
+       from briar_hunt_runs run
+       where run.id = ? and run.project_id = ? and run.status = 'completed'
+         and exists (
+           select 1 from json_each(run.workflow_snapshot_json, '$.stages') stage
+           where json_extract(stage.value, '$.id') = ?
+         )
+       on conflict (project_id, trigger_message_id) do nothing
+       returning *`,
+    )
+    .bind(
+      input.id,
+      input.triggerMessageId,
+      input.replyMessageId,
+      input.workflowStage,
+      input.reason,
+      input.createdAt,
+      input.createdAt,
+      input.runId,
+      input.projectId,
+      input.workflowStage,
+    )
+    .first<IssueReworkProposalRow>();
+}
+
+export async function listIssueReworkProposals(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+) {
+  const result = await db
+    .prepare(
+      `select * from briar_issue_rework_proposals
+       where project_id = ? and run_id = ?
+       order by created_at, id`,
+    )
+    .bind(projectId, runId)
+    .all<IssueReworkProposalRow>();
+  return result.results;
+}
+
+export async function getIssueReworkProposal(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  proposalId: string,
+) {
+  return await db
+    .prepare(
+      `select * from briar_issue_rework_proposals
+       where id = ? and project_id = ? and run_id = ?`,
+    )
+    .bind(proposalId, projectId, runId)
+    .first<IssueReworkProposalRow>();
+}
+
+export async function acceptIssueReworkProposal(
+  db: D1Database,
+  input: {
+    projectId: string;
+    runId: string;
+    proposalId: string;
+    userId: string;
+    acceptedAt: string;
+    appliedRevision: number;
+  },
+) {
+  return await db
+    .prepare(
+      `update briar_issue_rework_proposals
+       set status = 'accepted', accepted_by_user_id = ?, accepted_at = ?,
+           applied_revision = ?, updated_at = ?
+       where id = ? and project_id = ? and run_id = ?
+         and status = 'pending'
+       returning *`,
+    )
+    .bind(
+      input.userId,
+      input.acceptedAt,
+      input.appliedRevision,
+      input.acceptedAt,
+      input.proposalId,
+      input.projectId,
+      input.runId,
+    )
+    .first<IssueReworkProposalRow>();
+}
+
 export async function listIssueConversationNotifications(
   db: D1Database,
   projectId: string,
@@ -7919,6 +8046,10 @@ export async function reworkHuntRun(
       attempt: number;
       revision: number;
     };
+    completed?: {
+      expectedAttempt: number;
+      expectedRevision: number;
+    };
   },
 ): Promise<{
   outcome: HuntReworkOutcome;
@@ -7968,14 +8099,25 @@ export async function reworkHuntRun(
     );
   }
 
-  if (run.status !== "running" || !run.workflow_stage) {
+  const completedRework = input.completed !== undefined;
+  if (completedRework) {
+    if (
+      run.status !== "completed" ||
+      run.current_attempt !== input.completed?.expectedAttempt ||
+      run.current_revision !== input.completed?.expectedRevision
+    ) {
+      throw new HuntTransitionError(
+        "The completed run changed before rework could be accepted",
+      );
+    }
+  } else if (run.status !== "running" || !run.workflow_stage) {
     throw new HuntTransitionError("Only a running workflow stage can be reworked");
   }
   const isPaused = Boolean(run.paused_at);
   const workflow = parseWorkflow(run.workflow_snapshot_json);
-  const currentRank = workflow.stages.findIndex(
-    (stage) => stage.id === run.workflow_stage,
-  );
+  const currentRank = completedRework
+    ? workflow.stages.length - 1
+    : workflow.stages.findIndex((stage) => stage.id === run.workflow_stage);
   const targetRank = workflow.stages.findIndex(
     (stage) => stage.id === input.workflowStage,
   );
@@ -7987,7 +8129,7 @@ export async function reworkHuntRun(
   if (
     currentRank < 0 ||
     targetRank > currentRank ||
-    (!isPaused && targetRank === currentRank)
+    (!completedRework && !isPaused && targetRank === currentRank)
   ) {
     throw new HuntTransitionError(
       `Rework target ${input.workflowStage} must not follow ${run.workflow_stage}`,
@@ -7999,6 +8141,7 @@ export async function reworkHuntRun(
   const targetDashboardStage: DashboardStage = "queued";
   const claimReset = `claim_token_hash = null, claimed_by = null,
              claimed_at = null, lease_expires_at = null,`;
+  const sourceStatus = completedRework ? "completed" : "running";
   const recordedAt = new Date().toISOString();
   const eventId = crypto.randomUUID();
   const invalidatedStages = workflow.stages.slice(targetRank).map((stage) => stage.id);
@@ -8015,7 +8158,7 @@ export async function reworkHuntRun(
              ${claimReset}
              paused_at = null, resume_requested_at = null,
              completed_at = null, last_event_at = ?, updated_at = ?
-         where id = ? and project_id = ? and status = 'running'
+         where id = ? and project_id = ? and status = ?
            and current_attempt = ? and current_revision = ?
            and last_event_at = ?`,
       )
@@ -8029,6 +8172,7 @@ export async function reworkHuntRun(
         recordedAt,
         run.id,
         projectId,
+        sourceStatus,
         run.current_attempt,
         run.current_revision,
         run.last_event_at,

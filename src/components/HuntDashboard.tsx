@@ -152,6 +152,7 @@ import type {
   IssueAttachment,
   IssueMessage,
   IssueMessageSendResult,
+  IssueReworkProposal,
   IssueExecutionPreferences,
   IssueResultReview,
   OrganizationMember,
@@ -342,6 +343,7 @@ export function HuntDashboard({
   onDeleteIssue,
   onTransferIssue,
   onAddIssueDependency,
+  onAcceptIssueReworkProposal,
   onRemoveIssueDependency,
   onUpdateIssue,
   onUpdateIssuePreferences = async () => undefined,
@@ -402,6 +404,10 @@ export function HuntDashboard({
     dependentRunId: string,
     prerequisiteRunId: string,
   ) => Promise<unknown>;
+  onAcceptIssueReworkProposal?: (
+    runId: string,
+    proposalId: string,
+  ) => Promise<IssueReworkProposal>;
   onRemoveIssueDependency?: (
     dependentRunId: string,
     prerequisiteRunId: string,
@@ -967,6 +973,10 @@ export function HuntDashboard({
           onAddDependency={onAddIssueDependency
             ? (prerequisiteRunId) =>
                 onAddIssueDependency(selected.id, prerequisiteRunId)
+            : undefined}
+          onAcceptIssueReworkProposal={onAcceptIssueReworkProposal
+            ? (proposalId) =>
+                onAcceptIssueReworkProposal(selected.id, proposalId)
             : undefined}
           onRemoveDependency={onRemoveIssueDependency
             ? (prerequisiteRunId) =>
@@ -3365,6 +3375,7 @@ export function RunPage({
   isSidebarOpen,
   onBack,
   onAddDependency,
+  onAcceptIssueReworkProposal,
   onCancel,
   onDelete,
   onTransfer,
@@ -3406,6 +3417,9 @@ export function RunPage({
   isSidebarOpen: boolean;
   onBack: () => void;
   onAddDependency?: (prerequisiteRunId: string) => Promise<unknown>;
+  onAcceptIssueReworkProposal?: (
+    proposalId: string,
+  ) => Promise<IssueReworkProposal>;
   onCancel: () => Promise<unknown>;
   onDelete?: () => Promise<unknown>;
   onTransfer?: (targetProjectId: string) => Promise<unknown>;
@@ -4802,6 +4816,7 @@ export function RunPage({
                   >
                     <IssueConversation
                       mentionMembers={mentionMembers}
+                      onAcceptReworkProposal={onAcceptIssueReworkProposal}
                       onLoadAttachment={onLoadAttachment}
                       onLoad={onLoadIssueMessages}
                       onSend={onSendIssueMessage}
@@ -4815,6 +4830,7 @@ export function RunPage({
               {!companionMode ? (
                 <IssueConversation
                   mentionMembers={mentionMembers}
+                  onAcceptReworkProposal={onAcceptIssueReworkProposal}
                   onLoadAttachment={onLoadAttachment}
                   onLoad={onLoadIssueMessages}
                   onSend={onSendIssueMessage}
@@ -6174,12 +6190,16 @@ function RunEvidenceImagePreview({
 
 function IssueConversation({
   mentionMembers,
+  onAcceptReworkProposal,
   onLoadAttachment,
   onLoad,
   onSend,
   run,
 }: {
   mentionMembers: OrganizationMember[];
+  onAcceptReworkProposal?: (
+    proposalId: string,
+  ) => Promise<IssueReworkProposal>;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onLoad: () => Promise<IssueMessage[]>;
   onSend: (input: {
@@ -6200,6 +6220,9 @@ function IssueConversation({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [agentReplyStates, setAgentReplyStates] = useState<
     Record<string, { pending: number; error: string | null }>
+  >({});
+  const [reworkProposalStates, setReworkProposalStates] = useState<
+    Record<string, { accepting: boolean; error: string | null }>
   >({});
   const messageListRef = useRef<HTMLDivElement | null>(null);
   const onLoadRef = useRef(onLoad);
@@ -6314,6 +6337,37 @@ function IssueConversation({
       });
   };
 
+  const acceptReworkProposal = async (proposalId: string) => {
+    if (!onAcceptReworkProposal) return;
+    setReworkProposalStates((current) => ({
+      ...current,
+      [proposalId]: { accepting: true, error: null },
+    }));
+    try {
+      const accepted = await onAcceptReworkProposal(proposalId);
+      setMessages((current) =>
+        current.map((message) =>
+          message.proposedAction?.id === proposalId
+            ? { ...message, proposedAction: accepted }
+            : message,
+        )
+      );
+      setReworkProposalStates((current) => {
+        const next = { ...current };
+        delete next[proposalId];
+        return next;
+      });
+    } catch (caught) {
+      setReworkProposalStates((current) => ({
+        ...current,
+        [proposalId]: {
+          accepting: false,
+          error: caught instanceof Error ? caught.message : String(caught),
+        },
+      }));
+    }
+  };
+
   return (
     <section className="issue-conversation" aria-label={t("run.messages")}>
       <header className="issue-conversation-header">
@@ -6353,6 +6407,9 @@ function IssueConversation({
                   isReplying={isReplying}
                   localeTag={localeTag}
                   message={message}
+                  onAcceptReworkProposal={onAcceptReworkProposal && message.proposedAction
+                    ? () => void acceptReworkProposal(message.proposedAction!.id)
+                    : undefined}
                   onLoadAttachment={onLoadAttachment}
                   onReply={() =>
                     setActiveReplyMessageId((current) =>
@@ -6361,6 +6418,19 @@ function IssueConversation({
                   }
                   parentMessage={parentMessage}
                   replyComposerId={replyComposerId}
+                  reworkProposalState={message.proposedAction
+                    ? reworkProposalStates[message.proposedAction.id]
+                    : undefined}
+                  reworkStageLabel={message.proposedAction
+                    ? localizeWorkflowStage(
+                        t,
+                        message.proposedAction.workflowStage,
+                        run.workflow.stages.find(
+                          (stage) =>
+                            stage.id === message.proposedAction?.workflowStage,
+                        )?.label ?? message.proposedAction.workflowStage,
+                      )
+                    : null}
                 />
                 <AgentReplyState state={agentReplyStates[message.id]} />
                 {isReplying && (
@@ -6399,18 +6469,24 @@ function IssueMessageItem({
   isReplying = false,
   localeTag,
   message,
+  onAcceptReworkProposal,
   onLoadAttachment,
   onReply,
   parentMessage = null,
   replyComposerId,
+  reworkProposalState,
+  reworkStageLabel,
 }: {
   isReplying?: boolean;
   localeTag: string;
   message: IssueMessage;
+  onAcceptReworkProposal?: () => void;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onReply?: () => void;
   parentMessage?: IssueMessage | null;
   replyComposerId?: string;
+  reworkProposalState?: { accepting: boolean; error: string | null };
+  reworkStageLabel?: string | null;
 }) {
   const { t } = useI18n();
   return (
@@ -6450,6 +6526,51 @@ function IssueMessageItem({
             {message.body}
           </ReactMarkdown>
         </div>
+        {message.proposedAction ? (
+          <section className="issue-rework-proposal">
+            <header>
+              <strong>{t("run.reworkProposalTitle")}</strong>
+              <small>
+                {t("run.reworkProposalStage", {
+                  stage: reworkStageLabel ?? message.proposedAction.workflowStage,
+                })}
+              </small>
+            </header>
+            <p>{message.proposedAction.reason}</p>
+            {message.proposedAction.status === "accepted" ? (
+              <div className="issue-rework-proposal-accepted">
+                <BadgeCheck aria-hidden="true" size={15} />
+                {t("run.reworkProposalAccepted", {
+                  revision: message.proposedAction.appliedRevision ?? "",
+                })}
+              </div>
+            ) : onAcceptReworkProposal ? (
+              <button
+                className="issue-rework-proposal-accept"
+                disabled={reworkProposalState?.accepting}
+                onClick={onAcceptReworkProposal}
+                type="button"
+              >
+                {reworkProposalState?.accepting ? (
+                  <LoaderCircle aria-hidden="true" className="spin" size={15} />
+                ) : (
+                  <Play aria-hidden="true" size={15} />
+                )}
+                {t(
+                  reworkProposalState?.accepting
+                    ? "run.reworkProposalAccepting"
+                    : "run.reworkProposalAccept",
+                )}
+              </button>
+            ) : null}
+            {reworkProposalState?.error ? (
+              <p className="issue-rework-proposal-error">
+                <CircleAlert aria-hidden="true" size={14} />
+                {reworkProposalState.error}
+              </p>
+            ) : null}
+          </section>
+        ) : null}
       </div>
       {onReply && (
         <div

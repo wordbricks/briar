@@ -1590,6 +1590,15 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .issue-agent-reply-state { margin:4px 10px; padding:9px 11px; display:flex; align-items:center; gap:7px; border-radius:9px; color:var(--accent-foreground); background:var(--accent); font-size:var(--text-2xs); }
 .issue-message-group > .issue-agent-reply-state { margin-left:54px; }
 .issue-agent-reply-state.error { color:var(--foreground); background:color-mix(in srgb,var(--destructive) 10%,var(--card)); }
+.issue-rework-proposal { margin-top:10px; padding:11px; display:grid; gap:8px; border:1px solid color-mix(in srgb,var(--primary) 28%,var(--border)); border-radius:10px; background:color-mix(in srgb,var(--primary) 6%,var(--card)); }
+.issue-rework-proposal header { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.issue-rework-proposal header strong { font-size:var(--text-xs); }
+.issue-rework-proposal header small { color:var(--muted-foreground); font-size:var(--text-2xs); }
+.issue-rework-proposal p { margin:0; font-size:var(--text-xs); line-height:1.45; }
+.issue-rework-proposal-accept { width:max-content; min-height:32px; padding:6px 10px; display:inline-flex; align-items:center; gap:6px; border:0; border-radius:8px; color:var(--primary-foreground); background:var(--primary); font-size:var(--text-xs); font-weight:650; }
+.issue-rework-proposal-accept:disabled { opacity:.6; cursor:wait; }
+.issue-rework-proposal-accepted { display:flex; align-items:center; gap:6px; color:var(--primary); font-size:var(--text-xs); font-weight:650; }
+.issue-rework-proposal-error { display:flex; align-items:center; gap:6px; color:var(--destructive); }
 .issue-message-composer { position:relative; z-index:1; flex:0 0 auto; overflow:visible; display:grid; grid-template-rows:minmax(0,1fr) auto; border:1px solid var(--border); border-radius:16px; background:var(--card); box-shadow:0 5px 18px rgba(0,0,0,.08); transition:border-color .14s ease-out,box-shadow .14s ease-out; }
 .issue-conversation > .issue-message-composer { margin:0 14px 14px; }
 .issue-message-composer:focus-within { border-color:var(--input); box-shadow:0 0 0 3px color-mix(in srgb,var(--ring) 14%,transparent),0 7px 22px rgba(0,0,0,.1); }

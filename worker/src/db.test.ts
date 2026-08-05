@@ -10,6 +10,7 @@ import {
 import type { HuntEventInput } from "./db";
 import {
   acceptOrganizationInvitation,
+  acceptIssueReworkProposal,
   assertQueuedHuntClaim,
   claimNextQueuedHuntRun,
   claimDueProjectAgentScheduleRun,
@@ -19,6 +20,7 @@ import {
   createOrganization,
   createOrganizationInvitation,
   createIssueMessage,
+  createIssueReworkProposal,
   createProjectAgent,
   createProjectAgentSchedule,
   createProject,
@@ -49,6 +51,7 @@ import {
   listIssueMessages,
   listIssueThreadMessages,
   listIssueResultReviews,
+  listIssueReworkProposals,
   listInboxReadStates,
   listDashboardChanges,
   listDashboardRuns,
@@ -663,6 +666,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await executeSql(
       db,
       await readFile(resolve("migrations/0064_github_integration.sql"), "utf8"),
+    );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0065_issue_rework_proposals.sql"),
+        "utf8",
+      ),
     );
   }, 30_000);
 
@@ -3856,6 +3866,144 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         occurredAt: atMinute(81),
       }),
     ).rejects.toBeInstanceOf(HuntTransitionError);
+  });
+
+  it("keeps completed work history and selectively revises an accepted @briar proposal", async () => {
+    await db
+      .prepare(
+        `update briar_project_settings set workflow_json = ? where project_id = ?`,
+      )
+      .bind(JSON.stringify(releaseWorkflow), projectId)
+      .run();
+    const sourceKey = "completed-rework-proposal";
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 76, {
+        sourceKey,
+        eventKey: `${sourceKey}:queued`,
+      }),
+    );
+    await db
+      .prepare(
+        `update briar_hunt_runs
+         set status = 'completed', stage = 'completed',
+             workflow_stage = 'production_qa', branch = 'codex/original',
+             commit_sha = 'aabbcc1', target_sha = 'ddeeff2',
+             pull_request_urls = '["https://github.example/pr/1"]',
+             result_summary = 'Original result',
+             structured_result_json = '{"summary":"Original result"}',
+             staging_qa_status = 'passed', production_qa_status = 'passed',
+             completed_at = ?, last_event_at = ?, updated_at = ?
+         where id = ?`,
+      )
+      .bind(atMinute(77), atMinute(77), atMinute(77), runId)
+      .run();
+    await db
+      .prepare(
+        `insert into briar_run_evidence (
+           id, project_id, run_id, attempt, revision, evidence_key, workflow_stage,
+           evidence_type, status, detail, actor, observed_at, recorded_at
+         ) values (?, ?, ?, 1, 1, ?, 'analyzing', 'analysis', 'passed',
+                   'A/B/C verified', 'vitest', ?, ?),
+                  (?, ?, ?, 1, 1, ?, 'implementing', 'tests', 'passed',
+                   'D verified', 'vitest', ?, ?)`,
+      )
+      .bind(
+        crypto.randomUUID(),
+        projectId,
+        runId,
+        `${sourceKey}:analysis`,
+        atMinute(77),
+        atMinute(77),
+        crypto.randomUUID(),
+        projectId,
+        runId,
+        `${sourceKey}:implementing`,
+        atMinute(77),
+        atMinute(77),
+      )
+      .run();
+
+    const proposalId = "abababab-abab-4bab-8bab-abababababab";
+    const proposal = await createIssueReworkProposal(db, {
+      id: proposalId,
+      projectId,
+      runId,
+      triggerMessageId: "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd",
+      replyMessageId: "efefefef-efef-4fef-8fef-efefefefefef",
+      workflowStage: "implementing",
+      reason: "Replace D with D' and rerun affected QA.",
+      createdAt: atMinute(78),
+    });
+    expect(proposal).toMatchObject({
+      status: "pending",
+      expected_attempt: 1,
+      expected_revision: 1,
+    });
+    expect((await getHuntRunForProject(db, projectId, runId))?.status)
+      .toBe("completed");
+
+    const reworked = await reworkHuntRun(db, projectId, {
+      runId,
+      workflowStage: proposal!.workflow_stage,
+      requestId: proposalId,
+      actor: "briar-app:owner",
+      reason: proposal!.reason,
+      occurredAt: atMinute(79),
+      completed: { expectedAttempt: 1, expectedRevision: 1 },
+    });
+    const accepted = await acceptIssueReworkProposal(db, {
+      projectId,
+      runId,
+      proposalId,
+      userId: "owner",
+      acceptedAt: atMinute(79),
+      appliedRevision: reworked.revision!,
+    });
+    expect(accepted).toMatchObject({ status: "accepted", applied_revision: 2 });
+
+    const run = await getHuntRunForProject(db, projectId, runId);
+    expect(run).toMatchObject({
+      status: "queued",
+      current_attempt: 1,
+      current_revision: 2,
+      workflow_stage: "implementing",
+      branch: "codex/original",
+      pull_request_urls: '["https://github.example/pr/1"]',
+      commit_sha: null,
+      target_sha: null,
+      result_summary: null,
+      staging_qa_status: null,
+      production_qa_status: null,
+    });
+    expect(await listIssueReworkProposals(db, projectId, runId))
+      .toHaveLength(1);
+    const oldEvidence = await db
+      .prepare(
+        `select workflow_stage from briar_run_evidence
+         where run_id = ? and attempt = 1 and revision = 1
+         order by workflow_stage`,
+      )
+      .bind(runId)
+      .all<{ workflow_stage: string }>();
+    expect(oldEvidence.results.map((item) => item.workflow_stage)).toEqual([
+      "analyzing",
+      "implementing",
+    ]);
+    const requiredRevisions = await db
+      .prepare(
+        `select workflow_stage, required_revision from briar_run_stage_revisions
+         where run_id = ? order by workflow_stage`,
+      )
+      .bind(runId)
+      .all<{ workflow_stage: string; required_revision: number }>();
+    expect(requiredRevisions.results).toEqual([
+      { workflow_stage: "implementing", required_revision: 2 },
+      { workflow_stage: "pr_open", required_revision: 2 },
+      { workflow_stage: "production_qa", required_revision: 2 },
+      { workflow_stage: "staging_qa", required_revision: 2 },
+    ]);
   });
 
   it("allows manual complete without agent evidence required for run completion", async () => {

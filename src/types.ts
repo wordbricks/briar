@@ -98,8 +98,19 @@ export type IssueMessage = {
   attachments?: IssueAttachment[];
   author: IssueMessageAuthor;
   replyCount: number;
+  proposedAction?: IssueReworkProposal | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type IssueReworkProposal = {
+  id: string;
+  type: "request_issue_rework";
+  workflowStage: string;
+  reason: string;
+  status: "pending" | "accepted";
+  acceptedAt: string | null;
+  appliedRevision: number | null;
 };
 
 export type IssueMessageSendResult = {

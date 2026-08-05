@@ -249,6 +249,16 @@ export const mobileRunEventsResponseSchema = z.object({
   })),
 });
 
+export const mobileIssueReworkProposalSchema = z.object({
+  id: z.uuid(),
+  type: z.literal("request_issue_rework"),
+  workflowStage: z.string().min(1),
+  reason: z.string().min(1),
+  status: z.enum(["pending", "accepted"]),
+  acceptedAt: z.iso.datetime().nullable(),
+  appliedRevision: z.number().int().positive().nullable(),
+});
+
 export const mobileIssueMessagesResponseSchema = z.object({
   messages: z.array(z.object({
     id: z.uuid(),
@@ -258,6 +268,7 @@ export const mobileIssueMessagesResponseSchema = z.object({
     attachments: z.array(mobileIssueAttachmentSchema).default([]),
     author: mobileMessageAuthorSchema,
     replyCount: z.number().int().nonnegative(),
+    proposedAction: mobileIssueReworkProposalSchema.nullable().optional(),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
   })),
@@ -412,6 +423,13 @@ export const mobileAgentReplyResponseSchema = z.object({
   agentReply: mobileAgentReplySchema,
   message: mobileIssueMessageSchema.nullable(),
 });
+export const mobileAcceptIssueReworkProposalResponseSchema = z.object({
+  proposal: mobileIssueReworkProposalSchema,
+  outcome: z.enum(["accepted", "already_accepted"]),
+  attempt: z.number().int().positive(),
+  revision: z.number().int().positive(),
+  workflowStage: z.string().min(1),
+});
 export const mobileResultReviewSchema = mobileDashboardRunSchema.shape.resultReviews.unwrap().element;
 
 export const mobileProjectAgentSchema = z.object({
@@ -528,6 +546,9 @@ export const mobileOperationSchemas = {
   completeResultReview: { response: mobileResultReviewSchema },
   createIssueMessage: { request: mobileCreateMessageRequestSchema, response: mobileCreateMessageResponseSchema },
   getIssueAgentReply: { response: mobileAgentReplyResponseSchema },
+  acceptIssueReworkProposal: {
+    response: mobileAcceptIssueReworkProposalResponseSchema,
+  },
   listProjectAgents: { response: mobileProjectAgentsResponseSchema },
   listProjectAgentSessions: { response: mobileProjectAgentSessionsResponseSchema },
 } as const;
