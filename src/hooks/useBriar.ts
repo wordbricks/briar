@@ -2456,10 +2456,14 @@ export function useBriar(options: UseBriarOptions = {}) {
         body: string;
         parentMessageId: string | null;
         mentionedUserIds?: string[];
+        attachments?: File[];
+        attachmentReferences?: string[];
       },
     ): Promise<IssueMessageSendResult> => {
       const body = input.body.trim();
-      if (!body) throw new Error("메시지를 입력해 주세요.");
+      if (!body && !input.attachments?.length) {
+        throw new Error("메시지나 이미지를 추가해 주세요.");
+      }
       if (!activeProjectId) throw new Error("메시지를 보낼 프로젝트가 없습니다.");
       const cacheMessage = (message: IssueMessage) => {
         const currentMessages = issueMessagesByRun.current[runId] ?? [];
@@ -2483,6 +2487,13 @@ export function useBriar(options: UseBriarOptions = {}) {
           runId,
           parentMessageId: input.parentMessageId,
           body,
+          attachments: (input.attachments ?? []).map((file, index) => ({
+            id: input.attachmentReferences?.[index] ?? crypto.randomUUID(),
+            filename: file.name,
+            contentType: file.type,
+            byteSize: file.size,
+            url: URL.createObjectURL(file),
+          })),
           author: {
             id: demoUser.id,
             name: demoUser.name,
@@ -2504,6 +2515,8 @@ export function useBriar(options: UseBriarOptions = {}) {
           body,
           parentMessageId: input.parentMessageId,
           mentionedUserIds: input.mentionedUserIds,
+          attachments: input.attachments,
+          attachmentReferences: input.attachmentReferences,
         },
       );
       const message = cacheMessage(created.message);
