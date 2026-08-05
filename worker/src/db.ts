@@ -9130,27 +9130,88 @@ export async function transferIssue(
     : run.repository;
   const refreshWorkflow = adoptTargetWorkflow ? 1 : 0;
 
-  // Tombstone the run on the source project before reassigning project_id.
-  // The hunt_runs UPDATE trigger only upserts new.project_id.
-  const sourceDeleteChange = db
+  // Reassign the run first so a concurrent claim cannot leave children
+  // stranded on the target project. The UPDATE trigger only upserts
+  // new.project_id, so also write an explicit delete tombstone for source.
+  const movedRun = await db
     .prepare(
-      `insert into briar_dashboard_changes (
-         project_id, entity_type, entity_id, operation, created_at
-       ) values (?, 'run', ?, 'delete', datetime('now'))`,
+      `update briar_hunt_runs
+       set project_id = ?,
+           repository = case when ? = 1 then ? else repository end,
+           workflow_snapshot_json = case when ? = 1 then ? else workflow_snapshot_json end,
+           agent_id = null,
+           worker_id = null,
+           requested_worker_id = null,
+           claim_token_hash = null,
+           claimed_by = null,
+           claimed_at = null,
+           lease_expires_at = null,
+           claim_attempts = 0,
+           dispatch_mode = null,
+           dispatch_request_id = null,
+           dispatched_at = null,
+           requested_by_user_id = null,
+           requested_agent_provider = null,
+           requested_agent_model = null,
+           requested_agent_effort = null,
+           updated_at = ?
+       where id = ? and project_id = ?
+         and status <> 'running'
+         and not (
+           status = 'queued'
+           and lease_expires_at is not null
+           and lease_expires_at > ?
+         )
+       returning id`,
     )
-    .bind(input.sourceProjectId, input.runId);
-  const sourceSyncState = db
-    .prepare(
-      `insert into briar_dashboard_sync_state (project_id, current_version)
-       values (?, last_insert_rowid())
-       on conflict (project_id) do update set
-         current_version = excluded.current_version`,
+    .bind(
+      input.targetProjectId,
+      refreshWorkflow,
+      targetRepository,
+      refreshWorkflow,
+      targetWorkflowJson,
+      input.observedAt,
+      input.runId,
+      input.sourceProjectId,
+      input.observedAt,
     )
-    .bind(input.sourceProjectId);
+    .first<{ id: string }>();
 
-  const statements = [
-    sourceDeleteChange,
-    sourceSyncState,
+  if (!movedRun) {
+    const stillThere = await getHuntRunForProject(
+      db,
+      input.sourceProjectId,
+      input.runId,
+    );
+    if (!stillThere) {
+      const alreadyMoved = await getHuntRunForProject(
+        db,
+        input.targetProjectId,
+        input.runId,
+      );
+      return alreadyMoved ? "transferred" : "not_found";
+    }
+    return isActivelyClaimedRun(stillThere, input.observedAt)
+      ? "active"
+      : "not_found";
+  }
+
+  await db.batch([
+    db
+      .prepare(
+        `insert into briar_dashboard_changes (
+           project_id, entity_type, entity_id, operation, created_at
+         ) values (?, 'run', ?, 'delete', datetime('now'))`,
+      )
+      .bind(input.sourceProjectId, input.runId),
+    db
+      .prepare(
+        `insert into briar_dashboard_sync_state (project_id, current_version)
+         values (?, last_insert_rowid())
+         on conflict (project_id) do update set
+           current_version = excluded.current_version`,
+      )
+      .bind(input.sourceProjectId),
     db
       .prepare(
         `delete from briar_issue_dependencies
@@ -9223,72 +9284,8 @@ export async function transferIssue(
          where project_id = ? and run_id = ?`,
       )
       .bind(input.targetProjectId, input.sourceProjectId, input.runId),
-    db
-      .prepare(
-        `update briar_hunt_runs
-         set project_id = ?,
-             repository = case when ? = 1 then ? else repository end,
-             workflow_snapshot_json = case when ? = 1 then ? else workflow_snapshot_json end,
-             agent_id = null,
-             worker_id = null,
-             requested_worker_id = null,
-             claim_token_hash = null,
-             claimed_by = null,
-             claimed_at = null,
-             lease_expires_at = null,
-             claim_attempts = 0,
-             dispatch_mode = null,
-             dispatch_request_id = null,
-             dispatched_at = null,
-             requested_by_user_id = null,
-             requested_agent_provider = null,
-             requested_agent_model = null,
-             requested_agent_effort = null,
-             updated_at = ?
-         where id = ? and project_id = ?
-           and status <> 'running'
-           and not (
-             status = 'queued'
-             and lease_expires_at is not null
-             and lease_expires_at > ?
-           )
-         returning id`,
-      )
-      .bind(
-        input.targetProjectId,
-        refreshWorkflow,
-        targetRepository,
-        refreshWorkflow,
-        targetWorkflowJson,
-        input.observedAt,
-        input.runId,
-        input.sourceProjectId,
-        input.observedAt,
-      ),
-  ];
+  ]);
 
-  const results = await db.batch(statements);
-  const runUpdate = results.at(-1);
-  if ((runUpdate?.meta.changes ?? 0) === 0) {
-    // Race: run became active between the guard and the update.
-    const stillThere = await getHuntRunForProject(
-      db,
-      input.sourceProjectId,
-      input.runId,
-    );
-    if (!stillThere) {
-      // Moved or deleted by another writer; check target.
-      const moved = await getHuntRunForProject(
-        db,
-        input.targetProjectId,
-        input.runId,
-      );
-      return moved ? "transferred" : "not_found";
-    }
-    return isActivelyClaimedRun(stillThere, input.observedAt)
-      ? "active"
-      : "not_found";
-  }
   return "transferred";
 }
 
