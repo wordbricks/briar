@@ -86,7 +86,7 @@ describe("kanban card layout", () => {
     expect(badgeGroupRule).not.toContain("right:-");
     expect(badgeGroupRule).toContain("display:flex");
     expect(styles).toContain(
-      ".kanban-card-assignee-badges > span { width:34px; height:34px;",
+      ".kanban-card-assignee-badges > span { width:22px; height:22px;",
     );
     expect(firstRule(".kanban-card-assignee-badges > span")).toContain(
       "border-radius:50%",
@@ -97,8 +97,8 @@ describe("kanban card layout", () => {
     expect(firstRule(".kanban-card-worker-badge .worker-icon")).toContain(
       "border-radius:50%",
     );
-    expect(assignedCardKickerRule).toContain("padding-right:34px");
-    expect(multipleAssigneesKickerRule).toContain("padding-right:61px");
+    expect(assignedCardKickerRule).toContain("padding-right:22px");
+    expect(multipleAssigneesKickerRule).toContain("padding-right:39px");
   });
 
   it("fills the human assignee avatar to the badge without padding", () => {
