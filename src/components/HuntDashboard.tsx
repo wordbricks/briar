@@ -104,9 +104,12 @@ import {
   formatExecutionTokens,
 } from "../lib/agent-execution-metrics";
 import {
+  dataTransferHasFiles,
+  filesFromDataTransfer,
   formatAttachmentBytes,
   issueAttachmentAccept,
   maxIssueAttachmentCount,
+  normalizeIssueAttachmentFile,
   validateIssueAttachments,
 } from "../lib/issue-attachments";
 import {
@@ -496,7 +499,7 @@ export function HuntDashboard({
       !companionMode || companionSearchMode
         ? query.trim().toLowerCase()
         : "";
-    return runs.filter((run) => {
+    const next = runs.filter((run) => {
       if (source !== "all" && run.source !== source) return false;
       if (status === "active" && ["completed", "cancelled"].includes(run.status)) return false;
       if (status === "attention" && !["paused", "blocked", "failed"].includes(run.status)) return false;
@@ -506,6 +509,11 @@ export function HuntDashboard({
       ) return false;
       return !normalized || `${run.title} ${run.sourceKey} ${run.repository}`.toLowerCase().includes(normalized);
     });
+    // Mobile companion Tasks list: newest updated first (iOS native parity).
+    if (!companionMode) return next;
+    return [...next].sort((left, right) =>
+      right.updatedAt.localeCompare(left.updatedAt),
+    );
   }, [companionMode, companionSearchMode, query, runs, source, status]);
   const agentAssociationsByRunId = useMemo(() => {
     const agentById = new Map(agents.map((agent) => [agent.id, agent]));
@@ -696,9 +704,21 @@ export function HuntDashboard({
         ? checkpointsByBoundary.get(column.id) ?? []
         : [],
     }));
-    return companionMode
-      ? columns.filter((column) => column.runs.length > 0)
-      : columns;
+    // Mobile companion Tasks: one newest-updated-first stream (iOS TaskListView parity),
+    // not status/stage columns.
+    if (companionMode) {
+      return filtered.length > 0
+        ? [{
+            id: "companion-tasks",
+            label: t("companion.navTasks"),
+            tone: "slate",
+            placement: { status: "queued" as const, workflowStage: null },
+            runs: filtered,
+            checkpointsBefore: [],
+          }]
+        : [];
+    }
+    return columns;
   }, [
     companionMode,
     dashboard?.settings.checkpointPolicy,
@@ -1077,13 +1097,15 @@ export function HuntDashboard({
               ) : null}
               <section
                 aria-label={column.label}
-                className={`kanban-column ${column.tone}${dragOverColumnId === column.id ? " drag-over" : ""}`}
+                className={`kanban-column ${column.tone}${dragOverColumnId === column.id ? " drag-over" : ""}${companionMode ? " companion-task-stream" : ""}`}
                 data-kanban-column-id={column.id}
               >
-              <header>
-                <span><i aria-hidden="true" />{column.label}</span>
-                <strong>{column.runs.length}</strong>
-              </header>
+              {!companionMode ? (
+                <header>
+                  <span><i aria-hidden="true" />{column.label}</span>
+                  <strong>{column.runs.length}</strong>
+                </header>
+              ) : null}
               <div>
                 {column.runs.length ? column.runs.map((run) => (
                   <KanbanCard
@@ -1610,7 +1632,7 @@ export function CreateIssueDialog({
   ) => {
     if (selected.length === 0) return;
     const added = selected.map((file) => ({
-      file,
+      file: normalizeIssueAttachmentFile(file),
       reference: crypto.randomUUID(),
     }));
     const next = [...attachments, ...added];
@@ -1695,13 +1717,13 @@ export function CreateIssueDialog({
           isDraggingAttachments ? " is-dragging-attachments" : ""
         }`}
         onDragEnter={(event) => {
-          if (!Array.from(event.dataTransfer.types).includes("Files")) return;
+          if (!dataTransferHasFiles(event.dataTransfer)) return;
           event.preventDefault();
           attachmentDragDepthRef.current += 1;
           if (!isSubmitting) setIsDraggingAttachments(true);
         }}
         onDragLeave={(event) => {
-          if (!Array.from(event.dataTransfer.types).includes("Files")) return;
+          if (!dataTransferHasFiles(event.dataTransfer)) return;
           event.preventDefault();
           attachmentDragDepthRef.current = Math.max(
             0,
@@ -1712,17 +1734,17 @@ export function CreateIssueDialog({
           }
         }}
         onDragOver={(event) => {
-          if (!Array.from(event.dataTransfer.types).includes("Files")) return;
+          if (!dataTransferHasFiles(event.dataTransfer)) return;
           event.preventDefault();
           if (!isSubmitting) event.dataTransfer.dropEffect = "copy";
         }}
         onDrop={(event) => {
-          if (!Array.from(event.dataTransfer.types).includes("Files")) return;
+          if (!dataTransferHasFiles(event.dataTransfer)) return;
           event.preventDefault();
           attachmentDragDepthRef.current = 0;
           setIsDraggingAttachments(false);
           if (!isSubmitting) {
-            addAttachments(Array.from(event.dataTransfer.files), true);
+            addAttachments(filesFromDataTransfer(event.dataTransfer), true);
           }
         }}
         onKeyDown={(event) => {

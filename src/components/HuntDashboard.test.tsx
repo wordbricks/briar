@@ -824,6 +824,59 @@ describe("HuntDashboard", () => {
     expect(markup).not.toContain('class="status-tabs"');
   });
 
+  it("orders companion tasks by most recently updated first", () => {
+    const base = demoDashboard.runs[0];
+    const olderActive = {
+      ...base,
+      id: "order-older-active",
+      runNumber: 101,
+      title: "Older active task",
+      status: "running" as const,
+      updatedAt: "2026-08-01T10:00:00.000Z",
+    };
+    const newerCompleted = {
+      ...base,
+      id: "order-newer-completed",
+      runNumber: 102,
+      title: "Newer completed task",
+      status: "completed" as const,
+      workflowStage: null,
+      progress: 100,
+      updatedAt: "2026-08-03T12:00:00.000Z",
+      completedAt: "2026-08-03T12:00:00.000Z",
+    };
+    const middleBlocked = {
+      ...base,
+      id: "order-middle-blocked",
+      runNumber: 103,
+      title: "Middle blocked task",
+      status: "blocked" as const,
+      workflowStage: null,
+      updatedAt: "2026-08-02T08:00:00.000Z",
+    };
+
+    const markup = renderToStaticMarkup(
+      <HuntDashboard
+        {...dashboardProps}
+        companionMode
+        dashboard={{
+          ...demoDashboard,
+          // Deliberately not status-first or update-sorted input order.
+          runs: [olderActive, newerCompleted, middleBlocked],
+        }}
+      />,
+    );
+
+    const titles = Array.from(
+      markup.matchAll(/class="kanban-card-copy"><strong>([^<]*)<\/strong>/g),
+    ).map((match) => match[1]);
+    expect(titles).toEqual([
+      "Newer completed task",
+      "Middle blocked task",
+      "Older active task",
+    ]);
+  });
+
   it("keeps the desktop context menu disabled in companion mode", async () => {
     const container = document.createElement("div");
     document.body.append(container);
