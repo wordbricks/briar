@@ -16,6 +16,7 @@ import {
   isOpenCodeWritePermission,
   mapEffortToOpenCode,
   normalizeOpenCodeEvent,
+  openCodeBlockedRetry,
   openCodePermissionInput,
   openCodeQuestionInput,
   openCodeResponseText,
@@ -23,9 +24,17 @@ import {
   parseOpenCodeServerUrl,
   shouldAutoApproveOpenCodePermission,
   type OpenCodeApprovalResponse,
+  type OpenCodeBlockedRetry,
   type OpenCodeRunnerOutput,
   type OpenCodeRunnerRequest,
 } from "./opencode-runner-lib";
+
+class OpenCodeBlockedError extends Error {
+  constructor(readonly blocker: OpenCodeBlockedRetry) {
+    super(blocker.message);
+    this.name = "OpenCodeBlockedError";
+  }
+}
 
 const lines = createInterface({ input: process.stdin, crlfDelay: Infinity });
 
@@ -235,6 +244,8 @@ async function main() {
             emit({ type: "event", raw, event });
           }
         }
+        const blockedRetry = openCodeBlockedRetry(raw, sessionId);
+        if (blockedRetry) throw new OpenCodeBlockedError(blockedRetry);
         if (!raw || typeof raw !== "object") continue;
         const event = raw as { type?: unknown; properties?: unknown };
         const properties =
@@ -293,7 +304,7 @@ async function main() {
     })();
 
     const model = parseOpenCodeModel(request.model);
-    const response = await client.session.prompt({
+    const prompt = client.session.prompt({
       sessionID: sessionId,
       ...(model ? { model } : {}),
       ...(mapEffortToOpenCode(request.effort)
@@ -301,6 +312,10 @@ async function main() {
         : {}),
       parts: [{ type: "text", text: buildOpenCodePrompt(request) }],
     });
+    const response = await Promise.race([
+      prompt,
+      eventPump.then(() => new Promise<never>(() => undefined)),
+    ]);
     controller.abort();
     await eventPump.catch((caught) => {
       if (!controller.signal.aborted) throw caught;
@@ -338,7 +353,14 @@ async function main() {
 
 void main()
   .catch((caught) => {
-    emit({ type: "error", message: caught instanceof Error ? caught.message : String(caught) });
+    if (caught instanceof OpenCodeBlockedError) {
+      emit({ type: "blocked", ...caught.blocker });
+    } else {
+      emit({
+        type: "error",
+        message: caught instanceof Error ? caught.message : String(caught),
+      });
+    }
     process.exitCode = 1;
   })
   .finally(() => lines.close());

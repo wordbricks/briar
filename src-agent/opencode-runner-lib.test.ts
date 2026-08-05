@@ -7,6 +7,7 @@ import {
   createOpenCodeEventState,
   mapEffortToOpenCode,
   normalizeOpenCodeEvent,
+  openCodeBlockedRetry,
   parseOpenCodeModel,
   parseOpenCodeServerUrl,
   shouldAutoApproveOpenCodePermission,
@@ -39,6 +40,51 @@ describe("OpenCode runner helpers", () => {
   it("maps unsupported high effort aliases to OpenCode's high variant", () => {
     expect(mapEffortToOpenCode("ultra")).toBe("high");
     expect(mapEffortToOpenCode("medium")).toBe("medium");
+  });
+
+  it("detects a free-tier retry as a blocking provider state", () => {
+    expect(
+      openCodeBlockedRetry(
+        {
+          type: "session.status",
+          properties: {
+            sessionID: "session-1",
+            status: {
+              type: "retry",
+              attempt: 1,
+              message: "Free usage exceeded, subscribe to Go",
+              action: {
+                reason: "free_tier_limit",
+                provider: "opencode",
+                message: "Subscribe to OpenCode Go for reliable access.",
+              },
+              next: 1_785_974_400_864,
+            },
+          },
+        },
+        "session-1",
+      ),
+    ).toEqual({
+      reason: "free_tier_limit",
+      provider: "opencode",
+      message: "Subscribe to OpenCode Go for reliable access.",
+      nextRetryAt: "2026-08-06T00:00:00.864Z",
+    });
+  });
+
+  it("ignores retry states that are not free-tier blockers", () => {
+    const state = {
+      type: "session.status",
+      properties: {
+        sessionID: "session-1",
+        status: {
+          type: "retry",
+          action: { reason: "rate_limit", provider: "opencode" },
+        },
+      },
+    };
+    expect(openCodeBlockedRetry(state, "session-1")).toBeNull();
+    expect(openCodeBlockedRetry(state, "another-session")).toBeNull();
   });
 
   it("combines instructions, schemas, and the user prompt", () => {

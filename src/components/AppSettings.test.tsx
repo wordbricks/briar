@@ -5,6 +5,8 @@ import { createRoot } from "react-dom/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../i18n";
 import {
+  configureOpenCodeTerminalPath,
+  inspectOpenCodeTerminalPath,
   inspectOnboardingPrerequisites,
   installOnboardingPrerequisite,
   type OnboardingPrerequisites,
@@ -29,6 +31,8 @@ import {
 } from "../lib/agent-browser";
 
 vi.mock("../lib/initial-onboarding", () => ({
+  configureOpenCodeTerminalPath: vi.fn(),
+  inspectOpenCodeTerminalPath: vi.fn(),
   inspectOnboardingPrerequisites: vi.fn(),
   installOnboardingPrerequisite: vi.fn(),
 }));
@@ -107,6 +111,14 @@ describe("AppSettings", () => {
   beforeEach(() => {
     vi.mocked(inspectOnboardingPrerequisites).mockReset();
     vi.mocked(installOnboardingPrerequisite).mockReset();
+    vi.mocked(inspectOpenCodeTerminalPath).mockReset();
+    vi.mocked(configureOpenCodeTerminalPath).mockReset();
+    vi.mocked(inspectOpenCodeTerminalPath).mockResolvedValue({
+      supported: true,
+      configured: true,
+      binaryPath: "/Users/jay/.bun/bin/opencode",
+      configPath: "/Users/jay/.zshrc",
+    });
     vi.mocked(loadAppProviderSettings).mockReset();
     vi.mocked(updateAppProviderSettings).mockReset();
     vi.mocked(loadAppRuntimeSettings).mockReset();
@@ -566,6 +578,70 @@ describe("AppSettings", () => {
     expect(
       container.querySelector('[aria-label="Install Codex"]'),
     ).toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("offers to add an installed OpenCode binary to the terminal PATH", async () => {
+    vi.mocked(inspectOnboardingPrerequisites).mockResolvedValue(providerStatuses);
+    vi.mocked(inspectOpenCodeTerminalPath).mockResolvedValue({
+      supported: true,
+      configured: false,
+      binaryPath: "/Users/jay/.bun/bin/opencode",
+      configPath: "/Users/jay/.zshrc",
+    });
+    vi.mocked(configureOpenCodeTerminalPath).mockResolvedValue({
+      supported: true,
+      configured: true,
+      binaryPath: "/Users/jay/.bun/bin/opencode",
+      configPath: "/Users/jay/.zshrc",
+    });
+    vi.mocked(loadAppProviderSettings).mockResolvedValue({
+      codex: true,
+      claude: true,
+      grok: true,
+      opencode: true,
+    });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <I18nProvider>
+          <AppSettings
+            error={null}
+            initialSection="providers"
+            isSidebarOpen
+            loading={false}
+            onBack={() => undefined}
+            onRefresh={() => Promise.resolve(readiness)}
+            projectId="project-1"
+            projectName="Briar"
+            readiness={readiness}
+          />
+        </I18nProvider>,
+      );
+    });
+
+    const setupButton = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Set up OpenCode terminal PATH"]',
+    );
+    expect(setupButton).not.toBeNull();
+    expect(container.textContent).toContain(
+      "Set up PATH to use OpenCode from a terminal.",
+    );
+
+    await act(async () => setupButton?.click());
+
+    expect(configureOpenCodeTerminalPath).toHaveBeenCalledOnce();
+    expect(
+      container.querySelector('[aria-label="Set up OpenCode terminal PATH"]'),
+    ).toBeNull();
+    expect(container.textContent).toContain(
+      "The opencode command is available in new terminals.",
+    );
 
     await act(async () => root.unmount());
     container.remove();

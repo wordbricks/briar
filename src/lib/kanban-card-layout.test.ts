@@ -68,7 +68,7 @@ describe("kanban card layout", () => {
     expect(descriptionRule).toContain("-webkit-line-clamp:3");
   });
 
-  it("keeps assignee badges clear of the scroll edge and issue label", () => {
+  it("keeps assignee badges inside the card as circular badges", () => {
     const columnBodyRule = firstRule(".kanban-column > div");
     const badgeGroupRule = firstRule(".kanban-card-assignee-badges");
     const assignedCardKickerRule = firstRule(
@@ -80,8 +80,23 @@ describe("kanban card layout", () => {
 
     expect(columnBodyRule).toContain("padding:10px");
     expect(columnBodyRule).toContain("gap:10px");
-    expect(badgeGroupRule).toContain("top:-9px");
-    expect(badgeGroupRule).toContain("right:-7px");
+    expect(badgeGroupRule).toContain("top:10px");
+    expect(badgeGroupRule).toContain("right:10px");
+    expect(badgeGroupRule).not.toContain("top:-");
+    expect(badgeGroupRule).not.toContain("right:-");
+    expect(badgeGroupRule).toContain("display:flex");
+    expect(styles).toContain(
+      ".kanban-card-assignee-badges > span { width:34px; height:34px;",
+    );
+    expect(firstRule(".kanban-card-assignee-badges > span")).toContain(
+      "border-radius:50%",
+    );
+    expect(firstRule(".kanban-card-agent-badge .project-agent-avatar")).toContain(
+      "border-radius:50%",
+    );
+    expect(firstRule(".kanban-card-worker-badge .worker-icon")).toContain(
+      "border-radius:50%",
+    );
     expect(assignedCardKickerRule).toContain("padding-right:34px");
     expect(multipleAssigneesKickerRule).toContain("padding-right:61px");
   });

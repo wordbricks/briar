@@ -5,6 +5,8 @@ import {
   detachedPayloadDirection,
   detachedIssueReplyPrompt,
   detachedProviderRequest,
+  detachedProviderBlockedRunEvent,
+  detachedProviderBlockFromPayload,
   detachedTranscriptSequence,
   detachedTranscriptPayload,
   issueReplyTextFromPayload,
@@ -23,6 +25,38 @@ const agent = {
 };
 
 describe("detached Agent runner", () => {
+  it("builds a structured blocked handoff for an exhausted OpenCode free tier", () => {
+    const block = detachedProviderBlockFromPayload({
+      type: "blocked",
+      reason: "free_tier_limit",
+      provider: "opencode",
+      message: "Free limit reached",
+      nextRetryAt: "2026-08-06T00:00:00.864Z",
+    });
+    expect(block).not.toBeNull();
+
+    const event = detachedProviderBlockedRunEvent({
+      block: block!,
+      runId: "run-42",
+      attempt: 2,
+      actor: "briar-worker:worker-1",
+      repository: "briar",
+      model: "opencode/deepseek-v4-flash-free",
+      occurredAt: "2026-08-05T12:03:24.852Z",
+    });
+
+    expect(event.status).toBe("blocked");
+    expect(event.eventKey).toBe("detached:2:agent-blocked:free_tier_limit");
+    expect(event.structuredResult).toMatchObject({
+      outcome: "blocked",
+      humanActionRequired: true,
+      dueAt: "2026-08-06T00:00:00.864Z",
+    });
+    expect(event.structuredResult.summary).toContain("무료 사용 한도가 소진");
+    expect(event.structuredResult.nextAction).toContain("재시도");
+    expect(event.detail).toContain("retry/free_tier_limit");
+  });
+
   it("appends retry and resume output in a distinct transcript sequence range", () => {
     expect(detachedTranscriptSequence(1, 1)).toBe(1);
     expect(detachedTranscriptSequence(1, 37)).toBe(37);

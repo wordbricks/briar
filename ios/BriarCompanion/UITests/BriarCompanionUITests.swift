@@ -166,7 +166,7 @@ final class BriarCompanionUITests: XCTestCase {
             "task-row-77777777-7777-4777-8777-777777777777"
         ]
         XCTAssertTrue(createdRow.waitForExistence(timeout: 5))
-        createdRow.swipeRight()
+        createdRow.swipeLeft()
         let shortcut = app.buttons[
             "task-process-now-77777777-7777-4777-8777-777777777777"
         ]
