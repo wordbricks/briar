@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tauri::{
     image::Image,
-    menu::{Menu, MenuBuilder, MenuItemBuilder, SubmenuBuilder},
+    menu::{Menu, MenuBuilder, MenuItemBuilder},
     tray::{TrayIcon, TrayIconBuilder},
     AppHandle, Emitter, Manager,
 };
@@ -130,6 +130,16 @@ struct ProjectGroup<'a> {
     items: Vec<&'a StatusTrayRunItem>,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+enum ProjectMenuEntry<'a> {
+    Header {
+        project_id: &'a str,
+        project_name: &'a str,
+    },
+    Run(&'a StatusTrayRunItem),
+    Separator,
+}
+
 fn project_groups(snapshot: &StatusTraySnapshot) -> Vec<ProjectGroup<'_>> {
     let mut groups: Vec<ProjectGroup<'_>> = Vec::new();
     for item in &snapshot.items {
@@ -147,6 +157,25 @@ fn project_groups(snapshot: &StatusTraySnapshot) -> Vec<ProjectGroup<'_>> {
         }
     }
     groups
+}
+
+fn project_menu_entries(snapshot: &StatusTraySnapshot) -> Vec<ProjectMenuEntry<'_>> {
+    project_groups(snapshot)
+        .into_iter()
+        .flat_map(|group| {
+            let project_name = if group.project_name.trim().is_empty() {
+                group.project_id
+            } else {
+                group.project_name.trim()
+            };
+            std::iter::once(ProjectMenuEntry::Header {
+                project_id: group.project_id,
+                project_name,
+            })
+            .chain(group.items.into_iter().map(ProjectMenuEntry::Run))
+            .chain(std::iter::once(ProjectMenuEntry::Separator))
+        })
+        .collect()
 }
 
 pub fn run_menu_id(project_id: &str, run_id: &str) -> String {
@@ -169,43 +198,43 @@ fn tray_icon_image() -> Result<Image<'static>, String> {
 }
 
 fn build_menu(app: &AppHandle, snapshot: &StatusTraySnapshot) -> Result<Menu<tauri::Wry>, String> {
-    let running_header =
-        MenuItemBuilder::with_id("status-tray:running-header", &snapshot.running_label)
-            .enabled(false)
-            .build(app)
-            .map_err(|error| format!("Status tray header failed: {error}"))?;
-    let mut menu = MenuBuilder::new(app).item(&running_header);
+    let entries = project_menu_entries(snapshot);
+    let has_project_sections = !entries.is_empty();
+    let mut menu = MenuBuilder::new(app);
 
-    let groups = project_groups(snapshot);
-    for group in &groups {
-        let project_name = if group.project_name.trim().is_empty() {
-            group.project_id
-        } else {
-            group.project_name.trim()
-        };
-        let mut submenu = SubmenuBuilder::with_id(
-            app,
-            format!("status-tray:project:{}", group.project_id),
-            project_name,
-        );
-        for item in &group.items {
-            submenu = submenu.text(
-                run_menu_id(&item.project_id, &item.run_id),
-                format_run_menu_text(&item.title, &item.status_label),
-            );
+    for entry in entries {
+        match entry {
+            ProjectMenuEntry::Header {
+                project_id,
+                project_name,
+            } => {
+                let header = MenuItemBuilder::with_id(
+                    format!("status-tray:project-header:{project_id}"),
+                    project_name,
+                )
+                .enabled(false)
+                .build(app)
+                .map_err(|error| format!("Status tray project header failed: {error}"))?;
+                menu = menu.item(&header);
+            }
+            ProjectMenuEntry::Run(item) => {
+                menu = menu.text(
+                    run_menu_id(&item.project_id, &item.run_id),
+                    format_run_menu_text(&item.title, &item.status_label),
+                );
+            }
+            ProjectMenuEntry::Separator => {
+                menu = menu.separator();
+            }
         }
-        let submenu = submenu
-            .build()
-            .map_err(|error| format!("Status tray project menu failed: {error}"))?;
-        menu = menu.item(&submenu);
     }
 
-    if groups.is_empty() {
+    if !has_project_sections {
         let empty = MenuItemBuilder::with_id("status-tray:empty", &snapshot.empty_label)
             .enabled(false)
             .build(app)
             .map_err(|error| format!("Status tray empty item failed: {error}"))?;
-        menu = menu.item(&empty);
+        menu = menu.item(&empty).separator();
     }
 
     let open = MenuItemBuilder::with_id(OPEN_BRIAR_MENU_ID, &snapshot.open_label)
@@ -216,8 +245,7 @@ fn build_menu(app: &AppHandle, snapshot: &StatusTraySnapshot) -> Result<Menu<tau
         .enabled(true)
         .build(app)
         .map_err(|error| format!("Status tray quit item failed: {error}"))?;
-    menu.separator()
-        .item(&open)
+    menu.item(&open)
         .item(&quit)
         .build()
         .map_err(|error| format!("Status tray menu failed: {error}"))
@@ -357,6 +385,61 @@ mod tests {
         assert_eq!(
             groups.iter().map(|group| group.items.len()).sum::<usize>(),
             9
+        );
+    }
+
+    #[test]
+    fn lays_out_project_sections_as_flat_headers_runs_and_dividers() {
+        let snapshot = StatusTraySnapshot {
+            items: vec![
+                StatusTrayRunItem {
+                    project_id: "p1".to_string(),
+                    project_name: "  Briar  ".to_string(),
+                    run_id: "r1".to_string(),
+                    title: "First".to_string(),
+                    status_label: "Running".to_string(),
+                },
+                StatusTrayRunItem {
+                    project_id: "p2".to_string(),
+                    project_name: String::new(),
+                    run_id: "r2".to_string(),
+                    title: "Second".to_string(),
+                    status_label: "Running".to_string(),
+                },
+                StatusTrayRunItem {
+                    project_id: "p1".to_string(),
+                    project_name: "Briar".to_string(),
+                    run_id: "r3".to_string(),
+                    title: "Third".to_string(),
+                    status_label: "Running".to_string(),
+                },
+            ],
+            ..StatusTraySnapshot::default()
+        };
+
+        let entries = project_menu_entries(&snapshot);
+        let layout = entries
+            .iter()
+            .map(|entry| match entry {
+                ProjectMenuEntry::Header { project_name, .. } => {
+                    format!("header:{project_name}")
+                }
+                ProjectMenuEntry::Run(item) => format!("run:{}", item.run_id),
+                ProjectMenuEntry::Separator => "separator".to_string(),
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            layout,
+            vec![
+                "header:Briar",
+                "run:r1",
+                "run:r3",
+                "separator",
+                "header:p2",
+                "run:r2",
+                "separator",
+            ]
         );
     }
 
