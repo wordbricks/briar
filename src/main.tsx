@@ -5,6 +5,7 @@ import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { AppUpdateProvider } from "./components/AppUpdateProvider";
 import { DevelopmentBadge } from "./components/DevelopmentBadge";
 import { NativeLaunchIntro } from "./components/NativeLaunchIntro";
+import { ToastProvider } from "./components/ui/toast";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { I18nProvider } from "./i18n";
 import { installAppZoomShortcuts } from "./lib/app-zoom";
@@ -29,18 +30,20 @@ createRoot(document.getElementById("root")!).render(
     <ThemeProvider>
       <I18nProvider>
         <TooltipProvider delayDuration={200}>
-          <AppErrorBoundary>
-            {nativeLaunchIntro ? (
-              <NativeLaunchIntro />
-            ) : (
-              <AppUpdateProvider>
-                <App />
-              </AppUpdateProvider>
-            )}
-          </AppErrorBoundary>
-          {import.meta.env.DEV && !nativeLaunchIntro ? (
-            <DevelopmentBadge />
-          ) : null}
+          <ToastProvider>
+            <AppErrorBoundary>
+              {nativeLaunchIntro ? (
+                <NativeLaunchIntro />
+              ) : (
+                <AppUpdateProvider>
+                  <App />
+                </AppUpdateProvider>
+              )}
+            </AppErrorBoundary>
+            {import.meta.env.DEV && !nativeLaunchIntro ? (
+              <DevelopmentBadge />
+            ) : null}
+          </ToastProvider>
         </TooltipProvider>
       </I18nProvider>
     </ThemeProvider>

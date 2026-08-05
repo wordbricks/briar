@@ -34,4 +34,6 @@ export {
   TooltipTrigger,
 } from "./tooltip";
 export { Textarea } from "./textarea";
+export { ToastProvider, useToast } from "./toast";
+export type { ToastOptions, ToastTone } from "./toast";
 export { Typography, typographyVariants } from "./typography";

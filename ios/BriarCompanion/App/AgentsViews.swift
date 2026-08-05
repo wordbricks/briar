@@ -290,7 +290,12 @@ struct SessionDetailView: View {
     let snapshot: DashboardSnapshot?
     let refreshDashboard: () async -> Void
 
+    @AppStorage("companion-locale") private var localeRaw = CompanionLocale.ko.rawValue
     @State private var copied = false
+
+    private var locale: CompanionLocale {
+        CompanionLocale(rawValue: localeRaw) ?? .ko
+    }
 
     var body: some View {
         List {
@@ -394,13 +399,17 @@ struct SessionDetailView: View {
                         ClipboardService.copy(shareURL.absoluteString)
                         copied = true
                     } label: {
-                        Label(copied ? "복사됨" : "링크 복사", systemImage: "doc.on.doc")
+                        Label(L10n.text(.copyLink, locale: locale), systemImage: "doc.on.doc")
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
             }
         }
+        .companionToast(
+            isPresented: $copied,
+            message: L10n.text(.linkCopied, locale: locale)
+        )
     }
 
     private func issueLabel(_ issue: ProjectAgentSession.Issue) -> some View {

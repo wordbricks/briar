@@ -49,6 +49,31 @@
   background: var(--popover);
 }
 
+.dark .app-toast {
+  border-color: color-mix(in srgb, var(--border) 75%, #3d6b55);
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--card) 92%, #1c3a2c);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, .42), 0 2px 8px rgba(0, 0, 0, .24);
+}
+
+.dark .app-toast.success {
+  border-color: color-mix(in srgb, var(--border) 70%, #3d6b55);
+  background: color-mix(in srgb, var(--card) 90%, #1c3a2c);
+}
+
+.dark .app-toast.error {
+  border-color: color-mix(in srgb, var(--border) 70%, #7a3a45);
+  background: color-mix(in srgb, var(--card) 90%, #3a1d22);
+}
+
+.dark .app-toast-icon {
+  color: #6fbf97;
+}
+
+.dark .app-toast.error .app-toast-icon {
+  color: #e28795;
+}
+
 .dark .desktop-app-frame,
 .dark .app-shell,
 .dark .main-content,

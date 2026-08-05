@@ -523,6 +523,7 @@ private enum RunDetailTab: String, CaseIterable, Identifiable {
 
 struct RunDetailView: View {
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("companion-locale") private var localeRaw = CompanionLocale.ko.rawValue
     let run: DashboardRun
     @StateObject private var detail: RunDetailStore
     @StateObject private var mutations: IssueMutationStore
@@ -545,6 +546,10 @@ struct RunDetailView: View {
     @State private var reviewCompleted = false
     @State private var linkCopied = false
     @State private var selectedTab = RunDetailTab.issue
+
+    private var locale: CompanionLocale {
+        CompanionLocale(rawValue: localeRaw) ?? .ko
+    }
 
     private let projectID: UUID
     private let allRuns: [DashboardRun]
@@ -629,7 +634,7 @@ struct RunDetailView: View {
                         ClipboardService.copy(shareURL.absoluteString)
                         linkCopied = true
                     } label: {
-                        Label(linkCopied ? "링크 복사됨" : "링크 복사", systemImage: "doc.on.doc")
+                        Label(L10n.text(.copyLink, locale: locale), systemImage: "doc.on.doc")
                     }
                     .accessibilityIdentifier("issue-copy-link")
                     Divider()
@@ -641,6 +646,10 @@ struct RunDetailView: View {
                 .accessibilityIdentifier("issue-actions-menu")
             }
         }
+        .companionToast(
+            isPresented: $linkCopied,
+            message: L10n.text(.linkCopied, locale: locale)
+        )
         .task { await detail.load() }
         .refreshable { await detail.load() }
         .onChange(of: run.status) { _, status in localStatus = status }

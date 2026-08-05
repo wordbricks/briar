@@ -20,6 +20,7 @@ import {
   HuntDashboard,
   RunPage,
 } from "./HuntDashboard";
+import { ToastProvider } from "./ui/toast";
 import { TooltipProvider } from "./ui/tooltip";
 
 const dashboardProps = {
@@ -734,11 +735,13 @@ describe("HuntDashboard", () => {
     document.body.append(container);
     const root = createRoot(container);
     await act(async () => root.render(
-      <HuntDashboard
-        {...dashboardProps}
-        dashboard={demoDashboard}
-        onDeleteIssue={onDeleteIssue}
-      />,
+      <ToastProvider>
+        <HuntDashboard
+          {...dashboardProps}
+          dashboard={demoDashboard}
+          onDeleteIssue={onDeleteIssue}
+        />
+      </ToastProvider>,
     ));
     await act(async () => {
       container.querySelector<HTMLButtonElement>(".kanban-card")?.click();
@@ -763,6 +766,19 @@ describe("HuntDashboard", () => {
     expect(writeText).toHaveBeenCalledWith(
       `AH-${demoDashboard.runs[0].runNumber}`,
     );
+    const toastMessages = () =>
+      Array.from(
+        document.body.querySelectorAll<HTMLElement>('[data-testid="app-toast"]'),
+      ).map((node) => node.textContent ?? "");
+    expect(toastMessages().some((text) => text.includes("이슈 ID가 복사되었습니다")))
+      .toBe(true);
+    await act(async () => copyLink?.click());
+    expect(writeText).toHaveBeenCalledWith(
+      expect.stringContaining(`/open/issues/${demoDashboard.project.id}/`),
+    );
+    expect(toastMessages().some((text) => text.includes("링크가 복사되었습니다")))
+      .toBe(true);
+    expect(titlebarActions?.querySelector(".run-page-share-status")).toBeNull();
     expect(title?.nextElementSibling).toBe(titlebarActions);
     expect(titlebarActions?.firstElementChild?.classList).toContain(
       "run-page-property-badges",
