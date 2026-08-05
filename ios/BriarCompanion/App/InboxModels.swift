@@ -55,7 +55,10 @@ enum InboxMessageBuilder {
         if let snapshot {
             for run in snapshot.runs {
                 let stage = run.workflowStage ?? "none"
-                let version = "\(run.status.rawValue):\(stage):\(run.updatedAt.timeIntervalSince1970)"
+                // Keep this formula aligned with desktop/web `useInbox` so
+                // account-synced read versions match across clients.
+                let lastEventAt = run.lastEventAt ?? ISO8601DateFormatter.mobileContract.string(from: run.updatedAt)
+                let version = "\(run.currentAttempt ?? 1):\(run.currentRevision ?? 1):\(run.status.rawValue):\(stage):\(lastEventAt):\(run.eventCount ?? 0)"
                 messages.append(InboxMessage(
                     id: "issue:\(run.id.uuidString.lowercased())",
                     kind: .issue,
@@ -100,8 +103,9 @@ enum InboxMessageBuilder {
             let finalEvent = (session.events ?? []).reversed().first {
                 $0.type.rawValue == session.status.rawValue
             }
+            let fallbackTimestamp = session.completedAt ?? session.startedAt
             let version = finalEvent?.id ??
-                "\(session.status.rawValue):\((session.completedAt ?? session.startedAt).timeIntervalSince1970)"
+                "\(session.status.rawValue):\(ISO8601DateFormatter.mobileContract.string(from: fallbackTimestamp))"
             messages.append(InboxMessage(
                 id: "session:\(session.id)",
                 kind: .session,

@@ -455,6 +455,33 @@ export async function loadSession(token: string): Promise<SessionUser> {
   return sessionUserSchema.parse(result.user);
 }
 
+const inboxReadVersionsSchema = z.record(z.string().min(1), z.string().min(1));
+
+export async function loadInboxReadStates(
+  token: string,
+): Promise<Record<string, string>> {
+  const result = await request<{ readVersions?: unknown }>(
+    "/inbox/read-states",
+    token,
+  );
+  return inboxReadVersionsSchema.parse(result.readVersions ?? {});
+}
+
+export async function saveInboxReadStates(
+  token: string,
+  readVersions: Record<string, string>,
+): Promise<Record<string, string>> {
+  const result = await request<{ readVersions?: unknown }>(
+    "/inbox/read-states",
+    token,
+    {
+      method: "PUT",
+      body: JSON.stringify({ readVersions }),
+    },
+  );
+  return inboxReadVersionsSchema.parse(result.readVersions ?? {});
+}
+
 export async function updateAccountProfile(
   token: string,
   input: { username: string; name: string; image: string | null },

@@ -141,6 +141,7 @@ import {
   listIssueMessages,
   listIssueThreadMessages,
   listIssueResultReviews,
+  listInboxReadStates,
   listAllRunEvidenceImages,
   listEvidenceImagesForEvidence,
   listDashboardRuns,
@@ -189,6 +190,7 @@ import {
   updateIssueExecutionPreferences,
   updateHuntRunExecutionMetrics,
   updateSlackInstallationProject,
+  upsertInboxReadStates,
   upsertProjectAgentSession,
   upsertSlackInstallation,
   type HuntEventRow,
@@ -875,6 +877,31 @@ export const accountProfileInputSchema = z.object({
     .regex(/^data:image\/(?:jpeg|png|webp);base64,/u)
     .nullable(),
 });
+const inboxReadStateMaxEntries = 2_000;
+const inboxReadStateMessageIdSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(200)
+  .regex(/^(?:issue|session|conversation):.+$/u);
+const inboxReadStateVersionSchema = z.string().trim().min(1).max(500);
+export const inboxReadStatesInputSchema = z
+  .object({
+    readVersions: z
+      .record(inboxReadStateMessageIdSchema, inboxReadStateVersionSchema)
+      .default({}),
+  })
+  .strict()
+  .superRefine((input, context) => {
+    if (Object.keys(input.readVersions).length > inboxReadStateMaxEntries) {
+      context.addIssue({
+        code: "custom",
+        message: `At most ${inboxReadStateMaxEntries} inbox read states are allowed`,
+        path: ["readVersions"],
+      });
+    }
+  });
+
 export const accountDeletionInputSchema = z
   .object({
     confirmation: z.string().trim().email().max(320),
@@ -3480,6 +3507,38 @@ async function route(
   if (pathname === "/me" && request.method === "GET") {
     const session = await requireSession(auth, request);
     return json(mobileCurrentUserResponseSchema.parse({ user: session.user }));
+  }
+
+  if (pathname === "/inbox/read-states" && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const rows = await listInboxReadStates(db, session.user.id);
+    return json({
+      readVersions: Object.fromEntries(
+        rows.map((row) => [row.message_id, row.version]),
+      ),
+    });
+  }
+
+  if (pathname === "/inbox/read-states" && request.method === "PUT") {
+    const session = await requireSession(auth, request);
+    const input = inboxReadStatesInputSchema.parse(await readJson(request));
+    const entries = Object.entries(input.readVersions).map(
+      ([messageId, version]) => ({ messageId, version }),
+    );
+    if (entries.length > inboxReadStateMaxEntries) {
+      throw new HttpError(400, "Too many inbox read states");
+    }
+    const rows = await upsertInboxReadStates(
+      db,
+      session.user.id,
+      entries,
+      new Date().toISOString(),
+    );
+    return json({
+      readVersions: Object.fromEntries(
+        rows.map((row) => [row.message_id, row.version]),
+      ),
+    });
   }
 
   if (pathname === "/me" && request.method === "PATCH") {

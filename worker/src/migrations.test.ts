@@ -78,4 +78,16 @@ describe("D1 migrations", () => {
     expect(sql).toMatch(/briar_hunt_runs_assignee_idx/iu);
     expect(sql).not.toMatch(/\bupdate\s+briar_hunt_runs\b/iu);
   });
+
+  it("adds account-scoped inbox read state storage", async () => {
+    const sql = await readFile(
+      resolve("migrations", "0063_inbox_read_states.sql"),
+      "utf8",
+    );
+
+    expect(sql).toMatch(/create\s+table\s+briar_inbox_read_states/iu);
+    expect(sql).toMatch(/primary\s+key\s*\(\s*user_id\s*,\s*message_id\s*\)/iu);
+    expect(sql).toMatch(/briar_inbox_read_states_user_updated_idx/iu);
+    expect(sql).not.toMatch(/\bupdate\s+briar_/iu);
+  });
 });
