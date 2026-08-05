@@ -1303,7 +1303,9 @@ struct RunDetailView: View {
             localWorkflowStage = workflowStage
             actionError = nil
             await refresh()
-        } catch { actionError = error.localizedDescription }
+        } catch {
+            actionError = CompanionStore.message(for: error)
+        }
     }
 
     private func recover(action: String) async {

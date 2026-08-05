@@ -67,10 +67,14 @@ final class CompanionStore: ObservableObject {
     }
 
     static func message(for error: Error) -> String {
-        if case let MobileAPIError.httpStatus(status, message) = error {
-            return status == 401 ? "세션이 만료되었습니다. 다시 로그인해 주세요." : message
+        if let apiError = error as? MobileAPIError {
+            return apiError.localizedDescription
         }
         if error is CancellationError { return "" }
+        if let localized = error as? LocalizedError, let description = localized.errorDescription,
+           !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return description
+        }
         return "네트워크에 연결할 수 없습니다. 연결되면 다시 시도합니다."
     }
 }
