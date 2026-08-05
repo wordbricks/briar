@@ -3,7 +3,11 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { inspectOnboardingPrerequisites } from "../lib/initial-onboarding";
+import {
+  configureOpenCodeTerminalPath,
+  inspectOnboardingPrerequisites,
+  inspectOpenCodeTerminalPath,
+} from "../lib/initial-onboarding";
 import { InitialOnboarding } from "./InitialOnboarding";
 
 vi.mock("../lib/initial-onboarding", async (importOriginal) => {
@@ -38,6 +42,13 @@ vi.mock("../lib/initial-onboarding", async (importOriginal) => {
         authenticated: false,
       },
     }),
+    inspectOpenCodeTerminalPath: vi.fn().mockResolvedValue({
+      supported: true,
+      configured: true,
+      binaryPath: "/Users/jay/.bun/bin/opencode",
+      configPath: "/Users/jay/.zshrc",
+    }),
+    configureOpenCodeTerminalPath: vi.fn(),
     installOnboardingPrerequisite: vi.fn(),
   };
 });
@@ -210,6 +221,45 @@ describe("InitialOnboarding", () => {
     await act(async () => installLaterButton?.click());
     expect(container.querySelector(".embedded-login-shell")).not.toBeNull();
     expect(container.textContent).toContain("Google로 계속하기");
+  });
+
+  it("offers terminal PATH setup for an installed OpenCode CLI", async () => {
+    vi.mocked(inspectOnboardingPrerequisites).mockResolvedValueOnce({
+      git: { installed: true, version: "git version 2.50.1", authenticated: true },
+      codex: { installed: false, version: null, authenticated: false },
+      claude: { installed: false, version: null, authenticated: false },
+      grok: { installed: false, version: null, authenticated: false },
+      opencode: { installed: true, version: "1.18.13", authenticated: true },
+    });
+    vi.mocked(inspectOpenCodeTerminalPath).mockResolvedValueOnce({
+      supported: true,
+      configured: false,
+      binaryPath: "/Users/jay/.bun/bin/opencode",
+      configPath: "/Users/jay/.zshrc",
+    });
+    vi.mocked(configureOpenCodeTerminalPath).mockResolvedValueOnce({
+      supported: true,
+      configured: true,
+      binaryPath: "/Users/jay/.bun/bin/opencode",
+      configPath: "/Users/jay/.zshrc",
+    });
+    await act(async () => root.render(<InitialOnboarding {...createProps()} />));
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".initial-welcome-copy button")
+        ?.click();
+    });
+
+    const setupButton = Array.from(
+      container.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent?.includes("터미널 PATH 설정"));
+    expect(setupButton).toBeDefined();
+
+    await act(async () => setupButton?.click());
+
+    expect(configureOpenCodeTerminalPath).toHaveBeenCalledOnce();
+    expect(container.textContent).not.toContain("터미널 PATH 설정");
+    expect(container.textContent?.match(/설치됨/g)).toHaveLength(2);
   });
 
   it("cancels an in-progress login before returning to prerequisites", async () => {

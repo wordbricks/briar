@@ -462,6 +462,15 @@ struct AgentProviderModelCatalog {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+struct OpenCodeTerminalPathStatus {
+    supported: bool,
+    configured: bool,
+    binary_path: Option<String>,
+    config_path: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct AgentBrowserStatus {
     supported: bool,
     installed: bool,
@@ -1457,6 +1466,184 @@ async fn load_agent_provider_models(
     tauri::async_runtime::spawn_blocking(move || load_agent_provider_models_sync(&home))
         .await
         .map_err(|error| error.to_string())
+}
+
+const BRIAR_CLI_PATH_BLOCK_START: &str = "# >>> Briar CLI path >>>";
+const BRIAR_CLI_PATH_BLOCK_END: &str = "# <<< Briar CLI path <<<";
+
+#[derive(Clone, Copy)]
+enum ShellConfigKind {
+    Posix,
+    Fish,
+}
+
+fn shell_config(home: &Path, shell: Option<&OsStr>) -> Option<(PathBuf, ShellConfigKind)> {
+    let shell_name = shell
+        .and_then(|value| Path::new(value).file_name())
+        .and_then(OsStr::to_str)?;
+    match shell_name {
+        "zsh" => Some((home.join(".zshrc"), ShellConfigKind::Posix)),
+        "bash" => Some((home.join(".bashrc"), ShellConfigKind::Posix)),
+        "fish" => Some((home.join(".config/fish/config.fish"), ShellConfigKind::Fish)),
+        _ => None,
+    }
+}
+
+fn home_relative_cli_directory(home: &Path, directory: &Path) -> Option<String> {
+    let relative = directory.strip_prefix(home).ok()?;
+    if relative.as_os_str().is_empty() {
+        return None;
+    }
+    Some(format!("$HOME/{}", relative.to_string_lossy()))
+}
+
+fn shell_config_contains_cli_directory(contents: &str, home: &Path, directory: &Path) -> bool {
+    let absolute = directory.to_string_lossy();
+    let home_relative = home_relative_cli_directory(home, directory);
+    contents.lines().any(|line| {
+        let line = line.trim();
+        !line.starts_with('#')
+            && (line.contains(absolute.as_ref())
+                || home_relative
+                    .as_ref()
+                    .is_some_and(|candidate| line.contains(candidate)))
+    })
+}
+
+fn cli_directory_in_process_path(directory: &Path) -> bool {
+    env::var_os("PATH")
+        .map(|path| env::split_paths(&path).any(|candidate| candidate == directory))
+        .unwrap_or(false)
+}
+
+fn open_code_terminal_path_status_sync(
+    home: &Path,
+    shell: Option<&OsStr>,
+) -> Result<OpenCodeTerminalPathStatus, String> {
+    let execution_path = cli_execution_path(home)?;
+    let binary = agent::opencode_binary(home, &execution_path).ok();
+    Ok(open_code_terminal_path_status_for_binary(
+        home, shell, binary,
+    ))
+}
+
+fn open_code_terminal_path_status_for_binary(
+    home: &Path,
+    shell: Option<&OsStr>,
+    binary: Option<PathBuf>,
+) -> OpenCodeTerminalPathStatus {
+    let binary_directory = binary.as_deref().and_then(Path::parent);
+    let Some((config_path, _)) = shell_config(home, shell) else {
+        return OpenCodeTerminalPathStatus {
+            supported: false,
+            configured: false,
+            binary_path: binary.map(|path| path.to_string_lossy().into_owned()),
+            config_path: None,
+        };
+    };
+    let configured = binary_directory.is_some_and(|directory| {
+        cli_directory_in_process_path(directory)
+            || fs::read_to_string(&config_path)
+                .ok()
+                .is_some_and(|contents| {
+                    shell_config_contains_cli_directory(&contents, home, directory)
+                })
+    });
+    OpenCodeTerminalPathStatus {
+        supported: binary_directory.is_some(),
+        configured,
+        binary_path: binary.map(|path| path.to_string_lossy().into_owned()),
+        config_path: Some(config_path.to_string_lossy().into_owned()),
+    }
+}
+
+fn configure_open_code_terminal_path_sync(
+    home: &Path,
+    shell: Option<&OsStr>,
+) -> Result<OpenCodeTerminalPathStatus, String> {
+    let execution_path = cli_execution_path(home)?;
+    let binary = agent::opencode_binary(home, &execution_path)?;
+    configure_open_code_terminal_path_for_binary(home, shell, binary)
+}
+
+fn configure_open_code_terminal_path_for_binary(
+    home: &Path,
+    shell: Option<&OsStr>,
+    binary: PathBuf,
+) -> Result<OpenCodeTerminalPathStatus, String> {
+    let directory = binary
+        .parent()
+        .ok_or_else(|| "OpenCode 실행 경로를 확인하지 못했습니다.".to_string())?;
+    let (config_path, kind) = shell_config(home, shell).ok_or_else(|| {
+        "현재 로그인 shell은 자동 PATH 설정을 지원하지 않습니다. OpenCode 설치 경로를 PATH에 직접 추가하세요."
+            .to_string()
+    })?;
+    let existing = fs::read_to_string(&config_path).unwrap_or_default();
+    if !shell_config_contains_cli_directory(&existing, home, directory)
+        && !existing.contains(BRIAR_CLI_PATH_BLOCK_START)
+    {
+        if let Some(parent) = config_path.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|error| format!("shell 설정 디렉터리를 만들지 못했습니다: {error}"))?;
+        }
+        let display_directory = home_relative_cli_directory(home, directory)
+            .unwrap_or_else(|| directory.to_string_lossy().into_owned());
+        let command = match kind {
+            ShellConfigKind::Posix => format!("export PATH=\"{display_directory}:$PATH\""),
+            ShellConfigKind::Fish => format!("fish_add_path \"{display_directory}\""),
+        };
+        let prefix = if existing.is_empty() || existing.ends_with('\n') {
+            ""
+        } else {
+            "\n"
+        };
+        let block = format!(
+            "{prefix}{BRIAR_CLI_PATH_BLOCK_START}\n{command}\n{BRIAR_CLI_PATH_BLOCK_END}\n"
+        );
+        let mut options = OpenOptions::new();
+        options.create(true).append(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        options
+            .open(&config_path)
+            .and_then(|mut file| file.write_all(block.as_bytes()))
+            .map_err(|error| format!("shell PATH 설정을 저장하지 못했습니다: {error}"))?;
+    }
+    Ok(OpenCodeTerminalPathStatus {
+        supported: true,
+        configured: true,
+        binary_path: Some(binary.to_string_lossy().into_owned()),
+        config_path: Some(config_path.to_string_lossy().into_owned()),
+    })
+}
+
+#[tauri::command]
+async fn inspect_open_code_terminal_path(
+    app: tauri::AppHandle,
+) -> Result<OpenCodeTerminalPathStatus, String> {
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    let shell = env::var_os("SHELL");
+    tauri::async_runtime::spawn_blocking(move || {
+        open_code_terminal_path_status_sync(&home, shell.as_deref())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn configure_open_code_terminal_path(
+    app: tauri::AppHandle,
+) -> Result<OpenCodeTerminalPathStatus, String> {
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    let shell = env::var_os("SHELL");
+    tauri::async_runtime::spawn_blocking(move || {
+        configure_open_code_terminal_path_sync(&home, shell.as_deref())
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 fn install_cli_package(home: &Path, package: &str) -> Result<(), String> {
@@ -6825,6 +7012,8 @@ pub fn run() {
             set_main_window_onboarding_mode,
             inspect_onboarding_prerequisites,
             load_agent_provider_models,
+            inspect_open_code_terminal_path,
+            configure_open_code_terminal_path,
             inspect_agent_browser,
             inspect_ego_browser,
             open_agent_provider_login,
@@ -7283,6 +7472,59 @@ mod tests {
         .expect("Bun should resolve through the bundled runtime directory");
 
         assert_eq!(resolved, bundled.path().join("bun"));
+    }
+
+    #[test]
+    fn configures_the_opencode_terminal_path_idempotently_for_zsh() {
+        let home = tempfile::tempdir().expect("fixture home should exist");
+        let binary_directory = home.path().join(".bun/bin");
+        fs::create_dir_all(&binary_directory).expect("Bun bin directory should exist");
+        fs::write(binary_directory.join("opencode"), "fixture")
+            .expect("OpenCode fixture should be written");
+        fs::write(home.path().join(".zshrc"), "export EDITOR=vim\n")
+            .expect("zsh config should be written");
+
+        for _ in 0..2 {
+            let status = configure_open_code_terminal_path_for_binary(
+                home.path(),
+                Some(OsStr::new("/bin/zsh")),
+                binary_directory.join("opencode"),
+            )
+            .expect("terminal PATH should be configured");
+            assert!(status.supported);
+            assert!(status.configured);
+        }
+
+        let contents =
+            fs::read_to_string(home.path().join(".zshrc")).expect("zsh config should be readable");
+        assert!(contents.starts_with("export EDITOR=vim\n"));
+        assert!(contents.contains("export PATH=\"$HOME/.bun/bin:$PATH\""));
+        assert_eq!(contents.matches(BRIAR_CLI_PATH_BLOCK_START).count(), 1);
+        assert_eq!(contents.matches(BRIAR_CLI_PATH_BLOCK_END).count(), 1);
+    }
+
+    #[test]
+    fn recognizes_an_existing_fish_opencode_path() {
+        let home = tempfile::tempdir().expect("fixture home should exist");
+        let binary_directory = home.path().join(".bun/bin");
+        let config = home.path().join(".config/fish/config.fish");
+        fs::create_dir_all(&binary_directory).expect("Bun bin directory should exist");
+        fs::create_dir_all(config.parent().expect("fish config should have a parent"))
+            .expect("fish config directory should exist");
+        fs::write(binary_directory.join("opencode"), "fixture")
+            .expect("OpenCode fixture should be written");
+        fs::write(&config, "fish_add_path \"$HOME/.bun/bin\"\n")
+            .expect("fish config should be written");
+
+        let status = open_code_terminal_path_status_for_binary(
+            home.path(),
+            Some(OsStr::new("/opt/homebrew/bin/fish")),
+            Some(binary_directory.join("opencode")),
+        );
+
+        assert!(status.supported);
+        assert!(status.configured);
+        assert_eq!(status.config_path.as_deref(), config.to_str());
     }
 
     #[cfg(unix)]
