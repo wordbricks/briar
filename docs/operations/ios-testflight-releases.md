@@ -185,3 +185,29 @@ build checks, session/download/log security checks, and the Tauri iOS and
 Android regression builds. Archive identity, App Store provisioning,
 distribution signature, production entitlements, and all alternate app icons
 were verified before upload.
+
+## 2026-08-06 — 1.2.72 (1)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.72`
+- App Store Connect build: `1`
+- App Store Connect build ID: `67eb703e-c578-4adc-b4a2-6603884aadce`
+- Latest main commit: `761bbe9`
+- Release source commit: `c42c865056cb6968f4ec16889d3512aa31ef753f`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Internal group: `wordbricks` (`hasAccessToAllBuilds=true`)
+- Automatic tester notification: enabled
+- IPA SHA-256: `1c76f7bc16cbcb2c158a9b789fdbd6ada1a38b9ad830c0abe97cae136f902d9d`
+
+The release passed the shared API contract, Swift unit and UI tests, iPhone and
+iPad accessibility and layout tests, Production analyze and build checks,
+session/download/log security checks, and the Tauri iOS and Android regression
+builds. The completed-issue UI test now verifies the selected Result tab and
+visible result content instead of relying on an overwritten list accessibility
+identifier. Archive identity, App Store provisioning, distribution signature,
+production entitlements, and all alternate app icons were verified before
+upload.
