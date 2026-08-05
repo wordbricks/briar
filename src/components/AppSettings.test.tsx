@@ -461,6 +461,26 @@ describe("AppSettings", () => {
 
     expect(switchState("Codex enabled")).toMatch(/checked|true/);
     expect(switchState("Claude enabled")).toMatch(/checked|true/);
+    expect(container.textContent).not.toContain("GPT-5.6 Sol");
+
+    const codexDetails = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Toggle Codex details"]',
+    );
+    expect(codexDetails?.getAttribute("aria-expanded")).toBe("false");
+    await act(async () => codexDetails?.click());
+    expect(codexDetails?.getAttribute("aria-expanded")).toBe("true");
+    expect(container.textContent).toContain("Account connection");
+    expect(container.textContent).toContain("Connected");
+    expect(container.textContent).toContain("Supported models");
+    expect(container.textContent).toContain("GPT-5.6 Sol");
+
+    const claudeDetails = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Toggle Claude details"]',
+    );
+    await act(async () => claudeDetails?.click());
+    expect(codexDetails?.getAttribute("aria-expanded")).toBe("false");
+    expect(claudeDetails?.getAttribute("aria-expanded")).toBe("true");
+    expect(container.textContent).toContain("Claude Sonnet");
 
     await act(async () => {
       container

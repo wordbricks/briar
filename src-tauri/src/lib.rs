@@ -437,6 +437,29 @@ struct OnboardingPrerequisites {
     opencode: OnboardingPrerequisiteStatus,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AgentProviderModel {
+    id: String,
+    label: String,
+    is_default: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AgentProviderModelCatalogEntry {
+    models: Vec<AgentProviderModel>,
+    error: Option<String>,
+}
+
+#[derive(Serialize)]
+struct AgentProviderModelCatalog {
+    codex: AgentProviderModelCatalogEntry,
+    claude: AgentProviderModelCatalogEntry,
+    grok: AgentProviderModelCatalogEntry,
+    opencode: AgentProviderModelCatalogEntry,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct AgentBrowserStatus {
@@ -1152,6 +1175,145 @@ fn inspect_onboarding_prerequisites_sync(home: &Path) -> OnboardingPrerequisites
     }
 }
 
+fn bundled_agent_provider_models(provider: &str) -> Vec<AgentProviderModel> {
+    let models: &[(&str, &str)] = match provider {
+        "codex" => &[
+            ("gpt-5.6-sol", "GPT-5.6 Sol"),
+            ("gpt-5.6-terra", "GPT-5.6 Terra"),
+            ("gpt-5.6-luna", "GPT-5.6 Luna"),
+        ],
+        "claude" => &[
+            ("sonnet", "Claude Sonnet"),
+            ("opus", "Claude Opus"),
+            ("haiku", "Claude Haiku"),
+            ("fable", "Claude Fable"),
+        ],
+        "grok" => &[("grok-4.5", "Grok 4.5"), ("grok-build", "Grok Build")],
+        _ => &[],
+    };
+    models
+        .iter()
+        .map(|(id, label)| AgentProviderModel {
+            id: (*id).to_string(),
+            label: (*label).to_string(),
+            is_default: false,
+        })
+        .collect()
+}
+
+fn provider_model_entry(
+    provider: &str,
+    result: Result<Vec<AgentProviderModel>, String>,
+) -> AgentProviderModelCatalogEntry {
+    match result {
+        Ok(models) if !models.is_empty() => AgentProviderModelCatalogEntry {
+            models,
+            error: None,
+        },
+        Ok(_) => AgentProviderModelCatalogEntry {
+            models: bundled_agent_provider_models(provider),
+            error: Some("CLI가 지원 모델을 반환하지 않았습니다.".to_string()),
+        },
+        Err(error) => AgentProviderModelCatalogEntry {
+            models: bundled_agent_provider_models(provider),
+            error: Some(error),
+        },
+    }
+}
+
+fn parse_grok_models(output: &str) -> Vec<AgentProviderModel> {
+    output
+        .lines()
+        .filter_map(|line| {
+            let value = line.trim().strip_prefix("* ")?.trim();
+            let id = value.strip_suffix(" (default)").unwrap_or(value).trim();
+            (!id.is_empty()).then(|| AgentProviderModel {
+                id: id.to_string(),
+                label: id.to_string(),
+                is_default: value.ends_with(" (default)"),
+            })
+        })
+        .take(500)
+        .collect()
+}
+
+fn parse_opencode_models(output: &str) -> Vec<AgentProviderModel> {
+    output
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.chars().any(char::is_whitespace))
+        .map(|id| AgentProviderModel {
+            id: id.to_string(),
+            label: id.to_string(),
+            is_default: false,
+        })
+        .take(500)
+        .collect()
+}
+
+fn command_provider_models(
+    home: &Path,
+    binary: Result<PathBuf, String>,
+    parser: fn(&str) -> Vec<AgentProviderModel>,
+) -> Result<Vec<AgentProviderModel>, String> {
+    let binary = binary?;
+    let output = Command::new(binary)
+        .arg("models")
+        .env("PATH", cli_execution_path(home)?)
+        .env("HOME", home)
+        .output()
+        .map_err(|error| format!("지원 모델 목록을 가져오지 못했습니다: {error}"))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(if stderr.is_empty() {
+            "지원 모델 목록 명령이 실패했습니다.".to_string()
+        } else {
+            stderr
+        });
+    }
+    Ok(parser(&String::from_utf8_lossy(&output.stdout)))
+}
+
+fn load_agent_provider_models_sync(home: &Path) -> AgentProviderModelCatalog {
+    let execution_path = cli_execution_path(home).unwrap_or_default();
+    let runner: Arc<dyn host::CommandRunner> = Arc::new(host::LocalRunner::new(
+        execution_path.clone(),
+        home.to_path_buf(),
+    ));
+    let codex = agent::codex_binary(home, &execution_path).and_then(|binary| {
+        let binary = binary
+            .to_str()
+            .ok_or_else(|| "Codex CLI 경로가 올바르지 않습니다.".to_string())?;
+        agent::codex_models(runner, binary, home).map(|models| {
+            models
+                .into_iter()
+                .map(|(id, label, is_default)| AgentProviderModel {
+                    id,
+                    label,
+                    is_default,
+                })
+                .collect()
+        })
+    });
+    let claude = Ok(bundled_agent_provider_models("claude"));
+    let grok = command_provider_models(
+        home,
+        agent::grok_binary(home, &execution_path),
+        parse_grok_models,
+    );
+    let opencode = command_provider_models(
+        home,
+        agent::opencode_binary(home, &execution_path),
+        parse_opencode_models,
+    );
+    AgentProviderModelCatalog {
+        codex: provider_model_entry("codex", codex),
+        claude: provider_model_entry("claude", claude),
+        grok: provider_model_entry("grok", grok),
+        opencode: provider_model_entry("opencode", opencode),
+    }
+}
+
 fn connected_agent_provider(
     prerequisites: &OnboardingPrerequisites,
     enabled: AppProviderSettings,
@@ -1283,6 +1445,16 @@ async fn inspect_onboarding_prerequisites(
 ) -> Result<OnboardingPrerequisites, String> {
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
     tauri::async_runtime::spawn_blocking(move || inspect_onboarding_prerequisites_sync(&home))
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+async fn load_agent_provider_models(
+    app: tauri::AppHandle,
+) -> Result<AgentProviderModelCatalog, String> {
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || load_agent_provider_models_sync(&home))
         .await
         .map_err(|error| error.to_string())
 }
@@ -6652,6 +6824,7 @@ pub fn run() {
             finish_launch_intro,
             set_main_window_onboarding_mode,
             inspect_onboarding_prerequisites,
+            load_agent_provider_models,
             inspect_agent_browser,
             inspect_ego_browser,
             open_agent_provider_login,
@@ -6735,6 +6908,39 @@ pub fn run() {
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn parses_grok_model_catalog_and_default() {
+        let models = parse_grok_models(
+            "You are logged in.\n\nAvailable models:\n  * grok-4.5 (default)\n  * grok-build\n",
+        );
+        assert_eq!(
+            models,
+            vec![
+                AgentProviderModel {
+                    id: "grok-4.5".to_string(),
+                    label: "grok-4.5".to_string(),
+                    is_default: true,
+                },
+                AgentProviderModel {
+                    id: "grok-build".to_string(),
+                    label: "grok-build".to_string(),
+                    is_default: false,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn parses_opencode_model_catalog_one_slug_per_line() {
+        let models = parse_opencode_models(
+            "openai/gpt-5.6-sol\ninvalid model label\nanthropic/claude-sonnet-4-6\n",
+        );
+        assert_eq!(
+            models.into_iter().map(|model| model.id).collect::<Vec<_>>(),
+            vec!["openai/gpt-5.6-sol", "anthropic/claude-sonnet-4-6"]
+        );
+    }
 
     fn provider_prerequisite(installed: bool, authenticated: bool) -> OnboardingPrerequisiteStatus {
         OnboardingPrerequisiteStatus {

@@ -23,6 +23,7 @@ use std::ffi::OsString;
 const INITIALIZE_REQUEST_ID: u64 = 1;
 const THREAD_REQUEST_ID: u64 = 2;
 const TURN_REQUEST_ID: u64 = 3;
+const MODEL_LIST_REQUEST_ID: u64 = 4;
 pub(crate) const MAX_AUTO_HUNT_ISSUES: usize = 10;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -750,6 +751,59 @@ pub(crate) fn chat(
         message: response_message,
         workspace_root: workspace.to_string(),
     })
+}
+
+pub(crate) fn list_models(
+    runner: Arc<dyn CommandRunner>,
+    binary: &str,
+    workspace: &Path,
+) -> Result<Vec<(String, String, bool)>, String> {
+    let mut connection = CodexConnection::start(runner, binary, workspace, false, &[], &[], None)?;
+    connection.send(&initialize_request())?;
+    connection.read_response(INITIALIZE_REQUEST_ID)?;
+    connection.send(&json!({ "method": "initialized", "params": {} }))?;
+
+    let mut models = Vec::new();
+    let mut cursor: Option<String> = None;
+    loop {
+        let params = cursor
+            .as_ref()
+            .map(|cursor| json!({ "cursor": cursor }))
+            .unwrap_or_else(|| json!({}));
+        connection.send(&json!({
+            "method": "model/list",
+            "id": MODEL_LIST_REQUEST_ID,
+            "params": params,
+        }))?;
+        let result = connection.read_response(MODEL_LIST_REQUEST_ID)?;
+        let page = result
+            .get("data")
+            .and_then(Value::as_array)
+            .ok_or_else(|| "Codex가 지원 모델 목록을 반환하지 않았습니다.".to_string())?;
+        for model in page {
+            let Some(id) = model.get("model").and_then(Value::as_str) else {
+                continue;
+            };
+            let label = model
+                .get("displayName")
+                .and_then(Value::as_str)
+                .unwrap_or(id);
+            let is_default = model
+                .get("isDefault")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            models.push((id.to_string(), label.to_string(), is_default));
+        }
+        cursor = result
+            .get("nextCursor")
+            .and_then(Value::as_str)
+            .filter(|cursor| !cursor.is_empty())
+            .map(str::to_string);
+        if cursor.is_none() {
+            break;
+        }
+    }
+    Ok(models)
 }
 
 pub(crate) fn run_project_agent_with(
