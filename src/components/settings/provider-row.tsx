@@ -1,3 +1,4 @@
+import { ChevronDown } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -11,9 +12,14 @@ export function ProviderRow({
   className,
   description,
   disabled = false,
+  details,
+  detailsId,
+  detailsLabel,
   enabled,
+  expanded = false,
   icon,
   name,
+  onExpandedChange,
   onToggle,
   title,
   trailing,
@@ -23,17 +29,23 @@ export function ProviderRow({
   className?: string;
   description: string;
   disabled?: boolean;
+  details?: ReactNode;
+  detailsId?: string;
+  detailsLabel?: string;
   enabled: boolean;
+  expanded?: boolean;
   icon: ReactNode;
   name: string;
+  onExpandedChange?: (expanded: boolean) => void;
   onToggle?: (enabled: boolean) => void;
   title: ReactNode;
   trailing?: ReactNode;
 }) {
-  return (
+  const row = (
     <div
       className={cn(
         "settings-provider-row relative grid min-h-[72px] grid-cols-[34px_minmax(0,1fr)_auto_46px] items-center gap-x-3 border-b border-border/80 px-[18px] py-4 last:border-b-0",
+        details && "border-b-0",
         className,
       )}
     >
@@ -64,7 +76,27 @@ export function ProviderRow({
           {description}
         </Typography>
       </div>
-      {trailing ? <div className="justify-self-end text-muted-foreground">{trailing}</div> : null}
+      {trailing || details ? (
+        <div className="flex items-center justify-self-end gap-1 text-muted-foreground">
+          {trailing}
+          {details ? (
+            <button
+              aria-controls={detailsId}
+              aria-expanded={expanded}
+              aria-label={detailsLabel ?? `${expanded ? "Hide" : "Show"} ${name} details`}
+              className="grid size-8 place-items-center rounded-md border-0 bg-transparent text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2"
+              onClick={() => onExpandedChange?.(!expanded)}
+              type="button"
+            >
+              <ChevronDown
+                aria-hidden="true"
+                className={cn("transition-transform", expanded && "rotate-180")}
+                size={16}
+              />
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       <Switch
         aria-label={`${name} enabled`}
         checked={enabled}
@@ -72,6 +104,18 @@ export function ProviderRow({
         disabled={disabled || !available || !onToggle}
         onCheckedChange={(checked) => onToggle?.(checked)}
       />
+    </div>
+  );
+
+  if (!details) return row;
+  return (
+    <div className="border-b border-border/80 last:border-b-0">
+      {row}
+      {expanded ? (
+        <div id={detailsId} className="border-t border-border/70 bg-muted/25 px-[18px] py-4">
+          {details}
+        </div>
+      ) : null}
     </div>
   );
 }

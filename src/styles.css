@@ -186,21 +186,8 @@ body { overflow: hidden; font-synthesis: none; }
 .usage-settings-history-table span.error,.usage-settings-history-table span.unavailable { color:#96563e; background:#fbeee8; }
 .usage-settings-empty { min-height:180px; display:grid; place-content:center; justify-items:center; gap:7px; color:var(--muted-foreground); }
 .usage-settings-empty p { margin:0; font-size:var(--text-xs); }
-.provider-account-row { min-height:74px; padding:11px 14px; display:grid; grid-template-columns:auto minmax(0,1fr) auto auto; align-items:center; gap:11px; border-bottom:1px solid var(--border); }
-.provider-account-row:last-child { border-bottom:0; }
-.provider-account-row > div:nth-child(2) { min-width:0; display:flex; flex-direction:column; }
-.provider-account-row > div:nth-child(2) strong { font-size:var(--text-sm); text-transform:capitalize; }
-.provider-account-row > div:nth-child(2) span { overflow:hidden; color:var(--muted-foreground); font-size:var(--text-xs); text-overflow:ellipsis; white-space:nowrap; }
-.provider-account-row > div:nth-child(2) small { margin-top:3px; overflow:hidden; color:#9a5b43; font-size:var(--text-2xs); text-overflow:ellipsis; white-space:nowrap; }
-.provider-account-health { padding:3px 7px; border-radius:999px; color:#45785c; background:#eaf5ee; font-size:var(--text-2xs); white-space:nowrap; }
-.provider-account-health.error,.provider-account-health.unavailable { color:#96563e; background:#fbeee8; }
-.provider-account-row > button { min-height:30px; padding:0 10px; display:flex; align-items:center; gap:5px; border:1px solid var(--border); border-radius:8px; color:var(--foreground); background:var(--card); cursor:pointer; font-size:var(--text-xs); white-space:nowrap; }
-.provider-account-row > button:hover:not(:disabled) { background:var(--secondary); }
-.provider-account-row > button:disabled { opacity:.45; cursor:not-allowed; }
 @media (max-width:900px) {
   .usage-settings-provider-grid { grid-template-columns:1fr; }
-  .provider-account-row { grid-template-columns:auto minmax(0,1fr) auto; }
-  .provider-account-health { display:none; }
 }
 
 /* Ideas — fill app-shell height (above app-status-bar), not 100vh */
@@ -3795,7 +3782,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .companion-shell .kanban-column > header strong { min-width: 24px; text-align: center; }
 .companion-shell .kanban-column > div { padding: 0; gap: 0; overflow: visible; }
 .companion-task-swipe { position:relative; overflow:hidden; touch-action:pan-y; }
-.companion-task-swipe-action { width:72px; position:absolute; inset:0 auto 0 0; display:grid; place-items:center; border:0; color:#fff; background:#2376d9; cursor:pointer; }
+.companion-task-swipe-action { width:72px; position:absolute; inset:0 0 0 auto; display:grid; place-items:center; border:0; color:#fff; background:#2376d9; cursor:pointer; }
 .companion-task-swipe-action:disabled { color:rgba(255,255,255,.72); background:#78a9df; cursor:not-allowed; }
 .companion-task-swipe-action:focus-visible { outline:2px solid #fff; outline-offset:-4px; }
 .companion-task-swipe-content { position:relative; z-index:1; background:var(--card); transition:transform .18s cubic-bezier(.2,.8,.2,1); will-change:transform; }
