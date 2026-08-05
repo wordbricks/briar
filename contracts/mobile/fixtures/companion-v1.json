@@ -562,7 +562,7 @@
           "body": "Reviewed from the worker",
           "author": {
             "id": null,
-            "name": "Briar · Codex",
+            "name": "Briar \u00b7 Codex",
             "image": null,
             "provider": "codex"
           },
@@ -618,7 +618,7 @@
                 "runId": "33333333-3333-4333-8333-333333333333",
                 "runNumber": 3832,
                 "sourceKey": "briar-issue:fixture",
-                "title": "iOS Native Companion 읽기 경험",
+                "title": "iOS Native Companion \uc77d\uae30 \uacbd\ud5d8",
                 "outcome": "completed",
                 "summary": "Session finished successfully."
               }
@@ -646,6 +646,33 @@
             "updatedAt": "2026-08-02T01:05:00.000Z"
           }
         ]
+      }
+    },
+    "getInboxReadStates": {
+      "method": "GET",
+      "path": "/inbox/read-states",
+      "status": 200,
+      "response": {
+        "readVersions": {
+          "issue:33333333-3333-4333-8333-333333333333": "1:1:completed:merged:2026-08-02T01:00:00.000Z:4"
+        }
+      }
+    },
+    "putInboxReadStates": {
+      "method": "PUT",
+      "path": "/inbox/read-states",
+      "status": 200,
+      "request": {
+        "readVersions": {
+          "issue:33333333-3333-4333-8333-333333333333": "1:1:completed:merged:2026-08-02T01:00:00.000Z:4",
+          "conversation:44444444-4444-4444-8444-444444444444": "44444444-4444-4444-8444-444444444444"
+        }
+      },
+      "response": {
+        "readVersions": {
+          "issue:33333333-3333-4333-8333-333333333333": "1:1:completed:merged:2026-08-02T01:00:00.000Z:4",
+          "conversation:44444444-4444-4444-8444-444444444444": "44444444-4444-4444-8444-444444444444"
+        }
       }
     }
   }

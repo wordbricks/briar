@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   collapseLinkedAutoHuntSessions,
   type AutoHuntSession,
@@ -9,6 +9,10 @@ import {
   type AutoHuntWorkflowStageId,
 } from "../lib/auto-hunt-contract";
 import type { StructuredAgentResult } from "../lib/agent-result";
+import {
+  loadInboxReadStates,
+  saveInboxReadStates,
+} from "../lib/api";
 
 const storagePrefix = "briar.inbox.v1";
 const builtInWorkflowStageIds = new Set<string>(
@@ -220,6 +224,29 @@ export function isInboxMessageUnread(
   return readVersions[message.id] !== message.version;
 }
 
+export function mergeInboxReadVersions(
+  local: Record<string, string>,
+  remote: Record<string, string>,
+): Record<string, string> {
+  return {
+    ...local,
+    ...remote,
+  };
+}
+
+export function inboxReadVersionsToPush(
+  local: Record<string, string>,
+  remote: Record<string, string>,
+): Record<string, string> {
+  const pending: Record<string, string> = {};
+  for (const [messageId, version] of Object.entries(local)) {
+    if (remote[messageId] !== version) {
+      pending[messageId] = version;
+    }
+  }
+  return pending;
+}
+
 export function classifyInboxMessage(
   message: InboxMessage,
 ): InboxCategory {
@@ -331,6 +358,7 @@ export function useInbox(
   dashboard: DashboardPayload | null,
   sessions: AutoHuntSession[],
   projects: Project[],
+  token: string | null = null,
 ) {
   const storageKey = `${storagePrefix}:${userId ?? "signed-out"}`;
   const currentMessages = useMemo(
@@ -348,13 +376,111 @@ export function useInbox(
     storageKey,
     ...readInboxStorage(storageKey),
   }));
+  const remoteReadVersionsRef = useRef<Record<string, string>>({});
+  const pushQueueRef = useRef<Record<string, string>>({});
+  const pushInFlightRef = useRef(false);
 
   useEffect(() => {
+    remoteReadVersionsRef.current = {};
+    pushQueueRef.current = {};
     setState({
       storageKey,
       ...readInboxStorage(storageKey),
     });
   }, [storageKey]);
+
+  const flushReadStatePush = useCallback(async () => {
+    if (!token || !userId || pushInFlightRef.current) return;
+    const pending = pushQueueRef.current;
+    const entries = Object.entries(pending);
+    if (entries.length === 0) return;
+    pushInFlightRef.current = true;
+    pushQueueRef.current = {};
+    try {
+      const remote = await saveInboxReadStates(
+        token,
+        Object.fromEntries(entries),
+      );
+      remoteReadVersionsRef.current = mergeInboxReadVersions(
+        remoteReadVersionsRef.current,
+        remote,
+      );
+      setState((current) => {
+        if (current.storageKey !== storageKey) return current;
+        const readVersions = mergeInboxReadVersions(
+          current.readVersions,
+          remote,
+        );
+        const next = { messages: current.messages, readVersions };
+        writeInboxStorage(storageKey, next);
+        return { storageKey, ...next };
+      });
+    } catch {
+      // Keep local optimistic state and retry on the next mark/sync.
+      pushQueueRef.current = mergeInboxReadVersions(
+        Object.fromEntries(entries),
+        pushQueueRef.current,
+      );
+    } finally {
+      pushInFlightRef.current = false;
+      if (Object.keys(pushQueueRef.current).length > 0) {
+        void flushReadStatePush();
+      }
+    }
+  }, [storageKey, token, userId]);
+
+  const queueReadStatePush = useCallback(
+    (readVersions: Record<string, string>) => {
+      if (!token || !userId) return;
+      const pending = inboxReadVersionsToPush(
+        readVersions,
+        remoteReadVersionsRef.current,
+      );
+      if (Object.keys(pending).length === 0) return;
+      pushQueueRef.current = mergeInboxReadVersions(
+        pushQueueRef.current,
+        pending,
+      );
+      void flushReadStatePush();
+    },
+    [flushReadStatePush, token, userId],
+  );
+
+  useEffect(() => {
+    if (!userId || !token) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const remote = await loadInboxReadStates(token);
+        if (cancelled) return;
+        remoteReadVersionsRef.current = remote;
+        setState((current) => {
+          if (current.storageKey !== storageKey) return current;
+          const readVersions = mergeInboxReadVersions(
+            current.readVersions,
+            remote,
+          );
+          const next = { messages: current.messages, readVersions };
+          writeInboxStorage(storageKey, next);
+          return { storageKey, ...next };
+        });
+        const local = readInboxStorage(storageKey).readVersions;
+        const pending = inboxReadVersionsToPush(local, remote);
+        if (Object.keys(pending).length > 0) {
+          pushQueueRef.current = mergeInboxReadVersions(
+            pushQueueRef.current,
+            pending,
+          );
+          void flushReadStatePush();
+        }
+      } catch {
+        // Offline or auth race: keep local cache until the next successful sync.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [flushReadStatePush, storageKey, token, userId]);
 
   useEffect(() => {
     if (!userId) return;
@@ -365,11 +491,9 @@ export function useInbox(
         currentMessages,
         projects,
       );
-      const validIds = new Set(messages.map((message) => message.id));
-      const readVersions = Object.fromEntries(
-        Object.entries(current.readVersions).filter(([id]) => validIds.has(id)),
-      );
-      const next = { messages, readVersions };
+      // Keep account-synced read versions even when a message temporarily
+      // leaves the local feed, so another device's read state is not lost.
+      const next = { messages, readVersions: current.readVersions };
       writeInboxStorage(storageKey, next);
       return { storageKey, ...next };
     });
@@ -408,10 +532,11 @@ export function useInbox(
           },
         };
         writeInboxStorage(storageKey, next);
+        queueReadStatePush({ [messageId]: message.version });
         return { storageKey, ...next };
       });
     },
-    [storageKey],
+    [queueReadStatePush, storageKey],
   );
 
   const markAllRead = useCallback(() => {
@@ -422,22 +547,21 @@ export function useInbox(
         projects,
         organizationId,
       );
+      const organizationReadVersions = Object.fromEntries(
+        organizationMessages.map((message) => [message.id, message.version]),
+      );
       const next = {
         messages: current.messages,
         readVersions: {
           ...current.readVersions,
-          ...Object.fromEntries(
-            organizationMessages.map((message) => [
-              message.id,
-              message.version,
-            ]),
-          ),
+          ...organizationReadVersions,
         },
       };
       writeInboxStorage(storageKey, next);
+      queueReadStatePush(organizationReadVersions);
       return { storageKey, ...next };
     });
-  }, [organizationId, projects, storageKey]);
+  }, [organizationId, projects, queueReadStatePush, storageKey]);
 
   return {
     messages,

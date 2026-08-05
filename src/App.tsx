@@ -192,6 +192,7 @@ export function App() {
     briar.dashboard,
     autoHunt.sessions,
     briar.projects,
+    briar.token,
   );
   useInboxNotifications(
     briar.user?.id ?? null,

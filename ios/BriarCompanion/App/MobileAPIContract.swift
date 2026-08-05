@@ -13,6 +13,7 @@ enum MobileAPIContract {
         static let deviceToken = "/api/auth/device/token"
         static let currentUser = "/me"
         static let projects = "/projects"
+        static let inboxReadStates = "/inbox/read-states"
 
         static func issues(projectID: UUID) -> String {
             "/projects/\(projectID.uuidString.lowercased())/issues"
@@ -96,6 +97,14 @@ struct HealthResponse: Codable, Equatable, Sendable {
     let service: String
     let database: String
     let updates: String
+}
+
+struct InboxReadStatesResponse: Codable, Equatable, Sendable {
+    let readVersions: [String: String]
+}
+
+struct InboxReadStatesRequest: Codable, Equatable, Sendable {
+    let readVersions: [String: String]
 }
 
 struct DeviceCodeRequest: Codable, Equatable, Sendable {
@@ -507,4 +516,13 @@ extension JSONEncoder {
         encoder.dateEncodingStrategy = .iso8601
         return encoder
     }
+}
+
+extension ISO8601DateFormatter {
+    /// Matches the fractional-second ISO timestamps used by desktop inbox versions.
+    static let mobileContract: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
 }

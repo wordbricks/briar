@@ -41,7 +41,7 @@ struct CompanionRootView: View {
         _dashboard = StateObject(wrappedValue: DashboardStore(api: api))
         _ideas = StateObject(wrappedValue: IdeasStore(api: api))
         _agents = StateObject(wrappedValue: AgentsStore(api: api))
-        _inbox = StateObject(wrappedValue: InboxStore())
+        _inbox = StateObject(wrappedValue: InboxStore(api: api))
         _notifications = StateObject(wrappedValue: LocalNotificationService())
         authorization = DeviceAuthorizationService(api: api)
         self.presenter = presenter
@@ -101,11 +101,13 @@ struct CompanionRootView: View {
                 dashboard.select(projectID: nil, token: nil)
                 ideas.select(projectID: nil, token: nil)
                 agents.select(projectID: nil, token: nil, locale: locale.agentLocale.rawValue)
+                inbox.configure(token: nil, userID: nil)
                 projectSelectionComplete = false
                 return
             }
             do {
                 try await companion.load(token: token)
+                inbox.configure(token: token, userID: companion.user?.id)
                 projectSelectionComplete = false
                 applyPendingProjectIfNeeded()
             } catch let MobileAPIError.httpStatus(status, _) where status == 401 {
@@ -113,6 +115,9 @@ struct CompanionRootView: View {
             } catch {
                 // The recovery screen owns transport retries.
             }
+        }
+        .onChange(of: companion.user?.id) { _, userID in
+            inbox.configure(token: session.token, userID: userID)
         }
         .onChange(of: projectSelectionComplete, initial: true) { _, complete in
             updateProjectScopedStores(active: complete)
