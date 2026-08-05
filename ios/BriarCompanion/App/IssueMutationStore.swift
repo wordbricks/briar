@@ -251,24 +251,67 @@ final class IssueMutationStore: ObservableObject {
         runID: UUID,
         body: String,
         parentMessageID: UUID?,
+        attachments: [PendingIssueAttachment] = [],
         pollInterval: Duration = .seconds(2),
         maximumPolls: Int = 150
     ) async throws -> [IssueMessage] {
         try await perform("message-\(runID)") {
             let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else { throw IssueMutationError.invalidMessage }
-            let response: CreateIssueMessageResponse = try await api.send(
-                MobileAPIContract.Endpoint.runMessages(projectID: projectID, runID: runID),
-                method: "POST",
-                token: token,
-                body: CreateIssueMessageRequest(
-                    body: trimmed,
-                    parentMessageId: parentMessageID,
-                    mentionedUserIds: [],
-                    agentConversationId: nil
-                ),
-                as: CreateIssueMessageResponse.self
-            )
+            guard !trimmed.isEmpty || !attachments.isEmpty else {
+                throw IssueMutationError.invalidMessage
+            }
+            if let message = PendingIssueAttachment.validationMessage(for: attachments) {
+                throw IssueMutationError.attachment(message)
+            }
+            guard attachments.allSatisfy({ $0.contentType.hasPrefix("image/") }) else {
+                throw IssueMutationError.attachment("대화에는 이미지만 첨부할 수 있습니다.")
+            }
+            let path = MobileAPIContract.Endpoint.runMessages(projectID: projectID, runID: runID)
+            let response: CreateIssueMessageResponse
+            if attachments.isEmpty {
+                response = try await api.send(
+                    path,
+                    method: "POST",
+                    token: token,
+                    body: CreateIssueMessageRequest(
+                        body: trimmed,
+                        parentMessageId: parentMessageID,
+                        mentionedUserIds: [],
+                        agentConversationId: nil
+                    ),
+                    as: CreateIssueMessageResponse.self
+                )
+            } else {
+                let references = attachments.map { _ in UUID().uuidString.lowercased() }
+                let markdown = zip(attachments, references).map { attachment, reference in
+                    let name = attachment.filename.replacingOccurrences(of: "]", with: "\\]")
+                    return "![\(name)](briar-attachment://\(reference))"
+                }.joined(separator: "\n\n")
+                let messageBody = [trimmed, markdown].filter { !$0.isEmpty }.joined(separator: "\n\n")
+                response = try await api.upload(
+                    path,
+                    fields: [
+                        "body": messageBody,
+                        "parentMessageId": parentMessageID?.uuidString.lowercased() ?? "",
+                        "mentionedUserIds": "[]",
+                        "agentConversationId": "",
+                        "attachmentReferences": String(
+                            data: try JSONEncoder().encode(references),
+                            encoding: .utf8
+                        ) ?? "[]",
+                    ],
+                    files: attachments.map {
+                        MultipartFile(
+                            fieldName: "attachments",
+                            filename: $0.filename,
+                            contentType: $0.contentType,
+                            data: $0.data
+                        )
+                    },
+                    token: token,
+                    as: CreateIssueMessageResponse.self
+                )
+            }
             guard response.agentReply != nil else { return [response.message] }
             for _ in 0..<maximumPolls {
                 try await Task.sleep(for: pollInterval)

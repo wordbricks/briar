@@ -1,4 +1,7 @@
+import PhotosUI
 import SwiftUI
+import UIKit
+import UniformTypeIdentifiers
 
 private enum BriarFeatureFlags {
     static let ideas: Bool = {
@@ -535,6 +538,9 @@ struct RunDetailView: View {
     @State private var dependencyIDs: Set<UUID>
     @State private var preferences: IssueExecutionPreferences
     @State private var messageText = ""
+    @State private var messageAttachments: [PendingIssueAttachment] = []
+    @State private var selectedMessagePhotos: [PhotosPickerItem] = []
+    @State private var isLoadingMessagePhotos = false
     @State private var replyTo: IssueMessage?
     @State private var reviewCompleted = false
     @State private var linkCopied = false
@@ -924,16 +930,60 @@ struct RunDetailView: View {
             TextField("메시지 또는 @Briar 질문", text: $messageText, axis: .vertical)
                 .lineLimit(2...6)
                 .accessibilityIdentifier("issue-message-field")
+            ForEach(messageAttachments) { attachment in
+                HStack {
+                    if let image = UIImage(data: attachment.data) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 44, height: 44)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    Text(attachment.filename).lineLimit(1)
+                    Spacer()
+                    Button(role: .destructive) {
+                        messageAttachments.removeAll { $0.id == attachment.id }
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
             HStack {
                 if replyTo != nil { Button("답글 취소") { replyTo = nil } }
+                PhotosPicker(
+                    selection: $selectedMessagePhotos,
+                    maxSelectionCount: max(
+                        1,
+                        PendingIssueAttachment.maximumCount - messageAttachments.count
+                    ),
+                    matching: .images,
+                    preferredItemEncoding: .compatible
+                ) {
+                    Label("갤러리", systemImage: "photo.on.rectangle")
+                }
+                .disabled(
+                    isLoadingMessagePhotos ||
+                        messageAttachments.count >= PendingIssueAttachment.maximumCount
+                )
+                Button {
+                    pasteMessageImage()
+                } label: {
+                    Label("붙여넣기", systemImage: "doc.on.clipboard")
+                }
                 Spacer()
                 Button("보내기") { Task { await sendMessage() } }
                     .disabled(
-                        messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                        (messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+                            messageAttachments.isEmpty) ||
                             mutations.isActive("message-\(run.id)")
                     )
                     .accessibilityIdentifier("issue-message-send")
             }
+        }
+        .onChange(of: selectedMessagePhotos) { _, items in
+            guard !items.isEmpty else { return }
+            Task { await importMessagePhotos(items) }
         }
     }
 
@@ -957,14 +1007,35 @@ struct RunDetailView: View {
                 if let parent = detail.messages.first(where: { $0.id == message.parentMessageId }) {
                     HStack(alignment: .top, spacing: 6) {
                         Image(systemName: "arrowshape.turn.up.left").font(.caption2)
-                        Text(parent.body).font(.caption).lineLimit(2)
+                        Text(conversationMessageText(parent.body)).font(.caption).lineLimit(2)
                     }
                     .foregroundStyle(.secondary)
                     .padding(8)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
                 }
-                MarkdownText(markdown: message.body)
+                let visibleBody = conversationMessageText(message.body)
+                if !visibleBody.isEmpty {
+                    MarkdownText(markdown: visibleBody)
+                }
+                ForEach(message.attachments ?? []) { attachment in
+                    AuthenticatedImagePreview(
+                        sourceID: attachment.url,
+                        filename: attachment.filename,
+                        detail: ByteCountFormatter.string(
+                            fromByteCount: Int64(attachment.byteSize),
+                            countStyle: .file
+                        ),
+                        accessibilityID: "issue-message-image-\(attachment.id.uuidString.lowercased())",
+                        load: {
+                            try await detail.download(
+                                path: attachment.url,
+                                filename: attachment.filename
+                            )
+                        },
+                        open: { previewFile = PreviewFile(url: $0) }
+                    )
+                }
                 Button("답글") { replyTo = message }.font(.caption)
             }
         }
@@ -1327,10 +1398,12 @@ struct RunDetailView: View {
             let sent = try await mutations.sendMessage(
                 runID: run.id,
                 body: messageText,
-                parentMessageID: replyTo?.id
+                parentMessageID: replyTo?.id,
+                attachments: messageAttachments
             )
             detail.appendMessages(sent)
             messageText = ""
+            messageAttachments = []
             replyTo = nil
             actionError = nil
             await refresh()
@@ -1338,21 +1411,97 @@ struct RunDetailView: View {
             actionError = error.localizedDescription
             if case IssueMutationError.agentReplyTimedOut = error {
                 messageText = ""
+                messageAttachments = []
                 replyTo = nil
                 await detail.load()
                 await refresh()
             } else if case IssueMutationError.agentReplyPollingFailed = error {
                 messageText = ""
+                messageAttachments = []
                 replyTo = nil
                 await detail.load()
                 await refresh()
             } else if case IssueMutationError.agentReplyFailed = error {
                 messageText = ""
+                messageAttachments = []
                 replyTo = nil
                 await detail.load()
                 await refresh()
             }
         }
+    }
+
+    @MainActor
+    private func importMessagePhotos(_ items: [PhotosPickerItem]) async {
+        isLoadingMessagePhotos = true
+        defer {
+            isLoadingMessagePhotos = false
+            selectedMessagePhotos = []
+        }
+        do {
+            var loaded = messageAttachments
+            for item in items.prefix(PendingIssueAttachment.maximumCount - loaded.count) {
+                guard let data = try await item.loadTransferable(type: Data.self) else {
+                    throw IssueMutationError.attachment("사진 앱에서 이미지를 읽지 못했습니다.")
+                }
+                let supportedType = item.supportedContentTypes.first { type in
+                    guard type.conforms(to: .image),
+                          let mimeType = type.preferredMIMEType else { return false }
+                    return PendingIssueAttachment.allowedContentTypes.contains(mimeType)
+                }
+                if let supportedType,
+                   let mimeType = supportedType.preferredMIMEType,
+                   mimeType.hasPrefix("image/") {
+                    loaded.append(PendingIssueAttachment(
+                        filename: "image-\(UUID().uuidString).\(supportedType.preferredFilenameExtension ?? "bin")",
+                        contentType: mimeType,
+                        data: data
+                    ))
+                } else if let jpegData = UIImage(data: data)?.jpegData(compressionQuality: 0.9) {
+                    loaded.append(PendingIssueAttachment(
+                        filename: "image-\(UUID().uuidString).jpg",
+                        contentType: "image/jpeg",
+                        data: jpegData
+                    ))
+                } else {
+                    throw IssueMutationError.attachment("선택한 이미지 형식을 첨부할 수 없습니다.")
+                }
+            }
+            if let message = PendingIssueAttachment.validationMessage(for: loaded) {
+                throw IssueMutationError.attachment(message)
+            }
+            messageAttachments = loaded
+            actionError = nil
+        } catch {
+            actionError = error.localizedDescription
+        }
+    }
+
+    private func pasteMessageImage() {
+        guard let image = UIPasteboard.general.image,
+              let data = image.pngData() else {
+            actionError = "클립보드에 붙여넣을 수 있는 이미지가 없습니다."
+            return
+        }
+        let next = messageAttachments + [PendingIssueAttachment(
+            filename: "pasted-image-\(UUID().uuidString).png",
+            contentType: "image/png",
+            data: data
+        )]
+        if let message = PendingIssueAttachment.validationMessage(for: next) {
+            actionError = message
+            return
+        }
+        messageAttachments = next
+        actionError = nil
+    }
+
+    private func conversationMessageText(_ body: String) -> String {
+        body
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .filter { !$0.contains("](briar-attachment://") }
+            .joined(separator: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func deleteIssue() async {

@@ -255,6 +255,7 @@ export const mobileIssueMessagesResponseSchema = z.object({
     runId: z.uuid(),
     parentMessageId: z.uuid().nullable(),
     body: z.string(),
+    attachments: z.array(mobileIssueAttachmentSchema).default([]),
     author: mobileMessageAuthorSchema,
     replyCount: z.number().int().nonnegative(),
     createdAt: z.iso.datetime(),

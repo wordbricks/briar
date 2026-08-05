@@ -2513,6 +2513,82 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
+  it("pastes an image into the issue conversation and sends it without text", async () => {
+    const image = new File(["image"], "clipboard.png", { type: "image/png" });
+    const sentMessage: IssueMessage = {
+      id: "message-with-image",
+      runId: demoDashboard.runs[0].id,
+      parentMessageId: null,
+      body: "![clipboard.png](briar-attachment://stored-image)",
+      attachments: [{
+        id: "stored-image",
+        filename: image.name,
+        contentType: image.type,
+        byteSize: image.size,
+        url: "blob:stored-image",
+      }],
+      author: { id: "jay", name: "Jay", image: null, provider: null },
+      replyCount: 0,
+      createdAt: "2026-08-05T00:00:00.000Z",
+      updatedAt: "2026-08-05T00:00:00.000Z",
+    };
+    const onSendIssueMessage = vi.fn(async () => ({
+      message: sentMessage,
+      agentReply: null,
+    }));
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => image}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={onSendIssueMessage}
+          run={demoDashboard.runs[0]}
+        />,
+      );
+      await Promise.resolve();
+    });
+    const textarea = container.querySelector<HTMLTextAreaElement>(
+      ".issue-conversation > .issue-message-composer textarea",
+    );
+    const paste = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(paste, "clipboardData", {
+      value: {
+        files: [image],
+        items: [{ kind: "file", getAsFile: () => image }],
+        types: ["Files"],
+      },
+    });
+    await act(async () => textarea?.dispatchEvent(paste));
+    expect(container.querySelector(".issue-composer-attachment")?.textContent)
+      .toContain("clipboard.png");
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".issue-conversation > .issue-message-composer .issue-message-send",
+      )?.click();
+      await Promise.resolve();
+    });
+    expect(onSendIssueMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attachments: [image],
+        body: expect.stringContaining("briar-attachment://"),
+      }),
+    );
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("shows replies at the same level and writes a reply below its message", async () => {
     const createdAt = "2026-08-03T10:00:00.000Z";
     const rootMessage: IssueMessage = {

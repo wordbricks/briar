@@ -566,6 +566,47 @@ describe("API errors", () => {
     });
   });
 
+  it("uploads pasted conversation images as multipart form data", async () => {
+    const projectId = "22222222-2222-4222-8222-222222222222";
+    const runId = "11111111-1111-4111-8111-111111111111";
+    const reference = crypto.randomUUID();
+    const image = new File(["image"], "clipboard.png", { type: "image/png" });
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      const form = init?.body as FormData;
+      expect(form).toBeInstanceOf(FormData);
+      expect(form.get("body")).toContain(`briar-attachment://${reference}`);
+      expect(form.get("attachmentReferences")).toBe(JSON.stringify([reference]));
+      expect(form.getAll("attachments")).toEqual([image]);
+      return new Response(
+        JSON.stringify({
+          message: {
+            id: crypto.randomUUID(),
+            runId,
+            parentMessageId: null,
+            body: String(form.get("body")),
+            attachments: [],
+            author: { id: "owner", name: "Owner", image: null, provider: null },
+            replyCount: 0,
+            createdAt: "2026-08-05T00:00:00.000Z",
+            updatedAt: "2026-08-05T00:00:00.000Z",
+          },
+          agentReply: null,
+        }),
+        { status: 201, headers: { "Content-Type": "application/json" } },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createIssueMessage("token", projectId, runId, {
+      body: `스크린샷\n\n![clipboard.png](briar-attachment://${reference})`,
+      parentMessageId: null,
+      attachments: [image],
+      attachmentReferences: [reference],
+    });
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
   it("polls the server until the assigned worker persists its reply", async () => {
     const projectId = "22222222-2222-4222-8222-222222222222";
     const runId = "11111111-1111-4111-8111-111111111111";
