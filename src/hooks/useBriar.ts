@@ -15,6 +15,7 @@ import {
   createProject,
   deleteAccount as deleteRemoteAccount,
   deleteIssue as deleteRemoteIssue,
+  transferIssue as transferRemoteIssue,
   deleteProject as deleteRemoteProject,
   dispatchHuntRun,
   errorWithMessage,
@@ -2396,6 +2397,58 @@ export function useBriar(options: UseBriarOptions = {}) {
     [activeProjectId, dashboard, token],
   );
 
+  const transferIssueToProject = useCallback(
+    async (runId: string, targetProjectId: string) => {
+      if (!activeProjectId || !dashboard) {
+        throw new Error("이슈를 옮길 프로젝트가 없습니다.");
+      }
+      if (targetProjectId === activeProjectId) {
+        throw new Error("같은 프로젝트로는 옮길 수 없습니다.");
+      }
+      setDeletingIssueId(runId);
+      setError(null);
+      try {
+        if (!demoMode) {
+          if (!token) throw new Error("로그인이 필요합니다.");
+          await transferRemoteIssue(
+            token,
+            activeProjectId,
+            runId,
+            targetProjectId,
+          );
+        }
+        setDashboard((current) =>
+          current
+            ? {
+                ...current,
+                runs: current.runs
+                  .filter((run) => run.id !== runId)
+                  .map((run) => ({
+                    ...run,
+                    prerequisites: (run.prerequisites ?? []).filter(
+                      (dependency) => dependency.id !== runId,
+                    ),
+                    dependents: (run.dependents ?? []).filter(
+                      (dependency) => dependency.id !== runId,
+                    ),
+                  })),
+              }
+            : current,
+        );
+        delete issueMessagesByRun.current[runId];
+        delete runEvidenceByRun.current[runId];
+        delete runEventsByRun.current[runId];
+      } catch (caught) {
+        const message = caught instanceof Error ? caught.message : String(caught);
+        setError(message);
+        throw caught;
+      } finally {
+        setDeletingIssueId(null);
+      }
+    },
+    [activeProjectId, dashboard, demoMode, token],
+  );
+
   const readIssueMessages = useCallback(
     async (runId: string) => {
       if (!activeProjectId) throw new Error("메시지를 불러올 프로젝트가 없습니다.");
@@ -3012,6 +3065,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     dashboard,
     deleteAccount,
     deleteIssue: removeIssue,
+    transferIssue: transferIssueToProject,
     deleteProject: removeProject,
     deletingIssueId,
     deletingProjectId,

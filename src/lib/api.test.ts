@@ -14,6 +14,7 @@ import {
   deleteAccount,
   deleteProjectAgent,
   deleteIssue,
+  transferIssue,
   dispatchHuntRun,
   errorWithMessage,
   deleteProjectAgentSchedule,
@@ -394,6 +395,38 @@ describe("API errors", () => {
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining(`/projects/${projectId}/runs/${runId}`),
       expect.objectContaining({ method: "DELETE" }),
+    );
+  });
+
+  it("transfers an issue through its project-scoped transfer endpoint", async () => {
+    const projectId = "22222222-2222-4222-8222-222222222222";
+    const targetProjectId = "33333333-3333-4333-8333-333333333333";
+    const runId = "11111111-1111-4111-8111-111111111111";
+    const response = {
+      runId,
+      sourceProjectId: projectId,
+      targetProjectId,
+      outcome: "transferred",
+    };
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify(response), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      transferIssue("token", projectId, runId, targetProjectId),
+    ).resolves.toEqual(response);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(
+        `/projects/${projectId}/runs/${runId}/transfer`,
+      ),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ targetProjectId }),
+      }),
     );
   });
 

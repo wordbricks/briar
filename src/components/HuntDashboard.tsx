@@ -14,6 +14,7 @@ import {
   Copy,
   CornerUpLeft,
   FolderGit2,
+  FolderInput,
   GitCommitHorizontal,
   GitFork,
   GitPullRequest,
@@ -209,6 +210,7 @@ export function HuntDashboard({
   projects = [],
   onIssueDialogOpenChange,
   onDeleteIssue,
+  onTransferIssue,
   onAddIssueDependency,
   onRemoveIssueDependency,
   onUpdateIssue,
@@ -262,6 +264,10 @@ export function HuntDashboard({
   projects?: Project[];
   onIssueDialogOpenChange?: (isOpen: boolean) => void;
   onDeleteIssue: (runId: string) => Promise<unknown>;
+  onTransferIssue?: (
+    runId: string,
+    targetProjectId: string,
+  ) => Promise<unknown>;
   onAddIssueDependency?: (
     dependentRunId: string,
     prerequisiteRunId: string,
@@ -338,6 +344,12 @@ export function HuntDashboard({
     [onIssueDialogOpenChange],
   );
   const [editingRunId, setEditingRunId] = useState<string | null>(null);
+  const [transferringRunFromMenuId, setTransferringRunFromMenuId] =
+    useState<string | null>(null);
+  const [transferTargetProjectId, setTransferTargetProjectId] = useState("");
+  const [contextTransferError, setContextTransferError] = useState<string | null>(
+    null,
+  );
   const [deletingRunFromMenuId, setDeletingRunFromMenuId] =
     useState<string | null>(null);
   const [contextDeleteError, setContextDeleteError] = useState<string | null>(
@@ -493,6 +505,18 @@ export function HuntDashboard({
   const editingRun = runs.find((run) => run.id === editingRunId) ?? null;
   const deletingRunFromMenu =
     runs.find((run) => run.id === deletingRunFromMenuId) ?? null;
+  const transferringRunFromMenu =
+    runs.find((run) => run.id === transferringRunFromMenuId) ?? null;
+  const transferDestinationProjects = useMemo(() => {
+    const activeProjectId = dashboard?.project.id;
+    const organizationId = dashboard?.project.organizationId;
+    if (!activeProjectId) return [];
+    return projects.filter(
+      (project) =>
+        project.id !== activeProjectId &&
+        (!organizationId || project.organizationId === organizationId),
+    );
+  }, [dashboard?.project.id, dashboard?.project.organizationId, projects]);
   const activeCount = runs.filter((run) => !["completed", "cancelled"].includes(run.status)).length;
   const attentionCount = runs.filter((run) => ["paused", "blocked", "failed"].includes(run.status)).length;
   const completedCount = runs.filter((run) =>
@@ -801,6 +825,15 @@ export function HuntDashboard({
             await onDeleteIssue(selected.id);
             setSelectedRunId(null);
           }}
+          onTransfer={
+            onTransferIssue
+              ? async (targetProjectId) => {
+                  await onTransferIssue(selected.id, targetProjectId);
+                  setSelectedRunId(null);
+                }
+              : undefined
+          }
+          transferProjects={transferDestinationProjects}
           onAddDependency={onAddIssueDependency
             ? (prerequisiteRunId) =>
                 onAddIssueDependency(selected.id, prerequisiteRunId)
@@ -1045,6 +1078,17 @@ export function HuntDashboard({
               setDeletingRunFromMenuId(runId);
             }}
             onEdit={setEditingRunId}
+            onTransfer={
+              onTransferIssue
+                ? (runId) => {
+                    setContextTransferError(null);
+                    setTransferTargetProjectId(
+                      transferDestinationProjects[0]?.id ?? "",
+                    );
+                    setTransferringRunFromMenuId(runId);
+                  }
+                : undefined
+            }
             onMove={(run, placement) =>
               onMoveRun(run.id, placement).catch(() => undefined)
             }
@@ -1140,6 +1184,17 @@ export function HuntDashboard({
                       setContextDeleteError(null);
                       setDeletingRunFromMenuId(run.id);
                     }}
+                    onTransfer={
+                      onTransferIssue
+                        ? () => {
+                            setContextTransferError(null);
+                            setTransferTargetProjectId(
+                              transferDestinationProjects[0]?.id ?? "",
+                            );
+                            setTransferringRunFromMenuId(run.id);
+                          }
+                        : undefined
+                    }
                     onPointerCancel={(event) => {
                       if (
                         pointerDragRef.current?.pointerId === event.pointerId
@@ -1358,6 +1413,106 @@ export function HuntDashboard({
                 <Trash2 size={15} />
               )}
               {deletingIssueId ? t("issue.deleting") : t("issue.delete")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        onOpenChange={(open) => {
+          if (deletingIssueId) return;
+          if (!open) {
+            setTransferringRunFromMenuId(null);
+            setContextTransferError(null);
+          }
+        }}
+        open={Boolean(transferringRunFromMenu)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="mb-2 grid size-10 place-items-center rounded-xl bg-primary/10 text-primary">
+              <FolderInput size={20} strokeWidth={1.8} />
+            </div>
+            <DialogTitle>
+              {t("issue.transferTitle", {
+                title: transferringRunFromMenu?.title ?? "",
+              })}
+            </DialogTitle>
+            <DialogDescription>
+              {t("issue.transferDescription")}
+            </DialogDescription>
+          </DialogHeader>
+          {transferDestinationProjects.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              {t("issue.transferNoProjects")}
+            </p>
+          ) : (
+            <NativeSelect
+              disabled={Boolean(deletingIssueId)}
+              label={t("issue.transferTarget")}
+              onValueChange={setTransferTargetProjectId}
+              options={transferDestinationProjects.map((project) => ({
+                label: project.name,
+                value: project.id,
+              }))}
+              placeholder={t("issue.transferTargetPlaceholder")}
+              value={transferTargetProjectId}
+            />
+          )}
+          {contextTransferError ? (
+            <p className="text-xs text-destructive" role="alert">
+              {contextTransferError}
+            </p>
+          ) : null}
+          <DialogFooter>
+            <Button
+              disabled={Boolean(deletingIssueId)}
+              onClick={() => {
+                setTransferringRunFromMenuId(null);
+                setContextTransferError(null);
+              }}
+              type="button"
+              variant="outline"
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              disabled={
+                Boolean(deletingIssueId) ||
+                !onTransferIssue ||
+                !transferTargetProjectId ||
+                transferDestinationProjects.length === 0
+              }
+              onClick={() => {
+                if (!transferringRunFromMenu || !onTransferIssue) return;
+                setContextTransferError(null);
+                void onTransferIssue(
+                  transferringRunFromMenu.id,
+                  transferTargetProjectId,
+                )
+                  .then(() => {
+                    setTransferringRunFromMenuId(null);
+                    if (selectedRunId === transferringRunFromMenu.id) {
+                      setSelectedRunId(null);
+                    }
+                  })
+                  .catch((caught) => {
+                    setContextTransferError(
+                      caught instanceof Error
+                        ? caught.message
+                        : String(caught),
+                    );
+                  });
+              }}
+              type="button"
+            >
+              {deletingIssueId ? (
+                <LoaderCircle className="spin" size={15} />
+              ) : (
+                <FolderInput size={15} />
+              )}
+              {deletingIssueId
+                ? t("issue.transferring")
+                : t("issue.transferConfirm")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2248,6 +2403,7 @@ function KanbanCard({
   isMoving,
   isProcessing,
   onDelete,
+  onTransfer,
   onPointerCancel,
   onPointerDown,
   onPointerMove,
@@ -2272,6 +2428,7 @@ function KanbanCard({
   isMoving: boolean;
   isProcessing: boolean;
   onDelete: () => void;
+  onTransfer?: () => void;
   onPointerCancel: (event: ReactPointerEvent<HTMLElement>) => void;
   onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
   onPointerMove: (event: ReactPointerEvent<HTMLElement>) => void;
@@ -2304,6 +2461,7 @@ function KanbanCard({
         updatingIssueId === run.id
       }
       onDelete={onDelete}
+      onTransfer={onTransfer}
       onEdit={onEdit}
       onMove={onMove}
       onOpen={onOpen}
@@ -2471,6 +2629,7 @@ function IssueContextMenu({
   children,
   disabled,
   onDelete,
+  onTransfer,
   onEdit,
   onMove,
   onOpen,
@@ -2484,6 +2643,7 @@ function IssueContextMenu({
   children: ReactElement;
   disabled: boolean;
   onDelete: () => void;
+  onTransfer?: () => void;
   onEdit: () => void;
   onMove: (placement: HuntRunPlacement) => void;
   onOpen: () => void;
@@ -2861,6 +3021,15 @@ function IssueContextMenu({
             <Pencil aria-hidden="true" size={17} />
             <span>{t("issue.edit")}</span>
           </ContextMenu.Item>
+          {onTransfer ? (
+            <ContextMenu.Item
+              className="issue-context-item"
+              onSelect={onTransfer}
+            >
+              <FolderInput aria-hidden="true" size={17} />
+              <span>{t("issue.transfer")}</span>
+            </ContextMenu.Item>
+          ) : null}
 
           <ContextMenu.Separator className="issue-context-separator" />
 
@@ -2881,6 +3050,7 @@ function IssueList({
   availableProviders,
   deletingIssueId,
   onDelete,
+  onTransfer,
   onEdit,
   onMove,
   onOpen,
@@ -2895,6 +3065,7 @@ function IssueList({
   availableProviders: AgentProvider[];
   deletingIssueId: string | null;
   onDelete: (runId: string) => void;
+  onTransfer?: (runId: string) => void;
   onEdit: (runId: string) => void;
   onMove: (run: HuntRun, placement: HuntRunPlacement) => void;
   onOpen: (runId: string) => void;
@@ -2960,6 +3131,9 @@ function IssueList({
               }
               key={run.id}
               onDelete={() => onDelete(run.id)}
+              onTransfer={
+                onTransfer ? () => onTransfer(run.id) : undefined
+              }
               onEdit={() => onEdit(run.id)}
               onMove={(placement) => onMove(run, placement)}
               onOpen={() => onOpen(run.id)}
@@ -3047,6 +3221,8 @@ export function RunPage({
   onAddDependency,
   onCancel,
   onDelete,
+  onTransfer,
+  transferProjects = [],
   onDependencyOpen,
   onLoadAttachment,
   onLoadIssueMessages,
@@ -3086,6 +3262,8 @@ export function RunPage({
   onAddDependency?: (prerequisiteRunId: string) => Promise<unknown>;
   onCancel: () => Promise<unknown>;
   onDelete?: () => Promise<unknown>;
+  onTransfer?: (targetProjectId: string) => Promise<unknown>;
+  transferProjects?: Project[];
   onDependencyOpen?: (runId: string) => void;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onLoadIssueMessages: () => Promise<IssueMessage[]>;
@@ -3153,6 +3331,11 @@ export function RunPage({
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
+  const [transferTargetProjectId, setTransferTargetProjectId] = useState(
+    () => transferProjects[0]?.id ?? "",
+  );
+  const [transferError, setTransferError] = useState<string | null>(null);
   const [isPropertiesOpen, setIsPropertiesOpen] = useState(false);
   const [isCompletingResultReview, setIsCompletingResultReview] =
     useState(false);
@@ -3691,6 +3874,17 @@ export function RunPage({
                   : undefined
               }
               onDelete={onDelete ? () => setIsDeleteDialogOpen(true) : undefined}
+              onTransfer={
+                onTransfer
+                  ? () => {
+                      setTransferError(null);
+                      setTransferTargetProjectId(
+                        transferProjects[0]?.id ?? "",
+                      );
+                      setIsTransferDialogOpen(true);
+                    }
+                  : undefined
+              }
               onEdit={onUpdateIssue ? () => setIsEditDialogOpen(true) : undefined}
             />
           </div>
@@ -3725,6 +3919,17 @@ export function RunPage({
                       }
                       onDelete={
                         onDelete ? () => setIsDeleteDialogOpen(true) : undefined
+                      }
+                      onTransfer={
+                        onTransfer
+                          ? () => {
+                              setTransferError(null);
+                              setTransferTargetProjectId(
+                                transferProjects[0]?.id ?? "",
+                              );
+                              setIsTransferDialogOpen(true);
+                            }
+                          : undefined
                       }
                       onEdit={
                         onUpdateIssue
@@ -4835,6 +5040,87 @@ export function RunPage({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <Dialog
+        onOpenChange={(open) => {
+          if (isDeletingIssue) return;
+          setIsTransferDialogOpen(open);
+          if (!open) setTransferError(null);
+        }}
+        open={isTransferDialogOpen}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="mb-2 grid size-10 place-items-center rounded-xl bg-primary/10 text-primary">
+              <FolderInput size={20} strokeWidth={1.8} />
+            </div>
+            <DialogTitle>
+              {t("issue.transferTitle", { title: run.title })}
+            </DialogTitle>
+            <DialogDescription>
+              {t("issue.transferDescription")}
+            </DialogDescription>
+          </DialogHeader>
+          {transferProjects.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              {t("issue.transferNoProjects")}
+            </p>
+          ) : (
+            <NativeSelect
+              disabled={isDeletingIssue}
+              label={t("issue.transferTarget")}
+              onValueChange={setTransferTargetProjectId}
+              options={transferProjects.map((project) => ({
+                label: project.name,
+                value: project.id,
+              }))}
+              placeholder={t("issue.transferTargetPlaceholder")}
+              value={transferTargetProjectId}
+            />
+          )}
+          {transferError ? (
+            <p className="text-xs text-destructive" role="alert">
+              {transferError}
+            </p>
+          ) : null}
+          <DialogFooter>
+            <Button
+              disabled={isDeletingIssue}
+              onClick={() => setIsTransferDialogOpen(false)}
+              type="button"
+              variant="outline"
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              disabled={
+                isDeletingIssue ||
+                !onTransfer ||
+                !transferTargetProjectId ||
+                transferProjects.length === 0
+              }
+              onClick={() => {
+                if (!onTransfer || !transferTargetProjectId) return;
+                setTransferError(null);
+                void onTransfer(transferTargetProjectId).catch((caught) => {
+                  setTransferError(
+                    caught instanceof Error ? caught.message : String(caught),
+                  );
+                });
+              }}
+              type="button"
+            >
+              {isDeletingIssue ? (
+                <LoaderCircle className="spin" size={15} />
+              ) : (
+                <FolderInput size={15} />
+              )}
+              {isDeletingIssue
+                ? t("issue.transferring")
+                : t("issue.transferConfirm")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MainContent>
   );
 }
@@ -4843,12 +5129,14 @@ function IssueActionsMenu({
   disabled,
   onCancel,
   onDelete,
+  onTransfer,
   onEdit,
   onShare,
 }: {
   disabled: boolean;
   onCancel?: () => void;
   onDelete?: () => void;
+  onTransfer?: () => void;
   onEdit?: () => void;
   onShare?: () => void;
 }) {
@@ -4891,6 +5179,15 @@ function IssueActionsMenu({
             >
               <Pencil size={14} />
               {t("issue.edit")}
+            </DropdownMenu.Item>
+          ) : null}
+          {onTransfer ? (
+            <DropdownMenu.Item
+              className="run-page-actions-item"
+              onSelect={onTransfer}
+            >
+              <FolderInput size={14} />
+              {t("issue.transfer")}
             </DropdownMenu.Item>
           ) : null}
           {onCancel ? (

@@ -9064,6 +9064,234 @@ export async function deleteIssue(
   return run ? "active" : "not_found";
 }
 
+export type TransferIssueOutcome =
+  | "transferred"
+  | "not_found"
+  | "active"
+  | "same_project"
+  | "source_key_conflict";
+
+const isActivelyClaimedRun = (run: HuntRunRow, observedAt: string) =>
+  run.status === "running" ||
+  (
+    run.status === "queued" &&
+    run.lease_expires_at != null &&
+    run.lease_expires_at > observedAt
+  );
+
+/**
+ * Move an issue (hunt run) and its project-scoped children to another project
+ * in the same organization. Active/leased runs cannot transfer. Source-project
+ * dashboard clients receive an explicit delete tombstone; the run UPDATE trigger
+ * upserts the issue into the target project.
+ */
+export async function transferIssue(
+  db: D1Database,
+  input: {
+    sourceProjectId: string;
+    targetProjectId: string;
+    targetProjectName: string;
+    runId: string;
+    observedAt: string;
+  },
+): Promise<TransferIssueOutcome> {
+  if (input.sourceProjectId === input.targetProjectId) {
+    return "same_project";
+  }
+
+  const run = await getHuntRunForProject(
+    db,
+    input.sourceProjectId,
+    input.runId,
+  );
+  if (!run) return "not_found";
+  if (isActivelyClaimedRun(run, input.observedAt)) return "active";
+
+  const conflict = await db
+    .prepare(
+      `select id from briar_hunt_runs
+       where project_id = ? and source = ? and source_key = ?
+       limit 1`,
+    )
+    .bind(input.targetProjectId, run.source, run.source_key)
+    .first<{ id: string }>();
+  if (conflict) return "source_key_conflict";
+
+  const targetSettings = await getProjectSettings(db, input.targetProjectId);
+  const adoptTargetWorkflow =
+    run.status === "backlog" || run.status === "queued";
+  const targetWorkflowJson = adoptTargetWorkflow
+    ? stableJson(
+        parseWorkflow(targetSettings?.workflow_json ?? null),
+      )
+    : run.workflow_snapshot_json;
+  const targetRepository = adoptTargetWorkflow
+    ? (targetSettings?.github_repository ?? input.targetProjectName)
+    : run.repository;
+  const refreshWorkflow = adoptTargetWorkflow ? 1 : 0;
+
+  // Tombstone the run on the source project before reassigning project_id.
+  // The hunt_runs UPDATE trigger only upserts new.project_id.
+  const sourceDeleteChange = db
+    .prepare(
+      `insert into briar_dashboard_changes (
+         project_id, entity_type, entity_id, operation, created_at
+       ) values (?, 'run', ?, 'delete', datetime('now'))`,
+    )
+    .bind(input.sourceProjectId, input.runId);
+  const sourceSyncState = db
+    .prepare(
+      `insert into briar_dashboard_sync_state (project_id, current_version)
+       values (?, last_insert_rowid())
+       on conflict (project_id) do update set
+         current_version = excluded.current_version`,
+    )
+    .bind(input.sourceProjectId);
+
+  const statements = [
+    sourceDeleteChange,
+    sourceSyncState,
+    db
+      .prepare(
+        `delete from briar_issue_dependencies
+         where project_id = ?
+           and (prerequisite_run_id = ? or dependent_run_id = ?)`,
+      )
+      .bind(input.sourceProjectId, input.runId, input.runId),
+    db
+      .prepare(
+        `update briar_issue_attachments
+         set project_id = ?
+         where project_id = ? and run_id = ?`,
+      )
+      .bind(input.targetProjectId, input.sourceProjectId, input.runId),
+    db
+      .prepare(
+        `update briar_issue_messages
+         set project_id = ?
+         where project_id = ? and run_id = ?`,
+      )
+      .bind(input.targetProjectId, input.sourceProjectId, input.runId),
+    db
+      .prepare(
+        `update briar_run_evidence
+         set project_id = ?
+         where project_id = ? and run_id = ?`,
+      )
+      .bind(input.targetProjectId, input.sourceProjectId, input.runId),
+    db
+      .prepare(
+        `update briar_run_evidence_images
+         set project_id = ?
+         where project_id = ? and run_id = ?`,
+      )
+      .bind(input.targetProjectId, input.sourceProjectId, input.runId),
+    db
+      .prepare(
+        `update briar_issue_agent_reply_jobs
+         set project_id = ?,
+             preferred_worker_id = null,
+             claimed_worker_id = null
+         where project_id = ? and run_id = ?`,
+      )
+      .bind(input.targetProjectId, input.sourceProjectId, input.runId),
+    db
+      .prepare(
+        `update briar_log_archives
+         set project_id = ?
+         where project_id = ? and run_id = ?`,
+      )
+      .bind(input.targetProjectId, input.sourceProjectId, input.runId),
+    db
+      .prepare(
+        `update briar_archive_cleanup_queue
+         set project_id = ?
+         where project_id = ? and run_id = ?`,
+      )
+      .bind(input.targetProjectId, input.sourceProjectId, input.runId),
+    db
+      .prepare(
+        `update briar_run_pull_requests
+         set project_id = ?
+         where project_id = ? and run_id = ?`,
+      )
+      .bind(input.targetProjectId, input.sourceProjectId, input.runId),
+    db
+      .prepare(
+        `update briar_agent_transcript_sessions
+         set project_id = ?
+         where project_id = ? and run_id = ?`,
+      )
+      .bind(input.targetProjectId, input.sourceProjectId, input.runId),
+    db
+      .prepare(
+        `update briar_hunt_runs
+         set project_id = ?,
+             repository = case when ? = 1 then ? else repository end,
+             workflow_snapshot_json = case when ? = 1 then ? else workflow_snapshot_json end,
+             agent_id = null,
+             worker_id = null,
+             requested_worker_id = null,
+             claim_token_hash = null,
+             claimed_by = null,
+             claimed_at = null,
+             lease_expires_at = null,
+             claim_attempts = 0,
+             dispatch_mode = null,
+             dispatch_request_id = null,
+             dispatched_at = null,
+             requested_by_user_id = null,
+             requested_agent_provider = null,
+             requested_agent_model = null,
+             requested_agent_effort = null,
+             updated_at = ?
+         where id = ? and project_id = ?
+           and status <> 'running'
+           and not (
+             status = 'queued'
+             and lease_expires_at is not null
+             and lease_expires_at > ?
+           )
+         returning id`,
+      )
+      .bind(
+        input.targetProjectId,
+        refreshWorkflow,
+        targetRepository,
+        refreshWorkflow,
+        targetWorkflowJson,
+        input.observedAt,
+        input.runId,
+        input.sourceProjectId,
+        input.observedAt,
+      ),
+  ];
+
+  const results = await db.batch(statements);
+  const runUpdate = results.at(-1);
+  if ((runUpdate?.meta.changes ?? 0) === 0) {
+    // Race: run became active between the guard and the update.
+    const stillThere = await getHuntRunForProject(
+      db,
+      input.sourceProjectId,
+      input.runId,
+    );
+    if (!stillThere) {
+      // Moved or deleted by another writer; check target.
+      const moved = await getHuntRunForProject(
+        db,
+        input.targetProjectId,
+        input.runId,
+      );
+      return moved ? "transferred" : "not_found";
+    }
+    return isActivelyClaimedRun(stillThere, input.observedAt)
+      ? "active"
+      : "not_found";
+  }
+  return "transferred";
+}
+
 export type InboxReadStateRow = {
   message_id: string;
   version: string;

@@ -28,6 +28,7 @@ import {
   deleteAccountData,
   deleteProjectAgent,
   deleteIssue,
+  transferIssue,
   deleteIssueDependency,
   deleteProjectAgentSchedule,
   deleteProject,
@@ -667,6 +668,146 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
 
   afterAll(async () => {
     await miniflare.dispose();
+  });
+
+  it("transfers an issue to another project with children and a source tombstone", async () => {
+    const targetProjectId = "22222222-2222-4222-8222-222222222222";
+    await db
+      .prepare(
+        `update briar_project_settings set workflow_json = ? where project_id = ?`,
+      )
+      .bind(JSON.stringify(releaseWorkflow), projectId)
+      .run();
+    await executeSql(
+      db,
+      `
+      insert into briar_projects (
+        id, owner_user_id, organization_id, name, agent_token_hash, created_at, updated_at
+      ) values (
+        '${targetProjectId}', 'owner', '${projectId}', 'Target',
+        'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        '${atMinute(0)}', '${atMinute(0)}'
+      );
+      insert into briar_project_settings (
+        project_id, velen_org, linear_enabled, workflow_json, github_repository,
+        created_at, updated_at
+      ) values (
+        '${targetProjectId}', 'example', 0,
+        '${JSON.stringify(localWorkflow).replace(/'/g, "''")}',
+        'target/repository',
+        '${atMinute(0)}', '${atMinute(0)}'
+      );
+    `,
+    );
+
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 80, {
+        sourceKey: "transfer-issue-contract",
+        eventKey: "transfer-issue-contract:queued",
+        title: "Transfer me",
+        status: "queued",
+        branch: null,
+        commitSha: null,
+      }),
+    );
+    await createIssueAttachments(db, projectId, runId, [
+      {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        object_key: "issue-attachments/source/transfer.png",
+        filename: "transfer.png",
+        content_type: "image/png",
+        byte_size: 12,
+      },
+    ]);
+    await createIssueMessage(db, {
+      id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      projectId,
+      runId,
+      parentMessageId: null,
+      authorUserId: "owner",
+      authorAgentProvider: null,
+      body: "Keep this conversation",
+      createdAt: atMinute(81),
+    });
+
+    const sourceCursor = await getDashboardSyncCursor(db, projectId);
+    const targetCursor = await getDashboardSyncCursor(db, targetProjectId);
+    const outcome = await transferIssue(db, {
+      sourceProjectId: projectId,
+      targetProjectId,
+      targetProjectName: "Target",
+      runId,
+      observedAt: atMinute(82),
+    });
+    expect(outcome).toBe("transferred");
+
+    expect(await getHuntRunForProject(db, projectId, runId)).toBeNull();
+    const moved = await getHuntRunForProject(db, targetProjectId, runId);
+    expect(moved).toMatchObject({
+      id: runId,
+      project_id: targetProjectId,
+      title: "Transfer me",
+      repository: "target/repository",
+    });
+    expect(JSON.parse(moved!.workflow_snapshot_json).stages.map((s: { id: string }) => s.id))
+      .toEqual(localWorkflow.stages.map((stage) => stage.id));
+
+    const attachments = await listIssueAttachments(db, targetProjectId, runId);
+    expect(attachments).toHaveLength(1);
+    const messages = await listIssueMessages(db, targetProjectId, runId);
+    expect(messages.map((message) => message.body)).toContain(
+      "Keep this conversation",
+    );
+
+    const sourceChanges = await listDashboardChanges(db, projectId, sourceCursor);
+    expect(sourceChanges.changes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          entity_type: "run",
+          entity_id: runId,
+          operation: "delete",
+        }),
+      ]),
+    );
+    expect(await getDashboardSyncCursor(db, targetProjectId)).toBeGreaterThan(
+      targetCursor,
+    );
+    const targetUpserts = await db
+      .prepare(
+        `select entity_type, entity_id, operation
+         from briar_dashboard_changes
+         where project_id = ? and entity_id = ? and operation = 'upsert'`,
+      )
+      .bind(targetProjectId, runId)
+      .all<{ entity_type: string; entity_id: string; operation: string }>();
+    expect(targetUpserts.results).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          entity_type: "run",
+          entity_id: runId,
+          operation: "upsert",
+        }),
+      ]),
+    );
+
+    expect(
+      await transferIssue(db, {
+        sourceProjectId: projectId,
+        targetProjectId,
+        targetProjectName: "Target",
+        runId,
+        observedAt: atMinute(83),
+      }),
+    ).toBe("not_found");
+
+    await db
+      .prepare(
+        `update briar_project_settings set workflow_json = ? where project_id = ?`,
+      )
+      .bind(JSON.stringify(repositoryWorkflowBootstrap), projectId)
+      .run();
   });
 
   it("records monotonic dashboard deltas and a deletion tombstone", async () => {

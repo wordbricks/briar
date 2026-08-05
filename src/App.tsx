@@ -1269,6 +1269,7 @@ export function App() {
             onCreateIssue={briar.addIssue}
             onIssueDialogOpenChange={setIsIssueDialogOpen}
             onDeleteIssue={briar.deleteIssue}
+            onTransferIssue={briar.transferIssue}
             onAddIssueDependency={briar.addIssueDependency}
             onRemoveIssueDependency={briar.removeIssueDependency}
             onUpdateIssue={briar.editIssue}
@@ -1647,6 +1648,7 @@ export function App() {
             onCreateIssue={briar.addIssue}
             onIssueDialogOpenChange={setIsIssueDialogOpen}
             onDeleteIssue={briar.deleteIssue}
+            onTransferIssue={briar.transferIssue}
             onAddIssueDependency={briar.addIssueDependency}
             onRemoveIssueDependency={briar.removeIssueDependency}
             onUpdateIssue={briar.editIssue}

@@ -106,6 +106,18 @@ final class IssueMutationStore: ObservableObject {
         }
     }
 
+    func transferIssue(runID: UUID, targetProjectID: UUID) async throws -> TransferIssueResponse {
+        try await perform("transfer-\(runID)") {
+            try await api.send(
+                MobileAPIContract.Endpoint.runTransfer(projectID: projectID, runID: runID),
+                method: "POST",
+                token: token,
+                body: TransferIssueRequest(targetProjectId: targetProjectID),
+                as: TransferIssueResponse.self
+            )
+        }
+    }
+
     func savePreferences(
         runID: UUID,
         preferences: IssueExecutionPreferences
