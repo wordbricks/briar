@@ -108,6 +108,7 @@ import {
   filesFromDataTransfer,
   formatAttachmentBytes,
   issueAttachmentAccept,
+  isIssueAttachmentImage,
   maxIssueAttachmentCount,
   normalizeIssueAttachmentFile,
   validateIssueAttachments,
@@ -6364,7 +6365,10 @@ function IssueAttachmentPreview({
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [attachment.url, onLoadAttachment]);
-  const isImage = attachment.contentType.startsWith("image/");
+  const isImage = isIssueAttachmentImage(
+    attachment.contentType,
+    attachment.filename,
+  );
   return (
     <article className="run-attachment">
       <div className="run-attachment-media">

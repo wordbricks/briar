@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   dataTransferHasFiles,
   filesFromDataTransfer,
+  isIssueAttachmentImage,
   issueAttachmentMimeTypeFromName,
   maxIssueAttachmentBytes,
   normalizeIssueAttachmentFile,
@@ -59,6 +60,14 @@ describe("issue attachment drop helpers", () => {
     expect(issueAttachmentMimeTypeFromName("shot.JPG")).toBe("image/jpeg");
     expect(issueAttachmentMimeTypeFromName("clip.m4v")).toBe("video/mp4");
     expect(issueAttachmentMimeTypeFromName("notes.txt")).toBeNull();
+  });
+
+  it("detects image attachments from content type or filename", () => {
+    expect(isIssueAttachmentImage("image/png", "x.bin")).toBe(true);
+    expect(isIssueAttachmentImage("", "image.png")).toBe(true);
+    expect(isIssueAttachmentImage(null, "photo.JPG")).toBe(true);
+    expect(isIssueAttachmentImage("video/mp4", "clip.mp4")).toBe(false);
+    expect(isIssueAttachmentImage("", "notes.txt")).toBe(false);
   });
 
   it("fills empty File.type from the filename for supported media", () => {
