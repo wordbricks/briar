@@ -100,16 +100,19 @@ struct PendingIssueAttachment: Identifiable, Equatable, Sendable {
 }
 
 struct IssueDraft: Codable, Equatable, Sendable {
+    /// Default create-issue priority matches the desktop/web create dialog (P2).
+    static let defaultPriority: Int = 2
+
     var title = ""
     var description = ""
-    var priority: Int?
+    var priority: Int? = defaultPriority
     var assigneeUserId: String? = nil
     var status: DashboardRun.Status = .queued
 
     var isEmpty: Bool {
         title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
             description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-            priority == nil &&
+            priority == Self.defaultPriority &&
             assigneeUserId == nil
     }
 }
