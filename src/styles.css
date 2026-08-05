@@ -1221,6 +1221,28 @@ body { overflow: hidden; font-synthesis: none; }
 .run-page-layout { height:100%; min-height:0; position:relative; display:grid; grid-template-columns:minmax(0,2fr) minmax(340px,1fr); align-items:stretch; gap:0; }
 .run-page-main { min-width:0; min-height:0; display:flex; flex-direction:column; overflow:hidden; }
 .run-page-content { width:100%; min-width:0; min-height:0; flex:1; padding:16px 20px 22px 24px; overflow:hidden; }
+.issue-workflow-progress { min-width:0; min-height:70px; flex:0 0 auto; padding:11px 24px 9px; overflow-x:auto; border-top:1px solid var(--border); background:color-mix(in srgb,var(--card) 96%,var(--muted)); scrollbar-width:thin; }
+.issue-workflow-progress ol { min-width:max-content; margin:0; padding:0; display:flex; list-style:none; }
+.issue-workflow-progress li { min-width:96px; position:relative; flex:1 0 96px; display:grid; grid-template-rows:24px auto; justify-items:center; align-items:start; gap:3px; color:var(--muted-foreground); }
+.issue-workflow-progress li::before { content:""; height:2px; position:absolute; z-index:0; top:10px; right:50%; left:-50%; background:var(--border); }
+.issue-workflow-progress li:first-child::before { display:none; }
+.issue-workflow-progress li[data-reached="true"]::before { background:#765bd0; }
+.issue-workflow-marker { width:20px; height:20px; position:relative; z-index:1; display:grid; place-items:center; border:2px solid color-mix(in srgb,var(--muted-foreground) 55%,var(--border)); border-radius:50%; color:#fff; background:var(--card); box-shadow:0 0 0 3px var(--card); }
+.issue-workflow-marker i { width:6px; height:6px; display:block; border-radius:50%; background:transparent; }
+.issue-workflow-label { max-width:112px; overflow:hidden; font-size:var(--text-2xs); font-weight:550; line-height:1.25; text-align:center; text-overflow:ellipsis; white-space:nowrap; }
+.issue-workflow-progress li[data-state="complete"] { color:var(--foreground); }
+.issue-workflow-progress li[data-state="complete"] .issue-workflow-marker { border-color:#765bd0; background:#765bd0; }
+.issue-workflow-progress li[data-state="active"] { color:#654bb8; }
+.issue-workflow-progress li[data-state="active"] .issue-workflow-marker { border-color:#765bd0; box-shadow:0 0 0 3px var(--card),0 0 0 5px color-mix(in srgb,#765bd0 18%,transparent); }
+.issue-workflow-progress li[data-state="active"] .issue-workflow-marker i { background:#765bd0; }
+.issue-workflow-progress li[data-state="paused"] { color:#9b681f; }
+.issue-workflow-progress li[data-state="paused"] .issue-workflow-marker { border-color:#c18a35; }
+.issue-workflow-progress li[data-state="paused"] .issue-workflow-marker i { background:#c18a35; }
+.issue-workflow-progress li[data-state="blocked"],.issue-workflow-progress li[data-state="failed"] { color:var(--destructive); }
+.issue-workflow-progress li[data-state="blocked"] .issue-workflow-marker,.issue-workflow-progress li[data-state="failed"] .issue-workflow-marker { border-color:var(--destructive); }
+.issue-workflow-progress li[data-state="blocked"] .issue-workflow-marker i,.issue-workflow-progress li[data-state="failed"] .issue-workflow-marker i { background:var(--destructive); }
+.issue-workflow-progress li[data-state="cancelled"] .issue-workflow-marker { border-color:var(--muted-foreground); }
+.issue-workflow-progress li[data-state="cancelled"] .issue-workflow-marker i { background:var(--muted-foreground); }
 .run-properties-layer { position:absolute; z-index:10; inset:0; }
 .run-properties { width:min(310px,100%); min-width:0; min-height:0; height:100%; position:absolute; z-index:10; top:0; right:0; display:grid; align-content:start; gap:24px; padding:0 16px 20px; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; scrollbar-width:thin; border-left:1px solid var(--border); background:var(--card); box-shadow:-16px 0 40px rgba(0,0,0,.12); }
 .run-properties-header { min-height:46px; position:sticky; z-index:1; top:0; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border); background:var(--card); }
@@ -4268,6 +4290,8 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .companion-shell .run-page-main { min-height:360px; overflow:visible; }
 .companion-shell .run-page-content { min-height:320px; padding:16px 0 0; overflow:visible; }
 .companion-shell .issue-detail-tabs { padding:0; }
+.companion-shell .issue-workflow-progress { margin-top:18px; padding:13px 0 3px; border-bottom:1px solid var(--border); background:transparent; }
+.companion-shell .issue-workflow-progress li { min-width:88px; flex-basis:88px; }
 .companion-shell .issue-description-pane { height:auto; min-height:220px; }
 .companion-shell .issue-description-scroll { overflow:visible; }
 .companion-shell .run-result-panel { padding-right:0; }

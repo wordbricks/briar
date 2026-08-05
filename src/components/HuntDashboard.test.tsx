@@ -1502,6 +1502,19 @@ describe("HuntDashboard", () => {
     expect(container.querySelector(".run-page-content > .run-issue-description")).toBeNull();
     expect(container.querySelector(".run-page-content > .issue-activity")).toBeNull();
     expect(container.querySelector(".run-properties")).toBeNull();
+    const workflowProgress = container.querySelector(".issue-workflow-progress");
+    expect(workflowProgress?.querySelector("ol")?.getAttribute("aria-label")).toBe(
+      "전체 진행률",
+    );
+    const workflowStages = workflowProgress?.querySelectorAll("li") ?? [];
+    expect(workflowStages).toHaveLength(demoDashboard.runs[0].workflow.stages.length);
+    expect(workflowStages[0]?.getAttribute("data-state")).toBe("complete");
+    expect(workflowStages[1]?.getAttribute("data-state")).toBe("active");
+    expect(workflowStages[1]?.getAttribute("aria-current")).toBe("step");
+    expect(workflowStages[2]?.getAttribute("data-state")).toBe("upcoming");
+    expect(workflowStages[0]?.getAttribute("aria-label")).toContain("완료");
+    expect(workflowStages[1]?.getAttribute("aria-label")).toContain("진행 중");
+    expect(workflowStages[2]?.getAttribute("aria-label")).toContain("대기");
     expect(
       container.querySelectorAll(".run-page-property-badge"),
     ).toHaveLength(4);
