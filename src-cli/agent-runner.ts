@@ -31,6 +31,89 @@ export type DetachedAgent = {
   skill: string;
 };
 
+export type DetachedProviderBlock = {
+  reason: "free_tier_limit";
+  provider: string;
+  message: string;
+  nextRetryAt: string | null;
+};
+
+export function detachedProviderBlockFromPayload(
+  payload: unknown,
+): DetachedProviderBlock | null {
+  if (!payload || typeof payload !== "object") return null;
+  const record = payload as Record<string, unknown>;
+  if (record.type !== "blocked" || record.reason !== "free_tier_limit") {
+    return null;
+  }
+  if (typeof record.provider !== "string" || !record.provider.trim()) {
+    return null;
+  }
+  if (typeof record.message !== "string" || !record.message.trim()) {
+    return null;
+  }
+  const nextRetryAt =
+    typeof record.nextRetryAt === "string" &&
+      !Number.isNaN(Date.parse(record.nextRetryAt))
+      ? new Date(record.nextRetryAt).toISOString()
+      : null;
+  return {
+    reason: "free_tier_limit",
+    provider: record.provider.trim(),
+    message: record.message.trim(),
+    nextRetryAt,
+  };
+}
+
+export function detachedProviderBlockedRunEvent(input: {
+  block: DetachedProviderBlock;
+  runId: string;
+  attempt: number;
+  actor: string;
+  repository: string;
+  model: string | null;
+  occurredAt: string;
+}) {
+  const availableAt = input.block.nextRetryAt
+    ? ` OpenCode가 안내한 다음 사용 가능 시각은 ${input.block.nextRetryAt}입니다.`
+    : "";
+  const summary =
+    "OpenCode 무료 사용 한도가 소진되어 에이전트가 작업을 계속할 수 없습니다. " +
+    `작업이 완료되지 않았으며 현재까지의 변경 사항은 worktree에 보존됩니다. 사용 가능한 모델이나 요금제를 준비한 뒤 다시 실행해야 합니다.${availableAt}`;
+  const nextAction = input.block.nextRetryAt
+    ? `프로젝트 또는 이슈의 실행 모델을 사용 가능한 모델로 변경하거나 ${input.block.nextRetryAt} 이후까지 기다린 다음, Briar 이슈 화면에서 재시도를 눌러 새 실행이 시작되는지 확인해 주세요.`
+    : "프로젝트 또는 이슈의 실행 모델을 사용 가능한 모델로 변경하거나 OpenCode 요금제를 활성화한 다음, Briar 이슈 화면에서 재시도를 눌러 새 실행이 시작되는지 확인해 주세요.";
+  const selectedModel = input.model?.trim() || "provider default";
+  return {
+    runId: input.runId,
+    status: "blocked" as const,
+    workflowStage: null,
+    eventKey: `detached:${input.attempt}:agent-blocked:${input.block.reason}`,
+    occurredAt: input.occurredAt,
+    actor: input.actor,
+    repository: input.repository,
+    detail:
+      `OpenCode session entered retry/${input.block.reason}; ` +
+      `provider=${input.block.provider}, model=${selectedModel}, ` +
+      `providerMessage=${input.block.message}` +
+      (input.block.nextRetryAt
+        ? `, nextRetryAt=${input.block.nextRetryAt}`
+        : ""),
+    resultSummary: summary,
+    structuredResult: {
+      summary,
+      outcome: "blocked" as const,
+      importance: "important" as const,
+      urgency: "normal" as const,
+      impact: "issue" as const,
+      humanActionRequired: true,
+      nextAction,
+      dueAt: input.block.nextRetryAt,
+    },
+    pullRequestUrls: [] as string[],
+  };
+}
+
 export function detachedAgentPrompt(input: {
   agent: DetachedAgent | null;
   snapshot: {

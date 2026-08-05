@@ -32,8 +32,10 @@ import {
   detachedAgentPrompt,
   detachedIdeaPrompt,
   detachedIssueReplyPrompt,
-  detachedProviderRequest,
   detachedPayloadDirection,
+  detachedProviderBlockedRunEvent,
+  detachedProviderBlockFromPayload,
+  detachedProviderRequest,
   detachedTranscriptSequence,
   detachedTranscriptPayload,
   issueReplyTextFromPayload,
@@ -2048,6 +2050,7 @@ async function runClaimedIssueInRuntime(
   let sequence = 0;
   let stderr = "";
   let runnerError: string | null = null;
+  let runnerBlock: ReturnType<typeof detachedProviderBlockFromPayload> = null;
   let completed = false;
   let tokenUsage: AgentExecutionTokenUsage | null = null;
   const terminate = () => {
@@ -2081,6 +2084,7 @@ async function runClaimedIssueInRuntime(
       }
       tokenUsage =
         agentExecutionTokenUsageFromPayload(provider, payload) ?? tokenUsage;
+      runnerBlock ??= detachedProviderBlockFromPayload(payload);
       const direction = detachedPayloadDirection(payload);
       payload = detachedTranscriptPayload(payload, line);
       if (
@@ -2185,6 +2189,24 @@ async function runClaimedIssueInRuntime(
       throw signal.reason instanceof Error
         ? signal.reason
         : new Error("Worker execution was cancelled");
+    }
+    if (runnerBlock) {
+      await request(config.apiUrl, "/run-events", workerToken, {
+        method: "POST",
+        headers: { "X-Briar-Claim-Token": issue.claimToken },
+        body: JSON.stringify(
+          detachedProviderBlockedRunEvent({
+            block: runnerBlock,
+            runId: issue.runId,
+            attempt: issue.currentAttempt,
+            actor: `briar-worker:${activeProject.executionWorker?.workerId ?? "unknown"}`,
+            repository: issue.repository,
+            model: execution.model,
+            occurredAt: new Date().toISOString(),
+          }),
+        ),
+      });
+      return;
     }
     if (exitCode !== 0 || runnerError) {
       throw new Error(

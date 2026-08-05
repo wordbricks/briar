@@ -51,8 +51,16 @@ export type OpenCodeRunnerOutput =
       input: Record<string, unknown>;
       title?: string;
     }
+  | ({ type: "blocked" } & OpenCodeBlockedRetry)
   | { type: "result"; sessionId: string; message: string }
   | { type: "error"; message: string };
+
+export type OpenCodeBlockedRetry = {
+  reason: "free_tier_limit";
+  provider: string;
+  message: string;
+  nextRetryAt: string | null;
+};
 
 export type OpenCodeEventState = {
   messageRoles: Map<string, "user" | "assistant">;
@@ -215,6 +223,51 @@ function eventSessionId(event: Record<string, unknown>): string | undefined {
   if (!properties || typeof properties !== "object") return undefined;
   const sessionID = (properties as { sessionID?: unknown }).sessionID;
   return typeof sessionID === "string" ? sessionID : undefined;
+}
+
+/**
+ * Detect the OpenCode free-tier retry state that otherwise keeps the prompt
+ * request open until the provider's next quota window.
+ */
+export function openCodeBlockedRetry(
+  raw: unknown,
+  sessionId: string,
+): OpenCodeBlockedRetry | null {
+  if (!raw || typeof raw !== "object") return null;
+  const event = raw as Record<string, unknown>;
+  if (event.type !== "session.status" || eventSessionId(event) !== sessionId) {
+    return null;
+  }
+  const properties = event.properties as Record<string, unknown>;
+  const status = properties.status;
+  if (!status || typeof status !== "object") return null;
+  const retry = status as Record<string, unknown>;
+  if (retry.type !== "retry") return null;
+  const action = retry.action;
+  if (!action || typeof action !== "object") return null;
+  const blocker = action as Record<string, unknown>;
+  if (blocker.reason !== "free_tier_limit") return null;
+
+  const next = retry.next;
+  const nextRetryDate =
+    typeof next === "number" && Number.isFinite(next) ? new Date(next) : null;
+  return {
+    reason: "free_tier_limit",
+    provider:
+      typeof blocker.provider === "string" && blocker.provider.trim()
+        ? blocker.provider.trim()
+        : "opencode",
+    message:
+      typeof blocker.message === "string" && blocker.message.trim()
+        ? blocker.message.trim()
+        : typeof retry.message === "string" && retry.message.trim()
+          ? retry.message.trim()
+          : "OpenCode free usage limit reached.",
+    nextRetryAt:
+      nextRetryDate && !Number.isNaN(nextRetryDate.getTime())
+        ? nextRetryDate.toISOString()
+        : null,
+  };
 }
 
 function rememberMessagePart(state: OpenCodeEventState, messageId: string, partId: string) {
