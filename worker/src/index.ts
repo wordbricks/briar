@@ -333,6 +333,7 @@ import {
   exchangeSlackOAuthCode,
   parseSlackIssueInstruction,
   parseSlackCreateIssueSubmission,
+  buildSlackIssueCreatedMessage,
   postSlackCommandResponse,
   randomUrlSafeToken,
   sha256Hex,
@@ -2661,6 +2662,14 @@ async function processSlackAppMention(env: Env, payload: SlackEventCallback) {
         },
       },
     );
+    const run = await getHuntRunForProject(
+      env.DB,
+      installation.default_project_id,
+      runId,
+    );
+    if (!run) {
+      throw new Error("Created Slack mention issue is missing");
+    }
     const statusLabel =
       instruction.status === "backlog" ? "백로그" : "작업 대기열";
     const priorityLabel = instruction.priority
@@ -2669,7 +2678,13 @@ async function processSlackAppMention(env: Env, payload: SlackEventCallback) {
     await postSlackReply(
       token,
       payload.event,
-      `:white_check_mark: *${instruction.title}* 이슈를 만들었습니다.\n프로젝트: ${project.name} · ${statusLabel}${priorityLabel}\n이슈 ID: \`${runId}\``,
+      buildSlackIssueCreatedMessage({
+        title: instruction.title,
+        projectName: project.name,
+        statusLabel,
+        priorityLabel,
+        runNumber: run.run_number,
+      }),
     );
     await completeSlackEvent(
       env.DB,
@@ -3138,7 +3153,20 @@ async function processSlackCreateIssueSubmission(
       new Date().toISOString(),
     );
     try {
-      const text = `:white_check_mark: *${submission.title}* 이슈를 만들었습니다.\n프로젝트: ${project.name} · 작업 대기열\n이슈 ID: \`${created.runId}\``;
+      const run = await getHuntRunForProject(
+        env.DB,
+        project.id,
+        created.runId,
+      );
+      if (!run) {
+        throw new Error("Created Slack issue is missing");
+      }
+      const text = buildSlackIssueCreatedMessage({
+        title: submission.title,
+        projectName: project.name,
+        statusLabel: "작업 대기열",
+        runNumber: run.run_number,
+      });
       if (submission.responseUrl) {
         await postSlackCommandResponse(submission.responseUrl, text);
       } else {
