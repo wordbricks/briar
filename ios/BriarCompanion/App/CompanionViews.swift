@@ -224,6 +224,7 @@ struct CompanionShellView: View {
 struct TaskListView: View {
     @State private var filter = TaskFilter.all
     @State private var showingCreateIssue = false
+    @State private var dispatchRun: DashboardRun?
     @StateObject private var mutations: IssueMutationStore
 
     let project: ProjectsResponse.Project
@@ -324,6 +325,21 @@ struct TaskListView: View {
                                 )
                             }
                             .accessibilityIdentifier("task-row-\(run.id.uuidString)")
+                            .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                                if run.status == .backlog || run.status == .queued {
+                                    Button {
+                                        dispatchRun = run
+                                    } label: {
+                                        Label("바로 처리", systemImage: "play.fill")
+                                    }
+                                    .tint(.blue)
+                                    .disabled((run.waitingOnPrerequisiteCount ?? 0) > 0)
+                                    .accessibilityLabel("\(run.title) 바로 처리")
+                                    .accessibilityIdentifier(
+                                        "task-process-now-\(run.id.uuidString.lowercased())"
+                                    )
+                                }
+                            }
                         }
                     }
                     if let generatedAt = snapshot?.generatedAt {
@@ -356,6 +372,16 @@ struct TaskListView: View {
             CreateIssueSheet(
                 mutations: mutations,
                 members: snapshot?.members ?? [],
+                refresh: refresh
+            )
+        }
+        .sheet(item: $dispatchRun) { run in
+            DispatchIssueSheet(
+                run: run,
+                reassign: false,
+                providers: snapshot?.organizationProviders ?? [],
+                workers: snapshot?.workers ?? [],
+                mutations: mutations,
                 refresh: refresh
             )
         }

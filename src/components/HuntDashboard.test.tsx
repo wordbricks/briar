@@ -943,6 +943,71 @@ describe("HuntDashboard", () => {
     ]);
   });
 
+  it("reveals the process dialog shortcut when a queued companion task is swiped right", async () => {
+    const onProcessIssueNow = vi.fn();
+    const queuedRun = {
+      ...demoDashboard.runs[0],
+      status: "queued" as const,
+      workflowStage: null,
+      claimedBy: null,
+      claimedAt: null,
+      leaseExpiresAt: null,
+      workerId: null,
+      requestedWorkerId: null,
+      executionReadiness: "ready" as const,
+    };
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        companionMode
+        dashboard={{ ...demoDashboard, runs: [queuedRun] }}
+        onProcessIssueNow={onProcessIssueNow}
+      />,
+    ));
+
+    const swipeRow = container.querySelector<HTMLElement>(
+      ".companion-task-swipe",
+    );
+    const firePointer = (
+      type: string,
+      clientX: number,
+      clientY: number,
+    ) => {
+      const event = new Event(type, { bubbles: true, cancelable: true });
+      Object.defineProperties(event, {
+        button: { value: 0 },
+        clientX: { value: clientX },
+        clientY: { value: clientY },
+        isPrimary: { value: true },
+        pointerId: { value: 1 },
+        pointerType: { value: "touch" },
+      });
+      swipeRow?.dispatchEvent(event);
+    };
+
+    await act(async () => {
+      firePointer("pointerdown", 10, 20);
+      firePointer("pointermove", 70, 22);
+      firePointer("pointerup", 70, 22);
+    });
+
+    const action = container.querySelector<HTMLButtonElement>(
+      ".companion-task-swipe-action",
+    );
+    expect(swipeRow?.className).toContain("open");
+    expect(action?.getAttribute("aria-hidden")).toBe("false");
+    expect(action?.getAttribute("aria-label")).toBe("바로 처리하기");
+    expect(action?.disabled).toBe(false);
+
+    await act(async () => action?.click());
+    expect(onProcessIssueNow).toHaveBeenCalledWith(queuedRun);
+    expect(container.querySelector(".run-page")).toBeNull();
+
+    await act(async () => root.unmount());
+  });
+
   it("keeps the desktop context menu disabled in companion mode", async () => {
     const container = document.createElement("div");
     document.body.append(container);
