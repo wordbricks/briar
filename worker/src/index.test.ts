@@ -895,6 +895,134 @@ describe("Worker HTTP contract", () => {
     ).toContain("PATCH");
   });
 
+  it("verifies and acknowledges GitHub App ping webhooks", async () => {
+    const secret = "github-webhook-test-secret";
+    const body = JSON.stringify({ zen: "Responsive is better than fast.", hook_id: 42 });
+    const signature = `sha256=${
+      createHmac("sha256", secret).update(body).digest("hex")
+    }`;
+    const run = vi.fn(async () => ({ meta: { changes: 1 } }));
+    const bind = vi.fn(() => ({ run }));
+    const prepare = vi.fn(() => ({ bind }));
+    const env = {
+      DB: { prepare },
+      GITHUB_WEBHOOK_SECRET: secret,
+    } as never;
+    const request = new Request("https://briar-api.example/github/webhooks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-github-delivery": "33333333-3333-4333-8333-333333333333",
+        "x-github-event": "ping",
+        "x-hub-signature-256": signature,
+      },
+      body,
+    });
+
+    const response = await worker.fetch(request, env);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ ok: true, event: "ping" });
+    expect(prepare).toHaveBeenCalledTimes(3);
+  });
+
+  it("acknowledges GitHub App repository-selection deliveries", async () => {
+    const secret = "github-webhook-test-secret";
+    const body = JSON.stringify({
+      action: "added",
+      installation: { id: 901 },
+      repositories_added: [{
+        id: 701,
+        name: "briar",
+        full_name: "wordbricks/briar",
+        owner: { login: "wordbricks" },
+      }],
+      repositories_removed: [],
+    });
+    const signature = `sha256=${
+      createHmac("sha256", secret).update(body).digest("hex")
+    }`;
+    const run = vi.fn(async () => ({ meta: { changes: 1 } }));
+    const bind = vi.fn(() => ({ run }));
+    const prepare = vi.fn(() => ({ bind }));
+    const batch = vi.fn(async () => [
+      { meta: { changes: 0 } },
+      { meta: { changes: 0 } },
+      { meta: { changes: 0 } },
+    ]);
+    const response = await worker.fetch(new Request(
+      "https://briar-api.example/github/webhooks",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-github-delivery": "44444444-4444-4444-8444-444444444444",
+          "x-github-event": "installation_repositories",
+          "x-hub-signature-256": signature,
+        },
+        body,
+      },
+    ), {
+      DB: { prepare, batch },
+      GITHUB_WEBHOOK_SECRET: secret,
+    } as never);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      ok: true,
+      event: "installation_repositories",
+      action: "added",
+      updated: false,
+    });
+    expect(batch).toHaveBeenCalledOnce();
+  });
+
+  it("rejects a GitHub webhook before touching the database when its signature is invalid", async () => {
+    const prepare = vi.fn();
+    const response = await worker.fetch(
+      new Request("https://briar-api.example/github/webhooks", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-github-delivery": "33333333-3333-4333-8333-333333333333",
+          "x-github-event": "ping",
+          "x-hub-signature-256": `sha256=${"0".repeat(64)}`,
+        },
+        body: JSON.stringify({ zen: "Keep it logically awesome." }),
+      }),
+      {
+        DB: { prepare },
+        GITHUB_WEBHOOK_SECRET: "github-webhook-test-secret",
+      } as never,
+    );
+
+    expect(response.status).toBe(401);
+    expect(prepare).not.toHaveBeenCalled();
+  });
+
+  it("stops reading an oversized GitHub webhook before signature verification", async () => {
+    const prepare = vi.fn();
+    const response = await worker.fetch(
+      new Request("https://briar-api.example/github/webhooks", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-github-delivery": "33333333-3333-4333-8333-333333333333",
+          "x-github-event": "ping",
+          "x-hub-signature-256": `sha256=${"0".repeat(64)}`,
+        },
+        body: "x".repeat(1_048_577),
+      }),
+      {
+        DB: { prepare },
+        GITHUB_WEBHOOK_SECRET: "github-webhook-test-secret",
+      } as never,
+    );
+
+    expect(response.status).toBe(413);
+    expect(prepare).not.toHaveBeenCalled();
+  });
+
   it("acknowledges /create immediately on the command and legacy event URLs", async () => {
     const signingSecret = "test-slack-signing-secret";
     const pendingInstallation = new Promise<never>(() => {});

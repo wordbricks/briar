@@ -10,7 +10,6 @@ import {
   Globe2,
   Keyboard,
   Link2,
-  MessageSquare,
   Palette,
   Plug,
   Settings2,
@@ -170,7 +169,7 @@ export function UnifiedSettingsSidebar({
       },
       {
         id: "integrations",
-        icon: <MessageSquare size={16} strokeWidth={1.75} />,
+        icon: <Plug size={16} strokeWidth={1.75} />,
         label: t("organization.integrations"),
       },
     ],

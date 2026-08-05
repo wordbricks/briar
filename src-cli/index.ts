@@ -1516,10 +1516,14 @@ async function addRunEvidence() {
     parsed.url &&
     (parsed.status === "passed" || parsed.status === "pending")
   ) {
-    ensureBriarIssueLinkInGithubPullRequest({
+    const github = ensureBriarIssueLinkInGithubPullRequest({
       pullRequestUrl: parsed.url,
       issueUrl: briarIssueUrl(config.apiUrl, project.id, runId),
     });
+    parsed.metadata = {
+      ...(parsed.metadata ?? {}),
+      githubPullRequest: github.identity,
+    };
   }
   const imagePaths = values("--image").map((path) => resolve(path));
   const images = await Promise.all(

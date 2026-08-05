@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 export type EncryptedEnvPolicy = {
   publicKey: string;
   secrets: readonly string[];
+  optionalSecrets?: readonly string[];
 };
 
 export const encryptedEnvPolicies: Readonly<Record<string, EncryptedEnvPolicy>> = {
@@ -17,6 +18,13 @@ export const encryptedEnvPolicies: Readonly<Record<string, EncryptedEnvPolicy>> 
       "SLACK_CLIENT_SECRET",
       "SLACK_SIGNING_SECRET",
       "SLACK_TOKEN_ENCRYPTION_KEY",
+    ],
+    optionalSecrets: [
+      "GITHUB_APP_CLIENT_ID",
+      "GITHUB_APP_CLIENT_SECRET",
+      "GITHUB_APP_SLUG",
+      "GITHUB_CALLBACK_ORIGIN",
+      "GITHUB_WEBHOOK_SECRET",
     ],
   },
   ".env.release": {
@@ -66,11 +74,15 @@ export function verifyEncryptedEnv(
     entries.set(key, unquote(rawValue));
   }
 
-  const allowed = new Set([policy.publicKey, ...policy.secrets]);
+  const allowed = new Set([
+    policy.publicKey,
+    ...policy.secrets,
+    ...(policy.optionalSecrets ?? []),
+  ]);
   for (const key of entries.keys()) {
     if (!allowed.has(key)) throw new Error(`${filename} contains unexpected ${key}.`);
   }
-  for (const key of allowed) {
+  for (const key of [policy.publicKey, ...policy.secrets]) {
     if (!entries.has(key)) throw new Error(`${filename} is missing ${key}.`);
   }
 
@@ -80,6 +92,12 @@ export function verifyEncryptedEnv(
   }
   for (const key of policy.secrets) {
     if (!/^encrypted:[A-Za-z0-9+/=]+$/u.test(entries.get(key) ?? "")) {
+      throw new Error(`${filename} requires encrypted ciphertext for ${key}.`);
+    }
+  }
+  for (const key of policy.optionalSecrets ?? []) {
+    const value = entries.get(key);
+    if (value !== undefined && !/^encrypted:[A-Za-z0-9+/=]+$/u.test(value)) {
       throw new Error(`${filename} requires encrypted ciphertext for ${key}.`);
     }
   }

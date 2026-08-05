@@ -14,6 +14,18 @@ type GithubPullRequestTarget = {
   number: string;
 };
 
+export type GithubPullRequestIdentity = {
+  repositoryId: number;
+  repository: string;
+  pullRequestId: number;
+  pullRequestNodeId: string;
+  pullRequestNumber: number;
+};
+
+type GithubPullRequestInspection = GithubPullRequestIdentity & {
+  body: string;
+};
+
 export function briarIssueUrl(
   apiUrl: string,
   projectId: string,
@@ -65,6 +77,49 @@ const runGithubCommand: GithubCommandRunner = (command) => {
   };
 };
 
+function parseGithubPullRequestInspection(
+  stdout: string,
+  target: GithubPullRequestTarget,
+): GithubPullRequestInspection {
+  let value: unknown;
+  try {
+    value = JSON.parse(stdout);
+  } catch {
+    throw new Error("GitHub PR metadata response was not valid JSON");
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("GitHub PR metadata response was invalid");
+  }
+  const record = value as Record<string, unknown>;
+  const repository = typeof record.repository === "string"
+    ? record.repository.trim().toLowerCase()
+    : "";
+  const expectedRepository =
+    `${target.owner}/${target.repository}`.toLowerCase();
+  if (
+    typeof record.body !== "string" ||
+    !Number.isSafeInteger(record.repositoryId) ||
+    Number(record.repositoryId) <= 0 ||
+    repository !== expectedRepository ||
+    !Number.isSafeInteger(record.pullRequestId) ||
+    Number(record.pullRequestId) <= 0 ||
+    typeof record.pullRequestNodeId !== "string" ||
+    record.pullRequestNodeId.trim().length === 0 ||
+    !Number.isSafeInteger(record.pullRequestNumber) ||
+    Number(record.pullRequestNumber) !== Number(target.number)
+  ) {
+    throw new Error("GitHub PR metadata response did not match the requested PR");
+  }
+  return {
+    body: record.body,
+    repositoryId: Number(record.repositoryId),
+    repository,
+    pullRequestId: Number(record.pullRequestId),
+    pullRequestNodeId: record.pullRequestNodeId.trim(),
+    pullRequestNumber: Number(record.pullRequestNumber),
+  };
+}
+
 export function ensureBriarIssueLinkInGithubPullRequest(
   input: {
     pullRequestUrl: string;
@@ -82,17 +137,28 @@ export function ensureBriarIssueLinkInGithubPullRequest(
     "api",
     endpoint,
     "--jq",
-    '.body // ""',
+    "{body: (.body // \"\"), repositoryId: .base.repo.id, repository: .base.repo.full_name, pullRequestId: .id, pullRequestNodeId: .node_id, pullRequestNumber: .number}",
   ]);
   if (current.exitCode !== 0) {
     throw new Error(
       `GitHub PR description could not be read: ${current.stderr.trim() || "gh api failed"}`,
     );
   }
+  const inspection = parseGithubPullRequestInspection(current.stdout, target);
 
-  const body = appendBriarIssueLink(current.stdout, input.issueUrl);
-  if (body === current.stdout) {
-    return { updated: false, reason: "already_linked" as const };
+  const body = appendBriarIssueLink(inspection.body, input.issueUrl);
+  if (body === inspection.body) {
+    return {
+      updated: false,
+      reason: "already_linked" as const,
+      identity: {
+        repositoryId: inspection.repositoryId,
+        repository: inspection.repository,
+        pullRequestId: inspection.pullRequestId,
+        pullRequestNodeId: inspection.pullRequestNodeId,
+        pullRequestNumber: inspection.pullRequestNumber,
+      },
+    };
   }
 
   const updated = run([
@@ -111,5 +177,15 @@ export function ensureBriarIssueLinkInGithubPullRequest(
       }`,
     );
   }
-  return { updated: true, reason: "linked" as const };
+  return {
+    updated: true,
+    reason: "linked" as const,
+    identity: {
+      repositoryId: inspection.repositoryId,
+      repository: inspection.repository,
+      pullRequestId: inspection.pullRequestId,
+      pullRequestNodeId: inspection.pullRequestNodeId,
+      pullRequestNumber: inspection.pullRequestNumber,
+    },
+  };
 }

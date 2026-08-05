@@ -5,7 +5,7 @@ import {
   Cpu,
   Download,
   ImagePlus,
-  MessageSquare,
+  Plug,
   Search,
   Trash2,
   UserPlus,
@@ -60,8 +60,8 @@ import type {
   Project,
 } from "../types";
 import { OrganizationWorkersSettings } from "./OrganizationWorkersSettings";
+import { OrganizationIntegrationsSettings } from "./OrganizationIntegrationsSettings";
 import { SelectMenu } from "./SelectMenu";
-import { SlackIntegrationSettings } from "./SlackIntegrationSettings";
 
 type RoleFilter = "all" | OrganizationMember["role"];
 export type OrganizationSettingsSection =
@@ -302,7 +302,7 @@ export function OrganizationSettings({
             <SettingsNavItem
               active={activeSection === "integrations"}
               icon={
-                <MessageSquare aria-hidden="true" size={16} strokeWidth={1.8} />
+                <Plug aria-hidden="true" size={16} strokeWidth={1.8} />
               }
               onClick={() => setActiveSection("integrations")}
             >
@@ -873,7 +873,7 @@ export function OrganizationSettings({
                 userId={userId}
               />
             ) : (
-              <SlackIntegrationSettings
+              <OrganizationIntegrationsSettings
                 organizationId={organizationId}
                 token={token}
               />

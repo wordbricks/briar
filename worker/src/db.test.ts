@@ -652,6 +652,17 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db,
       await readFile(resolve("migrations/0063_inbox_read_states.sql"), "utf8"),
     );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0063_github_pull_request_sync.sql"),
+        "utf8",
+      ),
+    );
+    await executeSql(
+      db,
+      await readFile(resolve("migrations/0064_github_integration.sql"), "utf8"),
+    );
   }, 30_000);
 
   afterAll(async () => {
@@ -1490,6 +1501,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       ["pr_open", "pull_request", 6.4],
       ["staging_qa", "staging", 6.5],
     ] as const) {
+      const evidencePullRequestNumber = Math.round(minute * 10);
       await recordRunEvidence(db, projectId, {
         runId,
         evidenceKey: `${stage}:${type}`,
@@ -1498,8 +1510,20 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         status: "passed",
         detail: `${type} verified`,
         command: null,
-        url: null,
-        metadata: null,
+        url: type === "pull_request"
+          ? `https://github.com/example/repository/pull/${evidencePullRequestNumber}`
+          : null,
+        metadata: type === "pull_request"
+          ? {
+              githubPullRequest: {
+                repositoryId: 9001,
+                repository: "example/repository",
+                pullRequestId: 10_000 + evidencePullRequestNumber,
+                pullRequestNodeId: `PR_test_${evidencePullRequestNumber}`,
+                pullRequestNumber: evidencePullRequestNumber,
+              },
+            }
+          : null,
         actor: "vitest",
         observedAt: atMinute(minute),
       });
@@ -1719,6 +1743,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       ["staging_qa", "staging", 19.1],
       ["production_qa", "production", 19.2],
     ] as const) {
+      const evidencePullRequestNumber = Math.round(minute * 10);
       await recordRunEvidence(db, projectId, {
         runId,
         evidenceKey: `${stage}:${type}`,
@@ -1727,8 +1752,20 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         status: "passed",
         detail: `${type} verified`,
         command: null,
-        url: null,
-        metadata: null,
+        url: type === "pull_request"
+          ? `https://github.com/example/repository/pull/${evidencePullRequestNumber}`
+          : null,
+        metadata: type === "pull_request"
+          ? {
+              githubPullRequest: {
+                repositoryId: 9001,
+                repository: "example/repository",
+                pullRequestId: 10_000 + evidencePullRequestNumber,
+                pullRequestNodeId: `PR_test_${evidencePullRequestNumber}`,
+                pullRequestNumber: evidencePullRequestNumber,
+              },
+            }
+          : null,
         actor: "vitest",
         observedAt: atMinute(minute),
       });
@@ -1771,7 +1808,15 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       detail: "Pull request created",
       command: "gh pr create",
       url: pullRequestUrl,
-      metadata: null,
+      metadata: {
+        githubPullRequest: {
+          repositoryId: 9_001,
+          repository: "example/repository",
+          pullRequestId: 10_042,
+          pullRequestNodeId: "PR_test_42",
+          pullRequestNumber: 42,
+        },
+      },
       actor: "vitest",
       observedAt: atMinute(12.2),
     };
