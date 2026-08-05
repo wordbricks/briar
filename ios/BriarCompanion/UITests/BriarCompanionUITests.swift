@@ -70,6 +70,27 @@ final class BriarCompanionUITests: XCTestCase {
         captureScreenshot(named: "companion-attention-filter")
     }
 
+    func testCompletedIssueOpensResultTabFirst() {
+        let app = launchInsideCompanion()
+
+        app.segmentedControls.buttons["Completed"].tap()
+        let completed = app.staticTexts["공유 API 계약 검증"]
+        XCTAssertTrue(completed.waitForExistence(timeout: 5))
+        completed.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["run-detail"].waitForExistence(timeout: 5))
+        // Completed issues should land on the Result tab (Android React parity).
+        let resultPanel = app.descendants(matching: .any)["run-detail-result-panel"]
+        XCTAssertTrue(
+            resultPanel.waitForExistence(timeout: 5),
+            "완료된 이슈는 결과 탭이 먼저 보여야 합니다."
+        )
+        let resultTab = app.buttons["run-detail-tab-result"]
+        XCTAssertTrue(resultTab.waitForExistence(timeout: 5))
+        XCTAssertTrue(resultTab.isSelected || resultPanel.exists)
+        XCTAssertTrue(app.staticTexts["공유 계약이 검증되었습니다."].waitForExistence(timeout: 5))
+        captureScreenshot(named: "companion-completed-result-tab")
+    }
+
     func testOfflineErrorAndRetryScreen() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--ui-testing-offline"]

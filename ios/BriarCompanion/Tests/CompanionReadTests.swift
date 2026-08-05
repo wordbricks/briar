@@ -74,4 +74,16 @@ final class CompanionReadTests: XCTestCase {
         ])
         XCTAssertEqual(multi.map(\.updatedAt), multi.map(\.updatedAt).sorted(by: >))
     }
+
+    func testCompletedAndPausedPreferResultDetailTab() {
+        // Parity with shared React RunPage activeDetailTab default.
+        XCTAssertTrue(DashboardRun.Status.completed.prefersResultDetailTab)
+        XCTAssertTrue(DashboardRun.Status.paused.prefersResultDetailTab)
+        for status in DashboardRun.Status.allCases where status != .completed && status != .paused {
+            XCTAssertFalse(
+                status.prefersResultDetailTab,
+                "\(status.rawValue) should open on the Issue tab"
+            )
+        }
+    }
 }
