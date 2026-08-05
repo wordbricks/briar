@@ -943,7 +943,7 @@ describe("HuntDashboard", () => {
     ]);
   });
 
-  it("reveals the process dialog shortcut when a queued companion task is swiped right", async () => {
+  it("reveals the process dialog shortcut when a queued companion task is swiped left", async () => {
     const onProcessIssueNow = vi.fn();
     const queuedRun = {
       ...demoDashboard.runs[0],
@@ -988,9 +988,9 @@ describe("HuntDashboard", () => {
     };
 
     await act(async () => {
-      firePointer("pointerdown", 10, 20);
-      firePointer("pointermove", 70, 22);
-      firePointer("pointerup", 70, 22);
+      firePointer("pointerdown", 70, 20);
+      firePointer("pointermove", 10, 22);
+      firePointer("pointerup", 10, 22);
     });
 
     const action = container.querySelector<HTMLButtonElement>(

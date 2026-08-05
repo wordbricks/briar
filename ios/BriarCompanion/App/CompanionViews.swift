@@ -325,7 +325,7 @@ struct TaskListView: View {
                                 )
                             }
                             .accessibilityIdentifier("task-row-\(run.id.uuidString)")
-                            .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                 if run.status == .backlog || run.status == .queued {
                                     Button {
                                         dispatchRun = run
