@@ -192,6 +192,7 @@ final class AgentsInboxSystemTests: XCTestCase {
             let defaults = UserDefaults(suiteName: suiteName)!
             defer { defaults.removePersistentDomain(forName: suiteName) }
             let store = InboxStore(defaults: defaults)
+            store.configure(token: nil, userID: "fixture-user")
             store.update(snapshot: snapshot, sessions: [session], project: project)
             XCTAssertEqual(store.unreadCount, 4)
             // Store keeps a single chronological list for the mobile feed.
@@ -202,6 +203,12 @@ final class AgentsInboxSystemTests: XCTestCase {
             XCTAssertEqual(store.unreadCount, 3)
             store.markAllRead()
             XCTAssertEqual(store.unreadCount, 0)
+
+            // Account-scoped local cache survives store recreation for the same user.
+            let restored = InboxStore(defaults: defaults)
+            restored.configure(token: nil, userID: "fixture-user")
+            restored.update(snapshot: snapshot, sessions: [session], project: project)
+            XCTAssertEqual(restored.unreadCount, 0)
         }
     }
 

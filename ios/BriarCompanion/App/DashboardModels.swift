@@ -3,6 +3,8 @@ import Foundation
 struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
     let id: UUID
     let runNumber: Int?
+    let currentAttempt: Int?
+    let currentRevision: Int?
     let title: String
     let status: Status
     let workflowStage: String?
@@ -36,10 +38,14 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
     let workerId: String?
     let updatedAt: Date
     let completedAt: Date?
+    let lastEventAt: String?
+    let eventCount: Int?
 
     init(
         id: UUID,
         runNumber: Int? = nil,
+        currentAttempt: Int? = nil,
+        currentRevision: Int? = nil,
         title: String,
         status: Status,
         workflowStage: String? = nil,
@@ -72,10 +78,14 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         requestedWorkerId: String? = nil,
         workerId: String? = nil,
         updatedAt: Date,
-        completedAt: Date? = nil
+        completedAt: Date? = nil,
+        lastEventAt: String? = nil,
+        eventCount: Int? = nil
     ) {
         self.id = id
         self.runNumber = runNumber
+        self.currentAttempt = currentAttempt
+        self.currentRevision = currentRevision
         self.title = title
         self.status = status
         self.workflowStage = workflowStage
@@ -109,6 +119,8 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         self.workerId = workerId
         self.updatedAt = updatedAt
         self.completedAt = completedAt
+        self.lastEventAt = lastEventAt
+        self.eventCount = eventCount
     }
 
     enum Status: String, Codable, CaseIterable, Sendable {
