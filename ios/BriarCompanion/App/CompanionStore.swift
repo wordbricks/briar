@@ -6,6 +6,12 @@ struct OrganizationSummary: Identifiable, Equatable, Sendable {
     let name: String
 }
 
+struct ProductSummary: Identifiable, Equatable, Sendable {
+    let id: UUID
+    let name: String
+    let projects: [ProjectsResponse.Project]
+}
+
 @MainActor
 final class CompanionStore: ObservableObject {
     @Published private(set) var user: CurrentUserResponse.User?

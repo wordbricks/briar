@@ -943,6 +943,9 @@ export function App() {
         }}
         onRepositorySelect={briar.selectProjectRepository}
         onRepositoryInspect={briar.inspectProjectRepository}
+        products={briar.products.filter(
+          (product) => product.organizationId === briar.activeOrganizationId,
+        )}
         user={briar.user}
       />
     );
@@ -1271,6 +1274,7 @@ export function App() {
             isSidebarOpen={isSidebarOpen}
             onAddProject={briar.startProjectCreation}
             onCreateIssue={briar.addIssue}
+            onCreateProductIssue={briar.addProductIssue}
             onIssueDialogOpenChange={setIsIssueDialogOpen}
             onIssueViewed={markInboxIssueRead}
             onDeleteIssue={briar.deleteIssue}
@@ -1297,6 +1301,11 @@ export function App() {
             onSendIssueMessage={sendIssueMessage}
             processingIssueIds={processingIssueIds}
             projects={activeOrganizationProjects}
+            products={briar.products.filter(
+              (product) => product.organizationId === briar.activeOrganizationId,
+            )}
+            productWorkItems={briar.productWorkItems}
+            onProductWorkItemStatusChange={briar.changeProductWorkItemStatus}
             sessions={autoHunt.sessions}
             token={briar.token}
           />
@@ -1653,6 +1662,7 @@ export function App() {
               setCompanionPage("issues");
             }}
             onCreateIssue={briar.addIssue}
+            onCreateProductIssue={briar.addProductIssue}
             onIssueDialogOpenChange={setIsIssueDialogOpen}
             onIssueViewed={markInboxIssueRead}
             onDeleteIssue={briar.deleteIssue}
@@ -1679,6 +1689,11 @@ export function App() {
             onSendIssueMessage={sendIssueMessage}
             processingIssueIds={processingIssueIds}
             projects={activeOrganizationProjects}
+            products={briar.products.filter(
+              (product) => product.organizationId === briar.activeOrganizationId,
+            )}
+            productWorkItems={briar.productWorkItems}
+            onProductWorkItemStatusChange={briar.changeProductWorkItemStatus}
             sessions={autoHunt.sessions}
             token={briar.token}
           />

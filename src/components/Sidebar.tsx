@@ -16,7 +16,7 @@ import {
   Languages,
   Lightbulb,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
   collapseLinkedAutoHuntSessions,
   type AutoHuntSession,
@@ -525,7 +525,7 @@ export function Sidebar({
         </div>
 
         <div className="sidebar-project-list">
-          {visibleProjects.map((project) => {
+          {visibleProjects.map((project, index) => {
             const isActive = project.id === activeProjectId;
             const isExpanded = isProjectExpanded(project.id);
             const isMenuOpen = project.id === openProjectMenuId;
@@ -543,9 +543,21 @@ export function Sidebar({
               setProjectExpanded(project.id, true);
               open();
             };
+            const previousProject = visibleProjects[index - 1];
+            const productId = project.productId ?? project.id;
+            const showProductHeading =
+              !previousProject ||
+              (previousProject.productId ?? previousProject.id) !== productId;
 
             return (
-              <section className="sidebar-project-group" key={project.id}>
+              <Fragment key={project.id}>
+              {showProductHeading ? (
+                <div className="sidebar-product-heading">
+                  <span>{project.productName ?? project.name}</span>
+                  <small>{t("sidebar.product")}</small>
+                </div>
+              ) : null}
+              <section className="sidebar-project-group">
                 <div
                   className={`sidebar-project-row${needsAttention ? " has-warning" : ""}`}
                 >
@@ -779,6 +791,7 @@ export function Sidebar({
                   </div>
                 )}
               </section>
+              </Fragment>
             );
           })}
         </div>

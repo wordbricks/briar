@@ -93,6 +93,7 @@ import {
   type CompanionStatusFilter,
 } from "./CompanionBottomNavigation";
 import { ProjectAgentAvatar } from "./ProjectAgentAvatar";
+import { ProjectIcon } from "./ProjectIcon";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import { inboxIssueMessageVersion } from "../hooks/useInbox";
 import { useMobileBackHandler } from "../hooks/useMobileNavigation";
@@ -144,6 +145,7 @@ import {
 } from "../lib/issue-links";
 import type {
   CreateIssueInput,
+  CreateProductWorkItemInput,
   DashboardPayload,
   ExecutionWorker,
   HuntEvent,
@@ -158,6 +160,8 @@ import type {
   IssueResultReview,
   OrganizationMember,
   Project,
+  Product,
+  ProductWorkItem,
   ProjectAgent,
   RunEvidence,
   RunEvidenceImage,
@@ -339,7 +343,11 @@ export function HuntDashboard({
   isSidebarOpen,
   onAddProject,
   onCreateIssue,
+  onCreateProductIssue,
   projects = [],
+  products = [],
+  productWorkItems = [],
+  onProductWorkItemStatusChange,
   onIssueDialogOpenChange,
   onDeleteIssue,
   onTransferIssue,
@@ -396,7 +404,18 @@ export function HuntDashboard({
     projectId: string,
     input: CreateIssueInput,
   ) => Promise<unknown>;
+  onCreateProductIssue?: (
+    productId: string,
+    input: CreateProductWorkItemInput,
+  ) => Promise<unknown>;
   projects?: Project[];
+  products?: Product[];
+  productWorkItems?: ProductWorkItem[];
+  onProductWorkItemStatusChange?: (
+    productId: string,
+    workItemId: string,
+    status: "completed" | "cancelled",
+  ) => Promise<unknown>;
   onIssueDialogOpenChange?: (isOpen: boolean) => void;
   onDeleteIssue: (runId: string) => Promise<unknown>;
   onTransferIssue?: (
@@ -904,6 +923,12 @@ export function HuntDashboard({
         await onCreateIssue(projectId, input);
         setIsIssueDialogOpen(false);
       }}
+      onCreateProduct={onCreateProductIssue
+        ? async (productId, input) => {
+            await onCreateProductIssue(productId, input);
+            setIsIssueDialogOpen(false);
+          }
+        : undefined}
       projects={
         projects.length > 0
           ? projects
@@ -911,6 +936,7 @@ export function HuntDashboard({
             ? [dashboard.project]
             : []
       }
+      products={products}
       members={dashboard?.members ?? []}
     />
   ) : null;
@@ -1111,6 +1137,53 @@ export function HuntDashboard({
           <ErrorBanner className="error-banner" icon={<CircleAlert size={16} />}>
             {error ?? recoveryError}
           </ErrorBanner>
+        ) : null}
+        {productWorkItems.length > 0 && !companionSearchMode ? (
+          <section className="product-work-items" aria-label={t("product.workItems")}>
+            <header>
+              <div>
+                <strong>{dashboard?.project.productName ?? t("product.title")}</strong>
+                <small>{t("product.workItems")}</small>
+              </div>
+              <span>{productWorkItems.filter((item) => !["completed", "cancelled"].includes(item.status)).length}</span>
+            </header>
+            <div>
+              {productWorkItems.slice(0, companionMode ? 3 : 6).map((item) => {
+                const completedTargets = item.targets.filter(
+                  (target) => target.status === "completed",
+                ).length;
+                return (
+                  <article key={item.id}>
+                    <div>
+                      <strong>{item.title}</strong>
+                      <small>
+                        {t("product.targetProgress", {
+                          completed: completedTargets,
+                          total: item.targets.length,
+                        })}
+                      </small>
+                    </div>
+                    <span data-status={item.status}>
+                      {t(`product.status.${item.status}` as MessageKey)}
+                    </span>
+                    {item.status === "ready_for_review" && onProductWorkItemStatusChange ? (
+                      <button
+                        onClick={() => void onProductWorkItemStatusChange(
+                          item.productId,
+                          item.id,
+                          "completed",
+                        )}
+                        type="button"
+                      >
+                        <Check size={13} />
+                        {t("product.accept")}
+                      </button>
+                    ) : null}
+                  </article>
+                );
+              })}
+            </div>
+          </section>
         ) : null}
         {companionMode ? (
           <div className="queue-header">
@@ -1850,18 +1923,48 @@ export function CreateIssueDialog({
   isSubmitting,
   onClose,
   onCreate,
+  onCreateProduct,
   members = [],
   projects,
+  products = [],
 }: {
   compactHeader?: boolean;
   defaultProjectId?: string;
   isSubmitting: boolean;
   onClose: () => void;
   onCreate: (projectId: string, input: CreateIssueInput) => Promise<void>;
+  onCreateProduct?: (
+    productId: string,
+    input: CreateProductWorkItemInput,
+  ) => Promise<void>;
   members?: OrganizationMember[];
   projects: Project[];
+  products?: Product[];
 }) {
   const { t } = useI18n();
+  const productMode = Boolean(onCreateProduct);
+  const availableProducts = useMemo<Product[]>(() => {
+    if (products.length > 0) return products;
+    const grouped = new Map<string, Product>();
+    for (const project of projects) {
+      const productId = project.productId ?? project.id;
+      const existing = grouped.get(productId);
+      if (existing) {
+        existing.projects.push(project);
+      } else {
+        grouped.set(productId, {
+          id: productId,
+          name: project.productName ?? project.name,
+          organizationId: project.organizationId ?? "",
+          organizationName: project.organizationName ?? "",
+          role: project.role ?? "member",
+          createdAt: project.createdAt,
+          projects: [project],
+        });
+      }
+    }
+    return [...grouped.values()];
+  }, [products, projects]);
   const [initialDraft] = useState(() => {
     const draft = loadCreateIssueDraft();
     return draft && projects.some((project) => project.id === draft.projectId)
@@ -1885,6 +1988,24 @@ export function CreateIssueDialog({
       : projects.some((project) => project.id === defaultProjectId)
         ? defaultProjectId!
         : projects[0]?.id ?? ""
+  );
+  const [productId, setProductId] = useState(() =>
+    availableProducts.find((product) =>
+      product.projects.some((project) => project.id === projectId)
+    )?.id ?? availableProducts[0]?.id ?? ""
+  );
+  const [targetProjectIds, setTargetProjectIds] = useState<string[]>(() =>
+    projectId ? [projectId] : availableProducts[0]?.projects[0]?.id
+      ? [availableProducts[0].projects[0].id]
+      : []
+  );
+  const [productExecutionMode, setProductExecutionMode] = useState<
+    "parallel" | "sequential"
+  >("parallel");
+  const targetProjects =
+    availableProducts.find((product) => product.id === productId)?.projects ?? [];
+  const selectedTargetProjects = targetProjects.filter((project) =>
+    targetProjectIds.includes(project.id)
   );
   const [attachments, setAttachments] = useState<
     Array<{ file: File; reference: string }>
@@ -2124,10 +2245,10 @@ export function CreateIssueDialog({
           event.preventDefault();
           if (!title.trim() || isSubmitting) return;
           setSubmitError(null);
-          if (!projectId) return;
-          void onCreate(
-            projectId,
-            {
+          if (productMode ? !productId || targetProjectIds.length === 0 : !projectId) {
+            return;
+          }
+          const issueInput: CreateIssueInput = {
               title: title.trim(),
               description: description.trim() || null,
               priority: Number(priority),
@@ -2141,8 +2262,20 @@ export function CreateIssueDialog({
                     ),
                   }
                 : {}),
-            },
-          )
+            };
+          const createPromise = onCreateProduct && productMode
+            ? onCreateProduct(productId, {
+                ...issueInput,
+                targetProjectIds,
+                dependencies: productExecutionMode === "sequential"
+                  ? selectedTargetProjects.slice(1).map((project, index) => ({
+                        prerequisiteProjectId: selectedTargetProjects[index].id,
+                        dependentProjectId: project.id,
+                      }))
+                  : [],
+              })
+            : onCreate(projectId, issueInput);
+          void createPromise
             .then(clearCreateIssueDraft)
             .catch((error) =>
               setSubmitError(error instanceof Error ? error.message : String(error)),
@@ -2155,21 +2288,44 @@ export function CreateIssueDialog({
         <header>
           <div className="issue-dialog-context">
             {!compactHeader && <strong>{t("issue.newIssue")}</strong>}
-            {projects.length > 0 && (
+            {(productMode ? availableProducts.length > 0 : projects.length > 0) && (
               <>
                 {!compactHeader && <span aria-hidden="true">/</span>}
-                <SelectMenu
-                  className="issue-project-context"
-                  disabled={isSubmitting}
-                  label={t("issue.project")}
-                  onValueChange={setProjectId}
-                  options={projects.map((project) => ({
-                    label: project.name,
-                    value: project.id,
-                  }))}
-                  size="small"
-                  value={projectId}
-                />
+                {productMode ? (
+                  <SelectMenu
+                    className="issue-project-context"
+                    disabled={isSubmitting}
+                    label={t("issue.product")}
+                    onValueChange={(nextProductId) => {
+                      setProductId(nextProductId);
+                      const nextProjects = availableProducts.find(
+                        (product) => product.id === nextProductId,
+                      )?.projects ?? [];
+                      setTargetProjectIds(
+                        nextProjects[0]?.id ? [nextProjects[0].id] : [],
+                      );
+                    }}
+                    options={availableProducts.map((product) => ({
+                      label: product.name,
+                      value: product.id,
+                    }))}
+                    size="small"
+                    value={productId}
+                  />
+                ) : (
+                  <SelectMenu
+                    className="issue-project-context"
+                    disabled={isSubmitting}
+                    label={t("issue.project")}
+                    onValueChange={setProjectId}
+                    options={projects.map((project) => ({
+                      label: project.name,
+                      value: project.id,
+                    }))}
+                    size="small"
+                    value={projectId}
+                  />
+                )}
               </>
             )}
           </div>
@@ -2214,6 +2370,48 @@ export function CreateIssueDialog({
               placeholder={t("issue.descriptionPlaceholder")}
               removeLabel={(name) => t("issue.remove", { name })}
             />
+            {productMode && targetProjects.length > 0 ? (
+              <fieldset className="issue-target-projects">
+                <legend>{t("issue.targetProjects")}</legend>
+                <p>{t("issue.targetProjectsDescription")}</p>
+                <div>
+                  {targetProjects.map((project) => (
+                    <label key={project.id}>
+                      <input
+                        checked={targetProjectIds.includes(project.id)}
+                        disabled={isSubmitting}
+                        onChange={(event) => {
+                          setTargetProjectIds((current) =>
+                            event.target.checked
+                              ? [...current, project.id]
+                              : current.filter((id) => id !== project.id)
+                          );
+                        }}
+                        type="checkbox"
+                      />
+                      <ProjectIcon className="size-4" project={project} />
+                      <span>{project.name}</span>
+                    </label>
+                  ))}
+                </div>
+                {targetProjectIds.length > 1 ? (
+                  <label className="issue-product-execution-mode">
+                    <input
+                      aria-label={t("issue.executionMode")}
+                      checked={productExecutionMode === "sequential"}
+                      disabled={isSubmitting}
+                      onChange={(event) =>
+                        setProductExecutionMode(
+                          event.target.checked ? "sequential" : "parallel",
+                        )
+                      }
+                      type="checkbox"
+                    />
+                    <span>{t("issue.executionModeSequential")}</span>
+                  </label>
+                ) : null}
+              </fieldset>
+            ) : null}
             {remainingAttachments.length > 0 && (
               <div
                 aria-label={t("issue.attachments")}
@@ -2325,7 +2523,11 @@ export function CreateIssueDialog({
             </button>
             <button
               className="issue-submit-button"
-              disabled={isSubmitting || !title.trim() || !projectId}
+              disabled={
+                isSubmitting ||
+                !title.trim() ||
+                (productMode ? !productId || targetProjectIds.length === 0 : !projectId)
+              }
               type="submit"
             >
               {isSubmitting && <LoaderCircle className="spin" size={13} />}

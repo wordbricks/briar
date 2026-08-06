@@ -94,6 +94,8 @@ final class AgentsInboxSystemTests: XCTestCase {
             id: UUID(uuidString: "11111111-1111-4111-8111-111111111111")!,
             name: "Briar",
             icon: nil,
+            productId: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
+            productName: "Briar Product",
             organizationId: UUID(uuidString: "22222222-2222-4222-8222-222222222222")!,
             organizationName: "Wordbricks",
             role: .owner,

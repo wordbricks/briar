@@ -24,6 +24,7 @@ import {
   createProjectAgent,
   createProjectAgentSchedule,
   createProject,
+  createProductWorkItem,
   createIssueAttachments,
   createIssueDependency,
   createRunEvidenceImages,
@@ -37,6 +38,7 @@ import {
   findProjectIdByAgentTokenHash,
   getProject,
   getProjectSettings,
+  getProductWorkItem,
   getDashboardSyncCursor,
   getHuntRunForProject,
   getIssueAttachment,
@@ -62,6 +64,9 @@ import {
   isOrganizationHandleAvailable,
   issueProjectAgentToken,
   listProjects,
+  listProducts,
+  listProductProjects,
+  listProductWorkItemRuns,
   listProjectAgents,
   listProjectAgentSessions,
   listProjectAgentScheduleRuns,
@@ -86,6 +91,7 @@ import {
   updateOrganizationLogo,
   updateOrganizationMemberRole,
   updateProjectIcon,
+  updateProductWorkItemStatus,
   updateIssue,
   upsertInboxReadStates,
   upsertProjectAgentSession,
@@ -718,6 +724,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db,
       await readFile(
         resolve("migrations/0065_issue_rework_proposals.sql"),
+        "utf8",
+      ),
+    );
+    await executeTriggerMigration(
+      db,
+      await readFile(
+        resolve("migrations/0067_products_and_work_items.sql"),
         "utf8",
       ),
     );
@@ -2303,6 +2316,105 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await expect(deleteProject(db, project.id, "owner")).resolves.toBe(true);
     await expect(getProject(db, project.id, "owner")).resolves.toBeNull();
     await expect(getProjectSettings(db, project.id)).resolves.toBeNull();
+  });
+
+  it("groups repository projects into a product and aggregates product work", async () => {
+    const product = (await listProducts(db, "owner")).find(
+      (candidate) => candidate.id === projectId,
+    );
+    expect(product).toMatchObject({ id: projectId, name: "Example" });
+
+    const webProject = await createProject(db, {
+      ownerUserId: "owner",
+      organizationId: projectId,
+      productId: projectId,
+      name: "Example Web",
+      agentTokenHash: "7".repeat(64),
+    });
+    await updateProjectSettings(db, webProject.id, {
+      velenOrg: null,
+      dataSource: null,
+      linear: { enabled: false, source: null, teamKey: null },
+      githubRepository: "example/web",
+      workflow: releaseWorkflow,
+    });
+    await expect(listProductProjects(db, projectId)).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: projectId, product_id: projectId }),
+        expect.objectContaining({ id: webProject.id, product_id: projectId }),
+      ]),
+    );
+
+    const sourceKey = "briar-product-work-item:test-fanout";
+    const backendRunId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 50, { sourceKey, title: "Ship across repositories" }),
+    );
+    const webRunId = await recordHuntEvent(
+      db,
+      webProject.id,
+      event("queued", 50, { sourceKey, title: "Ship across repositories" }),
+    );
+    const workItemId = "77777777-7777-4777-8777-777777777777";
+    await createProductWorkItem(db, {
+      id: workItemId,
+      productId: projectId,
+      sourceKey,
+      title: "Ship across repositories",
+      description: "Backend and web must land together.",
+      priority: 2,
+      assigneeUserId: null,
+      status: "queued",
+      createdByUserId: "owner",
+      createdAt: atMinute(50),
+      targets: [
+        { projectId, runId: backendRunId, required: true, position: 0 },
+        { projectId: webProject.id, runId: webRunId, required: true, position: 1 },
+      ],
+      dependencies: [{
+        prerequisiteRunId: backendRunId,
+        dependentRunId: webRunId,
+      }],
+    });
+
+    await expect(listProductWorkItemRuns(db, workItemId)).resolves.toHaveLength(2);
+    await expect(getNextQueuedHuntRun(db, webProject.id)).resolves.toBeNull();
+
+    await db
+      .prepare("update briar_hunt_runs set status = 'completed' where id = ?")
+      .bind(backendRunId)
+      .run();
+    await expect(getNextQueuedHuntRun(db, webProject.id)).resolves.toMatchObject({
+      id: webRunId,
+    });
+    await db
+      .prepare("update briar_hunt_runs set status = 'completed' where id = ?")
+      .bind(webRunId)
+      .run();
+    await expect(getProductWorkItem(db, projectId, workItemId)).resolves.toMatchObject({
+      status: "ready_for_review",
+    });
+    await expect(
+      updateProductWorkItemStatus(db, projectId, workItemId, "completed"),
+    ).resolves.toBe(true);
+    await expect(getProductWorkItem(db, projectId, workItemId)).resolves.toMatchObject({
+      status: "completed",
+      completed_at: expect.any(String),
+    });
+    await db
+      .prepare("delete from briar_product_work_items where id = ?")
+      .bind(workItemId)
+      .run();
+    await db
+      .prepare("delete from briar_hunt_runs where id = ?")
+      .bind(backendRunId)
+      .run();
+    await db
+      .prepare("delete from briar_hunt_runs where id = ?")
+      .bind(webRunId)
+      .run();
+    await expect(deleteProject(db, webProject.id, "owner")).resolves.toBe(true);
   });
 
   it("shares organization projects with members without granting owner deletion", async () => {

@@ -63,6 +63,25 @@ const executeSql = async (db: D1Database, sql: string) => {
   }
 };
 
+const executeTriggerMigration = async (db: D1Database, sql: string) => {
+  let statement: string[] = [];
+  let inTrigger = false;
+  for (const line of sql.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed && statement.length === 0) continue;
+    statement.push(line);
+    if (/^create trigger\b/iu.test(trimmed)) inTrigger = true;
+    const complete = inTrigger ? /^end;$/iu.test(trimmed) : trimmed.endsWith(";");
+    if (!complete) continue;
+    await db.prepare(statement.join("\n")).run();
+    statement = [];
+    inTrigger = false;
+  }
+  if (statement.some((line) => line.trim())) {
+    throw new Error("Incomplete product migration statement");
+  }
+};
+
 const queuedEvent = (sourceKey: string, minute: number): HuntEventInput => ({
   source: "issue",
   sourceKey,
@@ -151,8 +170,12 @@ describe("detached execution workers", () => {
       "migrations/0062_issue_assignees.sql",
       "migrations/0063_inbox_read_states.sql",
       "migrations/0065_issue_rework_proposals.sql",
+      "migrations/0067_products_and_work_items.sql",
     ]) {
-      await executeSql(db, await readFile(resolve(migration), "utf8"));
+      const sql = await readFile(resolve(migration), "utf8");
+      await (migration.includes("0067_")
+        ? executeTriggerMigration(db, sql)
+        : executeSql(db, sql));
     }
     await executeSql(
       db,

@@ -61,6 +61,8 @@ export const mobileProjectsResponseSchema = z.object({
     id: z.uuid(),
     name: z.string(),
     icon: z.string().nullable(),
+    productId: z.uuid(),
+    productName: z.string(),
     organizationId: z.uuid(),
     organizationName: z.string(),
     role: z.enum(["owner", "admin", "member"]),

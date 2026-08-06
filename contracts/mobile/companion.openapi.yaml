@@ -1107,6 +1107,8 @@
           "id",
           "name",
           "icon",
+          "productId",
+          "productName",
           "organizationId",
           "organizationName",
           "role",
@@ -1125,6 +1127,13 @@
               "string",
               "null"
             ]
+          },
+          "productId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "productName": {
+            "type": "string"
           },
           "organizationId": {
             "type": "string",
