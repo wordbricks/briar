@@ -56,6 +56,11 @@ enum L10n {
         case linkCopied
         case profileEmail
         case notificationHint
+        case channelsCommon
+        case channelsOtherProject
+        case channelsEmpty
+        case channelThread
+        case channelHome
 
         var ko: String {
             switch self {
@@ -79,6 +84,11 @@ enum L10n {
             case .copyLink: "링크 복사"
             case .linkCopied: "링크를 복사했습니다"
             case .profileEmail: "이메일"
+            case .channelsCommon: "공통 채널"
+            case .channelsOtherProject: "다른 프로젝트"
+            case .channelsEmpty: "채널이 없습니다."
+            case .channelThread: "스레드"
+            case .channelHome: "홈"
             case .notificationHint: "선택한 분류의 새 항목이 도착하면 로컬 알림을 보냅니다."
             }
         }
@@ -105,6 +115,11 @@ enum L10n {
             case .copyLink: "Copy link"
             case .linkCopied: "Link copied"
             case .profileEmail: "Email"
+            case .channelsCommon: "Common channels"
+            case .channelsOtherProject: "Other project"
+            case .channelsEmpty: "No channels yet."
+            case .channelThread: "Thread"
+            case .channelHome: "Home"
             case .notificationHint: "Local notifications fire for newly arrived items in the selected categories."
             }
         }
@@ -131,6 +146,11 @@ enum L10n {
             case .copyLink: "复制链接"
             case .linkCopied: "链接已复制"
             case .profileEmail: "电子邮件"
+            case .channelsCommon: "公共频道"
+            case .channelsOtherProject: "其他项目"
+            case .channelsEmpty: "还没有频道。"
+            case .channelThread: "话题"
+            case .channelHome: "主页"
             case .notificationHint: "所选分类有新项目时会发送本地通知。"
             }
         }

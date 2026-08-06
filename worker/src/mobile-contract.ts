@@ -313,6 +313,128 @@ export const mobileIssueMessagesResponseSchema = z.object({
   })),
 });
 
+/**
+ * A channel's `defaultProjectId` is also how Home groups it: null means the
+ * channel belongs to the whole organization rather than to one project.
+ */
+export const mobileChannelSummarySchema = z.object({
+  id: z.uuid(),
+  organizationId: z.uuid(),
+  slug: z.string(),
+  name: z.string(),
+  topic: z.string().nullable(),
+  visibility: z.enum(["public", "private"]),
+  defaultProjectId: z.uuid().nullable(),
+  archivedAt: z.iso.datetime().nullable(),
+  memberCount: z.number().int().nonnegative(),
+  agentCount: z.number().int().nonnegative(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+});
+
+export const mobileChannelMessageSchema = z.object({
+  id: z.uuid(),
+  channelId: z.uuid(),
+  parentMessageId: z.uuid().nullable(),
+  body: z.string(),
+  author: z.discriminatedUnion("type", [
+    z.object({
+      type: z.literal("user"),
+      id: z.string(),
+      name: z.string(),
+      email: z.string(),
+      image: z.string().nullable(),
+    }),
+    z.object({
+      type: z.literal("agent"),
+      id: z.uuid().nullable(),
+      name: z.string(),
+      provider: z.string().nullable(),
+    }),
+  ]),
+  mentionedUserIds: z.array(z.string()).default([]),
+  mentionedAgentIds: z.array(z.uuid()).default([]),
+  replyCount: z.number().int().nonnegative(),
+  lastReplyAt: z.iso.datetime().nullable(),
+  document: z
+    .object({
+      ideaId: z.uuid(),
+      title: z.string(),
+      status: z.string(),
+      version: z.number().int().positive(),
+      projectId: z.uuid().nullable(),
+    })
+    .nullable(),
+  proposal: z
+    .object({
+      id: z.uuid(),
+      actionType: z.enum(["request_issue_create", "request_plan_document"]),
+      status: z.enum(["pending", "accepted"]),
+      projectId: z.uuid().nullable(),
+      payload: z.unknown(),
+      resultRunId: z.uuid().nullable(),
+      resultIdeaId: z.uuid().nullable(),
+    })
+    .nullable(),
+  createdAt: z.iso.datetime(),
+});
+
+export const mobileChannelsResponseSchema = z.object({
+  channels: z.array(mobileChannelSummarySchema),
+  cursor: z.number().int().nonnegative(),
+});
+
+export const mobileChannelDetailResponseSchema = z.object({
+  channel: mobileChannelSummarySchema,
+  members: z.array(z.object({
+    userId: z.string(),
+    name: z.string(),
+    email: z.string(),
+    image: z.string().nullable(),
+    role: z.enum(["owner", "member"]),
+    createdAt: z.iso.datetime(),
+  })),
+  agents: z.array(z.object({
+    agentId: z.uuid(),
+    handle: z.string().nullable(),
+    name: z.string(),
+    provider: z.enum(["codex", "claude", "grok", "opencode"]),
+    model: z.string().nullable(),
+    projectId: z.uuid().nullable(),
+    responsibility: z.string(),
+    createdAt: z.iso.datetime(),
+  })),
+  messages: z.array(mobileChannelMessageSchema),
+});
+
+export const mobileChannelMessagesResponseSchema = z.object({
+  messages: z.array(mobileChannelMessageSchema),
+});
+
+export const mobileCreateChannelMessageRequestSchema = z.object({
+  body: z.string().min(1),
+  parentMessageId: z.uuid().nullable().default(null),
+  mentionedUserIds: z.array(z.string()).default([]),
+  mentionedAgentIds: z.array(z.uuid()).default([]),
+});
+
+export const mobileCreateChannelMessageResponseSchema = z.object({
+  message: mobileChannelMessageSchema,
+  agentReplies: z.array(z.object({
+    id: z.uuid(),
+    agentId: z.uuid(),
+    channelId: z.uuid(),
+    triggerMessageId: z.uuid(),
+    parentMessageId: z.uuid(),
+    replyMessageId: z.uuid(),
+    status: z.enum(["queued", "running", "completed", "failed"]),
+    attempts: z.number().int().nonnegative(),
+    error: z.string().nullable(),
+    createdAt: z.iso.datetime(),
+    updatedAt: z.iso.datetime(),
+  })),
+});
+
 export const mobileRunEvidenceResponseSchema = z.object({
   evidence: z.array(z.object({
     key: z.string(),
@@ -634,6 +756,13 @@ export const mobileOperationSchemas = {
   },
   listProjectAgents: { response: mobileProjectAgentsResponseSchema },
   listProjectAgentSessions: { response: mobileProjectAgentSessionsResponseSchema },
+  listChannels: { response: mobileChannelsResponseSchema },
+  getChannel: { response: mobileChannelDetailResponseSchema },
+  listChannelMessages: { response: mobileChannelMessagesResponseSchema },
+  createChannelMessage: {
+    request: mobileCreateChannelMessageRequestSchema,
+    response: mobileCreateChannelMessageResponseSchema,
+  },
 } as const;
 
 export function isMobileClientId(value: string) {

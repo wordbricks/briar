@@ -13,7 +13,7 @@ describe("CompanionBottomNavigation", () => {
           onAgentsOpen={() => undefined}
           onIdeasOpen={() => undefined}
           onInboxOpen={() => undefined}
-          onSearchOpen={() => undefined}
+          onHomeOpen={() => undefined}
           onStatusChange={() => undefined}
           unreadInboxCount={3}
         />
@@ -23,7 +23,8 @@ describe("CompanionBottomNavigation", () => {
     expect(markup).toContain("Inbox");
     expect(markup).toContain("에이전트");
     expect(markup).not.toContain("아이디어");
-    expect(markup).toContain("검색");
+    expect(markup).toContain("홈");
+    expect(markup).not.toContain("검색");
     expect(markup).toContain('aria-current="page"');
     expect(markup).toContain(">3<");
     expect(markup).not.toContain(">Active<");
@@ -31,6 +32,7 @@ describe("CompanionBottomNavigation", () => {
     expect(markup).not.toContain(">Completed<");
     expect(markup.match(/<button/g)).toHaveLength(5);
     expect(markup).toContain("grid-cols-4");
+    expect(markup.indexOf("홈")).toBeLessThan(markup.indexOf("작업"));
     expect(markup.indexOf("companion-bottom-nav")).toBeLessThan(
       markup.indexOf("companion-fab"),
     );
@@ -45,7 +47,7 @@ describe("CompanionBottomNavigation", () => {
           onAgentsOpen={() => undefined}
           onIdeasOpen={() => undefined}
           onInboxOpen={() => undefined}
-          onSearchOpen={() => undefined}
+          onHomeOpen={() => undefined}
           onStatusChange={() => undefined}
           unreadInboxCount={0}
         />

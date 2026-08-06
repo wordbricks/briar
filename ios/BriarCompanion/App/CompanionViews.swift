@@ -22,6 +22,7 @@ struct CompanionShellView: View {
     @ObservedObject var agents: AgentsStore
     @ObservedObject var inbox: InboxStore
     @ObservedObject var notifications: LocalNotificationService
+    @ObservedObject var channels: ChannelsStore
 
     let projects: [ProjectsResponse.Project]
     let project: ProjectsResponse.Project
@@ -36,8 +37,25 @@ struct CompanionShellView: View {
     let selectProject: (UUID) -> Void
     let signOut: () -> Void
 
+    private var companionLocale: CompanionLocale {
+        CompanionLocale(rawValue: localeRaw) ?? .ko
+    }
+
     var body: some View {
         TabView(selection: $navigation.selectedTab) {
+            NavigationStack {
+                ChannelsHomeView(
+                    channels: channels,
+                    activeProjectID: project.id,
+                    projects: projects
+                )
+                .navigationTitle(L10n.text(.channelHome, locale: companionLocale))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { companionToolbar(showsProjectMenu: true) }
+            }
+            .tabItem { Label(L10n.text(.channelHome, locale: companionLocale), systemImage: "house") }
+            .tag(CompanionNavigationModel.Tab.home)
+
             NavigationStack(path: $taskPath) {
                 TaskListView(
                     project: project,
@@ -89,21 +107,6 @@ struct CompanionShellView: View {
             .tabItem { Label("Agents", systemImage: "cpu") }
             .tag(CompanionNavigationModel.Tab.agents)
             .badge(agents.sessions.filter { $0.status == .running }.count)
-
-            NavigationStack {
-                TaskSearchView(
-                    project: project,
-                    runs: snapshot?.runs ?? [],
-                    workers: snapshot?.workers ?? [],
-                    members: snapshot?.members ?? [],
-                    token: token,
-                    api: api
-                )
-                .navigationTitle("Search")
-                .toolbar { companionToolbar() }
-            }
-            .tabItem { Label("Search", systemImage: "magnifyingglass") }
-            .tag(CompanionNavigationModel.Tab.search)
 
             NavigationStack {
                 InboxHomeView(
@@ -586,65 +589,6 @@ struct StatusBadge: View {
         case .queued: .orange
         default: .secondary
         }
-    }
-}
-
-struct TaskSearchView: View {
-    @State private var query = ""
-
-    let project: ProjectsResponse.Project
-    let runs: [DashboardRun]
-    let workers: [DashboardWorker]
-    let members: [OrganizationMember]
-    let token: String
-    let api: any MobileAPIClientProtocol
-
-    private var results: [DashboardRun] {
-        TaskSearch.results(
-            in: runs,
-            query: query,
-            issueKeyPrefix: project.effectiveIssueKeyPrefix
-        )
-    }
-
-    var body: some View {
-        List {
-            if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                ContentUnavailableView(
-                    "작업 검색",
-                    systemImage: "magnifyingglass",
-                    description: Text("제목, 설명, 진행 내용 또는 결과에서 검색합니다.")
-                )
-            } else if results.isEmpty {
-                ContentUnavailableView.search(text: query)
-            } else {
-                ForEach(results) { run in
-                    NavigationLink {
-                        RunDetailView(
-                            run: run,
-                            projectID: project.id,
-                            issueKeyPrefix: project.effectiveIssueKeyPrefix,
-                            token: token,
-                            api: api,
-                            allRuns: runs,
-                            workers: workers,
-                            members: members
-                        )
-                    } label: {
-                        RunRow(
-                            run: run,
-                            issueKeyPrefix: project.effectiveIssueKeyPrefix,
-                            assignee: members.first { $0.userId == run.assigneeUserId },
-                            worker: RunRow.worker(for: run, workers: workers)
-                        )
-                    }
-                    .accessibilityIdentifier("search-result-\(run.id.uuidString)")
-                }
-            }
-        }
-        .listStyle(.plain)
-        .searchable(text: $query, prompt: "작업 검색")
-        .accessibilityIdentifier("task-search-list")
     }
 }
 
