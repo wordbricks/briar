@@ -59,11 +59,11 @@ describe("issue detail width", () => {
     expect(bodyRule).not.toContain("1180px");
     expect(bodyRule).toContain("margin:0");
     expect(layoutRule).toContain(
-      "grid-template-columns:minmax(0,2fr) minmax(340px,1fr)",
+      "grid-template-columns:minmax(0,2fr) var(--run-conversation-resizer-width,6px) var(--run-conversation-pane-width,minmax(340px,1fr))",
     );
     expect(layoutRule).toContain("gap:0");
     expect(styles).toContain(
-      "grid-template-columns:minmax(0,1fr) minmax(310px,38%)",
+      "grid-template-columns:minmax(0,1fr) var(--run-conversation-resizer-width,6px) minmax(310px,var(--run-conversation-pane-width,38%))",
     );
     expect(propertiesLayerRule).toContain("position:absolute");
     expect(propertiesLayerRule).toContain("inset:0");
@@ -116,5 +116,21 @@ describe("issue detail width", () => {
       expect(tabRule).toContain("overflow-y:auto");
     }
     expect(companionPaneRule).toContain("height:auto");
+  });
+
+  it("makes the desktop conversation window resizable with a separator", () => {
+    const resizerRule = firstRule(".run-page-conversation-resizer");
+    const resizingLayoutRule = firstRule(
+      ".run-page-layout.is-resizing-conversation",
+    );
+
+    expect(resizerRule).toContain("cursor:col-resize");
+    expect(resizerRule).toContain("touch-action:none");
+    expect(resizerRule).toContain("position:relative");
+    expect(resizerRule).toContain("z-index:1");
+    expect(styles).toContain(
+      ".run-page-conversation-resizer:hover::before,.run-page-conversation-resizer:focus-visible::before",
+    );
+    expect(resizingLayoutRule).toContain("user-select:none");
   });
 });

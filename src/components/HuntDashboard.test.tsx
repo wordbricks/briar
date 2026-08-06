@@ -1662,9 +1662,20 @@ describe("HuntDashboard", () => {
     expect(conversation?.querySelector(":scope > header")?.textContent).toContain(
       "대화",
     );
-    expect(container.querySelector(".run-page-main")?.nextElementSibling).toBe(
-      conversation,
+    const conversationResizer = container.querySelector(
+      ".run-page-conversation-resizer",
     );
+    expect(conversationResizer?.getAttribute("role")).toBe("separator");
+    expect(conversationResizer?.getAttribute("aria-orientation")).toBe(
+      "vertical",
+    );
+    expect(conversationResizer?.getAttribute("aria-valuemin")).toBe("30");
+    expect(conversationResizer?.getAttribute("aria-valuemax")).toBe("65");
+    expect(conversationResizer?.getAttribute("aria-valuenow")).toBe("38");
+    expect(container.querySelector(".run-page-main")?.nextElementSibling).toBe(
+      conversationResizer,
+    );
+    expect(conversationResizer?.nextElementSibling).toBe(conversation);
     expect(
       conversation?.querySelector(".issue-message-list + .issue-message-composer"),
     ).not.toBeNull();
@@ -1678,6 +1689,72 @@ describe("HuntDashboard", () => {
     expect(container.querySelector(".kanban-board")).not.toBeNull();
     await act(async () => root.unmount());
     container.remove();
+  });
+
+  it("resizes the desktop conversation window with the separator", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={demoDashboard}
+      />,
+    ));
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".kanban-card")?.click();
+    });
+
+    const resizer = container.querySelector<HTMLElement>(
+      ".run-page-conversation-resizer",
+    );
+    expect(resizer).not.toBeNull();
+    const layout = container.querySelector<HTMLElement>(".run-page-layout");
+    expect(layout?.style.getPropertyValue("--run-conversation-pane-width")).toBe(
+      "",
+    );
+
+    await act(async () => {
+      resizer?.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, key: "ArrowRight" }),
+      );
+    });
+    expect(resizer?.getAttribute("aria-valuenow")).toBe("43");
+    expect(
+      layout?.style.getPropertyValue("--run-conversation-pane-width"),
+    ).toBe("43%");
+    expect(
+      window.localStorage.getItem("briar.settings.conversation-pane.v1"),
+    ).toBe("43");
+
+    await act(async () => {
+      resizer?.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, key: "Home" }),
+      );
+    });
+    expect(resizer?.getAttribute("aria-valuenow")).toBe("30");
+
+    await act(async () => {
+      resizer?.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, key: "End" }),
+      );
+    });
+    expect(resizer?.getAttribute("aria-valuenow")).toBe("65");
+
+    await act(async () => {
+      resizer?.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, key: "ArrowLeft" }),
+      );
+    });
+    expect(resizer?.getAttribute("aria-valuenow")).toBe("60");
+    expect(
+      layout?.style.getPropertyValue("--run-conversation-pane-width"),
+    ).toBe("60%");
+
+    await act(async () => root.unmount());
+    container.remove();
+    window.localStorage.removeItem("briar.settings.conversation-pane.v1");
   });
 
   it("marks an open issue viewed again when its inbox version changes", async () => {

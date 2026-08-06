@@ -139,6 +139,14 @@ import {
   removeIssueAttachmentMarkdown,
 } from "../lib/issue-markdown";
 import {
+  clampConversationPaneWidth,
+  conversationPaneWidthDefault,
+  conversationPaneWidthMax,
+  conversationPaneWidthMin,
+  loadConversationPaneWidth,
+  saveConversationPaneWidth,
+} from "../lib/conversation-pane-width";
+import {
   issueMentionAtCaret,
   issueMentionHandle,
   mentionsIssueHandle,
@@ -3856,6 +3864,15 @@ export function RunPage({
   );
   const [transferError, setTransferError] = useState<string | null>(null);
   const [isPropertiesOpen, setIsPropertiesOpen] = useState(false);
+  const [conversationPaneWidth, setConversationPaneWidth] = useState<
+    number | null
+  >(() => loadConversationPaneWidth());
+  const [isResizingConversation, setIsResizingConversation] = useState(false);
+  const runPageLayoutRef = useRef<HTMLDivElement | null>(null);
+  const activeConversationResizePointerRef = useRef<number | null>(null);
+  const conversationWidthRef = useRef<number | null>(
+    loadConversationPaneWidth(),
+  );
   const [isCompletingResultReview, setIsCompletingResultReview] =
     useState(false);
   const [isResumePending, setIsResumePending] = useState(false);
@@ -3955,6 +3972,70 @@ export function RunPage({
   useEffect(() => {
     void loadRunEvents();
   }, [loadRunEvents, run.eventCount, run.id]);
+  const effectiveConversationPaneWidth =
+    conversationPaneWidth ?? conversationPaneWidthDefault;
+  const updateConversationPaneWidthFromPointer = (clientX: number) => {
+    const layout = runPageLayoutRef.current;
+    if (!layout) return;
+    const bounds = layout.getBoundingClientRect();
+    const availableWidth = Math.max(1, bounds.width);
+    const paneWidth = Math.max(
+      0,
+      (bounds.right - clientX) / availableWidth,
+    );
+    const width = clampConversationPaneWidth(paneWidth * 100);
+    setConversationPaneWidth(width);
+    conversationWidthRef.current = width;
+  };
+  const startConversationResize = (
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    activeConversationResizePointerRef.current = event.pointerId;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setIsResizingConversation(true);
+    event.preventDefault();
+  };
+  const moveConversationResize = (
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    if (activeConversationResizePointerRef.current !== event.pointerId) return;
+    updateConversationPaneWidthFromPointer(event.clientX);
+  };
+  const finishConversationResize = (
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    if (activeConversationResizePointerRef.current !== event.pointerId) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    activeConversationResizePointerRef.current = null;
+    setIsResizingConversation(false);
+    const width = conversationWidthRef.current;
+    if (width !== null) saveConversationPaneWidth(width);
+  };
+  const resizeConversationPaneWithKeyboard = (
+    event: ReactKeyboardEvent<HTMLDivElement>,
+  ) => {
+    let nextWidth: number | null = null;
+    if (event.key === "ArrowLeft") {
+      nextWidth = effectiveConversationPaneWidth - 5;
+    }
+    if (event.key === "ArrowRight") {
+      nextWidth = effectiveConversationPaneWidth + 5;
+    }
+    if (event.key === "Home") {
+      nextWidth = conversationPaneWidthMin;
+    }
+    if (event.key === "End") {
+      nextWidth = conversationPaneWidthMax;
+    }
+    if (nextWidth === null) return;
+    event.preventDefault();
+    const width = clampConversationPaneWidth(nextWidth);
+    setConversationPaneWidth(width);
+    conversationWidthRef.current = width;
+    saveConversationPaneWidth(width);
+  };
   const placementOptions = [
     { label: t("status.backlog"), value: "status:backlog" },
     { label: t("status.queued"), value: "status:queued" },
@@ -4508,7 +4589,17 @@ export function RunPage({
             </header>
           ) : null}
           <div className="run-page-body">
-            <div className="run-page-layout">
+            <div
+              className={`run-page-layout${isResizingConversation ? " is-resizing-conversation" : ""}`}
+              ref={runPageLayoutRef}
+              style={
+                conversationPaneWidth === null
+                  ? undefined
+                  : ({
+                      "--run-conversation-pane-width": `${conversationPaneWidth}%`,
+                    } as React.CSSProperties)
+              }
+            >
               <div className="run-page-main">
                 <div
                   aria-label={t("run.detailTabs")}
@@ -5240,14 +5331,31 @@ export function RunPage({
                 />
               </div>
               {!companionMode ? (
-                <IssueConversation
-                  mentionMembers={mentionMembers}
-                  onAcceptIssueAction={onAcceptIssueAction}
-                  onLoadAttachment={onLoadAttachment}
-                  onLoad={onLoadIssueMessages}
-                  onSend={onSendIssueMessage}
-                  run={run}
-                />
+                <>
+                  <div
+                    aria-label={t("run.resizeContentPanels")}
+                    aria-orientation="vertical"
+                    aria-valuemax={conversationPaneWidthMax}
+                    aria-valuemin={conversationPaneWidthMin}
+                    aria-valuenow={effectiveConversationPaneWidth}
+                    className="run-page-conversation-resizer"
+                    onKeyDown={resizeConversationPaneWithKeyboard}
+                    onPointerCancel={finishConversationResize}
+                    onPointerDown={startConversationResize}
+                    onPointerMove={moveConversationResize}
+                    onPointerUp={finishConversationResize}
+                    role="separator"
+                    tabIndex={0}
+                  />
+                  <IssueConversation
+                    mentionMembers={mentionMembers}
+                    onAcceptIssueAction={onAcceptIssueAction}
+                    onLoadAttachment={onLoadAttachment}
+                    onLoad={onLoadIssueMessages}
+                    onSend={onSendIssueMessage}
+                    run={run}
+                  />
+                </>
               ) : null}
               {isPropertiesOpen ? (
               <div
