@@ -94,6 +94,7 @@ import {
 } from "./CompanionBottomNavigation";
 import { ProjectAgentAvatar } from "./ProjectAgentAvatar";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
+import { inboxIssueMessageVersion } from "../hooks/useInbox";
 import { useMobileBackHandler } from "../hooks/useMobileNavigation";
 import { useProjectAgentWorkerEvents } from "../hooks/useProjectAgentWorkerEvents";
 import {
@@ -365,6 +366,7 @@ export function HuntDashboard({
   onCompanionInboxOpen,
   onCompanionSearchOpen,
   onCompanionStatusChange,
+  onIssueViewed,
   onRequestedRunOpen,
   onSendIssueMessage,
   requestedRunId = null,
@@ -439,6 +441,7 @@ export function HuntDashboard({
   onCompanionInboxOpen?: () => void;
   onCompanionSearchOpen?: () => void;
   onCompanionStatusChange?: (status: CompanionStatusFilter) => void;
+  onIssueViewed?: (runId: string) => void;
   onRequestedRunOpen?: () => void;
   onSendIssueMessage: (
     runId: string,
@@ -640,6 +643,9 @@ export function HuntDashboard({
 
   const runs = dashboard?.runs ?? [];
   const selected = runs.find((run) => run.id === selectedRunId) ?? null;
+  const selectedInboxVersion = selected
+    ? inboxIssueMessageVersion(selected)
+    : null;
   const editingRun = runs.find((run) => run.id === editingRunId) ?? null;
   const deletingRunFromMenu =
     runs.find((run) => run.id === deletingRunFromMenuId) ?? null;
@@ -747,6 +753,11 @@ export function HuntDashboard({
     setSelectedRunId(requestedRunId);
     onRequestedRunOpen?.();
   }, [onRequestedRunOpen, requestedRunId, runs]);
+
+  useEffect(() => {
+    if (!selected || !selectedInboxVersion) return;
+    onIssueViewed?.(selected.id);
+  }, [onIssueViewed, selected?.id, selectedInboxVersion]);
 
   const kanbanColumns = useMemo<KanbanColumn[]>(() => {
     const workflow = dashboard?.settings.workflow;

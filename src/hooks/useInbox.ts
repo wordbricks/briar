@@ -3,7 +3,7 @@ import {
   collapseLinkedAutoHuntSessions,
   type AutoHuntSession,
 } from "./useAutoHuntSessions";
-import type { DashboardPayload, HuntStatus, Project } from "../types";
+import type { DashboardPayload, HuntRun, HuntStatus, Project } from "../types";
 import {
   autoHuntWorkflowStageCatalog,
   type AutoHuntWorkflowStageId,
@@ -79,6 +79,20 @@ export type InboxCategory =
   | "important"
   | "activity";
 
+export function inboxIssueMessageVersion(
+  run: Pick<
+    HuntRun,
+    | "currentAttempt"
+    | "currentRevision"
+    | "status"
+    | "workflowStage"
+    | "lastEventAt"
+    | "eventCount"
+  >,
+) {
+  return `${run.currentAttempt}:${run.currentRevision}:${run.status}:${run.workflowStage ?? "none"}:${run.lastEventAt}:${run.eventCount}`;
+}
+
 type InboxStorage = {
   messages: InboxMessage[];
   readVersions: Record<string, string>;
@@ -110,7 +124,7 @@ export function buildCurrentInboxMessages(
         targetId: run.id,
         title: run.title,
         occurredAt: run.lastEventAt,
-        version: `${run.currentAttempt}:${run.currentRevision}:${run.status}:${run.workflowStage ?? "none"}:${run.lastEventAt}:${run.eventCount}`,
+        version: inboxIssueMessageVersion(run),
         runNumber: run.runNumber,
         status: run.status,
         workflowStage: run.workflowStage,

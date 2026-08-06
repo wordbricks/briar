@@ -129,6 +129,7 @@ struct CompanionShellView: View {
                 .tag(CompanionNavigationModel.Tab.ideas)
             }
         }
+        .environmentObject(inbox)
         .sheet(isPresented: $showingSettings) {
             CompanionSettingsView(
                 appearance: $appearance,
@@ -563,6 +564,7 @@ private enum RunDetailTab: String, CaseIterable, Identifiable {
 
 struct RunDetailView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var inbox: InboxStore
     @AppStorage("companion-locale") private var localeRaw = CompanionLocale.ko.rawValue
     let run: DashboardRun
     @StateObject private var detail: RunDetailStore
@@ -719,8 +721,14 @@ struct RunDetailView: View {
             isPresented: $linkCopied,
             message: L10n.text(.linkCopied, locale: locale)
         )
-        .task { await detail.load() }
+        .task {
+            inbox.markIssueRead(runID: run.id)
+            await detail.load()
+        }
         .refreshable { await detail.load() }
+        .onChange(of: inbox.messages) { _, _ in
+            inbox.markIssueRead(runID: run.id)
+        }
         .onChange(of: run.status) { _, status in
             localStatus = status
             // Keep parity with shared React RunPage: status transitions reselect the default tab.

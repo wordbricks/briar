@@ -199,7 +199,7 @@ final class AgentsInboxSystemTests: XCTestCase {
             XCTAssertEqual(store.messages.map(\.id), messages.map(\.id))
             XCTAssertEqual(store.messages(in: .urgent).count, 1)
             XCTAssertEqual(store.messages(in: .actionRequired).count, 2)
-            store.markRead(id: blockedMessage.id)
+            store.markIssueRead(runID: blocked.id)
             XCTAssertEqual(store.unreadCount, 3)
             store.markAllRead()
             XCTAssertEqual(store.unreadCount, 0)
