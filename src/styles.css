@@ -5253,11 +5253,20 @@ button.issue-message-state { width:100%; cursor:pointer; }
   .auto-hunt-session-execution-timeline .auto-hunt-agent-message > p { margin-left:0; font-size:var(--text-xs); }
 }
 
-/* Organization chat channels */
-.channels { display:grid; min-height:0; height:100%; grid-template-columns:minmax(0,1fr); background:var(--background, #faf9f6); }
-.channels:has(.channel-thread) { grid-template-columns:minmax(0,1fr) minmax(320px,30%); }
+/* Organization chat channels — fill remaining .app-shell width like .main-content */
+.channels {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  height: 100%;
+  grid-template-columns: minmax(0, 1fr);
+  overflow: hidden;
+  background: var(--background, #faf9f6);
+}
+.channels:has(.channel-thread) { grid-template-columns: minmax(0, 1fr) minmax(320px, 30%); }
 
-.channel-main { display: flex; min-height: 0; min-width: 0; flex-direction: column; }
+.channel-main { display: flex; min-height: 0; min-width: 0; height: 100%; flex-direction: column; }
 .channel-header { flex: 0 0 auto; border-bottom: 1px solid var(--border, #ddd8cf); padding: 12px 18px; background: var(--card, #fff); }
 .channel-header h2 { display: flex; margin: 0; align-items: center; gap: 7px; font-size: 17px; letter-spacing: -0.02em; }
 .channel-header p { margin: 3px 0 0; color: var(--muted-foreground, #777168); font-size: 12px; }
