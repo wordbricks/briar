@@ -351,10 +351,6 @@ private struct PreferredExecutionPicker: View {
             model = nil
             effort = IssueDraft.defaultEffort
         }
-        .onChange(of: model) { previous, model in
-            guard previous != model else { return }
-            if model == nil { effort = nil }
-        }
     }
 }
 
