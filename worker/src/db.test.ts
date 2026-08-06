@@ -105,7 +105,8 @@ import {
 } from "./ideas";
 
 const releaseWorkflow = normalizeAutoHuntWorkflow({
-  version: 1,
+  version: 2,
+  requirements: [],
   stages: [
     { id: "analyzing", label: "Analyze", required: true },
     { id: "implementing", label: "Implement", required: true },
@@ -113,15 +114,39 @@ const releaseWorkflow = normalizeAutoHuntWorkflow({
     { id: "staging_qa", label: "Staging QA", required: true },
     { id: "production_qa", label: "Production QA", required: true },
   ],
+  execution: {
+    checkpoints: [{
+      key: "legacy-after-production_qa",
+      stage: "production_qa",
+      position: "after",
+    }],
+  },
+  completion: {
+    requiredStages: [
+      "analyzing",
+      "implementing",
+      "pr_open",
+      "staging_qa",
+      "production_qa",
+    ],
+  },
 });
 const pullRequestBoundaryWorkflow = normalizeAutoHuntWorkflow({
-  version: 1,
+  version: 2,
+  requirements: [],
   stages: releaseWorkflow.stages,
-  execution: { stopAfterStage: "pr_open" },
+  execution: {
+    checkpoints: [{
+      key: "legacy-after-pr_open",
+      stage: "pr_open",
+      position: "after",
+    }],
+  },
   completion: releaseWorkflow.completion,
 });
 const localWorkflow = normalizeAutoHuntWorkflow({
-  version: 1,
+  version: 2,
+  requirements: [],
   stages: [
     { id: "analyzing", label: "Analyze", required: true },
     { id: "implementing", label: "Implement", required: true },
@@ -132,9 +157,18 @@ const localWorkflow = normalizeAutoHuntWorkflow({
       evidence: ["signoff/app-worker", "local QA"],
     },
   ],
+  execution: {
+    checkpoints: [{
+      key: "legacy-after-local_qa",
+      stage: "local_qa",
+      position: "after",
+    }],
+  },
+  completion: { requiredStages: ["analyzing", "implementing", "local_qa"] },
 });
 const revisionWorkflow = normalizeAutoHuntWorkflow({
-  version: 1,
+  version: 2,
+  requirements: [],
   stages: [
     {
       id: "analyzing",
@@ -161,19 +195,32 @@ const revisionWorkflow = normalizeAutoHuntWorkflow({
       evidence: ["local_ci"],
     },
   ],
-});
-const legacyWorkflowSnapshot = (
-  workflow: typeof releaseWorkflow,
-  execution?: {
-    pauseAfterStage?: string;
-    stopAfterStage?: string;
+  execution: {
+    checkpoints: [{
+      key: "legacy-after-local_qa",
+      stage: "local_qa",
+      position: "after",
+    }],
   },
+  completion: {
+    requiredStages: ["analyzing", "implementing", "reviewing", "local_qa"],
+  },
+});
+const singlePauseWorkflowSnapshot = (
+  workflow: typeof releaseWorkflow,
+  pauseAfterStage?: string,
 ) =>
   JSON.stringify({
-    version: 1,
+    version: 2,
     requirements: workflow.requirements,
     stages: workflow.stages,
-    ...(execution ? { execution } : {}),
+    execution: {
+      checkpoints: [{
+        key: `legacy-after-${pauseAfterStage ?? workflow.completion.requiredStages.at(-1)}`,
+        stage: pauseAfterStage ?? workflow.completion.requiredStages.at(-1),
+        position: "after",
+      }],
+    },
     completion: workflow.completion,
   });
 const projectId = "11111111-1111-4111-8111-111111111111";
@@ -1629,7 +1676,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       .prepare(
         `update briar_hunt_runs set workflow_snapshot_json = ? where id = ?`,
       )
-      .bind(legacyWorkflowSnapshot(releaseWorkflow), runId)
+      .bind(singlePauseWorkflowSnapshot(releaseWorkflow), runId)
       .run();
     expect(runId).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
@@ -1813,9 +1860,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         `update briar_hunt_runs set workflow_snapshot_json = ? where id = ?`,
       )
       .bind(
-        legacyWorkflowSnapshot(pullRequestBoundaryWorkflow, {
-          stopAfterStage: "pr_open",
-        }),
+        singlePauseWorkflowSnapshot(pullRequestBoundaryWorkflow, "pr_open"),
         runId,
       )
       .run();
@@ -2056,7 +2101,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       .prepare(
         `update briar_hunt_runs set workflow_snapshot_json = ? where id = ?`,
       )
-      .bind(legacyWorkflowSnapshot(revisionWorkflow), runId)
+      .bind(singlePauseWorkflowSnapshot(revisionWorkflow), runId)
       .run();
     for (const [stage, minute] of [
       ["analyzing", 13.1],
@@ -2960,7 +3005,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       .prepare(
         `update briar_hunt_runs set workflow_snapshot_json = ? where id = ?`,
       )
-      .bind(legacyWorkflowSnapshot(localWorkflow), runId)
+      .bind(singlePauseWorkflowSnapshot(localWorkflow), runId)
       .run();
     await recordHuntEvent(db, projectId, event("analyzing", 31, common));
     await recordHuntEvent(db, projectId, event("implementing", 32, common));
@@ -3662,14 +3707,21 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
 
   it("moves a run freely across workflow and terminal states with an audit trail", async () => {
     const manualWorkflow = normalizeAutoHuntWorkflow({
-      version: 1,
+      version: 2,
+      requirements: [],
       stages: [
         { id: "analyzing", label: "Analyze", required: false },
         { id: "implementing", label: "Implement", required: false },
         { id: "local_qa", label: "Local QA", required: false },
         { id: "manual_pause", label: "Manual pause", required: false },
       ],
-      execution: { pauseAfterStage: "manual_pause" },
+      execution: {
+        checkpoints: [{
+          key: "legacy-after-manual_pause",
+          stage: "manual_pause",
+          position: "after",
+        }],
+      },
       completion: { requiredStages: [] },
     });
     await updateProjectSettings(db, projectId, {

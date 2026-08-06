@@ -57,7 +57,7 @@ afterEach(async () => {
 });
 
 describe("CLI config loading", () => {
-  it("repairs a legacy empty workflow execution boundary", async () => {
+  it("loads a canonical workflow execution boundary", async () => {
     const directory = await configDirectory({
       apiUrl: "https://briar.example.com",
       projects: [
@@ -67,11 +67,12 @@ describe("CLI config loading", () => {
           agentToken: "briar_agent_test",
           autoHunt: {
             workflow: {
-              version: 1,
+              version: 2,
+              requirements: [],
               stages: [
                 { id: "analyzing", label: "Analyze", required: true },
               ],
-              execution: { stopAfterStage: "" },
+              execution: { checkpoints: [] },
               completion: { requiredStages: ["analyzing"] },
             },
           },

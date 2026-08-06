@@ -198,7 +198,7 @@ const projectAgentScheduleSchema = z.object({
 });
 const autoHuntWorkflowSchema: z.ZodType<AutoHuntWorkflow> = z
   .object({
-    version: z.union([z.literal(1), z.literal(2)]),
+    version: z.literal(2),
     requirements: z.array(z.object({
       id: z.string(),
       label: z.string(),
@@ -222,12 +222,9 @@ const autoHuntWorkflowSchema: z.ZodType<AutoHuntWorkflow> = z
           stage: z.string(),
           position: z.enum(["before", "after"]),
         })).optional(),
-        pauseAfterStage: z.string().optional(),
-        stopAfterStage: z.string().optional(),
       })
       .optional(),
     completion: z.object({ requiredStages: z.array(z.string()) }).optional(),
-    release: z.object({ enabled: z.boolean() }).optional(),
   })
   .transform(normalizeAutoHuntWorkflow);
 const projectAgentScheduleRunSchema = z.object({
@@ -259,28 +256,8 @@ const claimedProjectAgentScheduleRunSchema =
     claimToken: z.string().regex(/^briar_schedule_claim_[0-9a-f]{64}$/u),
   });
 
-// The settings screen still exposes the v1 single-pause control. Preserve
-// that read-only projection for snapshots that were converted from v1's
-// deterministic legacy-after checkpoint, while leaving true multi-checkpoint
-// v2 workflows in their canonical shape until a later UI pass.
-const normalizeDashboardWorkflow = (workflow: AutoHuntWorkflow) => {
-  const normalized = normalizeAutoHuntWorkflow(workflow);
-  const [checkpoint] = normalized.execution.checkpoints;
-  if (
-    normalized.execution.checkpoints.length === 1 &&
-    checkpoint?.position === "after" &&
-    checkpoint.key === `legacy-after-${checkpoint.stage}`
-  ) {
-    return normalizeAutoHuntWorkflow({
-      version: 1,
-      requirements: normalized.requirements,
-      stages: normalized.stages,
-      execution: { pauseAfterStage: checkpoint.stage },
-      completion: normalized.completion,
-    });
-  }
-  return normalized;
-};
+const normalizeDashboardWorkflow = (workflow: AutoHuntWorkflow) =>
+  normalizeAutoHuntWorkflow(workflow);
 
 const organizationSchema = z.object({
   id: z.string().uuid(),

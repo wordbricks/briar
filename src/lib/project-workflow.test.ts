@@ -418,7 +418,8 @@ describe("project workflow generator", () => {
       reviseProjectWorkflow(
         "project-1",
         {
-          version: 1,
+          version: 2,
+          requirements: [],
           stages: [
             {
               id: "implementing",
@@ -428,7 +429,7 @@ describe("project workflow generator", () => {
               checks: [],
             },
           ],
-          execution: { pauseAfterStage: "implementing" },
+          execution: { checkpoints: [] },
           completion: { requiredStages: ["implementing"] },
         },
         "   ",

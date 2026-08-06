@@ -1239,12 +1239,19 @@ describe("HuntDashboard", () => {
 
   it("renders workflow stages as kanban columns", () => {
     const customWorkflow = {
-      version: 1 as const,
+      version: 2 as const,
+      requirements: [],
       stages: [
         { id: "analyzing", label: "Analyze", required: true },
         { id: "security_review", label: "Security review", required: true },
       ],
-      execution: { pauseAfterStage: "security_review" },
+      execution: {
+        checkpoints: [{
+          key: "after-security-review",
+          stage: "security_review",
+          position: "after" as const,
+        }],
+      },
       completion: { requiredStages: ["analyzing", "security_review"] },
     };
     const customDashboard = {

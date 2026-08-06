@@ -196,38 +196,19 @@ export type AutoHuntWorkflowRequirement = {
   reason: string;
 };
 
-export type AutoHuntWorkflow = {
-  /** Raw v1 snapshots remain representable for read compatibility. */
-  version: 1 | 2;
-  requirements?: AutoHuntWorkflowRequirement[];
-  stages: AutoHuntWorkflowStage[];
-  execution: {
-    checkpoints?: AutoHuntWorkflowCheckpoint[];
-    /** @deprecated Read-only compatibility projection for pre-v2 callers. */
-    pauseAfterStage?: AutoHuntWorkflowStageId;
-    /** @deprecated Read-only compatibility projection for pre-v2 callers. */
-    stopAfterStage?: AutoHuntWorkflowStageId;
-  };
-  completion: {
-    requiredStages: AutoHuntWorkflowStageId[];
-  };
-};
-
 export type AutoHuntWorkflowV2 = {
   version: 2;
   requirements: AutoHuntWorkflowRequirement[];
   stages: AutoHuntWorkflowStage[];
   execution: {
     checkpoints: AutoHuntWorkflowCheckpoint[];
-    /** @deprecated Read-only compatibility projection for pre-v2 callers. */
-    pauseAfterStage?: AutoHuntWorkflowStageId;
-    /** @deprecated Read-only compatibility projection for pre-v2 callers. */
-    stopAfterStage?: AutoHuntWorkflowStageId;
   };
   completion: {
     requiredStages: AutoHuntWorkflowStageId[];
   };
 };
+
+export type AutoHuntWorkflow = AutoHuntWorkflowV2;
 
 export type AutoHuntWorkflowInput = {
   version?: number;
@@ -236,11 +217,7 @@ export type AutoHuntWorkflowInput = {
   completion?: { requiredStages?: AutoHuntWorkflowStageId[] };
   execution?: {
     checkpoints?: AutoHuntWorkflowCheckpoint[];
-    pauseAfterStage?: AutoHuntWorkflowStageId;
-    stopAfterStage?: AutoHuntWorkflowStageId;
   };
-  /** Read compatibility for workflows stored before an explicit pause stage. */
-  release?: { enabled: boolean };
 };
 
 const catalogById: Map<string, (typeof autoHuntWorkflowStageCatalog)[number]> = new Map(
@@ -263,50 +240,6 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const trimString = (value: unknown) =>
   typeof value === "string" ? value.trim() : null;
 
-const legacyCheckpointKey = (stage: string) => {
-  const key = `legacy-after-${stage}`;
-  if (!autoHuntWorkflowCheckpointKeyPattern.test(key)) {
-    throw new AutoHuntWorkflowValidationError([
-      `legacy checkpoint key for stage '${stage}' exceeds 64 characters`,
-    ]);
-  }
-  return key;
-};
-
-const createExecution = (
-  checkpoints: AutoHuntWorkflowCheckpoint[],
-  legacyPauseAfterStage?: AutoHuntWorkflowStageId,
-): AutoHuntWorkflowV2["execution"] => {
-  const execution = legacyPauseAfterStage
-    ? ({} as AutoHuntWorkflowV2["execution"])
-    : { checkpoints };
-  if (legacyPauseAfterStage) {
-    Object.defineProperty(execution, "checkpoints", {
-      configurable: true,
-      enumerable: false,
-      value: checkpoints,
-      writable: false,
-    });
-  }
-  if (legacyPauseAfterStage) {
-    // Keep the old desktop/UI projection available to code that has not moved
-    // to checkpoint rendering yet. `toJSON` is the canonical write boundary:
-    // v2 writers never persist either legacy field.
-    Object.defineProperty(execution, "pauseAfterStage", {
-      configurable: true,
-      enumerable: true,
-      value: legacyPauseAfterStage,
-      writable: false,
-    });
-  }
-  Object.defineProperty(execution, "toJSON", {
-    configurable: true,
-    enumerable: false,
-    value: () => ({ checkpoints: execution.checkpoints }),
-  });
-  return execution;
-};
-
 const cloneCanonicalWorkflow = (workflow: AutoHuntWorkflow): AutoHuntWorkflowV2 => {
   const normalized = normalizeAutoHuntWorkflow({
     version: workflow.version,
@@ -318,16 +251,11 @@ const cloneCanonicalWorkflow = (workflow: AutoHuntWorkflow): AutoHuntWorkflowV2 
       ...(stage.evidence ? { evidence: [...stage.evidence] } : {}),
       ...(stage.checks ? { checks: [...stage.checks] } : {}),
     })),
-    execution: workflow.version === 1
-      ? {
-          pauseAfterStage: workflow.execution.pauseAfterStage,
-          stopAfterStage: workflow.execution.stopAfterStage,
-        }
-      : {
-          checkpoints: workflow.execution.checkpoints?.map((checkpoint) => ({
-            ...checkpoint,
-          })),
-        },
+    execution: {
+      checkpoints: workflow.execution.checkpoints.map((checkpoint) => ({
+        ...checkpoint,
+      })),
+    },
     completion: {
       requiredStages: [...workflow.completion.requiredStages],
     },
@@ -343,7 +271,7 @@ const cloneCanonicalWorkflow = (workflow: AutoHuntWorkflow): AutoHuntWorkflowV2 
       ...(stage.checks ? { checks: [...stage.checks] } : {}),
     })),
     execution: {
-      checkpoints: (normalized.execution.checkpoints ?? []).map((checkpoint) => ({
+      checkpoints: normalized.execution.checkpoints.map((checkpoint) => ({
         ...checkpoint,
       })),
     },
@@ -359,7 +287,7 @@ const cloneCanonicalWorkflow = (workflow: AutoHuntWorkflow): AutoHuntWorkflowV2 
  */
 export const repositoryWorkflowPendingStageId = "repository_workflow_pending";
 export const repositoryWorkflowBootstrap: AutoHuntWorkflow = {
-  version: 1,
+  version: 2,
   requirements: [],
   stages: [
     {
@@ -368,12 +296,17 @@ export const repositoryWorkflowBootstrap: AutoHuntWorkflow = {
       required: true,
     },
   ],
-  execution: { pauseAfterStage: repositoryWorkflowPendingStageId },
+  execution: {
+    checkpoints: [{
+      key: "after-repository-workflow-pending",
+      stage: repositoryWorkflowPendingStageId,
+      position: "after",
+    }],
+  },
   completion: { requiredStages: [repositoryWorkflowPendingStageId] },
 };
 
-/** Clone through the canonical JSON boundary so compatibility projections and
- * non-enumerable read helpers cannot leak into a persisted v2 snapshot. */
+/** Clone through the canonical validation boundary. */
 export const cloneAutoHuntWorkflow = (
   workflow: AutoHuntWorkflow = repositoryWorkflowBootstrap,
 ): AutoHuntWorkflowV2 => cloneCanonicalWorkflow(workflow);
@@ -391,10 +324,8 @@ export function normalizeAutoHuntWorkflow(
     throw new AutoHuntWorkflowValidationError(["workflow must be an object"]);
   }
   const version = workflow.version;
-  if (version !== 1 && version !== 2) {
-    throw new AutoHuntWorkflowValidationError([
-      "version must be 1 (read compatibility) or 2",
-    ]);
+  if (version !== 2) {
+    throw new AutoHuntWorkflowValidationError(["version must be 2"]);
   }
   if (!Array.isArray(workflow.stages) || workflow.stages.length === 0) {
     throw new AutoHuntWorkflowValidationError(["stages must contain at least one stage"]);
@@ -554,34 +485,8 @@ export function normalizeAutoHuntWorkflow(
     issues.push("execution must be an object");
   }
   const execution = isRecord(workflow.execution) ? workflow.execution : null;
-  let checkpoints: AutoHuntWorkflowCheckpoint[] = [];
-  let legacyPauseAfterStage: AutoHuntWorkflowStageId | undefined;
-  if (version === 1) {
-    const pauseAfterStage = trimString(execution?.pauseAfterStage);
-    const stopAfterStage = trimString(execution?.stopAfterStage);
-    if (pauseAfterStage && stopAfterStage && pauseAfterStage !== stopAfterStage) {
-      issues.push(
-        "execution.pauseAfterStage and execution.stopAfterStage conflict",
-      );
-    }
-    const configuredStage = pauseAfterStage || stopAfterStage ||
-      requiredStages.at(-1) || stages.at(-1)!.id;
-    if (!stageIds.has(configuredStage)) {
-      issues.push(`legacy execution stage '${configuredStage}' is unknown`);
-    } else {
-      legacyPauseAfterStage = configuredStage;
-      checkpoints = [{
-        key: legacyCheckpointKey(configuredStage),
-        stage: configuredStage,
-        position: "after",
-      }];
-    }
-  } else if (
-    (execution?.pauseAfterStage !== undefined || execution?.stopAfterStage !== undefined) &&
-    typeof (execution as Record<string, unknown> | null)?.toJSON !== "function"
-  ) {
-    issues.push("version 2 execution must use checkpoints");
-  } else if (!execution || execution.checkpoints === undefined) {
+  const checkpoints: AutoHuntWorkflowCheckpoint[] = [];
+  if (!execution || execution.checkpoints === undefined) {
     issues.push("version 2 execution.checkpoints is required");
   } else if (execution?.checkpoints !== undefined) {
     if (!Array.isArray(execution.checkpoints) || execution.checkpoints.length > 100) {
@@ -629,16 +534,6 @@ export function normalizeAutoHuntWorkflow(
         });
       }
     }
-  } else {
-    // Snapshots created before execution was introduced paused after the last
-    // required stage. Preserve that behavior without rewriting the snapshot.
-    const fallbackStage = requiredStages.at(-1) ?? stages.at(-1)!.id;
-    legacyPauseAfterStage = fallbackStage;
-    checkpoints = [{
-      key: legacyCheckpointKey(fallbackStage),
-      stage: fallbackStage,
-      position: "after",
-    }];
   }
   if (issues.length > 0) throw new AutoHuntWorkflowValidationError(issues);
 
@@ -651,27 +546,22 @@ export function normalizeAutoHuntWorkflow(
     version: 2,
     requirements,
     stages,
-    execution: createExecution(checkpoints, legacyPauseAfterStage),
+    execution: { checkpoints },
     completion: { requiredStages },
   };
 }
 
 export function workflowPauseIndex(workflow: AutoHuntWorkflow) {
-  const legacyPauseStage = workflow.execution.pauseAfterStage ??
-    workflow.execution.stopAfterStage;
-  const checkpoint = [...(workflow.execution.checkpoints ?? [])]
+  const checkpoint = [...workflow.execution.checkpoints]
     .reverse()
-    .find((candidate) =>
-      candidate.position === "after" &&
-      (!legacyPauseStage || candidate.stage === legacyPauseStage),
-    );
+    .find((candidate) => candidate.position === "after");
   // The old event lifecycle only understands one after-stage pause. v2
   // checkpoint orchestration is deliberately opt-in through the progress API;
   // keep this compatibility helper inert for canonical v2 keys.
-  if (!checkpoint || !legacyPauseStage || !checkpoint.key.startsWith("legacy-after-")) {
+  if (!checkpoint || !checkpoint.key.startsWith("legacy-after-")) {
     return workflow.stages.length;
   }
-  return workflow.stages.findIndex((stage) => stage.id === legacyPauseStage);
+  return workflow.stages.findIndex((stage) => stage.id === checkpoint.stage);
 }
 
 /** @deprecated Use workflowPauseIndex. */
@@ -679,11 +569,11 @@ export const workflowStopIndex = workflowPauseIndex;
 
 export function workflowPauseStage(workflow: AutoHuntWorkflow) {
   const index = workflowPauseIndex(workflow);
-  return workflow.stages[index]?.id ?? workflow.execution.pauseAfterStage ?? null;
+  return workflow.stages[index]?.id ?? null;
 }
 
 export function orderedWorkflowCheckpoints(workflow: AutoHuntWorkflow) {
-  return [...(workflow.execution.checkpoints ?? [])];
+  return [...workflow.execution.checkpoints];
 }
 
 export function workflowCheckpointAt(
@@ -691,7 +581,7 @@ export function workflowCheckpointAt(
   stage: AutoHuntWorkflowStageId,
   position: AutoHuntWorkflowCheckpointPosition,
 ) {
-  return workflow.execution.checkpoints?.find(
+  return workflow.execution.checkpoints.find(
     (checkpoint) =>
       checkpoint.stage === stage && checkpoint.position === position,
   ) ?? null;
