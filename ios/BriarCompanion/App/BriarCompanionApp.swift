@@ -27,6 +27,7 @@ private struct UITestCompanionFlow: View {
     @State private var selectedProjectID: UUID?
     @State private var projectSelected = false
     @State private var createdRunStatus: DashboardRun.Status?
+    @State private var dependencyAdded = false
     @StateObject private var navigation = CompanionNavigationModel()
     @StateObject private var agents: AgentsStore
     @StateObject private var inbox = InboxStore()
@@ -167,6 +168,12 @@ private struct UITestCompanionFlow: View {
                 title: "의존성 연결 대상",
                 status: .queued,
                 detail: "선행 이슈를 선택할 수 있습니다.",
+                prerequisites: dependencyAdded ? [IssueDependencyReference(
+                    id: UUID(uuidString: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee")!,
+                    runNumber: 3835,
+                    title: "의존성 후보: API 준비",
+                    status: .completed
+                )] : nil,
                 updatedAt: Date(timeIntervalSince1970: 1_775_264_350)
             ),
             DashboardRun(
@@ -219,13 +226,16 @@ private struct UITestCompanionFlow: View {
 
     private func refreshSnapshot() async {
         createdRunStatus = await api.createdIssueStatus()
+        dependencyAdded = await api.createdDependencyAdded()
     }
 }
 
 private actor UITestAPIClient: MobileAPIClientProtocol {
     private var issueStatus: DashboardRun.Status?
+    private var dependencyAdded = false
 
     func createdIssueStatus() -> DashboardRun.Status? { issueStatus }
+    func createdDependencyAdded() -> Bool { dependencyAdded }
 
     func send<Response: Decodable & Sendable>(
         _ path: String,
@@ -252,6 +262,7 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
         } else if path.hasSuffix("/result-reviews") {
             payload = #"{"userId":"fixture-user","name":"Briar User","username":"briar_user","image":null,"completedAt":"2026-08-02T01:01:00Z"}"#
         } else if path.contains("/dependencies/") && method == "PUT" {
+            dependencyAdded = true
             payload = #"{"prerequisiteRunId":"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee","dependentRunId":"99999999-9999-4999-8999-999999999999","outcome":"created"}"#
         } else if path.hasSuffix("/messages") && method == "POST" {
             payload = #"{"message":{"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","runId":"77777777-7777-4777-8777-777777777777","parentMessageId":null,"body":"모바일에서 확인했습니다","author":{"id":"fixture-user","name":"Briar User","image":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==","provider":null},"replyCount":0,"createdAt":"2026-08-02T01:02:00Z","updatedAt":"2026-08-02T01:02:00Z"},"agentReply":null}"#
