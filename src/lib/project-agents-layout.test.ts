@@ -102,15 +102,21 @@ describe("project agents layout", () => {
     expect(firstRule(".auto-hunt-session-layout")).toContain(
       "grid-template-columns:minmax(0,1fr) minmax(300px,340px)",
     );
-    expect(styles).toContain(
-      ".auto-hunt-session-layout > .auto-hunt-stop-error,.auto-hunt-session-request-card { grid-column:1/-1; }",
+    expect(firstRule(".auto-hunt-session-detail-body")).toContain(
+      "display:flex",
+    );
+    expect(firstRule(".auto-hunt-session-main-column")).toContain(
+      "display:flex",
+    );
+    expect(firstRule(".auto-hunt-session-execution-timeline")).toContain(
+      "overflow-y:auto",
     );
     expect(firstRule(".auto-hunt-session-sidebar")).toContain(
       "display:grid",
     );
     expect(styles).toContain("@media (max-width:1100px)");
     expect(styles).toContain(
-      ".auto-hunt-session-layout { grid-template-columns:minmax(0,1fr); }",
+      ".auto-hunt-session-layout { flex:none; grid-template-columns:minmax(0,1fr); }",
     );
   });
 });

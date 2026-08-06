@@ -87,6 +87,7 @@ export function ProjectAgentSessionDetail({
     [agentMessages, session.dispatchEvents, t],
   );
   const agentMessagesRef = useRef<HTMLDivElement>(null);
+  const stickToBottomRef = useRef(true);
   const latestExecutionEntry =
     executionLogEntries[executionLogEntries.length - 1];
   const { toast } = useToast();
@@ -97,8 +98,18 @@ export function ProjectAgentSessionDetail({
   useEffect(() => {
     const messageList = agentMessagesRef.current;
     if (!messageList || executionLogEntries.length === 0) return;
-    messageList.scrollTop = messageList.scrollHeight;
+    if (stickToBottomRef.current) {
+      messageList.scrollTop = messageList.scrollHeight;
+    }
   }, [executionLogEntries.length, latestExecutionEntry?.text.length]);
+
+  const handleExecutionTimelineScroll = () => {
+    const messageList = agentMessagesRef.current;
+    if (!messageList) return;
+    stickToBottomRef.current =
+      messageList.scrollHeight - messageList.scrollTop - messageList.clientHeight
+      < 24;
+  };
 
   useEffect(() => {
     if (session.status !== "running") return;
@@ -278,7 +289,7 @@ export function ProjectAgentSessionDetail({
           aria-labelledby="project-agent-session-title"
           className="auto-hunt-session-page"
         >
-          <div className="auto-hunt-session-detail-body auto-hunt-session-layout">
+          <div className="auto-hunt-session-detail-body">
             {stopError ? (
               <div className="auto-hunt-stop-error" role="alert">
                 <CircleAlert size={14} />
@@ -287,79 +298,83 @@ export function ProjectAgentSessionDetail({
             ) : null}
             <section className="auto-hunt-session-request-card">
               <span>{t("agents.sessionRequest")}</span>
-              <p>{session.request?.trim() || t("agents.sessionRequestEmpty")}</p>
+              <p title={session.request?.trim() || undefined}>
+                {session.request?.trim() || t("agents.sessionRequestEmpty")}
+              </p>
             </section>
 
-            <div className="auto-hunt-session-main-column">
-              <section className="auto-hunt-dialog-section auto-hunt-app-server-section">
-                <header>
-                  <div>
-                    <h3>{t("agents.executionLog")}</h3>
-                    <p>{t("agents.executionLogDescription")}</p>
-                  </div>
-                  <span className="auto-hunt-event-count">
-                    {session.status === "running" ? (
-                      <i>
-                        <span />
-                        {t("autoHunt.live")}
-                      </i>
-                    ) : null}
-                    {t("autoHunt.eventCount", {
-                      count: executionLogEntries.length,
-                    })}
-                  </span>
-                </header>
-                {executionEvents.error ? (
-                  <div className="auto-hunt-event-state error">
-                    <CircleAlert size={14} />
-                    {executionEvents.error}
-                  </div>
-                ) : executionEvents.isLoading ? (
-                  <div className="auto-hunt-event-state">
-                    <LoaderCircle className="spin" size={14} />
-                    {t("autoHunt.eventsLoading")}
-                  </div>
-                ) : executionLogEntries.length === 0 ? (
-                  <div className="auto-hunt-event-state">
-                    {t("autoHunt.eventsEmpty")}
-                  </div>
-                ) : (
-                  <div
-                    aria-live="polite"
-                    className="auto-hunt-agent-messages auto-hunt-session-execution-timeline"
-                    ref={agentMessagesRef}
-                    role="log"
-                  >
-                    {executionLogEntries.map((entry, index) => (
-                      <article
-                        className={`auto-hunt-agent-message ${entry.status}`}
-                        key={entry.id}
-                      >
-                        <span
-                          aria-hidden="true"
-                          className="auto-hunt-message-index"
+            <div className="auto-hunt-session-layout">
+              <div className="auto-hunt-session-main-column">
+                <section className="auto-hunt-dialog-section auto-hunt-app-server-section">
+                  <header>
+                    <div>
+                      <h3>{t("agents.executionLog")}</h3>
+                      <p>{t("agents.executionLogDescription")}</p>
+                    </div>
+                    <span className="auto-hunt-event-count">
+                      {session.status === "running" ? (
+                        <i>
+                          <span />
+                          {t("autoHunt.live")}
+                        </i>
+                      ) : null}
+                      {t("autoHunt.eventCount", {
+                        count: executionLogEntries.length,
+                      })}
+                    </span>
+                  </header>
+                  {executionEvents.error ? (
+                    <div className="auto-hunt-event-state error">
+                      <CircleAlert size={14} />
+                      {executionEvents.error}
+                    </div>
+                  ) : executionEvents.isLoading ? (
+                    <div className="auto-hunt-event-state">
+                      <LoaderCircle className="spin" size={14} />
+                      {t("autoHunt.eventsLoading")}
+                    </div>
+                  ) : executionLogEntries.length === 0 ? (
+                    <div className="auto-hunt-event-state">
+                      {t("autoHunt.eventsEmpty")}
+                    </div>
+                  ) : (
+                    <div
+                      aria-live="polite"
+                      className="auto-hunt-agent-messages auto-hunt-session-execution-timeline"
+                      onScroll={handleExecutionTimelineScroll}
+                      ref={agentMessagesRef}
+                      role="log"
+                    >
+                      {executionLogEntries.map((entry, index) => (
+                        <article
+                          className={`auto-hunt-agent-message ${entry.status}`}
+                          key={entry.id}
                         >
-                          {index + 1}
-                        </span>
-                        <header>
-                          <strong>{entry.phase}</strong>
-                          {!entry.isComplete ? (
-                            <small className="auto-hunt-message-streaming">
-                              <LoaderCircle className="spin" size={11} />
-                              {t("autoHunt.agentMessage.streaming")}
-                            </small>
-                          ) : null}
-                          <time
-                            dateTime={new Date(entry.occurredAtMs).toISOString()}
+                          <span
+                            aria-hidden="true"
+                            className="auto-hunt-message-index"
                           >
-                            {formatEventTime(entry.occurredAtMs, localeTag)}
-                          </time>
-                        </header>
-                        <p>{entry.text}</p>
-                      </article>
-                    ))}
-                  </div>
-                )}
+                            {index + 1}
+                          </span>
+                          <header>
+                            <strong>{entry.phase}</strong>
+                            {!entry.isComplete ? (
+                              <small className="auto-hunt-message-streaming">
+                                <LoaderCircle className="spin" size={11} />
+                                {t("autoHunt.agentMessage.streaming")}
+                              </small>
+                            ) : null}
+                            <time
+                              dateTime={new Date(entry.occurredAtMs).toISOString()}
+                            >
+                              {formatEventTime(entry.occurredAtMs, localeTag)}
+                            </time>
+                          </header>
+                          <p>{entry.text}</p>
+                        </article>
+                      ))}
+                    </div>
+                  )}
               </section>
             </div>
 
@@ -469,6 +484,7 @@ export function ProjectAgentSessionDetail({
                 </div>
               </section>
             </aside>
+            </div>
           </div>
         </section>
       </div>
