@@ -87,17 +87,27 @@ struct ChannelMessagesView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            List {
-                ForEach(channels.messages) { message in
-                    NavigationLink(value: message) {
-                        ChannelMessageRow(message: message)
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(channels.messages) { message in
+                        NavigationLink(value: message) {
+                            ChannelMessageRow(
+                                message: message,
+                                locale: locale,
+                                showsThreadSummary: true
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
-            .listStyle(.plain)
             ChannelComposer(
                 draft: $draft,
                 sending: channels.sending,
+                placeholder: String(
+                    format: L10n.text(.channelMessagePlaceholder, locale: locale),
+                    channel.name
+                ),
                 send: { body in
                     await channels.send(
                         channelID: channel.id,
@@ -107,8 +117,16 @@ struct ChannelMessagesView: View {
                 }
             )
         }
-        .navigationTitle(channel.name)
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Label(
+                    channel.name,
+                    systemImage: channel.visibility == .restricted ? "lock" : "number"
+                )
+                .font(.headline)
+                .lineLimit(1)
+            }
+        }
         .task(id: channel.id) { await channels.openChannel(channel.id) }
         .navigationDestination(for: ChannelMessage.self) { message in
             ChannelThreadView(channels: channels, channel: channel, parent: message)
@@ -138,15 +156,20 @@ struct ChannelThreadView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            List {
-                ForEach(channels.thread) { message in
-                    ChannelMessageRow(message: message)
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(channels.thread) { message in
+                        ChannelMessageRow(message: message, locale: locale)
+                    }
                 }
             }
-            .listStyle(.plain)
             ChannelComposer(
                 draft: $draft,
                 sending: channels.sending,
+                placeholder: String(
+                    format: L10n.text(.channelMessagePlaceholder, locale: locale),
+                    channel.name
+                ),
                 send: { body in
                     await channels.send(
                         channelID: channel.id,
@@ -166,60 +189,126 @@ struct ChannelThreadView: View {
 
 private struct ChannelMessageRow: View {
     let message: ChannelMessage
+    let locale: CompanionLocale
+    var showsThreadSummary = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                Text(message.author.name).font(.footnote.weight(.semibold))
-                if message.author.type == .agent {
-                    Image(systemName: "cpu").font(.caption2).foregroundStyle(.secondary)
+        HStack(alignment: .top, spacing: 11) {
+            ProfileImageView(
+                image: message.author.type == .user ? message.author.image : nil,
+                name: message.author.type == .user ? message.author.name : nil,
+                systemImage: message.author.type == .agent ? "cpu" : "person.fill",
+                size: 40
+            )
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(alignment: .firstTextBaseline, spacing: 7) {
+                    Text(message.author.name)
+                        .font(.subheadline.weight(.bold))
+                        .lineLimit(1)
+                    if message.author.type == .agent {
+                        Image(systemName: "cpu")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    Text(message.createdAt, style: .time)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-                Spacer(minLength: 4)
-                Text(message.createdAt, style: .time)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-            Text(message.body).font(.callout)
-            if let document = message.document {
-                Label(document.title, systemImage: "doc.text")
+                Text(message.body)
+                    .font(.body)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if let document = message.document {
+                    Label(document.title, systemImage: "doc.text")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 3)
+                }
+                if showsThreadSummary, message.replyCount > 0 {
+                    HStack(spacing: 6) {
+                        Image(systemName: "bubble.left")
+                        Text(
+                            String(
+                                format: L10n.text(.channelReplies, locale: locale),
+                                message.replyCount
+                            )
+                        )
+                        .fontWeight(.semibold)
+                        if let lastReplyText {
+                            Text("· \(lastReplyText)")
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
                     .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            if message.replyCount > 0 {
-                Label("\(message.replyCount)", systemImage: "bubble.left")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.tint)
+                    .padding(.top, 4)
+                }
             }
         }
-        .padding(.vertical, 2)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 11)
+        .contentShape(Rectangle())
         .accessibilityIdentifier("channel-message-\(message.id.uuidString.lowercased())")
+    }
+
+    private var lastReplyText: String? {
+        guard let lastReplyAt = message.lastReplyAt else { return nil }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.locale = Locale(
+            identifier: switch locale {
+            case .ko: "ko_KR"
+            case .en: "en_US"
+            case .zh: "zh_CN"
+            }
+        )
+        let relative = formatter.localizedString(for: lastReplyAt, relativeTo: Date())
+        return String(
+            format: L10n.text(.channelLastReply, locale: locale),
+            relative
+        )
     }
 }
 
 private struct ChannelComposer: View {
     @Binding var draft: String
     let sending: Bool
+    let placeholder: String
     let send: (String) async -> Void
 
     var body: some View {
         HStack(spacing: 8) {
-            TextField("", text: $draft, axis: .vertical)
-                .textFieldStyle(.roundedBorder)
+            Image(systemName: "plus")
+                .font(.body.weight(.medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 40, height: 40)
+                .background(.background, in: Circle())
+                .overlay { Circle().stroke(Color.secondary.opacity(0.18), lineWidth: 1) }
+            TextField(placeholder, text: $draft, axis: .vertical)
+                .textFieldStyle(.plain)
                 .lineLimit(1...4)
                 .disabled(sending)
                 .accessibilityIdentifier("channel-composer-field")
-            Button {
-                let body = draft
-                draft = ""
-                Task { await send(body) }
-            } label: {
-                Image(systemName: "arrow.up.circle.fill").font(.title2)
+            if !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Button {
+                    let body = draft
+                    draft = ""
+                    Task { await send(body) }
+                } label: {
+                    Image(systemName: "arrow.up")
+                        .font(.body.weight(.bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 40, height: 40)
+                        .background(.tint, in: Circle())
+                }
+                .disabled(sending)
+                .accessibilityIdentifier("channel-composer-send")
             }
-            .disabled(sending || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            .accessibilityIdentifier("channel-composer-send")
         }
+        .padding(7)
+        .background(.secondary.opacity(0.1), in: Capsule())
+        .overlay { Capsule().stroke(Color.secondary.opacity(0.18), lineWidth: 1) }
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.vertical, 10)
         .background(.bar)
     }
 }

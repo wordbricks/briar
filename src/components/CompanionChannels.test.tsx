@@ -167,6 +167,52 @@ describe("CompanionChannels", () => {
     expect(container.textContent).toContain("Thread");
   });
 
+  it("presents channel messages with avatars, reply context, and a channel composer", async () => {
+    const item = message("m-1", "Hello team", 2);
+    item.author = {
+      type: "user",
+      id: "user-1",
+      name: "Jay",
+      email: "jay@example.com",
+      image: "https://example.com/jay.png",
+    };
+    item.lastReplyAt = "2026-08-01T08:00:00.000Z";
+    loadChannel.mockResolvedValue({
+      channel: channel("c-common", "Welcome", null),
+      members: [],
+      agents: [],
+      messages: [item],
+    });
+    await render();
+
+    await act(async () => {
+      [
+        ...container.querySelectorAll<HTMLButtonElement>(
+          ".companion-channel-group button",
+        ),
+      ]
+        .find((button) => button.textContent?.includes("Welcome"))!
+        .click();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(container.querySelector(".companion-channel-detail")).not.toBeNull();
+    expect(
+      container.querySelector<HTMLImageElement>("img.companion-channel-avatar")
+        ?.src,
+    ).toBe("https://example.com/jay.png");
+    expect(container.querySelector(".companion-channel-thread-summary")?.textContent)
+      .toContain("2 replies");
+    expect(container.querySelector(".companion-channel-thread-summary")?.textContent)
+      .toContain("last reply");
+    expect(
+      container.querySelector<HTMLInputElement>(".companion-channel-composer input")
+        ?.placeholder,
+    ).toBe("Message channel");
+  });
+
   it("posts a thread reply against the opened message", async () => {
     loadChannel.mockResolvedValue({
       channel: channel("c-common", "Welcome", null),

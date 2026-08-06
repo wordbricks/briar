@@ -60,6 +60,9 @@ enum L10n {
         case channelsOtherProject
         case channelsEmpty
         case channelThread
+        case channelReplies
+        case channelLastReply
+        case channelMessagePlaceholder
         case channelHome
 
         var ko: String {
@@ -88,6 +91,9 @@ enum L10n {
             case .channelsOtherProject: "다른 프로젝트"
             case .channelsEmpty: "채널이 없습니다."
             case .channelThread: "스레드"
+            case .channelReplies: "답글 %d개"
+            case .channelLastReply: "마지막 답글 %@"
+            case .channelMessagePlaceholder: "#%@에 메시지 보내기"
             case .channelHome: "홈"
             case .notificationHint: "선택한 분류의 새 항목이 도착하면 로컬 알림을 보냅니다."
             }
@@ -119,6 +125,9 @@ enum L10n {
             case .channelsOtherProject: "Other project"
             case .channelsEmpty: "No channels yet."
             case .channelThread: "Thread"
+            case .channelReplies: "%d replies"
+            case .channelLastReply: "last reply %@"
+            case .channelMessagePlaceholder: "Message #%@"
             case .channelHome: "Home"
             case .notificationHint: "Local notifications fire for newly arrived items in the selected categories."
             }
@@ -150,6 +159,9 @@ enum L10n {
             case .channelsOtherProject: "其他项目"
             case .channelsEmpty: "还没有频道。"
             case .channelThread: "话题"
+            case .channelReplies: "%d 条回复"
+            case .channelLastReply: "最后回复于%@"
+            case .channelMessagePlaceholder: "发送消息到 #%@"
             case .channelHome: "主页"
             case .notificationHint: "所选分类有新项目时会发送本地通知。"
             }

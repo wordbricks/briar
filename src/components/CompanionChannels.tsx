@@ -6,6 +6,7 @@ import {
   LoaderCircle,
   Lock,
   MessageSquare,
+  Plus,
   Send,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -150,7 +151,7 @@ export function CompanionChannels({
 
   if (channel && threadParentId) {
     return (
-      <section className="companion-channels">
+      <section className="companion-channels companion-channel-detail">
         <ChannelBar
           onBack={() => {
             setThreadParentId(null);
@@ -172,7 +173,7 @@ export function CompanionChannels({
 
   if (channel) {
     return (
-      <section className="companion-channels">
+      <section className="companion-channels companion-channel-detail">
         <ChannelBar
           onBack={() => {
             setChannel(null);
@@ -186,16 +187,13 @@ export function CompanionChannels({
           {loading && messages.length === 0 ? <Spinner /> : null}
           {messages.map((item) => (
             <button
+              aria-label={`${t("run.viewThread")}: ${item.author.name} — ${item.body}`}
               className="companion-channel-message-button"
               key={item.id}
               onClick={() => void openThread(item)}
               type="button"
             >
-              <MessageRow message={item} />
-              <span className="companion-channel-thread-hint">
-                <MessageSquare size={12} />
-                {item.replyCount > 0 ? item.replyCount : null}
-              </span>
+              <MessageRow message={item} showThreadSummary />
             </button>
           ))}
           {!loading && messages.length === 0 ? (
@@ -254,9 +252,10 @@ function ChannelBar({
   title: string;
   visibility?: "public" | "private";
 }) {
+  const { t } = useI18n();
   return (
     <header className="companion-channel-bar">
-      <button aria-label="뒤로" onClick={onBack} type="button">
+      <button aria-label={t("navigation.back")} onClick={onBack} type="button">
         <ChevronLeft size={18} />
       </button>
       {visibility === "private" ? <Lock size={15} /> : null}
@@ -266,22 +265,75 @@ function ChannelBar({
   );
 }
 
-function MessageRow({ message }: { message: ChannelMessage }) {
+function MessageRow({
+  message,
+  showThreadSummary = false,
+}: {
+  message: ChannelMessage;
+  showThreadSummary?: boolean;
+}) {
+  const { localeTag, t } = useI18n();
   return (
     <article className="companion-channel-message">
-      <header>
-        <strong>{message.author.name}</strong>
-        {message.author.type === "agent" ? <Bot size={12} /> : null}
-        <time>{new Date(message.createdAt).toLocaleTimeString()}</time>
-      </header>
-      <p>{message.body}</p>
-      {message.document ? (
-        <span className="companion-channel-document">
-          <FileText size={13} />
-          {message.document.title}
-        </span>
-      ) : null}
+      <MessageAvatar message={message} />
+      <div className="companion-channel-message-copy">
+        <header>
+          <strong>{message.author.name}</strong>
+          {message.author.type === "agent" ? <Bot size={12} /> : null}
+          <time>
+            {new Date(message.createdAt).toLocaleTimeString(localeTag, {
+              hour: "numeric",
+              minute: "2-digit",
+            })}
+          </time>
+        </header>
+        <p>{message.body}</p>
+        {message.document ? (
+          <span className="companion-channel-document">
+            <FileText size={13} />
+            {message.document.title}
+          </span>
+        ) : null}
+        {showThreadSummary && message.replyCount > 0 ? (
+          <span className="companion-channel-thread-summary">
+            <MessageSquare size={14} />
+            <strong>{t("run.replies", { count: message.replyCount })}</strong>
+            {message.lastReplyAt ? (
+              <small>
+                · {t("companion.channelLastReply", {
+                  time: relativeTime(message.lastReplyAt, localeTag),
+                })}
+              </small>
+            ) : null}
+          </span>
+        ) : null}
+      </div>
     </article>
+  );
+}
+
+function MessageAvatar({ message }: { message: ChannelMessage }) {
+  if (message.author.type === "user" && message.author.image) {
+    return (
+      <img
+        alt=""
+        className="companion-channel-avatar"
+        src={message.author.image}
+      />
+    );
+  }
+  return (
+    <span
+      aria-label={message.author.name}
+      className={`companion-channel-avatar fallback ${message.author.type}`}
+      role="img"
+    >
+      {message.author.type === "agent" ? (
+        <Bot size={18} />
+      ) : (
+        message.author.name.trim().charAt(0).toUpperCase() || "?"
+      )}
+    </span>
   );
 }
 
@@ -292,6 +344,7 @@ function Composer({
   busy: boolean;
   onSend: (body: string) => void;
 }) {
+  const { t } = useI18n();
   const [body, setBody] = useState("");
   return (
     <form
@@ -303,17 +356,37 @@ function Composer({
         setBody("");
       }}
     >
+      <span aria-hidden="true" className="companion-channel-composer-add">
+        <Plus size={20} />
+      </span>
       <input
-        aria-label="채널 메시지"
+        aria-label={t("companion.channelMessagePlaceholder")}
         disabled={busy}
         onChange={(event) => setBody(event.target.value)}
+        placeholder={t("companion.channelMessagePlaceholder")}
         value={body}
       />
-      <button aria-label="메시지 보내기" disabled={busy || !body.trim()} type="submit">
-        <Send size={16} />
-      </button>
+      {body.trim() ? (
+        <button aria-label={t("run.sendMessage")} disabled={busy} type="submit">
+          <Send size={16} />
+        </button>
+      ) : null}
     </form>
   );
+}
+
+function relativeTime(value: string, locale: string) {
+  const elapsedSeconds = Math.round(
+    (new Date(value).getTime() - Date.now()) / 1_000,
+  );
+  const formatter = new Intl.RelativeTimeFormat(locale, { numeric: "always" });
+  if (Math.abs(elapsedSeconds) < 3_600) {
+    return formatter.format(Math.round(elapsedSeconds / 60), "minute");
+  }
+  if (Math.abs(elapsedSeconds) < 86_400) {
+    return formatter.format(Math.round(elapsedSeconds / 3_600), "hour");
+  }
+  return formatter.format(Math.round(elapsedSeconds / 86_400), "day");
 }
 
 function Spinner() {
