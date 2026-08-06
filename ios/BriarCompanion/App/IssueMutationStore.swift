@@ -263,21 +263,35 @@ final class IssueMutationStore: ObservableObject {
         }
     }
 
-    func acceptReworkProposal(
+    func acceptIssueProposal(
         runID: UUID,
-        proposalID: UUID
-    ) async throws -> IssueReworkProposal {
-        try await perform("rework-proposal-\(proposalID)") {
-            let response: AcceptIssueReworkProposalResponse = try await api.send(
-                MobileAPIContract.Endpoint.acceptIssueReworkProposal(
+        proposal: IssueProposedAction
+    ) async throws -> IssueProposedAction {
+        try await perform("issue-proposal-\(proposal.id)") {
+            if proposal.type == .rework {
+                let response: AcceptIssueReworkProposalResponse = try await api.send(
+                    MobileAPIContract.Endpoint.acceptIssueReworkProposal(
+                        projectID: projectID,
+                        runID: runID,
+                        proposalID: proposal.id
+                    ),
+                    method: "POST",
+                    token: token,
+                    body: nil,
+                    as: AcceptIssueReworkProposalResponse.self
+                )
+                return response.proposal
+            }
+            let response: AcceptIssueActionProposalResponse = try await api.send(
+                MobileAPIContract.Endpoint.acceptIssueActionProposal(
                     projectID: projectID,
                     runID: runID,
-                    proposalID: proposalID
+                    proposalID: proposal.id
                 ),
                 method: "POST",
                 token: token,
                 body: nil,
-                as: AcceptIssueReworkProposalResponse.self
+                as: AcceptIssueActionProposalResponse.self
             )
             return response.proposal
         }

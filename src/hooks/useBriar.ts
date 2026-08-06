@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   acceptOrganizationInvitation as acceptRemoteOrganizationInvitation,
+  acceptIssueActionProposal as acceptRemoteIssueActionProposal,
   acceptIssueReworkProposal as acceptRemoteIssueReworkProposal,
   addIssueDependency,
   beginDeviceAuthorization,
@@ -137,6 +138,7 @@ import type {
   IssueAttachment,
   IssueMessage,
   IssueMessageSendResult,
+  IssueProposedAction,
   IssueExecutionPreferences,
   IssueResultReview,
   Organization,
@@ -2672,25 +2674,32 @@ export function useBriar(options: UseBriarOptions = {}) {
     [activeProjectId, token],
   );
 
-  const acceptReworkProposal = useCallback(
-    async (runId: string, proposalId: string) => {
+  const acceptConversationIssueAction = useCallback(
+    async (runId: string, proposal: IssueProposedAction) => {
       if (!activeProjectId || !dashboard) {
-        throw new Error("재작업할 이슈 처리 작업이 없습니다.");
+        throw new Error("변경할 이슈 처리 작업이 없습니다.");
       }
       if (demoMode) {
-        throw new Error("데모에서는 재작업 제안을 수락할 수 없습니다.");
+        throw new Error("데모에서는 이슈 변경 제안을 수락할 수 없습니다.");
       }
       if (!token) throw new Error("로그인이 필요합니다.");
-      const result = await acceptRemoteIssueReworkProposal(
-        token,
-        activeProjectId,
-        runId,
-        proposalId,
-      );
+      const result = proposal.type === "request_issue_rework"
+        ? await acceptRemoteIssueReworkProposal(
+            token,
+            activeProjectId,
+            runId,
+            proposal.id,
+          )
+        : await acceptRemoteIssueActionProposal(
+            token,
+            activeProjectId,
+            runId,
+            proposal.id,
+          );
       issueMessagesByRun.current = {
         ...issueMessagesByRun.current,
         [runId]: (issueMessagesByRun.current[runId] ?? []).map((message) =>
-          message.proposedAction?.id === proposalId
+          message.proposedAction?.id === proposal.id
             ? { ...message, proposedAction: result.proposal }
             : message,
         ),
@@ -3240,7 +3249,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     readRunEvidence,
     readRunEvidenceImage,
     addIssueMessage,
-    acceptReworkProposal,
+    acceptConversationIssueAction,
     setActiveOrganizationId: selectOrganization,
     setActiveProjectId: selectProject,
     selectProjectRepository,

@@ -1261,33 +1261,67 @@ struct RunDetailView: View {
                 }
                 if let proposal = message.proposedAction {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Briar 재작업 제안")
+                        Text(
+                            proposal.type == .rework ? "Briar 재작업 제안" :
+                                proposal.type == .update ? "현재 이슈 수정 제안" : "새 이슈 생성 제안"
+                        )
                             .font(.subheadline.weight(.semibold))
-                        Text("\(proposal.workflowStage)부터 개정")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text(proposal.reason)
-                            .font(.subheadline)
+                        if proposal.type == .rework {
+                            Text("\(proposal.workflowStage ?? "")부터 개정")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(proposal.reason ?? "")
+                                .font(.subheadline)
+                        } else if proposal.type == .update {
+                            if proposal.changedFields?.contains("title") == true {
+                                LabeledContent("제목", value: proposal.changes?.title ?? "")
+                            }
+                            if proposal.changedFields?.contains("description") == true {
+                                LabeledContent("설명", value: proposal.changes?.description ?? "설정 안 함")
+                            }
+                            if proposal.changedFields?.contains("priority") == true {
+                                LabeledContent(
+                                    "우선순위",
+                                    value: proposal.changes?.priority.map { "P\($0)" } ?? "설정 안 함"
+                                )
+                            }
+                        } else if let issue = proposal.issue {
+                            Text(issue.title).font(.subheadline.weight(.semibold))
+                            if let description = issue.description, !description.isEmpty {
+                                Text(description).font(.subheadline)
+                            }
+                            Text("\(issue.priority.map { "P\($0)" } ?? "우선순위 없음") · \(issue.status)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                         if proposal.status == .accepted {
                             Label(
-                                "리비전 \(proposal.appliedRevision.map(String.init) ?? "") 개정이 시작되었습니다.",
+                                proposal.type == .rework
+                                    ? "리비전 \(proposal.appliedRevision.map(String.init) ?? "") 개정이 시작되었습니다."
+                                    : proposal.type == .update
+                                        ? "이슈 내용이 수정되었습니다."
+                                        : "새 이슈가 생성되었습니다.",
                                 systemImage: "checkmark.seal.fill"
                             )
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.tint)
                         } else {
                             Button {
-                                Task { await acceptReworkProposal(proposal) }
+                                Task { await acceptIssueProposal(proposal) }
                             } label: {
-                                if mutations.isActive("rework-proposal-\(proposal.id)") {
+                                if mutations.isActive("issue-proposal-\(proposal.id)") {
                                     ProgressView()
                                 } else {
-                                    Label("수락하고 개정 시작", systemImage: "play.fill")
+                                    Label(
+                                        proposal.type == .rework ? "수락하고 개정 시작" :
+                                            proposal.type == .update ? "수락하고 이슈 수정" : "수락하고 이슈 만들기",
+                                        systemImage: "play.fill"
+                                    )
                                 }
                             }
                             .buttonStyle(.borderedProminent)
-                            .disabled(mutations.isActive("rework-proposal-\(proposal.id)"))
-                            .accessibilityIdentifier("accept-rework-proposal-\(proposal.id.uuidString.lowercased())")
+                            .disabled(mutations.isActive("issue-proposal-\(proposal.id)"))
+                            .accessibilityIdentifier("accept-issue-proposal-\(proposal.id.uuidString.lowercased())")
                         }
                     }
                     .padding(10)
@@ -1636,13 +1670,13 @@ struct RunDetailView: View {
         } catch { actionError = error.localizedDescription }
     }
 
-    private func acceptReworkProposal(_ proposal: IssueReworkProposal) async {
+    private func acceptIssueProposal(_ proposal: IssueProposedAction) async {
         do {
-            let accepted = try await mutations.acceptReworkProposal(
+            let accepted = try await mutations.acceptIssueProposal(
                 runID: run.id,
-                proposalID: proposal.id
+                proposal: proposal
             )
-            detail.updateReworkProposal(accepted)
+            detail.updateIssueProposal(accepted)
             actionError = nil
             await refresh()
         } catch {
