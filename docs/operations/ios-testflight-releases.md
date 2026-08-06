@@ -236,3 +236,32 @@ uses the iOS-supported paste button for clipboard image attachments, and makes
 dependency selection reliable on iOS 26. Archive identity, App Store
 provisioning, distribution signature, production entitlements, and all
 alternate app icons were verified before upload.
+
+## 2026-08-07 — 1.2.79 (2)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.79`
+- App Store Connect build: `2`
+- App Store Connect build ID: `3303ae5f-8a68-4578-82d8-237611738bc9`
+- Latest main commit: `85d8094e`
+- Release source commit: `85d8094ea6563c68302522a5e73c0bdbb828a1b9`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Internal group: `wordbricks` (`hasAccessToAllBuilds=true`)
+- Automatic tester notification: enabled
+- IPA SHA-256: `a82a5079076837534d8a33eb0296601c82d8babc4c3871c527622556e4daf611`
+
+The release passed the shared API contract, Swift unit and UI tests, iPhone and
+iPad accessibility and layout tests, Production analyze and build checks,
+session/download/log security checks, and the Tauri iOS and Android regression
+builds. Archive identity, App Store provisioning, distribution signature,
+production entitlements, and all alternate app icons were verified before
+upload.
+
+Build `1` (`54b73944-44b2-4a25-9059-4df289c9ee9e`) was processed as `VALID`
+from commit `6fad1765abe9fe6b7e610e26a08a8200db3cacd6`. While Apple was processing it,
+main advanced to `85d8094e`; build `2` was rebuilt and revalidated from that
+new latest main commit and is the final build handed off for this release.
