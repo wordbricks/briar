@@ -1671,6 +1671,53 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
+  it("marks an open issue viewed again when its inbox version changes", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    const onIssueViewed = vi.fn();
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={demoDashboard}
+        onIssueViewed={onIssueViewed}
+      />,
+    ));
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".kanban-card")?.click();
+    });
+
+    const viewedRun = demoDashboard.runs[0];
+    expect(onIssueViewed).toHaveBeenLastCalledWith(viewedRun.id);
+    const callsAfterOpening = onIssueViewed.mock.calls.length;
+
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={{
+          ...demoDashboard,
+          runs: demoDashboard.runs.map((run) =>
+            run.id === viewedRun.id
+              ? {
+                  ...run,
+                  eventCount: run.eventCount + 1,
+                  lastEventAt: "2026-08-06T03:00:00.000Z",
+                }
+              : run,
+          ),
+        }}
+        onIssueViewed={onIssueViewed}
+      />,
+    ));
+
+    expect(onIssueViewed).toHaveBeenLastCalledWith(viewedRun.id);
+    expect(onIssueViewed).toHaveBeenCalledTimes(callsAfterOpening + 1);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("shows a retryable state when the detail timeline fails to load", async () => {
     const events = demoRunEvents[demoDashboard.runs[0].id];
     const onLoadRunEvents = vi

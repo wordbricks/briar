@@ -194,6 +194,10 @@ export function App() {
     briar.projects,
     briar.token,
   );
+  const markInboxIssueRead = useCallback(
+    (runId: string) => inbox.markRead(`issue:${runId}`),
+    [inbox.markRead],
+  );
   useInboxNotifications(
     briar.user?.id ?? null,
     briar.activeOrganizationId,
@@ -1268,6 +1272,7 @@ export function App() {
             onAddProject={briar.startProjectCreation}
             onCreateIssue={briar.addIssue}
             onIssueDialogOpenChange={setIsIssueDialogOpen}
+            onIssueViewed={markInboxIssueRead}
             onDeleteIssue={briar.deleteIssue}
             onTransferIssue={briar.transferIssue}
             onAddIssueDependency={briar.addIssueDependency}
@@ -1649,6 +1654,7 @@ export function App() {
             }}
             onCreateIssue={briar.addIssue}
             onIssueDialogOpenChange={setIsIssueDialogOpen}
+            onIssueViewed={markInboxIssueRead}
             onDeleteIssue={briar.deleteIssue}
             onTransferIssue={briar.transferIssue}
             onAddIssueDependency={briar.addIssueDependency}
