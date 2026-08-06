@@ -34,6 +34,7 @@ import { NativeSelect } from "./NativeSelect";
 import { WorkerIcon } from "./WorkerIcon";
 
 export function WorkerDispatchDialog({
+  didDispatchSuccessfully = false,
   error,
   isDispatching,
   onOpenChange,
@@ -43,6 +44,7 @@ export function WorkerDispatchDialog({
   run,
   workers,
 }: {
+  didDispatchSuccessfully?: boolean;
   error: string | null;
   isDispatching: boolean;
   onOpenChange: (open: boolean) => void;
@@ -311,14 +313,17 @@ export function WorkerDispatchDialog({
 
         <DialogFooter>
           <Button
-            disabled={isDispatching}
+            disabled={isDispatching || didDispatchSuccessfully}
             onClick={() => onOpenChange(false)}
             variant="outline"
           >
             {t("common.cancel")}
           </Button>
           <Button
-            disabled={!canDispatch || isDispatching}
+            aria-label={
+              didDispatchSuccessfully ? t("worker.dispatchComplete") : undefined
+            }
+            disabled={!canDispatch || isDispatching || didDispatchSuccessfully}
             onClick={() =>
               onSubmit({
                 provider,
@@ -328,8 +333,14 @@ export function WorkerDispatchDialog({
               })
             }
           >
-            {isDispatching && <LoaderCircle className="spin" size={15} />}
-            {t(isReassign ? "worker.reassign" : "worker.dispatch")}
+            {didDispatchSuccessfully ? (
+              <Check aria-hidden="true" size={15} />
+            ) : isDispatching ? (
+              <LoaderCircle className="spin" size={15} />
+            ) : null}
+            {didDispatchSuccessfully
+              ? t("worker.dispatchComplete")
+              : t(isReassign ? "worker.reassign" : "worker.dispatch")}
           </Button>
         </DialogFooter>
       </DialogContent>

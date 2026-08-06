@@ -435,6 +435,7 @@ struct DispatchIssueSheet: View {
     @State private var preferences: IssueExecutionPreferences
     @State private var workerID: String?
     @State private var errorMessage: String?
+    @State private var didDispatchSuccessfully = false
 
     let runID: UUID
     let reassign: Bool
@@ -502,9 +503,27 @@ struct DispatchIssueSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("취소") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(reassign ? "재할당" : "실행") { Task { await dispatch() } }
+                    Button { Task { await dispatch() } } label: {
+                        if didDispatchSuccessfully {
+                            Image(systemName: "checkmark")
+                                .bold()
+                        } else if mutations.isActive("dispatch-\(runID)") {
+                            ProgressView()
+                        } else {
+                            Text(reassign ? "재할당" : "실행")
+                        }
+                    }
                         .disabled(
-                            mutations.isActive("dispatch-\(runID)") || !preferences.isValid
+                            mutations.isActive("dispatch-\(runID)") ||
+                                didDispatchSuccessfully ||
+                                !preferences.isValid
+                        )
+                        .accessibilityLabel(
+                            didDispatchSuccessfully
+                                ? "실행 완료"
+                                : (mutations.isActive("dispatch-\(runID)")
+                                    ? "실행 중"
+                                    : (reassign ? "재할당" : "실행"))
                         )
                         .accessibilityIdentifier("dispatch-issue-submit")
                 }
@@ -540,7 +559,9 @@ struct DispatchIssueSheet: View {
                 workerID: workerID,
                 reassign: reassign
             )
+            didDispatchSuccessfully = true
             await refresh()
+            try? await Task.sleep(for: .milliseconds(400))
             dismiss()
         } catch {
             errorMessage = error.localizedDescription
