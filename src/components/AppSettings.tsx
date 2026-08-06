@@ -84,6 +84,7 @@ import type { SessionUser } from "../types";
 import { AccountDeletionSettings } from "./AccountDeletionSettings";
 import { AccountProfileSettings } from "./AccountProfileSettings";
 import { BrowserSettings } from "./BrowserSettings";
+import { KeybindingsSettings } from "./KeybindingsSettings";
 
 export type SettingsSection =
   | "account"
@@ -589,6 +590,8 @@ export function AppSettings({
             </SettingsContent>
           ) : activeSection === "appearance" ? (
             <AppearanceSettings />
+          ) : activeSection === "keybindings" ? (
+            <KeybindingsSettings />
           ) : activeSection === "browser" ? (
             <BrowserSettings />
           ) : activeSection === "providers" ? (

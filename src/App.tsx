@@ -109,6 +109,7 @@ import {
   recoveryAgent,
   takePlannedUpdateAgentRecoveries,
 } from "./lib/planned-update-recovery";
+import { installKeybindingShortcuts } from "./lib/keybindings";
 import { useI18n } from "./i18n";
 import type { HuntRun, ProjectAgent } from "./types";
 
@@ -329,6 +330,15 @@ export function App() {
   );
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  useEffect(
+    () =>
+      installKeybindingShortcuts((id) => {
+        if (id === "sidebarToggle") {
+          setIsSidebarOpen((open) => !open);
+        }
+      }),
+    [],
+  );
   const [settingsTarget, setSettingsTarget] =
     useState<UnifiedSettingsTarget>({
       scope: "application",
