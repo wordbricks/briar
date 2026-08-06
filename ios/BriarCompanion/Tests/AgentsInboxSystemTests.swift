@@ -187,6 +187,25 @@ final class AgentsInboxSystemTests: XCTestCase {
         let failedSession = try XCTUnwrap(messages.first { $0.kind == .session })
         XCTAssertEqual(InboxMessageBuilder.classify(failedSession), .actionRequired)
 
+        // Importance filter keeps chronological order and drops excluded categories.
+        XCTAssertEqual(
+            InboxMessageBuilder.filter(messages, to: [.urgent]).map(\.title),
+            ["Needs help"]
+        )
+        XCTAssertEqual(
+            InboxMessageBuilder.filter(messages, to: [.urgent, .actionRequired]).count,
+            3
+        )
+        XCTAssertEqual(
+            InboxMessageBuilder.filter(messages, to: [.activity]).map(\.title),
+            ["Done"]
+        )
+        XCTAssertEqual(
+            InboxMessageBuilder.filter(messages, to: Set(InboxCategory.allCases)).map(\.id),
+            messages.map(\.id)
+        )
+        XCTAssertTrue(InboxMessageBuilder.filter(messages, to: []).isEmpty)
+
         await MainActor.run {
             let suiteName = "AgentsInboxSystemTests.\(UUID().uuidString)"
             let defaults = UserDefaults(suiteName: suiteName)!

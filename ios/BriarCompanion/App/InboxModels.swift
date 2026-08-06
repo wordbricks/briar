@@ -152,4 +152,11 @@ enum InboxMessageBuilder {
         }
         return .activity
     }
+
+    static func filter(
+        _ messages: [InboxMessage],
+        to categories: Set<InboxCategory>
+    ) -> [InboxMessage] {
+        messages.filter { categories.contains(classify($0)) }
+    }
 }
