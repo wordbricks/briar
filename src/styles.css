@@ -1604,6 +1604,10 @@ button.paused-review-state { width:100%; border:0; border-radius:8px; cursor:poi
 .issue-message > div > header time { color:var(--muted-foreground); font:500 var(--text-2xs) "DM Mono",monospace; }
 .issue-message-body { margin:2px 0 0; color:var(--foreground); font-size:var(--text-xs); line-height:1.65; overflow-wrap:anywhere; }
 .issue-message-body p { margin:0; white-space:pre-wrap; }
+.issue-message-body a.issue-mention-link { color:#2563eb; text-decoration-thickness:1px; text-underline-offset:2px; }
+.issue-message-body a.issue-mention-link:hover { color:#1d4ed8; }
+.dark .issue-message-body a.issue-mention-link { color:#60a5fa; }
+.dark .issue-message-body a.issue-mention-link:hover { color:#93c5fd; }
 .issue-message-body img { width:auto; max-width:100%; max-height:320px; margin-top:7px; display:block; object-fit:contain; border:1px solid var(--border); border-radius:9px; background:var(--muted); }
 .issue-message-parent-quote { margin:6px 0 0; padding:7px 9px; display:flex; align-items:flex-start; gap:7px; border:0; border-radius:8px; color:var(--muted-foreground); background:color-mix(in srgb,var(--muted) 88%,var(--card)); font-size:var(--text-2xs); line-height:1.45; }
 .issue-message-parent-quote svg { flex:0 0 auto; margin-top:1px; color:var(--muted-foreground); }
