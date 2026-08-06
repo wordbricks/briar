@@ -821,19 +821,9 @@ export function HuntDashboard({
     ];
     const checkpointsByBoundary = new Map<string, string[]>();
     const checkpointPolicy = dashboard?.settings.checkpointPolicy;
-    const legacyPauseStage = workflow?.execution.pauseAfterStage ??
-      workflow?.execution.stopAfterStage;
     const effectiveCheckpoints = checkpointPolicy
       ? checkpointPolicy.effective
-      : workflow?.execution.checkpoints?.length
-        ? workflow.execution.checkpoints
-        : legacyPauseStage
-          ? [{
-              key: `legacy-after-${legacyPauseStage}`,
-              stage: legacyPauseStage,
-              position: "after" as const,
-            }]
-          : [];
+      : workflow?.execution.checkpoints ?? [];
     for (const checkpoint of effectiveCheckpoints) {
       const stageColumnIndex = definitions.findIndex(
         (column) => column.id === `stage:${checkpoint.stage}`,

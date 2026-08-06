@@ -177,7 +177,7 @@ describe("D1 to R2 log archives", () => {
          project_id, velen_org, linear_enabled, workflow_json, created_at, updated_at
        ) values (
          '${projectId}', null, 0,
-         '{"version":1,"stages":[{"id":"archive_analyzing","label":"Analyze","required":true},{"id":"archive_implementing","label":"Implement","required":true}],"execution":{"stopAfterStage":"archive_implementing"},"completion":{"requiredStages":["archive_analyzing","archive_implementing"]}}',
+         '{"version":2,"requirements":[],"stages":[{"id":"archive_analyzing","label":"Analyze","required":true},{"id":"archive_implementing","label":"Implement","required":true}],"execution":{"checkpoints":[]},"completion":{"requiredStages":["archive_analyzing","archive_implementing"]}}',
          '${oldTime}', '${oldTime}'
        );`,
     );

@@ -6,9 +6,10 @@ import { afterEach, describe, expect, it } from "vitest";
 
 const temporaryHomes: string[] = [];
 const repositoryWorkflow = {
-  version: 1,
+  version: 2,
+  requirements: [],
   stages: [{ id: "analyzing", label: "Analyze", required: true }],
-  execution: { stopAfterStage: "analyzing" },
+  execution: { checkpoints: [] },
   completion: { requiredStages: ["analyzing"] },
 } as const;
 const bunExecutable = spawnSync("/usr/bin/env", ["which", "bun"], {

@@ -24,20 +24,26 @@ const v2 = (checkpoints: unknown[]) => ({
 }) as AutoHuntWorkflowInput;
 
 describe("Auto Hunt workflow v2 contract", () => {
-  it("clones a compatibility workflow without relying on execution.toJSON", () => {
+  it("clones a canonical workflow without sharing nested values", () => {
     const workflow = normalizeAutoHuntWorkflow({
-      version: 1,
+      version: 2,
+      requirements: [],
       stages: [
         { id: "analyzing", label: "Analyze", required: true },
         { id: "local_qa", label: "Validate", required: true },
       ],
-    });
-    Object.defineProperty(workflow.execution, "toJSON", {
-      configurable: true,
-      value: undefined,
+      execution: {
+        checkpoints: [{
+          key: "after-local-qa",
+          stage: "local_qa",
+          position: "after",
+        }],
+      },
+      completion: { requiredStages: ["analyzing", "local_qa"] },
     });
 
-    expect(cloneAutoHuntWorkflow(workflow)).toEqual({
+    const clone = cloneAutoHuntWorkflow(workflow);
+    expect(clone).toEqual({
       version: 2,
       requirements: [],
       stages: [
@@ -58,7 +64,7 @@ describe("Auto Hunt workflow v2 contract", () => {
       execution: {
         checkpoints: [
           {
-            key: "legacy-after-local_qa",
+            key: "after-local-qa",
             stage: "local_qa",
             position: "after",
           },
@@ -66,6 +72,8 @@ describe("Auto Hunt workflow v2 contract", () => {
       },
       completion: { requiredStages: ["analyzing", "local_qa"] },
     });
+    expect(clone).not.toBe(workflow);
+    expect(clone.execution.checkpoints).not.toBe(workflow.execution.checkpoints);
   });
 
   it("accepts zero checkpoints and writes only the canonical v2 shape", () => {
@@ -127,74 +135,13 @@ describe("Auto Hunt workflow v2 contract", () => {
     })).toThrow(AutoHuntWorkflowValidationError);
   });
 
-  it("normalizes v1 pause and stop fields without mutating the input snapshot", () => {
-    const pauseSnapshot = {
-      version: 1 as const,
-      stages,
-      execution: { pauseAfterStage: "pr_open" },
-      completion: { requiredStages: stages.map((stage) => stage.id) },
-    };
-    const before = JSON.stringify(pauseSnapshot);
-    const pause = normalizeAutoHuntWorkflow(pauseSnapshot);
-    const stop = normalizeAutoHuntWorkflow({
-      ...pauseSnapshot,
-      execution: { stopAfterStage: "pr_open" },
-    });
-
-    expect(JSON.stringify(pauseSnapshot)).toBe(before);
-    expect(pause.execution.checkpoints).toEqual([
-      { key: "legacy-after-pr_open", stage: "pr_open", position: "after" },
-    ]);
-    expect(stop.execution.checkpoints).toEqual(pause.execution.checkpoints);
-    expect(pause.execution.pauseAfterStage).toBe("pr_open");
-    expect(JSON.parse(JSON.stringify(pause)).execution).toEqual({
-      checkpoints: [
-        { key: "legacy-after-pr_open", stage: "pr_open", position: "after" },
-      ],
-    });
-  });
-
-  it("keeps the workflow clone helper canonical after a v1 input", () => {
-    const clone = cloneAutoHuntWorkflow({
-      version: 1,
-      stages,
-      execution: { pauseAfterStage: "pr_open" },
-      completion: { requiredStages: stages.map((stage) => stage.id) },
-    });
-
-    expect(clone).toEqual({
-      version: 2,
-      requirements: [],
-      stages: [
-        { ...stages[0], evidence: ["diff"] },
-        { ...stages[1], evidence: ["pull_request"] },
-        { ...stages[2], evidence: ["production"] },
-      ],
-      execution: {
-        checkpoints: [
-          { key: "legacy-after-pr_open", stage: "pr_open", position: "after" },
-        ],
-      },
-      completion: { requiredStages: stages.map((stage) => stage.id) },
-    });
-    expect(clone.execution.pauseAfterStage).toBeUndefined();
-  });
-
-  it("deduplicates matching v1 pause and stop fields and rejects conflicts", () => {
-    const same = normalizeAutoHuntWorkflow({
-      version: 1,
-      stages,
-      execution: { pauseAfterStage: "pr_open", stopAfterStage: "pr_open" },
-      completion: { requiredStages: stages.map((stage) => stage.id) },
-    });
-    expect(same.execution.checkpoints).toHaveLength(1);
-
+  it("rejects v1 workflows after persisted data has been migrated", () => {
     expect(() => normalizeAutoHuntWorkflow({
       version: 1,
       stages,
-      execution: { pauseAfterStage: "implementing", stopAfterStage: "pr_open" },
+      execution: { pauseAfterStage: "pr_open" },
       completion: { requiredStages: stages.map((stage) => stage.id) },
-    })).toThrow(AutoHuntWorkflowValidationError);
+    } as unknown as AutoHuntWorkflowInput)).toThrow("version must be 2");
   });
 
   it("combines project mandatory and user defaults with project ownership winning", () => {

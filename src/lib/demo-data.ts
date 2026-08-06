@@ -8,7 +8,8 @@ import type { RepositoryReadiness } from "./project-connection";
 const now = Date.now();
 const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
 const demoWorkflow = normalizeAutoHuntWorkflow({
-  version: 1,
+  version: 2,
+  requirements: [],
   stages: [
     { id: "analyzing", label: "Analyze", required: true },
     { id: "implementing", label: "Implement", required: true },
@@ -19,16 +20,16 @@ const demoWorkflow = normalizeAutoHuntWorkflow({
       checks: ["bun run test", "bun run build"],
     },
   ],
-});
-const demoWorkflowClone = cloneAutoHuntWorkflow(demoWorkflow);
-const demoWorkflowForUi = {
-  ...demoWorkflowClone,
-  version: 1 as const,
   execution: {
-    ...demoWorkflowClone.execution,
-    pauseAfterStage: demoWorkflow.execution.pauseAfterStage,
+    checkpoints: [{
+      key: "demo-after-local-qa",
+      stage: "local_qa",
+      position: "after",
+    }],
   },
-};
+  completion: { requiredStages: ["analyzing", "implementing", "local_qa"] },
+});
+const demoWorkflowForUi = cloneAutoHuntWorkflow(demoWorkflow);
 
 const runDefaults = {
   currentAttempt: 1,

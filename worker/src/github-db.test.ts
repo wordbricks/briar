@@ -288,7 +288,7 @@ describe("GitHub pull request D1 integration", () => {
     });
   };
 
-  const useLegacyPullRequestPause = async (scenario: Scenario) => {
+  const useSinglePullRequestPause = async (scenario: Scenario) => {
     const workflow = workflowFor(scenario.checkpoint);
     await db
       .prepare(
@@ -297,10 +297,16 @@ describe("GitHub pull request D1 integration", () => {
       )
       .bind(
         JSON.stringify({
-          version: 1,
+          version: 2,
           requirements: workflow.requirements,
           stages: workflow.stages,
-          execution: { pauseAfterStage: "pr_open" },
+          execution: {
+            checkpoints: [{
+              key: "legacy-after-pr_open",
+              stage: "pr_open",
+              position: "after",
+            }],
+          },
           completion: workflow.completion,
         }),
         scenario.runId,
@@ -1123,7 +1129,7 @@ describe("GitHub pull request D1 integration", () => {
 
   it("reconciles a merge that arrived before a legacy run paused", async () => {
     const scenario = await createScenario();
-    await useLegacyPullRequestPause(scenario);
+    await useSinglePullRequestPause(scenario);
     const pullRequest = await addPullRequestEvidence(scenario);
     const merge = pullRequestEvent(pullRequest, "merged");
 
@@ -1157,7 +1163,7 @@ describe("GitHub pull request D1 integration", () => {
 
   it("retries legacy reconciliation through an idempotent event replay", async () => {
     const scenario = await createScenario();
-    await useLegacyPullRequestPause(scenario);
+    await useSinglePullRequestPause(scenario);
     const pullRequest = await addPullRequestEvidence(scenario);
     const pausedAt = nextTime();
     const legacyEvent: HuntEventInput = {

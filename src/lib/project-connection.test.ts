@@ -59,11 +59,12 @@ describe("local project connection", () => {
   it("reuses shared workflow settings when a member connects locally", async () => {
     const generateWorkflow = vi.fn();
     const existingWorkflow = {
-      version: 1 as const,
+      version: 2 as const,
+      requirements: [],
       stages: [
         { id: "implementing", label: "Implement", required: true },
       ],
-      execution: { pauseAfterStage: "implementing" },
+      execution: { checkpoints: [] },
       completion: { requiredStages: ["implementing"] },
     };
 
@@ -82,12 +83,13 @@ describe("local project connection", () => {
 
   it("reuses an existing project workflow without analyzing the repository again", async () => {
     const existingWorkflow = {
-      version: 1 as const,
+      version: 2 as const,
+      requirements: [],
       stages: [
         { id: "implementing", label: "Implement", required: true },
         { id: "local_qa", label: "Local QA", required: true },
       ],
-      execution: { pauseAfterStage: "local_qa" },
+      execution: { checkpoints: [] },
       completion: { requiredStages: ["implementing", "local_qa"] },
     };
     const generateWorkflow = vi.fn();

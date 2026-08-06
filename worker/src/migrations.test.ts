@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { Miniflare } from "miniflare";
 import { unstable_splitSqlQuery } from "wrangler";
 import { describe, expect, it } from "vitest";
 
@@ -54,6 +55,193 @@ describe("D1 migrations", () => {
     expect(sql).toMatch(/add\s+column\s+checkpoint_policy_revision/iu);
     expect(sql).toMatch(/create\s+table\s+briar_user_workflow_checkpoint_defaults/iu);
     expect(sql).not.toMatch(/\bupdate\s+briar_(project_settings|hunt_runs)\b/iu);
+  });
+
+  it("canonicalizes every stored v1 workflow before runtime v1 support is removed", async () => {
+    const miniflare = new Miniflare({
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      d1Databases: { DB: "briar-workflow-v2-migration-test" },
+    });
+    try {
+      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+      await db
+        .prepare(
+          `create table briar_project_settings (
+             project_id text primary key,
+             workflow_json text not null,
+             mandatory_checkpoints_json text,
+             updated_at text not null
+           )`,
+        )
+        .run();
+      await db
+        .prepare(
+          `create table briar_hunt_runs (
+             id text primary key,
+             workflow_snapshot_json text not null,
+             updated_at text not null
+           )`,
+        )
+        .run();
+      const workflow = (pauseAfterStage?: string) => JSON.stringify({
+        version: 1,
+        stages: [
+          { id: "implementing", label: "Implement", required: true },
+          { id: "merged", label: "Merge", required: true },
+        ],
+        ...(pauseAfterStage ? { execution: { pauseAfterStage } } : {}),
+        completion: { requiredStages: ["implementing", "merged"] },
+      });
+      const explicitCheckpoint = JSON.stringify([
+        { key: "team-before-merge", stage: "merged", position: "before" },
+      ]);
+      const alreadyV2 = JSON.stringify({
+        version: 2,
+        requirements: [],
+        stages: [{ id: "implementing", label: "Implement", required: true }],
+        execution: { checkpoints: [] },
+        completion: { requiredStages: ["implementing"] },
+      });
+      for (const row of [
+        ["lazy", workflow("merged"), null],
+        ["explicit-empty", workflow("merged"), "[]"],
+        ["explicit-checkpoint", workflow("implementing"), explicitCheckpoint],
+        ["fallback", workflow(), null],
+        ["stop-only", JSON.stringify({
+          ...JSON.parse(workflow()),
+          execution: { stopAfterStage: "implementing" },
+        }), null],
+        ["already-v2", alreadyV2, "[]"],
+      ] as const) {
+        await db
+          .prepare(
+            `insert into briar_project_settings (
+               project_id, workflow_json, mandatory_checkpoints_json, updated_at
+             ) values (?, ?, ?, '2026-08-06T00:00:00.000Z')`,
+          )
+          .bind(...row)
+          .run();
+      }
+      for (const row of [
+        ["run-pause", workflow("implementing")],
+        ["run-fallback", workflow()],
+        ["run-v2", alreadyV2],
+      ] as const) {
+        await db
+          .prepare(
+            `insert into briar_hunt_runs (
+               id, workflow_snapshot_json, updated_at
+             ) values (?, ?, '2026-08-06T00:00:00.000Z')`,
+          )
+          .bind(...row)
+          .run();
+      }
+
+      const sql = await readFile(
+        resolve("migrations", "0066_normalize_project_workflows_v2.sql"),
+        "utf8",
+      );
+      for (const statement of unstable_splitSqlQuery(sql)) {
+        await db.prepare(statement).run();
+      }
+      const firstPass = await db
+        .prepare(
+          `select project_id, workflow_json, updated_at
+           from briar_project_settings order by project_id`,
+        )
+        .all<{ project_id: string; workflow_json: string; updated_at: string }>();
+      const byProject = new Map(
+        firstPass.results.map((row) => [row.project_id, JSON.parse(row.workflow_json)]),
+      );
+
+      expect(byProject.get("lazy")).toMatchObject({
+        version: 2,
+        requirements: [],
+        execution: {
+          checkpoints: [{
+            key: "legacy-after-merged",
+            stage: "merged",
+            position: "after",
+          }],
+        },
+      });
+      expect(byProject.get("explicit-empty")?.execution.checkpoints).toEqual([]);
+      expect(byProject.get("explicit-checkpoint")?.execution.checkpoints).toEqual(
+        JSON.parse(explicitCheckpoint),
+      );
+      expect(byProject.get("fallback")?.execution.checkpoints).toEqual([{
+        key: "legacy-after-merged",
+        stage: "merged",
+        position: "after",
+      }]);
+      expect(byProject.get("stop-only")?.execution.checkpoints).toEqual([{
+        key: "legacy-after-implementing",
+        stage: "implementing",
+        position: "after",
+      }]);
+      expect(
+        firstPass.results.find((row) => row.project_id === "already-v2")?.workflow_json,
+      ).toBe(alreadyV2);
+      expect(firstPass.results.every(
+        (row) => row.updated_at === "2026-08-06T00:00:00.000Z",
+      )).toBe(true);
+      const firstRunPass = await db
+        .prepare(
+          `select id, workflow_snapshot_json, updated_at
+           from briar_hunt_runs order by id`,
+        )
+        .all<{ id: string; workflow_snapshot_json: string; updated_at: string }>();
+      const byRun = new Map(
+        firstRunPass.results.map((row) => [
+          row.id,
+          JSON.parse(row.workflow_snapshot_json),
+        ]),
+      );
+      expect(byRun.get("run-pause")).toMatchObject({
+        version: 2,
+        requirements: [],
+        execution: {
+          checkpoints: [{
+            key: "legacy-after-implementing",
+            stage: "implementing",
+            position: "after",
+          }],
+        },
+      });
+      expect(byRun.get("run-fallback")?.execution.checkpoints).toEqual([{
+        key: "legacy-after-merged",
+        stage: "merged",
+        position: "after",
+      }]);
+      expect(
+        firstRunPass.results.find((row) => row.id === "run-v2")
+          ?.workflow_snapshot_json,
+      ).toBe(alreadyV2);
+      expect(firstRunPass.results.every(
+        (row) => row.updated_at === "2026-08-06T00:00:00.000Z",
+      )).toBe(true);
+
+      for (const statement of unstable_splitSqlQuery(sql)) {
+        await db.prepare(statement).run();
+      }
+      const secondPass = await db
+        .prepare(
+          `select project_id, workflow_json, updated_at
+           from briar_project_settings order by project_id`,
+        )
+        .all<{ project_id: string; workflow_json: string; updated_at: string }>();
+      expect(secondPass.results).toEqual(firstPass.results);
+      const secondRunPass = await db
+        .prepare(
+          `select id, workflow_snapshot_json, updated_at
+           from briar_hunt_runs order by id`,
+        )
+        .all<{ id: string; workflow_snapshot_json: string; updated_at: string }>();
+      expect(secondRunPass.results).toEqual(firstRunPass.results);
+    } finally {
+      await miniflare.dispose();
+    }
   });
 
   it("tracks resume requests without rewriting paused runs", async () => {

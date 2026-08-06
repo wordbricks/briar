@@ -103,7 +103,7 @@ const evidenceTypeSchema = z
 
 const workflowConfigSchema = z
   .object({
-    version: z.union([z.literal(1), z.literal(2)]),
+    version: z.literal(2),
     requirements: z
       .array(
         z
@@ -140,19 +140,11 @@ const workflowConfigSchema = z
           )
           .max(100)
           .optional(),
-        // Older desktop builds serialized a missing execution checkpoint as an
-        // empty string. normalizeAutoHuntWorkflow already repairs a missing or
-        // unknown checkpoint from the required stages, so keep that read
-        // compatibility here instead of rejecting the whole CLI config.
-        pauseAfterStage: z.string().trim().max(64).optional(),
-        stopAfterStage: z.string().trim().max(64).optional(),
       })
       .optional(),
     completion: z.object({
       requiredStages: z.array(workflowStageIdSchema),
     }).optional(),
-    /** Read compatibility for local configurations created before an explicit pause stage. */
-    release: z.object({ enabled: z.boolean() }).optional(),
   })
   .strict()
   .transform(normalizeAutoHuntWorkflow);

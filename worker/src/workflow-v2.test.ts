@@ -176,17 +176,21 @@ describe("workflow v2 D1 persistence and transitions", () => {
     });
     projectId = project.id;
 
-    // Seed a pre-migration v1 settings/run snapshot, then capture its exact
-    // stored bytes. Migration 0059 must only add schema, never rewrite them.
+    // Create the run through the v2-only runtime, then seed pre-migration v1
+    // settings/run bytes directly. Migration 0059 must never rewrite them.
     await db
       .prepare(`update briar_project_settings set workflow_json = ? where project_id = ?`)
-      .bind(v1Snapshot, projectId)
+      .bind(JSON.stringify(v2Workflow), projectId)
       .run();
     const legacyRunId = await recordHuntEvent(
       db,
       projectId,
       event("legacy-snapshot", "legacy-snapshot:queued", at(1)),
     );
+    await db
+      .prepare(`update briar_project_settings set workflow_json = ? where project_id = ?`)
+      .bind(v1Snapshot, projectId)
+      .run();
     await db
       .prepare(`update briar_hunt_runs set workflow_snapshot_json = ? where id = ?`)
       .bind(v1Snapshot, legacyRunId)

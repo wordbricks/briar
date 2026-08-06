@@ -407,7 +407,7 @@ const evidenceTypeSchema = z
   .regex(autoHuntEvidenceTypePattern);
 const workflowSchema = z
   .object({
-    version: z.union([z.literal(1), z.literal(2)]),
+    version: z.literal(2),
     requirements: z
       .array(
         z.object({
@@ -460,13 +460,9 @@ const workflowSchema = z
           )
           .max(100)
           .optional(),
-        pauseAfterStage: z.string().trim().max(64).optional(),
-        stopAfterStage: z.string().trim().max(64).optional(),
       })
       .strict()
       .optional(),
-    /** Read compatibility for workflows stored before an explicit pause stage. */
-    release: z.object({ enabled: z.boolean() }).strict().optional(),
   })
   .strict()
   .transform(normalizeAutoHuntWorkflow);
@@ -4005,35 +4001,8 @@ async function claimWorkflowContext(
   projectId: string,
   run: NonNullable<Awaited<ReturnType<typeof getHuntRunForProject>>>,
 ) {
-  const rawWorkflow = JSON.parse(run.workflow_snapshot_json) as { version?: number };
-  const workflow = normalizeAutoHuntWorkflow(rawWorkflow);
+  const workflow = normalizeAutoHuntWorkflow(JSON.parse(run.workflow_snapshot_json));
   const terminalStage = workflow.stages.at(-1)?.id ?? null;
-  if (rawWorkflow.version !== 2) {
-    const terminalResume = terminalStage && run.workflow_stage === terminalStage
-      ? await db
-          .prepare(
-            `select 1 as present from briar_hunt_events
-             where run_id = ? and event_key like 'workflow:resume:%'
-               and workflow_stage = ? order by recorded_at desc limit 1`,
-          )
-          .bind(run.id, terminalStage)
-          .first<{ present: number }>()
-      : null;
-    return {
-      startStage: terminalResume
-        ? null
-        : run.workflow_stage ?? workflow.stages.at(0)?.id ?? null,
-      resumeContext: terminalResume
-        ? {
-            checkpointKey: `legacy-after-${terminalStage}`,
-            position: "after" as const,
-            revision: run.current_revision,
-            terminalReviewOnly: true,
-          }
-        : null,
-    };
-  }
-
   const progress = await initializeWorkflowProgress(db, projectId, {
     runId: run.id,
     attempt: run.current_attempt,

@@ -57,12 +57,13 @@ describe("project agent skills", () => {
     const instructions = projectAgentRuntimeInstructions({
       skill: "# Auditor\n\nAudit the repository.",
       workflow: {
-        version: 1,
+        version: 2,
+        requirements: [],
         stages: [
           { id: "analyzing", label: "Analyze", required: true },
           { id: "local_qa", label: "Local QA", required: true },
         ],
-        execution: { pauseAfterStage: "local_qa" },
+        execution: { checkpoints: [] },
         completion: { requiredStages: ["analyzing", "local_qa"] },
       },
       invocation: "Run the scheduled automation.",
