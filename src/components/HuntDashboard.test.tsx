@@ -3422,6 +3422,74 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
+  it("renders a member mention as a blue no-op link", async () => {
+    const createdAt = new Date().toISOString();
+    const message: IssueMessage = {
+      id: "member-mention-message",
+      runId: demoDashboard.runs[0].id,
+      parentMessageId: null,
+      body: "@member 확인해 주세요. owner@example.com은 링크가 아닙니다.",
+      author: { id: "jay", name: "Jay", image: null, provider: null },
+      replyCount: 0,
+      createdAt,
+      updatedAt: createdAt,
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          mentionMembers={[{
+            userId: "member-1",
+            name: "Member One",
+            email: "member@example.com",
+            image: null,
+            role: "member",
+            createdAt,
+          }]}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => [message]}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("message should not be sent");
+          }}
+          run={demoDashboard.runs[0]}
+        />,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    const mentionLink = container.querySelector<HTMLAnchorElement>(
+      ".issue-message-body a.issue-mention-link",
+    );
+    expect(mentionLink?.textContent).toBe("@member");
+    expect(mentionLink?.getAttribute("href")).toBe("briar-mention://member");
+    expect(
+      container.querySelectorAll(".issue-message-body a.issue-mention-link"),
+    ).toHaveLength(1);
+    expect(
+      container.querySelector('.issue-message-body a[href="mailto:owner@example.com"]'),
+    ).not.toBeNull();
+
+    const click = new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+    });
+    expect(mentionLink?.dispatchEvent(click)).toBe(false);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("suggests and completes @briar when typing a mention", async () => {
     const container = document.createElement("div");
     document.body.append(container);
