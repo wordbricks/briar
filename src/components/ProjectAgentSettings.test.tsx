@@ -20,13 +20,13 @@ describe("ProjectAgentSettings", () => {
     const agent = {
       id: "agent-1",
       projectId: "project-1",
-      name: "Auto Hunt agent",
+      name: "Issue processing agent",
       avatar: null,
       codexPet: null,
       provider: "codex" as const,
       model: null,
       responsibility: "Process queued issues.",
-      skill: "# Auto Hunt agent\n\nProcess queued issues.",
+      skill: "# Issue processing agent\n\nProcess queued issues.",
       calendarColor: "#3275d5",
       createdAt: "2026-07-26T00:00:00.000Z",
       updatedAt: "2026-07-26T00:00:00.000Z",
@@ -77,9 +77,9 @@ describe("ProjectAgentSettings", () => {
     ).not.toBeNull();
     expect(
       container.querySelector<HTMLInputElement>(
-        '.project-agent-settings-fields input[placeholder="예: Jay 자동 사냥 에이전트"]',
+        '.project-agent-settings-fields input[placeholder="예: Jay 이슈 처리 에이전트"]',
       )?.value,
-    ).toBe("Auto Hunt agent");
+    ).toBe("Issue processing agent");
     expect(
       container.querySelector('input[aria-label="이미지 업로드"]'),
     ).not.toBeNull();
@@ -144,7 +144,7 @@ describe("ProjectAgentSettings", () => {
         ?.click();
     });
     expect(document.body.textContent).toContain(
-      "‘Auto Hunt agent’ 에이전트를 삭제할까요?",
+      "‘Issue processing agent’ 에이전트를 삭제할까요?",
     );
     await act(async () => {
       document.body

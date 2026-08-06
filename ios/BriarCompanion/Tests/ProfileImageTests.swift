@@ -35,7 +35,7 @@ final class ProfileImageTests: XCTestCase {
         {
           "id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
           "projectId":"11111111-1111-4111-8111-111111111111",
-          "name":"Auto Hunt agent",
+          "name":"Issue processing agent",
           "avatar":"\(samplePNGDataURL)",
           "codexPet":null,
           "provider":"codex",

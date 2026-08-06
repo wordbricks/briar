@@ -1985,7 +1985,7 @@ export function useBriar(options: UseBriarOptions = {}) {
           );
           const detail = input.status === "backlog"
             ? "Briar 앱에서 생성된 이슈가 백로그에 추가되었습니다."
-            : "Briar 앱에서 생성된 이슈가 Auto Hunt 처리를 기다리고 있습니다.";
+            : "Briar 앱에서 생성된 이슈가 처리를 기다리고 있습니다.";
           const initialEvent: HuntEvent = {
             id: crypto.randomUUID(),
             attempt: 1,
@@ -2593,7 +2593,7 @@ export function useBriar(options: UseBriarOptions = {}) {
   const acceptReworkProposal = useCallback(
     async (runId: string, proposalId: string) => {
       if (!activeProjectId || !dashboard) {
-        throw new Error("재작업할 Auto Hunt 작업이 없습니다.");
+        throw new Error("재작업할 이슈 처리 작업이 없습니다.");
       }
       if (demoMode) {
         throw new Error("데모에서는 재작업 제안을 수락할 수 없습니다.");
@@ -2622,7 +2622,7 @@ export function useBriar(options: UseBriarOptions = {}) {
   const recoverRun = useCallback(
     async (runId: string, action: "retry" | "cancel") => {
       if (!activeProjectId || !dashboard) {
-        throw new Error("복구할 Auto Hunt 작업이 없습니다.");
+        throw new Error("복구할 이슈 처리 작업이 없습니다.");
       }
       setRecoveringRunId(runId);
       setRecoveryError(null);
@@ -2642,8 +2642,8 @@ export function useBriar(options: UseBriarOptions = {}) {
                     const status = action === "retry" ? "queued" : "cancelled";
                     const detail =
                       action === "retry"
-                        ? `Auto Hunt ${attempt}차 시도를 요청했습니다.`
-                        : "사용자가 Auto Hunt 작업을 취소했습니다.";
+                        ? `이슈 처리 ${attempt}차 시도를 요청했습니다.`
+                        : "사용자가 이슈 처리 작업을 취소했습니다.";
                     const nextEvent: HuntEvent = {
                       id: crypto.randomUUID(),
                       attempt,
@@ -2710,7 +2710,7 @@ export function useBriar(options: UseBriarOptions = {}) {
   const resumeRun = useCallback(
     async (runId: string) => {
       if (!activeProjectId || !dashboard) {
-        throw new Error("재개할 Auto Hunt 작업이 없습니다.");
+        throw new Error("재개할 이슈 처리 작업이 없습니다.");
       }
       setRecoveringRunId(runId);
       setRecoveryError(null);
@@ -2826,7 +2826,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       input: { workflowStage: string; reason: string },
     ) => {
       if (!activeProjectId || !dashboard) {
-        throw new Error("재작업할 Auto Hunt 작업이 없습니다.");
+        throw new Error("재작업할 이슈 처리 작업이 없습니다.");
       }
       const reason = input.reason.trim();
       if (!reason) throw new Error("수정할 내용을 입력해 주세요.");
@@ -2954,7 +2954,7 @@ export function useBriar(options: UseBriarOptions = {}) {
   const moveRun = useCallback(
     async (runId: string, placement: HuntRunPlacement) => {
       if (!activeProjectId || !dashboard) {
-        throw new Error("이동할 Auto Hunt 작업이 없습니다.");
+        throw new Error("이동할 이슈 처리 작업이 없습니다.");
       }
       setRecoveringRunId(runId);
       setRecoveryError(null);

@@ -263,7 +263,7 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
             payload = #"{"evidence":[{"key":"ui-test:evidence:image","attempt":1,"revision":1,"stage":"reviewing","type":"review findings","status":"passed","detail":"완성 화면","url":null,"actor":"codex","observedAt":"2026-08-02T01:03:00Z","images":[{"id":"bbbbbbbb-2222-4222-8222-222222222222","filename":"result-screen.png","contentType":"image/png","byteSize":68,"url":"/ui-test/result-screen.png"}],"canonical":true}]}"#
         } else if path.contains("/agents") {
             payload = ##"""
-            {"agents":[{"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","projectId":"11111111-1111-4111-8111-111111111111","name":"Auto Hunt agent","avatar":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==","codexPet":null,"provider":"codex","model":"gpt-5.4","responsibility":"Perform Auto Hunt for every queued issue.","skill":"# Auto Hunt agent","calendarColor":"#3275d5","createdAt":"2026-08-02T01:00:00Z","updatedAt":"2026-08-02T01:00:00Z"}]}
+            {"agents":[{"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","projectId":"11111111-1111-4111-8111-111111111111","name":"Issue processing agent","avatar":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==","codexPet":null,"provider":"codex","model":"gpt-5.4","responsibility":"Process every queued issue.","skill":"# Issue processing agent","calendarColor":"#3275d5","createdAt":"2026-08-02T01:00:00Z","updatedAt":"2026-08-02T01:00:00Z"}]}
             """##
         } else if path.contains("/agent-sessions") {
             payload = ##"""

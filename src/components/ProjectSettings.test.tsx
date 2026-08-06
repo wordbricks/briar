@@ -236,7 +236,7 @@ describe("ProjectSettings", () => {
     );
     expect(
       container.querySelector(".project-workflow-contract")?.getAttribute("aria-label"),
-    ).toBe("Auto Hunt 워크플로 다이어그램");
+    ).toBe("이슈 처리 워크플로 다이어그램");
 
     const revisionInput = container.querySelector<HTMLTextAreaElement>(
       'textarea[aria-label="자연어로 수정 요청"]',

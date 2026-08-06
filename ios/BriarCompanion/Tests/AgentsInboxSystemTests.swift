@@ -14,7 +14,7 @@ final class AgentsInboxSystemTests: XCTestCase {
         let agentsData = try JSONSerialization.data(withJSONObject: agentsPayload)
         let agents = try JSONDecoder.mobileContract.decode(ProjectAgentsResponse.self, from: agentsData)
         XCTAssertEqual(agents.agents.count, 1)
-        XCTAssertEqual(agents.agents.first?.name, "Auto Hunt agent")
+        XCTAssertEqual(agents.agents.first?.name, "Issue processing agent")
         XCTAssertEqual(agents.agents.first?.provider, .codex)
         XCTAssertNotNil(agents.agents.first?.avatar)
         XCTAssertNotNil(ProfileImageSource.uiImage(from: agents.agents.first?.avatar))

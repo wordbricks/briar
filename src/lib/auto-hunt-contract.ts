@@ -228,7 +228,7 @@ export class AutoHuntWorkflowValidationError extends Error {
   readonly issues: string[];
 
   constructor(issues: string[]) {
-    super(`Invalid Auto Hunt workflow: ${issues.join("; ")}`);
+    super(`Invalid issue processing workflow: ${issues.join("; ")}`);
     this.name = "AutoHuntWorkflowValidationError";
     this.issues = issues;
   }

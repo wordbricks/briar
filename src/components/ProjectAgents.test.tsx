@@ -80,11 +80,11 @@ describe("ProjectAgents", () => {
     );
     await act(async () => Promise.resolve());
 
-    expect(container.textContent).toContain("자동 사냥 에이전트");
+    expect(container.textContent).toContain("이슈 처리 에이전트");
     expect(container.textContent).toContain("Sentry 오류 탐지 에이전트");
     expect(container.textContent).toContain("Feedback 분석 에이전트");
     expect(container.textContent).toContain(
-      "모든 대기중인 이슈에 대해서 자동사냥을 수행하는것",
+      "대기 중인 모든 이슈를 처리합니다.",
     );
     const createCard = container.querySelector<HTMLButtonElement>(
       ".project-agent-create-card",
@@ -133,7 +133,7 @@ describe("ProjectAgents", () => {
 
     expect(
       container.querySelector<HTMLButtonElement>(
-        'button[aria-label="자동 사냥 에이전트 세부 정보 열기"]',
+        'button[aria-label="이슈 처리 에이전트 세부 정보 열기"]',
       )?.textContent,
     ).toContain("실행 중");
     expect(
@@ -166,7 +166,7 @@ describe("ProjectAgents", () => {
     await act(async () => Promise.resolve());
 
     const runButton = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="자동 사냥 에이전트 책임 실행"]',
+      'button[aria-label="이슈 처리 에이전트 책임 실행"]',
     );
     expect(runButton).not.toBeNull();
 
@@ -180,13 +180,13 @@ describe("ProjectAgents", () => {
     expect(startedAgent.id).toBe("demo-agent-auto-hunt");
     expect(startedSession).toMatchObject({
       sessionId: expect.any(String),
-      request: "모든 대기중인 이슈에 대해서 자동사냥을 수행하는것",
+      request: "대기 중인 모든 이슈를 처리합니다.",
       startedAt: expect.any(String),
     });
     expect(runProjectAgent).toHaveBeenCalledWith(
       expect.objectContaining({
         agent: expect.objectContaining({ id: "demo-agent-auto-hunt" }),
-        message: "모든 대기중인 이슈에 대해서 자동사냥을 수행하는것",
+        message: "대기 중인 모든 이슈를 처리합니다.",
         sessionId: startedSession.sessionId,
       }),
     );
@@ -235,7 +235,7 @@ describe("ProjectAgents", () => {
     await act(async () => {
       container
         .querySelector<HTMLButtonElement>(
-          'button[aria-label="자동 사냥 에이전트 책임 실행"]',
+          'button[aria-label="이슈 처리 에이전트 책임 실행"]',
         )
         ?.click();
       await Promise.resolve();
@@ -267,7 +267,7 @@ describe("ProjectAgents", () => {
         Object.getOwnPropertyDescriptor(
           HTMLInputElement.prototype,
           "value",
-        )?.set?.call(name, "Jay 자동 사냥 에이전트");
+        )?.set?.call(name, "Jay 이슈 처리 에이전트");
         name.dispatchEvent(new Event("input", { bubbles: true }));
       }
       if (responsibility) {
@@ -291,7 +291,7 @@ describe("ProjectAgents", () => {
     });
 
     expect(onCreate).toHaveBeenCalledWith({
-      name: "Jay 자동 사냥 에이전트",
+      name: "Jay 이슈 처리 에이전트",
       provider: "codex",
       model: null,
       responsibility:
@@ -309,7 +309,7 @@ describe("ProjectAgents", () => {
     await act(async () => Promise.resolve());
 
     const settingsButton = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="자동 사냥 에이전트 설정"]',
+      'button[aria-label="이슈 처리 에이전트 설정"]',
     );
     expect(settingsButton).not.toBeNull();
     expect(settingsButton?.textContent).toBe("");
@@ -325,9 +325,9 @@ describe("ProjectAgents", () => {
     const responsibility = form?.querySelector<HTMLTextAreaElement>("textarea");
     expect(settingsPage?.textContent).toContain("에이전트 설정");
     expect(settingsPage?.textContent).not.toContain("프로젝트 실행 기본값");
-    expect(name?.value).toBe("자동 사냥 에이전트");
+    expect(name?.value).toBe("이슈 처리 에이전트");
     expect(responsibility?.value).toBe(
-      "모든 대기중인 이슈에 대해서 자동사냥을 수행하는것",
+      "대기 중인 모든 이슈를 처리합니다.",
     );
 
     await act(async () => {
@@ -374,7 +374,7 @@ describe("ProjectAgents", () => {
     await act(async () => {
       container
         .querySelector<HTMLButtonElement>(
-          'button[aria-label="자동 사냥 에이전트 설정"]',
+          'button[aria-label="이슈 처리 에이전트 설정"]',
         )
         ?.click();
     });
@@ -384,7 +384,7 @@ describe("ProjectAgents", () => {
         ?.click();
     });
     expect(document.body.textContent).toContain(
-      "‘자동 사냥 에이전트’ 에이전트를 삭제할까요?",
+      "‘이슈 처리 에이전트’ 에이전트를 삭제할까요?",
     );
 
     await act(async () => {
@@ -397,7 +397,7 @@ describe("ProjectAgents", () => {
     expect(container.querySelector("#project-agents")).not.toBeNull();
     expect(
       container.querySelector(
-        'button[aria-label="자동 사냥 에이전트 설정"]',
+        'button[aria-label="이슈 처리 에이전트 설정"]',
       ),
     ).toBeNull();
   });
@@ -417,7 +417,7 @@ describe("ProjectAgents", () => {
           runId: "run-auto",
           runNumber: 1,
           sourceKey: "AUTO-1",
-          title: "자동 사냥 이슈",
+          title: "이슈 처리 작업",
           outcome: "completed",
           summary: null,
         }],
@@ -466,13 +466,13 @@ describe("ProjectAgents", () => {
     await act(async () => {
       container
         .querySelector<HTMLButtonElement>(
-          'button[aria-label="자동 사냥 에이전트 세부 정보 열기"]',
+          'button[aria-label="이슈 처리 에이전트 세부 정보 열기"]',
         )
         ?.click();
     });
 
     expect(container.querySelector("#project-agent-detail")).not.toBeNull();
-    expect(container.textContent).toContain("자동 사냥 이슈");
+    expect(container.textContent).toContain("이슈 처리 작업");
     expect(container.textContent).not.toContain("Sentry 오류 조사");
     expect(container.textContent).not.toContain("에이전트에게 작업 요청");
 
@@ -491,7 +491,7 @@ describe("ProjectAgents", () => {
     await act(async () => {
       container
         .querySelector<HTMLButtonElement>(
-          'button[aria-label="자동 사냥 이슈 상세"]',
+          'button[aria-label="이슈 처리 작업 상세"]',
         )
         ?.click();
     });
@@ -513,7 +513,7 @@ describe("ProjectAgents", () => {
 
     expect(document.body.textContent).toContain("에이전트에게 작업 요청");
     expect(document.querySelector<HTMLTextAreaElement>("textarea")?.value).toBe(
-      "모든 대기중인 이슈에 대해서 자동사냥을 수행하는것",
+      "대기 중인 모든 이슈를 처리합니다.",
     );
     await act(async () => {
       container

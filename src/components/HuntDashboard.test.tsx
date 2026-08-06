@@ -138,7 +138,7 @@ describe("HuntDashboard", () => {
       />,
     );
 
-    expect(markup).toContain('aria-label="새 Auto Hunt 이슈"');
+    expect(markup).toContain('aria-label="새 이슈"');
   });
 
   it("opens issue creation with Command-N", async () => {
@@ -168,7 +168,7 @@ describe("HuntDashboard", () => {
 
     expect(shortcut.defaultPrevented).toBe(true);
     expect(
-      container.querySelector('[aria-label="새 Auto Hunt 이슈"]'),
+      container.querySelector('[aria-label="새 이슈"]'),
     ).not.toBeNull();
 
     await act(async () => root.unmount());
@@ -188,7 +188,7 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("아직 프로젝트가 없습니다.");
     expect(markup).toContain("프로젝트 만들기");
     expect(markup).not.toContain("이슈 만들기");
-    expect(markup).not.toContain("자동사냥 칸반 보드");
+    expect(markup).not.toContain("이슈 처리 칸반 보드");
   });
 
   it("uses the kanban as the full dashboard surface", () => {
@@ -1275,7 +1275,7 @@ describe("HuntDashboard", () => {
       />,
     );
 
-    expect(markup).toContain('aria-label="자동사냥 칸반 보드"');
+    expect(markup).toContain('aria-label="이슈 처리 칸반 보드"');
     expect(markup).toContain("분석");
     expect(markup).toContain("Security review");
     expect(markup).toContain('class="kanban-card');
@@ -1623,7 +1623,7 @@ describe("HuntDashboard", () => {
     expect(propertiesToggle?.getAttribute("aria-expanded")).toBe("false");
     expect(container.textContent).not.toContain("로컬 저장소 열기");
     expect(container.textContent).not.toContain(
-      "Auto Hunt 실행 증거를 실시간으로 표시합니다.",
+      "이슈 처리 실행 증거를 실시간으로 표시합니다.",
     );
     expect(container.querySelector(".issue-status-history-panel")).toBeNull();
     const statusHistoryTab = Array.from(
@@ -3340,7 +3340,7 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("app-page-header");
     expect(markup).toContain('data-tauri-drag-region="deep"');
     expect(markup).not.toContain("health-trigger");
-    expect(markup).not.toContain("Auto Hunt 연결 상태");
+    expect(markup).not.toContain("이슈 처리 연결 상태");
     expect(markup).not.toContain("Briar CLI");
   });
 

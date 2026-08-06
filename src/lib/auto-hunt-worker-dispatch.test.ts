@@ -166,7 +166,7 @@ describe("dispatchAutoHuntToWorkers", () => {
         },
       ),
     ).rejects.toThrow(
-      "재시도할 Auto Hunt 이슈를 현재 프로젝트에서 찾지 못했습니다.",
+      "재시도할 이슈를 현재 프로젝트에서 찾지 못했습니다.",
     );
     expect(retry).not.toHaveBeenCalled();
     expect(dispatch).not.toHaveBeenCalled();
@@ -191,7 +191,7 @@ describe("dispatchAutoHuntToWorkers", () => {
         },
       ),
     ).rejects.toThrow(
-      "선행 이슈가 완료되지 않아 Auto Hunt를 시작할 수 없습니다.",
+      "선행 이슈가 완료되지 않아 대기 이슈 처리를 시작할 수 없습니다.",
     );
     expect(retry).not.toHaveBeenCalled();
     expect(dispatch).not.toHaveBeenCalled();
