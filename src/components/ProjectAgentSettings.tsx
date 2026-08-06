@@ -12,9 +12,11 @@ import {
 import { useState } from "react";
 import { useI18n } from "../i18n";
 import {
+  agentEfforts,
   agentModels,
   agentProviders,
   type AgentProvider,
+  type ModelEffort,
 } from "../lib/project-llm";
 import {
   projectAgentAvatarAccept,
@@ -73,6 +75,7 @@ export function ProjectAgentSettings({
   const [codexPet, setCodexPet] = useState(agent.codexPet);
   const [provider, setProvider] = useState<AgentProvider>(agent.provider);
   const [model, setModel] = useState(agent.model ?? "");
+  const [effort, setEffort] = useState<ModelEffort | null>(agent.effort);
   const [responsibility, setResponsibility] = useState(agent.responsibility);
   const [calendarColor, setCalendarColor] = useState(agent.calendarColor);
   const [savedProfile, setSavedProfile] = useState({
@@ -81,6 +84,7 @@ export function ProjectAgentSettings({
     codexPet: agent.codexPet,
     provider: agent.provider,
     model: agent.model ?? "",
+    effort: agent.effort,
     responsibility: agent.responsibility,
     calendarColor: agent.calendarColor,
   });
@@ -97,6 +101,7 @@ export function ProjectAgentSettings({
     codexPet?.slug !== savedProfile.codexPet?.slug ||
     provider !== savedProfile.provider ||
     model !== savedProfile.model ||
+    effort !== savedProfile.effort ||
     responsibility !== savedProfile.responsibility ||
     calendarColor !== savedProfile.calendarColor;
   const selectedModelKnown = agentModels[provider].some(
@@ -114,6 +119,7 @@ export function ProjectAgentSettings({
         codexPet,
         provider,
         model: model || null,
+        effort,
         responsibility: responsibility.trim(),
         calendarColor,
       });
@@ -123,6 +129,7 @@ export function ProjectAgentSettings({
         codexPet: saved.codexPet,
         provider: saved.provider,
         model: saved.model ?? "",
+        effort: saved.effort,
         responsibility: saved.responsibility,
         calendarColor: saved.calendarColor,
       };
@@ -131,6 +138,7 @@ export function ProjectAgentSettings({
       setCodexPet(nextProfile.codexPet);
       setProvider(nextProfile.provider);
       setModel(nextProfile.model);
+      setEffort(nextProfile.effort);
       setResponsibility(nextProfile.responsibility);
       setCalendarColor(nextProfile.calendarColor);
       setSavedProfile(nextProfile);
@@ -365,6 +373,7 @@ export function ProjectAgentSettings({
                       onValueChange={(value) => {
                         setProvider(value as AgentProvider);
                         setModel("");
+                        setEffort(null);
                       }}
                       options={agentProviders.map((candidate) => ({
                         label: providerLabels[candidate],
@@ -392,6 +401,29 @@ export function ProjectAgentSettings({
                         })),
                       ]}
                       value={model}
+                    />
+                  </div>
+                  <div className="project-agent-settings-field">
+                    <Label>{t("agents.effort")}</Label>
+                    <NativeSelect
+                      disabled={profileSaving}
+                      label={t("agents.effort")}
+                      onValueChange={(value) =>
+                        setEffort(
+                          (value || null) as ModelEffort | null,
+                        )
+                      }
+                      options={[
+                        {
+                          label: t("agents.providerDefaultEffort"),
+                          value: "",
+                        },
+                        ...agentEfforts[provider].map((candidate) => ({
+                          label: candidate,
+                          value: candidate,
+                        })),
+                      ]}
+                      value={effort ?? ""}
                     />
                   </div>
                 </div>

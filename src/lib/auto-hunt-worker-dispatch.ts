@@ -31,7 +31,7 @@ export class NoQueuedAutoHuntIssuesError extends Error {
 export async function dispatchAutoHuntToWorkers(
   dependencies: AutoHuntWorkerDispatchDependencies,
   input: {
-    agent: Pick<ProjectAgent, "id" | "provider" | "model">;
+    agent: Pick<ProjectAgent, "id" | "provider" | "model" | "effort">;
     runs: HuntRun[];
     maxIssues?: number;
     targetRunIds?: string[];
@@ -81,7 +81,11 @@ export async function dispatchAutoHuntToWorkers(
       agentId: input.agent.id,
       provider,
       model,
-      effort: run.preferredModel ? (run.preferredEffort ?? null) : null,
+      effort: run.preferredModel
+        ? (run.preferredEffort ?? null)
+        : (run.preferredProvider
+            ? null
+            : (input.agent.effort ?? null)),
       workerId: null,
       reassign: Boolean(run.dispatchedAt || run.workerId),
     });

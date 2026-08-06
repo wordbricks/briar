@@ -1403,6 +1403,7 @@ describe("API errors", () => {
         name: "Repository auditor",
         provider: "codex",
         model: null,
+        effort: null,
         responsibility: "Audit the connected repository.",
         skill: "# Repository auditor\n\nAudit the connected repository.",
       },

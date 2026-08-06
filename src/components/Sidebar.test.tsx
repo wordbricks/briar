@@ -454,6 +454,7 @@ describe("Sidebar", () => {
               codexPet: null,
               provider: "codex",
               model: null,
+              effort: null,
               responsibility: "Inspect the design system",
               skill: "# Agent",
               calendarColor: "#3275d5",
