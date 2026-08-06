@@ -185,4 +185,8 @@ test("server-renders the localized empty blog", async () => {
   assert.match(html, /Briar 블로그/);
   assert.match(html, /첫 글을 준비하고 있어요/);
   assert.match(html, /aria-current="page"[^>]*>블로그</);
+  assert.match(
+    html,
+    /href="https:\/\/github\.com\/wordbricks\/briar"[^>]*target="_blank"/,
+  );
 });

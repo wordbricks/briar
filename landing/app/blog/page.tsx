@@ -5,6 +5,7 @@ import { getRequestLocale } from "../request-locale";
 import { ThemeToggle } from "../theme-toggle";
 
 const WEB_APP_URL = "/app/";
+const GITHUB_URL = "https://github.com/wordbricks/briar";
 
 const blogCopy = {
   ko: {
@@ -86,6 +87,15 @@ export default async function BlogPage() {
               englishLabel={c.language.english}
               koreanLabel={c.language.korean}
             />
+            <a
+              className="header-cta header-github"
+              href={GITHUB_URL}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Briar on GitHub"
+            >
+              GitHub <Arrow />
+            </a>
             <a className="header-cta header-download" href={WEB_APP_URL}>
               {c.nav.openWebApp} <Arrow />
             </a>
