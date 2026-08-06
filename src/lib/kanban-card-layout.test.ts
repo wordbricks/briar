@@ -150,6 +150,18 @@ describe("kanban card layout", () => {
     expect(assigneeRule).toContain("white-space:nowrap");
   });
 
+  it("constrains desktop columns to the board height so each column scrolls", () => {
+    const boardRule = firstRule(".kanban-board");
+    const columnBodyRule = firstRule(".kanban-column > div");
+
+    expect(boardRule).toContain("grid-auto-rows:minmax(0,1fr)");
+    expect(boardRule).toContain("overflow-x:auto");
+    expect(boardRule).toContain("overflow-y:hidden");
+    expect(columnBodyRule).toContain("overflow-y:auto");
+    expect(columnBodyRule).toContain("flex:1");
+    expect(columnBodyRule).toContain("min-height:0");
+  });
+
   it("stacks columns without horizontal scrolling on narrow screens", () => {
     const narrowScreenMarker = "@media (max-width:760px) { .sidebar";
     const boardRule = ruleAfter(narrowScreenMarker, ".kanban-board");
@@ -167,6 +179,7 @@ describe("kanban card layout", () => {
     expect(boardRule).toContain("overflow-x:hidden");
     expect(boardRule).toContain("overflow-y:auto");
     expect(columnRule).toContain("height:auto");
-    expect(columnBodyRule).toContain("overflow-y:visible");
+    expect(columnBodyRule).toContain("overflow-y:auto");
+    expect(columnBodyRule).toContain("max-height:min(50vh,420px)");
   });
 });
