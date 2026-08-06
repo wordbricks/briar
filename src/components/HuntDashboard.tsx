@@ -951,6 +951,11 @@ export function HuntDashboard({
     return (
       <>
         <RunPage
+          assignedWorker={
+            workerById.get(selected.workerId ?? "") ??
+            workerById.get(selected.requestedWorkerId ?? "") ??
+            null
+          }
           companionMode={companionMode}
           currentUserId={currentUserId}
           error={recoveryError}
@@ -3375,6 +3380,7 @@ function IssueList({
 }
 
 export function RunPage({
+  assignedWorker = null,
   availableProviders = [],
   availableRuns = [],
   companionMode = false,
@@ -3418,6 +3424,7 @@ export function RunPage({
   run,
   token = null,
 }: {
+  assignedWorker?: ExecutionWorker | null;
   availableProviders?: AgentProvider[];
   availableRuns?: HuntRun[];
   companionMode?: boolean;
@@ -3730,8 +3737,29 @@ export function RunPage({
       : run.requestedProvider != null
         ? run.requestedModel ?? null
         : performedAgentModel ?? null;
+  const executionWorker = assignedWorker ?? null;
+  const executionIdentityParts = [
+    executionProvider ? providerDisplayName(executionProvider) : null,
+    executionProvider && executionModel
+      ? modelDisplayName(executionProvider, executionModel)
+      : null,
+    executionWorker?.label ?? null,
+  ].filter((part): part is string => Boolean(part));
+  const executionIdentityText = executionIdentityParts.join(" · ");
+  const executionIdentity = executionIdentityParts.length > 0 ? (
+    <span
+      className="run-execution-identity"
+      title={executionIdentityText}
+    >
+      {executionProvider ? (
+        <AgentProviderIcon provider={executionProvider} size={12} />
+      ) : null}
+      {executionWorker ? <WorkerIcon icon={executionWorker.icon} size={14} /> : null}
+      <span>{executionIdentityText}</span>
+    </span>
+  ) : null;
   const executionMetricsPanel =
-    executionMetrics || executionProvider ? (
+    executionMetrics || executionProvider || executionWorker ? (
     <dl className="run-result-metrics" aria-label={t("run.resultMetrics")}>
       {executionMetrics ? (
         <div>
@@ -3753,6 +3781,15 @@ export function RunPage({
           <dt>{t("run.metricsModel")}</dt>
           <dd title={executionModel}>
             {modelDisplayName(executionProvider, executionModel)}
+          </dd>
+        </div>
+      ) : null}
+      {executionWorker ? (
+        <div>
+          <dt>{t("run.metricsWorker")}</dt>
+          <dd className="run-result-metrics-provider">
+            <WorkerIcon icon={executionWorker.icon} size={14} />
+            <span>{executionWorker.label}</span>
           </dd>
         </div>
       ) : null}
@@ -4440,6 +4477,11 @@ export function RunPage({
                                 : t("run.revision", {
                                     count: run.currentRevision,
                                   })}
+                              {executionIdentity ? (
+                                <>
+                                  {" "}· {executionIdentity}
+                                </>
+                              ) : null}
                             </small>
                           </div>
                           {executionMetricsPanel}
@@ -4694,6 +4736,11 @@ export function RunPage({
                             <small>
                               {t("run.attempt", { count: run.currentAttempt })} ·{" "}
                               {t("run.revision", { count: run.currentRevision })}
+                              {executionIdentity ? (
+                                <>
+                                  {" "}· {executionIdentity}
+                                </>
+                              ) : null}
                             </small>
                           </div>
                           {executionMetricsPanel}
@@ -5063,12 +5110,15 @@ export function RunPage({
                     </div>
                   </div>
                   <div
-                    aria-label={`${t("run.currentAttempt")} · ${t("run.currentRevision")}: ${t("run.attempt", { count: run.currentAttempt })} · ${t("run.revision", { count: run.currentRevision })}`}
+                    aria-label={`${t("run.currentAttempt")} · ${t("run.currentRevision")}: ${t("run.attempt", { count: run.currentAttempt })} · ${t("run.revision", { count: run.currentRevision })}${executionIdentityText ? ` · ${executionIdentityText}` : ""}`}
                     className="run-property"
-                    title={`${t("run.currentAttempt")} · ${t("run.currentRevision")}`}
+                    title={`${t("run.currentAttempt")} · ${t("run.currentRevision")}${executionIdentityText ? ` · ${executionIdentityText}` : ""}`}
                   >
                     <span className="run-property-icon attempt"><RotateCcw size={15} /></span>
-                    <span className="run-property-copy"><strong>{t("run.attempt", { count: run.currentAttempt })} · {t("run.revision", { count: run.currentRevision })}</strong></span>
+                    <span className="run-property-copy">
+                      <strong>{t("run.attempt", { count: run.currentAttempt })} · {t("run.revision", { count: run.currentRevision })}</strong>
+                      {executionIdentity}
+                    </span>
                   </div>
                 </section>
                 <IssueDependenciesPanel

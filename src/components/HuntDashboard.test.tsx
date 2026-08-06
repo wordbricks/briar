@@ -3772,6 +3772,52 @@ describe("HuntDashboard", () => {
     expect(markup).not.toContain('class="issue-description-markdown"');
   });
 
+  it("shows provider, model, and worker next to the attempt · revision label", () => {
+    const completedRun = {
+      ...demoDashboard.runs[0],
+      status: "completed" as const,
+      workerId: dashboardWorker.id,
+      resultSummary: "프로바이더·모델·워커 표시를 검증합니다.",
+      structuredResult: {
+        summary: "## 변경 결과\n\n- 실행 주체 정보를 시도·리비전 옆에 표시합니다.",
+        outcome: "completed" as const,
+        importance: "routine" as const,
+        urgency: "normal" as const,
+        impact: "issue" as const,
+        humanActionRequired: false,
+        nextAction: null,
+        dueAt: null,
+      },
+    };
+    const markup = renderToStaticMarkup(
+      <RunPage
+        assignedWorker={dashboardWorker}
+        isSidebarOpen
+        error={null}
+        isRecovering={false}
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => []}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }}
+        run={completedRun}
+      />,
+    );
+
+    expect(markup).toContain('class="run-execution-identity"');
+    expect(markup).toContain("Codex · GPT-5.6 Sol · Lemon Worker");
+    expect(
+      (markup.match(/class="run-execution-identity"/g) ?? []).length,
+    ).toBe(1);
+    expect(markup).toContain("워커");
+    expect(markup).toContain("Lemon Worker");
+  });
+
   it("prefers issue preferred provider/model over requested values in result metrics", () => {
     const completedRun = {
       ...demoDashboard.runs[0],

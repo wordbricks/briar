@@ -1356,13 +1356,17 @@ body { overflow: hidden; font-synthesis: none; }
 .completed-issue-card { margin:0 0 14px; padding:14px; border:1px solid color-mix(in srgb,#4baa86 42%,var(--border)); border-radius:12px; background:color-mix(in srgb,#4baa86 8%,var(--card)); box-shadow:0 1px 2px color-mix(in srgb,#4baa86 8%,transparent); }
 .completed-issue-card-heading { display:flex; align-items:center; gap:8px; color:#318064; }
 .completed-issue-card-heading strong { color:var(--foreground); font-size:var(--text-xs); }
-.completed-issue-card-heading > small { margin-left:auto; color:var(--muted-foreground); font:500 var(--text-2xs) "DM Mono",monospace; }
+.completed-issue-card-heading > small { min-width:0; margin-left:auto; color:var(--muted-foreground); font:500 var(--text-2xs) "DM Mono",monospace; }
+.completed-issue-card-heading > small > .run-execution-identity { max-width:34ch; }
 .run-result-metrics { margin:12px 0 0; display:flex; flex-wrap:wrap; gap:7px; }
 .run-result-metrics > div { min-width:92px; padding:8px 10px; display:grid; gap:3px; border:1px solid var(--border); border-radius:8px; background:color-mix(in srgb,var(--card) 82%,transparent); }
 .run-result-metrics dt { color:var(--muted-foreground); font-size:var(--text-3xs); font-weight:650; }
 .run-result-metrics dd { margin:0; color:var(--foreground); font:650 var(--text-xs) "DM Mono",monospace; }
 .run-result-metrics-provider { display:inline-flex; align-items:center; gap:6px; font-family:inherit; }
 .run-result-metrics-provider span { font:650 var(--text-xs) "DM Mono",monospace; }
+.run-execution-identity { min-width:0; display:inline-flex; align-items:center; gap:6px; color:var(--muted-foreground); }
+.run-execution-identity > span:last-child { min-width:0; overflow:hidden; font-weight:550; text-overflow:ellipsis; white-space:nowrap; }
+.run-property .run-execution-identity { margin-top:4px; font-size:var(--text-2xs); }
 .completed-issue-summary { min-width:0; margin-top:12px; color:var(--foreground); font-size:var(--text-xs); line-height:1.65; overflow-wrap:anywhere; }
 .completed-issue-summary > :first-child { margin-top:0; }
 .completed-issue-summary > :last-child { margin-bottom:0; }
