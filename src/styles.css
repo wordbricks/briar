@@ -2756,6 +2756,20 @@ button.issue-message-state { width:100%; cursor:pointer; }
   white-space: nowrap;
 }
 .select-menu-value.is-placeholder { color:var(--muted-foreground); font-weight: 500; }
+.select-menu-trigger-copy {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.select-menu-trigger-icon {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  border-radius: 5px;
+}
 .select-menu-chevron {
   flex: 0 0 auto;
   color: var(--muted-foreground);
@@ -2835,6 +2849,13 @@ button.issue-message-state { width:100%; cursor:pointer; }
   flex: 1;
   display: grid;
   gap: 3px;
+}
+.select-menu-option-icon {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  border-radius: 6px;
 }
 .select-menu-option-copy strong {
   overflow: hidden;

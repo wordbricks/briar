@@ -17,6 +17,7 @@ export type SelectMenuOption = {
   label: string;
   description?: string;
   disabled?: boolean;
+  icon?: string | null;
 };
 
 type MenuPosition = {
@@ -292,10 +293,19 @@ export function SelectMenu({
         role="combobox"
         type="button"
       >
-        <span
-          className={`select-menu-value${selectedOption ? "" : " is-placeholder"}`}
-        >
-          {selectedOption?.label ?? placeholder ?? label}
+        <span className="select-menu-trigger-copy">
+          {selectedOption?.icon ? (
+            <img
+              alt=""
+              className="select-menu-trigger-icon"
+              src={selectedOption.icon}
+            />
+          ) : null}
+          <span
+            className={`select-menu-value${selectedOption ? "" : " is-placeholder"}`}
+          >
+            {selectedOption?.label ?? placeholder ?? label}
+          </span>
         </span>
         <ChevronDown
           aria-hidden="true"
@@ -332,6 +342,13 @@ export function SelectMenu({
                     role="option"
                     type="button"
                   >
+                    {option.icon ? (
+                      <img
+                        alt=""
+                        className="select-menu-option-icon"
+                        src={option.icon}
+                      />
+                    ) : null}
                     <span className="select-menu-option-copy">
                       <strong>{option.label}</strong>
                       {option.description ? <small>{option.description}</small> : null}
