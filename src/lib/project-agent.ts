@@ -17,16 +17,16 @@ const defaultProjectAgentCopyByLocale: Record<
   DefaultProjectAgentCopy
 > = {
   ko: {
-    name: "자동 사냥 에이전트",
-    responsibility: "모든 대기중인 이슈에 대해서 자동사냥을 수행하는것",
+    name: "이슈 처리 에이전트",
+    responsibility: "대기 중인 모든 이슈를 처리합니다.",
   },
   en: {
-    name: "Auto Hunt agent",
-    responsibility: "Perform Auto Hunt for every queued issue.",
+    name: "Issue processing agent",
+    responsibility: "Process every queued issue.",
   },
   zh: {
-    name: "自动狩猎智能体",
-    responsibility: "对所有排队中的问题执行自动狩猎。",
+    name: "问题处理智能体",
+    responsibility: "处理所有排队中的问题。",
   },
 };
 

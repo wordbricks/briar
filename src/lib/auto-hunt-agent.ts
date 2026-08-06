@@ -144,17 +144,17 @@ export async function startProjectAutoHunt(
   } = {},
 ): Promise<AutoHuntAgentResponse> {
   if (!isTauri()) {
-    throw new Error("자동사냥은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
+    throw new Error("대기 이슈 자동 처리는 Briar 데스크톱 앱에서 사용할 수 있습니다.");
   }
   if (!briarApiUrl) {
-    throw new Error("자동사냥을 실행하려면 Briar API URL이 필요합니다.");
+    throw new Error("대기 이슈를 처리하려면 Briar API URL이 필요합니다.");
   }
   if (issues.length === 0) {
     throw new Error("대기 상태인 이슈가 없습니다.");
   }
   if (issues.length > maxAutoHuntIssuesLimit) {
     throw new Error(
-      `한 번의 자동사냥 세션에서는 최대 ${maxAutoHuntIssuesLimit}개의 이슈만 처리할 수 있습니다.`,
+      `한 번의 이슈 처리 세션에서는 최대 ${maxAutoHuntIssuesLimit}개의 이슈만 처리할 수 있습니다.`,
     );
   }
   const { invoke } = await import("@tauri-apps/api/core");
@@ -186,7 +186,7 @@ export async function retryProjectAutoHuntRun(
   reason: string,
 ) {
   if (!isTauri()) {
-    throw new Error("Auto Hunt 재시도는 Briar 데스크톱 앱에서 사용할 수 있습니다.");
+    throw new Error("이슈 처리 재시도는 Briar 데스크톱 앱에서 사용할 수 있습니다.");
   }
   const { invoke } = await import("@tauri-apps/api/core");
   return invoke<{

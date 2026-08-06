@@ -102,12 +102,12 @@ impl AutoHuntDispatchStore {
     pub(crate) fn new(app_data_directory: &Path) -> Result<Self, String> {
         let directory = app_data_directory.join("auto-hunt-dispatches");
         fs::create_dir_all(&directory)
-            .map_err(|error| format!("자동사냥 dispatch 저장 폴더를 만들지 못했습니다: {error}"))?;
+            .map_err(|error| format!("이슈 처리 실행 저장 폴더를 만들지 못했습니다: {error}"))?;
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
             fs::set_permissions(&directory, fs::Permissions::from_mode(0o700)).map_err(
-                |error| format!("자동사냥 dispatch 저장 폴더 권한을 지정하지 못했습니다: {error}"),
+                |error| format!("이슈 처리 실행 저장 폴더 권한을 지정하지 못했습니다: {error}"),
             )?;
         }
         Ok(Self {
@@ -127,7 +127,7 @@ impl AutoHuntDispatchStore {
         let _guard = self
             .write_lock
             .lock()
-            .map_err(|_| "자동사냥 dispatch 저장 잠금이 손상되었습니다.".to_string())?;
+            .map_err(|_| "이슈 처리 실행 저장 잠금이 손상되었습니다.".to_string())?;
         validate_id(dispatch_group_id)?;
         let started_at = now();
         let mut group = AutoHuntDispatchGroup {
@@ -168,12 +168,12 @@ impl AutoHuntDispatchStore {
             Ok(contents) => contents,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
             Err(error) => {
-                return Err(format!("자동사냥 dispatch 상태를 읽지 못했습니다: {error}"));
+                return Err(format!("이슈 처리 실행 상태를 읽지 못했습니다: {error}"));
             }
         };
         serde_json::from_str(&contents)
             .map(Some)
-            .map_err(|error| format!("자동사냥 dispatch 상태가 손상되었습니다: {error}"))
+            .map_err(|error| format!("이슈 처리 실행 상태가 손상되었습니다: {error}"))
     }
 
     pub(crate) fn add_worker(
@@ -390,19 +390,19 @@ impl AutoHuntDispatchStore {
     /// retried independently.
     pub(crate) fn interrupt_orphaned_groups(&self) -> Result<Vec<AutoHuntDispatchGroup>, String> {
         let entries = fs::read_dir(&self.directory)
-            .map_err(|error| format!("자동사냥 dispatch 폴더를 읽지 못했습니다: {error}"))?;
+            .map_err(|error| format!("이슈 처리 실행 폴더를 읽지 못했습니다: {error}"))?;
         let mut recovered = Vec::new();
         for entry in entries {
-            let entry = entry
-                .map_err(|error| format!("자동사냥 dispatch 항목을 읽지 못했습니다: {error}"))?;
+            let entry =
+                entry.map_err(|error| format!("이슈 처리 실행 항목을 읽지 못했습니다: {error}"))?;
             let path = entry.path();
             if path.extension().and_then(|extension| extension.to_str()) != Some("json") {
                 continue;
             }
             let contents = fs::read_to_string(&path)
-                .map_err(|error| format!("자동사냥 dispatch 상태를 읽지 못했습니다: {error}"))?;
+                .map_err(|error| format!("이슈 처리 실행 상태를 읽지 못했습니다: {error}"))?;
             let mut group: AutoHuntDispatchGroup = serde_json::from_str(&contents)
-                .map_err(|error| format!("자동사냥 dispatch 상태가 손상되었습니다: {error}"))?;
+                .map_err(|error| format!("이슈 처리 실행 상태가 손상되었습니다: {error}"))?;
             if group.status != AutoHuntDispatchStatus::Running {
                 continue;
             }
@@ -446,10 +446,10 @@ impl AutoHuntDispatchStore {
         let _guard = self
             .write_lock
             .lock()
-            .map_err(|_| "자동사냥 dispatch 저장 잠금이 손상되었습니다.".to_string())?;
+            .map_err(|_| "이슈 처리 실행 저장 잠금이 손상되었습니다.".to_string())?;
         let mut group = self
             .load(dispatch_group_id)?
-            .ok_or_else(|| "자동사냥 dispatch 상태를 찾지 못했습니다.".to_string())?;
+            .ok_or_else(|| "이슈 처리 실행 상태를 찾지 못했습니다.".to_string())?;
         mutate(&mut group)?;
         self.write_replace(&group)?;
         Ok(group)
@@ -467,14 +467,14 @@ impl AutoHuntDispatchStore {
         }
         let mut file = options.open(path).map_err(|error| {
             if error.kind() == std::io::ErrorKind::AlreadyExists {
-                "같은 dispatchGroupId의 자동사냥 실행이 이미 존재합니다.".to_string()
+                "같은 dispatchGroupId의 이슈 처리 실행이 이미 존재합니다.".to_string()
             } else {
-                format!("자동사냥 dispatch 상태를 만들지 못했습니다: {error}")
+                format!("이슈 처리 실행 상태를 만들지 못했습니다: {error}")
             }
         })?;
         file.write_all(&bytes)
             .and_then(|_| file.sync_all())
-            .map_err(|error| format!("자동사냥 dispatch 상태를 저장하지 못했습니다: {error}"))
+            .map_err(|error| format!("이슈 처리 실행 상태를 저장하지 못했습니다: {error}"))
     }
 
     fn write_replace(&self, group: &AutoHuntDispatchGroup) -> Result<(), String> {
@@ -492,11 +492,11 @@ impl AutoHuntDispatchStore {
         }
         let mut file = options
             .open(&temporary)
-            .map_err(|error| format!("자동사냥 dispatch 임시 상태를 만들지 못했습니다: {error}"))?;
+            .map_err(|error| format!("이슈 처리 실행의 임시 상태를 만들지 못했습니다: {error}"))?;
         file.write_all(&bytes)
             .and_then(|_| file.sync_all())
             .and_then(|_| fs::rename(&temporary, &path))
-            .map_err(|error| format!("자동사냥 dispatch 상태를 갱신하지 못했습니다: {error}"))
+            .map_err(|error| format!("이슈 처리 실행 상태를 갱신하지 못했습니다: {error}"))
     }
 
     fn path(&self, dispatch_group_id: &str) -> PathBuf {
@@ -506,7 +506,7 @@ impl AutoHuntDispatchStore {
 
 fn serialize(group: &AutoHuntDispatchGroup) -> Result<Vec<u8>, String> {
     serde_json::to_vec_pretty(group)
-        .map_err(|error| format!("자동사냥 dispatch 상태를 직렬화하지 못했습니다: {error}"))
+        .map_err(|error| format!("이슈 처리 실행 상태를 직렬화하지 못했습니다: {error}"))
 }
 
 fn push_event(
@@ -539,7 +539,7 @@ fn validate_id(value: &str) -> Result<(), String> {
             .bytes()
             .all(|character| character.is_ascii_alphanumeric() || matches!(character, b'-' | b'_'))
     {
-        return Err("자동사냥 dispatchGroupId가 올바르지 않습니다.".to_string());
+        return Err("이슈 처리 실행의 dispatchGroupId가 올바르지 않습니다.".to_string());
     }
     Ok(())
 }

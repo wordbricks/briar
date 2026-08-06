@@ -5723,7 +5723,7 @@ export async function assertQueuedHuntClaim(
   if (!run) return;
   if (run.status !== "queued") {
     if (claimTokenHash && run.claim_token_valid !== 1) {
-      throw new HuntClaimError("Auto Hunt claim token is no longer active");
+      throw new HuntClaimError("Issue processing claim token is no longer active");
     }
     return;
   }
@@ -5737,7 +5737,7 @@ export async function assertQueuedHuntClaim(
     (context as Record<string, unknown>).origin === "briar-app";
   if (!run.claim_token_hash) {
     if (claimTokenHash) {
-      throw new HuntClaimError("Auto Hunt claim token is no longer active");
+      throw new HuntClaimError("Issue processing claim token is no longer active");
     }
     if (!appCreated) return;
   }
@@ -5747,7 +5747,7 @@ export async function assertQueuedHuntClaim(
     run.lease_expires_at <= observedAt
   ) {
     throw new HuntClaimError(
-      "Queued Auto Hunt run requires its active claim token",
+      "Queued issue processing requires its active claim token",
     );
   }
 }
@@ -8252,7 +8252,7 @@ export async function reworkHuntRun(
       };
     }
     throw new HuntTransitionError(
-      "Auto Hunt run changed while rework was being recorded",
+      "Issue processing run changed while rework was being recorded",
     );
   }
 
@@ -8357,8 +8357,8 @@ export async function recoverHuntRun(
   const detail =
     input.reason ??
     (input.action === "retry"
-      ? `Auto Hunt ${nextAttempt}차 시도를 요청했습니다.`
-      : "사용자가 Auto Hunt 작업을 취소했습니다.");
+      ? `이슈 처리 ${nextAttempt}차 시도를 요청했습니다.`
+      : "사용자가 이슈 처리 작업을 취소했습니다.");
 
   const update =
     input.action === "retry"
@@ -8741,7 +8741,7 @@ export async function moveHuntRun(
       };
     }
     throw new HuntTransitionError(
-      "Auto Hunt run changed while its status was being moved",
+      "Issue processing run changed while its status was being moved",
     );
   }
 
@@ -8856,7 +8856,7 @@ export async function importLinearHuntRuns(
         : null;
       const detail =
         status === "queued"
-          ? "Linear에서 가져온 이슈가 Auto Hunt 처리를 기다리고 있습니다."
+          ? "Linear에서 가져온 이슈가 처리를 기다리고 있습니다."
           : `Linear에서 가져왔으며 ${status} 상태로 설정되었습니다.`;
       const resultSummary =
         status === "completed" ? "Imported from Linear as completed." : null;

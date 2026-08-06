@@ -13,12 +13,12 @@ const tutorialCopy = {
     metadata: {
       title: "Briar 튜토리얼 — 첫 이슈부터 검증된 결과까지",
       description:
-        "Briar에서 이슈를 만들고, Auto Hunt agent로 자동 처리하고, 정리된 결과와 검증 증거를 확인하고, 반복 업무를 자동화하는 방법을 알아보세요.",
+        "Briar에서 이슈를 만들고, 이슈 처리 에이전트로 자동 처리하고, 정리된 결과와 검증 증거를 확인하고, 반복 업무를 자동화하는 방법을 알아보세요.",
     },
     eyebrow: "9분 제품 둘러보기",
     title: "첫 이슈부터\n검증된 결과까지.",
     description:
-      "Briar의 실제 화면을 따라 이슈를 만들고, Auto Hunt agent로 자동 처리하고, 정리된 결과와 검증 근거까지 확인해 보세요.",
+      "Briar의 실제 화면을 따라 이슈를 만들고, 이슈 처리 에이전트로 자동 처리하고, 정리된 결과와 검증 근거까지 확인해 보세요.",
     start: "튜토리얼 시작",
     openApp: "Briar 열기",
     captured:
@@ -58,23 +58,23 @@ const tutorialCopy = {
           "카드를 열면 실행 단계와 최신 활동을 바로 확인할 수 있습니다.",
         ],
         image: "/tutorial/02-task-board.webp",
-        alt: "Briar Auto Hunt 칸반 작업 보드",
+        alt: "Briar 이슈 처리 칸반 작업 보드",
         caption: "사람과 에이전트가 공유하는 하나의 작업 상태입니다.",
       },
       {
         id: "run-auto-hunt",
         label: "03 · EXECUTE",
-        nav: "자동사냥 실행하기",
-        title: "Auto Hunt agent가 대기 이슈를 자동으로 처리하게 하세요.",
+        nav: "대기 이슈 처리하기",
+        title: "이슈 처리 에이전트가 대기 이슈를 자동으로 처리하게 하세요.",
         description:
-          "Agents에서 Auto Hunt agent의 Run Task를 열면 대기 중인 이슈를 찾아 워크플로에 따라 분석, 구현, 검증하도록 실행할 수 있습니다. 에이전트는 각 이슈를 독립된 작업으로 처리하고 진행 상태를 보드에 기록합니다.",
+          "Agents에서 이슈 처리 에이전트의 Run Task를 열면 대기 중인 이슈를 찾아 워크플로에 따라 분석, 구현, 검증하도록 실행할 수 있습니다. 에이전트는 각 이슈를 독립된 작업으로 처리하고 진행 상태를 보드에 기록합니다.",
         bullets: [
-          "요청에 “Perform Auto Hunt for every queued issue.”가 들어 있는지 확인하고 Run Task를 누릅니다.",
+          "요청에 “대기 중인 모든 이슈를 처리합니다.”가 들어 있는지 확인하고 Run Task를 누릅니다.",
           "실행이 시작되면 Queued 이슈가 워크플로 단계로 이동하고 필요한 검증까지 이어집니다.",
         ],
         image: "/tutorial/07-run-auto-hunt.webp",
-        alt: "Briar Auto Hunt agent 작업 실행 대화상자",
-        caption: "Auto Hunt agent를 실행해 대기 이슈를 자동으로 처리합니다.",
+        alt: "Briar 이슈 처리 에이전트 작업 실행 대화상자",
+        caption: "이슈 처리 에이전트를 실행해 대기 이슈를 자동으로 처리합니다.",
       },
       {
         id: "collaborate",
@@ -127,7 +127,7 @@ const tutorialCopy = {
         nav: "전문 에이전트 만들기",
         title: "반복되는 책임을 에이전트로 정의하세요.",
         description:
-          "Agents에서 한 가지 책임, 제공자, 모델을 조합해 재사용 가능한 에이전트를 만듭니다. Auto Hunt, 오류 탐지, 피드백 분석처럼 팀의 실제 역할에 맞춰 구성할 수 있습니다.",
+          "Agents에서 한 가지 책임, 제공자, 모델을 조합해 재사용 가능한 에이전트를 만듭니다. 대기 이슈 처리, 오류 탐지, 피드백 분석처럼 팀의 실제 역할에 맞춰 구성할 수 있습니다.",
         bullets: [
           "책임은 한 문장으로 구체적으로 적을수록 실행 범위가 선명해집니다.",
           "카드의 실행 버튼으로 필요할 때 즉시 책임을 수행시킵니다.",
@@ -164,12 +164,12 @@ const tutorialCopy = {
     metadata: {
       title: "Briar tutorial — From first issue to verified result",
       description:
-        "Learn how to create issues, process them with the Auto Hunt agent, review structured results and evidence, and automate recurring work in Briar.",
+        "Learn how to create issues, process them with the issue processing agent, review structured results and evidence, and automate recurring work in Briar.",
     },
     eyebrow: "9-minute product tour",
     title: "From first issue\nto verified result.",
     description:
-      "Follow real Briar screens to create an issue, process it with the Auto Hunt agent, and review a structured result with supporting evidence.",
+      "Follow real Briar screens to create an issue, process it with the issue processing agent, and review a structured result with supporting evidence.",
     start: "Start the tutorial",
     openApp: "Open Briar",
     captured:
@@ -209,23 +209,23 @@ const tutorialCopy = {
           "Open a card to inspect its current stage and latest activity.",
         ],
         image: "/tutorial/02-task-board.webp",
-        alt: "Briar Auto Hunt kanban task board",
+        alt: "Briar issue processing kanban task board",
         caption: "People and agents share one source of truth for task state.",
       },
       {
         id: "run-auto-hunt",
         label: "03 · EXECUTE",
-        nav: "Run Auto Hunt",
-        title: "Let the Auto Hunt agent process queued issues.",
+        nav: "Process queued issues",
+        title: "Let the issue processing agent handle queued issues.",
         description:
-          "Open Run Task for the Auto Hunt agent in Agents to find queued issues and move each one through analysis, implementation, and validation. Briar keeps every issue isolated and records its progress on the board.",
+          "Open Run Task for the issue processing agent in Agents to find queued issues and move each one through analysis, implementation, and validation. Briar keeps every issue isolated and records its progress on the board.",
         bullets: [
-          "Confirm the request says “Perform Auto Hunt for every queued issue.”, then choose Run Task.",
+          "Confirm the request says “Process every queued issue.”, then choose Run Task.",
           "Once the run starts, queued issues move through the workflow and continue into the required checks.",
         ],
         image: "/tutorial/07-run-auto-hunt.webp",
-        alt: "Briar Run Task dialog for the Auto Hunt agent",
-        caption: "Run the Auto Hunt agent to process queued issues automatically.",
+        alt: "Briar Run Task dialog for the issue processing agent",
+        caption: "Run the issue processing agent to process queued issues automatically.",
       },
       {
         id: "collaborate",
@@ -278,7 +278,7 @@ const tutorialCopy = {
         nav: "Create specialist agents",
         title: "Define recurring responsibilities as agents.",
         description:
-          "Combine one responsibility, a provider, and a model into a reusable project agent. Shape agents around real team roles such as Auto Hunt, error intake, or feedback analysis.",
+          "Combine one responsibility, a provider, and a model into a reusable project agent. Shape agents around real team roles such as queued issue processing, error intake, or feedback analysis.",
         bullets: [
           "A specific one-sentence responsibility keeps execution scope clear.",
           "Use the run action on a card to perform that responsibility on demand.",

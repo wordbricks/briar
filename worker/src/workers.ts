@@ -1665,7 +1665,7 @@ export async function renewHuntRunLease(
     )
     .first<{ id: string; lease_expires_at: string }>();
   if (!row) {
-    throw new WorkerConflictError("Auto Hunt claim token is no longer active");
+    throw new WorkerConflictError("Issue processing claim token is no longer active");
   }
   return row;
 }

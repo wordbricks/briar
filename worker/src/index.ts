@@ -2279,7 +2279,7 @@ async function requireActiveWorkerRunClaim(
     )
     .bind(runId, projectId, claimTokenHash, authenticatedAt)
     .first<{ id: string }>();
-  if (!active) throw new HttpError(409, "Auto Hunt claim token is no longer active");
+  if (!active) throw new HttpError(409, "Issue processing claim token is no longer active");
   return { projectId, claimTokenHash, authenticatedAt };
 }
 
@@ -2649,7 +2649,7 @@ async function processSlackAppMention(env: Env, payload: SlackEventCallback) {
         detail:
           instruction.status === "backlog"
             ? "Slack 멘션으로 생성된 이슈가 백로그에 추가되었습니다."
-            : "Slack 멘션으로 생성된 이슈가 Auto Hunt 처리를 기다리고 있습니다.",
+            : "Slack 멘션으로 생성된 이슈가 처리를 기다리고 있습니다.",
         priority: instruction.priority,
         branch: null,
         commitSha: null,
@@ -3145,8 +3145,8 @@ async function processSlackCreateIssueSubmission(
       actor: `slack:${submission.userId}`,
       detail:
         submission.source === "shortcut"
-          ? "Slack Briar shortcut으로 생성된 이슈가 Auto Hunt 처리를 기다리고 있습니다."
-          : "Slack /create 명령으로 생성된 이슈가 Auto Hunt 처리를 기다리고 있습니다.",
+          ? "Slack Briar shortcut으로 생성된 이슈가 처리를 기다리고 있습니다."
+          : "Slack /create 명령으로 생성된 이슈가 처리를 기다리고 있습니다.",
       context: {
         origin:
           submission.source === "shortcut"
@@ -6921,7 +6921,7 @@ async function route(
     const detail =
       input.status === "backlog"
         ? "Briar 앱에서 생성된 이슈가 백로그에 추가되었습니다."
-        : "Briar 앱에서 생성된 이슈가 Auto Hunt 처리를 기다리고 있습니다.";
+        : "Briar 앱에서 생성된 이슈가 처리를 기다리고 있습니다.";
     const created = await createIssueWithAttachments({
       db,
       attachmentsBucket,
@@ -7121,7 +7121,7 @@ async function route(
     }
     if (outcome === "active") {
       await cancelArchiveCleanup(db, archivedObjects);
-      throw new HttpError(409, "An active Auto Hunt issue cannot be deleted");
+      throw new HttpError(409, "An active issue cannot be deleted");
     }
     const attachmentKeys = [...attachments, ...(evidenceImages ?? [])].map(
       (attachment) => attachment.object_key,
@@ -7193,7 +7193,7 @@ async function route(
     if (outcome === "active") {
       throw new HttpError(
         409,
-        "An active Auto Hunt issue cannot be transferred",
+        "An active issue cannot be transferred",
       );
     }
     if (outcome === "same_project") {

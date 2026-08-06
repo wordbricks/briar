@@ -993,7 +993,7 @@ export async function convertIdeaPlanToIssues(
             sourceKey,
             item.title,
             JSON.stringify(workflow),
-            "아이디어 문서에서 생성된 이슈가 Auto Hunt 처리를 기다리고 있습니다.",
+            "아이디어 문서에서 생성된 이슈가 처리를 기다리고 있습니다.",
             item.priority,
             settings.github_repository ?? project.name,
             item.description,

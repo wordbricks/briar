@@ -65,7 +65,7 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(messages.messages.first?.author.name, "Briar User")
         XCTAssertEqual(evidence.evidence.first?.status, .passed)
         XCTAssertEqual(evidence.evidence.first?.images?.first?.filename, "companion.png")
-        XCTAssertEqual(agents.agents.first?.name, "Auto Hunt agent")
+        XCTAssertEqual(agents.agents.first?.name, "Issue processing agent")
         XCTAssertEqual(sessions.sessions.first?.id, "session-fixture-1")
         XCTAssertEqual(resume.checkpointKey, "user-before-production_qa")
         XCTAssertEqual(resume.attempt, 2)

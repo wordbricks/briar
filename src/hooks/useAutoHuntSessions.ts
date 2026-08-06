@@ -562,7 +562,7 @@ export function useAutoHuntSessions(
     const selectedRunIds = new Set(input.runIds);
     const selectedRuns = runs.filter((run) => selectedRunIds.has(run.id));
     if (selectedRuns.length !== selectedRunIds.size) {
-      throw new Error("전송한 Auto Hunt 이슈를 세션에 연결하지 못했습니다.");
+      throw new Error("전송한 이슈를 처리 세션에 연결하지 못했습니다.");
     }
     const startedAt = input.startedAt ?? new Date().toISOString();
     const parent = input.parentSessionId

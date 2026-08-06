@@ -3266,11 +3266,11 @@ fn select_issue_worktree(
     match matches.as_slice() {
         [worktree] => Ok(worktree.path.clone()),
         [] => Err(
-            "이 이슈의 원래 Auto Hunt 워크트리를 찾지 못했습니다. 워크트리가 삭제되었는지 확인해 주세요."
+            "이 이슈를 처리하던 원래 워크트리를 찾지 못했습니다. 워크트리가 삭제되었는지 확인해 주세요."
                 .to_string(),
         ),
         _ => Err(
-            "이슈 run과 일치하는 Auto Hunt 워크트리가 여러 개라서 안전하게 선택할 수 없습니다."
+            "이슈 run과 일치하는 처리용 워크트리가 여러 개라서 안전하게 선택할 수 없습니다."
                 .to_string(),
         ),
     }
@@ -3291,14 +3291,14 @@ fn resolve_issue_worktree(
     )?;
     if !output.success() {
         return Err(format!(
-            "Auto Hunt 워크트리 목록을 읽지 못했습니다: {}",
+            "이슈 처리용 워크트리 목록을 읽지 못했습니다: {}",
             output.failure_message()
         ));
     }
     let selected = select_issue_worktree(&output.stdout, run_id, recorded_branch)?;
     let selected = runner
         .canonicalize(&selected)
-        .map_err(|error| format!("이슈의 Auto Hunt 워크트리를 열지 못했습니다: {error}"))?;
+        .map_err(|error| format!("이슈 처리용 워크트리를 열지 못했습니다: {error}"))?;
     let connected = runner.canonicalize(connected_workspace)?;
     if selected == connected {
         return Err("연결된 공용 저장소는 이슈 워크트리로 사용할 수 없습니다.".to_string());
@@ -3630,7 +3630,7 @@ fn update_project_workflow_at(
     let auto_hunt = project
         .auto_hunt
         .as_mut()
-        .ok_or_else(|| "이 프로젝트에 Auto Hunt 설정이 없습니다.".to_string())?;
+        .ok_or_else(|| "이 프로젝트에 이슈 처리 설정이 없습니다.".to_string())?;
     auto_hunt.workflow = Some(workflow.clone());
     write_cli_config(config_path, &config)?;
     Ok(workflow)
@@ -3654,7 +3654,7 @@ fn update_project_velen_org_at(
     let auto_hunt = project
         .auto_hunt
         .as_mut()
-        .ok_or_else(|| "이 프로젝트에 Auto Hunt 설정이 없습니다.".to_string())?;
+        .ok_or_else(|| "이 프로젝트에 이슈 처리 설정이 없습니다.".to_string())?;
     let org = org
         .map(|org| org.trim().to_string())
         .filter(|org| !org.is_empty());
@@ -5152,7 +5152,7 @@ fn claim_auto_hunt_run(
     let output = cli_environment.run_briar(runner, connected_workspace, arguments)?;
     if !output.success() {
         return Err(format!(
-            "로컬 런타임이 자동사냥 작업을 claim하지 못했습니다: {}",
+            "로컬 런타임이 이슈 처리 작업을 claim하지 못했습니다: {}",
             output.failure_message()
         ));
     }
@@ -5177,7 +5177,7 @@ async fn retry_project_auto_hunt_run(
         || reason.trim().is_empty()
         || reason.len() > 2_000
     {
-        return Err("Auto Hunt 재시도 요청이 올바르지 않습니다.".to_string());
+        return Err("이슈 처리 재시도 요청이 올바르지 않습니다.".to_string());
     }
     let config_path = cli_config_path(&app)?;
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
@@ -5212,7 +5212,7 @@ async fn retry_project_auto_hunt_run(
         )?;
         if !output.success() {
             return Err(format!(
-                "Briar CLI가 Auto Hunt 재시도를 시작하지 못했습니다: {}",
+                "Briar CLI가 이슈 처리 재시도를 시작하지 못했습니다: {}",
                 output.failure_message()
             ));
         }
@@ -5276,7 +5276,7 @@ fn maintain_auto_hunt_worktree(
         Ok(())
     } else {
         Err(format!(
-            "Auto Hunt 워크트리 유지보수에 실패했습니다: {}",
+            "이슈 처리 워크트리 유지보수에 실패했습니다: {}",
             output.failure_message()
         ))
     }
@@ -5444,7 +5444,7 @@ fn validate_project_auto_hunt_request(
     }
     if request.issues.len() > agent::MAX_AUTO_HUNT_ISSUES {
         return Err(format!(
-            "한 번의 자동사냥 세션에서는 최대 {}개의 이슈만 처리할 수 있습니다.",
+            "한 번의 이슈 처리 세션에서는 최대 {}개의 이슈만 처리할 수 있습니다.",
             agent::MAX_AUTO_HUNT_ISSUES
         ));
     }
@@ -5453,7 +5453,7 @@ fn validate_project_auto_hunt_request(
         .iter()
         .any(|issue| auto_hunt_run_token(&issue.run_id).is_err())
     {
-        return Err("자동사냥 대상 이슈 ID가 올바르지 않습니다.".to_string());
+        return Err("이슈 처리 대상 이슈 ID가 올바르지 않습니다.".to_string());
     }
     if request.agent_id.trim().is_empty()
         || request.agent_id.len() > 128
@@ -5468,7 +5468,7 @@ fn validate_project_auto_hunt_request(
         || request.skill.trim().is_empty()
         || request.skill.len() > 10_000
     {
-        return Err("자동사냥 에이전트 설정이 올바르지 않습니다.".to_string());
+        return Err("이슈 처리 에이전트 설정이 올바르지 않습니다.".to_string());
     }
     if request
         .coordinator_conversation_id
@@ -5557,7 +5557,7 @@ async fn start_project_auto_hunt(
         || api_url.chars().any(char::is_whitespace)
         || !(api_url.starts_with("http://") || api_url.starts_with("https://"))
     {
-        return Err("자동사냥 API URL이 올바르지 않습니다.".to_string());
+        return Err("이슈 처리 API URL이 올바르지 않습니다.".to_string());
     }
     let config_path = cli_config_path(&app)?;
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
@@ -5813,7 +5813,7 @@ async fn start_project_auto_hunt(
                 let approved = approval_app
                     .dialog()
                     .message(approval_request_message(provider, method, params))
-                    .title(format!("{provider_name} 자동사냥 승인"))
+                    .title(format!("{provider_name} 이슈 처리 승인"))
                     .buttons(MessageDialogButtons::OkCancelCustom(
                         "승인".to_string(),
                         "거절".to_string(),
@@ -6103,7 +6103,7 @@ async fn start_project_auto_hunt(
             }
         }
         Err(join_error) => {
-            let error = format!("자동사냥 runtime 작업이 비정상 종료되었습니다: {join_error}");
+            let error = format!("이슈 처리 런타임 작업이 비정상 종료되었습니다: {join_error}");
             let persisted = completion_store.finish(
                 &dispatch_group_id,
                 auto_hunt_dispatch::AutoHuntDispatchStatus::Failed,
@@ -6127,7 +6127,7 @@ fn validate_auto_hunt_session_id(session_id: &str) -> Result<(), String> {
             .bytes()
             .all(|character| character.is_ascii_alphanumeric() || matches!(character, b'-' | b'_'))
     {
-        return Err("자동사냥 세션 ID가 올바르지 않습니다.".to_string());
+        return Err("이슈 처리 세션 ID가 올바르지 않습니다.".to_string());
     }
     Ok(())
 }
@@ -6150,14 +6150,14 @@ fn create_auto_hunt_event_sink(
     let path = auto_hunt_event_path(app, session_id)?;
     let directory = path
         .parent()
-        .ok_or_else(|| "자동사냥 이벤트 저장 경로가 올바르지 않습니다.".to_string())?;
+        .ok_or_else(|| "이슈 처리 이벤트 저장 경로가 올바르지 않습니다.".to_string())?;
     fs::create_dir_all(directory)
-        .map_err(|error| format!("자동사냥 이벤트 저장 폴더를 만들지 못했습니다: {error}"))?;
+        .map_err(|error| format!("이슈 처리 이벤트 저장 폴더를 만들지 못했습니다: {error}"))?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         fs::set_permissions(directory, fs::Permissions::from_mode(0o700)).map_err(|error| {
-            format!("자동사냥 이벤트 저장 폴더 권한을 지정하지 못했습니다: {error}")
+            format!("이슈 처리 이벤트 저장 폴더 권한을 지정하지 못했습니다: {error}")
         })?;
     }
     let (file, last_sequence) = open_auto_hunt_event_log(&path)?;
@@ -6174,15 +6174,15 @@ fn create_auto_hunt_event_sink(
             provider_event,
         );
         let serialized = serde_json::to_vec(&record)
-            .map_err(|error| format!("자동사냥 이벤트를 직렬화하지 못했습니다: {error}"))?;
+            .map_err(|error| format!("이슈 처리 이벤트를 직렬화하지 못했습니다: {error}"))?;
         {
             let mut file = file
                 .lock()
-                .map_err(|_| "자동사냥 이벤트 로그 잠금이 손상되었습니다.".to_string())?;
+                .map_err(|_| "이슈 처리 이벤트 로그 잠금이 손상되었습니다.".to_string())?;
             file.write_all(&serialized)
                 .and_then(|_| file.write_all(b"\n"))
                 .and_then(|_| file.flush())
-                .map_err(|error| format!("자동사냥 이벤트를 저장하지 못했습니다: {error}"))?;
+                .map_err(|error| format!("이슈 처리 이벤트를 저장하지 못했습니다: {error}"))?;
         }
         let _ = event_app.emit(AUTO_HUNT_APP_SERVER_EVENT, &record);
         Ok(())
@@ -6199,10 +6199,10 @@ fn open_auto_hunt_event_log(path: &Path) -> Result<(fs::File, u64), String> {
     }
     let mut file = options
         .open(path)
-        .map_err(|error| format!("자동사냥 이벤트 로그를 열지 못했습니다: {error}"))?;
+        .map_err(|error| format!("이슈 처리 이벤트 로그를 열지 못했습니다: {error}"))?;
     let mut contents = String::new();
     file.read_to_string(&mut contents)
-        .map_err(|error| format!("자동사냥 이벤트 로그를 읽지 못했습니다: {error}"))?;
+        .map_err(|error| format!("이슈 처리 이벤트 로그를 읽지 못했습니다: {error}"))?;
     let last_sequence = parse_auto_hunt_event_records(&contents)?
         .into_iter()
         .map(|record| record.sequence)
@@ -6221,7 +6221,7 @@ fn parse_auto_hunt_event_records(
         .map(|(index, line)| {
             serde_json::from_str(line).map_err(|error| {
                 format!(
-                    "자동사냥 이벤트 로그의 {}번째 줄이 손상되었습니다: {error}",
+                    "이슈 처리 이벤트 로그의 {}번째 줄이 손상되었습니다: {error}",
                     index + 1
                 )
             })
@@ -6240,7 +6240,7 @@ async fn load_auto_hunt_app_server_events(
             Ok(contents) => contents,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
             Err(error) => {
-                return Err(format!("자동사냥 이벤트 로그를 읽지 못했습니다: {error}"));
+                return Err(format!("이슈 처리 이벤트 로그를 읽지 못했습니다: {error}"));
             }
         };
         parse_auto_hunt_event_records(&contents)

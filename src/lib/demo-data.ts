@@ -140,7 +140,7 @@ const runSeeds: DemoRunSeed[] = [
         id: "event-1",
         status: "queued",
         workflowStage: null,
-        detail: "자동사냥 작업 등록",
+        detail: "이슈 처리 작업 등록",
         actor: "briar-cli",
         occurredAt: ago(42),
       }),

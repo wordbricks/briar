@@ -25,7 +25,7 @@
   "bundle": {
     "active": true,
     "resources": [],
-    "shortDescription": "Monitor Briar Auto Hunt from Android",
-    "longDescription": "Briar Companion monitors Auto Hunt work and queues new issues for a connected Briar desktop agent."
+    "shortDescription": "Monitor Briar issue processing from Android",
+    "longDescription": "Briar Companion monitors issue processing and queues new issues for a connected Briar desktop agent."
   }
 }
