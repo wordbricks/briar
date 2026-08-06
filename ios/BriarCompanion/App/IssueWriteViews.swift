@@ -10,6 +10,7 @@ struct CreateIssueSheet: View {
     @State private var selectedPhotoItems: [PhotosPickerItem] = []
     @State private var isLoadingPhotos = false
     @State private var errorMessage: String?
+    @State private var didSubmitSuccessfully = false
 
     @ObservedObject var mutations: IssueMutationStore
     let members: [OrganizationMember]
@@ -133,7 +134,10 @@ struct CreateIssueSheet: View {
                     Button {
                         Task { await submit() }
                     } label: {
-                        if mutations.isActive("create") {
+                        if didSubmitSuccessfully {
+                            Image(systemName: "checkmark")
+                                .bold()
+                        } else if mutations.isActive("create") {
                             ProgressView()
                         } else {
                             Text("등록")
@@ -141,10 +145,11 @@ struct CreateIssueSheet: View {
                     }
                     .disabled(
                         draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-                            mutations.isActive("create")
+                            mutations.isActive("create") ||
+                            didSubmitSuccessfully
                     )
                     .accessibilityLabel(
-                        mutations.isActive("create") ? "등록 중" : "등록"
+                        didSubmitSuccessfully ? "등록 완료" : (mutations.isActive("create") ? "등록 중" : "등록")
                     )
                     .accessibilityIdentifier("create-issue-submit")
                 }
@@ -219,6 +224,7 @@ struct CreateIssueSheet: View {
         do {
             _ = try await mutations.createIssue(draft: draft, attachments: attachments)
             persistence.clear()
+            didSubmitSuccessfully = true
             await refresh()
             dismiss()
         } catch {
