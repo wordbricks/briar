@@ -85,6 +85,7 @@ private struct UITestCompanionFlow: View {
                 agents: agents,
                 inbox: inbox,
                 notifications: notifications,
+                channels: ChannelsStore(api: api),
                 projects: [project, alternateProject],
                 project: selectedProject,
                 snapshot: snapshot,

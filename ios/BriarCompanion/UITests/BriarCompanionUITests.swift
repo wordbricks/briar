@@ -6,7 +6,7 @@ final class BriarCompanionUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    func testLoginProjectSelectionSearchAndDetailFlow() {
+    func testLoginProjectSelectionAndDetailFlow() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing"]
         app.launch()
@@ -29,15 +29,11 @@ final class BriarCompanionUITests: XCTestCase {
         alternateProject.tap()
         XCTAssertTrue(app.buttons["project-menu"].label.contains("Briar Mobile"))
 
-        XCTAssertTrue(app.tabBars.buttons["Search"].waitForExistence(timeout: 5))
-        app.tabBars.buttons["Search"].tap()
-        let searchField = app.searchFields["작업 검색"]
-        XCTAssertTrue(searchField.waitForExistence(timeout: 5))
-        searchField.tap()
-        searchField.typeText("Companion")
-
+        // Search was replaced by Home; reach a run from the Tasks list instead.
+        XCTAssertTrue(app.tabBars.buttons["홈"].waitForExistence(timeout: 5))
+        app.tabBars.buttons["Tasks"].tap()
         let result = app.descendants(matching: .any)[
-            "search-result-33333333-3333-4333-8333-333333333333"
+            "task-row-33333333-3333-4333-8333-333333333333"
         ]
         XCTAssertTrue(result.waitForExistence(timeout: 5))
         result.tap()
@@ -89,17 +85,12 @@ final class BriarCompanionUITests: XCTestCase {
         captureScreenshot(named: "companion-completed-result-tab")
     }
 
-    func testDependencyPickerSearchesAndAddsPrerequisite() {
+    func testDependencyPickerAddsPrerequisite() {
         let app = launchInsideCompanion()
 
-        app.tabBars.buttons["Search"].tap()
-        let searchField = app.searchFields["작업 검색"]
-        XCTAssertTrue(searchField.waitForExistence(timeout: 5))
-        searchField.tap()
-        searchField.typeText("의존성 연결 대상")
-
+        app.tabBars.buttons["Tasks"].tap()
         let result = app.descendants(matching: .any)[
-            "search-result-99999999-9999-4999-8999-999999999999"
+            "task-row-99999999-9999-4999-8999-999999999999"
         ]
         XCTAssertTrue(result.waitForExistence(timeout: 5))
         result.tap()

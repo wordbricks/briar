@@ -42,6 +42,24 @@ enum MobileAPIContract {
         static func ideaConvert(projectID: UUID, ideaID: UUID) -> String { "\(idea(projectID: projectID, ideaID: ideaID))/convert" }
         static func ideaJobRetry(projectID: UUID, ideaID: UUID, jobID: UUID) -> String { "\(idea(projectID: projectID, ideaID: ideaID))/jobs/\(jobID.uuidString.lowercased())/retry" }
 
+        static func channels(organizationID: UUID) -> String {
+            "/organizations/\(organizationID.uuidString.lowercased())/channels"
+        }
+
+        static func channel(organizationID: UUID, channelID: UUID) -> String {
+            "\(channels(organizationID: organizationID))/\(channelID.uuidString.lowercased())"
+        }
+
+        static func channelMessages(
+            organizationID: UUID,
+            channelID: UUID,
+            parentMessageID: UUID? = nil
+        ) -> String {
+            let base = "\(channel(organizationID: organizationID, channelID: channelID))/messages"
+            guard let parentMessageID else { return base }
+            return "\(base)?parentMessageId=\(parentMessageID.uuidString.lowercased())"
+        }
+
         static func runEvents(projectID: UUID, runID: UUID) -> String {
             "/projects/\(projectID.uuidString.lowercased())/runs/\(runID.uuidString.lowercased())/events"
         }

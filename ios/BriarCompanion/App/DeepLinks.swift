@@ -87,9 +87,9 @@ enum BriarShareLinks {
 @MainActor
 final class CompanionNavigationModel: ObservableObject {
     enum Tab: Hashable {
+        case home
         case tasks
         case agents
-        case search
         case inbox
         case ideas
     }
