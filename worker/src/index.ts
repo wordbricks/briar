@@ -393,6 +393,7 @@ import {
   channelReplyClaimInputSchema,
   channelReplyCompleteInputSchema,
   channelReplyLeaseInputSchema,
+  channelSlugFromName,
   channelUpdateInputSchema,
   handleFromName,
   organizationAgentInputSchema,
@@ -5369,8 +5370,8 @@ async function route(
     const role = await getOrganizationRole(db, organizationId, session.user.id);
     if (!role) throw new HttpError(404, "Organization not found");
     const input = channelInputSchema.parse(await readJson(request));
-    const slug = input.slug ?? handleFromName(input.name);
-    if (!slug) throw new HttpError(400, "Channel needs a slug");
+    const channelId = crypto.randomUUID();
+    const slug = input.slug ?? channelSlugFromName(input.name, channelId);
     if (input.defaultProjectId) {
       const project = await getProject(
         db,
@@ -5382,7 +5383,7 @@ async function route(
     let channel;
     try {
       channel = await createChannel(db, {
-        id: crypto.randomUUID(),
+        id: channelId,
         organizationId,
         slug,
         name: input.name,

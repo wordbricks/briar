@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { handleFromName } from "./channels-contract";
+import { channelSlugFromName, handleFromName } from "./channels-contract";
 import { mentionAtCaret, retainedMentions } from "./channel-mentions";
 
 const target = (handle: string) => ({
@@ -76,5 +76,13 @@ describe("handleFromName", () => {
 
   it("trims separators produced by punctuation", () => {
     expect(handleFromName("  Bumble!! ")).toBe("bumble");
+  });
+});
+
+describe("channelSlugFromName", () => {
+  it("generates a stable fallback slug for a non-Latin channel name", () => {
+    expect(
+      channelSlugFromName("제품 피드백", "ABCDEF00-1234-4000-8000-000000000001"),
+    ).toBe("channel-abcdef001234");
   });
 });

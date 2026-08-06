@@ -5,16 +5,22 @@ import {
   LoaderCircle,
   Lock,
   MessageSquare,
-  Plus,
   Send,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
   acceptChannelProposal,
-  createChannel,
   listChannelMessages,
   listChannels,
   loadChannel,
@@ -41,6 +47,10 @@ type ChannelsProps = {
   organizationId: string;
   token: string;
   currentUserId: string | null;
+  channels: ChannelSummary[];
+  activeChannelId: string | null;
+  onChannelSelect: (channelId: string | null) => void;
+  onChannelsChange: Dispatch<SetStateAction<ChannelSummary[]>>;
   onIssueCreated?: (runId: string) => void;
 };
 
@@ -63,10 +73,12 @@ export function Channels({
   organizationId,
   token,
   currentUserId,
+  channels,
+  activeChannelId,
+  onChannelSelect,
+  onChannelsChange,
   onIssueCreated,
 }: ChannelsProps) {
-  const [channels, setChannels] = useState<ChannelSummary[]>([]);
-  const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
   const [members, setMembers] = useState<ChannelMember[]>([]);
   const [agents, setAgents] = useState<ChannelAgentSummary[]>([]);
   const [messages, setMessages] = useState<ChannelMessage[]>([]);
@@ -76,6 +88,8 @@ export function Channels({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const cursor = useRef(0);
+  const activeChannelIdRef = useRef(activeChannelId);
+  activeChannelIdRef.current = activeChannelId;
 
   const activeChannel = useMemo(
     () => channels.find((channel) => channel.id === activeChannelId) ?? null,
@@ -89,8 +103,10 @@ export function Channels({
         const result = await listChannels(token, organizationId);
         if (cancelled) return;
         cursor.current = result.cursor;
-        setChannels(result.channels);
-        setActiveChannelId((current) => current ?? result.channels[0]?.id ?? null);
+        onChannelsChange(result.channels);
+        if (!activeChannelIdRef.current) {
+          onChannelSelect(result.channels[0]?.id ?? null);
+        }
       } catch (cause) {
         if (!cancelled) setError(errorMessage(cause));
       }
@@ -98,7 +114,7 @@ export function Channels({
     return () => {
       cancelled = true;
     };
-  }, [organizationId, token]);
+  }, [onChannelSelect, onChannelsChange, organizationId, token]);
 
   useEffect(() => {
     if (!activeChannelId) return;
@@ -132,7 +148,7 @@ export function Channels({
         if (stopped) return;
         cursor.current = delta.cursor;
         if (delta.channels.length || delta.removedChannelIds.length) {
-          setChannels((current) => {
+          onChannelsChange((current) => {
             const byId = new Map(current.map((channel) => [channel.id, channel]));
             for (const channel of delta.channels) byId.set(channel.id, channel);
             for (const id of delta.removedChannelIds) byId.delete(id);
@@ -183,7 +199,17 @@ export function Channels({
       stopped = true;
       window.clearInterval(timer);
     };
-  }, [activeChannelId, organizationId, token]);
+  }, [activeChannelId, onChannelsChange, organizationId, token]);
+
+  useEffect(() => {
+    if (
+      activeChannelId &&
+      channels.length > 0 &&
+      !channels.some((channel) => channel.id === activeChannelId)
+    ) {
+      onChannelSelect(channels[0]?.id ?? null);
+    }
+  }, [activeChannelId, channels, onChannelSelect]);
 
   const openThread = useCallback(
     async (parentId: string) => {
@@ -263,54 +289,12 @@ export function Channels({
     ],
   );
 
-  const addChannel = useCallback(async () => {
-    const name = window.prompt("채널 이름");
-    if (!name?.trim()) return;
-    try {
-      const result = await createChannel(token, organizationId, {
-        name: name.trim(),
-      });
-      setChannels((current) => [...current, result.channel]);
-      setActiveChannelId(result.channel.id);
-    } catch (cause) {
-      setError(errorMessage(cause));
-    }
-  }, [organizationId, token]);
-
   const pendingReplies = replies.filter(
     (reply) => reply.status === "queued" || reply.status === "running",
   );
 
   return (
     <div className="channels">
-      <aside className="channel-rail">
-        <header>
-          <span>채널</span>
-          <button aria-label="채널 만들기" onClick={() => void addChannel()}>
-            <Plus size={15} />
-          </button>
-        </header>
-        <nav>
-          {channels.map((channel) => (
-            <button
-              className={channel.id === activeChannelId ? "active" : ""}
-              key={channel.id}
-              onClick={() => setActiveChannelId(channel.id)}
-            >
-              {channel.visibility === "private" ? (
-                <Lock size={14} />
-              ) : (
-                <Hash size={14} />
-              )}
-              {channel.name}
-            </button>
-          ))}
-          {channels.length === 0 ? (
-            <p className="muted">아직 채널이 없습니다.</p>
-          ) : null}
-        </nav>
-      </aside>
-
       <section className="channel-main">
         {activeChannel ? (
           <>
