@@ -50,7 +50,7 @@ export function WorkerDispatchDialog({
     provider: AgentProvider;
     model: string | null;
     effort: ModelEffort | null;
-    workerId: string;
+    workerId: string | null;
   }) => void;
   open: boolean;
   policy?: ProjectExecutionWorkerPolicy;
@@ -146,19 +146,19 @@ export function WorkerDispatchDialog({
   }, [healthyProviders, open, provider]);
 
   useEffect(() => {
+    if (workerId === "") return;
     const selectedWorker = eligibleWorkers.find(
       (worker) => worker.id === workerId && worker.readiness === "available",
     );
     if (selectedWorker) return;
-    setWorkerId(
-      eligibleWorkers.find((worker) => worker.readiness === "available")?.id ??
-        "",
-    );
+    setWorkerId("");
   }, [eligibleWorkers, workerId]);
 
-  const canDispatch = eligibleWorkers.some(
-    (worker) => worker.id === workerId && worker.readiness === "available",
-  );
+  const canDispatch = workerId === ""
+    ? eligibleWorkers.length > 0
+    : eligibleWorkers.some(
+        (worker) => worker.id === workerId && worker.readiness === "available",
+      );
   const isReassign = Boolean(run?.dispatchedAt || run?.workerId);
 
   return (
@@ -236,11 +236,17 @@ export function WorkerDispatchDialog({
             <NativeSelect
               label={t("worker.executionEnvironment")}
               onValueChange={setWorkerId}
-              options={eligibleWorkers.map((worker) => ({
-                disabled: worker.readiness !== "available",
-                label: `${worker.icon?.type === "emoji" ? `${worker.icon.value} ` : ""}${worker.label} · ${t(`worker.readiness.${worker.readiness}` as MessageKey)}`,
-                value: worker.id,
-              }))}
+              options={[
+                {
+                  label: t("worker.anyAvailable"),
+                  value: "",
+                },
+                ...eligibleWorkers.map((worker) => ({
+                  disabled: worker.readiness !== "available",
+                  label: `${worker.icon?.type === "emoji" ? `${worker.icon.value} ` : ""}${worker.label} · ${t(`worker.readiness.${worker.readiness}` as MessageKey)}`,
+                  value: worker.id,
+                })),
+              ]}
               value={workerId}
             />
           </label>
@@ -249,25 +255,20 @@ export function WorkerDispatchDialog({
             {eligibleWorkers.length === 0 ? (
               <p><CircleAlert size={15} />{t("worker.noneForProvider")}</p>
             ) : (
-              eligibleWorkers.map((worker) => (
+              <>
                 <button
-                  aria-pressed={workerId === worker.id}
+                  aria-pressed={workerId === ""}
                   className="worker-readiness-row"
-                  disabled={worker.readiness !== "available"}
-                  key={worker.id}
-                  onClick={() => setWorkerId(worker.id)}
+                  onClick={() => setWorkerId("")}
                   type="button"
                 >
-                  <span className={`worker-readiness-dot ${worker.readiness}`} />
-                  <WorkerIcon icon={worker.icon} size={30} />
+                  <span className="worker-readiness-dot any" />
+                  <span className="worker-readiness-any-icon">
+                    <Waypoints size={30} />
+                  </span>
                   <span>
-                    <strong>{worker.label}</strong>
-                    <small>
-                      {t(`worker.readiness.${worker.readiness}` as MessageKey)}
-                      {worker.readinessDetail
-                        ? ` · ${worker.readinessDetail}`
-                        : ""}
-                    </small>
+                    <strong>{t("worker.anyAvailable")}</strong>
+                    <small>{t("worker.anyAvailableDetail")}</small>
                   </span>
                   <Check
                     aria-hidden="true"
@@ -275,7 +276,34 @@ export function WorkerDispatchDialog({
                     size={16}
                   />
                 </button>
-              ))
+                {eligibleWorkers.map((worker) => (
+                  <button
+                    aria-pressed={workerId === worker.id}
+                    className="worker-readiness-row"
+                    disabled={worker.readiness !== "available"}
+                    key={worker.id}
+                    onClick={() => setWorkerId(worker.id)}
+                    type="button"
+                  >
+                    <span className={`worker-readiness-dot ${worker.readiness}`} />
+                    <WorkerIcon icon={worker.icon} size={30} />
+                    <span>
+                      <strong>{worker.label}</strong>
+                      <small>
+                        {t(`worker.readiness.${worker.readiness}` as MessageKey)}
+                        {worker.readinessDetail
+                          ? ` · ${worker.readinessDetail}`
+                          : ""}
+                      </small>
+                    </span>
+                    <Check
+                      aria-hidden="true"
+                      className="worker-readiness-check"
+                      size={16}
+                    />
+                  </button>
+                ))}
+              </>
             )}
           </div>
           {error && <p className="run-status-error"><CircleAlert size={13} />{error}</p>}
@@ -296,7 +324,7 @@ export function WorkerDispatchDialog({
                 provider,
                 model: model || null,
                 effort: (effort || null) as ModelEffort | null,
-                workerId,
+                workerId: workerId || null,
               })
             }
           >

@@ -41,6 +41,8 @@ final class MobileAPIContractTests: XCTestCase {
         let agents: ProjectAgentsResponse = try decodeResponse("listProjectAgents")
         let sessions: ProjectAgentSessionsResponse = try decodeResponse("listProjectAgentSessions")
         let resume: ResumeRunResponse = try decodeResponse("resumeRun")
+        let dispatch: DispatchRunResponse = try decodeResponse("dispatchRun")
+        let reassign: DispatchRunResponse = try decodeResponse("reassignRun")
         let accepted: AcceptIssueReworkProposalResponse = try decodeResponse(
             "acceptIssueReworkProposal"
         )
@@ -73,6 +75,11 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(resume.checkpointKey, "user-before-production_qa")
         XCTAssertEqual(resume.attempt, 2)
         XCTAssertEqual(resume.revision, 3)
+        XCTAssertEqual(dispatch.dispatchMode, "any")
+        XCTAssertNil(dispatch.requestedWorkerId)
+        XCTAssertEqual(dispatch.outcome, "dispatched")
+        XCTAssertEqual(reassign.dispatchMode, "specific")
+        XCTAssertEqual(reassign.requestedWorkerId, "worker-1")
         XCTAssertEqual(accepted.proposal.status, .accepted)
         XCTAssertEqual(accepted.revision, 2)
         XCTAssertEqual(acceptedAction.proposal.type, .update)
