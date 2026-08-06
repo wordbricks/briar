@@ -181,7 +181,8 @@ summary.
 briar project doctor                   # worktrees.enabled/root/branchPrefix/baseRef
 briar worktree list                    # every worktree under this project's root
 briar worktree show                    # the active claim's worktree
-briar worktree maintain [--path <dir>] # compact outputs; GC only if merged + clean
+briar worktree maintain [--path <dir>] # compact outputs; completed+24h GC when clean
+briar worktree maintain --all          # sweep recorded completed worktrees
 briar worktree remove [--path <dir>] [--force]
 ```
 
@@ -235,15 +236,18 @@ Worker's former current directory. Maintenance has two ordered phases:
    on Briar's allowlist **and** `git check-ignore` confirms that exact path is
    ignored. Tracked source directories and ignored secrets such as `.env` are
    not removed.
-2. Garbage-collect the worktree only when its branch is already an ancestor of
-   the configured base ref and the remaining checkout is clean. An unmerged
-   branch, source changes, an unreadable Git status, or a removal error keeps
-   the worktree in place.
+2. Record completed worktrees for a 24-hour inspection and fast-rework window.
+   The desktop host and registered Worker sweep those records hourly and remove
+   the checkout when it is clean. Merge state does not gate checkout removal:
+   a branch with commits absent from the base ref is preserved separately, and
+   a later retry or rework recreates its worktree from that branch. Source
+   changes, an unreadable Git status, or a removal error keeps the checkout.
 
 Maintenance is best-effort and never changes the run outcome. Blocked and
 failed runs therefore keep their source checkout for inspection, while their
 reproducible dependency and build output can be restored on retry. The same
-logic is available manually through `briar worktree maintain`.
+logic is available manually through `briar worktree maintain`; `--all` sweeps
+all recorded completions for the current project.
 
 ## Failure modes
 
@@ -252,5 +256,5 @@ logic is available manually through `briar worktree maintain`.
 | `workspaceError` in the claim payload, no workspace | fetch failed with no local base ref, or no base ref exists | record `blocked`; check the remote and `doctor`'s `worktrees.baseRef` |
 | `worktrees.baseRef` is `null` | no `origin/HEAD` and no `main`/`master` | `git remote set-head origin -a`, or pass `--base-branch` |
 | Removal refuses | uncommitted or untracked files | commit, discard, or pass `--force` |
-| `preservedBranch` in the removal result | the branch holds commits the base ref does not | merge, push, or delete it deliberately |
+| `preservedBranch` in the removal result | the removed checkout's branch holds commits the base ref does not | keep it for rework, push it, or delete it deliberately |
 | Worktree missing from `worktree list` | directory deleted outside git | rerun removal; bookkeeping is pruned automatically |

@@ -428,18 +428,20 @@ Worktree commands:
 briar worktree show
 briar worktree list
 briar worktree maintain [--path '<worktree>']
+briar worktree maintain --all
 briar worktree remove [--path '<worktree>'] [--force]
 ```
 
-Leave blocked or failed worktrees in place for inspection. After completion, remove a
-worktree only when the work is merged or intentionally abandoned. Removal refuses dirty
-worktrees and preserves a branch whose commits are not in the base ref.
+Leave blocked or failed worktrees in place for inspection. Completed worktrees have a
+24-hour inspection and fast-rework window, then Briar removes the checkout when it is clean.
+Merge state does not gate checkout removal. Any branch whose commits are not in the base ref
+is preserved, and a later retry or rework recreates the worktree from that branch.
 
 After a Worker exits, the Briar host automatically runs the same maintenance operation.
-It removes only allowlisted reproducible directories that Git confirms are ignored, then
-deletes the worktree only when its branch is merged into the base ref and the remaining
-checkout is clean. Unmerged commits and source changes are retained; maintenance failure
-does not change the run outcome.
+It immediately removes only allowlisted reproducible directories that Git confirms are
+ignored. The desktop host and registered Worker then sweep recorded completions hourly.
+Uncommitted or untracked source changes keep the checkout in place; maintenance failure does
+not change the run outcome.
 
 ## Handoff
 

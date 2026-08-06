@@ -11,10 +11,21 @@
  * runs can recover without trusting stale bookkeeping.
  */
 
-import { copyFile, cp, lstat, mkdir, readFile, readdir, rm, stat } from "node:fs/promises";
+import {
+  copyFile,
+  cp,
+  lstat,
+  mkdir,
+  readFile,
+  readdir,
+  rename,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { realpathSync } from "node:fs";
 import type { Dirent } from "node:fs";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 /** Project-level list of gitignored paths to copy into each new worktree. */
@@ -48,6 +59,75 @@ export const RECLAIMABLE_ARTIFACT_DIRECTORY_NAMES = new Set([
   "node_modules",
   "target",
 ]);
+
+/** Keep completed worktrees available briefly for inspection and fast rework. */
+export const COMPLETED_WORKTREE_RETENTION_MS = 24 * 60 * 60 * 1_000;
+const COMPLETED_WORKTREE_REGISTRY_DIRECTORY = ".briar-completed-worktrees";
+
+export type CompletedWorktreeRecord = {
+  runId: string;
+  path: string;
+  branch: string;
+  completedAt: string;
+};
+
+function completedWorktreeRecordPath(root: string, runId: string): string {
+  if (!/^[0-9a-f-]{36}$/iu.test(runId)) {
+    throw new Error("완료된 워크트리의 run ID가 올바르지 않습니다.");
+  }
+  return join(resolve(root), COMPLETED_WORKTREE_REGISTRY_DIRECTORY, `${runId}.json`);
+}
+
+/** Persist cleanup eligibility outside the disposable worktree itself. */
+export async function recordCompletedWorktree(
+  root: string,
+  record: CompletedWorktreeRecord,
+): Promise<void> {
+  assertPathWithinRoot(record.path, root);
+  if (!Number.isFinite(Date.parse(record.completedAt))) {
+    throw new Error("완료된 워크트리의 완료 시각이 올바르지 않습니다.");
+  }
+  const path = completedWorktreeRecordPath(root, record.runId);
+  await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+  const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`;
+  await writeFile(temporary, `${JSON.stringify(record)}\n`, { mode: 0o600 });
+  await rename(temporary, path);
+}
+
+export async function listCompletedWorktrees(root: string): Promise<CompletedWorktreeRecord[]> {
+  const directory = join(resolve(root), COMPLETED_WORKTREE_REGISTRY_DIRECTORY);
+  let entries: Dirent[];
+  try {
+    entries = await readdir(directory, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const records: CompletedWorktreeRecord[] = [];
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
+    try {
+      const candidate = JSON.parse(await readFile(join(directory, entry.name), "utf8"));
+      if (
+        candidate &&
+        typeof candidate.runId === "string" &&
+        typeof candidate.path === "string" &&
+        typeof candidate.branch === "string" &&
+        typeof candidate.completedAt === "string" &&
+        Number.isFinite(Date.parse(candidate.completedAt)) &&
+        isPathWithinRoot(candidate.path, root)
+      ) {
+        records.push(candidate as CompletedWorktreeRecord);
+      }
+    } catch {
+      // A malformed record must not prevent cleanup of the remaining runs.
+    }
+  }
+  return records.sort((left, right) => left.completedAt.localeCompare(right.completedAt));
+}
+
+export async function removeCompletedWorktreeRecord(root: string, runId: string): Promise<void> {
+  await rm(completedWorktreeRecordPath(root, runId), { force: true });
+}
 
 /**
  * Base-ref probe order. Remote-tracking refs come first so a new worktree is
@@ -507,12 +587,37 @@ export async function allocateIssueWorktree(
     }
 
     if (await pathExists(worktreePath)) continue;
-    const branchTaken =
-      refExistsIn(git, repositoryPath, `refs/heads/${branch}`) ||
-      remotes.some((remote) =>
-        refExistsIn(git, repositoryPath, `refs/remotes/${remote}/${branch}`),
+    const localBranchRef = `refs/heads/${branch}`;
+    const localBranchExists = refExistsIn(git, repositoryPath, localBranchRef);
+    if (localBranchExists) {
+      await mkdir(root, { recursive: true, mode: 0o700 });
+      gitOrThrow(
+        git,
+        ["worktree", "add", "--no-track", worktreePath, localBranchRef],
+        {
+          cwd: repositoryPath,
+          timeoutMs: WORKTREE_ADD_TIMEOUT_MS,
+          message: "보존된 작업 브랜치에서 워크트리를 다시 만들지 못했습니다.",
+        },
       );
-    if (branchTaken) continue;
+      return {
+        path: worktreePath,
+        branch,
+        baseRef,
+        baseRefResolved,
+        baseSha: gitOrThrow(git, ["rev-parse", "HEAD"], {
+          cwd: worktreePath,
+          message: "복원된 워크트리의 HEAD를 읽지 못했습니다.",
+        }),
+        reused: true,
+        includedPaths: await copyWorktreeIncludes(repositoryPath, worktreePath),
+        ...(warning ? { warning } : {}),
+      };
+    }
+    const remoteBranchExists = remotes.some((remote) =>
+      refExistsIn(git, repositoryPath, `refs/remotes/${remote}/${branch}`),
+    );
+    if (remoteBranchExists) continue;
 
     await mkdir(root, { recursive: true, mode: 0o700 });
     gitOrThrow(
@@ -664,10 +769,15 @@ export type TerminalWorktreeMaintenanceResult = {
   compactedPaths: string[];
   failedPaths: string[];
   gc:
-    | { status: "removed"; branchDeleted: boolean }
+    | { status: "removed"; branchDeleted: boolean; preservedBranch?: string }
     | {
         status: "retained";
-        reason: "unmerged" | "dirty" | "git-status-error" | "removal-error";
+        reason:
+          | "not-completed"
+          | "retention-period"
+          | "dirty"
+          | "git-status-error"
+          | "removal-error";
         detail?: string;
       };
 };
@@ -759,26 +869,28 @@ export function issueWorktreeMergedIntoBase(
 }
 
 /**
- * Compact a terminal run's reproducible outputs, then garbage-collect its
- * worktree only when the branch is merged and the remaining checkout is clean.
- * Source changes and unmerged commits are always retained.
+ * Compact a terminal run's reproducible outputs immediately. A completed
+ * run's worktree becomes disposable after the retention period when the
+ * checkout is clean. The branch is handled separately: removeIssueWorktree
+ * preserves it whenever it still contains commits absent from the base ref.
  */
 export async function maintainTerminalIssueWorktree(
   git: GitRunner,
   repositoryPath: string,
   worktree: { path: string; branch: string },
-  options: { baseRef?: string } = {},
+  options: { baseRef?: string; completedAt?: string; nowMs?: number } = {},
 ): Promise<TerminalWorktreeMaintenanceResult> {
   const compacted = await compactWorktreeArtifacts(git, worktree.path);
+  if (!options.completedAt) {
+    return { ...compacted, gc: { status: "retained", reason: "not-completed" } };
+  }
+  const completedAtMs = Date.parse(options.completedAt);
+  const nowMs = options.nowMs ?? Date.now();
   if (
-    !issueWorktreeMergedIntoBase(
-      git,
-      repositoryPath,
-      worktree.branch,
-      options.baseRef,
-    )
+    !Number.isFinite(completedAtMs) ||
+    completedAtMs > nowMs - COMPLETED_WORKTREE_RETENTION_MS
   ) {
-    return { ...compacted, gc: { status: "retained", reason: "unmerged" } };
+    return { ...compacted, gc: { status: "retained", reason: "retention-period" } };
   }
 
   const status = git(["status", "--porcelain", "--untracked-files=all"], {
@@ -804,7 +916,11 @@ export async function maintainTerminalIssueWorktree(
     });
     return {
       ...compacted,
-      gc: { status: "removed", branchDeleted: removed.branchDeleted },
+      gc: {
+        status: "removed",
+        branchDeleted: removed.branchDeleted,
+        ...(removed.preservedBranch ? { preservedBranch: removed.preservedBranch } : {}),
+      },
     };
   } catch (error) {
     return {

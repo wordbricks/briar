@@ -64,10 +64,13 @@ import {
   allocateIssueWorktree,
   defaultWorktreeRoot,
   findExistingIssueWorktree,
+  listCompletedWorktrees,
   listIssueWorktrees,
   maintainTerminalIssueWorktree,
   projectWorktreeRoot,
+  recordCompletedWorktree,
   removeAnalysisWorktree,
+  removeCompletedWorktreeRecord,
   removeIssueWorktree,
   resolveBaseRef,
   samePath,
@@ -222,6 +225,8 @@ const projectConfigSchema = z
         leaseExpiresAt: z.string().datetime({ offset: true }),
         worktree: claimWorktreeSchema.optional(),
         finished: z.boolean().optional(),
+        terminalStatus: z.enum(["completed", "cancelled", "blocked", "failed"]).optional(),
+        finishedAt: z.string().datetime({ offset: true }).optional(),
       })
       .optional(),
   })
@@ -1094,6 +1099,10 @@ async function allocateClaimWorkspace(
       git: runGit,
       ...(value("--base-branch") ? { baseRef: required("--base-branch") } : {}),
     });
+    await removeCompletedWorktreeRecord(
+      projectWorktreeRoot(worktreeSettings(project).root, project.id),
+      issue.runId,
+    );
     config.projects = config.projects.map((candidate) =>
       candidate.id === project.id && candidate.activeClaim
         ? {
@@ -1184,13 +1193,101 @@ async function worktreeRemove() {
   console.log(JSON.stringify({ path: registered.path, branch: registered.branch, ...result }));
 }
 
+async function maintainRecordedCompletedWorktrees(project: ProjectConfig) {
+  const root = projectWorktreeRoot(worktreeSettings(project).root, project.id);
+  const registeredWorktrees = listIssueWorktrees(runGit, project.repositoryPath, root);
+  const results = [];
+  for (const record of await listCompletedWorktrees(root)) {
+    const registered = registeredWorktrees.find(
+      (worktree) =>
+        worktree.branch === record.branch && samePath(worktree.path, record.path),
+    );
+    if (!registered?.branch) {
+      await removeCompletedWorktreeRecord(root, record.runId);
+      results.push({
+        path: record.path,
+        branch: record.branch,
+        gc: { status: "removed", branchDeleted: false, alreadyAbsent: true },
+      });
+      continue;
+    }
+    const result = await maintainTerminalIssueWorktree(
+      runGit,
+      project.repositoryPath,
+      { path: registered.path, branch: registered.branch },
+      { completedAt: record.completedAt },
+    );
+    if (result.gc.status === "removed") {
+      await removeCompletedWorktreeRecord(root, record.runId);
+    }
+    results.push({ path: registered.path, branch: registered.branch, ...result });
+  }
+  return results;
+}
+
+async function syncCompletedWorktreeRecordsFromDashboard(
+  config: Config,
+  project: ProjectConfig,
+): Promise<number> {
+  if (!config.userToken) return 0;
+  const dashboard = await request<{ runs: unknown[] }>(
+    config.apiUrl,
+    `/projects/${encodeURIComponent(project.id)}/dashboard`,
+    config.userToken,
+  );
+  const completedRuns = z
+    .array(
+      z.object({
+        id: z.string().uuid(),
+        status: z.string(),
+        branch: z.string().nullable(),
+        completedAt: z.string().datetime({ offset: true }).nullable(),
+      }),
+    )
+    .parse(dashboard.runs)
+    .filter(
+      (run): run is typeof run & { branch: string; completedAt: string } =>
+        run.status === "completed" && Boolean(run.branch && run.completedAt),
+    );
+  const root = projectWorktreeRoot(worktreeSettings(project).root, project.id);
+  const existingRunIds = new Set(
+    (await listCompletedWorktrees(root)).map((record) => record.runId),
+  );
+  const registeredWorktrees = listIssueWorktrees(runGit, project.repositoryPath, root);
+  let recorded = 0;
+  for (const run of completedRuns) {
+    if (existingRunIds.has(run.id)) continue;
+    const worktree = registeredWorktrees.find((candidate) => candidate.branch === run.branch);
+    if (!worktree?.branch) continue;
+    await recordCompletedWorktree(root, {
+      runId: run.id,
+      path: worktree.path,
+      branch: worktree.branch,
+      completedAt: run.completedAt,
+    });
+    recorded += 1;
+  }
+  return recorded;
+}
+
 async function worktreeMaintain() {
   const config = await loadConfig();
   const project = await currentProject(config);
   const root = projectWorktreeRoot(worktreeSettings(project).root, project.id);
+  const registeredWorktrees = listIssueWorktrees(runGit, project.repositoryPath, root);
+  if (has("--all")) {
+    try {
+      await syncCompletedWorktreeRecordsFromDashboard(config, project);
+    } catch {
+      // Previously recorded completions remain maintainable while offline.
+    }
+    const results = await maintainRecordedCompletedWorktrees(project);
+    console.log(JSON.stringify({ projectId: project.id, results }));
+    return;
+  }
   const activeWorktree = project.activeClaim?.worktree;
   const target = resolve(value("--path") ?? activeClaimWorktree(project).path);
-  const registered = listIssueWorktrees(runGit, project.repositoryPath, root).find((worktree) =>
+  const registered = registeredWorktrees.find((worktree) =>
     samePath(worktree.path, target),
   );
   if (!registered?.branch) {
@@ -1200,11 +1297,29 @@ async function worktreeMaintain() {
     activeWorktree && samePath(activeWorktree.path, registered.path)
       ? activeWorktree.baseRef
       : undefined;
+  const completedAt = value("--completed-at");
+  if (completedAt) z.string().datetime({ offset: true }).parse(completedAt);
+  const completedRunId = value("--run");
+  if (completedRunId) z.string().uuid().parse(completedRunId);
+  if (Boolean(completedAt) !== Boolean(completedRunId)) {
+    throw new Error("--completed-at and --run must be supplied together");
+  }
+  if (completedAt && completedRunId) {
+    await recordCompletedWorktree(root, {
+      runId: completedRunId,
+      path: registered.path,
+      branch: registered.branch,
+      completedAt,
+    });
+  }
   const result = await maintainTerminalIssueWorktree(
     runGit,
     project.repositoryPath,
     { path: registered.path, branch: registered.branch },
-    { ...(baseRef ? { baseRef } : {}) },
+    {
+      ...(baseRef ? { baseRef } : {}),
+      ...(completedAt ? { completedAt } : {}),
+    },
   );
   if (
     result.gc.status === "removed" &&
@@ -1217,6 +1332,9 @@ async function worktreeMaintain() {
       return { ...candidate, activeClaim };
     });
     await saveConfig(config);
+  }
+  if (result.gc.status === "removed" && completedRunId) {
+    await removeCompletedWorktreeRecord(root, completedRunId);
   }
   console.log(JSON.stringify({ path: registered.path, branch: registered.branch, ...result }));
 }
@@ -1466,6 +1584,8 @@ async function addRunEvent(forcedStatus?: string) {
                   ...candidate.activeClaim,
                   token: undefined,
                   finished: true,
+                  terminalStatus: input.status as "completed" | "cancelled" | "blocked" | "failed",
+                  finishedAt: input.occurredAt,
                 }
               : candidate.activeClaim,
           }
@@ -2239,11 +2359,40 @@ async function runClaimedIssueInRuntime(
     await exitPromise.catch(() => null);
     if (workspace.type === "worktree") {
       try {
+        let completedAt: string | undefined;
+        try {
+          const runtimeConfig = configSchema.parse(
+            JSON.parse(await readFile(join(runtimeDirectory, "config.json"), "utf8")),
+          );
+          const runtimeClaim = runtimeConfig.projects.find(
+            (candidate) => candidate.id === project.id,
+          )?.activeClaim;
+          if (
+            runtimeClaim?.runId === issue.runId &&
+            runtimeClaim.terminalStatus === "completed"
+          ) {
+            completedAt = runtimeClaim.finishedAt;
+          }
+        } catch {
+          // Maintenance still compacts reproducible artifacts without a
+          // completion timestamp; deletion remains disabled.
+        }
+        if (completedAt) {
+          await recordCompletedWorktree(
+            projectWorktreeRoot(worktreeSettings(project).root, project.id),
+            {
+              runId: issue.runId,
+              path: workspace.path,
+              branch: workspace.branch,
+              completedAt,
+            },
+          );
+        }
         const maintenance = await maintainTerminalIssueWorktree(
           runGit,
           project.repositoryPath,
           { path: workspace.path, branch: workspace.branch },
-          { baseRef: workspace.baseRef },
+          { baseRef: workspace.baseRef, ...(completedAt ? { completedAt } : {}) },
         );
         console.error(
           `worktree maintenance for ${issue.sourceKey}: ${JSON.stringify(maintenance)}`,
@@ -3034,6 +3183,7 @@ async function workerCommand() {
   }
 
   const maxIssues = Number.parseInt(value("--max-issues") ?? "", 10);
+  let lastWorktreeSweepAt = Number.NEGATIVE_INFINITY;
   const result = await runWorkerLoop(
     {
       claim: async () => {
@@ -3131,6 +3281,22 @@ async function workerCommand() {
         );
       },
       heartbeat: async (readinessState = "ready") => {
+        if (Date.now() - lastWorktreeSweepAt >= 60 * 60 * 1_000) {
+          lastWorktreeSweepAt = Date.now();
+          try {
+            await syncCompletedWorktreeRecordsFromDashboard(config, project);
+            const maintenance = await maintainRecordedCompletedWorktrees(project);
+            if (maintenance.length > 0) {
+              console.log(`completed worktree maintenance: ${JSON.stringify(maintenance)}`);
+            }
+          } catch (error) {
+            console.error(
+              `completed worktree maintenance failed: ${
+                error instanceof Error ? error.message : String(error)
+              }`,
+            );
+          }
+        }
         const providerHealth = await inspectWorkerProviderHealth(
           config.agentProviders,
         );
@@ -3496,7 +3662,8 @@ const usage = `Briar CLI
     [--base-branch <ref>]
   briar worktree show
   briar worktree list
-  briar worktree maintain [--path <worktree>]
+  briar worktree maintain [--path <worktree> --run <uuid> --completed-at <ISO-8601>]
+  briar worktree maintain --all
   briar worktree remove [--path <worktree>] [--force]
   briar run event add [--run <uuid>]
     [--source <issue|feedback|error> --source-key <key> --title <title>]

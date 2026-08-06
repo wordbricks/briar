@@ -35,6 +35,8 @@ const AUTO_HUNT_APP_SERVER_EVENT: &str = "auto-hunt-app-server-event";
 const AUTO_HUNT_DISPATCH_EVENT: &str = "auto-hunt-dispatch-event";
 const PROJECT_LLM_PROGRESS_EVENT: &str = "project-llm-progress";
 const PROJECT_AGENT_SCHEDULE_POLL_EVENT: &str = "project-agent-schedule-poll";
+#[cfg(all(desktop, not(dev)))]
+const WORKTREE_SWEEP_INTERVAL_SECS: u64 = 60 * 60;
 #[cfg(all(desktop, not(target_os = "macos")))]
 const INBOX_NOTIFICATION_OPEN_EVENT: &str = "inbox-notification-open";
 #[cfg(target_os = "macos")]
@@ -5252,13 +5254,26 @@ fn auto_hunt_claim_arguments(run_id: &str) -> Vec<String> {
     ]
 }
 
-fn auto_hunt_worktree_maintenance_arguments(path: &Path) -> Vec<String> {
-    vec![
+fn auto_hunt_worktree_maintenance_arguments(
+    path: &Path,
+    run_id: Option<&str>,
+    completed_at: Option<&str>,
+) -> Vec<String> {
+    let mut arguments = vec![
         "worktree".to_string(),
         "maintain".to_string(),
         "--path".to_string(),
         path.to_string_lossy().into_owned(),
-    ]
+    ];
+    if let (Some(run_id), Some(completed_at)) = (run_id, completed_at) {
+        arguments.extend([
+            "--run".to_string(),
+            run_id.to_string(),
+            "--completed-at".to_string(),
+            completed_at.to_string(),
+        ]);
+    }
+    arguments
 }
 
 fn maintain_auto_hunt_worktree(
@@ -5266,11 +5281,13 @@ fn maintain_auto_hunt_worktree(
     cli_environment: &agent::AutoHuntCliEnvironment,
     connected_workspace: &Path,
     worktree_path: &Path,
+    run_id: Option<&str>,
+    completed_at: Option<&str>,
 ) -> Result<(), String> {
     let output = cli_environment.run_briar(
         runner,
         connected_workspace,
-        auto_hunt_worktree_maintenance_arguments(worktree_path),
+        auto_hunt_worktree_maintenance_arguments(worktree_path, run_id, completed_at),
     )?;
     if output.success() {
         Ok(())
@@ -5279,6 +5296,62 @@ fn maintain_auto_hunt_worktree(
             "이슈 처리 워크트리 유지보수에 실패했습니다: {}",
             output.failure_message()
         ))
+    }
+}
+
+#[cfg(all(desktop, not(dev)))]
+fn maintain_expired_auto_hunt_worktrees(config_path: &Path, home: &Path) -> Result<(), String> {
+    let config = read_cli_config(config_path)?;
+    let execution_path = cli_execution_path(home)?;
+    let mut errors = Vec::new();
+    for project in &config.projects {
+        let project_id = project.id.clone();
+        let api_url = project
+            .api_url
+            .as_deref()
+            .unwrap_or(config.api_url.as_str())
+            .to_string();
+        let runtime = connected_project_runtime(config_path, &project_id, home).and_then(
+            |(runner, workspace)| {
+                let include_velen = project_auto_hunt_uses_velen(config_path, &project_id)?;
+                let cli_environment = agent::AutoHuntCliEnvironment::prepare_local(
+                    runner.clone(),
+                    home,
+                    &execution_path,
+                    &workspace,
+                    &project_id,
+                    &api_url,
+                    include_velen,
+                )?;
+                Ok((runner, workspace, cli_environment))
+            },
+        );
+        let (runner, workspace, cli_environment) = match runtime {
+            Ok(runtime) => runtime,
+            Err(error) => {
+                errors.push(format!("{project_id}: {error}"));
+                continue;
+            }
+        };
+        match cli_environment.run_briar(
+            runner.as_ref(),
+            &workspace,
+            vec![
+                "worktree".to_string(),
+                "maintain".to_string(),
+                "--all".to_string(),
+            ],
+        ) {
+            Ok(output) if output.success() => {}
+            Ok(output) => errors.push(format!("{project_id}: {}", output.failure_message())),
+            Err(error) => errors.push(format!("{project_id}: {error}")),
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors.join("; "))
     }
 }
 
@@ -5923,6 +5996,8 @@ async fn start_project_auto_hunt(
                             &cli_environment,
                             &workspace,
                             &worker_workspace,
+                            None,
+                            None,
                         ) {
                             eprintln!("{error}");
                         }
@@ -5982,11 +6057,27 @@ async fn start_project_auto_hunt(
                 }
             }
 
+            let completed_at = dispatch_store
+                .load(&request.session_id)
+                .ok()
+                .flatten()
+                .and_then(|group| {
+                    group
+                        .workers
+                        .into_iter()
+                        .find(|worker| worker.session_id == worker_session_id)
+                })
+                .filter(|worker| {
+                    worker.status == auto_hunt_dispatch::AutoHuntWorkerStatus::Completed
+                })
+                .and_then(|worker| worker.completed_at);
             if let Err(error) = maintain_auto_hunt_worktree(
                 runner.as_ref(),
                 &cli_environment,
                 &workspace,
                 &worker_workspace,
+                completed_at.as_ref().map(|_| claimed.run_id.as_str()),
+                completed_at.as_deref(),
             ) {
                 eprintln!("{error}");
             }
@@ -7001,6 +7092,22 @@ pub fn run() {
                         "Briar CLI and Auto Hunt skill automatic synchronization failed: {error}"
                     );
                 }
+                #[cfg(not(dev))]
+                {
+                    let worktree_sweep_config = cli_config_path(_app.handle())?;
+                    let worktree_sweep_home = home.clone();
+                    std::thread::spawn(move || loop {
+                        if let Err(error) = maintain_expired_auto_hunt_worktrees(
+                            &worktree_sweep_config,
+                            &worktree_sweep_home,
+                        ) {
+                            eprintln!("Completed worktree cleanup failed: {error}");
+                        }
+                        std::thread::sleep(std::time::Duration::from_secs(
+                            WORKTREE_SWEEP_INTERVAL_SECS,
+                        ));
+                    });
+                }
             }
             Ok(())
         })
@@ -8008,9 +8115,11 @@ branch refs/heads/briar/second-11111111
 
     #[test]
     fn maintains_the_finished_workers_exact_worktree() {
-        let arguments = auto_hunt_worktree_maintenance_arguments(Path::new(
-            "/tmp/briar/workspaces/project/issue-515b7a2c",
-        ));
+        let arguments = auto_hunt_worktree_maintenance_arguments(
+            Path::new("/tmp/briar/workspaces/project/issue-515b7a2c"),
+            Some("515b7a2c-8918-5a8f-a292-f0b95090281c"),
+            Some("2026-08-06T00:00:00Z"),
+        );
 
         assert_eq!(
             arguments,
@@ -8019,6 +8128,10 @@ branch refs/heads/briar/second-11111111
                 "maintain",
                 "--path",
                 "/tmp/briar/workspaces/project/issue-515b7a2c",
+                "--run",
+                "515b7a2c-8918-5a8f-a292-f0b95090281c",
+                "--completed-at",
+                "2026-08-06T00:00:00Z",
             ],
         );
     }
