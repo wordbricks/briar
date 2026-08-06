@@ -8,18 +8,22 @@ import {
   allocateIssueWorktree,
   assertPathWithinRoot,
   compactWorktreeArtifacts,
+  COMPLETED_WORKTREE_RETENTION_MS,
   copyWorktreeIncludes,
   defaultWorktreeRoot,
   findExistingIssueWorktree,
   isPathWithinRoot,
+  listCompletedWorktrees,
   listIssueWorktrees,
   maintainTerminalIssueWorktree,
   parseRemoteTrackingBase,
   parseWorktreeIncludeFile,
   parseWorktreeList,
   qualifyBaseRef,
+  recordCompletedWorktree,
   refreshRemoteBase,
   removeAnalysisWorktree,
+  removeCompletedWorktreeRecord,
   removeIssueWorktree,
   resolveBaseRef,
   samePath,
@@ -460,11 +464,40 @@ describe("allocation", () => {
     ).rejects.toThrow(/기준 브랜치/u);
   });
 
-  it("skips a name whose branch already exists", async () => {
-    const { root, git } = await allocationHarness((gitArgs) =>
+  it("recreates a removed worktree from its preserved local branch", async () => {
+    const { root, git, calls } = await allocationHarness((gitArgs) =>
       gitArgs[0] === "rev-parse" &&
       gitArgs[1] === "--verify" &&
       gitArgs.at(-1) === "refs/heads/briar/fix-login-redirect-3f6b9c21^{commit}"
+        ? ok("sha")
+        : null,
+    );
+    const worktree = await allocateIssueWorktree({
+      repositoryPath: "/repo",
+      projectId: "project-1",
+      issue,
+      settings: { root, branchPrefix: "briar" },
+      git,
+    });
+    expect(worktree).toMatchObject({
+      branch: "briar/fix-login-redirect-3f6b9c21",
+      reused: true,
+    });
+    expect(calls).toContainEqual([
+      "worktree",
+      "add",
+      "--no-track",
+      worktree.path,
+      "refs/heads/briar/fix-login-redirect-3f6b9c21",
+    ]);
+  });
+
+  it("skips a name reserved only by a remote branch", async () => {
+    const { root, git } = await allocationHarness((gitArgs) =>
+      gitArgs[0] === "rev-parse" &&
+      gitArgs[1] === "--verify" &&
+      gitArgs.at(-1) ===
+        "refs/remotes/origin/briar/fix-login-redirect-3f6b9c21^{commit}"
         ? ok("sha")
         : null,
     );
@@ -638,6 +671,23 @@ describe("removal", () => {
 });
 
 describe("terminal worktree maintenance", () => {
+  it("persists completed cleanup records outside the disposable worktree", async () => {
+    const root = await temporaryDirectory("briar-worktree-registry-");
+    const path = join(root, "issue-12345678");
+    await mkdir(path);
+    const record = {
+      runId: "515b7a2c-8918-5a8f-a292-f0b95090281c",
+      path,
+      branch: "briar/issue-12345678",
+      completedAt: "2026-08-01T00:00:00.000Z",
+    };
+
+    await recordCompletedWorktree(root, record);
+    await expect(listCompletedWorktrees(root)).resolves.toEqual([record]);
+    await removeCompletedWorktreeRecord(root, record.runId);
+    await expect(listCompletedWorktrees(root)).resolves.toEqual([]);
+  });
+
   it("compacts only known artifact directories that Git confirms are ignored", async () => {
     const worktree = await temporaryDirectory("briar-worktree-compact-");
     const ignoredArtifacts = ["node_modules", "src-tauri/target", "apps/web/.next"];
@@ -663,7 +713,7 @@ describe("terminal worktree maintenance", () => {
     expect(existsSync(join(worktree, "config/.env"))).toBe(true);
   });
 
-  it("compacts outputs and removes a clean worktree whose branch is merged", async () => {
+  it("compacts outputs and removes a clean completed worktree after 24 hours", async () => {
     const path = await temporaryDirectory("briar-worktree-gc-");
     await mkdir(join(path, "node_modules"));
     await writeFile(join(path, "node_modules/package.json"), "{}");
@@ -674,22 +724,20 @@ describe("terminal worktree maintenance", () => {
     });
 
     await expect(
-      maintainTerminalIssueWorktree(git, "/repo", worktree, { baseRef: "origin/main" }),
+      maintainTerminalIssueWorktree(git, "/repo", worktree, {
+        baseRef: "origin/main",
+        completedAt: "2026-08-01T00:00:00.000Z",
+        nowMs: Date.parse("2026-08-02T00:00:00.000Z"),
+      }),
     ).resolves.toEqual({
       compactedPaths: ["node_modules"],
       failedPaths: [],
       gc: { status: "removed", branchDeleted: true },
     });
-    expect(calls).toContainEqual([
-      "merge-base",
-      "--is-ancestor",
-      "refs/heads/briar/merged-12345678",
-      "refs/remotes/origin/main",
-    ]);
     expect(calls).toContainEqual(["worktree", "remove", path]);
   });
 
-  it("keeps an unmerged branch after compacting its reproducible outputs", async () => {
+  it("removes an expired clean worktree but preserves its unmerged branch", async () => {
     const path = await temporaryDirectory("briar-worktree-unmerged-");
     await mkdir(join(path, "src-tauri/target"), { recursive: true });
     await writeFile(join(path, "src-tauri/target/app"), "binary");
@@ -697,22 +745,60 @@ describe("terminal worktree maintenance", () => {
     const { git, calls } = fakeGit((gitArgs) => {
       if (gitArgs[0] === "check-ignore") return ok();
       if (gitArgs[0] === "merge-base") return fail("not an ancestor");
+      if (gitArgs[0] === "branch" && gitArgs[1] === "-d") return fail("not fully merged");
       return ok();
     });
 
     await expect(
-      maintainTerminalIssueWorktree(git, "/repo", worktree, { baseRef: "origin/main" }),
+      maintainTerminalIssueWorktree(git, "/repo", worktree, {
+        baseRef: "origin/main",
+        completedAt: "2026-08-01T00:00:00.000Z",
+        nowMs: Date.parse("2026-08-02T00:00:00.000Z"),
+      }),
     ).resolves.toEqual({
       compactedPaths: ["src-tauri/target"],
       failedPaths: [],
-      gc: { status: "retained", reason: "unmerged" },
+      gc: {
+        status: "removed",
+        branchDeleted: false,
+        preservedBranch: "briar/open-12345678",
+      },
     });
+    expect(calls).toContainEqual(["worktree", "remove", path]);
+    expect(calls).not.toContainEqual(["branch", "-D", worktree.branch]);
+  });
+
+  it("keeps a completed worktree during its 24-hour retention period", async () => {
+    const path = await temporaryDirectory("briar-worktree-retention-");
+    const worktree = { path, branch: "briar/recent-12345678" };
+    const nowMs = Date.parse("2026-08-02T00:00:00.000Z");
+    const { git, calls } = fakeGit(() => ok());
+
+    await expect(
+      maintainTerminalIssueWorktree(git, "/repo", worktree, {
+        completedAt: new Date(nowMs - COMPLETED_WORKTREE_RETENTION_MS + 1).toISOString(),
+        nowMs,
+      }),
+    ).resolves.toMatchObject({ gc: { status: "retained", reason: "retention-period" } });
     expect(calls.some((gitArgs) => gitArgs[0] === "worktree" && gitArgs[1] === "remove")).toBe(
       false,
     );
   });
 
-  it("keeps merged worktrees that still contain source changes", async () => {
+  it("keeps worktrees that have not completed", async () => {
+    const path = await temporaryDirectory("briar-worktree-running-");
+    const worktree = { path, branch: "briar/running-12345678" };
+    const { git, calls } = fakeGit(() => ok());
+
+    await expect(
+      maintainTerminalIssueWorktree(git, "/repo", worktree),
+    ).resolves.toMatchObject({ gc: { status: "retained", reason: "not-completed" } });
+    expect(calls.some((gitArgs) => gitArgs[0] === "worktree" && gitArgs[1] === "remove")).toBe(
+      false,
+    );
+  });
+
+  it("keeps expired completed worktrees that still contain source changes", async () => {
     const path = await temporaryDirectory("briar-worktree-dirty-");
     const worktree = { path, branch: "briar/dirty-12345678" };
     let statusCalls = 0;
@@ -726,7 +812,11 @@ describe("terminal worktree maintenance", () => {
     });
 
     await expect(
-      maintainTerminalIssueWorktree(git, "/repo", worktree, { baseRef: "origin/main" }),
+      maintainTerminalIssueWorktree(git, "/repo", worktree, {
+        baseRef: "origin/main",
+        completedAt: "2026-08-01T00:00:00.000Z",
+        nowMs: Date.parse("2026-08-02T00:00:00.000Z"),
+      }),
     ).resolves.toMatchObject({ gc: { status: "retained", reason: "dirty" } });
     expect(statusCalls).toBe(1);
     expect(calls.some((gitArgs) => gitArgs[0] === "worktree" && gitArgs[1] === "remove")).toBe(
