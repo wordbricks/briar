@@ -129,7 +129,11 @@ describe("Channels", () => {
     await act(async () => {
       root.render(
         <Channels
+          activeChannelId="channel-1"
+          channels={[channel]}
           currentUserId="user-1"
+          onChannelSelect={() => undefined}
+          onChannelsChange={() => undefined}
           organizationId="org-1"
           token="token"
         />,
@@ -154,6 +158,7 @@ describe("Channels", () => {
 
   it("lists channels and their messages", async () => {
     await render([message()]);
+    expect(container.querySelector(".channel-rail")).toBeNull();
     expect(container.textContent).toContain("Welcome");
     expect(container.textContent).toContain("Hello team");
     expect(container.textContent).toContain("@honey");
@@ -257,7 +262,11 @@ describe("Channels", () => {
     await act(async () => {
       root.render(
         <Channels
+          activeChannelId="channel-1"
+          channels={[channel]}
           currentUserId="user-1"
+          onChannelSelect={() => undefined}
+          onChannelsChange={() => undefined}
           organizationId="org-1"
           token="token"
           onIssueCreated={onIssueCreated}

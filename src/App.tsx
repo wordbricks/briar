@@ -93,11 +93,14 @@ import {
 import { isRepositoryConnectedForImport } from "./lib/linear-import";
 import { settingsAccountSelection } from "./lib/settings-account-selection";
 import {
+  createChannel,
   dispatchHuntRun,
+  listChannels,
   loadDashboard,
   loadProjectAgents,
   retryHuntRun,
 } from "./lib/api";
+import type { ChannelSummary } from "./lib/channels-contract";
 import { dispatchAutoHuntToWorkers } from "./lib/auto-hunt-worker-dispatch";
 import { demoProjectAgents } from "./lib/demo-project-agents";
 import { executeProjectAgentTask } from "./lib/project-agent-execution";
@@ -174,6 +177,38 @@ export function App() {
     invitationToken,
   ]);
   const briar = useBriar(scheduleSessionOptions);
+  const [organizationChannels, setOrganizationChannels] = useState<
+    ChannelSummary[]
+  >([]);
+  const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
+  const [channelsLoading, setChannelsLoading] = useState(false);
+  useEffect(() => {
+    const organizationId = briar.activeOrganizationId;
+    const token = briar.token;
+    setOrganizationChannels([]);
+    setActiveChannelId(null);
+    if (!organizationId || !token) {
+      setChannelsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setChannelsLoading(true);
+    void listChannels(token, organizationId)
+      .then((result) => {
+        if (!cancelled) setOrganizationChannels(result.channels);
+      })
+      .catch(() => {
+        // The conversation view reports request errors when opened. Keep the
+        // sidebar usable so channel creation can still be retried.
+      })
+      .finally(() => {
+        if (!cancelled) setChannelsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [briar.activeOrganizationId, briar.token]);
   const [statusTrayRunsByProject, setStatusTrayRunsByProject] = useState<
     Record<string, readonly HuntRun[]>
   >({});
@@ -363,6 +398,27 @@ export function App() {
     navigate: navigateToPage,
     reset: resetNavigation,
   } = useNavigationHistory<ActivePage>("issues");
+  const createOrganizationChannel = useCallback(
+    async (name: string) => {
+      if (!briar.activeOrganizationId || !briar.token) {
+        throw new Error("Organization is not available");
+      }
+      const result = await createChannel(
+        briar.token,
+        briar.activeOrganizationId,
+        { name },
+      );
+      setOrganizationChannels((current) =>
+        [
+          ...current.filter((channel) => channel.id !== result.channel.id),
+          result.channel,
+        ].sort((left, right) => left.name.localeCompare(right.name)),
+      );
+      setActiveChannelId(result.channel.id);
+      navigateToPage("channels");
+    },
+    [briar.activeOrganizationId, briar.token, navigateToPage],
+  );
   const [pendingBriarLink, setPendingBriarLink] =
     useState<BriarLinkTarget | null>(null);
   const [pendingInboxNotificationTarget, setPendingInboxNotificationTarget] =
@@ -995,10 +1051,13 @@ export function App() {
           />
         {activePage !== "settings" ? (
           <Sidebar
+            activeChannelId={activeChannelId}
             activePage={activePage}
             activeOrganizationId={briar.activeOrganizationId}
             activeProjectId={briar.activeProjectId}
             agents={issueAgents}
+            channels={organizationChannels}
+            channelsLoading={channelsLoading}
             connectedProjectIds={briar.connectedProjectIds}
             isOpen={isSidebarOpen}
             onAddProject={briar.startProjectCreation}
@@ -1011,9 +1070,17 @@ export function App() {
             onIdeasOpen={() => navigateToPage("ideas")}
             onScheduleOpen={() => navigateToPage("schedule")}
             onInboxOpen={() => navigateToPage("inbox")}
-            onChannelsOpen={
+            onChannelCreate={
+              briar.activeOrganizationId && briar.token
+                ? createOrganizationChannel
+                : undefined
+            }
+            onChannelOpen={
               briar.activeOrganizationId
-                ? () => navigateToPage("channels")
+                ? (channelId) => {
+                    setActiveChannelId(channelId);
+                    navigateToPage("channels");
+                  }
                 : undefined
             }
             onIssuesOpen={() => {
@@ -1286,7 +1353,11 @@ export function App() {
           briar.activeOrganizationId &&
           briar.token ? (
           <Channels
+            activeChannelId={activeChannelId}
+            channels={organizationChannels}
             currentUserId={briar.user?.id ?? null}
+            onChannelSelect={setActiveChannelId}
+            onChannelsChange={setOrganizationChannels}
             organizationId={briar.activeOrganizationId}
             token={briar.token}
             onIssueCreated={(runId) => {

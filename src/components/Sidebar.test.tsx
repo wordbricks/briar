@@ -58,6 +58,103 @@ const sidebarProps = {
 };
 
 describe("Sidebar", () => {
+  it("shows channels as an accordion and creates one from its context menu", async () => {
+    const onChannelOpen = vi.fn();
+    const onChannelCreate = vi.fn().mockResolvedValue(undefined);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <Sidebar
+          {...sidebarProps}
+          activeChannelId="channel-1"
+          activePage="channels"
+          channels={[
+            {
+              id: "channel-1",
+              organizationId: "organization-1",
+              slug: "general",
+              name: "General",
+              topic: null,
+              visibility: "public",
+              defaultProjectId: null,
+              archivedAt: null,
+              memberCount: 1,
+              agentCount: 0,
+              createdAt: "2026-08-01T00:00:00Z",
+              updatedAt: "2026-08-01T00:00:00Z",
+            },
+          ]}
+          onChannelCreate={onChannelCreate}
+          onChannelOpen={onChannelOpen}
+        />,
+      );
+    });
+
+    const toggle = container.querySelector<HTMLButtonElement>(
+      ".sidebar-channels-toggle",
+    )!;
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(container.querySelector(".sidebar-channel-list")?.textContent).toContain(
+      "General",
+    );
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".sidebar-channel-list button")
+        ?.click();
+    });
+    expect(onChannelOpen).toHaveBeenCalledWith("channel-1");
+
+    await act(async () => toggle.click());
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(container.querySelector(".sidebar-channel-list")).toBeNull();
+    await act(async () => toggle.click());
+
+    await act(async () => {
+      toggle.dispatchEvent(
+        new MouseEvent("contextmenu", {
+          bubbles: true,
+          button: 2,
+          cancelable: true,
+          clientX: 120,
+          clientY: 90,
+        }),
+      );
+    });
+    const addItem = document.body.querySelector<HTMLElement>(
+      ".sidebar-channel-context-menu-item",
+    );
+    expect(addItem?.textContent).toContain("채널 추가");
+    await act(async () => addItem?.click());
+
+    const dialog = document.body.querySelector<HTMLElement>(
+      ".channel-create-dialog",
+    );
+    expect(dialog?.textContent).toContain("새 채널");
+    const input = dialog?.querySelector<HTMLInputElement>("input")!;
+    const valueSetter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    )!.set!;
+    valueSetter.call(input, "제품 피드백");
+    await act(async () => {
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      dialog
+        ?.querySelector("form")
+        ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+
+    expect(onChannelCreate).toHaveBeenCalledWith("제품 피드백");
+    expect(document.body.querySelector(".channel-create-dialog")).toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("shows projects as a native-style hierarchy", () => {
     const markup = renderToStaticMarkup(
       <Sidebar

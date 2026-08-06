@@ -15,6 +15,8 @@
 
 .dark .sidebar-brand,
 .dark .sidebar-primary-nav a,
+.dark .sidebar-channels-toggle,
+.dark .sidebar-channel-list button,
 .dark .sidebar-project-heading,
 .dark .sidebar-project-toggle,
 .dark .sidebar-project-view,
@@ -26,6 +28,9 @@
 .dark .sidebar-brand[aria-expanded="true"],
 .dark .sidebar-primary-nav a:hover,
 .dark .sidebar-primary-nav a.active,
+.dark .sidebar-channels-toggle:hover,
+.dark .sidebar-channel-list button:hover,
+.dark .sidebar-channel-list button.active,
 .dark .sidebar-project-heading:hover,
 .dark .sidebar-project-toggle:hover,
 .dark .sidebar-project-view:hover,
@@ -37,6 +42,8 @@
 
 .dark .sidebar-organization-menu,
 .dark .sidebar-project-menu,
+.dark .sidebar-channel-context-menu,
+.dark .channel-create-dialog,
 .dark .account-popover,
 .dark .agent-usage-popover,
 .dark .worker-status-popover,
