@@ -8,6 +8,7 @@ import {
   mapEffortToOpenCode,
   normalizeOpenCodeEvent,
   openCodeBlockedRetry,
+  openCodeTransientOverload,
   parseOpenCodeModel,
   parseOpenCodeServerUrl,
   shouldAutoApproveOpenCodePermission,
@@ -85,6 +86,52 @@ describe("OpenCode runner helpers", () => {
     };
     expect(openCodeBlockedRetry(state, "session-1")).toBeNull();
     expect(openCodeBlockedRetry(state, "another-session")).toBeNull();
+  });
+
+  it.each([502, 503, 504] as const)(
+    "detects an OpenCode upstream HTTP %i failure as a blocking provider state",
+    (statusCode) => {
+      const error = {
+        name: "UnknownError",
+        data: {
+          message: `\"Streaming response failed: [${statusCode}] The request queue is full.\"`,
+        },
+      };
+      expect(openCodeTransientOverload(error)).toEqual({
+        reason: "upstream_overloaded",
+        provider: "opencode",
+        message: `Streaming response failed: [${statusCode}] The request queue is full.`,
+        nextRetryAt: null,
+        statusCode,
+      });
+      expect(
+        openCodeBlockedRetry(
+          {
+            type: "session.error",
+            properties: { sessionID: "session-1", error },
+          },
+          "session-1",
+        ),
+      ).toMatchObject({ reason: "upstream_overloaded", statusCode });
+    },
+  );
+
+  it("does not block permanent or unrelated OpenCode errors", () => {
+    expect(
+      openCodeTransientOverload({ message: "Streaming response failed: [400] Bad request" }),
+    ).toBeNull();
+    expect(
+      openCodeBlockedRetry(
+        {
+          type: "session.error",
+          properties: {
+            sessionID: "another-session",
+            error: { message: "Streaming response failed: [503] queue full" },
+          },
+        },
+        "session-1",
+      ),
+    ).toBeNull();
   });
 
   it("combines instructions, schemas, and the user prompt", () => {

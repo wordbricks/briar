@@ -31,19 +31,31 @@ export type DetachedAgent = {
   skill: string;
 };
 
-export type DetachedProviderBlock = {
-  reason: "free_tier_limit";
-  provider: string;
-  message: string;
-  nextRetryAt: string | null;
-};
+export type DetachedProviderBlock =
+  | {
+      reason: "free_tier_limit";
+      provider: string;
+      message: string;
+      nextRetryAt: string | null;
+    }
+  | {
+      reason: "upstream_overloaded";
+      provider: string;
+      message: string;
+      nextRetryAt: null;
+      statusCode: 502 | 503 | 504;
+    };
 
 export function detachedProviderBlockFromPayload(
   payload: unknown,
 ): DetachedProviderBlock | null {
   if (!payload || typeof payload !== "object") return null;
   const record = payload as Record<string, unknown>;
-  if (record.type !== "blocked" || record.reason !== "free_tier_limit") {
+  if (
+    record.type !== "blocked" ||
+    (record.reason !== "free_tier_limit" &&
+      record.reason !== "upstream_overloaded")
+  ) {
     return null;
   }
   if (typeof record.provider !== "string" || !record.provider.trim()) {
@@ -57,6 +69,19 @@ export function detachedProviderBlockFromPayload(
       !Number.isNaN(Date.parse(record.nextRetryAt))
       ? new Date(record.nextRetryAt).toISOString()
       : null;
+  if (record.reason === "upstream_overloaded") {
+    const statusCode = Number(record.statusCode);
+    if (statusCode !== 502 && statusCode !== 503 && statusCode !== 504) {
+      return null;
+    }
+    return {
+      reason: "upstream_overloaded",
+      provider: record.provider.trim(),
+      message: record.message.trim(),
+      nextRetryAt: null,
+      statusCode,
+    };
+  }
   return {
     reason: "free_tier_limit",
     provider: record.provider.trim(),
@@ -77,12 +102,15 @@ export function detachedProviderBlockedRunEvent(input: {
   const availableAt = input.block.nextRetryAt
     ? ` OpenCode가 안내한 다음 사용 가능 시각은 ${input.block.nextRetryAt}입니다.`
     : "";
-  const summary =
-    "OpenCode 무료 사용 한도가 소진되어 에이전트가 작업을 계속할 수 없습니다. " +
-    `작업이 완료되지 않았으며 현재까지의 변경 사항은 worktree에 보존됩니다. 사용 가능한 모델이나 요금제를 준비한 뒤 다시 실행해야 합니다.${availableAt}`;
-  const nextAction = input.block.nextRetryAt
-    ? `프로젝트 또는 이슈의 실행 모델을 사용 가능한 모델로 변경하거나 ${input.block.nextRetryAt} 이후까지 기다린 다음, Briar 이슈 화면에서 재시도를 눌러 새 실행이 시작되는지 확인해 주세요.`
-    : "프로젝트 또는 이슈의 실행 모델을 사용 가능한 모델로 변경하거나 OpenCode 요금제를 활성화한 다음, Briar 이슈 화면에서 재시도를 눌러 새 실행이 시작되는지 확인해 주세요.";
+  const summary = input.block.reason === "upstream_overloaded"
+    ? "OpenCode 서비스가 혼잡해 요청을 처리하지 못했습니다. 작업이 완료되지 않았으며 현재까지의 변경 사항은 worktree에 보존됩니다. 잠시 후 다시 시도하거나 사용 가능한 다른 모델로 변경해 주세요."
+    : "OpenCode 무료 사용 한도가 소진되어 에이전트가 작업을 계속할 수 없습니다. " +
+      `작업이 완료되지 않았으며 현재까지의 변경 사항은 worktree에 보존됩니다. 사용 가능한 모델이나 요금제를 준비한 뒤 다시 실행해야 합니다.${availableAt}`;
+  const nextAction = input.block.reason === "upstream_overloaded"
+    ? "잠시 기다린 뒤 Briar 이슈 화면에서 재시도를 누르거나, 프로젝트 또는 이슈의 실행 모델을 다른 사용 가능한 모델로 변경한 뒤 새 실행이 시작되는지 확인해 주세요."
+    : input.block.nextRetryAt
+      ? `프로젝트 또는 이슈의 실행 모델을 사용 가능한 모델로 변경하거나 ${input.block.nextRetryAt} 이후까지 기다린 다음, Briar 이슈 화면에서 재시도를 눌러 새 실행이 시작되는지 확인해 주세요.`
+      : "프로젝트 또는 이슈의 실행 모델을 사용 가능한 모델로 변경하거나 OpenCode 요금제를 활성화한 다음, Briar 이슈 화면에서 재시도를 눌러 새 실행이 시작되는지 확인해 주세요.";
   const selectedModel = input.model?.trim() || "provider default";
   return {
     runId: input.runId,
@@ -93,7 +121,9 @@ export function detachedProviderBlockedRunEvent(input: {
     actor: input.actor,
     repository: input.repository,
     detail:
-      `OpenCode session entered retry/${input.block.reason}; ` +
+      (input.block.reason === "upstream_overloaded"
+        ? `OpenCode upstream returned transient HTTP ${input.block.statusCode}; `
+        : `OpenCode session entered retry/${input.block.reason}; `) +
       `provider=${input.block.provider}, model=${selectedModel}, ` +
       `providerMessage=${input.block.message}` +
       (input.block.nextRetryAt

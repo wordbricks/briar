@@ -55,12 +55,20 @@ export type OpenCodeRunnerOutput =
   | { type: "result"; sessionId: string; message: string }
   | { type: "error"; message: string };
 
-export type OpenCodeBlockedRetry = {
-  reason: "free_tier_limit";
-  provider: string;
-  message: string;
-  nextRetryAt: string | null;
-};
+export type OpenCodeBlockedRetry =
+  | {
+      reason: "free_tier_limit";
+      provider: string;
+      message: string;
+      nextRetryAt: string | null;
+    }
+  | {
+      reason: "upstream_overloaded";
+      provider: string;
+      message: string;
+      nextRetryAt: null;
+      statusCode: 502 | 503 | 504;
+    };
 
 export type OpenCodeEventState = {
   messageRoles: Map<string, "user" | "assistant">;
@@ -225,9 +233,80 @@ function eventSessionId(event: Record<string, unknown>): string | undefined {
   return typeof sessionID === "string" ? sessionID : undefined;
 }
 
+const transientUpstreamStatusCodes = new Set([502, 503, 504]);
+
+function transientUpstreamStatusCode(
+  value: unknown,
+  depth = 0,
+): 502 | 503 | 504 | null {
+  if (depth > 4) return null;
+  if (typeof value === "string") {
+    const match = value.match(
+      /\[(502|503|504)\]|\b(?:HTTP|status(?:\s*code)?)\D{0,8}(502|503|504)\b|\b(502|503|504)\s+(?:Bad Gateway|Service Unavailable|Gateway Timeout)\b/iu,
+    );
+    const parsed = Number(match?.[1] ?? match?.[2] ?? match?.[3]);
+    return transientUpstreamStatusCodes.has(parsed)
+      ? (parsed as 502 | 503 | 504)
+      : null;
+  }
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  for (const key of ["status", "statusCode", "code"]) {
+    const parsed = Number(record[key]);
+    if (transientUpstreamStatusCodes.has(parsed)) {
+      return parsed as 502 | 503 | 504;
+    }
+  }
+  for (const nested of Object.values(record)) {
+    const statusCode = transientUpstreamStatusCode(nested, depth + 1);
+    if (statusCode) return statusCode;
+  }
+  return null;
+}
+
+function openCodeErrorMessage(value: unknown, depth = 0): string | null {
+  if (depth > 4) return null;
+  if (typeof value === "string" && value.trim()) {
+    const trimmed = value.trim();
+    if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+      try {
+        const decoded = JSON.parse(trimmed);
+        if (typeof decoded === "string" && decoded.trim()) return decoded.trim();
+      } catch {
+        // Keep the provider's original message when it is not valid JSON.
+      }
+    }
+    return trimmed;
+  }
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  for (const key of ["message", "error", "data"]) {
+    const message = openCodeErrorMessage(record[key], depth + 1);
+    if (message) return message;
+  }
+  return null;
+}
+
+/** Convert transient OpenCode upstream HTTP failures into a resumable block. */
+export function openCodeTransientOverload(
+  error: unknown,
+): OpenCodeBlockedRetry | null {
+  const statusCode = transientUpstreamStatusCode(error);
+  if (!statusCode) return null;
+  return {
+    reason: "upstream_overloaded",
+    provider: "opencode",
+    message:
+      openCodeErrorMessage(error) ??
+      `OpenCode upstream returned HTTP ${statusCode}.`,
+    nextRetryAt: null,
+    statusCode,
+  };
+}
+
 /**
- * Detect the OpenCode free-tier retry state that otherwise keeps the prompt
- * request open until the provider's next quota window.
+ * Detect OpenCode provider states that should release the worker for a later
+ * retry instead of leaving the issue failed or the prompt request open.
  */
 export function openCodeBlockedRetry(
   raw: unknown,
@@ -235,10 +314,14 @@ export function openCodeBlockedRetry(
 ): OpenCodeBlockedRetry | null {
   if (!raw || typeof raw !== "object") return null;
   const event = raw as Record<string, unknown>;
-  if (event.type !== "session.status" || eventSessionId(event) !== sessionId) {
+  if (eventSessionId(event) !== sessionId) {
     return null;
   }
   const properties = event.properties as Record<string, unknown>;
+  if (event.type === "session.error") {
+    return openCodeTransientOverload(properties.error);
+  }
+  if (event.type !== "session.status") return null;
   const status = properties.status;
   if (!status || typeof status !== "object") return null;
   const retry = status as Record<string, unknown>;

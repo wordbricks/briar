@@ -17,6 +17,7 @@ import {
   mapEffortToOpenCode,
   normalizeOpenCodeEvent,
   openCodeBlockedRetry,
+  openCodeTransientOverload,
   openCodePermissionInput,
   openCodeQuestionInput,
   openCodeResponseText,
@@ -324,6 +325,10 @@ async function main() {
     const responseError =
       "error" in response.data.info ? response.data.info.error : undefined;
     if (responseError) {
+      const transientOverload = openCodeTransientOverload(responseError);
+      if (transientOverload) {
+        throw new OpenCodeBlockedError(transientOverload);
+      }
       throw new Error(
         `OpenCode assistant response failed: ${JSON.stringify(responseError)}`,
       );
