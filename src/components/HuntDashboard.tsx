@@ -7178,9 +7178,24 @@ function IssueConversation({
                       autoFocus
                       compact
                       mentionMembers={mentionMembers}
-                      onSubmit={(body, mentionedUserIds, attachments, references) =>
-                        sendMessage(body, message.id, mentionedUserIds, attachments, references)
-                      }
+                      onCancel={() => setActiveReplyMessageId(null)}
+                      onSubmit={async (
+                        body,
+                        mentionedUserIds,
+                        attachments,
+                        references,
+                      ) => {
+                        await sendMessage(
+                          body,
+                          message.id,
+                          mentionedUserIds,
+                          attachments,
+                          references,
+                        );
+                        setActiveReplyMessageId((current) =>
+                          current === message.id ? null : current,
+                        );
+                      }}
                       placeholder={t("run.threadPlaceholder")}
                     />
                   </div>
@@ -7452,12 +7467,14 @@ function MessageComposer({
   autoFocus = false,
   compact = false,
   mentionMembers,
+  onCancel,
   onSubmit,
   placeholder,
 }: {
   autoFocus?: boolean;
   compact?: boolean;
   mentionMembers: OrganizationMember[];
+  onCancel?: () => void;
   onSubmit: (
     body: string,
     mentionedUserIds: string[],
@@ -7693,6 +7710,11 @@ function MessageComposer({
             setMentionDismissed(true);
             return;
           }
+          if (event.key === "Escape" && onCancel && !sending) {
+            event.preventDefault();
+            onCancel();
+            return;
+          }
           if (
             event.key === "Enter" &&
             !event.shiftKey &&
@@ -7717,6 +7739,18 @@ function MessageComposer({
         value={body}
       />
       <footer>
+        {onCancel ? (
+          <button
+            aria-label={t("run.cancelReply")}
+            className="issue-reply-cancel"
+            disabled={sending}
+            onClick={onCancel}
+            title={t("run.cancelReply")}
+            type="button"
+          >
+            <X size={17} />
+          </button>
+        ) : null}
         <button
           aria-label={t("issue.attachmentLabel")}
           className="issue-composer-link"
