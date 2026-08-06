@@ -355,7 +355,7 @@ struct IssueMessage: Codable, Equatable, Identifiable, Sendable {
     let attachments: [IssueAttachment]?
     let author: Author
     let replyCount: Int
-    var proposedAction: IssueReworkProposal? = nil
+    var proposedAction: IssueProposedAction? = nil
     let createdAt: Date
     let updatedAt: Date
 
@@ -367,14 +367,37 @@ struct IssueMessage: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
-struct IssueReworkProposal: Codable, Equatable, Identifiable, Sendable {
+struct IssueProposedAction: Codable, Equatable, Identifiable, Sendable {
     let id: UUID
-    let type: String
-    let workflowStage: String
-    let reason: String
+    let type: ActionType
+    let workflowStage: String?
+    let reason: String?
+    let changes: Changes?
+    let changedFields: [String]?
+    let issue: NewIssue?
     let status: Status
     let acceptedAt: Date?
     let appliedRevision: Int?
+    let resultRunId: UUID?
+
+    enum ActionType: String, Codable, Sendable {
+        case rework = "request_issue_rework"
+        case update = "request_issue_update"
+        case create = "request_issue_create"
+    }
+
+    struct Changes: Codable, Equatable, Sendable {
+        let title: String?
+        let description: String?
+        let priority: Int?
+    }
+
+    struct NewIssue: Codable, Equatable, Sendable {
+        let title: String
+        let description: String?
+        let priority: Int?
+        let status: String
+    }
 
     enum Status: String, Codable, Sendable {
         case pending
@@ -383,11 +406,17 @@ struct IssueReworkProposal: Codable, Equatable, Identifiable, Sendable {
 }
 
 struct AcceptIssueReworkProposalResponse: Codable, Equatable, Sendable {
-    let proposal: IssueReworkProposal
+    let proposal: IssueProposedAction
     let outcome: String
     let attempt: Int
     let revision: Int
     let workflowStage: String
+}
+
+struct AcceptIssueActionProposalResponse: Codable, Equatable, Sendable {
+    let proposal: IssueProposedAction
+    let outcome: String
+    let resultRunId: UUID?
 }
 
 struct RunEvidenceResponse: Codable, Equatable, Sendable {

@@ -15,6 +15,7 @@ const recovery: PlannedUpdateAgentRecovery = {
     agentName: "Provider-neutral agent",
     agentProvider: "grok",
     agentModel: "grok-4.5",
+    agentEffort: null,
     responsibility: "Finish the task.",
     skill: "# Agent",
     message: "Fix the regression.",
@@ -30,6 +31,7 @@ describe("planned update recovery", () => {
       name: "Provider-neutral agent",
       provider: "grok",
       model: "grok-4.5",
+      effort: null,
       responsibility: "Finish the task.",
       skill: "# Agent",
     });

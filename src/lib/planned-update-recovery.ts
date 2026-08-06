@@ -1,5 +1,6 @@
 import type {
   AgentProvider,
+  ModelEffort,
   ProjectAgentRunInput,
   ProjectAgentRunSnapshot,
 } from "./project-llm";
@@ -14,6 +15,7 @@ export type PlannedUpdateAgentRecovery = {
     agentName: string;
     agentProvider: AgentProvider;
     agentModel: string | null;
+    agentEffort: ModelEffort | null;
     responsibility: string;
     skill: string;
     message: string;
@@ -60,6 +62,7 @@ export function recoveryAgent(
     name: recovery.request.agentName,
     provider: recovery.request.agentProvider,
     model: recovery.request.agentModel,
+    effort: recovery.request.agentEffort,
     responsibility: recovery.request.responsibility,
     skill: recovery.request.skill,
   };

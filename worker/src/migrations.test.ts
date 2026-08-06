@@ -70,6 +70,18 @@ describe("D1 migrations", () => {
     expect(sql).not.toMatch(/\bupdate\s+briar_hunt_runs\b/iu);
   });
 
+  it("stores conversation issue writes as approval proposals", async () => {
+    const sql = await readFile(
+      resolve("migrations", "0068_issue_action_proposals.sql"),
+      "utf8",
+    );
+
+    expect(sql).toMatch(/create\s+table\s+briar_issue_action_proposals/iu);
+    expect(sql).toMatch(/request_issue_update/iu);
+    expect(sql).toMatch(/request_issue_create/iu);
+    expect(sql).not.toMatch(/\bupdate\s+briar_hunt_runs\b/iu);
+  });
+
   it("canonicalizes every stored v1 workflow before runtime v1 support is removed", async () => {
     const miniflare = new Miniflare({
       modules: true,

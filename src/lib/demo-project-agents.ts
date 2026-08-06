@@ -21,6 +21,7 @@ export function demoProjectAgents(
       codexPet: null,
       provider: "codex",
       model: null,
+      effort: null,
       responsibility: defaultAgent.responsibility,
       skill: projectAgentSkill(defaultAgent),
       calendarColor: defaultProjectAgentCalendarColor,
@@ -35,6 +36,7 @@ export function demoProjectAgents(
       codexPet: null,
       provider: "claude",
       model: "opus",
+      effort: null,
       responsibility:
         "Sentry의 에러 내역들을 보고 issue를 만들어서 배정하는 에이전트",
       skill: projectAgentSkill({
@@ -54,6 +56,7 @@ export function demoProjectAgents(
       codexPet: null,
       provider: "grok",
       model: "grok-4.5",
+      effort: null,
       responsibility:
         "유저 피드백 채널에 들어오는 피드백을 취합하고 분석해서 액션아이템을 만들어 이슈를 만드는 에이전트",
       skill: projectAgentSkill({

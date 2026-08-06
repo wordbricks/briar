@@ -67,6 +67,7 @@ const agent: ProjectAgent = {
   codexPet: null,
   provider: "codex",
   model: null,
+  effort: null,
   responsibility: "릴리스 작업을 처리합니다.",
   skill: "# 릴리스 에이전트",
   calendarColor: "#3275d5",

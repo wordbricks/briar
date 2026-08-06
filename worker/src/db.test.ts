@@ -10,6 +10,8 @@ import {
 import type { HuntEventInput } from "./db";
 import {
   acceptOrganizationInvitation,
+  acceptIssueCreateProposal,
+  acceptIssueUpdateProposal,
   acceptIssueReworkProposal,
   assertQueuedHuntClaim,
   claimNextQueuedHuntRun,
@@ -19,6 +21,7 @@ import {
   completeIssueResultReview,
   createOrganization,
   createOrganizationInvitation,
+  createIssueActionProposal,
   createIssueMessage,
   createIssueReworkProposal,
   createProjectAgent,
@@ -40,12 +43,14 @@ import {
   getDashboardSyncCursor,
   getHuntRunForProject,
   getIssueAttachment,
+  getIssueActionProposal,
   getOrganizationInvitationByTokenHash,
   getRunEvidenceImage,
   getNextQueuedHuntRun,
   HuntClaimError,
   HuntTransitionError,
   listIssueAttachments,
+  listIssueActionProposals,
   listIssueDependencies,
   listIssueConversationNotifications,
   listIssueMessages,
@@ -725,6 +730,20 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db,
       await readFile(resolve("migrations/0067_issue_checkpoints.sql"), "utf8"),
     );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0068_issue_action_proposals.sql"),
+        "utf8",
+      ),
+    );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0069_project_agent_effort.sql"),
+        "utf8",
+      ),
+    );
   }, 30_000);
 
   afterAll(async () => {
@@ -1195,6 +1214,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       name: "Sentry 오류 탐지 에이전트",
       provider: "claude",
       model: "opus",
+      effort: null,
       responsibility:
         "Sentry 오류를 분석해 이슈를 만들고 담당자에게 배정합니다.",
       calendarColor: "#8b5cf6",
@@ -1226,6 +1246,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       name: "Disposable agent",
       provider: "codex",
       model: null,
+      effort: null,
       responsibility: "Validate deletion behavior.",
       calendarColor: "#d97706",
     });
@@ -1608,6 +1629,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       codexPet,
       provider: "claude",
       model: "sonnet",
+      effort: "high",
       responsibility: "Coordinates release checks and reports the result.",
       calendarColor: "#0f9f76",
     });
@@ -1621,6 +1643,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       avatar_spritesheet_object_key: codexPet.objectKey,
       provider: "claude",
       model: "sonnet",
+      effort: "high",
       responsibility: "Coordinates release checks and reports the result.",
       skill_markdown: expect.stringContaining(
         "Coordinates release checks and reports the result.",
@@ -1636,6 +1659,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
           name: "Wrong project",
           provider: "grok",
           model: null,
+          effort: null,
           responsibility: "Must not update another project.",
           calendarColor: "#d97706",
         },
@@ -4062,6 +4086,113 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ]);
   });
 
+  it("applies conversation issue writes only after acceptance and rejects stale edits", async () => {
+    const sourceKey = "conversation-issue-action";
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 81, {
+        sourceKey,
+        title: "Original title",
+        status: "backlog",
+        eventKey: `${sourceKey}:backlog`,
+      }),
+    );
+    const updateProposal = await createIssueActionProposal(db, {
+      id: "11111111-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      projectId,
+      conversationRunId: runId,
+      triggerMessageId: "22222222-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      replyMessageId: "33333333-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      actionType: "request_issue_update",
+      payloadJson: JSON.stringify({ changes: { title: "Approved title" } }),
+      createdAt: atMinute(82),
+    });
+    expect(updateProposal).toMatchObject({ status: "pending" });
+    expect((await getHuntRunForProject(db, projectId, runId))?.title)
+      .toBe("Original title");
+
+    const accepted = await acceptIssueUpdateProposal(db, {
+      projectId,
+      conversationRunId: runId,
+      proposalId: updateProposal!.id,
+      userId: "owner",
+      acceptedAt: atMinute(83),
+      title: "Approved title",
+      description: "Approved description",
+      priority: 2,
+    });
+    expect(accepted).toMatchObject({
+      status: "accepted",
+      result_run_id: runId,
+    });
+    expect(await getHuntRunForProject(db, projectId, runId)).toMatchObject({
+      title: "Approved title",
+      issue_description: "Approved description",
+      priority: 2,
+    });
+
+    const staleProposal = await createIssueActionProposal(db, {
+      id: "44444444-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      projectId,
+      conversationRunId: runId,
+      triggerMessageId: "55555555-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      replyMessageId: "66666666-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      actionType: "request_issue_update",
+      payloadJson: JSON.stringify({ changes: { priority: 1 } }),
+      createdAt: atMinute(84),
+    });
+    await updateIssue(db, projectId, runId, {
+      title: "Human edit",
+      description: "Approved description",
+      priority: 3,
+      updatedAt: atMinute(85),
+    });
+    expect(await acceptIssueUpdateProposal(db, {
+      projectId,
+      conversationRunId: runId,
+      proposalId: staleProposal!.id,
+      userId: "owner",
+      acceptedAt: atMinute(86),
+      title: "Human edit",
+      description: "Approved description",
+      priority: 1,
+    })).toBeNull();
+    expect((await getIssueActionProposal(
+      db,
+      projectId,
+      runId,
+      staleProposal!.id,
+    ))?.status).toBe("pending");
+
+    const createProposal = await createIssueActionProposal(db, {
+      id: "77777777-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      projectId,
+      conversationRunId: runId,
+      triggerMessageId: "88888888-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      replyMessageId: "99999999-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      actionType: "request_issue_create",
+      payloadJson: JSON.stringify({
+        issue: {
+          title: "Follow-up",
+          description: null,
+          priority: null,
+          status: "backlog",
+        },
+      }),
+      createdAt: atMinute(87),
+    });
+    expect(await acceptIssueCreateProposal(db, {
+      projectId,
+      conversationRunId: runId,
+      proposalId: createProposal!.id,
+      userId: "owner",
+      acceptedAt: atMinute(88),
+      resultRunId: runId,
+    })).toMatchObject({ status: "accepted", result_run_id: runId });
+    expect(await listIssueActionProposals(db, projectId, runId)).toHaveLength(3);
+  });
+
   it("allows manual complete without agent evidence required for run completion", async () => {
     const strictWorkflow = normalizeAutoHuntWorkflow({
       version: 2,
@@ -4157,9 +4288,11 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     // This suite intentionally retains the legacy `kind` column for earlier
     // compatibility tests. Production removed it in migration 0028.
     await db.prepare("alter table briar_project_agents drop column kind").run();
-    // Migration 0055 predates the pause checkpoint, resume request marker, and
-    // human issue assignee. Exercise the historical rebuild against that
-    // earlier shape, then restore the current columns for the tests that follow.
+    // Migration 0055 predates the pause checkpoint, resume request marker,
+    // human issue assignee, and the agent effort setting. Exercise the
+    // historical rebuild against that earlier shape, then restore the current
+    // columns for the tests that follow.
+    await db.prepare("alter table briar_project_agents drop column effort").run();
     const pausedRuns = await db
       .prepare("select count(*) as count from briar_hunt_runs where paused_at is not null")
       .first<{ count: number }>();
@@ -4264,6 +4397,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db,
       await readFile(resolve("migrations/0067_issue_checkpoints.sql"), "utf8"),
     );
+    await db
+      .prepare(
+        `alter table briar_project_agents add column effort text check (
+           effort is null or effort in ('low', 'medium', 'high', 'xhigh', 'max', 'ultra')
+         )`,
+      )
+      .run();
   });
 
   it("updates an idea through chat and atomically creates an acyclic issue plan", async () => {

@@ -4856,9 +4856,9 @@ async fn run_project_agent(
             .agent_model
             .clone()
             .filter(|value| !value.trim().is_empty());
-        let effort = (provider == settings.provider)
+        let effort = request.agent_effort.or((provider == settings.provider)
             .then_some(settings.effort)
-            .flatten();
+            .flatten());
         let approve = |method: &str, params: &serde_json::Value| {
             let provider_name = provider.display_name();
             approval_app

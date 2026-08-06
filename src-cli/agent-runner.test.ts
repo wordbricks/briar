@@ -255,6 +255,8 @@ describe("detached Agent runner", () => {
     expect(prompt).toContain("Fixed the retry race.");
     expect(prompt).toContain("@briar what changed?");
     expect(prompt).toContain("request_issue_rework");
+    expect(prompt).toContain("request_issue_update");
+    expect(prompt).toContain("request_issue_create");
     expect(prompt).toContain("confirmation button");
     expect(launch.kind).toBe("runner");
     expect(launch.request).toMatchObject({
@@ -282,6 +284,39 @@ describe("detached Agent runner", () => {
     expect(parseDetachedIssueReplyResult("plain fallback")).toEqual({
       reply: "plain fallback",
       proposedAction: null,
+    });
+  });
+
+  it("parses issue edit and creation proposals without applying them", () => {
+    expect(parseDetachedIssueReplyResult(JSON.stringify({
+      reply: "설명 변경을 제안했습니다. 수락해 주세요.",
+      proposedAction: {
+        type: "request_issue_update",
+        changes: { description: "새 승인 기준", priority: 1 },
+      },
+    }))).toEqual({
+      reply: "설명 변경을 제안했습니다. 수락해 주세요.",
+      proposedAction: {
+        type: "request_issue_update",
+        changes: { description: "새 승인 기준", priority: 1 },
+      },
+    });
+    expect(parseDetachedIssueReplyResult(JSON.stringify({
+      reply: "후속 이슈 생성을 제안했습니다. 수락해 주세요.",
+      proposedAction: {
+        type: "request_issue_create",
+        issue: {
+          title: "후속 QA",
+          description: null,
+          priority: 2,
+          status: "backlog",
+        },
+      },
+    }))).toMatchObject({
+      proposedAction: {
+        type: "request_issue_create",
+        issue: { title: "후속 QA", status: "backlog" },
+      },
     });
   });
 

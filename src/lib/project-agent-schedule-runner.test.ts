@@ -28,6 +28,7 @@ const run: ClaimedProjectAgentScheduleRun = {
     name: "Auditor",
     provider: "codex",
     model: null,
+    effort: null,
     responsibility: "Audit the connected repository.",
     skill: "# Auditor\n\nAudit the connected repository.",
   },

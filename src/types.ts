@@ -101,7 +101,7 @@ export type IssueMessage = {
   attachments?: IssueAttachment[];
   author: IssueMessageAuthor;
   replyCount: number;
-  proposedAction?: IssueReworkProposal | null;
+  proposedAction?: IssueProposedAction | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -115,6 +115,39 @@ export type IssueReworkProposal = {
   acceptedAt: string | null;
   appliedRevision: number | null;
 };
+
+export type IssueUpdateProposal = {
+  id: string;
+  type: "request_issue_update";
+  changes: {
+    title?: string;
+    description?: string | null;
+    priority?: number | null;
+  };
+  changedFields?: Array<"title" | "description" | "priority">;
+  status: "pending" | "accepted";
+  acceptedAt: string | null;
+  resultRunId: string | null;
+};
+
+export type IssueCreateProposal = {
+  id: string;
+  type: "request_issue_create";
+  issue: {
+    title: string;
+    description: string | null;
+    priority: number | null;
+    status: "backlog" | "queued";
+  };
+  status: "pending" | "accepted";
+  acceptedAt: string | null;
+  resultRunId: string | null;
+};
+
+export type IssueProposedAction =
+  | IssueReworkProposal
+  | IssueUpdateProposal
+  | IssueCreateProposal;
 
 export type IssueMessageSendResult = {
   message: IssueMessage;
@@ -330,6 +363,7 @@ export type ProjectAgent = {
   codexPet: ProjectAgentCodexPet | null;
   provider: AgentProvider;
   model: string | null;
+  effort: ModelEffort | null;
   responsibility: string;
   skill: string;
   calendarColor: string;
@@ -343,6 +377,7 @@ export type CreateProjectAgentInput = {
   codexPet?: ProjectAgentCodexPet | null;
   provider: AgentProvider;
   model: string | null;
+  effort?: ModelEffort | null;
   responsibility: string;
   calendarColor: string;
 };
@@ -389,7 +424,7 @@ export type ProjectAgentScheduleRun = {
   scheduleName: string;
   agent: Pick<
     ProjectAgent,
-    "id" | "name" | "provider" | "model" | "responsibility" | "skill"
+    "id" | "name" | "provider" | "model" | "effort" | "responsibility" | "skill"
   >;
   workflow: AutoHuntWorkflow;
   status: "running" | "completed" | "failed";

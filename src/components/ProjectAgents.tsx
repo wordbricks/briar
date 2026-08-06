@@ -27,8 +27,10 @@ import {
   updateProjectAgent,
 } from "../lib/api";
 import {
+  agentEfforts,
   agentModels,
   type AgentProvider,
+  type ModelEffort,
 } from "../lib/project-llm";
 import { demoProjectAgents } from "../lib/demo-project-agents";
 import {
@@ -217,6 +219,7 @@ export function ProjectAgents({
             codexPet: null,
             provider: input.provider,
             model: input.model,
+            effort: input.effort ?? null,
             responsibility: input.responsibility,
             skill: projectAgentSkill({
               name: input.name ?? `${providerLabels[input.provider]} Agent`,
@@ -250,6 +253,8 @@ export function ProjectAgents({
             input.codexPet === undefined ? agent.codexPet : input.codexPet,
           provider: input.provider,
           model: input.model,
+          effort:
+            input.effort === undefined ? agent.effort : input.effort,
           responsibility: input.responsibility,
           skill: projectAgentSkill({
             name: input.name ?? `${providerLabels[input.provider]} Agent`,
@@ -607,6 +612,9 @@ export function ProjectAgentDialog({
     agent?.provider ?? "codex",
   );
   const [model, setModel] = useState(agent?.model ?? "");
+  const [effort, setEffort] = useState<ModelEffort | null>(
+    agent?.effort ?? null,
+  );
   const [responsibility, setResponsibility] = useState(
     agent?.responsibility ?? "",
   );
@@ -637,6 +645,7 @@ export function ProjectAgentDialog({
             name: name.trim() || null,
             provider,
             model: model || null,
+            effort,
             responsibility: responsibility.trim(),
             calendarColor,
           }).catch((caught) => {
@@ -689,6 +698,7 @@ export function ProjectAgentDialog({
                 onValueChange={(value) => {
                   setProvider(value as AgentProvider);
                   setModel("");
+                  setEffort(null);
                 }}
                 options={(
                   ["codex", "claude", "grok", "opencode"] as AgentProvider[]
@@ -714,6 +724,28 @@ export function ProjectAgentDialog({
                       : option.label,
                 }))}
                 value={model}
+              />
+            </label>
+            <label>
+              <span>
+                {t("agents.effort")} <em>{t("common.optional")}</em>
+              </span>
+              <NativeSelect
+                label={t("agents.effort")}
+                onValueChange={(value) =>
+                  setEffort((value || null) as ModelEffort | null)
+                }
+                options={[
+                  {
+                    label: t("agents.providerDefaultEffort"),
+                    value: "",
+                  },
+                  ...agentEfforts[provider].map((candidate) => ({
+                    label: candidate,
+                    value: candidate,
+                  })),
+                ]}
+                value={effort ?? ""}
               />
             </label>
           </div>
