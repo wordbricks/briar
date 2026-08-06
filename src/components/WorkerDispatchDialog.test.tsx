@@ -39,6 +39,35 @@ describe("WorkerDispatchDialog", () => {
     document.body.innerHTML = "";
   });
 
+  it("shows a disabled completion state after dispatch succeeds", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <WorkerDispatchDialog
+          didDispatchSuccessfully
+          error={null}
+          isDispatching={false}
+          onOpenChange={vi.fn()}
+          onSubmit={vi.fn()}
+          open
+          run={null}
+          workers={[worker("worker-complete", "Complete Mac")]}
+        />,
+      );
+    });
+
+    const completeButton = document.body.querySelector<HTMLButtonElement>(
+      'button[aria-label="실행 완료"]',
+    );
+    expect(completeButton?.disabled).toBe(true);
+    expect(completeButton?.textContent).toContain("실행 완료");
+
+    await act(async () => root.unmount());
+  });
+
   it("shows only policy-allowed Workers and preselects the project default", async () => {
     const allowed = worker("worker-allowed", "Allowed Mac");
     const denied = worker("worker-denied", "Denied Mac");
