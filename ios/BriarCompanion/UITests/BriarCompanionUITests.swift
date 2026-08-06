@@ -88,6 +88,46 @@ final class BriarCompanionUITests: XCTestCase {
         captureScreenshot(named: "companion-completed-result-tab")
     }
 
+    func testDependencyPickerSearchesAndAddsPrerequisite() {
+        let app = launchInsideCompanion()
+
+        app.tabBars.buttons["Search"].tap()
+        let searchField = app.searchFields["작업 검색"]
+        XCTAssertTrue(searchField.waitForExistence(timeout: 5))
+        searchField.tap()
+        searchField.typeText("의존성 연결 대상")
+
+        let result = app.descendants(matching: .any)[
+            "search-result-99999999-9999-4999-8999-999999999999"
+        ]
+        XCTAssertTrue(result.waitForExistence(timeout: 5))
+        result.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["run-detail"].waitForExistence(timeout: 5))
+
+        app.buttons["run-detail-tab-control"].tap()
+        let addDependency = app.buttons["add-dependency-button"]
+        XCTAssertTrue(addDependency.waitForExistence(timeout: 5))
+        addDependency.tap()
+
+        XCTAssertTrue(app.navigationBars["의존성 추가"].waitForExistence(timeout: 5))
+        let dependencySearch = app.searchFields["이슈 검색"]
+        XCTAssertTrue(dependencySearch.waitForExistence(timeout: 5))
+        dependencySearch.tap()
+        dependencySearch.typeText("API 준비")
+        let candidate = app.buttons[
+            "dependency-option-eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+        ]
+        XCTAssertTrue(candidate.waitForExistence(timeout: 5))
+        candidate.tap()
+
+        XCTAssertFalse(candidate.waitForExistence(timeout: 5))
+        app.buttons["dependency-picker-close"].tap()
+        XCTAssertTrue(app.buttons[
+            "remove-dependency-eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+        ].waitForExistence(timeout: 5))
+        captureScreenshot(named: "companion-dependency-picker")
+    }
+
     func testOfflineErrorAndRetryScreen() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--ui-testing-offline"]
