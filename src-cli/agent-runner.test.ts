@@ -57,6 +57,40 @@ describe("detached Agent runner", () => {
     expect(event.detail).toContain("retry/free_tier_limit");
   });
 
+  it("builds a structured blocked handoff for transient OpenCode overload", () => {
+    const block = detachedProviderBlockFromPayload({
+      type: "blocked",
+      reason: "upstream_overloaded",
+      provider: "opencode",
+      message: "Streaming response failed: [503] The request queue is full.",
+      nextRetryAt: null,
+      statusCode: 503,
+    });
+    expect(block).not.toBeNull();
+
+    const event = detachedProviderBlockedRunEvent({
+      block: block!,
+      runId: "run-503",
+      attempt: 2,
+      actor: "briar-worker:worker-1",
+      repository: "briar",
+      model: "opencode/deepseek-v4-flash-free",
+      occurredAt: "2026-08-06T01:00:00.000Z",
+    });
+
+    expect(event.status).toBe("blocked");
+    expect(event.eventKey).toBe("detached:2:agent-blocked:upstream_overloaded");
+    expect(event.structuredResult).toMatchObject({
+      outcome: "blocked",
+      humanActionRequired: true,
+      dueAt: null,
+    });
+    expect(event.structuredResult.summary).toContain("OpenCode 서비스가 혼잡");
+    expect(event.structuredResult.nextAction).toContain("재시도");
+    expect(event.structuredResult.nextAction).toContain("모델");
+    expect(event.detail).toContain("transient HTTP 503");
+  });
+
   it("appends retry and resume output in a distinct transcript sequence range", () => {
     expect(detachedTranscriptSequence(1, 1)).toBe(1);
     expect(detachedTranscriptSequence(1, 37)).toBe(37);
