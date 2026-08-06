@@ -90,7 +90,9 @@ export type IdeaIssuePlanItem = z.infer<typeof ideaIssuePlanItemSchema>;
 
 export type IdeaSummary = {
   id: string;
-  projectId: string;
+  organizationId: string;
+  /** Null for an organization idea: it names a target project only on convert. */
+  projectId: string | null;
   author: { id: string; name: string; image: string | null };
   title: string;
   documentMarkdown: string;

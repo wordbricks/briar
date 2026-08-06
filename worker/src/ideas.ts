@@ -16,7 +16,8 @@ import { workflowSnapshotForRun } from "./workflow-policy";
 
 type IdeaRow = {
   id: string;
-  project_id: string;
+  organization_id: string;
+  project_id: string | null;
   author_user_id: string;
   author_name: string;
   author_image: string | null;
@@ -42,7 +43,8 @@ type IdeaMessageRow = {
 
 export type IdeaJobRow = {
   id: string;
-  project_id: string;
+  organization_id: string;
+  project_id: string | null;
   idea_id: string;
   kind: "chat" | "issue_plan";
   trigger_message_id: string | null;
@@ -73,7 +75,7 @@ type IdeaPlanRow = {
 };
 
 const ideaSelect = `
-  select idea.id, idea.project_id, idea.author_user_id,
+  select idea.id, idea.organization_id, idea.project_id, idea.author_user_id,
          author.name as author_name, author.image as author_image,
          idea.title, idea.title_is_auto, idea.document_markdown,
          idea.status, idea.provider, idea.model, idea.version,
@@ -85,6 +87,7 @@ const ideaSelect = `
 
 const summaryJson = (row: IdeaRow): IdeaSummary => ({
   id: row.id,
+  organizationId: row.organization_id,
   projectId: row.project_id,
   author: {
     id: row.author_user_id,
@@ -143,6 +146,7 @@ export async function createIdea(
   db: D1Database,
   input: {
     id: string;
+    organizationId: string;
     projectId: string;
     authorUserId: string;
     provider: IdeaProvider;
@@ -154,12 +158,13 @@ export async function createIdea(
   await db
     .prepare(
       `insert into briar_ideas (
-         id, project_id, author_user_id, title, provider, model,
-         created_at, updated_at
-       ) values (?, ?, ?, ?, ?, ?, ?, ?)`,
+         id, organization_id, project_id, author_user_id, title, provider,
+         model, created_at, updated_at
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       input.id,
+      input.organizationId,
       input.projectId,
       input.authorUserId,
       input.title,
@@ -170,6 +175,57 @@ export async function createIdea(
     )
     .run();
   return getIdea(db, input.projectId, input.id, input.authorUserId);
+}
+
+/**
+ * Organization ideas (`project_id is null`) are the plan documents Agents write
+ * in channels. They are listed alongside project ideas so a member can find a
+ * document without knowing which channel produced it.
+ */
+export async function listOrganizationIdeas(
+  db: D1Database,
+  organizationId: string,
+) {
+  const rows = await db
+    .prepare(
+      `${ideaSelect} where idea.organization_id = ? and idea.project_id is null
+       order by idea.updated_at desc, idea.id`,
+    )
+    .bind(organizationId)
+    .all<IdeaRow>();
+  return rows.results.map(summaryJson);
+}
+
+export async function getOrganizationIdea(
+  db: D1Database,
+  organizationId: string,
+  ideaId: string,
+  currentUserId: string,
+): Promise<IdeaDetail | null> {
+  const row = await db
+    .prepare(
+      `${ideaSelect} where idea.organization_id = ? and idea.project_id is null
+       and idea.id = ?`,
+    )
+    .bind(organizationId, ideaId)
+    .first<IdeaRow>();
+  if (!row) return null;
+  const messages = await db
+    .prepare(
+      `select id, role, body, job_id, created_at
+       from briar_idea_messages where idea_id = ?
+       order by created_at, id`,
+    )
+    .bind(ideaId)
+    .all<IdeaMessageRow>();
+  return {
+    ...summaryJson(row),
+    canEdit: row.author_user_id === currentUserId,
+    messages: messages.results.map(messageJson),
+    activeJob: null,
+    plan: null,
+    generatedRunIds: [],
+  };
 }
 
 export async function getIdea(
@@ -358,10 +414,12 @@ async function enqueueJob(
   await db
     .prepare(
       `insert into briar_idea_jobs (
-         id, project_id, idea_id, kind, trigger_message_id,
+         id, organization_id, project_id, idea_id, kind, trigger_message_id,
          reply_message_id, expected_version, provider, model,
          created_at, updated_at
-       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       )
+       select ?, idea.organization_id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+       from briar_ideas idea where idea.id = ?`,
     )
     .bind(
       input.id,
@@ -375,6 +433,7 @@ async function enqueueJob(
       idea.model,
       input.createdAt,
       input.createdAt,
+      input.ideaId,
     )
     .run();
   return "queued" as const;
@@ -431,10 +490,12 @@ export async function sendIdeaMessage(
     db
       .prepare(
         `insert into briar_idea_jobs (
-           id, project_id, idea_id, kind, trigger_message_id,
+           id, organization_id, project_id, idea_id, kind, trigger_message_id,
            reply_message_id, expected_version, provider, model,
            created_at, updated_at
-         ) values (?, ?, ?, 'chat', ?, ?, ?, ?, ?, ?, ?)`,
+         )
+         select ?, idea.organization_id, ?, ?, 'chat', ?, ?, ?, ?, ?, ?, ?
+         from briar_ideas idea where idea.id = ?`,
       )
       .bind(
         input.jobId,
@@ -447,6 +508,7 @@ export async function sendIdeaMessage(
         idea.model,
         input.createdAt,
         input.createdAt,
+        input.ideaId,
       ),
   ]);
   return "queued" as const;

@@ -24,6 +24,7 @@ import {
   type AgentExecutionTokenUsage,
 } from "../src/lib/agent-execution-metrics";
 import { validateEvidenceImages } from "../src/lib/evidence-images";
+import { channelReplyCompletionSchema } from "../src/lib/channels-contract";
 import {
   ideaPlanResultSchema,
   ideaTurnResultSchema,
@@ -31,6 +32,7 @@ import {
 import {
   createDetachedTranscriptSequencer,
   detachedAgentPrompt,
+  detachedChannelReplyPrompt,
   detachedIdeaPrompt,
   detachedIssueReplyPrompt,
   detachedPayloadDirection,
@@ -1969,6 +1971,28 @@ const claimedIdeaSchema = z.object({
 
 type ClaimedIdea = z.infer<typeof claimedIdeaSchema>;
 
+const claimedChannelReplySchema = z.object({
+  workType: z.literal("channelReply"),
+  workId: z.string().uuid(),
+  organizationId: z.string().uuid(),
+  channelId: z.string().uuid(),
+  /** Null for an organization Agent: there is no repository to open. */
+  projectId: z.string().uuid().nullable(),
+  runId: z.string().uuid(),
+  sourceKey: z.string().min(1),
+  title: z.string().min(1),
+  triggerMessageId: z.string().uuid(),
+  parentMessageId: z.string().uuid(),
+  provider: z.enum(["codex", "claude", "grok", "opencode"]),
+  model: z.string().nullable(),
+  claimToken: z.string().startsWith("briar_channel_claim_"),
+  claimedAt: z.string().datetime({ offset: true }),
+  leaseExpiresAt: z.string().datetime({ offset: true }),
+  snapshot: z.record(z.string(), z.unknown()),
+});
+
+type ClaimedChannelReply = z.infer<typeof claimedChannelReplySchema>;
+
 async function runClaimedIssue(
   config: Config,
   project: ProjectConfig,
@@ -2906,6 +2930,213 @@ async function failClaimedIdea(
   );
 }
 
+/**
+ * Runs one channel reply. An organization Agent has no repository, so the
+ * provider runs in an empty scratch directory instead of a worktree. Transcript
+ * events are not persisted: transcript sessions are project-scoped and a
+ * channel reply may have no project at all.
+ */
+async function runClaimedChannelReply(
+  config: Config,
+  project: ProjectConfig,
+  reply: ClaimedChannelReply,
+  workerToken: string,
+  signal: AbortSignal,
+) {
+  const registered = project.executionWorker;
+  if (!registered) throw new Error("Worker registration is missing");
+  const binaryName = reply.provider === "claude" ? "claude" : reply.provider;
+  const agentBinary = Bun.which(binaryName);
+  if (!agentBinary) {
+    throw new Error(`${binaryName} coding agent is not installed on this Worker`);
+  }
+  const analysisWorktree = reply.projectId
+    ? await allocateAnalysisWorktree({
+        repositoryPath: project.repositoryPath,
+        projectId: project.id,
+        workId: reply.workId,
+        settings: worktreeSettings(project),
+        git: runGit,
+      })
+    : null;
+  const workspacePath =
+    analysisWorktree?.path ??
+    join(configDirectory, "worker-sessions", `channel-${reply.workId}`);
+  if (!analysisWorktree) {
+    await mkdir(workspacePath, { recursive: true });
+  }
+  try {
+    const prompt = detachedChannelReplyPrompt({
+      snapshot: reply.snapshot,
+      workspaceAvailable: Boolean(analysisWorktree),
+    });
+    const launch = detachedProviderRequest({
+      agent: {
+        id: reply.workId,
+        name: "Briar Channel",
+        provider: reply.provider,
+        model: reply.model,
+        effort: null,
+        responsibility: "",
+        skill: "",
+      },
+      prompt,
+      workspacePath,
+      fullAccess: false,
+      readOnly: true,
+      agentBinary,
+    });
+    let command = agentBinary;
+    let commandArgs = launch.arguments;
+    if (launch.kind === "runner") {
+      const runnerPath = (
+        await Promise.all(
+          [
+            resolve(import.meta.dir, `agent/${reply.provider}-runner.js`),
+            resolve(import.meta.dir, `../dist-agent/${reply.provider}-runner.js`),
+          ].map(async (path) => ((await Bun.file(path).exists()) ? path : null)),
+        )
+      ).find((path): path is string => Boolean(path));
+      if (!runnerPath) {
+        throw new Error(
+          `${reply.provider} runner bundle is missing; run \`bun run agent:build\``,
+        );
+      }
+      command = process.execPath;
+      commandArgs = [runnerPath];
+    }
+    const child = spawn(command, commandArgs, {
+      cwd: workspacePath,
+      env: {
+        ...process.env,
+        PATH: workerExecutionPath(),
+        BRIAR_CLI: workerCliPath(),
+        BRIAR_WORKER_TOKEN: workerToken,
+      },
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    const exitPromise = new Promise<number | null>((resolveExit, rejectExit) => {
+      child.once("error", rejectExit);
+      child.once("close", resolveExit);
+    });
+    let stderr = "";
+    let resultText: string | null = null;
+    let runnerError: string | null = null;
+    const terminate = () => {
+      if (child.exitCode !== null || child.killed) return;
+      child.kill("SIGTERM");
+      setTimeout(() => {
+        if (child.exitCode === null) child.kill("SIGKILL");
+      }, 5_000).unref();
+    };
+    signal.addEventListener("abort", terminate, { once: true });
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk: string) => {
+      stderr = `${stderr}${chunk}`.slice(-8_000);
+    });
+    if (launch.request) child.stdin.write(`${JSON.stringify(launch.request)}\n`);
+    else child.stdin.end();
+
+    try {
+      const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
+      for await (const line of lines) {
+        if (!line.trim()) continue;
+        let payload: unknown = line;
+        try {
+          payload = JSON.parse(line);
+        } catch {
+          // Preserve plain provider output as the candidate result.
+        }
+        const candidate = issueReplyTextFromPayload(payload);
+        if (candidate) resultText = candidate;
+        if (
+          payload &&
+          typeof payload === "object" &&
+          "type" in payload &&
+          (payload as { type?: string }).type === "error"
+        ) {
+          runnerError = String(
+            (payload as { message?: unknown }).message ?? "Agent failed",
+          );
+        }
+      }
+      const exitCode = await exitPromise;
+      if (signal.aborted) {
+        throw signal.reason instanceof Error
+          ? signal.reason
+          : new Error("Worker execution was cancelled");
+      }
+      if (exitCode !== 0 || runnerError) {
+        throw new Error(
+          runnerError ?? (stderr.trim() || `Agent exited with ${exitCode}`),
+        );
+      }
+      if (!resultText) throw new Error("Agent returned an empty channel reply");
+      const result = channelReplyCompletionSchema.parse(
+        parseDetachedJsonResult(resultText),
+      );
+      await request(
+        config.apiUrl,
+        `/channel-reply-claims/${reply.workId}/complete`,
+        workerToken,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            organizationId: reply.organizationId,
+            workerId: registered.workerId,
+            claimToken: reply.claimToken,
+            result,
+          }),
+        },
+      );
+    } finally {
+      signal.removeEventListener("abort", terminate);
+      terminate();
+    }
+  } finally {
+    if (analysisWorktree) {
+      try {
+        await removeAnalysisWorktree({
+          repositoryPath: project.repositoryPath,
+          path: analysisWorktree.path,
+          git: runGit,
+        });
+      } catch (error) {
+        console.error(
+          `Channel analysis worktree cleanup failed: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
+  }
+}
+
+async function failClaimedChannelReply(
+  config: Config,
+  project: ProjectConfig,
+  reply: ClaimedChannelReply,
+  workerToken: string,
+  error: unknown,
+) {
+  const workerId = project.executionWorker?.workerId;
+  if (!workerId) throw error;
+  await request(
+    config.apiUrl,
+    `/channel-reply-claims/${reply.workId}/complete`,
+    workerToken,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        organizationId: reply.organizationId,
+        workerId,
+        claimToken: reply.claimToken,
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    },
+  );
+}
+
 async function workerRegisterCommand() {
   const config = await loadConfig();
   const userToken = process.env.BRIAR_USER_TOKEN ?? config.userToken;
@@ -3216,6 +3447,23 @@ async function workerCommand() {
         if (replyClaim.work !== null) {
           return claimedIssueReplySchema.parse(replyClaim.work);
         }
+        if (registered.organizationId) {
+          const channelClaim = await request<{ work: unknown }>(
+            config.apiUrl,
+            "/channel-reply-claims",
+            workerToken,
+            {
+              method: "POST",
+              body: JSON.stringify({
+                organizationId: registered.organizationId,
+                workerId,
+              }),
+            },
+          );
+          if (channelClaim.work !== null) {
+            return claimedChannelReplySchema.parse(channelClaim.work);
+          }
+        }
         const claimed = await request<{ work: unknown }>(
           config.apiUrl,
           "/queue/claims",
@@ -3246,6 +3494,23 @@ async function workerCommand() {
                 projectId: project.id,
                 workerId,
                 claimToken: idea.claimToken,
+              }),
+            },
+          );
+          return;
+        }
+        if (issue.workType === "channelReply") {
+          const reply = claimedChannelReplySchema.parse(issue);
+          await request(
+            config.apiUrl,
+            `/channel-reply-claims/${reply.workId}/lease`,
+            workerToken,
+            {
+              method: "POST",
+              body: JSON.stringify({
+                organizationId: reply.organizationId,
+                workerId,
+                claimToken: reply.claimToken,
               }),
             },
           );
@@ -3428,6 +3693,27 @@ async function workerCommand() {
             await runClaimedIdea(config, project, idea, workerToken, signal);
           } catch (error) {
             await failClaimedIdea(config, project, idea, workerToken, error);
+          }
+          return;
+        }
+        if (issue.workType === "channelReply") {
+          const reply = claimedChannelReplySchema.parse(issue);
+          try {
+            await runClaimedChannelReply(
+              config,
+              project,
+              reply,
+              workerToken,
+              signal,
+            );
+          } catch (error) {
+            await failClaimedChannelReply(
+              config,
+              project,
+              reply,
+              workerToken,
+              error,
+            );
           }
           return;
         }

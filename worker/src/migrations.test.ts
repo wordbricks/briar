@@ -10,6 +10,7 @@ describe("D1 migrations", () => {
     "0050_hunt_run_event_count.sql",
     "0053_issue_result_reviews.sql",
     "0055_agent_provider_opencode.sql",
+    "0074_channel_delta_sync.sql",
   ])("keeps each trigger in a separate Wrangler statement: %s", async (name) => {
     const sql = await readFile(resolve("migrations", name), "utf8");
     const statements = unstable_splitSqlQuery(sql);
@@ -21,15 +22,49 @@ describe("D1 migrations", () => {
     expect(triggerCounts.filter((count) => count === 1)).not.toHaveLength(0);
   });
 
-  it("uses D1 transaction-safe foreign-key deferral for table rebuilds", async () => {
-    const sql = await readFile(
-      resolve("migrations", "0055_agent_provider_opencode.sql"),
+  it.each([
+    "0055_agent_provider_opencode.sql",
+    "0071_organization_agents.sql",
+    "0072_organization_ideas.sql",
+    "0073_organization_channels.sql",
+  ])(
+    "uses D1 transaction-safe foreign-key deferral for table rebuilds: %s",
+    async (name) => {
+      const sql = await readFile(resolve("migrations", name), "utf8");
+
+      expect(sql).toMatch(/pragma\s+defer_foreign_keys\s*=\s*on\s*;/iu);
+      expect(sql).toMatch(/pragma\s+defer_foreign_keys\s*=\s*off\s*;/iu);
+      expect(sql).not.toMatch(/pragma\s+foreign_keys\s*=/iu);
+    },
+  );
+
+  it("keeps Agent and idea ownership organization-scoped with an optional project", async () => {
+    const agents = await readFile(
+      resolve("migrations", "0071_organization_agents.sql"),
+      "utf8",
+    );
+    const ideas = await readFile(
+      resolve("migrations", "0072_organization_ideas.sql"),
       "utf8",
     );
 
-    expect(sql).toMatch(/pragma\s+defer_foreign_keys\s*=\s*on\s*;/iu);
-    expect(sql).toMatch(/pragma\s+defer_foreign_keys\s*=\s*off\s*;/iu);
-    expect(sql).not.toMatch(/pragma\s+foreign_keys\s*=/iu);
+    // A null project_id is what marks an organization Agent or idea, so the
+    // column must not carry NOT NULL while organization_id must.
+    expect(agents).toMatch(
+      /organization_id text not null\s+references briar_organizations/iu,
+    );
+    expect(agents).toMatch(
+      /project_id text references briar_projects \(id\) on delete cascade/iu,
+    );
+    expect(ideas).toMatch(
+      /organization_id text not null\s+references briar_organizations/iu,
+    );
+    expect(ideas).toMatch(
+      /project_id text references briar_projects \(id\) on delete cascade/iu,
+    );
+    expect(agents).toMatch(
+      /create unique index briar_project_agents_handle_idx[\s\S]*where handle is not null/iu,
+    );
   });
 
   it("adds workflow v2 progress without rewriting stored snapshots", async () => {

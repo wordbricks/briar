@@ -14,6 +14,7 @@ import { HuntDashboard, RunPage } from "./components/HuntDashboard";
 import { WorkerDispatchDialog } from "./components/WorkerDispatchDialog";
 import { Inbox } from "./components/Inbox";
 import { InboxDetailPanel } from "./components/InboxDetailPanel";
+import { Channels } from "./components/Channels";
 import { Ideas } from "./components/Ideas";
 import { InitialOnboarding } from "./components/InitialOnboarding";
 import { InvitationOnboarding } from "./components/InvitationOnboarding";
@@ -116,6 +117,7 @@ import type { HuntRun, ProjectAgent } from "./types";
 type ActivePage =
   | "issues"
   | "agents"
+  | "channels"
   | "ideas"
   | "schedule"
   | "inbox"
@@ -1008,6 +1010,11 @@ export function App() {
             onIdeasOpen={() => navigateToPage("ideas")}
             onScheduleOpen={() => navigateToPage("schedule")}
             onInboxOpen={() => navigateToPage("inbox")}
+            onChannelsOpen={
+              briar.activeOrganizationId
+                ? () => navigateToPage("channels")
+                : undefined
+            }
             onIssuesOpen={() => {
               setRequestedRunId(null);
               setIssueListRequestKey((key) => key + 1);
@@ -1273,6 +1280,19 @@ export function App() {
             isSidebarOpen={isSidebarOpen}
             project={activeProject}
             token={briar.token}
+          />
+        ) : activePage === "channels" &&
+          briar.activeOrganizationId &&
+          briar.token ? (
+          <Channels
+            currentUserId={briar.user?.id ?? null}
+            organizationId={briar.activeOrganizationId}
+            token={briar.token}
+            onIssueCreated={(runId) => {
+              setRequestedRunId(runId);
+              setIssueListRequestKey((key) => key + 1);
+              navigateToPage("issues");
+            }}
           />
         ) : activePage === "ideas" && featureFlags.ideas && activeProject ? (
           <Ideas
