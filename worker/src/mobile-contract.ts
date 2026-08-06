@@ -345,9 +345,14 @@ export const mobileCreateIssueResponseSchema = z.object({
   assigneeUserId: z.string().nullable(),
   attachments: z.array(mobileIssueAttachmentSchema),
 });
-export const mobileUpdateIssueRequestSchema = mobileIssueWriteBaseSchema.omit({
-  status: true,
-});
+export const mobileUpdateIssueRequestSchema = z
+  .object({
+    title: z.string().trim().min(1).max(300),
+    description: z.string().max(100_000).nullable(),
+    priority: z.number().int().min(1).max(4).nullable(),
+    assigneeUserId: z.string().nullable(),
+  })
+  .strict();
 export const mobileUpdateIssueResponseSchema = z.object({
   runId: z.uuid(),
   title: z.string(),

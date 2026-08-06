@@ -2325,7 +2325,8 @@ export function CreateIssueDialog({
               label={t("issue.preferredModel")}
               onValueChange={setPreferredModel}
               options={
-                preferredProvider
+                preferredProvider &&
+                preferredProvider in agentModels
                   ? agentModels[preferredProvider as AgentProvider].map(
                       (option) => ({
                         ...option,
