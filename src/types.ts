@@ -47,6 +47,7 @@ export type CreateIssueInput = {
   attachmentReferences?: string[];
   preferredProvider?: AgentProvider | null;
   preferredModel?: string | null;
+  preferredEffort?: ModelEffort | null;
   checkpoints?: AutoHuntWorkflowCheckpoint[];
 };
 

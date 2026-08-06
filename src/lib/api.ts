@@ -1323,6 +1323,7 @@ export async function createIssue(
   form.set("status", input.status);
   form.set("preferredProvider", input.preferredProvider ?? "");
   form.set("preferredModel", input.preferredModel ?? "");
+  form.set("preferredEffort", input.preferredEffort ?? "");
   if (input.checkpoints?.length) {
     form.set("checkpoints", JSON.stringify(input.checkpoints));
   }

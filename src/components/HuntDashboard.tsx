@@ -2075,6 +2075,9 @@ export function CreateIssueDialog({
   const [preferredModel, setPreferredModel] = useState(
     initialDraft?.preferredModel ?? "",
   );
+  const [preferredEffort, setPreferredEffort] = useState(
+    initialDraft?.preferredEffort ?? "high",
+  );
   const [projectId, setProjectId] = useState(() =>
     projects.some((project) => project.id === initialDraft?.projectId)
       ? initialDraft!.projectId
@@ -2111,6 +2114,7 @@ export function CreateIssueDialog({
       assigneeUserId: assigneeUserId || null,
       preferredProvider: preferredProvider || null,
       preferredModel: preferredModel || null,
+      preferredEffort: preferredEffort || null,
       ...(checkpoints.length > 0 ? { checkpoints } : {}),
     });
   }, [
@@ -2119,6 +2123,7 @@ export function CreateIssueDialog({
     description,
     preferredModel,
     preferredProvider,
+    preferredEffort,
     checkpoints,
     priority,
     projectId,
@@ -2344,6 +2349,10 @@ export function CreateIssueDialog({
                 | AgentProvider
                 | null,
               preferredModel: preferredModel || null,
+              preferredEffort:
+                preferredProvider && preferredModel
+                  ? ((preferredEffort || null) as ModelEffort | null)
+                  : null,
               ...(checkpoints.length > 0 ? { checkpoints } : {}),
               attachments: attachments.map(({ file }) => file),
               ...(attachments.length > 0
@@ -2511,6 +2520,7 @@ export function CreateIssueDialog({
               onValueChange={(value) => {
                 setPreferredProvider(value);
                 if (preferredModel) setPreferredModel("");
+                setPreferredEffort("high");
               }}
               options={[
                 { label: t("issue.agentDefault"), value: "" },
@@ -2541,6 +2551,27 @@ export function CreateIssueDialog({
               }
               placeholder={t("issue.selectProviderFirst")}
               value={preferredModel}
+            />
+            <NativeSelect
+              className="issue-effort-select"
+              disabled={!preferredProvider || !preferredModel}
+              label={t("settings.effort")}
+              onValueChange={setPreferredEffort}
+              options={
+                preferredProvider && preferredProvider in agentEfforts
+                  ? [
+                      { label: t("settings.providerDefaultEffort"), value: "" },
+                      ...agentEfforts[preferredProvider as AgentProvider].map(
+                        (effort) => ({
+                          label: effort,
+                          value: effort,
+                        }),
+                      ),
+                    ]
+                  : []
+              }
+              placeholder={t("issue.selectModelFirst")}
+              value={preferredEffort}
             />
             <label className="issue-attachment-trigger">
               <Paperclip size={13} />

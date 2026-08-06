@@ -42,6 +42,7 @@ struct CreateIssueSheet: View {
                     PreferredExecutionPicker(
                         provider: $draft.preferredProvider,
                         model: $draft.preferredModel,
+                        effort: $draft.preferredEffort,
                         providers: providers
                     )
                 }
@@ -313,6 +314,7 @@ private struct PendingAttachmentRow: View {
 private struct PreferredExecutionPicker: View {
     @Binding var provider: AgentProvider?
     @Binding var model: String?
+    @Binding var effort: ModelEffort?
     let providers: [AgentProvider]
 
     private var availableModels: [String] {
@@ -320,27 +322,38 @@ private struct PreferredExecutionPicker: View {
     }
 
     var body: some View {
-        VStack {
-            Picker("프로바이더", selection: $provider) {
-                Text("기본값").tag(AgentProvider?.none)
-                ForEach(providers) { provider in
-                    Text(provider.displayName)
-                        .tag(AgentProvider?.some(provider))
-                }
+        Picker("프로바이더", selection: $provider) {
+            Text("기본값").tag(AgentProvider?.none)
+            ForEach(providers) { provider in
+                Text(provider.displayName)
+                    .tag(AgentProvider?.some(provider))
             }
-            .accessibilityIdentifier("create-issue-provider")
-            Picker("모델", selection: $model) {
-                Text("기본값").tag(String?.none)
-                ForEach(availableModels, id: \.self) { model in
-                    Text(model).tag(String?.some(model))
-                }
-            }
-            .disabled(provider == nil)
-            .accessibilityIdentifier("create-issue-model")
         }
+        .accessibilityIdentifier("create-issue-provider")
+        Picker("모델", selection: $model) {
+            Text("기본값").tag(String?.none)
+            ForEach(availableModels, id: \.self) { model in
+                Text(model).tag(String?.some(model))
+            }
+        }
+        .disabled(provider == nil)
+        .accessibilityIdentifier("create-issue-model")
+        Picker("Effort", selection: $effort) {
+            Text("기본값").tag(ModelEffort?.none)
+            ForEach(provider?.efforts ?? []) { effort in
+                Text(effort.rawValue).tag(ModelEffort?.some(effort))
+            }
+        }
+        .disabled(model == nil)
+        .accessibilityIdentifier("create-issue-effort")
         .onChange(of: provider) { previous, provider in
             guard previous != provider else { return }
             model = nil
+            effort = IssueDraft.defaultEffort
+        }
+        .onChange(of: model) { previous, model in
+            guard previous != model else { return }
+            if model == nil { effort = nil }
         }
     }
 }

@@ -49,7 +49,10 @@ final class IssueMutationStore: ObservableObject {
                         assigneeUserId: draft.assigneeUserId,
                         status: draft.status,
                         preferredProvider: draft.preferredProvider,
-                        preferredModel: draft.preferredModel
+                        preferredModel: draft.preferredModel,
+                        preferredEffort: draft.preferredProvider != nil && draft.preferredModel != nil
+                            ? draft.preferredEffort
+                            : nil
                     ),
                     as: CreateIssueResponse.self
                 )
@@ -64,6 +67,9 @@ final class IssueMutationStore: ObservableObject {
                     "status": draft.status.rawValue,
                     "preferredProvider": draft.preferredProvider?.rawValue ?? "",
                     "preferredModel": draft.preferredModel ?? "",
+                    "preferredEffort": draft.preferredProvider != nil && draft.preferredModel != nil
+                        ? (draft.preferredEffort?.rawValue ?? "")
+                        : "",
                 ],
                 files: attachments.map {
                     MultipartFile(

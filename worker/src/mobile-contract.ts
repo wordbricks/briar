@@ -363,6 +363,7 @@ const mobileIssueWriteBaseSchema = z
     status: z.enum(["backlog", "queued"]),
     preferredProvider: mobileProviderSchema.nullable().optional(),
     preferredModel: z.string().nullable().optional(),
+    preferredEffort: mobileEffortSchema.nullable().optional(),
   })
   .strict();
 
@@ -372,6 +373,18 @@ export const mobileCreateIssueRequestSchema = mobileIssueWriteBaseSchema
       context.addIssue({
         code: "custom",
         message: "A provider is required for a model preference",
+      });
+    }
+    if (input.preferredEffort && !input.preferredProvider) {
+      context.addIssue({
+        code: "custom",
+        message: "A provider is required for an effort preference",
+      });
+    }
+    if (input.preferredEffort && !input.preferredModel) {
+      context.addIssue({
+        code: "custom",
+        message: "A model is required for an effort preference",
       });
     }
   });
