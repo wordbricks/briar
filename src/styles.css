@@ -1622,7 +1622,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .issue-message-composer footer button:hover { color:var(--foreground); background:var(--secondary); }
 .issue-message-composer footer button:active { transform:scale(.94); }
 .issue-message-composer footer button:focus-visible { outline:2px solid #8b70dd; outline-offset:1px; }
-.issue-composer-file-input { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
+.issue-composer-file-input { display:none; }
 .issue-message-composer footer .issue-message-send { color:var(--foreground); }
 .issue-message-composer footer .issue-message-send:disabled { color:var(--muted-foreground); background:transparent; cursor:default; transform:none; }
 .issue-composer-error { margin:0; padding:0 10px 8px; display:flex; align-items:center; gap:5px; color:#b13f54; font-size:var(--text-2xs); }
