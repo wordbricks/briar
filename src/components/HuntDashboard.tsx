@@ -1966,6 +1966,26 @@ export function EditIssueDialog({
   );
 }
 
+const checkpointMenuDefaultZIndex = 130;
+
+function getCheckpointMenuZIndex(trigger: HTMLElement) {
+  let zIndex = checkpointMenuDefaultZIndex;
+  let ancestor = trigger.parentElement;
+
+  while (ancestor) {
+    const ancestorZIndex = Number.parseInt(
+      window.getComputedStyle(ancestor).zIndex,
+      10,
+    );
+    if (Number.isFinite(ancestorZIndex)) {
+      zIndex = Math.max(zIndex, ancestorZIndex + 1);
+    }
+    ancestor = ancestor.parentElement;
+  }
+
+  return zIndex;
+}
+
 function IssueCheckpointDropdown({
   checkpoints,
   disabled = false,
@@ -1978,16 +1998,26 @@ function IssueCheckpointDropdown({
   workflow: AutoHuntWorkflow;
 }) {
   const { t } = useI18n();
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const [menuZIndex, setMenuZIndex] = useState(checkpointMenuDefaultZIndex);
   const inherited = new Set(
     workflow.execution.checkpoints.map(checkpointBoundaryKey),
   );
   const selected = new Set(checkpoints.map(checkpointBoundaryKey));
+
+  useLayoutEffect(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    setMenuZIndex(getCheckpointMenuZIndex(trigger));
+  }, []);
+
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
         <button
           className="issue-checkpoint-trigger"
           disabled={disabled}
+          ref={triggerRef}
           type="button"
         >
           <Clock3 aria-hidden="true" size={13} />
@@ -2004,6 +2034,7 @@ function IssueCheckpointDropdown({
           className="issue-checkpoint-menu"
           collisionPadding={10}
           sideOffset={6}
+          style={{ zIndex: menuZIndex }}
         >
           <DropdownMenu.Label className="issue-checkpoint-menu-heading">
             {t("issue.checkpointsDescription")}

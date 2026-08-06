@@ -972,4 +972,37 @@ describe("CreateIssueDialog attachments", () => {
     );
     await act(async () => root.unmount());
   });
+
+  it("floats the checkpoint menu above the dialog backdrop", async () => {
+    const style = document.createElement("style");
+    style.textContent = ".issue-dialog-backdrop { z-index: 1100; }";
+    document.head.append(style);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <CreateIssueDialog
+        {...projectProps}
+        isSubmitting={false}
+        onClose={() => undefined}
+        onCreate={async () => undefined}
+        workflow={demoDashboard.settings.workflow}
+        workflowProjectId="project-1"
+      />,
+    ));
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".issue-checkpoint-trigger",
+      )?.dispatchEvent(
+        new MouseEvent("pointerdown", { bubbles: true, button: 0 }),
+      );
+    });
+    const menu = document.body.querySelector<HTMLElement>(
+      ".issue-checkpoint-menu",
+    );
+    expect(menu).not.toBeNull();
+    expect(Number.parseInt(menu?.style.zIndex ?? "", 10)).toBeGreaterThan(1100);
+
+    await act(async () => root.unmount());
+    style.remove();
+  });
 });
