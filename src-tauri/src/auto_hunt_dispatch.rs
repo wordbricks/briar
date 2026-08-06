@@ -393,8 +393,8 @@ impl AutoHuntDispatchStore {
             .map_err(|error| format!("이슈 처리 실행 폴더를 읽지 못했습니다: {error}"))?;
         let mut recovered = Vec::new();
         for entry in entries {
-            let entry = entry
-                .map_err(|error| format!("이슈 처리 실행 항목을 읽지 못했습니다: {error}"))?;
+            let entry =
+                entry.map_err(|error| format!("이슈 처리 실행 항목을 읽지 못했습니다: {error}"))?;
             let path = entry.path();
             if path.extension().and_then(|extension| extension.to_str()) != Some("json") {
                 continue;
