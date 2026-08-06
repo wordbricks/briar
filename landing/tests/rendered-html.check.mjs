@@ -138,3 +138,36 @@ test("server-renders the localized tutorial with captured product screens", asyn
   assert.match(html, /\/tutorial\/04-evidence\.webp/);
   assert.match(html, /\/tutorial\/06-schedule\.webp/);
 });
+
+test("server-renders the localized download catalog", async () => {
+  const response = await render({
+    acceptLanguage: "ko-KR,ko;q=0.9",
+    path: "/download",
+  });
+  assert.equal(response.status, 200);
+
+  const html = await response.text();
+  assert.match(html, /<html lang="ko">/i);
+  assert.match(html, /Briar 다운로드/);
+  assert.match(html, /Apple Silicon 다운로드/);
+  assert.match(html, /Android 릴리즈 열기/);
+  assert.match(html, /웹 앱 열기/);
+  assert.match(
+    html,
+    /https:\/\/briar-api\.wbai\.workers\.dev\/releases\/latest\/mac-aarch64\.dmg/,
+  );
+  assert.match(
+    html,
+    /https:\/\/github\.com\/wordbricks\/briar\/releases\/latest/,
+  );
+});
+
+test("landing header links to tutorial and download without section navigation", async () => {
+  const response = await render({ acceptLanguage: "en-US,en;q=0.9" });
+  const html = await response.text();
+  const header = html.match(/<header class="site-header">([\s\S]*?)<\/header>/)?.[1] ?? "";
+
+  assert.match(header, /href="\/tutorial"/);
+  assert.match(header, /href="\/download"/);
+  assert.doesNotMatch(header, /href="#(?:product|workflow|security|agents)"/);
+});
