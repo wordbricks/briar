@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 enum AgentProvider: String, Codable, CaseIterable, Identifiable, Sendable {
     case codex
@@ -96,6 +97,20 @@ struct PendingIssueAttachment: Identifiable, Equatable, Sendable {
         return total <= maximumTotalBytes
             ? nil
             : "첨부 파일의 전체 크기는 25MB를 넘을 수 없습니다."
+    }
+
+    /// Decodes clipboard image data and wraps it as a server-supported JPEG attachment.
+    /// Returns nil when the data is not a decodable image, so a text-only paste is ignored.
+    static func jpeg(from data: Data) -> Self? {
+        guard data.isEmpty == false,
+              let image = UIImage(data: data),
+              let jpegData = image.jpegData(compressionQuality: 0.9)
+        else { return nil }
+        return Self(
+            filename: "image-\(UUID().uuidString).jpg",
+            contentType: "image/jpeg",
+            data: jpegData
+        )
     }
 }
 
