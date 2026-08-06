@@ -1,6 +1,6 @@
 [package]
 name = "briar"
-version = "1.2.75"
+version = "1.2.76"
 description = "Agent Development Environment"
 authors = ["Wordbricks"]
 edition = "2021"
