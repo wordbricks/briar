@@ -256,6 +256,42 @@ final class IssueMutationTests: XCTestCase {
         XCTAssertEqual(count, 1)
     }
 
+    func testDuplicateDispatchTapSendsOnlyOneRequest() async throws {
+        let recorder = MutationAPIRecorder(delay: .milliseconds(100))
+        let store = IssueMutationStore(
+            api: recorder,
+            projectID: Self.projectID,
+            token: "token"
+        )
+        let preferences = IssueExecutionPreferences(
+            provider: .codex,
+            model: nil,
+            effort: nil
+        )
+
+        async let first: Void = store.dispatch(
+            runID: Self.runID,
+            preferences: preferences,
+            workerID: nil,
+            reassign: false
+        )
+        try await Task.sleep(for: .milliseconds(10))
+        do {
+            try await store.dispatch(
+                runID: Self.runID,
+                preferences: preferences,
+                workerID: nil,
+                reassign: false
+            )
+            XCTFail("The second tap must be rejected while dispatch is active")
+        } catch IssueMutationError.duplicateAction {
+            // Expected.
+        }
+        try await first
+        let count = await recorder.requestCount()
+        XCTAssertEqual(count, 1)
+    }
+
     func testMutatingRunRequestUsesInjectedIdempotencyIdentifier() async throws {
         let recorder = MutationAPIRecorder()
         let requestID = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!
