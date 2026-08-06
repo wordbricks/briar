@@ -58,6 +58,7 @@ struct CompanionShellView: View {
                         RunDetailView(
                             run: run,
                             projectID: project.id,
+                            issueKeyPrefix: project.effectiveIssueKeyPrefix,
                             token: token,
                             api: api,
                             projects: projects,
@@ -309,6 +310,7 @@ struct TaskListView: View {
                                 RunDetailView(
                                     run: run,
                                     projectID: project.id,
+                                    issueKeyPrefix: project.effectiveIssueKeyPrefix,
                                     token: token,
                                     api: api,
                                     projects: projects,
@@ -321,10 +323,11 @@ struct TaskListView: View {
                             } label: {
                                 RunRow(
                                     run: run,
+                                    issueKeyPrefix: project.effectiveIssueKeyPrefix,
                                     assignee: snapshot?.members?.first {
                                         $0.userId == run.assigneeUserId
                                     },
-                                    workerLabel: RunRow.workerLabel(
+                                    worker: RunRow.worker(
                                         for: run,
                                         workers: snapshot?.workers ?? []
                                     )
@@ -397,65 +400,156 @@ struct TaskListView: View {
 
 struct RunRow: View {
     let run: DashboardRun
+    let issueKeyPrefix: String
     let assignee: OrganizationMember?
-    let workerLabel: String?
+    let worker: DashboardWorker?
 
-    init(run: DashboardRun, assignee: OrganizationMember? = nil, workerLabel: String? = nil) {
+    init(
+        run: DashboardRun,
+        issueKeyPrefix: String = "AH",
+        assignee: OrganizationMember? = nil,
+        worker: DashboardWorker? = nil
+    ) {
         self.run = run
+        self.issueKeyPrefix = issueKeyPrefix
         self.assignee = assignee
-        self.workerLabel = workerLabel
+        self.worker = worker
     }
 
-    static func workerLabel(for run: DashboardRun, workers: [DashboardWorker]) -> String? {
+    static func worker(for run: DashboardRun, workers: [DashboardWorker]) -> DashboardWorker? {
         let workerID = run.workerId ?? run.requestedWorkerId
         guard let workerID else { return nil }
-        if let worker = workers.first(where: { $0.id == workerID }) {
-            return worker.label
+        return workers.first { $0.id == workerID }
+    }
+
+    static func workflowStageSystemImage(for stage: String) -> String {
+        switch stage {
+        case "analyzing": "magnifyingglass"
+        case "planning": "list.bullet.clipboard"
+        case "implementing": "hammer"
+        case "reviewing": "eye"
+        case "pr_open": "arrow.triangle.pull"
+        case "local_qa", "ci_qa": "checkmark.seal"
+        case "staging_qa", "production_qa": "shippingbox"
+        case "monitoring": "waveform.path.ecg"
+        case "merged": "arrow.triangle.merge"
+        default: "point.3.connected.trianglepath.dotted"
         }
-        return workerID
+    }
+
+    static func workflowStageLabel(for run: DashboardRun) -> String? {
+        guard let workflowStage = run.workflowStage else { return nil }
+        return run.workflow?.stages.first { $0.id == workflowStage }?.label ?? workflowStage
+    }
+
+    private var workerLabel: String? {
+        worker?.label ?? run.workerId ?? run.requestedWorkerId
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(run.title).font(.headline)
+            HStack(alignment: .top) {
+                Text(run.title)
+                    .font(.headline)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .layoutPriority(1)
                 Spacer(minLength: 8)
                 StatusBadge(
                     status: run.status,
                     reviewed: !(run.resultReviews ?? []).isEmpty
                 )
+                .fixedSize(horizontal: true, vertical: false)
             }
             if let detail = run.detail, !detail.isEmpty {
                 Text(detail)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            HStack(spacing: 12) {
-                if let runNumber = run.runNumber {
-                    Text("#\(runNumber)")
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) {
+                    identityMetadata
+                    Spacer(minLength: 4)
+                    updatedMetadata
                 }
-                if let workflowStage = run.workflowStage {
-                    Text(workflowStage)
+                VStack(alignment: .leading, spacing: 6) {
+                    identityMetadata
+                    updatedMetadata
                 }
-                if let assignee {
-                    ProfileImageView(
-                        image: assignee.image,
-                        name: assignee.name,
-                        size: 20
-                    )
-                    .accessibilityLabel(assignee.name)
-                }
-                if let workerLabel {
-                    Label(workerLabel, systemImage: "desktopcomputer")
-                        .accessibilityLabel("실행 Worker \(workerLabel)")
-                }
-                Text(run.updatedAt, style: .relative)
             }
             .font(.caption)
             .foregroundStyle(.tertiary)
         }
         .padding(.vertical, 4)
+    }
+
+    private var identityMetadata: some View {
+        HStack(spacing: 10) {
+            if let runNumber = run.runNumber {
+                Text("\(issueKeyPrefix)-\(runNumber)")
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+            if let workflowStage = run.workflowStage,
+               let workflowStageLabel = Self.workflowStageLabel(for: run) {
+                Image(systemName: Self.workflowStageSystemImage(for: workflowStage))
+                    .accessibilityLabel("작업 단계 \(workflowStageLabel)")
+                    .help(workflowStageLabel)
+            }
+            if let assignee {
+                ProfileImageView(
+                    image: assignee.image,
+                    name: assignee.name,
+                    size: 20
+                )
+                .accessibilityLabel("담당자 \(assignee.name)")
+            }
+            if let workerLabel {
+                RunWorkerIconView(worker: worker, label: workerLabel)
+            }
+        }
+        .fixedSize(horizontal: true, vertical: false)
+    }
+
+    private var updatedMetadata: some View {
+        Text(run.updatedAt, style: .relative)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+    }
+}
+
+private struct RunWorkerIconView: View {
+    let worker: DashboardWorker?
+    let label: String
+
+    var body: some View {
+        ZStack {
+            switch worker?.icon?.type {
+            case .emoji:
+                Text(worker?.icon?.value ?? "")
+                    .font(.system(size: 12))
+                    .frame(width: 20, height: 20)
+                    .background(Color.secondary.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            case .image:
+                ProfileImageView(
+                    image: worker?.icon?.value,
+                    systemImage: "desktopcomputer",
+                    size: 20,
+                    cornerRadius: 6
+                )
+            case nil:
+                Image(systemName: "desktopcomputer")
+                    .font(.caption.weight(.medium))
+                    .frame(width: 20, height: 20)
+                    .background(Color.secondary.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("실행 Worker \(label)")
+        .help(label)
     }
 }
 
@@ -505,7 +599,13 @@ struct TaskSearchView: View {
     let token: String
     let api: any MobileAPIClientProtocol
 
-    private var results: [DashboardRun] { TaskSearch.results(in: runs, query: query) }
+    private var results: [DashboardRun] {
+        TaskSearch.results(
+            in: runs,
+            query: query,
+            issueKeyPrefix: project.effectiveIssueKeyPrefix
+        )
+    }
 
     var body: some View {
         List {
@@ -523,6 +623,7 @@ struct TaskSearchView: View {
                         RunDetailView(
                             run: run,
                             projectID: project.id,
+                            issueKeyPrefix: project.effectiveIssueKeyPrefix,
                             token: token,
                             api: api,
                             allRuns: runs,
@@ -532,8 +633,9 @@ struct TaskSearchView: View {
                     } label: {
                         RunRow(
                             run: run,
+                            issueKeyPrefix: project.effectiveIssueKeyPrefix,
                             assignee: members.first { $0.userId == run.assigneeUserId },
-                            workerLabel: RunRow.workerLabel(for: run, workers: workers)
+                            worker: RunRow.worker(for: run, workers: workers)
                         )
                     }
                     .accessibilityIdentifier("search-result-\(run.id.uuidString)")
@@ -621,6 +723,7 @@ struct RunDetailView: View {
     }
 
     private let projectID: UUID
+    private let issueKeyPrefix: String
     private let projects: [ProjectsResponse.Project]
     private let allRuns: [DashboardRun]
     private let workers: [DashboardWorker]
@@ -640,6 +743,7 @@ struct RunDetailView: View {
     init(
         run: DashboardRun,
         projectID: UUID,
+        issueKeyPrefix: String = "AH",
         token: String,
         api: any MobileAPIClientProtocol,
         projects: [ProjectsResponse.Project] = [],
@@ -651,6 +755,7 @@ struct RunDetailView: View {
     ) {
         self.run = run
         self.projectID = projectID
+        self.issueKeyPrefix = issueKeyPrefix
         self.projects = projects
         self.allRuns = allRuns
         self.workers = workers
@@ -689,91 +794,12 @@ struct RunDetailView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            Picker("이슈 상세 탭", selection: $selectedTab) {
-                ForEach(RunDetailTab.allCases) { tab in
-                    Text(tab.title)
-                        .tag(tab)
-                        .accessibilityIdentifier("run-detail-tab-\(tab.rawValue)")
-                }
-            }
-            .pickerStyle(.segmented)
-            .controlSize(.small)
-            .padding(.horizontal)
-            .padding(.vertical, 10)
-            .background(Color(uiColor: .systemGroupedBackground))
-            .accessibilityIdentifier("run-detail-tabs")
-
-            List { selectedTabContent }
-            .accessibilityIdentifier("run-detail-\(selectedTab.rawValue)-panel")
-        }
-        .navigationTitle(run.title)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Menu {
-                    let shareURL = BriarShareLinks.issueShareURL(
-                        projectID: projectID,
-                        runID: run.id,
-                        origin: BriarShareLinks.defaultOrigin
-                    )
-                    ShareLink(item: shareURL) {
-                        Label("이슈 공유", systemImage: "square.and.arrow.up")
-                    }
-                    Button {
-                        ClipboardService.copy(shareURL.absoluteString)
-                        linkCopied = true
-                    } label: {
-                        Label(L10n.text(.copyLink, locale: locale), systemImage: "doc.on.doc")
-                    }
-                    .accessibilityIdentifier("issue-copy-link")
-                    Divider()
-                    Button("수정") { showingEdit = true }
-                    if !transferDestinations.isEmpty {
-                        Button("다른 프로젝트로 이동") {
-                            transferTargetProjectID = transferDestinations.first?.id
-                            showingTransfer = true
-                        }
-                    }
-                    Button("삭제", role: .destructive) { confirmingDelete = true }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                }
-                .accessibilityIdentifier("issue-actions-menu")
-            }
-        }
-        .companionToast(
-            isPresented: $linkCopied,
-            message: L10n.text(.linkCopied, locale: locale)
-        )
-        .task {
-            inbox.markIssueRead(runID: run.id)
-            await detail.load()
-        }
-        .refreshable { await detail.load() }
-        .onChange(of: inbox.messages) { _, _ in
-            inbox.markIssueRead(runID: run.id)
-        }
-        .onChange(of: run.status) { _, status in
-            localStatus = status
-            // Keep parity with shared React RunPage: status transitions reselect the default tab.
-            selectedTab = status.prefersResultDetailTab ? .result : .issue
-        }
-        .onChange(of: run.workflowStage) { _, stage in localWorkflowStage = stage }
-        .onChange(of: run.prerequisites) { _, prerequisites in
-            dependencyIDs = Set((prerequisites ?? []).map(\.id))
-        }
+        lifecycleContent
         .sheet(item: $previewFile) { file in
             QuickLookPreview(fileURL: file.url)
                 .ignoresSafeArea()
         }
-        .alert("미리보기를 열 수 없음", isPresented: Binding(
-            get: { previewError != nil },
-            set: { if !$0 { previewError = nil } }
-        )) {
-            Button("확인", role: .cancel) { previewError = nil }
-        } message: {
-            Text(previewError ?? "")
-        }
+        .modifier(PreviewErrorAlertModifier(message: $previewError))
         .alert("이슈를 삭제할까요?", isPresented: $confirmingDelete) {
             Button("삭제", role: .destructive) { Task { await deleteIssue() } }
             Button("취소", role: .cancel) {}
@@ -815,8 +841,9 @@ struct RunDetailView: View {
         }
         .sheet(isPresented: $showingDependencyPicker) {
             DependencyPickerSheet(
-                candidates: dependencyCandidates,
                 selectedIDs: $dependencyIDs,
+                candidates: dependencyCandidates,
+                issueKeyPrefix: issueKeyPrefix,
                 onAdd: { prerequisiteID in
                     try await changeDependency(prerequisiteID, enabled: true)
                 }
@@ -824,6 +851,86 @@ struct RunDetailView: View {
             .presentationDetents([.medium, .large])
         }
         .accessibilityIdentifier("run-detail")
+    }
+
+    private var lifecycleContent: some View {
+        detailContent
+            .navigationTitle(run.title)
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        let shareURL = BriarShareLinks.issueShareURL(
+                            projectID: projectID,
+                            runID: run.id,
+                            origin: BriarShareLinks.defaultOrigin
+                        )
+                        ShareLink(item: shareURL) {
+                            Label("이슈 공유", systemImage: "square.and.arrow.up")
+                        }
+                        Button {
+                            ClipboardService.copy(shareURL.absoluteString)
+                            linkCopied = true
+                        } label: {
+                            Label(L10n.text(.copyLink, locale: locale), systemImage: "doc.on.doc")
+                        }
+                        .accessibilityIdentifier("issue-copy-link")
+                        Divider()
+                        Button("수정") { showingEdit = true }
+                        if !transferDestinations.isEmpty {
+                            Button("다른 프로젝트로 이동") {
+                                transferTargetProjectID = transferDestinations.first?.id
+                                showingTransfer = true
+                            }
+                        }
+                        Button("삭제", role: .destructive) { confirmingDelete = true }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                    .accessibilityIdentifier("issue-actions-menu")
+                }
+            }
+            .companionToast(
+                isPresented: $linkCopied,
+                message: L10n.text(.linkCopied, locale: locale)
+            )
+            .task {
+                inbox.markIssueRead(runID: run.id)
+                await detail.load()
+            }
+            .refreshable { await detail.load() }
+            .onChange(of: inbox.messages) { _, _ in
+                inbox.markIssueRead(runID: run.id)
+            }
+            .onChange(of: run.status) { _, status in
+                localStatus = status
+                // Keep parity with shared React RunPage: status transitions reselect the default tab.
+                selectedTab = status.prefersResultDetailTab ? .result : .issue
+            }
+            .onChange(of: run.workflowStage) { _, stage in localWorkflowStage = stage }
+            .onChange(of: run.prerequisites) { _, prerequisites in
+                dependencyIDs = Set((prerequisites ?? []).map(\.id))
+            }
+    }
+
+    private var detailContent: some View {
+        VStack(spacing: 0) {
+            Picker("이슈 상세 탭", selection: $selectedTab) {
+                ForEach(RunDetailTab.allCases) { tab in
+                    Text(tab.title)
+                        .tag(tab)
+                        .accessibilityIdentifier("run-detail-tab-\(tab.rawValue)")
+                }
+            }
+            .pickerStyle(.segmented)
+            .controlSize(.small)
+            .padding(.horizontal)
+            .padding(.vertical, 10)
+            .background(Color(uiColor: .systemGroupedBackground))
+            .accessibilityIdentifier("run-detail-tabs")
+
+            List { selectedTabContent }
+            .accessibilityIdentifier("run-detail-\(selectedTab.rawValue)-panel")
+        }
     }
 
     @ViewBuilder
@@ -1064,7 +1171,7 @@ struct RunDetailView: View {
                     HStack {
                         VStack(alignment: .leading) {
                             Text(dependency.title)
-                            Text("#\(dependency.runNumber) · \(dependency.status.displayName)")
+                            Text("\(issueKeyPrefix)-\(dependency.runNumber) · \(dependency.status.displayName)")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -1510,7 +1617,9 @@ struct RunDetailView: View {
                         status: localStatus,
                         reviewed: !(run.resultReviews ?? []).isEmpty
                     )
-                    if let runNumber = run.runNumber { Text("#\(runNumber)") }
+                    if let runNumber = run.runNumber {
+                        Text("\(issueKeyPrefix)-\(runNumber)")
+                    }
                     Spacer()
                     Text(run.updatedAt, style: .relative)
                 }
@@ -1858,6 +1967,24 @@ struct RunDetailView: View {
     }
 }
 
+private struct PreviewErrorAlertModifier: ViewModifier {
+    @Binding var message: String?
+
+    func body(content: Content) -> some View {
+        content.alert(
+            "미리보기를 열 수 없음",
+            isPresented: Binding(
+                get: { message != nil },
+                set: { if !$0 { message = nil } }
+            )
+        ) {
+            Button("확인", role: .cancel) { message = nil }
+        } message: {
+            Text(message ?? "")
+        }
+    }
+}
+
 struct DependencyPickerSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var selectedIDs: Set<UUID>
@@ -1866,6 +1993,7 @@ struct DependencyPickerSheet: View {
     @State private var errorMessage: String?
 
     let candidates: [DashboardRun]
+    let issueKeyPrefix: String
     let onAdd: (UUID) async throws -> Void
 
     private var filteredCandidates: [DashboardRun] {
@@ -1876,7 +2004,7 @@ struct DependencyPickerSheet: View {
             let searchableText = [
                 candidate.title,
                 candidate.detail ?? "",
-                candidate.runNumber.map { "#\($0)" } ?? "",
+                candidate.runNumber.map { "\(issueKeyPrefix)-\($0)" } ?? "",
                 candidate.status.displayName,
             ].joined(separator: " ")
             return searchableText.localizedCaseInsensitiveContains(normalizedQuery)
@@ -1913,7 +2041,7 @@ struct DependencyPickerSheet: View {
                                             .foregroundStyle(.primary)
                                         HStack(spacing: 6) {
                                             if let number = candidate.runNumber {
-                                                Text("#\(number)")
+                                                Text("\(issueKeyPrefix)-\(number)")
                                             }
                                             Text(candidate.status.displayName)
                                         }
@@ -1929,7 +2057,7 @@ struct DependencyPickerSheet: View {
                                     }
                                 }
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.borderless)
                             .disabled(addingID != nil)
                             .accessibilityLabel("\(candidate.title) 의존성 추가")
                             .accessibilityIdentifier(
@@ -1960,6 +2088,7 @@ struct DependencyPickerSheet: View {
         defer { addingID = nil }
         do {
             try await onAdd(candidate.id)
+            dismiss()
         } catch {
             errorMessage = error.localizedDescription
         }

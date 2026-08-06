@@ -87,6 +87,7 @@ export function CompanionHeader({
             options={projects.map((project) => ({
               label: project.name,
               value: project.id,
+              icon: project.icon,
             }))}
             size="small"
             value={activeProjectId ?? ""}

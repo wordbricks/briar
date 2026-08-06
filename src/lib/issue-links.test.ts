@@ -176,6 +176,18 @@ describe("issue links", () => {
     expect(writeText).toHaveBeenCalledWith("AH-42");
   });
 
+  it("copies the configured project issue key", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    await copyIssueId(42, "BR");
+
+    expect(writeText).toHaveBeenCalledWith("BR-42");
+  });
+
   it("uses native sharing when the WebView supports it", async () => {
     const share = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "share", {

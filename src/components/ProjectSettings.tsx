@@ -36,6 +36,7 @@ import {
   SettingsSidebar,
 } from "@/components/settings";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -73,6 +74,11 @@ import type {
   LinearImportStatesResult,
 } from "../lib/linear-import";
 import { requiredWorkflowStages } from "../lib/auto-hunt-contract";
+import {
+  defaultIssueKeyPrefix,
+  isIssueKeyPrefix,
+  normalizeIssueKeyPrefix,
+} from "../lib/issue-key";
 import {
   projectIconAccept,
   projectIconFromFile,
@@ -115,6 +121,7 @@ export function ProjectSettings({
   onLoadLinearImportStates,
   onImportLinearIssues,
   onIconChange,
+  onIssueKeyPrefixChange,
   onRefreshVelen,
   onRefreshHealth,
   project,
@@ -153,6 +160,10 @@ export function ProjectSettings({
     statusMapping: Record<string, string>;
   }) => Promise<LinearImportResult>;
   onIconChange: (projectId: string, icon: string | null) => Promise<unknown>;
+  onIssueKeyPrefixChange: (
+    projectId: string,
+    issueKeyPrefix: string,
+  ) => Promise<unknown>;
   onRefreshVelen: (org?: string | null) => Promise<VelenInspection | null>;
   onRefreshHealth?: () => Promise<AutoHuntHealth | null>;
   project: Project;
@@ -203,9 +214,20 @@ export function ProjectSettings({
   const [isIconSaving, setIsIconSaving] = useState(false);
   const [iconError, setIconError] = useState<string | null>(null);
   const [iconSaved, setIconSaved] = useState(false);
+  const [issueKeyPrefix, setIssueKeyPrefix] = useState(
+    project.issueKeyPrefix ?? defaultIssueKeyPrefix,
+  );
+  const [issueKeyPrefixSaving, setIssueKeyPrefixSaving] = useState(false);
+  const [issueKeyPrefixError, setIssueKeyPrefixError] = useState<string | null>(null);
+  const [issueKeyPrefixSaved, setIssueKeyPrefixSaved] = useState(false);
   useEffect(() => {
     if (initialSection) setActiveSection(initialSection);
   }, [initialSection]);
+  useEffect(() => {
+    setIssueKeyPrefix(project.issueKeyPrefix ?? defaultIssueKeyPrefix);
+    setIssueKeyPrefixError(null);
+    setIssueKeyPrefixSaved(false);
+  }, [project.id, project.issueKeyPrefix]);
   const [velenOrg, setVelenOrg] = useState(
     () => dashboard?.settings.velenOrg ?? "",
   );
@@ -614,6 +636,73 @@ export function ProjectSettings({
                     date: new Date(project.createdAt).toLocaleDateString(localeTag),
                   })}
                 </Typography>
+              </div>
+              <div className="border-t border-border pt-5">
+                <div className="grid gap-2">
+                  <div>
+                    <Typography as="strong" variant="body">
+                      {t("settings.issueKeyPrefix")}
+                    </Typography>
+                    <Typography className="mt-1" tone="muted" variant="caption">
+                      {t("settings.issueKeyPrefixDescription")}
+                    </Typography>
+                  </div>
+                  <div className="flex max-w-sm items-center gap-2">
+                    <Input
+                      aria-label={t("settings.issueKeyPrefix")}
+                      disabled={project.role === "member" || issueKeyPrefixSaving}
+                      maxLength={3}
+                      onChange={(event) => {
+                        setIssueKeyPrefix(
+                          normalizeIssueKeyPrefix(event.currentTarget.value),
+                        );
+                        setIssueKeyPrefixError(null);
+                        setIssueKeyPrefixSaved(false);
+                      }}
+                      value={issueKeyPrefix}
+                    />
+                    <Button
+                      disabled={
+                        project.role === "member" ||
+                        issueKeyPrefixSaving ||
+                        !isIssueKeyPrefix(issueKeyPrefix) ||
+                        issueKeyPrefix ===
+                          (project.issueKeyPrefix ?? defaultIssueKeyPrefix)
+                      }
+                      onClick={() => {
+                        setIssueKeyPrefixSaving(true);
+                        setIssueKeyPrefixError(null);
+                        setIssueKeyPrefixSaved(false);
+                        void onIssueKeyPrefixChange(project.id, issueKeyPrefix)
+                          .then(() => setIssueKeyPrefixSaved(true))
+                          .catch(() =>
+                            setIssueKeyPrefixError(
+                              t("settings.issueKeyPrefixSaveFailed"),
+                            ),
+                          )
+                          .finally(() => setIssueKeyPrefixSaving(false));
+                      }}
+                      type="button"
+                      variant="outline"
+                    >
+                      {issueKeyPrefixSaving
+                        ? t("common.saving")
+                        : t("common.save")}
+                    </Button>
+                  </div>
+                  <Typography tone="muted" variant="micro">
+                    {t("settings.issueKeyPrefixHint")}
+                  </Typography>
+                  {issueKeyPrefixError ? (
+                    <Typography className="text-destructive" role="alert" variant="caption">
+                      {issueKeyPrefixError}
+                    </Typography>
+                  ) : issueKeyPrefixSaved ? (
+                    <Typography className="text-success" role="status" variant="caption">
+                      {t("settings.issueKeyPrefixSaved")}
+                    </Typography>
+                  ) : null}
+                </div>
               </div>
               <div className="border-t border-border pt-5">
                 <div className="flex items-start gap-4">

@@ -91,6 +91,7 @@ const sessionUserSchema = z.object({
 const projectSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
+  issueKeyPrefix: z.string().regex(/^[A-Z0-9]{1,3}$/u).default("AH"),
   icon: z
     .string()
     .max(400_000)
@@ -1010,6 +1011,22 @@ export async function updateProjectIcon(
   return { project: projectSchema.parse(result.project) };
 }
 
+export async function updateProjectIssueKeyPrefix(
+  token: string,
+  projectId: string,
+  issueKeyPrefix: string,
+) {
+  const result = await request<{ project: unknown }>(
+    `/projects/${projectId}/issue-key-prefix`,
+    token,
+    {
+      method: "PUT",
+      body: JSON.stringify({ issueKeyPrefix }),
+    },
+  );
+  return { project: projectSchema.parse(result.project) };
+}
+
 export async function loadProjectAgents(
   token: string,
   projectId: string,
@@ -1332,6 +1349,7 @@ export async function createIssue(
   form.set("status", input.status);
   form.set("preferredProvider", input.preferredProvider ?? "");
   form.set("preferredModel", input.preferredModel ?? "");
+  form.set("preferredEffort", input.preferredEffort ?? "");
   if (input.checkpoints?.length) {
     form.set("checkpoints", JSON.stringify(input.checkpoints));
   }

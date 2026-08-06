@@ -60,6 +60,7 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["완료"].exists)
         XCTAssertTrue(app.staticTexts["확인 필요"].exists)
         XCTAssertTrue(app.staticTexts["실패"].exists)
+        captureScreenshot(named: "companion-task-icons")
 
         app.segmentedControls.buttons["Attention"].tap()
         XCTAssertTrue(app.staticTexts["오프라인 복구 확인"].waitForExistence(timeout: 5))
@@ -114,14 +115,14 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(dependencySearch.waitForExistence(timeout: 5))
         dependencySearch.tap()
         dependencySearch.typeText("API 준비")
+        app.keyboards.buttons["Search"].tap()
         let candidate = app.buttons[
             "dependency-option-eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
         ]
         XCTAssertTrue(candidate.waitForExistence(timeout: 5))
         candidate.tap()
 
-        XCTAssertFalse(candidate.waitForExistence(timeout: 5))
-        app.buttons["dependency-picker-close"].tap()
+        XCTAssertTrue(app.collectionViews["dependency-picker"].waitForNonExistence(timeout: 5))
         XCTAssertTrue(app.buttons[
             "remove-dependency-eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
         ].waitForExistence(timeout: 5))
@@ -159,6 +160,14 @@ final class BriarCompanionUITests: XCTestCase {
             .textClipped,
         ])
         captureScreenshot(named: "companion-accessibility-xxxl")
+
+        app.buttons["login-button"].tap()
+        XCTAssertTrue(app.buttons["project-continue-button"].waitForExistence(timeout: 5))
+        app.buttons["project-continue-button"].tap()
+        XCTAssertTrue(app.buttons["project-menu"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["iOS Native Companion 읽기 경험"].exists)
+        try app.performAccessibilityAudit(for: [.textClipped])
+        captureScreenshot(named: "companion-task-list-accessibility-xxxl")
     }
 
     func testAgentsInboxAndSettingsSurface() {
@@ -171,6 +180,20 @@ final class BriarCompanionUITests: XCTestCase {
 
         app.tabBars.buttons["Inbox"].tap()
         XCTAssertTrue(app.navigationBars["Inbox"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["inbox-importance-filters"].exists)
+        for category in ["urgent", "action_required", "important", "activity"] {
+            XCTAssertTrue(
+                app.buttons["inbox-filter-\(category)"].exists,
+                "\(category) 필터 칩이 표시되어야 합니다."
+            )
+        }
+        // Turning off the activity filter hides routine updates, keeping attention rows.
+        app.buttons["inbox-filter-activity"].tap()
+        XCTAssertTrue(app.staticTexts["오프라인 복구 확인"].waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            app.staticTexts["공유 API 계약 검증"].waitForNonExistence(timeout: 5),
+            "최근 활동 메시지는 활동 필터를 끄면 사라져야 합니다."
+        )
         captureScreenshot(named: "companion-inbox")
 
         app.buttons["account-menu"].tap()
@@ -190,6 +213,7 @@ final class BriarCompanionUITests: XCTestCase {
         app.buttons["create-issue-button"].tap()
         let title = app.textFields["create-issue-title"]
         XCTAssertTrue(title.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["create-issue-paste-attachment"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.navigationBars["새 이슈"].exists)
         title.tap()
         title.typeText("모바일 쓰기 흐름 확인")

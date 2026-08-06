@@ -211,3 +211,28 @@ visible result content instead of relying on an overwritten list accessibility
 identifier. Archive identity, App Store provisioning, distribution signature,
 production entitlements, and all alternate app icons were verified before
 upload.
+
+## 2026-08-06 — 1.2.77 (1)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.77`
+- App Store Connect build: `1`
+- App Store Connect build ID: `da37daae-cb38-429f-a01d-bfb089afb350`
+- Latest main commit: `00fed4b1`
+- Release source commit: `52fd88678135879f083a069a94e17c84a692172a`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Internal group: `wordbricks` (`hasAccessToAllBuilds=true`)
+- Automatic tester notification: enabled
+- IPA SHA-256: `9903d192c6db27c0ed4b7e0be022bfb9c3b4d6077a8077cbfaac7ad02983360f`
+
+The release passed the shared API contract, Swift unit and UI tests, iPhone and
+iPad accessibility and layout tests, Production analyze and build checks, and
+the Tauri iOS and Android regression builds. It restores Swift 6 compilation,
+uses the iOS-supported paste button for clipboard image attachments, and makes
+dependency selection reliable on iOS 26. Archive identity, App Store
+provisioning, distribution signature, production entitlements, and all
+alternate app icons were verified before upload.

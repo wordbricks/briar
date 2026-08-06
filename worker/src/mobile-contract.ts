@@ -60,6 +60,7 @@ export const mobileProjectsResponseSchema = z.object({
   projects: z.array(z.object({
     id: z.uuid(),
     name: z.string(),
+    issueKeyPrefix: z.string().regex(/^[A-Z0-9]{1,3}$/u).default("AH"),
     icon: z.string().nullable(),
     organizationId: z.uuid(),
     organizationName: z.string(),
@@ -193,6 +194,10 @@ export const mobileInboxReadStatesSchema = z.object({
 export const mobileDashboardWorkerSchema = z.object({
   id: z.string(),
   label: z.string(),
+  icon: z.discriminatedUnion("type", [
+    z.object({ type: z.literal("emoji"), value: z.string() }),
+    z.object({ type: z.literal("image"), value: z.string() }),
+  ]).nullable().optional(),
   agentProvider: z.enum(["codex", "claude", "grok", "opencode"]).optional(),
   providers: z.array(z.enum(["codex", "claude", "grok", "opencode"])).optional(),
   readiness: z.string(),
@@ -359,6 +364,7 @@ const mobileIssueWriteBaseSchema = z
     status: z.enum(["backlog", "queued"]),
     preferredProvider: mobileProviderSchema.nullable().optional(),
     preferredModel: z.string().nullable().optional(),
+    preferredEffort: mobileEffortSchema.nullable().optional(),
   })
   .strict();
 
@@ -368,6 +374,18 @@ export const mobileCreateIssueRequestSchema = mobileIssueWriteBaseSchema
       context.addIssue({
         code: "custom",
         message: "A provider is required for a model preference",
+      });
+    }
+    if (input.preferredEffort && !input.preferredProvider) {
+      context.addIssue({
+        code: "custom",
+        message: "A provider is required for an effort preference",
+      });
+    }
+    if (input.preferredEffort && !input.preferredModel) {
+      context.addIssue({
+        code: "custom",
+        message: "A model is required for an effort preference",
       });
     }
   });

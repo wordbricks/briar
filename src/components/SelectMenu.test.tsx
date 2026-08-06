@@ -117,6 +117,42 @@ describe("SelectMenu", () => {
     container.remove();
   });
 
+  it("renders an optional icon on the trigger and the option rows", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <SelectMenu
+          id="icon-select"
+          label="Project"
+          onValueChange={() => undefined}
+          options={[
+            {
+              label: "Briar",
+              value: "project-1",
+              icon: "data:image/png;base64,AA==",
+            },
+            { label: "Briar Mobile", value: "project-2", icon: null },
+          ]}
+          value="project-1"
+        />,
+      );
+    });
+
+    const trigger = container.querySelector<HTMLButtonElement>("#icon-select");
+    expect(trigger?.querySelector(".select-menu-trigger-icon")?.getAttribute("src"))
+      .toBe("data:image/png;base64,AA==");
+
+    await act(async () => trigger?.click());
+    const listbox = document.querySelector("#icon-select-listbox");
+    expect(listbox?.querySelectorAll(".select-menu-option-icon")).toHaveLength(1);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("renders the portaled listbox above the trigger's ancestor layer", async () => {
     const container = document.createElement("div");
     container.style.position = "fixed";

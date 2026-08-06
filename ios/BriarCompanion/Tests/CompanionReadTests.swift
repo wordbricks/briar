@@ -18,6 +18,7 @@ final class CompanionReadTests: XCTestCase {
             ),
             DashboardRun(
                 id: UUID(uuidString: "22222222-2222-4222-8222-222222222222")!,
+                runNumber: 2,
                 title: "Offline recovery",
                 status: .blocked,
                 detail: "Needs network attention",
@@ -60,6 +61,10 @@ final class CompanionReadTests: XCTestCase {
         XCTAssertEqual(TaskSearch.results(in: runs, query: "Markdown").count, 1)
         XCTAssertEqual(TaskSearch.results(in: runs, query: "network").count, 1)
         XCTAssertEqual(TaskSearch.results(in: runs, query: "Android").count, 1)
+        XCTAssertEqual(
+            TaskSearch.results(in: runs, query: "BR-2", issueKeyPrefix: "BR").count,
+            1
+        )
         XCTAssertEqual(TaskSearch.results(in: runs, query: "missing").count, 0)
     }
 
@@ -85,5 +90,29 @@ final class CompanionReadTests: XCTestCase {
                 "\(status.rawValue) should open on the Issue tab"
             )
         }
+    }
+
+    func testTaskRowUsesCompactStageAndWorkerIcons() {
+        let worker = DashboardWorker(
+            id: "worker-1",
+            label: "Mac Studio",
+            icon: .init(type: .emoji, value: "🍋"),
+            readiness: "available",
+            readinessDetail: nil,
+            activeSessions: 0,
+            availableSessions: 1
+        )
+        let run = DashboardRun(
+            id: UUID(),
+            title: "Merged task",
+            status: .completed,
+            workflowStage: "merged",
+            workerId: worker.id,
+            updatedAt: newer
+        )
+
+        XCTAssertEqual(RunRow.workflowStageSystemImage(for: "merged"), "arrow.triangle.merge")
+        XCTAssertEqual(RunRow.workflowStageSystemImage(for: "custom"), "point.3.connected.trianglepath.dotted")
+        XCTAssertEqual(RunRow.worker(for: run, workers: [worker]), worker)
     }
 }

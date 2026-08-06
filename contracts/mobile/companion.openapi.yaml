@@ -1145,6 +1145,7 @@
         "required": [
           "id",
           "name",
+          "issueKeyPrefix",
           "icon",
           "organizationId",
           "organizationName",
@@ -1158,6 +1159,10 @@
           },
           "name": {
             "type": "string"
+          },
+          "issueKeyPrefix": {
+            "type": "string",
+            "pattern": "^[A-Z0-9]{1,3}$"
           },
           "icon": {
             "type": [
@@ -1512,6 +1517,16 @@
           "label": {
             "type": "string"
           },
+          "icon": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/WorkerIcon"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "agentProvider": {
             "type": "string",
             "enum": [
@@ -1552,6 +1567,42 @@
           }
         },
         "additionalProperties": true
+      },
+      "WorkerIcon": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "value"
+            ],
+            "properties": {
+              "type": {
+                "const": "emoji"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "value"
+            ],
+            "properties": {
+              "type": {
+                "const": "image"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
       },
       "ConversationNotification": {
         "type": "object",

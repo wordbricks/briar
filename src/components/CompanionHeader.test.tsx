@@ -30,6 +30,7 @@ const projects = [
     id: "project-1",
     name: "Briar",
     organizationId: "organization-1",
+    icon: "data:image/png;base64,AA==",
     createdAt: "2026-07-23",
   },
 ];
@@ -66,6 +67,8 @@ describe("CompanionHeader", () => {
     expect(markup).not.toContain("companion-workspace-mark");
     expect(markup).toContain('aria-label="현재 프로젝트"');
     expect(markup).toContain('<span class="select-menu-value">Briar</span>');
+    expect(markup).toContain('class="select-menu-trigger-icon"');
+    expect(markup).toContain('src="data:image/png;base64,AA=="');
     expect(markup).toContain('class="companion-header-trailing"');
     expect(markup).toContain('class="companion-page-title"');
     expect(markup).toContain(">Tasks</h1>");

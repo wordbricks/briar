@@ -372,7 +372,7 @@ describe("Inbox", () => {
     expect(container.textContent).toContain("재현 절차를 추가했습니다.");
   });
 
-  it("companion mode shows a chronological feed without category filters or page title", async () => {
+  it("companion mode shows a chronological feed with importance filters and no page title", async () => {
     const messages = [
       issue("activity", "Routine dependency update", {
         occurredAt: "2026-07-28T12:00:00.000Z",
@@ -426,7 +426,14 @@ describe("Inbox", () => {
 
     expect(container.querySelector("#inbox-title")).toBeNull();
     expect(container.querySelector(".inbox-heading")).toBeNull();
-    expect(container.querySelector(".inbox-filters")).toBeNull();
+    // Mobile keeps the importance filter while hiding the project filter and count.
+    const filters = [...container.querySelectorAll(".inbox-filter")];
+    expect(filters).toHaveLength(4);
+    expect(
+      filters.map((filter) => filter.getAttribute("aria-pressed")),
+    ).toEqual(["true", "true", "true", "true"]);
+    expect(container.querySelector(".inbox-project-filter")).toBeNull();
+    expect(container.querySelector(".inbox-filter-bar > span")).toBeNull();
     expect(container.querySelector(".inbox-section")).toBeNull();
     expect(container.querySelectorAll(".inbox-message")).toHaveLength(3);
     expect(container.textContent).toContain("Routine dependency update");
@@ -443,6 +450,94 @@ describe("Inbox", () => {
       "Production is blocked",
       "Release scope decision",
     ]);
+  });
+
+  it("companion mode filters the feed by importance", async () => {
+    const messages = [
+      issue("activity", "Routine dependency update", {
+        structuredResult: {
+          summary: "Routine maintenance completed.",
+          outcome: "completed",
+          importance: "routine",
+          urgency: "normal",
+          impact: "issue",
+          humanActionRequired: false,
+          nextAction: null,
+          dueAt: null,
+        },
+      }),
+      issue("urgent", "Production is blocked", {
+        status: "failed",
+        priority: 1,
+      }),
+      issue("action", "Release scope decision", {
+        structuredResult: {
+          summary: "A release decision is required.",
+          outcome: "partial",
+          importance: "important",
+          urgency: "time_sensitive",
+          impact: "project",
+          humanActionRequired: true,
+          nextAction: "Choose the release scope.",
+          dueAt: null,
+        },
+      }),
+      issue("important", "Milestone shipped", {
+        structuredResult: {
+          summary: "The project milestone shipped.",
+          outcome: "completed",
+          importance: "important",
+          urgency: "normal",
+          impact: "project",
+          humanActionRequired: false,
+          nextAction: null,
+          dueAt: null,
+        },
+      }),
+    ];
+
+    await act(async () =>
+      root.render(
+        <I18nProvider>
+          <Inbox
+            companionMode
+            isSidebarOpen
+            messages={messages}
+            onMarkAllRead={vi.fn()}
+            onMarkRead={vi.fn()}
+            onOpen={vi.fn()}
+            projects={projects}
+            unreadCount={4}
+          />
+        </I18nProvider>,
+      ),
+    );
+
+    expect(container.querySelectorAll(".inbox-message")).toHaveLength(4);
+
+    const activityFilter = [...container.querySelectorAll(".inbox-filter")].find(
+      (button) => button.textContent?.includes("최근 활동"),
+    );
+    await act(async () =>
+      (activityFilter as HTMLButtonElement | undefined)?.click(),
+    );
+
+    expect(activityFilter?.getAttribute("aria-pressed")).toBe("false");
+    expect(container.querySelectorAll(".inbox-message")).toHaveLength(3);
+    expect(container.textContent).not.toContain("Routine dependency update");
+    expect(container.textContent).toContain("Production is blocked");
+    expect(container.textContent).toContain("Release scope decision");
+    expect(container.textContent).toContain("Milestone shipped");
+
+    const urgentFilter = [...container.querySelectorAll(".inbox-filter")].find(
+      (button) => button.textContent?.includes("긴급"),
+    );
+    await act(async () => (urgentFilter as HTMLButtonElement | undefined)?.click());
+
+    expect(container.querySelectorAll(".inbox-message")).toHaveLength(2);
+    expect(container.textContent).not.toContain("Production is blocked");
+    expect(container.textContent).toContain("Release scope decision");
+    expect(container.textContent).toContain("Milestone shipped");
   });
 
   it("pages helper functions reveal 50 items at a time", () => {

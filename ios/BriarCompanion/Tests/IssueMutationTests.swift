@@ -99,6 +99,13 @@ final class IssueMutationTests: XCTestCase {
         XCTAssertEqual(restored.preferredModel, "sonnet")
     }
 
+    func testIssueDraftDefaultsEffortToHigh() {
+        let draft = IssueDraft()
+        XCTAssertEqual(draft.preferredEffort, IssueDraft.defaultEffort)
+        XCTAssertEqual(draft.preferredEffort, .high)
+        XCTAssertTrue(draft.isEmpty)
+    }
+
     func testCreateIssueRequestEncodesPreferredProviderAndModel() throws {
         let request = CreateIssueRequest(
             title: "선호 실행 이슈",
@@ -107,7 +114,8 @@ final class IssueMutationTests: XCTestCase {
             assigneeUserId: nil,
             status: .queued,
             preferredProvider: .claude,
-            preferredModel: "sonnet"
+            preferredModel: "sonnet",
+            preferredEffort: .high
         )
         let data = try JSONEncoder.mobileContract.encode(request)
         let object = try XCTUnwrap(
@@ -115,6 +123,7 @@ final class IssueMutationTests: XCTestCase {
         )
         XCTAssertEqual(object["preferredProvider"] as? String, "claude")
         XCTAssertEqual(object["preferredModel"] as? String, "sonnet")
+        XCTAssertEqual(object["preferredEffort"] as? String, "high")
     }
 
     func testCreateIssueSendsPreferredPreferences() async throws {
@@ -127,6 +136,7 @@ final class IssueMutationTests: XCTestCase {
         var draft = IssueDraft(title: "선호 실행 이슈", description: "", priority: 2, status: .queued)
         draft.preferredProvider = .claude
         draft.preferredModel = "sonnet"
+        draft.preferredEffort = .high
 
         _ = try await store.createIssue(draft: draft, attachments: [])
 
@@ -137,6 +147,7 @@ final class IssueMutationTests: XCTestCase {
         )
         XCTAssertEqual(body["preferredProvider"] as? String, "claude")
         XCTAssertEqual(body["preferredModel"] as? String, "sonnet")
+        XCTAssertEqual(body["preferredEffort"] as? String, "high")
     }
 
     func testDispatchRunRequestEncodesWorkerSelection() throws {
@@ -194,7 +205,8 @@ final class IssueMutationTests: XCTestCase {
             reassign: false
         )
 
-        let bodyData = try XCTUnwrap(await recorder.lastJSONBodyData())
+        let recordedBodyData = await recorder.lastJSONBodyData()
+        let bodyData = try XCTUnwrap(recordedBodyData)
         let body = try XCTUnwrap(
             JSONSerialization.jsonObject(with: bodyData) as? [String: Any]
         )
@@ -224,7 +236,8 @@ final class IssueMutationTests: XCTestCase {
             reassign: false
         )
 
-        let bodyData = try XCTUnwrap(await recorder.lastJSONBodyData())
+        let recordedBodyData = await recorder.lastJSONBodyData()
+        let bodyData = try XCTUnwrap(recordedBodyData)
         let body = try XCTUnwrap(
             JSONSerialization.jsonObject(with: bodyData) as? [String: Any]
         )
@@ -250,6 +263,42 @@ final class IssueMutationTests: XCTestCase {
             // Expected.
         }
         _ = try await first
+        let count = await recorder.requestCount()
+        XCTAssertEqual(count, 1)
+    }
+
+    func testDuplicateDispatchTapSendsOnlyOneRequest() async throws {
+        let recorder = MutationAPIRecorder(delay: .milliseconds(100))
+        let store = IssueMutationStore(
+            api: recorder,
+            projectID: Self.projectID,
+            token: "token"
+        )
+        let preferences = IssueExecutionPreferences(
+            provider: .codex,
+            model: nil,
+            effort: nil
+        )
+
+        async let first: Void = store.dispatch(
+            runID: Self.runID,
+            preferences: preferences,
+            workerID: nil,
+            reassign: false
+        )
+        try await Task.sleep(for: .milliseconds(10))
+        do {
+            try await store.dispatch(
+                runID: Self.runID,
+                preferences: preferences,
+                workerID: nil,
+                reassign: false
+            )
+            XCTFail("The second tap must be rejected while dispatch is active")
+        } catch IssueMutationError.duplicateAction {
+            // Expected.
+        }
+        try await first
         let count = await recorder.requestCount()
         XCTAssertEqual(count, 1)
     }

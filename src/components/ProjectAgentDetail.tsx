@@ -204,6 +204,7 @@ export function ProjectAgentDetail({
     return (
       <ProjectAgentSessionDetail
         isSidebarOpen={isSidebarOpen}
+        issueKeyPrefix={dashboard?.project.issueKeyPrefix}
         onBack={() => setSelectedSessionId(null)}
         onIssueOpen={onIssueOpen}
         onStop={() => onStopSession(selectedSession.id)}

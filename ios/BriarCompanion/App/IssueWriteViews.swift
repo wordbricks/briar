@@ -36,97 +36,13 @@ struct CreateIssueSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("이슈") {
-                    TextField("제목", text: $draft.title)
-                        .accessibilityIdentifier("create-issue-title")
-                    // Description field with a photo attachment control inside the
-                    // bottom-trailing corner of the writing area.
-                    VStack(alignment: .leading, spacing: 8) {
-                        ZStack(alignment: .bottomTrailing) {
-                            TextField("설명", text: $draft.description, axis: .vertical)
-                                .lineLimit(4...10)
-                                .padding(.trailing, 36)
-                                .padding(.bottom, 28)
-                                .accessibilityIdentifier("create-issue-description")
-                                // Pastes an image from the clipboard as an attachment when the
-                                // user taps the iOS edit menu's default "붙여넣기" (Paste).
-                                .onPasteCommand(of: [UTType.image]) { providers in
-                                    Task { await importPastedImages(providers) }
-                                }
-                            PhotosPicker(
-                                selection: $selectedPhotoItems,
-                                maxSelectionCount: max(
-                                    1,
-                                    PendingIssueAttachment.maximumCount - attachments.count
-                                ),
-                                selectionBehavior: .ordered,
-                                matching: .any(of: [.images, .videos]),
-                                preferredItemEncoding: .compatible
-                            ) {
-                                Image(systemName: "photo")
-                                    .font(.body.weight(.medium))
-                                    .foregroundStyle(.secondary)
-                                    .frame(width: 32, height: 32)
-                                    .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.borderless)
-                            .disabled(
-                                isLoadingPhotos ||
-                                    attachments.count >= PendingIssueAttachment.maximumCount
-                            )
-                            .accessibilityLabel("이미지·영상 첨부")
-                            .accessibilityIdentifier("create-issue-attachment")
-                            .padding(.trailing, 2)
-                            .padding(.bottom, 2)
-                        }
-                        if !attachments.isEmpty {
-                            ForEach(attachments) { attachment in
-                                HStack {
-                                    Label(attachment.filename, systemImage: "paperclip")
-                                        .lineLimit(1)
-                                    Spacer()
-                                    Text(ByteCountFormatter.string(
-                                        fromByteCount: Int64(attachment.data.count),
-                                        countStyle: .file
-                                    ))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    Button(role: .destructive) {
-                                        attachments.removeAll { $0.id == attachment.id }
-                                    } label: {
-                                        Image(systemName: "xmark.circle.fill")
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                            Text("첨부 \(attachments.count)/5 · 파일당 20MB, 전체 25MB")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                Section("속성") {
-                    Picker("담당자", selection: $draft.assigneeUserId) {
-                        Text("미배정").tag(String?.none)
-                        ForEach(members) { member in
-                            Text(member.name).tag(String?.some(member.userId))
-                        }
-                    }
-                    Picker("우선순위", selection: $draft.priority) {
-                        Text("없음").tag(Int?.none)
-                        ForEach(1...4, id: \.self) { priority in
-                            Text("P\(priority)").tag(Int?.some(priority))
-                        }
-                    }
-                    Picker("등록 위치", selection: $draft.status) {
-                        Text("실행 대기").tag(DashboardRun.Status.queued)
-                        Text("백로그").tag(DashboardRun.Status.backlog)
-                    }
-                }
+                issueSection
+                attributesSection
                 Section("선호 실행") {
                     PreferredExecutionPicker(
                         provider: $draft.preferredProvider,
                         model: $draft.preferredModel,
+                        effort: $draft.preferredEffort,
                         providers: providers
                     )
                 }
@@ -174,6 +90,88 @@ struct CreateIssueSheet: View {
             .onChange(of: selectedPhotoItems) { _, items in
                 guard !items.isEmpty else { return }
                 Task { await importPhotos(items) }
+            }
+        }
+    }
+
+    private var issueSection: some View {
+        Section("이슈") {
+            TextField("제목", text: $draft.title)
+                .accessibilityIdentifier("create-issue-title")
+            // Description field with a photo attachment control inside the
+            // bottom-trailing corner of the writing area.
+            VStack(alignment: .leading, spacing: 8) {
+                ZStack(alignment: .bottomTrailing) {
+                    TextField("설명", text: $draft.description, axis: .vertical)
+                        .lineLimit(4...10)
+                        .padding(.trailing, 72)
+                        .padding(.bottom, 28)
+                        .accessibilityIdentifier("create-issue-description")
+                    HStack(spacing: 4) {
+                        PasteButton(supportedContentTypes: [UTType.image]) { providers in
+                            Task { await importPastedImages(providers) }
+                        }
+                        .labelStyle(.iconOnly)
+                        .accessibilityLabel("클립보드 이미지 붙여넣기")
+                        .accessibilityIdentifier("create-issue-paste-attachment")
+                        PhotosPicker(
+                            selection: $selectedPhotoItems,
+                            maxSelectionCount: max(
+                                1,
+                                PendingIssueAttachment.maximumCount - attachments.count
+                            ),
+                            selectionBehavior: .ordered,
+                            matching: .any(of: [.images, .videos]),
+                            preferredItemEncoding: .compatible
+                        ) {
+                            Image(systemName: "photo")
+                                .font(.body.weight(.medium))
+                                .foregroundStyle(.secondary)
+                                .frame(width: 32, height: 32)
+                                .contentShape(Rectangle())
+                        }
+                        .accessibilityLabel("이미지·영상 첨부")
+                        .accessibilityIdentifier("create-issue-attachment")
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(
+                        isLoadingPhotos ||
+                            attachments.count >= PendingIssueAttachment.maximumCount
+                    )
+                    .padding(.trailing, 2)
+                    .padding(.bottom, 2)
+                }
+                if !attachments.isEmpty {
+                    ForEach(attachments) { attachment in
+                        PendingAttachmentRow(attachment: attachment) {
+                            attachments.removeAll { $0.id == attachment.id }
+                        }
+                    }
+                    Text("첨부 \(attachments.count)/5 · 파일당 20MB, 전체 25MB")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private var attributesSection: some View {
+        Section("속성") {
+            Picker("담당자", selection: $draft.assigneeUserId) {
+                Text("미배정").tag(String?.none)
+                ForEach(members) { member in
+                    Text(member.name).tag(String?.some(member.userId))
+                }
+            }
+            Picker("우선순위", selection: $draft.priority) {
+                Text("없음").tag(Int?.none)
+                ForEach(1...4, id: \.self) { priority in
+                    Text("P\(priority)").tag(Int?.some(priority))
+                }
+            }
+            Picker("등록 위치", selection: $draft.status) {
+                Text("실행 대기").tag(DashboardRun.Status.queued)
+                Text("백로그").tag(DashboardRun.Status.backlog)
             }
         }
     }
@@ -249,7 +247,7 @@ struct CreateIssueSheet: View {
             PendingIssueAttachment.maximumCount - loaded.count
         ) {
             do {
-                let data = try await provider.loadTransferable(type: Data.self)
+                let data = try await loadTransferableData(from: provider)
                 // Clipboard images can arrive as PNG/HEIC/TIFF; normalize them to the
                 // server-supported JPEG format just like the Photos picker does.
                 guard let attachment = PendingIssueAttachment.jpeg(from: data)
@@ -280,11 +278,43 @@ struct CreateIssueSheet: View {
             errorMessage = error.localizedDescription
         }
     }
+
+    private func loadTransferableData(from provider: NSItemProvider) async throws -> Data {
+        try await withCheckedThrowingContinuation { continuation in
+            _ = provider.loadTransferable(type: Data.self) { result in
+                continuation.resume(with: result)
+            }
+        }
+    }
+}
+
+private struct PendingAttachmentRow: View {
+    let attachment: PendingIssueAttachment
+    let remove: () -> Void
+
+    var body: some View {
+        HStack {
+            Label(attachment.filename, systemImage: "paperclip")
+                .lineLimit(1)
+            Spacer()
+            Text(ByteCountFormatter.string(
+                fromByteCount: Int64(attachment.data.count),
+                countStyle: .file
+            ))
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            Button(role: .destructive, action: remove) {
+                Image(systemName: "xmark.circle.fill")
+            }
+            .buttonStyle(.plain)
+        }
+    }
 }
 
 private struct PreferredExecutionPicker: View {
     @Binding var provider: AgentProvider?
     @Binding var model: String?
+    @Binding var effort: ModelEffort?
     let providers: [AgentProvider]
 
     private var availableModels: [String] {
@@ -292,27 +322,34 @@ private struct PreferredExecutionPicker: View {
     }
 
     var body: some View {
-        VStack {
-            Picker("프로바이더", selection: $provider) {
-                Text("기본값").tag(AgentProvider?.none)
-                ForEach(providers) { provider in
-                    Text(provider.displayName)
-                        .tag(AgentProvider?.some(provider))
-                }
+        Picker("프로바이더", selection: $provider) {
+            Text("기본값").tag(AgentProvider?.none)
+            ForEach(providers) { provider in
+                Text(provider.displayName)
+                    .tag(AgentProvider?.some(provider))
             }
-            .accessibilityIdentifier("create-issue-provider")
-            Picker("모델", selection: $model) {
-                Text("기본값").tag(String?.none)
-                ForEach(availableModels, id: \.self) { model in
-                    Text(model).tag(String?.some(model))
-                }
-            }
-            .disabled(provider == nil)
-            .accessibilityIdentifier("create-issue-model")
         }
+        .accessibilityIdentifier("create-issue-provider")
+        Picker("모델", selection: $model) {
+            Text("기본값").tag(String?.none)
+            ForEach(availableModels, id: \.self) { model in
+                Text(model).tag(String?.some(model))
+            }
+        }
+        .disabled(provider == nil)
+        .accessibilityIdentifier("create-issue-model")
+        Picker("Effort", selection: $effort) {
+            Text("기본값").tag(ModelEffort?.none)
+            ForEach(provider?.efforts ?? []) { effort in
+                Text(effort.rawValue).tag(ModelEffort?.some(effort))
+            }
+        }
+        .disabled(model == nil)
+        .accessibilityIdentifier("create-issue-effort")
         .onChange(of: provider) { previous, provider in
             guard previous != provider else { return }
             model = nil
+            effort = IssueDraft.defaultEffort
         }
     }
 }
@@ -407,6 +444,7 @@ struct DispatchIssueSheet: View {
     @State private var preferences: IssueExecutionPreferences
     @State private var workerID: String?
     @State private var errorMessage: String?
+    @State private var didDispatchSuccessfully = false
 
     let runID: UUID
     let reassign: Bool
@@ -474,9 +512,27 @@ struct DispatchIssueSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("취소") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(reassign ? "재할당" : "실행") { Task { await dispatch() } }
+                    Button { Task { await dispatch() } } label: {
+                        if didDispatchSuccessfully {
+                            Image(systemName: "checkmark")
+                                .bold()
+                        } else if mutations.isActive("dispatch-\(runID)") {
+                            ProgressView()
+                        } else {
+                            Text(reassign ? "재할당" : "실행")
+                        }
+                    }
                         .disabled(
-                            mutations.isActive("dispatch-\(runID)") || !preferences.isValid
+                            mutations.isActive("dispatch-\(runID)") ||
+                                didDispatchSuccessfully ||
+                                !preferences.isValid
+                        )
+                        .accessibilityLabel(
+                            didDispatchSuccessfully
+                                ? "실행 완료"
+                                : (mutations.isActive("dispatch-\(runID)")
+                                    ? "실행 중"
+                                    : (reassign ? "재할당" : "실행"))
                         )
                         .accessibilityIdentifier("dispatch-issue-submit")
                 }
@@ -512,7 +568,9 @@ struct DispatchIssueSheet: View {
                 workerID: workerID,
                 reassign: reassign
             )
+            didDispatchSuccessfully = true
             await refresh()
+            try? await Task.sleep(for: .milliseconds(400))
             dismiss()
         } catch {
             errorMessage = error.localizedDescription

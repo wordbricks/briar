@@ -152,10 +152,15 @@ import {
   mentionsIssueHandle,
 } from "../lib/issue-agent-reply";
 import {
+  isIssueMentionUrl,
+  remarkIssueMentions,
+} from "../lib/issue-mentions";
+import {
   copyIssueId,
   copyIssueShareLink,
   shareIssueLink,
 } from "../lib/issue-links";
+import { formatIssueKey } from "../lib/issue-key";
 import type {
   CreateIssueInput,
   DashboardPayload,
@@ -747,14 +752,27 @@ export function HuntDashboard({
         status === "completed" &&
         !["completed", "cancelled"].includes(run.status)
       ) return false;
-      return !normalized || `${run.title} ${run.sourceKey} ${run.repository}`.toLowerCase().includes(normalized);
+      return !normalized || [
+        run.title,
+        run.sourceKey,
+        run.repository,
+        formatIssueKey(dashboard?.project.issueKeyPrefix, run.runNumber),
+      ].join(" ").toLowerCase().includes(normalized);
     });
     // Mobile companion Tasks list: newest updated first (iOS native parity).
     if (!companionMode) return next;
     return [...next].sort((left, right) =>
       right.updatedAt.localeCompare(left.updatedAt),
     );
-  }, [companionMode, companionSearchMode, query, runs, source, status]);
+  }, [
+    companionMode,
+    companionSearchMode,
+    dashboard?.project.issueKeyPrefix,
+    query,
+    runs,
+    source,
+    status,
+  ]);
   const agentAssociationsByRunId = useMemo(() => {
     const agentById = new Map(agents.map((agent) => [agent.id, agent]));
     const activeAgents = new Map<string, ProjectAgent>();
@@ -1037,6 +1055,7 @@ export function HuntDashboard({
             null
           }
           companionMode={companionMode}
+          issueKeyPrefix={dashboard?.project.issueKeyPrefix}
           currentUserId={currentUserId}
           error={recoveryError}
           isDeletingIssue={deletingIssueId === selected.id}
@@ -1302,6 +1321,7 @@ export function HuntDashboard({
         {view === "list" && !companionMode ? (
           <IssueList
             availableProviders={availableProviders}
+            issueKeyPrefix={dashboard?.project.issueKeyPrefix}
             deletingIssueId={deletingIssueId}
             onDelete={(runId) => {
               setContextDeleteError(null);
@@ -1409,6 +1429,7 @@ export function HuntDashboard({
                   >
                     <KanbanCard
                       availableProviders={availableProviders}
+                      issueKeyPrefix={dashboard?.project.issueKeyPrefix}
                       activeAgent={
                         agentAssociationsByRunId.activeAgents.get(run.id) ?? null
                       }
@@ -1418,9 +1439,13 @@ export function HuntDashboard({
                       ) ?? null
                     }
                     assignedWorker={
-                      ["completed", "cancelled", "paused", "blocked", "failed"].includes(
-                        run.status,
-                      )
+                      !companionMode && [
+                        "completed",
+                        "cancelled",
+                        "paused",
+                        "blocked",
+                        "failed",
+                      ].includes(run.status)
                         ? null
                         : workerById.get(run.workerId ?? "") ??
                           workerById.get(run.requestedWorkerId ?? "") ??
@@ -2071,6 +2096,9 @@ export function CreateIssueDialog({
   const [preferredModel, setPreferredModel] = useState(
     initialDraft?.preferredModel ?? "",
   );
+  const [preferredEffort, setPreferredEffort] = useState(
+    initialDraft?.preferredEffort ?? "high",
+  );
   const [projectId, setProjectId] = useState(() =>
     projects.some((project) => project.id === initialDraft?.projectId)
       ? initialDraft!.projectId
@@ -2107,6 +2135,7 @@ export function CreateIssueDialog({
       assigneeUserId: assigneeUserId || null,
       preferredProvider: preferredProvider || null,
       preferredModel: preferredModel || null,
+      preferredEffort: preferredEffort || null,
       ...(checkpoints.length > 0 ? { checkpoints } : {}),
     });
   }, [
@@ -2115,6 +2144,7 @@ export function CreateIssueDialog({
     description,
     preferredModel,
     preferredProvider,
+    preferredEffort,
     checkpoints,
     priority,
     projectId,
@@ -2340,6 +2370,10 @@ export function CreateIssueDialog({
                 | AgentProvider
                 | null,
               preferredModel: preferredModel || null,
+              preferredEffort:
+                preferredProvider && preferredModel
+                  ? ((preferredEffort || null) as ModelEffort | null)
+                  : null,
               ...(checkpoints.length > 0 ? { checkpoints } : {}),
               attachments: attachments.map(({ file }) => file),
               ...(attachments.length > 0
@@ -2507,6 +2541,7 @@ export function CreateIssueDialog({
               onValueChange={(value) => {
                 setPreferredProvider(value);
                 if (preferredModel) setPreferredModel("");
+                setPreferredEffort("high");
               }}
               options={[
                 { label: t("issue.agentDefault"), value: "" },
@@ -2537,6 +2572,27 @@ export function CreateIssueDialog({
               }
               placeholder={t("issue.selectProviderFirst")}
               value={preferredModel}
+            />
+            <NativeSelect
+              className="issue-effort-select"
+              disabled={!preferredProvider || !preferredModel}
+              label={t("settings.effort")}
+              onValueChange={setPreferredEffort}
+              options={
+                preferredProvider && preferredProvider in agentEfforts
+                  ? [
+                      { label: t("settings.providerDefaultEffort"), value: "" },
+                      ...agentEfforts[preferredProvider as AgentProvider].map(
+                        (effort) => ({
+                          label: effort,
+                          value: effort,
+                        }),
+                      ),
+                    ]
+                  : []
+              }
+              placeholder={t("issue.selectModelFirst")}
+              value={preferredEffort}
             />
             <label className="issue-attachment-trigger">
               <Paperclip size={13} />
@@ -2819,6 +2875,7 @@ function KanbanCard({
   isDragging = false,
   isMoving,
   isProcessing,
+  issueKeyPrefix,
   onDelete,
   onTransfer,
   onPointerCancel,
@@ -2845,6 +2902,7 @@ function KanbanCard({
   isDragging?: boolean;
   isMoving: boolean;
   isProcessing: boolean;
+  issueKeyPrefix?: string;
   onDelete: () => void;
   onTransfer?: () => void;
   onPointerCancel: (event: ReactPointerEvent<HTMLElement>) => void;
@@ -2949,7 +3007,16 @@ function KanbanCard({
           </span>
         )}
         <span className="kanban-card-kicker">
-          <small>AH-{run.runNumber}</small>
+          <small>{formatIssueKey(issueKeyPrefix, run.runNumber)}</small>
+          {run.workflowStage && (
+            <i
+              aria-label={run.workflow.stages.find((stage) => stage.id === run.workflowStage)?.label ?? run.workflowStage}
+              className="kanban-card-stage-icon"
+              title={run.workflow.stages.find((stage) => stage.id === run.workflowStage)?.label ?? run.workflowStage}
+            >
+              <Waypoints aria-hidden="true" size={13} />
+            </i>
+          )}
         </span>
         <span className="kanban-card-copy">
           <strong>{run.title}</strong>
@@ -3553,6 +3620,7 @@ function IssueContextMenu({
 
 function IssueList({
   availableProviders,
+  issueKeyPrefix,
   deletingIssueId,
   onDelete,
   onTransfer,
@@ -3569,6 +3637,7 @@ function IssueList({
   updatingIssueId,
 }: {
   availableProviders: AgentProvider[];
+  issueKeyPrefix?: string;
   deletingIssueId: string | null;
   onDelete: (runId: string) => void;
   onTransfer?: (runId: string) => void;
@@ -3679,7 +3748,7 @@ function IssueList({
                 <span className="issue-list-task" role="cell">
                   <span className="issue-list-task-kicker">
                     <small>
-                      AH-{run.runNumber} · {run.sourceKey}
+                      {formatIssueKey(issueKeyPrefix, run.runNumber)} · {run.sourceKey}
                       {assignee ? ` · ${assignee.name}` : ""}
                     </small>
                     <PullRequestIconLink urls={run.pullRequestUrls} />
@@ -3731,6 +3800,7 @@ export function RunPage({
   isRecovering,
   isUpdatingIssue = false,
   isSidebarOpen,
+  issueKeyPrefix,
   onBack,
   onAddDependency,
   onAcceptIssueAction,
@@ -3776,6 +3846,7 @@ export function RunPage({
   isRecovering: boolean;
   isUpdatingIssue?: boolean;
   isSidebarOpen: boolean;
+  issueKeyPrefix?: string;
   onBack: () => void;
   onAddDependency?: (prerequisiteRunId: string) => Promise<unknown>;
   onAcceptIssueAction?: (
@@ -4354,7 +4425,7 @@ export function RunPage({
   };
   const copyId = async () => {
     try {
-      await copyIssueId(run.runNumber);
+      await copyIssueId(run.runNumber, issueKeyPrefix);
       toast(t("issue.idCopied"), { tone: "success" });
     } catch {
       toast(t("issue.copyIdFailed"), { tone: "error" });
@@ -4433,7 +4504,7 @@ export function RunPage({
             <ArrowLeft aria-hidden="true" size={16} />
           </Button>
           <small className="run-page-window-number">
-            AH-{run.runNumber}
+            {formatIssueKey(issueKeyPrefix, run.runNumber)}
           </small>
           <strong
             className="run-page-window-title"
@@ -4533,7 +4604,7 @@ export function RunPage({
                 </button>
                 <div className="run-page-overview">
                   <div className="run-page-title-row">
-                    <small>AH-{run.runNumber}</small>
+                    <small>{formatIssueKey(issueKeyPrefix, run.runNumber)}</small>
                     <h1 id="run-page-title">{run.title}</h1>
                     <IssueActionsMenu
                       disabled={isUpdatingIssue || isDeletingIssue || isRecovering}
@@ -5570,6 +5641,7 @@ export function RunPage({
                 </section>
                 <IssueDependenciesPanel
                   availableRuns={availableRuns}
+                  issueKeyPrefix={issueKeyPrefix}
                   isUpdating={isUpdatingIssue}
                   onAdd={onAddDependency}
                   onOpen={onDependencyOpen}
@@ -5902,6 +5974,7 @@ function IssueActionsMenu({
 
 function IssueDependenciesPanel({
   availableRuns,
+  issueKeyPrefix,
   isUpdating,
   onAdd,
   onOpen,
@@ -5909,6 +5982,7 @@ function IssueDependenciesPanel({
   run,
 }: {
   availableRuns: HuntRun[];
+  issueKeyPrefix?: string;
   isUpdating: boolean;
   onAdd?: (prerequisiteRunId: string) => Promise<unknown>;
   onOpen?: (runId: string) => void;
@@ -5934,7 +6008,7 @@ function IssueDependenciesPanel({
     ? candidates.filter((candidate) =>
         [
           candidate.title,
-          `AH-${candidate.runNumber}`,
+          formatIssueKey(issueKeyPrefix, candidate.runNumber),
           candidate.status,
         ].some((value) => value.toLocaleLowerCase().includes(normalizedSearchQuery)),
       )
@@ -5961,7 +6035,7 @@ function IssueDependenciesPanel({
             onClick={() => onOpen?.(dependency.id)}
             type="button"
           >
-            <span>AH-{dependency.runNumber}</span>
+            <span>{formatIssueKey(issueKeyPrefix, dependency.runNumber)}</span>
             <strong>{dependency.title}</strong>
             <small>{t(`status.${dependency.status}` as MessageKey)}</small>
           </button>
@@ -6070,7 +6144,7 @@ function IssueDependenciesPanel({
                 >
                   <span className="issue-dependency-picker-copy">
                     <span>
-                      AH-{candidate.runNumber} · {t(`status.${candidate.status}` as MessageKey)}
+                      {formatIssueKey(issueKeyPrefix, candidate.runNumber)} · {t(`status.${candidate.status}` as MessageKey)}
                     </span>
                     <strong>{candidate.title}</strong>
                   </span>
@@ -6941,6 +7015,13 @@ function IssueConversation({
     (total, state) => total + state.pending,
     0,
   );
+  const mentionHandles = useMemo(
+    () => [
+      "briar",
+      ...mentionMembers.map((member) => issueMentionHandle(member)),
+    ],
+    [mentionMembers],
+  );
 
   useLayoutEffect(() => {
     const messageList = messageListRef.current;
@@ -7086,6 +7167,7 @@ function IssueConversation({
                   isReplying={isReplying}
                   localeTag={localeTag}
                   message={message}
+                  mentionHandles={mentionHandles}
                   onAcceptIssueAction={onAcceptIssueAction && message.proposedAction
                     ? () => void acceptIssueAction(message.proposedAction!)
                     : undefined}
@@ -7122,9 +7204,24 @@ function IssueConversation({
                       autoFocus
                       compact
                       mentionMembers={mentionMembers}
-                      onSubmit={(body, mentionedUserIds, attachments, references) =>
-                        sendMessage(body, message.id, mentionedUserIds, attachments, references)
-                      }
+                      onCancel={() => setActiveReplyMessageId(null)}
+                      onSubmit={async (
+                        body,
+                        mentionedUserIds,
+                        attachments,
+                        references,
+                      ) => {
+                        await sendMessage(
+                          body,
+                          message.id,
+                          mentionedUserIds,
+                          attachments,
+                          references,
+                        );
+                        setActiveReplyMessageId((current) =>
+                          current === message.id ? null : current,
+                        );
+                      }}
                       placeholder={t("run.threadPlaceholder")}
                     />
                   </div>
@@ -7149,6 +7246,7 @@ function IssueMessageItem({
   isReplying = false,
   localeTag,
   message,
+  mentionHandles,
   onAcceptIssueAction,
   onLoadAttachment,
   onReply,
@@ -7160,6 +7258,7 @@ function IssueMessageItem({
   isReplying?: boolean;
   localeTag: string;
   message: IssueMessage;
+  mentionHandles: readonly string[];
   onAcceptIssueAction?: () => void;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onReply?: () => void;
@@ -7169,6 +7268,10 @@ function IssueMessageItem({
   reworkStageLabel?: string | null;
 }) {
   const { t } = useI18n();
+  const remarkPlugins = useMemo(
+    () => [remarkGfm, remarkIssueMentions(mentionHandles)],
+    [mentionHandles],
+  );
   const proposal = message.proposedAction;
   const proposalTitle = proposal?.type === "request_issue_update"
     ? t("run.issueUpdateProposalTitle")
@@ -7199,6 +7302,23 @@ function IssueMessageItem({
         <div className="issue-message-body">
           <ReactMarkdown
             components={{
+              a: ({ children, href, node: _node, ...props }) => {
+                const isMention = isIssueMentionUrl(href);
+                return (
+                  <a
+                    {...props}
+                    className={isMention ? "issue-mention-link" : props.className}
+                    href={href}
+                    onClick={
+                      isMention
+                        ? (event) => event.preventDefault()
+                        : props.onClick
+                    }
+                  >
+                    {children}
+                  </a>
+                );
+              },
               img: ({ alt = "", src }) => (
                 <IssueMarkdownImage
                   alt={alt}
@@ -7208,10 +7328,12 @@ function IssueMessageItem({
                 />
               ),
             }}
-            remarkPlugins={[remarkGfm]}
+            remarkPlugins={remarkPlugins}
             skipHtml
             urlTransform={(url) =>
-              issueAttachmentReference(url) ? url : defaultUrlTransform(url)
+              isIssueMentionUrl(url) || issueAttachmentReference(url)
+                ? url
+                : defaultUrlTransform(url)
             }
           >
             {message.body}
@@ -7371,12 +7493,14 @@ function MessageComposer({
   autoFocus = false,
   compact = false,
   mentionMembers,
+  onCancel,
   onSubmit,
   placeholder,
 }: {
   autoFocus?: boolean;
   compact?: boolean;
   mentionMembers: OrganizationMember[];
+  onCancel?: () => void;
   onSubmit: (
     body: string,
     mentionedUserIds: string[],
@@ -7612,6 +7736,11 @@ function MessageComposer({
             setMentionDismissed(true);
             return;
           }
+          if (event.key === "Escape" && onCancel && !sending) {
+            event.preventDefault();
+            onCancel();
+            return;
+          }
           if (
             event.key === "Enter" &&
             !event.shiftKey &&
@@ -7636,6 +7765,18 @@ function MessageComposer({
         value={body}
       />
       <footer>
+        {onCancel ? (
+          <button
+            aria-label={t("run.cancelReply")}
+            className="issue-reply-cancel"
+            disabled={sending}
+            onClick={onCancel}
+            title={t("run.cancelReply")}
+            type="button"
+          >
+            <X size={17} />
+          </button>
+        ) : null}
         <button
           aria-label={t("issue.attachmentLabel")}
           className="issue-composer-link"

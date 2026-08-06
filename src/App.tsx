@@ -381,6 +381,9 @@ export function App() {
   const [quickProcessError, setQuickProcessError] = useState<string | null>(
     null,
   );
+  const [completedDispatchRunId, setCompletedDispatchRunId] = useState<
+    string | null
+  >(null);
   const [dispatchRun, setDispatchRun] = useState<HuntRun | null>(null);
   const [companionPage, setCompanionPage] = useState<
     "issues" | "agents" | "ideas" | "search" | "inbox" | "settings"
@@ -611,6 +614,7 @@ export function App() {
   const processIssueNow = (run: HuntRun) => {
     if (!activeProject) return;
     setQuickProcessError(null);
+    setCompletedDispatchRunId(null);
     if (run.executionReadiness === "waiting") {
       setQuickProcessError(
         t("issue.waitingOnPrerequisites", {
@@ -627,7 +631,13 @@ export function App() {
     effort: ModelEffort | null;
     workerId: string | null;
   }) => {
-    if (!activeProject || !briar.token || !dispatchRun) return;
+    if (
+      !activeProject ||
+      !briar.token ||
+      !dispatchRun ||
+      quickStartingRunId ||
+      completedDispatchRunId
+    ) return;
     setQuickStartingRunId(dispatchRun.id);
     setQuickProcessError(null);
     try {
@@ -642,8 +652,17 @@ export function App() {
           reassign: Boolean(dispatchRun.dispatchedAt || dispatchRun.workerId),
         },
       );
+      setCompletedDispatchRunId(dispatchRun.id);
+      try {
+        await briar.refresh();
+      } catch (caught) {
+        setQuickProcessError(
+          caught instanceof Error ? caught.message : String(caught),
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, 400));
       setDispatchRun(null);
-      await briar.refresh();
+      setCompletedDispatchRunId(null);
     } catch (caught) {
       setQuickProcessError(
         caught instanceof Error ? caught.message : String(caught),
@@ -762,6 +781,7 @@ export function App() {
   useEffect(() => {
     setQuickProcessError(null);
     setQuickStartingRunId(null);
+    setCompletedDispatchRunId(null);
     setDispatchRun(null);
   }, [briar.activeProjectId]);
 
@@ -1218,6 +1238,7 @@ export function App() {
               briar.runLinearIssueImport(activeProject.id, input)
             }
             onIconChange={briar.changeProjectIcon}
+            onIssueKeyPrefixChange={briar.changeProjectIssueKeyPrefix}
             onRefreshVelen={briar.refreshVelen}
             onRefreshHealth={briar.refreshHealth}
             project={activeProject}
@@ -1359,6 +1380,7 @@ export function App() {
                   isProcessing={processingIssueIds.has(inboxDetailRun.id)}
                   isRecovering={briar.recoveringRunId === inboxDetailRun.id}
                   isSidebarOpen
+                  issueKeyPrefix={briar.dashboard?.project.issueKeyPrefix}
                   isUpdatingIssue={
                     briar.updatingIssueId === inboxDetailRun.id
                   }
@@ -1436,6 +1458,11 @@ export function App() {
               ) : inboxDetailSession ? (
                 <ProjectAgentSessionDetail
                   isSidebarOpen
+                  issueKeyPrefix={
+                    briar.projects.find(
+                      (project) => project.id === inboxDetailSession.projectId,
+                    )?.issueKeyPrefix
+                  }
                   onBack={() => setInboxDetailTarget(null)}
                   onIssueOpen={(runId) =>
                     setInboxDetailTarget((current) =>
@@ -1553,6 +1580,11 @@ export function App() {
         {requestedCompanionSession ? (
           <ProjectAgentSessionDetail
             isSidebarOpen
+            issueKeyPrefix={
+              briar.projects.find(
+                (project) => project.id === requestedCompanionSession.projectId,
+              )?.issueKeyPrefix
+            }
             onBack={() => setRequestedSessionId(null)}
             onIssueOpen={(runId) => {
               setRequestedSessionId(null);
@@ -1722,10 +1754,13 @@ export function App() {
           />
         )}
         <WorkerDispatchDialog
+          didDispatchSuccessfully={completedDispatchRunId === dispatchRun?.id}
           error={quickProcessError}
           isDispatching={Boolean(quickStartingRunId)}
           onOpenChange={(open) => {
-            if (!open && !quickStartingRunId) setDispatchRun(null);
+            if (!open && !quickStartingRunId && !completedDispatchRunId) {
+              setDispatchRun(null);
+            }
           }}
           onSubmit={(input) => void submitWorkerDispatch(input)}
           open={Boolean(dispatchRun)}
@@ -1741,10 +1776,13 @@ export function App() {
     <>
       {content}
       <WorkerDispatchDialog
+        didDispatchSuccessfully={completedDispatchRunId === dispatchRun?.id}
         error={quickProcessError}
         isDispatching={Boolean(quickStartingRunId)}
         onOpenChange={(open) => {
-          if (!open && !quickStartingRunId) setDispatchRun(null);
+          if (!open && !quickStartingRunId && !completedDispatchRunId) {
+            setDispatchRun(null);
+          }
         }}
         onSubmit={(input) => void submitWorkerDispatch(input)}
         open={Boolean(dispatchRun)}

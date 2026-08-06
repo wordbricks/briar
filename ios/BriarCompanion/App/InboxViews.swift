@@ -4,6 +4,7 @@ struct InboxHomeView: View {
     @ObservedObject var inbox: InboxStore
     @ObservedObject var navigation: CompanionNavigationModel
     @AppStorage("companion-locale") private var localeRaw = CompanionLocale.ko.rawValue
+    @State private var activeCategories: Set<InboxCategory> = Set(InboxCategory.allCases)
 
     let project: ProjectsResponse.Project
     let snapshot: DashboardSnapshot?
@@ -13,6 +14,18 @@ struct InboxHomeView: View {
 
     private var locale: CompanionLocale {
         CompanionLocale(rawValue: localeRaw) ?? .ko
+    }
+
+    private var filteredMessages: [InboxMessage] {
+        InboxMessageBuilder.filter(inbox.messages, to: activeCategories)
+    }
+
+    private func toggleCategory(_ category: InboxCategory) {
+        if activeCategories.contains(category) {
+            activeCategories.remove(category)
+        } else {
+            activeCategories.insert(category)
+        }
     }
 
     var body: some View {
@@ -38,10 +51,31 @@ struct InboxHomeView: View {
                     description: Text("멘션, 이슈 변경, 완료된 세션이 이곳에 표시됩니다.")
                 )
             } else {
-                // Single chronological feed: newest first, no urgency sections.
+                // Importance filter: one toggle per urgency category, all on by default.
                 Section {
-                    ForEach(inbox.messages) { message in
-                        inboxRow(message)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(InboxCategory.allCases) { category in
+                                filterChip(category)
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                    .accessibilityIdentifier("inbox-importance-filters")
+                }
+
+                if filteredMessages.isEmpty {
+                    ContentUnavailableView(
+                        "선택한 필터에 메시지가 없습니다.",
+                        systemImage: "line.3.horizontal.decrease.circle",
+                        description: Text("다른 필터를 선택해 메시지를 확인해 보세요.")
+                    )
+                } else {
+                    // Single chronological feed: newest first, no urgency sections.
+                    Section {
+                        ForEach(filteredMessages) { message in
+                            inboxRow(message)
+                        }
                     }
                 }
             }
@@ -61,6 +95,34 @@ struct InboxHomeView: View {
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private func filterChip(_ category: InboxCategory) -> some View {
+        let isActive = activeCategories.contains(category)
+        Button {
+            toggleCategory(category)
+        } label: {
+            HStack(spacing: 5) {
+                Text(category.title)
+                Text("\(inbox.messages(in: category).count)")
+                    .font(.caption2.weight(.semibold))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(
+                        Capsule().fill(isActive ? Color.accentColor.opacity(0.15) : Color(.secondarySystemFill))
+                    )
+            }
+            .font(.caption.weight(.semibold))
+            .padding(.horizontal, 11)
+            .padding(.vertical, 6)
+            .background(
+                Capsule().fill(isActive ? Color.accentColor.opacity(0.12) : Color(.tertiarySystemFill))
+            )
+            .foregroundStyle(isActive ? Color.accentColor : Color.secondary)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("inbox-filter-\(category.rawValue)")
     }
 
     @ViewBuilder

@@ -10,7 +10,7 @@ describe("D1 migrations", () => {
     "0050_hunt_run_event_count.sql",
     "0053_issue_result_reviews.sql",
     "0055_agent_provider_opencode.sql",
-    "0073_channel_delta_sync.sql",
+    "0074_channel_delta_sync.sql",
   ])("keeps each trigger in a separate Wrangler statement: %s", async (name) => {
     const sql = await readFile(resolve("migrations", name), "utf8");
     const statements = unstable_splitSqlQuery(sql);
@@ -24,9 +24,9 @@ describe("D1 migrations", () => {
 
   it.each([
     "0055_agent_provider_opencode.sql",
-    "0070_organization_agents.sql",
-    "0071_organization_ideas.sql",
-    "0072_organization_channels.sql",
+    "0071_organization_agents.sql",
+    "0072_organization_ideas.sql",
+    "0073_organization_channels.sql",
   ])(
     "uses D1 transaction-safe foreign-key deferral for table rebuilds: %s",
     async (name) => {
@@ -40,11 +40,11 @@ describe("D1 migrations", () => {
 
   it("keeps Agent and idea ownership organization-scoped with an optional project", async () => {
     const agents = await readFile(
-      resolve("migrations", "0070_organization_agents.sql"),
+      resolve("migrations", "0071_organization_agents.sql"),
       "utf8",
     );
     const ideas = await readFile(
-      resolve("migrations", "0071_organization_ideas.sql"),
+      resolve("migrations", "0072_organization_ideas.sql"),
       "utf8",
     );
 

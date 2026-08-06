@@ -339,15 +339,27 @@ struct ProjectSelectionView: View {
                         .accessibilityIdentifier("organization-picker")
                     }
                     Section {
-                        Picker("프로젝트", selection: $selectedProjectID) {
-                            ForEach(visibleProjects, id: \.id) { project in
-                                Text(project.name)
-                                    .tag(Optional(project.id))
+                        ForEach(visibleProjects, id: \.id) { project in
+                            Button {
+                                selectedProjectID = project.id
+                            } label: {
+                                HStack(spacing: 12) {
+                                    ProjectIconView(icon: project.icon, size: 28)
+                                    Text(project.name)
+                                        .foregroundStyle(.primary)
+                                    Spacer()
+                                    if project.id == selectedProjectID {
+                                        Image(systemName: "checkmark")
+                                            .font(.footnote.weight(.semibold))
+                                            .foregroundStyle(.tint)
+                                    }
+                                }
+                                .contentShape(Rectangle())
                             }
+                            .buttonStyle(.plain)
+                            .accessibilityAddTraits(project.id == selectedProjectID ? .isSelected : [])
+                            .accessibilityIdentifier("project-picker")
                         }
-                        .pickerStyle(.inline)
-                        .labelsHidden()
-                        .accessibilityIdentifier("project-picker")
                     } header: {
                         Text("확인할 프로젝트")
                     } footer: {

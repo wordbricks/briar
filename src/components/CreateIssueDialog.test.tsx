@@ -374,6 +374,7 @@ describe("CreateIssueDialog attachments", () => {
         assigneeUserId: null,
         attachments: [],
         description: null,
+        preferredEffort: null,
         preferredModel: null,
         preferredProvider: null,
         priority: 2,
@@ -558,6 +559,7 @@ describe("CreateIssueDialog attachments", () => {
       {
         attachments: [],
         description: null,
+        preferredEffort: null,
         preferredModel: null,
         preferredProvider: null,
         priority: 2,
@@ -623,6 +625,18 @@ describe("CreateIssueDialog attachments", () => {
         ?.click();
     });
     await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(
+          ".issue-effort-select .select-menu-trigger",
+        )
+        ?.click();
+    });
+    await act(async () => {
+      document
+        .querySelector<HTMLButtonElement>('[role="option"][data-value="xhigh"]')
+        ?.click();
+    });
+    await act(async () => {
       container.querySelector<HTMLFormElement>("form")?.requestSubmit();
     });
 
@@ -631,6 +645,7 @@ describe("CreateIssueDialog attachments", () => {
       expect.objectContaining({
         preferredProvider: "claude",
         preferredModel: "sonnet",
+        preferredEffort: "xhigh",
         title: "Preferred execution issue",
       }),
     );
@@ -785,6 +800,7 @@ describe("CreateIssueDialog attachments", () => {
       .toEqual({
         assigneeUserId: null,
         description: "Keep this description",
+        preferredEffort: "high",
         preferredModel: null,
         preferredProvider: null,
         priority: "4",

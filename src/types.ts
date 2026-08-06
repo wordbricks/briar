@@ -47,6 +47,7 @@ export type CreateIssueInput = {
   attachmentReferences?: string[];
   preferredProvider?: AgentProvider | null;
   preferredModel?: string | null;
+  preferredEffort?: ModelEffort | null;
   checkpoints?: AutoHuntWorkflowCheckpoint[];
 };
 
@@ -348,6 +349,7 @@ export type HuntRunPlacement = {
 export type Project = {
   id: string;
   name: string;
+  issueKeyPrefix?: string;
   icon?: string | null;
   organizationId?: string;
   organizationName?: string;

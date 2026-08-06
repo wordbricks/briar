@@ -45,6 +45,7 @@ type ModelEffort = "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
 export type ProjectRow = {
   id: string;
   name: string;
+  issue_key_prefix: string;
   icon: string | null;
   organization_id: string;
   organization_name: string;
@@ -650,6 +651,7 @@ export type HuntEventInput = {
   createdByUserId?: string | null;
   preferredAgentProvider?: ProjectAgentProvider | null;
   preferredAgentModel?: string | null;
+  preferredAgentEffort?: ModelEffort | null;
 };
 
 export type ProjectSettingsInput = {
@@ -3448,6 +3450,7 @@ export async function listProjects(db: D1Database, userId: string) {
   const result = await db
     .prepare(
       `select project.id, project.name,
+              project.issue_key_prefix,
               coalesce(project.icon_data_url_browser, project.icon_data_url) as icon,
               project.organization_id,
               organization.name as organization_name,
@@ -3471,6 +3474,7 @@ export async function listOrganizationProjects(
   const result = await db
     .prepare(
       `select project.id, project.name,
+              project.issue_key_prefix,
               coalesce(project.icon_data_url_browser, project.icon_data_url) as icon,
               project.organization_id,
               organization.name as organization_name,
@@ -3499,6 +3503,7 @@ export async function createProject(
   const project: ProjectRow = {
     id: crypto.randomUUID(),
     name: input.name,
+    issue_key_prefix: "AH",
     icon: null,
     organization_id: input.organizationId,
     organization_name: "",
@@ -3586,6 +3591,7 @@ export async function getProject(
   return await db
     .prepare(
       `select project.id, project.name,
+              project.issue_key_prefix,
               coalesce(project.icon_data_url_browser, project.icon_data_url) as icon,
               project.organization_id,
               organization.name as organization_name,
@@ -3614,6 +3620,23 @@ export async function updateProjectIcon(
        where id = ?`,
     )
     .bind(icon, updatedAt, projectId)
+    .run();
+  return result.meta.changes > 0;
+}
+
+export async function updateProjectIssueKeyPrefix(
+  db: D1Database,
+  projectId: string,
+  issueKeyPrefix: string,
+) {
+  const updatedAt = new Date().toISOString();
+  const result = await db
+    .prepare(
+      `update briar_projects
+       set issue_key_prefix = ?, updated_at = ?
+       where id = ?`,
+    )
+    .bind(issueKeyPrefix, updatedAt, projectId)
     .run();
   return result.meta.changes > 0;
 }
@@ -6548,9 +6571,9 @@ export async function recordHuntEvent(
            pull_request_urls, target_sha, source_created_at,
            staging_qa_status, production_qa_status, staging_qa_detail,
            production_qa_detail, context_json, started_at, completed_at,
-           last_event_at, created_at, updated_at,
-           preferred_agent_provider, preferred_agent_model
-         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            last_event_at, created_at, updated_at,
+            preferred_agent_provider, preferred_agent_model, preferred_agent_effort
+         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          on conflict(project_id, source, source_key) do nothing`,
       )
       .bind(
@@ -6595,6 +6618,7 @@ export async function recordHuntEvent(
         recordedAt,
         normalizedInput.preferredAgentProvider ?? null,
         normalizedInput.preferredAgentModel ?? null,
+        normalizedInput.preferredAgentEffort ?? null,
       ),
     db
       .prepare(

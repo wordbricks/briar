@@ -6,10 +6,10 @@ Status: implemented (1~4단계). Updated 2026-08-06.
 
 | 영역 | 상태 | 위치 |
 | --- | --- | --- |
-| 에이전트 조직 스코프 승격, 핸들 | done | `migrations/0070_organization_agents.sql`, `worker/src/organization-agents.ts` |
-| 조직 아이디어(`project_id is null`) | done | `migrations/0071_organization_ideas.sql`, `worker/src/ideas.ts` |
-| 채널·메시지·스레드·멘션·답글 잡·제안 | done | `migrations/0072_organization_channels.sql`, `worker/src/channels.ts` |
-| 조직 스코프 변경 피드 | done | `migrations/0073_channel_delta_sync.sql` |
+| 에이전트 조직 스코프 승격, 핸들 | done | `migrations/0071_organization_agents.sql`, `worker/src/organization-agents.ts` |
+| 조직 아이디어(`project_id is null`) | done | `migrations/0072_organization_ideas.sql`, `worker/src/ideas.ts` |
+| 채널·메시지·스레드·멘션·답글 잡·제안 | done | `migrations/0073_organization_channels.sql`, `worker/src/channels.ts` |
+| 조직 스코프 변경 피드 | done | `migrations/0074_channel_delta_sync.sql` |
 | 채널 API와 조직 스코프 클레임 평면 | done | `worker/src/index.ts` |
 | 워커 러너 `channelReply` | done | `src-cli/index.ts`, `src-cli/agent-runner.ts` |
 | 데스크탑 채널 화면과 멘션 픽커 | done | `src/components/Channels.tsx`, `src/lib/channel-mentions.ts` |
@@ -142,7 +142,7 @@ create unique index briar_project_agents_handle_idx
 
 ## 데이터 모델
 
-다음 마이그레이션 번호는 `0070`이다.
+마이그레이션 번호는 `0071`부터다.
 
 ### 채널과 구성원
 

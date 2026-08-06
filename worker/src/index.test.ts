@@ -14,6 +14,7 @@ import worker, {
   pausedRunReworkInputSchema,
   parseProjectSettingsInput,
   projectIconInputSchema,
+  projectIssueKeyPrefixInputSchema,
   projectAgentSessionInputSchema,
   projectAgentScheduleInputSchema,
   projectAgentScheduleRunCompletionSchema,
@@ -150,12 +151,58 @@ describe("Worker HTTP contract", () => {
             status: "queued",
             preferredProvider: "claude",
             preferredModel: "sonnet",
+            preferredEffort: "high",
           }),
         },
       );
     const { input } = await readIssueRequest(issueRequest());
     expect(input.preferredProvider).toBe("claude");
     expect(input.preferredModel).toBe("sonnet");
+    expect(input.preferredEffort).toBe("high");
+  });
+
+  it("rejects an effort preference without a provider on issue creation", async () => {
+    const issueRequest = () =>
+      new Request(
+        "https://briar-api.example/projects/22222222-2222-4222-8222-222222222222/issues",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            title: "잘못된 선호 effort",
+            description: null,
+            priority: 2,
+            assigneeUserId: null,
+            status: "queued",
+            preferredProvider: null,
+            preferredModel: null,
+            preferredEffort: "high",
+          }),
+        },
+      );
+    await expect(readIssueRequest(issueRequest())).rejects.toThrow();
+  });
+
+  it("rejects an effort preference without a model on issue creation", async () => {
+    const issueRequest = () =>
+      new Request(
+        "https://briar-api.example/projects/22222222-2222-4222-8222-222222222222/issues",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            title: "잘못된 선호 effort",
+            description: null,
+            priority: 2,
+            assigneeUserId: null,
+            status: "queued",
+            preferredProvider: "claude",
+            preferredModel: null,
+            preferredEffort: "high",
+          }),
+        },
+      );
+    await expect(readIssueRequest(issueRequest())).rejects.toThrow();
   });
 
   it("rejects a preferred model without a provider on issue creation", async () => {
@@ -277,6 +324,18 @@ describe("Worker HTTP contract", () => {
       projectIconInputSchema.parse({
         icon: "data:image/svg+xml;base64,bG9nbw==",
       }),
+    ).toThrow();
+  });
+
+  it("normalizes project issue key prefixes and enforces the three-character limit", () => {
+    expect(
+      projectIssueKeyPrefixInputSchema.parse({ issueKeyPrefix: " br " }),
+    ).toEqual({ issueKeyPrefix: "BR" });
+    expect(() =>
+      projectIssueKeyPrefixInputSchema.parse({ issueKeyPrefix: "LONG" }),
+    ).toThrow();
+    expect(() =>
+      projectIssueKeyPrefixInputSchema.parse({ issueKeyPrefix: "B-R" }),
     ).toThrow();
   });
 

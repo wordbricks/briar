@@ -210,8 +210,19 @@ struct ResultReview: Codable, Equatable, Identifiable, Sendable {
 }
 
 struct DashboardWorker: Codable, Equatable, Identifiable, Sendable {
+    struct Icon: Codable, Equatable, Sendable {
+        enum Kind: String, Codable, Sendable {
+            case emoji
+            case image
+        }
+
+        let type: Kind
+        let value: String
+    }
+
     let id: String
     let label: String
+    let icon: Icon?
     let agentProvider: AgentProvider?
     let providers: [AgentProvider]?
     let readiness: String
@@ -222,6 +233,7 @@ struct DashboardWorker: Codable, Equatable, Identifiable, Sendable {
     init(
         id: String,
         label: String,
+        icon: Icon? = nil,
         agentProvider: AgentProvider? = nil,
         providers: [AgentProvider]? = nil,
         readiness: String,
@@ -231,6 +243,7 @@ struct DashboardWorker: Codable, Equatable, Identifiable, Sendable {
     ) {
         self.id = id
         self.label = label
+        self.icon = icon
         self.agentProvider = agentProvider
         self.providers = providers
         self.readiness = readiness
@@ -490,12 +503,22 @@ enum TaskOrdering {
 }
 
 enum TaskSearch {
-    static func results(in runs: [DashboardRun], query: String) -> [DashboardRun] {
+    static func results(
+        in runs: [DashboardRun],
+        query: String,
+        issueKeyPrefix: String = "AH"
+    ) -> [DashboardRun] {
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !needle.isEmpty else { return TaskOrdering.byMostRecentlyUpdated(runs) }
         return TaskOrdering.byMostRecentlyUpdated(
             runs.filter { run in
-                [run.title, run.detail, run.issueDescription, run.resultSummary]
+                [
+                    run.title,
+                    run.detail,
+                    run.issueDescription,
+                    run.resultSummary,
+                    run.runNumber.map { "\(issueKeyPrefix)-\($0)" },
+                ]
                     .compactMap { $0 }
                     .contains { $0.localizedCaseInsensitiveContains(needle) }
             }

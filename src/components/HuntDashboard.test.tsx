@@ -488,6 +488,31 @@ describe("HuntDashboard", () => {
     },
   );
 
+  it("keeps compact Worker and workflow-stage icons on completed companion tasks", () => {
+    const run = {
+      ...demoDashboard.runs[0],
+      status: "completed" as const,
+      workflowStage: "merged",
+      workerId: dashboardWorker.id,
+    };
+    const markup = renderToStaticMarkup(
+      <HuntDashboard
+        {...dashboardProps}
+        companionMode
+        dashboard={{
+          ...demoDashboard,
+          runs: [run],
+          workers: [dashboardWorker],
+        }}
+      />,
+    );
+
+    expect(markup).toContain('class="kanban-card-worker-badge"');
+    expect(markup).toContain('aria-label="배정된 Worker: Lemon Worker"');
+    expect(markup).toContain('class="kanban-card-stage-icon"');
+    expect(markup).not.toContain(">Lemon Worker<");
+  });
+
   it("keeps the performed agent name in issue properties after completion", async () => {
     const run = demoDashboard.runs[0];
     const container = document.createElement("div");
@@ -742,7 +767,10 @@ describe("HuntDashboard", () => {
       <ToastProvider>
         <HuntDashboard
           {...dashboardProps}
-          dashboard={demoDashboard}
+          dashboard={{
+            ...demoDashboard,
+            project: { ...demoDashboard.project, issueKeyPrefix: "BR" },
+          }}
           onDeleteIssue={onDeleteIssue}
         />
       </ToastProvider>,
@@ -768,7 +796,7 @@ describe("HuntDashboard", () => {
     expect(copyId?.getAttribute("aria-label")).toBe("이슈 ID 복사");
     await act(async () => copyId?.click());
     expect(writeText).toHaveBeenCalledWith(
-      `AH-${demoDashboard.runs[0].runNumber}`,
+      `BR-${demoDashboard.runs[0].runNumber}`,
     );
     const toastMessages = () =>
       Array.from(
@@ -3090,13 +3118,42 @@ describe("HuntDashboard", () => {
     const replyComposer = messageGroup.querySelector<HTMLElement>(
       ".issue-inline-reply-composer .issue-message-composer",
     );
-    const replyTextarea = replyComposer?.querySelector<HTMLTextAreaElement>(
+    let replyTextarea = replyComposer?.querySelector<HTMLTextAreaElement>(
       "textarea",
     );
     expect(replyComposer?.querySelector(".issue-composer-formatting")).toBeNull();
     expect(replyComposer?.querySelector(".issue-composer-link")).not.toBeNull();
-    expect(replyComposer?.querySelectorAll("footer button")).toHaveLength(2);
+    expect(replyComposer?.querySelectorAll("footer button")).toHaveLength(3);
+    expect(
+      replyComposer?.querySelector<HTMLButtonElement>(".issue-reply-cancel")
+        ?.getAttribute("aria-label"),
+    ).toBe("답글 취소");
     expect(replyTextarea?.placeholder).toBe("답장 남기기…");
+
+    await act(async () => {
+      replyTextarea?.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          bubbles: true,
+          cancelable: true,
+          key: "Escape",
+        }),
+      );
+    });
+    expect(replyButton?.getAttribute("aria-expanded")).toBe("false");
+    expect(messageGroup.querySelector(".issue-inline-reply-composer")).toBeNull();
+
+    await act(async () => replyButton?.click());
+    const cancelButton = messageGroup.querySelector<HTMLButtonElement>(
+      ".issue-reply-cancel",
+    );
+    await act(async () => cancelButton?.click());
+    expect(replyButton?.getAttribute("aria-expanded")).toBe("false");
+    expect(messageGroup.querySelector(".issue-inline-reply-composer")).toBeNull();
+
+    await act(async () => replyButton?.click());
+    replyTextarea = messageGroup.querySelector<HTMLTextAreaElement>(
+      ".issue-inline-reply-composer textarea",
+    );
 
     const messageList = container.querySelector<HTMLElement>(
       ".issue-message-list",
@@ -3126,6 +3183,8 @@ describe("HuntDashboard", () => {
       await Promise.resolve();
     });
     expect(messageList.scrollTop).toBe(480);
+    expect(replyButton?.getAttribute("aria-expanded")).toBe("false");
+    expect(messageGroup.querySelector(".issue-inline-reply-composer")).toBeNull();
     expect(
       messageGroup.querySelector(":scope > .issue-agent-reply-state")?.textContent,
     ).toContain("Briar가 답변을 작성하고 있습니다");
@@ -3145,8 +3204,6 @@ describe("HuntDashboard", () => {
       messageGroup.querySelector(":scope > .issue-agent-reply-state"),
     ).toBeNull();
 
-    await act(async () => replyButton?.click());
-    expect(messageGroup.querySelector(".issue-inline-reply-composer")).toBeNull();
     await act(async () => root.unmount());
     container.remove();
   });
@@ -3390,6 +3447,74 @@ describe("HuntDashboard", () => {
         container.querySelectorAll(".issue-message-parent-quote"),
       ).some((quote) => quote.textContent?.includes(userMessage.body)),
     ).toBe(true);
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("renders a member mention as a blue no-op link", async () => {
+    const createdAt = new Date().toISOString();
+    const message: IssueMessage = {
+      id: "member-mention-message",
+      runId: demoDashboard.runs[0].id,
+      parentMessageId: null,
+      body: "@member 확인해 주세요. owner@example.com은 링크가 아닙니다.",
+      author: { id: "jay", name: "Jay", image: null, provider: null },
+      replyCount: 0,
+      createdAt,
+      updatedAt: createdAt,
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          mentionMembers={[{
+            userId: "member-1",
+            name: "Member One",
+            email: "member@example.com",
+            image: null,
+            role: "member",
+            createdAt,
+          }]}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => [message]}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("message should not be sent");
+          }}
+          run={demoDashboard.runs[0]}
+        />,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    const mentionLink = container.querySelector<HTMLAnchorElement>(
+      ".issue-message-body a.issue-mention-link",
+    );
+    expect(mentionLink?.textContent).toBe("@member");
+    expect(mentionLink?.getAttribute("href")).toBe("briar-mention://member");
+    expect(
+      container.querySelectorAll(".issue-message-body a.issue-mention-link"),
+    ).toHaveLength(1);
+    expect(
+      container.querySelector('.issue-message-body a[href="mailto:owner@example.com"]'),
+    ).not.toBeNull();
+
+    const click = new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+    });
+    expect(mentionLink?.dispatchEvent(click)).toBe(false);
+
     await act(async () => root.unmount());
     container.remove();
   });

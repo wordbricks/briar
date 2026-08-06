@@ -351,6 +351,7 @@ struct SessionDetailView: View {
                                 RunDetailView(
                                     run: run,
                                     projectID: project.id,
+                                    issueKeyPrefix: project.effectiveIssueKeyPrefix,
                                     token: token,
                                     api: api,
                                     allRuns: snapshot?.runs ?? [],
@@ -414,7 +415,8 @@ struct SessionDetailView: View {
 
     private func issueLabel(_ issue: ProjectAgentSession.Issue) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("#\(issue.runNumber) \(issue.title)").font(.headline)
+            Text("\(project.issueKey(runNumber: issue.runNumber)) \(issue.title)")
+                .font(.headline)
             Text(issue.outcome.displayName)
                 .font(.caption)
                 .foregroundStyle(.secondary)

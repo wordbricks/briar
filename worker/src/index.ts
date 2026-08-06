@@ -213,6 +213,7 @@ import {
   updateOrganizationLogo,
   updateOrganizationMemberRole,
   updateProjectIcon,
+  updateProjectIssueKeyPrefix,
   updateIssue,
   updateIssueCheckpoints,
   updateIssueExecutionPreferences,
@@ -790,6 +791,15 @@ export const projectIconInputSchema = z
       .nullable(),
   })
   .strict();
+export const projectIssueKeyPrefixInputSchema = z
+  .object({
+    issueKeyPrefix: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .regex(/^[A-Z0-9]{1,3}$/u),
+  })
+  .strict();
 const projectAgentInputSchema = z
   .object({
     name: z.string().trim().min(1).max(100).nullable().optional(),
@@ -1066,6 +1076,10 @@ const issueInputBaseSchema = z
       .nullable()
       .optional(),
     preferredModel: z.string().trim().min(1).max(100).nullable().optional(),
+    preferredEffort: z
+      .enum(["low", "medium", "high", "xhigh", "max", "ultra"])
+      .nullable()
+      .optional(),
     checkpoints: z.array(workflowCheckpointSchema).max(100).default([]),
   })
   .strict();
@@ -1077,6 +1091,18 @@ const issueInputSchema = issueInputBaseSchema.superRefine((input, context) => {
       message: "A provider is required for a model preference",
     });
   }
+  if (!input.preferredProvider && input.preferredEffort) {
+    context.addIssue({
+      code: "custom",
+      message: "A provider is required for an effort preference",
+    });
+  }
+  if (!input.preferredModel && input.preferredEffort) {
+    context.addIssue({
+      code: "custom",
+      message: "A model is required for an effort preference",
+    });
+  }
   if (
     input.preferredProvider &&
     input.preferredProvider !== "opencode" &&
@@ -1086,6 +1112,22 @@ const issueInputSchema = issueInputBaseSchema.superRefine((input, context) => {
     context.addIssue({
       code: "custom",
       message: `${input.preferredModel} is not available from ${input.preferredProvider}`,
+    });
+  }
+  if (input.preferredProvider === "claude" && input.preferredEffort === "ultra") {
+    context.addIssue({
+      code: "custom",
+      message: "Claude does not support ultra effort",
+    });
+  }
+  if (
+    (input.preferredProvider === "grok" || input.preferredProvider === "opencode") &&
+    input.preferredEffort &&
+    !["low", "medium", "high"].includes(input.preferredEffort)
+  ) {
+    context.addIssue({
+      code: "custom",
+      message: `${input.preferredProvider} supports low, medium, or high effort`,
     });
   }
 });
@@ -1452,6 +1494,7 @@ export async function readIssueRequest(request: Request) {
   const status = form.get("status");
   const preferredProvider = form.get("preferredProvider");
   const preferredModel = form.get("preferredModel");
+  const preferredEffort = form.get("preferredEffort");
   const rawCheckpoints = form.get("checkpoints");
   let checkpoints: unknown = [];
   if (typeof rawCheckpoints === "string" && rawCheckpoints) {
@@ -1482,6 +1525,10 @@ export async function readIssueRequest(request: Request) {
       preferredModel:
         typeof preferredModel === "string" && preferredModel.trim()
           ? preferredModel
+          : null,
+      preferredEffort:
+        typeof preferredEffort === "string" && preferredEffort.trim()
+          ? preferredEffort
           : null,
       checkpoints,
     }),
@@ -2081,6 +2128,7 @@ async function createIssueWithAttachments(input: {
       createdByUserId: input.createdByUserId,
       preferredAgentProvider: input.issue.preferredProvider ?? null,
       preferredAgentModel: input.issue.preferredModel ?? null,
+      preferredAgentEffort: input.issue.preferredEffort ?? null,
     });
     await createIssueAttachments(
       input.db,
@@ -2490,6 +2538,7 @@ function projectJson(row: ProjectRow) {
   return {
     id: row.id,
     name: row.name,
+    issueKeyPrefix: row.issue_key_prefix,
     icon: row.icon,
     organizationId: row.organization_id,
     organizationName: row.organization_name,
@@ -2882,6 +2931,7 @@ async function processSlackAppMention(env: Env, payload: SlackEventCallback) {
         statusLabel,
         priorityLabel,
         runNumber: run.run_number,
+        issueKeyPrefix: project.issue_key_prefix,
       }),
     );
     await completeSlackEvent(
@@ -3365,6 +3415,7 @@ async function processSlackCreateIssueSubmission(
         projectName: project.name,
         statusLabel: "작업 대기열",
         runNumber: run.run_number,
+        issueKeyPrefix: project.issue_key_prefix,
       });
       if (submission.responseUrl) {
         await postSlackCommandResponse(submission.responseUrl, text);
@@ -6131,6 +6182,40 @@ async function route(
       throw new HttpError(404, "Project not found");
     }
     return json({ project: projectJson({ ...project, icon: input.icon }) });
+  }
+
+  const projectIssueKeyPrefixMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/issue-key-prefix$/u,
+  );
+  if (projectIssueKeyPrefixMatch && request.method === "PUT") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      projectIssueKeyPrefixMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    if (!canManageOrganization(project.member_role)) {
+      throw new HttpError(403, "Organization admin access required");
+    }
+    const input = projectIssueKeyPrefixInputSchema.parse(
+      await readJson(request),
+    );
+    if (
+      !(await updateProjectIssueKeyPrefix(
+        db,
+        project.id,
+        input.issueKeyPrefix,
+      ))
+    ) {
+      throw new HttpError(404, "Project not found");
+    }
+    return json({
+      project: projectJson({
+        ...project,
+        issue_key_prefix: input.issueKeyPrefix,
+      }),
+    });
   }
 
   const settingsMatch = pathname.match(/^\/projects\/([0-9a-f-]+)\/settings$/u);

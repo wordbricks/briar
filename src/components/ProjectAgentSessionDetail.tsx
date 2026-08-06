@@ -28,9 +28,11 @@ import {
   naturalLanguageFromAgentMessage,
 } from "../lib/auto-hunt-agent";
 import { copySessionShareLink } from "../lib/issue-links";
+import { formatIssueKey } from "../lib/issue-key";
 
 export function ProjectAgentSessionDetail({
   isSidebarOpen,
+  issueKeyPrefix,
   onBack,
   onIssueOpen,
   onStop,
@@ -38,6 +40,7 @@ export function ProjectAgentSessionDetail({
   token = null,
 }: {
   isSidebarOpen: boolean;
+  issueKeyPrefix?: string;
   onBack: () => void;
   onIssueOpen: (runId: string) => void;
   onStop: () => Promise<boolean>;
@@ -459,7 +462,7 @@ export function ProjectAgentSessionDetail({
                           onClick={() => onIssueOpen(issue.runId)}
                           type="button"
                         >
-                          <span>AH-{issue.runNumber}</span>
+                          <span>{formatIssueKey(issueKeyPrefix, issue.runNumber)}</span>
                           <div>
                             <strong>{issue.title}</strong>
                             {issue.summary ? <small>{issue.summary}</small> : null}
