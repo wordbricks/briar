@@ -744,6 +744,18 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         "utf8",
       ),
     );
+    await executeSql(
+      db,
+      await readFile(resolve("migrations/0056_ideas.sql"), "utf8"),
+    );
+    await executeSql(
+      db,
+      await readFile(resolve("migrations/0070_organization_agents.sql"), "utf8"),
+    );
+    await executeSql(
+      db,
+      await readFile(resolve("migrations/0071_organization_ideas.sql"), "utf8"),
+    );
   }, 30_000);
 
   afterAll(async () => {
@@ -4285,14 +4297,17 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
   });
 
   it("preserves related rows while migration 0055 rebuilds provider tables", async () => {
-    // This suite intentionally retains the legacy `kind` column for earlier
-    // compatibility tests. Production removed it in migration 0028.
-    await db.prepare("alter table briar_project_agents drop column kind").run();
     // Migration 0055 predates the pause checkpoint, resume request marker,
-    // human issue assignee, and the agent effort setting. Exercise the
-    // historical rebuild against that earlier shape, then restore the current
-    // columns for the tests that follow.
+    // human issue assignee, the agent effort setting, and the organization
+    // scope added in 0070. Exercise the historical rebuild against that earlier
+    // shape, then restore the current columns for the tests that follow.
     await db.prepare("alter table briar_project_agents drop column effort").run();
+    await db.prepare("drop index briar_project_agents_handle_idx").run();
+    await db.prepare("drop index briar_project_agents_organization_idx").run();
+    await db.prepare("alter table briar_project_agents drop column handle").run();
+    await db
+      .prepare("alter table briar_project_agents drop column organization_id")
+      .run();
     const pausedRuns = await db
       .prepare("select count(*) as count from briar_hunt_runs where paused_at is not null")
       .first<{ count: number }>();
@@ -4404,20 +4419,48 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
          )`,
       )
       .run();
+    await db
+      .prepare("alter table briar_project_agents add column organization_id text")
+      .run();
+    await db
+      .prepare("alter table briar_project_agents add column handle text")
+      .run();
+    await db
+      .prepare(
+        `update briar_project_agents set organization_id = (
+           select organization_id from briar_projects
+           where briar_projects.id = briar_project_agents.project_id
+         ), handle = 'agent-' || lower(replace(id, '-', ''))`,
+      )
+      .run();
+    await db
+      .prepare(
+        `create unique index briar_project_agents_handle_idx
+           on briar_project_agents (organization_id, handle)
+           where handle is not null`,
+      )
+      .run();
+    await db
+      .prepare(
+        `create index briar_project_agents_organization_idx
+           on briar_project_agents (organization_id, created_at, id)`,
+      )
+      .run();
   });
 
   it("updates an idea through chat and atomically creates an acyclic issue plan", async () => {
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0056_ideas.sql"), "utf8"),
-    );
     await db
       .prepare(`update briar_project_settings set workflow_json = ? where project_id = ?`)
       .bind(JSON.stringify(localWorkflow), projectId)
       .run();
+    const organizationId = (await db
+      .prepare(`select organization_id from briar_projects where id = ?`)
+      .bind(projectId)
+      .first<{ organization_id: string }>())!.organization_id;
     const ideaId = "12121212-1212-4121-8121-121212121212";
     const idea = await createIdea(db, {
       id: ideaId,
+      organizationId,
       projectId,
       authorUserId: "owner",
       provider: "codex",

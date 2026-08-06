@@ -9,6 +9,7 @@ import {
   ChevronUp,
   Check,
   Ellipsis,
+  Hash,
   Inbox,
   LogOut,
   Plus,
@@ -49,6 +50,7 @@ export function Sidebar({
   onIdeasOpen = () => undefined,
   onScheduleOpen,
   onInboxOpen,
+  onChannelsOpen,
   onIssuesOpen,
   onCreateIssue,
   onAddOrganization,
@@ -70,6 +72,7 @@ export function Sidebar({
   activePage:
     | "issues"
     | "agents"
+    | "channels"
     | "ideas"
     | "schedule"
     | "inbox"
@@ -89,6 +92,7 @@ export function Sidebar({
   onIdeasOpen?: () => void;
   onScheduleOpen: () => void;
   onInboxOpen: () => void;
+  onChannelsOpen?: () => void;
   onIssuesOpen: () => void;
   onCreateIssue: () => void;
   onAddOrganization: () => void;
@@ -509,6 +513,20 @@ export function Sidebar({
             />
           )}
         </a>
+        {onChannelsOpen ? (
+          <a
+            aria-current={activePage === "channels" ? "page" : undefined}
+            className={activePage === "channels" ? "active" : ""}
+            href="#channels"
+            onClick={(event) => {
+              event.preventDefault();
+              onChannelsOpen();
+            }}
+          >
+            <Hash size={16} strokeWidth={1.7} />
+            <span>채널</span>
+          </a>
+        ) : null}
       </nav>
 
       <div className="sidebar-projects">

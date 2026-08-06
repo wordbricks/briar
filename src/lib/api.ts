@@ -14,6 +14,15 @@ import {
 import type { AgentProvider, ModelEffort } from "./project-llm";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import type {
+  ChannelAgentReply,
+  ChannelAgentSummary,
+  ChannelDelta,
+  ChannelMember,
+  ChannelMessage,
+  ChannelSummary,
+  ChannelVisibility,
+} from "./channels-contract";
+import type {
   IdeaDetail,
   IdeaIssuePlanItem,
   IdeaProvider,
@@ -1343,6 +1352,218 @@ export async function createIssue(
     assigneeUserId: string | null;
     attachments: IssueAttachment[];
   }>(`/projects/${projectId}/issues`, token, { method: "POST", body: form });
+}
+
+export async function listChannels(token: string, organizationId: string) {
+  return request<{ channels: ChannelSummary[]; cursor: number }>(
+    `/organizations/${organizationId}/channels`,
+    token,
+  );
+}
+
+export async function createChannel(
+  token: string,
+  organizationId: string,
+  input: {
+    name: string;
+    slug?: string;
+    topic?: string | null;
+    visibility?: ChannelVisibility;
+    defaultProjectId?: string | null;
+  },
+) {
+  return request<{ channel: ChannelSummary }>(
+    `/organizations/${organizationId}/channels`,
+    token,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+}
+
+export async function loadChannel(
+  token: string,
+  organizationId: string,
+  channelId: string,
+) {
+  return request<{
+    channel: ChannelSummary;
+    members: ChannelMember[];
+    agents: ChannelAgentSummary[];
+    messages: ChannelMessage[];
+  }>(`/organizations/${organizationId}/channels/${channelId}`, token);
+}
+
+export async function updateChannel(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  input: {
+    name?: string;
+    topic?: string | null;
+    visibility?: ChannelVisibility;
+    defaultProjectId?: string | null;
+    archived?: boolean;
+  },
+) {
+  return request<{ channel: ChannelSummary }>(
+    `/organizations/${organizationId}/channels/${channelId}`,
+    token,
+    { method: "PATCH", body: JSON.stringify(input) },
+  );
+}
+
+export async function listChannelMessages(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  parentMessageId?: string,
+) {
+  const query = parentMessageId
+    ? `?parentMessageId=${encodeURIComponent(parentMessageId)}`
+    : "";
+  return request<{ messages: ChannelMessage[] }>(
+    `/organizations/${organizationId}/channels/${channelId}/messages${query}`,
+    token,
+  );
+}
+
+export async function sendChannelMessage(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  input: {
+    body: string;
+    parentMessageId?: string | null;
+    mentionedUserIds?: string[];
+    mentionedAgentIds?: string[];
+  },
+) {
+  return request<{
+    message: ChannelMessage;
+    agentReplies: ChannelAgentReply[];
+  }>(
+    `/organizations/${organizationId}/channels/${channelId}/messages`,
+    token,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+}
+
+export async function loadChannelAgentReplies(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  messageId: string,
+) {
+  return request<{
+    agentReplies: ChannelAgentReply[];
+    messages: ChannelMessage[];
+  }>(
+    `/organizations/${organizationId}/channels/${channelId}/messages/${messageId}/agent-replies`,
+    token,
+  );
+}
+
+export async function setChannelAgent(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  agentId: string,
+  present: boolean,
+) {
+  return request<{ agents: ChannelAgentSummary[] }>(
+    `/organizations/${organizationId}/channels/${channelId}/agents/${agentId}`,
+    token,
+    { method: present ? "PUT" : "DELETE" },
+  );
+}
+
+export async function acceptChannelProposal(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  proposalId: string,
+  projectId: string | null,
+) {
+  return request<{
+    outcome: "accepted" | "already_accepted";
+    resultRunId: string | null;
+  }>(
+    `/organizations/${organizationId}/channels/${channelId}/proposals/${proposalId}/accept`,
+    token,
+    { method: "POST", body: JSON.stringify({ projectId }) },
+  );
+}
+
+export async function loadChannelDelta(
+  token: string,
+  organizationId: string,
+  since: number,
+) {
+  return request<ChannelDelta>(
+    `/organizations/${organizationId}/channel-changes?since=${since}`,
+    token,
+  );
+}
+
+export async function listOrganizationAgents(
+  token: string,
+  organizationId: string,
+) {
+  return request<{ agents: ChannelAgentSummary[]; canManage: boolean }>(
+    `/organizations/${organizationId}/agents`,
+    token,
+  );
+}
+
+export async function createOrganizationAgent(
+  token: string,
+  organizationId: string,
+  input: {
+    name: string;
+    handle?: string;
+    provider: AgentProvider;
+    model: string | null;
+    responsibility: string;
+    effort?: ModelEffort | null;
+  },
+) {
+  return request<{ agent: ChannelAgentSummary }>(
+    `/organizations/${organizationId}/agents`,
+    token,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+}
+
+export async function deleteOrganizationAgent(
+  token: string,
+  organizationId: string,
+  agentId: string,
+) {
+  return request<{ deleted: boolean }>(
+    `/organizations/${organizationId}/agents/${agentId}`,
+    token,
+    { method: "DELETE" },
+  );
+}
+
+export async function listOrganizationIdeas(
+  token: string,
+  organizationId: string,
+) {
+  return request<{ ideas: IdeaSummary[] }>(
+    `/organizations/${organizationId}/ideas`,
+    token,
+  );
+}
+
+export async function loadOrganizationIdea(
+  token: string,
+  organizationId: string,
+  ideaId: string,
+) {
+  return request<{ idea: IdeaDetail }>(
+    `/organizations/${organizationId}/ideas/${ideaId}`,
+    token,
+  );
 }
 
 export async function listIdeas(token: string, projectId: string) {

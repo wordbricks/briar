@@ -36,6 +36,7 @@ import {
   type ProjectAgentScheduleNotificationLevel,
   type ProjectAgentScheduleRecurrence,
 } from "../../src/lib/project-agent-schedule";
+import { allocateAgentHandle } from "./organization-agents";
 import { workflowSnapshotForRun } from "./workflow-policy";
 
 type ProjectAgentProvider = "codex" | "claude" | "grok" | "opencode";
@@ -3555,12 +3556,14 @@ export async function createProject(
     db
       .prepare(
         `insert into briar_project_agents (
-           id, project_id, name, provider, model, responsibility,
-           skill_markdown, calendar_color, created_at, updated_at
-         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           id, organization_id, project_id, name, provider, model,
+           responsibility, skill_markdown, calendar_color, created_at,
+           updated_at
+         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         defaultAgent.id,
+        input.organizationId,
         defaultAgent.project_id,
         defaultAgent.name,
         defaultAgent.provider,
@@ -3761,16 +3764,32 @@ export async function createProjectAgent(
     created_at: createdAt,
     updated_at: createdAt,
   };
+  // The organization and mention handle follow the project the Agent is
+  // created in; both are required before it can appear in a channel roster.
+  const organization = await db
+    .prepare(`select organization_id from briar_projects where id = ?`)
+    .bind(projectId)
+    .first<{ organization_id: string }>();
+  if (!organization) throw new Error("Project not found");
+  const handle = await allocateAgentHandle(
+    db,
+    organization.organization_id,
+    input.name,
+    agent.id,
+  );
   await db
     .prepare(
       `insert into briar_project_agents (
-         id, project_id, name, avatar, avatar_pet_json,
-         avatar_spritesheet_object_key, provider, model, effort, responsibility,
-         skill_markdown, calendar_color, created_at, updated_at
-       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         id, organization_id, handle, project_id, name, avatar,
+         avatar_pet_json, avatar_spritesheet_object_key, provider, model,
+         effort, responsibility, skill_markdown, calendar_color, created_at,
+         updated_at
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       agent.id,
+      organization.organization_id,
+      handle,
       agent.project_id,
       agent.name,
       agent.avatar,

@@ -330,14 +330,72 @@ import {
   failIdeaJob,
   getClaimedIdeaJob,
   getIdea,
+  getOrganizationIdea,
   ideaJobSnapshot,
   listIdeas,
+  listOrganizationIdeas,
   renewIdeaJobLease,
   retryIdeaJob,
   sendIdeaMessage,
   updateIdea,
   updateIdeaPlan,
 } from "./ideas";
+import {
+  acceptChannelActionProposal,
+  addChannelAgent,
+  addChannelMember,
+  channelJson,
+  channelMessageJson,
+  channelReplyJson,
+  claimNextChannelAgentReply,
+  completeChannelReply,
+  createChannel,
+  createChannelMessage,
+  deleteChannel,
+  enqueueChannelAgentReplies,
+  failChannelReply,
+  getChannel,
+  getChannelActionProposal,
+  getChannelAgentReplyJob,
+  getChannelById,
+  getChannelMessage,
+  getChannelSyncCursor,
+  getClaimedChannelReply,
+  getOrganizationProject,
+  listOrganizationProjectTargets,
+  listChannelAgentReplies,
+  listChannelAgents,
+  listChannelMembers,
+  listChannelRootMessages,
+  listChannelThreadMessages,
+  listChannels,
+  loadChannelDelta,
+  removeChannelAgent,
+  removeChannelMember,
+  renewChannelReplyLease,
+  updateChannel,
+} from "./channels";
+import {
+  createOrganizationAgent,
+  deleteOrganizationAgent,
+  getOrganizationAgent,
+  listOrganizationAgents,
+  organizationAgentJson,
+  updateOrganizationAgent,
+} from "./organization-agents";
+import {
+  channelInputSchema,
+  channelIssueProposalPayloadSchema,
+  channelMemberInputSchema,
+  channelMessageInputSchema,
+  channelProposalAcceptInputSchema,
+  channelReplyClaimInputSchema,
+  channelReplyCompleteInputSchema,
+  channelReplyLeaseInputSchema,
+  channelUpdateInputSchema,
+  handleFromName,
+  organizationAgentInputSchema,
+} from "../../src/lib/channels-contract";
 import {
   buildSlackCreateIssueModal,
   callSlackApi,
@@ -2312,6 +2370,36 @@ async function requireWorkerCredential(db: D1Database, request: Request) {
   );
   if (!principal) throw new HttpError(401, "Invalid worker token");
   return principal;
+}
+
+/**
+ * Channel work is organization work, so a device only has to prove it belongs
+ * to the organization. Whether it may run a particular job is decided per job:
+ * organization Agents need nothing more, project Agents still need a binding.
+ */
+async function requireWorkerOrganization(
+  db: D1Database,
+  request: Request,
+  organizationId: string,
+) {
+  const principal = await requireWorkerCredential(db, request);
+  if (principal.organizationId !== organizationId) {
+    throw new HttpError(403, "Worker is not enabled for this organization");
+  }
+  return principal;
+}
+
+async function requireChannelAccess(
+  db: D1Database,
+  organizationId: string,
+  channelId: string,
+  userId: string,
+) {
+  const role = await getOrganizationRole(db, organizationId, userId);
+  if (!role) throw new HttpError(404, "Organization not found");
+  const channel = await getChannel(db, organizationId, channelId, userId);
+  if (!channel) throw new HttpError(404, "Channel not found");
+  return channel;
 }
 
 async function requireWorkerProjectBinding(
@@ -4451,6 +4539,7 @@ async function route(
     const input = ideaCreateInputSchema.parse(await readJson(request));
     const idea = await createIdea(db, {
       id: crypto.randomUUID(),
+      organizationId: project.organization_id,
       projectId: project.id,
       authorUserId: session.user.id,
       provider: input.provider,
@@ -5081,6 +5170,512 @@ async function route(
     );
     if (!removed) throw new HttpError(404, "Member not found");
     return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  const organizationAgentsMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/agents$/u,
+  );
+  if (organizationAgentsMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const organizationId = organizationAgentsMatch[1];
+    const role = await getOrganizationRole(db, organizationId, session.user.id);
+    if (!role) throw new HttpError(404, "Organization not found");
+    const agents = await listOrganizationAgents(db, organizationId);
+    return json({
+      agents: agents.map(organizationAgentJson),
+      canManage: canManageOrganization(role),
+    });
+  }
+  if (organizationAgentsMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const organizationId = organizationAgentsMatch[1];
+    const role = await getOrganizationRole(db, organizationId, session.user.id);
+    if (!canManageOrganization(role)) {
+      throw new HttpError(403, "Organization admin access required");
+    }
+    const input = organizationAgentInputSchema.parse(await readJson(request));
+    const agent = await createOrganizationAgent(db, {
+      id: crypto.randomUUID(),
+      organizationId,
+      name: input.name,
+      handle: input.handle ?? handleFromName(input.name) ?? undefined,
+      provider: input.provider,
+      model: input.model,
+      responsibility: input.responsibility,
+      effort: input.effort,
+      createdAt: new Date().toISOString(),
+    });
+    if (!agent) throw new HttpError(500, "Agent was not created");
+    return json({ agent: organizationAgentJson(agent) }, 201);
+  }
+
+  const organizationAgentMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/agents\/([0-9a-f-]+)$/u,
+  );
+  if (organizationAgentMatch && request.method === "PATCH") {
+    const session = await requireSession(auth, request);
+    const organizationId = organizationAgentMatch[1];
+    const role = await getOrganizationRole(db, organizationId, session.user.id);
+    if (!canManageOrganization(role)) {
+      throw new HttpError(403, "Organization admin access required");
+    }
+    const input = organizationAgentInputSchema.parse(await readJson(request));
+    const agent = await updateOrganizationAgent(db, {
+      organizationId,
+      agentId: organizationAgentMatch[2],
+      name: input.name,
+      handle: input.handle,
+      provider: input.provider,
+      model: input.model,
+      responsibility: input.responsibility,
+      effort: input.effort,
+      updatedAt: new Date().toISOString(),
+    });
+    if (!agent) throw new HttpError(404, "Organization agent not found");
+    return json({ agent: organizationAgentJson(agent) });
+  }
+  if (organizationAgentMatch && request.method === "DELETE") {
+    const session = await requireSession(auth, request);
+    const organizationId = organizationAgentMatch[1];
+    const role = await getOrganizationRole(db, organizationId, session.user.id);
+    if (!canManageOrganization(role)) {
+      throw new HttpError(403, "Organization admin access required");
+    }
+    const deleted = await deleteOrganizationAgent(
+      db,
+      organizationId,
+      organizationAgentMatch[2],
+    );
+    if (!deleted) throw new HttpError(404, "Organization agent not found");
+    return json({ deleted: true });
+  }
+
+  const organizationIdeasMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/ideas$/u,
+  );
+  if (organizationIdeasMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const organizationId = organizationIdeasMatch[1];
+    const role = await getOrganizationRole(db, organizationId, session.user.id);
+    if (!role) throw new HttpError(404, "Organization not found");
+    return json({ ideas: await listOrganizationIdeas(db, organizationId) });
+  }
+
+  const organizationIdeaMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/ideas\/([0-9a-f-]+)$/u,
+  );
+  if (organizationIdeaMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const organizationId = organizationIdeaMatch[1];
+    const role = await getOrganizationRole(db, organizationId, session.user.id);
+    if (!role) throw new HttpError(404, "Organization not found");
+    const idea = await getOrganizationIdea(
+      db,
+      organizationId,
+      organizationIdeaMatch[2],
+      session.user.id,
+    );
+    if (!idea) throw new HttpError(404, "Idea not found");
+    return json({ idea });
+  }
+
+  const channelChangesMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/channel-changes$/u,
+  );
+  if (channelChangesMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const organizationId = channelChangesMatch[1];
+    const role = await getOrganizationRole(db, organizationId, session.user.id);
+    if (!role) throw new HttpError(404, "Organization not found");
+    const since = Number(
+      new URL(request.url).searchParams.get("since") ?? "0",
+    );
+    if (!Number.isSafeInteger(since) || since < 0) {
+      throw new HttpError(400, "Invalid channel cursor");
+    }
+    return json(
+      await loadChannelDelta(db, organizationId, session.user.id, since),
+    );
+  }
+
+  const organizationChannelsMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/channels$/u,
+  );
+  if (organizationChannelsMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const organizationId = organizationChannelsMatch[1];
+    const role = await getOrganizationRole(db, organizationId, session.user.id);
+    if (!role) throw new HttpError(404, "Organization not found");
+    const channels = await listChannels(db, organizationId, session.user.id);
+    return json({
+      channels: channels.map(channelJson),
+      cursor: await getChannelSyncCursor(db, organizationId),
+    });
+  }
+  if (organizationChannelsMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const organizationId = organizationChannelsMatch[1];
+    const role = await getOrganizationRole(db, organizationId, session.user.id);
+    if (!role) throw new HttpError(404, "Organization not found");
+    const input = channelInputSchema.parse(await readJson(request));
+    const slug = input.slug ?? handleFromName(input.name);
+    if (!slug) throw new HttpError(400, "Channel needs a slug");
+    if (input.defaultProjectId) {
+      const project = await getProject(
+        db,
+        input.defaultProjectId,
+        session.user.id,
+      );
+      if (!project) throw new HttpError(404, "Project not found");
+    }
+    let channel;
+    try {
+      channel = await createChannel(db, {
+        id: crypto.randomUUID(),
+        organizationId,
+        slug,
+        name: input.name,
+        topic: input.topic,
+        visibility: input.visibility,
+        defaultProjectId: input.defaultProjectId,
+        createdByUserId: session.user.id,
+        createdAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message.toLowerCase() : "";
+      if (message.includes("unique")) {
+        throw new HttpError(409, "Channel slug already exists");
+      }
+      throw error;
+    }
+    if (!channel) throw new HttpError(500, "Channel was not created");
+    return json({ channel: channelJson(channel) }, 201);
+  }
+
+  const organizationChannelMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)$/u,
+  );
+  if (organizationChannelMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const channel = await requireChannelAccess(
+      db,
+      organizationChannelMatch[1],
+      organizationChannelMatch[2],
+      session.user.id,
+    );
+    const [members, agents, messages] = await Promise.all([
+      listChannelMembers(db, channel.id),
+      listChannelAgents(db, channel.id),
+      listChannelRootMessages(db, channel.id),
+    ]);
+    return json({
+      channel: channelJson(channel),
+      members,
+      agents: agents.map(organizationAgentJson),
+      messages,
+    });
+  }
+  if (organizationChannelMatch && request.method === "PATCH") {
+    const session = await requireSession(auth, request);
+    await requireChannelAccess(
+      db,
+      organizationChannelMatch[1],
+      organizationChannelMatch[2],
+      session.user.id,
+    );
+    const input = channelUpdateInputSchema.parse(await readJson(request));
+    if (input.defaultProjectId) {
+      const project = await getProject(
+        db,
+        input.defaultProjectId,
+        session.user.id,
+      );
+      if (!project) throw new HttpError(404, "Project not found");
+    }
+    const channel = await updateChannel(db, {
+      organizationId: organizationChannelMatch[1],
+      channelId: organizationChannelMatch[2],
+      userId: session.user.id,
+      ...input,
+      updatedAt: new Date().toISOString(),
+    });
+    if (!channel) throw new HttpError(404, "Channel not found");
+    return json({ channel: channelJson(channel) });
+  }
+  if (organizationChannelMatch && request.method === "DELETE") {
+    const session = await requireSession(auth, request);
+    const organizationId = organizationChannelMatch[1];
+    const role = await getOrganizationRole(db, organizationId, session.user.id);
+    if (!canManageOrganization(role)) {
+      throw new HttpError(403, "Organization admin access required");
+    }
+    const deleted = await deleteChannel(
+      db,
+      organizationId,
+      organizationChannelMatch[2],
+    );
+    if (!deleted) throw new HttpError(404, "Channel not found");
+    return json({ deleted: true });
+  }
+
+  const channelMemberMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/members\/([0-9a-zA-Z-]+)$/u,
+  );
+  if (channelMemberMatch && request.method === "PUT") {
+    const session = await requireSession(auth, request);
+    const channel = await requireChannelAccess(
+      db,
+      channelMemberMatch[1],
+      channelMemberMatch[2],
+      session.user.id,
+    );
+    const input = channelMemberInputSchema.parse(await readJson(request));
+    const targetRole = await getOrganizationRole(
+      db,
+      channelMemberMatch[1],
+      channelMemberMatch[3],
+    );
+    if (!targetRole) throw new HttpError(404, "Organization member not found");
+    await addChannelMember(db, {
+      channelId: channel.id,
+      userId: channelMemberMatch[3],
+      role: input.role,
+      createdAt: new Date().toISOString(),
+    });
+    return json({ members: await listChannelMembers(db, channel.id) });
+  }
+  if (channelMemberMatch && request.method === "DELETE") {
+    const session = await requireSession(auth, request);
+    const channel = await requireChannelAccess(
+      db,
+      channelMemberMatch[1],
+      channelMemberMatch[2],
+      session.user.id,
+    );
+    await removeChannelMember(db, channel.id, channelMemberMatch[3]);
+    return json({ members: await listChannelMembers(db, channel.id) });
+  }
+
+  const channelAgentMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/agents\/([0-9a-f-]+)$/u,
+  );
+  if (channelAgentMatch && request.method === "PUT") {
+    const session = await requireSession(auth, request);
+    const channel = await requireChannelAccess(
+      db,
+      channelAgentMatch[1],
+      channelAgentMatch[2],
+      session.user.id,
+    );
+    const agent = await getOrganizationAgent(
+      db,
+      channelAgentMatch[1],
+      channelAgentMatch[3],
+    );
+    if (!agent) throw new HttpError(404, "Agent not found");
+    // Adding a project Agent exposes that project's context to the channel, so
+    // the member doing it must be able to reach the project themselves.
+    if (agent.project_id) {
+      const project = await getProject(db, agent.project_id, session.user.id);
+      if (!project) throw new HttpError(403, "Project access required");
+    }
+    await addChannelAgent(db, {
+      channelId: channel.id,
+      agentId: agent.id,
+      addedByUserId: session.user.id,
+      createdAt: new Date().toISOString(),
+    });
+    const agents = await listChannelAgents(db, channel.id);
+    return json({ agents: agents.map(organizationAgentJson) });
+  }
+  if (channelAgentMatch && request.method === "DELETE") {
+    const session = await requireSession(auth, request);
+    const channel = await requireChannelAccess(
+      db,
+      channelAgentMatch[1],
+      channelAgentMatch[2],
+      session.user.id,
+    );
+    await removeChannelAgent(db, channel.id, channelAgentMatch[3]);
+    const agents = await listChannelAgents(db, channel.id);
+    return json({ agents: agents.map(organizationAgentJson) });
+  }
+
+  const channelMessagesMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/messages$/u,
+  );
+  if (channelMessagesMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const channel = await requireChannelAccess(
+      db,
+      channelMessagesMatch[1],
+      channelMessagesMatch[2],
+      session.user.id,
+    );
+    const parentMessageId = new URL(request.url).searchParams.get(
+      "parentMessageId",
+    );
+    return json({
+      messages: parentMessageId
+        ? await listChannelThreadMessages(db, channel.id, parentMessageId)
+        : await listChannelRootMessages(db, channel.id),
+    });
+  }
+  if (channelMessagesMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const organizationId = channelMessagesMatch[1];
+    const channel = await requireChannelAccess(
+      db,
+      organizationId,
+      channelMessagesMatch[2],
+      session.user.id,
+    );
+    if (channel.archived_at) {
+      throw new HttpError(409, "Channel is archived");
+    }
+    const input = channelMessageInputSchema.parse(await readJson(request));
+    const roster = await listChannelAgents(db, channel.id);
+    const mentionedAgents = input.mentionedAgentIds.map((agentId) => {
+      const agent = roster.find((candidate) => candidate.id === agentId);
+      if (!agent) {
+        throw new HttpError(400, "Mentioned Agent is not in this channel");
+      }
+      return agent;
+    });
+    for (const userId of input.mentionedUserIds) {
+      if (!(await getOrganizationRole(db, organizationId, userId))) {
+        throw new HttpError(400, "Mentioned member is not in this organization");
+      }
+    }
+    const createdAt = new Date().toISOString();
+    const message = await createChannelMessage(db, {
+      id: crypto.randomUUID(),
+      channelId: channel.id,
+      parentMessageId: input.parentMessageId,
+      authorUserId: session.user.id,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: input.body,
+      mentionedUserIds: input.mentionedUserIds,
+      mentionedAgentIds: input.mentionedAgentIds,
+      createdAt,
+    });
+    if (!message) throw new HttpError(404, "Thread message not found");
+    const agentReplies = await enqueueChannelAgentReplies(db, {
+      organizationId,
+      channelId: channel.id,
+      triggerMessageId: message.id,
+      parentMessageId: message.parentMessageId ?? message.id,
+      agents: mentionedAgents.map((agent) => ({
+        id: agent.id,
+        projectId: agent.project_id,
+        provider: agent.provider,
+      })),
+      createdAt,
+    });
+    return json(
+      {
+        message,
+        agentReplies: agentReplies.map(channelReplyJson),
+      },
+      201,
+    );
+  }
+
+  const channelAgentRepliesMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/messages\/([0-9a-f-]+)\/agent-replies$/u,
+  );
+  if (channelAgentRepliesMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const channel = await requireChannelAccess(
+      db,
+      channelAgentRepliesMatch[1],
+      channelAgentRepliesMatch[2],
+      session.user.id,
+    );
+    const jobs = await listChannelAgentReplies(
+      db,
+      channel.id,
+      channelAgentRepliesMatch[3],
+    );
+    const replies = await Promise.all(
+      jobs
+        .filter((job) => job.status === "completed")
+        .map((job) => getChannelMessage(db, channel.id, job.reply_message_id)),
+    );
+    return json({
+      agentReplies: jobs.map(channelReplyJson),
+      messages: replies.filter((reply) => reply !== null),
+    });
+  }
+
+  const channelProposalAcceptMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/proposals\/([0-9a-f-]+)\/accept$/u,
+  );
+  if (channelProposalAcceptMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const channel = await requireChannelAccess(
+      db,
+      channelProposalAcceptMatch[1],
+      channelProposalAcceptMatch[2],
+      session.user.id,
+    );
+    const proposal = await getChannelActionProposal(
+      db,
+      channel.id,
+      channelProposalAcceptMatch[3],
+    );
+    if (!proposal) throw new HttpError(404, "Proposal not found");
+    if (proposal.status === "accepted") {
+      return json({
+        outcome: "already_accepted",
+        resultRunId: proposal.result_run_id,
+      });
+    }
+    const input = channelProposalAcceptInputSchema.parse(
+      await readJson(request),
+    );
+    // The conversation never fixes a project, so the accepting member does:
+    // their choice wins, then the proposal's, then the channel default.
+    const targetProjectId =
+      input.projectId ?? proposal.project_id ?? channel.default_project_id;
+    if (!targetProjectId) {
+      throw new HttpError(400, "A target project is required");
+    }
+    const project = await getProject(db, targetProjectId, session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    const payload = channelIssueProposalPayloadSchema.parse(
+      JSON.parse(proposal.payload_json),
+    );
+    const created = await createIssueWithAttachments({
+      db,
+      attachmentsBucket,
+      project,
+      issue: { ...payload.issue, checkpoints: [] },
+      attachments: [],
+      sourceKey: `briar-channel-proposal:${proposal.id}`,
+      actor: "briar-channel",
+      detail: "채널 대화에서 사용자가 승인한 제안으로 생성된 이슈입니다.",
+      context: {
+        origin: "briar-channel",
+        proposalId: proposal.id,
+        channelId: channel.id,
+      },
+      issueId: proposal.id,
+      createdByUserId: session.user.id,
+      occurredAt: proposal.created_at,
+    });
+    const accepted = await acceptChannelActionProposal(db, {
+      channelId: channel.id,
+      proposalId: proposal.id,
+      projectId: project.id,
+      userId: session.user.id,
+      resultRunId: created.runId,
+      acceptedAt: new Date().toISOString(),
+    });
+    if (!accepted) throw new HttpError(409, "Proposal changed");
+    return json({ outcome: "accepted", resultRunId: created.runId });
   }
 
   const organizationWorkersMatch = pathname.match(
@@ -8263,6 +8858,189 @@ async function route(
           })),
         },
       },
+    });
+  }
+
+  if (pathname === "/channel-reply-claims" && request.method === "POST") {
+    const input = channelReplyClaimInputSchema.parse(await readJson(request));
+    const principal = await requireWorkerOrganization(
+      db,
+      request,
+      input.organizationId,
+    );
+    // Readiness and provider health still come from a project binding, which
+    // every registered device has. Eligibility per job is enforced in the claim.
+    const binding = await executionWorkerBindingById(
+      db,
+      principal.deviceId,
+      input.workerId,
+    );
+    if (!binding || binding.state === "disabled") {
+      throw new HttpError(403, "Worker is not enabled for this organization");
+    }
+    const observedAt = new Date().toISOString();
+    if (
+      workerStateAt(
+        binding.last_heartbeat_at,
+        observedAt,
+        binding.state,
+      ) !== "online" ||
+      binding.accepting_work !== 1 ||
+      binding.readiness_state === "needs_attention"
+    ) {
+      throw new HttpError(409, "Worker is not ready to claim replies");
+    }
+    const providers = executionWorkerProviders(binding);
+    if (providers.length === 0) {
+      throw new HttpError(409, "Worker has no available reply provider");
+    }
+    const claimToken = `briar_channel_claim_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
+    const job = await claimNextChannelAgentReply(db, input.organizationId, {
+      deviceId: principal.deviceId,
+      providers,
+      claimTokenHash: await sha256(claimToken),
+      claimedAt: observedAt,
+      leaseExpiresAt: leaseExpiryFrom(observedAt),
+    });
+    if (!job) return json({ work: null });
+    const [channel, agent, messages] = await Promise.all([
+      getChannelById(db, job.organization_id, job.channel_id),
+      getOrganizationAgent(db, job.organization_id, job.agent_id),
+      listChannelThreadMessages(db, job.channel_id, job.parent_message_id),
+    ]);
+    if (!channel || !agent || !job.agent_provider) {
+      throw new HttpError(409, "Reply job lost its channel context");
+    }
+    const project = job.project_id
+      ? await getOrganizationProject(db, job.organization_id, job.project_id)
+      : null;
+    return json({
+      work: {
+        workType: "channelReply",
+        workId: job.id,
+        organizationId: job.organization_id,
+        channelId: job.channel_id,
+        // Null means there is no repository: the runner skips worktree setup.
+        projectId: job.project_id,
+        // The worker loop keys in-flight work by runId; a channel reply has no
+        // run, so the channel stands in for it.
+        runId: job.channel_id,
+        sourceKey: `briar-channel:${job.channel_id}:reply:${job.trigger_message_id}`,
+        title: channel.name,
+        triggerMessageId: job.trigger_message_id,
+        parentMessageId: job.parent_message_id,
+        provider: job.agent_provider,
+        model: agent.model,
+        claimToken,
+        claimedAt: job.claimed_at,
+        leaseExpiresAt: job.lease_expires_at,
+        snapshot: {
+          channel: {
+            id: channel.id,
+            name: channel.name,
+            slug: channel.slug,
+            topic: channel.topic,
+            defaultProjectId: channel.default_project_id,
+          },
+          agent: {
+            id: agent.id,
+            name: agent.name,
+            handle: agent.handle,
+            responsibility: agent.responsibility,
+            provider: agent.provider,
+            model: agent.model,
+            projectId: agent.project_id,
+          },
+          project: project ? { id: project.id, name: project.name } : null,
+          projectTargets: await listOrganizationProjectTargets(
+            db,
+            job.organization_id,
+          ),
+          messages,
+        },
+      },
+    });
+  }
+
+  const channelReplyClaimMatch = pathname.match(
+    /^\/channel-reply-claims\/([0-9a-f-]+)\/(lease|complete)$/u,
+  );
+  if (channelReplyClaimMatch && request.method === "POST") {
+    if (channelReplyClaimMatch[2] === "lease") {
+      const input = channelReplyLeaseInputSchema.parse(await readJson(request));
+      await requireWorkerOrganization(db, request, input.organizationId);
+      const observedAt = new Date().toISOString();
+      const renewed = await renewChannelReplyLease(db, {
+        jobId: channelReplyClaimMatch[1],
+        claimTokenHash: await sha256(input.claimToken),
+        leaseExpiresAt: leaseExpiryFrom(observedAt),
+      });
+      if (!renewed) throw new HttpError(409, "Reply claim is no longer active");
+      return json({ leaseExpiresAt: renewed.lease_expires_at });
+    }
+
+    const input = channelReplyCompleteInputSchema.parse(await readJson(request));
+    await requireWorkerOrganization(db, request, input.organizationId);
+    const claimTokenHash = await sha256(input.claimToken);
+    const job = await getClaimedChannelReply(
+      db,
+      channelReplyClaimMatch[1],
+      claimTokenHash,
+    );
+    if (!job || job.organization_id !== input.organizationId) {
+      throw new HttpError(409, "Reply claim is no longer active");
+    }
+    const observedAt = new Date().toISOString();
+    if (input.error) {
+      const failed = await failChannelReply(db, {
+        jobId: job.id,
+        claimTokenHash,
+        error: input.error,
+        updatedAt: observedAt,
+      });
+      if (!failed) throw new HttpError(409, "Reply claim is no longer active");
+      return json({ agentReply: channelReplyJson(failed) });
+    }
+    const agent = await getOrganizationAgent(
+      db,
+      job.organization_id,
+      job.agent_id,
+    );
+    if (!agent) throw new HttpError(409, "Reply job lost its Agent");
+    const result = input.result!;
+    // A document or issue may only target a project inside this organization.
+    for (const projectId of [
+      result.document?.projectId,
+      result.issueProposal?.projectId,
+    ]) {
+      if (!projectId) continue;
+      const project = await getOrganizationProject(
+        db,
+        job.organization_id,
+        projectId,
+      );
+      if (!project) {
+        throw new HttpError(400, "Target project is outside this organization");
+      }
+    }
+    const completed = await completeChannelReply(db, job, {
+      jobId: job.id,
+      claimTokenHash,
+      body: result.body,
+      document: result.document,
+      issueProposal: result.issueProposal,
+      agentName: agent.name,
+      agentProvider: job.agent_provider ?? agent.provider,
+      completedAt: observedAt,
+    });
+    if (!completed) throw new HttpError(409, "Reply claim is no longer active");
+    return json({
+      agentReply: channelReplyJson(completed),
+      message: await getChannelMessage(
+        db,
+        job.channel_id,
+        job.reply_message_id,
+      ),
     });
   }
 
