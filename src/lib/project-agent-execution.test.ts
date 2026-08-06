@@ -36,6 +36,7 @@ describe("executeProjectAgentTask", () => {
           name: "Release agent",
           provider: "claude",
           model: "sonnet",
+          effort: null,
           responsibility: "Maintain releases.",
           skill: "# Release agent",
         },

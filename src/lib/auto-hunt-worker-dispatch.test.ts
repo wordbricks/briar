@@ -104,6 +104,7 @@ describe("dispatchAutoHuntToWorkers", () => {
       id: "agent-1",
       provider: "claude" as const,
       model: "sonnet",
+      effort: null,
     };
 
     await dispatchAutoHuntToWorkers(
@@ -148,6 +149,63 @@ describe("dispatchAutoHuntToWorkers", () => {
         provider: "codex",
         model: "gpt-5.6-sol",
         effort: "xhigh",
+      }),
+    );
+  });
+
+  it("falls back to the Agent effort when the issue has no preference", async () => {
+    const dispatch = vi.fn(async () => undefined);
+    const retry = vi.fn(async () => undefined);
+    const configuredAgent = {
+      id: "agent-1",
+      provider: "claude" as const,
+      model: "sonnet",
+      effort: "high" as const,
+    };
+
+    await dispatchAutoHuntToWorkers(
+      { dispatch, retry },
+      {
+        agent: configuredAgent,
+        runs: [
+          run("run-1"),
+          run("run-2", {
+            preferredProvider: "grok",
+          }),
+          run("run-3", {
+            preferredProvider: "codex",
+            preferredModel: "gpt-5.6-sol",
+          }),
+        ],
+        maxIssues: 3,
+      },
+    );
+
+    expect(dispatch).toHaveBeenNthCalledWith(
+      1,
+      expect.anything(),
+      expect.objectContaining({
+        provider: "claude",
+        model: "sonnet",
+        effort: "high",
+      }),
+    );
+    expect(dispatch).toHaveBeenNthCalledWith(
+      2,
+      expect.anything(),
+      expect.objectContaining({
+        provider: "grok",
+        model: null,
+        effort: null,
+      }),
+    );
+    expect(dispatch).toHaveBeenNthCalledWith(
+      3,
+      expect.anything(),
+      expect.objectContaining({
+        provider: "codex",
+        model: "gpt-5.6-sol",
+        effort: null,
       }),
     );
   });

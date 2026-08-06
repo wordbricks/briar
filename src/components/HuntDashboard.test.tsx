@@ -54,6 +54,7 @@ const dashboardAgent: ProjectAgent = {
   codexPet: null,
   provider: "codex",
   model: null,
+  effort: null,
   responsibility: "Process issues",
   skill: "# Agent",
   calendarColor: "#3275d5",
@@ -2091,6 +2092,101 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
+  it("scrolls the issue work log to the newest message when the tab opens", async () => {
+    const run: HuntRun = {
+      ...demoDashboard.runs[0],
+      status: "completed",
+      workerId: "worker-1",
+    };
+    let resolveTranscript: (transcript: api.ProjectAgentTranscript) => void =
+      () => undefined;
+    const transcript = new Promise<api.ProjectAgentTranscript>((resolve) => {
+      resolveTranscript = resolve;
+    });
+    const loadTranscript = vi
+      .spyOn(api, "loadProjectAgentTranscript")
+      .mockReturnValue(transcript);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          projectId={demoDashboard.project.id}
+          run={run}
+          token="session-token"
+        />,
+      );
+      await Promise.resolve();
+    });
+
+    const activityTab = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
+    ).find((tab) => tab.textContent === "작업 로그");
+    await act(async () => activityTab?.click());
+
+    const panel = container.querySelector<HTMLElement>(
+      ".issue-agent-activity-panel",
+    );
+    expect(panel).not.toBeNull();
+    if (!panel) throw new Error("work log panel was not rendered");
+    Object.defineProperty(panel, "scrollHeight", {
+      configurable: true,
+      value: 640,
+    });
+    panel.scrollTop = 0;
+    await act(async () => {
+      resolveTranscript({
+        session: {
+          sessionId: `detached-${run.id}`,
+          runId: run.id,
+          workerId: "worker-1",
+          agentProvider: "codex",
+          startedAt: "2026-08-03T12:00:00.000Z",
+          lastEventAt: "2026-08-03T12:00:01.000Z",
+          eventCount: 1,
+        },
+        events: [{
+          sequence: 1,
+          direction: "server",
+          message: {
+            type: "item.completed",
+            item: {
+              id: "message-1",
+              type: "agent_message",
+              phase: "final_answer",
+              text: "가장 최신 메시지입니다.",
+            },
+          },
+          recordedAt: "2026-08-03T12:00:01.000Z",
+        }],
+      });
+      await transcript;
+      await Promise.resolve();
+    });
+
+    expect(panel.textContent).toContain("가장 최신 메시지입니다.");
+    expect(panel.scrollTop).toBe(640);
+
+    await act(async () => root.unmount());
+    loadTranscript.mockRestore();
+    container.remove();
+  });
+
   it("shows editable prerequisite and follow-up relationships in issue properties", async () => {
     const prerequisite = demoDashboard.runs[1];
     const dependent = demoDashboard.runs[0];
@@ -3682,7 +3778,7 @@ describe("HuntDashboard", () => {
           error={null}
           isRecovering={false}
           isSidebarOpen
-          onAcceptIssueReworkProposal={onAccept}
+          onAcceptIssueAction={onAccept}
           onBack={() => undefined}
           onCancel={async () => undefined}
           onLoadAttachment={async () => new Blob()}
@@ -3708,8 +3804,79 @@ describe("HuntDashboard", () => {
       acceptButton?.click();
       await Promise.resolve();
     });
-    expect(onAccept).toHaveBeenCalledWith(proposalId);
+    expect(onAccept).toHaveBeenCalledWith(message.proposedAction);
     expect(container.textContent).toContain("리비전 2 개정이 시작되었습니다.");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("requires acceptance before an @briar-created issue is persisted", async () => {
+    const message: IssueMessage = {
+      id: "10101010-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      runId: demoDashboard.runs[1].id,
+      parentMessageId: null,
+      body: "후속 QA 이슈 생성을 제안했습니다.",
+      author: { id: null, name: "Briar · Codex", image: null, provider: "codex" },
+      replyCount: 0,
+      proposedAction: {
+        id: "20202020-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        type: "request_issue_create",
+        issue: {
+          title: "후속 QA",
+          description: "모바일 승인 흐름을 확인합니다.",
+          priority: 2,
+          status: "backlog",
+        },
+        status: "pending",
+        acceptedAt: null,
+        resultRunId: null,
+      },
+      createdAt: "2026-08-06T01:00:00.000Z",
+      updatedAt: "2026-08-06T01:00:00.000Z",
+    };
+    const onAccept = vi.fn(async () => ({
+      ...message.proposedAction!,
+      status: "accepted" as const,
+      acceptedAt: "2026-08-06T01:01:00.000Z",
+      resultRunId: "30303030-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    }));
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <TooltipProvider>
+        <RunPage
+          error={null}
+          isRecovering={false}
+          isSidebarOpen
+          onAcceptIssueAction={onAccept}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => [message]}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => { throw new Error("not implemented"); }}
+          run={demoDashboard.runs[1]}
+        />
+      </TooltipProvider>,
+    ));
+    await act(async () => { await Promise.resolve(); });
+
+    const acceptButton = container.querySelector<HTMLButtonElement>(
+      ".issue-rework-proposal-accept",
+    );
+    expect(container.textContent).toContain("후속 QA");
+    expect(acceptButton?.textContent).toContain("수락하고 이슈 만들기");
+    expect(onAccept).not.toHaveBeenCalled();
+    await act(async () => {
+      acceptButton?.click();
+      await Promise.resolve();
+    });
+    expect(onAccept).toHaveBeenCalledWith(message.proposedAction);
+    expect(container.textContent).toContain("새 이슈가 생성되었습니다.");
 
     await act(async () => root.unmount());
     container.remove();

@@ -159,7 +159,7 @@ import type {
   IssueAttachment,
   IssueMessage,
   IssueMessageSendResult,
-  IssueReworkProposal,
+  IssueProposedAction,
   IssueExecutionPreferences,
   IssueResultReview,
   OrganizationMember,
@@ -399,7 +399,7 @@ export function HuntDashboard({
   onDeleteIssue,
   onTransferIssue,
   onAddIssueDependency,
-  onAcceptIssueReworkProposal,
+  onAcceptIssueAction,
   onRemoveIssueDependency,
   onUpdateIssue,
   onUpdateIssueCheckpoints = async () => undefined,
@@ -463,10 +463,10 @@ export function HuntDashboard({
     dependentRunId: string,
     prerequisiteRunId: string,
   ) => Promise<unknown>;
-  onAcceptIssueReworkProposal?: (
+  onAcceptIssueAction?: (
     runId: string,
-    proposalId: string,
-  ) => Promise<IssueReworkProposal>;
+    proposal: IssueProposedAction,
+  ) => Promise<IssueProposedAction>;
   onRemoveIssueDependency?: (
     dependentRunId: string,
     prerequisiteRunId: string,
@@ -1054,9 +1054,9 @@ export function HuntDashboard({
             ? (prerequisiteRunId) =>
                 onAddIssueDependency(selected.id, prerequisiteRunId)
             : undefined}
-          onAcceptIssueReworkProposal={onAcceptIssueReworkProposal
-            ? (proposalId) =>
-                onAcceptIssueReworkProposal(selected.id, proposalId)
+          onAcceptIssueAction={onAcceptIssueAction
+            ? (proposal) =>
+                onAcceptIssueAction(selected.id, proposal)
             : undefined}
           onRemoveDependency={onRemoveIssueDependency
             ? (prerequisiteRunId) =>
@@ -3725,7 +3725,7 @@ export function RunPage({
   isSidebarOpen,
   onBack,
   onAddDependency,
-  onAcceptIssueReworkProposal,
+  onAcceptIssueAction,
   onCancel,
   onUnassignRun,
   onDelete,
@@ -3770,9 +3770,9 @@ export function RunPage({
   isSidebarOpen: boolean;
   onBack: () => void;
   onAddDependency?: (prerequisiteRunId: string) => Promise<unknown>;
-  onAcceptIssueReworkProposal?: (
-    proposalId: string,
-  ) => Promise<IssueReworkProposal>;
+  onAcceptIssueAction?: (
+    proposal: IssueProposedAction,
+  ) => Promise<IssueProposedAction>;
   onCancel: () => Promise<unknown>;
   onUnassignRun?: (runId: string) => Promise<unknown>;
   onDelete?: () => Promise<unknown>;
@@ -5225,7 +5225,7 @@ export function RunPage({
                   >
                     <IssueConversation
                       mentionMembers={mentionMembers}
-                      onAcceptReworkProposal={onAcceptIssueReworkProposal}
+                      onAcceptIssueAction={onAcceptIssueAction}
                       onLoadAttachment={onLoadAttachment}
                       onLoad={onLoadIssueMessages}
                       onSend={onSendIssueMessage}
@@ -5242,7 +5242,7 @@ export function RunPage({
               {!companionMode ? (
                 <IssueConversation
                   mentionMembers={mentionMembers}
-                  onAcceptReworkProposal={onAcceptIssueReworkProposal}
+                  onAcceptIssueAction={onAcceptIssueAction}
                   onLoadAttachment={onLoadAttachment}
                   onLoad={onLoadIssueMessages}
                   onSend={onSendIssueMessage}
@@ -6244,12 +6244,21 @@ function IssueAgentActivityPanel({
   provider: AgentProvider | null;
 }) {
   const { t } = useI18n();
+  const panelRef = useRef<HTMLDivElement | null>(null);
+
+  useLayoutEffect(() => {
+    const panel = panelRef.current;
+    if (panel && !loading && !error && activity.length > 0) {
+      panel.scrollTop = panel.scrollHeight;
+    }
+  }, [activity, error, loading]);
 
   return (
     <div
       aria-labelledby={labelledBy}
       className="issue-agent-activity-panel"
       id={id}
+      ref={panelRef}
       role="tabpanel"
     >
       <header>
@@ -6752,16 +6761,16 @@ function RunEvidenceImagePreview({
 
 function IssueConversation({
   mentionMembers,
-  onAcceptReworkProposal,
+  onAcceptIssueAction,
   onLoadAttachment,
   onLoad,
   onSend,
   run,
 }: {
   mentionMembers: OrganizationMember[];
-  onAcceptReworkProposal?: (
-    proposalId: string,
-  ) => Promise<IssueReworkProposal>;
+  onAcceptIssueAction?: (
+    proposal: IssueProposedAction,
+  ) => Promise<IssueProposedAction>;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onLoad: () => Promise<IssueMessage[]>;
   onSend: (input: {
@@ -6783,7 +6792,7 @@ function IssueConversation({
   const [agentReplyStates, setAgentReplyStates] = useState<
     Record<string, { pending: number; error: string | null }>
   >({});
-  const [reworkProposalStates, setReworkProposalStates] = useState<
+  const [actionProposalStates, setActionProposalStates] = useState<
     Record<string, { accepting: boolean; error: string | null }>
   >({});
   const messageListRef = useRef<HTMLDivElement | null>(null);
@@ -6899,30 +6908,30 @@ function IssueConversation({
       });
   };
 
-  const acceptReworkProposal = async (proposalId: string) => {
-    if (!onAcceptReworkProposal) return;
-    setReworkProposalStates((current) => ({
+  const acceptIssueAction = async (proposal: IssueProposedAction) => {
+    if (!onAcceptIssueAction) return;
+    setActionProposalStates((current) => ({
       ...current,
-      [proposalId]: { accepting: true, error: null },
+      [proposal.id]: { accepting: true, error: null },
     }));
     try {
-      const accepted = await onAcceptReworkProposal(proposalId);
+      const accepted = await onAcceptIssueAction(proposal);
       setMessages((current) =>
         current.map((message) =>
-          message.proposedAction?.id === proposalId
+          message.proposedAction?.id === proposal.id
             ? { ...message, proposedAction: accepted }
             : message,
         )
       );
-      setReworkProposalStates((current) => {
+      setActionProposalStates((current) => {
         const next = { ...current };
-        delete next[proposalId];
+        delete next[proposal.id];
         return next;
       });
     } catch (caught) {
-      setReworkProposalStates((current) => ({
+      setActionProposalStates((current) => ({
         ...current,
-        [proposalId]: {
+        [proposal.id]: {
           accepting: false,
           error: caught instanceof Error ? caught.message : String(caught),
         },
@@ -6969,8 +6978,8 @@ function IssueConversation({
                   isReplying={isReplying}
                   localeTag={localeTag}
                   message={message}
-                  onAcceptReworkProposal={onAcceptReworkProposal && message.proposedAction
-                    ? () => void acceptReworkProposal(message.proposedAction!.id)
+                  onAcceptIssueAction={onAcceptIssueAction && message.proposedAction
+                    ? () => void acceptIssueAction(message.proposedAction!)
                     : undefined}
                   onLoadAttachment={onLoadAttachment}
                   onReply={() =>
@@ -6980,16 +6989,17 @@ function IssueConversation({
                   }
                   parentMessage={parentMessage}
                   replyComposerId={replyComposerId}
-                  reworkProposalState={message.proposedAction
-                    ? reworkProposalStates[message.proposedAction.id]
+                  actionProposalState={message.proposedAction
+                    ? actionProposalStates[message.proposedAction.id]
                     : undefined}
-                  reworkStageLabel={message.proposedAction
+                  reworkStageLabel={message.proposedAction?.type === "request_issue_rework"
                     ? localizeWorkflowStage(
                         t,
                         message.proposedAction.workflowStage,
                         run.workflow.stages.find(
                           (stage) =>
-                            stage.id === message.proposedAction?.workflowStage,
+                            message.proposedAction?.type === "request_issue_rework" &&
+                            stage.id === message.proposedAction.workflowStage,
                         )?.label ?? message.proposedAction.workflowStage,
                       )
                     : null}
@@ -7031,26 +7041,37 @@ function IssueMessageItem({
   isReplying = false,
   localeTag,
   message,
-  onAcceptReworkProposal,
+  onAcceptIssueAction,
   onLoadAttachment,
   onReply,
   parentMessage = null,
   replyComposerId,
-  reworkProposalState,
+  actionProposalState,
   reworkStageLabel,
 }: {
   isReplying?: boolean;
   localeTag: string;
   message: IssueMessage;
-  onAcceptReworkProposal?: () => void;
+  onAcceptIssueAction?: () => void;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onReply?: () => void;
   parentMessage?: IssueMessage | null;
   replyComposerId?: string;
-  reworkProposalState?: { accepting: boolean; error: string | null };
+  actionProposalState?: { accepting: boolean; error: string | null };
   reworkStageLabel?: string | null;
 }) {
   const { t } = useI18n();
+  const proposal = message.proposedAction;
+  const proposalTitle = proposal?.type === "request_issue_update"
+    ? t("run.issueUpdateProposalTitle")
+    : proposal?.type === "request_issue_create"
+      ? t("run.issueCreateProposalTitle")
+      : t("run.reworkProposalTitle");
+  const proposalAcceptLabel = proposal?.type === "request_issue_update"
+    ? t("run.issueUpdateProposalAccept")
+    : proposal?.type === "request_issue_create"
+      ? t("run.issueCreateProposalAccept")
+      : t("run.reworkProposalAccept");
   return (
     <article className="issue-message">
       <MessageAvatar message={message} />
@@ -7088,47 +7109,77 @@ function IssueMessageItem({
             {message.body}
           </ReactMarkdown>
         </div>
-        {message.proposedAction ? (
+        {proposal ? (
           <section className="issue-rework-proposal">
             <header>
-              <strong>{t("run.reworkProposalTitle")}</strong>
-              <small>
-                {t("run.reworkProposalStage", {
-                  stage: reworkStageLabel ?? message.proposedAction.workflowStage,
-                })}
-              </small>
+              <strong>{proposalTitle}</strong>
+              {proposal.type === "request_issue_rework" ? (
+                <small>
+                  {t("run.reworkProposalStage", {
+                    stage: reworkStageLabel ?? proposal.workflowStage,
+                  })}
+                </small>
+              ) : proposal.type === "request_issue_create" ? (
+                <small>
+                  {t("run.issueProposalStatus", { status: proposal.issue.status })}
+                </small>
+              ) : null}
             </header>
-            <p>{message.proposedAction.reason}</p>
-            {message.proposedAction.status === "accepted" ? (
+            {proposal.type === "request_issue_rework" ? (
+              <p>{proposal.reason}</p>
+            ) : proposal.type === "request_issue_update" ? (
+              <dl className="issue-action-proposal-fields">
+                {proposal.changes.title !== undefined ? (
+                  <div><dt>{t("run.issueProposalTitleField")}</dt><dd>{proposal.changes.title}</dd></div>
+                ) : null}
+                {proposal.changes.description !== undefined ? (
+                  <div><dt>{t("run.issueProposalDescriptionField")}</dt><dd>{proposal.changes.description || t("run.issueProposalClearValue")}</dd></div>
+                ) : null}
+                {proposal.changes.priority !== undefined ? (
+                  <div><dt>{t("run.issueProposalPriorityField")}</dt><dd>{proposal.changes.priority ? `P${proposal.changes.priority}` : t("run.issueProposalClearValue")}</dd></div>
+                ) : null}
+              </dl>
+            ) : (
+              <div className="issue-action-proposal-create">
+                <strong>{proposal.issue.title}</strong>
+                {proposal.issue.description ? <p>{proposal.issue.description}</p> : null}
+                <small>
+                  {t("run.issueProposalPriorityField")}: {proposal.issue.priority ? `P${proposal.issue.priority}` : t("run.issueProposalClearValue")}
+                </small>
+              </div>
+            )}
+            {proposal.status === "accepted" ? (
               <div className="issue-rework-proposal-accepted">
                 <BadgeCheck aria-hidden="true" size={15} />
-                {t("run.reworkProposalAccepted", {
-                  revision: message.proposedAction.appliedRevision ?? "",
-                })}
+                {proposal.type === "request_issue_rework"
+                  ? t("run.reworkProposalAccepted", {
+                      revision: proposal.appliedRevision ?? "",
+                    })
+                  : proposal.type === "request_issue_create"
+                    ? t("run.issueCreateProposalAccepted")
+                    : t("run.issueUpdateProposalAccepted")}
               </div>
-            ) : onAcceptReworkProposal ? (
+            ) : onAcceptIssueAction ? (
               <button
                 className="issue-rework-proposal-accept"
-                disabled={reworkProposalState?.accepting}
-                onClick={onAcceptReworkProposal}
+                disabled={actionProposalState?.accepting}
+                onClick={onAcceptIssueAction}
                 type="button"
               >
-                {reworkProposalState?.accepting ? (
+                {actionProposalState?.accepting ? (
                   <LoaderCircle aria-hidden="true" className="spin" size={15} />
                 ) : (
                   <Play aria-hidden="true" size={15} />
                 )}
-                {t(
-                  reworkProposalState?.accepting
-                    ? "run.reworkProposalAccepting"
-                    : "run.reworkProposalAccept",
-                )}
+                {actionProposalState?.accepting
+                  ? t("run.reworkProposalAccepting")
+                  : proposalAcceptLabel}
               </button>
             ) : null}
-            {reworkProposalState?.error ? (
+            {actionProposalState?.error ? (
               <p className="issue-rework-proposal-error">
                 <CircleAlert aria-hidden="true" size={14} />
-                {reworkProposalState.error}
+                {actionProposalState.error}
               </p>
             ) : null}
           </section>

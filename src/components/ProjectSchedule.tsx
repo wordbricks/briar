@@ -212,6 +212,7 @@ export function ProjectSchedule({
                   name: agent.name,
                   provider: agent.provider,
                   model: agent.model,
+                  effort: agent.effort,
                   responsibility: agent.responsibility,
                   skill: agent.skill,
                 },

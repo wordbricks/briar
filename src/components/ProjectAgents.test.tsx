@@ -294,6 +294,7 @@ describe("ProjectAgents", () => {
       name: "Jay 이슈 처리 에이전트",
       provider: "codex",
       model: null,
+      effort: null,
       responsibility:
         "Jay한테 assign된 todo 이슈를 3개씩 처리하는 에이전트",
       calendarColor: "#3275d5",

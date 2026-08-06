@@ -170,6 +170,7 @@ export type ProjectAgentRunInput = {
     name: string;
     provider: AgentProvider;
     model: string | null;
+    effort: ModelEffort | null;
     responsibility: string;
     skill: string;
   };
@@ -342,6 +343,7 @@ export async function runProjectAgent(
       agentName: input.agent.name,
       agentProvider: input.agent.provider,
       agentModel: input.agent.model,
+      agentEffort: input.agent.effort,
       responsibility: input.agent.responsibility,
       skill: input.agent.skill,
       message: input.message,

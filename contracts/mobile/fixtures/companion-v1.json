@@ -435,6 +435,26 @@
         "workflowStage": "implementing"
       }
     },
+    "acceptIssueActionProposal": {
+      "method": "POST",
+      "path": "/projects/{projectId}/runs/{runId}/issue-action-proposals/{proposalId}/accept",
+      "status": 200,
+      "response": {
+        "proposal": {
+          "id": "abababab-abab-4bab-8bab-abababababab",
+          "type": "request_issue_update",
+          "changes": {
+            "description": "Use the revised acceptance criteria."
+          },
+          "changedFields": ["description"],
+          "status": "accepted",
+          "acceptedAt": "2026-08-02T01:03:00.000Z",
+          "resultRunId": "33333333-3333-4333-8333-333333333333"
+        },
+        "outcome": "accepted",
+        "resultRunId": "33333333-3333-4333-8333-333333333333"
+      }
+    },
     "cancelRun": {
       "method": "POST",
       "path": "/projects/{projectId}/runs/{runId}/cancel",

@@ -58,6 +58,7 @@ const agent: ProjectAgent = {
   },
   provider: "codex",
   model: null,
+  effort: null,
   responsibility: "Run tasks",
   skill: "# Agent",
   calendarColor: "#3275d5",

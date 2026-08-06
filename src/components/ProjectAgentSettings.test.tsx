@@ -25,6 +25,7 @@ describe("ProjectAgentSettings", () => {
       codexPet: null,
       provider: "codex" as const,
       model: null,
+      effort: null,
       responsibility: "Process queued issues.",
       skill: "# Issue processing agent\n\nProcess queued issues.",
       calendarColor: "#3275d5",
@@ -89,7 +90,7 @@ describe("ProjectAgentSettings", () => {
     ).not.toBeNull();
     expect(
       container.querySelectorAll(".project-agent-settings-fields .native-select"),
-    ).toHaveLength(2);
+    ).toHaveLength(3);
     expect(container.textContent).toContain("실행 설정");
     expect(container.textContent).not.toContain("프로젝트 실행 기본값");
     expect(container.querySelector("#project-runtime-provider")).toBeNull();
@@ -126,6 +127,19 @@ describe("ProjectAgentSettings", () => {
         )
         ?.click();
     });
+    const [, , effortTrigger] = Array.from(
+      container.querySelectorAll<HTMLButtonElement>(
+        ".project-agent-settings-fields .native-select button",
+      ),
+    );
+    await act(async () => effortTrigger?.click());
+    await act(async () => {
+      document
+        .querySelector<HTMLButtonElement>(
+          '.select-menu-option[data-value="high"]',
+        )
+        ?.click();
+    });
     await act(async () => {
       container
         .querySelector<HTMLFormElement>("form.project-agent-settings-card")
@@ -135,7 +149,11 @@ describe("ProjectAgentSettings", () => {
       await Promise.resolve();
     });
     expect(onSave).toHaveBeenCalledWith(
-      expect.objectContaining({ provider: "claude", model: "opus" }),
+      expect.objectContaining({
+        provider: "claude",
+        model: "opus",
+        effort: "high",
+      }),
     );
 
     await act(async () => {

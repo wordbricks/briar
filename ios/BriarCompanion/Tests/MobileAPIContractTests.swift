@@ -44,6 +44,9 @@ final class MobileAPIContractTests: XCTestCase {
         let accepted: AcceptIssueReworkProposalResponse = try decodeResponse(
             "acceptIssueReworkProposal"
         )
+        let acceptedAction: AcceptIssueActionProposalResponse = try decodeResponse(
+            "acceptIssueActionProposal"
+        )
 
         XCTAssertTrue(health.ok)
         XCTAssertEqual(device.userCode, "BRIAR123")
@@ -72,6 +75,8 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(resume.revision, 3)
         XCTAssertEqual(accepted.proposal.status, .accepted)
         XCTAssertEqual(accepted.revision, 2)
+        XCTAssertEqual(acceptedAction.proposal.type, .update)
+        XCTAssertEqual(acceptedAction.proposal.changes?.description, "Use the revised acceptance criteria.")
     }
 
     func testEndpointPathsMatchOpenAPISubset() {
@@ -114,6 +119,14 @@ final class MobileAPIContractTests: XCTestCase {
                 proposalID: proposalID
             ),
             "/projects/11111111-1111-4111-8111-111111111111/runs/33333333-3333-4333-8333-333333333333/rework-proposals/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/accept"
+        )
+        XCTAssertEqual(
+            MobileAPIContract.Endpoint.acceptIssueActionProposal(
+                projectID: projectID,
+                runID: runID,
+                proposalID: proposalID
+            ),
+            "/projects/11111111-1111-4111-8111-111111111111/runs/33333333-3333-4333-8333-333333333333/issue-action-proposals/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/accept"
         )
         XCTAssertEqual(
             MobileAPIContract.Endpoint.projectAgents(projectID: projectID, locale: "en"),

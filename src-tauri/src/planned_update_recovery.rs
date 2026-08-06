@@ -281,6 +281,7 @@ mod tests {
             agent_name: "Release agent".to_string(),
             agent_provider: AgentProviderKind::Claude,
             agent_model: Some("sonnet".to_string()),
+            agent_effort: None,
             responsibility: "Maintain releases".to_string(),
             skill: "Release safely".to_string(),
             message: "Prepare the release".to_string(),

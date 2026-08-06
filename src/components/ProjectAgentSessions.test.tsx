@@ -15,6 +15,7 @@ const agent: ProjectAgent = {
   codexPet: null,
   provider: "codex",
   model: null,
+  effort: null,
   responsibility: "Review the release.",
   skill: "# Release agent",
   calendarColor: "#3275d5",

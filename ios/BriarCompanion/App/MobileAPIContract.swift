@@ -94,6 +94,14 @@ enum MobileAPIContract {
             "\(run(projectID: projectID, runID: runID))/rework-proposals/\(proposalID.uuidString.lowercased())/accept"
         }
 
+        static func acceptIssueActionProposal(
+            projectID: UUID,
+            runID: UUID,
+            proposalID: UUID
+        ) -> String {
+            "\(run(projectID: projectID, runID: runID))/issue-action-proposals/\(proposalID.uuidString.lowercased())/accept"
+        }
+
         static func projectAgents(projectID: UUID, locale: String) -> String {
             "/projects/\(projectID.uuidString.lowercased())/agents?locale=\(locale)"
         }

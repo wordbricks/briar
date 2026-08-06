@@ -38,6 +38,7 @@ import type {
   HuntEvent,
   IssueAttachment,
   IssueMessage,
+  IssueProposedAction,
   IssueExecutionPreferences,
   IssueResultReview,
   ClaimedProjectAgentScheduleRun,
@@ -115,6 +116,10 @@ const projectAgentSchema = z.object({
     .default(null),
   provider: z.enum(["codex", "claude", "grok", "opencode"]),
   model: z.string().nullable(),
+  effort: z
+    .enum(["low", "medium", "high", "xhigh", "max", "ultra"])
+    .nullable()
+    .default(null),
   responsibility: z.string(),
   skill: z.string(),
   calendarColor: z
@@ -238,6 +243,7 @@ const projectAgentScheduleRunSchema = z.object({
     name: true,
     provider: true,
     model: true,
+    effort: true,
     responsibility: true,
     skill: true,
   }),
@@ -1736,13 +1742,30 @@ export async function acceptIssueReworkProposal(
   proposalId: string,
 ) {
   return request<{
-    proposal: NonNullable<IssueMessage["proposedAction"]>;
+    proposal: Extract<IssueProposedAction, { type: "request_issue_rework" }>;
     outcome: "accepted" | "already_accepted";
     attempt: number;
     revision: number;
     workflowStage: string;
   }>(
     `/projects/${projectId}/runs/${runId}/rework-proposals/${proposalId}/accept`,
+    token,
+    { method: "POST", body: JSON.stringify({}) },
+  );
+}
+
+export async function acceptIssueActionProposal(
+  token: string,
+  projectId: string,
+  runId: string,
+  proposalId: string,
+) {
+  return request<{
+    proposal: Exclude<IssueProposedAction, { type: "request_issue_rework" }>;
+    outcome: "accepted" | "already_accepted";
+    resultRunId: string | null;
+  }>(
+    `/projects/${projectId}/runs/${runId}/issue-action-proposals/${proposalId}/accept`,
     token,
     { method: "POST", body: JSON.stringify({}) },
   );
