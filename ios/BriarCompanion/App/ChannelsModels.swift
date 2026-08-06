@@ -28,12 +28,14 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
     let body: String
     let author: Author
     let replyCount: Int
+    let lastReplyAt: Date?
     let document: Document?
     let createdAt: Date
 
     struct Author: Codable, Hashable, Sendable {
         let type: Kind
         let name: String
+        let image: String?
         let provider: String?
 
         enum Kind: String, Codable, Hashable, Sendable {

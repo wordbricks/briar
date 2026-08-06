@@ -130,4 +130,33 @@ final class ChannelGroupingTests: XCTestCase {
     func testReturnsNothingWithoutVisibleChannels() {
         XCTAssertTrue(groups([], activeProjectID: projectOne, names: [:]).isEmpty)
     }
+
+    func testDecodesAvatarAndLastReplyMetadataUsedByMessageRows() throws {
+        let json = """
+        {
+          "id": "aaaaaaaa-0000-4000-8000-000000000001",
+          "channelId": "bbbbbbbb-0000-4000-8000-000000000001",
+          "parentMessageId": null,
+          "body": "Hello team",
+          "author": {
+            "type": "user",
+            "name": "Jay",
+            "image": "https://example.com/jay.png",
+            "provider": null
+          },
+          "replyCount": 2,
+          "lastReplyAt": "2026-08-01T08:00:00Z",
+          "document": null,
+          "createdAt": "2026-08-01T01:00:00Z"
+        }
+        """
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        let message = try decoder.decode(ChannelMessage.self, from: Data(json.utf8))
+
+        XCTAssertEqual(message.author.image, "https://example.com/jay.png")
+        XCTAssertEqual(message.replyCount, 2)
+        XCTAssertNotNil(message.lastReplyAt)
+    }
 }
