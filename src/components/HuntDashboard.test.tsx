@@ -2092,6 +2092,101 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
+  it("scrolls the issue work log to the newest message when the tab opens", async () => {
+    const run: HuntRun = {
+      ...demoDashboard.runs[0],
+      status: "completed",
+      workerId: "worker-1",
+    };
+    let resolveTranscript: (transcript: api.ProjectAgentTranscript) => void =
+      () => undefined;
+    const transcript = new Promise<api.ProjectAgentTranscript>((resolve) => {
+      resolveTranscript = resolve;
+    });
+    const loadTranscript = vi
+      .spyOn(api, "loadProjectAgentTranscript")
+      .mockReturnValue(transcript);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          projectId={demoDashboard.project.id}
+          run={run}
+          token="session-token"
+        />,
+      );
+      await Promise.resolve();
+    });
+
+    const activityTab = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
+    ).find((tab) => tab.textContent === "작업 로그");
+    await act(async () => activityTab?.click());
+
+    const panel = container.querySelector<HTMLElement>(
+      ".issue-agent-activity-panel",
+    );
+    expect(panel).not.toBeNull();
+    if (!panel) throw new Error("work log panel was not rendered");
+    Object.defineProperty(panel, "scrollHeight", {
+      configurable: true,
+      value: 640,
+    });
+    panel.scrollTop = 0;
+    await act(async () => {
+      resolveTranscript({
+        session: {
+          sessionId: `detached-${run.id}`,
+          runId: run.id,
+          workerId: "worker-1",
+          agentProvider: "codex",
+          startedAt: "2026-08-03T12:00:00.000Z",
+          lastEventAt: "2026-08-03T12:00:01.000Z",
+          eventCount: 1,
+        },
+        events: [{
+          sequence: 1,
+          direction: "server",
+          message: {
+            type: "item.completed",
+            item: {
+              id: "message-1",
+              type: "agent_message",
+              phase: "final_answer",
+              text: "가장 최신 메시지입니다.",
+            },
+          },
+          recordedAt: "2026-08-03T12:00:01.000Z",
+        }],
+      });
+      await transcript;
+      await Promise.resolve();
+    });
+
+    expect(panel.textContent).toContain("가장 최신 메시지입니다.");
+    expect(panel.scrollTop).toBe(640);
+
+    await act(async () => root.unmount());
+    loadTranscript.mockRestore();
+    container.remove();
+  });
+
   it("shows editable prerequisite and follow-up relationships in issue properties", async () => {
     const prerequisite = demoDashboard.runs[1];
     const dependent = demoDashboard.runs[0];
