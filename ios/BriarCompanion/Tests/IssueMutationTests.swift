@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import XCTest
 @testable import BriarCompanion
 
@@ -22,6 +23,26 @@ final class IssueMutationTests: XCTestCase {
             contentType: "image/png",
             data: Data(count: PendingIssueAttachment.maximumFileBytes + 1)
         )]))
+    }
+
+    func testBuildsJPEGAttachmentFromPastedImageData() {
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 10, height: 10))
+        let pngData = renderer.pngData { context in
+            context.cgContext.setFillColor(UIColor.red.cgColor)
+            context.cgContext.fill(CGRect(x: 0, y: 0, width: 10, height: 10))
+        }
+        guard let attachment = PendingIssueAttachment.jpeg(from: pngData) else {
+            return XCTFail("expected a JPEG attachment from clipboard image data")
+        }
+        XCTAssertEqual(attachment.contentType, "image/jpeg")
+        XCTAssertTrue(attachment.filename.hasSuffix(".jpg"))
+        XCTAssertFalse(attachment.data.isEmpty)
+        XCTAssertNil(PendingIssueAttachment.validationMessage(for: [attachment]))
+    }
+
+    func testPastingNonImageDataProducesNoAttachment() {
+        XCTAssertNil(PendingIssueAttachment.jpeg(from: Data()))
+        XCTAssertNil(PendingIssueAttachment.jpeg(from: Data([0x00, 0x01, 0x02])))
     }
 
     func testDraftPersistsUntilSuccessfulCreation() {

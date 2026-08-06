@@ -45,6 +45,11 @@ struct CreateIssueSheet: View {
                                 .padding(.trailing, 36)
                                 .padding(.bottom, 28)
                                 .accessibilityIdentifier("create-issue-description")
+                                // Pastes an image from the clipboard as an attachment when the
+                                // user taps the iOS edit menu's default "붙여넣기" (Paste).
+                                .onPasteCommand(of: [UTType.image]) { providers in
+                                    Task { await importPastedImages(providers) }
+                                }
                             PhotosPicker(
                                 selection: $selectedPhotoItems,
                                 maxSelectionCount: max(
@@ -217,6 +222,40 @@ struct CreateIssueSheet: View {
             errorMessage = error is PhotoImportError
                 ? error.localizedDescription
                 : "사진 앱에서 선택한 항목을 읽지 못했습니다."
+        }
+    }
+
+    @MainActor
+    private func importPastedImages(_ providers: [NSItemProvider]) async {
+        guard !providers.isEmpty, attachments.count < PendingIssueAttachment.maximumCount
+        else { return }
+        isLoadingPhotos = true
+        defer {
+            isLoadingPhotos = false
+        }
+
+        var loaded = attachments
+        for provider in providers.prefix(
+            PendingIssueAttachment.maximumCount - loaded.count
+        ) {
+            do {
+                let data = try await provider.loadTransferable(type: Data.self)
+                // Clipboard images can arrive as PNG/HEIC/TIFF; normalize them to the
+                // server-supported JPEG format just like the Photos picker does.
+                guard let attachment = PendingIssueAttachment.jpeg(from: data)
+                else { continue }
+                loaded.append(attachment)
+            } catch {
+                continue
+            }
+        }
+        if loaded.count == attachments.count {
+            errorMessage = "클립보드에서 붙여넣을 이미지를 읽지 못했습니다."
+        } else if let message = PendingIssueAttachment.validationMessage(for: loaded) {
+            errorMessage = message
+        } else {
+            attachments = loaded
+            errorMessage = nil
         }
     }
 
