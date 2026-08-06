@@ -429,6 +429,20 @@ export function shouldPersistDetachedTranscriptPayload(payload: unknown) {
   return event.type !== "messageDelta";
 }
 
+export function createDetachedTranscriptSequencer(claimAttempt: number) {
+  let persistedCount = 0;
+  const next = () => {
+    persistedCount += 1;
+    return detachedTranscriptSequence(claimAttempt, persistedCount);
+  };
+  return {
+    next,
+    nextForPayload(payload: unknown) {
+      return shouldPersistDetachedTranscriptPayload(payload) ? next() : null;
+    },
+  };
+}
+
 export function detachedTranscriptPayload(payload: unknown, rawLine: string) {
   const bounded = boundedTranscriptPayload(payload, rawLine);
   if (!bounded || typeof bounded !== "object") return bounded;

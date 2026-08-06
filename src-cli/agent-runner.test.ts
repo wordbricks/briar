@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   boundedTranscriptPayload,
+  createDetachedTranscriptSequencer,
   detachedAgentPrompt,
   detachedPayloadDirection,
   detachedIssueReplyPrompt,
@@ -397,5 +398,28 @@ describe("detached Agent runner", () => {
         },
       }),
     ).toBe(true);
+  });
+
+  it("assigns transcript sequences only to persisted payloads", () => {
+    const sequencer = createDetachedTranscriptSequencer(1);
+    const delta = {
+      type: "event",
+      event: { type: "messageDelta", id: "message-1", delta: "x" },
+    };
+    for (let index = 0; index < 20_000; index += 1) {
+      expect(sequencer.nextForPayload(delta)).toBeNull();
+    }
+
+    expect(
+      sequencer.nextForPayload({
+        type: "event",
+        event: {
+          type: "messageCompleted",
+          id: "message-1",
+          text: "done",
+        },
+      }),
+    ).toBe(1);
+    expect(sequencer.next()).toBe(2);
   });
 });

@@ -29,6 +29,7 @@ import {
   ideaTurnResultSchema,
 } from "../src/lib/ideas-contract";
 import {
+  createDetachedTranscriptSequencer,
   detachedAgentPrompt,
   detachedIdeaPrompt,
   detachedIssueReplyPrompt,
@@ -36,7 +37,6 @@ import {
   detachedProviderBlockedRunEvent,
   detachedProviderBlockFromPayload,
   detachedProviderRequest,
-  detachedTranscriptSequence,
   detachedTranscriptPayload,
   issueReplyTextFromPayload,
   parseDetachedIssueReplyResult,
@@ -2160,7 +2160,9 @@ async function runClaimedIssueInRuntime(
     child.once("error", rejectExit);
     child.once("close", resolveExit);
   });
-  let sequence = 0;
+  const transcriptSequencer = createDetachedTranscriptSequencer(
+    issue.claimAttempts,
+  );
   let stderr = "";
   let runnerError: string | null = null;
   let runnerBlock: ReturnType<typeof detachedProviderBlockFromPayload> = null;
@@ -2188,7 +2190,6 @@ async function runClaimedIssueInRuntime(
   try {
     for await (const line of lines) {
       if (!line.trim()) continue;
-      sequence += 1;
       let payload: unknown = line;
       try {
         payload = JSON.parse(line);
@@ -2239,7 +2240,8 @@ async function runClaimedIssueInRuntime(
       ) {
         completed = true;
       }
-      if (shouldPersistDetachedTranscriptPayload(payload)) {
+      const transcriptSequence = transcriptSequencer.nextForPayload(payload);
+      if (transcriptSequence !== null) {
         try {
           await request(config.apiUrl, "/transcripts", workerToken, {
             method: "POST",
@@ -2250,7 +2252,7 @@ async function runClaimedIssueInRuntime(
               workerId: activeProject.executionWorker?.workerId,
               agentProvider: provider,
               events: [{
-                sequence: detachedTranscriptSequence(issue.claimAttempts, sequence),
+                sequence: transcriptSequence,
                 direction,
                 payload,
               }],
@@ -2270,7 +2272,6 @@ async function runClaimedIssueInRuntime(
       Date.now() - executionStartedAt,
       tokenUsage,
     );
-    sequence += 1;
     try {
       await request(config.apiUrl, "/transcripts", workerToken, {
         method: "POST",
@@ -2284,7 +2285,7 @@ async function runClaimedIssueInRuntime(
           executionMetrics,
           events: [
             {
-              sequence: detachedTranscriptSequence(issue.claimAttempts, sequence),
+              sequence: transcriptSequencer.next(),
               direction: "server",
               payload: { type: "execution.metrics", executionMetrics },
             },
