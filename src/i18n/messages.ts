@@ -1052,6 +1052,7 @@ export const ko = {
   "run.sendMessage": "메시지 보내기",
   "run.sendingMessage": "보내는 중",
   "run.replyInThread": "답글 작성",
+  "run.cancelReply": "답글 취소",
   "run.thread": "스레드",
   "run.replies": "답장 {count}개",
   "run.viewThread": "스레드 보기",
@@ -1445,6 +1446,7 @@ export type Messages = Record<MessageKey, string>;
 
 export const en: Messages = {
   ...ko,
+  "run.cancelReply": "Cancel reply",
   "run.issueUpdateProposalTitle": "Current issue edit proposal",
   "run.issueCreateProposalTitle": "New issue proposal",
   "run.issueUpdateProposalAccept": "Accept and update issue",
@@ -2170,6 +2172,7 @@ export const en: Messages = {
 };
 export const zh: Messages = {
   ...en,
+  "run.cancelReply": "取消回复",
   "run.issueUpdateProposalTitle": "当前问题修改建议",
   "run.issueCreateProposalTitle": "新问题创建建议",
   "run.issueUpdateProposalAccept": "接受并修改问题",

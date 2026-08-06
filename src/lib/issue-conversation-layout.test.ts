@@ -70,6 +70,9 @@ describe("issue conversation layout", () => {
       "box-shadow:0 4px 14px",
     );
     expect(
+      firstRule(".issue-message-composer footer .issue-reply-cancel"),
+    ).toContain("margin-right:auto");
+    expect(
       firstRule(".issue-inline-reply-composer .issue-message-composer textarea"),
     ).toContain("min-height:52px");
   });
