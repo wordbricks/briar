@@ -737,6 +737,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         "utf8",
       ),
     );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0069_project_agent_effort.sql"),
+        "utf8",
+      ),
+    );
   }, 30_000);
 
   afterAll(async () => {
@@ -1207,6 +1214,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       name: "Sentry 오류 탐지 에이전트",
       provider: "claude",
       model: "opus",
+      effort: null,
       responsibility:
         "Sentry 오류를 분석해 이슈를 만들고 담당자에게 배정합니다.",
       calendarColor: "#8b5cf6",
@@ -1238,6 +1246,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       name: "Disposable agent",
       provider: "codex",
       model: null,
+      effort: null,
       responsibility: "Validate deletion behavior.",
       calendarColor: "#d97706",
     });
@@ -1620,6 +1629,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       codexPet,
       provider: "claude",
       model: "sonnet",
+      effort: "high",
       responsibility: "Coordinates release checks and reports the result.",
       calendarColor: "#0f9f76",
     });
@@ -1633,6 +1643,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       avatar_spritesheet_object_key: codexPet.objectKey,
       provider: "claude",
       model: "sonnet",
+      effort: "high",
       responsibility: "Coordinates release checks and reports the result.",
       skill_markdown: expect.stringContaining(
         "Coordinates release checks and reports the result.",
@@ -1648,6 +1659,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
           name: "Wrong project",
           provider: "grok",
           model: null,
+          effort: null,
           responsibility: "Must not update another project.",
           calendarColor: "#d97706",
         },
@@ -4276,9 +4288,11 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     // This suite intentionally retains the legacy `kind` column for earlier
     // compatibility tests. Production removed it in migration 0028.
     await db.prepare("alter table briar_project_agents drop column kind").run();
-    // Migration 0055 predates the pause checkpoint, resume request marker, and
-    // human issue assignee. Exercise the historical rebuild against that
-    // earlier shape, then restore the current columns for the tests that follow.
+    // Migration 0055 predates the pause checkpoint, resume request marker,
+    // human issue assignee, and the agent effort setting. Exercise the
+    // historical rebuild against that earlier shape, then restore the current
+    // columns for the tests that follow.
+    await db.prepare("alter table briar_project_agents drop column effort").run();
     const pausedRuns = await db
       .prepare("select count(*) as count from briar_hunt_runs where paused_at is not null")
       .first<{ count: number }>();
@@ -4383,6 +4397,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db,
       await readFile(resolve("migrations/0067_issue_checkpoints.sql"), "utf8"),
     );
+    await db
+      .prepare(
+        `alter table briar_project_agents add column effort text check (
+           effort is null or effort in ('low', 'medium', 'high', 'xhigh', 'max', 'ultra')
+         )`,
+      )
+      .run();
   });
 
   it("updates an idea through chat and atomically creates an acyclic issue plan", async () => {

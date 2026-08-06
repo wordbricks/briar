@@ -54,6 +54,7 @@ const dashboardAgent: ProjectAgent = {
   codexPet: null,
   provider: "codex",
   model: null,
+  effort: null,
   responsibility: "Process issues",
   skill: "# Agent",
   calendarColor: "#3275d5",

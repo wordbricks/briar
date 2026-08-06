@@ -21,6 +21,7 @@ const scheduledRun = (
     name,
     provider: "codex",
     model: null,
+    effort: null,
     responsibility: "Fulfill the saved responsibility.",
     skill: "# Agent",
   },

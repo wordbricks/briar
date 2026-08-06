@@ -15,6 +15,7 @@ const agent: ProjectAgent = {
   codexPet: null,
   provider: "codex",
   model: null,
+  effort: null,
   responsibility: "Run the queued issue workflow.",
   skill: "# Auto Hunt agent\n\nRun the queued issue workflow.",
   calendarColor: "#3275d5",

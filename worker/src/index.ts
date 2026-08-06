@@ -752,6 +752,10 @@ const projectAgentInputSchema = z
       .optional(),
     provider: z.enum(["codex", "claude", "grok", "opencode"]),
     model: z.string().trim().min(1).max(100).nullable().optional(),
+    effort: z
+      .enum(["low", "medium", "high", "xhigh", "max", "ultra"])
+      .nullable()
+      .optional(),
     responsibility: z.string().trim().min(1).max(2_000),
     calendarColor: z
       .string()
@@ -2422,6 +2426,7 @@ const projectAgentJson = (row: ProjectAgentRow) => {
       : null,
     provider: row.provider,
     model: row.model,
+    effort: row.effort,
     responsibility: row.responsibility,
     skill: row.skill_markdown,
     calendarColor: row.calendar_color,
@@ -2476,6 +2481,7 @@ const projectAgentScheduleRunJson = (
     name: row.agent_name,
     provider: row.agent_provider,
     model: row.agent_model,
+    effort: row.agent_effort,
     responsibility: row.agent_responsibility,
     skill: row.agent_skill_markdown,
   },
@@ -5775,6 +5781,7 @@ async function route(
       avatar: input.avatar ?? null,
       provider: input.provider,
       model: input.model ?? null,
+      effort: input.effort ?? null,
       responsibility: input.responsibility,
       calendarColor: input.calendarColor,
     });
@@ -6034,6 +6041,7 @@ async function route(
           codexPet: nextCodexPet,
           provider: input.provider,
           model: input.model ?? null,
+          effort: input.effort ?? null,
           responsibility: input.responsibility,
           calendarColor: input.calendarColor,
         },

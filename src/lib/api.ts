@@ -116,6 +116,10 @@ const projectAgentSchema = z.object({
     .default(null),
   provider: z.enum(["codex", "claude", "grok", "opencode"]),
   model: z.string().nullable(),
+  effort: z
+    .enum(["low", "medium", "high", "xhigh", "max", "ultra"])
+    .nullable()
+    .default(null),
   responsibility: z.string(),
   skill: z.string(),
   calendarColor: z
@@ -239,6 +243,7 @@ const projectAgentScheduleRunSchema = z.object({
     name: true,
     provider: true,
     model: true,
+    effort: true,
     responsibility: true,
     skill: true,
   }),
