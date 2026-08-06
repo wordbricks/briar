@@ -194,7 +194,8 @@ final class IssueMutationTests: XCTestCase {
             reassign: false
         )
 
-        let bodyData = try XCTUnwrap(await recorder.lastJSONBodyData())
+        let recordedBodyData = await recorder.lastJSONBodyData()
+        let bodyData = try XCTUnwrap(recordedBodyData)
         let body = try XCTUnwrap(
             JSONSerialization.jsonObject(with: bodyData) as? [String: Any]
         )
@@ -224,7 +225,8 @@ final class IssueMutationTests: XCTestCase {
             reassign: false
         )
 
-        let bodyData = try XCTUnwrap(await recorder.lastJSONBodyData())
+        let recordedBodyData = await recorder.lastJSONBodyData()
+        let bodyData = try XCTUnwrap(recordedBodyData)
         let body = try XCTUnwrap(
             JSONSerialization.jsonObject(with: bodyData) as? [String: Any]
         )

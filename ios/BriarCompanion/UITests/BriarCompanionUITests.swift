@@ -114,14 +114,14 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(dependencySearch.waitForExistence(timeout: 5))
         dependencySearch.tap()
         dependencySearch.typeText("API 준비")
+        app.keyboards.buttons["Search"].tap()
         let candidate = app.buttons[
             "dependency-option-eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
         ]
         XCTAssertTrue(candidate.waitForExistence(timeout: 5))
         candidate.tap()
 
-        XCTAssertFalse(candidate.waitForExistence(timeout: 5))
-        app.buttons["dependency-picker-close"].tap()
+        XCTAssertTrue(app.collectionViews["dependency-picker"].waitForNonExistence(timeout: 5))
         XCTAssertTrue(app.buttons[
             "remove-dependency-eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
         ].waitForExistence(timeout: 5))
@@ -190,6 +190,7 @@ final class BriarCompanionUITests: XCTestCase {
         app.buttons["create-issue-button"].tap()
         let title = app.textFields["create-issue-title"]
         XCTAssertTrue(title.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["create-issue-paste-attachment"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.navigationBars["새 이슈"].exists)
         title.tap()
         title.typeText("모바일 쓰기 흐름 확인")
