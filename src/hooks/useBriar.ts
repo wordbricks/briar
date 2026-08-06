@@ -2040,6 +2040,7 @@ export function useBriar(options: UseBriarOptions = {}) {
             assigneeUserId: input.assigneeUserId ?? null,
             preferredProvider: input.preferredProvider ?? null,
             preferredModel: input.preferredModel ?? null,
+            preferredEffort: input.preferredEffort ?? null,
             repository:
               targetDashboard.settings.githubRepository ?? project.name,
             branch: null,

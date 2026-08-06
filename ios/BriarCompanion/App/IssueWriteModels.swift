@@ -117,6 +117,8 @@ struct PendingIssueAttachment: Identifiable, Equatable, Sendable {
 struct IssueDraft: Codable, Equatable, Sendable {
     /// Default create-issue priority matches the desktop/web create dialog (P2).
     static let defaultPriority: Int = 2
+    /// Default preferred-execution effort matches the desktop/web create dialog (high).
+    static let defaultEffort: ModelEffort? = .high
 
     var title = ""
     var description = ""
@@ -125,6 +127,7 @@ struct IssueDraft: Codable, Equatable, Sendable {
     var status: DashboardRun.Status = .queued
     var preferredProvider: AgentProvider? = nil
     var preferredModel: String? = nil
+    var preferredEffort: ModelEffort? = defaultEffort
 
     var isEmpty: Bool {
         title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
@@ -132,7 +135,8 @@ struct IssueDraft: Codable, Equatable, Sendable {
             priority == Self.defaultPriority &&
             assigneeUserId == nil &&
             preferredProvider == nil &&
-            preferredModel == nil
+            preferredModel == nil &&
+            (preferredEffort == nil || preferredEffort == Self.defaultEffort)
     }
 }
 
@@ -144,6 +148,7 @@ struct CreateIssueRequest: Codable, Sendable {
     let status: DashboardRun.Status
     let preferredProvider: AgentProvider?
     let preferredModel: String?
+    let preferredEffort: ModelEffort?
 }
 
 struct CreateIssueResponse: Codable, Sendable {

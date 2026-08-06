@@ -1008,6 +1008,10 @@ const issueInputBaseSchema = z
       .nullable()
       .optional(),
     preferredModel: z.string().trim().min(1).max(100).nullable().optional(),
+    preferredEffort: z
+      .enum(["low", "medium", "high", "xhigh", "max", "ultra"])
+      .nullable()
+      .optional(),
     checkpoints: z.array(workflowCheckpointSchema).max(100).default([]),
   })
   .strict();
@@ -1019,6 +1023,18 @@ const issueInputSchema = issueInputBaseSchema.superRefine((input, context) => {
       message: "A provider is required for a model preference",
     });
   }
+  if (!input.preferredProvider && input.preferredEffort) {
+    context.addIssue({
+      code: "custom",
+      message: "A provider is required for an effort preference",
+    });
+  }
+  if (!input.preferredModel && input.preferredEffort) {
+    context.addIssue({
+      code: "custom",
+      message: "A model is required for an effort preference",
+    });
+  }
   if (
     input.preferredProvider &&
     input.preferredProvider !== "opencode" &&
@@ -1028,6 +1044,22 @@ const issueInputSchema = issueInputBaseSchema.superRefine((input, context) => {
     context.addIssue({
       code: "custom",
       message: `${input.preferredModel} is not available from ${input.preferredProvider}`,
+    });
+  }
+  if (input.preferredProvider === "claude" && input.preferredEffort === "ultra") {
+    context.addIssue({
+      code: "custom",
+      message: "Claude does not support ultra effort",
+    });
+  }
+  if (
+    (input.preferredProvider === "grok" || input.preferredProvider === "opencode") &&
+    input.preferredEffort &&
+    !["low", "medium", "high"].includes(input.preferredEffort)
+  ) {
+    context.addIssue({
+      code: "custom",
+      message: `${input.preferredProvider} supports low, medium, or high effort`,
     });
   }
 });
@@ -1394,6 +1426,7 @@ export async function readIssueRequest(request: Request) {
   const status = form.get("status");
   const preferredProvider = form.get("preferredProvider");
   const preferredModel = form.get("preferredModel");
+  const preferredEffort = form.get("preferredEffort");
   const rawCheckpoints = form.get("checkpoints");
   let checkpoints: unknown = [];
   if (typeof rawCheckpoints === "string" && rawCheckpoints) {
@@ -1424,6 +1457,10 @@ export async function readIssueRequest(request: Request) {
       preferredModel:
         typeof preferredModel === "string" && preferredModel.trim()
           ? preferredModel
+          : null,
+      preferredEffort:
+        typeof preferredEffort === "string" && preferredEffort.trim()
+          ? preferredEffort
           : null,
       checkpoints,
     }),
@@ -2023,6 +2060,7 @@ async function createIssueWithAttachments(input: {
       createdByUserId: input.createdByUserId,
       preferredAgentProvider: input.issue.preferredProvider ?? null,
       preferredAgentModel: input.issue.preferredModel ?? null,
+      preferredAgentEffort: input.issue.preferredEffort ?? null,
     });
     await createIssueAttachments(
       input.db,

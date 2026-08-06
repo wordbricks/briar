@@ -99,6 +99,13 @@ final class IssueMutationTests: XCTestCase {
         XCTAssertEqual(restored.preferredModel, "sonnet")
     }
 
+    func testIssueDraftDefaultsEffortToHigh() {
+        let draft = IssueDraft()
+        XCTAssertEqual(draft.preferredEffort, IssueDraft.defaultEffort)
+        XCTAssertEqual(draft.preferredEffort, .high)
+        XCTAssertTrue(draft.isEmpty)
+    }
+
     func testCreateIssueRequestEncodesPreferredProviderAndModel() throws {
         let request = CreateIssueRequest(
             title: "선호 실행 이슈",
@@ -107,7 +114,8 @@ final class IssueMutationTests: XCTestCase {
             assigneeUserId: nil,
             status: .queued,
             preferredProvider: .claude,
-            preferredModel: "sonnet"
+            preferredModel: "sonnet",
+            preferredEffort: .high
         )
         let data = try JSONEncoder.mobileContract.encode(request)
         let object = try XCTUnwrap(
@@ -115,6 +123,7 @@ final class IssueMutationTests: XCTestCase {
         )
         XCTAssertEqual(object["preferredProvider"] as? String, "claude")
         XCTAssertEqual(object["preferredModel"] as? String, "sonnet")
+        XCTAssertEqual(object["preferredEffort"] as? String, "high")
     }
 
     func testCreateIssueSendsPreferredPreferences() async throws {
@@ -127,6 +136,7 @@ final class IssueMutationTests: XCTestCase {
         var draft = IssueDraft(title: "선호 실행 이슈", description: "", priority: 2, status: .queued)
         draft.preferredProvider = .claude
         draft.preferredModel = "sonnet"
+        draft.preferredEffort = .high
 
         _ = try await store.createIssue(draft: draft, attachments: [])
 
@@ -137,6 +147,7 @@ final class IssueMutationTests: XCTestCase {
         )
         XCTAssertEqual(body["preferredProvider"] as? String, "claude")
         XCTAssertEqual(body["preferredModel"] as? String, "sonnet")
+        XCTAssertEqual(body["preferredEffort"] as? String, "high")
     }
 
     func testDispatchRunRequestEncodesWorkerSelection() throws {

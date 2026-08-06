@@ -9,6 +9,7 @@ export type CreateIssueDraft = {
   assigneeUserId?: string | null;
   preferredProvider?: string | null;
   preferredModel?: string | null;
+  preferredEffort?: string | null;
   checkpoints?: Array<{
     key: string;
     stage: string;
@@ -50,7 +51,10 @@ function isCreateIssueDraft(value: unknown): value is CreateIssueDraft {
       typeof draft.preferredProvider === "string") &&
     (draft.preferredModel === undefined ||
       draft.preferredModel === null ||
-      typeof draft.preferredModel === "string")
+      typeof draft.preferredModel === "string") &&
+    (draft.preferredEffort === undefined ||
+      draft.preferredEffort === null ||
+      typeof draft.preferredEffort === "string")
   );
 }
 
