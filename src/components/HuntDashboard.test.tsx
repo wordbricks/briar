@@ -604,6 +604,7 @@ describe("HuntDashboard", () => {
     );
     expect(menu?.textContent).toContain("상태");
     expect(menu?.textContent).toContain("우선순위");
+    expect(menu?.textContent).toContain("체크포인트");
     expect(menu?.textContent).toContain("선호 프로바이더");
     expect(menu?.textContent).toContain("선호 모델");
     expect(menu?.textContent).toContain("바로 처리하기");
@@ -1874,6 +1875,59 @@ describe("HuntDashboard", () => {
     );
     await act(async () => openFullPage?.click());
     expect(onOpenFullPage).toHaveBeenCalledTimes(1);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("adds a checkpoint from an unstarted issue progress chart", async () => {
+    const onUpdateIssueCheckpoints = vi.fn(async () => undefined);
+    const run: HuntRun = {
+      ...demoDashboard.runs[0],
+      status: "queued",
+      workflowStage: null,
+      claimedAt: null,
+      leaseExpiresAt: null,
+      issueCheckpoints: [],
+      workflow: {
+        ...demoDashboard.runs[0].workflow,
+        execution: { checkpoints: [] },
+      },
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <RunPage
+        error={null}
+        isRecovering={false}
+        isSidebarOpen
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => []}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }}
+        onUpdateIssueCheckpoints={onUpdateIssueCheckpoints}
+        run={run}
+      />,
+    ));
+
+    const checkpoint = container.querySelector<HTMLButtonElement>(
+      '.issue-workflow-checkpoint[data-position="after"]',
+    );
+    expect(checkpoint?.disabled).toBe(false);
+    await act(async () => checkpoint?.click());
+    expect(onUpdateIssueCheckpoints).toHaveBeenCalledWith([
+      expect.objectContaining({
+        key: expect.stringMatching(/^issue-after-/u),
+        position: "after",
+      }),
+    ]);
 
     await act(async () => root.unmount());
     container.remove();
@@ -3629,7 +3683,7 @@ describe("HuntDashboard", () => {
           error={null}
           isRecovering={false}
           isSidebarOpen
-          onAcceptIssueReworkProposal={onAccept}
+          onAcceptIssueAction={onAccept}
           onBack={() => undefined}
           onCancel={async () => undefined}
           onLoadAttachment={async () => new Blob()}
@@ -3655,8 +3709,79 @@ describe("HuntDashboard", () => {
       acceptButton?.click();
       await Promise.resolve();
     });
-    expect(onAccept).toHaveBeenCalledWith(proposalId);
+    expect(onAccept).toHaveBeenCalledWith(message.proposedAction);
     expect(container.textContent).toContain("리비전 2 개정이 시작되었습니다.");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("requires acceptance before an @briar-created issue is persisted", async () => {
+    const message: IssueMessage = {
+      id: "10101010-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      runId: demoDashboard.runs[1].id,
+      parentMessageId: null,
+      body: "후속 QA 이슈 생성을 제안했습니다.",
+      author: { id: null, name: "Briar · Codex", image: null, provider: "codex" },
+      replyCount: 0,
+      proposedAction: {
+        id: "20202020-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        type: "request_issue_create",
+        issue: {
+          title: "후속 QA",
+          description: "모바일 승인 흐름을 확인합니다.",
+          priority: 2,
+          status: "backlog",
+        },
+        status: "pending",
+        acceptedAt: null,
+        resultRunId: null,
+      },
+      createdAt: "2026-08-06T01:00:00.000Z",
+      updatedAt: "2026-08-06T01:00:00.000Z",
+    };
+    const onAccept = vi.fn(async () => ({
+      ...message.proposedAction!,
+      status: "accepted" as const,
+      acceptedAt: "2026-08-06T01:01:00.000Z",
+      resultRunId: "30303030-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    }));
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <TooltipProvider>
+        <RunPage
+          error={null}
+          isRecovering={false}
+          isSidebarOpen
+          onAcceptIssueAction={onAccept}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => [message]}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => { throw new Error("not implemented"); }}
+          run={demoDashboard.runs[1]}
+        />
+      </TooltipProvider>,
+    ));
+    await act(async () => { await Promise.resolve(); });
+
+    const acceptButton = container.querySelector<HTMLButtonElement>(
+      ".issue-rework-proposal-accept",
+    );
+    expect(container.textContent).toContain("후속 QA");
+    expect(acceptButton?.textContent).toContain("수락하고 이슈 만들기");
+    expect(onAccept).not.toHaveBeenCalled();
+    await act(async () => {
+      acceptButton?.click();
+      await Promise.resolve();
+    });
+    expect(onAccept).toHaveBeenCalledWith(message.proposedAction);
+    expect(container.textContent).toContain("새 이슈가 생성되었습니다.");
 
     await act(async () => root.unmount());
     container.remove();

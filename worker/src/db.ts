@@ -1,5 +1,6 @@
 import {
   isTerminalTrackerState,
+  additionalWorkflowCheckpoints,
   isRepositoryWorkflowPending,
   cloneAutoHuntWorkflow,
   normalizeAutoHuntWorkflow,
@@ -8,6 +9,7 @@ import {
   workflowCheckpointAt,
   workflowPauseIndex,
   workflowPauseStage,
+  workflowWithAdditionalCheckpoints,
   type AutoHuntQaEnvironment,
   type AutoHuntQaStatus,
   type AutoHuntPersistedRunStatus,
@@ -308,6 +310,7 @@ export type HuntRunRow = {
   status: AutoHuntPersistedRunStatus;
   workflow_stage: AutoHuntWorkflowStageId | null;
   workflow_snapshot_json: string;
+  issue_checkpoints_json: string;
   detail: string | null;
   priority: number | null;
   assignee_user_id: string | null;
@@ -552,6 +555,23 @@ export type IssueReworkProposalRow = {
   updated_at: string;
 };
 
+export type IssueActionProposalRow = {
+  id: string;
+  project_id: string;
+  conversation_run_id: string;
+  trigger_message_id: string;
+  reply_message_id: string;
+  action_type: "request_issue_update" | "request_issue_create";
+  payload_json: string;
+  expected_run_updated_at: string | null;
+  status: "pending" | "accepted";
+  accepted_by_user_id: string | null;
+  accepted_at: string | null;
+  result_run_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type IssueConversationNotificationRow = IssueMessageRow & {
   run_title: string;
   root_message_id: string;
@@ -616,6 +636,7 @@ export type HuntEventInput = {
   tracker: TrackerInput;
   issueDescription: string | null;
   assigneeUserId?: string | null;
+  issueCheckpoints?: AutoHuntWorkflowCheckpoint[];
   resultSummary: string | null;
   structuredResult: StructuredAgentResult | null;
   pullRequestUrls: string[];
@@ -5336,6 +5357,194 @@ export async function acceptIssueReworkProposal(
     .first<IssueReworkProposalRow>();
 }
 
+export async function createIssueActionProposal(
+  db: D1Database,
+  input: {
+    id: string;
+    projectId: string;
+    conversationRunId: string;
+    triggerMessageId: string;
+    replyMessageId: string;
+    actionType: IssueActionProposalRow["action_type"];
+    payloadJson: string;
+    createdAt: string;
+  },
+) {
+  return await db
+    .prepare(
+      `insert into briar_issue_action_proposals (
+         id, project_id, conversation_run_id, trigger_message_id,
+         reply_message_id, action_type, payload_json,
+         expected_run_updated_at, created_at, updated_at
+       )
+       select ?, run.project_id, run.id, ?, ?, ?, ?,
+              case when ? = 'request_issue_update' then run.updated_at else null end,
+              ?, ?
+       from briar_hunt_runs run
+       where run.id = ? and run.project_id = ?
+       on conflict (project_id, trigger_message_id) do nothing
+       returning *`,
+    )
+    .bind(
+      input.id,
+      input.triggerMessageId,
+      input.replyMessageId,
+      input.actionType,
+      input.payloadJson,
+      input.actionType,
+      input.createdAt,
+      input.createdAt,
+      input.conversationRunId,
+      input.projectId,
+    )
+    .first<IssueActionProposalRow>();
+}
+
+export async function listIssueActionProposals(
+  db: D1Database,
+  projectId: string,
+  conversationRunId: string,
+) {
+  const result = await db
+    .prepare(
+      `select * from briar_issue_action_proposals
+       where project_id = ? and conversation_run_id = ?
+       order by created_at, id`,
+    )
+    .bind(projectId, conversationRunId)
+    .all<IssueActionProposalRow>();
+  return result.results;
+}
+
+export async function getIssueActionProposal(
+  db: D1Database,
+  projectId: string,
+  conversationRunId: string,
+  proposalId: string,
+) {
+  return await db
+    .prepare(
+      `select * from briar_issue_action_proposals
+       where id = ? and project_id = ? and conversation_run_id = ?`,
+    )
+    .bind(proposalId, projectId, conversationRunId)
+    .first<IssueActionProposalRow>();
+}
+
+export async function acceptIssueUpdateProposal(
+  db: D1Database,
+  input: {
+    projectId: string;
+    conversationRunId: string;
+    proposalId: string;
+    userId: string;
+    acceptedAt: string;
+    title: string;
+    description: string | null;
+    priority: number | null;
+  },
+) {
+  const proposal = await getIssueActionProposal(
+    db,
+    input.projectId,
+    input.conversationRunId,
+    input.proposalId,
+  );
+  if (!proposal || proposal.action_type !== "request_issue_update") return null;
+  if (proposal.status === "accepted") return proposal;
+  const results = await db.batch([
+    db
+      .prepare(
+        `update briar_hunt_runs
+         set title = ?, issue_description = ?, priority = ?, updated_at = ?
+         where id = ? and project_id = ? and updated_at = ?
+           and exists (
+             select 1 from briar_issue_action_proposals proposal
+             where proposal.id = ? and proposal.project_id = ?
+               and proposal.conversation_run_id = briar_hunt_runs.id
+               and proposal.status = 'pending'
+               and proposal.action_type = 'request_issue_update'
+           )`,
+      )
+      .bind(
+        input.title,
+        input.description,
+        input.priority,
+        input.acceptedAt,
+        input.conversationRunId,
+        input.projectId,
+        proposal.expected_run_updated_at,
+        input.proposalId,
+        input.projectId,
+      ),
+    db
+      .prepare(
+        `update briar_issue_action_proposals
+         set status = 'accepted', accepted_by_user_id = ?, accepted_at = ?,
+             result_run_id = conversation_run_id, updated_at = ?
+         where id = ? and project_id = ? and conversation_run_id = ?
+           and status = 'pending' and action_type = 'request_issue_update'
+           and exists (
+             select 1 from briar_hunt_runs run
+             where run.id = ? and run.project_id = ? and run.updated_at = ?
+           )`,
+      )
+      .bind(
+        input.userId,
+        input.acceptedAt,
+        input.acceptedAt,
+        input.proposalId,
+        input.projectId,
+        input.conversationRunId,
+        input.conversationRunId,
+        input.projectId,
+        input.acceptedAt,
+      ),
+  ]);
+  if ((results[0]?.meta.changes ?? 0) === 0 ||
+      (results[1]?.meta.changes ?? 0) === 0) {
+    return null;
+  }
+  return await getIssueActionProposal(
+    db,
+    input.projectId,
+    input.conversationRunId,
+    input.proposalId,
+  );
+}
+
+export async function acceptIssueCreateProposal(
+  db: D1Database,
+  input: {
+    projectId: string;
+    conversationRunId: string;
+    proposalId: string;
+    userId: string;
+    acceptedAt: string;
+    resultRunId: string;
+  },
+) {
+  return await db
+    .prepare(
+      `update briar_issue_action_proposals
+       set status = 'accepted', accepted_by_user_id = ?, accepted_at = ?,
+           result_run_id = ?, updated_at = ?
+       where id = ? and project_id = ? and conversation_run_id = ?
+         and status = 'pending' and action_type = 'request_issue_create'
+       returning *`,
+    )
+    .bind(
+      input.userId,
+      input.acceptedAt,
+      input.resultRunId,
+      input.acceptedAt,
+      input.proposalId,
+      input.projectId,
+      input.conversationRunId,
+    )
+    .first<IssueActionProposalRow>();
+}
+
 export async function listIssueConversationNotifications(
   db: D1Database,
   projectId: string,
@@ -6146,14 +6355,26 @@ export async function recordHuntEvent(
     normalizedInput.workflowStage,
   );
   const existingRun = await loadRunForIdentity(db, projectId, normalizedInput);
-  const workflowSnapshot = existingRun
+  const baseWorkflowSnapshot = existingRun
     ? parseWorkflow(existingRun.workflow_snapshot_json)
-    : parseWorkflow(
-        stableJson(await workflowSnapshotForRun(
-          db,
-          projectId,
-          normalizedInput.createdByUserId,
-        )),
+    : await workflowSnapshotForRun(
+        db,
+        projectId,
+        normalizedInput.createdByUserId,
+      );
+  const issueCheckpointSnapshot = existingRun
+    ? (JSON.parse(
+        existingRun.issue_checkpoints_json || "[]",
+      ) as AutoHuntWorkflowCheckpoint[])
+    : additionalWorkflowCheckpoints(
+        baseWorkflowSnapshot,
+        normalizedInput.issueCheckpoints ?? [],
+      );
+  const workflowSnapshot = existingRun
+    ? baseWorkflowSnapshot
+    : workflowWithAdditionalCheckpoints(
+        baseWorkflowSnapshot,
+        issueCheckpointSnapshot,
       );
   const pauseRank = workflowPauseIndex(workflowSnapshot);
   const requestedRank = normalizedInput.workflowStage
@@ -6298,7 +6519,8 @@ export async function recordHuntEvent(
       .prepare(
         `insert into briar_hunt_runs (
            id, project_id, source, source_key, title, stage, status,
-           workflow_stage, workflow_snapshot_json, detail, priority,
+           workflow_stage, workflow_snapshot_json, issue_checkpoints_json,
+           detail, priority,
            assignee_user_id,
            repository, branch, commit_sha, tracker_provider,
            tracker_issue_id, tracker_issue_identifier, tracker_issue_url,
@@ -6309,7 +6531,7 @@ export async function recordHuntEvent(
            production_qa_detail, context_json, started_at, completed_at,
            last_event_at, created_at, updated_at,
            preferred_agent_provider, preferred_agent_model
-         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          on conflict(project_id, source, source_key) do nothing`,
       )
       .bind(
@@ -6322,6 +6544,7 @@ export async function recordHuntEvent(
         normalizedInput.status,
         normalizedInput.workflowStage,
         stableJson(workflowSnapshot),
+        stableJson(issueCheckpointSnapshot),
         normalizedInput.detail,
         normalizedInput.priority,
         normalizedInput.assigneeUserId ?? null,
@@ -9191,6 +9414,75 @@ export async function updateIssueExecutionPreferences(
     .first<HuntRunRow>();
 }
 
+export async function updateIssueCheckpoints(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  checkpoints: AutoHuntWorkflowCheckpoint[],
+  updatedAt: string,
+) {
+  const run = await getHuntRunForProject(db, projectId, runId);
+  if (!run) return "not_found" as const;
+  if (
+    !["backlog", "queued"].includes(run.status) ||
+    run.claim_token_hash ||
+    run.claimed_at
+  ) {
+    return "ineligible" as const;
+  }
+
+  const currentWorkflow = normalizeAutoHuntWorkflow(
+    JSON.parse(run.workflow_snapshot_json),
+  );
+  const previousIssueCheckpoints = JSON.parse(
+    run.issue_checkpoints_json || "[]",
+  ) as AutoHuntWorkflowCheckpoint[];
+  const previousBoundaries = new Set(
+    previousIssueCheckpoints.map(
+      (checkpoint) => `${checkpoint.stage}:${checkpoint.position}`,
+    ),
+  );
+  const baseWorkflow = normalizeAutoHuntWorkflow({
+    ...currentWorkflow,
+    execution: {
+      checkpoints: currentWorkflow.execution.checkpoints.filter(
+        (checkpoint) =>
+          !previousBoundaries.has(`${checkpoint.stage}:${checkpoint.position}`),
+      ),
+    },
+  });
+  const normalizedCheckpoints = additionalWorkflowCheckpoints(
+    baseWorkflow,
+    checkpoints,
+  );
+  const nextWorkflow = workflowWithAdditionalCheckpoints(
+    baseWorkflow,
+    normalizedCheckpoints,
+  );
+  const result = await db
+    .prepare(
+      `update briar_hunt_runs
+       set workflow_snapshot_json = ?, issue_checkpoints_json = ?, updated_at = ?
+       where id = ? and project_id = ?
+         and workflow_snapshot_json = ?
+         and status in ('backlog', 'queued')
+         and claim_token_hash is null
+         and claimed_at is null`,
+    )
+    .bind(
+      stableJson(nextWorkflow),
+      stableJson(normalizedCheckpoints),
+      updatedAt,
+      runId,
+      projectId,
+      run.workflow_snapshot_json,
+    )
+    .run();
+  return (result.meta.changes ?? 0) > 0
+    ? ("updated" as const)
+    : ("ineligible" as const);
+}
+
 export async function deleteIssue(
   db: D1Database,
   projectId: string,
@@ -9278,9 +9570,27 @@ export async function transferIssue(
   const targetSettings = await getProjectSettings(db, input.targetProjectId);
   const adoptTargetWorkflow =
     run.status === "backlog" || run.status === "queued";
+  const targetBaseWorkflow = parseWorkflow(targetSettings?.workflow_json ?? null);
+  const targetStageIds = new Set(targetBaseWorkflow.stages.map((stage) => stage.id));
+  const targetBoundaries = new Set(
+    targetBaseWorkflow.execution.checkpoints.map(
+      (checkpoint) => `${checkpoint.stage}:${checkpoint.position}`,
+    ),
+  );
+  const compatibleIssueCheckpoints = adoptTargetWorkflow
+    ? (JSON.parse(run.issue_checkpoints_json || "[]") as AutoHuntWorkflowCheckpoint[])
+        .filter(
+          (checkpoint) =>
+            targetStageIds.has(checkpoint.stage) &&
+            !targetBoundaries.has(`${checkpoint.stage}:${checkpoint.position}`),
+        )
+    : [];
   const targetWorkflowJson = adoptTargetWorkflow
     ? stableJson(
-        parseWorkflow(targetSettings?.workflow_json ?? null),
+        workflowWithAdditionalCheckpoints(
+          targetBaseWorkflow,
+          compatibleIssueCheckpoints,
+        ),
       )
     : run.workflow_snapshot_json;
   const targetRepository = adoptTargetWorkflow
@@ -9297,6 +9607,7 @@ export async function transferIssue(
        set project_id = ?,
            repository = case when ? = 1 then ? else repository end,
            workflow_snapshot_json = case when ? = 1 then ? else workflow_snapshot_json end,
+           issue_checkpoints_json = case when ? = 1 then ? else issue_checkpoints_json end,
            agent_id = null,
            worker_id = null,
            requested_worker_id = null,
@@ -9328,6 +9639,8 @@ export async function transferIssue(
       targetRepository,
       refreshWorkflow,
       targetWorkflowJson,
+      refreshWorkflow,
+      stableJson(compatibleIssueCheckpoints),
       input.observedAt,
       input.runId,
       input.sourceProjectId,

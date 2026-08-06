@@ -3,6 +3,7 @@ import {
   normalizeAutoHuntWorkflow,
   resolveCheckpointPolicy,
   workflowWithEffectiveCheckpoints,
+  workflowWithAdditionalCheckpoints,
   type AutoHuntWorkflow,
   type AutoHuntWorkflowCheckpoint,
   type AutoHuntWorkflowInput,
@@ -89,13 +90,15 @@ export async function workflowSnapshotForRun(
   db: D1Database,
   projectId: string,
   userId?: string | null,
+  issueCheckpoints: AutoHuntWorkflowCheckpoint[] = [],
 ): Promise<AutoHuntWorkflow> {
   const policy = await loadWorkflowCheckpointPolicy(db, projectId, userId);
-  return workflowWithEffectiveCheckpoints(
+  const effective = workflowWithEffectiveCheckpoints(
     policy.workflow,
     policy.projectMandatory,
     policy.userDefaults,
   );
+  return workflowWithAdditionalCheckpoints(effective, issueCheckpoints);
 }
 
 export async function assertStoredCheckpointPoliciesCompatible(

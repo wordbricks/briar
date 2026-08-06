@@ -104,6 +104,12 @@ import {
 } from "../lib/auto-hunt-agent";
 import { eventMeta, runMeta } from "../lib/stages";
 import {
+  checkpointKeyForBoundary,
+  type AutoHuntWorkflow,
+  type AutoHuntWorkflowCheckpoint,
+  type AutoHuntWorkflowCheckpointPosition,
+} from "../lib/auto-hunt-contract";
+import {
   formatExecutionDuration,
   formatExecutionTokens,
 } from "../lib/agent-execution-metrics";
@@ -153,7 +159,7 @@ import type {
   IssueAttachment,
   IssueMessage,
   IssueMessageSendResult,
-  IssueReworkProposal,
+  IssueProposedAction,
   IssueExecutionPreferences,
   IssueResultReview,
   OrganizationMember,
@@ -191,6 +197,54 @@ type KanbanPointerDrag = {
   startX: number;
   startY: number;
 };
+
+const checkpointBoundaryKey = (
+  checkpoint: Pick<AutoHuntWorkflowCheckpoint, "stage" | "position">,
+) => `${checkpoint.stage}:${checkpoint.position}`;
+
+const issueCheckpoint = (
+  stage: string,
+  position: AutoHuntWorkflowCheckpointPosition,
+): AutoHuntWorkflowCheckpoint => ({
+  key: checkpointKeyForBoundary("issue", { stage, position }),
+  stage,
+  position,
+});
+
+function toggleIssueCheckpoint(
+  checkpoints: AutoHuntWorkflowCheckpoint[],
+  stage: string,
+  position: AutoHuntWorkflowCheckpointPosition,
+) {
+  const boundary = `${stage}:${position}`;
+  return checkpoints.some(
+      (checkpoint) => checkpointBoundaryKey(checkpoint) === boundary,
+    )
+    ? checkpoints.filter(
+        (checkpoint) => checkpointBoundaryKey(checkpoint) !== boundary,
+      )
+    : [...checkpoints, issueCheckpoint(stage, position)];
+}
+
+function inheritedCheckpointBoundaries(
+  workflow: AutoHuntWorkflow,
+  issueCheckpoints: AutoHuntWorkflowCheckpoint[],
+) {
+  const issueBoundaries = new Set(issueCheckpoints.map(checkpointBoundaryKey));
+  return new Set(
+    workflow.execution.checkpoints
+      .filter((checkpoint) => !issueBoundaries.has(checkpointBoundaryKey(checkpoint)))
+      .map(checkpointBoundaryKey),
+  );
+}
+
+function canEditIssueCheckpoints(run: HuntRun) {
+  return (
+    ["backlog", "queued"].includes(run.status) &&
+    !run.claimedAt &&
+    !(run.leaseExpiresAt && Date.parse(run.leaseExpiresAt) > Date.now())
+  );
+}
 
 const kanbanPointerDragThreshold = 6;
 const kanbanAutoScrollEdge = 72;
@@ -345,9 +399,10 @@ export function HuntDashboard({
   onDeleteIssue,
   onTransferIssue,
   onAddIssueDependency,
-  onAcceptIssueReworkProposal,
+  onAcceptIssueAction,
   onRemoveIssueDependency,
   onUpdateIssue,
+  onUpdateIssueCheckpoints = async () => undefined,
   onUpdateIssuePreferences = async () => undefined,
   onLoadAttachment,
   onLoadIssueMessages,
@@ -408,15 +463,19 @@ export function HuntDashboard({
     dependentRunId: string,
     prerequisiteRunId: string,
   ) => Promise<unknown>;
-  onAcceptIssueReworkProposal?: (
+  onAcceptIssueAction?: (
     runId: string,
-    proposalId: string,
-  ) => Promise<IssueReworkProposal>;
+    proposal: IssueProposedAction,
+  ) => Promise<IssueProposedAction>;
   onRemoveIssueDependency?: (
     dependentRunId: string,
     prerequisiteRunId: string,
   ) => Promise<unknown>;
   onUpdateIssue: (runId: string, input: UpdateIssueInput) => Promise<unknown>;
+  onUpdateIssueCheckpoints?: (
+    runId: string,
+    checkpoints: AutoHuntWorkflowCheckpoint[],
+  ) => Promise<unknown>;
   onUpdateIssuePreferences?: (
     runId: string,
     input: IssueExecutionPreferences,
@@ -914,6 +973,17 @@ export function HuntDashboard({
             : []
       }
       members={dashboard?.members ?? []}
+      workflow={dashboard
+        ? {
+            ...dashboard.settings.workflow,
+            execution: {
+              checkpoints:
+                dashboard.settings.checkpointPolicy?.effective ??
+                dashboard.settings.workflow.execution.checkpoints,
+            },
+          }
+        : undefined}
+      workflowProjectId={dashboard?.project.id}
     />
   ) : null;
 
@@ -984,9 +1054,9 @@ export function HuntDashboard({
             ? (prerequisiteRunId) =>
                 onAddIssueDependency(selected.id, prerequisiteRunId)
             : undefined}
-          onAcceptIssueReworkProposal={onAcceptIssueReworkProposal
-            ? (proposalId) =>
-                onAcceptIssueReworkProposal(selected.id, proposalId)
+          onAcceptIssueAction={onAcceptIssueAction
+            ? (proposal) =>
+                onAcceptIssueAction(selected.id, proposal)
             : undefined}
           onRemoveDependency={onRemoveIssueDependency
             ? (prerequisiteRunId) =>
@@ -1015,6 +1085,8 @@ export function HuntDashboard({
           onResume={() => onResumeRun(selected.id)}
           onSendIssueMessage={(input) => onSendIssueMessage(selected.id, input)}
           onUpdateIssue={(input) => onUpdateIssue(selected.id, input)}
+          onUpdateIssueCheckpoints={(checkpoints) =>
+            onUpdateIssueCheckpoints(selected.id, checkpoints)}
           onUpdateIssuePreferences={(input) =>
             onUpdateIssuePreferences(selected.id, input)}
           availableProviders={availableProviders}
@@ -1256,6 +1328,11 @@ export function HuntDashboard({
                 () => undefined,
               )
             }
+            onCheckpointsChange={(run, checkpoints) =>
+              onUpdateIssueCheckpoints(run.id, checkpoints).catch(
+                () => undefined,
+              )
+            }
             runs={filtered}
             members={dashboard?.members ?? []}
             processingIssueIds={processingIssueIds}
@@ -1468,6 +1545,11 @@ export function HuntDashboard({
                     }
                     onPreferencesChange={(preferences) =>
                       onUpdateIssuePreferences(run.id, preferences).catch(
+                        () => undefined,
+                      )
+                    }
+                    onCheckpointsChange={(checkpoints) =>
+                      onUpdateIssueCheckpoints(run.id, checkpoints).catch(
                         () => undefined,
                       )
                     }
@@ -1851,6 +1933,89 @@ export function EditIssueDialog({
   );
 }
 
+function IssueCheckpointDropdown({
+  checkpoints,
+  disabled = false,
+  onChange,
+  workflow,
+}: {
+  checkpoints: AutoHuntWorkflowCheckpoint[];
+  disabled?: boolean;
+  onChange: (checkpoints: AutoHuntWorkflowCheckpoint[]) => void;
+  workflow: AutoHuntWorkflow;
+}) {
+  const { t } = useI18n();
+  const inherited = new Set(
+    workflow.execution.checkpoints.map(checkpointBoundaryKey),
+  );
+  const selected = new Set(checkpoints.map(checkpointBoundaryKey));
+  return (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild>
+        <button
+          className="issue-checkpoint-trigger"
+          disabled={disabled}
+          type="button"
+        >
+          <Clock3 aria-hidden="true" size={13} />
+          <span>{t("issue.checkpoints")}</span>
+          {(checkpoints.length > 0 || inherited.size > 0) && (
+            <strong>{checkpoints.length + inherited.size}</strong>
+          )}
+          <ChevronDown aria-hidden="true" size={12} />
+        </button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          align="start"
+          className="issue-checkpoint-menu"
+          collisionPadding={10}
+          sideOffset={6}
+        >
+          <DropdownMenu.Label className="issue-checkpoint-menu-heading">
+            {t("issue.checkpointsDescription")}
+          </DropdownMenu.Label>
+          {workflow.stages.flatMap((stage) =>
+            (["before", "after"] as const).map((position) => {
+              const boundary = `${stage.id}:${position}`;
+              const locked = inherited.has(boundary);
+              const checked = locked || selected.has(boundary);
+              const stageLabel = localizeWorkflowStage(t, stage.id, stage.label);
+              return (
+                <DropdownMenu.CheckboxItem
+                  checked={checked}
+                  className="issue-checkpoint-menu-item"
+                  disabled={locked}
+                  key={boundary}
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    if (locked) return;
+                    onChange(toggleIssueCheckpoint(
+                      checkpoints,
+                      stage.id,
+                      position,
+                    ));
+                  }}
+                >
+                  <DropdownMenu.ItemIndicator className="issue-checkpoint-menu-check">
+                    <Check aria-hidden="true" size={13} />
+                  </DropdownMenu.ItemIndicator>
+                  <span>
+                    {position === "before"
+                      ? t("run.checkpointBefore", { stage: stageLabel })
+                      : t("run.checkpointAfter", { stage: stageLabel })}
+                  </span>
+                  {locked && <small>{t("issue.checkpointRequired")}</small>}
+                </DropdownMenu.CheckboxItem>
+              );
+            }),
+          )}
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
+  );
+}
+
 export function CreateIssueDialog({
   availableProviders = agentProviders,
   compactHeader = false,
@@ -1860,6 +2025,8 @@ export function CreateIssueDialog({
   onCreate,
   members = [],
   projects,
+  workflow,
+  workflowProjectId,
 }: {
   availableProviders?: readonly AgentProvider[];
   compactHeader?: boolean;
@@ -1869,6 +2036,8 @@ export function CreateIssueDialog({
   onCreate: (projectId: string, input: CreateIssueInput) => Promise<void>;
   members?: OrganizationMember[];
   projects: Project[];
+  workflow?: AutoHuntWorkflow;
+  workflowProjectId?: string;
 }) {
   const { t } = useI18n();
   const [initialDraft] = useState(() => {
@@ -1901,6 +2070,11 @@ export function CreateIssueDialog({
         ? defaultProjectId!
         : projects[0]?.id ?? ""
   );
+  const [checkpoints, setCheckpoints] = useState<AutoHuntWorkflowCheckpoint[]>(
+    initialDraft && initialDraft.projectId === workflowProjectId
+      ? initialDraft.checkpoints ?? []
+      : [],
+  );
   const [attachments, setAttachments] = useState<
     Array<{ file: File; reference: string }>
   >([]);
@@ -1925,6 +2099,7 @@ export function CreateIssueDialog({
       assigneeUserId: assigneeUserId || null,
       preferredProvider: preferredProvider || null,
       preferredModel: preferredModel || null,
+      ...(checkpoints.length > 0 ? { checkpoints } : {}),
     });
   }, [
     assigneeUserId,
@@ -1932,6 +2107,7 @@ export function CreateIssueDialog({
     description,
     preferredModel,
     preferredProvider,
+    checkpoints,
     priority,
     projectId,
     status,
@@ -2156,6 +2332,7 @@ export function CreateIssueDialog({
                 | AgentProvider
                 | null,
               preferredModel: preferredModel || null,
+              ...(checkpoints.length > 0 ? { checkpoints } : {}),
               attachments: attachments.map(({ file }) => file),
               ...(attachments.length > 0
                 ? {
@@ -2185,7 +2362,12 @@ export function CreateIssueDialog({
                   className="issue-project-context"
                   disabled={isSubmitting}
                   label={t("issue.project")}
-                  onValueChange={setProjectId}
+                  onValueChange={(nextProjectId) => {
+                    setProjectId(nextProjectId);
+                    if (nextProjectId !== workflowProjectId) {
+                      setCheckpoints([]);
+                    }
+                  }}
                   options={projects.map((project) => ({
                     label: project.name,
                     value: project.id,
@@ -2264,6 +2446,14 @@ export function CreateIssueDialog({
             )}
           </div>
           <div className="issue-metadata-bar">
+            {workflow && projectId === workflowProjectId ? (
+              <IssueCheckpointDropdown
+                checkpoints={checkpoints}
+                disabled={isSubmitting}
+                onChange={setCheckpoints}
+                workflow={workflow}
+              />
+            ) : null}
             <NativeSelect
               className="issue-assignee-select"
               label={t("issue.assignee")}
@@ -2634,6 +2824,7 @@ function KanbanCard({
   onProcessNow,
   onPriorityChange,
   onPreferencesChange,
+  onCheckpointsChange,
   token,
   updatingIssueId,
 }: {
@@ -2659,6 +2850,7 @@ function KanbanCard({
   onProcessNow?: () => void;
   onPriorityChange: (priority: number | null) => void;
   onPreferencesChange: (preferences: IssueExecutionPreferences) => void;
+  onCheckpointsChange: (checkpoints: AutoHuntWorkflowCheckpoint[]) => void;
   token: string | null;
   updatingIssueId: string | null;
 }) {
@@ -2687,6 +2879,7 @@ function KanbanCard({
       onProcessNow={onProcessNow}
       onPriorityChange={onPriorityChange}
       onPreferencesChange={onPreferencesChange}
+      onCheckpointsChange={onCheckpointsChange}
       run={run}
       isProcessing={isProcessing}
     >
@@ -2864,6 +3057,7 @@ function IssueContextMenu({
   onProcessNow,
   onPriorityChange,
   onPreferencesChange,
+  onCheckpointsChange,
   run,
   isProcessing,
 }: {
@@ -2878,6 +3072,7 @@ function IssueContextMenu({
   onProcessNow?: () => void;
   onPriorityChange: (priority: number | null) => void;
   onPreferencesChange: (preferences: IssueExecutionPreferences) => void;
+  onCheckpointsChange: (checkpoints: AutoHuntWorkflowCheckpoint[]) => void;
   run: HuntRun;
   isProcessing: boolean;
 }) {
@@ -2921,6 +3116,15 @@ function IssueContextMenu({
         }`
       : t("settings.providerDefaultModel")
     : t("run.notSet");
+  const issueCheckpoints = run.issueCheckpoints ?? [];
+  const inheritedBoundaries = inheritedCheckpointBoundaries(
+    run.workflow,
+    issueCheckpoints,
+  );
+  const selectedIssueBoundaries = new Set(
+    issueCheckpoints.map(checkpointBoundaryKey),
+  );
+  const checkpointsEditable = canEditIssueCheckpoints(run);
   const isClaimed =
     run.status === "queued" &&
     Boolean(run.leaseExpiresAt) &&
@@ -3055,6 +3259,71 @@ function IssueContextMenu({
                     </ContextMenu.RadioItem>
                   ))}
                 </ContextMenu.RadioGroup>
+              </ContextMenu.SubContent>
+            </ContextMenu.Portal>
+          </ContextMenu.Sub>
+
+          <ContextMenu.Sub>
+            <ContextMenu.SubTrigger className="issue-context-item">
+              <Clock3 aria-hidden="true" size={17} />
+              <span>{t("issue.checkpoints")}</span>
+              <small>
+                {checkpointsEditable
+                  ? t("issue.checkpointCount", { count: issueCheckpoints.length })
+                  : t("issue.checkpointsLocked")}
+              </small>
+              <ChevronRight aria-hidden="true" size={14} />
+            </ContextMenu.SubTrigger>
+            <ContextMenu.Portal>
+              <ContextMenu.SubContent
+                className="issue-context-menu issue-context-submenu issue-checkpoint-context-menu"
+                collisionPadding={10}
+                sideOffset={7}
+              >
+                {run.workflow.stages.flatMap((stage) =>
+                  (["before", "after"] as const).map((position) => {
+                    const boundary = `${stage.id}:${position}`;
+                    const inherited = inheritedBoundaries.has(boundary);
+                    const checked =
+                      inherited || selectedIssueBoundaries.has(boundary);
+                    const stageLabel = localizeWorkflowStage(
+                      t,
+                      stage.id,
+                      stage.label,
+                    );
+                    return (
+                      <ContextMenu.CheckboxItem
+                        checked={checked}
+                        className="issue-context-item issue-context-choice"
+                        disabled={inherited || !checkpointsEditable}
+                        key={boundary}
+                        onSelect={() => {
+                          if (inherited || !checkpointsEditable) return;
+                          onCheckpointsChange(toggleIssueCheckpoint(
+                            issueCheckpoints,
+                            stage.id,
+                            position,
+                          ));
+                        }}
+                      >
+                        <ContextMenu.ItemIndicator
+                          className="issue-context-check"
+                          forceMount
+                        >
+                          {checked ? <Check aria-hidden="true" size={14} /> : null}
+                        </ContextMenu.ItemIndicator>
+                        <span>
+                          {position === "before"
+                            ? t("run.checkpointBefore", { stage: stageLabel })
+                            : t("run.checkpointAfter", { stage: stageLabel })}
+                        </span>
+                        {inherited ? (
+                          <small>{t("issue.checkpointRequired")}</small>
+                        ) : null}
+                      </ContextMenu.CheckboxItem>
+                    );
+                  }),
+                )}
               </ContextMenu.SubContent>
             </ContextMenu.Portal>
           </ContextMenu.Sub>
@@ -3285,6 +3554,7 @@ function IssueList({
   onProcessIssueNow,
   onPriorityChange,
   onPreferencesChange,
+  onCheckpointsChange,
   members,
   runs,
   processingIssueIds,
@@ -3302,6 +3572,10 @@ function IssueList({
   onPreferencesChange: (
     run: HuntRun,
     preferences: IssueExecutionPreferences,
+  ) => void;
+  onCheckpointsChange: (
+    run: HuntRun,
+    checkpoints: AutoHuntWorkflowCheckpoint[],
   ) => void;
   members: OrganizationMember[];
   runs: HuntRun[];
@@ -3376,6 +3650,9 @@ function IssueList({
               onPreferencesChange={(preferences) =>
                 onPreferencesChange(run, preferences)
               }
+              onCheckpointsChange={(checkpoints) =>
+                onCheckpointsChange(run, checkpoints)
+              }
               run={run}
               isProcessing={processingIssueIds.has(run.id)}
             >
@@ -3448,7 +3725,7 @@ export function RunPage({
   isSidebarOpen,
   onBack,
   onAddDependency,
-  onAcceptIssueReworkProposal,
+  onAcceptIssueAction,
   onCancel,
   onUnassignRun,
   onDelete,
@@ -3471,6 +3748,7 @@ export function RunPage({
   onRemoveDependency,
   onSendIssueMessage,
   onUpdateIssue,
+  onUpdateIssueCheckpoints,
   onUpdateIssuePreferences = async () => undefined,
   performedAgentName = null,
   performedAgentProvider = null,
@@ -3492,9 +3770,9 @@ export function RunPage({
   isSidebarOpen: boolean;
   onBack: () => void;
   onAddDependency?: (prerequisiteRunId: string) => Promise<unknown>;
-  onAcceptIssueReworkProposal?: (
-    proposalId: string,
-  ) => Promise<IssueReworkProposal>;
+  onAcceptIssueAction?: (
+    proposal: IssueProposedAction,
+  ) => Promise<IssueProposedAction>;
   onCancel: () => Promise<unknown>;
   onUnassignRun?: (runId: string) => Promise<unknown>;
   onDelete?: () => Promise<unknown>;
@@ -3526,6 +3804,9 @@ export function RunPage({
     attachmentReferences?: string[];
   }) => Promise<IssueMessageSendResult>;
   onUpdateIssue?: (input: UpdateIssueInput) => Promise<unknown>;
+  onUpdateIssueCheckpoints?: (
+    checkpoints: AutoHuntWorkflowCheckpoint[],
+  ) => Promise<unknown>;
   onUpdateIssuePreferences?: (
     input: IssueExecutionPreferences,
   ) => Promise<unknown>;
@@ -4944,7 +5225,7 @@ export function RunPage({
                   >
                     <IssueConversation
                       mentionMembers={mentionMembers}
-                      onAcceptReworkProposal={onAcceptIssueReworkProposal}
+                      onAcceptIssueAction={onAcceptIssueAction}
                       onLoadAttachment={onLoadAttachment}
                       onLoad={onLoadIssueMessages}
                       onSend={onSendIssueMessage}
@@ -4953,12 +5234,15 @@ export function RunPage({
                   </div>
                 ) : null}
                 </div>
-                <IssueWorkflowProgress run={run} />
+                <IssueWorkflowProgress
+                  onCheckpointsChange={onUpdateIssueCheckpoints}
+                  run={run}
+                />
               </div>
               {!companionMode ? (
                 <IssueConversation
                   mentionMembers={mentionMembers}
-                  onAcceptReworkProposal={onAcceptIssueReworkProposal}
+                  onAcceptIssueAction={onAcceptIssueAction}
                   onLoadAttachment={onLoadAttachment}
                   onLoad={onLoadIssueMessages}
                   onSend={onSendIssueMessage}
@@ -5749,8 +6033,24 @@ function issueWorkflowProgressState(
   return "upcoming";
 }
 
-function IssueWorkflowProgress({ run }: { run: HuntRun }) {
+function IssueWorkflowProgress({
+  onCheckpointsChange,
+  run,
+}: {
+  onCheckpointsChange?: (
+    checkpoints: AutoHuntWorkflowCheckpoint[],
+  ) => Promise<unknown>;
+  run: HuntRun;
+}) {
   const { t } = useI18n();
+  const [savingBoundary, setSavingBoundary] = useState<string | null>(null);
+  const [checkpointError, setCheckpointError] = useState<string | null>(null);
+  const issueCheckpoints = run.issueCheckpoints ?? [];
+  const issueBoundaries = new Set(issueCheckpoints.map(checkpointBoundaryKey));
+  const effectiveBoundaries = new Set(
+    run.workflow.execution.checkpoints.map(checkpointBoundaryKey),
+  );
+  const editable = Boolean(onCheckpointsChange) && canEditIssueCheckpoints(run);
   const stateLabels: Record<IssueWorkflowProgressState, string> = {
     complete: t("status.completed"),
     active: t("status.running"),
@@ -5768,6 +6068,54 @@ function IssueWorkflowProgress({ run }: { run: HuntRun }) {
           const state = issueWorkflowProgressState(run, index);
           const label = localizeWorkflowStage(t, stage.id, stage.label);
           const isCurrent = !["complete", "upcoming"].includes(state);
+          const renderCheckpoint = (
+            position: AutoHuntWorkflowCheckpointPosition,
+          ) => {
+            const boundary = `${stage.id}:${position}`;
+            const issueSpecific = issueBoundaries.has(boundary);
+            const configured = effectiveBoundaries.has(boundary);
+            const inherited = configured && !issueSpecific;
+            if (!editable && !configured) return null;
+            const action = issueSpecific
+              ? t("issue.checkpointRemove")
+              : t("issue.checkpointAdd");
+            return (
+              <button
+                aria-label={inherited
+                  ? t("issue.checkpointRequiredAt", { stage: label })
+                  : `${action}: ${position === "before"
+                      ? t("run.checkpointBefore", { stage: label })
+                      : t("run.checkpointAfter", { stage: label })}`}
+                className="issue-workflow-checkpoint"
+                data-active={configured}
+                data-inherited={inherited}
+                data-position={position}
+                disabled={inherited || !editable || savingBoundary !== null}
+                onClick={() => {
+                  if (!onCheckpointsChange || inherited || !editable) return;
+                  setCheckpointError(null);
+                  setSavingBoundary(boundary);
+                  void onCheckpointsChange(toggleIssueCheckpoint(
+                    issueCheckpoints,
+                    stage.id,
+                    position,
+                  ))
+                    .catch((error) => setCheckpointError(
+                      error instanceof Error ? error.message : String(error),
+                    ))
+                    .finally(() => setSavingBoundary(null));
+                }}
+                title={inherited ? t("issue.checkpointRequired") : action}
+                type="button"
+              >
+                {savingBoundary === boundary ? (
+                  <LoaderCircle aria-hidden="true" className="spin" size={10} />
+                ) : (
+                  <Clock3 aria-hidden="true" size={10} />
+                )}
+              </button>
+            );
+          };
           return (
             <li
               aria-current={isCurrent ? "step" : undefined}
@@ -5776,16 +6124,23 @@ function IssueWorkflowProgress({ run }: { run: HuntRun }) {
               data-state={state}
               key={stage.id}
             >
+              {renderCheckpoint("before")}
               <span aria-hidden="true" className="issue-workflow-marker">
                 {state === "complete" ? <Check size={11} strokeWidth={3} /> : <i />}
               </span>
               <span aria-hidden="true" className="issue-workflow-label">
                 {label}
               </span>
+              {renderCheckpoint("after")}
             </li>
           );
         })}
       </ol>
+      {checkpointError ? (
+        <span className="issue-workflow-checkpoint-error" role="alert">
+          {checkpointError}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -6397,16 +6752,16 @@ function RunEvidenceImagePreview({
 
 function IssueConversation({
   mentionMembers,
-  onAcceptReworkProposal,
+  onAcceptIssueAction,
   onLoadAttachment,
   onLoad,
   onSend,
   run,
 }: {
   mentionMembers: OrganizationMember[];
-  onAcceptReworkProposal?: (
-    proposalId: string,
-  ) => Promise<IssueReworkProposal>;
+  onAcceptIssueAction?: (
+    proposal: IssueProposedAction,
+  ) => Promise<IssueProposedAction>;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onLoad: () => Promise<IssueMessage[]>;
   onSend: (input: {
@@ -6428,7 +6783,7 @@ function IssueConversation({
   const [agentReplyStates, setAgentReplyStates] = useState<
     Record<string, { pending: number; error: string | null }>
   >({});
-  const [reworkProposalStates, setReworkProposalStates] = useState<
+  const [actionProposalStates, setActionProposalStates] = useState<
     Record<string, { accepting: boolean; error: string | null }>
   >({});
   const messageListRef = useRef<HTMLDivElement | null>(null);
@@ -6544,30 +6899,30 @@ function IssueConversation({
       });
   };
 
-  const acceptReworkProposal = async (proposalId: string) => {
-    if (!onAcceptReworkProposal) return;
-    setReworkProposalStates((current) => ({
+  const acceptIssueAction = async (proposal: IssueProposedAction) => {
+    if (!onAcceptIssueAction) return;
+    setActionProposalStates((current) => ({
       ...current,
-      [proposalId]: { accepting: true, error: null },
+      [proposal.id]: { accepting: true, error: null },
     }));
     try {
-      const accepted = await onAcceptReworkProposal(proposalId);
+      const accepted = await onAcceptIssueAction(proposal);
       setMessages((current) =>
         current.map((message) =>
-          message.proposedAction?.id === proposalId
+          message.proposedAction?.id === proposal.id
             ? { ...message, proposedAction: accepted }
             : message,
         )
       );
-      setReworkProposalStates((current) => {
+      setActionProposalStates((current) => {
         const next = { ...current };
-        delete next[proposalId];
+        delete next[proposal.id];
         return next;
       });
     } catch (caught) {
-      setReworkProposalStates((current) => ({
+      setActionProposalStates((current) => ({
         ...current,
-        [proposalId]: {
+        [proposal.id]: {
           accepting: false,
           error: caught instanceof Error ? caught.message : String(caught),
         },
@@ -6614,8 +6969,8 @@ function IssueConversation({
                   isReplying={isReplying}
                   localeTag={localeTag}
                   message={message}
-                  onAcceptReworkProposal={onAcceptReworkProposal && message.proposedAction
-                    ? () => void acceptReworkProposal(message.proposedAction!.id)
+                  onAcceptIssueAction={onAcceptIssueAction && message.proposedAction
+                    ? () => void acceptIssueAction(message.proposedAction!)
                     : undefined}
                   onLoadAttachment={onLoadAttachment}
                   onReply={() =>
@@ -6625,16 +6980,17 @@ function IssueConversation({
                   }
                   parentMessage={parentMessage}
                   replyComposerId={replyComposerId}
-                  reworkProposalState={message.proposedAction
-                    ? reworkProposalStates[message.proposedAction.id]
+                  actionProposalState={message.proposedAction
+                    ? actionProposalStates[message.proposedAction.id]
                     : undefined}
-                  reworkStageLabel={message.proposedAction
+                  reworkStageLabel={message.proposedAction?.type === "request_issue_rework"
                     ? localizeWorkflowStage(
                         t,
                         message.proposedAction.workflowStage,
                         run.workflow.stages.find(
                           (stage) =>
-                            stage.id === message.proposedAction?.workflowStage,
+                            message.proposedAction?.type === "request_issue_rework" &&
+                            stage.id === message.proposedAction.workflowStage,
                         )?.label ?? message.proposedAction.workflowStage,
                       )
                     : null}
@@ -6676,26 +7032,37 @@ function IssueMessageItem({
   isReplying = false,
   localeTag,
   message,
-  onAcceptReworkProposal,
+  onAcceptIssueAction,
   onLoadAttachment,
   onReply,
   parentMessage = null,
   replyComposerId,
-  reworkProposalState,
+  actionProposalState,
   reworkStageLabel,
 }: {
   isReplying?: boolean;
   localeTag: string;
   message: IssueMessage;
-  onAcceptReworkProposal?: () => void;
+  onAcceptIssueAction?: () => void;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onReply?: () => void;
   parentMessage?: IssueMessage | null;
   replyComposerId?: string;
-  reworkProposalState?: { accepting: boolean; error: string | null };
+  actionProposalState?: { accepting: boolean; error: string | null };
   reworkStageLabel?: string | null;
 }) {
   const { t } = useI18n();
+  const proposal = message.proposedAction;
+  const proposalTitle = proposal?.type === "request_issue_update"
+    ? t("run.issueUpdateProposalTitle")
+    : proposal?.type === "request_issue_create"
+      ? t("run.issueCreateProposalTitle")
+      : t("run.reworkProposalTitle");
+  const proposalAcceptLabel = proposal?.type === "request_issue_update"
+    ? t("run.issueUpdateProposalAccept")
+    : proposal?.type === "request_issue_create"
+      ? t("run.issueCreateProposalAccept")
+      : t("run.reworkProposalAccept");
   return (
     <article className="issue-message">
       <MessageAvatar message={message} />
@@ -6733,47 +7100,77 @@ function IssueMessageItem({
             {message.body}
           </ReactMarkdown>
         </div>
-        {message.proposedAction ? (
+        {proposal ? (
           <section className="issue-rework-proposal">
             <header>
-              <strong>{t("run.reworkProposalTitle")}</strong>
-              <small>
-                {t("run.reworkProposalStage", {
-                  stage: reworkStageLabel ?? message.proposedAction.workflowStage,
-                })}
-              </small>
+              <strong>{proposalTitle}</strong>
+              {proposal.type === "request_issue_rework" ? (
+                <small>
+                  {t("run.reworkProposalStage", {
+                    stage: reworkStageLabel ?? proposal.workflowStage,
+                  })}
+                </small>
+              ) : proposal.type === "request_issue_create" ? (
+                <small>
+                  {t("run.issueProposalStatus", { status: proposal.issue.status })}
+                </small>
+              ) : null}
             </header>
-            <p>{message.proposedAction.reason}</p>
-            {message.proposedAction.status === "accepted" ? (
+            {proposal.type === "request_issue_rework" ? (
+              <p>{proposal.reason}</p>
+            ) : proposal.type === "request_issue_update" ? (
+              <dl className="issue-action-proposal-fields">
+                {proposal.changes.title !== undefined ? (
+                  <div><dt>{t("run.issueProposalTitleField")}</dt><dd>{proposal.changes.title}</dd></div>
+                ) : null}
+                {proposal.changes.description !== undefined ? (
+                  <div><dt>{t("run.issueProposalDescriptionField")}</dt><dd>{proposal.changes.description || t("run.issueProposalClearValue")}</dd></div>
+                ) : null}
+                {proposal.changes.priority !== undefined ? (
+                  <div><dt>{t("run.issueProposalPriorityField")}</dt><dd>{proposal.changes.priority ? `P${proposal.changes.priority}` : t("run.issueProposalClearValue")}</dd></div>
+                ) : null}
+              </dl>
+            ) : (
+              <div className="issue-action-proposal-create">
+                <strong>{proposal.issue.title}</strong>
+                {proposal.issue.description ? <p>{proposal.issue.description}</p> : null}
+                <small>
+                  {t("run.issueProposalPriorityField")}: {proposal.issue.priority ? `P${proposal.issue.priority}` : t("run.issueProposalClearValue")}
+                </small>
+              </div>
+            )}
+            {proposal.status === "accepted" ? (
               <div className="issue-rework-proposal-accepted">
                 <BadgeCheck aria-hidden="true" size={15} />
-                {t("run.reworkProposalAccepted", {
-                  revision: message.proposedAction.appliedRevision ?? "",
-                })}
+                {proposal.type === "request_issue_rework"
+                  ? t("run.reworkProposalAccepted", {
+                      revision: proposal.appliedRevision ?? "",
+                    })
+                  : proposal.type === "request_issue_create"
+                    ? t("run.issueCreateProposalAccepted")
+                    : t("run.issueUpdateProposalAccepted")}
               </div>
-            ) : onAcceptReworkProposal ? (
+            ) : onAcceptIssueAction ? (
               <button
                 className="issue-rework-proposal-accept"
-                disabled={reworkProposalState?.accepting}
-                onClick={onAcceptReworkProposal}
+                disabled={actionProposalState?.accepting}
+                onClick={onAcceptIssueAction}
                 type="button"
               >
-                {reworkProposalState?.accepting ? (
+                {actionProposalState?.accepting ? (
                   <LoaderCircle aria-hidden="true" className="spin" size={15} />
                 ) : (
                   <Play aria-hidden="true" size={15} />
                 )}
-                {t(
-                  reworkProposalState?.accepting
-                    ? "run.reworkProposalAccepting"
-                    : "run.reworkProposalAccept",
-                )}
+                {actionProposalState?.accepting
+                  ? t("run.reworkProposalAccepting")
+                  : proposalAcceptLabel}
               </button>
             ) : null}
-            {reworkProposalState?.error ? (
+            {actionProposalState?.error ? (
               <p className="issue-rework-proposal-error">
                 <CircleAlert aria-hidden="true" size={14} />
-                {reworkProposalState.error}
+                {actionProposalState.error}
               </p>
             ) : null}
           </section>

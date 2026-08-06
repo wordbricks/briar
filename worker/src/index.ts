@@ -104,6 +104,7 @@ import {
   consumeGithubOAuthState,
   consumeSlackOAuthState,
   createGithubOAuthState,
+  createIssueActionProposal,
   createIssueMessage,
   createIssueReworkProposal,
   createIssueDependency,
@@ -133,6 +134,7 @@ import {
   findProjectIdByAgentTokenHash,
   getProjectAgent,
   getClaimedIssueAgentReply,
+  getIssueActionProposal,
   getIssueAgentReplyJob,
   getIssueReworkProposal,
   getIssueAttachment,
@@ -154,6 +156,7 @@ import {
   listIssueAttachments,
   listIssueDependencies,
   listIssueConversationNotifications,
+  listIssueActionProposals,
   listIssueMessages,
   listIssueReworkProposals,
   listIssueThreadMessages,
@@ -193,6 +196,8 @@ import {
   revokeOrganizationInvitation,
   renewProjectAgentScheduleRunLease,
   renewIssueAgentReplyLease,
+  acceptIssueCreateProposal,
+  acceptIssueUpdateProposal,
   acceptIssueReworkProposal,
   rollbackNewAppIssue,
   startWorkflowStageLifecycle,
@@ -209,6 +214,7 @@ import {
   updateOrganizationMemberRole,
   updateProjectIcon,
   updateIssue,
+  updateIssueCheckpoints,
   updateIssueExecutionPreferences,
   updateHuntRunExecutionMetrics,
   updateSlackInstallationProject,
@@ -221,6 +227,7 @@ import {
   type HuntRunRow,
   type IssueAttachmentInput,
   type IssueAttachmentRow,
+  type IssueActionProposalRow,
   type IssueAgentReplyJobRow,
   type IssueConversationNotificationRow,
   type IssueMessageRow,
@@ -1001,6 +1008,7 @@ const issueInputBaseSchema = z
       .nullable()
       .optional(),
     preferredModel: z.string().trim().min(1).max(100).nullable().optional(),
+    checkpoints: z.array(workflowCheckpointSchema).max(100).default([]),
   })
   .strict();
 
@@ -1266,21 +1274,55 @@ export async function readIssueMessageRequest(request: Request) {
   };
 }
 
+const issueUpdateProposalActionSchema = z
+  .object({
+    type: z.literal("request_issue_update"),
+    changes: z
+      .object({
+        title: z.string().trim().min(1).max(300).optional(),
+        description: z.string().trim().max(100_000).nullable().optional(),
+        priority: z.number().int().min(1).max(4).nullable().optional(),
+      })
+      .strict()
+      .refine((changes) => Object.keys(changes).length > 0, {
+        message: "At least one issue change is required",
+      }),
+  })
+  .strict();
+
+const issueCreateProposalActionSchema = z
+  .object({
+    type: z.literal("request_issue_create"),
+    issue: z
+      .object({
+        title: z.string().trim().min(1).max(300),
+        description: z.string().trim().max(100_000).nullable(),
+        priority: z.number().int().min(1).max(4).nullable(),
+        status: z.enum(["backlog", "queued"]),
+      })
+      .strict(),
+  })
+  .strict();
+
+const issueAgentProposedActionSchema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("request_issue_rework"),
+      workflowStage: workflowStageIdSchema,
+      reason: z.string().trim().min(1).max(4_000),
+    })
+    .strict(),
+  issueUpdateProposalActionSchema,
+  issueCreateProposalActionSchema,
+]);
+
 const issueAgentReplyCompletionSchema = z
   .object({
     projectId: z.string().uuid(),
     workerId: z.string().trim().min(1).max(128),
     claimToken: z.string().startsWith("briar_reply_claim_"),
     body: z.string().trim().min(1).max(10_000).optional(),
-    proposedAction: z
-      .object({
-        type: z.literal("request_issue_rework"),
-        workflowStage: workflowStageIdSchema,
-        reason: z.string().trim().min(1).max(4_000),
-      })
-      .strict()
-      .nullable()
-      .optional(),
+    proposedAction: issueAgentProposedActionSchema.nullable().optional(),
     error: z.string().trim().min(1).max(4_000).optional(),
   })
   .strict()
@@ -1352,6 +1394,15 @@ export async function readIssueRequest(request: Request) {
   const status = form.get("status");
   const preferredProvider = form.get("preferredProvider");
   const preferredModel = form.get("preferredModel");
+  const rawCheckpoints = form.get("checkpoints");
+  let checkpoints: unknown = [];
+  if (typeof rawCheckpoints === "string" && rawCheckpoints) {
+    try {
+      checkpoints = JSON.parse(rawCheckpoints);
+    } catch {
+      throw new HttpError(400, "Issue checkpoints are invalid");
+    }
+  }
   return {
     input: issueInputSchema.parse({
       title: form.get("title"),
@@ -1374,6 +1425,7 @@ export async function readIssueRequest(request: Request) {
         typeof preferredModel === "string" && preferredModel.trim()
           ? preferredModel
           : null,
+      checkpoints,
     }),
     attachments,
     attachmentReferences,
@@ -1894,10 +1946,11 @@ async function createIssueWithAttachments(input: {
   context: Record<string, unknown>;
   issueId?: string;
   createdByUserId?: string | null;
+  occurredAt?: string;
 }) {
   const settings = await getProjectSettings(input.db, input.project.id);
   const issueStorageId = input.issueId ?? crypto.randomUUID();
-  const occurredAt = new Date().toISOString();
+  const occurredAt = input.occurredAt ?? new Date().toISOString();
   const storedAttachments: Array<IssueAttachmentInput & { file: File }> =
     input.attachments.map((file) => {
       const id = crypto.randomUUID();
@@ -1949,6 +2002,7 @@ async function createIssueWithAttachments(input: {
       detail: input.detail,
       priority: input.issue.priority ?? null,
       assigneeUserId: input.issue.assigneeUserId ?? null,
+      issueCheckpoints: input.issue.checkpoints,
       branch: null,
       commitSha: null,
       tracker: null,
@@ -3183,6 +3237,7 @@ async function processSlackCreateIssueSubmission(
         description: submission.description,
         priority: null,
         status: "queued",
+        checkpoints: [],
       },
       attachments,
       sourceKey,
@@ -3762,10 +3817,33 @@ const issueReworkProposalJson = (proposal: IssueReworkProposalRow) => ({
   appliedRevision: proposal.applied_revision,
 });
 
+const issueActionProposalJson = (proposal: IssueActionProposalRow) => {
+  const payload = JSON.parse(proposal.payload_json) as Record<string, unknown>;
+  return {
+    id: proposal.id,
+    type: proposal.action_type,
+    ...payload,
+    ...(proposal.action_type === "request_issue_update" && payload.changes &&
+      typeof payload.changes === "object" && !Array.isArray(payload.changes)
+      ? { changedFields: Object.keys(payload.changes) }
+      : {}),
+    status: proposal.status,
+    acceptedAt: proposal.accepted_at,
+    resultRunId: proposal.result_run_id,
+  };
+};
+
+type IssueProposalRow = IssueReworkProposalRow | IssueActionProposalRow;
+
+const issueProposalJson = (proposal: IssueProposalRow) =>
+  "action_type" in proposal
+    ? issueActionProposalJson(proposal)
+    : issueReworkProposalJson(proposal);
+
 const issueMessageJson = (
   message: IssueMessageRow,
   attachments: IssueAttachmentRow[] = [],
-  proposal: IssueReworkProposalRow | null = null,
+  proposal: IssueProposalRow | null = null,
 ) => ({
   id: message.id,
   runId: message.run_id,
@@ -3791,7 +3869,7 @@ const issueMessageJson = (
     provider: message.author_agent_provider,
   },
   replyCount: message.reply_count,
-  proposedAction: proposal ? issueReworkProposalJson(proposal) : null,
+  proposedAction: proposal ? issueProposalJson(proposal) : null,
   createdAt: message.created_at,
   updatedAt: message.updated_at,
 });
@@ -3960,6 +4038,7 @@ function dashboardRunJson(
           terminalReviewOnly,
         }
       : null,
+    issueCheckpoints: JSON.parse(run.issue_checkpoints_json || "[]"),
     detail: run.detail,
     priority: run.priority,
     assigneeUserId: run.assignee_user_id,
@@ -6556,13 +6635,17 @@ async function route(
       issueMessagesMatch[2],
     );
     if (!run) throw new HttpError(404, "Run not found");
-    const [messages, attachments, proposals] = await Promise.all([
+    const [messages, attachments, reworkProposals, actionProposals] = await Promise.all([
       listIssueMessagesWithArchive(db, env.ARCHIVES, project.id, run.id),
       listIssueAttachments(db, project.id, run.id),
       listIssueReworkProposals(db, project.id, run.id),
+      listIssueActionProposals(db, project.id, run.id),
     ]);
     const proposalsByReply = new Map(
-      proposals.map((proposal) => [proposal.reply_message_id, proposal]),
+      [...reworkProposals, ...actionProposals].map((proposal) => [
+        proposal.reply_message_id,
+        proposal,
+      ]),
     );
     return json({
       messages: messages.map((message) =>
@@ -6743,7 +6826,7 @@ async function route(
     if (!job || job.run_id !== issueAgentReplyStatusMatch[2]) {
       throw new HttpError(404, "Agent reply not found");
     }
-    const [messages, proposals] =
+    const [messages, reworkProposals, actionProposals] =
       job.status === "completed"
         ? await Promise.all([
             listIssueMessagesWithArchive(
@@ -6753,12 +6836,13 @@ async function route(
               job.run_id,
             ),
             listIssueReworkProposals(db, project.id, job.run_id),
+            listIssueActionProposals(db, project.id, job.run_id),
           ])
-        : [[], []];
+        : [[], [], []];
     const reply = messages.find(
       (message) => message.id === job.reply_message_id,
     );
-    const proposal = proposals.find(
+    const proposal = [...reworkProposals, ...actionProposals].find(
       (candidate) => candidate.reply_message_id === job.reply_message_id,
     ) ?? null;
     return json({
@@ -6841,6 +6925,132 @@ async function route(
       }
       throw error;
     }
+  }
+
+  const issueActionProposalAcceptMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/issue-action-proposals\/([0-9a-f-]+)\/accept$/u,
+  );
+  if (issueActionProposalAcceptMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      issueActionProposalAcceptMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const proposal = await getIssueActionProposal(
+      db,
+      project.id,
+      issueActionProposalAcceptMatch[2],
+      issueActionProposalAcceptMatch[3],
+    );
+    if (!proposal) throw new HttpError(404, "Issue action proposal not found");
+    if (proposal.status === "accepted") {
+      return json({
+        proposal: issueActionProposalJson(proposal),
+        outcome: "already_accepted",
+        resultRunId: proposal.result_run_id,
+      });
+    }
+
+    const acceptedAt = new Date().toISOString();
+    const rawPayload = JSON.parse(proposal.payload_json);
+    if (proposal.action_type === "request_issue_update") {
+      const action = issueUpdateProposalActionSchema.parse({
+        type: proposal.action_type,
+        ...rawPayload,
+      });
+      const run = await getHuntRunForProject(
+        db,
+        project.id,
+        proposal.conversation_run_id,
+      );
+      if (!run) throw new HttpError(404, "Run not found");
+      const hasDescription = Object.prototype.hasOwnProperty.call(
+        action.changes,
+        "description",
+      );
+      const hasPriority = Object.prototype.hasOwnProperty.call(
+        action.changes,
+        "priority",
+      );
+      const accepted = await acceptIssueUpdateProposal(db, {
+        projectId: project.id,
+        conversationRunId: proposal.conversation_run_id,
+        proposalId: proposal.id,
+        userId: session.user.id,
+        acceptedAt,
+        title: action.changes.title ?? run.title,
+        description: hasDescription
+          ? action.changes.description ?? null
+          : run.issue_description,
+        priority: hasPriority
+          ? action.changes.priority ?? null
+          : run.priority,
+      });
+      if (!accepted) {
+        throw new HttpError(
+          409,
+          "The issue changed after this proposal was created",
+          "ISSUE_ACTION_PROPOSAL_CONFLICT",
+        );
+      }
+      return json({
+        proposal: issueActionProposalJson(accepted),
+        outcome: "accepted",
+        resultRunId: accepted.result_run_id,
+      });
+    }
+
+    const action = issueCreateProposalActionSchema.parse({
+      type: proposal.action_type,
+      ...rawPayload,
+    });
+    const created = await createIssueWithAttachments({
+      db,
+      attachmentsBucket,
+      project,
+      issue: {
+        ...action.issue,
+        checkpoints: [],
+      },
+      attachments: [],
+      sourceKey: `briar-conversation-proposal:${proposal.id}`,
+      // Keep the event payload stable across retries. The accepting user is
+      // recorded on the proposal row itself.
+      actor: "briar-conversation",
+      detail: "대화창에서 사용자가 승인한 제안으로 생성된 이슈입니다.",
+      context: {
+        origin: "briar-conversation",
+        proposalId: proposal.id,
+        conversationRunId: proposal.conversation_run_id,
+      },
+      issueId: proposal.id,
+      createdByUserId: session.user.id,
+      occurredAt: proposal.created_at,
+    });
+    const accepted = await acceptIssueCreateProposal(db, {
+      projectId: project.id,
+      conversationRunId: proposal.conversation_run_id,
+      proposalId: proposal.id,
+      userId: session.user.id,
+      acceptedAt,
+      resultRunId: created.runId,
+    }) ?? await getIssueActionProposal(
+      db,
+      project.id,
+      proposal.conversation_run_id,
+      proposal.id,
+    );
+    if (!accepted) throw new HttpError(409, "Issue action proposal changed");
+    return json({
+      proposal: issueActionProposalJson(accepted),
+      outcome:
+        accepted.status === "accepted" && accepted.accepted_at !== acceptedAt
+          ? "already_accepted"
+          : "accepted",
+      resultRunId: accepted.result_run_id,
+    });
   }
 
   const projectRunEvidenceMatch = pathname.match(
@@ -7008,6 +7218,9 @@ async function route(
   const issuePreferencesMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/preferences$/u,
   );
+  const issueCheckpointsMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/checkpoints$/u,
+  );
   const issueResultReviewsMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/result-reviews$/u,
   );
@@ -7086,6 +7299,37 @@ async function route(
       provider: run.preferred_agent_provider,
       model: run.preferred_agent_model,
       effort: run.preferred_agent_effort,
+    });
+  }
+  if (issueCheckpointsMatch && request.method === "PUT") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      issueCheckpointsMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const input = z
+      .object({ checkpoints: z.array(workflowCheckpointSchema).max(100) })
+      .strict()
+      .parse(await readJson(request));
+    const outcome = await updateIssueCheckpoints(
+      db,
+      project.id,
+      issueCheckpointsMatch[2],
+      input.checkpoints,
+      new Date().toISOString(),
+    );
+    if (outcome === "not_found") throw new HttpError(404, "Run not found");
+    if (outcome === "ineligible") {
+      throw new HttpError(
+        409,
+        "Checkpoints can only be changed before issue execution starts",
+      );
+    }
+    return json({
+      runId: issueCheckpointsMatch[2],
+      checkpoints: input.checkpoints,
     });
   }
   if (issueResultReviewsMatch && request.method === "POST") {
@@ -8105,8 +8349,8 @@ async function route(
       ) ?? null;
     }
     if (!reply) throw new HttpError(409, "Agent reply could not be persisted");
-    let proposal: IssueReworkProposalRow | null = null;
-    if (input.proposedAction) {
+    let proposal: IssueProposalRow | null = null;
+    if (input.proposedAction?.type === "request_issue_rework") {
       proposal = await createIssueReworkProposal(db, {
         id: crypto.randomUUID(),
         projectId: input.projectId,
@@ -8119,6 +8363,29 @@ async function route(
       });
       if (!proposal) {
         proposal = (await listIssueReworkProposals(
+          db,
+          input.projectId,
+          job.run_id,
+        )).find(
+          (candidate) => candidate.trigger_message_id === job.trigger_message_id,
+        ) ?? null;
+      }
+    } else if (input.proposedAction) {
+      const payload = input.proposedAction.type === "request_issue_update"
+        ? { changes: input.proposedAction.changes }
+        : { issue: input.proposedAction.issue };
+      proposal = await createIssueActionProposal(db, {
+        id: crypto.randomUUID(),
+        projectId: input.projectId,
+        conversationRunId: job.run_id,
+        triggerMessageId: job.trigger_message_id,
+        replyMessageId: job.reply_message_id,
+        actionType: input.proposedAction.type,
+        payloadJson: JSON.stringify(payload),
+        createdAt: observedAt,
+      });
+      if (!proposal) {
+        proposal = (await listIssueActionProposals(
           db,
           input.projectId,
           job.run_id,

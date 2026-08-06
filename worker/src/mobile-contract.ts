@@ -259,6 +259,40 @@ export const mobileIssueReworkProposalSchema = z.object({
   appliedRevision: z.number().int().positive().nullable(),
 });
 
+export const mobileIssueUpdateProposalSchema = z.object({
+  id: z.uuid(),
+  type: z.literal("request_issue_update"),
+  changes: z.object({
+    title: z.string().optional(),
+    description: z.string().nullable().optional(),
+    priority: z.number().int().min(1).max(4).nullable().optional(),
+  }),
+  changedFields: z.array(z.enum(["title", "description", "priority"])),
+  status: z.enum(["pending", "accepted"]),
+  acceptedAt: z.iso.datetime().nullable(),
+  resultRunId: z.uuid().nullable(),
+});
+
+export const mobileIssueCreateProposalSchema = z.object({
+  id: z.uuid(),
+  type: z.literal("request_issue_create"),
+  issue: z.object({
+    title: z.string(),
+    description: z.string().nullable(),
+    priority: z.number().int().min(1).max(4).nullable(),
+    status: z.enum(["backlog", "queued"]),
+  }),
+  status: z.enum(["pending", "accepted"]),
+  acceptedAt: z.iso.datetime().nullable(),
+  resultRunId: z.uuid().nullable(),
+});
+
+export const mobileIssueProposedActionSchema = z.discriminatedUnion("type", [
+  mobileIssueReworkProposalSchema,
+  mobileIssueUpdateProposalSchema,
+  mobileIssueCreateProposalSchema,
+]);
+
 export const mobileIssueMessagesResponseSchema = z.object({
   messages: z.array(z.object({
     id: z.uuid(),
@@ -268,7 +302,7 @@ export const mobileIssueMessagesResponseSchema = z.object({
     attachments: z.array(mobileIssueAttachmentSchema).default([]),
     author: mobileMessageAuthorSchema,
     replyCount: z.number().int().nonnegative(),
-    proposedAction: mobileIssueReworkProposalSchema.nullable().optional(),
+    proposedAction: mobileIssueProposedActionSchema.nullable().optional(),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
   })),
@@ -450,6 +484,14 @@ export const mobileAcceptIssueReworkProposalResponseSchema = z.object({
   revision: z.number().int().positive(),
   workflowStage: z.string().min(1),
 });
+export const mobileAcceptIssueActionProposalResponseSchema = z.object({
+  proposal: z.union([
+    mobileIssueUpdateProposalSchema,
+    mobileIssueCreateProposalSchema,
+  ]),
+  outcome: z.enum(["accepted", "already_accepted"]),
+  resultRunId: z.uuid().nullable(),
+});
 export const mobileResultReviewSchema = mobileDashboardRunSchema.shape.resultReviews.unwrap().element;
 
 export const mobileProjectAgentSchema = z.object({
@@ -568,6 +610,9 @@ export const mobileOperationSchemas = {
   getIssueAgentReply: { response: mobileAgentReplyResponseSchema },
   acceptIssueReworkProposal: {
     response: mobileAcceptIssueReworkProposalResponseSchema,
+  },
+  acceptIssueActionProposal: {
+    response: mobileAcceptIssueActionProposalResponseSchema,
   },
   listProjectAgents: { response: mobileProjectAgentsResponseSchema },
   listProjectAgentSessions: { response: mobileProjectAgentSessionsResponseSchema },

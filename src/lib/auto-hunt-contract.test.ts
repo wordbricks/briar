@@ -6,6 +6,7 @@ import {
   normalizeAutoHuntWorkflow,
   resolveCheckpointPolicy,
   workflowWithEffectiveCheckpoints,
+  workflowWithAdditionalCheckpoints,
   type AutoHuntWorkflowInput,
 } from "./auto-hunt-contract";
 
@@ -199,6 +200,22 @@ describe("Auto Hunt workflow v2 contract", () => {
       "user-implement",
       "project-production",
     ]);
+  });
+
+  it("adds issue checkpoints without overriding inherited boundaries", () => {
+    const workflow = normalizeAutoHuntWorkflow(v2([
+      { key: "project-before-pr", stage: "pr_open", position: "before" },
+    ]));
+    const snapshot = workflowWithAdditionalCheckpoints(workflow, [
+      { key: "issue-before-pr", stage: "pr_open", position: "before" },
+      { key: "issue-after-pr", stage: "pr_open", position: "after" },
+    ]);
+
+    expect(snapshot.execution.checkpoints).toEqual([
+      { key: "project-before-pr", stage: "pr_open", position: "before" },
+      { key: "issue-after-pr", stage: "pr_open", position: "after" },
+    ]);
+    expect(workflow.execution.checkpoints).toHaveLength(1);
   });
 
   it("rejects unknown and duplicate policy boundaries before persistence", () => {

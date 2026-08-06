@@ -685,6 +685,45 @@
         }
       }
     },
+    "/projects/{projectId}/runs/{runId}/issue-action-proposals/{proposalId}/accept": {
+      "post": {
+        "operationId": "acceptIssueActionProposal",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          },
+          {
+            "$ref": "#/components/parameters/RunId"
+          },
+          {
+            "name": "proposalId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Issue write proposal accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptIssueActionProposalResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/projects/{projectId}/runs/{runId}/cancel": {
       "post": {
         "operationId": "cancelRun",
@@ -1616,6 +1655,61 @@
         },
         "additionalProperties": false
       },
+      "IssueUpdateProposal": {
+        "type": "object",
+        "required": ["id", "type", "changes", "changedFields", "status", "acceptedAt", "resultRunId"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "type": { "type": "string", "enum": ["request_issue_update"] },
+          "changes": {
+            "type": "object",
+            "properties": {
+              "title": { "type": "string" },
+              "description": { "type": ["string", "null"] },
+              "priority": { "type": ["integer", "null"], "minimum": 1, "maximum": 4 }
+            },
+            "additionalProperties": false
+          },
+          "changedFields": {
+            "type": "array",
+            "items": { "type": "string", "enum": ["title", "description", "priority"] }
+          },
+          "status": { "type": "string", "enum": ["pending", "accepted"] },
+          "acceptedAt": { "type": ["string", "null"], "format": "date-time" },
+          "resultRunId": { "type": ["string", "null"], "format": "uuid" }
+        },
+        "additionalProperties": false
+      },
+      "IssueCreateProposal": {
+        "type": "object",
+        "required": ["id", "type", "issue", "status", "acceptedAt", "resultRunId"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "type": { "type": "string", "enum": ["request_issue_create"] },
+          "issue": {
+            "type": "object",
+            "required": ["title", "description", "priority", "status"],
+            "properties": {
+              "title": { "type": "string" },
+              "description": { "type": ["string", "null"] },
+              "priority": { "type": ["integer", "null"], "minimum": 1, "maximum": 4 },
+              "status": { "type": "string", "enum": ["backlog", "queued"] }
+            },
+            "additionalProperties": false
+          },
+          "status": { "type": "string", "enum": ["pending", "accepted"] },
+          "acceptedAt": { "type": ["string", "null"], "format": "date-time" },
+          "resultRunId": { "type": ["string", "null"], "format": "uuid" }
+        },
+        "additionalProperties": false
+      },
+      "IssueProposedAction": {
+        "oneOf": [
+          { "$ref": "#/components/schemas/IssueReworkProposal" },
+          { "$ref": "#/components/schemas/IssueUpdateProposal" },
+          { "$ref": "#/components/schemas/IssueCreateProposal" }
+        ]
+      },
       "AcceptIssueReworkProposalResponse": {
         "type": "object",
         "required": [
@@ -1631,6 +1725,21 @@
           "attempt": { "type": "integer", "minimum": 1 },
           "revision": { "type": "integer", "minimum": 1 },
           "workflowStage": { "type": "string" }
+        },
+        "additionalProperties": false
+      },
+      "AcceptIssueActionProposalResponse": {
+        "type": "object",
+        "required": ["proposal", "outcome", "resultRunId"],
+        "properties": {
+          "proposal": {
+            "oneOf": [
+              { "$ref": "#/components/schemas/IssueUpdateProposal" },
+              { "$ref": "#/components/schemas/IssueCreateProposal" }
+            ]
+          },
+          "outcome": { "type": "string", "enum": ["accepted", "already_accepted"] },
+          "resultRunId": { "type": ["string", "null"], "format": "uuid" }
         },
         "additionalProperties": false
       },
@@ -1682,7 +1791,7 @@
                 },
                 "proposedAction": {
                   "oneOf": [
-                    { "$ref": "#/components/schemas/IssueReworkProposal" },
+                    { "$ref": "#/components/schemas/IssueProposedAction" },
                     { "type": "null" }
                   ]
                 },

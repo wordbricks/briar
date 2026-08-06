@@ -216,6 +216,16 @@ only an authenticated user click applies the rework. Acceptance keeps the same
 attempt, branch, pull request, prior events, and evidence, increments the
 revision, and invalidates evidence only from the selected workflow stage onward.
 
+An `@briar` reply may also attach `request_issue_update` or
+`request_issue_create` when the user's own message explicitly asks to edit the
+current issue or create another issue. These actions use the same proposal and
+approval flow: the agent cannot write directly, and nothing changes until an
+authenticated user clicks the approval button. Updates are rejected if the
+source issue changed after the proposal was created, so stale conversation
+context cannot overwrite newer edits. Creation adds a new issue to the same
+project while leaving the current run, branch, pull request, QA evidence, and
+conversation history intact.
+
 Removal is conservative by design:
 
 1. It refuses while the worktree has uncommitted or untracked changes, before

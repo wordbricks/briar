@@ -9,6 +9,11 @@ export type CreateIssueDraft = {
   assigneeUserId?: string | null;
   preferredProvider?: string | null;
   preferredModel?: string | null;
+  checkpoints?: Array<{
+    key: string;
+    stage: string;
+    position: "before" | "after";
+  }>;
 };
 
 function isCreateIssueDraft(value: unknown): value is CreateIssueDraft {
@@ -25,6 +30,18 @@ function isCreateIssueDraft(value: unknown): value is CreateIssueDraft {
       draft.priority === "3" ||
       draft.priority === "4") &&
     typeof draft.projectId === "string" &&
+    (draft.checkpoints === undefined ||
+      (Array.isArray(draft.checkpoints) &&
+        draft.checkpoints.length <= 100 &&
+        draft.checkpoints.every((checkpoint) => {
+          if (!checkpoint || typeof checkpoint !== "object") return false;
+          const candidate = checkpoint as Record<string, unknown>;
+          return (
+            typeof candidate.key === "string" &&
+            typeof candidate.stage === "string" &&
+            (candidate.position === "before" || candidate.position === "after")
+          );
+        }))) &&
     (draft.assigneeUserId === undefined ||
       draft.assigneeUserId === null ||
       typeof draft.assigneeUserId === "string") &&
@@ -52,7 +69,11 @@ export function loadCreateIssueDraft(): CreateIssueDraft | null {
 
 export function saveCreateIssueDraft(draft: CreateIssueDraft) {
   try {
-    if (!draft.title.trim() && !draft.description.trim()) {
+    if (
+      !draft.title.trim() &&
+      !draft.description.trim() &&
+      !draft.checkpoints?.length
+    ) {
       window.localStorage.removeItem(createIssueDraftStorageKey);
       return;
     }
