@@ -6244,12 +6244,21 @@ function IssueAgentActivityPanel({
   provider: AgentProvider | null;
 }) {
   const { t } = useI18n();
+  const panelRef = useRef<HTMLDivElement | null>(null);
+
+  useLayoutEffect(() => {
+    const panel = panelRef.current;
+    if (panel && !loading && !error && activity.length > 0) {
+      panel.scrollTop = panel.scrollHeight;
+    }
+  }, [activity, error, loading]);
 
   return (
     <div
       aria-labelledby={labelledBy}
       className="issue-agent-activity-panel"
       id={id}
+      ref={panelRef}
       role="tabpanel"
     >
       <header>
