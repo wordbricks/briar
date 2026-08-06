@@ -114,6 +114,9 @@ import {
   createProjectAgent,
   createProjectAgentSchedule,
   createProject,
+  createProduct,
+  createProductWorkItem,
+  createProductWorkItemDependency,
   createSlackOAuthState,
   claimSlackEvent,
   deleteAccountData,
@@ -127,6 +130,8 @@ import {
   transferIssue,
   deleteIssueDependency,
   deleteProject,
+  deleteEmptyProduct,
+  deleteProductWorkItemDependency,
   EventKeyConflictError,
   enqueueIssueAgentReply,
   failIssueAgentReply,
@@ -144,6 +149,8 @@ import {
   getSlackInstallation,
   isOrganizationHandleAvailable,
   getProject,
+  getProduct,
+  getProductWorkItem,
   getProjectSettings,
   getDashboardSyncCursor,
   getHuntRunForProject,
@@ -173,12 +180,18 @@ import {
   listOrganizationProjects,
   listOrganizations,
   listProjects,
+  listProducts,
+  listProductProjects,
+  listProductWorkItems,
+  listProductWorkItemRuns,
+  listProductWorkItemDependencies,
   listProjectAgents,
   listProjectAgentSessions,
   listProjectAgentScheduleRuns,
   listProjectAgentSchedules,
   listSlackInstallations,
   moveHuntRun,
+  moveProjectToProduct,
   planAccountDeletion,
   issueProjectAgentToken,
   recoverHuntRun,
@@ -208,6 +221,8 @@ import {
   updateOrganizationLogo,
   updateOrganizationMemberRole,
   updateProjectIcon,
+  updateProduct,
+  updateProductWorkItemStatus,
   updateIssue,
   updateIssueExecutionPreferences,
   updateHuntRunExecutionMetrics,
@@ -228,6 +243,9 @@ import {
   type IssueResultReviewRow,
   type IssueDependencyRow,
   type ProjectRow,
+  type ProductRow,
+  type ProductWorkItemRow,
+  type ProductWorkItemRunRow,
   type ProjectAgentRow,
   type ProjectAgentScheduleRunRow,
   type ProjectAgentScheduleRow,
@@ -711,7 +729,15 @@ export async function readRunEvidenceRequest(request: Request) {
 const projectInputSchema = z.object({
   name: z.string().trim().min(1).max(100),
   organizationId: z.string().uuid().optional(),
+  productId: z.string().uuid().optional(),
 });
+const productInputSchema = z
+  .object({
+    name: z.string().trim().min(1).max(100),
+    organizationId: z.string().uuid(),
+  })
+  .strict();
+const productUpdateSchema = productInputSchema.pick({ name: true }).strict();
 const maxProjectIconDataUrlLength = 400_000;
 const maxProjectIconRequestBytes = maxProjectIconDataUrlLength + 20;
 export const projectIconInputSchema = z
@@ -985,6 +1011,46 @@ const issueInputSchema = z
     priority: z.number().int().min(1).max(4).nullable().optional(),
     assigneeUserId: z.string().trim().min(1).max(200).nullable().optional(),
     status: z.enum(["backlog", "queued"]).default("queued"),
+  })
+  .strict();
+
+const productWorkItemDependencyInputSchema = z
+  .object({
+    prerequisiteProjectId: z.string().uuid(),
+    dependentProjectId: z.string().uuid(),
+  })
+  .strict()
+  .refine(
+    (input) => input.prerequisiteProjectId !== input.dependentProjectId,
+    "A project cannot depend on itself",
+  );
+
+const productWorkItemInputSchema = issueInputSchema
+  .extend({
+    targetProjectIds: z.array(z.string().uuid()).min(1).max(20),
+    dependencies: z.array(productWorkItemDependencyInputSchema).max(100).default([]),
+  })
+  .refine(
+    (input) => new Set(input.targetProjectIds).size === input.targetProjectIds.length,
+    "Target projects must be unique",
+  )
+  .refine(
+    (input) => input.dependencies.every(
+      (dependency) =>
+        input.targetProjectIds.includes(dependency.prerequisiteProjectId) &&
+        input.targetProjectIds.includes(dependency.dependentProjectId),
+    ),
+    "Dependencies must reference selected target projects",
+  );
+
+const productWorkItemStatusInputSchema = z
+  .object({ status: z.enum(["completed", "cancelled"]) })
+  .strict();
+
+const productWorkItemRunDependencySchema = z
+  .object({
+    prerequisiteRunId: z.string().uuid(),
+    dependentRunId: z.string().uuid(),
   })
   .strict();
 
@@ -1337,6 +1403,83 @@ export async function readIssueRequest(request: Request) {
     }),
     attachments,
     attachmentReferences,
+  };
+}
+
+async function readProductWorkItemRequest(request: Request) {
+  const contentType = request.headers.get("content-type") ?? "";
+  if (!contentType.toLowerCase().startsWith("multipart/form-data;")) {
+    return {
+      input: productWorkItemInputSchema.parse(await readJson(request)),
+      attachments: [] as File[],
+      attachmentReferences: [] as string[],
+    };
+  }
+
+  const declaredLength = Number(request.headers.get("content-length") ?? "0");
+  if (!Number.isSafeInteger(declaredLength) || declaredLength <= 0) {
+    throw new HttpError(411, "Multipart Content-Length is required");
+  }
+  if (declaredLength > maxIssueMultipartBytes) {
+    throw new HttpError(413, "Issue attachments exceed the 25MB total limit");
+  }
+
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    throw new HttpError(400, "Invalid multipart form data");
+  }
+  const rawAttachments = form.getAll("attachments");
+  if (rawAttachments.some((attachment) => !(attachment instanceof File))) {
+    throw new HttpError(400, "Attachments must be files");
+  }
+  const attachments = rawAttachments as File[];
+  const attachmentError = validateIssueAttachments(attachments);
+  if (attachmentError) throw new HttpError(400, attachmentError);
+
+  const parseJsonArray = (name: string) => {
+    const raw = form.get(name);
+    if (typeof raw !== "string" || !raw) return [];
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed)) throw new Error("not an array");
+      return parsed;
+    } catch {
+      throw new HttpError(400, `${name} is invalid`);
+    }
+  };
+
+  const attachmentReferences = parseJsonArray("attachmentReferences");
+  if (
+    attachmentReferences.length !== attachments.length ||
+    !attachmentReferences.every(isIssueAttachmentReference)
+  ) {
+    throw new HttpError(400, "Attachment references are invalid");
+  }
+  const description = form.get("description");
+  const priority = form.get("priority");
+  const assigneeUserId = form.get("assigneeUserId");
+  const status = form.get("status");
+  return {
+    input: productWorkItemInputSchema.parse({
+      title: form.get("title"),
+      description:
+        typeof description === "string" && description.trim()
+          ? description
+          : null,
+      priority:
+        typeof priority === "string" && priority ? Number(priority) : null,
+      assigneeUserId:
+        typeof assigneeUserId === "string" && assigneeUserId.trim()
+          ? assigneeUserId
+          : null,
+      status: typeof status === "string" && status ? status : undefined,
+      targetProjectIds: parseJsonArray("targetProjectIds"),
+      dependencies: parseJsonArray("dependencies"),
+    }),
+    attachments,
+    attachmentReferences: attachmentReferences as string[],
   };
 }
 
@@ -2307,10 +2450,64 @@ function projectJson(row: ProjectRow) {
     id: row.id,
     name: row.name,
     icon: row.icon,
+    productId: row.product_id,
+    productName: row.product_name,
     organizationId: row.organization_id,
     organizationName: row.organization_name,
     role: row.member_role,
     createdAt: row.created_at,
+  };
+}
+
+function productJson(row: ProductRow) {
+  return {
+    id: row.id,
+    name: row.name,
+    organizationId: row.organization_id,
+    organizationName: row.organization_name,
+    role: row.member_role,
+    createdAt: row.created_at,
+  };
+}
+
+function productWorkItemJson(
+  row: ProductWorkItemRow,
+  targets: ProductWorkItemRunRow[],
+  dependencies: Array<{
+    prerequisite_run_id: string;
+    dependent_run_id: string;
+  }>,
+) {
+  return {
+    id: row.id,
+    productId: row.product_id,
+    source: row.source,
+    sourceKey: row.source_key,
+    title: row.title,
+    description: row.description,
+    priority: row.priority,
+    assigneeUserId: row.assignee_user_id,
+    status: row.status,
+    completedAt: row.completed_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    targets: targets.map((target) => ({
+      projectId: target.project_id,
+      projectName: target.project_name,
+      runId: target.run_id,
+      runNumber: target.run_number,
+      status:
+        target.run_status === "running" && target.paused_at
+          ? "paused"
+          : target.run_status,
+      required: target.required === 1,
+      position: target.position,
+      pullRequestUrls: parseJsonArray(target.pull_request_urls),
+    })),
+    dependencies: dependencies.map((dependency) => ({
+      prerequisiteRunId: dependency.prerequisite_run_id,
+      dependentRunId: dependency.dependent_run_id,
+    })),
   };
 }
 
@@ -5305,6 +5502,300 @@ async function route(
     return json({ installation: slackInstallationJson(installation) });
   }
 
+  if (pathname === "/products" && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const [products, projects] = await Promise.all([
+      listProducts(db, session.user.id),
+      listProjects(db, session.user.id),
+    ]);
+    return json({
+      products: products.map((product) => ({
+        ...productJson(product),
+        projects: projects
+          .filter((project) => project.product_id === product.id)
+          .map(projectJson),
+      })),
+    });
+  }
+
+  if (pathname === "/products" && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const input = productInputSchema.parse(await readJson(request));
+    const role = await getOrganizationRole(
+      db,
+      input.organizationId,
+      session.user.id,
+    );
+    if (!role || !canManageOrganization(role)) {
+      throw new HttpError(403, "Organization admin access required");
+    }
+    const product = await createProduct(db, input);
+    const organization = (await listOrganizations(db, session.user.id)).find(
+      (candidate) => candidate.id === input.organizationId,
+    );
+    product.organization_name = organization?.name ?? "";
+    product.member_role = role;
+    return json({ product: { ...productJson(product), projects: [] } }, 201);
+  }
+
+  const productWorkItemsMatch = pathname.match(
+    /^\/products\/([0-9a-f-]+)\/work-items$/u,
+  );
+  if (productWorkItemsMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const product = await getProduct(db, productWorkItemsMatch[1], session.user.id);
+    if (!product) throw new HttpError(404, "Product not found");
+    const items = await listProductWorkItems(db, product.id);
+    const workItems = await Promise.all(
+      items.map(async (item) =>
+        productWorkItemJson(
+          item,
+          await listProductWorkItemRuns(db, item.id),
+          await listProductWorkItemDependencies(db, item.id),
+        ),
+      ),
+    );
+    return json({ workItems });
+  }
+
+  if (productWorkItemsMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const product = await getProduct(db, productWorkItemsMatch[1], session.user.id);
+    if (!product) throw new HttpError(404, "Product not found");
+    const { input, attachments, attachmentReferences } =
+      await readProductWorkItemRequest(request);
+    await requireIssueAssigneeMembership(
+      db,
+      product.organization_id,
+      input.assigneeUserId,
+    );
+    const productProjects = await listProductProjects(db, product.id);
+    const projectById = new Map(
+      productProjects.map((project) => [project.id, project]),
+    );
+    if (input.targetProjectIds.some((projectId) => !projectById.has(projectId))) {
+      throw new HttpError(400, "Every target project must belong to the product");
+    }
+    const dependencyGraph = new Map<string, string[]>();
+    for (const dependency of input.dependencies) {
+      const dependents = dependencyGraph.get(dependency.prerequisiteProjectId) ?? [];
+      dependents.push(dependency.dependentProjectId);
+      dependencyGraph.set(dependency.prerequisiteProjectId, dependents);
+    }
+    const visiting = new Set<string>();
+    const visited = new Set<string>();
+    const hasCycle = (projectId: string): boolean => {
+      if (visiting.has(projectId)) return true;
+      if (visited.has(projectId)) return false;
+      visiting.add(projectId);
+      const cycle = (dependencyGraph.get(projectId) ?? []).some(hasCycle);
+      visiting.delete(projectId);
+      visited.add(projectId);
+      return cycle;
+    };
+    if (input.targetProjectIds.some(hasCycle)) {
+      throw new HttpError(400, "Product work item dependencies cannot contain a cycle");
+    }
+
+    const workItemId = crypto.randomUUID();
+    const sourceKey = `briar-product-work-item:${workItemId}`;
+    const detail =
+      input.status === "backlog"
+        ? `Product ${product.name} work item was added to the backlog.`
+        : `Product ${product.name} work item is waiting for Auto Hunt.`;
+    const createdTargets: Array<{
+      project: ProjectRow;
+      runId: string;
+      objectKeys: string[];
+    }> = [];
+    try {
+      for (const projectId of input.targetProjectIds) {
+        const project = projectById.get(projectId)!;
+        const created = await createIssueWithAttachments({
+          db,
+          attachmentsBucket,
+          project,
+          issue: input,
+          attachments,
+          attachmentReferences,
+          sourceKey,
+          actor: "briar-product",
+          detail,
+          context: {
+            origin: "briar-product",
+            productId: product.id,
+            productWorkItemId: workItemId,
+          },
+          issueId: `${workItemId}-${project.id}`,
+          createdByUserId: session.user.id,
+        });
+        createdTargets.push({
+          project,
+          runId: created.runId,
+          objectKeys: created.attachments.map((attachment) => attachment.object_key),
+        });
+      }
+      const runByProjectId = new Map(
+        createdTargets.map((target) => [target.project.id, target.runId]),
+      );
+      const createdAt = new Date().toISOString();
+      await createProductWorkItem(db, {
+        id: workItemId,
+        productId: product.id,
+        sourceKey,
+        title: input.title,
+        description: input.description ?? null,
+        priority: input.priority ?? null,
+        assigneeUserId: input.assigneeUserId ?? null,
+        status: input.status,
+        createdByUserId: session.user.id,
+        createdAt,
+        targets: createdTargets.map((target, position) => ({
+          projectId: target.project.id,
+          runId: target.runId,
+          required: true,
+          position,
+        })),
+        dependencies: input.dependencies.map((dependency) => ({
+          prerequisiteRunId: runByProjectId.get(
+            dependency.prerequisiteProjectId,
+          )!,
+          dependentRunId: runByProjectId.get(dependency.dependentProjectId)!,
+        })),
+      });
+      const row = await getProductWorkItem(db, product.id, workItemId);
+      if (!row) throw new Error("Product work item was not stored");
+      return json(
+        {
+          workItem: productWorkItemJson(
+            row,
+            await listProductWorkItemRuns(db, row.id),
+            await listProductWorkItemDependencies(db, row.id),
+          ),
+        },
+        201,
+      );
+    } catch (error) {
+      for (const target of createdTargets.reverse()) {
+        try {
+          await rollbackNewAppIssue(db, target.project.id, target.runId);
+          if (target.objectKeys.length > 0) {
+            await attachmentsBucket.delete(target.objectKeys);
+          }
+        } catch (cleanupError) {
+          console.error("product work item cleanup failed", cleanupError);
+        }
+      }
+      throw error;
+    }
+  }
+
+  const productWorkItemMatch = pathname.match(
+    /^\/products\/([0-9a-f-]+)\/work-items\/([0-9a-f-]+)$/u,
+  );
+  if (productWorkItemMatch && ["GET", "PATCH"].includes(request.method)) {
+    const session = await requireSession(auth, request);
+    const product = await getProduct(db, productWorkItemMatch[1], session.user.id);
+    if (!product) throw new HttpError(404, "Product not found");
+    let item = await getProductWorkItem(db, product.id, productWorkItemMatch[2]);
+    if (!item) throw new HttpError(404, "Product work item not found");
+    if (request.method === "PATCH") {
+      const input = productWorkItemStatusInputSchema.parse(await readJson(request));
+      if (!(await updateProductWorkItemStatus(db, product.id, item.id, input.status))) {
+        throw new HttpError(
+          409,
+          input.status === "completed"
+            ? "All required project runs must be completed before acceptance"
+            : "Product work item cannot be cancelled",
+        );
+      }
+      item = (await getProductWorkItem(db, product.id, item.id))!;
+    }
+    return json({
+      workItem: productWorkItemJson(
+        item,
+        await listProductWorkItemRuns(db, item.id),
+        await listProductWorkItemDependencies(db, item.id),
+      ),
+    });
+  }
+
+  const productWorkItemDependenciesMatch = pathname.match(
+    /^\/products\/([0-9a-f-]+)\/work-items\/([0-9a-f-]+)\/dependencies$/u,
+  );
+  if (
+    productWorkItemDependenciesMatch &&
+    ["POST", "DELETE"].includes(request.method)
+  ) {
+    const session = await requireSession(auth, request);
+    const product = await getProduct(
+      db,
+      productWorkItemDependenciesMatch[1],
+      session.user.id,
+    );
+    if (!product) throw new HttpError(404, "Product not found");
+    const item = await getProductWorkItem(
+      db,
+      product.id,
+      productWorkItemDependenciesMatch[2],
+    );
+    if (!item) throw new HttpError(404, "Product work item not found");
+    const input = productWorkItemRunDependencySchema.parse(await readJson(request));
+    const changed = request.method === "POST"
+      ? await createProductWorkItemDependency(db, {
+          workItemId: item.id,
+          prerequisiteRunId: input.prerequisiteRunId,
+          dependentRunId: input.dependentRunId,
+          createdByUserId: session.user.id,
+        })
+      : await deleteProductWorkItemDependency(db, {
+          workItemId: item.id,
+          prerequisiteRunId: input.prerequisiteRunId,
+          dependentRunId: input.dependentRunId,
+        });
+    if (!changed) {
+      throw new HttpError(409, "Dependency is invalid, duplicated, or cyclic");
+    }
+    return new Response(null, {
+      status: request.method === "POST" ? 201 : 204,
+      headers: corsHeaders,
+    });
+  }
+
+  const productMatch = pathname.match(/^\/products\/([0-9a-f-]+)$/u);
+  if (productMatch && ["GET", "PATCH", "DELETE"].includes(request.method)) {
+    const session = await requireSession(auth, request);
+    const product = await getProduct(db, productMatch[1], session.user.id);
+    if (!product) throw new HttpError(404, "Product not found");
+    if (request.method === "GET") {
+      return json({
+        product: {
+          ...productJson(product),
+          projects: (await listProductProjects(db, product.id)).map(projectJson),
+        },
+      });
+    }
+    if (!canManageOrganization(product.member_role)) {
+      throw new HttpError(403, "Organization admin access required");
+    }
+    if (request.method === "PATCH") {
+      const input = productUpdateSchema.parse(await readJson(request));
+      await updateProduct(db, product.id, input.name);
+      return json({
+        product: {
+          ...productJson({ ...product, name: input.name }),
+          projects: (await listProductProjects(db, product.id)).map((project) =>
+            projectJson({ ...project, product_name: input.name })
+          ),
+        },
+      });
+    }
+    if (!(await deleteEmptyProduct(db, product.id))) {
+      throw new HttpError(409, "Move or delete every project before deleting a product");
+    }
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
   if (pathname === "/projects" && request.method === "GET") {
     const session = await requireSession(auth, request);
     const projects = await listProjects(db, session.user.id);
@@ -5335,6 +5826,15 @@ async function route(
     if (!organization || !canManageOrganization(organization.role)) {
       throw new HttpError(403, "Organization admin access required");
     }
+    const selectedProduct = input.productId
+      ? await getProduct(db, input.productId, session.user.id)
+      : null;
+    if (
+      input.productId &&
+      (!selectedProduct || selectedProduct.organization_id !== organization.id)
+    ) {
+      throw new HttpError(400, "Product must belong to the selected organization");
+    }
     const agentToken = `briar_agent_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
     const tokenHash = await sha256(agentToken);
     const project = await createProject(db, {
@@ -5342,9 +5842,11 @@ async function route(
       organizationId: organization.id,
       name: input.name,
       agentTokenHash: tokenHash,
+      productId: selectedProduct?.id,
     });
     project.organization_name = organization.name;
     project.member_role = organization.role;
+    if (selectedProduct) project.product_name = selectedProduct.name;
     return json({ project: projectJson(project), agentToken }, 201);
   }
 
@@ -5394,6 +5896,36 @@ async function route(
       1_000,
     );
     return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  const projectProductMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/product$/u,
+  );
+  if (projectProductMatch && request.method === "PUT") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, projectProductMatch[1], session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    if (!canManageOrganization(project.member_role)) {
+      throw new HttpError(403, "Organization admin access required");
+    }
+    const input = z
+      .object({ productId: z.string().uuid() })
+      .strict()
+      .parse(await readJson(request));
+    const product = await getProduct(db, input.productId, session.user.id);
+    if (!product || product.organization_id !== project.organization_id) {
+      throw new HttpError(400, "Product must belong to the project organization");
+    }
+    if (!(await moveProjectToProduct(db, project.id, product.id))) {
+      throw new HttpError(404, "Project not found");
+    }
+    return json({
+      project: projectJson({
+        ...project,
+        product_id: product.id,
+        product_name: product.name,
+      }),
+    });
   }
 
   const projectIconMatch = pathname.match(

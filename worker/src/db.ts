@@ -43,10 +43,60 @@ export type ProjectRow = {
   id: string;
   name: string;
   icon: string | null;
+  product_id: string;
+  product_name: string;
   organization_id: string;
   organization_name: string;
   member_role: OrganizationRole;
   created_at: string;
+};
+
+export type ProductRow = {
+  id: string;
+  name: string;
+  organization_id: string;
+  organization_name: string;
+  member_role: OrganizationRole;
+  created_at: string;
+};
+
+export type ProductWorkItemStatus =
+  | "backlog"
+  | "queued"
+  | "in_progress"
+  | "blocked"
+  | "failed"
+  | "ready_for_review"
+  | "completed"
+  | "cancelled";
+
+export type ProductWorkItemRow = {
+  id: string;
+  product_id: string;
+  source: AutoHuntSource;
+  source_key: string;
+  title: string;
+  description: string | null;
+  priority: number | null;
+  assignee_user_id: string | null;
+  status: ProductWorkItemStatus;
+  created_by_user_id: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ProductWorkItemRunRow = {
+  work_item_id: string;
+  project_id: string;
+  project_name: string;
+  run_id: string;
+  run_number: number;
+  run_status: AutoHuntPersistedRunStatus;
+  paused_at: string | null;
+  required: number;
+  position: number;
+  pull_request_urls: string;
 };
 
 export type OrganizationRole = "owner" | "admin" | "member";
@@ -3423,15 +3473,17 @@ export async function listProjects(db: D1Database, userId: string) {
     .prepare(
       `select project.id, project.name,
               coalesce(project.icon_data_url_browser, project.icon_data_url) as icon,
+              product.id as product_id, product.name as product_name,
               project.organization_id,
               organization.name as organization_name,
               membership.role as member_role, project.created_at
        from briar_projects project
+       join briar_products product on product.id = project.product_id
        join briar_organizations organization on organization.id = project.organization_id
        join briar_organization_members membership
          on membership.organization_id = project.organization_id
         and membership.user_id = ?
-       order by organization.created_at, project.created_at`,
+       order by organization.created_at, product.created_at, project.created_at`,
     )
     .bind(userId)
     .all<ProjectRow>();
@@ -3446,16 +3498,155 @@ export async function listOrganizationProjects(
     .prepare(
       `select project.id, project.name,
               coalesce(project.icon_data_url_browser, project.icon_data_url) as icon,
+              product.id as product_id, product.name as product_name,
               project.organization_id,
               organization.name as organization_name,
               'member' as member_role, project.created_at
        from briar_projects project
+       join briar_products product on product.id = project.product_id
        join briar_organizations organization
          on organization.id = project.organization_id
        where project.organization_id = ?
-       order by project.created_at`,
+       order by product.created_at, project.created_at`,
     )
     .bind(organizationId)
+    .all<ProjectRow>();
+  return result.results;
+}
+
+export async function listProducts(db: D1Database, userId: string) {
+  const result = await db
+    .prepare(
+      `select product.id, product.name, product.organization_id,
+              organization.name as organization_name,
+              membership.role as member_role, product.created_at
+       from briar_products product
+       join briar_organizations organization
+         on organization.id = product.organization_id
+       join briar_organization_members membership
+         on membership.organization_id = product.organization_id
+        and membership.user_id = ?
+       order by organization.created_at, product.created_at, product.id`,
+    )
+    .bind(userId)
+    .all<ProductRow>();
+  return result.results;
+}
+
+export async function getProduct(
+  db: D1Database,
+  productId: string,
+  userId: string,
+) {
+  return db
+    .prepare(
+      `select product.id, product.name, product.organization_id,
+              organization.name as organization_name,
+              membership.role as member_role, product.created_at
+       from briar_products product
+       join briar_organizations organization
+         on organization.id = product.organization_id
+       join briar_organization_members membership
+         on membership.organization_id = product.organization_id
+        and membership.user_id = ?
+       where product.id = ?`,
+    )
+    .bind(userId, productId)
+    .first<ProductRow>();
+}
+
+export async function createProduct(
+  db: D1Database,
+  input: { organizationId: string; name: string },
+) {
+  const createdAt = new Date().toISOString();
+  const product: ProductRow = {
+    id: crypto.randomUUID(),
+    name: input.name,
+    organization_id: input.organizationId,
+    organization_name: "",
+    member_role: "owner",
+    created_at: createdAt,
+  };
+  await db
+    .prepare(
+      `insert into briar_products (
+         id, organization_id, name, created_at, updated_at
+       ) values (?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      product.id,
+      product.organization_id,
+      product.name,
+      createdAt,
+      createdAt,
+    )
+    .run();
+  return product;
+}
+
+export async function updateProduct(
+  db: D1Database,
+  productId: string,
+  name: string,
+) {
+  const updatedAt = new Date().toISOString();
+  const result = await db
+    .prepare(
+      `update briar_products set name = ?, updated_at = ? where id = ?`,
+    )
+    .bind(name, updatedAt, productId)
+    .run();
+  return result.meta.changes > 0;
+}
+
+export async function deleteEmptyProduct(db: D1Database, productId: string) {
+  const result = await db
+    .prepare(
+      `delete from briar_products
+       where id = ? and not exists (
+         select 1 from briar_projects where product_id = briar_products.id
+       )`,
+    )
+    .bind(productId)
+    .run();
+  return result.meta.changes > 0;
+}
+
+export async function moveProjectToProduct(
+  db: D1Database,
+  projectId: string,
+  productId: string,
+) {
+  const result = await db
+    .prepare(
+      `update briar_projects
+       set product_id = ?, updated_at = ?
+       where id = ? and organization_id = (
+         select organization_id from briar_products where id = ?
+       )`,
+    )
+    .bind(productId, new Date().toISOString(), projectId, productId)
+    .run();
+  return result.meta.changes > 0;
+}
+
+export async function listProductProjects(db: D1Database, productId: string) {
+  const result = await db
+    .prepare(
+      `select project.id, project.name,
+              coalesce(project.icon_data_url_browser, project.icon_data_url) as icon,
+              product.id as product_id, product.name as product_name,
+              project.organization_id, organization.name as organization_name,
+              'member' as member_role, project.created_at
+       from briar_projects project
+       join briar_products product on product.id = project.product_id
+       join briar_organizations organization
+         on organization.id = project.organization_id
+       where project.product_id = ?
+       order by project.created_at, project.id`,
+    )
+    .bind(productId)
     .all<ProjectRow>();
   return result.results;
 }
@@ -3467,13 +3658,17 @@ export async function createProject(
     organizationId: string;
     name: string;
     agentTokenHash: string;
+    productId?: string;
   },
 ) {
   const createdAt = new Date().toISOString();
+  const productId = input.productId ?? crypto.randomUUID();
   const project: ProjectRow = {
     id: crypto.randomUUID(),
     name: input.name,
     icon: null,
+    product_id: productId,
+    product_name: input.name,
     organization_id: input.organizationId,
     organization_name: "",
     member_role: "owner",
@@ -3497,18 +3692,36 @@ export async function createProject(
     created_at: createdAt,
     updated_at: createdAt,
   };
-  await db.batch([
+  const statements = [
+    ...(input.productId
+      ? []
+      : [
+          db
+            .prepare(
+              `insert into briar_products (
+                 id, organization_id, name, created_at, updated_at
+               ) values (?, ?, ?, ?, ?)`,
+            )
+            .bind(
+              productId,
+              input.organizationId,
+              input.name,
+              createdAt,
+              createdAt,
+            ),
+        ]),
     db
       .prepare(
         `insert into briar_projects (
-           id, owner_user_id, organization_id, name, agent_token_hash,
-           created_at, updated_at
-         ) values (?, ?, ?, ?, ?, ?, ?)`,
+           id, owner_user_id, organization_id, product_id, name,
+           agent_token_hash, created_at, updated_at
+         ) values (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         project.id,
         input.ownerUserId,
         input.organizationId,
+        productId,
         project.name,
         input.agentTokenHash,
         createdAt,
@@ -3545,7 +3758,8 @@ export async function createProject(
         defaultAgent.created_at,
         defaultAgent.updated_at,
       ),
-  ]);
+  ];
+  await db.batch(statements);
   return project;
 }
 
@@ -3558,10 +3772,12 @@ export async function getProject(
     .prepare(
       `select project.id, project.name,
               coalesce(project.icon_data_url_browser, project.icon_data_url) as icon,
+              product.id as product_id, product.name as product_name,
               project.organization_id,
               organization.name as organization_name,
               membership.role as member_role, project.created_at
        from briar_projects project
+       join briar_products product on product.id = project.product_id
        join briar_organizations organization on organization.id = project.organization_id
        join briar_organization_members membership
          on membership.organization_id = project.organization_id
@@ -3603,6 +3819,279 @@ export async function deleteProject(
        )`,
     )
     .bind(projectId, userId)
+    .run();
+  return result.meta.changes > 0;
+}
+
+export async function createProductWorkItem(
+  db: D1Database,
+  input: {
+    id: string;
+    productId: string;
+    sourceKey: string;
+    title: string;
+    description: string | null;
+    priority: number | null;
+    assigneeUserId: string | null;
+    status: "backlog" | "queued";
+    createdByUserId: string;
+    createdAt: string;
+    targets: Array<{
+      projectId: string;
+      runId: string;
+      required: boolean;
+      position: number;
+    }>;
+    dependencies: Array<{
+      prerequisiteRunId: string;
+      dependentRunId: string;
+    }>;
+  },
+) {
+  const statements = [
+    db
+      .prepare(
+        `insert into briar_product_work_items (
+           id, product_id, source, source_key, title, description, priority,
+           assignee_user_id, status, created_by_user_id,
+           created_at, updated_at
+         ) values (?, ?, 'issue', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        input.id,
+        input.productId,
+        input.sourceKey,
+        input.title,
+        input.description,
+        input.priority,
+        input.assigneeUserId,
+        input.status,
+        input.createdByUserId,
+        input.createdAt,
+        input.createdAt,
+      ),
+    ...input.targets.map((target) =>
+      db
+        .prepare(
+          `insert into briar_product_work_item_runs (
+             work_item_id, project_id, run_id, required, position, created_at
+           ) values (?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          input.id,
+          target.projectId,
+          target.runId,
+          target.required ? 1 : 0,
+          target.position,
+          input.createdAt,
+        ),
+    ),
+    ...input.dependencies.map((dependency) =>
+      db
+        .prepare(
+          `insert into briar_product_work_item_dependencies (
+             work_item_id, prerequisite_run_id, dependent_run_id,
+             created_by_user_id, created_at
+           ) values (?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          input.id,
+          dependency.prerequisiteRunId,
+          dependency.dependentRunId,
+          input.createdByUserId,
+          input.createdAt,
+        ),
+    ),
+  ];
+  const results = await db.batch(statements);
+  if (results.some((result) => !result.success)) {
+    throw new Error("Product work item could not be stored");
+  }
+}
+
+export async function listProductWorkItems(
+  db: D1Database,
+  productId: string,
+) {
+  const result = await db
+    .prepare(
+      `select id, product_id, source, source_key, title, description,
+              priority, assignee_user_id, status, created_by_user_id,
+              completed_at, created_at, updated_at
+       from briar_product_work_items
+       where product_id = ?
+       order by
+         case when status in ('completed', 'cancelled') then 1 else 0 end,
+         updated_at desc, id`,
+    )
+    .bind(productId)
+    .all<ProductWorkItemRow>();
+  return result.results;
+}
+
+export async function getProductWorkItem(
+  db: D1Database,
+  productId: string,
+  workItemId: string,
+) {
+  return db
+    .prepare(
+      `select id, product_id, source, source_key, title, description,
+              priority, assignee_user_id, status, created_by_user_id,
+              completed_at, created_at, updated_at
+       from briar_product_work_items
+       where product_id = ? and id = ?`,
+    )
+    .bind(productId, workItemId)
+    .first<ProductWorkItemRow>();
+}
+
+export async function listProductWorkItemRuns(
+  db: D1Database,
+  workItemId: string,
+) {
+  const result = await db
+    .prepare(
+      `select link.work_item_id, link.project_id, project.name as project_name,
+              link.run_id, run.run_number, run.status as run_status,
+              run.paused_at, link.required, link.position,
+              run.pull_request_urls
+       from briar_product_work_item_runs link
+       join briar_projects project on project.id = link.project_id
+       join briar_hunt_runs run on run.id = link.run_id
+       where link.work_item_id = ?
+       order by link.position, link.project_id`,
+    )
+    .bind(workItemId)
+    .all<ProductWorkItemRunRow>();
+  return result.results;
+}
+
+export async function listProductWorkItemDependencies(
+  db: D1Database,
+  workItemId: string,
+) {
+  const result = await db
+    .prepare(
+      `select prerequisite_run_id, dependent_run_id
+       from briar_product_work_item_dependencies
+       where work_item_id = ?
+       order by created_at, prerequisite_run_id, dependent_run_id`,
+    )
+    .bind(workItemId)
+    .all<{ prerequisite_run_id: string; dependent_run_id: string }>();
+  return result.results;
+}
+
+export async function updateProductWorkItemStatus(
+  db: D1Database,
+  productId: string,
+  workItemId: string,
+  status: "completed" | "cancelled",
+) {
+  const updatedAt = new Date().toISOString();
+  const result = await db
+    .prepare(
+      `update briar_product_work_items
+       set status = ?, completed_at = ?, updated_at = ?
+       where id = ? and product_id = ?
+         and (
+           (? = 'completed' and status = 'ready_for_review')
+           or (? = 'cancelled' and status not in ('completed', 'cancelled'))
+         )`,
+    )
+    .bind(
+      status,
+      updatedAt,
+      updatedAt,
+      workItemId,
+      productId,
+      status,
+      status,
+    )
+    .run();
+  return result.meta.changes > 0;
+}
+
+export async function createProductWorkItemDependency(
+  db: D1Database,
+  input: {
+    workItemId: string;
+    prerequisiteRunId: string;
+    dependentRunId: string;
+    createdByUserId: string;
+  },
+) {
+  const createdAt = new Date().toISOString();
+  const inserted = await db
+    .prepare(
+      `with recursive reachable(run_id) as (
+         values (?)
+         union
+         select dependency.dependent_run_id
+         from briar_product_work_item_dependencies dependency
+         join reachable on reachable.run_id = dependency.prerequisite_run_id
+         where dependency.work_item_id = ?
+       )
+       insert into briar_product_work_item_dependencies (
+         work_item_id, prerequisite_run_id, dependent_run_id,
+         created_by_user_id, created_at
+       )
+       select ?, ?, ?, ?, ?
+       where ? <> ?
+         and exists (
+           select 1 from briar_product_work_item_runs
+           where work_item_id = ? and run_id = ?
+         )
+         and exists (
+           select 1 from briar_product_work_item_runs
+           where work_item_id = ? and run_id = ?
+         )
+         and not exists (
+           select 1 from reachable where run_id = ?
+         )
+       on conflict (prerequisite_run_id, dependent_run_id) do nothing
+       returning prerequisite_run_id`,
+    )
+    .bind(
+      input.dependentRunId,
+      input.workItemId,
+      input.workItemId,
+      input.prerequisiteRunId,
+      input.dependentRunId,
+      input.createdByUserId,
+      createdAt,
+      input.prerequisiteRunId,
+      input.dependentRunId,
+      input.workItemId,
+      input.prerequisiteRunId,
+      input.workItemId,
+      input.dependentRunId,
+      input.prerequisiteRunId,
+    )
+    .first<{ prerequisite_run_id: string }>();
+  return Boolean(inserted);
+}
+
+export async function deleteProductWorkItemDependency(
+  db: D1Database,
+  input: {
+    workItemId: string;
+    prerequisiteRunId: string;
+    dependentRunId: string;
+  },
+) {
+  const result = await db
+    .prepare(
+      `delete from briar_product_work_item_dependencies
+       where work_item_id = ? and prerequisite_run_id = ?
+         and dependent_run_id = ?`,
+    )
+    .bind(
+      input.workItemId,
+      input.prerequisiteRunId,
+      input.dependentRunId,
+    )
     .run();
   return result.meta.changes > 0;
 }
@@ -4639,7 +5128,8 @@ export async function listIssueDependencies(
 ) {
   const result = await db
     .prepare(
-      `select dependency.project_id, dependency.prerequisite_run_id,
+      `select * from (
+       select dependency.project_id, dependency.prerequisite_run_id,
               dependency.dependent_run_id, dependency.created_by_user_id,
               dependency.created_at,
               prerequisite.run_number as prerequisite_run_number,
@@ -4656,10 +5146,29 @@ export async function listIssueDependencies(
        join briar_hunt_runs dependent
          on dependent.id = dependency.dependent_run_id
        where dependency.project_id = ?
-       order by dependency.created_at, dependency.prerequisite_run_id,
-                dependency.dependent_run_id`,
+       union all
+       select dependent.project_id as project_id,
+              dependency.prerequisite_run_id,
+              dependency.dependent_run_id, dependency.created_by_user_id,
+              dependency.created_at,
+              prerequisite.run_number as prerequisite_run_number,
+              prerequisite.title as prerequisite_title,
+              prerequisite.status as prerequisite_status,
+              prerequisite.paused_at as prerequisite_paused_at,
+              dependent.run_number as dependent_run_number,
+              dependent.title as dependent_title,
+              dependent.status as dependent_status,
+              dependent.paused_at as dependent_paused_at
+       from briar_product_work_item_dependencies dependency
+       join briar_hunt_runs prerequisite
+         on prerequisite.id = dependency.prerequisite_run_id
+       join briar_hunt_runs dependent
+         on dependent.id = dependency.dependent_run_id
+       where dependent.project_id = ? or prerequisite.project_id = ?
+       )
+       order by created_at, prerequisite_run_id, dependent_run_id`,
     )
-    .bind(projectId)
+    .bind(projectId, projectId, projectId)
     .all<IssueDependencyRow>();
   return result.results;
 }
@@ -5510,6 +6019,14 @@ export async function getNextQueuedHuntRun(db: D1Database, projectId: string) {
              and dependency.dependent_run_id = run.id
              and prerequisite.status != 'completed'
          )
+         and not exists (
+           select 1
+           from briar_product_work_item_dependencies dependency
+           join briar_hunt_runs prerequisite
+             on prerequisite.id = dependency.prerequisite_run_id
+           where dependency.dependent_run_id = run.id
+             and prerequisite.status != 'completed'
+         )
        order by
          case when run.resume_requested_at is not null then 0 else 1 end,
          case when run.priority is null then 1 else 0 end,
@@ -5569,6 +6086,14 @@ export async function claimNextQueuedHuntRun(
                on prerequisite.id = dependency.prerequisite_run_id
              where dependency.project_id = briar_hunt_runs.project_id
                and dependency.dependent_run_id = briar_hunt_runs.id
+               and prerequisite.status != 'completed'
+           )
+           and not exists (
+             select 1
+             from briar_product_work_item_dependencies dependency
+             join briar_hunt_runs prerequisite
+               on prerequisite.id = dependency.prerequisite_run_id
+             where dependency.dependent_run_id = briar_hunt_runs.id
                and prerequisite.status != 'completed'
            )
            and (? = 0 or dispatched_at is not null)

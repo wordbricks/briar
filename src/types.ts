@@ -47,6 +47,14 @@ export type CreateIssueInput = {
   attachmentReferences?: string[];
 };
 
+export type CreateProductWorkItemInput = CreateIssueInput & {
+  targetProjectIds: string[];
+  dependencies?: Array<{
+    prerequisiteProjectId: string;
+    dependentProjectId: string;
+  }>;
+};
+
 export type UpdateIssueInput = {
   title: string;
   description: string | null;
@@ -312,10 +320,61 @@ export type Project = {
   id: string;
   name: string;
   icon?: string | null;
+  productId?: string;
+  productName?: string;
   organizationId?: string;
   organizationName?: string;
   role?: "owner" | "admin" | "member";
   createdAt: string;
+};
+
+export type Product = {
+  id: string;
+  name: string;
+  organizationId: string;
+  organizationName: string;
+  role: "owner" | "admin" | "member";
+  createdAt: string;
+  projects: Project[];
+};
+
+export type ProductWorkItemStatus =
+  | "backlog"
+  | "queued"
+  | "in_progress"
+  | "blocked"
+  | "failed"
+  | "ready_for_review"
+  | "completed"
+  | "cancelled";
+
+export type ProductWorkItem = {
+  id: string;
+  productId: string;
+  source: HuntSource;
+  sourceKey: string;
+  title: string;
+  description: string | null;
+  priority: number | null;
+  assigneeUserId: string | null;
+  status: ProductWorkItemStatus;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  targets: Array<{
+    projectId: string;
+    projectName: string;
+    runId: string;
+    runNumber: number;
+    status: HuntStatus;
+    required: boolean;
+    position: number;
+    pullRequestUrls: string[];
+  }>;
+  dependencies: Array<{
+    prerequisiteRunId: string;
+    dependentRunId: string;
+  }>;
 };
 
 export type ProjectAgent = {

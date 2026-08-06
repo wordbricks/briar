@@ -318,6 +318,16 @@ struct ProjectSelectionView: View {
         return projects.filter { $0.organizationId == selectedOrganizationID }
     }
 
+    private var visibleProducts: [ProductSummary] {
+        Dictionary(grouping: visibleProjects, by: \.productId)
+            .compactMap { id, projects in
+                projects.first.map {
+                    ProductSummary(id: id, name: $0.productName, projects: projects)
+                }
+            }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
     var body: some View {
         if projects.isEmpty {
             ContentUnavailableView {
@@ -340,16 +350,20 @@ struct ProjectSelectionView: View {
                     }
                     Section {
                         Picker("프로젝트", selection: $selectedProjectID) {
-                            ForEach(visibleProjects, id: \.id) { project in
-                                Text(project.name)
-                                    .tag(Optional(project.id))
+                            ForEach(visibleProducts) { product in
+                                Section(product.name) {
+                                    ForEach(product.projects, id: \.id) { project in
+                                        Text(project.name)
+                                            .tag(Optional(project.id))
+                                    }
+                                }
                             }
                         }
                         .pickerStyle(.inline)
                         .labelsHidden()
                         .accessibilityIdentifier("project-picker")
                     } header: {
-                        Text("확인할 프로젝트")
+                        Text("확인할 프로덕트 / 프로젝트")
                     } footer: {
                         Text("Companion은 선택한 프로젝트의 정보를 읽기 전용으로 표시합니다.")
                     }

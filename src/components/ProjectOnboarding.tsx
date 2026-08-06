@@ -32,7 +32,7 @@ import type {
   AgentProvider,
   ProjectLlmProgress,
 } from "../lib/project-llm";
-import type { SessionUser } from "../types";
+import type { Product, SessionUser } from "../types";
 import { useI18n } from "../i18n";
 import { Logo } from "./Logo";
 
@@ -66,7 +66,7 @@ type Props = {
     repositoryPath: string,
     onProgress?: (progress: ProjectLlmProgress) => void,
   ) => Promise<PreparedProjectConnection>;
-  onCreate: (input: { name: string }) => Promise<unknown>;
+  onCreate: (input: { name: string; productId?: string }) => Promise<unknown>;
   onFinish: () => void;
   onLogout: () => void;
   onReviseWorkflow: (
@@ -80,6 +80,7 @@ type Props = {
     workflow: LocalAutoHuntConfig["workflow"],
   ) => Promise<RepositoryReadiness>;
   user: SessionUser;
+  products?: Product[];
 };
 
 type OnboardingPhase =
@@ -146,6 +147,7 @@ export function ProjectOnboarding({
   onRepositorySelect,
   onReviseWorkflow,
   onSkip,
+  products = [],
   user,
 }: Props) {
   const { t } = useI18n();
@@ -153,6 +155,9 @@ export function ProjectOnboarding({
     canCancel || connection ? "repository" : "purpose",
   );
   const [name, setName] = useState(connection?.project.name ?? "");
+  const [productId, setProductId] = useState(
+    connection?.project.productId ?? products[0]?.id ?? "",
+  );
   const [repositoryPath, setRepositoryPath] = useState("");
   const [repositoryReadiness, setRepositoryReadiness] =
     useState<RepositoryReadiness | null>(null);
@@ -283,7 +288,10 @@ export function ProjectOnboarding({
     if (!projectName) return;
     if (!connection) {
       try {
-        await onCreate({ name: projectName });
+        await onCreate({
+          name: projectName,
+          ...(productId ? { productId } : {}),
+        });
       } catch {
         return;
       }
@@ -522,16 +530,34 @@ export function ProjectOnboarding({
                     {repositoryError ? <p className="repository-readiness-error" role="alert"><CircleAlert size={13} />{repositoryError}</p> : null}
                   </section>
                   {!connection ? (
-                    <label>
-                      <span>{t("onboarding.projectName")}<small>{name ? t("onboarding.nameFromRepository") : null}</small></span>
-                      <input
-                        aria-label={t("onboarding.projectName")}
-                        className="native-input"
-                        onChange={(event) => setName(event.currentTarget.value)}
-                        placeholder="wordbricks"
-                        value={name}
-                      />
-                    </label>
+                    <>
+                      <label>
+                        <span>{t("onboarding.product")}</span>
+                        <select
+                          aria-label={t("onboarding.product")}
+                          className="native-input"
+                          onChange={(event) => setProductId(event.currentTarget.value)}
+                          value={productId}
+                        >
+                          <option value="">{t("onboarding.newProduct")}</option>
+                          {products.map((product) => (
+                            <option key={product.id} value={product.id}>
+                              {product.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        <span>{t("onboarding.projectName")}<small>{name ? t("onboarding.nameFromRepository") : null}</small></span>
+                        <input
+                          aria-label={t("onboarding.projectName")}
+                          className="native-input"
+                          onChange={(event) => setName(event.currentTarget.value)}
+                          placeholder="wordbricks"
+                          value={name}
+                        />
+                      </label>
+                    </>
                   ) : null}
                   {error ? <div className="login-error" role="alert">{error}</div> : null}
                   {repositoryReadiness?.gitReady ? (

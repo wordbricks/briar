@@ -14,6 +14,8 @@ import {
   createIssue,
   createIssueMessage,
   createProject,
+  createProduct as createRemoteProduct,
+  createProductWorkItem,
   deleteAccount as deleteRemoteAccount,
   deleteIssue as deleteRemoteIssue,
   transferIssue as transferRemoteIssue,
@@ -34,6 +36,8 @@ import {
   loadLinearImportStates,
   loadOrganizations,
   loadProjects,
+  loadProducts,
+  loadProductWorkItems,
   loadSession,
   isOrganizationHandleAvailable as checkRemoteOrganizationHandle,
   moveHuntRun,
@@ -50,6 +54,7 @@ import {
   updateOrganizationLogo as updateRemoteOrganizationLogo,
   updateProjectIcon as updateRemoteProjectIcon,
   updateProjectSettings,
+  updateProductWorkItemStatus as updateRemoteProductWorkItemStatus,
   updateCheckpointPolicy,
   waitForIssueAgentReply,
   type DeviceClientId,
@@ -127,6 +132,7 @@ import { startProjectAgentSchedulePolling } from "../lib/project-agent-schedule-
 import type {
   ClaimedProjectAgentScheduleRun,
   CreateIssueInput,
+  CreateProductWorkItemInput,
   DashboardPayload,
   HuntEvent,
   HuntRun,
@@ -138,6 +144,8 @@ import type {
   IssueResultReview,
   Organization,
   Project,
+  Product,
+  ProductWorkItem,
   ProjectSettings,
   RunEvidence,
   RunEvidenceImage,
@@ -196,6 +204,25 @@ const demoOrganization: Organization = {
   role: demoDashboard.project.role!,
   createdAt: demoDashboard.project.createdAt,
 };
+const demoProjects: Project[] = [
+  demoDashboard.project,
+  {
+    ...demoDashboard.project,
+    id: "demo-web-project",
+    name: "Briar Web",
+    createdAt: new Date(
+      new Date(demoDashboard.project.createdAt).getTime() + 1_000,
+    ).toISOString(),
+  },
+  {
+    ...demoDashboard.project,
+    id: "demo-mobile-project",
+    name: "Briar Mobile",
+    createdAt: new Date(
+      new Date(demoDashboard.project.createdAt).getTime() + 2_000,
+    ).toISOString(),
+  },
+];
 const demoMessageTime = new Date(Date.now() - 18 * 60_000).toISOString();
 const demoReplyTime = new Date(Date.now() - 8 * 60_000).toISOString();
 const initialDemoIssueMessages: Record<string, IssueMessage[]> = {
@@ -304,8 +331,22 @@ export function useBriar(options: UseBriarOptions = {}) {
   const [user, setUser] = useState<SessionUser | null>(demoMode ? demoUser : null);
   const [token, setToken] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>(
-    demoMode ? [demoDashboard.project] : [],
+    demoMode ? demoProjects : [],
   );
+  const [products, setProducts] = useState<Product[]>(
+    demoMode
+      ? [{
+          id: demoDashboard.project.productId ?? demoDashboard.project.id,
+          name: demoDashboard.project.productName ?? demoDashboard.project.name,
+          organizationId: demoOrganization.id,
+          organizationName: demoOrganization.name,
+          role: demoOrganization.role,
+          createdAt: demoDashboard.project.createdAt,
+          projects: demoProjects,
+        }]
+      : [],
+  );
+  const [productWorkItems, setProductWorkItems] = useState<ProductWorkItem[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>(
     demoMode ? [demoOrganization] : [],
   );
@@ -333,6 +374,29 @@ export function useBriar(options: UseBriarOptions = {}) {
   const [deletingIssueId, setDeletingIssueId] = useState<string | null>(null);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const [recoveringRunId, setRecoveringRunId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const productId = projects.find(
+      (project) => project.id === activeProjectId,
+    )?.productId;
+    if (demoMode || !token || !productId) {
+      setProductWorkItems([]);
+      return;
+    }
+    let cancelled = false;
+    void loadProductWorkItems(token, productId)
+      .then((items) => {
+        if (!cancelled) setProductWorkItems(items);
+      })
+      .catch((caught) => {
+        if (!cancelled) {
+          setError(caught instanceof Error ? caught.message : String(caught));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeProjectId, dashboard?.generatedAt, projects, token]);
   const issueMessagesByRun = useRef<Record<string, IssueMessage[]>>(
     demoMode ? initialDemoIssueMessages : {},
   );
@@ -568,10 +632,18 @@ export function useBriar(options: UseBriarOptions = {}) {
       const nextConnectedProjectIds = remoteMode
         ? null
         : await readConnectedProjectIds();
+      let nextProducts: Product[];
+      try {
+        nextProducts = await loadProducts(result.token);
+      } catch (caught) {
+        if (!cancelled) scheduleRetry(caught);
+        return;
+      }
       if (cancelled) return;
       setToken(result.token);
       setUser(result.user);
       setProjects(result.projects);
+      setProducts(nextProducts);
       setOrganizations(nextOrganizations);
       setConnectedProjectIds(nextConnectedProjectIds);
       const selection = resolveActiveAccountSelection(
@@ -875,10 +947,11 @@ export function useBriar(options: UseBriarOptions = {}) {
           if (attempt !== loginAttempt.current) return;
           if (result.access_token) {
             const nextToken = result.access_token;
-            const [nextUser, nextProjects, loadedOrganizations] =
+            const [nextUser, nextProjects, nextProducts, loadedOrganizations] =
               await Promise.all([
                 loadSession(nextToken),
                 loadProjects(nextToken),
+                loadProducts(nextToken),
                 loadOrganizations(nextToken),
               ]);
             const nextOrganizations = deferDefaultOrganization
@@ -904,6 +977,7 @@ export function useBriar(options: UseBriarOptions = {}) {
             setToken(nextToken);
             setUser(nextUser);
             setProjects(nextProjects);
+            setProducts(nextProducts);
             setOrganizations(nextOrganizations);
             setConnectedProjectIds(nextConnectedProjectIds);
             const selection = resolveActiveAccountSelection(
@@ -963,12 +1037,14 @@ export function useBriar(options: UseBriarOptions = {}) {
           token,
           invitationToken,
         );
-        const [nextOrganizations, nextProjects] = await Promise.all([
+        const [nextOrganizations, nextProjects, nextProducts] = await Promise.all([
           loadOrganizations(token),
           loadProjects(token),
+          loadProducts(token),
         ]);
         setOrganizations(nextOrganizations);
         setProjects(nextProjects);
+        setProducts(nextProducts);
         setActiveOrganizationId(result.invitation.organizationId);
         setActiveProjectId(result.invitation.initialProjectId);
         setDashboard(null);
@@ -991,6 +1067,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     setToken(null);
     setUser(null);
     setProjects([]);
+    setProducts([]);
     setOrganizations([]);
     setConnectedProjectIds(null);
     setActiveOrganizationId(null);
@@ -1025,6 +1102,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       setToken(null);
       setUser(null);
       setProjects([]);
+      setProducts([]);
       setOrganizations([]);
       setConnectedProjectIds(null);
       setActiveOrganizationId(null);
@@ -1125,6 +1203,20 @@ export function useBriar(options: UseBriarOptions = {}) {
             : project,
         ),
       );
+      setProducts((current) =>
+        current.map((product) =>
+          product.organizationId === organizationId
+            ? {
+                ...product,
+                organizationName: organization.name,
+                projects: product.projects.map((project) => ({
+                  ...project,
+                  organizationName: organization.name,
+                })),
+              }
+            : product
+        ),
+      );
       setDashboard((current) =>
         current?.project.organizationId === organizationId
           ? {
@@ -1179,6 +1271,14 @@ export function useBriar(options: UseBriarOptions = {}) {
         current.map((candidate) =>
           candidate.id === projectId ? project : candidate,
         ),
+      );
+      setProducts((current) =>
+        current.map((product) => ({
+          ...product,
+          projects: product.projects.map((candidate) =>
+            candidate.id === projectId ? project : candidate
+          ),
+        })),
       );
       setDashboard((current) =>
         current?.project.id === projectId
@@ -1244,8 +1344,39 @@ export function useBriar(options: UseBriarOptions = {}) {
     [organizations, token],
   );
 
+  const addProduct = useCallback(
+    async (input: { name: string; organizationId?: string }) => {
+      const organization = organizations.find(
+        (candidate) =>
+          candidate.id === (input.organizationId ?? activeOrganizationId),
+      );
+      if (!organization) throw new Error("프로덕트를 추가할 조직이 없습니다.");
+      if (demoMode) {
+        const product: Product = {
+          id: crypto.randomUUID(),
+          name: input.name.trim(),
+          organizationId: organization.id,
+          organizationName: organization.name,
+          role: organization.role,
+          createdAt: new Date().toISOString(),
+          projects: [],
+        };
+        setProducts((current) => [...current, product]);
+        return product;
+      }
+      if (!token) throw new Error("로그인이 필요합니다.");
+      const { product } = await createRemoteProduct(token, {
+        name: input.name,
+        organizationId: organization.id,
+      });
+      setProducts((current) => [...current, product]);
+      return product;
+    },
+    [activeOrganizationId, organizations, token],
+  );
+
   const addProject = useCallback(
-    async (input: { name: string }) => {
+    async (input: { name: string; productId?: string }) => {
       if (demoMode) {
         const organization =
           organizations.find(
@@ -1254,12 +1385,34 @@ export function useBriar(options: UseBriarOptions = {}) {
         const project: Project = {
           id: crypto.randomUUID(),
           name: input.name.trim(),
+          productId: input.productId ?? crypto.randomUUID(),
+          productName:
+            products.find((candidate) => candidate.id === input.productId)?.name ??
+            input.name.trim(),
           organizationId: organization.id,
           organizationName: organization.name,
           role: organization.role,
           createdAt: new Date().toISOString(),
         };
         setProjects((current) => [...current, project]);
+        setProducts((current) => {
+          const existing = current.find((product) => product.id === project.productId);
+          return existing
+            ? current.map((product) =>
+                product.id === existing.id
+                  ? { ...product, projects: [...product.projects, project] }
+                  : product
+              )
+            : [...current, {
+                id: project.productId!,
+                name: project.productName!,
+                organizationId: organization.id,
+                organizationName: organization.name,
+                role: organization.role,
+                createdAt: project.createdAt,
+                projects: [project],
+              }];
+        });
         setActiveOrganizationId(organization.id);
         setActiveProjectId(project.id);
         setDashboard(emptyDashboard(project));
@@ -1276,6 +1429,26 @@ export function useBriar(options: UseBriarOptions = {}) {
           organizationId: activeOrganizationId ?? undefined,
         });
         setProjects((current) => [...current, result.project]);
+        setProducts((current) => {
+          const product = current.find(
+            (candidate) => candidate.id === result.project.productId,
+          );
+          return product
+            ? current.map((candidate) =>
+                candidate.id === product.id
+                  ? { ...candidate, projects: [...candidate.projects, result.project] }
+                  : candidate
+              )
+            : [...current, {
+                id: result.project.productId!,
+                name: result.project.productName!,
+                organizationId: result.project.organizationId!,
+                organizationName: result.project.organizationName!,
+                role: result.project.role!,
+                createdAt: result.project.createdAt,
+                projects: [result.project],
+              }];
+        });
         setActiveOrganizationId(
           result.project.organizationId ?? activeOrganizationId,
         );
@@ -1292,7 +1465,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         setLoading(false);
       }
     },
-    [activeOrganizationId, organizations, token],
+    [activeOrganizationId, organizations, products, token],
   );
 
   const removeProject = useCallback(
@@ -1315,6 +1488,14 @@ export function useBriar(options: UseBriarOptions = {}) {
         }
 
         const remaining = projects.filter((candidate) => candidate.id !== projectId);
+        setProducts((current) =>
+          current.map((product) => ({
+            ...product,
+            projects: product.projects.filter(
+              (candidate) => candidate.id !== projectId,
+            ),
+          })),
+        );
         const deletedActiveProject = activeProjectId === projectId;
         const nextActiveProject = deletedActiveProject
           ? (remaining.find(
@@ -2082,6 +2263,76 @@ export function useBriar(options: UseBriarOptions = {}) {
       }
     },
     [activeProjectId, dashboard, projects, refresh, selectProject, token],
+  );
+
+  const addProductIssue = useCallback(
+    async (productId: string, input: CreateProductWorkItemInput) => {
+      const product = products.find((candidate) => candidate.id === productId);
+      if (!product) throw new Error("이슈를 추가할 프로덕트가 없습니다.");
+      if (
+        input.targetProjectIds.length === 0 ||
+        input.targetProjectIds.some(
+          (projectId) => !product.projects.some((project) => project.id === projectId),
+        )
+      ) {
+        throw new Error("프로덕트에 속한 저장소를 하나 이상 선택하세요.");
+      }
+      setIsCreatingIssue(true);
+      setError(null);
+      try {
+        if (demoMode) {
+          for (const projectId of input.targetProjectIds) {
+            await addIssue(projectId, input);
+          }
+          return null;
+        }
+        if (!token) throw new Error("로그인이 필요합니다.");
+        const workItem = await createProductWorkItem(token, productId, input);
+        if (
+          projects.find((project) => project.id === activeProjectId)?.productId ===
+          productId
+        ) {
+          setProductWorkItems((current) => [workItem, ...current]);
+        }
+        const activeTarget = workItem.targets.find(
+          (target) => target.projectId === activeProjectId,
+        );
+        if (activeTarget) {
+          await refresh("snapshot");
+        } else if (workItem.targets[0]) {
+          selectProject(workItem.targets[0].projectId);
+        }
+        return workItem;
+      } catch (caught) {
+        const message = caught instanceof Error ? caught.message : String(caught);
+        setError(message);
+        throw caught;
+      } finally {
+        setIsCreatingIssue(false);
+      }
+    },
+    [activeProjectId, addIssue, products, projects, refresh, selectProject, token],
+  );
+
+  const changeProductWorkItemStatus = useCallback(
+    async (
+      productId: string,
+      workItemId: string,
+      status: "completed" | "cancelled",
+    ) => {
+      if (!token) throw new Error("로그인이 필요합니다.");
+      const updated = await updateRemoteProductWorkItemStatus(
+        token,
+        productId,
+        workItemId,
+        status,
+      );
+      setProductWorkItems((current) =>
+        current.map((item) => item.id === updated.id ? updated : item),
+      );
+      return updated;
+    },
+    [token],
   );
 
   const readIssueAttachment = useCallback(
@@ -3081,6 +3332,8 @@ export function useBriar(options: UseBriarOptions = {}) {
     activeProjectId,
     addOrganization,
     addIssue,
+    addProductIssue,
+    addProduct,
     addProject,
     cancelProjectCreation,
     cancelLogin,
@@ -3118,6 +3371,9 @@ export function useBriar(options: UseBriarOptions = {}) {
     logout,
     organizations,
     projects,
+    products,
+    productWorkItems,
+    changeProductWorkItemStatus,
     projectConnection,
     projectReadiness,
     projectReadinessError,

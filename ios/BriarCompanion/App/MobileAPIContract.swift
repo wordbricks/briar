@@ -221,6 +221,8 @@ struct ProjectsResponse: Codable, Equatable, Sendable {
         let id: UUID
         let name: String
         let icon: String?
+        let productId: UUID
+        let productName: String
         let organizationId: UUID
         let organizationName: String
         let role: Role

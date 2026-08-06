@@ -4,7 +4,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CreateIssueDialog } from "./HuntDashboard";
-import type { CreateIssueInput } from "../types";
+import type { CreateIssueInput, CreateProductWorkItemInput } from "../types";
 import { createIssueDraftStorageKey } from "../lib/create-issue-draft";
 
 const projects = [
@@ -822,6 +822,76 @@ describe("CreateIssueDialog attachments", () => {
     ).toBe("Retry this issue");
     expect(container.querySelector(".issue-form-error")?.textContent).toContain(
       "Creation failed",
+    );
+    await act(async () => root.unmount());
+  });
+
+  it("creates one ordered product work item for multiple selected repositories", async () => {
+    const productProjects = projects.map((project) => ({
+      ...project,
+      productId: "product-1",
+      productName: "GG Product",
+    }));
+    const onCreateProduct = vi.fn<(
+      productId: string,
+      input: CreateProductWorkItemInput,
+    ) => Promise<void>>(async () => undefined);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <CreateIssueDialog
+          defaultProjectId="project-1"
+          isSubmitting={false}
+          onClose={() => undefined}
+          onCreate={async () => undefined}
+          onCreateProduct={onCreateProduct}
+          products={[{
+            id: "product-1",
+            name: "GG Product",
+            organizationId: "organization-1",
+            organizationName: "Example",
+            role: "owner",
+            createdAt: "2026-07-01T00:00:00.000Z",
+            projects: productProjects,
+          }]}
+          projects={productProjects}
+        />,
+      );
+    });
+
+    const titleInput = container.querySelector<HTMLInputElement>(
+      ".issue-title-input",
+    );
+    const targetInputs = container.querySelectorAll<HTMLInputElement>(
+      ".issue-target-projects input[type='checkbox']",
+    );
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set?.call(titleInput, "Ship social login");
+      titleInput?.dispatchEvent(new Event("input", { bubbles: true }));
+      targetInputs[1]?.click();
+    });
+    await act(async () => {
+      container
+        .querySelector<HTMLInputElement>(
+          ".issue-product-execution-mode input",
+        )
+        ?.click();
+      container.querySelector<HTMLFormElement>("form")?.requestSubmit();
+    });
+
+    expect(onCreateProduct).toHaveBeenCalledWith(
+      "product-1",
+      expect.objectContaining({
+        title: "Ship social login",
+        targetProjectIds: ["project-1", "project-2"],
+        dependencies: [{
+          prerequisiteProjectId: "project-1",
+          dependentProjectId: "project-2",
+        }],
+      }),
     );
     await act(async () => root.unmount());
   });

@@ -26,6 +26,7 @@ import type {
 } from "./linear-import";
 import type {
   CreateIssueInput,
+  CreateProductWorkItemInput,
   CreateProjectAgentInput,
   CreateProjectAgentScheduleInput,
   DashboardPayload,
@@ -41,6 +42,8 @@ import type {
   IssueResultReview,
   ClaimedProjectAgentScheduleRun,
   Project,
+  Product,
+  ProductWorkItem,
   ProjectAgent,
   ProjectAgentSchedule,
   ProjectAgentScheduleRun,
@@ -86,10 +89,67 @@ const projectSchema = z.object({
     .regex(/^data:image\/(?:jpeg|png|webp);base64,/u)
     .nullable()
     .default(null),
+  productId: z.string().uuid(),
+  productName: z.string(),
   organizationId: z.string().uuid(),
   organizationName: z.string(),
   role: z.enum(["owner", "admin", "member"]),
   createdAt: z.string(),
+});
+const productSchema: z.ZodType<Product> = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  organizationId: z.string().uuid(),
+  organizationName: z.string(),
+  role: z.enum(["owner", "admin", "member"]),
+  createdAt: z.string(),
+  projects: z.array(projectSchema),
+});
+const productWorkItemSchema: z.ZodType<ProductWorkItem> = z.object({
+  id: z.string().uuid(),
+  productId: z.string().uuid(),
+  source: z.enum(["issue", "error", "feedback"]),
+  sourceKey: z.string(),
+  title: z.string(),
+  description: z.string().nullable(),
+  priority: z.number().int().min(1).max(4).nullable(),
+  assigneeUserId: z.string().nullable(),
+  status: z.enum([
+    "backlog",
+    "queued",
+    "in_progress",
+    "blocked",
+    "failed",
+    "ready_for_review",
+    "completed",
+    "cancelled",
+  ]),
+  completedAt: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  targets: z.array(z.object({
+    projectId: z.string().uuid(),
+    projectName: z.string(),
+    runId: z.string().uuid(),
+    runNumber: z.number().int().positive(),
+    status: z.enum([
+      "backlog",
+      "queued",
+      "running",
+      "paused",
+      "blocked",
+      "failed",
+      "completed",
+      "cancelled",
+    ]),
+    required: z.boolean(),
+    position: z.number().int().nonnegative(),
+    pullRequestUrls: z.array(z.string()),
+  })),
+  dependencies: z.array(z.object({
+    prerequisiteRunId: z.string().uuid(),
+    dependentRunId: z.string().uuid(),
+  })),
 });
 const projectAgentSchema = z.object({
   id: z.string().uuid(),
@@ -483,6 +543,22 @@ export async function deleteAccount(
 export async function loadProjects(token: string): Promise<Project[]> {
   const result = await request<{ projects: unknown[] }>("/projects", token);
   return z.array(projectSchema).parse(result.projects);
+}
+
+export async function loadProducts(token: string): Promise<Product[]> {
+  const result = await request<{ products: unknown[] }>("/products", token);
+  return z.array(productSchema).parse(result.products);
+}
+
+export async function loadProductWorkItems(
+  token: string,
+  productId: string,
+): Promise<ProductWorkItem[]> {
+  const result = await request<{ workItems: unknown[] }>(
+    `/products/${productId}/work-items`,
+    token,
+  );
+  return z.array(productWorkItemSchema).parse(result.workItems);
 }
 
 export async function loadOrganizations(
@@ -966,12 +1042,49 @@ export async function loadProjectAgentTranscript(
 
 export async function createProject(
   token: string,
-  input: { name: string; organizationId?: string },
+  input: { name: string; organizationId?: string; productId?: string },
 ) {
   return request<{ project: Project; agentToken: string }>("/projects", token, {
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+export async function createProduct(
+  token: string,
+  input: { name: string; organizationId: string },
+) {
+  const result = await request<{ product: unknown }>("/products", token, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return { product: productSchema.parse(result.product) };
+}
+
+export async function updateProduct(
+  token: string,
+  productId: string,
+  name: string,
+) {
+  const result = await request<{ product: unknown }>(
+    `/products/${productId}`,
+    token,
+    { method: "PATCH", body: JSON.stringify({ name }) },
+  );
+  return { product: productSchema.parse(result.product) };
+}
+
+export async function moveProjectToProduct(
+  token: string,
+  projectId: string,
+  productId: string,
+) {
+  const result = await request<{ project: unknown }>(
+    `/projects/${projectId}/product`,
+    token,
+    { method: "PUT", body: JSON.stringify({ productId }) },
+  );
+  return { project: projectSchema.parse(result.project) };
 }
 
 export async function deleteProject(token: string, projectId: string) {
@@ -1331,6 +1444,65 @@ export async function createIssue(
     assigneeUserId: string | null;
     attachments: IssueAttachment[];
   }>(`/projects/${projectId}/issues`, token, { method: "POST", body: form });
+}
+
+export async function createProductWorkItem(
+  token: string,
+  productId: string,
+  input: CreateProductWorkItemInput,
+): Promise<ProductWorkItem> {
+  if (input.attachments.length === 0) {
+    const {
+      attachments: _attachments,
+      attachmentReferences: _attachmentReferences,
+      ...workItem
+    } = input;
+    const result = await request<{ workItem: unknown }>(
+      `/products/${productId}/work-items`,
+      token,
+      { method: "POST", body: JSON.stringify(workItem) },
+    );
+    return productWorkItemSchema.parse(result.workItem);
+  }
+  const attachmentError = validateIssueAttachments(input.attachments);
+  if (attachmentError) throw new Error(attachmentError);
+  const form = new FormData();
+  form.set("title", input.title);
+  form.set("description", input.description ?? "");
+  form.set("priority", input.priority === null ? "" : String(input.priority));
+  form.set("assigneeUserId", input.assigneeUserId ?? "");
+  form.set("status", input.status);
+  form.set("targetProjectIds", JSON.stringify(input.targetProjectIds));
+  form.set("dependencies", JSON.stringify(input.dependencies ?? []));
+  if (input.attachmentReferences?.length) {
+    form.set(
+      "attachmentReferences",
+      JSON.stringify(input.attachmentReferences),
+    );
+  }
+  input.attachments.forEach((attachment) => {
+    form.append("attachments", attachment, attachment.name);
+  });
+  const result = await request<{ workItem: unknown }>(
+    `/products/${productId}/work-items`,
+    token,
+    { method: "POST", body: form },
+  );
+  return productWorkItemSchema.parse(result.workItem);
+}
+
+export async function updateProductWorkItemStatus(
+  token: string,
+  productId: string,
+  workItemId: string,
+  status: "completed" | "cancelled",
+) {
+  const result = await request<{ workItem: unknown }>(
+    `/products/${productId}/work-items/${workItemId}`,
+    token,
+    { method: "PATCH", body: JSON.stringify({ status }) },
+  );
+  return productWorkItemSchema.parse(result.workItem);
 }
 
 export async function listIdeas(token: string, projectId: string) {
