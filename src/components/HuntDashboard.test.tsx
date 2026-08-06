@@ -1986,6 +1986,7 @@ describe("HuntDashboard", () => {
   it("shows editable prerequisite and follow-up relationships in issue properties", async () => {
     const prerequisite = demoDashboard.runs[1];
     const dependent = demoDashboard.runs[0];
+    const addDependency = vi.fn(async () => undefined);
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
@@ -1996,7 +1997,7 @@ describe("HuntDashboard", () => {
           isSidebarOpen
           error={null}
           isRecovering={false}
-          onAddDependency={async () => undefined}
+          onAddDependency={addDependency}
           onBack={() => undefined}
           onCancel={async () => undefined}
           onLoadAttachment={async () => new Blob()}
@@ -2042,6 +2043,29 @@ describe("HuntDashboard", () => {
     expect(
       dependencies?.querySelector('[aria-label*="의존성 제거"]'),
     ).not.toBeNull();
+
+    await act(async () => {
+      dependencies?.querySelector<HTMLButtonElement>(
+        ".issue-dependency-add-button",
+      )?.click();
+    });
+    const picker = document.querySelector('[role="dialog"]');
+    expect(picker?.textContent).toContain("선행 이슈 추가");
+    expect(picker?.querySelector('[aria-label="이슈 검색"]')).not.toBeNull();
+    const candidateButton = picker?.querySelector<HTMLButtonElement>(
+      ".issue-dependency-picker-item",
+    );
+    expect(candidateButton).not.toBeNull();
+    await act(async () => candidateButton?.click());
+    expect(addDependency).toHaveBeenCalledWith(
+      expect.not.stringMatching(prerequisite.id),
+    );
+    await act(async () => {
+      Array.from(picker?.querySelectorAll<HTMLButtonElement>("button") ?? [])
+        .find((button) => button.textContent?.trim() === "닫기")
+        ?.click();
+    });
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
 
     await act(async () => root.unmount());
     container.remove();
