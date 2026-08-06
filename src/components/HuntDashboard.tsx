@@ -152,6 +152,10 @@ import {
   mentionsIssueHandle,
 } from "../lib/issue-agent-reply";
 import {
+  isIssueMentionUrl,
+  remarkIssueMentions,
+} from "../lib/issue-mentions";
+import {
   copyIssueId,
   copyIssueShareLink,
   shareIssueLink,
@@ -6985,6 +6989,13 @@ function IssueConversation({
     (total, state) => total + state.pending,
     0,
   );
+  const mentionHandles = useMemo(
+    () => [
+      "briar",
+      ...mentionMembers.map((member) => issueMentionHandle(member)),
+    ],
+    [mentionMembers],
+  );
 
   useLayoutEffect(() => {
     const messageList = messageListRef.current;
@@ -7130,6 +7141,7 @@ function IssueConversation({
                   isReplying={isReplying}
                   localeTag={localeTag}
                   message={message}
+                  mentionHandles={mentionHandles}
                   onAcceptIssueAction={onAcceptIssueAction && message.proposedAction
                     ? () => void acceptIssueAction(message.proposedAction!)
                     : undefined}
@@ -7193,6 +7205,7 @@ function IssueMessageItem({
   isReplying = false,
   localeTag,
   message,
+  mentionHandles,
   onAcceptIssueAction,
   onLoadAttachment,
   onReply,
@@ -7204,6 +7217,7 @@ function IssueMessageItem({
   isReplying?: boolean;
   localeTag: string;
   message: IssueMessage;
+  mentionHandles: readonly string[];
   onAcceptIssueAction?: () => void;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onReply?: () => void;
@@ -7213,6 +7227,10 @@ function IssueMessageItem({
   reworkStageLabel?: string | null;
 }) {
   const { t } = useI18n();
+  const remarkPlugins = useMemo(
+    () => [remarkGfm, remarkIssueMentions(mentionHandles)],
+    [mentionHandles],
+  );
   const proposal = message.proposedAction;
   const proposalTitle = proposal?.type === "request_issue_update"
     ? t("run.issueUpdateProposalTitle")
@@ -7243,6 +7261,23 @@ function IssueMessageItem({
         <div className="issue-message-body">
           <ReactMarkdown
             components={{
+              a: ({ children, href, node: _node, ...props }) => {
+                const isMention = isIssueMentionUrl(href);
+                return (
+                  <a
+                    {...props}
+                    className={isMention ? "issue-mention-link" : props.className}
+                    href={href}
+                    onClick={
+                      isMention
+                        ? (event) => event.preventDefault()
+                        : props.onClick
+                    }
+                  >
+                    {children}
+                  </a>
+                );
+              },
               img: ({ alt = "", src }) => (
                 <IssueMarkdownImage
                   alt={alt}
@@ -7252,10 +7287,12 @@ function IssueMessageItem({
                 />
               ),
             }}
-            remarkPlugins={[remarkGfm]}
+            remarkPlugins={remarkPlugins}
             skipHtml
             urlTransform={(url) =>
-              issueAttachmentReference(url) ? url : defaultUrlTransform(url)
+              isIssueMentionUrl(url) || issueAttachmentReference(url)
+                ? url
+                : defaultUrlTransform(url)
             }
           >
             {message.body}
