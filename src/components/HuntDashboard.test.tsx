@@ -488,6 +488,31 @@ describe("HuntDashboard", () => {
     },
   );
 
+  it("keeps compact Worker and workflow-stage icons on completed companion tasks", () => {
+    const run = {
+      ...demoDashboard.runs[0],
+      status: "completed" as const,
+      workflowStage: "merged",
+      workerId: dashboardWorker.id,
+    };
+    const markup = renderToStaticMarkup(
+      <HuntDashboard
+        {...dashboardProps}
+        companionMode
+        dashboard={{
+          ...demoDashboard,
+          runs: [run],
+          workers: [dashboardWorker],
+        }}
+      />,
+    );
+
+    expect(markup).toContain('class="kanban-card-worker-badge"');
+    expect(markup).toContain('aria-label="배정된 Worker: Lemon Worker"');
+    expect(markup).toContain('class="kanban-card-stage-icon"');
+    expect(markup).not.toContain(">Lemon Worker<");
+  });
+
   it("keeps the performed agent name in issue properties after completion", async () => {
     const run = demoDashboard.runs[0];
     const container = document.createElement("div");

@@ -193,6 +193,10 @@ export const mobileInboxReadStatesSchema = z.object({
 export const mobileDashboardWorkerSchema = z.object({
   id: z.string(),
   label: z.string(),
+  icon: z.discriminatedUnion("type", [
+    z.object({ type: z.literal("emoji"), value: z.string() }),
+    z.object({ type: z.literal("image"), value: z.string() }),
+  ]).nullable().optional(),
   agentProvider: z.enum(["codex", "claude", "grok", "opencode"]).optional(),
   providers: z.array(z.enum(["codex", "claude", "grok", "opencode"])).optional(),
   readiness: z.string(),

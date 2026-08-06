@@ -3871,7 +3871,8 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .companion-shell .kanban-card:active { background: #f5f5f1; }
 .companion-shell .kanban-card-kicker { justify-content: flex-start; gap: 9px; }
 .companion-shell .kanban-card-copy { gap: 0; }
-.companion-shell .kanban-card-copy > strong { overflow:hidden; display:-webkit-box; font-size:var(--text-xs); line-height: 1.4; -webkit-box-orient:vertical; -webkit-line-clamp: 1; }
+.companion-shell .kanban-card.has-assignees .kanban-card-copy { padding-right: 24px; }
+.companion-shell .kanban-card-copy > strong { overflow:hidden; display:-webkit-box; overflow-wrap:anywhere; font-size:var(--text-xs); line-height: 1.4; -webkit-box-orient:vertical; -webkit-line-clamp: 2; }
 .companion-shell .kanban-card-copy > span { display: none; }
 .companion-shell .kanban-card-badges { margin-top: 0; gap: 7px; }
 .companion-shell .kanban-card-badges > i:not(.status-pill) { min-height: 18px; padding: 0; border: 0; border-radius: 0; background: transparent; }

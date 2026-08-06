@@ -1418,9 +1418,13 @@ export function HuntDashboard({
                       ) ?? null
                     }
                     assignedWorker={
-                      ["completed", "cancelled", "paused", "blocked", "failed"].includes(
-                        run.status,
-                      )
+                      !companionMode && [
+                        "completed",
+                        "cancelled",
+                        "paused",
+                        "blocked",
+                        "failed",
+                      ].includes(run.status)
                         ? null
                         : workerById.get(run.workerId ?? "") ??
                           workerById.get(run.requestedWorkerId ?? "") ??
@@ -2950,6 +2954,15 @@ function KanbanCard({
         )}
         <span className="kanban-card-kicker">
           <small>AH-{run.runNumber}</small>
+          {run.workflowStage && (
+            <i
+              aria-label={run.workflow.stages.find((stage) => stage.id === run.workflowStage)?.label ?? run.workflowStage}
+              className="kanban-card-stage-icon"
+              title={run.workflow.stages.find((stage) => stage.id === run.workflowStage)?.label ?? run.workflowStage}
+            >
+              <Waypoints aria-hidden="true" size={13} />
+            </i>
+          )}
         </span>
         <span className="kanban-card-copy">
           <strong>{run.title}</strong>

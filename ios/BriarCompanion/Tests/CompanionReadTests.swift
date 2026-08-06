@@ -86,4 +86,28 @@ final class CompanionReadTests: XCTestCase {
             )
         }
     }
+
+    func testTaskRowUsesCompactStageAndWorkerIcons() {
+        let worker = DashboardWorker(
+            id: "worker-1",
+            label: "Mac Studio",
+            icon: .init(type: .emoji, value: "🍋"),
+            readiness: "available",
+            readinessDetail: nil,
+            activeSessions: 0,
+            availableSessions: 1
+        )
+        let run = DashboardRun(
+            id: UUID(),
+            title: "Merged task",
+            status: .completed,
+            workflowStage: "merged",
+            workerId: worker.id,
+            updatedAt: newer
+        )
+
+        XCTAssertEqual(RunRow.workflowStageSystemImage(for: "merged"), "arrow.triangle.merge")
+        XCTAssertEqual(RunRow.workflowStageSystemImage(for: "custom"), "point.3.connected.trianglepath.dotted")
+        XCTAssertEqual(RunRow.worker(for: run, workers: [worker]), worker)
+    }
 }

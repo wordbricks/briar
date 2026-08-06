@@ -60,6 +60,7 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["완료"].exists)
         XCTAssertTrue(app.staticTexts["확인 필요"].exists)
         XCTAssertTrue(app.staticTexts["실패"].exists)
+        captureScreenshot(named: "companion-task-icons")
 
         app.segmentedControls.buttons["Attention"].tap()
         XCTAssertTrue(app.staticTexts["오프라인 복구 확인"].waitForExistence(timeout: 5))
@@ -159,6 +160,14 @@ final class BriarCompanionUITests: XCTestCase {
             .textClipped,
         ])
         captureScreenshot(named: "companion-accessibility-xxxl")
+
+        app.buttons["login-button"].tap()
+        XCTAssertTrue(app.buttons["project-continue-button"].waitForExistence(timeout: 5))
+        app.buttons["project-continue-button"].tap()
+        XCTAssertTrue(app.buttons["project-menu"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["iOS Native Companion 읽기 경험"].exists)
+        try app.performAccessibilityAudit(for: [.textClipped])
+        captureScreenshot(named: "companion-task-list-accessibility-xxxl")
     }
 
     func testAgentsInboxAndSettingsSurface() {
