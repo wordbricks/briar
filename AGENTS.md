@@ -14,3 +14,12 @@ that read them.
 # Mobile App Changes
 
 When modifying the mobile app, make the corresponding changes for both iOS and Android. Do not consider a mobile app change complete if only one platform has been updated.
+
+# Web Deployments
+
+Deploy all production web changes to Cloudflare. The landing site under
+`landing/` deploys to the existing `briar-landing` Cloudflare Worker
+(`https://briar-landing.wbai.workers.dev`). Do not use OpenAI Sites or another
+hosting provider for production web deployments. Build and test the landing
+site from the merged `main` branch, then deploy the generated vinext Worker
+with Wrangler while preserving its `ASSETS` and `IMAGES` bindings.
