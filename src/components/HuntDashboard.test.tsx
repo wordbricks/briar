@@ -130,6 +130,43 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("이슈 만들기");
   });
 
+  it("shows a loading overlay while the issue list is loading", () => {
+    const markup = renderToStaticMarkup(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={null}
+      />,
+    );
+
+    expect(markup).toContain('class="issues-loading-overlay"');
+    expect(markup).toContain('role="status"');
+    expect(markup).toContain('aria-busy="true"');
+    expect(markup).toContain("이슈를 불러오는 중입니다…");
+  });
+
+  it("does not show the loading overlay once issues have loaded", () => {
+    const markup = renderToStaticMarkup(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={demoDashboard}
+      />,
+    );
+
+    expect(markup).not.toContain('class="issues-loading-overlay"');
+  });
+
+  it("hides the loading overlay when loading the dashboard failed", () => {
+    const markup = renderToStaticMarkup(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={null}
+        error="대시보드를 불러오지 못했습니다."
+      />,
+    );
+
+    expect(markup).not.toContain('class="issues-loading-overlay"');
+  });
+
   it("shows the create dialog when issue creation is opened externally", () => {
     const markup = renderToStaticMarkup(
       <HuntDashboard

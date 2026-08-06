@@ -713,6 +713,7 @@ export function HuntDashboard({
   }, [isSourceFilterOpen]);
 
   const runs = dashboard?.runs ?? [];
+  const issuesLoading = dashboard === null && !noProject && !error && !recoveryError;
   const selected = runs.find((run) => run.id === selectedRunId) ?? null;
   const selectedInboxVersion = selected
     ? inboxIssueMessageVersion(selected)
@@ -1293,7 +1294,17 @@ export function HuntDashboard({
             </div>
           </div>
         )}
-        {view === "list" && !companionMode ? (
+        {issuesLoading ? (
+          <div
+            aria-live="polite"
+            aria-busy="true"
+            className="issues-loading-overlay"
+            role="status"
+          >
+            <LoaderCircle aria-hidden="true" className="spin" size={20} />
+            <span>{t("dashboard.loadingIssues")}</span>
+          </div>
+        ) : view === "list" && !companionMode ? (
           <IssueList
             availableProviders={availableProviders}
             issueKeyPrefix={dashboard?.project.issueKeyPrefix}

@@ -992,6 +992,7 @@ body { overflow: hidden; font-synthesis: none; }
 .health-trigger.attention > small { color: #a56d28; }
 @keyframes health-pulse { 50% { opacity: .45; transform: scale(.78); } }
 .dashboard-scroll { min-height:0; flex:1; padding:0; display:flex; flex-direction:column; overflow:hidden; }
+.issues-loading-overlay { min-height:220px; flex:1; display:flex; align-items:center; justify-content:center; gap:10px; color:var(--muted-foreground); background:var(--background); font-size:var(--text-xs); }
 .eyebrow { margin: 0 0 7px; color: var(--primary); font: var(--font-weight-medium) var(--text-2xs)/var(--leading-2xs) var(--font-mono); letter-spacing: var(--tracking-wide); text-transform: uppercase; }
 .error-banner, .login-error { padding: 10px 12px; color: #a63b4d; background: #fff1f3; border: 1px solid #f3cbd2; border-radius: 10px; font-size:var(--text-xs); }
 .error-banner { width:100%; margin:0 0 12px; display:flex; gap:8px; align-items:center; }
