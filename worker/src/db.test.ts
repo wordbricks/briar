@@ -10,6 +10,8 @@ import {
 import type { HuntEventInput } from "./db";
 import {
   acceptOrganizationInvitation,
+  acceptIssueCreateProposal,
+  acceptIssueUpdateProposal,
   acceptIssueReworkProposal,
   assertQueuedHuntClaim,
   claimNextQueuedHuntRun,
@@ -19,6 +21,7 @@ import {
   completeIssueResultReview,
   createOrganization,
   createOrganizationInvitation,
+  createIssueActionProposal,
   createIssueMessage,
   createIssueReworkProposal,
   createProjectAgent,
@@ -40,12 +43,14 @@ import {
   getDashboardSyncCursor,
   getHuntRunForProject,
   getIssueAttachment,
+  getIssueActionProposal,
   getOrganizationInvitationByTokenHash,
   getRunEvidenceImage,
   getNextQueuedHuntRun,
   HuntClaimError,
   HuntTransitionError,
   listIssueAttachments,
+  listIssueActionProposals,
   listIssueDependencies,
   listIssueConversationNotifications,
   listIssueMessages,
@@ -724,6 +729,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await executeSql(
       db,
       await readFile(resolve("migrations/0067_issue_checkpoints.sql"), "utf8"),
+    );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0068_issue_action_proposals.sql"),
+        "utf8",
+      ),
     );
   }, 30_000);
 
@@ -4060,6 +4072,113 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       { workflow_stage: "production_qa", required_revision: 2 },
       { workflow_stage: "staging_qa", required_revision: 2 },
     ]);
+  });
+
+  it("applies conversation issue writes only after acceptance and rejects stale edits", async () => {
+    const sourceKey = "conversation-issue-action";
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 81, {
+        sourceKey,
+        title: "Original title",
+        status: "backlog",
+        eventKey: `${sourceKey}:backlog`,
+      }),
+    );
+    const updateProposal = await createIssueActionProposal(db, {
+      id: "11111111-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      projectId,
+      conversationRunId: runId,
+      triggerMessageId: "22222222-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      replyMessageId: "33333333-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      actionType: "request_issue_update",
+      payloadJson: JSON.stringify({ changes: { title: "Approved title" } }),
+      createdAt: atMinute(82),
+    });
+    expect(updateProposal).toMatchObject({ status: "pending" });
+    expect((await getHuntRunForProject(db, projectId, runId))?.title)
+      .toBe("Original title");
+
+    const accepted = await acceptIssueUpdateProposal(db, {
+      projectId,
+      conversationRunId: runId,
+      proposalId: updateProposal!.id,
+      userId: "owner",
+      acceptedAt: atMinute(83),
+      title: "Approved title",
+      description: "Approved description",
+      priority: 2,
+    });
+    expect(accepted).toMatchObject({
+      status: "accepted",
+      result_run_id: runId,
+    });
+    expect(await getHuntRunForProject(db, projectId, runId)).toMatchObject({
+      title: "Approved title",
+      issue_description: "Approved description",
+      priority: 2,
+    });
+
+    const staleProposal = await createIssueActionProposal(db, {
+      id: "44444444-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      projectId,
+      conversationRunId: runId,
+      triggerMessageId: "55555555-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      replyMessageId: "66666666-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      actionType: "request_issue_update",
+      payloadJson: JSON.stringify({ changes: { priority: 1 } }),
+      createdAt: atMinute(84),
+    });
+    await updateIssue(db, projectId, runId, {
+      title: "Human edit",
+      description: "Approved description",
+      priority: 3,
+      updatedAt: atMinute(85),
+    });
+    expect(await acceptIssueUpdateProposal(db, {
+      projectId,
+      conversationRunId: runId,
+      proposalId: staleProposal!.id,
+      userId: "owner",
+      acceptedAt: atMinute(86),
+      title: "Human edit",
+      description: "Approved description",
+      priority: 1,
+    })).toBeNull();
+    expect((await getIssueActionProposal(
+      db,
+      projectId,
+      runId,
+      staleProposal!.id,
+    ))?.status).toBe("pending");
+
+    const createProposal = await createIssueActionProposal(db, {
+      id: "77777777-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      projectId,
+      conversationRunId: runId,
+      triggerMessageId: "88888888-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      replyMessageId: "99999999-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      actionType: "request_issue_create",
+      payloadJson: JSON.stringify({
+        issue: {
+          title: "Follow-up",
+          description: null,
+          priority: null,
+          status: "backlog",
+        },
+      }),
+      createdAt: atMinute(87),
+    });
+    expect(await acceptIssueCreateProposal(db, {
+      projectId,
+      conversationRunId: runId,
+      proposalId: createProposal!.id,
+      userId: "owner",
+      acceptedAt: atMinute(88),
+      resultRunId: runId,
+    })).toMatchObject({ status: "accepted", result_run_id: runId });
+    expect(await listIssueActionProposals(db, projectId, runId)).toHaveLength(3);
   });
 
   it("allows manual complete without agent evidence required for run completion", async () => {
