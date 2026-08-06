@@ -357,11 +357,8 @@ export default async function Home() {
         <div className="shell nav-shell">
           <Brand c={c} />
           <nav aria-label={c.aria.mainMenu}>
-            <a href="#product">{c.nav.product}</a>
-            <a href="#workflow">{c.nav.workflow}</a>
-            <a href="#security">{c.nav.security}</a>
-            <a href="#agents">{c.nav.agents}</a>
             <a href="/tutorial">{c.nav.tutorial}</a>
+            <a href="/download">{c.nav.download}</a>
           </nav>
           <div className="header-actions">
             <ThemeToggle
