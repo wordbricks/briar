@@ -358,6 +358,7 @@ export default async function Home() {
           <Brand c={c} />
           <nav aria-label={c.aria.mainMenu}>
             <a href="/tutorial">{c.nav.tutorial}</a>
+            <a href="/blog">{c.nav.blog}</a>
             <a href="/download">{c.nav.download}</a>
           </nav>
           <div className="header-actions">
@@ -688,6 +689,7 @@ export default async function Home() {
             </a>
             <a href="#security">{c.footer.security}</a>
             <a href="/tutorial">{c.nav.tutorial}</a>
+            <a href="/blog">{c.nav.blog}</a>
             <a href="#top">{c.footer.backToTop}</a>
           </div>
         </div>

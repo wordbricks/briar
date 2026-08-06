@@ -162,12 +162,31 @@ test("server-renders the localized download catalog", async () => {
   );
 });
 
-test("landing header links to tutorial and download without section navigation", async () => {
+test("landing header links to tutorial, blog, and download without section navigation", async () => {
   const response = await render({ acceptLanguage: "en-US,en;q=0.9" });
   const html = await response.text();
   const header = html.match(/<header class="site-header">([\s\S]*?)<\/header>/)?.[1] ?? "";
 
   assert.match(header, /href="\/tutorial"/);
+  assert.match(header, /href="\/blog"/);
   assert.match(header, /href="\/download"/);
   assert.doesNotMatch(header, /href="#(?:product|workflow|security|agents)"/);
+});
+
+test("server-renders the localized empty blog", async () => {
+  const response = await render({
+    acceptLanguage: "ko-KR,ko;q=0.9",
+    path: "/blog",
+  });
+  assert.equal(response.status, 200);
+
+  const html = await response.text();
+  assert.match(html, /<html lang="ko">/i);
+  assert.match(html, /Briar 블로그/);
+  assert.match(html, /첫 글을 준비하고 있어요/);
+  assert.match(html, /aria-current="page"[^>]*>블로그</);
+  assert.match(
+    html,
+    /href="https:\/\/github\.com\/wordbricks\/briar"[^>]*target="_blank"/,
+  );
 });

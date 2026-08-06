@@ -665,7 +665,10 @@
             "name": "proposalId",
             "in": "path",
             "required": true,
-            "schema": { "type": "string", "format": "uuid" }
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         ],
         "responses": {
@@ -704,7 +707,10 @@
             "name": "proposalId",
             "in": "path",
             "required": true,
-            "schema": { "type": "string", "format": "uuid" }
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         ],
         "responses": {
@@ -895,6 +901,164 @@
           }
         }
       }
+    },
+    "/organizations/{organizationId}/channels": {
+      "get": {
+        "operationId": "listChannels",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Channels in the organization visible to the member",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/organizations/{organizationId}/channels/{channelId}": {
+      "get": {
+        "operationId": "getChannel",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "$ref": "#/components/parameters/ChannelId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Channel with its roster and root messages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelDetailResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/organizations/{organizationId}/channels/{channelId}/messages": {
+      "get": {
+        "operationId": "listChannelMessages",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "$ref": "#/components/parameters/ChannelId"
+          },
+          {
+            "name": "parentMessageId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Root messages, or the thread under parentMessageId",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelMessagesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createChannelMessage",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "$ref": "#/components/parameters/ChannelId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateChannelMessageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Created message with any queued Agent replies",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateChannelMessageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -934,22 +1098,42 @@
           "type": "string",
           "format": "uuid"
         }
+      },
+      "OrganizationId": {
+        "name": "organizationId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "ChannelId": {
+        "name": "channelId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
       }
     },
     "schemas": {
-    "InboxReadStates": {
-      "type": "object",
-      "required": ["readVersions"],
-      "properties": {
-        "readVersions": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
+      "InboxReadStates": {
+        "type": "object",
+        "required": [
+          "readVersions"
+        ],
+        "properties": {
+          "readVersions": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
           }
-        }
+        },
+        "additionalProperties": false
       },
-      "additionalProperties": false
-    },
       "MobileClientId": {
         "type": "string",
         "enum": [
@@ -1272,14 +1456,43 @@
       },
       "OrganizationMember": {
         "type": "object",
-        "required": ["userId", "name", "email", "image", "role", "createdAt"],
+        "required": [
+          "userId",
+          "name",
+          "email",
+          "image",
+          "role",
+          "createdAt"
+        ],
         "properties": {
-          "userId": { "type": "string" },
-          "name": { "type": "string" },
-          "email": { "type": "string", "format": "email" },
-          "image": { "type": ["string", "null"] },
-          "role": { "type": "string", "enum": ["owner", "admin", "member"] },
-          "createdAt": { "type": "string", "format": "date-time" }
+          "userId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "image": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "admin",
+              "member"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
         },
         "additionalProperties": true
       },
@@ -1292,71 +1505,316 @@
           "updatedAt"
         ],
         "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "runNumber": { "type": "integer", "minimum": 1 },
-                  "currentAttempt": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "currentRevision": {
-          "type": "integer",
-          "minimum": 1
-        },
-"title": { "type": "string" },
-          "status": { "type": "string", "enum": ["backlog", "queued", "running", "paused", "blocked", "failed", "completed", "cancelled"] },
-          "workflowStage": { "type": ["string", "null"] },
-          "pausedAt": { "type": ["string", "null"], "format": "date-time" },
-          "resumeRequestedAt": { "type": ["string", "null"], "format": "date-time" },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "runNumber": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "currentAttempt": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "currentRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "backlog",
+              "queued",
+              "running",
+              "paused",
+              "blocked",
+              "failed",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "workflowStage": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pausedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "resumeRequestedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
           "checkpoint": {
-            "type": ["object", "null"],
+            "type": [
+              "object",
+              "null"
+            ],
             "properties": {
-              "key": { "type": "string" },
-              "stage": { "type": "string" },
-              "stageLabel": { "type": "string" },
-              "position": { "type": "string", "enum": ["before", "after"] },
-              "attempt": { "type": "integer", "minimum": 1 },
-              "revision": { "type": "integer", "minimum": 1 },
-              "reachedAt": { "type": ["string", "null"], "format": "date-time" },
-              "nextStage": { "type": ["string", "null"] },
-              "nextStageLabel": { "type": ["string", "null"] },
-              "terminalReviewOnly": { "type": "boolean" }
+              "key": {
+                "type": "string"
+              },
+              "stage": {
+                "type": "string"
+              },
+              "stageLabel": {
+                "type": "string"
+              },
+              "position": {
+                "type": "string",
+                "enum": [
+                  "before",
+                  "after"
+                ]
+              },
+              "attempt": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "reachedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "nextStage": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "nextStageLabel": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "terminalReviewOnly": {
+                "type": "boolean"
+              }
             }
           },
-          "workflow": { "type": "object", "additionalProperties": true },
-          "progress": { "type": "number", "minimum": 0, "maximum": 100 },
-          "detail": { "type": ["string", "null"] },
-          "priority": { "type": ["integer", "null"], "minimum": 1, "maximum": 4 },
-          "assigneeUserId": { "type": ["string", "null"] },
-          "issueDescription": { "type": ["string", "null"] },
-          "attachments": { "type": "array", "items": { "$ref": "#/components/schemas/IssueAttachment" } },
-          "prerequisites": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
-          "dependents": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
-          "executionReadiness": { "type": "string", "enum": ["ready", "waiting"] },
-          "waitingOnPrerequisiteCount": { "type": "integer", "minimum": 0 },
-          "resultSummary": { "type": ["string", "null"] },
-          "structuredResult": { "type": ["object", "null"], "additionalProperties": true },
-          "resultReviews": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
-          "pullRequestUrls": { "type": "array", "items": { "type": "string", "format": "uri" } },
-          "branch": { "type": ["string", "null"] },
-          "commitSha": { "type": ["string", "null"] },
-          "preferredProvider": { "type": ["string", "null"], "enum": ["codex", "claude", "grok", "opencode", null] },
-          "preferredModel": { "type": ["string", "null"] },
-          "preferredEffort": { "type": ["string", "null"], "enum": ["low", "medium", "high", "xhigh", "max", "ultra", null] },
-          "requestedProvider": { "type": ["string", "null"], "enum": ["codex", "claude", "grok", "opencode", null] },
-          "requestedModel": { "type": ["string", "null"] },
-          "requestedEffort": { "type": ["string", "null"], "enum": ["low", "medium", "high", "xhigh", "max", "ultra", null] },
-          "requestedWorkerId": { "type": ["string", "null"] },
-          "workerId": { "type": ["string", "null"] },
-                  "lastEventAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "eventCount": {
-          "type": "integer",
-          "minimum": 0
-        },
-"updatedAt": { "type": "string", "format": "date-time" },
-          "completedAt": { "type": ["string", "null"], "format": "date-time" }
+          "workflow": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "progress": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "priority": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 4
+          },
+          "assigneeUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "issueDescription": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IssueAttachment"
+            }
+          },
+          "prerequisites": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "dependents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "executionReadiness": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "waiting"
+            ]
+          },
+          "waitingOnPrerequisiteCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "resultSummary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "structuredResult": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": true
+          },
+          "resultReviews": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "pullRequestUrls": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "branch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "commitSha": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "preferredProvider": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "codex",
+              "claude",
+              "grok",
+              "opencode",
+              null
+            ]
+          },
+          "preferredModel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "preferredEffort": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max",
+              "ultra",
+              null
+            ]
+          },
+          "requestedProvider": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "codex",
+              "claude",
+              "grok",
+              "opencode",
+              null
+            ]
+          },
+          "requestedModel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "requestedEffort": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max",
+              "ultra",
+              null
+            ]
+          },
+          "requestedWorkerId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workerId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lastEventAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "eventCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
         },
         "additionalProperties": true
       },
@@ -1397,7 +1855,9 @@
           },
           "members": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/OrganizationMember" }
+            "items": {
+              "$ref": "#/components/schemas/OrganizationMember"
+            }
           },
           "conversationNotifications": {
             "type": "array",
@@ -1469,7 +1929,9 @@
           },
           "members": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/OrganizationMember" }
+            "items": {
+              "$ref": "#/components/schemas/OrganizationMember"
+            }
           },
           "conversationNotifications": {
             "type": "array",
@@ -1671,12 +2133,42 @@
                 "occurredAt"
               ],
               "properties": {
-                "id": { "type": "string", "format": "uuid" },
-                "status": { "type": "string", "enum": ["backlog", "queued", "running", "paused", "blocked", "failed", "completed", "cancelled"] },
-                "workflowStage": { "type": ["string", "null"] },
-                "detail": { "type": ["string", "null"] },
-                "actor": { "type": "string" },
-                "occurredAt": { "type": "string", "format": "date-time" }
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "backlog",
+                    "queued",
+                    "running",
+                    "paused",
+                    "blocked",
+                    "failed",
+                    "completed",
+                    "cancelled"
+                  ]
+                },
+                "workflowStage": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "detail": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "actor": {
+                  "type": "string"
+                },
+                "occurredAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
               },
               "additionalProperties": true
             }
@@ -1696,69 +2188,218 @@
           "appliedRevision"
         ],
         "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "type": { "type": "string", "enum": ["request_issue_rework"] },
-          "workflowStage": { "type": "string" },
-          "reason": { "type": "string" },
-          "status": { "type": "string", "enum": ["pending", "accepted"] },
-          "acceptedAt": { "type": ["string", "null"], "format": "date-time" },
-          "appliedRevision": { "type": ["integer", "null"], "minimum": 1 }
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "request_issue_rework"
+            ]
+          },
+          "workflowStage": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "accepted"
+            ]
+          },
+          "acceptedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "appliedRevision": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          }
         },
         "additionalProperties": false
       },
       "IssueUpdateProposal": {
         "type": "object",
-        "required": ["id", "type", "changes", "changedFields", "status", "acceptedAt", "resultRunId"],
+        "required": [
+          "id",
+          "type",
+          "changes",
+          "changedFields",
+          "status",
+          "acceptedAt",
+          "resultRunId"
+        ],
         "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "type": { "type": "string", "enum": ["request_issue_update"] },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "request_issue_update"
+            ]
+          },
           "changes": {
             "type": "object",
             "properties": {
-              "title": { "type": "string" },
-              "description": { "type": ["string", "null"] },
-              "priority": { "type": ["integer", "null"], "minimum": 1, "maximum": 4 }
+              "title": {
+                "type": "string"
+              },
+              "description": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "priority": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 1,
+                "maximum": 4
+              }
             },
             "additionalProperties": false
           },
           "changedFields": {
             "type": "array",
-            "items": { "type": "string", "enum": ["title", "description", "priority"] }
+            "items": {
+              "type": "string",
+              "enum": [
+                "title",
+                "description",
+                "priority"
+              ]
+            }
           },
-          "status": { "type": "string", "enum": ["pending", "accepted"] },
-          "acceptedAt": { "type": ["string", "null"], "format": "date-time" },
-          "resultRunId": { "type": ["string", "null"], "format": "uuid" }
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "accepted"
+            ]
+          },
+          "acceptedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "resultRunId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
         },
         "additionalProperties": false
       },
       "IssueCreateProposal": {
         "type": "object",
-        "required": ["id", "type", "issue", "status", "acceptedAt", "resultRunId"],
+        "required": [
+          "id",
+          "type",
+          "issue",
+          "status",
+          "acceptedAt",
+          "resultRunId"
+        ],
         "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "type": { "type": "string", "enum": ["request_issue_create"] },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "request_issue_create"
+            ]
+          },
           "issue": {
             "type": "object",
-            "required": ["title", "description", "priority", "status"],
+            "required": [
+              "title",
+              "description",
+              "priority",
+              "status"
+            ],
             "properties": {
-              "title": { "type": "string" },
-              "description": { "type": ["string", "null"] },
-              "priority": { "type": ["integer", "null"], "minimum": 1, "maximum": 4 },
-              "status": { "type": "string", "enum": ["backlog", "queued"] }
+              "title": {
+                "type": "string"
+              },
+              "description": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "priority": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 1,
+                "maximum": 4
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "backlog",
+                  "queued"
+                ]
+              }
             },
             "additionalProperties": false
           },
-          "status": { "type": "string", "enum": ["pending", "accepted"] },
-          "acceptedAt": { "type": ["string", "null"], "format": "date-time" },
-          "resultRunId": { "type": ["string", "null"], "format": "uuid" }
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "accepted"
+            ]
+          },
+          "acceptedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "resultRunId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
         },
         "additionalProperties": false
       },
       "IssueProposedAction": {
         "oneOf": [
-          { "$ref": "#/components/schemas/IssueReworkProposal" },
-          { "$ref": "#/components/schemas/IssueUpdateProposal" },
-          { "$ref": "#/components/schemas/IssueCreateProposal" }
+          {
+            "$ref": "#/components/schemas/IssueReworkProposal"
+          },
+          {
+            "$ref": "#/components/schemas/IssueUpdateProposal"
+          },
+          {
+            "$ref": "#/components/schemas/IssueCreateProposal"
+          }
         ]
       },
       "AcceptIssueReworkProposalResponse": {
@@ -1771,26 +2412,62 @@
           "workflowStage"
         ],
         "properties": {
-          "proposal": { "$ref": "#/components/schemas/IssueReworkProposal" },
-          "outcome": { "type": "string", "enum": ["accepted", "already_accepted"] },
-          "attempt": { "type": "integer", "minimum": 1 },
-          "revision": { "type": "integer", "minimum": 1 },
-          "workflowStage": { "type": "string" }
+          "proposal": {
+            "$ref": "#/components/schemas/IssueReworkProposal"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "already_accepted"
+            ]
+          },
+          "attempt": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "workflowStage": {
+            "type": "string"
+          }
         },
         "additionalProperties": false
       },
       "AcceptIssueActionProposalResponse": {
         "type": "object",
-        "required": ["proposal", "outcome", "resultRunId"],
+        "required": [
+          "proposal",
+          "outcome",
+          "resultRunId"
+        ],
         "properties": {
           "proposal": {
             "oneOf": [
-              { "$ref": "#/components/schemas/IssueUpdateProposal" },
-              { "$ref": "#/components/schemas/IssueCreateProposal" }
+              {
+                "$ref": "#/components/schemas/IssueUpdateProposal"
+              },
+              {
+                "$ref": "#/components/schemas/IssueCreateProposal"
+              }
             ]
           },
-          "outcome": { "type": "string", "enum": ["accepted", "already_accepted"] },
-          "resultRunId": { "type": ["string", "null"], "format": "uuid" }
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "already_accepted"
+            ]
+          },
+          "resultRunId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
         },
         "additionalProperties": false
       },
@@ -1842,8 +2519,12 @@
                 },
                 "proposedAction": {
                   "oneOf": [
-                    { "$ref": "#/components/schemas/IssueProposedAction" },
-                    { "type": "null" }
+                    {
+                      "$ref": "#/components/schemas/IssueProposedAction"
+                    },
+                    {
+                      "type": "null"
+                    }
                   ]
                 },
                 "createdAt": {
@@ -2256,6 +2937,328 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ProjectAgentSession"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "ChannelSummary": {
+        "type": "object",
+        "required": [
+          "id",
+          "organizationId",
+          "slug",
+          "name",
+          "topic",
+          "visibility",
+          "defaultProjectId",
+          "archivedAt",
+          "memberCount",
+          "agentCount",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "topic": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "private"
+            ]
+          },
+          "defaultProjectId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Project the channel belongs to. Null means an organization-wide common channel."
+          },
+          "archivedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "memberCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "agentCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": true
+      },
+      "ChannelMessage": {
+        "type": "object",
+        "required": [
+          "id",
+          "channelId",
+          "parentMessageId",
+          "body",
+          "author",
+          "mentionedUserIds",
+          "mentionedAgentIds",
+          "replyCount",
+          "lastReplyAt",
+          "document",
+          "proposal",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "channelId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "parentMessageId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "body": {
+            "type": "string"
+          },
+          "author": {
+            "type": "object",
+            "required": [
+              "type",
+              "name"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "user",
+                  "agent"
+                ]
+              },
+              "id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "image": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "provider": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": true
+          },
+          "mentionedUserIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "mentionedAgentIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "replyCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "lastReplyAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "document": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": true
+          },
+          "proposal": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": true
+      },
+      "ChannelsResponse": {
+        "type": "object",
+        "required": [
+          "channels",
+          "cursor"
+        ],
+        "properties": {
+          "channels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChannelSummary"
+            }
+          },
+          "cursor": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": true
+      },
+      "ChannelDetailResponse": {
+        "type": "object",
+        "required": [
+          "channel",
+          "members",
+          "agents",
+          "messages"
+        ],
+        "properties": {
+          "channel": {
+            "$ref": "#/components/schemas/ChannelSummary"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "agents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChannelMessage"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "ChannelMessagesResponse": {
+        "type": "object",
+        "required": [
+          "messages"
+        ],
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChannelMessage"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "CreateChannelMessageRequest": {
+        "type": "object",
+        "required": [
+          "body"
+        ],
+        "properties": {
+          "body": {
+            "type": "string",
+            "minLength": 1
+          },
+          "parentMessageId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "mentionedUserIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "mentionedAgentIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateChannelMessageResponse": {
+        "type": "object",
+        "required": [
+          "message",
+          "agentReplies"
+        ],
+        "properties": {
+          "message": {
+            "$ref": "#/components/schemas/ChannelMessage"
+          },
+          "agentReplies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
             }
           }
         },

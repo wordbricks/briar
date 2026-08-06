@@ -4988,3 +4988,133 @@ html[data-theme="light"] .download-platform-icon.web {
     margin-top: 62px;
   }
 }
+
+/* Blog */
+.blog-page {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+}
+
+.blog-header {
+  position: sticky;
+  top: 0;
+  background: rgb(13 9 10 / 0.78);
+  backdrop-filter: blur(18px);
+}
+
+.blog-header nav .is-current {
+  color: var(--ink);
+}
+
+.blog-hero {
+  position: relative;
+  overflow: hidden;
+  padding-block: 116px 96px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.blog-hero::after {
+  position: absolute;
+  top: -180px;
+  left: 38%;
+  z-index: -1;
+  width: 650px;
+  height: 430px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(168 148 255 / 0.17), transparent 68%);
+  filter: blur(22px);
+  content: "";
+}
+
+.blog-hero h1 {
+  margin: 25px 0 0;
+  color: var(--ink);
+  font-size: clamp(56px, 8vw, 104px);
+  font-weight: 510;
+  letter-spacing: -0.075em;
+  line-height: 0.98;
+}
+
+.blog-hero > p {
+  max-width: 650px;
+  margin: 28px 0 0;
+  color: var(--ink-muted);
+  font-size: 17px;
+  letter-spacing: -0.025em;
+  line-height: 1.75;
+}
+
+.blog-empty {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  flex: 1;
+  gap: 48px;
+  align-items: start;
+  padding-block: 82px 130px;
+}
+
+.blog-empty > span {
+  padding-top: 9px;
+  color: var(--violet);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.blog-empty > div {
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
+}
+
+.blog-empty h2 {
+  margin: 28px 0 0;
+  color: var(--ink);
+  font-size: clamp(30px, 4vw, 52px);
+  font-weight: 520;
+  letter-spacing: -0.055em;
+}
+
+.blog-empty p {
+  margin: 18px 0 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+html[data-theme="light"] .blog-header {
+  background: rgb(251 248 246 / 0.82);
+}
+
+@media (max-width: 800px) {
+  .blog-hero {
+    padding-block: 90px 74px;
+  }
+
+  .blog-empty {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+}
+
+@media (max-width: 560px) {
+  .blog-header .language-switcher {
+    display: none;
+  }
+
+  .blog-hero {
+    padding-block: 72px 58px;
+  }
+
+  .blog-hero h1 {
+    font-size: 48px;
+  }
+
+  .blog-hero > p {
+    font-size: 14px;
+  }
+
+  .blog-empty {
+    padding-block: 62px 90px;
+  }
+}

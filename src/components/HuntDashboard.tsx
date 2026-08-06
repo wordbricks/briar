@@ -391,7 +391,6 @@ function CompanionTaskSwipeAction({
 export function HuntDashboard({
   agents = [],
   companionMode = false,
-  companionSearchMode = false,
   companionStatus,
   companionUnreadInboxCount = 0,
   currentUserId = null,
@@ -433,7 +432,7 @@ export function HuntDashboard({
   onCompanionAgentsOpen,
   onCompanionIdeasOpen,
   onCompanionInboxOpen,
-  onCompanionSearchOpen,
+  onCompanionHomeOpen,
   onCompanionStatusChange,
   onIssueViewed,
   onRequestedRunOpen,
@@ -446,7 +445,6 @@ export function HuntDashboard({
 }: {
   agents?: ProjectAgent[];
   companionMode?: boolean;
-  companionSearchMode?: boolean;
   companionStatus?: CompanionStatusFilter;
   companionUnreadInboxCount?: number;
   currentUserId?: string | null;
@@ -512,7 +510,7 @@ export function HuntDashboard({
   onCompanionAgentsOpen?: () => void;
   onCompanionIdeasOpen?: () => void;
   onCompanionInboxOpen?: () => void;
-  onCompanionSearchOpen?: () => void;
+  onCompanionHomeOpen?: () => void;
   onCompanionStatusChange?: (status: CompanionStatusFilter) => void;
   onIssueViewed?: (runId: string) => void;
   onRequestedRunOpen?: () => void;
@@ -741,10 +739,7 @@ export function HuntDashboard({
     ["completed", "cancelled"].includes(run.status)
   ).length;
   const filtered = useMemo(() => {
-    const normalized =
-      !companionMode || companionSearchMode
-        ? query.trim().toLowerCase()
-        : "";
+    const normalized = companionMode ? "" : query.trim().toLowerCase();
     const next = runs.filter((run) => {
       if (source !== "all" && run.source !== source) return false;
       if (status === "active" && ["completed", "cancelled"].includes(run.status)) return false;
@@ -767,7 +762,6 @@ export function HuntDashboard({
     );
   }, [
     companionMode,
-    companionSearchMode,
     dashboard?.project.issueKeyPrefix,
     query,
     runs,
@@ -1223,11 +1217,6 @@ export function HuntDashboard({
           <div className="queue-header">
             <div className="queue-heading">
               <div className="queue-heading-copy">
-                {companionSearchMode ? (
-                  <Typography as="h2" variant="heading">
-                    {t("companion.navSearch")}
-                  </Typography>
-                ) : null}
                 <Typography as="span" tone="muted" variant="caption">
                   {t("dashboard.taskCount", { count: filtered.length })}
                 </Typography>
@@ -1277,20 +1266,6 @@ export function HuntDashboard({
                 )}
               </div>
             </div>
-            {companionSearchMode && (
-              <div className="queue-tools">
-                <label className="search-box">
-                  <Search size={15} />
-                  <Input
-                    autoFocus
-                    className="h-full border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder={t("dashboard.search")}
-                    value={query}
-                  />
-                </label>
-              </div>
-            )}
           </div>
         ) : null}
         {!companionMode && (
@@ -1617,12 +1592,12 @@ export function HuntDashboard({
       </div>
       {companionMode && (
         <CompanionBottomNavigation
-          activeDestination={companionSearchMode ? "search" : status}
+          activeDestination={status}
           onCreate={() => setIsIssueDialogOpen(true)}
           onAgentsOpen={() => onCompanionAgentsOpen?.()}
           onIdeasOpen={() => onCompanionIdeasOpen?.()}
           onInboxOpen={() => onCompanionInboxOpen?.()}
-          onSearchOpen={() => onCompanionSearchOpen?.()}
+          onHomeOpen={() => onCompanionHomeOpen?.()}
           onStatusChange={setStatus}
           unreadInboxCount={companionUnreadInboxCount}
         />
@@ -1977,6 +1952,26 @@ export function EditIssueDialog({
   );
 }
 
+const checkpointMenuDefaultZIndex = 130;
+
+function getCheckpointMenuZIndex(trigger: HTMLElement) {
+  let zIndex = checkpointMenuDefaultZIndex;
+  let ancestor = trigger.parentElement;
+
+  while (ancestor) {
+    const ancestorZIndex = Number.parseInt(
+      window.getComputedStyle(ancestor).zIndex,
+      10,
+    );
+    if (Number.isFinite(ancestorZIndex)) {
+      zIndex = Math.max(zIndex, ancestorZIndex + 1);
+    }
+    ancestor = ancestor.parentElement;
+  }
+
+  return zIndex;
+}
+
 function IssueCheckpointDropdown({
   checkpoints,
   disabled = false,
@@ -1989,16 +1984,26 @@ function IssueCheckpointDropdown({
   workflow: AutoHuntWorkflow;
 }) {
   const { t } = useI18n();
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const [menuZIndex, setMenuZIndex] = useState(checkpointMenuDefaultZIndex);
   const inherited = new Set(
     workflow.execution.checkpoints.map(checkpointBoundaryKey),
   );
   const selected = new Set(checkpoints.map(checkpointBoundaryKey));
+
+  useLayoutEffect(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    setMenuZIndex(getCheckpointMenuZIndex(trigger));
+  }, []);
+
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
         <button
           className="issue-checkpoint-trigger"
           disabled={disabled}
+          ref={triggerRef}
           type="button"
         >
           <Clock3 aria-hidden="true" size={13} />
@@ -2015,6 +2020,7 @@ function IssueCheckpointDropdown({
           className="issue-checkpoint-menu"
           collisionPadding={10}
           sideOffset={6}
+          style={{ zIndex: menuZIndex }}
         >
           <DropdownMenu.Label className="issue-checkpoint-menu-heading">
             {t("issue.checkpointsDescription")}

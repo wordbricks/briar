@@ -16,7 +16,10 @@ import {
   Settings,
   Languages,
   Lightbulb,
+  Lock,
 } from "lucide-react";
+import * as ContextMenu from "@radix-ui/react-context-menu";
+import * as Dialog from "@radix-ui/react-dialog";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   collapseLinkedAutoHuntSessions,
@@ -26,6 +29,7 @@ import { useI18n, type Locale } from "../i18n";
 import { featureFlags } from "../lib/feature-flags";
 import { isProjectConnectedLocally } from "../lib/local-project-connection";
 import type { RepositoryReadiness } from "../lib/project-connection";
+import type { ChannelSummary } from "../lib/channels-contract";
 import type {
   Organization,
   Project,
@@ -40,7 +44,10 @@ export function Sidebar({
   activePage,
   activeOrganizationId,
   activeProjectId,
+  activeChannelId,
   agents,
+  channels,
+  channelsLoading = false,
   connectedProjectIds,
   ideasEnabled = featureFlags.ideas,
   isOpen,
@@ -50,7 +57,8 @@ export function Sidebar({
   onIdeasOpen = () => undefined,
   onScheduleOpen,
   onInboxOpen,
-  onChannelsOpen,
+  onChannelCreate,
+  onChannelOpen,
   onIssuesOpen,
   onCreateIssue,
   onAddOrganization,
@@ -82,7 +90,10 @@ export function Sidebar({
     | "settings";
   activeOrganizationId: string | null;
   activeProjectId: string | null;
+  activeChannelId?: string | null;
   agents: ProjectAgent[];
+  channels?: ChannelSummary[];
+  channelsLoading?: boolean;
   connectedProjectIds: string[] | null;
   ideasEnabled?: boolean;
   isOpen: boolean;
@@ -92,7 +103,8 @@ export function Sidebar({
   onIdeasOpen?: () => void;
   onScheduleOpen: () => void;
   onInboxOpen: () => void;
-  onChannelsOpen?: () => void;
+  onChannelCreate?: (name: string) => Promise<void>;
+  onChannelOpen?: (channelId: string) => void;
   onIssuesOpen: () => void;
   onCreateIssue: () => void;
   onAddOrganization: () => void;
@@ -116,6 +128,13 @@ export function Sidebar({
 }) {
   const { locale, setLocale, t } = useI18n();
   const [isOrganizationMenuOpen, setIsOrganizationMenuOpen] = useState(false);
+  const [areChannelsExpanded, setAreChannelsExpanded] = useState(true);
+  const [isChannelCreateOpen, setIsChannelCreateOpen] = useState(false);
+  const [channelName, setChannelName] = useState("");
+  const [channelCreateError, setChannelCreateError] = useState<string | null>(
+    null,
+  );
+  const [isCreatingChannel, setIsCreatingChannel] = useState(false);
   const [organizationMenuView, setOrganizationMenuView] = useState<
     "actions" | "organizations"
   >("actions");
@@ -133,6 +152,35 @@ export function Sidebar({
   const accountMenuRef = useRef<HTMLDivElement>(null);
   const languageMenuRef = useRef<HTMLDivElement>(null);
   const languageTriggerRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (activePage === "channels") setAreChannelsExpanded(true);
+  }, [activePage]);
+
+  const closeChannelCreate = () => {
+    if (isCreatingChannel) return;
+    setIsChannelCreateOpen(false);
+    setChannelName("");
+    setChannelCreateError(null);
+  };
+
+  const submitChannelCreate = async () => {
+    const name = channelName.trim();
+    if (!name || !onChannelCreate || isCreatingChannel) return;
+    setIsCreatingChannel(true);
+    setChannelCreateError(null);
+    try {
+      await onChannelCreate(name);
+      setIsChannelCreateOpen(false);
+      setChannelName("");
+    } catch (cause) {
+      setChannelCreateError(
+        cause instanceof Error ? cause.message : String(cause),
+      );
+    } finally {
+      setIsCreatingChannel(false);
+    }
+  };
 
   useEffect(() => {
     if (!isOrganizationMenuOpen) return;
@@ -513,19 +561,84 @@ export function Sidebar({
             />
           )}
         </a>
-        {onChannelsOpen ? (
-          <a
-            aria-current={activePage === "channels" ? "page" : undefined}
-            className={activePage === "channels" ? "active" : ""}
-            href="#channels"
-            onClick={(event) => {
-              event.preventDefault();
-              onChannelsOpen();
-            }}
-          >
-            <Hash size={16} strokeWidth={1.7} />
-            <span>채널</span>
-          </a>
+        {onChannelOpen ? (
+          <div className="sidebar-channels">
+            <ContextMenu.Root>
+              <ContextMenu.Trigger asChild>
+                <button
+                  aria-controls="sidebar-channel-list"
+                  aria-expanded={areChannelsExpanded}
+                  aria-label={
+                    areChannelsExpanded
+                      ? t("sidebar.collapseChannels")
+                      : t("sidebar.expandChannels")
+                  }
+                  className={`sidebar-channels-toggle${
+                    activePage === "channels" ? " active" : ""
+                  }`}
+                  onClick={() => setAreChannelsExpanded((expanded) => !expanded)}
+                  type="button"
+                >
+                  <ChevronRight
+                    aria-hidden="true"
+                    className={areChannelsExpanded ? "open" : ""}
+                    size={14}
+                    strokeWidth={1.8}
+                  />
+                  <Hash aria-hidden="true" size={16} strokeWidth={1.7} />
+                  <span>{t("sidebar.channels")}</span>
+                </button>
+              </ContextMenu.Trigger>
+              {onChannelCreate ? (
+                <ContextMenu.Portal>
+                  <ContextMenu.Content className="sidebar-channel-context-menu">
+                    <ContextMenu.Item
+                      className="sidebar-channel-context-menu-item"
+                      onSelect={() => {
+                        setChannelCreateError(null);
+                        setIsChannelCreateOpen(true);
+                      }}
+                    >
+                      <Plus aria-hidden="true" size={15} strokeWidth={1.7} />
+                      <span>{t("sidebar.addChannel")}</span>
+                    </ContextMenu.Item>
+                  </ContextMenu.Content>
+                </ContextMenu.Portal>
+              ) : null}
+            </ContextMenu.Root>
+
+            {areChannelsExpanded ? (
+              <div className="sidebar-channel-list" id="sidebar-channel-list">
+                {(channels ?? []).map((channel) => (
+                  <button
+                    aria-current={
+                      activePage === "channels" && channel.id === activeChannelId
+                        ? "page"
+                        : undefined
+                    }
+                    className={
+                      activePage === "channels" && channel.id === activeChannelId
+                        ? "active"
+                        : ""
+                    }
+                    key={channel.id}
+                    onClick={() => onChannelOpen(channel.id)}
+                    type="button"
+                  >
+                    {channel.visibility === "private" ? (
+                      <Lock aria-hidden="true" size={14} strokeWidth={1.7} />
+                    ) : (
+                      <Hash aria-hidden="true" size={14} strokeWidth={1.7} />
+                    )}
+                    <span>{channel.name}</span>
+                  </button>
+                ))}
+                {!channelsLoading && (channels ?? []).length === 0 ? (
+                  <p>{t("sidebar.noChannels")}</p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         ) : null}
       </nav>
 
@@ -904,6 +1017,65 @@ export function Sidebar({
           <UpdateControl />
         </div>
       </div>
+
+      <Dialog.Root
+        onOpenChange={(open) => {
+          if (!open) closeChannelCreate();
+        }}
+        open={isChannelCreateOpen}
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay className="channel-create-overlay" />
+          <Dialog.Content className="channel-create-dialog">
+            <header>
+              <Dialog.Title>{t("channel.createTitle")}</Dialog.Title>
+              <Dialog.Description>
+                {t("channel.createDescription")}
+              </Dialog.Description>
+            </header>
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void submitChannelCreate();
+              }}
+            >
+              <label htmlFor="new-channel-name">{t("channel.name")}</label>
+              <input
+                autoComplete="off"
+                autoFocus
+                disabled={isCreatingChannel}
+                id="new-channel-name"
+                maxLength={100}
+                onChange={(event) => setChannelName(event.target.value)}
+                placeholder={t("channel.namePlaceholder")}
+                value={channelName}
+              />
+              {channelCreateError ? (
+                <p className="channel-create-error" role="alert">
+                  {channelCreateError}
+                </p>
+              ) : null}
+              <footer>
+                <button
+                  disabled={isCreatingChannel}
+                  onClick={closeChannelCreate}
+                  type="button"
+                >
+                  {t("common.cancel")}
+                </button>
+                <button
+                  disabled={isCreatingChannel || !channelName.trim()}
+                  type="submit"
+                >
+                  {isCreatingChannel
+                    ? t("channel.creating")
+                    : t("channel.create")}
+                </button>
+              </footer>
+            </form>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </aside>
   );
 }

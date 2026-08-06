@@ -1,4 +1,4 @@
-import { Bot, Inbox, Lightbulb, ListTodo, Plus, Search } from "lucide-react";
+import { Bot, House, Inbox, Lightbulb, ListTodo, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { featureFlags } from "@/lib/feature-flags";
@@ -14,9 +14,9 @@ export type CompanionStatusFilter =
 type CompanionDestination =
   | CompanionStatusFilter
   | "agents"
+  | "home"
   | "ideas"
-  | "inbox"
-  | "search";
+  | "inbox";
 
 export function CompanionBottomNavigation({
   activeDestination,
@@ -24,8 +24,8 @@ export function CompanionBottomNavigation({
   onCreate,
   onAgentsOpen,
   onIdeasOpen = () => undefined,
+  onHomeOpen,
   onInboxOpen,
-  onSearchOpen,
   onStatusChange,
   unreadInboxCount,
 }: {
@@ -34,8 +34,8 @@ export function CompanionBottomNavigation({
   onCreate?: () => void;
   onAgentsOpen: () => void;
   onIdeasOpen?: () => void;
+  onHomeOpen: () => void;
   onInboxOpen: () => void;
-  onSearchOpen: () => void;
   onStatusChange: (status: CompanionStatusFilter) => void;
   unreadInboxCount: number;
 }) {
@@ -46,12 +46,12 @@ export function CompanionBottomNavigation({
     label: string;
     value: CompanionDestination;
   }> = [
+    { icon: House, label: t("companion.navHome"), value: "home" },
     { icon: ListTodo, label: t("companion.navTasks"), value: "all" },
     { icon: Bot, label: t("companion.navAgents"), value: "agents" },
     ...(ideasEnabled
       ? [{ icon: Lightbulb, label: t("companion.navIdeas"), value: "ideas" as const }]
       : []),
-    { icon: Search, label: t("companion.navSearch"), value: "search" },
     {
       count: unreadInboxCount,
       icon: Inbox,
@@ -84,7 +84,7 @@ export function CompanionBottomNavigation({
                 if (destination.value === "agents") onAgentsOpen();
                 else if (destination.value === "ideas") onIdeasOpen();
                 else if (destination.value === "inbox") onInboxOpen();
-                else if (destination.value === "search") onSearchOpen();
+                else if (destination.value === "home") onHomeOpen();
                 else onStatusChange(destination.value);
               }}
               type="button"

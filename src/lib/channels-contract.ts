@@ -57,6 +57,13 @@ export function handleFromName(name: string) {
     .replace(/-+$/gu, "");
 }
 
+export function channelSlugFromName(name: string, channelId: string) {
+  return (
+    handleFromName(name) ||
+    `channel-${channelId.replace(/[^a-z0-9]/giu, "").toLowerCase().slice(0, 12)}`
+  );
+}
+
 export const channelInputSchema = z
   .object({
     name: channelNameSchema,

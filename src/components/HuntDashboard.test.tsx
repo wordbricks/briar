@@ -950,7 +950,8 @@ describe("HuntDashboard", () => {
     expect(markup).toContain('aria-label="이슈 만들기"');
     expect(markup).toContain("companion-bottom-nav");
     expect(markup).toContain("companion-fab");
-    expect(markup).toContain("검색");
+    expect(markup).toContain("홈");
+    expect(markup).not.toContain("검색");
     expect(markup).toMatch(/<strong[^>]*>Inbox<\/strong>/);
     expect(markup).not.toContain('class="search-box"');
     expect(markup).toContain('aria-label="필터"');
@@ -1138,19 +1139,14 @@ describe("HuntDashboard", () => {
     await act(async () => root.unmount());
   });
 
-  it("renders task search on the companion Search page", () => {
+  it("puts Home first in the companion navigation and drops task search", () => {
     const markup = renderToStaticMarkup(
-      <HuntDashboard
-        {...dashboardProps}
-        companionMode
-        companionSearchMode
-        dashboard={demoDashboard}
-      />,
+      <HuntDashboard {...dashboardProps} companionMode dashboard={demoDashboard} />,
     );
 
-    expect(markup).toMatch(/<h2[^>]*>검색<\/h2>/);
-    expect(markup).toContain('class="search-box"');
-    expect(markup).toContain('placeholder="작업 검색"');
+    const nav = markup.slice(markup.indexOf("companion-bottom-nav"));
+    expect(markup).not.toContain('class="search-box"');
+    expect(nav.indexOf("홈")).toBeLessThan(nav.indexOf("작업"));
     expect(markup).toMatch(
       /aria-current="page"[^>]*class="[^"]*active[^"]*"/,
     );
