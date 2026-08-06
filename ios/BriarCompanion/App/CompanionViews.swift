@@ -324,7 +324,7 @@ struct TaskListView: View {
                                     assignee: snapshot?.members?.first {
                                         $0.userId == run.assigneeUserId
                                     },
-                                    workerLabel: RunRow.workerLabel(
+                                    worker: RunRow.worker(
                                         for: run,
                                         workers: snapshot?.workers ?? []
                                     )
@@ -398,64 +398,148 @@ struct TaskListView: View {
 struct RunRow: View {
     let run: DashboardRun
     let assignee: OrganizationMember?
-    let workerLabel: String?
+    let worker: DashboardWorker?
 
-    init(run: DashboardRun, assignee: OrganizationMember? = nil, workerLabel: String? = nil) {
+    init(run: DashboardRun, assignee: OrganizationMember? = nil, worker: DashboardWorker? = nil) {
         self.run = run
         self.assignee = assignee
-        self.workerLabel = workerLabel
+        self.worker = worker
     }
 
-    static func workerLabel(for run: DashboardRun, workers: [DashboardWorker]) -> String? {
+    static func worker(for run: DashboardRun, workers: [DashboardWorker]) -> DashboardWorker? {
         let workerID = run.workerId ?? run.requestedWorkerId
         guard let workerID else { return nil }
-        if let worker = workers.first(where: { $0.id == workerID }) {
-            return worker.label
+        return workers.first { $0.id == workerID }
+    }
+
+    static func workflowStageSystemImage(for stage: String) -> String {
+        switch stage {
+        case "analyzing": "magnifyingglass"
+        case "planning": "list.bullet.clipboard"
+        case "implementing": "hammer"
+        case "reviewing": "eye"
+        case "pr_open": "arrow.triangle.pull"
+        case "local_qa", "ci_qa": "checkmark.seal"
+        case "staging_qa", "production_qa": "shippingbox"
+        case "monitoring": "waveform.path.ecg"
+        case "merged": "arrow.triangle.merge"
+        default: "point.3.connected.trianglepath.dotted"
         }
-        return workerID
+    }
+
+    static func workflowStageLabel(for run: DashboardRun) -> String? {
+        guard let workflowStage = run.workflowStage else { return nil }
+        return run.workflow?.stages.first { $0.id == workflowStage }?.label ?? workflowStage
+    }
+
+    private var workerLabel: String? {
+        worker?.label ?? run.workerId ?? run.requestedWorkerId
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(run.title).font(.headline)
+            HStack(alignment: .top) {
+                Text(run.title)
+                    .font(.headline)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .layoutPriority(1)
                 Spacer(minLength: 8)
                 StatusBadge(
                     status: run.status,
                     reviewed: !(run.resultReviews ?? []).isEmpty
                 )
+                .fixedSize(horizontal: true, vertical: false)
             }
             if let detail = run.detail, !detail.isEmpty {
                 Text(detail)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            HStack(spacing: 12) {
-                if let runNumber = run.runNumber {
-                    Text("#\(runNumber)")
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) {
+                    identityMetadata
+                    Spacer(minLength: 4)
+                    updatedMetadata
                 }
-                if let workflowStage = run.workflowStage {
-                    Text(workflowStage)
+                VStack(alignment: .leading, spacing: 6) {
+                    identityMetadata
+                    updatedMetadata
                 }
-                if let assignee {
-                    ProfileImageView(
-                        image: assignee.image,
-                        name: assignee.name,
-                        size: 20
-                    )
-                    .accessibilityLabel(assignee.name)
-                }
-                if let workerLabel {
-                    Label(workerLabel, systemImage: "desktopcomputer")
-                        .accessibilityLabel("실행 Worker \(workerLabel)")
-                }
-                Text(run.updatedAt, style: .relative)
             }
             .font(.caption)
             .foregroundStyle(.tertiary)
         }
         .padding(.vertical, 4)
+    }
+
+    private var identityMetadata: some View {
+        HStack(spacing: 10) {
+            if let runNumber = run.runNumber {
+                Text("#\(runNumber)")
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+            if let workflowStage = run.workflowStage,
+               let workflowStageLabel = Self.workflowStageLabel(for: run) {
+                Image(systemName: Self.workflowStageSystemImage(for: workflowStage))
+                    .accessibilityLabel("작업 단계 \(workflowStageLabel)")
+                    .help(workflowStageLabel)
+            }
+            if let assignee {
+                ProfileImageView(
+                    image: assignee.image,
+                    name: assignee.name,
+                    size: 20
+                )
+                .accessibilityLabel("담당자 \(assignee.name)")
+            }
+            if let workerLabel {
+                RunWorkerIconView(worker: worker, label: workerLabel)
+            }
+        }
+        .fixedSize(horizontal: true, vertical: false)
+    }
+
+    private var updatedMetadata: some View {
+        Text(run.updatedAt, style: .relative)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+    }
+}
+
+private struct RunWorkerIconView: View {
+    let worker: DashboardWorker?
+    let label: String
+
+    var body: some View {
+        ZStack {
+            switch worker?.icon?.type {
+            case .emoji:
+                Text(worker?.icon?.value ?? "")
+                    .font(.system(size: 12))
+                    .frame(width: 20, height: 20)
+                    .background(Color.secondary.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            case .image:
+                ProfileImageView(
+                    image: worker?.icon?.value,
+                    systemImage: "desktopcomputer",
+                    size: 20,
+                    cornerRadius: 6
+                )
+            case nil:
+                Image(systemName: "desktopcomputer")
+                    .font(.caption.weight(.medium))
+                    .frame(width: 20, height: 20)
+                    .background(Color.secondary.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("실행 Worker \(label)")
+        .help(label)
     }
 }
 
@@ -533,7 +617,7 @@ struct TaskSearchView: View {
                         RunRow(
                             run: run,
                             assignee: members.first { $0.userId == run.assigneeUserId },
-                            workerLabel: RunRow.workerLabel(for: run, workers: workers)
+                            worker: RunRow.worker(for: run, workers: workers)
                         )
                     }
                     .accessibilityIdentifier("search-result-\(run.id.uuidString)")

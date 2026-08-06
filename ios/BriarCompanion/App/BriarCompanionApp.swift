@@ -143,8 +143,10 @@ private struct UITestCompanionFlow: View {
                 id: UUID(uuidString: "44444444-4444-4444-8444-444444444444")!,
                 title: "공유 API 계약 검증",
                 status: .completed,
+                workflowStage: "merged",
                 detail: "iOS와 Android 계약 통과",
                 resultSummary: "공유 계약이 검증되었습니다.",
+                workerId: "worker-1",
                 updatedAt: Date(timeIntervalSince1970: 1_775_264_300),
                 completedAt: Date(timeIntervalSince1970: 1_775_264_300)
             ),
@@ -210,6 +212,7 @@ private struct UITestCompanionFlow: View {
             workers: [DashboardWorker(
                 id: "worker-1",
                 label: "Mac Studio",
+                icon: .init(type: .emoji, value: "🍋"),
                 agentProvider: .codex,
                 providers: [.codex],
                 readiness: "available",

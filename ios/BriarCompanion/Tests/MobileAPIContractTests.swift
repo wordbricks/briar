@@ -63,6 +63,8 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(snapshot.runs.first?.requestedWorkerId, "worker-1")
         XCTAssertEqual(snapshot.runs.first?.attachments?.first?.filename, "design.png")
         XCTAssertEqual(snapshot.workers?.first?.readiness, "available")
+        XCTAssertEqual(snapshot.workers?.first?.icon?.type, .emoji)
+        XCTAssertEqual(snapshot.workers?.first?.icon?.value, "🍋")
         XCTAssertEqual(delta.cursor, 42)
         XCTAssertEqual(delta.runs.first?.status, .completed)
         XCTAssertEqual(delta.runs.first?.structuredResult?.outcome, "completed")

@@ -168,6 +168,10 @@
           {
             "id": "worker-1",
             "label": "Mac Studio",
+            "icon": {
+              "type": "emoji",
+              "value": "🍋"
+            },
             "readiness": "available",
             "readinessDetail": "Ready for work",
             "activeSessions": 1,
