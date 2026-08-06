@@ -58,6 +58,7 @@ struct CompanionShellView: View {
                         RunDetailView(
                             run: run,
                             projectID: project.id,
+                            issueKeyPrefix: project.effectiveIssueKeyPrefix,
                             token: token,
                             api: api,
                             projects: projects,
@@ -309,6 +310,7 @@ struct TaskListView: View {
                                 RunDetailView(
                                     run: run,
                                     projectID: project.id,
+                                    issueKeyPrefix: project.effectiveIssueKeyPrefix,
                                     token: token,
                                     api: api,
                                     projects: projects,
@@ -321,6 +323,7 @@ struct TaskListView: View {
                             } label: {
                                 RunRow(
                                     run: run,
+                                    issueKeyPrefix: project.effectiveIssueKeyPrefix,
                                     assignee: snapshot?.members?.first {
                                         $0.userId == run.assigneeUserId
                                     },
@@ -397,11 +400,18 @@ struct TaskListView: View {
 
 struct RunRow: View {
     let run: DashboardRun
+    let issueKeyPrefix: String
     let assignee: OrganizationMember?
     let worker: DashboardWorker?
 
-    init(run: DashboardRun, assignee: OrganizationMember? = nil, worker: DashboardWorker? = nil) {
+    init(
+        run: DashboardRun,
+        issueKeyPrefix: String = "AH",
+        assignee: OrganizationMember? = nil,
+        worker: DashboardWorker? = nil
+    ) {
         self.run = run
+        self.issueKeyPrefix = issueKeyPrefix
         self.assignee = assignee
         self.worker = worker
     }
@@ -478,7 +488,7 @@ struct RunRow: View {
     private var identityMetadata: some View {
         HStack(spacing: 10) {
             if let runNumber = run.runNumber {
-                Text("#\(runNumber)")
+                Text("\(issueKeyPrefix)-\(runNumber)")
                     .fixedSize(horizontal: true, vertical: false)
             }
             if let workflowStage = run.workflowStage,
@@ -589,7 +599,13 @@ struct TaskSearchView: View {
     let token: String
     let api: any MobileAPIClientProtocol
 
-    private var results: [DashboardRun] { TaskSearch.results(in: runs, query: query) }
+    private var results: [DashboardRun] {
+        TaskSearch.results(
+            in: runs,
+            query: query,
+            issueKeyPrefix: project.effectiveIssueKeyPrefix
+        )
+    }
 
     var body: some View {
         List {
@@ -607,6 +623,7 @@ struct TaskSearchView: View {
                         RunDetailView(
                             run: run,
                             projectID: project.id,
+                            issueKeyPrefix: project.effectiveIssueKeyPrefix,
                             token: token,
                             api: api,
                             allRuns: runs,
@@ -616,6 +633,7 @@ struct TaskSearchView: View {
                     } label: {
                         RunRow(
                             run: run,
+                            issueKeyPrefix: project.effectiveIssueKeyPrefix,
                             assignee: members.first { $0.userId == run.assigneeUserId },
                             worker: RunRow.worker(for: run, workers: workers)
                         )
@@ -705,6 +723,7 @@ struct RunDetailView: View {
     }
 
     private let projectID: UUID
+    private let issueKeyPrefix: String
     private let projects: [ProjectsResponse.Project]
     private let allRuns: [DashboardRun]
     private let workers: [DashboardWorker]
@@ -724,6 +743,7 @@ struct RunDetailView: View {
     init(
         run: DashboardRun,
         projectID: UUID,
+        issueKeyPrefix: String = "AH",
         token: String,
         api: any MobileAPIClientProtocol,
         projects: [ProjectsResponse.Project] = [],
@@ -735,6 +755,7 @@ struct RunDetailView: View {
     ) {
         self.run = run
         self.projectID = projectID
+        self.issueKeyPrefix = issueKeyPrefix
         self.projects = projects
         self.allRuns = allRuns
         self.workers = workers
@@ -822,6 +843,7 @@ struct RunDetailView: View {
             DependencyPickerSheet(
                 selectedIDs: $dependencyIDs,
                 candidates: dependencyCandidates,
+                issueKeyPrefix: issueKeyPrefix,
                 onAdd: { prerequisiteID in
                     try await changeDependency(prerequisiteID, enabled: true)
                 }
@@ -1149,7 +1171,7 @@ struct RunDetailView: View {
                     HStack {
                         VStack(alignment: .leading) {
                             Text(dependency.title)
-                            Text("#\(dependency.runNumber) · \(dependency.status.displayName)")
+                            Text("\(issueKeyPrefix)-\(dependency.runNumber) · \(dependency.status.displayName)")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -1595,7 +1617,9 @@ struct RunDetailView: View {
                         status: localStatus,
                         reviewed: !(run.resultReviews ?? []).isEmpty
                     )
-                    if let runNumber = run.runNumber { Text("#\(runNumber)") }
+                    if let runNumber = run.runNumber {
+                        Text("\(issueKeyPrefix)-\(runNumber)")
+                    }
                     Spacer()
                     Text(run.updatedAt, style: .relative)
                 }
@@ -1969,6 +1993,7 @@ struct DependencyPickerSheet: View {
     @State private var errorMessage: String?
 
     let candidates: [DashboardRun]
+    let issueKeyPrefix: String
     let onAdd: (UUID) async throws -> Void
 
     private var filteredCandidates: [DashboardRun] {
@@ -1979,7 +2004,7 @@ struct DependencyPickerSheet: View {
             let searchableText = [
                 candidate.title,
                 candidate.detail ?? "",
-                candidate.runNumber.map { "#\($0)" } ?? "",
+                candidate.runNumber.map { "\(issueKeyPrefix)-\($0)" } ?? "",
                 candidate.status.displayName,
             ].joined(separator: " ")
             return searchableText.localizedCaseInsensitiveContains(normalizedQuery)
@@ -2016,7 +2041,7 @@ struct DependencyPickerSheet: View {
                                             .foregroundStyle(.primary)
                                         HStack(spacing: 6) {
                                             if let number = candidate.runNumber {
-                                                Text("#\(number)")
+                                                Text("\(issueKeyPrefix)-\(number)")
                                             }
                                             Text(candidate.status.displayName)
                                         }

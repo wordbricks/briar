@@ -1145,6 +1145,7 @@
         "required": [
           "id",
           "name",
+          "issueKeyPrefix",
           "icon",
           "organizationId",
           "organizationName",
@@ -1158,6 +1159,10 @@
           },
           "name": {
             "type": "string"
+          },
+          "issueKeyPrefix": {
+            "type": "string",
+            "pattern": "^[A-Z0-9]{1,3}$"
           },
           "icon": {
             "type": [

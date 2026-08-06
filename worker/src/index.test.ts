@@ -14,6 +14,7 @@ import worker, {
   pausedRunReworkInputSchema,
   parseProjectSettingsInput,
   projectIconInputSchema,
+  projectIssueKeyPrefixInputSchema,
   projectAgentSessionInputSchema,
   projectAgentScheduleInputSchema,
   projectAgentScheduleRunCompletionSchema,
@@ -323,6 +324,18 @@ describe("Worker HTTP contract", () => {
       projectIconInputSchema.parse({
         icon: "data:image/svg+xml;base64,bG9nbw==",
       }),
+    ).toThrow();
+  });
+
+  it("normalizes project issue key prefixes and enforces the three-character limit", () => {
+    expect(
+      projectIssueKeyPrefixInputSchema.parse({ issueKeyPrefix: " br " }),
+    ).toEqual({ issueKeyPrefix: "BR" });
+    expect(() =>
+      projectIssueKeyPrefixInputSchema.parse({ issueKeyPrefix: "LONG" }),
+    ).toThrow();
+    expect(() =>
+      projectIssueKeyPrefixInputSchema.parse({ issueKeyPrefix: "B-R" }),
     ).toThrow();
   });
 

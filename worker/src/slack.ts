@@ -3,6 +3,7 @@ import {
   maxIssueAttachmentCount,
   validateIssueAttachments,
 } from "../../src/lib/issue-attachments";
+import { formatIssueKey } from "../../src/lib/issue-key";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -219,8 +220,8 @@ export function slackHelpMessage() {
 }
 
 /** Human-readable Briar issue key shown in the app and Slack confirmations. */
-export function formatBriarIssueKey(runNumber: number) {
-  return `AH-${runNumber}`;
+export function formatBriarIssueKey(runNumber: number, issueKeyPrefix?: string) {
+  return formatIssueKey(issueKeyPrefix, runNumber);
 }
 
 export function buildSlackIssueCreatedMessage(input: {
@@ -229,12 +230,13 @@ export function buildSlackIssueCreatedMessage(input: {
   statusLabel: string;
   priorityLabel?: string;
   runNumber: number;
+  issueKeyPrefix?: string;
 }) {
   const priorityLabel = input.priorityLabel ?? "";
   return [
     `:white_check_mark: *${input.title}* 이슈를 만들었습니다.`,
     `프로젝트: ${input.projectName} · ${input.statusLabel}${priorityLabel}`,
-    `이슈 ID: \`${formatBriarIssueKey(input.runNumber)}\``,
+    `이슈 ID: \`${formatBriarIssueKey(input.runNumber, input.issueKeyPrefix)}\``,
   ].join("\n");
 }
 

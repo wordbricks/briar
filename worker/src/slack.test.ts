@@ -285,6 +285,7 @@ describe("Slack integration", () => {
 
   it("formats human-readable issue keys for Slack confirmations", () => {
     expect(formatBriarIssueKey(1231)).toBe("AH-1231");
+    expect(formatBriarIssueKey(1231, "BR")).toBe("BR-1231");
     expect(
       buildSlackIssueCreatedMessage({
         title: "로그인 버튼이 동작하지 않아요",
@@ -306,8 +307,9 @@ describe("Slack integration", () => {
         projectName: "First",
         statusLabel: "작업 대기열",
         runNumber: 42,
+        issueKeyPrefix: "PRJ",
       }),
-    ).toContain("이슈 ID: `AH-42`");
+    ).toContain("이슈 ID: `PRJ-42`");
     expect(
       buildSlackIssueCreatedMessage({
         title: "Create from shortcut",

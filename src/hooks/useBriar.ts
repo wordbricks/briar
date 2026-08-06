@@ -51,6 +51,7 @@ import {
   updateOrganization as updateRemoteOrganization,
   updateOrganizationLogo as updateRemoteOrganizationLogo,
   updateProjectIcon as updateRemoteProjectIcon,
+  updateProjectIssueKeyPrefix as updateRemoteProjectIssueKeyPrefix,
   updateProjectSettings,
   updateCheckpointPolicy,
   waitForIssueAgentReply,
@@ -1180,6 +1181,41 @@ export function useBriar(options: UseBriarOptions = {}) {
         demoMode || !token
           ? { ...currentProject, icon }
           : (await updateRemoteProjectIcon(token, projectId, icon)).project;
+      setProjects((current) =>
+        current.map((candidate) =>
+          candidate.id === projectId ? project : candidate,
+        ),
+      );
+      setDashboard((current) =>
+        current?.project.id === projectId
+          ? { ...current, project }
+          : current,
+      );
+      setProjectConnection((current) =>
+        current?.project.id === projectId
+          ? { ...current, project }
+          : current,
+      );
+      return project;
+    },
+    [projects, token],
+  );
+
+  const changeProjectIssueKeyPrefix = useCallback(
+    async (projectId: string, issueKeyPrefix: string) => {
+      const currentProject = projects.find((project) => project.id === projectId);
+      if (!currentProject) throw new Error("변경할 프로젝트를 찾을 수 없습니다.");
+      if (!demoMode && !token) throw new Error("로그인이 필요합니다.");
+      const project =
+        demoMode || !token
+          ? { ...currentProject, issueKeyPrefix }
+          : (
+              await updateRemoteProjectIssueKeyPrefix(
+                token,
+                projectId,
+                issueKeyPrefix,
+              )
+            ).project;
       setProjects((current) =>
         current.map((candidate) =>
           candidate.id === projectId ? project : candidate,
@@ -3178,6 +3214,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     cancelLogin,
     changeOrganizationLogo,
     changeProjectIcon,
+    changeProjectIssueKeyPrefix,
     checkOrganizationHandle,
     connectProject,
     connectedProjectIds,

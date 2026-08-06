@@ -228,6 +228,7 @@ struct ProjectsResponse: Codable, Equatable, Sendable {
     struct Project: Codable, Equatable, Sendable {
         let id: UUID
         let name: String
+        var issueKeyPrefix: String? = nil
         let icon: String?
         let organizationId: UUID
         let organizationName: String
@@ -239,6 +240,20 @@ struct ProjectsResponse: Codable, Equatable, Sendable {
             case admin
             case member
         }
+    }
+}
+
+extension ProjectsResponse.Project {
+    var effectiveIssueKeyPrefix: String {
+        let normalized = issueKeyPrefix?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard let normalized,
+              normalized.range(of: #"^[A-Z0-9]{1,3}$"#, options: .regularExpression) != nil
+        else { return "AH" }
+        return normalized
+    }
+
+    func issueKey(runNumber: Int) -> String {
+        "\(effectiveIssueKeyPrefix)-\(runNumber)"
     }
 }
 

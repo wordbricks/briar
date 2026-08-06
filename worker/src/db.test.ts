@@ -91,6 +91,7 @@ import {
   updateOrganizationLogo,
   updateOrganizationMemberRole,
   updateProjectIcon,
+  updateProjectIssueKeyPrefix,
   updateIssue,
   upsertInboxReadStates,
   upsertProjectAgentSession,
@@ -741,6 +742,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db,
       await readFile(
         resolve("migrations/0069_project_agent_effort.sql"),
+        "utf8",
+      ),
+    );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0070_project_issue_key_prefix.sql"),
         "utf8",
       ),
     );
@@ -2698,6 +2706,16 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await expect(getProject(db, projectId, "owner")).resolves.toMatchObject({
       id: projectId,
       icon: null,
+    });
+  });
+
+  it("stores a project issue key prefix", async () => {
+    await expect(
+      updateProjectIssueKeyPrefix(db, projectId, "BR"),
+    ).resolves.toBe(true);
+    await expect(getProject(db, projectId, "owner")).resolves.toMatchObject({
+      id: projectId,
+      issue_key_prefix: "BR",
     });
   });
 

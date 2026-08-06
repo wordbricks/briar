@@ -280,6 +280,7 @@ export const demoDashboard: DashboardPayload = {
   project: {
     id: "demo-project",
     name: "Briar",
+    issueKeyPrefix: "AH",
     organizationId: "demo-organization",
     organizationName: "Briar",
     role: "owner",
