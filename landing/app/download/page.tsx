@@ -114,6 +114,7 @@ export default async function DownloadPage() {
           </a>
           <nav aria-label={c.aria.mainMenu}>
             <a href="/tutorial">{c.nav.tutorial}</a>
+            <a href="/blog">{c.nav.blog}</a>
             <a className="is-current" href="/download" aria-current="page">
               {c.nav.download}
             </a>
