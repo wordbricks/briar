@@ -1314,6 +1314,8 @@ export async function createIssue(
   form.set("priority", input.priority === null ? "" : String(input.priority));
   form.set("assigneeUserId", input.assigneeUserId ?? "");
   form.set("status", input.status);
+  form.set("preferredProvider", input.preferredProvider ?? "");
+  form.set("preferredModel", input.preferredModel ?? "");
   if (input.attachmentReferences?.length) {
     form.set(
       "attachmentReferences",

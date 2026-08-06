@@ -373,6 +373,7 @@ struct TaskListView: View {
             CreateIssueSheet(
                 mutations: mutations,
                 members: snapshot?.members ?? [],
+                providers: snapshot?.organizationProviders ?? [],
                 refresh: refresh
             )
         }

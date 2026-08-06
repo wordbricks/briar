@@ -7,6 +7,7 @@ import {
   claimProjectAgentScheduleRun,
   completeProjectAgentScheduleRun,
   completeIssueResultReview,
+  createIssue,
   createIssueMessage,
   createOrganizationInvitation,
   createProjectAgent,
@@ -476,6 +477,46 @@ describe("API errors", () => {
       2,
       expect.stringContaining(endpoint),
       expect.objectContaining({ method: "DELETE" }),
+    );
+  });
+
+  it("sends preferred provider and model when creating an issue without attachments", async () => {
+    const projectId = "22222222-2222-4222-8222-222222222222";
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(
+          JSON.stringify({
+            runId: "11111111-1111-4111-8111-111111111111",
+            sourceKey: "briar-issue:test",
+            stage: "queued",
+            status: "queued",
+            assigneeUserId: null,
+            attachments: [],
+          }),
+          { headers: { "Content-Type": "application/json" } },
+        ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createIssue("token", projectId, {
+      title: "선호 실행 이슈",
+      description: null,
+      priority: 2,
+      status: "queued",
+      attachments: [],
+      preferredProvider: "claude",
+      preferredModel: "sonnet",
+    });
+
+    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    expect(body).toMatchObject({
+      title: "선호 실행 이슈",
+      preferredProvider: "claude",
+      preferredModel: "sonnet",
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(`/projects/${projectId}/issues`),
+      expect.objectContaining({ method: "POST" }),
     );
   });
 

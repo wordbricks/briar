@@ -373,6 +373,8 @@ describe("CreateIssueDialog attachments", () => {
         assigneeUserId: null,
         attachments: [],
         description: null,
+        preferredModel: null,
+        preferredProvider: null,
         priority: 2,
         status: "queued",
         title: "Keyboard-created issue",
@@ -555,11 +557,81 @@ describe("CreateIssueDialog attachments", () => {
       {
         attachments: [],
         description: null,
+        preferredModel: null,
+        preferredProvider: null,
         priority: 2,
         assigneeUserId: "user-1",
         status: "backlog",
         title: "Backlog issue",
       },
+    );
+
+    await act(async () => root.unmount());
+  });
+
+  it("selects a preferred provider and model when creating an issue", async () => {
+    const onCreate = vi.fn(async () => undefined);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <CreateIssueDialog
+          {...projectProps}
+          availableProviders={["codex", "claude", "grok"]}
+          isSubmitting={false}
+          onClose={() => undefined}
+          onCreate={onCreate}
+        />,
+      );
+    });
+
+    const titleInput = container.querySelector<HTMLInputElement>(
+      ".issue-title-input",
+    );
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set?.call(titleInput, "Preferred execution issue");
+      titleInput?.dispatchEvent(new Event("input", { bubbles: true }));
+      container
+        .querySelector<HTMLButtonElement>(
+          ".issue-provider-select .select-menu-trigger",
+        )
+        ?.click();
+    });
+    await act(async () => {
+      document
+        .querySelector<HTMLButtonElement>('[role="option"][data-value="claude"]')
+        ?.click();
+    });
+    expect(
+      container.querySelector<HTMLButtonElement>(
+        ".issue-provider-select .select-menu-trigger",
+      )?.textContent,
+    ).toContain("Claude");
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(
+          ".issue-model-select .select-menu-trigger",
+        )
+        ?.click();
+    });
+    await act(async () => {
+      document
+        .querySelector<HTMLButtonElement>('[role="option"][data-value="sonnet"]')
+        ?.click();
+    });
+    await act(async () => {
+      container.querySelector<HTMLFormElement>("form")?.requestSubmit();
+    });
+
+    expect(onCreate).toHaveBeenCalledWith(
+      "project-1",
+      expect.objectContaining({
+        preferredProvider: "claude",
+        preferredModel: "sonnet",
+        title: "Preferred execution issue",
+      }),
     );
 
     await act(async () => root.unmount());
@@ -712,6 +784,8 @@ describe("CreateIssueDialog attachments", () => {
       .toEqual({
         assigneeUserId: null,
         description: "Keep this description",
+        preferredModel: null,
+        preferredProvider: null,
         priority: "4",
         projectId: "project-2",
         status: "backlog",

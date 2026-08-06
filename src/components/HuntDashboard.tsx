@@ -166,6 +166,7 @@ import type {
 import {
   agentEfforts,
   agentModels,
+  agentProviders,
   type AgentProvider,
   type ModelEffort,
 } from "../lib/project-llm";
@@ -896,6 +897,7 @@ export function HuntDashboard({
   ]);
   const createIssueDialog = isIssueDialogOpen ? (
     <CreateIssueDialog
+      availableProviders={availableProviders}
       compactHeader={companionMode}
       defaultProjectId={dashboard?.project.id}
       isSubmitting={isCreatingIssue}
@@ -1850,6 +1852,7 @@ export function EditIssueDialog({
 }
 
 export function CreateIssueDialog({
+  availableProviders = agentProviders,
   compactHeader = false,
   defaultProjectId,
   isSubmitting,
@@ -1858,6 +1861,7 @@ export function CreateIssueDialog({
   members = [],
   projects,
 }: {
+  availableProviders?: readonly AgentProvider[];
   compactHeader?: boolean;
   defaultProjectId?: string;
   isSubmitting: boolean;
@@ -1883,6 +1887,12 @@ export function CreateIssueDialog({
   const [priority, setPriority] = useState(initialDraft?.priority ?? "2");
   const [assigneeUserId, setAssigneeUserId] = useState(
     initialDraft?.assigneeUserId ?? "",
+  );
+  const [preferredProvider, setPreferredProvider] = useState(
+    initialDraft?.preferredProvider ?? "",
+  );
+  const [preferredModel, setPreferredModel] = useState(
+    initialDraft?.preferredModel ?? "",
   );
   const [projectId, setProjectId] = useState(() =>
     projects.some((project) => project.id === initialDraft?.projectId)
@@ -1913,11 +1923,15 @@ export function CreateIssueDialog({
       status,
       title,
       assigneeUserId: assigneeUserId || null,
+      preferredProvider: preferredProvider || null,
+      preferredModel: preferredModel || null,
     });
   }, [
     assigneeUserId,
     attachments,
     description,
+    preferredModel,
+    preferredProvider,
     priority,
     projectId,
     status,
@@ -2138,6 +2152,10 @@ export function CreateIssueDialog({
               priority: Number(priority),
               assigneeUserId: assigneeUserId || null,
               status,
+              preferredProvider: (preferredProvider || null) as
+                | AgentProvider
+                | null,
+              preferredModel: preferredModel || null,
               attachments: attachments.map(({ file }) => file),
               ...(attachments.length > 0
                 ? {
@@ -2284,6 +2302,43 @@ export function CreateIssueDialog({
                 { label: t("issue.priority4"), value: "4" },
               ]}
               value={priority}
+            />
+            <NativeSelect
+              className="issue-provider-select"
+              label={t("issue.preferredProvider")}
+              onValueChange={(value) => {
+                setPreferredProvider(value);
+                if (preferredModel) setPreferredModel("");
+              }}
+              options={[
+                { label: t("issue.agentDefault"), value: "" },
+                ...availableProviders.map((provider) => ({
+                  label: providerDisplayName(provider),
+                  value: provider,
+                })),
+              ]}
+              value={preferredProvider}
+            />
+            <NativeSelect
+              className="issue-model-select"
+              disabled={!preferredProvider}
+              label={t("issue.preferredModel")}
+              onValueChange={setPreferredModel}
+              options={
+                preferredProvider &&
+                preferredProvider in agentModels
+                  ? agentModels[preferredProvider as AgentProvider].map(
+                      (option) => ({
+                        ...option,
+                        label: option.value
+                          ? option.label
+                          : t("settings.providerDefaultModel"),
+                      }),
+                    )
+                  : []
+              }
+              placeholder={t("issue.selectProviderFirst")}
+              value={preferredModel}
             />
             <label className="issue-attachment-trigger">
               <Paperclip size={13} />

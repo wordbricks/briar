@@ -47,7 +47,9 @@ final class IssueMutationStore: ObservableObject {
                         description: description.isEmpty ? nil : description,
                         priority: draft.priority,
                         assigneeUserId: draft.assigneeUserId,
-                        status: draft.status
+                        status: draft.status,
+                        preferredProvider: draft.preferredProvider,
+                        preferredModel: draft.preferredModel
                     ),
                     as: CreateIssueResponse.self
                 )
@@ -60,6 +62,8 @@ final class IssueMutationStore: ObservableObject {
                     "priority": draft.priority.map(String.init) ?? "",
                     "assigneeUserId": draft.assigneeUserId ?? "",
                     "status": draft.status.rawValue,
+                    "preferredProvider": draft.preferredProvider?.rawValue ?? "",
+                    "preferredModel": draft.preferredModel ?? "",
                 ],
                 files: attachments.map {
                     MultipartFile(

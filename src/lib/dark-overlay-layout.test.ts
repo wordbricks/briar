@@ -75,7 +75,7 @@ describe("dark overlay layout", () => {
 
   it("keeps create-dialog assignee select content-sized, not full width", () => {
     const metadataSelectSizing = firstRule(
-      ".issue-dialog .issue-status-select.select-menu,\n.issue-dialog .issue-assignee-select.select-menu,\n.issue-dialog .issue-priority-select.select-menu",
+      ".issue-dialog .issue-status-select.select-menu,\n.issue-dialog .issue-assignee-select.select-menu,\n.issue-dialog .issue-priority-select.select-menu,\n.issue-dialog .issue-provider-select.select-menu,\n.issue-dialog .issue-model-select.select-menu",
     );
     expect(metadataSelectSizing).toContain("width: auto");
     expect(metadataSelectSizing).toContain("max-width: 180px");

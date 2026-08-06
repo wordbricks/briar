@@ -82,6 +82,63 @@ final class IssueMutationTests: XCTestCase {
         XCTAssertTrue(persistence.load().isEmpty)
     }
 
+    func testIssueDraftPersistsPreferredProviderAndModel() {
+        let suite = "IssueMutationTests-preferences-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let persistence = IssueDraftPersistence(defaults: defaults)
+
+        var draft = IssueDraft(title: "선호 실행 이슈")
+        draft.preferredProvider = .claude
+        draft.preferredModel = "sonnet"
+        XCTAssertFalse(draft.isEmpty)
+
+        persistence.save(draft)
+        let restored = persistence.load()
+        XCTAssertEqual(restored.preferredProvider, .claude)
+        XCTAssertEqual(restored.preferredModel, "sonnet")
+    }
+
+    func testCreateIssueRequestEncodesPreferredProviderAndModel() throws {
+        let request = CreateIssueRequest(
+            title: "선호 실행 이슈",
+            description: nil,
+            priority: 2,
+            assigneeUserId: nil,
+            status: .queued,
+            preferredProvider: .claude,
+            preferredModel: "sonnet"
+        )
+        let data = try JSONEncoder.mobileContract.encode(request)
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+        XCTAssertEqual(object["preferredProvider"] as? String, "claude")
+        XCTAssertEqual(object["preferredModel"] as? String, "sonnet")
+    }
+
+    func testCreateIssueSendsPreferredPreferences() async throws {
+        let recorder = MutationAPIRecorder()
+        let store = IssueMutationStore(
+            api: recorder,
+            projectID: Self.projectID,
+            token: "token"
+        )
+        var draft = IssueDraft(title: "선호 실행 이슈", description: "", priority: 2, status: .queued)
+        draft.preferredProvider = .claude
+        draft.preferredModel = "sonnet"
+
+        _ = try await store.createIssue(draft: draft, attachments: [])
+
+        let recorded = await recorder.lastJSONBodyData()
+        let bodyData = try XCTUnwrap(recorded)
+        let body = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: bodyData) as? [String: Any]
+        )
+        XCTAssertEqual(body["preferredProvider"] as? String, "claude")
+        XCTAssertEqual(body["preferredModel"] as? String, "sonnet")
+    }
+
     func testDuplicateCreateTapSendsOnlyOneRequest() async throws {
         let recorder = MutationAPIRecorder(delay: .milliseconds(100))
         let store = IssueMutationStore(

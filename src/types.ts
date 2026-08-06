@@ -45,6 +45,8 @@ export type CreateIssueInput = {
   status: "backlog" | "queued";
   attachments: File[];
   attachmentReferences?: string[];
+  preferredProvider?: AgentProvider | null;
+  preferredModel?: string | null;
 };
 
 export type UpdateIssueInput = {

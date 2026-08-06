@@ -315,7 +315,9 @@
         "description": "Create and run",
         "priority": 2,
         "assigneeUserId": "fixture-user",
-        "status": "queued"
+        "status": "queued",
+        "preferredProvider": "codex",
+        "preferredModel": "gpt-5.6-sol"
       },
       "response": {
         "runId": "33333333-3333-4333-8333-333333333333",

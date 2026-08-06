@@ -14,17 +14,20 @@ struct CreateIssueSheet: View {
 
     @ObservedObject var mutations: IssueMutationStore
     let members: [OrganizationMember]
+    let providers: [AgentProvider]
     let persistence: IssueDraftPersistence
     let refresh: () async -> Void
 
     init(
         mutations: IssueMutationStore,
         members: [OrganizationMember] = [],
+        providers: [AgentProvider] = [],
         persistence: IssueDraftPersistence = IssueDraftPersistence(),
         refresh: @escaping () async -> Void
     ) {
         self.mutations = mutations
         self.members = members
+        self.providers = providers.isEmpty ? AgentProvider.allCases : providers
         self.persistence = persistence
         self.refresh = refresh
         _draft = State(initialValue: persistence.load())
@@ -119,6 +122,13 @@ struct CreateIssueSheet: View {
                         Text("실행 대기").tag(DashboardRun.Status.queued)
                         Text("백로그").tag(DashboardRun.Status.backlog)
                     }
+                }
+                Section("선호 실행") {
+                    PreferredExecutionPicker(
+                        provider: $draft.preferredProvider,
+                        model: $draft.preferredModel,
+                        providers: providers
+                    )
                 }
                 if let errorMessage {
                     Section {
@@ -268,6 +278,41 @@ struct CreateIssueSheet: View {
             dismiss()
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private struct PreferredExecutionPicker: View {
+    @Binding var provider: AgentProvider?
+    @Binding var model: String?
+    let providers: [AgentProvider]
+
+    private var availableModels: [String] {
+        provider?.models ?? []
+    }
+
+    var body: some View {
+        VStack {
+            Picker("프로바이더", selection: $provider) {
+                Text("기본값").tag(AgentProvider?.none)
+                ForEach(providers) { provider in
+                    Text(provider.displayName)
+                        .tag(AgentProvider?.some(provider))
+                }
+            }
+            .accessibilityIdentifier("create-issue-provider")
+            Picker("모델", selection: $model) {
+                Text("기본값").tag(String?.none)
+                ForEach(availableModels, id: \.self) { model in
+                    Text(model).tag(String?.some(model))
+                }
+            }
+            .disabled(provider == nil)
+            .accessibilityIdentifier("create-issue-model")
+        }
+        .onChange(of: provider) { previous, provider in
+            guard previous != provider else { return }
+            model = nil
         }
     }
 }
