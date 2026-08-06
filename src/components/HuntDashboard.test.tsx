@@ -603,6 +603,7 @@ describe("HuntDashboard", () => {
     );
     expect(menu?.textContent).toContain("상태");
     expect(menu?.textContent).toContain("우선순위");
+    expect(menu?.textContent).toContain("체크포인트");
     expect(menu?.textContent).toContain("선호 프로바이더");
     expect(menu?.textContent).toContain("선호 모델");
     expect(menu?.textContent).toContain("바로 처리하기");
@@ -1873,6 +1874,59 @@ describe("HuntDashboard", () => {
     );
     await act(async () => openFullPage?.click());
     expect(onOpenFullPage).toHaveBeenCalledTimes(1);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("adds a checkpoint from an unstarted issue progress chart", async () => {
+    const onUpdateIssueCheckpoints = vi.fn(async () => undefined);
+    const run: HuntRun = {
+      ...demoDashboard.runs[0],
+      status: "queued",
+      workflowStage: null,
+      claimedAt: null,
+      leaseExpiresAt: null,
+      issueCheckpoints: [],
+      workflow: {
+        ...demoDashboard.runs[0].workflow,
+        execution: { checkpoints: [] },
+      },
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <RunPage
+        error={null}
+        isRecovering={false}
+        isSidebarOpen
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => []}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }}
+        onUpdateIssueCheckpoints={onUpdateIssueCheckpoints}
+        run={run}
+      />,
+    ));
+
+    const checkpoint = container.querySelector<HTMLButtonElement>(
+      '.issue-workflow-checkpoint[data-position="after"]',
+    );
+    expect(checkpoint?.disabled).toBe(false);
+    await act(async () => checkpoint?.click());
+    expect(onUpdateIssueCheckpoints).toHaveBeenCalledWith([
+      expect.objectContaining({
+        key: expect.stringMatching(/^issue-after-/u),
+        position: "after",
+      }),
+    ]);
 
     await act(async () => root.unmount());
     container.remove();

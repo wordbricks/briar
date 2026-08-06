@@ -5,6 +5,7 @@ import {
   autoHuntRequirementKinds,
   normalizeAutoHuntWorkflow,
   type AutoHuntWorkflow,
+  type AutoHuntWorkflowCheckpoint,
 } from "./auto-hunt-contract";
 import {
   defaultProjectAgentCalendarColor,
@@ -1316,6 +1317,9 @@ export async function createIssue(
   form.set("status", input.status);
   form.set("preferredProvider", input.preferredProvider ?? "");
   form.set("preferredModel", input.preferredModel ?? "");
+  if (input.checkpoints?.length) {
+    form.set("checkpoints", JSON.stringify(input.checkpoints));
+  }
   if (input.attachmentReferences?.length) {
     form.set(
       "attachmentReferences",
@@ -1479,6 +1483,21 @@ export async function updateIssueExecutionPreferences(
       body: JSON.stringify(input),
     },
   );
+}
+
+export async function updateIssueCheckpoints(
+  token: string,
+  projectId: string,
+  runId: string,
+  checkpoints: AutoHuntWorkflowCheckpoint[],
+) {
+  return request<{
+    runId: string;
+    checkpoints: AutoHuntWorkflowCheckpoint[];
+  }>(`/projects/${projectId}/runs/${runId}/checkpoints`, token, {
+    method: "PUT",
+    body: JSON.stringify({ checkpoints }),
+  });
 }
 
 export async function completeIssueResultReview(

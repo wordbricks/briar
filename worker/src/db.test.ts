@@ -721,6 +721,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         "utf8",
       ),
     );
+    await executeSql(
+      db,
+      await readFile(resolve("migrations/0067_issue_checkpoints.sql"), "utf8"),
+    );
   }, 30_000);
 
   afterAll(async () => {
@@ -4172,6 +4176,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       )
       .first<{ count: number }>();
     expect(assignedRuns?.count ?? 0).toBe(0);
+    const issueCheckpointRuns = await db
+      .prepare(
+        "select count(*) as count from briar_hunt_runs where issue_checkpoints_json <> '[]'",
+      )
+      .first<{ count: number }>();
+    expect(issueCheckpointRuns?.count ?? 0).toBe(0);
+    await db.prepare("alter table briar_hunt_runs drop column issue_checkpoints_json").run();
     await db.prepare("drop index briar_hunt_runs_assignee_idx").run();
     await db.prepare("alter table briar_hunt_runs drop column assignee_user_id").run();
     await db.prepare("drop index briar_hunt_runs_resume_requested_idx").run();
@@ -4248,6 +4259,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await executeSql(
       db,
       await readFile(resolve("migrations/0062_issue_assignees.sql"), "utf8"),
+    );
+    await executeSql(
+      db,
+      await readFile(resolve("migrations/0067_issue_checkpoints.sql"), "utf8"),
     );
   });
 

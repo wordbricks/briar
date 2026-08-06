@@ -209,6 +209,7 @@ import {
   updateOrganizationMemberRole,
   updateProjectIcon,
   updateIssue,
+  updateIssueCheckpoints,
   updateIssueExecutionPreferences,
   updateHuntRunExecutionMetrics,
   updateSlackInstallationProject,
@@ -997,6 +998,7 @@ const issueInputBaseSchema = z
       .nullable()
       .optional(),
     preferredModel: z.string().trim().min(1).max(100).nullable().optional(),
+    checkpoints: z.array(workflowCheckpointSchema).max(100).default([]),
   })
   .strict();
 
@@ -1348,6 +1350,15 @@ export async function readIssueRequest(request: Request) {
   const status = form.get("status");
   const preferredProvider = form.get("preferredProvider");
   const preferredModel = form.get("preferredModel");
+  const rawCheckpoints = form.get("checkpoints");
+  let checkpoints: unknown = [];
+  if (typeof rawCheckpoints === "string" && rawCheckpoints) {
+    try {
+      checkpoints = JSON.parse(rawCheckpoints);
+    } catch {
+      throw new HttpError(400, "Issue checkpoints are invalid");
+    }
+  }
   return {
     input: issueInputSchema.parse({
       title: form.get("title"),
@@ -1370,6 +1381,7 @@ export async function readIssueRequest(request: Request) {
         typeof preferredModel === "string" && preferredModel.trim()
           ? preferredModel
           : null,
+      checkpoints,
     }),
     attachments,
     attachmentReferences,
@@ -1945,6 +1957,7 @@ async function createIssueWithAttachments(input: {
       detail: input.detail,
       priority: input.issue.priority ?? null,
       assigneeUserId: input.issue.assigneeUserId ?? null,
+      issueCheckpoints: input.issue.checkpoints,
       branch: null,
       commitSha: null,
       tracker: null,
@@ -3177,6 +3190,7 @@ async function processSlackCreateIssueSubmission(
         description: submission.description,
         priority: null,
         status: "queued",
+        checkpoints: [],
       },
       attachments,
       sourceKey,
@@ -3954,6 +3968,7 @@ function dashboardRunJson(
           terminalReviewOnly,
         }
       : null,
+    issueCheckpoints: JSON.parse(run.issue_checkpoints_json || "[]"),
     detail: run.detail,
     priority: run.priority,
     assigneeUserId: run.assignee_user_id,
@@ -7000,6 +7015,9 @@ async function route(
   const issuePreferencesMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/preferences$/u,
   );
+  const issueCheckpointsMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/checkpoints$/u,
+  );
   const issueResultReviewsMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/result-reviews$/u,
   );
@@ -7078,6 +7096,37 @@ async function route(
       provider: run.preferred_agent_provider,
       model: run.preferred_agent_model,
       effort: run.preferred_agent_effort,
+    });
+  }
+  if (issueCheckpointsMatch && request.method === "PUT") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      issueCheckpointsMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const input = z
+      .object({ checkpoints: z.array(workflowCheckpointSchema).max(100) })
+      .strict()
+      .parse(await readJson(request));
+    const outcome = await updateIssueCheckpoints(
+      db,
+      project.id,
+      issueCheckpointsMatch[2],
+      input.checkpoints,
+      new Date().toISOString(),
+    );
+    if (outcome === "not_found") throw new HttpError(404, "Run not found");
+    if (outcome === "ineligible") {
+      throw new HttpError(
+        409,
+        "Checkpoints can only be changed before issue execution starts",
+      );
+    }
+    return json({
+      runId: issueCheckpointsMatch[2],
+      checkpoints: input.checkpoints,
     });
   }
   if (issueResultReviewsMatch && request.method === "POST") {

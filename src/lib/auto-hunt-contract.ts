@@ -79,14 +79,14 @@ const checkpointBoundaryId = (
 ) => `${checkpoint.stage}:${checkpoint.position}`;
 
 export const checkpointKeyForBoundary = (
-  owner: "project" | "user",
+  owner: "project" | "user" | "issue",
   checkpoint: Pick<AutoHuntWorkflowCheckpoint, "stage" | "position">,
 ) => `${owner}-${checkpoint.position}-${checkpoint.stage}`;
 
 export function canonicalizeCheckpointSet(
   workflow: AutoHuntWorkflow,
   checkpoints: AutoHuntWorkflowCheckpoint[],
-  owner: "project" | "user",
+  owner: "project" | "user" | "issue",
 ) {
   const normalized = normalizeAutoHuntWorkflow(workflow);
   const stageOrder = new Map(
@@ -174,6 +174,42 @@ export function workflowWithEffectiveCheckpoints(
     version: 2,
     execution: { checkpoints: policy.effective },
   });
+}
+
+export function workflowWithAdditionalCheckpoints(
+  workflow: AutoHuntWorkflow,
+  checkpoints: AutoHuntWorkflowCheckpoint[],
+) {
+  const normalized = normalizeAutoHuntWorkflow(workflow);
+  const additional = additionalWorkflowCheckpoints(normalized, checkpoints);
+  return normalizeAutoHuntWorkflow({
+    ...normalized,
+    execution: {
+      checkpoints: canonicalizeCheckpointSet(
+        normalized,
+        [...normalized.execution.checkpoints, ...additional],
+        "project",
+      ),
+    },
+  });
+}
+
+export function additionalWorkflowCheckpoints(
+  workflow: AutoHuntWorkflow,
+  checkpoints: AutoHuntWorkflowCheckpoint[],
+) {
+  const normalized = normalizeAutoHuntWorkflow(workflow);
+  const additional = canonicalizeCheckpointSet(
+    normalized,
+    checkpoints,
+    "issue",
+  );
+  const existingBoundaries = new Set(
+    normalized.execution.checkpoints.map(checkpointBoundaryId),
+  );
+  return additional.filter(
+    (checkpoint) => !existingBoundaries.has(checkpointBoundaryId(checkpoint)),
+  );
 }
 
 export const autoHuntRequirementKinds = [

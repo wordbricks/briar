@@ -44,6 +44,7 @@ import {
   resumeHuntRun,
   removeIssueDependency,
   updateIssue,
+  updateIssueCheckpoints,
   updateIssueExecutionPreferences,
   updateAccountProfile as updateRemoteAccountProfile,
   updateOrganization as updateRemoteOrganization,
@@ -115,6 +116,8 @@ import {
   isRepositoryWorkflowPending,
   progressForAutoHuntRun,
   repositoryWorkflowBootstrap,
+  workflowWithAdditionalCheckpoints,
+  type AutoHuntWorkflowCheckpoint,
 } from "../lib/auto-hunt-contract";
 import { isMobileCompanion, isWebApp } from "../lib/platform";
 import { canonicalizeIssueAttachmentReferences } from "../lib/issue-markdown";
@@ -2001,6 +2004,15 @@ export function useBriar(options: UseBriarOptions = {}) {
             occurredAt,
             recordedAt: occurredAt,
           };
+          const baseWorkflow = targetDashboard.settings.checkpointPolicy
+            ? {
+                ...targetDashboard.settings.workflow,
+                execution: {
+                  checkpoints:
+                    targetDashboard.settings.checkpointPolicy.effective,
+                },
+              }
+            : targetDashboard.settings.workflow;
           const run: HuntRun = {
             id: crypto.randomUUID(),
             runNumber:
@@ -2015,7 +2027,11 @@ export function useBriar(options: UseBriarOptions = {}) {
             title: input.title.trim(),
             status: input.status,
             workflowStage: null,
-            workflow: targetDashboard.settings.workflow,
+            workflow: workflowWithAdditionalCheckpoints(
+              baseWorkflow,
+              input.checkpoints ?? [],
+            ),
+            issueCheckpoints: input.checkpoints ?? [],
             progress: input.status === "backlog" ? 0 : 5,
             detail,
             priority: input.priority,
@@ -2191,6 +2207,70 @@ export function useBriar(options: UseBriarOptions = {}) {
         return result;
       } catch (caught) {
         setError(caught instanceof Error ? caught.message : String(caught));
+        throw caught;
+      } finally {
+        setUpdatingIssueId(null);
+      }
+    },
+    [activeProjectId, dashboard, refresh, token],
+  );
+
+  const editIssueCheckpoints = useCallback(
+    async (runId: string, checkpoints: AutoHuntWorkflowCheckpoint[]) => {
+      if (!activeProjectId || !dashboard) {
+        throw new Error("이슈를 수정할 프로젝트가 없습니다.");
+      }
+      setUpdatingIssueId(runId);
+      setError(null);
+      try {
+        if (demoMode) {
+          const updatedAt = new Date().toISOString();
+          setDashboard((current) => current
+            ? {
+                ...current,
+                runs: current.runs.map((run) => {
+                  if (run.id !== runId) return run;
+                  const previousBoundaries = new Set(
+                    (run.issueCheckpoints ?? []).map(
+                      (checkpoint) => `${checkpoint.stage}:${checkpoint.position}`,
+                    ),
+                  );
+                  const baseWorkflow = {
+                    ...run.workflow,
+                    execution: {
+                      checkpoints: run.workflow.execution.checkpoints.filter(
+                        (checkpoint) => !previousBoundaries.has(
+                          `${checkpoint.stage}:${checkpoint.position}`,
+                        ),
+                      ),
+                    },
+                  };
+                  return {
+                    ...run,
+                    workflow: workflowWithAdditionalCheckpoints(
+                      baseWorkflow,
+                      checkpoints,
+                    ),
+                    issueCheckpoints: checkpoints,
+                    updatedAt,
+                  };
+                }),
+              }
+            : current);
+          return { runId, checkpoints };
+        }
+        if (!token) throw new Error("로그인이 필요합니다.");
+        const result = await updateIssueCheckpoints(
+          token,
+          activeProjectId,
+          runId,
+          checkpoints,
+        );
+        await refresh("snapshot");
+        return result;
+      } catch (caught) {
+        const message = caught instanceof Error ? caught.message : String(caught);
+        setError(message);
         throw caught;
       } finally {
         setUpdatingIssueId(null);
@@ -3146,6 +3226,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     refreshVelen,
     readIssueAttachment,
     editIssue,
+    editIssueCheckpoints,
     editIssueExecutionPreferences,
     completeResultReview,
     addIssueDependency: (dependentRunId: string, prerequisiteRunId: string) =>
