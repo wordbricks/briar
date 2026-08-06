@@ -349,6 +349,7 @@ export type HuntRunPlacement = {
 export type Project = {
   id: string;
   name: string;
+  issueKeyPrefix?: string;
   icon?: string | null;
   organizationId?: string;
   organizationName?: string;

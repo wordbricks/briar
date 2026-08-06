@@ -47,6 +47,7 @@ describe("ProjectSettings", () => {
       }],
     }));
     const onIconChange = vi.fn(async () => undefined);
+    const onIssueKeyPrefixChange = vi.fn(async () => undefined);
     vi.mocked(projectIconFromFile).mockResolvedValue(
       "data:image/webp;base64,aWNvbg==",
     );
@@ -139,6 +140,7 @@ describe("ProjectSettings", () => {
           onLoadLinearImportStates={onLoadLinearImportStates}
           onImportLinearIssues={onImportLinearIssues}
           onIconChange={onIconChange}
+          onIssueKeyPrefixChange={onIssueKeyPrefixChange}
           onRefreshVelen={onRefreshVelen}
           project={{
             id: "project-1",
@@ -369,6 +371,22 @@ describe("ProjectSettings", () => {
     expect(container.querySelector(".project-settings-card")?.textContent).toContain(
       "Briar",
     );
+    const prefixInput = container.querySelector<HTMLInputElement>(
+      'input[aria-label="이슈 키 프리픽스"]',
+    )!;
+    await act(async () => {
+      const valueSetter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set;
+      valueSetter?.call(prefixInput, "br");
+      prefixInput.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const prefixSaveButton = prefixInput.parentElement?.querySelector("button");
+    await act(async () => prefixSaveButton?.click());
+    expect(onIssueKeyPrefixChange).toHaveBeenCalledWith("project-1", "BR");
+    expect(container.textContent).toContain("이슈 키 프리픽스를 저장했습니다.");
+
     const iconFile = new File(["icon"], "icon.svg", { type: "image/svg+xml" });
     const iconInput = container.querySelector<HTMLInputElement>(
       'input[aria-label="아이콘 업로드"]',
@@ -422,6 +440,7 @@ describe("ProjectSettings", () => {
             truncated: false,
           })}
           onIconChange={async () => undefined}
+          onIssueKeyPrefixChange={async () => undefined}
           onRefreshVelen={async () => null}
           project={{
             id: "project-1",

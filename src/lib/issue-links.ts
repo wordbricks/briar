@@ -1,3 +1,5 @@
+import { formatIssueKey } from "./issue-key";
+
 const issueLinkPathPattern =
   /^\/open\/issues\/([0-9a-f-]{36})\/([0-9a-f-]{36})\/?$/iu;
 const sessionLinkPathPattern =
@@ -129,8 +131,11 @@ async function copyText(value: string): Promise<void> {
   if (!copied) throw new Error("Unable to copy text");
 }
 
-export async function copyIssueId(runNumber: number): Promise<void> {
-  await copyText(`AH-${runNumber}`);
+export async function copyIssueId(
+  runNumber: number,
+  issueKeyPrefix?: string,
+): Promise<void> {
+  await copyText(formatIssueKey(issueKeyPrefix, runNumber));
 }
 
 export async function copyIssueShareLink(input: {

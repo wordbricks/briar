@@ -56,6 +56,8 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(pending.error, .authorizationPending)
         XCTAssertEqual(user.user.email, "user@example.com")
         XCTAssertEqual(projects.projects.first?.role, .owner)
+        XCTAssertEqual(projects.projects.first?.effectiveIssueKeyPrefix, "BR")
+        XCTAssertEqual(projects.projects.first?.issueKey(runNumber: 42), "BR-42")
         XCTAssertEqual(snapshot.cursor, 41)
         XCTAssertEqual(snapshot.runs.first?.status, .running)
         XCTAssertEqual(snapshot.runs.first?.workflow?.stages.count, 3)

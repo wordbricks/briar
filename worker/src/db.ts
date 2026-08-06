@@ -44,6 +44,7 @@ type ModelEffort = "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
 export type ProjectRow = {
   id: string;
   name: string;
+  issue_key_prefix: string;
   icon: string | null;
   organization_id: string;
   organization_name: string;
@@ -3448,6 +3449,7 @@ export async function listProjects(db: D1Database, userId: string) {
   const result = await db
     .prepare(
       `select project.id, project.name,
+              project.issue_key_prefix,
               coalesce(project.icon_data_url_browser, project.icon_data_url) as icon,
               project.organization_id,
               organization.name as organization_name,
@@ -3471,6 +3473,7 @@ export async function listOrganizationProjects(
   const result = await db
     .prepare(
       `select project.id, project.name,
+              project.issue_key_prefix,
               coalesce(project.icon_data_url_browser, project.icon_data_url) as icon,
               project.organization_id,
               organization.name as organization_name,
@@ -3499,6 +3502,7 @@ export async function createProject(
   const project: ProjectRow = {
     id: crypto.randomUUID(),
     name: input.name,
+    issue_key_prefix: "AH",
     icon: null,
     organization_id: input.organizationId,
     organization_name: "",
@@ -3584,6 +3588,7 @@ export async function getProject(
   return await db
     .prepare(
       `select project.id, project.name,
+              project.issue_key_prefix,
               coalesce(project.icon_data_url_browser, project.icon_data_url) as icon,
               project.organization_id,
               organization.name as organization_name,
@@ -3612,6 +3617,23 @@ export async function updateProjectIcon(
        where id = ?`,
     )
     .bind(icon, updatedAt, projectId)
+    .run();
+  return result.meta.changes > 0;
+}
+
+export async function updateProjectIssueKeyPrefix(
+  db: D1Database,
+  projectId: string,
+  issueKeyPrefix: string,
+) {
+  const updatedAt = new Date().toISOString();
+  const result = await db
+    .prepare(
+      `update briar_projects
+       set issue_key_prefix = ?, updated_at = ?
+       where id = ?`,
+    )
+    .bind(issueKeyPrefix, updatedAt, projectId)
     .run();
   return result.meta.changes > 0;
 }

@@ -767,7 +767,10 @@ describe("HuntDashboard", () => {
       <ToastProvider>
         <HuntDashboard
           {...dashboardProps}
-          dashboard={demoDashboard}
+          dashboard={{
+            ...demoDashboard,
+            project: { ...demoDashboard.project, issueKeyPrefix: "BR" },
+          }}
           onDeleteIssue={onDeleteIssue}
         />
       </ToastProvider>,
@@ -793,7 +796,7 @@ describe("HuntDashboard", () => {
     expect(copyId?.getAttribute("aria-label")).toBe("이슈 ID 복사");
     await act(async () => copyId?.click());
     expect(writeText).toHaveBeenCalledWith(
-      `AH-${demoDashboard.runs[0].runNumber}`,
+      `BR-${demoDashboard.runs[0].runNumber}`,
     );
     const toastMessages = () =>
       Array.from(

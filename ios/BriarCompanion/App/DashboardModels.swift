@@ -503,12 +503,22 @@ enum TaskOrdering {
 }
 
 enum TaskSearch {
-    static func results(in runs: [DashboardRun], query: String) -> [DashboardRun] {
+    static func results(
+        in runs: [DashboardRun],
+        query: String,
+        issueKeyPrefix: String = "AH"
+    ) -> [DashboardRun] {
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !needle.isEmpty else { return TaskOrdering.byMostRecentlyUpdated(runs) }
         return TaskOrdering.byMostRecentlyUpdated(
             runs.filter { run in
-                [run.title, run.detail, run.issueDescription, run.resultSummary]
+                [
+                    run.title,
+                    run.detail,
+                    run.issueDescription,
+                    run.resultSummary,
+                    run.runNumber.map { "\(issueKeyPrefix)-\($0)" },
+                ]
                     .compactMap { $0 }
                     .contains { $0.localizedCaseInsensitiveContains(needle) }
             }

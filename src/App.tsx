@@ -1231,6 +1231,7 @@ export function App() {
               briar.runLinearIssueImport(activeProject.id, input)
             }
             onIconChange={briar.changeProjectIcon}
+            onIssueKeyPrefixChange={briar.changeProjectIssueKeyPrefix}
             onRefreshVelen={briar.refreshVelen}
             onRefreshHealth={briar.refreshHealth}
             project={activeProject}
@@ -1359,6 +1360,7 @@ export function App() {
                   isProcessing={processingIssueIds.has(inboxDetailRun.id)}
                   isRecovering={briar.recoveringRunId === inboxDetailRun.id}
                   isSidebarOpen
+                  issueKeyPrefix={briar.dashboard?.project.issueKeyPrefix}
                   isUpdatingIssue={
                     briar.updatingIssueId === inboxDetailRun.id
                   }
@@ -1436,6 +1438,11 @@ export function App() {
               ) : inboxDetailSession ? (
                 <ProjectAgentSessionDetail
                   isSidebarOpen
+                  issueKeyPrefix={
+                    briar.projects.find(
+                      (project) => project.id === inboxDetailSession.projectId,
+                    )?.issueKeyPrefix
+                  }
                   onBack={() => setInboxDetailTarget(null)}
                   onIssueOpen={(runId) =>
                     setInboxDetailTarget((current) =>
@@ -1553,6 +1560,11 @@ export function App() {
         {requestedCompanionSession ? (
           <ProjectAgentSessionDetail
             isSidebarOpen
+            issueKeyPrefix={
+              briar.projects.find(
+                (project) => project.id === requestedCompanionSession.projectId,
+              )?.issueKeyPrefix
+            }
             onBack={() => setRequestedSessionId(null)}
             onIssueOpen={(runId) => {
               setRequestedSessionId(null);

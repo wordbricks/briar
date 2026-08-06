@@ -82,6 +82,7 @@ const sessionUserSchema = z.object({
 const projectSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
+  issueKeyPrefix: z.string().regex(/^[A-Z0-9]{1,3}$/u).default("AH"),
   icon: z
     .string()
     .max(400_000)
@@ -996,6 +997,22 @@ export async function updateProjectIcon(
     {
       method: "PUT",
       body: JSON.stringify({ icon }),
+    },
+  );
+  return { project: projectSchema.parse(result.project) };
+}
+
+export async function updateProjectIssueKeyPrefix(
+  token: string,
+  projectId: string,
+  issueKeyPrefix: string,
+) {
+  const result = await request<{ project: unknown }>(
+    `/projects/${projectId}/issue-key-prefix`,
+    token,
+    {
+      method: "PUT",
+      body: JSON.stringify({ issueKeyPrefix }),
     },
   );
   return { project: projectSchema.parse(result.project) };

@@ -61,6 +61,7 @@ afterEach(async () => {
 async function mount(
   session: AutoHuntSession,
   onIssueOpen: (runId: string) => void = vi.fn(),
+  issueKeyPrefix?: string,
 ) {
   const container = document.createElement("div");
   document.body.append(container);
@@ -71,6 +72,7 @@ async function mount(
       <ToastProvider>
         <ProjectAgentSessionDetail
           isSidebarOpen={true}
+          issueKeyPrefix={issueKeyPrefix}
           onBack={vi.fn()}
           onIssueOpen={onIssueOpen}
           onStop={vi.fn().mockResolvedValue(true)}
@@ -147,12 +149,12 @@ describe("ProjectAgentSessionDetail", () => {
         outcome: "pending",
         summary: "이슈 카드 요약",
       }],
-    }, onIssueOpen);
+    }, onIssueOpen, "BR");
     const card = container.querySelector<HTMLButtonElement>(
       'button[aria-label="연결된 이슈 상세"]',
     );
 
-    expect(card?.textContent).toContain("AH-42");
+    expect(card?.textContent).toContain("BR-42");
     expect(card?.textContent).toContain("이슈 카드 요약");
     expect(card?.querySelector("svg")).not.toBeNull();
 

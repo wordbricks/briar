@@ -213,6 +213,7 @@ import {
   updateOrganizationLogo,
   updateOrganizationMemberRole,
   updateProjectIcon,
+  updateProjectIssueKeyPrefix,
   updateIssue,
   updateIssueCheckpoints,
   updateIssueExecutionPreferences,
@@ -730,6 +731,15 @@ export const projectIconInputSchema = z
         /^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/]+={0,2}$/iu,
       )
       .nullable(),
+  })
+  .strict();
+export const projectIssueKeyPrefixInputSchema = z
+  .object({
+    issueKeyPrefix: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .regex(/^[A-Z0-9]{1,3}$/u),
   })
   .strict();
 const projectAgentInputSchema = z
@@ -2440,6 +2450,7 @@ function projectJson(row: ProjectRow) {
   return {
     id: row.id,
     name: row.name,
+    issueKeyPrefix: row.issue_key_prefix,
     icon: row.icon,
     organizationId: row.organization_id,
     organizationName: row.organization_name,
@@ -2832,6 +2843,7 @@ async function processSlackAppMention(env: Env, payload: SlackEventCallback) {
         statusLabel,
         priorityLabel,
         runNumber: run.run_number,
+        issueKeyPrefix: project.issue_key_prefix,
       }),
     );
     await completeSlackEvent(
@@ -3315,6 +3327,7 @@ async function processSlackCreateIssueSubmission(
         projectName: project.name,
         statusLabel: "작업 대기열",
         runNumber: run.run_number,
+        issueKeyPrefix: project.issue_key_prefix,
       });
       if (submission.responseUrl) {
         await postSlackCommandResponse(submission.responseUrl, text);
@@ -5574,6 +5587,40 @@ async function route(
       throw new HttpError(404, "Project not found");
     }
     return json({ project: projectJson({ ...project, icon: input.icon }) });
+  }
+
+  const projectIssueKeyPrefixMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/issue-key-prefix$/u,
+  );
+  if (projectIssueKeyPrefixMatch && request.method === "PUT") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      projectIssueKeyPrefixMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    if (!canManageOrganization(project.member_role)) {
+      throw new HttpError(403, "Organization admin access required");
+    }
+    const input = projectIssueKeyPrefixInputSchema.parse(
+      await readJson(request),
+    );
+    if (
+      !(await updateProjectIssueKeyPrefix(
+        db,
+        project.id,
+        input.issueKeyPrefix,
+      ))
+    ) {
+      throw new HttpError(404, "Project not found");
+    }
+    return json({
+      project: projectJson({
+        ...project,
+        issue_key_prefix: input.issueKeyPrefix,
+      }),
+    });
   }
 
   const settingsMatch = pathname.match(/^\/projects\/([0-9a-f-]+)\/settings$/u);

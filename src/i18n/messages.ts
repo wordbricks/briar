@@ -1129,6 +1129,11 @@ export const ko = {
   "settings.navAgent": "에이전트 구성",
   "settings.navAgentDescription": "이 프로젝트에서 실행되는 에이전트의 공통 런타임과 권한을 관리합니다.",
   "settings.projectName": "프로젝트 이름",
+  "settings.issueKeyPrefix": "이슈 키 프리픽스",
+  "settings.issueKeyPrefixDescription": "이 프로젝트의 이슈 번호 앞에 표시할 짧은 코드를 설정합니다.",
+  "settings.issueKeyPrefixHint": "영문 또는 숫자 1~3자 · 예: BR-42",
+  "settings.issueKeyPrefixSaved": "이슈 키 프리픽스를 저장했습니다.",
+  "settings.issueKeyPrefixSaveFailed": "이슈 키 프리픽스를 저장하지 못했습니다.",
   "settings.created": "생성일 {date}",
   "settings.velenTitle": "Velen 연결",
   "settings.velenDescription": "조직 데이터와 메모리 컨텍스트가 필요할 때 선택적으로 연결합니다.",
@@ -1445,6 +1450,11 @@ export type Messages = Record<MessageKey, string>;
 
 export const en: Messages = {
   ...ko,
+  "settings.issueKeyPrefix": "Issue key prefix",
+  "settings.issueKeyPrefixDescription": "Set the short code shown before issue numbers in this project.",
+  "settings.issueKeyPrefixHint": "1–3 letters or numbers · Example: BR-42",
+  "settings.issueKeyPrefixSaved": "Issue key prefix saved.",
+  "settings.issueKeyPrefixSaveFailed": "The issue key prefix couldn't be saved.",
   "run.issueUpdateProposalTitle": "Current issue edit proposal",
   "run.issueCreateProposalTitle": "New issue proposal",
   "run.issueUpdateProposalAccept": "Accept and update issue",
@@ -2170,6 +2180,11 @@ export const en: Messages = {
 };
 export const zh: Messages = {
   ...en,
+  "settings.issueKeyPrefix": "问题键前缀",
+  "settings.issueKeyPrefixDescription": "设置显示在此项目问题编号前的短代码。",
+  "settings.issueKeyPrefixHint": "1–3 个字母或数字 · 示例：BR-42",
+  "settings.issueKeyPrefixSaved": "问题键前缀已保存。",
+  "settings.issueKeyPrefixSaveFailed": "无法保存问题键前缀。",
   "run.issueUpdateProposalTitle": "当前问题修改建议",
   "run.issueCreateProposalTitle": "新问题创建建议",
   "run.issueUpdateProposalAccept": "接受并修改问题",

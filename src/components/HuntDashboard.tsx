@@ -156,6 +156,7 @@ import {
   copyIssueShareLink,
   shareIssueLink,
 } from "../lib/issue-links";
+import { formatIssueKey } from "../lib/issue-key";
 import type {
   CreateIssueInput,
   DashboardPayload,
@@ -747,14 +748,27 @@ export function HuntDashboard({
         status === "completed" &&
         !["completed", "cancelled"].includes(run.status)
       ) return false;
-      return !normalized || `${run.title} ${run.sourceKey} ${run.repository}`.toLowerCase().includes(normalized);
+      return !normalized || [
+        run.title,
+        run.sourceKey,
+        run.repository,
+        formatIssueKey(dashboard?.project.issueKeyPrefix, run.runNumber),
+      ].join(" ").toLowerCase().includes(normalized);
     });
     // Mobile companion Tasks list: newest updated first (iOS native parity).
     if (!companionMode) return next;
     return [...next].sort((left, right) =>
       right.updatedAt.localeCompare(left.updatedAt),
     );
-  }, [companionMode, companionSearchMode, query, runs, source, status]);
+  }, [
+    companionMode,
+    companionSearchMode,
+    dashboard?.project.issueKeyPrefix,
+    query,
+    runs,
+    source,
+    status,
+  ]);
   const agentAssociationsByRunId = useMemo(() => {
     const agentById = new Map(agents.map((agent) => [agent.id, agent]));
     const activeAgents = new Map<string, ProjectAgent>();
@@ -1037,6 +1051,7 @@ export function HuntDashboard({
             null
           }
           companionMode={companionMode}
+          issueKeyPrefix={dashboard?.project.issueKeyPrefix}
           currentUserId={currentUserId}
           error={recoveryError}
           isDeletingIssue={deletingIssueId === selected.id}
@@ -1302,6 +1317,7 @@ export function HuntDashboard({
         {view === "list" && !companionMode ? (
           <IssueList
             availableProviders={availableProviders}
+            issueKeyPrefix={dashboard?.project.issueKeyPrefix}
             deletingIssueId={deletingIssueId}
             onDelete={(runId) => {
               setContextDeleteError(null);
@@ -1409,6 +1425,7 @@ export function HuntDashboard({
                   >
                     <KanbanCard
                       availableProviders={availableProviders}
+                      issueKeyPrefix={dashboard?.project.issueKeyPrefix}
                       activeAgent={
                         agentAssociationsByRunId.activeAgents.get(run.id) ?? null
                       }
@@ -2854,6 +2871,7 @@ function KanbanCard({
   isDragging = false,
   isMoving,
   isProcessing,
+  issueKeyPrefix,
   onDelete,
   onTransfer,
   onPointerCancel,
@@ -2880,6 +2898,7 @@ function KanbanCard({
   isDragging?: boolean;
   isMoving: boolean;
   isProcessing: boolean;
+  issueKeyPrefix?: string;
   onDelete: () => void;
   onTransfer?: () => void;
   onPointerCancel: (event: ReactPointerEvent<HTMLElement>) => void;
@@ -2984,7 +3003,7 @@ function KanbanCard({
           </span>
         )}
         <span className="kanban-card-kicker">
-          <small>AH-{run.runNumber}</small>
+          <small>{formatIssueKey(issueKeyPrefix, run.runNumber)}</small>
           {run.workflowStage && (
             <i
               aria-label={run.workflow.stages.find((stage) => stage.id === run.workflowStage)?.label ?? run.workflowStage}
@@ -3597,6 +3616,7 @@ function IssueContextMenu({
 
 function IssueList({
   availableProviders,
+  issueKeyPrefix,
   deletingIssueId,
   onDelete,
   onTransfer,
@@ -3613,6 +3633,7 @@ function IssueList({
   updatingIssueId,
 }: {
   availableProviders: AgentProvider[];
+  issueKeyPrefix?: string;
   deletingIssueId: string | null;
   onDelete: (runId: string) => void;
   onTransfer?: (runId: string) => void;
@@ -3723,7 +3744,7 @@ function IssueList({
                 <span className="issue-list-task" role="cell">
                   <span className="issue-list-task-kicker">
                     <small>
-                      AH-{run.runNumber} · {run.sourceKey}
+                      {formatIssueKey(issueKeyPrefix, run.runNumber)} · {run.sourceKey}
                       {assignee ? ` · ${assignee.name}` : ""}
                     </small>
                     <PullRequestIconLink urls={run.pullRequestUrls} />
@@ -3775,6 +3796,7 @@ export function RunPage({
   isRecovering,
   isUpdatingIssue = false,
   isSidebarOpen,
+  issueKeyPrefix,
   onBack,
   onAddDependency,
   onAcceptIssueAction,
@@ -3820,6 +3842,7 @@ export function RunPage({
   isRecovering: boolean;
   isUpdatingIssue?: boolean;
   isSidebarOpen: boolean;
+  issueKeyPrefix?: string;
   onBack: () => void;
   onAddDependency?: (prerequisiteRunId: string) => Promise<unknown>;
   onAcceptIssueAction?: (
@@ -4398,7 +4421,7 @@ export function RunPage({
   };
   const copyId = async () => {
     try {
-      await copyIssueId(run.runNumber);
+      await copyIssueId(run.runNumber, issueKeyPrefix);
       toast(t("issue.idCopied"), { tone: "success" });
     } catch {
       toast(t("issue.copyIdFailed"), { tone: "error" });
@@ -4477,7 +4500,7 @@ export function RunPage({
             <ArrowLeft aria-hidden="true" size={16} />
           </Button>
           <small className="run-page-window-number">
-            AH-{run.runNumber}
+            {formatIssueKey(issueKeyPrefix, run.runNumber)}
           </small>
           <strong
             className="run-page-window-title"
@@ -4577,7 +4600,7 @@ export function RunPage({
                 </button>
                 <div className="run-page-overview">
                   <div className="run-page-title-row">
-                    <small>AH-{run.runNumber}</small>
+                    <small>{formatIssueKey(issueKeyPrefix, run.runNumber)}</small>
                     <h1 id="run-page-title">{run.title}</h1>
                     <IssueActionsMenu
                       disabled={isUpdatingIssue || isDeletingIssue || isRecovering}
@@ -5614,6 +5637,7 @@ export function RunPage({
                 </section>
                 <IssueDependenciesPanel
                   availableRuns={availableRuns}
+                  issueKeyPrefix={issueKeyPrefix}
                   isUpdating={isUpdatingIssue}
                   onAdd={onAddDependency}
                   onOpen={onDependencyOpen}
@@ -5946,6 +5970,7 @@ function IssueActionsMenu({
 
 function IssueDependenciesPanel({
   availableRuns,
+  issueKeyPrefix,
   isUpdating,
   onAdd,
   onOpen,
@@ -5953,6 +5978,7 @@ function IssueDependenciesPanel({
   run,
 }: {
   availableRuns: HuntRun[];
+  issueKeyPrefix?: string;
   isUpdating: boolean;
   onAdd?: (prerequisiteRunId: string) => Promise<unknown>;
   onOpen?: (runId: string) => void;
@@ -5978,7 +6004,7 @@ function IssueDependenciesPanel({
     ? candidates.filter((candidate) =>
         [
           candidate.title,
-          `AH-${candidate.runNumber}`,
+          formatIssueKey(issueKeyPrefix, candidate.runNumber),
           candidate.status,
         ].some((value) => value.toLocaleLowerCase().includes(normalizedSearchQuery)),
       )
@@ -6005,7 +6031,7 @@ function IssueDependenciesPanel({
             onClick={() => onOpen?.(dependency.id)}
             type="button"
           >
-            <span>AH-{dependency.runNumber}</span>
+            <span>{formatIssueKey(issueKeyPrefix, dependency.runNumber)}</span>
             <strong>{dependency.title}</strong>
             <small>{t(`status.${dependency.status}` as MessageKey)}</small>
           </button>
@@ -6114,7 +6140,7 @@ function IssueDependenciesPanel({
                 >
                   <span className="issue-dependency-picker-copy">
                     <span>
-                      AH-{candidate.runNumber} · {t(`status.${candidate.status}` as MessageKey)}
+                      {formatIssueKey(issueKeyPrefix, candidate.runNumber)} · {t(`status.${candidate.status}` as MessageKey)}
                     </span>
                     <strong>{candidate.title}</strong>
                   </span>

@@ -18,6 +18,7 @@ final class CompanionReadTests: XCTestCase {
             ),
             DashboardRun(
                 id: UUID(uuidString: "22222222-2222-4222-8222-222222222222")!,
+                runNumber: 2,
                 title: "Offline recovery",
                 status: .blocked,
                 detail: "Needs network attention",
@@ -60,6 +61,10 @@ final class CompanionReadTests: XCTestCase {
         XCTAssertEqual(TaskSearch.results(in: runs, query: "Markdown").count, 1)
         XCTAssertEqual(TaskSearch.results(in: runs, query: "network").count, 1)
         XCTAssertEqual(TaskSearch.results(in: runs, query: "Android").count, 1)
+        XCTAssertEqual(
+            TaskSearch.results(in: runs, query: "BR-2", issueKeyPrefix: "BR").count,
+            1
+        )
         XCTAssertEqual(TaskSearch.results(in: runs, query: "missing").count, 0)
     }
 
