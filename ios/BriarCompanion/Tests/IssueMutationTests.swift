@@ -139,6 +139,99 @@ final class IssueMutationTests: XCTestCase {
         XCTAssertEqual(body["preferredModel"] as? String, "sonnet")
     }
 
+    func testDispatchRunRequestEncodesWorkerSelection() throws {
+        let requestID = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!
+
+        let specific = DispatchRunRequest(
+            provider: .codex,
+            model: nil,
+            effort: nil,
+            persistPreferences: true,
+            workerId: "worker-1",
+            requestId: requestID
+        )
+        let specificData = try JSONEncoder.mobileContract.encode(specific)
+        let specificObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: specificData) as? [String: Any]
+        )
+        XCTAssertEqual(specificObject["workerId"] as? String, "worker-1")
+
+        let auto = DispatchRunRequest(
+            provider: .codex,
+            model: nil,
+            effort: nil,
+            persistPreferences: true,
+            workerId: nil,
+            requestId: requestID
+        )
+        let autoData = try JSONEncoder.mobileContract.encode(auto)
+        let autoObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: autoData) as? [String: Any]
+        )
+        // Swift synthesized Codable omits nil optional keys; the server treats a
+        // missing workerId the same as null (auto-assign), matching dispatchMode "any".
+        XCTAssertFalse(autoObject.keys.contains("workerId"))
+    }
+
+    func testDispatchSendsSelectedWorkerID() async throws {
+        let recorder = MutationAPIRecorder()
+        let requestID = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!
+        let store = IssueMutationStore(
+            api: recorder,
+            projectID: Self.projectID,
+            token: "token",
+            requestID: { requestID }
+        )
+
+        try await store.dispatch(
+            runID: Self.runID,
+            preferences: IssueExecutionPreferences(
+                provider: .codex,
+                model: nil,
+                effort: nil
+            ),
+            workerID: "worker-1",
+            reassign: false
+        )
+
+        let bodyData = try XCTUnwrap(await recorder.lastJSONBodyData())
+        let body = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: bodyData) as? [String: Any]
+        )
+        XCTAssertEqual(body["workerId"] as? String, "worker-1")
+        XCTAssertEqual(body["provider"] as? String, "codex")
+        XCTAssertEqual(body["requestId"] as? String, requestID.uuidString)
+    }
+
+    func testDispatchSendsAutoAssignmentWhenNoWorkerSelected() async throws {
+        let recorder = MutationAPIRecorder()
+        let requestID = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!
+        let store = IssueMutationStore(
+            api: recorder,
+            projectID: Self.projectID,
+            token: "token",
+            requestID: { requestID }
+        )
+
+        try await store.dispatch(
+            runID: Self.runID,
+            preferences: IssueExecutionPreferences(
+                provider: .claude,
+                model: nil,
+                effort: nil
+            ),
+            workerID: nil,
+            reassign: false
+        )
+
+        let bodyData = try XCTUnwrap(await recorder.lastJSONBodyData())
+        let body = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: bodyData) as? [String: Any]
+        )
+        XCTAssertFalse(body.keys.contains("workerId"))
+        XCTAssertEqual(body["provider"] as? String, "claude")
+    }
+
     func testDuplicateCreateTapSendsOnlyOneRequest() async throws {
         let recorder = MutationAPIRecorder(delay: .milliseconds(100))
         let store = IssueMutationStore(
@@ -450,6 +543,8 @@ private actor MutationAPIRecorder: MobileAPIClientProtocol {
             payload = #"{"runId":"33333333-3333-4333-8333-333333333333","outcome":"moved","status":"queued","workflowStage":null}"#
         } else if path.hasSuffix("/resume") {
             payload = #"{"runId":"33333333-3333-4333-8333-333333333333","outcome":"approved","workflowStage":"production_qa","startStage":"production_qa","checkpointKey":"user-before-production_qa","attempt":2,"revision":3,"terminalReviewOnly":false}"#
+        } else if path.hasSuffix("/dispatch") || path.hasSuffix("/reassign") {
+            payload = #"{"runId":"33333333-3333-4333-8333-333333333333","agentId":null,"provider":"codex","model":null,"effort":null,"requestedWorkerId":"worker-1","requestedByUserId":"fixture-user","dispatchMode":"specific","dispatchedAt":"2026-08-02T01:00:00.000Z","outcome":"dispatched"}"#
         } else {
             throw MobileAPIError.invalidRequest
         }

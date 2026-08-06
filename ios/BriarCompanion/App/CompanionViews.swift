@@ -93,6 +93,7 @@ struct CompanionShellView: View {
                 TaskSearchView(
                     project: project,
                     runs: snapshot?.runs ?? [],
+                    workers: snapshot?.workers ?? [],
                     members: snapshot?.members ?? [],
                     token: token,
                     api: api
@@ -322,7 +323,11 @@ struct TaskListView: View {
                                     run: run,
                                     assignee: snapshot?.members?.first {
                                         $0.userId == run.assigneeUserId
-                                    }
+                                    },
+                                    workerLabel: RunRow.workerLabel(
+                                        for: run,
+                                        workers: snapshot?.workers ?? []
+                                    )
                                 )
                             }
                             .accessibilityIdentifier("task-row-\(run.id.uuidString)")
@@ -393,10 +398,21 @@ struct TaskListView: View {
 struct RunRow: View {
     let run: DashboardRun
     let assignee: OrganizationMember?
+    let workerLabel: String?
 
-    init(run: DashboardRun, assignee: OrganizationMember? = nil) {
+    init(run: DashboardRun, assignee: OrganizationMember? = nil, workerLabel: String? = nil) {
         self.run = run
         self.assignee = assignee
+        self.workerLabel = workerLabel
+    }
+
+    static func workerLabel(for run: DashboardRun, workers: [DashboardWorker]) -> String? {
+        let workerID = run.workerId ?? run.requestedWorkerId
+        guard let workerID else { return nil }
+        if let worker = workers.first(where: { $0.id == workerID }) {
+            return worker.label
+        }
+        return workerID
     }
 
     var body: some View {
@@ -429,6 +445,10 @@ struct RunRow: View {
                         size: 20
                     )
                     .accessibilityLabel(assignee.name)
+                }
+                if let workerLabel {
+                    Label(workerLabel, systemImage: "desktopcomputer")
+                        .accessibilityLabel("실행 Worker \(workerLabel)")
                 }
                 Text(run.updatedAt, style: .relative)
             }
@@ -480,6 +500,7 @@ struct TaskSearchView: View {
 
     let project: ProjectsResponse.Project
     let runs: [DashboardRun]
+    let workers: [DashboardWorker]
     let members: [OrganizationMember]
     let token: String
     let api: any MobileAPIClientProtocol
@@ -505,12 +526,14 @@ struct TaskSearchView: View {
                             token: token,
                             api: api,
                             allRuns: runs,
+                            workers: workers,
                             members: members
                         )
                     } label: {
                         RunRow(
                             run: run,
-                            assignee: members.first { $0.userId == run.assigneeUserId }
+                            assignee: members.first { $0.userId == run.assigneeUserId },
+                            workerLabel: RunRow.workerLabel(for: run, workers: workers)
                         )
                     }
                     .accessibilityIdentifier("search-result-\(run.id.uuidString)")
@@ -1503,8 +1526,18 @@ struct RunDetailView: View {
                     "담당자",
                     value: members.first { $0.userId == run.assigneeUserId }?.name ?? "미배정"
                 )
+                LabeledContent("실행 Worker", value: assignedWorkerLabel)
             }
         }
+    }
+
+    private var assignedWorkerLabel: String {
+        let workerID = run.workerId ?? run.requestedWorkerId
+        guard let workerID else { return "자동 배정" }
+        if let worker = workers.first(where: { $0.id == workerID }) {
+            return worker.label
+        }
+        return workerID
     }
 
     private func open(path: String, filename: String) async {

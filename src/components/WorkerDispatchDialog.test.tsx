@@ -80,8 +80,85 @@ describe("WorkerDispatchDialog", () => {
         ?.click();
     });
     expect(
-      document.body.querySelector('.select-menu-option[data-value="any"]'),
-    ).toBeNull();
+      document.body.querySelector('.select-menu-option[data-value=""]'),
+    ).not.toBeNull();
+    expect(
+      document.body.querySelector(
+        '.select-menu-option[data-value="worker-allowed"]',
+      ),
+    ).not.toBeNull();
+
+    await act(async () => root.unmount());
+  });
+
+  it("submits an auto-assigned Worker when no specific Worker is chosen", async () => {
+    const onSubmit = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <WorkerDispatchDialog
+          error={null}
+          isDispatching={false}
+          onOpenChange={vi.fn()}
+          onSubmit={onSubmit}
+          open
+          run={null}
+          workers={[worker("worker-auto", "Auto Mac")]}
+        />,
+      );
+    });
+
+    expect(
+      document.body.querySelector('[aria-pressed="true"]')?.textContent,
+    ).toContain("사용 가능한 Worker 자동 선택");
+
+    const dispatchButton = Array.from(
+      document.body.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent?.includes("실행 배정"));
+    await act(async () => dispatchButton?.click());
+
+    expect(onSubmit).toHaveBeenCalledWith({
+      effort: null,
+      model: null,
+      provider: "codex",
+      workerId: null,
+    });
+
+    await act(async () => root.unmount());
+  });
+
+  it("falls back to auto-assign when the preselected Worker is not available", async () => {
+    const busy = {
+      ...worker("worker-busy", "Busy Mac"),
+      readiness: "busy" as const,
+    } satisfies ExecutionWorker;
+    const onSubmit = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <WorkerDispatchDialog
+          error={null}
+          isDispatching={false}
+          onOpenChange={vi.fn()}
+          onSubmit={onSubmit}
+          open
+          run={{
+            requestedWorkerId: "worker-busy",
+          } as never}
+          workers={[busy]}
+        />,
+      );
+    });
+
+    expect(
+      document.body.querySelector('[aria-pressed="true"]')?.textContent,
+    ).toContain("사용 가능한 Worker 자동 선택");
 
     await act(async () => root.unmount());
   });

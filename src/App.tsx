@@ -623,7 +623,7 @@ export function App() {
     provider: AgentProvider;
     model: string | null;
     effort: ModelEffort | null;
-    workerId: string;
+    workerId: string | null;
   }) => {
     if (!activeProject || !briar.token || !dispatchRun) return;
     setQuickStartingRunId(dispatchRun.id);
@@ -635,6 +635,7 @@ export function App() {
         dispatchRun.id,
         {
           ...input,
+          workerId: input.workerId || null,
           persistPreferences: true,
           reassign: Boolean(dispatchRun.dispatchedAt || dispatchRun.workerId),
         },

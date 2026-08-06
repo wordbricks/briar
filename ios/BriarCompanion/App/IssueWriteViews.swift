@@ -499,7 +499,8 @@ struct DispatchIssueSheet: View {
     private var compatibleWorkers: [DashboardWorker] {
         guard let provider = preferences.provider else { return workers }
         return workers.filter { worker in
-            (worker.providers ?? worker.agentProvider.map { [$0] } ?? []).contains(provider)
+            worker.readiness == "available" &&
+                (worker.providers ?? worker.agentProvider.map { [$0] } ?? []).contains(provider)
         }
     }
 
