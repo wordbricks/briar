@@ -13,6 +13,7 @@ Status: implemented (1~4단계). Updated 2026-08-06.
 | 채널 API와 조직 스코프 클레임 평면 | done | `worker/src/index.ts` |
 | 워커 러너 `channelReply` | done | `src-cli/index.ts`, `src-cli/agent-runner.ts` |
 | 데스크탑 채널 화면과 멘션 픽커 | done | `src/components/Channels.tsx`, `src/lib/channel-mentions.ts` |
+| 모바일 Home 탭(공유 웹 셸 + iOS 네이티브) | done | `src/components/CompanionChannels.tsx`, `ios/BriarCompanion/App/Channels*.swift` |
 
 구현하면서 설계와 달라졌거나 미룬 것:
 
@@ -27,8 +28,14 @@ Status: implemented (1~4단계). Updated 2026-08-06.
 - **채널 답글 트랜스크립트 미기록**. `briar_agent_transcript_sessions.project_id`가
   NOT NULL이라 프로젝트 없는 실행을 담을 수 없다.
 - **채널 첨부 미구현**. 계획서는 첨부가 아니라 문서 카드로 처리한다.
-- **모바일 미구현**. 모바일 앱 코드는 건드리지 않았으므로 iOS/Android 동시
-  변경 규칙에 걸리지 않지만, `mobile-contract.ts` 확장은 남아 있다.
+- **모바일 Home**은 채널 목록 → 메시지 → 스레드까지만 제공한다. 멘션 픽커와
+  이슈 제안 승인은 데스크탑 전용이며, 모바일에서는 본문만 보낼 수 있다.
+- **채널의 프로젝트 소속은 `default_project_id`가 겸한다.** Home 그룹핑은 이
+  값이 null이면 공통 채널로 본다. 채널에 별도 소속 컬럼을 두지 않기 위한
+  선택이며, 제안 기본값과 그룹핑이 같은 값을 공유한다.
+- **모바일에서 Search를 제거했다.** 하단 탭 첫 자리를 Home이 가져가면서
+  도달 불가능해진 iOS `TaskSearchView`와 웹 셸의 companion 검색 UI를 함께
+  삭제했다. 순수 헬퍼 `TaskSearch`는 테스트와 함께 남아 있다.
 
 ## 목표
 

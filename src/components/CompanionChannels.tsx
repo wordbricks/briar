@@ -1,0 +1,329 @@
+import {
+  Bot,
+  ChevronLeft,
+  FileText,
+  Hash,
+  LoaderCircle,
+  Lock,
+  MessageSquare,
+  Send,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  listChannelMessages,
+  listChannels,
+  loadChannel,
+  sendChannelMessage,
+} from "../lib/api";
+import {
+  groupChannels,
+  type ChannelGroupProject,
+} from "../lib/channel-grouping";
+import type {
+  ChannelMessage,
+  ChannelSummary,
+} from "../lib/channels-contract";
+import { useI18n } from "../i18n";
+
+type CompanionChannelsProps = {
+  organizationId: string;
+  activeProjectId: string | null;
+  projects: readonly ChannelGroupProject[];
+  token: string;
+};
+
+/**
+ * Home on mobile is a channel list, then a channel's root messages, then one
+ * message's thread. Each level replaces the previous one rather than opening a
+ * side panel: a phone has no room for the desktop three-column layout.
+ */
+export function CompanionChannels({
+  organizationId,
+  activeProjectId,
+  projects,
+  token,
+}: CompanionChannelsProps) {
+  const { t } = useI18n();
+  const [channels, setChannels] = useState<ChannelSummary[]>([]);
+  const [channel, setChannel] = useState<ChannelSummary | null>(null);
+  const [messages, setMessages] = useState<ChannelMessage[]>([]);
+  const [thread, setThread] = useState<ChannelMessage[] | null>(null);
+  const [threadParentId, setThreadParentId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    void (async () => {
+      try {
+        const result = await listChannels(token, organizationId);
+        if (!cancelled) setChannels(result.channels);
+      } catch (cause) {
+        if (!cancelled) setError(message(cause));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [organizationId, token]);
+
+  const groups = useMemo(
+    () =>
+      groupChannels(channels, {
+        activeProjectId,
+        projects,
+        commonLabel: t("companion.channelsCommon"),
+        unknownProjectLabel: t("companion.channelsOtherProject"),
+      }),
+    [activeProjectId, channels, projects, t],
+  );
+
+  const openChannel = useCallback(
+    async (summary: ChannelSummary) => {
+      setChannel(summary);
+      setThread(null);
+      setThreadParentId(null);
+      setMessages([]);
+      setLoading(true);
+      try {
+        const result = await loadChannel(token, organizationId, summary.id);
+        setChannel(result.channel);
+        setMessages(result.messages);
+      } catch (cause) {
+        setError(message(cause));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [organizationId, token],
+  );
+
+  const openThread = useCallback(
+    async (parent: ChannelMessage) => {
+      if (!channel) return;
+      setThreadParentId(parent.id);
+      setThread(null);
+      setLoading(true);
+      try {
+        const result = await listChannelMessages(
+          token,
+          organizationId,
+          channel.id,
+          parent.id,
+        );
+        setThread(result.messages);
+      } catch (cause) {
+        setError(message(cause));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [channel, organizationId, token],
+  );
+
+  const send = useCallback(
+    async (body: string) => {
+      if (!channel || !body.trim()) return;
+      setBusy(true);
+      try {
+        const result = await sendChannelMessage(token, organizationId, channel.id, {
+          body: body.trim(),
+          parentMessageId: threadParentId,
+        });
+        if (threadParentId) {
+          setThread((current) => [...(current ?? []), result.message]);
+        } else {
+          setMessages((current) => [...current, result.message]);
+        }
+      } catch (cause) {
+        setError(message(cause));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [channel, organizationId, threadParentId, token],
+  );
+
+  if (channel && threadParentId) {
+    return (
+      <section className="companion-channels">
+        <ChannelBar
+          onBack={() => {
+            setThreadParentId(null);
+            setThread(null);
+          }}
+          title={t("companion.channelThread")}
+        />
+        {error ? <p className="companion-channel-error">{error}</p> : null}
+        <div className="companion-channel-messages">
+          {loading && !thread ? <Spinner /> : null}
+          {(thread ?? []).map((item) => (
+            <MessageRow key={item.id} message={item} />
+          ))}
+        </div>
+        <Composer busy={busy} onSend={send} />
+      </section>
+    );
+  }
+
+  if (channel) {
+    return (
+      <section className="companion-channels">
+        <ChannelBar
+          onBack={() => {
+            setChannel(null);
+            setMessages([]);
+          }}
+          title={channel.name}
+          visibility={channel.visibility}
+        />
+        {error ? <p className="companion-channel-error">{error}</p> : null}
+        <div className="companion-channel-messages">
+          {loading && messages.length === 0 ? <Spinner /> : null}
+          {messages.map((item) => (
+            <button
+              className="companion-channel-message-button"
+              key={item.id}
+              onClick={() => void openThread(item)}
+              type="button"
+            >
+              <MessageRow message={item} />
+              <span className="companion-channel-thread-hint">
+                <MessageSquare size={12} />
+                {item.replyCount > 0 ? item.replyCount : null}
+              </span>
+            </button>
+          ))}
+          {!loading && messages.length === 0 ? (
+            <p className="companion-channel-empty">
+              {t("companion.channelsEmpty")}
+            </p>
+          ) : null}
+        </div>
+        <Composer busy={busy} onSend={send} />
+      </section>
+    );
+  }
+
+  return (
+    <section className="companion-channels">
+      {error ? <p className="companion-channel-error">{error}</p> : null}
+      {loading && channels.length === 0 ? <Spinner /> : null}
+      {groups.map((group) => (
+        <div className="companion-channel-group" key={group.key}>
+          <h2 className="companion-channel-divider">{group.label}</h2>
+          <ul>
+            {group.channels.map((item) => (
+              <li key={item.id}>
+                <button onClick={() => void openChannel(item)} type="button">
+                  {item.visibility === "private" ? (
+                    <Lock size={15} />
+                  ) : (
+                    <Hash size={15} />
+                  )}
+                  <span>{item.name}</span>
+                  {item.agentCount > 0 ? (
+                    <i className="companion-channel-agent-count">
+                      <Bot size={12} />
+                      {item.agentCount}
+                    </i>
+                  ) : null}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+      {!loading && groups.length === 0 ? (
+        <p className="companion-channel-empty">{t("companion.channelsEmpty")}</p>
+      ) : null}
+    </section>
+  );
+}
+
+function ChannelBar({
+  onBack,
+  title,
+  visibility,
+}: {
+  onBack: () => void;
+  title: string;
+  visibility?: "public" | "private";
+}) {
+  return (
+    <header className="companion-channel-bar">
+      <button aria-label="뒤로" onClick={onBack} type="button">
+        <ChevronLeft size={18} />
+      </button>
+      {visibility === "private" ? <Lock size={15} /> : null}
+      {visibility === "public" ? <Hash size={15} /> : null}
+      <strong>{title}</strong>
+    </header>
+  );
+}
+
+function MessageRow({ message }: { message: ChannelMessage }) {
+  return (
+    <article className="companion-channel-message">
+      <header>
+        <strong>{message.author.name}</strong>
+        {message.author.type === "agent" ? <Bot size={12} /> : null}
+        <time>{new Date(message.createdAt).toLocaleTimeString()}</time>
+      </header>
+      <p>{message.body}</p>
+      {message.document ? (
+        <span className="companion-channel-document">
+          <FileText size={13} />
+          {message.document.title}
+        </span>
+      ) : null}
+    </article>
+  );
+}
+
+function Composer({
+  busy,
+  onSend,
+}: {
+  busy: boolean;
+  onSend: (body: string) => void;
+}) {
+  const [body, setBody] = useState("");
+  return (
+    <form
+      className="companion-channel-composer"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!body.trim() || busy) return;
+        onSend(body);
+        setBody("");
+      }}
+    >
+      <input
+        aria-label="채널 메시지"
+        disabled={busy}
+        onChange={(event) => setBody(event.target.value)}
+        value={body}
+      />
+      <button aria-label="메시지 보내기" disabled={busy || !body.trim()} type="submit">
+        <Send size={16} />
+      </button>
+    </form>
+  );
+}
+
+function Spinner() {
+  return (
+    <p className="companion-channel-loading">
+      <LoaderCircle className="spin" size={16} />
+    </p>
+  );
+}
+
+function message(cause: unknown) {
+  return cause instanceof Error ? cause.message : String(cause);
+}

@@ -15,6 +15,7 @@ import { WorkerDispatchDialog } from "./components/WorkerDispatchDialog";
 import { Inbox } from "./components/Inbox";
 import { InboxDetailPanel } from "./components/InboxDetailPanel";
 import { Channels } from "./components/Channels";
+import { CompanionChannels } from "./components/CompanionChannels";
 import { Ideas } from "./components/Ideas";
 import { InitialOnboarding } from "./components/InitialOnboarding";
 import { InvitationOnboarding } from "./components/InvitationOnboarding";
@@ -386,7 +387,7 @@ export function App() {
   >(null);
   const [dispatchRun, setDispatchRun] = useState<HuntRun | null>(null);
   const [companionPage, setCompanionPage] = useState<
-    "issues" | "agents" | "ideas" | "search" | "inbox" | "settings"
+    "issues" | "agents" | "ideas" | "home" | "inbox" | "settings"
   >("issues");
   const [companionStatus, setCompanionStatus] =
     useState<CompanionStatusFilter>("all");
@@ -1602,6 +1603,27 @@ export function App() {
             onAccountSave={briar.updateAccountProfile}
             user={briar.user}
           />
+        ) : companionPage === "home" && briar.activeOrganizationId && briar.token ? (
+          <>
+            <CompanionChannels
+              activeProjectId={activeProject?.id ?? null}
+              organizationId={briar.activeOrganizationId}
+              projects={activeOrganizationProjects}
+              token={briar.token}
+            />
+            <CompanionBottomNavigation
+              activeDestination="home"
+              onAgentsOpen={() => setCompanionPage("agents")}
+              onIdeasOpen={() => setCompanionPage("ideas")}
+              onInboxOpen={() => setCompanionPage("inbox")}
+              onHomeOpen={() => {}}
+              onStatusChange={(status) => {
+                setCompanionStatus(status);
+                setCompanionPage("issues");
+              }}
+              unreadInboxCount={inbox.unreadCount}
+            />
+          </>
         ) : companionPage === "inbox" ? (
           <>
             <Inbox
@@ -1622,7 +1644,7 @@ export function App() {
               onAgentsOpen={() => setCompanionPage("agents")}
               onIdeasOpen={() => setCompanionPage("ideas")}
               onInboxOpen={() => {}}
-              onSearchOpen={() => setCompanionPage("search")}
+              onHomeOpen={() => setCompanionPage("home")}
               onStatusChange={(status) => {
                 setCompanionStatus(status);
                 setCompanionPage("issues");
@@ -1647,7 +1669,7 @@ export function App() {
               onAgentsOpen={() => setCompanionPage("agents")}
               onIdeasOpen={() => {}}
               onInboxOpen={() => setCompanionPage("inbox")}
-              onSearchOpen={() => setCompanionPage("search")}
+              onHomeOpen={() => setCompanionPage("home")}
               onStatusChange={(status) => {
                 setCompanionStatus(status);
                 setCompanionPage("issues");
@@ -1687,7 +1709,7 @@ export function App() {
               onAgentsOpen={() => {}}
               onIdeasOpen={() => setCompanionPage("ideas")}
               onInboxOpen={() => setCompanionPage("inbox")}
-              onSearchOpen={() => setCompanionPage("search")}
+              onHomeOpen={() => setCompanionPage("home")}
               onStatusChange={(status) => {
                 setCompanionStatus(status);
                 setCompanionPage("issues");
@@ -1700,7 +1722,6 @@ export function App() {
             agents={activeProjectAgents}
             currentUserId={briar.user?.id ?? null}
             companionMode
-            companionSearchMode={companionPage === "search"}
             companionStatus={companionStatus}
             companionUnreadInboxCount={inbox.unreadCount}
             dashboard={briar.dashboard}
@@ -1716,7 +1737,7 @@ export function App() {
             onCompanionAgentsOpen={() => setCompanionPage("agents")}
             onCompanionIdeasOpen={() => setCompanionPage("ideas")}
             onCompanionInboxOpen={() => setCompanionPage("inbox")}
-            onCompanionSearchOpen={() => setCompanionPage("search")}
+            onCompanionHomeOpen={() => setCompanionPage("home")}
             onCompanionStatusChange={(status) => {
               setCompanionStatus(status);
               setCompanionPage("issues");
