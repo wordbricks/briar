@@ -142,19 +142,16 @@ export function Inbox({
       ),
     [projectMessages],
   );
-  const filteredMessages = useMemo(() => {
-    // Companion: all categories, newest-first order already provided by useInbox.
-    if (companionMode) return projectMessages;
-    return projectMessages.filter((message) =>
-      activeFilters.has(classifyInboxMessage(message)),
-    );
-  }, [activeFilters, companionMode, projectMessages]);
-  const filterKey = useMemo(
+  const filteredMessages = useMemo(
     () =>
-      companionMode
-        ? `${effectiveProjectId}:companion-chronological`
-        : `${effectiveProjectId}:${[...activeFilters].sort().join(",")}`,
-    [activeFilters, companionMode, effectiveProjectId],
+      projectMessages.filter((message) =>
+        activeFilters.has(classifyInboxMessage(message)),
+      ),
+    [activeFilters, projectMessages],
+  );
+  const filterKey = useMemo(
+    () => `${effectiveProjectId}:${[...activeFilters].sort().join(",")}`,
+    [activeFilters, effectiveProjectId],
   );
   const visibleMessages = useMemo(
     () => pageInboxMessages(filteredMessages, visibleCount),
@@ -260,9 +257,9 @@ export function Inbox({
           aria-label={t("inbox.messages")}
           className="inbox-panel rounded-none border-0 bg-card"
         >
-          {companionMode ? null : (
-            <header className="inbox-filter-bar">
-              <div className="inbox-filter-controls">
+          <header className="inbox-filter-bar">
+            <div className="inbox-filter-controls">
+              {companionMode ? null : (
                 <SelectMenu
                   className="inbox-project-filter"
                   label={t("inbox.projectFilter")}
@@ -271,35 +268,37 @@ export function Inbox({
                   size="small"
                   value={effectiveProjectId}
                 />
-                <div
-                  aria-label={t("inbox.filters")}
-                  className="inbox-filters"
-                  role="group"
-                >
-                  {inboxFilters.map((category) => (
-                    <button
-                      aria-pressed={activeFilters.has(category)}
-                      className={cn("inbox-filter", category)}
-                      key={category}
-                      onClick={() => toggleFilter(category)}
-                      type="button"
-                    >
-                      <FilterIcon category={category} />
-                      <span>
-                        {t(`inbox.category.${category}` as MessageKey)}
-                      </span>
-                      <span className="inbox-filter-count">
-                        {categoryCounts[category]}
-                      </span>
-                    </button>
-                  ))}
-                </div>
+              )}
+              <div
+                aria-label={t("inbox.filters")}
+                className="inbox-filters"
+                role="group"
+              >
+                {inboxFilters.map((category) => (
+                  <button
+                    aria-pressed={activeFilters.has(category)}
+                    className={cn("inbox-filter", category)}
+                    key={category}
+                    onClick={() => toggleFilter(category)}
+                    type="button"
+                  >
+                    <FilterIcon category={category} />
+                    <span>
+                      {t(`inbox.category.${category}` as MessageKey)}
+                    </span>
+                    <span className="inbox-filter-count">
+                      {categoryCounts[category]}
+                    </span>
+                  </button>
+                ))}
               </div>
+            </div>
+            {companionMode ? null : (
               <Typography as="span" tone="muted" variant="caption">
                 {t("inbox.filteredCount", { count: filteredMessages.length })}
               </Typography>
-            </header>
-          )}
+            )}
+          </header>
 
           {messages.length === 0 ? (
             <EmptyState
