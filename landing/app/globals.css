@@ -5098,6 +5098,10 @@ html[data-theme="light"] .blog-header {
 }
 
 @media (max-width: 560px) {
+  .blog-header .language-switcher {
+    display: none;
+  }
+
   .blog-hero {
     padding-block: 72px 58px;
   }
