@@ -129,6 +129,7 @@ struct CompanionShellView: View {
                 .tag(CompanionNavigationModel.Tab.ideas)
             }
         }
+        .environmentObject(inbox)
         .sheet(isPresented: $showingSettings) {
             CompanionSettingsView(
                 appearance: $appearance,
@@ -502,6 +503,7 @@ struct TaskSearchView: View {
                             projectID: project.id,
                             token: token,
                             api: api,
+                            allRuns: runs,
                             members: members
                         )
                     } label: {
@@ -562,6 +564,7 @@ private enum RunDetailTab: String, CaseIterable, Identifiable {
 
 struct RunDetailView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var inbox: InboxStore
     @AppStorage("companion-locale") private var localeRaw = CompanionLocale.ko.rawValue
     let run: DashboardRun
     @StateObject private var detail: RunDetailStore
@@ -574,6 +577,7 @@ struct RunDetailView: View {
     @State private var reassigning = false
     @State private var confirmingDelete = false
     @State private var showingTransfer = false
+    @State private var showingDependencyPicker = false
     @State private var transferTargetProjectID: UUID?
     @State private var localStatus: DashboardRun.Status
     @State private var localWorkflowStage: String?
@@ -717,8 +721,14 @@ struct RunDetailView: View {
             isPresented: $linkCopied,
             message: L10n.text(.linkCopied, locale: locale)
         )
-        .task { await detail.load() }
+        .task {
+            inbox.markIssueRead(runID: run.id)
+            await detail.load()
+        }
         .refreshable { await detail.load() }
+        .onChange(of: inbox.messages) { _, _ in
+            inbox.markIssueRead(runID: run.id)
+        }
         .onChange(of: run.status) { _, status in
             localStatus = status
             // Keep parity with shared React RunPage: status transitions reselect the default tab.
@@ -778,6 +788,16 @@ struct RunDetailView: View {
                 mutations: mutations,
                 refresh: refresh
             )
+        }
+        .sheet(isPresented: $showingDependencyPicker) {
+            DependencyPickerSheet(
+                candidates: dependencyCandidates,
+                selectedIDs: $dependencyIDs,
+                onAdd: { prerequisiteID in
+                    try await changeDependency(prerequisiteID, enabled: true)
+                }
+            )
+            .presentationDetents([.medium, .large])
         }
         .accessibilityIdentifier("run-detail")
     }
@@ -1012,24 +1032,105 @@ struct RunDetailView: View {
     @ViewBuilder
     private var dependenciesControl: some View {
         Section("의존성") {
-            let candidates = allRuns.filter { $0.id != run.id && $0.status != .cancelled }
-            if candidates.isEmpty {
-                Text("추가할 수 있는 선행 이슈가 없습니다.")
+            if selectedDependencyReferences.isEmpty {
+                Text("선행 이슈가 없습니다.")
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(candidates) { candidate in
-                    Toggle(isOn: dependencyBinding(candidate.id)) {
+                ForEach(selectedDependencyReferences) { dependency in
+                    HStack {
                         VStack(alignment: .leading) {
-                            Text(candidate.title)
-                            if let number = candidate.runNumber {
-                                Text("#\(number) · \(candidate.status.displayName)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                            Text(dependency.title)
+                            Text("#\(dependency.runNumber) · \(dependency.status.displayName)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 8)
+                        Button(role: .destructive) {
+                            Task { try? await changeDependency(dependency.id, enabled: false) }
+                        } label: {
+                            if mutations.isActive("dependency-\(run.id)-\(dependency.id)") {
+                                ProgressView()
+                            } else {
+                                Image(systemName: "minus.circle")
                             }
                         }
+                        .buttonStyle(.borderless)
+                        .disabled(mutations.isActive("dependency-\(run.id)-\(dependency.id)"))
+                        .accessibilityLabel("\(dependency.title) 의존성 제거")
+                        .accessibilityIdentifier(
+                            "remove-dependency-\(dependency.id.uuidString.lowercased())"
+                        )
                     }
                 }
             }
+
+            Button {
+                showingDependencyPicker = true
+            } label: {
+                Label("의존성 추가", systemImage: "plus.circle")
+            }
+            .disabled(dependencyCandidates.isEmpty)
+            .accessibilityIdentifier("add-dependency-button")
+        }
+    }
+
+    private var dependencyCandidates: [DashboardRun] {
+        allRuns
+            .filter { $0.id != run.id && $0.status != .cancelled }
+            .sorted { left, right in
+                switch (left.runNumber, right.runNumber) {
+                case let (leftNumber?, rightNumber?):
+                    return leftNumber < rightNumber
+                case (_?, nil): return true
+                case (nil, _?): return false
+                default:
+                    return left.title.localizedCaseInsensitiveCompare(right.title) == .orderedAscending
+                }
+            }
+    }
+
+    private var selectedDependencyReferences: [IssueDependencyReference] {
+        let loadedReferences = Dictionary(
+            uniqueKeysWithValues: allRuns.map { candidate in
+                (
+                    candidate.id,
+                    IssueDependencyReference(
+                        id: candidate.id,
+                        runNumber: candidate.runNumber ?? 0,
+                        title: candidate.title,
+                        status: candidate.status
+                    )
+                )
+            }
+        )
+        let existingReferences = Dictionary(
+            uniqueKeysWithValues: (run.prerequisites ?? []).map { ($0.id, $0) }
+        )
+        return dependencyIDs.compactMap { dependencyID in
+            loadedReferences[dependencyID] ?? existingReferences[dependencyID]
+        }.sorted { left, right in
+            if left.runNumber != right.runNumber { return left.runNumber < right.runNumber }
+            return left.title.localizedCaseInsensitiveCompare(right.title) == .orderedAscending
+        }
+    }
+
+    private func changeDependency(_ prerequisiteID: UUID, enabled: Bool) async throws {
+        do {
+            try await mutations.setDependency(
+                runID: run.id,
+                prerequisiteID: prerequisiteID,
+                enabled: enabled
+            )
+            if enabled {
+                dependencyIDs.insert(prerequisiteID)
+            } else {
+                dependencyIDs.remove(prerequisiteID)
+            }
+            actionError = nil
+            await refresh()
+        } catch {
+            actionError = error.localizedDescription
+            throw error
         }
     }
 
@@ -1525,30 +1626,6 @@ struct RunDetailView: View {
         }
     }
 
-    private func dependencyBinding(_ prerequisiteID: UUID) -> Binding<Bool> {
-        Binding(
-            get: { dependencyIDs.contains(prerequisiteID) },
-            set: { enabled in
-                Task {
-                    do {
-                        try await mutations.setDependency(
-                            runID: run.id,
-                            prerequisiteID: prerequisiteID,
-                            enabled: enabled
-                        )
-                        if enabled {
-                            dependencyIDs.insert(prerequisiteID)
-                        } else {
-                            dependencyIDs.remove(prerequisiteID)
-                        }
-                        actionError = nil
-                        await refresh()
-                    } catch { actionError = error.localizedDescription }
-                }
-            }
-        )
-    }
-
     private func completeReview() async {
         do {
             _ = try await mutations.completeReview(runID: run.id)
@@ -1710,6 +1787,114 @@ struct RunDetailView: View {
         let label: String
 
         var id: String { "\(status.rawValue):\(workflowStage ?? "none")" }
+    }
+}
+
+struct DependencyPickerSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var selectedIDs: Set<UUID>
+    @State private var query = ""
+    @State private var addingID: UUID?
+    @State private var errorMessage: String?
+
+    let candidates: [DashboardRun]
+    let onAdd: (UUID) async throws -> Void
+
+    private var filteredCandidates: [DashboardRun] {
+        let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return candidates.filter { candidate in
+            guard !selectedIDs.contains(candidate.id) else { return false }
+            guard !normalizedQuery.isEmpty else { return true }
+            let searchableText = [
+                candidate.title,
+                candidate.detail ?? "",
+                candidate.runNumber.map { "#\($0)" } ?? "",
+                candidate.status.displayName,
+            ].joined(separator: " ")
+            return searchableText.localizedCaseInsensitiveContains(normalizedQuery)
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if let errorMessage {
+                    Section {
+                        Label(errorMessage, systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(.red)
+                    }
+                }
+
+                if filteredCandidates.isEmpty {
+                    ContentUnavailableView(
+                        query.isEmpty ? "추가할 수 있는 이슈가 없습니다." : "검색 결과 없음",
+                        systemImage: query.isEmpty ? "checklist" : "magnifyingglass",
+                        description: query.isEmpty
+                            ? Text("이미 추가했거나 추가할 수 없는 이슈만 남았습니다.")
+                            : Text("다른 제목이나 이슈 번호로 검색해 보세요.")
+                    )
+                } else {
+                    Section("선행 이슈 선택") {
+                        ForEach(filteredCandidates) { candidate in
+                            Button {
+                                Task { @MainActor in await add(candidate) }
+                            } label: {
+                                HStack(spacing: 12) {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(candidate.title)
+                                            .foregroundStyle(.primary)
+                                        HStack(spacing: 6) {
+                                            if let number = candidate.runNumber {
+                                                Text("#\(number)")
+                                            }
+                                            Text(candidate.status.displayName)
+                                        }
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    }
+                                    Spacer(minLength: 8)
+                                    if addingID == candidate.id {
+                                        ProgressView()
+                                    } else {
+                                        Image(systemName: "plus.circle.fill")
+                                            .foregroundStyle(.tint)
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(addingID != nil)
+                            .accessibilityLabel("\(candidate.title) 의존성 추가")
+                            .accessibilityIdentifier(
+                                "dependency-option-\(candidate.id.uuidString.lowercased())"
+                            )
+                        }
+                    }
+                }
+            }
+            .listStyle(.insetGrouped)
+            .navigationTitle("의존성 추가")
+            .navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $query, prompt: "이슈 검색")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("닫기") { dismiss() }
+                        .accessibilityIdentifier("dependency-picker-close")
+                }
+            }
+            .accessibilityIdentifier("dependency-picker")
+        }
+    }
+
+    private func add(_ candidate: DashboardRun) async {
+        guard addingID == nil else { return }
+        addingID = candidate.id
+        errorMessage = nil
+        defer { addingID = nil }
+        do {
+            try await onAdd(candidate.id)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 }
 

@@ -82,6 +82,10 @@ final class InboxStore: ObservableObject {
         queuePush([id: message.version])
     }
 
+    func markIssueRead(runID: UUID) {
+        markRead(id: "issue:\(runID.uuidString.lowercased())")
+    }
+
     func markAllRead() {
         var pushed: [String: String] = [:]
         for message in messages {
