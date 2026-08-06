@@ -2020,6 +2020,8 @@ export function useBriar(options: UseBriarOptions = {}) {
             detail,
             priority: input.priority,
             assigneeUserId: input.assigneeUserId ?? null,
+            preferredProvider: input.preferredProvider ?? null,
+            preferredModel: input.preferredModel ?? null,
             repository:
               targetDashboard.settings.githubRepository ?? project.name,
             branch: null,

@@ -123,12 +123,16 @@ struct IssueDraft: Codable, Equatable, Sendable {
     var priority: Int? = defaultPriority
     var assigneeUserId: String? = nil
     var status: DashboardRun.Status = .queued
+    var preferredProvider: AgentProvider? = nil
+    var preferredModel: String? = nil
 
     var isEmpty: Bool {
         title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
             description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
             priority == Self.defaultPriority &&
-            assigneeUserId == nil
+            assigneeUserId == nil &&
+            preferredProvider == nil &&
+            preferredModel == nil
     }
 }
 
@@ -138,6 +142,8 @@ struct CreateIssueRequest: Codable, Sendable {
     let priority: Int?
     let assigneeUserId: String?
     let status: DashboardRun.Status
+    let preferredProvider: AgentProvider?
+    let preferredModel: String?
 }
 
 struct CreateIssueResponse: Codable, Sendable {

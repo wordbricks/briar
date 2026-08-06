@@ -7,6 +7,8 @@ export type CreateIssueDraft = {
   priority: "1" | "2" | "3" | "4";
   projectId: string;
   assigneeUserId?: string | null;
+  preferredProvider?: string | null;
+  preferredModel?: string | null;
 };
 
 function isCreateIssueDraft(value: unknown): value is CreateIssueDraft {
@@ -25,7 +27,13 @@ function isCreateIssueDraft(value: unknown): value is CreateIssueDraft {
     typeof draft.projectId === "string" &&
     (draft.assigneeUserId === undefined ||
       draft.assigneeUserId === null ||
-      typeof draft.assigneeUserId === "string")
+      typeof draft.assigneeUserId === "string") &&
+    (draft.preferredProvider === undefined ||
+      draft.preferredProvider === null ||
+      typeof draft.preferredProvider === "string") &&
+    (draft.preferredModel === undefined ||
+      draft.preferredModel === null ||
+      typeof draft.preferredModel === "string")
   );
 }
 

@@ -316,13 +316,27 @@ const mobileProviderSchema = z.enum(["codex", "claude", "grok", "opencode"]);
 const mobileEffortSchema = z.enum(["low", "medium", "high", "xhigh", "max", "ultra"]);
 const requestIdSchema = z.object({ requestId: z.uuid() });
 
-export const mobileCreateIssueRequestSchema = z.object({
-  title: z.string().trim().min(1).max(300),
-  description: z.string().max(100_000).nullable(),
-  priority: z.number().int().min(1).max(4).nullable(),
-  assigneeUserId: z.string().nullable(),
-  status: z.enum(["backlog", "queued"]),
-}).strict();
+const mobileIssueWriteBaseSchema = z
+  .object({
+    title: z.string().trim().min(1).max(300),
+    description: z.string().max(100_000).nullable(),
+    priority: z.number().int().min(1).max(4).nullable(),
+    assigneeUserId: z.string().nullable(),
+    status: z.enum(["backlog", "queued"]),
+    preferredProvider: mobileProviderSchema.nullable().optional(),
+    preferredModel: z.string().nullable().optional(),
+  })
+  .strict();
+
+export const mobileCreateIssueRequestSchema = mobileIssueWriteBaseSchema
+  .superRefine((input, context) => {
+    if (input.preferredModel && !input.preferredProvider) {
+      context.addIssue({
+        code: "custom",
+        message: "A provider is required for a model preference",
+      });
+    }
+  });
 export const mobileCreateIssueResponseSchema = z.object({
   runId: z.uuid(),
   sourceKey: z.string(),
@@ -331,8 +345,9 @@ export const mobileCreateIssueResponseSchema = z.object({
   assigneeUserId: z.string().nullable(),
   attachments: z.array(mobileIssueAttachmentSchema),
 });
-export const mobileUpdateIssueRequestSchema = mobileCreateIssueRequestSchema
-  .omit({ status: true });
+export const mobileUpdateIssueRequestSchema = mobileIssueWriteBaseSchema.omit({
+  status: true,
+});
 export const mobileUpdateIssueResponseSchema = z.object({
   runId: z.uuid(),
   title: z.string(),

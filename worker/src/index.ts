@@ -978,15 +978,47 @@ const slackOAuthInputSchema = z
   .strict();
 const slackInstallationUpdateSchema = slackOAuthInputSchema;
 
-const issueInputSchema = z
+const providerModels = {
+  codex: new Set(["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"]),
+  claude: new Set(["sonnet", "opus", "haiku", "fable"]),
+  grok: new Set(["grok-4.5", "grok-build"]),
+  opencode: new Set<string>(),
+} as const;
+
+const issueInputBaseSchema = z
   .object({
     title: z.string().trim().min(1).max(300),
     description: z.string().trim().max(100_000).nullable().optional(),
     priority: z.number().int().min(1).max(4).nullable().optional(),
     assigneeUserId: z.string().trim().min(1).max(200).nullable().optional(),
     status: z.enum(["backlog", "queued"]).default("queued"),
+    preferredProvider: z
+      .enum(["codex", "claude", "grok", "opencode"])
+      .nullable()
+      .optional(),
+    preferredModel: z.string().trim().min(1).max(100).nullable().optional(),
   })
   .strict();
+
+const issueInputSchema = issueInputBaseSchema.superRefine((input, context) => {
+  if (!input.preferredProvider && input.preferredModel) {
+    context.addIssue({
+      code: "custom",
+      message: "A provider is required for a model preference",
+    });
+  }
+  if (
+    input.preferredProvider &&
+    input.preferredProvider !== "opencode" &&
+    input.preferredModel &&
+    !providerModels[input.preferredProvider].has(input.preferredModel)
+  ) {
+    context.addIssue({
+      code: "custom",
+      message: `${input.preferredModel} is not available from ${input.preferredProvider}`,
+    });
+  }
+});
 
 const ideaModelSchema = z.string().trim().min(1).max(100).nullable();
 const ideaCreateInputSchema = z
@@ -1037,7 +1069,7 @@ const ideaJobCompletionInputSchema = ideaJobLeaseInputSchema.extend({
   result: z.unknown().optional(),
 });
 
-export const issueUpdateInputSchema = issueInputSchema
+export const issueUpdateInputSchema = issueInputBaseSchema
   .pick({
     title: true,
     description: true,
@@ -1059,12 +1091,6 @@ const modelEffortSchema = z.enum([
   "max",
   "ultra",
 ]);
-const providerModels = {
-  codex: new Set(["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"]),
-  claude: new Set(["sonnet", "opus", "haiku", "fable"]),
-  grok: new Set(["grok-4.5", "grok-build"]),
-  opencode: new Set<string>(),
-} as const;
 
 export const issueExecutionPreferencesSchema = z
   .object({
@@ -1320,6 +1346,8 @@ export async function readIssueRequest(request: Request) {
   const priority = form.get("priority");
   const assigneeUserId = form.get("assigneeUserId");
   const status = form.get("status");
+  const preferredProvider = form.get("preferredProvider");
+  const preferredModel = form.get("preferredModel");
   return {
     input: issueInputSchema.parse({
       title: form.get("title"),
@@ -1334,6 +1362,14 @@ export async function readIssueRequest(request: Request) {
           ? assigneeUserId
           : null,
       status: typeof status === "string" && status ? status : undefined,
+      preferredProvider:
+        typeof preferredProvider === "string" && preferredProvider.trim()
+          ? preferredProvider
+          : null,
+      preferredModel:
+        typeof preferredModel === "string" && preferredModel.trim()
+          ? preferredModel
+          : null,
     }),
     attachments,
     attachmentReferences,
@@ -1927,6 +1963,8 @@ async function createIssueWithAttachments(input: {
         attachmentCount: storedAttachments.length,
       },
       createdByUserId: input.createdByUserId,
+      preferredAgentProvider: input.issue.preferredProvider ?? null,
+      preferredAgentModel: input.issue.preferredModel ?? null,
     });
     await createIssueAttachments(
       input.db,

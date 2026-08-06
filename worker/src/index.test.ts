@@ -17,6 +17,7 @@ import worker, {
   projectAgentSessionInputSchema,
   projectAgentScheduleInputSchema,
   projectAgentScheduleRunCompletionSchema,
+  readIssueRequest,
   readRunEvidenceRequest,
   runEvidenceInputSchema,
   runReworkInputSchema,
@@ -132,6 +133,71 @@ describe("Worker HTTP contract", () => {
         events: [{ sequence: 1, direction: "server", payload: {} }],
       }),
     ).toThrow(/runId and runAttempt/iu);
+  });
+
+  it("accepts preferred provider and model on issue creation", async () => {
+    const issueRequest = () =>
+      new Request(
+        "https://briar-api.example/projects/22222222-2222-4222-8222-222222222222/issues",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            title: "선호 프로바이더 이슈",
+            description: null,
+            priority: 2,
+            assigneeUserId: null,
+            status: "queued",
+            preferredProvider: "claude",
+            preferredModel: "sonnet",
+          }),
+        },
+      );
+    const { input } = await readIssueRequest(issueRequest());
+    expect(input.preferredProvider).toBe("claude");
+    expect(input.preferredModel).toBe("sonnet");
+  });
+
+  it("rejects a preferred model without a provider on issue creation", async () => {
+    const issueRequest = () =>
+      new Request(
+        "https://briar-api.example/projects/22222222-2222-4222-8222-222222222222/issues",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            title: "잘못된 선호 모델",
+            description: null,
+            priority: 2,
+            assigneeUserId: null,
+            status: "queued",
+            preferredProvider: null,
+            preferredModel: "sonnet",
+          }),
+        },
+      );
+    await expect(readIssueRequest(issueRequest())).rejects.toThrow();
+  });
+
+  it("rejects a preferred model that the provider does not offer", async () => {
+    const issueRequest = () =>
+      new Request(
+        "https://briar-api.example/projects/22222222-2222-4222-8222-222222222222/issues",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            title: "지원하지 않는 모델",
+            description: null,
+            priority: 2,
+            assigneeUserId: null,
+            status: "queued",
+            preferredProvider: "codex",
+            preferredModel: "sonnet",
+          }),
+        },
+      );
+    await expect(readIssueRequest(issueRequest())).rejects.toThrow();
   });
 
   it("requires an email confirmation for account deletion", () => {

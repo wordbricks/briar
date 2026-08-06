@@ -35,6 +35,8 @@ describe("issue multipart input", () => {
       priority: 2,
       assigneeUserId: null,
       status: "backlog",
+      preferredProvider: null,
+      preferredModel: null,
     });
     expect(result.attachments).toHaveLength(1);
     expect(result.attachments[0]).toEqual(

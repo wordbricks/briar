@@ -1986,7 +1986,9 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .issue-metadata-bar {
   min-height: 72px;
   flex: 0 0 auto;
+  padding: 12px 0;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   border-top: 1px solid var(--border);
@@ -1994,7 +1996,9 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .issue-attachment-trigger,
 .issue-dialog .issue-status-select.select-menu .select-menu-trigger,
 .issue-dialog .issue-assignee-select.select-menu .select-menu-trigger,
-.issue-dialog .issue-priority-select.select-menu .select-menu-trigger {
+.issue-dialog .issue-priority-select.select-menu .select-menu-trigger,
+.issue-dialog .issue-provider-select.select-menu .select-menu-trigger,
+.issue-dialog .issue-model-select.select-menu .select-menu-trigger {
   height: 34px;
   padding: 0 10px;
   display: flex;
@@ -2016,7 +2020,9 @@ button.issue-message-state { width:100%; cursor:pointer; }
 }
 .issue-dialog .issue-status-select.select-menu,
 .issue-dialog .issue-assignee-select.select-menu,
-.issue-dialog .issue-priority-select.select-menu {
+.issue-dialog .issue-priority-select.select-menu,
+.issue-dialog .issue-provider-select.select-menu,
+.issue-dialog .issue-model-select.select-menu {
   width: auto;
   max-width: 180px;
   height: 34px;
@@ -2024,7 +2030,9 @@ button.issue-message-state { width:100%; cursor:pointer; }
 }
 .issue-dialog .issue-status-select.select-menu .select-menu-trigger,
 .issue-dialog .issue-assignee-select.select-menu .select-menu-trigger,
-.issue-dialog .issue-priority-select.select-menu .select-menu-trigger {
+.issue-dialog .issue-priority-select.select-menu .select-menu-trigger,
+.issue-dialog .issue-provider-select.select-menu .select-menu-trigger,
+.issue-dialog .issue-model-select.select-menu .select-menu-trigger {
   border-color: var(--border);
   background:var(--card);
   font-weight: 500;
@@ -2038,6 +2046,12 @@ button.issue-message-state { width:100%; cursor:pointer; }
 }
 .issue-dialog .issue-priority-select.select-menu .select-menu-trigger {
   min-width: 110px;
+}
+.issue-dialog .issue-provider-select.select-menu .select-menu-trigger {
+  min-width: 118px;
+}
+.issue-dialog .issue-model-select.select-menu .select-menu-trigger {
+  min-width: 128px;
 }
 .issue-dialog .issue-status-select.select-menu .select-menu-trigger::before {
   content: "";
@@ -2057,7 +2071,9 @@ button.issue-message-state { width:100%; cursor:pointer; }
 }
 .issue-dialog .issue-status-select.select-menu .select-menu-trigger:hover:not(:disabled),
 .issue-dialog .issue-assignee-select.select-menu .select-menu-trigger:hover:not(:disabled),
-.issue-dialog .issue-priority-select.select-menu .select-menu-trigger:hover:not(:disabled) {
+.issue-dialog .issue-priority-select.select-menu .select-menu-trigger:hover:not(:disabled),
+.issue-dialog .issue-provider-select.select-menu .select-menu-trigger:hover:not(:disabled),
+.issue-dialog .issue-model-select.select-menu .select-menu-trigger:hover:not(:disabled) {
   border-color: var(--input);
   background: var(--accent);
 }
@@ -2066,7 +2082,11 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .issue-dialog .issue-assignee-select.select-menu .select-menu-trigger:focus-visible,
 .issue-dialog .issue-assignee-select.select-menu[data-open] .select-menu-trigger,
 .issue-dialog .issue-priority-select.select-menu .select-menu-trigger:focus-visible,
-.issue-dialog .issue-priority-select.select-menu[data-open] .select-menu-trigger {
+.issue-dialog .issue-priority-select.select-menu[data-open] .select-menu-trigger,
+.issue-dialog .issue-provider-select.select-menu .select-menu-trigger:focus-visible,
+.issue-dialog .issue-provider-select.select-menu[data-open] .select-menu-trigger,
+.issue-dialog .issue-model-select.select-menu .select-menu-trigger:focus-visible,
+.issue-dialog .issue-model-select.select-menu[data-open] .select-menu-trigger {
   border-color: #9f8cdf;
   box-shadow: 0 0 0 3px rgba(128, 104, 206, .12);
 }
@@ -4120,7 +4140,9 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .companion-shell .issue-attachment-trigger,
 .companion-shell .issue-dialog .issue-status-select.select-menu .select-menu-trigger,
 .companion-shell .issue-dialog .issue-assignee-select.select-menu .select-menu-trigger,
-.companion-shell .issue-dialog .issue-priority-select.select-menu .select-menu-trigger {
+.companion-shell .issue-dialog .issue-priority-select.select-menu .select-menu-trigger,
+.companion-shell .issue-dialog .issue-provider-select.select-menu .select-menu-trigger,
+.companion-shell .issue-dialog .issue-model-select.select-menu .select-menu-trigger {
   height: 42px;
   flex: 0 0 auto;
   padding: 0 11px;
@@ -4130,7 +4152,9 @@ button.issue-message-state { width:100%; cursor:pointer; }
 }
 .companion-shell .issue-dialog .issue-status-select.select-menu,
 .companion-shell .issue-dialog .issue-assignee-select.select-menu,
-.companion-shell .issue-dialog .issue-priority-select.select-menu {
+.companion-shell .issue-dialog .issue-priority-select.select-menu,
+.companion-shell .issue-dialog .issue-provider-select.select-menu,
+.companion-shell .issue-dialog .issue-model-select.select-menu {
   width: auto;
   max-width: 180px;
   height: 42px;
@@ -4145,6 +4169,12 @@ button.issue-message-state { width:100%; cursor:pointer; }
 }
 .companion-shell .issue-dialog .issue-priority-select.select-menu .select-menu-trigger {
   min-width: 130px;
+}
+.companion-shell .issue-dialog .issue-provider-select.select-menu .select-menu-trigger {
+  min-width: 130px;
+}
+.companion-shell .issue-dialog .issue-model-select.select-menu .select-menu-trigger {
+  min-width: 140px;
 }
 .companion-shell .issue-attachment-trigger {
   margin-left: 0;
@@ -4244,7 +4274,9 @@ button.issue-message-state { width:100%; cursor:pointer; }
   .issue-attachment-trigger,
   .issue-dialog .issue-status-select.select-menu .select-menu-trigger,
   .issue-dialog .issue-assignee-select.select-menu .select-menu-trigger,
-  .issue-dialog .issue-priority-select.select-menu .select-menu-trigger {
+  .issue-dialog .issue-priority-select.select-menu .select-menu-trigger,
+  .issue-dialog .issue-provider-select.select-menu .select-menu-trigger,
+  .issue-dialog .issue-model-select.select-menu .select-menu-trigger {
     height: 42px;
     flex: 0 0 auto;
     padding: 0 11px;
@@ -4254,7 +4286,9 @@ button.issue-message-state { width:100%; cursor:pointer; }
   }
   .issue-dialog .issue-status-select.select-menu,
   .issue-dialog .issue-assignee-select.select-menu,
-  .issue-dialog .issue-priority-select.select-menu {
+  .issue-dialog .issue-priority-select.select-menu,
+  .issue-dialog .issue-provider-select.select-menu,
+  .issue-dialog .issue-model-select.select-menu {
     width: auto;
     max-width: 180px;
     height: 42px;
@@ -4269,6 +4303,12 @@ button.issue-message-state { width:100%; cursor:pointer; }
   }
   .issue-dialog .issue-priority-select.select-menu .select-menu-trigger {
     min-width: 130px;
+  }
+  .issue-dialog .issue-provider-select.select-menu .select-menu-trigger {
+    min-width: 130px;
+  }
+  .issue-dialog .issue-model-select.select-menu .select-menu-trigger {
+    min-width: 140px;
   }
   .issue-attachment-trigger { margin-left: 0; }
   .issue-dialog > footer {

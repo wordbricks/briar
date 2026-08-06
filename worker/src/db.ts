@@ -624,6 +624,8 @@ export type HuntEventInput = {
   productionQaDetail: string | null;
   context: Record<string, unknown> | null;
   createdByUserId?: string | null;
+  preferredAgentProvider?: ProjectAgentProvider | null;
+  preferredAgentModel?: string | null;
 };
 
 export type ProjectSettingsInput = {
@@ -6296,8 +6298,9 @@ export async function recordHuntEvent(
            pull_request_urls, target_sha, source_created_at,
            staging_qa_status, production_qa_status, staging_qa_detail,
            production_qa_detail, context_json, started_at, completed_at,
-           last_event_at, created_at, updated_at
-         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           last_event_at, created_at, updated_at,
+           preferred_agent_provider, preferred_agent_model
+         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          on conflict(project_id, source, source_key) do nothing`,
       )
       .bind(
@@ -6339,6 +6342,8 @@ export async function recordHuntEvent(
         normalizedInput.occurredAt,
         recordedAt,
         recordedAt,
+        normalizedInput.preferredAgentProvider ?? null,
+        normalizedInput.preferredAgentModel ?? null,
       ),
     db
       .prepare(
