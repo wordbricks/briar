@@ -5418,7 +5418,8 @@ function IssueDependenciesPanel({
   run: HuntRun;
 }) {
   const { t } = useI18n();
-  const [selectedRunId, setSelectedRunId] = useState("");
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const prerequisiteIds = new Set(
     (run.prerequisites ?? []).map((dependency) => dependency.id),
@@ -5430,20 +5431,21 @@ function IssueDependenciesPanel({
     )
     .sort((left, right) => left.runNumber - right.runNumber);
 
-  useEffect(() => {
-    if (
-      selectedRunId &&
-      !candidates.some((candidate) => candidate.id === selectedRunId)
-    ) {
-      setSelectedRunId("");
-    }
-  }, [candidates, selectedRunId]);
+  const normalizedSearchQuery = searchQuery.trim().toLocaleLowerCase();
+  const filteredCandidates = normalizedSearchQuery
+    ? candidates.filter((candidate) =>
+        [
+          candidate.title,
+          `AH-${candidate.runNumber}`,
+          candidate.status,
+        ].some((value) => value.toLocaleLowerCase().includes(normalizedSearchQuery)),
+      )
+    : candidates;
 
   const mutate = async (action: () => Promise<unknown>) => {
     setError(null);
     try {
       await action();
-      setSelectedRunId("");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     }
@@ -5506,23 +5508,15 @@ function IssueDependenciesPanel({
       </div>
       {onAdd ? (
         <div className="issue-dependency-add">
-          <select
-            aria-label={t("issue.prerequisiteSelect")}
-            disabled={isUpdating || candidates.length === 0}
-            onChange={(event) => setSelectedRunId(event.target.value)}
-            value={selectedRunId}
-          >
-            <option value="">{t("issue.prerequisiteSelect")}</option>
-            {candidates.map((candidate) => (
-              <option key={candidate.id} value={candidate.id}>
-                AH-{candidate.runNumber} · {candidate.title}
-              </option>
-            ))}
-          </select>
           <button
-            disabled={isUpdating || !selectedRunId}
-            onClick={() =>
-              selectedRunId && void mutate(() => onAdd(selectedRunId))}
+            aria-label={t("issue.dependencyAdd")}
+            className="issue-dependency-add-button"
+            disabled={isUpdating || candidates.length === 0}
+            onClick={() => {
+              setError(null);
+              setSearchQuery("");
+              setIsPickerOpen(true);
+            }}
             type="button"
           >
             {isUpdating ? <LoaderCircle className="spin" size={13} /> : <Plus size={13} />}
@@ -5539,6 +5533,77 @@ function IssueDependenciesPanel({
         )}
       </div>
       {error ? <p className="issue-dependency-error" role="alert">{error}</p> : null}
+      <Dialog
+        onOpenChange={(open) => {
+          if (isUpdating) return;
+          setIsPickerOpen(open);
+          if (!open) {
+            setSearchQuery("");
+            setError(null);
+          }
+        }}
+        open={isPickerOpen}
+      >
+        <DialogContent className="dependency-picker-dialog sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>{t("issue.dependencyPickerTitle")}</DialogTitle>
+            <DialogDescription>{t("issue.dependenciesDescription")}</DialogDescription>
+          </DialogHeader>
+          <Input
+            aria-label={t("issue.dependencySearch")}
+            autoFocus
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder={t("issue.dependencySearch")}
+            value={searchQuery}
+          />
+          <div
+            aria-label={t("issue.prerequisites")}
+            className="issue-dependency-picker-list"
+            role="listbox"
+          >
+            {filteredCandidates.length > 0 ? (
+              filteredCandidates.map((candidate) => (
+                <button
+                  className="issue-dependency-picker-item"
+                  disabled={isUpdating}
+                  key={candidate.id}
+                  onClick={() => onAdd && void mutate(() => onAdd(candidate.id))}
+                  type="button"
+                >
+                  <span className="issue-dependency-picker-copy">
+                    <span>
+                      AH-{candidate.runNumber} · {t(`status.${candidate.status}` as MessageKey)}
+                    </span>
+                    <strong>{candidate.title}</strong>
+                  </span>
+                  {isUpdating ? (
+                    <LoaderCircle className="spin" size={15} />
+                  ) : (
+                    <Plus size={15} />
+                  )}
+                </button>
+              ))
+            ) : (
+              <p className="issue-dependency-picker-empty">
+                {normalizedSearchQuery
+                  ? t("issue.dependencyNoSearchResults")
+                  : t("issue.dependencyNoCandidates")}
+              </p>
+            )}
+          </div>
+          {error ? <p className="issue-dependency-error" role="alert">{error}</p> : null}
+          <DialogFooter>
+            <Button
+              disabled={isUpdating}
+              onClick={() => setIsPickerOpen(false)}
+              type="button"
+              variant="outline"
+            >
+              {t("common.close")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

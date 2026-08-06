@@ -161,6 +161,23 @@ private struct UITestCompanionFlow: View {
                 detail: "재시도 가능",
                 updatedAt: Date(timeIntervalSince1970: 1_775_264_100)
             ),
+            DashboardRun(
+                id: UUID(uuidString: "99999999-9999-4999-8999-999999999999")!,
+                runNumber: 3834,
+                title: "의존성 연결 대상",
+                status: .queued,
+                detail: "선행 이슈를 선택할 수 있습니다.",
+                updatedAt: Date(timeIntervalSince1970: 1_775_264_350)
+            ),
+            DashboardRun(
+                id: UUID(uuidString: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee")!,
+                runNumber: 3835,
+                title: "의존성 후보: API 준비",
+                status: .completed,
+                detail: "검색으로 선택할 선행 이슈",
+                updatedAt: Date(timeIntervalSince1970: 1_775_264_250),
+                completedAt: Date(timeIntervalSince1970: 1_775_264_250)
+            ),
         ]
         if let createdRunStatus {
             runs.insert(DashboardRun(
@@ -234,6 +251,8 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
             payload = #"{"runId":"66666666-6666-4666-8666-666666666666","provider":"codex","model":"gpt-5.6-sol","effort":"high"}"#
         } else if path.hasSuffix("/result-reviews") {
             payload = #"{"userId":"fixture-user","name":"Briar User","username":"briar_user","image":null,"completedAt":"2026-08-02T01:01:00Z"}"#
+        } else if path.contains("/dependencies/") && method == "PUT" {
+            payload = #"{"prerequisiteRunId":"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee","dependentRunId":"99999999-9999-4999-8999-999999999999","outcome":"created"}"#
         } else if path.hasSuffix("/messages") && method == "POST" {
             payload = #"{"message":{"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","runId":"77777777-7777-4777-8777-777777777777","parentMessageId":null,"body":"모바일에서 확인했습니다","author":{"id":"fixture-user","name":"Briar User","image":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==","provider":null},"replyCount":0,"createdAt":"2026-08-02T01:02:00Z","updatedAt":"2026-08-02T01:02:00Z"},"agentReply":null}"#
         } else if path.hasSuffix("/events") {
