@@ -7,6 +7,7 @@ import {
   createOrganization,
   createProject,
   recordHuntEvent,
+  updateIssueCheckpoints,
   updateProjectMandatoryCheckpoints,
   updateUserWorkflowCheckpointDefaults,
   type HuntEventInput,
@@ -248,5 +249,76 @@ describe("workflow checkpoint policy persistence", () => {
       .bind(userRunId)
       .first<{ workflow_snapshot_json: string }>();
     expect(stored?.workflow_snapshot_json).toBe(userSnapshotBefore);
+  });
+
+  it("freezes and updates additive checkpoints for an unstarted issue", async () => {
+    const event = queuedEvent("issue-checkpoint-run", "policy-user");
+    event.issueCheckpoints = [{
+      key: "issue-after-pr_open",
+      stage: "pr_open",
+      position: "after",
+    }];
+    const runId = await recordHuntEvent(db, projectId, event);
+    const created = await db
+      .prepare(
+        `select workflow_snapshot_json, issue_checkpoints_json
+         from briar_hunt_runs where id = ?`,
+      )
+      .bind(runId)
+      .first<{
+        workflow_snapshot_json: string;
+        issue_checkpoints_json: string;
+      }>();
+    expect(JSON.parse(created!.issue_checkpoints_json)).toEqual(
+      event.issueCheckpoints,
+    );
+    expect(
+      JSON.parse(created!.workflow_snapshot_json).execution.checkpoints,
+    ).toContainEqual(event.issueCheckpoints[0]);
+
+    const replacement = [{
+      key: "issue-before-production_qa",
+      stage: "production_qa",
+      position: "before" as const,
+    }];
+    await expect(
+      updateIssueCheckpoints(
+        db,
+        projectId,
+        runId,
+        replacement,
+        "2026-08-04T01:00:00.000Z",
+      ),
+    ).resolves.toBe("updated");
+    const updated = await db
+      .prepare(
+        `select workflow_snapshot_json, issue_checkpoints_json
+         from briar_hunt_runs where id = ?`,
+      )
+      .bind(runId)
+      .first<{
+        workflow_snapshot_json: string;
+        issue_checkpoints_json: string;
+      }>();
+    const updatedWorkflow = JSON.parse(updated!.workflow_snapshot_json);
+    expect(JSON.parse(updated!.issue_checkpoints_json)).toEqual(replacement);
+    expect(updatedWorkflow.execution.checkpoints).toContainEqual(replacement[0]);
+    expect(updatedWorkflow.execution.checkpoints).not.toContainEqual(
+      event.issueCheckpoints[0],
+    );
+
+    await db
+      .prepare(`update briar_hunt_runs set status = 'running' where id = ?`)
+      .bind(runId)
+      .run();
+    await expect(
+      updateIssueCheckpoints(
+        db,
+        projectId,
+        runId,
+        [],
+        "2026-08-04T02:00:00.000Z",
+      ),
+    ).resolves.toBe("ineligible");
   });
 });

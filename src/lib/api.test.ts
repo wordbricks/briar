@@ -35,6 +35,7 @@ import {
   updateOrganizationMemberRole,
   updateAccountProfile,
   updateIssue,
+  updateIssueCheckpoints,
   updateIssueExecutionPreferences,
   updateProjectSettings,
   upsertProjectAgentSession,
@@ -552,6 +553,34 @@ describe("API errors", () => {
       expect.objectContaining({
         method: "PUT",
         body: JSON.stringify(preferences),
+      }),
+    );
+  });
+
+  it("updates issue-specific checkpoints independently of issue content", async () => {
+    const projectId = "22222222-2222-4222-8222-222222222222";
+    const runId = "11111111-1111-4111-8111-111111111111";
+    const checkpoints = [{
+      key: "issue-after-local_qa",
+      stage: "local_qa",
+      position: "after" as const,
+    }];
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ runId, checkpoints }), {
+        headers: { "Content-Type": "application/json" },
+      }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      updateIssueCheckpoints("token", projectId, runId, checkpoints),
+    ).resolves.toEqual({ runId, checkpoints });
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(
+        `/projects/${projectId}/runs/${runId}/checkpoints`,
+      ),
+      expect.objectContaining({
+        method: "PUT",
+        body: JSON.stringify({ checkpoints }),
       }),
     );
   });

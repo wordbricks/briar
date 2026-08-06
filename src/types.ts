@@ -47,6 +47,7 @@ export type CreateIssueInput = {
   attachmentReferences?: string[];
   preferredProvider?: AgentProvider | null;
   preferredModel?: string | null;
+  checkpoints?: AutoHuntWorkflowCheckpoint[];
 };
 
 export type UpdateIssueInput = {
@@ -187,6 +188,7 @@ export type HuntRun = {
     nextStageLabel: string | null;
     terminalReviewOnly: boolean;
   } | null;
+  issueCheckpoints?: AutoHuntWorkflowCheckpoint[];
   detail: string | null;
   priority: number | null;
   assigneeUserId?: string | null;

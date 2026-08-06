@@ -1279,6 +1279,7 @@ export function App() {
             onAcceptIssueReworkProposal={briar.acceptReworkProposal}
             onRemoveIssueDependency={briar.removeIssueDependency}
             onUpdateIssue={briar.editIssue}
+            onUpdateIssueCheckpoints={briar.editIssueCheckpoints}
             onUpdateIssuePreferences={briar.editIssueExecutionPreferences}
             onLoadAttachment={briar.readIssueAttachment}
             onLoadIssueMessages={briar.readIssueMessages}
@@ -1382,6 +1383,11 @@ export function App() {
                     sendIssueMessage(inboxDetailRun.id, input)}
                   onUpdateIssue={(input) =>
                     briar.editIssue(inboxDetailRun.id, input)}
+                  onUpdateIssueCheckpoints={(checkpoints) =>
+                    briar.editIssueCheckpoints(
+                      inboxDetailRun.id,
+                      checkpoints,
+                    )}
                   onUpdateIssuePreferences={(input) =>
                     briar.editIssueExecutionPreferences(
                       inboxDetailRun.id,
@@ -1661,6 +1667,7 @@ export function App() {
             onAcceptIssueReworkProposal={briar.acceptReworkProposal}
             onRemoveIssueDependency={briar.removeIssueDependency}
             onUpdateIssue={briar.editIssue}
+            onUpdateIssueCheckpoints={briar.editIssueCheckpoints}
             onUpdateIssuePreferences={briar.editIssueExecutionPreferences}
             onLoadAttachment={briar.readIssueAttachment}
             onLoadIssueMessages={briar.readIssueMessages}

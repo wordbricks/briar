@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CreateIssueDialog } from "./HuntDashboard";
 import type { CreateIssueInput } from "../types";
 import { createIssueDraftStorageKey } from "../lib/create-issue-draft";
+import { demoDashboard } from "../lib/demo-data";
 
 const projects = [
   {
@@ -896,6 +897,62 @@ describe("CreateIssueDialog attachments", () => {
     ).toBe("Retry this issue");
     expect(container.querySelector(".issue-form-error")?.textContent).toContain(
       "Creation failed",
+    );
+    await act(async () => root.unmount());
+  });
+
+  it("adds an issue checkpoint while creating an issue", async () => {
+    const onCreate = vi.fn(async (
+      _projectId: string,
+      _input: CreateIssueInput,
+    ) => undefined);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <CreateIssueDialog
+        {...projectProps}
+        isSubmitting={false}
+        onClose={() => undefined}
+        onCreate={onCreate}
+        workflow={demoDashboard.settings.workflow}
+        workflowProjectId="project-1"
+      />,
+    ));
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".issue-checkpoint-trigger",
+      )?.dispatchEvent(
+        new MouseEvent("pointerdown", { bubbles: true, button: 0 }),
+      );
+    });
+    const option = Array.from(
+      document.body.querySelectorAll<HTMLElement>(
+        '[role="menuitemcheckbox"]:not([data-disabled])',
+      ),
+    ).find((item) => item.getAttribute("data-state") === "unchecked");
+    expect(option).toBeDefined();
+    await act(async () => option?.click());
+
+    const title = container.querySelector<HTMLInputElement>(
+      ".issue-title-input",
+    );
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set?.call(title, "Checkpoint issue");
+      title?.dispatchEvent(new Event("input", { bubbles: true }));
+      container.querySelector<HTMLFormElement>("form")?.requestSubmit();
+    });
+
+    expect(onCreate).toHaveBeenCalledWith(
+      "project-1",
+      expect.objectContaining({
+        checkpoints: [expect.objectContaining({
+          key: expect.stringMatching(/^issue-/u),
+          position: expect.stringMatching(/^(before|after)$/u),
+        })],
+      }),
     );
     await act(async () => root.unmount());
   });
