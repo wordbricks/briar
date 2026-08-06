@@ -3115,13 +3115,42 @@ describe("HuntDashboard", () => {
     const replyComposer = messageGroup.querySelector<HTMLElement>(
       ".issue-inline-reply-composer .issue-message-composer",
     );
-    const replyTextarea = replyComposer?.querySelector<HTMLTextAreaElement>(
+    let replyTextarea = replyComposer?.querySelector<HTMLTextAreaElement>(
       "textarea",
     );
     expect(replyComposer?.querySelector(".issue-composer-formatting")).toBeNull();
     expect(replyComposer?.querySelector(".issue-composer-link")).not.toBeNull();
-    expect(replyComposer?.querySelectorAll("footer button")).toHaveLength(2);
+    expect(replyComposer?.querySelectorAll("footer button")).toHaveLength(3);
+    expect(
+      replyComposer?.querySelector<HTMLButtonElement>(".issue-reply-cancel")
+        ?.getAttribute("aria-label"),
+    ).toBe("답글 취소");
     expect(replyTextarea?.placeholder).toBe("답장 남기기…");
+
+    await act(async () => {
+      replyTextarea?.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          bubbles: true,
+          cancelable: true,
+          key: "Escape",
+        }),
+      );
+    });
+    expect(replyButton?.getAttribute("aria-expanded")).toBe("false");
+    expect(messageGroup.querySelector(".issue-inline-reply-composer")).toBeNull();
+
+    await act(async () => replyButton?.click());
+    const cancelButton = messageGroup.querySelector<HTMLButtonElement>(
+      ".issue-reply-cancel",
+    );
+    await act(async () => cancelButton?.click());
+    expect(replyButton?.getAttribute("aria-expanded")).toBe("false");
+    expect(messageGroup.querySelector(".issue-inline-reply-composer")).toBeNull();
+
+    await act(async () => replyButton?.click());
+    replyTextarea = messageGroup.querySelector<HTMLTextAreaElement>(
+      ".issue-inline-reply-composer textarea",
+    );
 
     const messageList = container.querySelector<HTMLElement>(
       ".issue-message-list",
@@ -3151,6 +3180,8 @@ describe("HuntDashboard", () => {
       await Promise.resolve();
     });
     expect(messageList.scrollTop).toBe(480);
+    expect(replyButton?.getAttribute("aria-expanded")).toBe("false");
+    expect(messageGroup.querySelector(".issue-inline-reply-composer")).toBeNull();
     expect(
       messageGroup.querySelector(":scope > .issue-agent-reply-state")?.textContent,
     ).toContain("Briar가 답변을 작성하고 있습니다");
@@ -3170,8 +3201,6 @@ describe("HuntDashboard", () => {
       messageGroup.querySelector(":scope > .issue-agent-reply-state"),
     ).toBeNull();
 
-    await act(async () => replyButton?.click());
-    expect(messageGroup.querySelector(".issue-inline-reply-composer")).toBeNull();
     await act(async () => root.unmount());
     container.remove();
   });

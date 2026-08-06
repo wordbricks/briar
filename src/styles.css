@@ -1659,6 +1659,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .issue-message-composer footer button:hover { color:var(--foreground); background:var(--secondary); }
 .issue-message-composer footer button:active { transform:scale(.94); }
 .issue-message-composer footer button:focus-visible { outline:2px solid #8b70dd; outline-offset:1px; }
+.issue-message-composer footer .issue-reply-cancel { margin-right:auto; }
 .issue-composer-file-input { display:none; }
 .issue-message-composer footer .issue-message-send { color:var(--foreground); }
 .issue-message-composer footer .issue-message-send:disabled { color:var(--muted-foreground); background:transparent; cursor:default; transform:none; }
