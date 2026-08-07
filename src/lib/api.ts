@@ -66,6 +66,7 @@ import type {
   UpdateProjectAgentInput,
   UpdateProjectAgentScheduleInput,
   UpdateIssueInput,
+  UpdateIssueResult,
   WorkerIcon,
 } from "../types";
 
@@ -1702,16 +1703,49 @@ export async function updateIssue(
   runId: string,
   input: UpdateIssueInput,
 ) {
-  return request<{
-    runId: string;
-    title: string;
-    description: string | null;
-    priority: number | null;
-    assigneeUserId: string | null;
-  }>(`/projects/${projectId}/runs/${runId}`, token, {
-    method: "PATCH",
-    body: JSON.stringify(input),
-  });
+  if (input.attachments.length === 0) {
+    const {
+      attachments: _attachments,
+      attachmentReferences: _attachmentReferences,
+      ...issue
+    } = input;
+    return request<UpdateIssueResult>(
+      `/projects/${projectId}/runs/${runId}`,
+      token,
+      {
+        method: "PATCH",
+        body: JSON.stringify(
+          input.keptAttachmentIds === undefined
+            ? issue
+            : { ...issue, keptAttachmentIds: input.keptAttachmentIds },
+        ),
+      },
+    );
+  }
+  const attachmentError = validateIssueAttachments(input.attachments);
+  if (attachmentError) throw new Error(attachmentError);
+  const form = new FormData();
+  form.set("title", input.title);
+  form.set("description", input.description ?? "");
+  form.set("priority", input.priority === null ? "" : String(input.priority));
+  form.set("assigneeUserId", input.assigneeUserId ?? "");
+  if (input.attachmentReferences?.length) {
+    form.set(
+      "attachmentReferences",
+      JSON.stringify(input.attachmentReferences),
+    );
+  }
+  if (input.keptAttachmentIds !== undefined) {
+    form.set("keptAttachmentIds", JSON.stringify(input.keptAttachmentIds));
+  }
+  for (const attachment of input.attachments) {
+    form.append("attachments", attachment, attachment.name);
+  }
+  return request<UpdateIssueResult>(
+    `/projects/${projectId}/runs/${runId}`,
+    token,
+    { method: "PATCH", body: form },
+  );
 }
 
 export async function updateIssueExecutionPreferences(

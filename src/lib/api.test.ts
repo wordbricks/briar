@@ -338,6 +338,7 @@ describe("API errors", () => {
         title: "Updated issue",
         description: "Updated description",
         priority: 1,
+        attachments: [],
       }),
     ).resolves.toEqual({
       runId,
@@ -356,6 +357,58 @@ describe("API errors", () => {
         }),
       }),
     );
+  });
+
+  it("uploads issue update attachments as multipart form data", async () => {
+    const projectId = "22222222-2222-4222-8222-222222222222";
+    const runId = "11111111-1111-4111-8111-111111111111";
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        const form = init?.body instanceof FormData ? init.body : new FormData();
+        return new Response(
+          JSON.stringify({
+            runId,
+            title: form.get("title"),
+            description: form.get("description"),
+            priority: Number(form.get("priority")),
+            assigneeUserId: null,
+            attachments: [],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const image = new File(["image"], "inline.png", { type: "image/png" });
+    const reference = "draft-inline-1";
+
+    const result = await updateIssue("token", projectId, runId, {
+      title: "Updated issue",
+      description: `![inline.png](briar-attachment://${reference})`,
+      priority: 1,
+      attachments: [image],
+      attachmentReferences: [reference],
+      keptAttachmentIds: [],
+    });
+    expect(result).toMatchObject({
+      runId,
+      title: "Updated issue",
+      priority: 1,
+    });
+    const [calledUrl, init] = fetchMock.mock.calls[0]!;
+    expect(String(calledUrl)).toContain(
+      `/projects/${projectId}/runs/${runId}`,
+    );
+    expect(init?.method).toBe("PATCH");
+    const body = init?.body as FormData;
+    expect(body.get("title")).toBe("Updated issue");
+    expect(body.get("attachmentReferences")).toBe(
+      JSON.stringify([reference]),
+    );
+    expect(body.get("keptAttachmentIds")).toBe(JSON.stringify([]));
+    const uploaded = body.getAll("attachments") as File[];
+    expect(uploaded).toHaveLength(1);
+    expect(uploaded[0]?.name).toBe("inline.png");
   });
 
   it("records a result review through the project-scoped run endpoint", async () => {

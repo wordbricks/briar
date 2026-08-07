@@ -56,6 +56,18 @@ export type UpdateIssueInput = {
   description: string | null;
   priority: number | null;
   assigneeUserId?: string | null;
+  attachments: File[];
+  attachmentReferences?: string[];
+  keptAttachmentIds?: string[];
+};
+
+export type UpdateIssueResult = {
+  runId: string;
+  title: string;
+  description: string | null;
+  priority: number | null;
+  assigneeUserId: string | null;
+  attachments: IssueAttachment[];
 };
 
 export type IssueExecutionPreferences = {

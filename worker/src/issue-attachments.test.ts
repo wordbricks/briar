@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { maxIssueMultipartBytes } from "../../src/lib/issue-attachments";
-import { readIssueMessageRequest, readIssueRequest } from "./index";
+import {
+  readIssueMessageRequest,
+  readIssueRequest,
+  readIssueUpdateRequest,
+} from "./index";
 
 const issueRequest = (
   file: File,
@@ -102,6 +106,98 @@ describe("issue multipart input", () => {
         ),
       ),
     ).rejects.toThrow("Attachment references are invalid");
+  });
+});
+
+describe("issue update multipart input", () => {
+  const updateRequest = (
+    file: File,
+    declaredLength = file.size + 2048,
+    keptAttachmentIds?: string[],
+  ) => {
+    const form = new FormData();
+    form.set("title", "Edited screenshot issue");
+    form.set("description", "Replaced description");
+    form.set("priority", "3");
+    form.set("assigneeUserId", "user-1");
+    form.append("attachments", file, file.name);
+    form.set("attachmentReferences", JSON.stringify(["draft-update-1"]));
+    if (keptAttachmentIds) {
+      form.set("keptAttachmentIds", JSON.stringify(keptAttachmentIds));
+    }
+    return new Request("https://briar.example/projects/project/runs/run", {
+      method: "PATCH",
+      headers: { "Content-Length": String(declaredLength) },
+      body: form,
+    });
+  };
+
+  const existingAttachmentId = "7316678b-e3d4-4de3-a045-b76a0fc2e765";
+
+  it("parses a JSON update without attachment fields", async () => {
+    const result = await readIssueUpdateRequest(
+      new Request("https://briar.example/projects/project/runs/run", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: "Updated issue",
+          description: null,
+          priority: 2,
+          assigneeUserId: null,
+        }),
+      }),
+    );
+
+    expect(result.input).toEqual({
+      title: "Updated issue",
+      description: null,
+      priority: 2,
+      assigneeUserId: null,
+    });
+    expect(result.attachments).toEqual([]);
+    expect(result.keptAttachmentIds).toBeUndefined();
+  });
+
+  it("parses a multipart update with attachments and kept IDs", async () => {
+    const result = await readIssueUpdateRequest(
+      updateRequest(
+        new File(["image"], "inline.png", { type: "image/png" }),
+        undefined,
+        [existingAttachmentId],
+      ),
+    );
+
+    expect(result.input).toEqual({
+      title: "Edited screenshot issue",
+      description: "Replaced description",
+      priority: 3,
+      assigneeUserId: "user-1",
+    });
+    expect(result.attachments).toEqual([
+      expect.objectContaining({ name: "inline.png", type: "image/png" }),
+    ]);
+    expect(result.attachmentReferences).toEqual(["draft-update-1"]);
+    expect(result.keptAttachmentIds).toEqual([existingAttachmentId]);
+  });
+
+  it("keeps keptAttachmentIds undefined when the field is absent", async () => {
+    const result = await readIssueUpdateRequest(
+      updateRequest(new File(["image"], "inline.png", { type: "image/png" })),
+    );
+
+    expect(result.keptAttachmentIds).toBeUndefined();
+  });
+
+  it("rejects malformed kept attachment IDs", async () => {
+    await expect(
+      readIssueUpdateRequest(
+        updateRequest(
+          new File(["image"], "inline.png", { type: "image/png" }),
+          undefined,
+          ["not-a-uuid"],
+        ),
+      ),
+    ).rejects.toThrow("Kept attachment IDs are invalid");
   });
 });
 
